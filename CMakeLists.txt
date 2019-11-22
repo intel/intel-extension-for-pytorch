@@ -95,7 +95,9 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
 # ---[ Main build
 set(DPCPP_SRCS)
-add_subdirectory(torch_dpcpp)
+set(DPCPP_ATEN_SRCS)
+add_subdirectory(torch_dpcpp/csrc/aten)
+set(DPCPP_SRCS ${DPCPP_ATEN_SRCS})
 
 message("---" ${DPCPP_SRCS})
 add_library(torch_dpcpp ${DPCPP_SRCS})
@@ -104,7 +106,7 @@ add_library(torch_dpcpp ${DPCPP_SRCS})
 # target_include_directories(torch PRIVATE ${Caffe2_SYCL_INCLUDE})
 # target_link_libraries(torch PRIVATE ${Caffe2_SYCL_DEPENDENCY_LIBS})
 IF(USE_COMPUTECPP)
-  add_sycl_to_target(TARGET torch SOURCES ${Caffe2_SYCL_SRCS})
+  add_sycl_to_target(TARGET torch_dpcpp SOURCES ${DPCPP_SRCS})
 ENDIF()
 
 # if(USE_DPCPP)
