@@ -1,0 +1,55 @@
+#include <THDP/THSYCLAllocator.h>
+#include <c10/dpcpp/SYCLUtils.h>
+#include <c10/dpcpp/SYCLMemory.h>
+#include <c10/dpcpp/SYCLException.h>
+#include <c10/core/Allocator.h>
+#include <mutex> 
+struct THSYCLDefaultAllocator {
+  //lock around all operations
+  std::mutex mutex_;
+ 
+  void* malloc(size_t num_bytes) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto ptr = c10::sycl::syclMalloc(num_bytes);
+    return static_cast<void*>(ptr);
+  }
+
+  void free(void* p) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    c10::sycl::syclFree(p);
+  }
+
+  void free_all() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    c10::sycl::syclFreeAll();
+  }
+};
+
+THSYCLDefaultAllocator default_allocator;
+
+static void SyclDefaultDeleter(void* ptr) {
+  default_allocator.free(ptr);
+}
+
+struct SyclDefaultAllocator : public at::Allocator {
+  at::DataPtr allocate(size_t size) const override {
+    at::DeviceIndex device;
+    C10_SYCL_CHECK(c10::sycl::syclGetDevice(&device));
+    void* p = nullptr;
+    if (size != 0) {
+      p = default_allocator.malloc(size);
+    }
+    return {p, p, &SyclDefaultDeleter, at::Device(at::DeviceType::SYCL, device)};
+  }
+  at::DeleterFnPtr raw_deleter() const override {
+    return &SyclDefaultDeleter;
+  }
+};
+
+
+SyclDefaultAllocator device_allocator;
+THSYCL_API at::Allocator* THSYCLAllocator_get(void) {
+  return &device_allocator;
+}
+
+
