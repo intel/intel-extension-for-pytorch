@@ -18,7 +18,8 @@ ELSE()
   MESSAGE(FATAL_ERROR "ComputeCpp not found. Compiling without SYCL support")
 ENDIF()
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+set(CMAKE_LIBRARY_INCLUDES_DIRECTORY "${CMAKE_BINARY_DIR}/includes")
 
 
 # ---[ Build flags
@@ -94,13 +95,50 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
 
 # ---[ Main build
+
+# includes
+set(PYTORCH_ROOT "${PROJECT_SOURCE_DIR}/third_party/pytorch")
+set(PYTORCH_ATEN_SRC_ROOT "${PYTORCH_ROOT}/aten/src")
+set(PYTORCH_ATEN_INCLUDES "${PYTORCH_ROOT}/aten/src/ATen")
+set(PYTORCH_ATEN_CORE_INCLUDES "${PYTORCH_ROOT}/aten/src/ATen/core")
+set(PYTORCH_C10_CORE_INCLUDES "${PYTORCH_ROOT}/c10/core")
+set(PYTORCH_C10_DPCPP_INCLUDES "${PYTORCH_ROOT}/c10/dpcpp")
+set(PYTORCH_C10_UTIL_INCLUDES "${PYTORCH_ROOT}/c10/util")
+set(PYTORCH_C10_MACROS_INCLUDES "${PYTORCH_ROOT}/c10/macros")
+include_directories(${PYTORCH_ROOT})
+include_directories(${PYTORCH_ATEN_SRC_ROOT})
+include_directories(${PYTORCH_ATEN_INCLUDES})
+include_directories(${PYTORCH_ATEN_CORE_INCLUDES})
+include_directories(${PYTORCH_C10_CORE_INCLUDES})
+include_directories(${PYTORCH_C10_DPCPP_INCLUDES})
+include_directories(${PYTORCH_C10_UTIL_INCLUDES})
+include_directories(${PYTORCH_C10_MACROS_INCLUDES})
+
+set(C10_USE_GFLAGS ${USE_GFLAGS})
+set(C10_USE_GLOG ${USE_GLOG})
+set(C10_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+set(C10_USE_NUMA ${USE_NUMA})
+set(C10_DISABLE_NUMA ${CAFFE2_DISABLE_NUMA})
+configure_file(
+    "${PYTORCH_C10_MACROS_INCLUDES}/cmake_macros.h.in"
+    "${CMAKE_BINARY_DIR}/c10/macros/cmake_macros.h")
+include_directories(${CMAKE_BINARY_DIR})
+
+set(PYTORCH_OUT_ATEN_SRC_ROOT "${CMAKE_BINARY_DIR}/aten/src")
+include_directories(${PYTORCH_OUT_ATEN_SRC_ROOT})
+
+# dependencies
+set(DPCPP_DEP)
+include(cmake/Dependencies.cmake)
+
+# sources
 set(DPCPP_SRCS)
 set(DPCPP_ATEN_SRCS)
 add_subdirectory(torch_dpcpp/csrc/aten)
 set(DPCPP_SRCS ${DPCPP_ATEN_SRCS})
 
-message("---" ${DPCPP_SRCS})
 add_library(torch_dpcpp ${DPCPP_SRCS})
+add_dependencies(torch_dpcpp ${DPCPP_DEP})
 # target_link_libraries(torch PUBLIC c10_sycl)
 # target_include_directories(torch INTERFACE $<INSTALL_INTERFACE:include>)
 # target_include_directories(torch PRIVATE ${Caffe2_SYCL_INCLUDE})

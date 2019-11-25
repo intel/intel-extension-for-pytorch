@@ -1,0 +1,10 @@
+set(USE_SYCL OFF CACHE BOOL "enable SYCL")
+set(USE_CUDA OFF CACHE BOOL "enable CUDA")
+set(USE_FBGEMM OFF CACHE BOOL "enable FBGEMM")
+set(USE_MKLDNN OFF CACHE BOOL "enable MKLDNN")
+set(USE_NNPACK OFF CACHE BOOL "enable NNPACK")
+set(USE_DISTRIBUTED OFF CACHE BOOL "enable DISTRIBUTED")
+set(BUILD_CAFFE2_OPS OFF CACHE BOOL "enable Caffe2 OPs")
+
+set(DPCPP_DEP torch)
+add_subdirectory(third_party/pytorch)
