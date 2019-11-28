@@ -19,9 +19,8 @@ void StorageImpl_resize(at::StorageImpl *self, ptrdiff_t size) {
     self->set_data_ptr(c10::DataPtr(nullptr, c10::Device(c10::DeviceType::SYCL, device)));
     self->set_numel(0);
   } else {
-    c10::DataPtr data =
-      self->allocator()->allocate(size *itemsize);
-    
+    c10::DataPtr data = self->allocator()->allocate(size *itemsize);
+
     if (self->data_ptr()) {
       syclMemcpyAsync(data.get(),
                       self->data(),
@@ -30,7 +29,6 @@ void StorageImpl_resize(at::StorageImpl *self, ptrdiff_t size) {
     }
     self->set_data_ptr(std::move(data));
     self->set_numel(size);
-
   }
 }
 
