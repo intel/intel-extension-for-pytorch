@@ -142,7 +142,7 @@ include_directories(${CMAKE_BINARY_DIR})
 # include_directories(${CAFFE2_OUT_ATEN_SRC_ROOT})
 
 # dependencies
-set(DPCPP_DEP)
+# set(DPCPP_DEP)
 include(cmake/Dependencies.cmake)
 
 # sources
@@ -152,7 +152,7 @@ add_subdirectory(torch_dpcpp/csrc/aten)
 set(DPCPP_SRCS ${DPCPP_ATEN_SRCS})
 
 add_library(torch_dpcpp ${DPCPP_SRCS})
-add_dependencies(torch_dpcpp ${DPCPP_DEP})
+# add_dependencies(torch_dpcpp ${DPCPP_DEP})
 # target_link_libraries(torch PUBLIC c10_sycl)
 # target_include_directories(torch INTERFACE $<INSTALL_INTERFACE:include>)
 # target_include_directories(torch PRIVATE ${Caffe2_SYCL_INCLUDE})
