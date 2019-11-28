@@ -1,6 +1,6 @@
 #include <functions/Resize.h>
-#include <core/TensorImplUtils.hpp>
-#include <core/StorageImplUtils.hpp>
+#include <core/TensorImplUtils.h>
+#include <core/StorageImplUtils.h>
 #include <core/General.h>
 
 namespace at { namespace native {

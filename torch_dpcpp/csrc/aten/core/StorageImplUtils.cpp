@@ -1,5 +1,10 @@
 #include <c10/util/intrusive_ptr.h>
+#include <c10/core/TensorImpl.h>
+#include <c10/dpcpp/SYCLUtils.h>
 #include <c10/dpcpp/SYCLException.h>
+#include <c10/dpcpp/SYCLMemory.h>
+
+#include <core/SYCLContext.h>
 #include <core/General.h>
 
 namespace at { namespace native {
@@ -40,7 +45,7 @@ at::StorageImpl* StorageImpl_new(caffe2::TypeMeta data_type) {
   at::StorageImpl *storage = c10::make_intrusive<at::StorageImpl> (
       data_type,
       0,
-      state->syclDeviceAllocator,
+      at::sycl::getSYCLDeviceAllocator(),
       true).release();
   return storage;
 }

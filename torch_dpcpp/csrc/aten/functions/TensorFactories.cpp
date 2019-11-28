@@ -5,7 +5,7 @@
 #include <ATen/native/TensorFactories.h>
 #include <c10/util/Exception.h>
 
-#include <core/TensorImplUtils.hpp>
+#include <core/TensorImplUtils.h>
 #include <functions/Numerics.h>
 #include <functions/Resize.h>
 
