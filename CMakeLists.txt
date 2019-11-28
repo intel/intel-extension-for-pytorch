@@ -108,6 +108,7 @@ set(PYTORCH_C10_MACROS_INCLUDES "${PYTORCH_ROOT}/c10/macros")
 
 set(DPCPP_ROOT "${PROJECT_SOURCE_DIR}/torch_dpcpp/csrc")
 set(DPCPP_ATEN_SRC_ROOT "${DPCPP_ROOT}/aten")
+set(DPCPP_ATEN_GENERATED "${DPCPP_ROOT}/aten/generated")
 
 include_directories(${PYTORCH_ROOT})
 include_directories(${PYTORCH_ATEN_SRC_ROOT})
@@ -118,6 +119,7 @@ include_directories(${PYTORCH_C10_DPCPP_INCLUDES})
 include_directories(${PYTORCH_C10_UTIL_INCLUDES})
 include_directories(${PYTORCH_C10_MACROS_INCLUDES})
 include_directories(${DPCPP_ATEN_SRC_ROOT})
+include_directories(${DPCPP_ATEN_GENERATED})
 
 set(C10_USE_GFLAGS ${USE_GFLAGS})
 set(C10_USE_GLOG ${USE_GLOG})
