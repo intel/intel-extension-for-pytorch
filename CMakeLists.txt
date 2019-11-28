@@ -126,10 +126,17 @@ set(C10_USE_GLOG ${USE_GLOG})
 set(C10_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 set(C10_USE_NUMA ${USE_NUMA})
 set(C10_DISABLE_NUMA ${CAFFE2_DISABLE_NUMA})
+
 configure_file(
     "${PYTORCH_C10_MACROS_INCLUDES}/cmake_macros.h.in"
     "${CMAKE_BINARY_DIR}/c10/macros/cmake_macros.h")
 include_directories(${CMAKE_BINARY_DIR})
+
+configure_file(
+    "${PYTORCH_ATEN_INCLUDES}/Config.h.in"
+    "${CMAKE_BINARY_DIR}/include/ATen/Config.h")
+set(DPCPP_OUT_INCLUDE "${CMAKE_BINARY_DIR}/include")
+include_directories(${DPCPP_OUT_INCLUDE})
 
 # do not compile pytorch any more
 # use generated files for current stage
@@ -138,7 +145,7 @@ include_directories(${CMAKE_BINARY_DIR})
 #
 # set(PYTORCH_OUT_ATEN_SRC_ROOT "${CMAKE_BINARY_DIR}/aten/src")
 # include_directories(${PYTORCH_OUT_ATEN_SRC_ROOT})
-# 
+#
 # # workaround for THGeneral.h
 # set(CAFFE2_OUT_ATEN_SRC_ROOT "${CMAKE_BINARY_DIR}/third_party/pytorch/caffe2/aten/src")
 # include_directories(${CAFFE2_OUT_ATEN_SRC_ROOT})

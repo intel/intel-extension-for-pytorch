@@ -1,43 +1,44 @@
 #include <functions/Resize.h>
 #include <core/TensorImplUtils.h>
 #include <core/StorageImplUtils.h>
+#include <core/TensorInfo.h>
 #include <core/General.h>
 
 namespace at { namespace native {
 
 int TensorImpl_nDimension(const at::TensorImpl *self) {
-  return tensor->dim();
+  return self->dim();
 }
 
 int TensorImpl_nDimensionLegacyNoScalars(const at::TensorImpl *self) {
-  if (tensor->dim() == 0) {
+  if (self->dim() == 0) {
     return 1;
   } else {
-    return tensor->dim();
+    return self->dim();
   }
 }
 
 int TensorImpl_nDimensionLegacyAll(const at::TensorImpl *self) {
-  if (tensor->is_empty()) {
+  if (self->is_empty()) {
     return 0;
-  } else if (tensor->dim() == 0) {
+  } else if (self->dim() == 0) {
     return 1;
   } else {
-    return tensor->dim();
+    return self->dim();
   }
 }
 
-const int64_t* TensorImpl_getSizePtr(at::TensorImpl* tensor) {
-  return tensor->sizes().data();
+const int64_t* TensorImpl_getSizePtr(at::TensorImpl* self) {
+  return self->sizes().data();
 }
 
 int64_t TensorImpl_size(const at::TensorImpl *self, int dim) {
-  THArgCheck((dim >= 0) && (dim < self->dim()), 2, "out of range");
+  TORCH_CHECK((dim >= 0) && (dim < self->dim()), "out of range");
   return self->size(dim);
 }
 
 int64_t TensorImpl_sizeLegacyNoScalars(const at::TensorImpl *self, int dim) {
-  THArgCheck((dim >= 0) && (dim < TensorImpl_nDimensionLegacyNoScalars(self)), 2, "dimension %d out of range of %dD tensor",
+  TORCH_CHECK((dim >= 0) && (dim < TensorImpl_nDimensionLegacyNoScalars(self)), "dimension %d out of range of %dD tensor",
       dim, TensorImpl_nDimensionLegacyNoScalars(self));
   return self->dim() == 0 ? 1 : self->size(dim);
 }
@@ -50,23 +51,23 @@ std::vector<int64_t> TensorImpl_sizesLegacyNoScalars(const at::TensorImpl *self)
   }
 }
 
-const int64_t* TensorImpl_getStridePtr(at::TensorImpl* tensor) {
-  return tensor->strides().data();
+const int64_t* TensorImpl_getStridePtr(at::TensorImpl* self) {
+  return self->strides().data();
 }
 
 int64_t TensorImpl_stride(const at::TensorImpl *self, int dim) {
-  THArgCheck((dim >= 0) && (dim < self->dim()), 2, "out of range");
+  TORCH_CHECK((dim >= 0) && (dim < self->dim()), "out of range");
   return self->stride(dim);
 }
 
 int64_t TensorImpl_strideLegacyNoScalars(const at::TensorImpl *self, int dim) {
-  THArgCheck((dim >= 0) && (dim < TensorImpl_nDimensionLegacyNoScalars(self)), 2, "dimension %d out of range of %dD tensor",
+  TORCH_CHECK((dim >= 0) && (dim < TensorImpl_nDimensionLegacyNoScalars(self)), "dimension %d out of range of %dD tensor",
       dim, TensorImpl_nDimensionLegacyNoScalars(self));
   return self->dim() == 0 ? 1 : self->stride(dim);
 }
 
 TensorImpl* TensorImpl_resizeImpl(at::TensorImpl* self, at::IntArrayRef size,
-    c10::optional<IntArrayRef> stride, bool device_guard = true) {
+    c10::optional<IntArrayRef> stride, bool device_guard) {
   if (self->sizes() == size && (!stride || self->strides() == stride)) {
     return self;
   }
@@ -110,7 +111,7 @@ TensorImpl* TensorImpl_resizeImpl(at::TensorImpl* self, at::IntArrayRef size,
 
 void TensorImpl_resize(at::TensorImpl *self, at::IntArrayRef size, at::IntArrayRef stride) {
   if(stride.data()) {
-    THArgCheck(stride.size() == size.size(), 3, "invalid stride");
+    TORCH_CHECK(stride.size() == size.size(), "invalid stride");
   }
 
 #ifdef DEBUG
@@ -141,7 +142,7 @@ void TensorImpl_resizeAs(at::TensorImpl *self, TensorImpl *src) {
 
 void TensorImpl_resizeNd(at::TensorImpl *self,
     int nDimension, const int64_t *size, const int64_t *stride) {
-  THArgCheck(nDimension >= 0, "resizeNd nDimension must be non-negative");
+  TORCH_CHECK(nDimension >= 0, "resizeNd nDimension must be non-negative");
   at::IntArrayRef sizes(size, nDimension);
   at::optional<at::IntArrayRef> strides;
   if (stride) {
@@ -159,7 +160,7 @@ at::StorageImpl* TensorImpl_getStoragePtr(const at::TensorImpl* tensor) {
   // for the first time (providing the necessary type).  It is an ERROR to
   // invoke any PyTorch operations on such a half-constructed storage,
   // and this check tests for that case.
-  THArgCheck(tensor->storage(), "Cannot use PyTorch operations on a half-constructed "
+  TORCH_CHECK(tensor->storage(), "Cannot use PyTorch operations on a half-constructed "
            "tensor.  If this tensor came from Caffe2, please call GetMutableData on "
            "it first; otherwise, this is a bug, please report it.");
   return tensor->storage().unsafeGetStorageImpl();
@@ -175,7 +176,7 @@ void TensorImpl_stealAndSetStoragePtr(at::TensorImpl* tensor, at::StorageImpl* s
 
   // We used to allow this, but this breaks device caching.
   // Let's put an actual error message for this one.
-  THArgCheck(tensor->storage().device() == storage->device(),
+  TORCH_CHECK(tensor->storage().device() == storage->device(),
             "Attempted to set the storage of a tensor on device \"", tensor->storage().device(),
              "\" to a storage on different device \"", storage->device(),
             "\".  This is no longer allowed; the devices must match.");
@@ -195,7 +196,7 @@ void TensorImpl_set(at::TensorImpl *self, at::TensorImpl *src) {
 void TensorImpl_setStorage(at::TensorImpl *self, at::StorageImpl *storage_,
     ptrdiff_t storageOffset_, at::IntArrayRef size_, at::IntArrayRef stride_) {
   if (stride_.data()) {
-    THArgCheck(size_.size() == stride_.size(), 5, "inconsistent size/stride sizes");
+    TORCH_CHECK(size_.size() == stride_.size(), "inconsistent size/stride sizes");
   }
 
   TensorImpl_setStorageNd(self,
@@ -219,7 +220,7 @@ void TensorImpl_setStorageNd(at::TensorImpl *self, at::StorageImpl *storage,
       at::raw::intrusive_ptr::incref(storage);
       TensorImpl_stealAndSetStoragePtr(self, storage);
     } else {
-      TensorImpl_stealAndSetStoragePtr(self, StorageImpl_new(state, data_type));
+      TensorImpl_stealAndSetStoragePtr(self, StorageImpl_new(data_type));
     }
   }
 
@@ -239,7 +240,7 @@ void TensorImpl_squeeze1d(at::TensorImpl *self, at::TensorImpl *src, int dimensi
   if(!src)
     src = self;
 
-  THArgCheck(dimension < src->dim(), 3, "dimension out of range");
+  TORCH_CHECK(dimension < src->dim(), "dimension out of range");
 
   TensorImpl_set(self, src);
 
@@ -260,7 +261,7 @@ void TensorImpl_unsqueeze1d(at::TensorImpl *self, at::TensorImpl *src, int dimen
   if(!src)
     src = self;
 
-  THArgCheck((dimension >= 0) && (dimension <= src->dim()), 3, "dimension out of range");
+  TORCH_CHECK((dimension >= 0) && (dimension <= src->dim()), "dimension out of range");
 
   TensorImpl_set(self, src);
 
