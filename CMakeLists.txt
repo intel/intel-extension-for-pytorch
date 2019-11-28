@@ -129,12 +129,17 @@ configure_file(
     "${CMAKE_BINARY_DIR}/c10/macros/cmake_macros.h")
 include_directories(${CMAKE_BINARY_DIR})
 
-set(PYTORCH_OUT_ATEN_SRC_ROOT "${CMAKE_BINARY_DIR}/aten/src")
-include_directories(${PYTORCH_OUT_ATEN_SRC_ROOT})
-
-# workaround for THGeneral.h
-set(CAFFE2_OUT_ATEN_SRC_ROOT "${CMAKE_BINARY_DIR}/third_party/pytorch/caffe2/aten/src")
-include_directories(${CAFFE2_OUT_ATEN_SRC_ROOT})
+# do not compile pytorch any more
+# use generated files for current stage
+# we will generate files by ourselves in future
+# so it is unnecessary to take efforts to integrate pytorch gen system
+#
+# set(PYTORCH_OUT_ATEN_SRC_ROOT "${CMAKE_BINARY_DIR}/aten/src")
+# include_directories(${PYTORCH_OUT_ATEN_SRC_ROOT})
+# 
+# # workaround for THGeneral.h
+# set(CAFFE2_OUT_ATEN_SRC_ROOT "${CMAKE_BINARY_DIR}/third_party/pytorch/caffe2/aten/src")
+# include_directories(${CAFFE2_OUT_ATEN_SRC_ROOT})
 
 # dependencies
 set(DPCPP_DEP)
