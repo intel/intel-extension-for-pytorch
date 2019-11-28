@@ -7,12 +7,10 @@
 #include <core/SYCLApplyUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
-#include <THDP/THSYCLDeviceUtils.h> // only for THCRoundUp?
-#include <THDP/THSYCLNumerics.h>
-#include <THDP/THSYCLScanUtils.h>
-#include <THDP/THSYCLTensorMathReduce.h> // AddOp
 #include <ATen/native/dpcpp/SortingCommon.h>
 #include <ATen/native/dpcpp/SortingRadixSelect.h>
+
+#include <functions/Numerics.h>
 
 
 DP_DEF_K2(gatherKthValueKernelName, typename scalar_t, typename index_t, int Dim);
@@ -79,7 +77,7 @@ void gatherKthValue(
               bool inRange = (i < inputSliceSize);
               scalar_t v = inRange ? inputSliceStart[i * inputWithinSliceStride]
                                      : static_cast<scalar_t>(0);
-              bool isKValue = inRange && THSYCLNumerics<scalar_t>::eq(v, kValue);
+              bool isKValue = inRange && Numerics<scalar_t>::eq(v, kValue);
 
               if (isKValue) {
                   kValueIndex = i;

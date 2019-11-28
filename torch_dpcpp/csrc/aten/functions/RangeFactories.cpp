@@ -5,7 +5,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/AccumulateType.h>
-#include <THDP/THSYCLAlgorithm.h>
+#include <functions/Numerics.h>
 #include <cmath>
 #include <limits>
 
@@ -36,7 +36,7 @@ struct LogspaceOp {
       : start_(start), step_(step), base_(base) {}
   T operator()(ptrdiff_t index) {
     accT increment = step_ * static_cast<accT>(index);
-    accT value = THSYCLNumerics<accT>::pow(base_, start_ + increment);
+    accT value = Numerics<accT>::pow(base_, start_ + increment);
     return static_cast<T>(value);
   }
 
@@ -98,7 +98,7 @@ Tensor& logspace_sycl_out(Tensor& result, Scalar start, Scalar end, int64_t step
   if (steps == 0) {
     // skip
   } else if (steps == 1) {
-    r.fill_(THSYCLNumerics<double>::pow(10.0, start.to<double>()));
+    r.fill_(Numerics<double>::pow(10.0, start.to<double>()));
   } else {
     AT_DISPATCH_FLOATING_TYPES(r.scalar_type(), "logspace_sycl", [&]() {
       scalar_t scalar_base = static_cast<scalar_t>(base);

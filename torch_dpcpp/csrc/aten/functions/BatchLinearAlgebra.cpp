@@ -4,7 +4,7 @@
 #include <ATen/NativeFunctions.h>
 #include <core/SYCLApplyUtils.h>
 #include <ATen/native/LinearAlgebraUtils.h>
-#include <THDP/THSYCLDeviceUtils.h>
+#include <functions/Numerics.h>
 
 DP_DEF_K2(triuTrilSycl, typename scalar_t, typename IndexType, bool upper);
 
@@ -22,7 +22,7 @@ void triu_tril_sycl_kernel(
 
   auto queue         = c10::sycl::syclGetCurrentQueue();
   int64_t group_size = c10::sycl::syclMaxWorkGroupSize(queue);
-  auto num_groups    = THSYCLCeilDiv(N, group_size);
+  auto num_groups    = CeilDiv(N, group_size);
   auto total_items   = num_groups * group_size;
 
   auto cgf = DP_Q_CGF(cgh) {

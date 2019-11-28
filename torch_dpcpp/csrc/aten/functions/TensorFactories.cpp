@@ -3,9 +3,11 @@
 #include <ATen/NativeFunctions.h>
 #include <core/SYCLContext.h>
 #include <ATen/native/TensorFactories.h>
-#include <ATen/native/dpcpp/Resize.h>
 #include <c10/util/Exception.h>
-#include <THDP/THSYCLDeviceUtils.h>
+
+#include <core/TensorImplUtils.hpp>
+#include <functions/Numerics.h>
+#include <functions/Resize.h>
 
 namespace at {
 namespace native {
@@ -38,7 +40,7 @@ Tensor empty_sycl(IntArrayRef size, const TensorOptions& options, c10::optional<
 Tensor empty_strided_sycl(IntArrayRef size, IntArrayRef stride, const TensorOptions& options) {
   check_size_nonnegative(size);
   auto t = at::native::empty_sycl({0}, options);
-  at::native::resize_impl_sycl_(t.unsafeGetTensorImpl(), size, stride);
+  TensorImpl_resizeImpl(t.unsafeGetTensorImpl(), size, stride);
   return t;
 }
 
@@ -137,7 +139,7 @@ triu_indices_sycl_kernel(scalar_t * tensor,
   auto queue         = c10::sycl::syclGetCurrentQueue();
   int64_t group_size = c10::sycl::syclMaxWorkGroupSize(queue);
   auto totalElements = triu_size;
-  auto num_groups    = THSYCLCeilDiv(totalElements, group_size);
+  auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
   auto cgf = DP_Q_CGF(cgh) {
@@ -183,7 +185,7 @@ tril_indices_sycl_kernel(scalar_t * tensor,
   auto queue         = c10::sycl::syclGetCurrentQueue();
   int64_t group_size = c10::sycl::syclMaxWorkGroupSize(queue);
   auto totalElements = tril_size;
-  auto num_groups    = THSYCLCeilDiv(totalElements, group_size);
+  auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
   auto cgf = DP_Q_CGF(cgh) {

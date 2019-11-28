@@ -3,9 +3,9 @@
 #include <core/SYCLContext.h>
 #include <c10/dpcpp/SYCLMemory.h>
 #include <c10/dpcpp/SYCLUtils.h>
-#include <THDP/THSYCLNumerics.h>
 
-#include <ATen/native/dpcpp/Resize.h>
+#include <functions/Numerics.h>
+#include <functions/Resize.h>
 
 namespace at {
 namespace native {
@@ -35,7 +35,7 @@ static inline void sigmoid_sycl(Tensor & output, const Tensor & self) {
       auto in_ptr = in_acc.template get_pointer<scalar_t>();
       auto out_ptr = out_acc.template get_pointer<scalar_t>();
       if (id < size / sizeof(scalar_t))
-        out_ptr[id] = 1 / (1 + THSYCLNumerics<scalar_t>::exp(-static_cast<scalar_t>(in_ptr[id])));
+        out_ptr[id] = 1 / (1 + Numerics<scalar_t>::exp(-static_cast<scalar_t>(in_ptr[id])));
     });
   });
 }
