@@ -9,7 +9,8 @@
 #include <c10/util/Exception.h>
 #include <c10/dpcpp/SYCLUtils.h>
 #include <THDP/THSYCL.h>
-#include <THDP/THSYCLGeneral.h>
+
+#include <utils/General.h>
 
 #include <cstddef>
 #include <functional>

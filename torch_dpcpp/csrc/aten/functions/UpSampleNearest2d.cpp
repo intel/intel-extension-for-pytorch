@@ -5,8 +5,6 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/dpcpp/UpSample.h>
 
-#include <THDP/THSYCLTensor.hpp>
-#include <THDP/THSYCLDeviceTensor.h>
 
 namespace at {
 namespace native {

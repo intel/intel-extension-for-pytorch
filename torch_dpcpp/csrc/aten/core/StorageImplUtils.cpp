@@ -5,18 +5,18 @@
 #include <c10/dpcpp/SYCLMemory.h>
 
 #include <core/SYCLContext.h>
-#include <core/General.h>
+#include <utils/General.h>
 
 namespace at { namespace native {
 
 void StorageImpl_resize(at::StorageImpl *self, ptrdiff_t size) {
-  THArgCheck(size >= 0, 2, "invalid size");
-  THAssert(self->allocator() != nullptr);
+  TORCH_CHECK(size >= 0, "invalid size");
+  TORCH_INTERNAL_ASSERT(self->allocator() != nullptr);
   c10::DeviceIndex device;
   C10_SYCL_CHECK(c10::sycl::syclGetDevice(&device));
 
   if (!self->resizable())
-    THError("Trying to resize storage that is not resizable");;
+    TORCH_CHECK(false, "Trying to resize storage that is not resizable");;
 
   size_t itemsize = self->itemsize();
 

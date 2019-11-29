@@ -2,7 +2,7 @@
 #include <core/TensorImplUtils.h>
 #include <core/StorageImplUtils.h>
 #include <core/TensorInfo.h>
-#include <core/General.h>
+#include <utils/General.h>
 
 namespace at { namespace native {
 
@@ -115,7 +115,7 @@ void TensorImpl_resize(at::TensorImpl *self, at::IntArrayRef size, at::IntArrayR
   }
 
 #ifdef DEBUG
-  THAssert(size.size() <= INT_MAX);
+  TORCH_INTERNAL_ASSERT(size.size() <= INT_MAX);
 #endif
   TensorImpl_resizeNd(self, size.size(), size.data(), stride.data());
 }
@@ -213,7 +213,7 @@ void TensorImpl_setStorageNd(at::TensorImpl *self, at::StorageImpl *storage,
   if(TensorImpl_getStoragePtr(self) != storage)
   {
     if (!TensorImpl_getStoragePtr(self)) {
-      THError("Tensor: invalid null storage");
+      TORCH_CHECK(false, "Tensor: invalid null storage");
     }
     auto data_type = TensorImpl_getStoragePtr(self)->dtype();
     if (storage) {
@@ -226,7 +226,7 @@ void TensorImpl_setStorageNd(at::TensorImpl *self, at::StorageImpl *storage,
 
   /* storageOffset */
   if (storageOffset < 0) {
-    THError("Tensor: invalid storage offset");
+    TORCH_CHECK(false, "Tensor: invalid storage offset");
   }
   self->set_storage_offset(storageOffset);
 
@@ -279,7 +279,7 @@ void TensorImpl_unsqueeze1d(at::TensorImpl *self, at::TensorImpl *src, int dimen
 }
 
 bool TensorImpl_allContiguous(at::TensorImpl **inputs, int numInputs) {
-  THAssert(numInputs > 0);
+  TORCH_INTERNAL_ASSERT(numInputs > 0);
   for (int i = 0; i < numInputs; ++i) {
     if (!inputs[i]->is_contiguous()) {
       return false;
@@ -312,7 +312,7 @@ int TensorImpl_getDevice(const at::TensorImpl* tensor) {
 }
 
 bool TensorImpl_allSameDevice(at::TensorImpl ** inputs, int numInputs) {
-  THAssert(numInputs > 0);
+  TORCH_INTERNAL_ASSERT(numInputs > 0);
   int device = TensorImpl_getDevice(inputs[0]);
   for (int i = 1; i < numInputs; ++i) {
     if (TensorImpl_getDevice(inputs[i]) != device) {
