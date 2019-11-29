@@ -1,11 +1,10 @@
 #include <c10/dpcpp/SYCL.h>
 #include <ATen/Context.h>
 #include <ATen/Dispatch.h>
-#include <ATen/native/dpcpp/Loops.h>
-#include <ATen/native/DispatchStub.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/Indexing.h>
 
+#include <functions/Loops.h>
 #include <utils/Atomics.h>
 
 
@@ -69,8 +68,5 @@ static void index_put_kernel_sycl(TensorIterator& iter, IntArrayRef index_size, 
     });
   }
 }
-
-REGISTER_DISPATCH(index_stub, &index_kernel_sycl);
-REGISTER_DISPATCH(index_put_stub, &index_put_kernel_sycl);
 
 }} // namespace at::native

@@ -1,7 +1,6 @@
 #include <c10/dpcpp/SYCL.h>
 #include <ATen/Context.h>
 #include <ATen/Dispatch.h>
-#include <ATen/native/DispatchStub.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/Tanh.h>
 
@@ -19,8 +18,6 @@ static void tanh_backward_sycl(TensorIterator &iter) {
     });
   });
 }
-
-REGISTER_DISPATCH(tanh_backward_stub, &tanh_backward_sycl);
 
 }} // namespace at::native
 

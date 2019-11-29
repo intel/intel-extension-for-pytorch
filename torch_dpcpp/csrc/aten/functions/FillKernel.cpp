@@ -1,9 +1,8 @@
 #include <ATen/Dispatch.h>
-#include <ATen/native/dpcpp/Loops.h>
-#include <ATen/native/DispatchStub.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/Fill.h>
 
+#include <functions/Loops.h>
 #include <core/SYCLApplyUtils.h>
 
 namespace at { namespace native {
@@ -22,8 +21,6 @@ void fill_kernel_sycl(TensorIterator& iter, Scalar value) {
         iter.tensor(0), TensorFillOp<scalar_t>(value.to<scalar_t>()));
   });
 }
-
-REGISTER_DISPATCH(fill_stub, &fill_kernel_sycl);
 
 } // namespace native
 } // namespace at

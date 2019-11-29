@@ -1,6 +1,5 @@
 #include <ATen/Context.h>
 #include <ATen/Dispatch.h>
-#include <ATen/native/DispatchStub.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/BinaryOps.h>
 
@@ -49,17 +48,11 @@ static void div_kernel_sycl(TensorIterator& iter) {
     AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "div", [&]() {
       sycl_kernel_for_tensor_iter<SyclOpDiv>(iter,
         [](scalar_t a, scalar_t b)-> scalar_t {
-        return a / b;  
-      });   
+        return a / b;
+      });
     });
   }
 }
 
-
-REGISTER_DISPATCH(add_stub, &add_kernel_sycl);
-REGISTER_DISPATCH(sub_stub, &sub_kernel_sycl);
-REGISTER_DISPATCH(mul_stub, &mul_kernel_sycl);
-REGISTER_DISPATCH(div_stub, &div_kernel_sycl);
 }
 }
-

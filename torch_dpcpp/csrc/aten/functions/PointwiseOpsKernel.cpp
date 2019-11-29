@@ -1,7 +1,6 @@
 #include <c10/dpcpp/SYCL.h>
 #include <ATen/Context.h>
 #include <ATen/Dispatch.h>
-#include <ATen/native/DispatchStub.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/PointwiseOps.h>
 
@@ -30,9 +29,6 @@ static void addcdiv_sycl_kernel(TensorIterator& iter, Scalar value) {
     });
   });
 }
-
-REGISTER_DISPATCH(addcmul_stub, &addcmul_sycl_kernel);
-REGISTER_DISPATCH(addcdiv_stub, &addcdiv_sycl_kernel);
 
 }} // namespace at::native
 

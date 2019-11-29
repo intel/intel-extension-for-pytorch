@@ -1,10 +1,10 @@
 #include <ATen/Context.h>
 #include <ATen/Dispatch.h>
-#include <ATen/native/dpcpp/Loops.h>
-#include <ATen/native/DispatchStub.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/ReduceOps.h>
-#include <ATen/native/dpcpp/Reduce.h>
+
+#include <functions/Loops.h>
+#include <functions/Reduce.h>
 
 #include <iostream>
 
@@ -326,12 +326,5 @@ void or_kernel_sycl(TensorIterator& iter) {
   sycl_reduce_kernel<uint8_t, uint8_t>(iter, func_wrapper<uint8_t> (or_kernel<uint8_t>()), false);
 }
 
-REGISTER_DISPATCH(std_var_stub, &std_var_kernel_sycl);
-REGISTER_DISPATCH(sum_stub, &sum_kernel_sycl);
-REGISTER_DISPATCH(prod_stub, &prod_kernel_sycl);
-REGISTER_DISPATCH(mean_stub, &mean_kernel_sycl);
-REGISTER_DISPATCH(and_stub, &and_kernel_sycl);
-REGISTER_DISPATCH(or_stub, &or_kernel_sycl);
-REGISTER_DISPATCH(norm_stub, &norm_kernel_sycl);
 }
 }

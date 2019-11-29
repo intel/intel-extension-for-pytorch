@@ -2,7 +2,6 @@
 #include <c10/dpcpp/SYCL.h>
 #include <ATen/Context.h>
 #include <ATen/Dispatch.h>
-#include <ATen/native/DispatchStub.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/UnaryOps.h>
 
@@ -45,9 +44,5 @@ void neg_kernel_sycl(TensorIterator& iter) {
     });
   });
 }
-
-REGISTER_DISPATCH(bitwise_not_stub, &bitwise_not_kernel_sycl);
-REGISTER_DISPATCH(logical_not_stub, &logical_not_kernel_sycl);
-REGISTER_DISPATCH(neg_stub, &neg_kernel_sycl);
 
 }}

@@ -1,9 +1,11 @@
-
 #include <ATen/ATen.h>
 
-#include <ATen/native/dpcpp/Loops.h>
 #include <ATen/native/Activation.h>
-#include <ATen/native/dpcpp/Eltwise.hpp>
+
+#include <functions/Eltwise.hpp>
+#include <functions/Loops.h>
+
+
 namespace at { namespace native {
 
 template <typename scalar_t>
@@ -50,5 +52,5 @@ static void threshold_kernel(TensorIterator& iter, Scalar threshold_scalar, Scal
     }
   });
 }
-REGISTER_DISPATCH(threshold_stub, &threshold_kernel);
+
 }} //namepsace at::native

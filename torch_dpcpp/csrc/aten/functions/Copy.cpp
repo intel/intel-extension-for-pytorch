@@ -239,7 +239,5 @@ static void copy_kernel_sycl(TensorIterator& iter, bool non_blocking) {
   );
 }
 
-REGISTER_DISPATCH(copy_stub, &copy_kernel_sycl);
-
 } // namespace native
 } // namespace at
