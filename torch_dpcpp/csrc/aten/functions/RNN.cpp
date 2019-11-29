@@ -4,23 +4,8 @@
 #include <ATen/Config.h>
 
 #include <c10/dpcpp/SYCLUtils.h>
-
-#if !AT_SYCL_ENABLED()
-
-namespace at { namespace native {
-
-std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
-      const Tensor& input, const Tensor& hx_, const Tensor& cx_,
-      TensorList params, bool has_biases,
-      int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
-  AT_ERROR("_sycl_rnn: ATen not compiled with MKLDNN support");
-}
-
-}}
-
-#else // AT_SYCL_ENABLED
-
 #include <core/Runtime.h>
+
 
 using namespace mkldnn;
 
@@ -37,7 +22,7 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   int32_t num_layers = num_layers_;
-  int32_t hidden_size = hx_.size(-1);   
+  int32_t hidden_size = hx_.size(-1);
   int32_t seq_length = input.size(0);
   int32_t mini_batch = input.size(1);
   int32_t input_size = input.size(2);
@@ -47,7 +32,7 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
   auto layer_hx_0 = hx_.unbind(0);
   auto layer_cx_0 = cx_.unbind(0);
   std::vector<Tensor> layer_hx, layer_cx;
-  
+
   int32_t total_layers = layer_hx_0.size();
   layer_hx.reserve(total_layers);
   layer_cx.reserve(total_layers);
@@ -59,7 +44,7 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
     layer_hx.push_back(tensor_h);
     layer_cx.push_back(tensor_c);
   }
-  
+
   std::vector<Tensor> weight_arr_i, weight_arr_h, bias_arr;
   weight_arr_i.reserve(total_layers);
   weight_arr_h.reserve(total_layers);
@@ -72,7 +57,7 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
     for (int32_t j = 0; j < num_directions; j++){
       auto layer_input_size = (i == 0) ? input_size : hidden_size * num_directions;
       int32_t index = (i * num_directions + j) * (has_biases ? 4 : 2);
-      weight_arr_i.push_back(params[index].t().contiguous()); 
+      weight_arr_i.push_back(params[index].t().contiguous());
       weight_arr_h.push_back(params[index+1].t().contiguous());
       if (has_biases) {
         bias_arr.push_back((params[index+2] + params[index+3]));
@@ -82,14 +67,13 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
     }
   }
 
-  
   auto data_t = memory::data_type::f32;
   auto format_any = memory::format_tag::any;
   auto format_tnc = memory::format_tag::tnc;
   auto format_ldnc = memory::format_tag::ldnc;
   auto format_ldigo = memory::format_tag::ldigo;
   auto format_ldgo = memory::format_tag::ldgo;
-  
+
   memory::dims weights_layer_0_dims = {1, 1, input_size, num_gate, hidden_size}; // layer = 0
   memory::dims weights_layer_1_dims = {1, 1, hidden_size * num_directions, num_gate, hidden_size};
   memory::dims weights_iter_dims = {1, 1, hidden_size, num_gate, hidden_size};
@@ -101,7 +85,7 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
   memory::dims dst_layer_dims = {seq_length, mini_batch, hidden_size};
   memory::dims dst_iter_dims = {1, 1, mini_batch, hidden_size};
   memory::dims dst_iter_c_dims = {1, 1, mini_batch, hidden_size};
-  
+
   std::vector<Tensor> hy_arr, cy_arr;
   hy_arr.reserve(total_layers);
   cy_arr.reserve(total_layers);
@@ -109,7 +93,7 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
     hy_arr.push_back(at::empty({dst_iter_dims}, hx_.options()));
     cy_arr.push_back(at::empty({dst_iter_c_dims}, cx_.options()));
   }
-  
+
   auto layer_x = input;
   for (int32_t layer = 0; layer < num_layers; layer++) {
     std::vector<Tensor> layer_y;
@@ -121,7 +105,7 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
       auto src_layer_dims = (layer == 0) ? src_layer_0_dims : src_layer_1_dims;
       auto dir = (direction > 0) ? rnn_direction::unidirectional_right2left
           : rnn_direction::unidirectional_left2right;
-      
+
       auto weights_layer_md = memory::desc(
                 {weights_layer_dims}, data_t, memory::format_tag::any);
       auto weights_iter_md = memory::desc(
@@ -140,44 +124,44 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
               = memory::desc({dst_iter_dims}, data_t, memory::format_tag::any);
       auto dst_iter_c_md = memory::desc(
               {dst_iter_c_dims}, data_t, memory::format_tag::any);
-      
+
       std::shared_ptr<lstm_forward::desc> lstm_forward_desc;
       lstm_forward_desc.reset(new lstm_forward::desc(prop_kind::forward_inference,
         dir, src_layer_md, src_iter_md, src_iter_c_md,
         weights_layer_md, weights_iter_md, bias_md,
         dst_layer_md, dst_iter_md, dst_iter_c_md, rnn_flags::undef));
-      
+
       std::shared_ptr<lstm_forward::primitive_desc> lstm_forward_pd;
       lstm_forward_pd.reset(new lstm_forward::primitive_desc(
         *lstm_forward_desc, engine));
-      
+
       auto weights_layer_usr_memory = memory({{{weights_layer_dims}, data_t, format_ldigo}, engine});
-      sycl_set_mkldnn_buffer(weight_arr_i[index].data_ptr(), weights_layer_usr_memory); 
-      
+      sycl_set_mkldnn_buffer(weight_arr_i[index].data_ptr(), weights_layer_usr_memory);
+
       auto weights_iter_usr_memory = memory({{{weights_iter_dims}, data_t, format_ldigo}, engine});
-      sycl_set_mkldnn_buffer(weight_arr_h[index].data_ptr(), weights_iter_usr_memory); 
-      
+      sycl_set_mkldnn_buffer(weight_arr_h[index].data_ptr(), weights_iter_usr_memory);
+
       auto bias_usr_memory = memory({{{bias_dims}, data_t, format_ldgo}, engine});
-      sycl_set_mkldnn_buffer(bias_arr[index].data_ptr(), bias_usr_memory); 
-      
+      sycl_set_mkldnn_buffer(bias_arr[index].data_ptr(), bias_usr_memory);
+
       auto src_layer_usr_memory = memory({{{src_layer_dims}, data_t, format_tnc}, engine});
       sycl_set_mkldnn_buffer(layer_x.data_ptr(), src_layer_usr_memory);
-      
+
       auto src_iter_usr_memory = memory({{{src_iter_dims}, data_t, format_ldnc}, engine});
       sycl_set_mkldnn_buffer(layer_hx[index].data_ptr(), src_iter_usr_memory);
-      
+
       auto src_iter_c_usr_memory = memory({{{src_iter_c_dims}, data_t, format_ldnc}, engine});
       sycl_set_mkldnn_buffer(layer_cx[index].data_ptr(), src_iter_c_usr_memory);
-      
+
       auto dst_layer_usr_memory = memory({{{dst_layer_dims}, data_t, format_tnc}, engine});
       sycl_set_mkldnn_buffer(layer_y[direction].data_ptr(), dst_layer_usr_memory);
-      
+
       auto dst_iter_usr_memory = memory({{{dst_iter_dims}, data_t, format_ldnc}, engine});
       sycl_set_mkldnn_buffer(hy_arr[index].data_ptr(), dst_iter_usr_memory);
-      
+
       auto dst_iter_c_usr_memory = memory({{{dst_iter_c_dims}, data_t, format_ldnc}, engine});
       sycl_set_mkldnn_buffer(cy_arr[index].data_ptr(), dst_iter_c_usr_memory);
-      
+
       auto expected_weights_layer_md = lstm_forward_pd->weights_layer_desc();
       auto weights_layer_memory = weights_layer_usr_memory;
       if (weights_layer_usr_memory.get_desc() != expected_weights_layer_md) {
@@ -261,7 +245,7 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
                             {DNNL_ARG_DST_LAYER, dst_layer_memory},
                             {DNNL_ARG_DST_ITER, dst_iter_memory},
                             {DNNL_ARG_DST_ITER_C, dst_iter_c_memory}});
-      
+
       if (dst_layer_memory != dst_layer_usr_memory) {
         reorder(dst_layer_memory, dst_layer_usr_memory).
             execute(strm, dst_layer_memory, dst_layer_usr_memory);
@@ -286,7 +270,7 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
 
   }
   auto output = layer_x;
-  
+
   auto hy = at::cat(hy_arr, 0).resize_({num_layers * num_directions, mini_batch, hidden_size});
   auto cy = at::cat(cy_arr, 0).resize_({num_layers * num_directions, mini_batch, hidden_size});
 
@@ -304,5 +288,3 @@ void lstm_sycl(Tensor& output, Tensor& hy, Tensor& cy,
 REGISTER_SYCL_DISPATCH(lstm_sycl_stub, &lstm_sycl);
 
 }} // namespace at::native
-
-#endif

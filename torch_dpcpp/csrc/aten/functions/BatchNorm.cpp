@@ -1,36 +1,10 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/Config.h>
-
-#if !AT_SYCL_ENABLED()
-
-namespace at { namespace native {
-// See Note [ATen preprocessor philosophy]
-
-std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm(
-        const Tensor& input, const Tensor& weight,
-            const Tensor& bias, const Tensor& running_mean, const Tensor& running_var,
-                bool training, double exponential_average_factor, double epsilon) {
-    throw std::runtime_error("sycl_batch_norm: ATen not compiled with MKLDNN support");
-}
-
-std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm_backward(
-    const Tensor& grad_output, const Tensor& input, const Tensor& weight,
-    // Unused: but we require them to be passed so that double backwards
-    // has access
-    const Tensor& running_mean, const Tensor& running_var,
-    const Tensor& save_mean, const Tensor& save_var, bool training,
-    double epsilon, std::array<bool,3> grad_input_mask) {
-    throw std::runtime_error("sycl_batch_norm_backward: ATen not compiled with MKLDNN support");
-}
-
-}}  // namespace at::native
-
-#else // AT_SYCL_ENABLED
-
 #include <core/Runtime.h>
 #include <c10/dpcpp/SYCLMemory.h>
 #include <c10/dpcpp/SYCLMath.h>
+
 using namespace mkldnn;
 namespace at { namespace native {
 
@@ -334,4 +308,3 @@ std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm_backward(
 }
 
 }} // at::native
-#endif

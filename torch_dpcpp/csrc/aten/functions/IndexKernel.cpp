@@ -5,7 +5,8 @@
 #include <ATen/native/DispatchStub.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/Indexing.h>
-#include <THDP/THDPAtomics.h>
+
+#include <utils/Atomics.h>
 
 
 DP_DEF_K1(index_kernel);

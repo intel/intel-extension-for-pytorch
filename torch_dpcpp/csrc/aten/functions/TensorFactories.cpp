@@ -6,7 +6,7 @@
 #include <c10/util/Exception.h>
 
 #include <core/TensorImplUtils.h>
-#include <functions/Numerics.h>
+#include <utils/Numerics.h>
 #include <functions/Resize.h>
 
 namespace at {

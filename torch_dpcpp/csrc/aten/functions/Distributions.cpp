@@ -1,7 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 #include <core/SYCLContext.h>
-#include <ATen/native/dpcpp/Resize.h>
 
 #include <c10/dpcpp/SYCLMemory.h>
 #include <c10/dpcpp/SYCLUtils.h>
@@ -40,7 +39,7 @@ void bernoulli_scalar_sycl_kernel(
     c10::sycl::parallel_for_setup(ret.numel(), tile_size, range, global_range);
     auto out_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, ret.data_ptr<scalar_t>(), size);
     cgh.parallel_for<bernoulli_scalar_sycl_ker<scalar_t>>(cl::sycl::nd_range<1>(
-      cl::sycl::range<1>(global_range), cl::sycl::range<1>(tile_size)), 
+      cl::sycl::range<1>(global_range), cl::sycl::range<1>(tile_size)),
       [=](cl::sycl::nd_item<1> item) {
         int64_t id = item.get_global_linear_id();
         auto out_ptr = out_acc.template get_pointer<scalar_t>();

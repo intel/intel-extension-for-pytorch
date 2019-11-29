@@ -4,7 +4,7 @@
 #include <ATen/NativeFunctions.h>
 #include <core/SYCLApplyUtils.h>
 #include <ATen/native/LinearAlgebraUtils.h>
-#include <functions/Numerics.h>
+#include <utils/Numerics.h>
 
 DP_DEF_K2(triuTrilSycl, typename scalar_t, typename IndexType, bool upper);
 

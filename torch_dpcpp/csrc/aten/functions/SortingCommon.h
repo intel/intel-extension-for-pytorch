@@ -7,9 +7,9 @@
 #include <core/SYCLApplyUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <THDP/THSYCLDeviceUtils.h> // only for THCRoundUp?
-#include <THDP/THSYCLNumerics.h>
 #include <THDP/THSYCLScanUtils.h>
 #include <THDP/THSYCLTensorMathReduce.h> // AddOp
+
 
 namespace at {
 namespace native {

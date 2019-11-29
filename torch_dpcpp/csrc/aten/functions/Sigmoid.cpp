@@ -4,7 +4,7 @@
 #include <c10/dpcpp/SYCLMemory.h>
 #include <c10/dpcpp/SYCLUtils.h>
 
-#include <functions/Numerics.h>
+#include <utils/Numerics.h>
 #include <functions/Resize.h>
 
 namespace at {

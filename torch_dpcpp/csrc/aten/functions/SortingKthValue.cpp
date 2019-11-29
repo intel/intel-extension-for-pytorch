@@ -10,7 +10,7 @@
 #include <ATen/native/dpcpp/SortingCommon.h>
 #include <ATen/native/dpcpp/SortingRadixSelect.h>
 
-#include <functions/Numerics.h>
+#include <utils/Numerics.h>
 
 
 DP_DEF_K2(gatherKthValueKernelName, typename scalar_t, typename index_t, int Dim);
