@@ -31,9 +31,11 @@
 
 #include <ATen/Config.h>
 
-#include <ATen/dpcpp/SYCLDevice.h>
-#include <ATen/dpcpp/SYCLContext.h>
 #include <ATen/LegacyTHFunctionsSYCL.h>
+
+#include <core/SYCLDevice.h>
+#include <core/SYCLContext.h>
+
 
 namespace at {
 

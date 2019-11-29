@@ -1,10 +1,10 @@
 #include <ATen/ATen.h>
 #include <ATen/InitialTensorOptions.h>
 #include <ATen/NativeFunctions.h>
-#include <core/SYCLContext.h>
 #include <ATen/native/TensorFactories.h>
 #include <c10/util/Exception.h>
 
+#include <core/SYCLContext.h>
 #include <core/TensorImplUtils.h>
 #include <utils/Numerics.h>
 #include <functions/Resize.h>

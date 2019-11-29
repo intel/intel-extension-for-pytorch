@@ -4,13 +4,14 @@
 
 #include <assert.h>
 #include <ATen/ATen.h>
-#include <core/Array.h>
-#include <core/detail/OffsetCalculator.h>
 #include <ATen/native/TensorIterator.h>
-#include <ATen/native/dpcpp/Loops.h>
-#include <core/SYCLContext.h>
 #include <c10/dpcpp/SYCL.h>
 #include <c10/dpcpp/SYCLMemory.h>
+
+#include <core/SYCLContext.h>
+#include <core/Array.h>
+#include <core/detail/OffsetCalculator.h>
+#include <functions/Loops.h>
 
 #include <ATen/detail/FunctionTraits.h>
 #include <functional>
@@ -18,6 +19,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+
 
 DP_DEF_K1(reduce_kernel);
 

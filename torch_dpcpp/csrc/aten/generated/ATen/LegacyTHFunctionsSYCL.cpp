@@ -15,8 +15,9 @@
 #undef THNN_
 #undef THSYCLIndexTensor_
 
-#include <ATen/dpcpp/SYCLDevice.h>
-#include <ATen/dpcpp/SYCLContext.h>
+#include <core/SYCLDevice.h>
+#include <core/SYCLContext.h>
+
 
 namespace at {
 namespace native {

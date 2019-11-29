@@ -15,10 +15,10 @@ struct TensorInfo {
   TensorInfo();
   TensorInfo(T* p,
              int dim,
-             IndexType sz[MAX_TENSORINFO_DIMS], 
+             IndexType sz[MAX_TENSORINFO_DIMS],
              IndexType st[MAX_TENSORINFO_DIMS]);
 
-  // Set the sive of given dimension to 1, as if were a 
+  // Set the sive of given dimension to 1, as if were a
   // reduction dim (allow you to calculate offsets of the
   // reduction slice)
   void reduceDim(int dim);
@@ -89,7 +89,7 @@ struct IndexToOffset {
       IndexType curDimOffset = curDimIndex * info.strides[i];
       offset += curDimOffset;
       linearId /= info.sizes[i];
-    }   
+    }
 
     return offset + linearId * info.strides[0];
   }
@@ -109,12 +109,11 @@ struct IndexToOffset<T, IndexType, -1> {
         IndexType curDimOffset = curDimIndex * info.strides[i];
         offset += curDimOffset;
         linearId /= info.sizes[i];
-      }   
+      }
 
       return offset + linearId * info.strides[0];
   }
 };
-
 
 
 } // detail

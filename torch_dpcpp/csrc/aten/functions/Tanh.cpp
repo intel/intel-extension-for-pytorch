@@ -1,10 +1,12 @@
 #include <c10/dpcpp/SYCL.h>
 #include <ATen/Context.h>
 #include <ATen/Dispatch.h>
-#include <ATen/native/dpcpp/Loops.h>
 #include <ATen/native/DispatchStub.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/Tanh.h>
+
+#include <functions/Loops.h>
+
 
 DP_DEF_K1(tanh_backward);
 

@@ -2,9 +2,10 @@
 #include <ATen/AccumulateType.h>
 #include <ATen/native/TensorTransformations.h>
 #include <ATen/NativeFunctions.h>
-#include <core/SYCLContext.h>
 #include <c10/dpcpp/SYCLMemory.h>
 #include <c10/dpcpp/SYCLUtils.h>
+
+#include <core/SYCLContext.h>
 
 #include <cstddef>
 #include <vector>

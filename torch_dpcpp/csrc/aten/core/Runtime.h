@@ -1,13 +1,15 @@
 #pragma once
 
-#include <vector>
-#include <mkldnn.hpp>
-
-#include <core/SYCLContext.h>
 #include <ATen/Config.h>
 
 #include <c10/dpcpp/SYCLUtils.h>
 #include <c10/dpcpp/SYCLMemory.h>
+
+#include <core/SYCLContext.h>
+
+#include <vector>
+#include <mkldnn.hpp>
+
 
 using namespace mkldnn;
 

@@ -5,7 +5,10 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/AccumulateType.h>
+
+#include <utils/Algorithm.h>
 #include <utils/Numerics.h>
+
 #include <cmath>
 #include <limits>
 

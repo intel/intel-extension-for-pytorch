@@ -2,17 +2,19 @@
 
 #include <core/detail/IndexUtils.h>
 #include <ATen/TensorUtils.h>
-#include <core/SYCLContext.h>
-#include <math.h>
 #include <ATen/LegacyTHFunctionsSYCL.h>
+
+#include <core/SYCLContext.h>
+
+#include <math.h>
 
 namespace at {
 namespace sycl {
 
 // We pull the kernel name from anonymous namespace to outside,
-// because otherwise dpcpp compiler will fail to recognize 
-// these kernel name. [CORC-4860] DPCPP compiler team argue 
-// that it violates the spec that kernel name should be 
+// because otherwise dpcpp compiler will fail to recognize
+// these kernel name. [CORC-4860] DPCPP compiler team argue
+// that it violates the spec that kernel name should be
 // globally visible if put the kernel name in anonymous namespace.
 
 template <typename Op,

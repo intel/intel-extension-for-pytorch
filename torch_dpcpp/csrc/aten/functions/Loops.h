@@ -1,14 +1,15 @@
 #pragma once
 
 #include <ATen/ATen.h>
-#include <core/SYCLContext.h>
 #include <core/detail/OffsetCalculator.h>
 #include <core/detail/TensorInfo.h>
 #include <ATen/detail/FunctionTraits.h>
 #include <ATen/native/TensorIterator.h>
+
 #include <c10/dpcpp/SYCLMemory.h>
 #include <c10/dpcpp/SYCLUtils.h>
 
+#include <core/SYCLContext.h>
 
 
 namespace at { namespace native {
