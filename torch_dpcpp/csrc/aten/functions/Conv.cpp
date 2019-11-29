@@ -4,39 +4,8 @@
 
 #include <c10/dpcpp/SYCLUtils.h>
 
-#if !AT_SYCL_ENABLED()
-
-namespace at { namespace native {
-
-at::Tensor sycl_convolution(
-    const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias,
-    IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups) {
-  AT_ERROR("sycl_convolution_forward: ATen not compiled with MKLDNN support");
-}
-
-at::Tensor sycl_convolution_backward_input(
-    IntArrayRef input_size, const at::Tensor& grad_output, const at::Tensor& weight,
-    IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool bias_defined) {
-  AT_ERROR("sycl_convolution_backward_input: ATen not compiled with MKLDNN support");
-}
-
-std::tuple<at::Tensor,at::Tensor> sycl_convolution_backward_weights(
-    IntArrayRef weight_size, const at::Tensor& grad_output, const at::Tensor& input,
-    IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool bias_defined) {
-  AT_ERROR("sycl_convolution_backward_weights: ATen not compiled with MKLDNN support");
-}
-
-std::tuple<at::Tensor,at::Tensor,at::Tensor> sycl_convolution_backward(
-    const at::Tensor& input, const at::Tensor& grad_output_t, const at::Tensor& weight,
-    IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, std::array<bool,3> output_mask) {
-  AT_ERROR("sycl_convolution_backward: ATen not compiled with MKLDNN support");
-}
-
-}}
-
-#else // AT_SYCL_ENABLED
-
 #include <core/Runtime.h>
+
 
 using namespace mkldnn;
 
@@ -459,5 +428,3 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> sycl_convolution_backward(
 }
 
 }}  // namespace at::native
-
-#endif

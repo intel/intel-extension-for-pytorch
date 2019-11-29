@@ -7,9 +7,9 @@
 #include <core/SYCLApplyUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
-#include <ATen/native/dpcpp/SortingCommon.h>
-#include <ATen/native/dpcpp/SortingRadixSelect.h>
 
+#include <functions/SortingCommon.h>
+#include <functions/SortingRadixSelect.h>
 #include <utils/Numerics.h>
 
 

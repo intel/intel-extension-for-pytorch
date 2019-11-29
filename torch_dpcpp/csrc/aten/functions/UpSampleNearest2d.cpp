@@ -3,7 +3,8 @@
 #include <c10/dpcpp/SYCL.h>
 #include <c10/dpcpp/SYCLMemory.h>
 #include <ATen/NativeFunctions.h>
-#include <ATen/native/dpcpp/UpSample.h>
+
+#include <functions/UpSample.h>
 
 
 namespace at {
