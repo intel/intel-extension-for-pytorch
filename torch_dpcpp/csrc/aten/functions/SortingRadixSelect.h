@@ -1,3 +1,5 @@
+#include <utils/Numerics.h>
+
 namespace at {
 namespace native {
 
@@ -219,7 +221,6 @@ template <
 
     if (hasVal)
       counts[digitInRadix]++;
-
   }
 
     for (uint32_t i = 0; i < RadixSize; ++i) {
@@ -253,7 +254,7 @@ scalar_t findPattern(
     bitwise_t desired,
     bitwise_t desiredMask,
     DP::nd_item<1> &item_id) {
- 
+
  auto local_id = item_id.get_local_id(0);
 
  auto smem_ptr = SyclConvertToActualTypePtr(scalar_t, smem);
@@ -266,7 +267,7 @@ scalar_t findPattern(
 
   // All threads participate in the loop, in order to sync on the flag
   index_t numIterations =
-      THSYCLRoundUp(sliceSize, (index_t)item_id.get_local_range(0));
+      RoundUp(sliceSize, (index_t)item_id.get_local_range(0));
   for (index_t i = local_id; i < numIterations; i += item_id.get_local_range(0)) {
     bool inRange = (i < sliceSize);
     scalar_t v = inRange ? data[i * withinSliceStride]
@@ -288,7 +289,7 @@ scalar_t findPattern(
     item_id.barrier(cl::sycl::access::fence_space::local_space);
 
     // Check to see if a thread found the value
-    if (THSYCLNumerics<scalar_t>::ne(found, ScalarConvert<int, scalar_t>::to(0))) {
+    if (Numerics<scalar_t>::ne(found, ScalarConvert<int, scalar_t>::to(0))) {
       // all threads return this value
       return val;
     }
@@ -301,7 +302,7 @@ scalar_t findPattern(
 // Returns the top-Kth element found in the data using radix selection
 template <typename scalar_t, typename bitwise_t, typename index_t, bool Order>
 void radixSelect(
-    const dp_global_ptr_pt<scalar_t> &data, 
+    const dp_global_ptr_pt<scalar_t> &data,
     index_t k,
     index_t sliceSize,
     index_t withinSliceStride,

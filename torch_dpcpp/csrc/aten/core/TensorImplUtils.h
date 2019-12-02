@@ -5,6 +5,8 @@
 
 namespace at { namespace native {
 
+TensorImpl *TensorImpl_new();
+at::Tensor TensorImpl_wrap(TensorImpl *tensor);
 int TensorImpl_nDimension(const at::TensorImpl *self);
 int TensorImpl_nDimensionLegacyNoScalars(const at::TensorImpl *self);
 int TensorImpl_nDimensionLegacyAll(const at::TensorImpl *self);

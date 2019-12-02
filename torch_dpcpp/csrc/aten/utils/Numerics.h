@@ -4,9 +4,9 @@
 #include <ATen/ATen.h>
 #include <c10/dpcpp/SYCL.h>
 #include <c10/dpcpp/SYCLUtils.h>
-#include <ATen/dpcpp/NumericLimits.h>
 
-namespace at { namespace native {
+#include <core/NumericLimits.h>
+
 
 template <typename T>
 struct Numerics {
@@ -356,9 +356,6 @@ DP_BOTH inline T CeilDiv(T a, T b) { return (a + b - 1) / b; }
  *       */
 
 template <typename T>
-DP_BOTH inline T RoundUp(T a, T b) { return THSYCLCeilDiv(a, b) * b; }
-
-} // native::
-} // at::
+DP_BOTH inline T RoundUp(T a, T b) { return CeilDiv(a, b) * b; }
 
 #endif

@@ -6,6 +6,19 @@
 
 namespace at { namespace native {
 
+TensorImpl *TensorImpl_new(caffe2::TypeMeta type_meta)
+{
+  return c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
+    c10::intrusive_ptr<at::StorageImpl>::reclaim(StorageImpl_new(type_meta)),
+    at::SYCLTensorId()
+  ).release();
+}
+
+at::Tensor TensorImpl_wrap(TensorImpl *tensor) {
+  c10::raw::intrusive_ptr::incref(tensor);
+  return at::Tensor(c10::intrusive_ptr<at::TensorImpl>::reclaim(tensor));
+}
+
 int TensorImpl_nDimension(const at::TensorImpl *self) {
   return self->dim();
 }
