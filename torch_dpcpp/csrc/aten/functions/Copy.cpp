@@ -31,7 +31,7 @@ class copy_functor {
 namespace at {
 namespace native {
 
-static void copy_kernel_sycl(TensorIterator& iter, bool non_blocking);
+void copy_kernel_sycl(TensorIterator& iter, bool non_blocking);
 
 namespace {
 
@@ -231,7 +231,7 @@ void _copy__sycl(TensorIterator& iter, bool non_blocking) {
 
 } //namespace
 
-static void copy_kernel_sycl(TensorIterator& iter, bool non_blocking) {
+void copy_kernel_sycl(TensorIterator& iter, bool non_blocking) {
   AT_DISPATCH_ALL_TYPES_AND2(
       ScalarType::Half, ScalarType::Bool, iter.tensor(0).scalar_type(), "_copy__sycl", [&]() {
         _copy__sycl<scalar_t>(iter, non_blocking);

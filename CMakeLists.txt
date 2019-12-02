@@ -160,7 +160,7 @@ set(DPCPP_ATEN_SRCS)
 add_subdirectory(torch_dpcpp/csrc/aten)
 set(DPCPP_SRCS ${DPCPP_ATEN_SRCS})
 
-add_library(torch_dpcpp ${DPCPP_SRCS})
+add_library(torch_dpcpp SHARED ${DPCPP_SRCS})
 # add_dependencies(torch_dpcpp ${DPCPP_DEP})
 # target_link_libraries(torch PUBLIC c10_sycl)
 # target_include_directories(torch INTERFACE $<INSTALL_INTERFACE:include>)

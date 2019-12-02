@@ -5,6 +5,7 @@
 #include <c10/dpcpp/SYCLMemory.h>
 #include <c10/dpcpp/SYCLUtils.h>
 
+#include <core/TensorImplUtils.h>
 #include <core/TensorCopy.h>
 #include <utils/Algorithm.h>
 #include <utils/Numerics.h>
@@ -277,9 +278,9 @@ reduceDimIndex(TensorTypeK *tgt1_,
   TensorImpl_resize(tgt1_, dim, {});
   TensorImpl_resize(tgt2_, dim, {});
 
-  TensorTypeK *tgt1 = (TensorTypeK*)TensorImpl_newContiguous<ScalarTypeK>(tgt1_);
-  TensorTypeIndex *tgt2 = (TensorTypeIndex*)TensorImpl_newContiguous<ScalarTypeIndex>(tgt2_);
-  src = (TensorTypeK*)TensorImpl_newContiguous<ScalarTypeK>(src);
+  TensorTypeK *tgt1 = (TensorTypeK*)at::native::TensorImpl_newContiguous<ScalarTypeK>(tgt1_);
+  TensorTypeIndex *tgt2 = (TensorTypeIndex*)at::native::TensorImpl_newContiguous<ScalarTypeIndex>(tgt2_);
+  src = (TensorTypeK*)at::native::TensorImpl_newContiguous<ScalarTypeK>(src);
 
   if (dimension == TensorImpl_nDimensionLegacyAll(src) - 1) {
     transformReduceInnermostDimIndex(tgt1, tgt2, src, init, binary_op);
@@ -287,12 +288,12 @@ reduceDimIndex(TensorTypeK *tgt1_,
     transformReduceOuterDimIndex(tgt1, tgt2, src, dimension, init, binary_op);
   }
 
-  TensorImpl_free(src);
-  TensorImpl_freeCopyTo<ScalarTypeK>(tgt1, tgt1_);
-  TensorImpl_freeCopyTo<ScalarTypeIndex>(tgt2, tgt2_);
+  at::native::TensorImpl_free(src);
+  at::native::TensorImpl_freeCopyTo<ScalarTypeK>(tgt1, tgt1_);
+  at::native::TensorImpl_freeCopyTo<ScalarTypeIndex>(tgt2, tgt2_);
   if (!keepdim) {
-    TensorImpl_squeeze1d(tgt1_, tgt1_, dimension);
-    TensorImpl_squeeze1d(tgt2_, tgt2_, dimension);
+    at::native::TensorImpl_squeeze1d(tgt1_, tgt1_, dimension);
+    at::native::TensorImpl_squeeze1d(tgt2_, tgt2_, dimension);
   }
 }
 
