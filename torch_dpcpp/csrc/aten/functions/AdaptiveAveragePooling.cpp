@@ -37,7 +37,7 @@ static void adaptive_avg_pool2d_out_sycl_frame(
   auto data_t = memory::data_type::f32;
   if (std::is_same<scalar_t, Half>::value == true) {
     data_t = memory::data_type::f16;
-    prop_kind = prop_kind::forward_inference;
+    prop_kind = dnnl::prop_kind::forward_inference;
   }
   auto format_nchw = memory::format_tag::nchw;
 
@@ -218,10 +218,10 @@ static void adaptive_avg_pool2d_backward_out_sycl_frame(
     dH = kH;
 
     auto alg_kind = algorithm::pooling_avg;
-    auto prop_kind = prop_kind::forward_training;
+    auto prop_kind = dnnl::prop_kind::forward_training;
 
     output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols});
-    
+
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "adaptive_avg_pool2d_sycl", [&] {
           auto input_data = input.data_ptr<scalar_t>();
           auto output_data = output.data_ptr<scalar_t>();
@@ -261,7 +261,7 @@ static void adaptive_avg_pool2d_backward_out_sycl_frame(
     dH = kH;
 
     auto alg_kind = algorithm::pooling_avg;
-    auto prop_kind = prop_kind::forward_training;
+    auto prop_kind = dnnl::prop_kind::forward_training;
 
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "adaptive_avg_pool2d_backward_sycl", [&] {
           auto gradOutput_data = gradOutput.data_ptr<scalar_t>();

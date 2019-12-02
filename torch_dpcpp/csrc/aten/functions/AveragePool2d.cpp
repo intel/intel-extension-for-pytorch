@@ -37,7 +37,7 @@ static void avg_pool2d_out_sycl_frame(
   auto data_t = memory::data_type::f32;
   if (std::is_same<scalar_t, Half>::value == true) {
      data_t = memory::data_type::f16;
-     prop_kind = prop_kind::forward_inference;
+     prop_kind = dnnl::prop_kind::forward_inference;
   }
   auto format_nchw = memory::format_tag::nchw;
 
@@ -244,7 +244,7 @@ void avg_pool2d_out_sycl_template(
   Tensor input = input_.contiguous();
 
   auto alg_kind = count_include_pad ? algorithm::pooling_avg_include_padding : algorithm::pooling_avg_exclude_padding;
-  auto prop_kind = prop_kind::forward_training;
+  auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(),
     "avg_pool2d_out_sycl_frame",
@@ -326,7 +326,7 @@ Tensor& avg_pool2d_backward_out_sycl_template(
   TORCH_CHECK(gradInput.is_contiguous(), "gradInput must be contiguous");
 
   auto alg_kind = count_include_pad ? algorithm::pooling_avg_include_padding : algorithm::pooling_avg_exclude_padding;
-  auto prop_kind = prop_kind::forward_training;
+  auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES(input.scalar_type(),
     "avg_pool2d_backward_out_sycl_frame",

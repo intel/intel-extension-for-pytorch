@@ -39,7 +39,7 @@ static void max_pool2d_with_indices_out_frame(
   auto data_t = memory::data_type::f32;
   if (std::is_same<scalar_t, Half>::value == true) {
     data_t = memory::data_type::f16;
-    prop_kind = prop_kind::forward_inference;
+    prop_kind = dnnl::prop_kind::forward_inference;
   }
   auto format_nchw = memory::format_tag::nchw;
 
@@ -299,7 +299,7 @@ void max_pool2d_with_indices_out_sycl_template(
   indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
 
   auto alg_kind = algorithm::pooling_max;
-  auto prop_kind = prop_kind::forward_training;
+  auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(),
       "max_pool2d_with_indices_sycl",
@@ -380,7 +380,7 @@ Tensor& max_pool2d_with_indices_backward_out_sycl_template(
   const int64_t outputWidth_for_shape_check = pooling_output_shape<int64_t>(inputWidth, kW, padW, dW, dilationW, ceil_mode);
 
   auto alg_kind = algorithm::pooling_max;
-  auto prop_kind = prop_kind::forward_training;
+  auto prop_kind = dnnl::prop_kind::forward_training;
 
   max_pool2d_backward_shape_check(
     input,
