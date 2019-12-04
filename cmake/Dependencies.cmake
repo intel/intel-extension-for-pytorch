@@ -1,5 +1,5 @@
 # DNNL
-set(USE_SYCL ON CACHE BOOL "enable SYCL")
+# set(USE_SYCL ON CACHE BOOL "enable SYCL")
 find_package(MKLDNN QUIET)
 if(NOT MKLDNN_FOUND)
   message(FATAL_ERROR "Cannot find DNNL")
