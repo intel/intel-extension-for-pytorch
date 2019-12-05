@@ -802,23 +802,24 @@ def generate_aten_to_xla(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
     ptype = param_type(p)
     cptype = type_core(ptype)
     pname = param_name(p)
-    if cptype == 'TensorList':
-      xname = 'l_{}'.format(pname)
-      code += ('  auto {} = bridge::XlaCreateTensorList({});\n').format(
-          xname, pname)
-      param_vars.append(xname)
-    elif cptype == 'TensorOptions':
-      gcode, xname = rewrite_tensor_options(fname, pname)
-      code += gcode
-      param_vars.append(xname)
-    elif cptype != 'Tensor':
-      param_vars.append(pname)
-    elif type_is_const(ptype):
-      xname = tfetcher.add(pname, is_write_param(fnopts, pname, False))
-      param_vars.append(xname)
-    else:
-      xname = tfetcher.add(pname, is_write_param(fnopts, pname, True))
-      param_vars.append(xname)
+    param_vars.append(pname)
+    # if cptype == 'TensorList':
+    #   xname = 'l_{}'.format(pname)
+    #   code += ('  auto {} = bridge::XlaCreateTensorList({});\n').format(
+    #       xname, pname)
+    #   param_vars.append(xname)
+    # elif cptype == 'TensorOptions':
+    #   gcode, xname = rewrite_tensor_options(fname, pname)
+    #   code += gcode
+    #   param_vars.append(xname)
+    # elif cptype != 'Tensor':
+    #   param_vars.append(pname)
+    # elif type_is_const(ptype):
+    #   xname = tfetcher.add(pname, is_write_param(fnopts, pname, False))
+    #   param_vars.append(xname)
+    # else:
+    #   xname = tfetcher.add(pname, is_write_param(fnopts, pname, True))
+    #   param_vars.append(xname)
     if p == ref_param and not get_optional(fnopts, 'ref_param'):
       xla_ref_param = param_vars[-1]
   # code += tfetcher.generate_fetches()

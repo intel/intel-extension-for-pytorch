@@ -8,7 +8,7 @@
 namespace at {
 
 at::Tensor AtenIpexTypeDefault::add(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha) {
-  return at::add(xlatens[0], xlatens[1], alpha);
+  return at::add(self, other, alpha);
 }
 
 
