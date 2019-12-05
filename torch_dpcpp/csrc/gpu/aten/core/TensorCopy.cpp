@@ -1,6 +1,6 @@
 #include <ATen/native/TensorIterator.h>
+#include <ATen/core/Tensor.h>
 
-#include <core/Tensor.h>
 #include <core/TensorImplUtils.h>
 #include <core/TensorCopy.h>
 #include <functions/Copy.h>
