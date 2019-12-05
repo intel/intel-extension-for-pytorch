@@ -101,7 +101,7 @@ _FN_OUT = {
     'arange_out(Tensor, Scalar, Scalar, Scalar) -> Tensor':
         FuncOpts(
             outfn_template=ArgTemplate(
-                'AtenXlaType::arange($1, $2, $3, $0.options())')),
+                'AtenIpexType::arange($1, $2, $3, $0.options())')),
     'bitwise_not_out':
         FuncOpts(),
     'clamp_out':
@@ -126,47 +126,47 @@ _FN_OUT_REGEX = []
 
 _FN_REMAP = {
     '_th_eq(Tensor, Scalar) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::eq'),
+        FuncOpts(outfn_name='AtenIpexType::eq'),
     '_th_eq(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::eq'),
+        FuncOpts(outfn_name='AtenIpexType::eq'),
     '_th_ge(Tensor, Scalar) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::ge'),
+        FuncOpts(outfn_name='AtenIpexType::ge'),
     '_th_ge(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::ge'),
+        FuncOpts(outfn_name='AtenIpexType::ge'),
     '_th_gt(Tensor, Scalar) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::gt'),
+        FuncOpts(outfn_name='AtenIpexType::gt'),
     '_th_gt(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::gt'),
+        FuncOpts(outfn_name='AtenIpexType::gt'),
     '_th_le(Tensor, Scalar) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::le'),
+        FuncOpts(outfn_name='AtenIpexType::le'),
     '_th_le(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::le'),
+        FuncOpts(outfn_name='AtenIpexType::le'),
     '_th_lt(Tensor, Scalar) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::lt'),
+        FuncOpts(outfn_name='AtenIpexType::lt'),
     '_th_lt(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::lt'),
+        FuncOpts(outfn_name='AtenIpexType::lt'),
     '_th_ne(Tensor, Scalar) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::ne'),
+        FuncOpts(outfn_name='AtenIpexType::ne'),
     '_th_ne(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::ne'),
+        FuncOpts(outfn_name='AtenIpexType::ne'),
     's__th_and(Tensor, Tensor) -> Tensor':
         FuncOpts(
-            outfn_name='AtenXlaType::__and__', shape_check_indices=((0, 1),)),
+            outfn_name='AtenIpexType::__and__', shape_check_indices=((0, 1),)),
     's__th_or(Tensor, Tensor) -> Tensor':
         FuncOpts(
-            outfn_name='AtenXlaType::__or__', shape_check_indices=((0, 1),)),
+            outfn_name='AtenIpexType::__or__', shape_check_indices=((0, 1),)),
     's__th_xor(Tensor, Tensor) -> Tensor':
         FuncOpts(
-            outfn_name='AtenXlaType::__xor__', shape_check_indices=((0, 1),)),
+            outfn_name='AtenIpexType::__xor__', shape_check_indices=((0, 1),)),
     '_s_where(Tensor, Tensor, Tensor) -> Tensor':
         FuncOpts(
-            outfn_name='AtenXlaType::where',
+            outfn_name='AtenIpexType::where',
             shape_check_indices=(
                 (0, 1),
                 (0, 2),
             )),
     's__th_eq(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::eq', shape_check_indices=((0, 1),)),
+        FuncOpts(outfn_name='AtenIpexType::eq', shape_check_indices=((0, 1),)),
 }
 
 _TYPE_NSMAP = {
@@ -764,7 +764,7 @@ def generate_aten_out(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
     m = re.match(r'(.*)_out$', fname)
     assert m is not None, fname
     out_count = num_outputs if num_outputs is not None else 1
-    fcall = create_call('AtenXlaType::{}'.format(m.group(1)),
+    fcall = create_call('AtenIpexType::{}'.format(m.group(1)),
                         param_vars[out_count:])
 
   tmp_result = '{}_tmp'.format(fname)
@@ -953,7 +953,7 @@ def generate_registrations(fgens, overrides):
   for fgen in fgens:
     mapsig_key = get_mapsig_key(fgen.mapsig)
     if mapsig_key in overrides:
-      override_fn = 'AtenXlaType::{}'.format(fgen.func)
+      override_fn = 'AtenIpexType::{}'.format(fgen.func)
       overridden.add(mapsig_key)
     else:
       override_fn = fgen.xfunc if fgen.code else None
@@ -1004,7 +1004,7 @@ def check_overrides(overrides, overridden):
     if not mapsig_key in overridden:
       misses += 1
       print(
-          'AtenXlaType function missed override: {}; // {}'.format(
+          'AtenIpexType function missed override: {}; // {}'.format(
               cpp_sig, mapsig),
           file=sys.stderr)
   return misses == 0
