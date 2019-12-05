@@ -22,7 +22,7 @@ IF(MSVC)
   RETURN()
 ENDIF(MSVC)
 
-SET(IDEEP_ROOT "${PROJECT_SOURCE_DIR}/third_party/ideep")
+SET(IDEEP_ROOT "${PROJECT_SOURCE_DIR}/third_party/dnnl_for_gpu")
 SET(MKLDNN_ROOT "${IDEEP_ROOT}/mkl-dnn")
 
 FIND_PACKAGE(BLAS)
