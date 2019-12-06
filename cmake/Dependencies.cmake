@@ -1,11 +1,14 @@
 # DNNL
-# set(USE_SYCL ON CACHE BOOL "enable SYCL")
-#find_package(DNNL QUIET)
-#if(NOT DNNL)
-#  message(FATAL_ERROR "Cannot find DNNL")
-#else()
-#  include_directories(BEFORE SYSTEM ${MKLDNN_INCLUDE_DIR})
-#endif()
+if(USE_SYCL)
+  find_package(MKLDNN QUIET)
+  if(NOT MKLDNN_FOUND)
+    message(FATAL_ERROR "Cannot find DNNL")
+  else()
+    include_directories(BEFORE SYSTEM ${MKLDNN_INCLUDE_DIR})
+  endif()
+else()
+  add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
+endif()
 
 # PyTorch
 # TODO: generate aten related files for now
