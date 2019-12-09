@@ -1,9 +1,11 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/Config.h>
+
 #include <core/Runtime.h>
-#include <c10/dpcpp/SYCLMemory.h>
-#include <c10/dpcpp/SYCLMath.h>
+#include <core/SYCLMemory.h>
+#include <core/SYCLMath.h>
+
 
 using namespace mkldnn;
 namespace at { namespace native {

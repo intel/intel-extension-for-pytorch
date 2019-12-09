@@ -1,9 +1,9 @@
-#include <c10/dpcpp/SYCL.h>
 #include <ATen/Context.h>
 #include <ATen/Dispatch.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/Indexing.h>
 
+#include <core/SYCL.h>
 #include <functions/Loops.h>
 #include <utils/Atomics.h>
 

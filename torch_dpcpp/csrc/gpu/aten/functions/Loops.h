@@ -6,9 +6,8 @@
 #include <ATen/detail/FunctionTraits.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <c10/dpcpp/SYCLMemory.h>
-#include <c10/dpcpp/SYCLUtils.h>
-
+#include <core/SYCLMemory.h>
+#include <core/SYCLUtils.h>
 #include <core/SYCLContext.h>
 
 

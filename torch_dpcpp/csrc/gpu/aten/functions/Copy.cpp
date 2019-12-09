@@ -1,10 +1,12 @@
 #include <ATen/ATen.h>
 #include <ATen/Dispatch.h>
-#include <c10/dpcpp/SYCLGuard.h>
-#include <c10/dpcpp/SYCLStream.h>
-#include <c10/dpcpp/SYCLException.h>
-#include <c10/dpcpp/SYCLMemory.h>
+
 #include <ATen/native/TensorIterator.h>
+
+#include <core/SYCLGuard.h>
+#include <core/SYCLStream.h>
+#include <core/SYCLException.h>
+#include <core/SYCLMemory.h>
 #include <core/SYCLApplyUtils.h>
 #include <ATen/native/Copy.h>
 

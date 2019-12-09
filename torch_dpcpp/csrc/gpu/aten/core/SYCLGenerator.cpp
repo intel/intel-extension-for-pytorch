@@ -1,5 +1,6 @@
 #include <ATen/SYCLGenerator.h>
-#include <c10/dpcpp/SYCLFunctions.h>
+#include <core/SYCLFunctions.h>
+
 
 namespace at {
 

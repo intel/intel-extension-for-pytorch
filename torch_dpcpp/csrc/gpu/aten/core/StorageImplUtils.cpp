@@ -1,9 +1,9 @@
 #include <c10/util/intrusive_ptr.h>
-#include <c10/core/TensorImpl.h>
-#include <c10/dpcpp/SYCLUtils.h>
-#include <c10/dpcpp/SYCLException.h>
-#include <c10/dpcpp/SYCLMemory.h>
 
+#include <core/SYCLException.h>
+#include <core/SYCLMemory.h>
+#include <core/TensorImpl.h>
+#include <core/SYCLUtils.h>
 #include <core/SYCLContext.h>
 #include <utils/General.h>
 

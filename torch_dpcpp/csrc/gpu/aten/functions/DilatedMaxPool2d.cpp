@@ -2,8 +2,9 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
 #include <tuple>
+
 #include <core/Runtime.h>
-#include <c10/dpcpp/SYCLMath.h>
+#include <core/SYCLMath.h>
 
 using namespace mkldnn;
 namespace at {

@@ -2,8 +2,9 @@
 #include <ATen/native/SortingUtils.h>
 #include <assert.h>
 #include <c10/macros/Macros.h>
-#include <c10/dpcpp/SYCL.h>
 #include <stdlib.h>
+
+#include <core/SYCL.h>
 #include <core/SYCLApplyUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>

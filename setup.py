@@ -155,7 +155,7 @@ class DPCPPBuild(build_ext, object):
     print(ext.project_dir)
     print("***")
     if not os.path.exists(ext.build_dir):
-        os.mkdir(ext.build_dir)
+      os.mkdir(ext.build_dir)
 
     build_type = 'Release'
     if _check_env_flag('DEBUG'):
@@ -166,6 +166,9 @@ class DPCPPBuild(build_ext, object):
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + ext_dir,
         ]
+    use_sycl = os.environ["USE_SYCL"]
+    if int(use_sycl) == 1:
+      cmake_args += ['-DUSE_SYCL=1']
     build_args = ['-j', str(multiprocessing.cpu_count())]
 
     env = os.environ.copy()
