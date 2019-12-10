@@ -149,11 +149,6 @@ class DPCPPBuild(build_ext, object):
   
   def build_extension(self, ext):
     ext_dir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
-    print("***")
-    print(ext_dir)
-    print(ext.build_dir)
-    print(ext.project_dir)
-    print("***")
     if not os.path.exists(ext.build_dir):
         os.mkdir(ext.build_dir)
 
@@ -212,7 +207,7 @@ setup(
             'build/*.so*',
         ],
     },
-    ext_modules=[DPCPPExt('torch_dpcpp')],
+    ext_modules=[DPCPPExt('intel_pytorch_extension')],
     cmdclass={
         'build_ext': DPCPPBuild,
         'clean': DPCPPClean,

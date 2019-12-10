@@ -87,6 +87,9 @@ torch/include/
 torch/share/
 torch/test/
 torch/version.py
+
+scripts/version.py
+torch_dpcpp/csrc/version.cpp
 # Root level file used in CI to specify certain env configs.
 # E.g., see .circleci/config.yaml
 env

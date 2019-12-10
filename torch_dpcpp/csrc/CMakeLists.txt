@@ -6,6 +6,7 @@ LIST(APPEND DPCPP_COMMON_SRCS
     ${DPCPP_ROOT}/aten_ipex_type_default.cpp
     ${DPCPP_ROOT}/aten_ipex_type.cpp
     ${DPCPP_ROOT}/init_python_bindings.cpp
+    ${DPCPP_ROOT}/tensor_impl.cpp
     ${DPCPP_ROOT}/version.cpp
 )
 

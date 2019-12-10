@@ -1,3 +1,5 @@
+#include "torch_dpcpp/csrc/tensor_impl.h"
+
 #include <c10/core/ScalarType.h>
 #include <c10/core/impl/DeviceGuardImplInterface.h>
 #include <c10/macros/Macros.h>
@@ -38,8 +40,13 @@ struct IPEXGuardImpl : public c10::impl::DeviceGuardImplInterface {
   }
 };
 
-C10_REGISTER_GUARD_IMPL(IPEX, IPEXGuardImpl);
+C10_REGISTER_GUARD_IMPL(DPCPP, IPEXGuardImpl);
 
 }  // namespace
+
+IPEXTensorImpl::IPEXTensorImpl(const at::Tensor& tensor) :
+    c10::TensorImpl(c10::TensorTypeSet(c10::TensorTypeId::DPCPPTensorId),
+                    tensor.dtype(),
+                    c10::Device(c10::DeviceType::DPCPP, 0)) {}
 
 }  // namespace torch_ipex

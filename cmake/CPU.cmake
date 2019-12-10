@@ -108,9 +108,12 @@ set(DPCPP_COMMON_SRCS)
 set(DPCPP_CPU_SRCS)
 
 add_subdirectory(${DPCPP_ROOT})
+add_subdirectory(${DPCPP_ROOT}/cpu)
 
+# Compile code with pybind11
 set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS})
 pybind11_add_module(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 
+target_compile_options(${PLUGIN_NAME} PRIVATE "-DC10_BUILD_MAIN_LIB")
 add_dependencies(${PLUGIN_NAME} pybind11)
 add_dependencies(${PLUGIN_NAME} dnnl)
