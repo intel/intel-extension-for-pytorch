@@ -3,8 +3,9 @@
 #include <ATen/Tensor.h>
 
 namespace torch_ipex {
+namespace cpu {
 
-class AtenIpexTypeDefault {
+class AtenIpexCPUDefault {
 public:
   static at::Tensor add(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   static at::Tensor ones(at::IntArrayRef size, const at::TensorOptions & options);
@@ -13,5 +14,5 @@ public:
   static at::Tensor to(const at::Tensor & self, c10::Device device, at::ScalarType dtype, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> memory_format);
 };
 
-void RegisterAtenTypeFunctions();
-} // namespace torch_ipe
+} // cpu
+} // torch_ipex

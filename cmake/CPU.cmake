@@ -100,6 +100,8 @@ else()
 endif()
 
 include_directories(${PROJECT_SOURCE_DIR})
+include_directories(${PROJECT_SOURCE_DIR}/torch_dpcpp)
+include_directories(${PROJECT_SOURCE_DIR}/torch_dpcpp/csrc/)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
 
 # sources

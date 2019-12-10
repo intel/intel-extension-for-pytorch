@@ -1,11 +1,11 @@
-#include "torch_dpcpp/csrc/aten_ipex_type.h"
+#include "aten_ipex_type.h"
 
 #include <ATen/Context.h>
 
 #include <mutex>
 
-#include "torch_dpcpp/csrc/aten_ipex_type_default.h"
-#include "torch_dpcpp/csrc/version.h"
+#include "aten_ipex_type_default.h"
+#include "version.h"
 
 namespace torch_ipex {
 

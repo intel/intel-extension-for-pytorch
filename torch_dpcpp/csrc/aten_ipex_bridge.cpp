@@ -1,4 +1,4 @@
-#include "torch_dpcpp/csrc/aten_ipex_bridge.h"
+#include "aten_ipex_bridge.h"
 
 #include <map>
 #include <string>

@@ -40,9 +40,9 @@ struct C10_API DefaultDPCPPAllocator final : at::Allocator {
     void* data = c10::alloc_cpu(nbytes);
     if (FLAGS_caffe2_report_cpu_memory_usage && nbytes > 0) {
       getMemoryAllocationReporter().New(data, nbytes);
-      return {data, data, &ReportAndDelete, at::Device(at::DeviceType::DPCPP)};
+      return {data, data, &ReportAndDelete, at::Device(at::DeviceType::DPCPP, 0)};
     }
-    return {data, data, &c10::free_cpu, at::Device(at::DeviceType::DPCPP)};
+    return {data, data, &c10::free_cpu, at::Device(at::DeviceType::DPCPP, 0)};
   }
 
   static void ReportAndDelete(void* ptr) {

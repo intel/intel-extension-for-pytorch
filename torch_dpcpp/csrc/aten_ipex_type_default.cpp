@@ -1,4 +1,4 @@
-#include "torch_dpcpp/csrc/aten_ipex_type_default.h"
+#include "aten_ipex_type_default.h"
 
 #include <ATen/Context.h>
 #include <ATen/core/op_registration/op_registration.h>
@@ -7,21 +7,26 @@
 
 #include <c10/util/Exception.h>
 
-#include "torch_dpcpp/csrc/aten_ipex_bridge.h"
+#include "aten_ipex_bridge.h"
+#include "utils.h"
+#include "cpu/OPs.h"
 
 namespace torch_ipex {
 
 at::Tensor AtenIpexTypeDefault::add(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha) {
-  auto _self = bridge::fallbackToCPUTensor(self);
-  auto _other = bridge::fallbackToCPUTensor(other);
-  auto res = at::add(_self, _other, alpha);
-  return bridge::upgradeToDPCPPTensor(res);
+  if (check_device(self, DPCPPSubDev::CPU)) {
+    return cpu::AtenIpexCPUDefault::add(self, other, alpha);
+  } else {
+    AT_ASSERT(false);
+  }
 }
 
 at::Tensor AtenIpexTypeDefault::ones(at::IntArrayRef size, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::CPU);
-  auto ones_tensor = at::ones(size, o_options);
-  return bridge::upgradeToDPCPPTensor(ones_tensor);
+  if (check_device(options, DPCPPSubDev::CPU)) {
+    return cpu::AtenIpexCPUDefault::ones(size, options);
+  } else {
+    AT_ASSERT(false);
+  }
 }
 
 at::Tensor AtenIpexTypeDefault::empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {

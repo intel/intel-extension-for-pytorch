@@ -1,5 +1,5 @@
-#include "torch_dpcpp/csrc/init_python_bindings.h"
-#include "torch_dpcpp/csrc/version.h"
+#include "init_python_bindings.h"
+#include "version.h"
 
 #include <c10/core/Device.h>
 #include <c10/util/Optional.h>
@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "torch_dpcpp/csrc/aten_ipex_type.h"
+#include "aten_ipex_type.h"
 
 namespace torch_ipex {
 namespace {
