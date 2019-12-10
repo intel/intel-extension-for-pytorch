@@ -1,9 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 
-#include <c10/dpcpp/SYCLMemory.h>
-#include <c10/dpcpp/SYCLUtils.h>
-
+#include <core/SYCLMemory.h>
+#include <core/SYCLUtils.h>
 #include <core/SYCLContext.h>
 
 #include <THDP/THSYCLGenerator.hpp>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
-#include <c10/dpcpp/SYCLGuard.h>
+
 
 namespace at { namespace native {
 

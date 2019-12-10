@@ -1,9 +1,10 @@
 #ifndef ALGORITHM_INC
 #define ALGORITHM_INC
 
-#include <c10/dpcpp/SYCL.h>
+#include <core/SYCL.h>
 #include <utils/General.h>
 #include <utils/Numerics.h>
+
 
 // alternative for cuda thrust::tabulate
 template <typename ForwardIterator, typename UnaryOp>

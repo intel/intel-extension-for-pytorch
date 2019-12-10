@@ -2,10 +2,11 @@
 
 #include <ATen/core/ATenGeneral.h>
 #include <ATen/Context.h>
-#include <c10/dpcpp/SYCLStream.h>
-#include <c10/dpcpp/SYCLUtils.h>
-#include <c10/dpcpp/SYCLFunctions.h>
-#include <c10/dpcpp/SYCLMemory.h>
+
+#include <core/SYCLStream.h>
+#include <core/SYCLFunctions.h>
+#include <core/SYCLMemory.h>
+#include <core/SYCLUtils.h>
 
 namespace at {
 namespace sycl {

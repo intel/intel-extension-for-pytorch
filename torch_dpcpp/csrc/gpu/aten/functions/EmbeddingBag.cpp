@@ -1,11 +1,11 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 #include <ATen/TensorUtils.h>
-#include <c10/dpcpp/SYCLMemory.h>
-#include <c10/dpcpp/SYCLUtils.h>
 #include <THDP/THSYCLDeviceUtils.h>
-#include <c10/dpcpp/SYCL.h>
 
+#include <core/SYCL.h>
+#include <core/SYCLMemory.h>
+#include <core/SYCLUtils.h>
 #include <core/SYCLContext.h>
 
 
@@ -30,7 +30,7 @@ void EmbeddingBag_updateOutputKernel(
     scalar_t* per_sample_weights, int64_t per_sample_weights_stride) {
 
   // the strategy here is that each bag x feature is handled by a single thread
-  
+
   using accscalar_t = acc_type<scalar_t, true>;
   auto queue = c10::sycl::syclGetCurrentQueue();
   int64_t chunksPerBag = THSYCLCeilDiv(featureSize, (int64_t)32);
@@ -38,7 +38,7 @@ void EmbeddingBag_updateOutputKernel(
   int64_t kernel_range = 1024 * 64;
   bool per_sample_weights_defined = per_sample_weights ? true : false;
   DP::buffer<uint8_t, 1> dummy_buffer(DP::range<1>(1));
-  
+
   auto cgf = DP_Q_CGF(cgh) {
     auto in_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, input);
     auto offset_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, offsets);

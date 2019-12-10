@@ -1,7 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/native/Repeat.h>
-#include <c10/dpcpp/SYCLUtils.h>
-#include <c10/dpcpp/SYCLMemory.h>
+
+#include <core/SYCLMemory.h>
+#include <core/SYCLUtils.h>
 
 DP_DEF_K1(ComputeDpcppKer);
 

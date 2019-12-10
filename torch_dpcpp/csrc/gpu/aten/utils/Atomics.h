@@ -1,7 +1,7 @@
 #ifndef ATOMICS_INC
 #define ATOMICS_INC
 
-#include <c10/dpcpp/SYCLUtils.h>
+#include <core/SYCLUtils.h>
 
 
 static inline DP_DEVICE void atomicAdd(const dp_global_ptr_pt<float> &address, float val) {

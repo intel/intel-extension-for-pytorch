@@ -1,7 +1,10 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
+
 #include <core/SYCLContext.h>
-#include <c10/dpcpp/SYCLMemory.h>
+#include <core/SYCLMemory.h>
+
+
 namespace at {
 namespace native {
 

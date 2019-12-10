@@ -1,10 +1,10 @@
 #include <ATen/Dispatch.h>
-#include <c10/dpcpp/SYCL.h>
-#include <c10/dpcpp/SYCLMemory.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/AccumulateType.h>
 
+#include <core/SYCL.h>
+#include <core/SYCLMemory.h>
 #include <utils/Algorithm.h>
 #include <utils/Numerics.h>
 

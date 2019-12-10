@@ -14,10 +14,9 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 # Common dependencies
 
-add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/pybind11)
-add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
-
 include(cmake/Dependencies.cmake)
+
+add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/pybind11)
 
 IF(USE_SYCL)
   include(cmake/GPU.cmake)

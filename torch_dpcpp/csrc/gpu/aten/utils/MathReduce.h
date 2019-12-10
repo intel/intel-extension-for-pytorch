@@ -1,10 +1,9 @@
 #ifndef TENSORMATH_REDUCE_H
 #define TENSORMATH_REDUCE_H
 
-#include <c10/dpcpp/SYCL.h>
-#include <c10/dpcpp/SYCLMemory.h>
-#include <c10/dpcpp/SYCLUtils.h>
-
+#include <core/SYCL.h>
+#include <core/SYCLMemory.h>
+#include <core/SYCLUtils.h>
 #include <core/TensorImplUtils.h>
 #include <core/TensorCopy.h>
 #include <utils/Algorithm.h>

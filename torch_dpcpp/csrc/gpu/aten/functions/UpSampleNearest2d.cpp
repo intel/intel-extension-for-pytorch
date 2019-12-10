@@ -1,9 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/Dispatch.h>
-#include <c10/dpcpp/SYCL.h>
-#include <c10/dpcpp/SYCLMemory.h>
 #include <ATen/NativeFunctions.h>
 
+#include <core/SYCL.h>
+#include <core/SYCLMemory.h>
 #include <functions/UpSample.h>
 
 

@@ -2,9 +2,11 @@
 #define NUMERICS_INC
 
 #include <ATen/ATen.h>
-#include <c10/dpcpp/SYCL.h>
-#include <c10/dpcpp/SYCLUtils.h>
 #include <ATen/dpcpp/NumericLimits.h>
+
+#include <core/SYCL.h>
+#include <core/SYCLUtils.h>
+
 
 namespace at { namespace native {
 
