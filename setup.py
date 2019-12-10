@@ -161,8 +161,7 @@ class DPCPPBuild(build_ext, object):
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + ext_dir,
         ]
-    use_sycl = os.environ["USE_SYCL"]
-    if int(use_sycl) == 1:
+    if _check_env_flag("USE_SYCL"):
       cmake_args += ['-DUSE_SYCL=1']
     build_args = ['-j', str(multiprocessing.cpu_count())]
 
