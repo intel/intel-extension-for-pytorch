@@ -1,6 +1,6 @@
-#include <c10/dpcpp/SYCLStream.h>
-#include <c10/dpcpp/SYCLMath.h>
-#include <c10/dpcpp/SYCLMemory.h>
+#include <core/SYCLStream.h>
+#include <core/SYCLMath.h>
+#include <core/SYCLMemory.h>
 
 DP_DEF_K1(memory_scale);
 DP_DEF_K1(memory_scale1);

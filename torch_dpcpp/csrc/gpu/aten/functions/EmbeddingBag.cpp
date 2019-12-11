@@ -1,7 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 #include <ATen/TensorUtils.h>
-#include <THDP/THSYCLDeviceUtils.h>
+
+#include <legacy/THSYCLDeviceUtils.h>
 
 #include <core/SYCL.h>
 #include <core/SYCLMemory.h>

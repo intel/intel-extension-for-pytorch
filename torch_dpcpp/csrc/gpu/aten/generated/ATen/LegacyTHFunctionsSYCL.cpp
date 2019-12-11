@@ -9,9 +9,9 @@
 #endif
 #include <ATen/SYCLGenerator.h>
 #include <ATen/ExpandUtils.h>
-#include <THDP/THSYCL.h>
-#include <THDP/THSYCLTensor.hpp>
-#include <THDPNN/THSYCLNN.h>
+#include <legacy/THSYCL.h>
+#include <legacy/THSYCLTensor.hpp>
+#include <legacy/THSYCLNN.h>
 #undef THNN_
 #undef THSYCLIndexTensor_
 

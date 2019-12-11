@@ -2,7 +2,7 @@
 #include <CL/sycl.hpp>
 
 #include "c10/util/Exception.h"
-#include "c10/dpcpp/SYCLMacros.h"
+#include "core/SYCLMacros.h"
 
 #define C10_SYCL_TRY                                       \
   try {

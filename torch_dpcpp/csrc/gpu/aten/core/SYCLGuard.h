@@ -1,11 +1,11 @@
 #pragma once
 
-#include <c10/dpcpp/impl/SYCLGuardImpl.h>
-#include <c10/dpcpp/SYCLMacros.h>
 #include <c10/core/DeviceType.h>
 #include <c10/core/impl/InlineDeviceGuard.h>
 #include <c10/core/impl/InlineStreamGuard.h>
 
+#include <core/SYCLGuardImpl.h>
+#include <core/SYCLMacros.h>
 #include <cstddef>
 
 namespace c10 { namespace sycl {

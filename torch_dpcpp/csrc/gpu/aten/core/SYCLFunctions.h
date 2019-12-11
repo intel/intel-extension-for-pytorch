@@ -11,8 +11,8 @@
 
 #include <c10/macros/Macros.h>
 #include <c10/core/Device.h>
-#include <c10/dpcpp/SYCLException.h>
-#include <c10/dpcpp/SYCLUtils.h>
+#include <core/SYCLException.h>
+#include <core/SYCLUtils.h>
 
 namespace c10 {
 namespace sycl {
