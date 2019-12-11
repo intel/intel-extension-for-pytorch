@@ -17,7 +17,7 @@ set(CMAKE_LIBRARY_INCLUDES_DIRECTORY "${CMAKE_BINARY_DIR}/includes")
 
 # ---[ Build flags
 set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-narrowing")
 # Eigen fails to build with some versions, so convert this to a warning
@@ -90,27 +90,34 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 # ---[ Main build
 
 # includes
-set(PYTORCH_ROOT "${PROJECT_SOURCE_DIR}/third_party/pytorch")
-set(PYTORCH_ATEN_SRC_ROOT "${PYTORCH_ROOT}/aten/src")
-set(PYTORCH_ATEN_INCLUDES "${PYTORCH_ROOT}/aten/src/ATen")
-set(PYTORCH_ATEN_CORE_INCLUDES "${PYTORCH_ROOT}/aten/src/ATen/core")
-set(PYTORCH_C10_CORE_INCLUDES "${PYTORCH_ROOT}/c10/core")
-set(PYTORCH_C10_DPCPP_INCLUDES "${PYTORCH_ROOT}/c10/dpcpp")
-set(PYTORCH_C10_UTIL_INCLUDES "${PYTORCH_ROOT}/c10/util")
-set(PYTORCH_C10_MACROS_INCLUDES "${PYTORCH_ROOT}/c10/macros")
+if(DEFINED PYTORCH_INSTALL_DIR)
+  include_directories(${PYTORCH_INSTALL_DIR}/include)
+else()
+  message(FATAL_ERROR, "Cannot find installed PyTorch directory")
+endif()
+
+set (PYTORCH_INCLUDES "${PYTORCH_INSTALL_DIR}/include")
+# set(PYTORCH_ROOT "${PROJECT_SOURCE_DIR}/third_party/pytorch")
+# set(PYTORCH_ATEN_SRC_ROOT "${PYTORCH_ROOT}/aten/src")
+# set(PYTORCH_ATEN_INCLUDES "${PYTORCH_ROOT}/aten/src/ATen")
+# set(PYTORCH_ATEN_CORE_INCLUDES "${PYTORCH_ROOT}/aten/src/ATen/core")
+# set(PYTORCH_C10_CORE_INCLUDES "${PYTORCH_ROOT}/c10/core")
+# set(PYTORCH_C10_DPCPP_INCLUDES "${PYTORCH_ROOT}/c10/dpcpp")
+# set(PYTORCH_C10_UTIL_INCLUDES "${PYTORCH_ROOT}/c10/util")
+# set(PYTORCH_C10_MACROS_INCLUDES "${PYTORCH_ROOT}/c10/macros")
 
 set(DPCPP_GPU_ROOT "${PROJECT_SOURCE_DIR}/torch_dpcpp/csrc/gpu")
 set(DPCPP_GPU_ATEN_SRC_ROOT "${DPCPP_GPU_ROOT}/aten")
 set(DPCPP_GPU_ATEN_GENERATED "${DPCPP_GPU_ROOT}/aten/generated")
 
-include_directories(${PYTORCH_ROOT})
-include_directories(${PYTORCH_ATEN_SRC_ROOT})
+include_directories(${PYTORCH_INCLUDES})
+# include_directories(${PYTORCH_ATEN_SRC_ROOT})
 # include_directories(${PYTORCH_ATEN_INCLUDES})
 # include_directories(${PYTORCH_ATEN_CORE_INCLUDES})
-include_directories(${PYTORCH_C10_CORE_INCLUDES})
-include_directories(${PYTORCH_C10_DPCPP_INCLUDES})
-include_directories(${PYTORCH_C10_UTIL_INCLUDES})
-include_directories(${PYTORCH_C10_MACROS_INCLUDES})
+# include_directories(${PYTORCH_C10_CORE_INCLUDES})
+# include_directories(${PYTORCH_C10_DPCPP_INCLUDES})
+# include_directories(${PYTORCH_C10_UTIL_INCLUDES})
+# include_directories(${PYTORCH_C10_MACROS_INCLUDES})
 include_directories(${DPCPP_GPU_ATEN_SRC_ROOT})
 include_directories(${DPCPP_GPU_ATEN_GENERATED})
 
@@ -120,16 +127,16 @@ set(C10_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 set(C10_USE_NUMA ${USE_NUMA})
 set(C10_DISABLE_NUMA ${CAFFE2_DISABLE_NUMA})
 
-configure_file(
-    "${PYTORCH_C10_MACROS_INCLUDES}/cmake_macros.h.in"
-    "${CMAKE_BINARY_DIR}/c10/macros/cmake_macros.h")
-include_directories(${CMAKE_BINARY_DIR})
+# configure_file(
+#     "${PYTORCH_C10_MACROS_INCLUDES}/cmake_macros.h.in"
+#     "${CMAKE_BINARY_DIR}/c10/macros/cmake_macros.h")
+# include_directories(${CMAKE_BINARY_DIR})
 
-configure_file(
-    "${PYTORCH_ATEN_INCLUDES}/Config.h.in"
-    "${CMAKE_BINARY_DIR}/include/ATen/Config.h")
-set(DPCPP_OUT_INCLUDE "${CMAKE_BINARY_DIR}/include")
-include_directories(${DPCPP_OUT_INCLUDE})
+# configure_file(
+#     "${PYTORCH_ATEN_INCLUDES}/Config.h.in"
+#     "${CMAKE_BINARY_DIR}/include/ATen/Config.h")
+# set(DPCPP_OUT_INCLUDE "${CMAKE_BINARY_DIR}/include")
+# include_directories(${DPCPP_OUT_INCLUDE})
 
 # do not compile pytorch any more
 # use generated files for current stage
