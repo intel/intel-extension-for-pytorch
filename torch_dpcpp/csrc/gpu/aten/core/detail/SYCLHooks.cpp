@@ -7,7 +7,8 @@
 #include <core/SYCLDevice.h>
 #include <ATen/detail/SYCLHooksInterface.h>
 #include <c10/util/Exception.h>
-#include <THDP/THSYCL.h>
+
+#include <legacy/THSYCL.h>
 
 #include <core/SYCLUtils.h>
 #include <utils/General.h>

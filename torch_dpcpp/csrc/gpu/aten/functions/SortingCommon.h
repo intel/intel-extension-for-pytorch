@@ -8,8 +8,8 @@
 #include <core/SYCLApplyUtils.h>
 #include <core/detail/TensorInfo.h>
 
-#include <THDP/THSYCLDeviceUtils.h> // only for THCRoundUp?
-#include <THDP/THSYCLScanUtils.h>
+#include <legacy/THSYCLDeviceUtils.h> // only for THCRoundUp?
+#include <legacy/THSYCLScanUtils.h>
 
 #include <utils/MathReduce.h> // AddOp
 

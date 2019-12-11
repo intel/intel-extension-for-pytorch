@@ -3,7 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <c10/macros/Macros.h>
-#include <THDP/THSYCLIntegerDivider.h>
+#include <legacy/THSYCLIntegerDivider.h>
 
 #include <core/Array.h>
 

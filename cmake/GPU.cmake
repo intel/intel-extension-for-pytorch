@@ -118,6 +118,7 @@ include_directories(${PYTORCH_INCLUDES})
 # include_directories(${PYTORCH_C10_DPCPP_INCLUDES})
 # include_directories(${PYTORCH_C10_UTIL_INCLUDES})
 # include_directories(${PYTORCH_C10_MACROS_INCLUDES})
+include_directories(${DPCPP_GPU_ROOT})
 include_directories(${DPCPP_GPU_ATEN_SRC_ROOT})
 include_directories(${DPCPP_GPU_ATEN_GENERATED})
 

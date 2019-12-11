@@ -5,8 +5,8 @@
 #include <core/SYCLUtils.h>
 #include <core/SYCLContext.h>
 
-#include <THDP/THSYCLGenerator.hpp>
-#include <THDP/generic/THSYCLTensorRandomKernel.hpp>
+#include <legacy/THSYCLGenerator.hpp>
+#include <legacy/generic/THSYCLTensorRandomKernel.hpp>
 
 
 namespace {

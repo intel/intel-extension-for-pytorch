@@ -1,5 +1,5 @@
-#include <c10/dpcpp/SYCLStream.h>
-#include <c10/dpcpp/SYCLMemory.h>
+#include <core/SYCLStream.h>
+#include <core/SYCLMemory.h>
 
 namespace c10 {
 namespace sycl {

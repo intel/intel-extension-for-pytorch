@@ -1,6 +1,6 @@
-#include <c10/dpcpp/SYCLStream.h>
-#include <c10/dpcpp/SYCLGuard.h>
-#include <c10/dpcpp/SYCLException.h>
+#include <core/SYCLStream.h>
+#include <core/SYCLGuard.h>
+#include <core/SYCLException.h>
 #include <c10/util/Exception.h>
 
 #include <mutex>
