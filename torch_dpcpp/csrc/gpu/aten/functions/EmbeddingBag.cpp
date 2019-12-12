@@ -1,9 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
-#include <ATen/TensorUtils.h>
 
 #include <legacy/THSYCLDeviceUtils.h>
 
+#include <core/DPCPPTensorUtils.h>
 #include <core/SYCL.h>
 #include <core/SYCLMemory.h>
 #include <core/SYCLUtils.h>
@@ -129,7 +129,7 @@ void EmbeddingBag_updateOutputKernel(
   cgh.parallel_for<DP_K(EmbeddingbagSycl, scalar_t)>(
     DP::nd_range<2>(DP::range<2>(kernel_range, 4), DP::range<2>(64, 4)), kfn);
 };
-DP_Q_ASYNC_SUBMIT(queue, cgf); 
+DP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 
@@ -147,24 +147,24 @@ _embedding_bag_sycl(const Tensor &weight, const Tensor &indices,
   auto offsets_arg = TensorArg(offsets, "offsets", 1);
   checkScalarType("embedding_bag_sycl", offsets_arg, kLong);
   auto weight_arg = TensorArg(weight, "weight", 1);
-  checkSameSYCL("embedding_bag_sycl", weight_arg, indices_arg);
-  checkSameSYCL("embedding_bag_sycl", weight_arg, offsets_arg);
-  
+  checkSameDPCPP("embedding_bag_sycl", weight_arg, indices_arg);
+  checkSameDPCPP("embedding_bag_sycl", weight_arg, offsets_arg);
+
   int64_t numIndices = indices.size(0);
   int64_t numBags = offsets.size(0);
   int64_t featureSize = weight.size(1);
-  
+
   auto bag_size = at::zeros(offsets.sizes(), indices.options());
   auto offset2bag =
       at::zeros({indices.size(0)}, indices.options()); // offset2bag = [0 0 0 0 0]
 
   auto output = at::zeros({offsets.size(0), weight.size(1)}, weight.options());
-  
+
   Tensor max_indices;
-  
+
   max_indices = at::zeros({offsets.size(0), weight.size(1)}, indices.options());
-  
-  
+
+
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(weight.scalar_type(), "embedding_bag_sycl", [&] {
     EmbeddingBag_updateOutputKernel<scalar_t>(
         indices.data_ptr<int64_t>(), offsets.data_ptr<int64_t>(),

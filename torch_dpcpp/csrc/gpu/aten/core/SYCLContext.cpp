@@ -1,12 +1,13 @@
 #include <core/SYCLContext.h>
 #include <core/SYCLState.h>
+#include <legacy/THSYCLAllocator.h>
 
 
 namespace at {
 namespace sycl {
 
-Allocator* getSYCLDeviceAllocator() {
-  return at::globalContext().getTHSYCLState()->syclDeviceAllocator;
+at::Allocator* getSYCLDeviceAllocator() {
+  return THSYCLAllocator_get();
 }
 
 } // namespace sycl

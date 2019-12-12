@@ -73,7 +73,7 @@ public:
   /// Construct a SYCLStream from a Stream.  This construction is checked,
   /// and will raise an error if the Stream is not, in fact, a SYCL stream.
   explicit SYCLStream(Stream stream) : stream_(stream) {
-    TORCH_CHECK(stream_.device_type() == DeviceType::SYCL);
+    TORCH_CHECK(stream_.device_type() == DeviceType::DPCPP);
   }
 
   /// Construct a SYCLStream from a Stream with no error checking.
@@ -98,7 +98,7 @@ public:
 
   /// Get the full Device that this stream is associated with.  The Device
   /// is guaranteed to be a SYCL device.
-  Device device() const { return Device(DeviceType::SYCL, device_index()); }
+  Device device() const { return Device(DeviceType::DPCPP, device_index()); }
 
   /// Return the stream ID corresponding to this particular stream.
   StreamId id() const { return stream_.id(); }

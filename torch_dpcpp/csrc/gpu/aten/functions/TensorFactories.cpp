@@ -4,6 +4,8 @@
 #include <ATen/native/TensorFactories.h>
 #include <c10/util/Exception.h>
 
+#include <aten_ipex_tensor_type.h>
+
 #include <core/SYCLContext.h>
 #include <core/TensorImplUtils.h>
 #include <utils/Numerics.h>
@@ -13,8 +15,8 @@ namespace at {
 namespace native {
 
 Tensor empty_sycl(IntArrayRef size, const TensorOptions& options, c10::optional<MemoryFormat> optional_memory_format) {
-  AT_ASSERT(options.backend() == at::Backend::SYCL);
-  AT_ASSERT(!options.is_variable()); // is_variable should have been "unpacked"
+  AT_ASSERT(options.backend() == at::Backend::DPCPP);
+  // AT_ASSERT(!options.is_variable()); // is_variable should have been "unpacked"
 
   auto* allocator = at::sycl::getSYCLDeviceAllocator();
   int64_t nelements = prod_intlist(size);
@@ -26,7 +28,7 @@ Tensor empty_sycl(IntArrayRef size, const TensorOptions& options, c10::optional<
     allocator,
     /*resizeable=*/true);
 
-  auto tensor = detail::make_tensor<TensorImpl>(storage_impl, SYCLTensorId());
+  auto tensor = detail::make_tensor<TensorImpl>(storage_impl, at::DPCPPTensorId());
   // Default TensorImpl has size [0]
   if (size.size() != 1 || size[0] != 0) {
     tensor.unsafeGetTensorImpl()->set_sizes_contiguous(size);
@@ -39,13 +41,9 @@ Tensor empty_sycl(IntArrayRef size, const TensorOptions& options, c10::optional<
 
 Tensor empty_strided_sycl(IntArrayRef size, IntArrayRef stride, const TensorOptions& options) {
   check_size_nonnegative(size);
-  auto t = at::native::empty_sycl({0}, options);
+  auto t = at::native::empty_sycl({0}, options, c10::nullopt);
   TensorImpl_resizeImpl(t.unsafeGetTensorImpl(), size, stride);
   return t;
-}
-
-Tensor& eye_out_sycl(Tensor& result, int64_t n) {
-  return at::native::eye_out_sycl(result, n, /*m=*/-1);
 }
 
 Tensor& eye_out_sycl(Tensor& result, int64_t n, int64_t m) {
@@ -64,6 +62,10 @@ Tensor& eye_out_sycl(Tensor& result, int64_t n, int64_t m) {
   Tensor diag = result.as_strided({sz}, {stride});
   diag.fill_(1);
   return result;
+}
+
+Tensor& eye_out_sycl(Tensor& result, int64_t n) {
+  return at::native::eye_out_sycl(result, n, /*m=*/-1);
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ triangle ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -225,7 +227,7 @@ Tensor triu_indices_sycl(int64_t row, int64_t col, int64_t offset, const TensorO
   check_args(row, col, options);
 
   auto triu_size = row * col - get_tril_size(row, col, offset - 1);
-  auto tensor = empty_sycl({2, triu_size}, options);
+  auto tensor = empty_sycl({2, triu_size}, options, c10::nullopt);
 
   if (triu_size > 0) {
     // # of triu elements in the first row
@@ -257,7 +259,7 @@ Tensor tril_indices_sycl(int64_t row, int64_t col, int64_t offset, const TensorO
   check_args(row, col, options);
 
   auto tril_size = get_tril_size(row, col, offset);
-  auto tensor = empty_sycl({2, tril_size}, options);
+  auto tensor = empty_sycl({2, tril_size}, options, c10::nullopt);
 
   if (tril_size > 0) {
     auto m_first_row = (offset > 0) ?

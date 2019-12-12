@@ -17,7 +17,7 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
       int64_t num_layers_, double dropout_p, bool train, bool bidirectional, bool batch_first) {
 
   TORCH_CHECK(!batch_first, "_mkldnn_rnn: don't support batch first input");
-  Device curDevice = Device(kSYCL, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -285,6 +285,6 @@ void lstm_sycl(Tensor& output, Tensor& hy, Tensor& cy,
   std::tie(output, hy, cy) = result;
 }
 
-REGISTER_SYCL_DISPATCH(lstm_sycl_stub, &lstm_sycl);
+// REGISTER_SYCL_DISPATCH(lstm_sycl_stub, &lstm_sycl);
 
 }} // namespace at::native

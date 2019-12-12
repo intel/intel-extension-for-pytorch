@@ -5,6 +5,9 @@
 #include <ATen/InferSize.h>
 #include <c10/dpcpp/SYCLException.h>
 
+#include <aten_ipex_tensor_type.h>
+
+
 /**** access methods ****/
 THSYCLStorage *THSYCLTensor_(storage)(THSYCLState *state, const THSYCLTensor *self)
 {
@@ -66,7 +69,7 @@ THSYCLTensor *THSYCLTensor_(new)(THSYCLState *state)
 {
   return c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
     c10::intrusive_ptr<at::StorageImpl>::reclaim(THSYCLStorage_(new)(state)),
-    at::SYCLTensorId()
+    at::DPCPPTensorId()
   ).release();
 }
 
@@ -76,7 +79,7 @@ THSYCLTensor *THSYCLTensor_(newWithTensor)(THSYCLState *state, THSYCLTensor *ten
 {
   THSYCLTensor *self = c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
     c10::intrusive_ptr<at::StorageImpl>::reclaim(THSYCLStorage_(new)(state)),
-    at::SYCLTensorId()
+    at::DPCPPTensorId()
   ).release();
   THSYCLTensor_(setStorageNd)(state,
                               self,
@@ -95,7 +98,7 @@ THSYCLTensor *THSYCLTensor_(newWithStorage)(THSYCLState *state, THSYCLStorage *s
   }
   THSYCLTensor *self = c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
     c10::intrusive_ptr<at::StorageImpl>::reclaim(THSYCLStorage_(new)(state)),
-    at::SYCLTensorId()
+    at::DPCPPTensorId()
   ).release();
   THSYCLTensor_(setStorageNd)(state, self, storage, storageOffset, sizes.size(),
                            const_cast<int64_t*>(sizes.data()), const_cast<int64_t*>(strides.data()));

@@ -1,4 +1,4 @@
-#include <ATen/SYCLGenerator.h>
+#include <core/SYCLGenerator.h>
 #include <core/SYCLFunctions.h>
 
 
@@ -52,7 +52,7 @@ std::shared_ptr<SYCLGenerator> createSYCLGenerator(DeviceIndex device_index) {
 } // namespace sycl
 
 SYCLGenerator::SYCLGenerator(DeviceIndex device_index)
-  : Generator{Device(DeviceType::SYCL, device_index)} { }
+  : Generator{Device(DeviceType::DPCPP, device_index)} { }
 
 void SYCLGenerator::set_current_seed(uint64_t seed) {
   seed_ = seed;
@@ -84,7 +84,7 @@ std::pair<uint64_t, uint64_t> SYCLGenerator::philox_engine_inputs(uint64_t incre
 }
 
 DeviceType SYCLGenerator::device_type() {
-  return DeviceType::SYCL;
+  return DeviceType::DPCPP;
 }
 
 std::shared_ptr<SYCLGenerator> SYCLGenerator::clone() const {

@@ -33,7 +33,7 @@ static void max_pool2d_with_indices_out_frame(
           algorithm alg_kind,
           prop_kind prop_kind)
 {
-  at::Device curDevice = at::Device(at::kSYCL, c10::sycl::current_device());
+  at::Device curDevice = at::Device(at::kDPCPP, c10::sycl::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -93,7 +93,7 @@ static void max_pool2d_with_indices_out_frame(
       data_t,
       format_nchw}, engine});
 
-  auto indices_usr = at::empty({output_tz}, at::TensorOptions(kSYCL).dtype(kInt));
+  auto indices_usr = at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
   at::native::sycl_set_mkldnn_buffer((void *)indices_usr.data_ptr<int32_t>(), indices_usr_memory);
   memory indices_memory = indices_usr_memory;
 
@@ -149,7 +149,7 @@ static void max_pool2d_with_indices_backward_out_frame(
           algorithm alg_kind,
           prop_kind prop_kind)
 {
-  at::Device curDevice = at::Device(at::kSYCL, c10::sycl::current_device());
+  at::Device curDevice = at::Device(at::kDPCPP, c10::sycl::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -209,7 +209,7 @@ static void max_pool2d_with_indices_backward_out_frame(
 
   std::shared_ptr<pooling_backward> pool_backward;
 
-  auto indices_usr = at::empty({output_tz}, at::TensorOptions(kSYCL).dtype(kInt));
+  auto indices_usr = at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
   c10::sycl::syclMemoryCopyType(indices_usr.data_ptr<int32_t>(), (int64_t *)indices_data, indices_usr.numel());
 
   pool_backward.reset(new pooling_backward(*pooling_backward_pd));

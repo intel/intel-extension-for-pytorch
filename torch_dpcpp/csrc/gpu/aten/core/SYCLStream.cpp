@@ -172,7 +172,7 @@ SYCLStreamImpl* SYCLStreamToSYCLStreamImpl(SYCLStream stream) {
 SYCLStream SYCLStreamImplToSYCLStream(const SYCLStreamImpl *ptr) {
   return SYCLStream(SYCLStream::UNCHECKED,
               Stream(Stream::UNSAFE,
-                     c10::Device(DeviceType::SYCL, ptr->getDeviceIndex()),
+                     c10::Device(DeviceType::DPCPP, ptr->getDeviceIndex()),
                      SYCLStream_getStreamId(ptr)));
 }
 

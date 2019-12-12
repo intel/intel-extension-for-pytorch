@@ -662,7 +662,7 @@ void kernelPointwiseApply4(
 template <typename scalar, int step, typename Op, bool with_offset=false>
 inline void SYCL_tensor_apply1(at::Tensor a,
                                const Op &op) {
-  checkBackend("SYCL_Tensor_apply1", {a}, Backend::SYCL);
+  checkBackend("SYCL_Tensor_apply1", {a}, Backend::DPCPP);
   auto dim = a.dim();
 
   std::vector<int64_t> collapsed_shape;
@@ -767,7 +767,7 @@ template <typename scalar1, typename scalar2, int step, typename Op, bool with_o
 inline void SYCL_tensor_apply2(at::Tensor dst,
                                at::Tensor src,
                                const Op &op) {
-  checkBackend("SYCL_Tensor_apply2", {dst, src}, Backend::SYCL);
+  checkBackend("SYCL_Tensor_apply2", {dst, src}, Backend::DPCPP);
   int64_t totalElements = dst.numel();
 
   TORCH_CHECK(totalElements == src.numel(),
@@ -892,7 +892,7 @@ inline void SYCL_tensor_apply3(at::Tensor dst,
                                at::Tensor src1,
                  at::Tensor src2,
                                const Op &op) {
-  checkBackend("SYCL_Tensor_apply3", {dst, src1, src2}, Backend::SYCL);
+  checkBackend("SYCL_Tensor_apply3", {dst, src1, src2}, Backend::DPCPP);
   int64_t totalElements = dst.numel();
 
   TORCH_CHECK(totalElements == src1.numel() &&
@@ -1048,7 +1048,7 @@ inline void SYCL_tensor_apply4(at::Tensor dst,
                                at::Tensor src2,
                                at::Tensor src3,
                                const Op &op) {
-  checkBackend("SYCL_Tensor_apply4", {dst, src1, src2, src3}, Backend::SYCL);
+  checkBackend("SYCL_Tensor_apply4", {dst, src1, src2, src3}, Backend::DPCPP);
   int64_t totalElements = dst.numel();
 
   TORCH_CHECK(totalElements == src1.numel() &&

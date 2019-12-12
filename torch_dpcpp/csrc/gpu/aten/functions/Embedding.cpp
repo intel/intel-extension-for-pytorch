@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
-#include <ATen/TensorUtils.h>
 
+#include <core/DPCPPTensorUtils.h>
 #include <core/SYCLMemory.h>
 #include <core/SYCLUtils.h>
 #include <core/SYCLContext.h>
@@ -98,7 +98,7 @@ Tensor embedding_dense_backward_sycl(const Tensor & grad_, const Tensor & indice
   auto grad_arg = TensorArg(grad_, "grad", 1);
   auto indices_arg = TensorArg(indices, "indices", 1);
   checkScalarType("embedding_backward", indices_arg, kLong);
-  checkSameSYCL("embedding_backward", grad_arg, indices_arg);
+  checkSameDPCPP("embedding_backward", grad_arg, indices_arg);
 
   auto indices_contig = indices.contiguous();
   auto indices_data = indices_contig.data_ptr<int64_t>();

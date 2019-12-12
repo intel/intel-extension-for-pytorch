@@ -19,7 +19,7 @@ std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm_template (
 {
     auto output = at::empty_like(input);
 
-    Device curDevice = Device(kSYCL, c10::sycl::current_device());
+    Device curDevice = Device(kDPCPP, c10::sycl::current_device());
     auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
     auto propagation = training ? prop_kind::forward_training: prop_kind::forward_inference;
@@ -145,7 +145,7 @@ std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm (
     const Tensor& bias, const Tensor& running_mean, const Tensor& running_var,
     bool training, double momentum, double epsilon)
 {
-    checkBackend("sycl_batch_norm", {input, weight, bias, running_mean, running_var}, Backend::SYCL);
+    checkBackend("sycl_batch_norm", {input, weight, bias, running_mean, running_var}, Backend::DPCPP);
 
     if (input.scalar_type() != at::ScalarType::Float && input.scalar_type() != at::ScalarType::Half) {
         //TODO: add more scalar type support.
@@ -183,7 +183,7 @@ std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm_backward(
     grad_bias = at::empty_like(weight);
   }
 
-  Device curDevice = Device(kSYCL, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto flags = normalization_flags::use_scale_shift; // backward only support training mode
 

@@ -69,7 +69,7 @@ struct GpuEngineManager {
   }
 
   engine& get_engine(const Device &device) {
-    AT_ASSERT(device.type() == kSYCL);
+    AT_ASSERT(device.type() == kDPCPP);
     AT_ASSERT(device.index() < c10::sycl::device_count());
     return _gpu_engines[device.index()];
   }
@@ -101,7 +101,7 @@ struct GpuStreamManager {
   stream get_stream(int device_index = 0) {
     int device_count = (int) c10::sycl::device_count();
     AT_ASSERT(device_count > 0 && device_index < device_count);
-    return mkldnn::stream(GpuEngineManager::Instance().get_engine({kSYCL, c10::sycl::current_device()}),
+    return mkldnn::stream(GpuEngineManager::Instance().get_engine({kDPCPP, c10::sycl::current_device()}),
                           c10::sycl::getDefaultSYCLStream(device_index).sycl_queue());
   }
   GpuStreamManager(GpuStreamManager const&) = delete;
