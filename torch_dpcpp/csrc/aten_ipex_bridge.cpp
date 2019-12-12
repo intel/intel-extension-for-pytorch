@@ -6,6 +6,7 @@
 
 #include <ATen/Tensor.h>
 #include <c10/core/StorageImpl.h>
+#include <c10/util/Exception.h>
 
 namespace torch_ipex {
 namespace bridge {
@@ -60,6 +61,42 @@ at::Tensor upgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     _tensor.unsafeGetTensorImpl()->set_sizes_contiguous(_tensor_sizes);
   }
   return _tensor;
+}
+
+void copyTensor(at::Tensor& dstTensor, const at::Tensor& scrTensor) {
+  TORCH_CHECK(dstTensor.layout() == c10::kStrided);
+  TORCH_CHECK(scrTensor.layout() == c10::kStrided);
+  TORCH_CHECK(dstTensor.is_contiguous());
+  TORCH_CHECK(scrTensor.is_contiguous());
+  TORCH_CHECK(dstTensor.numel() == scrTensor.numel());
+  TORCH_CHECK(dstTensor.dtype() == scrTensor.dtype());
+  TORCH_CHECK(dstTensor.nbytes() == scrTensor.nbytes());
+  TORCH_CHECK(dstTensor.layout() == scrTensor.layout());
+  TORCH_CHECK((dstTensor.device().type() == c10::DeviceType::CPU) || (dstTensor.device().type() == c10::DeviceType::DPCPP));
+  TORCH_CHECK((scrTensor.device().type() == c10::DeviceType::CPU) || (scrTensor.device().type() == c10::DeviceType::DPCPP));
+  memcpy(dstTensor.unsafeGetTensorImpl()->data(), scrTensor.unsafeGetTensorImpl()->data(), dstTensor.nbytes());
+}
+
+at::TensorList fallbackToCPUTensorList(const at::TensorList& tensor_list) {
+  std::vector<at::Tensor> dpcpp_tensor_vec;
+  for (const auto& tensor : tensor_list) {
+    if (tensor.defined()) {
+      dpcpp_tensor_vec.push_back(fallbackToCPUTensor(tensor));
+    }
+  }
+  return at::TensorList(dpcpp_tensor_vec);
+}
+
+std::vector<at::Tensor> upgradeToDPCPPTensorVec(const std::vector<at::Tensor> &tensor_vec) {
+  std::vector<at::Tensor> ret_dpcpp_tensor_vec;
+  for (size_t i = 0; i < tensor_vec.size(); i++) {
+    auto&& cur_tensor = tensor_vec[i];
+    TORCH_CHECK(cur_tensor.layout() == c10::kStrided);
+    TORCH_CHECK(cur_tensor.is_contiguous());
+    auto&& cur_dpcpp_tensor = upgradeToDPCPPTensor(cur_tensor);
+    ret_dpcpp_tensor_vec.push_back(cur_dpcpp_tensor);
+  }
+  return ret_dpcpp_tensor_vec;
 }
 
 }  // namespace bridge
