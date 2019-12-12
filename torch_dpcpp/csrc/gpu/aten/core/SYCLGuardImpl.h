@@ -14,16 +14,16 @@ namespace sycl {
 namespace impl {
 
 struct SYCLGuardImpl final : public c10::impl::DeviceGuardImplInterface {
-  static constexpr DeviceType static_type = DeviceType::SYCL;
+  static constexpr DeviceType static_type = DeviceType::DPCPP;
   SYCLGuardImpl() {}
   SYCLGuardImpl(DeviceType t) {
-    AT_ASSERT(t == DeviceType::SYCL);
+    AT_ASSERT(t == DeviceType::DPCPP);
   }
   DeviceType type() const override {
-    return DeviceType::SYCL;
+    return DeviceType::DPCPP;
   }
   Device exchangeDevice(Device d) const override {
-    AT_ASSERT(d.type() == DeviceType::SYCL);
+    AT_ASSERT(d.type() == DeviceType::DPCPP);
     Device old_device = getDevice();
     if (old_device.index() != d.index()) {
       C10_SYCL_CHECK(syclSetDevice(d.index()));
@@ -33,10 +33,10 @@ struct SYCLGuardImpl final : public c10::impl::DeviceGuardImplInterface {
   Device getDevice() const override {
     DeviceIndex device;
     C10_SYCL_CHECK(syclGetDevice(&device));
-    return Device(DeviceType::SYCL, device);
+    return Device(DeviceType::DPCPP, device);
   }
   void setDevice(Device d) const override {
-    AT_ASSERT(d.type() == DeviceType::SYCL);
+    AT_ASSERT(d.type() == DeviceType::DPCPP);
     C10_SYCL_CHECK(syclSetDevice(d.index()));
   }
   void uncheckedSetDevice(Device d) const noexcept override {

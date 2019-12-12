@@ -1,7 +1,7 @@
 #ifndef THSYCL_DEVICE_UTILS_INC
 #define THSYCL_DEVICE_UTILS_INC
 
-#include <c10/dpcpp/SYCLUtils.h>
+#include <core/SYCLUtils.h>
 
 template <typename T>
 DP_BOTH inline T THSYCLMin(T a, T b) { return (a < b) ? a : b; }

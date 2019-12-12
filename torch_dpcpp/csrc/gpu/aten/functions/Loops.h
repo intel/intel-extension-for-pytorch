@@ -217,7 +217,7 @@ template <typename scalar_t, typename func_t>
 void sycl_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
 
   for (int arg = 0; arg < iter.ntensors(); arg++) {
-    TORCH_INTERNAL_ASSERT(iter.device(arg).is_sycl());
+    TORCH_INTERNAL_ASSERT(iter.device(arg).type() == at::kDPCPP);
   }
 
   if (iter.numel() == 0) {

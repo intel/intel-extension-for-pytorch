@@ -1,7 +1,7 @@
 #include <ATen/Context.h>
 #include <ATen/Dispatch.h>
 #include <ATen/native/TensorIterator.h>
-#include <ATen/native/Tanh.h>
+// #include <ATen/native/Tanh.h>
 
 #include <core/SYCL.h>
 #include <functions/Loops.h>

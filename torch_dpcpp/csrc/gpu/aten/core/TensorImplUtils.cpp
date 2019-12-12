@@ -2,7 +2,10 @@
 #include <core/TensorImplUtils.h>
 #include <core/StorageImplUtils.h>
 #include <core/TensorInfo.h>
+#include <core/SYCLGuard.h>
 #include <utils/General.h>
+
+#include <aten_ipex_tensor_type.h>
 
 namespace at { namespace native {
 
@@ -10,7 +13,7 @@ TensorImpl *TensorImpl_new(caffe2::TypeMeta type_meta)
 {
   return c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
     c10::intrusive_ptr<at::StorageImpl>::reclaim(StorageImpl_new(type_meta)),
-    at::SYCLTensorId()
+    at::DPCPPTensorId()
   ).release();
 }
 

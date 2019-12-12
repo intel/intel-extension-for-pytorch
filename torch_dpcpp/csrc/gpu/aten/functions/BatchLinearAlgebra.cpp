@@ -87,11 +87,6 @@ Tensor& triu_tril_sycl_template(Tensor& result, const Tensor& self, int64_t k, c
   return result;
 }
 
-
-Tensor& tril_sycl_(Tensor &self, int64_t k) {
-  return tril_sycl_out(self, self, k);
-}
-
 Tensor& tril_sycl_out(Tensor &result, const Tensor& self, int64_t k) {
   if (result.sizes() != self.sizes()) {
     result.resize_as_(self);
@@ -103,8 +98,8 @@ Tensor& tril_sycl_out(Tensor &result, const Tensor& self, int64_t k) {
   return triu_tril_sycl_template<false>(result, self, k, "tril");
 }
 
-Tensor& triu_sycl_(Tensor &self, int64_t k) {
-  return triu_sycl_out(self, self, k);
+Tensor& tril_sycl_(Tensor &self, int64_t k) {
+  return tril_sycl_out(self, self, k);
 }
 
 Tensor& triu_sycl_out(Tensor &result, const Tensor& self, int64_t k) {
@@ -117,7 +112,9 @@ Tensor& triu_sycl_out(Tensor &result, const Tensor& self, int64_t k) {
   return triu_tril_sycl_template<true>(result, self, k, "triu");
 }
 
-
+Tensor& triu_sycl_(Tensor &self, int64_t k) {
+  return triu_sycl_out(self, self, k);
+}
 
 } // namespace native
 } // namespace at

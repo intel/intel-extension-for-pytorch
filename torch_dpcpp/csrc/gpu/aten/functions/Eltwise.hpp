@@ -13,7 +13,7 @@ namespace at { namespace native {
 template <algorithm alg_kind>
 void sycl_eltwise (at::Tensor& output, const at::Tensor& input, float alpha, float beta)
 {
-  Device curDevice = Device(kSYCL, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
   int32_t n = input.size(0);
@@ -48,7 +48,7 @@ void sycl_eltwise (at::Tensor& output, const at::Tensor& input, float alpha, flo
 template <algorithm alg_kind>
 void sycl_eltwise_backward(char* diff_src, char* src, char* diff_dst, int32_t len, float alpha, float beta)
 {
-  Device curDevice = Device(kSYCL, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
   int32_t n = len;

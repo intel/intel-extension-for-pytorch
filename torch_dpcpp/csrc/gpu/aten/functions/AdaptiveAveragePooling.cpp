@@ -30,7 +30,7 @@ static void adaptive_avg_pool2d_out_sycl_frame(
           algorithm alg_kind,
           prop_kind prop_kind)
 {
-  Device curDevice = Device(kSYCL, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -119,7 +119,7 @@ static void adaptive_avg_pool2d_backward_out_sycl_frame(
           algorithm alg_kind,
           prop_kind prop_kind)
 {
-  at::Device curDevice = at::Device(at::kSYCL, c10::sycl::current_device());
+  at::Device curDevice = at::Device(at::kDPCPP, c10::sycl::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 

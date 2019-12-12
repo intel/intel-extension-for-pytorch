@@ -6,6 +6,6 @@ namespace impl {
 
 constexpr DeviceType SYCLGuardImpl::static_type;
 
-C10_REGISTER_GUARD_IMPL(SYCL, SYCLGuardImpl);
+C10_REGISTER_GUARD_IMPL(DPCPP, SYCLGuardImpl);
 
 }}} // namespace c10::sycl::detail

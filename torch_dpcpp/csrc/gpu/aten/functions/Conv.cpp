@@ -36,7 +36,7 @@ at::Tensor sycl_convolution(
   auto output = at::empty(conv_output_size(
     input.sizes(), weight.sizes(), padding, stride, dilation, groups), input.options());
 
-  Device curDevice = Device(kSYCL, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -154,7 +154,7 @@ Tensor sycl_convolution_backward_input(
 {
   auto grad_input = at::empty(input_size, grad_output.options());
 
-  Device curDevice = Device(kSYCL, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -277,7 +277,7 @@ std::tuple<at::Tensor, at::Tensor> sycl_convolution_backward_weights(
     grad_bias = at::empty({grad_output.size(1)}, grad_output.options());
   }
 
-  Device curDevice = Device(kSYCL, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -415,11 +415,19 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> sycl_convolution_backward(
 
   Tensor grad_input, grad_weight, grad_bias;
   if (output_mask[0]) {
-    grad_input = at::sycl_convolution_backward_input(
+    // grad_input = at::sycl_convolution_backward_input(
+    //   input.sizes(), grad_output, weight, padding, stride, dilation, groups, output_mask[2]);
+    // FIXME: we should route to at variable op to insert bp info, even though it is backward op
+    // It exists double backward case
+    grad_input = sycl_convolution_backward_input(
       input.sizes(), grad_output, weight, padding, stride, dilation, groups, output_mask[2]);
   }
   if (output_mask[1] || output_mask[2]) {
-    std::tie(grad_weight, grad_bias) = at::sycl_convolution_backward_weights(
+    // FIXME: we should route to at variable op to insert bp info, even though it is backward op
+    // It exists double backward case
+    // std::tie(grad_weight, grad_bias) = at::sycl_convolution_backward_weights(
+    //   weight.sizes(), grad_output, input, padding, stride, dilation, groups, output_mask[2]);
+    std::tie(grad_weight, grad_bias) = sycl_convolution_backward_weights(
       weight.sizes(), grad_output, input, padding, stride, dilation, groups, output_mask[2]);
   }
 

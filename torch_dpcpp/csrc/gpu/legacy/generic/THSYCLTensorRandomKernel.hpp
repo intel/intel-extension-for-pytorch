@@ -1,8 +1,8 @@
 #ifndef __THSYCLTENSORRANDOMKERNEL_HPP__
 #define __THSYCLTENSORRANDOMKERNEL_HPP__
 
-#include <c10/dpcpp/SYCL.h>
-#include <c10/dpcpp/SYCLMemory.h>
+#include <core/SYCL.h>
+#include <core/SYCLMemory.h>
 
 using namespace cl::sycl;
 using ACC_1D_RW_G = accessor<c10::sycl::buffer_data_type_t, 1, access::mode::read_write, access::target::global_buffer>;

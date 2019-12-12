@@ -2,7 +2,6 @@
 
 #include <core/SYCLException.h>
 #include <core/SYCLMemory.h>
-#include <core/TensorImpl.h>
 #include <core/SYCLUtils.h>
 #include <core/SYCLContext.h>
 #include <utils/General.h>
@@ -21,7 +20,7 @@ void StorageImpl_resize(at::StorageImpl *self, ptrdiff_t size) {
   size_t itemsize = self->itemsize();
 
   if (size == 0) {
-    self->set_data_ptr(c10::DataPtr(nullptr, c10::Device(c10::DeviceType::SYCL, device)));
+    self->set_data_ptr(c10::DataPtr(nullptr, c10::Device(c10::DeviceType::DPCPP, device)));
     self->set_numel(0);
   } else {
     c10::DataPtr data = self->allocator()->allocate(size *itemsize);

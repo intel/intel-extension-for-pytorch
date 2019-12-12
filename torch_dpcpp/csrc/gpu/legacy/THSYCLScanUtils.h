@@ -1,13 +1,13 @@
 #ifndef THSYCL_SCAN_UTILS_INC
 #define THSYCL_SCAN_UTILS_INC
-#include <THDP/THSYCLDeviceUtils.h>
+#include <legacy/THSYCLDeviceUtils.h>
 
 // Collection of in-kernel scan / prefix sum utilities
 
 // Inclusive Scan via an upsweep/downsweep mechanism. Assumes:
 //
 // 1. Power2ScanSize is a power of 2. This code still works for collections that
-// do not exactly contain a power of 2 number of elements, simply round up to the 
+// do not exactly contain a power of 2 number of elements, simply round up to the
 // nearest power of 2 and then call.
 //
 // 2. That there are two-elements per thread, i.e. the size of the smem storage
@@ -18,13 +18,13 @@
 // Upsweep:
 //
 //    0  1  2  3  4  5  6  7
-//       1     5     9    13  
+//       1     5     9    13
 //             6          22
 //                        28
 //
 // Downsweep:
 //                  15
-//         3     10    21  
+//         3     10    21
 template <typename T>
 using local_accessor_t = cl::sycl::accessor<T, 1, cl::sycl::access::mode::read_write, cl::sycl::access::target::local>;
 

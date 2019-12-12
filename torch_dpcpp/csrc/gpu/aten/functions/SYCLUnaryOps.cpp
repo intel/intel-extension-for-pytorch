@@ -3,10 +3,6 @@
 
 namespace at { namespace native {
 
-Tensor& _clamp__sycl(Tensor& self, optional<Scalar> min, optional<Scalar> max) {
-  return _clamp_out_sycl(self, self, min, max);
-}
-
 Tensor& _clamp_out_sycl(
     Tensor& result,
     const Tensor& self,
@@ -22,6 +18,10 @@ Tensor& _clamp_out_sycl(
     AT_ERROR("At least one of 'min' or 'max' must not be None");
   }
   return result;
+}
+
+Tensor& _clamp__sycl(Tensor& self, optional<Scalar> min, optional<Scalar> max) {
+  return _clamp_out_sycl(self, self, min, max);
 }
 
 Tensor& _clamp_max__sycl(Tensor& self, Scalar max) {

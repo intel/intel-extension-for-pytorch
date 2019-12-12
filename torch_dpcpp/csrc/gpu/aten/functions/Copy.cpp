@@ -12,12 +12,26 @@
 
 namespace at {
 namespace sycl {
+
+template <typename T>
+struct inter_copy_type {
+  using type = T;
+};
+
+template <>
+struct inter_copy_type<uint8_t> {
+  using type = int64_t;
+};
+
+template <typename T>
+using inter_copy_type_t = typename inter_copy_type<T>::type;
+
 template <typename dst_T, typename src_T>
 class copy_functor {
   public :
     copy_functor() {}
     void operator()(dst_T &dst_val, const src_T& src_val) const {
-      dst_val = static_cast<dst_T>(static_cast<native::inter_copy_type_t<dst_T>>(src_val));
+      dst_val = static_cast<dst_T>(static_cast<inter_copy_type_t<dst_T>>(src_val));
     }
 };
 }}
@@ -192,10 +206,10 @@ void _copy__sycl(TensorIterator& iter, bool non_blocking) {
   TORCH_CHECK(dst.numel() == src.numel(),"sizes do not match");
   AT_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half, at::ScalarType::Bool, src.scalar_type(), "_copy_sycl", [&]() {
-        if (dst.is_sycl() && src.is_sycl()) {
+        if (dst.device().type() == at::kDPCPP && src.device().type() == at::kDPCPP) {
           copy_device_to_device(iter, non_blocking);
         } else {
-          if (dst.is_sycl()) {
+          if (dst.device().type() == at::kDPCPP) {
             if (std::is_same<dst_T, scalar_t>::value) {
               if (non_blocking) {
                 copy_from_cpu_async_(iter);

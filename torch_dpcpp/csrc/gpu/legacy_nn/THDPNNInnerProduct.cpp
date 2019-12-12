@@ -7,7 +7,7 @@ void dnnl_vec_inner_product_forward(
     THSYCLTensor *input1,
     THSYCLTensor *input2,
     THSYCLTensor *output) {
-  at::Device curDevice = at::Device(at::kSYCL, c10::sycl::current_device());
+  at::Device curDevice = at::Device(at::kDPCPP, c10::sycl::current_device());
   auto engine = at::native::GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = at::native::GpuStreamManager::Instance().get_stream();
 
@@ -29,11 +29,11 @@ void dnnl_vec_inner_product_forward(
   std::shared_ptr<inner_product_forward::desc> ipFwd_desc;
   ipFwd_desc.reset(new inner_product_forward::desc(prop_kind::forward, input_md, weight_md, output_md));
   auto ip_forward_pd = inner_product_forward::primitive_desc(*ipFwd_desc, engine);
-  
+
   // vec_inner_product only supports fp32
   auto input_usr_memory = memory({{{input_tz}, data_t, format_nc}, engine});
   at::native::sycl_set_mkldnn_buffer(input1->data<float>(), input_usr_memory);
-  
+
   auto weight_usr_memory = memory({{{weight_tz}, data_t, format_oi}, engine});
   at::native::sycl_set_mkldnn_buffer(input2->data<float>(), weight_usr_memory);
 

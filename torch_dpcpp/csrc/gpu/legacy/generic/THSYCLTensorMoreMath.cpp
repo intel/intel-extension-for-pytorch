@@ -44,7 +44,7 @@ static void THSYCLTensor_(catArray_mkldnn__)(THSYCLState *state,
   // mkldnn setup
   // TODO: scalar_t => mkldnn data type
   at::Device curDevice =
-      at::Device(at::kSYCL, c10::sycl::current_device());
+      at::Device(at::kDPCPP, c10::sycl::current_device());
   auto mkldnn_data_t = memory::data_type::f32;
   auto mkldnn_format = [&]() -> memory::format_tag {
     switch(nDims) {
