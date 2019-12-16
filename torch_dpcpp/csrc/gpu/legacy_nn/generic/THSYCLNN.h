@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDPNN/generic/THSYCLNN.h"
+#define THSYCL_GENERIC_FILE "legacy_nn/generic/THSYCLNN.h"
 #else
 
 #include <ATen/core/Reduction.h>

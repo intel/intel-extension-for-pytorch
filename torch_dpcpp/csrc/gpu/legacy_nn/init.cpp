@@ -1,9 +1,10 @@
-#include <THDP/THSYCL.h>
-#include <THDPNN/THSYCLNN.h>
+#include <legacy/THSYCL.h>
+#include <legacy_nn/THSYCLNN.h>
 
-#include <THDP/THSYCLTensor.hpp>
-#include <ATen/dpcpp/SYCLApplyUtils.h>
-#include <THDPNN/THDPNNInnerProduct.h>
+#include <legacy/THSYCLTensor.hpp>
+#include <legacy_nn/THDPNNInnerProduct.h>
+
+#include <core/SYCLApplyUtils.h>
 #include <cmath>
 
 #define torch_(NAME) THSYCL_CONCAT_3(torch_, Real, NAME)
@@ -63,16 +64,16 @@
     THArgCheck(COND, ARG, FORMAT, s1.str);                             \
   }
 
-#include <THDPNN/generic/AbsCriterion.c>
-#include <THDP/THSYCLGenerateFloatTypes.h>
+#include <legacy_nn/generic/AbsCriterion.c>
+#include <legacy/THSYCLGenerateFloatTypes.h>
 
-#include <THDPNN/generic/ClassNLLCriterion.c>
-#include <THDP/THSYCLGenerateFloatTypes.h>
+#include <legacy_nn/generic/ClassNLLCriterion.c>
+#include <legacy/THSYCLGenerateFloatTypes.h>
 
-#include <THDPNN/MSECriterion.h>
-#include <THDPNN/generic/MSECriterion.c>
-#include <THDP/THSYCLGenerateFloatTypes.h>
+#include <legacy_nn/MSECriterion.h>
+#include <legacy_nn/generic/MSECriterion.c>
+#include <legacy/THSYCLGenerateFloatTypes.h>
 
-#include <THDPNN/BCECriterion.h>
-#include <THDPNN/generic/BCECriterion.c>
-#include <THDP/THSYCLGenerateFloatTypes.h>
+#include <legacy_nn/BCECriterion.h>
+#include <legacy_nn/generic/BCECriterion.c>
+#include <legacy/THSYCLGenerateFloatTypes.h>

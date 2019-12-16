@@ -1,9 +1,11 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDPNN/generic/ClassNLLCriterion.c"
+#define THSYCL_GENERIC_FILE "legacy_nn/generic/ClassNLLCriterion.c"
 #else
-#include <ATen/dpcpp/SYCLContext.h>
-#include <THDPNN/common.h>
-#include <THDP/THSYCLNumerics.h>
+#include <core/SYCLContext.h>
+#include <legacy_nn/common.h>
+#include <legacy/THSYCLNumerics.h>
+
+
 class THNN_(updateOutputName) {};
 class THNN_(updateOutputKernel1Name) {};
 class THNN_(updateOutputKernelName) {};
@@ -56,7 +58,7 @@ void THNN_(ClassNLLCriterion_updateOutput)(
             " but got weight tensor of shape: %s", n_classes, s1.str);
   }
 
-  if (reduction == Reduction::None && n_dims == 2) {
+  if (reduction == at::Reduction::None && n_dims == 2) {
     THSYCLTensor_(resize1d)(state, output, batch_size);
     if (weights) {
       weights = THSYCLTensor_(newContiguous)(state, weights);
@@ -131,7 +133,7 @@ void THNN_(ClassNLLCriterion_updateOutput)(
       total_weight_ptr[0] = has_weights ? weights_ptr[cur_target] : static_cast<scalar_t>(1.0f);
       output_ptr[0] = -static_cast<scalar_t>(input_ptr[cur_target]) * static_cast<scalar_t>(total_weight_ptr[0]);
       }
-      if (reduction == Reduction::Mean && total_weight_ptr[0]) {
+      if (reduction == at::Reduction::Mean && total_weight_ptr[0]) {
         output_ptr[0] /= total_weight_ptr[0];
       }
     });
@@ -181,7 +183,7 @@ void THNN_(ClassNLLCriterion_updateOutput)(
 
       output_ptr[0] = local_output_acc[0];
       total_weight_ptr[0] = local_total_weight_acc[0];
-      if (reduction == Reduction::Mean && total_weight_ptr[0]) {
+      if (reduction == at::Reduction::Mean && total_weight_ptr[0]) {
         output_ptr[0] /= total_weight_ptr[0];
       }
 
@@ -242,7 +244,7 @@ THSYCL_API void THNN_(ClassNLLCriterion_updateGradInput)(
     THError("weight tensor should be defined either for all or no classes");
   }
 
-  if (reduction == Reduction::None && n_dims == 2) {
+  if (reduction == at::Reduction::None && n_dims == 2) {
     THSYCLNN_check_dim_size(state, gradOutput, 1, 0, batch_size);
     if (weights) {
       weights = THSYCLTensor_(newContiguous)(state, weights);
@@ -310,7 +312,7 @@ THSYCL_API void THNN_(ClassNLLCriterion_updateGradInput)(
      auto total_weight_ptr = total_weight_acc.template get_pointer<scalar_t>();
      if (*total_weight_ptr <= 0)
     return;
-     scalar_t norm = (reduction == Reduction::Mean) ? (ScalarConvert<int, scalar_t>::to(1) / static_cast<scalar_t>(*total_weight_ptr)) : ScalarConvert<int, scalar_t>::to(1);
+     scalar_t norm = (reduction == at::Reduction::Mean) ? (ScalarConvert<int, scalar_t>::to(1) / static_cast<scalar_t>(*total_weight_ptr)) : ScalarConvert<int, scalar_t>::to(1);
      int t = (int)*target_ptr;
      if (t != (int) ignore_index) {
        gradInput_ptr[t] = -(has_weights ? weights_ptr[t] : ScalarConvert<int, scalar_t>::to(1)) * norm * gradOutput_ptr[0];
@@ -343,13 +345,13 @@ THSYCL_API void THNN_(ClassNLLCriterion_updateGradInput)(
       if (*total_weight_ptr <= 0)
       return;
     int i, t;
-    scalar_t norm = (reduction == Reduction::Mean) ? (static_cast<scalar_t>(1.0f) / static_cast<scalar_t>(*total_weight_ptr)) : ScalarConvert<int, scalar_t>::to(1);
+    scalar_t norm = (reduction == at::Reduction::Mean) ? (static_cast<scalar_t>(1.0f) / static_cast<scalar_t>(*total_weight_ptr)) : ScalarConvert<int, scalar_t>::to(1);
       for (i = local_item_id; i <  nframe; i += local_size) {
       t = (int)target_ptr[i];
       if (t != (int) ignore_index) {
             // assert(t >= 0 && t < n_classes)
         gradInput_ptr[i * ndim + t] = -(has_weights? weights_ptr[t] : ScalarConvert<int, scalar_t>::to(1)) * norm * gradOutput_ptr[0];
-  
+
           }
     }
     });

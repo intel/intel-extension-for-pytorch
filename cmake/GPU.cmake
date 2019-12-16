@@ -167,6 +167,10 @@ set(DPCPP_LEGACY_SRCS)
 add_subdirectory(torch_dpcpp/csrc/gpu/legacy)
 list(APPEND DPCPP_SRCS ${DPCPP_LEGACY_SRCS})
 
+set(DPCPP_LEGACY_NN_SRCS)
+add_subdirectory(torch_dpcpp/csrc/gpu/legacy_nn)
+list(APPEND DPCPP_SRCS ${DPCPP_LEGACY_NN_SRCS})
+
 add_library(torch_dpcpp SHARED ${DPCPP_SRCS})
 # add_dependencies(torch_dpcpp ${DPCPP_DEP})
 # target_link_libraries(torch PUBLIC c10_sycl)

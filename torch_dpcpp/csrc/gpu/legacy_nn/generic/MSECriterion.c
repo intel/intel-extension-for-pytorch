@@ -1,11 +1,10 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDPNN/generic/MSECriterion.c"
+#define THSYCL_GENERIC_FILE "legacy_nn/generic/MSECriterion.c"
 #else
-#include <ATen/dpcpp/SYCLContext.h>
-#include <THDPNN/common.h>
-#include <THDP/THSYCLNumerics.h>
-#include <THDP/THSYCLDeviceUtils.h>
-
+#include <core/SYCLContext.h>
+#include <legacy_nn/common.h>
+#include <legacy/THSYCLNumerics.h>
+#include <legacy/THSYCLDeviceUtils.h>
 
 
 THSYCL_API void THNN_(MSECriterion_updateOutput)(
@@ -17,19 +16,19 @@ THSYCL_API void THNN_(MSECriterion_updateOutput)(
 {
   THSYCLNN_CHECK_SHAPE(state, input, target);
 
-  if (reduction != Reduction::None) {
+  if (reduction != at::Reduction::None) {
     THSYCLTensor_(resize0d)(state, output);
 
     accreal sum = 0;
     int64_t size = THSYCLTensor_(nElement)(state, input);
     at::sycl::SYCL_tensor_apply2<scalar_t, scalar_t>(THTensor_wrap(input), THTensor_wrap(target), TensorSubOp<scalar_t>());
-   
+
     THSYCLTensor_(resize1d)(state, input, size);
     THSYCLTensor_(resize1d)(state, target, size);
 
     dnnl_vec_inner_product_forward((int)size, input, target, output);
 
-    if (reduction == Reduction::Mean) {
+    if (reduction == at::Reduction::Mean) {
       sum = THSYCLTensor_(get0d)(state, output);
       sum /= size;
       THSYCLTensor_(set0d)(state, output, (scalar_t)sum);

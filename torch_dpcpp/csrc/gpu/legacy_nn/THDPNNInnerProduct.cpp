@@ -1,6 +1,6 @@
-#include <ATen/dpcpp/Runtime.h>
-#include <c10/dpcpp/SYCLMemory.h>
-#include <THDPNN/THDPNNInnerProduct.h>
+#include <core/Runtime.h>
+#include <core/SYCLMemory.h>
+#include <legacy_nn/THDPNNInnerProduct.h>
 
 void dnnl_vec_inner_product_forward(
     int K,

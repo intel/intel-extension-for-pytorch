@@ -1,10 +1,10 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDPNN/generic/BCECriterion.c"
+#define THSYCL_GENERIC_FILE "legacy_nn/generic/BCECriterion.c"
 #else
-#include <ATen/dpcpp/SYCLContext.h>
-#include <THDPNN/common.h>
-#include <THDP/THSYCLNumerics.h>
-#include <THDP/THSYCLDeviceUtils.h>
+#include <core/SYCLContext.h>
+#include <legacy_nn/common.h>
+#include <legacy/THSYCLNumerics.h>
+#include <legacy/THSYCLDeviceUtils.h>
 
 
 THSYCL_API void THNN_(BCECriterion_updateOutput)(
@@ -18,10 +18,10 @@ THSYCL_API void THNN_(BCECriterion_updateOutput)(
   THSYCLNN_CHECK_NELEMENT(state, input, target);
   THSYCLNN_CHECK_NELEMENT(state, input, weights);
 
-  if (reduction == Reduction::None) {
+  if (reduction == at::Reduction::None) {
     THSYCLTensor_(resizeAs)(state, output, input);
     at::sycl::SYCL_tensor_apply3<scalar_t, scalar_t, scalar_t>(THTensor_wrap(output), THTensor_wrap(input), THTensor_wrap(target), TensorBCEOp<scalar_t>());
-    
+
   if (weights) {
       THSYCLTensor_(cmul)(state, output, output, weights);
     }
@@ -50,7 +50,7 @@ THSYCL_API void THNN_(BCECriterion_updateOutput)(
     THSYCLTensor_(set0d)(state, output, (scalar_t)sum);
   }
 
-  if (reduction == Reduction::Mean) {
+  if (reduction == at::Reduction::Mean) {
     sum /= size;
     THSYCLTensor_(set0d)(state, output, (scalar_t)sum);
   }
