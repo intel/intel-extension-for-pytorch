@@ -1,9 +1,10 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensor.cpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensor.cpp"
 #else
 
 #include <ATen/InferSize.h>
-#include <c10/dpcpp/SYCLException.h>
+#include <ATen/TensorUtils.h>
+#include <core/SYCLException.h>
 
 #include <aten_ipex_tensor_type.h>
 
@@ -69,7 +70,7 @@ THSYCLTensor *THSYCLTensor_(new)(THSYCLState *state)
 {
   return c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
     c10::intrusive_ptr<at::StorageImpl>::reclaim(THSYCLStorage_(new)(state)),
-    at::DPCPPTensorId()
+    at::torch_ipex::DPCPPTensorId()
   ).release();
 }
 
@@ -79,7 +80,7 @@ THSYCLTensor *THSYCLTensor_(newWithTensor)(THSYCLState *state, THSYCLTensor *ten
 {
   THSYCLTensor *self = c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
     c10::intrusive_ptr<at::StorageImpl>::reclaim(THSYCLStorage_(new)(state)),
-    at::DPCPPTensorId()
+    at::torch_ipex::DPCPPTensorId()
   ).release();
   THSYCLTensor_(setStorageNd)(state,
                               self,
@@ -98,7 +99,7 @@ THSYCLTensor *THSYCLTensor_(newWithStorage)(THSYCLState *state, THSYCLStorage *s
   }
   THSYCLTensor *self = c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
     c10::intrusive_ptr<at::StorageImpl>::reclaim(THSYCLStorage_(new)(state)),
-    at::DPCPPTensorId()
+    at::torch_ipex::DPCPPTensorId()
   ).release();
   THSYCLTensor_(setStorageNd)(state, self, storage, storageOffset, sizes.size(),
                            const_cast<int64_t*>(sizes.data()), const_cast<int64_t*>(strides.data()));
@@ -214,9 +215,9 @@ THSYCLTensor *THSYCLTensor_(newView)(THSYCLState *state, THSYCLTensor *tensor, a
   ptrdiff_t numel = THSYCLTensor_(nElement)(state, tensor);
   THSYCLTensor *self = THSYCLTensor_(new)(state);
   auto inferred_size = at::infer_size(size, numel);
-  auto stride = THTensor_compute_stride(tensor->sizes(),
-                                        tensor->strides(),
-                                        inferred_size);
+  auto stride = at::detail::computeStride(tensor->sizes(),
+                                          tensor->strides(),
+                                          inferred_size);
   THArgCheck(stride.has_value(), 2, "view size is "
     "not compatible with input tensor's size and stride (at least one dimension spans "
     "across two contiguous subspaces). Call .contiguous() before .view().");

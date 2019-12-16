@@ -1,70 +1,70 @@
 #ifndef TH_SYCL_TENSOR_MATH_INC
 #define TH_SYCL_TENSOR_MATH_INC
 
-#include <THDP/THSYCLTensor.h>
-#include <THDP/THSYCLGeneral.h>
+#include <legacy/THSYCLTensor.h>
+#include <legacy/THSYCLGeneral.h>
 
-#include <THDP/generic/THSYCLTensorMathBlas.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMathBlas.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMath.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMath.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMath.h>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorMath.h>
+#include <legacy/THSYCLGenerateBoolType.h>
 
-#include <THDP/generic/THSYCLTensorMathScan.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMathScan.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMasked.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMasked.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMasked.h>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorMasked.h>
+#include <legacy/THSYCLGenerateBoolType.h>
 
-#include <THDP/generic/THSYCLTensorMathPairwise.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMathPairwise.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMathPairwise.h>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorMathPairwise.h>
+#include <legacy/THSYCLGenerateBoolType.h>
 
-#include <THDP/generic/THSYCLTensorMathPointwise.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMathPointwise.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMathPointwise.h>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorMathPointwise.h>
+#include <legacy/THSYCLGenerateBoolType.h>
 
-#include <THDP/generic/THSYCLTensorMathCompare.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMathCompare.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMathCompare.h>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorMathCompare.h>
+#include <legacy/THSYCLGenerateBoolType.h>
 
-#include <THDP/generic/THSYCLTensorMathCompareT.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMathCompareT.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMathCompareT.h>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorMathCompareT.h>
+#include <legacy/THSYCLGenerateBoolType.h>
 
-#include <THDP/generic/THSYCLTensorMathReduce.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMathReduce.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMathReduce.h>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorMathReduce.h>
+#include <legacy/THSYCLGenerateBoolType.h>
 
-#include <THDP/generic/THSYCLTensorSort.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorSort.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorSort.h>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorSort.h>
+#include <legacy/THSYCLGenerateBoolType.h>
 
-#include <THDP/generic/THSYCLTensorMode.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMode.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorTopK.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorTopK.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/THSYCLNumerics.h>
+#include <legacy/THSYCLNumerics.h>
 
 template<typename T>
 class diag_to_sycl_ker {};

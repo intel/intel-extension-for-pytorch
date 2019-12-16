@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorMathBlas.h"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorMathBlas.h"
 #else
 
 THSYCL_API void THSYCLTensor_(addmv)(THSYCLState* state, THSYCLTensor* r_, scalar_t beta, THSYCLTensor* t, scalar_t alpha, THSYCLTensor* mat, THSYCLTensor* vec);

@@ -1,9 +1,9 @@
-#include <THDP/THSYCL.h>
-#include <THDP/THSYCLTensorMathCompareT.h>
-#include <THDP/THSYCLTensor.hpp>
+#include <legacy/THSYCL.h>
+#include <legacy/THSYCLTensorMathCompareT.h>
+#include <legacy/THSYCLTensor.hpp>
 
-#include <THDP/generic/THSYCLTensorMathCompareT.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMathCompareT.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMathCompareT.cpp>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorMathCompareT.cpp>
+#include <legacy/THSYCLGenerateBoolType.h>

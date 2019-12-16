@@ -1,4 +1,4 @@
-#include <THDP/THSYCLSortUtils.h>
+#include <legacy/THSYCLSortUtils.h>
 
 // Returns 2^(ceil(lg(n)) from Stanford bit twiddling hacks
 uint64_t nextHighestPowerOf2(uint64_t n) {
@@ -7,9 +7,9 @@ uint64_t nextHighestPowerOf2(uint64_t n) {
   n |= n >> 2;
   n |= n >> 4;
   n |= n >> 8;
-  n |= n >> 16; 
+  n |= n >> 16;
 #ifndef _MSC_VER
-  n |= n >> 32; 
+  n |= n >> 32;
 #endif
   n++;
 

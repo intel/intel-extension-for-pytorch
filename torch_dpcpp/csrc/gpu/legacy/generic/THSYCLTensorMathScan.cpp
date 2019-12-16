@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorMathScan.cpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorMathScan.cpp"
 #else
 
 #ifndef THC_REAL_IS_HALF

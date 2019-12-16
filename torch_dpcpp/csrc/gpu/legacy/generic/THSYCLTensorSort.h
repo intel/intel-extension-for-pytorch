@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorSort.h"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorSort.h"
 #else
 
 /* Performs an in-place sort of (keys, values). Only works for slice sizes

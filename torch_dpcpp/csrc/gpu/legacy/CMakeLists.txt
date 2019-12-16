@@ -1,16 +1,5 @@
-SET(ATen_SYCL_INCLUDE ${ATen_SYCL_INCLUDE}
-  "${CMAKE_CURRENT_BINARY_DIR}"
-  "${CMAKE_CURRENT_SOURCE_DIR}"
-  PARENT_SCOPE)
+FILE(GLOB legacy_function_src "./*.cpp")
 
-CONFIGURE_FILE(THSYCLGeneral.h.in "${CMAKE_CURRENT_BINARY_DIR}/THSYCLGeneral.h")
-
-FILE(GLOB tmp *.cpp)
-SET(ATen_SYCL_SRCS ${ATen_SYCL_SRCS} ${tmp} PARENT_SCOPE)
-
-INSTALL(FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/THSYCLGeneral.h
-  THSYCLTensorCopy.h
-  THSYCLTensorCopy.hpp
-  THSYCLTensorIndex.h
-  DESTINATION "${ATEN_INSTALL_INCLUDE_SUBDIR}/THSYCL")
+set(legacy_src)
+list(APPEND legacy_src ${legacy_function_src})
+set(DPCPP_LEGACY_SRCS ${legacy_src} PARENT_SCOPE)

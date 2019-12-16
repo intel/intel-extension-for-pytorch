@@ -1,12 +1,12 @@
-#include <THDP/THSYCLTensor.hpp>
-#include <THDP/THSYCLSortUtils.h>
-#include <THDP/THSYCLTensorMath.h>
-#include <THDP/THSYCLTensorCopy.h>
-#include <THDP/THSYCLTensorSort.h>
-#include <THDP/generic/THSYCLTensorSort.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
-#include <THDP/generic/THSYCLTensorSort.cpp>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/THSYCLTensor.hpp>
+#include <legacy/THSYCLSortUtils.h>
+#include <legacy/THSYCLTensorMath.h>
+#include <legacy/THSYCLTensorCopy.h>
+#include <legacy/THSYCLTensorSort.h>
+#include <legacy/generic/THSYCLTensorSort.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorSort.cpp>
+#include <legacy/THSYCLGenerateBoolType.h>
 
 template <typename IndexType, int Dim>
 void fillSliceWithIndex(TensorInfo<int64_t, IndexType> out,
@@ -30,7 +30,7 @@ void fillSliceWithIndex(TensorInfo<int64_t, IndexType> out,
       for (IndexType i = local_id; i < sliceSize; i += item_id.get_local_range(0)) {
         // Torch indices are 1-based (hence the +1)
         base[i * sliceStride] = i /* + TH_INDEX_BASE */;
-      } 
+      }
     });
   });
 }

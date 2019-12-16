@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorMathPairwise.h"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorMathPairwise.h"
 #else
 
 THSYCL_API int THSYCLTensor_(equal)(THSYCLState* state, THSYCLTensor* self_, THSYCLTensor* src_);

@@ -1,11 +1,11 @@
-#include <THDP/THSYCLTensorMath.h>
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLTensorCopy.h>
-#include <THDP/THSYCLTensor.hpp>
-#include <THDP/THSYCLStorage.hpp>
-#include <THDP/THSYCLTensorMasked.h>
-#include <THDP/THSYCLTensorTypeUtils.h>
+#include <legacy/THSYCLTensorMath.h>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLTensorCopy.h>
+#include <legacy/THSYCLTensor.hpp>
+#include <legacy/THSYCLStorage.hpp>
+#include <legacy/THSYCLTensorMasked.h>
+#include <legacy/THSYCLTensorTypeUtils.h>
 
-#include <THDP/generic/THSYCLTensorMasked.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMasked.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
 

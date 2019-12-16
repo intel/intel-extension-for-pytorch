@@ -1,9 +1,9 @@
 #ifndef THSYCL_TENSORMATH_POINTWISE_H
 #define THSYCL_TENSORMATH_POINTWISE_H
-#include <THDP/THSYCLTensor.hpp>
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLNumerics.h>
-#include <ATen/dpcpp/SYCLApplyUtils.h>
+#include <legacy/THSYCLTensor.hpp>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLNumerics.h>
+#include <core/SYCLApplyUtils.h>
 
 template <typename T>
 struct TensorATan2Op {

@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorMasked.h"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorMasked.h"
 #else
 
 THSYCL_API void THSYCLTensor_(maskedFill)(THSYCLState *state,

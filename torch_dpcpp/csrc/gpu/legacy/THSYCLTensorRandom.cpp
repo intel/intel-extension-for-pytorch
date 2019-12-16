@@ -1,9 +1,9 @@
-#include <THDP/THSYCLTensorRandom.h>
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLGenerator.hpp>
+#include <legacy/THSYCLTensorRandom.h>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLGenerator.hpp>
 
-#include <c10/dpcpp/SYCLException.h>
-#include <c10/dpcpp/SYCLUtils.h>
+#include <core/SYCLException.h>
+#include <core/SYCLUtils.h>
 
 #include <random>
 
@@ -116,5 +116,5 @@ void THSYCLRandom_manualSeedAll(THSYCLState* state, uint64_t seed)
   THSYCLCheck(c10::sycl::syclSetDevice(currentDevice));
 }
 
-#include <THDP/generic/THSYCLTensorRandom.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorRandom.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>

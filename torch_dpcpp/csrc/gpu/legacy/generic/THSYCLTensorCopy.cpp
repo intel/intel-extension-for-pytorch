@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorCopy.cpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorCopy.cpp"
 #else
 
 void THSYCLTensor_(copy)(THSYCLState* state, THSYCLTensor* dst, THSYCLTensor* src) {

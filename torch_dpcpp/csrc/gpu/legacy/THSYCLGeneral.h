@@ -3,7 +3,7 @@
 #include <TH/THGeneral.h>
 #include <TH/THAllocator.h>
 #ifdef __cplusplus
-#include <c10/dpcpp/SYCLStream.h>
+#include <core/SYCLStream.h>
 #include <c10/core/Allocator.h>
 #endif
 

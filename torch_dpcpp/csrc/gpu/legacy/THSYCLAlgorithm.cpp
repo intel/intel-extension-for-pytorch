@@ -1,1 +1,1 @@
-#include <THDP/THSYCLAlgorithm.h>
+#include <legacy/THSYCLAlgorithm.h>

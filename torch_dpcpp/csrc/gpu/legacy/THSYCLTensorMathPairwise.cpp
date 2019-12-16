@@ -1,20 +1,20 @@
-#include <THDP/THSYCLTensorMath.h>
-#include <THDP/THSYCLGeneral.h>
+#include <legacy/THSYCLTensorMath.h>
+#include <legacy/THSYCLGeneral.h>
 #include <TH/THHalf.h>
-#include <THDP/THSYCLTensorCopy.h>
-#include <THDP/THSYCLNumerics.h>
-#include <THDP/THSYCLTensorMathCompareT.h>
-#include <THDP/THSYCLTensor.hpp>
+#include <legacy/THSYCLTensorCopy.h>
+#include <legacy/THSYCLNumerics.h>
+#include <legacy/THSYCLTensorMathCompareT.h>
+#include <legacy/THSYCLTensor.hpp>
 
 template<typename T>
-static 
+static
 typename std::enable_if<std::is_signed<T>::value, bool>::type
 modulo_wrap(T a, T b) {
   return (a != 0) && (a < 0) != (b < 0);
 }
 
 template<typename T>
-static 
+static
 typename std::enable_if<std::is_unsigned<T>::value, bool>::type
 modulo_wrap(T a, T b) {
   return false;
@@ -187,8 +187,8 @@ struct TensorTriOp {
   const int64_t stride0, stride1, k;
 };
 
-#include <THDP/generic/THSYCLTensorMathPairwise.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMathPairwise.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMathPairwise.cpp>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorMathPairwise.cpp>
+#include <legacy/THSYCLGenerateBoolType.h>

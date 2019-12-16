@@ -1,6 +1,6 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorTopK.cpp"
-#else 
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorTopK.cpp"
+#else
 void THSYCLTensor_(topk)(THSYCLState* state,
                          THSYCLTensor *topK,
                          THSyclLongTensor *indices,
@@ -13,12 +13,12 @@ void THSYCLTensor_(topk)(THSYCLState* state,
   THArgCheck(dims <= MAX_SYCLTORCH_DIMS, 3, SYCLTORCH_DIM_WARNING);
   int numDims = THSYCLTensor_(nDimensionLegacyNoScalars)(state, input_);
   THArgCheck(numDims <= MAX_SYCLTORCH_DIMS, 4, SYCLTORCH_DIM_WARNING);
-  
+
   THArgCheck(dim >= 0 && dim < numDims, 6, "dim not in range");
 
   int64_t sliceSize = THSYCLTensor_(sizeLegacyNoScalars)(state, input_, dim);
   THArgCheck(k >= 0 && k <= sliceSize, 5, "k not in range for dimension");
- 
+
   THSYCLTensor *input = THSYCLTensor_(newContiguous)(state, input_);
 
   // Build the output size, which is the dim being selected set to

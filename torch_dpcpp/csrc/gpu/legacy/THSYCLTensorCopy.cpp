@@ -1,8 +1,8 @@
 //#include <THC/THCApply.cuh>
 #include <TH/THHalf.h>
 //#include <THC/THCNumerics.cuh>
-#include <THDP/THSYCLTensorCopy.hpp>
-#include <THDP/THSYCLTensor.hpp>
+#include <legacy/THSYCLTensorCopy.hpp>
+#include <legacy/THSYCLTensor.hpp>
 #include <type_traits>
 
 // Copy operator for the pointwise apply kernel
@@ -14,9 +14,9 @@ struct CopyOp {
   }
 };
 
-#include <THDP/generic/THSYCLTensorCopy.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorCopy.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorCopy.cpp>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorCopy.cpp>
+#include <legacy/THSYCLGenerateBoolType.h>
 

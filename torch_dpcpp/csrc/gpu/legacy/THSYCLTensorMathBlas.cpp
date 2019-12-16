@@ -1,8 +1,8 @@
-#include <THDP/THSYCLTensorMath.h>
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLTensorCopy.h>
-#include <THDP/THSYCLTensor.hpp>
-#include <THDP/THSYCLStorage.hpp>
+#include <legacy/THSYCLTensorMath.h>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLTensorCopy.h>
+#include <legacy/THSYCLTensor.hpp>
+#include <legacy/THSYCLStorage.hpp>
 
-#include <THDP/generic/THSYCLTensorMathBlas.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMathBlas.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>

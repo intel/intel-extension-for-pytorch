@@ -2,13 +2,13 @@
 #ifndef TH_SYCL_TENSOR_MATH_SCAN_INC
 #define TH_SYCL_TENSOR_MATH_SCAN_INC
 
-#include <THDP/THSYCLTensor.h>
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLTensorMath.h>
-#include <THDP/THSYCLAlgorithm.h>
-#include <THDP/THSYCLTensorMathReduce.h>
-#include <c10/dpcpp/SYCLMemory.h>
-#include <c10/dpcpp/SYCLUtils.h>
+#include <legacy/THSYCLTensor.h>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLTensorMath.h>
+#include <legacy/THSYCLAlgorithm.h>
+#include <legacy/THSYCLTensorMathReduce.h>
+#include <core/SYCLMemory.h>
+#include <core/SYCLUtils.h>
 
 template <typename T, typename BinOp>
 class scanthrust_sycl_ker {};

@@ -1,9 +1,9 @@
-#include <c10/dpcpp/SYCL.h>
-#include <THDP/THSYCLTensor.hpp>
-#include <THDP/THSYCLTensorCopy.hpp>
-#include <THDP/THSYCLTensorTypeUtils.h>
-#include <THDP/THSYCLDeviceUtils.h>
-#include <THDP/THDPAtomics.h>
+#include <core/SYCL.h>
+#include <legacy/THSYCLTensor.hpp>
+#include <legacy/THSYCLTensorCopy.hpp>
+#include <legacy/THSYCLTensorTypeUtils.h>
+#include <legacy/THSYCLDeviceUtils.h>
+#include <legacy/THDPAtomics.h>
 
 // Compute the offsets into the given tensors for a linear index. For the 't2'
 // tensor, dimension 'dim' is skipped. The tensors are assumed to have the same
@@ -163,7 +163,6 @@ void THSyclTensor_scatterKernel(
                                                           index, &indexOffset,
                                                           src, &srcOffset,
                                                           tensor, &tensorOffset);
-                                                          
         int64_t indexValue = index_ptr[indexOffset];
         // assert(indexValue >= 0 && indexValue < src.sizes[dim]);
         tensorOffset += indexValue * tensor.strides[dim];
@@ -177,7 +176,7 @@ void THSyclTensor_scatterKernel(
       DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);  
+  DP_Q_ASYNC_SUBMIT(queue, cgf);
 
 }
 
@@ -189,7 +188,7 @@ void THSyclTensor_scatterAddKernel(
     TensorInfo<int64_t, IndexType> index,
     const int dim,
     const IndexType totalElements) {
-  
+
   auto queue         = c10::sycl::syclGetCurrentQueue();
   IndexType group_size = (IndexType)c10::sycl::syclMaxWorkGroupSize(queue);
   auto num_groups    = THSYCLCeilDiv(totalElements, group_size);
@@ -203,7 +202,7 @@ void THSyclTensor_scatterAddKernel(
       auto tensor_ptr = acc_out.template get_pointer<Real>();
       auto src_ptr = acc_src.template get_pointer<Real>();
       auto index_ptr = acc_index.template get_pointer<int64_t>();
-    
+
       for (IndexType linearIndex = (IndexType)item.get_global_id(0);
            linearIndex < totalElements; linearIndex += (IndexType)item.get_global_range()[0]) {
         IndexType tensorOffset = 0;
@@ -214,7 +213,7 @@ void THSyclTensor_scatterAddKernel(
                                                           index, &indexOffset,
                                                           src, &srcOffset,
                                                           tensor, &tensorOffset);
-        
+
         int64_t indexValue = index_ptr[indexOffset];
         // assert(indexValue >= 0 && indexValue < src.sizes[dim]);
         tensorOffset += indexValue * tensor.strides[dim];
@@ -231,8 +230,8 @@ void THSyclTensor_scatterAddKernel(
 }
 
 
-#include <THDP/generic/THSYCLTensorScatterGather.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorScatterGather.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorScatterGather.cpp>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorScatterGather.cpp>
+#include <legacy/THSYCLGenerateBoolType.h>

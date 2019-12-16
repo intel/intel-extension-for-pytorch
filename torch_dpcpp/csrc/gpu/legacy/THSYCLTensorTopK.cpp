@@ -1,9 +1,9 @@
-#include <THDP/THSYCL.h>
+#include <legacy/THSYCL.h>
 
-#include <THDP/THSYCLScanUtils.h>
-#include <THDP/THSYCLTensorTypeUtils.h>
-#include <THDP/THSYCLTensorMathReduce.h>
-#include <THDP/THSYCLTensorTopK.h>
+#include <legacy/THSYCLScanUtils.h>
+#include <legacy/THSYCLTensorTypeUtils.h>
+#include <legacy/THSYCLTensorMathReduce.h>
+#include <legacy/THSYCLTensorTopK.h>
 
-#include <THDP/generic/THSYCLTensorTopK.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorTopK.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>

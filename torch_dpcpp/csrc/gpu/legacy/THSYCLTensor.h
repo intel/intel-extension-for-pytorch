@@ -1,8 +1,8 @@
 #pragma once
 
 #include <TH/THTensor.h>
-#include <THDP/THSYCLStorage.h>
-#include <THDP/THSYCLGeneral.h>
+#include <legacy/THSYCLStorage.h>
+#include <legacy/THSYCLGeneral.h>
 
 #define THSYCLTensor_(NAME) THSYCL_CONCAT_4(TH, SYCLReal, Tensor_, NAME)
 
@@ -14,8 +14,8 @@ typedef struct THSYCL_CLASS THSYCLDescBuff
 } THSYCLDescBuff;
 
 
-#include <THDP/generic/THSYCLTensor.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensor.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensor.h>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensor.h>
+#include <legacy/THSYCLGenerateBoolType.h>

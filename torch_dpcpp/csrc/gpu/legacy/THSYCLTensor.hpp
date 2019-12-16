@@ -3,10 +3,10 @@
 // STOP!!! Thinking of including this header directly?  Please
 // // read Note [TH abstraction violation]
 
-#include <THDP/THSYCLTensor.h>
+#include <legacy/THSYCLTensor.h>
 #include <TH/THTensor.hpp>
-#include <THDP/THSYCLStorage.hpp>
-#include <THDP/THSYCLGeneral.h>
+#include <legacy/THSYCLStorage.hpp>
+#include <legacy/THSYCLGeneral.h>
 
 #include <ATen/ATen.h>
 
@@ -22,8 +22,8 @@ THSYCL_API int64_t THSYCLTensor_strideLegacyNoScalars(THSYCLState *state, const 
 
 std::vector<int64_t> THSYCLTensor_sizesLegacyNoScalars(THSYCLState *state, const THSYCLTensor *self);
 
-#include <THDP/generic/THSYCLTensorFastGetSet.hpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorFastGetSet.hpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
 
 THSYCL_API THSYCLTensor *THSYCLTensor_new(THSYCLState *state, caffe2::TypeMeta type_meta);
@@ -59,8 +59,8 @@ THSYCL_API void THSYCLTensor_preserveReduceDimSemantics(THSYCLState *state, THSY
 /* true otherwise.                                             */
 THSYCL_API bool THSYCLTensor_maybeOverlappingIndices(THSYCLState* state, const THSYCLTensor* t);
 
-#include <THDP/generic/THSYCLTensor.hpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensor.hpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensor.hpp>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensor.hpp>
+#include <legacy/THSYCLGenerateBoolType.h>

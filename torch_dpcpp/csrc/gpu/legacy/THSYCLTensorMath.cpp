@@ -1,6 +1,6 @@
-#include <THDP/THSYCLTensorMath.h>
-#include <THDP/THSYCLStorage.hpp>
-#include <ATen/dpcpp/SYCLApplyUtils.h>
+#include <legacy/THSYCLTensorMath.h>
+#include <legacy/THSYCLStorage.hpp>
+#include <core/SYCLApplyUtils.h>
 template <typename T>
 struct TensorFillOp {
   TensorFillOp(T v) : val(v) {}
@@ -9,8 +9,8 @@ struct TensorFillOp {
   const T val;
 };
 
-#include <c10/dpcpp/SYCLUtils.h>
-#include <THDP/THSYCLTensorTypeUtils.h>
+#include <core/SYCLUtils.h>
+#include <legacy/THSYCLTensorTypeUtils.h>
 
 // calculate shift where we should start processing on current item
 template <typename _NDItemId, typename _GlobalIdx, typename _SizeNIter, typename _SizeN>
@@ -429,8 +429,8 @@ pattern_scan(cl::sycl::queue& queue, TensorInfo<InputType, IndexType>& input,
   return __result;
 }
 
-#include <THDP/generic/THSYCLTensorMath.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMath.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMath.cpp>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorMath.cpp>
+#include <legacy/THSYCLGenerateBoolType.h>

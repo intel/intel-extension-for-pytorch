@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorSort.cpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorSort.cpp"
 #else
 
 // In alignment with default sort on a c++ map, this function

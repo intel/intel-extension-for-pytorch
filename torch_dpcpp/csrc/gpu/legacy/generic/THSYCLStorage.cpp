@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLStorage.cpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLStorage.cpp"
 #else
 
 #include <c10/util/intrusive_ptr.h>

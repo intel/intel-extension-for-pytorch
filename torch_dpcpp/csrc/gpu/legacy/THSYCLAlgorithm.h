@@ -1,9 +1,9 @@
 #ifndef TH_SYCL_ALGORITHM_INC
 #define TH_SYCL_ALGORITHM_INC
 
-#include <c10/dpcpp/SYCL.h>
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLNumerics.h>
+#include <core/SYCL.h>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLNumerics.h>
 
 // alternative for cuda thrust::tabulate
 template <typename ForwardIterator, typename UnaryOp>

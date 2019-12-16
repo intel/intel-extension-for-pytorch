@@ -1,10 +1,10 @@
 #ifndef THSYCL_TENSORMATH_COMPARE_H
 #define THSYCL_TENSORMATH_COMPARE_H
-#include <THDP/THSYCLTensorMath.h>
-#include <THDP/THSYCLTensor.hpp>
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLNumerics.h>
-#include <ATen/dpcpp/SYCLApplyUtils.h>
+#include <legacy/THSYCLTensorMath.h>
+#include <legacy/THSYCLTensor.hpp>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLNumerics.h>
+#include <core/SYCLApplyUtils.h>
 
 
 template <typename T, typename TOut>

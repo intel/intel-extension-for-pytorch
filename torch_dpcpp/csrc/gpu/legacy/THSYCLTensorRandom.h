@@ -1,10 +1,10 @@
 #ifndef TH_SYCL_TENSOR_RANDOM_INC
 #define TH_SYCL_TENSOR_RANDOM_INC
 
-#include <THDP/THSYCLTensor.h>
+#include <legacy/THSYCLTensor.h>
 
-#include <THDP/generic/THSYCLTensorRandom.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorRandom.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
 typedef struct THSYCLGenerator THSYCLGenerator;
 

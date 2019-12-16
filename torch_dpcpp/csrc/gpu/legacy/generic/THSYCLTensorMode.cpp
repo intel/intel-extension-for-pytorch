@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorMode.cpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorMode.cpp"
 #else
 
 void THSYCLTensor_(mode)(THSYCLState* state,

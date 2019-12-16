@@ -992,7 +992,7 @@ Tensor s__th_masked_select(const Tensor & self, const Tensor & mask) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select", false, Backend::DPCPP, ScalarType::Byte);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select", false, Backend::DPCPP, ScalarType::Byte);
@@ -1002,7 +1002,7 @@ Tensor s__th_masked_select(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select", false, Backend::DPCPP, ScalarType::Char);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select", false, Backend::DPCPP, ScalarType::Byte);
@@ -1012,7 +1012,7 @@ Tensor s__th_masked_select(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select", false, Backend::DPCPP, ScalarType::Double);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select", false, Backend::DPCPP, ScalarType::Byte);
@@ -1022,7 +1022,7 @@ Tensor s__th_masked_select(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select", false, Backend::DPCPP, ScalarType::Float);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select", false, Backend::DPCPP, ScalarType::Byte);
@@ -1032,7 +1032,7 @@ Tensor s__th_masked_select(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select", false, Backend::DPCPP, ScalarType::Int);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select", false, Backend::DPCPP, ScalarType::Byte);
@@ -1042,7 +1042,7 @@ Tensor s__th_masked_select(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select", false, Backend::DPCPP, ScalarType::Long);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select", false, Backend::DPCPP, ScalarType::Byte);
@@ -1052,7 +1052,7 @@ Tensor s__th_masked_select(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select", false, Backend::DPCPP, ScalarType::Short);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select", false, Backend::DPCPP, ScalarType::Byte);
@@ -1062,7 +1062,7 @@ Tensor s__th_masked_select(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select", false, Backend::DPCPP, ScalarType::Half);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select", false, Backend::DPCPP, ScalarType::Byte);
@@ -1184,7 +1184,7 @@ Tensor s__th_masked_select_bool(const Tensor & self, const Tensor & mask) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Byte);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Bool);
@@ -1194,7 +1194,7 @@ Tensor s__th_masked_select_bool(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Char);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Bool);
@@ -1204,7 +1204,7 @@ Tensor s__th_masked_select_bool(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Double);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Bool);
@@ -1214,7 +1214,7 @@ Tensor s__th_masked_select_bool(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Float);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Bool);
@@ -1224,7 +1224,7 @@ Tensor s__th_masked_select_bool(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Int);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Bool);
@@ -1234,7 +1234,7 @@ Tensor s__th_masked_select_bool(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Long);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Bool);
@@ -1244,7 +1244,7 @@ Tensor s__th_masked_select_bool(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Short);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Bool);
@@ -1254,7 +1254,7 @@ Tensor s__th_masked_select_bool(const Tensor & self, const Tensor & mask) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Half);
             auto mask_ = checked_tensor_unwrap(mask, "mask", 2, "_th_masked_select_bool", false, Backend::DPCPP, ScalarType::Bool);
@@ -1358,7 +1358,7 @@ Tensor _th_nonzero(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_nonzero", false, Backend::DPCPP, ScalarType::Bool);
             THSyclBoolTensor_nonzero(globalContext().getTHSYCLState(), result_, self_);
@@ -1367,7 +1367,7 @@ Tensor _th_nonzero(const Tensor & self) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_nonzero", false, Backend::DPCPP, ScalarType::Byte);
             THSyclByteTensor_nonzero(globalContext().getTHSYCLState(), result_, self_);
@@ -1376,7 +1376,7 @@ Tensor _th_nonzero(const Tensor & self) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_nonzero", false, Backend::DPCPP, ScalarType::Char);
             THSyclCharTensor_nonzero(globalContext().getTHSYCLState(), result_, self_);
@@ -1385,7 +1385,7 @@ Tensor _th_nonzero(const Tensor & self) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_nonzero", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_nonzero(globalContext().getTHSYCLState(), result_, self_);
@@ -1394,7 +1394,7 @@ Tensor _th_nonzero(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_nonzero", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_nonzero(globalContext().getTHSYCLState(), result_, self_);
@@ -1403,7 +1403,7 @@ Tensor _th_nonzero(const Tensor & self) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_nonzero", false, Backend::DPCPP, ScalarType::Int);
             THSyclIntTensor_nonzero(globalContext().getTHSYCLState(), result_, self_);
@@ -1412,7 +1412,7 @@ Tensor _th_nonzero(const Tensor & self) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_nonzero", false, Backend::DPCPP, ScalarType::Long);
             THSyclLongTensor_nonzero(globalContext().getTHSYCLState(), result_, self_);
@@ -1421,7 +1421,7 @@ Tensor _th_nonzero(const Tensor & self) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_nonzero", false, Backend::DPCPP, ScalarType::Short);
             THSyclShortTensor_nonzero(globalContext().getTHSYCLState(), result_, self_);
@@ -1430,7 +1430,7 @@ Tensor _th_nonzero(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_nonzero", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_nonzero(globalContext().getTHSYCLState(), result_, self_);
@@ -1677,7 +1677,7 @@ Tensor _th_index_select(const Tensor & self, int64_t dim, const Tensor & index) 
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_index_select", false, Backend::DPCPP, ScalarType::Bool);
             dim = maybe_wrap_dim(dim, self_);
@@ -1688,7 +1688,7 @@ Tensor _th_index_select(const Tensor & self, int64_t dim, const Tensor & index) 
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_index_select", false, Backend::DPCPP, ScalarType::Byte);
             dim = maybe_wrap_dim(dim, self_);
@@ -1699,7 +1699,7 @@ Tensor _th_index_select(const Tensor & self, int64_t dim, const Tensor & index) 
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_index_select", false, Backend::DPCPP, ScalarType::Char);
             dim = maybe_wrap_dim(dim, self_);
@@ -1710,7 +1710,7 @@ Tensor _th_index_select(const Tensor & self, int64_t dim, const Tensor & index) 
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_index_select", false, Backend::DPCPP, ScalarType::Double);
             dim = maybe_wrap_dim(dim, self_);
@@ -1721,7 +1721,7 @@ Tensor _th_index_select(const Tensor & self, int64_t dim, const Tensor & index) 
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_index_select", false, Backend::DPCPP, ScalarType::Float);
             dim = maybe_wrap_dim(dim, self_);
@@ -1732,7 +1732,7 @@ Tensor _th_index_select(const Tensor & self, int64_t dim, const Tensor & index) 
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_index_select", false, Backend::DPCPP, ScalarType::Int);
             dim = maybe_wrap_dim(dim, self_);
@@ -1743,7 +1743,7 @@ Tensor _th_index_select(const Tensor & self, int64_t dim, const Tensor & index) 
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_index_select", false, Backend::DPCPP, ScalarType::Long);
             dim = maybe_wrap_dim(dim, self_);
@@ -1754,7 +1754,7 @@ Tensor _th_index_select(const Tensor & self, int64_t dim, const Tensor & index) 
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_index_select", false, Backend::DPCPP, ScalarType::Short);
             dim = maybe_wrap_dim(dim, self_);
@@ -1765,7 +1765,7 @@ Tensor _th_index_select(const Tensor & self, int64_t dim, const Tensor & index) 
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_index_select", false, Backend::DPCPP, ScalarType::Half);
             dim = maybe_wrap_dim(dim, self_);
@@ -1953,7 +1953,7 @@ Tensor _th_take(const Tensor & self, const Tensor & index) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_take", false, Backend::DPCPP, ScalarType::Byte);
             auto index_ = checked_tensor_unwrap(index, "index", 2, "_th_take", false, Backend::DPCPP, ScalarType::Long);
@@ -1963,7 +1963,7 @@ Tensor _th_take(const Tensor & self, const Tensor & index) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_take", false, Backend::DPCPP, ScalarType::Char);
             auto index_ = checked_tensor_unwrap(index, "index", 2, "_th_take", false, Backend::DPCPP, ScalarType::Long);
@@ -1973,7 +1973,7 @@ Tensor _th_take(const Tensor & self, const Tensor & index) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_take", false, Backend::DPCPP, ScalarType::Double);
             auto index_ = checked_tensor_unwrap(index, "index", 2, "_th_take", false, Backend::DPCPP, ScalarType::Long);
@@ -1983,7 +1983,7 @@ Tensor _th_take(const Tensor & self, const Tensor & index) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_take", false, Backend::DPCPP, ScalarType::Float);
             auto index_ = checked_tensor_unwrap(index, "index", 2, "_th_take", false, Backend::DPCPP, ScalarType::Long);
@@ -1993,7 +1993,7 @@ Tensor _th_take(const Tensor & self, const Tensor & index) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_take", false, Backend::DPCPP, ScalarType::Int);
             auto index_ = checked_tensor_unwrap(index, "index", 2, "_th_take", false, Backend::DPCPP, ScalarType::Long);
@@ -2003,7 +2003,7 @@ Tensor _th_take(const Tensor & self, const Tensor & index) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_take", false, Backend::DPCPP, ScalarType::Long);
             auto index_ = checked_tensor_unwrap(index, "index", 2, "_th_take", false, Backend::DPCPP, ScalarType::Long);
@@ -2013,7 +2013,7 @@ Tensor _th_take(const Tensor & self, const Tensor & index) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_take", false, Backend::DPCPP, ScalarType::Short);
             auto index_ = checked_tensor_unwrap(index, "index", 2, "_th_take", false, Backend::DPCPP, ScalarType::Long);
@@ -2023,7 +2023,7 @@ Tensor _th_take(const Tensor & self, const Tensor & index) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_take", false, Backend::DPCPP, ScalarType::Half);
             auto index_ = checked_tensor_unwrap(index, "index", 2, "_th_take", false, Backend::DPCPP, ScalarType::Long);
@@ -2304,7 +2304,7 @@ Tensor _th_unfold(const Tensor & self, int64_t dimension, int64_t size, int64_t 
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_unfold", false, Backend::DPCPP, ScalarType::Byte);
             dimension = maybe_wrap_dim(dimension, self_);
@@ -2314,7 +2314,7 @@ Tensor _th_unfold(const Tensor & self, int64_t dimension, int64_t size, int64_t 
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_unfold", false, Backend::DPCPP, ScalarType::Char);
             dimension = maybe_wrap_dim(dimension, self_);
@@ -2324,7 +2324,7 @@ Tensor _th_unfold(const Tensor & self, int64_t dimension, int64_t size, int64_t 
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_unfold", false, Backend::DPCPP, ScalarType::Double);
             dimension = maybe_wrap_dim(dimension, self_);
@@ -2334,7 +2334,7 @@ Tensor _th_unfold(const Tensor & self, int64_t dimension, int64_t size, int64_t 
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_unfold", false, Backend::DPCPP, ScalarType::Float);
             dimension = maybe_wrap_dim(dimension, self_);
@@ -2344,7 +2344,7 @@ Tensor _th_unfold(const Tensor & self, int64_t dimension, int64_t size, int64_t 
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_unfold", false, Backend::DPCPP, ScalarType::Int);
             dimension = maybe_wrap_dim(dimension, self_);
@@ -2354,7 +2354,7 @@ Tensor _th_unfold(const Tensor & self, int64_t dimension, int64_t size, int64_t 
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_unfold", false, Backend::DPCPP, ScalarType::Long);
             dimension = maybe_wrap_dim(dimension, self_);
@@ -2364,7 +2364,7 @@ Tensor _th_unfold(const Tensor & self, int64_t dimension, int64_t size, int64_t 
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_unfold", false, Backend::DPCPP, ScalarType::Short);
             dimension = maybe_wrap_dim(dimension, self_);
@@ -2374,7 +2374,7 @@ Tensor _th_unfold(const Tensor & self, int64_t dimension, int64_t size, int64_t 
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_unfold", false, Backend::DPCPP, ScalarType::Half);
             dimension = maybe_wrap_dim(dimension, self_);
@@ -2757,7 +2757,7 @@ Tensor _th_gather(const Tensor & self, int64_t dim, const Tensor & index) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_(index.sizes());
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gather", false, Backend::DPCPP, ScalarType::Bool);
@@ -2769,7 +2769,7 @@ Tensor _th_gather(const Tensor & self, int64_t dim, const Tensor & index) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_(index.sizes());
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gather", false, Backend::DPCPP, ScalarType::Byte);
@@ -2781,7 +2781,7 @@ Tensor _th_gather(const Tensor & self, int64_t dim, const Tensor & index) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_(index.sizes());
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gather", false, Backend::DPCPP, ScalarType::Char);
@@ -2793,7 +2793,7 @@ Tensor _th_gather(const Tensor & self, int64_t dim, const Tensor & index) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_(index.sizes());
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gather", false, Backend::DPCPP, ScalarType::Double);
@@ -2805,7 +2805,7 @@ Tensor _th_gather(const Tensor & self, int64_t dim, const Tensor & index) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_(index.sizes());
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gather", false, Backend::DPCPP, ScalarType::Float);
@@ -2817,7 +2817,7 @@ Tensor _th_gather(const Tensor & self, int64_t dim, const Tensor & index) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_(index.sizes());
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gather", false, Backend::DPCPP, ScalarType::Int);
@@ -2829,7 +2829,7 @@ Tensor _th_gather(const Tensor & self, int64_t dim, const Tensor & index) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_(index.sizes());
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gather", false, Backend::DPCPP, ScalarType::Long);
@@ -2841,7 +2841,7 @@ Tensor _th_gather(const Tensor & self, int64_t dim, const Tensor & index) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_(index.sizes());
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gather", false, Backend::DPCPP, ScalarType::Short);
@@ -2853,7 +2853,7 @@ Tensor _th_gather(const Tensor & self, int64_t dim, const Tensor & index) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_(index.sizes());
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gather", false, Backend::DPCPP, ScalarType::Half);
@@ -3033,7 +3033,7 @@ Tensor _th_and(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = other.toBool();
@@ -3043,7 +3043,7 @@ Tensor _th_and(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -3053,7 +3053,7 @@ Tensor _th_and(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -3063,7 +3063,7 @@ Tensor _th_and(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -3073,7 +3073,7 @@ Tensor _th_and(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -3083,7 +3083,7 @@ Tensor _th_and(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -3093,7 +3093,7 @@ Tensor _th_and(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -3103,7 +3103,7 @@ Tensor _th_and(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -3113,7 +3113,7 @@ Tensor _th_and(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -3244,7 +3244,7 @@ Tensor s__th_and(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_and", false, Backend::DPCPP, ScalarType::Bool);
@@ -3254,7 +3254,7 @@ Tensor s__th_and(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_and", false, Backend::DPCPP, ScalarType::Byte);
@@ -3264,7 +3264,7 @@ Tensor s__th_and(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_and", false, Backend::DPCPP, ScalarType::Char);
@@ -3274,7 +3274,7 @@ Tensor s__th_and(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_and", false, Backend::DPCPP, ScalarType::Double);
@@ -3284,7 +3284,7 @@ Tensor s__th_and(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_and", false, Backend::DPCPP, ScalarType::Float);
@@ -3294,7 +3294,7 @@ Tensor s__th_and(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_and", false, Backend::DPCPP, ScalarType::Int);
@@ -3304,7 +3304,7 @@ Tensor s__th_and(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_and", false, Backend::DPCPP, ScalarType::Long);
@@ -3314,7 +3314,7 @@ Tensor s__th_and(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_and", false, Backend::DPCPP, ScalarType::Short);
@@ -3324,7 +3324,7 @@ Tensor s__th_and(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_and", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_and", false, Backend::DPCPP, ScalarType::Half);
@@ -3594,7 +3594,7 @@ Tensor _th_or(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = other.toBool();
@@ -3604,7 +3604,7 @@ Tensor _th_or(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -3614,7 +3614,7 @@ Tensor _th_or(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -3624,7 +3624,7 @@ Tensor _th_or(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -3634,7 +3634,7 @@ Tensor _th_or(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -3644,7 +3644,7 @@ Tensor _th_or(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -3654,7 +3654,7 @@ Tensor _th_or(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -3664,7 +3664,7 @@ Tensor _th_or(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -3674,7 +3674,7 @@ Tensor _th_or(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -3805,7 +3805,7 @@ Tensor s__th_or(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_or", false, Backend::DPCPP, ScalarType::Bool);
@@ -3815,7 +3815,7 @@ Tensor s__th_or(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_or", false, Backend::DPCPP, ScalarType::Byte);
@@ -3825,7 +3825,7 @@ Tensor s__th_or(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_or", false, Backend::DPCPP, ScalarType::Char);
@@ -3835,7 +3835,7 @@ Tensor s__th_or(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_or", false, Backend::DPCPP, ScalarType::Double);
@@ -3845,7 +3845,7 @@ Tensor s__th_or(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_or", false, Backend::DPCPP, ScalarType::Float);
@@ -3855,7 +3855,7 @@ Tensor s__th_or(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_or", false, Backend::DPCPP, ScalarType::Int);
@@ -3865,7 +3865,7 @@ Tensor s__th_or(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_or", false, Backend::DPCPP, ScalarType::Long);
@@ -3875,7 +3875,7 @@ Tensor s__th_or(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_or", false, Backend::DPCPP, ScalarType::Short);
@@ -3885,7 +3885,7 @@ Tensor s__th_or(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_or", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_or", false, Backend::DPCPP, ScalarType::Half);
@@ -4155,7 +4155,7 @@ Tensor _th_xor(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = other.toBool();
@@ -4165,7 +4165,7 @@ Tensor _th_xor(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -4175,7 +4175,7 @@ Tensor _th_xor(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -4185,7 +4185,7 @@ Tensor _th_xor(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -4195,7 +4195,7 @@ Tensor _th_xor(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -4205,7 +4205,7 @@ Tensor _th_xor(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -4215,7 +4215,7 @@ Tensor _th_xor(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -4225,7 +4225,7 @@ Tensor _th_xor(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -4235,7 +4235,7 @@ Tensor _th_xor(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -4366,7 +4366,7 @@ Tensor s__th_xor(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_xor", false, Backend::DPCPP, ScalarType::Bool);
@@ -4376,7 +4376,7 @@ Tensor s__th_xor(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_xor", false, Backend::DPCPP, ScalarType::Byte);
@@ -4386,7 +4386,7 @@ Tensor s__th_xor(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_xor", false, Backend::DPCPP, ScalarType::Char);
@@ -4396,7 +4396,7 @@ Tensor s__th_xor(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_xor", false, Backend::DPCPP, ScalarType::Double);
@@ -4406,7 +4406,7 @@ Tensor s__th_xor(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_xor", false, Backend::DPCPP, ScalarType::Float);
@@ -4416,7 +4416,7 @@ Tensor s__th_xor(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_xor", false, Backend::DPCPP, ScalarType::Int);
@@ -4426,7 +4426,7 @@ Tensor s__th_xor(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_xor", false, Backend::DPCPP, ScalarType::Long);
@@ -4436,7 +4436,7 @@ Tensor s__th_xor(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_xor", false, Backend::DPCPP, ScalarType::Short);
@@ -4446,7 +4446,7 @@ Tensor s__th_xor(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_xor", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_xor", false, Backend::DPCPP, ScalarType::Half);
@@ -4707,7 +4707,7 @@ Tensor _th_lshift(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -4717,7 +4717,7 @@ Tensor _th_lshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -4727,7 +4727,7 @@ Tensor _th_lshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -4737,7 +4737,7 @@ Tensor _th_lshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -4747,7 +4747,7 @@ Tensor _th_lshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -4757,7 +4757,7 @@ Tensor _th_lshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -4767,7 +4767,7 @@ Tensor _th_lshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -4777,7 +4777,7 @@ Tensor _th_lshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -4899,7 +4899,7 @@ Tensor s__th_lshift(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lshift", false, Backend::DPCPP, ScalarType::Byte);
@@ -4909,7 +4909,7 @@ Tensor s__th_lshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lshift", false, Backend::DPCPP, ScalarType::Char);
@@ -4919,7 +4919,7 @@ Tensor s__th_lshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lshift", false, Backend::DPCPP, ScalarType::Double);
@@ -4929,7 +4929,7 @@ Tensor s__th_lshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lshift", false, Backend::DPCPP, ScalarType::Float);
@@ -4939,7 +4939,7 @@ Tensor s__th_lshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lshift", false, Backend::DPCPP, ScalarType::Int);
@@ -4949,7 +4949,7 @@ Tensor s__th_lshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lshift", false, Backend::DPCPP, ScalarType::Long);
@@ -4959,7 +4959,7 @@ Tensor s__th_lshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lshift", false, Backend::DPCPP, ScalarType::Short);
@@ -4969,7 +4969,7 @@ Tensor s__th_lshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lshift", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lshift", false, Backend::DPCPP, ScalarType::Half);
@@ -5216,7 +5216,7 @@ Tensor _th_rshift(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -5226,7 +5226,7 @@ Tensor _th_rshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -5236,7 +5236,7 @@ Tensor _th_rshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -5246,7 +5246,7 @@ Tensor _th_rshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -5256,7 +5256,7 @@ Tensor _th_rshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -5266,7 +5266,7 @@ Tensor _th_rshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -5276,7 +5276,7 @@ Tensor _th_rshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -5286,7 +5286,7 @@ Tensor _th_rshift(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -5408,7 +5408,7 @@ Tensor s__th_rshift(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_rshift", false, Backend::DPCPP, ScalarType::Byte);
@@ -5418,7 +5418,7 @@ Tensor s__th_rshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_rshift", false, Backend::DPCPP, ScalarType::Char);
@@ -5428,7 +5428,7 @@ Tensor s__th_rshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_rshift", false, Backend::DPCPP, ScalarType::Double);
@@ -5438,7 +5438,7 @@ Tensor s__th_rshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_rshift", false, Backend::DPCPP, ScalarType::Float);
@@ -5448,7 +5448,7 @@ Tensor s__th_rshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_rshift", false, Backend::DPCPP, ScalarType::Int);
@@ -5458,7 +5458,7 @@ Tensor s__th_rshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_rshift", false, Backend::DPCPP, ScalarType::Long);
@@ -5468,7 +5468,7 @@ Tensor s__th_rshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_rshift", false, Backend::DPCPP, ScalarType::Short);
@@ -5478,7 +5478,7 @@ Tensor s__th_rshift(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rshift", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_rshift", false, Backend::DPCPP, ScalarType::Half);
@@ -5725,7 +5725,7 @@ Tensor _th_lt(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -5735,7 +5735,7 @@ Tensor _th_lt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -5745,7 +5745,7 @@ Tensor _th_lt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -5755,7 +5755,7 @@ Tensor _th_lt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -5765,7 +5765,7 @@ Tensor _th_lt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -5775,7 +5775,7 @@ Tensor _th_lt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -5785,7 +5785,7 @@ Tensor _th_lt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -5795,7 +5795,7 @@ Tensor _th_lt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -5917,7 +5917,7 @@ Tensor s__th_lt(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt", false, Backend::DPCPP, ScalarType::Byte);
@@ -5927,7 +5927,7 @@ Tensor s__th_lt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt", false, Backend::DPCPP, ScalarType::Char);
@@ -5937,7 +5937,7 @@ Tensor s__th_lt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt", false, Backend::DPCPP, ScalarType::Double);
@@ -5947,7 +5947,7 @@ Tensor s__th_lt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt", false, Backend::DPCPP, ScalarType::Float);
@@ -5957,7 +5957,7 @@ Tensor s__th_lt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt", false, Backend::DPCPP, ScalarType::Int);
@@ -5967,7 +5967,7 @@ Tensor s__th_lt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt", false, Backend::DPCPP, ScalarType::Long);
@@ -5977,7 +5977,7 @@ Tensor s__th_lt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt", false, Backend::DPCPP, ScalarType::Short);
@@ -5987,7 +5987,7 @@ Tensor s__th_lt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt", false, Backend::DPCPP, ScalarType::Half);
@@ -6091,7 +6091,7 @@ Tensor _th_lt_byte(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -6101,7 +6101,7 @@ Tensor _th_lt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -6111,7 +6111,7 @@ Tensor _th_lt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -6121,7 +6121,7 @@ Tensor _th_lt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -6131,7 +6131,7 @@ Tensor _th_lt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -6141,7 +6141,7 @@ Tensor _th_lt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -6151,7 +6151,7 @@ Tensor _th_lt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -6161,7 +6161,7 @@ Tensor _th_lt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -6283,7 +6283,7 @@ Tensor s__th_lt_byte(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Byte);
@@ -6293,7 +6293,7 @@ Tensor s__th_lt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Char);
@@ -6303,7 +6303,7 @@ Tensor s__th_lt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Double);
@@ -6313,7 +6313,7 @@ Tensor s__th_lt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Float);
@@ -6323,7 +6323,7 @@ Tensor s__th_lt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Int);
@@ -6333,7 +6333,7 @@ Tensor s__th_lt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Long);
@@ -6343,7 +6343,7 @@ Tensor s__th_lt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Short);
@@ -6353,7 +6353,7 @@ Tensor s__th_lt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_lt_byte", false, Backend::DPCPP, ScalarType::Half);
@@ -6609,7 +6609,7 @@ Tensor _th_gt(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = other.toBool();
@@ -6619,7 +6619,7 @@ Tensor _th_gt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -6629,7 +6629,7 @@ Tensor _th_gt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -6639,7 +6639,7 @@ Tensor _th_gt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -6649,7 +6649,7 @@ Tensor _th_gt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -6659,7 +6659,7 @@ Tensor _th_gt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -6669,7 +6669,7 @@ Tensor _th_gt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -6679,7 +6679,7 @@ Tensor _th_gt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -6689,7 +6689,7 @@ Tensor _th_gt(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -6820,7 +6820,7 @@ Tensor s__th_gt(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt", false, Backend::DPCPP, ScalarType::Bool);
@@ -6830,7 +6830,7 @@ Tensor s__th_gt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt", false, Backend::DPCPP, ScalarType::Byte);
@@ -6840,7 +6840,7 @@ Tensor s__th_gt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt", false, Backend::DPCPP, ScalarType::Char);
@@ -6850,7 +6850,7 @@ Tensor s__th_gt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt", false, Backend::DPCPP, ScalarType::Double);
@@ -6860,7 +6860,7 @@ Tensor s__th_gt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt", false, Backend::DPCPP, ScalarType::Float);
@@ -6870,7 +6870,7 @@ Tensor s__th_gt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt", false, Backend::DPCPP, ScalarType::Int);
@@ -6880,7 +6880,7 @@ Tensor s__th_gt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt", false, Backend::DPCPP, ScalarType::Long);
@@ -6890,7 +6890,7 @@ Tensor s__th_gt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt", false, Backend::DPCPP, ScalarType::Short);
@@ -6900,7 +6900,7 @@ Tensor s__th_gt(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt", false, Backend::DPCPP, ScalarType::Half);
@@ -7004,7 +7004,7 @@ Tensor _th_gt_byte(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -7014,7 +7014,7 @@ Tensor _th_gt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -7024,7 +7024,7 @@ Tensor _th_gt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -7034,7 +7034,7 @@ Tensor _th_gt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -7044,7 +7044,7 @@ Tensor _th_gt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -7054,7 +7054,7 @@ Tensor _th_gt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -7064,7 +7064,7 @@ Tensor _th_gt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -7074,7 +7074,7 @@ Tensor _th_gt_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -7196,7 +7196,7 @@ Tensor s__th_gt_byte(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Byte);
@@ -7206,7 +7206,7 @@ Tensor s__th_gt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Char);
@@ -7216,7 +7216,7 @@ Tensor s__th_gt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Double);
@@ -7226,7 +7226,7 @@ Tensor s__th_gt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Float);
@@ -7236,7 +7236,7 @@ Tensor s__th_gt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Int);
@@ -7246,7 +7246,7 @@ Tensor s__th_gt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Long);
@@ -7256,7 +7256,7 @@ Tensor s__th_gt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Short);
@@ -7266,7 +7266,7 @@ Tensor s__th_gt_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_gt_byte", false, Backend::DPCPP, ScalarType::Half);
@@ -7513,7 +7513,7 @@ Tensor _th_le(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -7523,7 +7523,7 @@ Tensor _th_le(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -7533,7 +7533,7 @@ Tensor _th_le(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -7543,7 +7543,7 @@ Tensor _th_le(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -7553,7 +7553,7 @@ Tensor _th_le(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -7563,7 +7563,7 @@ Tensor _th_le(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -7573,7 +7573,7 @@ Tensor _th_le(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -7583,7 +7583,7 @@ Tensor _th_le(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -7705,7 +7705,7 @@ Tensor s__th_le(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le", false, Backend::DPCPP, ScalarType::Byte);
@@ -7715,7 +7715,7 @@ Tensor s__th_le(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le", false, Backend::DPCPP, ScalarType::Char);
@@ -7725,7 +7725,7 @@ Tensor s__th_le(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le", false, Backend::DPCPP, ScalarType::Double);
@@ -7735,7 +7735,7 @@ Tensor s__th_le(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le", false, Backend::DPCPP, ScalarType::Float);
@@ -7745,7 +7745,7 @@ Tensor s__th_le(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le", false, Backend::DPCPP, ScalarType::Int);
@@ -7755,7 +7755,7 @@ Tensor s__th_le(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le", false, Backend::DPCPP, ScalarType::Long);
@@ -7765,7 +7765,7 @@ Tensor s__th_le(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le", false, Backend::DPCPP, ScalarType::Short);
@@ -7775,7 +7775,7 @@ Tensor s__th_le(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le", false, Backend::DPCPP, ScalarType::Half);
@@ -7879,7 +7879,7 @@ Tensor _th_le_byte(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -7889,7 +7889,7 @@ Tensor _th_le_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -7899,7 +7899,7 @@ Tensor _th_le_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -7909,7 +7909,7 @@ Tensor _th_le_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -7919,7 +7919,7 @@ Tensor _th_le_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -7929,7 +7929,7 @@ Tensor _th_le_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -7939,7 +7939,7 @@ Tensor _th_le_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -7949,7 +7949,7 @@ Tensor _th_le_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -8071,7 +8071,7 @@ Tensor s__th_le_byte(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le_byte", false, Backend::DPCPP, ScalarType::Byte);
@@ -8081,7 +8081,7 @@ Tensor s__th_le_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le_byte", false, Backend::DPCPP, ScalarType::Char);
@@ -8091,7 +8091,7 @@ Tensor s__th_le_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le_byte", false, Backend::DPCPP, ScalarType::Double);
@@ -8101,7 +8101,7 @@ Tensor s__th_le_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le_byte", false, Backend::DPCPP, ScalarType::Float);
@@ -8111,7 +8111,7 @@ Tensor s__th_le_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le_byte", false, Backend::DPCPP, ScalarType::Int);
@@ -8121,7 +8121,7 @@ Tensor s__th_le_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le_byte", false, Backend::DPCPP, ScalarType::Long);
@@ -8131,7 +8131,7 @@ Tensor s__th_le_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le_byte", false, Backend::DPCPP, ScalarType::Short);
@@ -8141,7 +8141,7 @@ Tensor s__th_le_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_le_byte", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_le_byte", false, Backend::DPCPP, ScalarType::Half);
@@ -8388,7 +8388,7 @@ Tensor _th_ge(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -8398,7 +8398,7 @@ Tensor _th_ge(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -8408,7 +8408,7 @@ Tensor _th_ge(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -8418,7 +8418,7 @@ Tensor _th_ge(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -8428,7 +8428,7 @@ Tensor _th_ge(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -8438,7 +8438,7 @@ Tensor _th_ge(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -8448,7 +8448,7 @@ Tensor _th_ge(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -8458,7 +8458,7 @@ Tensor _th_ge(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -8580,7 +8580,7 @@ Tensor s__th_ge(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge", false, Backend::DPCPP, ScalarType::Byte);
@@ -8590,7 +8590,7 @@ Tensor s__th_ge(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge", false, Backend::DPCPP, ScalarType::Char);
@@ -8600,7 +8600,7 @@ Tensor s__th_ge(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge", false, Backend::DPCPP, ScalarType::Double);
@@ -8610,7 +8610,7 @@ Tensor s__th_ge(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge", false, Backend::DPCPP, ScalarType::Float);
@@ -8620,7 +8620,7 @@ Tensor s__th_ge(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge", false, Backend::DPCPP, ScalarType::Int);
@@ -8630,7 +8630,7 @@ Tensor s__th_ge(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge", false, Backend::DPCPP, ScalarType::Long);
@@ -8640,7 +8640,7 @@ Tensor s__th_ge(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge", false, Backend::DPCPP, ScalarType::Short);
@@ -8650,7 +8650,7 @@ Tensor s__th_ge(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge", false, Backend::DPCPP, ScalarType::Half);
@@ -8754,7 +8754,7 @@ Tensor _th_ge_byte(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -8764,7 +8764,7 @@ Tensor _th_ge_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -8774,7 +8774,7 @@ Tensor _th_ge_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -8784,7 +8784,7 @@ Tensor _th_ge_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -8794,7 +8794,7 @@ Tensor _th_ge_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -8804,7 +8804,7 @@ Tensor _th_ge_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -8814,7 +8814,7 @@ Tensor _th_ge_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -8824,7 +8824,7 @@ Tensor _th_ge_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -8946,7 +8946,7 @@ Tensor s__th_ge_byte(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Byte);
@@ -8956,7 +8956,7 @@ Tensor s__th_ge_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Char);
@@ -8966,7 +8966,7 @@ Tensor s__th_ge_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Double);
@@ -8976,7 +8976,7 @@ Tensor s__th_ge_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Float);
@@ -8986,7 +8986,7 @@ Tensor s__th_ge_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Int);
@@ -8996,7 +8996,7 @@ Tensor s__th_ge_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Long);
@@ -9006,7 +9006,7 @@ Tensor s__th_ge_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Short);
@@ -9016,7 +9016,7 @@ Tensor s__th_ge_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ge_byte", false, Backend::DPCPP, ScalarType::Half);
@@ -9272,7 +9272,7 @@ Tensor _th_eq(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = other.toBool();
@@ -9282,7 +9282,7 @@ Tensor _th_eq(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -9292,7 +9292,7 @@ Tensor _th_eq(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -9302,7 +9302,7 @@ Tensor _th_eq(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -9312,7 +9312,7 @@ Tensor _th_eq(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -9322,7 +9322,7 @@ Tensor _th_eq(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -9332,7 +9332,7 @@ Tensor _th_eq(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -9342,7 +9342,7 @@ Tensor _th_eq(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -9352,7 +9352,7 @@ Tensor _th_eq(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -9483,7 +9483,7 @@ Tensor s__th_eq(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq", false, Backend::DPCPP, ScalarType::Bool);
@@ -9493,7 +9493,7 @@ Tensor s__th_eq(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq", false, Backend::DPCPP, ScalarType::Byte);
@@ -9503,7 +9503,7 @@ Tensor s__th_eq(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq", false, Backend::DPCPP, ScalarType::Char);
@@ -9513,7 +9513,7 @@ Tensor s__th_eq(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq", false, Backend::DPCPP, ScalarType::Double);
@@ -9523,7 +9523,7 @@ Tensor s__th_eq(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq", false, Backend::DPCPP, ScalarType::Float);
@@ -9533,7 +9533,7 @@ Tensor s__th_eq(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq", false, Backend::DPCPP, ScalarType::Int);
@@ -9543,7 +9543,7 @@ Tensor s__th_eq(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq", false, Backend::DPCPP, ScalarType::Long);
@@ -9553,7 +9553,7 @@ Tensor s__th_eq(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq", false, Backend::DPCPP, ScalarType::Short);
@@ -9563,7 +9563,7 @@ Tensor s__th_eq(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq", false, Backend::DPCPP, ScalarType::Half);
@@ -9676,7 +9676,7 @@ Tensor _th_eq_byte(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = other.toBool();
@@ -9686,7 +9686,7 @@ Tensor _th_eq_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -9696,7 +9696,7 @@ Tensor _th_eq_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -9706,7 +9706,7 @@ Tensor _th_eq_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -9716,7 +9716,7 @@ Tensor _th_eq_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -9726,7 +9726,7 @@ Tensor _th_eq_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -9736,7 +9736,7 @@ Tensor _th_eq_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -9746,7 +9746,7 @@ Tensor _th_eq_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -9756,7 +9756,7 @@ Tensor _th_eq_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -9887,7 +9887,7 @@ Tensor s__th_eq_byte(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Bool);
@@ -9897,7 +9897,7 @@ Tensor s__th_eq_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Byte);
@@ -9907,7 +9907,7 @@ Tensor s__th_eq_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Char);
@@ -9917,7 +9917,7 @@ Tensor s__th_eq_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Double);
@@ -9927,7 +9927,7 @@ Tensor s__th_eq_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Float);
@@ -9937,7 +9937,7 @@ Tensor s__th_eq_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Int);
@@ -9947,7 +9947,7 @@ Tensor s__th_eq_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Long);
@@ -9957,7 +9957,7 @@ Tensor s__th_eq_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Short);
@@ -9967,7 +9967,7 @@ Tensor s__th_eq_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_eq_byte", false, Backend::DPCPP, ScalarType::Half);
@@ -10228,7 +10228,7 @@ Tensor _th_ne(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -10238,7 +10238,7 @@ Tensor _th_ne(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -10248,7 +10248,7 @@ Tensor _th_ne(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -10258,7 +10258,7 @@ Tensor _th_ne(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -10268,7 +10268,7 @@ Tensor _th_ne(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -10278,7 +10278,7 @@ Tensor _th_ne(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -10288,7 +10288,7 @@ Tensor _th_ne(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -10298,7 +10298,7 @@ Tensor _th_ne(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -10420,7 +10420,7 @@ Tensor s__th_ne(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne", false, Backend::DPCPP, ScalarType::Byte);
@@ -10430,7 +10430,7 @@ Tensor s__th_ne(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne", false, Backend::DPCPP, ScalarType::Char);
@@ -10440,7 +10440,7 @@ Tensor s__th_ne(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne", false, Backend::DPCPP, ScalarType::Double);
@@ -10450,7 +10450,7 @@ Tensor s__th_ne(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne", false, Backend::DPCPP, ScalarType::Float);
@@ -10460,7 +10460,7 @@ Tensor s__th_ne(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne", false, Backend::DPCPP, ScalarType::Int);
@@ -10470,7 +10470,7 @@ Tensor s__th_ne(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne", false, Backend::DPCPP, ScalarType::Long);
@@ -10480,7 +10480,7 @@ Tensor s__th_ne(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne", false, Backend::DPCPP, ScalarType::Short);
@@ -10490,7 +10490,7 @@ Tensor s__th_ne(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Bool), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne", false, Backend::DPCPP, ScalarType::Half);
@@ -10594,7 +10594,7 @@ Tensor _th_ne_byte(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -10604,7 +10604,7 @@ Tensor _th_ne_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -10614,7 +10614,7 @@ Tensor _th_ne_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -10624,7 +10624,7 @@ Tensor _th_ne_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -10634,7 +10634,7 @@ Tensor _th_ne_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -10644,7 +10644,7 @@ Tensor _th_ne_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -10654,7 +10654,7 @@ Tensor _th_ne_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -10664,7 +10664,7 @@ Tensor _th_ne_byte(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -10786,7 +10786,7 @@ Tensor s__th_ne_byte(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Byte);
@@ -10796,7 +10796,7 @@ Tensor s__th_ne_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Char);
@@ -10806,7 +10806,7 @@ Tensor s__th_ne_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Double);
@@ -10816,7 +10816,7 @@ Tensor s__th_ne_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Float);
@@ -10826,7 +10826,7 @@ Tensor s__th_ne_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Int);
@@ -10836,7 +10836,7 @@ Tensor s__th_ne_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Long);
@@ -10846,7 +10846,7 @@ Tensor s__th_ne_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Short);
@@ -10856,7 +10856,7 @@ Tensor s__th_ne_byte(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Byte), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_ne_byte", false, Backend::DPCPP, ScalarType::Half);
@@ -11130,7 +11130,7 @@ Tensor s__th_min(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_min", false, Backend::DPCPP, ScalarType::Bool);
@@ -11140,7 +11140,7 @@ Tensor s__th_min(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_min", false, Backend::DPCPP, ScalarType::Byte);
@@ -11150,7 +11150,7 @@ Tensor s__th_min(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_min", false, Backend::DPCPP, ScalarType::Char);
@@ -11160,7 +11160,7 @@ Tensor s__th_min(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_min", false, Backend::DPCPP, ScalarType::Double);
@@ -11170,7 +11170,7 @@ Tensor s__th_min(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_min", false, Backend::DPCPP, ScalarType::Float);
@@ -11180,7 +11180,7 @@ Tensor s__th_min(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_min", false, Backend::DPCPP, ScalarType::Int);
@@ -11190,7 +11190,7 @@ Tensor s__th_min(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_min", false, Backend::DPCPP, ScalarType::Long);
@@ -11200,7 +11200,7 @@ Tensor s__th_min(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_min", false, Backend::DPCPP, ScalarType::Short);
@@ -11210,7 +11210,7 @@ Tensor s__th_min(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_min", false, Backend::DPCPP, ScalarType::Half);
@@ -11394,9 +11394,9 @@ std::tuple<Tensor,Tensor> _th_min(const Tensor & self, int64_t dim, bool keepdim
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_));
-            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Byte);
             dim = maybe_wrap_dim(dim, self_);
@@ -11408,9 +11408,9 @@ std::tuple<Tensor,Tensor> _th_min(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Char: {
-            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_));
-            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Char);
             dim = maybe_wrap_dim(dim, self_);
@@ -11422,9 +11422,9 @@ std::tuple<Tensor,Tensor> _th_min(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Double: {
-            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_));
-            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Double);
             dim = maybe_wrap_dim(dim, self_);
@@ -11436,9 +11436,9 @@ std::tuple<Tensor,Tensor> _th_min(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Float: {
-            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_));
-            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Float);
             dim = maybe_wrap_dim(dim, self_);
@@ -11450,9 +11450,9 @@ std::tuple<Tensor,Tensor> _th_min(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Int: {
-            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_));
-            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Int);
             dim = maybe_wrap_dim(dim, self_);
@@ -11464,9 +11464,9 @@ std::tuple<Tensor,Tensor> _th_min(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Long: {
-            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_));
-            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Long);
             dim = maybe_wrap_dim(dim, self_);
@@ -11478,9 +11478,9 @@ std::tuple<Tensor,Tensor> _th_min(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Short: {
-            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_));
-            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Short);
             dim = maybe_wrap_dim(dim, self_);
@@ -11492,9 +11492,9 @@ std::tuple<Tensor,Tensor> _th_min(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Half: {
-            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_));
-            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto min_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto min_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(min_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_min", false, Backend::DPCPP, ScalarType::Half);
             dim = maybe_wrap_dim(dim, self_);
@@ -11627,7 +11627,7 @@ Tensor s__th_max(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Bool);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_max", false, Backend::DPCPP, ScalarType::Bool);
@@ -11637,7 +11637,7 @@ Tensor s__th_max(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_max", false, Backend::DPCPP, ScalarType::Byte);
@@ -11647,7 +11647,7 @@ Tensor s__th_max(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_max", false, Backend::DPCPP, ScalarType::Char);
@@ -11657,7 +11657,7 @@ Tensor s__th_max(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_max", false, Backend::DPCPP, ScalarType::Double);
@@ -11667,7 +11667,7 @@ Tensor s__th_max(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_max", false, Backend::DPCPP, ScalarType::Float);
@@ -11677,7 +11677,7 @@ Tensor s__th_max(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_max", false, Backend::DPCPP, ScalarType::Int);
@@ -11687,7 +11687,7 @@ Tensor s__th_max(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_max", false, Backend::DPCPP, ScalarType::Long);
@@ -11697,7 +11697,7 @@ Tensor s__th_max(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_max", false, Backend::DPCPP, ScalarType::Short);
@@ -11707,7 +11707,7 @@ Tensor s__th_max(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_max", false, Backend::DPCPP, ScalarType::Half);
@@ -11891,9 +11891,9 @@ std::tuple<Tensor,Tensor> _th_max(const Tensor & self, int64_t dim, bool keepdim
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_));
-            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Byte);
             dim = maybe_wrap_dim(dim, self_);
@@ -11905,9 +11905,9 @@ std::tuple<Tensor,Tensor> _th_max(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Char: {
-            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_));
-            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Char);
             dim = maybe_wrap_dim(dim, self_);
@@ -11919,9 +11919,9 @@ std::tuple<Tensor,Tensor> _th_max(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Double: {
-            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_));
-            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Double);
             dim = maybe_wrap_dim(dim, self_);
@@ -11933,9 +11933,9 @@ std::tuple<Tensor,Tensor> _th_max(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Float: {
-            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_));
-            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Float);
             dim = maybe_wrap_dim(dim, self_);
@@ -11947,9 +11947,9 @@ std::tuple<Tensor,Tensor> _th_max(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Int: {
-            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_));
-            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Int);
             dim = maybe_wrap_dim(dim, self_);
@@ -11961,9 +11961,9 @@ std::tuple<Tensor,Tensor> _th_max(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Long: {
-            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_));
-            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Long);
             dim = maybe_wrap_dim(dim, self_);
@@ -11975,9 +11975,9 @@ std::tuple<Tensor,Tensor> _th_max(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Short: {
-            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_));
-            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Short);
             dim = maybe_wrap_dim(dim, self_);
@@ -11989,9 +11989,9 @@ std::tuple<Tensor,Tensor> _th_max(const Tensor & self, int64_t dim, bool keepdim
             break;
         }
         case ScalarType::Half: {
-            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_));
-            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto max_indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto max_indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(max_indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_max", false, Backend::DPCPP, ScalarType::Half);
             dim = maybe_wrap_dim(dim, self_);
@@ -12121,9 +12121,9 @@ std::tuple<Tensor,Tensor> _th_mode(const Tensor & self, int64_t dim, bool keepdi
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mode", false, Backend::DPCPP, ScalarType::Byte);
             dim = maybe_wrap_dim(dim, self_);
@@ -12135,9 +12135,9 @@ std::tuple<Tensor,Tensor> _th_mode(const Tensor & self, int64_t dim, bool keepdi
             break;
         }
         case ScalarType::Char: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mode", false, Backend::DPCPP, ScalarType::Char);
             dim = maybe_wrap_dim(dim, self_);
@@ -12149,9 +12149,9 @@ std::tuple<Tensor,Tensor> _th_mode(const Tensor & self, int64_t dim, bool keepdi
             break;
         }
         case ScalarType::Double: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mode", false, Backend::DPCPP, ScalarType::Double);
             dim = maybe_wrap_dim(dim, self_);
@@ -12163,9 +12163,9 @@ std::tuple<Tensor,Tensor> _th_mode(const Tensor & self, int64_t dim, bool keepdi
             break;
         }
         case ScalarType::Float: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mode", false, Backend::DPCPP, ScalarType::Float);
             dim = maybe_wrap_dim(dim, self_);
@@ -12177,9 +12177,9 @@ std::tuple<Tensor,Tensor> _th_mode(const Tensor & self, int64_t dim, bool keepdi
             break;
         }
         case ScalarType::Int: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mode", false, Backend::DPCPP, ScalarType::Int);
             dim = maybe_wrap_dim(dim, self_);
@@ -12191,9 +12191,9 @@ std::tuple<Tensor,Tensor> _th_mode(const Tensor & self, int64_t dim, bool keepdi
             break;
         }
         case ScalarType::Long: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mode", false, Backend::DPCPP, ScalarType::Long);
             dim = maybe_wrap_dim(dim, self_);
@@ -12205,9 +12205,9 @@ std::tuple<Tensor,Tensor> _th_mode(const Tensor & self, int64_t dim, bool keepdi
             break;
         }
         case ScalarType::Short: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mode", false, Backend::DPCPP, ScalarType::Short);
             dim = maybe_wrap_dim(dim, self_);
@@ -12219,9 +12219,9 @@ std::tuple<Tensor,Tensor> _th_mode(const Tensor & self, int64_t dim, bool keepdi
             break;
         }
         case ScalarType::Half: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mode", false, Backend::DPCPP, ScalarType::Half);
             dim = maybe_wrap_dim(dim, self_);
@@ -12351,9 +12351,9 @@ std::tuple<Tensor,Tensor> _th_sort(const Tensor & self, int64_t dim, bool descen
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sort", false, Backend::DPCPP, ScalarType::Byte);
             dim = maybe_wrap_dim(dim, self_);
@@ -12365,9 +12365,9 @@ std::tuple<Tensor,Tensor> _th_sort(const Tensor & self, int64_t dim, bool descen
             break;
         }
         case ScalarType::Char: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sort", false, Backend::DPCPP, ScalarType::Char);
             dim = maybe_wrap_dim(dim, self_);
@@ -12379,9 +12379,9 @@ std::tuple<Tensor,Tensor> _th_sort(const Tensor & self, int64_t dim, bool descen
             break;
         }
         case ScalarType::Double: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sort", false, Backend::DPCPP, ScalarType::Double);
             dim = maybe_wrap_dim(dim, self_);
@@ -12393,9 +12393,9 @@ std::tuple<Tensor,Tensor> _th_sort(const Tensor & self, int64_t dim, bool descen
             break;
         }
         case ScalarType::Float: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sort", false, Backend::DPCPP, ScalarType::Float);
             dim = maybe_wrap_dim(dim, self_);
@@ -12407,9 +12407,9 @@ std::tuple<Tensor,Tensor> _th_sort(const Tensor & self, int64_t dim, bool descen
             break;
         }
         case ScalarType::Int: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sort", false, Backend::DPCPP, ScalarType::Int);
             dim = maybe_wrap_dim(dim, self_);
@@ -12421,9 +12421,9 @@ std::tuple<Tensor,Tensor> _th_sort(const Tensor & self, int64_t dim, bool descen
             break;
         }
         case ScalarType::Long: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sort", false, Backend::DPCPP, ScalarType::Long);
             dim = maybe_wrap_dim(dim, self_);
@@ -12435,9 +12435,9 @@ std::tuple<Tensor,Tensor> _th_sort(const Tensor & self, int64_t dim, bool descen
             break;
         }
         case ScalarType::Short: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sort", false, Backend::DPCPP, ScalarType::Short);
             dim = maybe_wrap_dim(dim, self_);
@@ -12449,9 +12449,9 @@ std::tuple<Tensor,Tensor> _th_sort(const Tensor & self, int64_t dim, bool descen
             break;
         }
         case ScalarType::Half: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sort", false, Backend::DPCPP, ScalarType::Half);
             dim = maybe_wrap_dim(dim, self_);
@@ -12581,9 +12581,9 @@ std::tuple<Tensor,Tensor> _th_topk(const Tensor & self, int64_t k, int64_t dim, 
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_topk", false, Backend::DPCPP, ScalarType::Byte);
             dim = maybe_wrap_dim(dim, self_);
@@ -12595,9 +12595,9 @@ std::tuple<Tensor,Tensor> _th_topk(const Tensor & self, int64_t k, int64_t dim, 
             break;
         }
         case ScalarType::Char: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_topk", false, Backend::DPCPP, ScalarType::Char);
             dim = maybe_wrap_dim(dim, self_);
@@ -12609,9 +12609,9 @@ std::tuple<Tensor,Tensor> _th_topk(const Tensor & self, int64_t k, int64_t dim, 
             break;
         }
         case ScalarType::Double: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_topk", false, Backend::DPCPP, ScalarType::Double);
             dim = maybe_wrap_dim(dim, self_);
@@ -12623,9 +12623,9 @@ std::tuple<Tensor,Tensor> _th_topk(const Tensor & self, int64_t k, int64_t dim, 
             break;
         }
         case ScalarType::Float: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_topk", false, Backend::DPCPP, ScalarType::Float);
             dim = maybe_wrap_dim(dim, self_);
@@ -12637,9 +12637,9 @@ std::tuple<Tensor,Tensor> _th_topk(const Tensor & self, int64_t k, int64_t dim, 
             break;
         }
         case ScalarType::Int: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_topk", false, Backend::DPCPP, ScalarType::Int);
             dim = maybe_wrap_dim(dim, self_);
@@ -12651,9 +12651,9 @@ std::tuple<Tensor,Tensor> _th_topk(const Tensor & self, int64_t k, int64_t dim, 
             break;
         }
         case ScalarType::Long: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_topk", false, Backend::DPCPP, ScalarType::Long);
             dim = maybe_wrap_dim(dim, self_);
@@ -12665,9 +12665,9 @@ std::tuple<Tensor,Tensor> _th_topk(const Tensor & self, int64_t k, int64_t dim, 
             break;
         }
         case ScalarType::Short: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_topk", false, Backend::DPCPP, ScalarType::Short);
             dim = maybe_wrap_dim(dim, self_);
@@ -12679,9 +12679,9 @@ std::tuple<Tensor,Tensor> _th_topk(const Tensor & self, int64_t k, int64_t dim, 
             break;
         }
         case ScalarType::Half: {
-            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto values_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto values = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(values_));
-            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto indices_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(ScalarType::Long), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto indices = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(indices_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_topk", false, Backend::DPCPP, ScalarType::Half);
             dim = maybe_wrap_dim(dim, self_);
@@ -12779,7 +12779,7 @@ Tensor _th_abs(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_abs", false, Backend::DPCPP, ScalarType::Byte);
             THSyclByteTensor_abs(globalContext().getTHSYCLState(), result_, self_);
@@ -12788,7 +12788,7 @@ Tensor _th_abs(const Tensor & self) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_abs", false, Backend::DPCPP, ScalarType::Char);
             THSyclCharTensor_abs(globalContext().getTHSYCLState(), result_, self_);
@@ -12797,7 +12797,7 @@ Tensor _th_abs(const Tensor & self) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_abs", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_abs(globalContext().getTHSYCLState(), result_, self_);
@@ -12806,7 +12806,7 @@ Tensor _th_abs(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_abs", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_abs(globalContext().getTHSYCLState(), result_, self_);
@@ -12815,7 +12815,7 @@ Tensor _th_abs(const Tensor & self) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_abs", false, Backend::DPCPP, ScalarType::Int);
             THSyclIntTensor_abs(globalContext().getTHSYCLState(), result_, self_);
@@ -12824,7 +12824,7 @@ Tensor _th_abs(const Tensor & self) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_abs", false, Backend::DPCPP, ScalarType::Long);
             THSyclLongTensor_abs(globalContext().getTHSYCLState(), result_, self_);
@@ -12833,7 +12833,7 @@ Tensor _th_abs(const Tensor & self) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_abs", false, Backend::DPCPP, ScalarType::Short);
             THSyclShortTensor_abs(globalContext().getTHSYCLState(), result_, self_);
@@ -12842,7 +12842,7 @@ Tensor _th_abs(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_abs", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_abs(globalContext().getTHSYCLState(), result_, self_);
@@ -12897,7 +12897,7 @@ Tensor _th_sigmoid(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sigmoid", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_sigmoid(globalContext().getTHSYCLState(), result_, self_);
@@ -12906,7 +12906,7 @@ Tensor _th_sigmoid(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sigmoid", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_sigmoid(globalContext().getTHSYCLState(), result_, self_);
@@ -12915,7 +12915,7 @@ Tensor _th_sigmoid(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sigmoid", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_sigmoid(globalContext().getTHSYCLState(), result_, self_);
@@ -12970,7 +12970,7 @@ Tensor _th_log(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_log", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_log(globalContext().getTHSYCLState(), result_, self_);
@@ -12979,7 +12979,7 @@ Tensor _th_log(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_log", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_log(globalContext().getTHSYCLState(), result_, self_);
@@ -12988,7 +12988,7 @@ Tensor _th_log(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_log", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_log(globalContext().getTHSYCLState(), result_, self_);
@@ -13043,7 +13043,7 @@ Tensor _th_log10(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_log10", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_log10(globalContext().getTHSYCLState(), result_, self_);
@@ -13052,7 +13052,7 @@ Tensor _th_log10(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_log10", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_log10(globalContext().getTHSYCLState(), result_, self_);
@@ -13061,7 +13061,7 @@ Tensor _th_log10(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_log10", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_log10(globalContext().getTHSYCLState(), result_, self_);
@@ -13116,7 +13116,7 @@ Tensor _th_log1p(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_log1p", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_log1p(globalContext().getTHSYCLState(), result_, self_);
@@ -13125,7 +13125,7 @@ Tensor _th_log1p(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_log1p", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_log1p(globalContext().getTHSYCLState(), result_, self_);
@@ -13134,7 +13134,7 @@ Tensor _th_log1p(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_log1p", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_log1p(globalContext().getTHSYCLState(), result_, self_);
@@ -13189,7 +13189,7 @@ Tensor _th_log2(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_log2", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_log2(globalContext().getTHSYCLState(), result_, self_);
@@ -13198,7 +13198,7 @@ Tensor _th_log2(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_log2", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_log2(globalContext().getTHSYCLState(), result_, self_);
@@ -13207,7 +13207,7 @@ Tensor _th_log2(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_log2", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_log2(globalContext().getTHSYCLState(), result_, self_);
@@ -13262,7 +13262,7 @@ Tensor _th_digamma(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_digamma", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_digamma(globalContext().getTHSYCLState(), result_, self_);
@@ -13271,7 +13271,7 @@ Tensor _th_digamma(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_digamma", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_digamma(globalContext().getTHSYCLState(), result_, self_);
@@ -13280,7 +13280,7 @@ Tensor _th_digamma(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_digamma", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_digamma(globalContext().getTHSYCLState(), result_, self_);
@@ -13364,7 +13364,7 @@ Tensor _th_exp(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_exp", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_exp(globalContext().getTHSYCLState(), result_, self_);
@@ -13373,7 +13373,7 @@ Tensor _th_exp(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_exp", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_exp(globalContext().getTHSYCLState(), result_, self_);
@@ -13382,7 +13382,7 @@ Tensor _th_exp(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_exp", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_exp(globalContext().getTHSYCLState(), result_, self_);
@@ -13437,7 +13437,7 @@ Tensor _th_expm1(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_expm1", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_expm1(globalContext().getTHSYCLState(), result_, self_);
@@ -13446,7 +13446,7 @@ Tensor _th_expm1(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_expm1", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_expm1(globalContext().getTHSYCLState(), result_, self_);
@@ -13455,7 +13455,7 @@ Tensor _th_expm1(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_expm1", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_expm1(globalContext().getTHSYCLState(), result_, self_);
@@ -13510,7 +13510,7 @@ Tensor _th_cos(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cos", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_cos(globalContext().getTHSYCLState(), result_, self_);
@@ -13519,7 +13519,7 @@ Tensor _th_cos(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cos", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_cos(globalContext().getTHSYCLState(), result_, self_);
@@ -13528,7 +13528,7 @@ Tensor _th_cos(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cos", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_cos(globalContext().getTHSYCLState(), result_, self_);
@@ -13583,7 +13583,7 @@ Tensor _th_acos(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_acos", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_acos(globalContext().getTHSYCLState(), result_, self_);
@@ -13592,7 +13592,7 @@ Tensor _th_acos(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_acos", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_acos(globalContext().getTHSYCLState(), result_, self_);
@@ -13601,7 +13601,7 @@ Tensor _th_acos(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_acos", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_acos(globalContext().getTHSYCLState(), result_, self_);
@@ -13656,7 +13656,7 @@ Tensor _th_cosh(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cosh", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_cosh(globalContext().getTHSYCLState(), result_, self_);
@@ -13665,7 +13665,7 @@ Tensor _th_cosh(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cosh", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_cosh(globalContext().getTHSYCLState(), result_, self_);
@@ -13674,7 +13674,7 @@ Tensor _th_cosh(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cosh", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_cosh(globalContext().getTHSYCLState(), result_, self_);
@@ -13729,7 +13729,7 @@ Tensor _th_sin(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sin", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_sin(globalContext().getTHSYCLState(), result_, self_);
@@ -13738,7 +13738,7 @@ Tensor _th_sin(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sin", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_sin(globalContext().getTHSYCLState(), result_, self_);
@@ -13747,7 +13747,7 @@ Tensor _th_sin(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sin", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_sin(globalContext().getTHSYCLState(), result_, self_);
@@ -13802,7 +13802,7 @@ Tensor _th_asin(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_asin", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_asin(globalContext().getTHSYCLState(), result_, self_);
@@ -13811,7 +13811,7 @@ Tensor _th_asin(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_asin", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_asin(globalContext().getTHSYCLState(), result_, self_);
@@ -13820,7 +13820,7 @@ Tensor _th_asin(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_asin", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_asin(globalContext().getTHSYCLState(), result_, self_);
@@ -13875,7 +13875,7 @@ Tensor _th_sinh(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sinh", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_sinh(globalContext().getTHSYCLState(), result_, self_);
@@ -13884,7 +13884,7 @@ Tensor _th_sinh(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sinh", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_sinh(globalContext().getTHSYCLState(), result_, self_);
@@ -13893,7 +13893,7 @@ Tensor _th_sinh(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sinh", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_sinh(globalContext().getTHSYCLState(), result_, self_);
@@ -13948,7 +13948,7 @@ Tensor _th_tan(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_tan", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_tan(globalContext().getTHSYCLState(), result_, self_);
@@ -13957,7 +13957,7 @@ Tensor _th_tan(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_tan", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_tan(globalContext().getTHSYCLState(), result_, self_);
@@ -13966,7 +13966,7 @@ Tensor _th_tan(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_tan", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_tan(globalContext().getTHSYCLState(), result_, self_);
@@ -14021,7 +14021,7 @@ Tensor _th_atan(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_atan", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_atan(globalContext().getTHSYCLState(), result_, self_);
@@ -14030,7 +14030,7 @@ Tensor _th_atan(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_atan", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_atan(globalContext().getTHSYCLState(), result_, self_);
@@ -14039,7 +14039,7 @@ Tensor _th_atan(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_atan", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_atan(globalContext().getTHSYCLState(), result_, self_);
@@ -14094,7 +14094,7 @@ Tensor _th_tanh(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_tanh", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_tanh(globalContext().getTHSYCLState(), result_, self_);
@@ -14103,7 +14103,7 @@ Tensor _th_tanh(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_tanh", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_tanh(globalContext().getTHSYCLState(), result_, self_);
@@ -14112,7 +14112,7 @@ Tensor _th_tanh(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_tanh", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_tanh(globalContext().getTHSYCLState(), result_, self_);
@@ -14167,7 +14167,7 @@ Tensor _th_erf(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_erf", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_erf(globalContext().getTHSYCLState(), result_, self_);
@@ -14176,7 +14176,7 @@ Tensor _th_erf(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_erf", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_erf(globalContext().getTHSYCLState(), result_, self_);
@@ -14185,7 +14185,7 @@ Tensor _th_erf(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_erf", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_erf(globalContext().getTHSYCLState(), result_, self_);
@@ -14240,7 +14240,7 @@ Tensor _th_erfc(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_erfc", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_erfc(globalContext().getTHSYCLState(), result_, self_);
@@ -14249,7 +14249,7 @@ Tensor _th_erfc(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_erfc", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_erfc(globalContext().getTHSYCLState(), result_, self_);
@@ -14258,7 +14258,7 @@ Tensor _th_erfc(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_erfc", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_erfc(globalContext().getTHSYCLState(), result_, self_);
@@ -14342,7 +14342,7 @@ Tensor _th_erfinv(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_erfinv", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_erfinv(globalContext().getTHSYCLState(), result_, self_);
@@ -14351,7 +14351,7 @@ Tensor _th_erfinv(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_erfinv", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_erfinv(globalContext().getTHSYCLState(), result_, self_);
@@ -14360,7 +14360,7 @@ Tensor _th_erfinv(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_erfinv", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_erfinv(globalContext().getTHSYCLState(), result_, self_);
@@ -14415,7 +14415,7 @@ Tensor _th_sqrt(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sqrt", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_sqrt(globalContext().getTHSYCLState(), result_, self_);
@@ -14424,7 +14424,7 @@ Tensor _th_sqrt(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sqrt", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_sqrt(globalContext().getTHSYCLState(), result_, self_);
@@ -14433,7 +14433,7 @@ Tensor _th_sqrt(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sqrt", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_sqrt(globalContext().getTHSYCLState(), result_, self_);
@@ -14488,7 +14488,7 @@ Tensor _th_rsqrt(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rsqrt", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_rsqrt(globalContext().getTHSYCLState(), result_, self_);
@@ -14497,7 +14497,7 @@ Tensor _th_rsqrt(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rsqrt", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_rsqrt(globalContext().getTHSYCLState(), result_, self_);
@@ -14506,7 +14506,7 @@ Tensor _th_rsqrt(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_rsqrt", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_rsqrt(globalContext().getTHSYCLState(), result_, self_);
@@ -14561,7 +14561,7 @@ Tensor _th_ceil(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ceil", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_ceil(globalContext().getTHSYCLState(), result_, self_);
@@ -14570,7 +14570,7 @@ Tensor _th_ceil(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ceil", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_ceil(globalContext().getTHSYCLState(), result_, self_);
@@ -14579,7 +14579,7 @@ Tensor _th_ceil(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ceil", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_ceil(globalContext().getTHSYCLState(), result_, self_);
@@ -14634,7 +14634,7 @@ Tensor _th_floor(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_floor", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_floor(globalContext().getTHSYCLState(), result_, self_);
@@ -14643,7 +14643,7 @@ Tensor _th_floor(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_floor", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_floor(globalContext().getTHSYCLState(), result_, self_);
@@ -14652,7 +14652,7 @@ Tensor _th_floor(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_floor", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_floor(globalContext().getTHSYCLState(), result_, self_);
@@ -14707,7 +14707,7 @@ Tensor _th_round(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_round", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_round(globalContext().getTHSYCLState(), result_, self_);
@@ -14716,7 +14716,7 @@ Tensor _th_round(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_round", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_round(globalContext().getTHSYCLState(), result_, self_);
@@ -14725,7 +14725,7 @@ Tensor _th_round(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_round", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_round(globalContext().getTHSYCLState(), result_, self_);
@@ -14780,7 +14780,7 @@ Tensor _th_trunc(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_trunc", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_trunc(globalContext().getTHSYCLState(), result_, self_);
@@ -14789,7 +14789,7 @@ Tensor _th_trunc(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_trunc", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_trunc(globalContext().getTHSYCLState(), result_, self_);
@@ -14798,7 +14798,7 @@ Tensor _th_trunc(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_trunc", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_trunc(globalContext().getTHSYCLState(), result_, self_);
@@ -14882,7 +14882,7 @@ Tensor _th_frac(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_frac", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_frac(globalContext().getTHSYCLState(), result_, self_);
@@ -14891,7 +14891,7 @@ Tensor _th_frac(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_frac", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_frac(globalContext().getTHSYCLState(), result_, self_);
@@ -14900,7 +14900,7 @@ Tensor _th_frac(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_frac", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_frac(globalContext().getTHSYCLState(), result_, self_);
@@ -15003,7 +15003,7 @@ Tensor _th_pow(const Tensor & self, Scalar exponent) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Byte);
             auto exponent_ = exponent.toByte();
@@ -15013,7 +15013,7 @@ Tensor _th_pow(const Tensor & self, Scalar exponent) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Char);
             auto exponent_ = exponent.toChar();
@@ -15023,7 +15023,7 @@ Tensor _th_pow(const Tensor & self, Scalar exponent) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Double);
             auto exponent_ = exponent.toDouble();
@@ -15033,7 +15033,7 @@ Tensor _th_pow(const Tensor & self, Scalar exponent) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Float);
             auto exponent_ = exponent.toFloat();
@@ -15043,7 +15043,7 @@ Tensor _th_pow(const Tensor & self, Scalar exponent) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Int);
             auto exponent_ = exponent.toInt();
@@ -15053,7 +15053,7 @@ Tensor _th_pow(const Tensor & self, Scalar exponent) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Long);
             auto exponent_ = exponent.toLong();
@@ -15063,7 +15063,7 @@ Tensor _th_pow(const Tensor & self, Scalar exponent) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Short);
             auto exponent_ = exponent.toShort();
@@ -15073,7 +15073,7 @@ Tensor _th_pow(const Tensor & self, Scalar exponent) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Half);
             auto exponent_ = exponent.toHalf();
@@ -15195,7 +15195,7 @@ Tensor s__th_pow(const Tensor & self, const Tensor & exponent) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Byte);
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Byte);
@@ -15205,7 +15205,7 @@ Tensor s__th_pow(const Tensor & self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Char);
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Char);
@@ -15215,7 +15215,7 @@ Tensor s__th_pow(const Tensor & self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Double);
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Double);
@@ -15225,7 +15225,7 @@ Tensor s__th_pow(const Tensor & self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Float);
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Float);
@@ -15235,7 +15235,7 @@ Tensor s__th_pow(const Tensor & self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Int);
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Int);
@@ -15245,7 +15245,7 @@ Tensor s__th_pow(const Tensor & self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Long);
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Long);
@@ -15255,7 +15255,7 @@ Tensor s__th_pow(const Tensor & self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Short);
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Short);
@@ -15265,7 +15265,7 @@ Tensor s__th_pow(const Tensor & self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_pow", false, Backend::DPCPP, ScalarType::Half);
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Half);
@@ -15369,7 +15369,7 @@ Tensor _th_pow(Scalar self, const Tensor & exponent) {
     auto dispatch_scalar_type = infer_scalar_type(exponent);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = self.toByte();
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Byte);
@@ -15379,7 +15379,7 @@ Tensor _th_pow(Scalar self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = self.toChar();
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Char);
@@ -15389,7 +15389,7 @@ Tensor _th_pow(Scalar self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = self.toDouble();
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Double);
@@ -15399,7 +15399,7 @@ Tensor _th_pow(Scalar self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = self.toFloat();
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Float);
@@ -15409,7 +15409,7 @@ Tensor _th_pow(Scalar self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = self.toInt();
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Int);
@@ -15419,7 +15419,7 @@ Tensor _th_pow(Scalar self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = self.toLong();
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Long);
@@ -15429,7 +15429,7 @@ Tensor _th_pow(Scalar self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = self.toShort();
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Short);
@@ -15439,7 +15439,7 @@ Tensor _th_pow(Scalar self, const Tensor & exponent) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = self.toHalf();
             auto exponent_ = checked_tensor_unwrap(exponent, "exponent", 2, "_th_pow", false, Backend::DPCPP, ScalarType::Half);
@@ -15745,7 +15745,7 @@ Tensor _th_cumsum(const Tensor & self, int64_t dim) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumsum", false, Backend::DPCPP, ScalarType::Byte);
             dim = maybe_wrap_dim(dim, self_);
@@ -15755,7 +15755,7 @@ Tensor _th_cumsum(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumsum", false, Backend::DPCPP, ScalarType::Char);
             dim = maybe_wrap_dim(dim, self_);
@@ -15765,7 +15765,7 @@ Tensor _th_cumsum(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumsum", false, Backend::DPCPP, ScalarType::Double);
             dim = maybe_wrap_dim(dim, self_);
@@ -15775,7 +15775,7 @@ Tensor _th_cumsum(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumsum", false, Backend::DPCPP, ScalarType::Float);
             dim = maybe_wrap_dim(dim, self_);
@@ -15785,7 +15785,7 @@ Tensor _th_cumsum(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumsum", false, Backend::DPCPP, ScalarType::Int);
             dim = maybe_wrap_dim(dim, self_);
@@ -15795,7 +15795,7 @@ Tensor _th_cumsum(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumsum", false, Backend::DPCPP, ScalarType::Long);
             dim = maybe_wrap_dim(dim, self_);
@@ -15805,7 +15805,7 @@ Tensor _th_cumsum(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumsum", false, Backend::DPCPP, ScalarType::Short);
             dim = maybe_wrap_dim(dim, self_);
@@ -15815,7 +15815,7 @@ Tensor _th_cumsum(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumsum", false, Backend::DPCPP, ScalarType::Half);
             dim = maybe_wrap_dim(dim, self_);
@@ -15919,7 +15919,7 @@ Tensor _th_cumprod(const Tensor & self, int64_t dim) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumprod", false, Backend::DPCPP, ScalarType::Byte);
             dim = maybe_wrap_dim(dim, self_);
@@ -15929,7 +15929,7 @@ Tensor _th_cumprod(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumprod", false, Backend::DPCPP, ScalarType::Char);
             dim = maybe_wrap_dim(dim, self_);
@@ -15939,7 +15939,7 @@ Tensor _th_cumprod(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumprod", false, Backend::DPCPP, ScalarType::Double);
             dim = maybe_wrap_dim(dim, self_);
@@ -15949,7 +15949,7 @@ Tensor _th_cumprod(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumprod", false, Backend::DPCPP, ScalarType::Float);
             dim = maybe_wrap_dim(dim, self_);
@@ -15959,7 +15959,7 @@ Tensor _th_cumprod(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumprod", false, Backend::DPCPP, ScalarType::Int);
             dim = maybe_wrap_dim(dim, self_);
@@ -15969,7 +15969,7 @@ Tensor _th_cumprod(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumprod", false, Backend::DPCPP, ScalarType::Long);
             dim = maybe_wrap_dim(dim, self_);
@@ -15979,7 +15979,7 @@ Tensor _th_cumprod(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumprod", false, Backend::DPCPP, ScalarType::Short);
             dim = maybe_wrap_dim(dim, self_);
@@ -15989,7 +15989,7 @@ Tensor _th_cumprod(const Tensor & self, int64_t dim) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_cumprod", false, Backend::DPCPP, ScalarType::Half);
             dim = maybe_wrap_dim(dim, self_);
@@ -16093,7 +16093,7 @@ Tensor _th_sign(const Tensor & self) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sign", false, Backend::DPCPP, ScalarType::Bool);
             THSyclBoolTensor_sign(globalContext().getTHSYCLState(), result_, self_);
@@ -16102,7 +16102,7 @@ Tensor _th_sign(const Tensor & self) {
             break;
         }
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sign", false, Backend::DPCPP, ScalarType::Byte);
             THSyclByteTensor_sign(globalContext().getTHSYCLState(), result_, self_);
@@ -16111,7 +16111,7 @@ Tensor _th_sign(const Tensor & self) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sign", false, Backend::DPCPP, ScalarType::Char);
             THSyclCharTensor_sign(globalContext().getTHSYCLState(), result_, self_);
@@ -16120,7 +16120,7 @@ Tensor _th_sign(const Tensor & self) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sign", false, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_sign(globalContext().getTHSYCLState(), result_, self_);
@@ -16129,7 +16129,7 @@ Tensor _th_sign(const Tensor & self) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sign", false, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_sign(globalContext().getTHSYCLState(), result_, self_);
@@ -16138,7 +16138,7 @@ Tensor _th_sign(const Tensor & self) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sign", false, Backend::DPCPP, ScalarType::Int);
             THSyclIntTensor_sign(globalContext().getTHSYCLState(), result_, self_);
@@ -16147,7 +16147,7 @@ Tensor _th_sign(const Tensor & self) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sign", false, Backend::DPCPP, ScalarType::Long);
             THSyclLongTensor_sign(globalContext().getTHSYCLState(), result_, self_);
@@ -16156,7 +16156,7 @@ Tensor _th_sign(const Tensor & self) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sign", false, Backend::DPCPP, ScalarType::Short);
             THSyclShortTensor_sign(globalContext().getTHSYCLState(), result_, self_);
@@ -16165,7 +16165,7 @@ Tensor _th_sign(const Tensor & self) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_sign", false, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_sign(globalContext().getTHSYCLState(), result_, self_);
@@ -16378,7 +16378,7 @@ Tensor _th_fmod(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -16388,7 +16388,7 @@ Tensor _th_fmod(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -16398,7 +16398,7 @@ Tensor _th_fmod(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -16408,7 +16408,7 @@ Tensor _th_fmod(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -16418,7 +16418,7 @@ Tensor _th_fmod(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -16428,7 +16428,7 @@ Tensor _th_fmod(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -16438,7 +16438,7 @@ Tensor _th_fmod(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -16448,7 +16448,7 @@ Tensor _th_fmod(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -16570,7 +16570,7 @@ Tensor s__th_fmod(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_fmod", false, Backend::DPCPP, ScalarType::Byte);
@@ -16580,7 +16580,7 @@ Tensor s__th_fmod(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_fmod", false, Backend::DPCPP, ScalarType::Char);
@@ -16590,7 +16590,7 @@ Tensor s__th_fmod(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_fmod", false, Backend::DPCPP, ScalarType::Double);
@@ -16600,7 +16600,7 @@ Tensor s__th_fmod(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_fmod", false, Backend::DPCPP, ScalarType::Float);
@@ -16610,7 +16610,7 @@ Tensor s__th_fmod(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_fmod", false, Backend::DPCPP, ScalarType::Int);
@@ -16620,7 +16620,7 @@ Tensor s__th_fmod(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_fmod", false, Backend::DPCPP, ScalarType::Long);
@@ -16630,7 +16630,7 @@ Tensor s__th_fmod(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_fmod", false, Backend::DPCPP, ScalarType::Short);
@@ -16640,7 +16640,7 @@ Tensor s__th_fmod(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_fmod", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_fmod", false, Backend::DPCPP, ScalarType::Half);
@@ -16887,7 +16887,7 @@ Tensor _th_remainder(const Tensor & self, Scalar other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = other.toByte();
@@ -16897,7 +16897,7 @@ Tensor _th_remainder(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = other.toChar();
@@ -16907,7 +16907,7 @@ Tensor _th_remainder(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = other.toDouble();
@@ -16917,7 +16917,7 @@ Tensor _th_remainder(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = other.toFloat();
@@ -16927,7 +16927,7 @@ Tensor _th_remainder(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = other.toInt();
@@ -16937,7 +16937,7 @@ Tensor _th_remainder(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = other.toLong();
@@ -16947,7 +16947,7 @@ Tensor _th_remainder(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = other.toShort();
@@ -16957,7 +16957,7 @@ Tensor _th_remainder(const Tensor & self, Scalar other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = other.toHalf();
@@ -17079,7 +17079,7 @@ Tensor s__th_remainder(const Tensor & self, const Tensor & other) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Byte);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_remainder", false, Backend::DPCPP, ScalarType::Byte);
@@ -17089,7 +17089,7 @@ Tensor s__th_remainder(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Char);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_remainder", false, Backend::DPCPP, ScalarType::Char);
@@ -17099,7 +17099,7 @@ Tensor s__th_remainder(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Double);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_remainder", false, Backend::DPCPP, ScalarType::Double);
@@ -17109,7 +17109,7 @@ Tensor s__th_remainder(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Float);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_remainder", false, Backend::DPCPP, ScalarType::Float);
@@ -17119,7 +17119,7 @@ Tensor s__th_remainder(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Int);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_remainder", false, Backend::DPCPP, ScalarType::Int);
@@ -17129,7 +17129,7 @@ Tensor s__th_remainder(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Long);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_remainder", false, Backend::DPCPP, ScalarType::Long);
@@ -17139,7 +17139,7 @@ Tensor s__th_remainder(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Short);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_remainder", false, Backend::DPCPP, ScalarType::Short);
@@ -17149,7 +17149,7 @@ Tensor s__th_remainder(const Tensor & self, const Tensor & other) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_remainder", false, Backend::DPCPP, ScalarType::Half);
             auto other_ = checked_tensor_unwrap(other, "other", 2, "_th_remainder", false, Backend::DPCPP, ScalarType::Half);
@@ -17404,7 +17404,7 @@ Tensor _th_clamp(const Tensor & self, Scalar min, Scalar max) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp", false, Backend::DPCPP, ScalarType::Byte);
             auto min_ = min.toByte();
@@ -17415,7 +17415,7 @@ Tensor _th_clamp(const Tensor & self, Scalar min, Scalar max) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp", false, Backend::DPCPP, ScalarType::Char);
             auto min_ = min.toChar();
@@ -17426,7 +17426,7 @@ Tensor _th_clamp(const Tensor & self, Scalar min, Scalar max) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp", false, Backend::DPCPP, ScalarType::Double);
             auto min_ = min.toDouble();
@@ -17437,7 +17437,7 @@ Tensor _th_clamp(const Tensor & self, Scalar min, Scalar max) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp", false, Backend::DPCPP, ScalarType::Float);
             auto min_ = min.toFloat();
@@ -17448,7 +17448,7 @@ Tensor _th_clamp(const Tensor & self, Scalar min, Scalar max) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp", false, Backend::DPCPP, ScalarType::Int);
             auto min_ = min.toInt();
@@ -17459,7 +17459,7 @@ Tensor _th_clamp(const Tensor & self, Scalar min, Scalar max) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp", false, Backend::DPCPP, ScalarType::Long);
             auto min_ = min.toLong();
@@ -17470,7 +17470,7 @@ Tensor _th_clamp(const Tensor & self, Scalar min, Scalar max) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp", false, Backend::DPCPP, ScalarType::Short);
             auto min_ = min.toShort();
@@ -17481,7 +17481,7 @@ Tensor _th_clamp(const Tensor & self, Scalar min, Scalar max) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp", false, Backend::DPCPP, ScalarType::Half);
             auto min_ = min.toHalf();
@@ -17586,7 +17586,7 @@ Tensor _th_clamp_min(const Tensor & self, Scalar min) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_min", false, Backend::DPCPP, ScalarType::Byte);
             auto min_ = min.toByte();
@@ -17596,7 +17596,7 @@ Tensor _th_clamp_min(const Tensor & self, Scalar min) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_min", false, Backend::DPCPP, ScalarType::Char);
             auto min_ = min.toChar();
@@ -17606,7 +17606,7 @@ Tensor _th_clamp_min(const Tensor & self, Scalar min) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_min", false, Backend::DPCPP, ScalarType::Double);
             auto min_ = min.toDouble();
@@ -17616,7 +17616,7 @@ Tensor _th_clamp_min(const Tensor & self, Scalar min) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_min", false, Backend::DPCPP, ScalarType::Float);
             auto min_ = min.toFloat();
@@ -17626,7 +17626,7 @@ Tensor _th_clamp_min(const Tensor & self, Scalar min) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_min", false, Backend::DPCPP, ScalarType::Int);
             auto min_ = min.toInt();
@@ -17636,7 +17636,7 @@ Tensor _th_clamp_min(const Tensor & self, Scalar min) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_min", false, Backend::DPCPP, ScalarType::Long);
             auto min_ = min.toLong();
@@ -17646,7 +17646,7 @@ Tensor _th_clamp_min(const Tensor & self, Scalar min) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_min", false, Backend::DPCPP, ScalarType::Short);
             auto min_ = min.toShort();
@@ -17656,7 +17656,7 @@ Tensor _th_clamp_min(const Tensor & self, Scalar min) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_min", false, Backend::DPCPP, ScalarType::Half);
             auto min_ = min.toHalf();
@@ -17760,7 +17760,7 @@ Tensor _th_clamp_max(const Tensor & self, Scalar max) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_max", false, Backend::DPCPP, ScalarType::Byte);
             auto max_ = max.toByte();
@@ -17770,7 +17770,7 @@ Tensor _th_clamp_max(const Tensor & self, Scalar max) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_max", false, Backend::DPCPP, ScalarType::Char);
             auto max_ = max.toChar();
@@ -17780,7 +17780,7 @@ Tensor _th_clamp_max(const Tensor & self, Scalar max) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_max", false, Backend::DPCPP, ScalarType::Double);
             auto max_ = max.toDouble();
@@ -17790,7 +17790,7 @@ Tensor _th_clamp_max(const Tensor & self, Scalar max) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_max", false, Backend::DPCPP, ScalarType::Float);
             auto max_ = max.toFloat();
@@ -17800,7 +17800,7 @@ Tensor _th_clamp_max(const Tensor & self, Scalar max) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_max", false, Backend::DPCPP, ScalarType::Int);
             auto max_ = max.toInt();
@@ -17810,7 +17810,7 @@ Tensor _th_clamp_max(const Tensor & self, Scalar max) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_max", false, Backend::DPCPP, ScalarType::Long);
             auto max_ = max.toLong();
@@ -17820,7 +17820,7 @@ Tensor _th_clamp_max(const Tensor & self, Scalar max) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_max", false, Backend::DPCPP, ScalarType::Short);
             auto max_ = max.toShort();
@@ -17830,7 +17830,7 @@ Tensor _th_clamp_max(const Tensor & self, Scalar max) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_clamp_max", false, Backend::DPCPP, ScalarType::Half);
             auto max_ = max.toHalf();
@@ -17950,7 +17950,7 @@ Tensor _th_diag(const Tensor & self, int64_t diagonal) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_diag", false, Backend::DPCPP, ScalarType::Byte);
             if (self_->dim() == 0) {
@@ -17962,7 +17962,7 @@ Tensor _th_diag(const Tensor & self, int64_t diagonal) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_diag", false, Backend::DPCPP, ScalarType::Char);
             if (self_->dim() == 0) {
@@ -17974,7 +17974,7 @@ Tensor _th_diag(const Tensor & self, int64_t diagonal) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_diag", false, Backend::DPCPP, ScalarType::Double);
             if (self_->dim() == 0) {
@@ -17986,7 +17986,7 @@ Tensor _th_diag(const Tensor & self, int64_t diagonal) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_diag", false, Backend::DPCPP, ScalarType::Float);
             if (self_->dim() == 0) {
@@ -17998,7 +17998,7 @@ Tensor _th_diag(const Tensor & self, int64_t diagonal) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_diag", false, Backend::DPCPP, ScalarType::Int);
             if (self_->dim() == 0) {
@@ -18010,7 +18010,7 @@ Tensor _th_diag(const Tensor & self, int64_t diagonal) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_diag", false, Backend::DPCPP, ScalarType::Long);
             if (self_->dim() == 0) {
@@ -18022,7 +18022,7 @@ Tensor _th_diag(const Tensor & self, int64_t diagonal) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_diag", false, Backend::DPCPP, ScalarType::Short);
             if (self_->dim() == 0) {
@@ -18034,7 +18034,7 @@ Tensor _th_diag(const Tensor & self, int64_t diagonal) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_diag", false, Backend::DPCPP, ScalarType::Half);
             if (self_->dim() == 0) {
@@ -18182,7 +18182,7 @@ Tensor s__th_addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toByte();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmm", false, Backend::DPCPP, ScalarType::Byte);
@@ -18195,7 +18195,7 @@ Tensor s__th_addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toChar();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmm", false, Backend::DPCPP, ScalarType::Char);
@@ -18208,7 +18208,7 @@ Tensor s__th_addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toDouble();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmm", false, Backend::DPCPP, ScalarType::Double);
@@ -18221,7 +18221,7 @@ Tensor s__th_addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toFloat();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmm", false, Backend::DPCPP, ScalarType::Float);
@@ -18234,7 +18234,7 @@ Tensor s__th_addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toInt();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmm", false, Backend::DPCPP, ScalarType::Int);
@@ -18247,7 +18247,7 @@ Tensor s__th_addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toLong();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmm", false, Backend::DPCPP, ScalarType::Long);
@@ -18260,7 +18260,7 @@ Tensor s__th_addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toShort();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmm", false, Backend::DPCPP, ScalarType::Short);
@@ -18273,7 +18273,7 @@ Tensor s__th_addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toHalf();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmm", false, Backend::DPCPP, ScalarType::Half);
@@ -18513,7 +18513,7 @@ Tensor s__th_addmv(const Tensor & self, const Tensor & mat, const Tensor & vec, 
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toByte();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmv", false, Backend::DPCPP, ScalarType::Byte);
@@ -18526,7 +18526,7 @@ Tensor s__th_addmv(const Tensor & self, const Tensor & mat, const Tensor & vec, 
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toChar();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmv", false, Backend::DPCPP, ScalarType::Char);
@@ -18539,7 +18539,7 @@ Tensor s__th_addmv(const Tensor & self, const Tensor & mat, const Tensor & vec, 
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toDouble();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmv", false, Backend::DPCPP, ScalarType::Double);
@@ -18552,7 +18552,7 @@ Tensor s__th_addmv(const Tensor & self, const Tensor & mat, const Tensor & vec, 
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toFloat();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmv", false, Backend::DPCPP, ScalarType::Float);
@@ -18565,7 +18565,7 @@ Tensor s__th_addmv(const Tensor & self, const Tensor & mat, const Tensor & vec, 
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toInt();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmv", false, Backend::DPCPP, ScalarType::Int);
@@ -18578,7 +18578,7 @@ Tensor s__th_addmv(const Tensor & self, const Tensor & mat, const Tensor & vec, 
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toLong();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmv", false, Backend::DPCPP, ScalarType::Long);
@@ -18591,7 +18591,7 @@ Tensor s__th_addmv(const Tensor & self, const Tensor & mat, const Tensor & vec, 
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toShort();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmv", false, Backend::DPCPP, ScalarType::Short);
@@ -18604,7 +18604,7 @@ Tensor s__th_addmv(const Tensor & self, const Tensor & mat, const Tensor & vec, 
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toHalf();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addmv", false, Backend::DPCPP, ScalarType::Half);
@@ -18844,7 +18844,7 @@ Tensor s__th_addr(const Tensor & self, const Tensor & vec1, const Tensor & vec2,
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toByte();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addr", false, Backend::DPCPP, ScalarType::Byte);
@@ -18857,7 +18857,7 @@ Tensor s__th_addr(const Tensor & self, const Tensor & vec1, const Tensor & vec2,
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toChar();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addr", false, Backend::DPCPP, ScalarType::Char);
@@ -18870,7 +18870,7 @@ Tensor s__th_addr(const Tensor & self, const Tensor & vec1, const Tensor & vec2,
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toDouble();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addr", false, Backend::DPCPP, ScalarType::Double);
@@ -18883,7 +18883,7 @@ Tensor s__th_addr(const Tensor & self, const Tensor & vec1, const Tensor & vec2,
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toFloat();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addr", false, Backend::DPCPP, ScalarType::Float);
@@ -18896,7 +18896,7 @@ Tensor s__th_addr(const Tensor & self, const Tensor & vec1, const Tensor & vec2,
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toInt();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addr", false, Backend::DPCPP, ScalarType::Int);
@@ -18909,7 +18909,7 @@ Tensor s__th_addr(const Tensor & self, const Tensor & vec1, const Tensor & vec2,
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toLong();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addr", false, Backend::DPCPP, ScalarType::Long);
@@ -18922,7 +18922,7 @@ Tensor s__th_addr(const Tensor & self, const Tensor & vec1, const Tensor & vec2,
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toShort();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addr", false, Backend::DPCPP, ScalarType::Short);
@@ -18935,7 +18935,7 @@ Tensor s__th_addr(const Tensor & self, const Tensor & vec1, const Tensor & vec2,
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toHalf();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addr", false, Backend::DPCPP, ScalarType::Half);
@@ -19141,7 +19141,7 @@ Tensor _th_ger(const Tensor & self, const Tensor & vec2) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.dim() == 0 ? 1 : self.size(0),vec2.dim() == 0 ? 1 : vec2.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ger", false, Backend::DPCPP, ScalarType::Byte);
@@ -19152,7 +19152,7 @@ Tensor _th_ger(const Tensor & self, const Tensor & vec2) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.dim() == 0 ? 1 : self.size(0),vec2.dim() == 0 ? 1 : vec2.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ger", false, Backend::DPCPP, ScalarType::Char);
@@ -19163,7 +19163,7 @@ Tensor _th_ger(const Tensor & self, const Tensor & vec2) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.dim() == 0 ? 1 : self.size(0),vec2.dim() == 0 ? 1 : vec2.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ger", false, Backend::DPCPP, ScalarType::Double);
@@ -19174,7 +19174,7 @@ Tensor _th_ger(const Tensor & self, const Tensor & vec2) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.dim() == 0 ? 1 : self.size(0),vec2.dim() == 0 ? 1 : vec2.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ger", false, Backend::DPCPP, ScalarType::Float);
@@ -19185,7 +19185,7 @@ Tensor _th_ger(const Tensor & self, const Tensor & vec2) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.dim() == 0 ? 1 : self.size(0),vec2.dim() == 0 ? 1 : vec2.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ger", false, Backend::DPCPP, ScalarType::Int);
@@ -19196,7 +19196,7 @@ Tensor _th_ger(const Tensor & self, const Tensor & vec2) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.dim() == 0 ? 1 : self.size(0),vec2.dim() == 0 ? 1 : vec2.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ger", false, Backend::DPCPP, ScalarType::Long);
@@ -19207,7 +19207,7 @@ Tensor _th_ger(const Tensor & self, const Tensor & vec2) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.dim() == 0 ? 1 : self.size(0),vec2.dim() == 0 ? 1 : vec2.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ger", false, Backend::DPCPP, ScalarType::Short);
@@ -19218,7 +19218,7 @@ Tensor _th_ger(const Tensor & self, const Tensor & vec2) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.dim() == 0 ? 1 : self.size(0),vec2.dim() == 0 ? 1 : vec2.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_ger", false, Backend::DPCPP, ScalarType::Half);
@@ -19331,7 +19331,7 @@ Tensor _th_mv(const Tensor & self, const Tensor & vec) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mv", false, Backend::DPCPP, ScalarType::Byte);
@@ -19342,7 +19342,7 @@ Tensor _th_mv(const Tensor & self, const Tensor & vec) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mv", false, Backend::DPCPP, ScalarType::Char);
@@ -19353,7 +19353,7 @@ Tensor _th_mv(const Tensor & self, const Tensor & vec) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mv", false, Backend::DPCPP, ScalarType::Double);
@@ -19364,7 +19364,7 @@ Tensor _th_mv(const Tensor & self, const Tensor & vec) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mv", false, Backend::DPCPP, ScalarType::Float);
@@ -19375,7 +19375,7 @@ Tensor _th_mv(const Tensor & self, const Tensor & vec) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mv", false, Backend::DPCPP, ScalarType::Int);
@@ -19386,7 +19386,7 @@ Tensor _th_mv(const Tensor & self, const Tensor & vec) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mv", false, Backend::DPCPP, ScalarType::Long);
@@ -19397,7 +19397,7 @@ Tensor _th_mv(const Tensor & self, const Tensor & vec) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mv", false, Backend::DPCPP, ScalarType::Short);
@@ -19408,7 +19408,7 @@ Tensor _th_mv(const Tensor & self, const Tensor & vec) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mv", false, Backend::DPCPP, ScalarType::Half);
@@ -19521,7 +19521,7 @@ Tensor _th_mm(const Tensor & self, const Tensor & mat2) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),mat2.size(1) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mm", false, Backend::DPCPP, ScalarType::Byte);
@@ -19532,7 +19532,7 @@ Tensor _th_mm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),mat2.size(1) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mm", false, Backend::DPCPP, ScalarType::Char);
@@ -19543,7 +19543,7 @@ Tensor _th_mm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),mat2.size(1) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mm", false, Backend::DPCPP, ScalarType::Double);
@@ -19554,7 +19554,7 @@ Tensor _th_mm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),mat2.size(1) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mm", false, Backend::DPCPP, ScalarType::Float);
@@ -19565,7 +19565,7 @@ Tensor _th_mm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),mat2.size(1) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mm", false, Backend::DPCPP, ScalarType::Int);
@@ -19576,7 +19576,7 @@ Tensor _th_mm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),mat2.size(1) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mm", false, Backend::DPCPP, ScalarType::Long);
@@ -19587,7 +19587,7 @@ Tensor _th_mm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),mat2.size(1) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mm", false, Backend::DPCPP, ScalarType::Short);
@@ -19598,7 +19598,7 @@ Tensor _th_mm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),mat2.size(1) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_mm", false, Backend::DPCPP, ScalarType::Half);
@@ -19711,7 +19711,7 @@ Tensor _th_bmm(const Tensor & self, const Tensor & mat2) {
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),self.size(1),mat2.size(2) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_bmm", false, Backend::DPCPP, ScalarType::Byte);
@@ -19722,7 +19722,7 @@ Tensor _th_bmm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),self.size(1),mat2.size(2) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_bmm", false, Backend::DPCPP, ScalarType::Char);
@@ -19733,7 +19733,7 @@ Tensor _th_bmm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),self.size(1),mat2.size(2) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_bmm", false, Backend::DPCPP, ScalarType::Double);
@@ -19744,7 +19744,7 @@ Tensor _th_bmm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),self.size(1),mat2.size(2) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_bmm", false, Backend::DPCPP, ScalarType::Float);
@@ -19755,7 +19755,7 @@ Tensor _th_bmm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),self.size(1),mat2.size(2) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_bmm", false, Backend::DPCPP, ScalarType::Int);
@@ -19766,7 +19766,7 @@ Tensor _th_bmm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),self.size(1),mat2.size(2) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_bmm", false, Backend::DPCPP, ScalarType::Long);
@@ -19777,7 +19777,7 @@ Tensor _th_bmm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),self.size(1),mat2.size(2) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_bmm", false, Backend::DPCPP, ScalarType::Short);
@@ -19788,7 +19788,7 @@ Tensor _th_bmm(const Tensor & self, const Tensor & mat2) {
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             result.resize_({ self.size(0),self.size(1),mat2.size(2) });
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_th_bmm", false, Backend::DPCPP, ScalarType::Half);
@@ -19935,7 +19935,7 @@ Tensor s__th_addbmm(const Tensor & self, const Tensor & batch1, const Tensor & b
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toByte();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addbmm", false, Backend::DPCPP, ScalarType::Byte);
@@ -19948,7 +19948,7 @@ Tensor s__th_addbmm(const Tensor & self, const Tensor & batch1, const Tensor & b
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toChar();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addbmm", false, Backend::DPCPP, ScalarType::Char);
@@ -19961,7 +19961,7 @@ Tensor s__th_addbmm(const Tensor & self, const Tensor & batch1, const Tensor & b
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toDouble();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addbmm", false, Backend::DPCPP, ScalarType::Double);
@@ -19974,7 +19974,7 @@ Tensor s__th_addbmm(const Tensor & self, const Tensor & batch1, const Tensor & b
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toFloat();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addbmm", false, Backend::DPCPP, ScalarType::Float);
@@ -19987,7 +19987,7 @@ Tensor s__th_addbmm(const Tensor & self, const Tensor & batch1, const Tensor & b
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toInt();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addbmm", false, Backend::DPCPP, ScalarType::Int);
@@ -20000,7 +20000,7 @@ Tensor s__th_addbmm(const Tensor & self, const Tensor & batch1, const Tensor & b
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toLong();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addbmm", false, Backend::DPCPP, ScalarType::Long);
@@ -20013,7 +20013,7 @@ Tensor s__th_addbmm(const Tensor & self, const Tensor & batch1, const Tensor & b
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toShort();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addbmm", false, Backend::DPCPP, ScalarType::Short);
@@ -20026,7 +20026,7 @@ Tensor s__th_addbmm(const Tensor & self, const Tensor & batch1, const Tensor & b
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toHalf();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_addbmm", false, Backend::DPCPP, ScalarType::Half);
@@ -20266,7 +20266,7 @@ Tensor s__th_baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & 
     auto dispatch_scalar_type = infer_scalar_type(self);
     switch (dispatch_scalar_type) {
         case ScalarType::Byte: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toByte();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_baddbmm", false, Backend::DPCPP, ScalarType::Byte);
@@ -20279,7 +20279,7 @@ Tensor s__th_baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & 
             break;
         }
         case ScalarType::Char: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toChar();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_baddbmm", false, Backend::DPCPP, ScalarType::Char);
@@ -20292,7 +20292,7 @@ Tensor s__th_baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & 
             break;
         }
         case ScalarType::Double: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toDouble();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_baddbmm", false, Backend::DPCPP, ScalarType::Double);
@@ -20305,7 +20305,7 @@ Tensor s__th_baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & 
             break;
         }
         case ScalarType::Float: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toFloat();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_baddbmm", false, Backend::DPCPP, ScalarType::Float);
@@ -20318,7 +20318,7 @@ Tensor s__th_baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & 
             break;
         }
         case ScalarType::Int: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toInt();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_baddbmm", false, Backend::DPCPP, ScalarType::Int);
@@ -20331,7 +20331,7 @@ Tensor s__th_baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & 
             break;
         }
         case ScalarType::Long: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toLong();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_baddbmm", false, Backend::DPCPP, ScalarType::Long);
@@ -20344,7 +20344,7 @@ Tensor s__th_baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & 
             break;
         }
         case ScalarType::Short: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toShort();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_baddbmm", false, Backend::DPCPP, ScalarType::Short);
@@ -20357,7 +20357,7 @@ Tensor s__th_baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & 
             break;
         }
         case ScalarType::Half: {
-            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto result_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto result = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(result_));
             auto beta_ = beta.toHalf();
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_th_baddbmm", false, Backend::DPCPP, ScalarType::Half);
@@ -20551,7 +20551,7 @@ Tensor _th_cat(TensorList tensors, int64_t dim) {
     auto dispatch_scalar_type = infer_scalar_type(tensors);
     switch (dispatch_scalar_type) {
         case ScalarType::Bool: {
-            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<bool>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto self = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(self_));
             auto tensors_ = checked_tensor_list_unwrap(tensors,"tensors",1, Backend::DPCPP, ScalarType::Bool);
             THSyclBoolTensor_catArray(globalContext().getTHSYCLState(), self_, tensors_.data(), tensors_.size(), dim);
@@ -20559,7 +20559,7 @@ Tensor _th_cat(TensorList tensors, int64_t dim) {
             break;
         }
         case ScalarType::Byte: {
-            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<uint8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto self = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(self_));
             auto tensors_ = checked_tensor_list_unwrap(tensors,"tensors",1, Backend::DPCPP, ScalarType::Byte);
             THSyclByteTensor_catArray(globalContext().getTHSYCLState(), self_, tensors_.data(), tensors_.size(), dim);
@@ -20567,7 +20567,7 @@ Tensor _th_cat(TensorList tensors, int64_t dim) {
             break;
         }
         case ScalarType::Char: {
-            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int8_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto self = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(self_));
             auto tensors_ = checked_tensor_list_unwrap(tensors,"tensors",1, Backend::DPCPP, ScalarType::Char);
             THSyclCharTensor_catArray(globalContext().getTHSYCLState(), self_, tensors_.data(), tensors_.size(), dim);
@@ -20575,7 +20575,7 @@ Tensor _th_cat(TensorList tensors, int64_t dim) {
             break;
         }
         case ScalarType::Double: {
-            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto self = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(self_));
             auto tensors_ = checked_tensor_list_unwrap(tensors,"tensors",1, Backend::DPCPP, ScalarType::Double);
             THSyclDoubleTensor_catArray(globalContext().getTHSYCLState(), self_, tensors_.data(), tensors_.size(), dim);
@@ -20583,7 +20583,7 @@ Tensor _th_cat(TensorList tensors, int64_t dim) {
             break;
         }
         case ScalarType::Float: {
-            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto self = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(self_));
             auto tensors_ = checked_tensor_list_unwrap(tensors,"tensors",1, Backend::DPCPP, ScalarType::Float);
             THSyclTensor_catArray(globalContext().getTHSYCLState(), self_, tensors_.data(), tensors_.size(), dim);
@@ -20591,7 +20591,7 @@ Tensor _th_cat(TensorList tensors, int64_t dim) {
             break;
         }
         case ScalarType::Int: {
-            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto self = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(self_));
             auto tensors_ = checked_tensor_list_unwrap(tensors,"tensors",1, Backend::DPCPP, ScalarType::Int);
             THSyclIntTensor_catArray(globalContext().getTHSYCLState(), self_, tensors_.data(), tensors_.size(), dim);
@@ -20599,7 +20599,7 @@ Tensor _th_cat(TensorList tensors, int64_t dim) {
             break;
         }
         case ScalarType::Long: {
-            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int64_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto self = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(self_));
             auto tensors_ = checked_tensor_list_unwrap(tensors,"tensors",1, Backend::DPCPP, ScalarType::Long);
             THSyclLongTensor_catArray(globalContext().getTHSYCLState(), self_, tensors_.data(), tensors_.size(), dim);
@@ -20607,7 +20607,7 @@ Tensor _th_cat(TensorList tensors, int64_t dim) {
             break;
         }
         case ScalarType::Short: {
-            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<int16_t>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto self = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(self_));
             auto tensors_ = checked_tensor_list_unwrap(tensors,"tensors",1, Backend::DPCPP, ScalarType::Short);
             THSyclShortTensor_catArray(globalContext().getTHSYCLState(), self_, tensors_.data(), tensors_.size(), dim);
@@ -20615,7 +20615,7 @@ Tensor _th_cat(TensorList tensors, int64_t dim) {
             break;
         }
         case ScalarType::Half: {
-            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto self = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(self_));
             auto tensors_ = checked_tensor_list_unwrap(tensors,"tensors",1, Backend::DPCPP, ScalarType::Half);
             THSyclHalfTensor_catArray(globalContext().getTHSYCLState(), self_, tensors_.data(), tensors_.size(), dim);
@@ -20682,7 +20682,7 @@ Tensor _thnn_binary_cross_entropy_forward(const Tensor & self, const Tensor & ta
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_thnn_binary_cross_entropy_forward", false, Backend::DPCPP, ScalarType::Double);
             auto target_ = checked_tensor_unwrap(target, "target", 2, "_thnn_binary_cross_entropy_forward", false, Backend::DPCPP, ScalarType::Double);
             auto weight_ = checked_tensor_unwrap(weight, "weight", 3, "_thnn_binary_cross_entropy_forward", true, Backend::DPCPP, ScalarType::Double);
-            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto output = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(output_));
             THNN_SyclDoubleBCECriterion_updateOutput(globalContext().getTHSYCLState(), self_, target_, output_, reduction, weight_ ? weight_ : NULL);
             output_->maybe_zero_dim(false);
@@ -20693,7 +20693,7 @@ Tensor _thnn_binary_cross_entropy_forward(const Tensor & self, const Tensor & ta
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_thnn_binary_cross_entropy_forward", false, Backend::DPCPP, ScalarType::Float);
             auto target_ = checked_tensor_unwrap(target, "target", 2, "_thnn_binary_cross_entropy_forward", false, Backend::DPCPP, ScalarType::Float);
             auto weight_ = checked_tensor_unwrap(weight, "weight", 3, "_thnn_binary_cross_entropy_forward", true, Backend::DPCPP, ScalarType::Float);
-            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto output = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(output_));
             THNN_SyclBCECriterion_updateOutput(globalContext().getTHSYCLState(), self_, target_, output_, reduction, weight_ ? weight_ : NULL);
             output_->maybe_zero_dim(false);
@@ -20704,7 +20704,7 @@ Tensor _thnn_binary_cross_entropy_forward(const Tensor & self, const Tensor & ta
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_thnn_binary_cross_entropy_forward", false, Backend::DPCPP, ScalarType::Half);
             auto target_ = checked_tensor_unwrap(target, "target", 2, "_thnn_binary_cross_entropy_forward", false, Backend::DPCPP, ScalarType::Half);
             auto weight_ = checked_tensor_unwrap(weight, "weight", 3, "_thnn_binary_cross_entropy_forward", true, Backend::DPCPP, ScalarType::Half);
-            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto output = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(output_));
             THNN_SyclHalfBCECriterion_updateOutput(globalContext().getTHSYCLState(), self_, target_, output_, reduction, weight_ ? weight_ : NULL);
             output_->maybe_zero_dim(false);
@@ -20775,7 +20775,7 @@ Tensor _thnn_binary_cross_entropy_backward(const Tensor & grad_output, const Ten
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_thnn_binary_cross_entropy_backward", false, Backend::DPCPP, ScalarType::Double);
             auto target_ = checked_tensor_unwrap(target, "target", 3, "_thnn_binary_cross_entropy_backward", false, Backend::DPCPP, ScalarType::Double);
             auto weight_ = checked_tensor_unwrap(weight, "weight", 4, "_thnn_binary_cross_entropy_backward", true, Backend::DPCPP, ScalarType::Double);
-            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto grad_input = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(grad_input_));
             THNN_SyclDoubleBCECriterion_updateGradInput(globalContext().getTHSYCLState(), self_, target_, grad_output_, grad_input_, reduction, weight_ ? weight_ : NULL);
             grad_input_->maybe_zero_dim(false);
@@ -20787,7 +20787,7 @@ Tensor _thnn_binary_cross_entropy_backward(const Tensor & grad_output, const Ten
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_thnn_binary_cross_entropy_backward", false, Backend::DPCPP, ScalarType::Float);
             auto target_ = checked_tensor_unwrap(target, "target", 3, "_thnn_binary_cross_entropy_backward", false, Backend::DPCPP, ScalarType::Float);
             auto weight_ = checked_tensor_unwrap(weight, "weight", 4, "_thnn_binary_cross_entropy_backward", true, Backend::DPCPP, ScalarType::Float);
-            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto grad_input = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(grad_input_));
             THNN_SyclBCECriterion_updateGradInput(globalContext().getTHSYCLState(), self_, target_, grad_output_, grad_input_, reduction, weight_ ? weight_ : NULL);
             grad_input_->maybe_zero_dim(false);
@@ -20799,7 +20799,7 @@ Tensor _thnn_binary_cross_entropy_backward(const Tensor & grad_output, const Ten
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_thnn_binary_cross_entropy_backward", false, Backend::DPCPP, ScalarType::Half);
             auto target_ = checked_tensor_unwrap(target, "target", 3, "_thnn_binary_cross_entropy_backward", false, Backend::DPCPP, ScalarType::Half);
             auto weight_ = checked_tensor_unwrap(weight, "weight", 4, "_thnn_binary_cross_entropy_backward", true, Backend::DPCPP, ScalarType::Half);
-            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto grad_input = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(grad_input_));
             THNN_SyclHalfBCECriterion_updateGradInput(globalContext().getTHSYCLState(), self_, target_, grad_output_, grad_input_, reduction, weight_ ? weight_ : NULL);
             grad_input_->maybe_zero_dim(false);
@@ -20862,7 +20862,7 @@ Tensor _thnn_l1_loss_forward(const Tensor & self, const Tensor & target, int64_t
         case ScalarType::Double: {
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_thnn_l1_loss_forward", false, Backend::DPCPP, ScalarType::Double);
             auto target_ = checked_tensor_unwrap(target, "target", 2, "_thnn_l1_loss_forward", false, Backend::DPCPP, ScalarType::Double);
-            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto output = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(output_));
             THNN_SyclDoubleAbsCriterion_updateOutput(globalContext().getTHSYCLState(), self_, target_, output_, reduction);
             output_->maybe_zero_dim(false);
@@ -20872,7 +20872,7 @@ Tensor _thnn_l1_loss_forward(const Tensor & self, const Tensor & target, int64_t
         case ScalarType::Float: {
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_thnn_l1_loss_forward", false, Backend::DPCPP, ScalarType::Float);
             auto target_ = checked_tensor_unwrap(target, "target", 2, "_thnn_l1_loss_forward", false, Backend::DPCPP, ScalarType::Float);
-            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto output = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(output_));
             THNN_SyclAbsCriterion_updateOutput(globalContext().getTHSYCLState(), self_, target_, output_, reduction);
             output_->maybe_zero_dim(false);
@@ -20882,7 +20882,7 @@ Tensor _thnn_l1_loss_forward(const Tensor & self, const Tensor & target, int64_t
         case ScalarType::Half: {
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_thnn_l1_loss_forward", false, Backend::DPCPP, ScalarType::Half);
             auto target_ = checked_tensor_unwrap(target, "target", 2, "_thnn_l1_loss_forward", false, Backend::DPCPP, ScalarType::Half);
-            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto output = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(output_));
             THNN_SyclHalfAbsCriterion_updateOutput(globalContext().getTHSYCLState(), self_, target_, output_, reduction);
             output_->maybe_zero_dim(false);
@@ -20949,7 +20949,7 @@ Tensor _thnn_l1_loss_backward(const Tensor & grad_output, const Tensor & self, c
             auto grad_output_ = checked_tensor_unwrap(grad_output, "grad_output", 1, "_thnn_l1_loss_backward", false, Backend::DPCPP, ScalarType::Double);
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_thnn_l1_loss_backward", false, Backend::DPCPP, ScalarType::Double);
             auto target_ = checked_tensor_unwrap(target, "target", 3, "_thnn_l1_loss_backward", false, Backend::DPCPP, ScalarType::Double);
-            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto grad_input = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(grad_input_));
             THNN_SyclDoubleAbsCriterion_updateGradInput(globalContext().getTHSYCLState(), self_, target_, grad_output_, grad_input_, reduction);
             grad_input_->maybe_zero_dim(false);
@@ -20960,7 +20960,7 @@ Tensor _thnn_l1_loss_backward(const Tensor & grad_output, const Tensor & self, c
             auto grad_output_ = checked_tensor_unwrap(grad_output, "grad_output", 1, "_thnn_l1_loss_backward", false, Backend::DPCPP, ScalarType::Float);
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_thnn_l1_loss_backward", false, Backend::DPCPP, ScalarType::Float);
             auto target_ = checked_tensor_unwrap(target, "target", 3, "_thnn_l1_loss_backward", false, Backend::DPCPP, ScalarType::Float);
-            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto grad_input = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(grad_input_));
             THNN_SyclAbsCriterion_updateGradInput(globalContext().getTHSYCLState(), self_, target_, grad_output_, grad_input_, reduction);
             grad_input_->maybe_zero_dim(false);
@@ -20971,7 +20971,7 @@ Tensor _thnn_l1_loss_backward(const Tensor & grad_output, const Tensor & self, c
             auto grad_output_ = checked_tensor_unwrap(grad_output, "grad_output", 1, "_thnn_l1_loss_backward", false, Backend::DPCPP, ScalarType::Half);
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_thnn_l1_loss_backward", false, Backend::DPCPP, ScalarType::Half);
             auto target_ = checked_tensor_unwrap(target, "target", 3, "_thnn_l1_loss_backward", false, Backend::DPCPP, ScalarType::Half);
-            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto grad_input = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(grad_input_));
             THNN_SyclHalfAbsCriterion_updateGradInput(globalContext().getTHSYCLState(), self_, target_, grad_output_, grad_input_, reduction);
             grad_input_->maybe_zero_dim(false);
@@ -21034,7 +21034,7 @@ Tensor _thnn_mse_loss_forward(const Tensor & self, const Tensor & target, int64_
         case ScalarType::Double: {
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_thnn_mse_loss_forward", false, Backend::DPCPP, ScalarType::Double);
             auto target_ = checked_tensor_unwrap(target, "target", 2, "_thnn_mse_loss_forward", false, Backend::DPCPP, ScalarType::Double);
-            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto output = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(output_));
             THNN_SyclDoubleMSECriterion_updateOutput(globalContext().getTHSYCLState(), self_, target_, output_, reduction);
             output_->maybe_zero_dim(false);
@@ -21044,7 +21044,7 @@ Tensor _thnn_mse_loss_forward(const Tensor & self, const Tensor & target, int64_
         case ScalarType::Float: {
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_thnn_mse_loss_forward", false, Backend::DPCPP, ScalarType::Float);
             auto target_ = checked_tensor_unwrap(target, "target", 2, "_thnn_mse_loss_forward", false, Backend::DPCPP, ScalarType::Float);
-            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto output = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(output_));
             THNN_SyclMSECriterion_updateOutput(globalContext().getTHSYCLState(), self_, target_, output_, reduction);
             output_->maybe_zero_dim(false);
@@ -21054,7 +21054,7 @@ Tensor _thnn_mse_loss_forward(const Tensor & self, const Tensor & target, int64_
         case ScalarType::Half: {
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_thnn_mse_loss_forward", false, Backend::DPCPP, ScalarType::Half);
             auto target_ = checked_tensor_unwrap(target, "target", 2, "_thnn_mse_loss_forward", false, Backend::DPCPP, ScalarType::Half);
-            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto output = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(output_));
             THNN_SyclHalfMSECriterion_updateOutput(globalContext().getTHSYCLState(), self_, target_, output_, reduction);
             output_->maybe_zero_dim(false);
@@ -21121,7 +21121,7 @@ Tensor _thnn_mse_loss_backward(const Tensor & grad_output, const Tensor & self, 
             auto grad_output_ = checked_tensor_unwrap(grad_output, "grad_output", 1, "_thnn_mse_loss_backward", false, Backend::DPCPP, ScalarType::Double);
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_thnn_mse_loss_backward", false, Backend::DPCPP, ScalarType::Double);
             auto target_ = checked_tensor_unwrap(target, "target", 3, "_thnn_mse_loss_backward", false, Backend::DPCPP, ScalarType::Double);
-            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto grad_input = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(grad_input_));
             THNN_SyclDoubleMSECriterion_updateGradInput(globalContext().getTHSYCLState(), self_, target_, grad_output_, grad_input_, reduction);
             grad_input_->maybe_zero_dim(false);
@@ -21132,7 +21132,7 @@ Tensor _thnn_mse_loss_backward(const Tensor & grad_output, const Tensor & self, 
             auto grad_output_ = checked_tensor_unwrap(grad_output, "grad_output", 1, "_thnn_mse_loss_backward", false, Backend::DPCPP, ScalarType::Float);
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_thnn_mse_loss_backward", false, Backend::DPCPP, ScalarType::Float);
             auto target_ = checked_tensor_unwrap(target, "target", 3, "_thnn_mse_loss_backward", false, Backend::DPCPP, ScalarType::Float);
-            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto grad_input = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(grad_input_));
             THNN_SyclMSECriterion_updateGradInput(globalContext().getTHSYCLState(), self_, target_, grad_output_, grad_input_, reduction);
             grad_input_->maybe_zero_dim(false);
@@ -21143,7 +21143,7 @@ Tensor _thnn_mse_loss_backward(const Tensor & grad_output, const Tensor & self, 
             auto grad_output_ = checked_tensor_unwrap(grad_output, "grad_output", 1, "_thnn_mse_loss_backward", false, Backend::DPCPP, ScalarType::Half);
             auto self_ = checked_tensor_unwrap(self, "self", 2, "_thnn_mse_loss_backward", false, Backend::DPCPP, ScalarType::Half);
             auto target_ = checked_tensor_unwrap(target, "target", 3, "_thnn_mse_loss_backward", false, Backend::DPCPP, ScalarType::Half);
-            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto grad_input = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(grad_input_));
             THNN_SyclHalfMSECriterion_updateGradInput(globalContext().getTHSYCLState(), self_, target_, grad_output_, grad_input_, reduction);
             grad_input_->maybe_zero_dim(false);
@@ -21216,9 +21216,9 @@ std::tuple<Tensor,Tensor> _thnn_nll_loss_forward(const Tensor & self, const Tens
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_thnn_nll_loss_forward", false, Backend::DPCPP, ScalarType::Double);
             auto target_ = checked_tensor_unwrap(target, "target", 2, "_thnn_nll_loss_forward", false, Backend::DPCPP, ScalarType::Long);
             auto weight_ = checked_tensor_unwrap(weight, "weight", 3, "_thnn_nll_loss_forward", true, Backend::DPCPP, ScalarType::Double);
-            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto output = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(output_));
-            auto total_weight_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto total_weight_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto total_weight = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(total_weight_));
             THNN_SyclDoubleClassNLLCriterion_updateOutput(globalContext().getTHSYCLState(), self_, target_, output_, reduction, weight_ ? weight_ : NULL, total_weight_, ignore_index);
             output_->maybe_zero_dim(reduction != Reduction::None || self_->dim() == 0);
@@ -21230,9 +21230,9 @@ std::tuple<Tensor,Tensor> _thnn_nll_loss_forward(const Tensor & self, const Tens
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_thnn_nll_loss_forward", false, Backend::DPCPP, ScalarType::Float);
             auto target_ = checked_tensor_unwrap(target, "target", 2, "_thnn_nll_loss_forward", false, Backend::DPCPP, ScalarType::Long);
             auto weight_ = checked_tensor_unwrap(weight, "weight", 3, "_thnn_nll_loss_forward", true, Backend::DPCPP, ScalarType::Float);
-            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto output = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(output_));
-            auto total_weight_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto total_weight_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto total_weight = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(total_weight_));
             THNN_SyclClassNLLCriterion_updateOutput(globalContext().getTHSYCLState(), self_, target_, output_, reduction, weight_ ? weight_ : NULL, total_weight_, ignore_index);
             output_->maybe_zero_dim(reduction != Reduction::None || self_->dim() == 0);
@@ -21244,9 +21244,9 @@ std::tuple<Tensor,Tensor> _thnn_nll_loss_forward(const Tensor & self, const Tens
             auto self_ = checked_tensor_unwrap(self, "self", 1, "_thnn_nll_loss_forward", false, Backend::DPCPP, ScalarType::Half);
             auto target_ = checked_tensor_unwrap(target, "target", 2, "_thnn_nll_loss_forward", false, Backend::DPCPP, ScalarType::Long);
             auto weight_ = checked_tensor_unwrap(weight, "weight", 3, "_thnn_nll_loss_forward", true, Backend::DPCPP, ScalarType::Half);
-            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto output_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto output = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(output_));
-            auto total_weight_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto total_weight_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto total_weight = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(total_weight_));
             THNN_SyclHalfClassNLLCriterion_updateOutput(globalContext().getTHSYCLState(), self_, target_, output_, reduction, weight_ ? weight_ : NULL, total_weight_, ignore_index);
             output_->maybe_zero_dim(reduction != Reduction::None || self_->dim() == 0);
@@ -21322,7 +21322,7 @@ Tensor _thnn_nll_loss_backward(const Tensor & grad_output, const Tensor & self, 
             auto target_ = checked_tensor_unwrap(target, "target", 3, "_thnn_nll_loss_backward", false, Backend::DPCPP, ScalarType::Long);
             auto weight_ = checked_tensor_unwrap(weight, "weight", 4, "_thnn_nll_loss_backward", true, Backend::DPCPP, ScalarType::Double);
             auto total_weight_ = checked_tensor_unwrap(total_weight, "total_weight", 7, "_thnn_nll_loss_backward", false, Backend::DPCPP, ScalarType::Double);
-            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<double>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto grad_input = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(grad_input_));
             THNN_SyclDoubleClassNLLCriterion_updateGradInput(globalContext().getTHSYCLState(), self_, target_, grad_output_, grad_input_, reduction, weight_ ? weight_ : NULL, total_weight_, ignore_index);
             grad_input_->maybe_zero_dim(self_->dim() == 0);
@@ -21335,7 +21335,7 @@ Tensor _thnn_nll_loss_backward(const Tensor & grad_output, const Tensor & self, 
             auto target_ = checked_tensor_unwrap(target, "target", 3, "_thnn_nll_loss_backward", false, Backend::DPCPP, ScalarType::Long);
             auto weight_ = checked_tensor_unwrap(weight, "weight", 4, "_thnn_nll_loss_backward", true, Backend::DPCPP, ScalarType::Float);
             auto total_weight_ = checked_tensor_unwrap(total_weight, "total_weight", 7, "_thnn_nll_loss_backward", false, Backend::DPCPP, ScalarType::Float);
-            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<float>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto grad_input = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(grad_input_));
             THNN_SyclClassNLLCriterion_updateGradInput(globalContext().getTHSYCLState(), self_, target_, grad_output_, grad_input_, reduction, weight_ ? weight_ : NULL, total_weight_, ignore_index);
             grad_input_->maybe_zero_dim(self_->dim() == 0);
@@ -21348,7 +21348,7 @@ Tensor _thnn_nll_loss_backward(const Tensor & grad_output, const Tensor & self, 
             auto target_ = checked_tensor_unwrap(target, "target", 3, "_thnn_nll_loss_backward", false, Backend::DPCPP, ScalarType::Long);
             auto weight_ = checked_tensor_unwrap(weight, "weight", 4, "_thnn_nll_loss_backward", true, Backend::DPCPP, ScalarType::Half);
             auto total_weight_ = checked_tensor_unwrap(total_weight, "total_weight", 7, "_thnn_nll_loss_backward", false, Backend::DPCPP, ScalarType::Half);
-            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::DPCPPTensorId()).release();
+            auto grad_input_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(caffe2::TypeMeta::Make<Half>(), 0, allocator(), true),at::torch_ipex::DPCPPTensorId()).release();
             auto grad_input = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(grad_input_));
             THNN_SyclHalfClassNLLCriterion_updateGradInput(globalContext().getTHSYCLState(), self_, target_, grad_output_, grad_input_, reduction, weight_ ? weight_ : NULL, total_weight_, ignore_index);
             grad_input_->maybe_zero_dim(self_->dim() == 0);

@@ -1,16 +1,17 @@
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLTensor.hpp>
-#include <THDP/THSYCLTensorCopy.h>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLTensor.hpp>
+#include <legacy/THSYCLTensorCopy.h>
 
-#include <THDP/generic/THSYCLTensor.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensor.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensor.cpp>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensor.cpp>
+#include <legacy/THSYCLGenerateBoolType.h>
 
-#include <THDP/THSYCLTensorInfo.h>
+#include <core/TensorImplUtils.h>
+#include <core/TensorInfo.h>
 
-#include <ATen/native/dpcpp/Resize.h>
+#include <functions/Resize.h>
 
 int THSYCLTensor_nDimension(THSYCLState *state, const THSYCLTensor *self) {
   return THTensor_nDimension(self);
@@ -88,13 +89,13 @@ void THSYCLTensor_resizeAs(THSYCLState *state, THSYCLTensor *self, THSYCLTensor 
   {
     isSame = 1;
     for(d = 0; d < self->dim(); d++)
-    {   
+    {
       if(self->size(d) != src->size(d))
-      {   
+      {
         isSame = 0;
         break;
-      }   
-    }   
+      }
+    }
   }
 
   if(!isSame)
@@ -108,7 +109,7 @@ void THSYCLTensor_resizeNd(THSYCLState *state, THSYCLTensor *self, int nDimensio
   if (stride) {
     strides = at::IntArrayRef(stride, nDimension);
   }
-  at::native::resize_impl_sycl_(self, sizes, strides, /*device_guard=*/false);
+  at::native::TensorImpl_resizeImpl(self, sizes, strides, /*device_guard=*/false);
 }
 
 void THSYCLTensor_set(THSYCLState *state, THSYCLTensor *self, THSYCLTensor *src) {
@@ -372,6 +373,3 @@ bool THSYCLTensor_maybeOverlappingIndices(THSYCLState* state, const THSYCLTensor
 
   return false;
 }
-      
-
-

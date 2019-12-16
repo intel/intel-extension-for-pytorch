@@ -1,9 +1,9 @@
-#include <THDP/THSYCLGeneral.h>
+#include <legacy/THSYCLGeneral.h>
 #include <TH/TH.h>
-#include <THDP/THSYCLAllocator.h>
-#include <THDP/THSYCLTensorRandom.h>
+#include <legacy/THSYCLAllocator.h>
+#include <legacy/THSYCLTensorRandom.h>
 
-#include <c10/dpcpp/SYCLStream.h>
+#include <core/SYCLStream.h>
 
 #include <stdlib.h>
 #include <stdint.h>

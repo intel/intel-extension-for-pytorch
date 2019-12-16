@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorMathPointwise3.cpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorMathPointwise3.cpp"
 #else
 
 #if !defined(THSYCL_REAL_IS_BOOL)

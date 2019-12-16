@@ -1,9 +1,9 @@
-#include <THDP/THSYCLSleep.h>
+#include <legacy/THSYCLSleep.h>
 
-#include <c10/dpcpp/SYCLStream.h>
-#include <c10/dpcpp/SYCLMemory.h>
-#include <c10/dpcpp/SYCLUtils.h>
-#include <c10/dpcpp/SYCLException.h>
+#include <core/SYCLStream.h>
+#include <core/SYCLMemory.h>
+#include <core/SYCLUtils.h>
+#include <core/SYCLException.h>
 
 #include <time.h>
 

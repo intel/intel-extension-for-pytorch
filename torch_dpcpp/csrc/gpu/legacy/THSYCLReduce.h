@@ -1,10 +1,10 @@
 #ifndef THSYCL_REDUCE_INC
 #define THSYCL_REDUCE_INC
 
-#include <c10/dpcpp/SYCLUtils.h>
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLDeviceUtils.h>
-#include <THDP/THSYCLTensorTypeUtils.h>
+#include <core/SYCLUtils.h>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLDeviceUtils.h>
+#include <legacy/THSYCLTensorTypeUtils.h>
 
 DP_DEF_K2(reducedim,
           typename T,

@@ -7,9 +7,9 @@
 #define THSYCLGenerateManyTypes
 #endif
 
-#include <THDP/THSYCLGenerateHalfType.h>
-#include <THDP/THSYCLGenerateFloatType.h>
-#include <THDP/THSYCLGenerateDoubleType.h>
+#include <legacy/THSYCLGenerateHalfType.h>
+#include <legacy/THSYCLGenerateFloatType.h>
+#include <legacy/THSYCLGenerateDoubleType.h>
 
 #ifdef THSYCLFloatLocalGenerateManyTypes
 #undef THSYCLFloatLocalGenerateManyTypes

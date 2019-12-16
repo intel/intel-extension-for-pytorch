@@ -3,8 +3,8 @@
 
 #include <TH/THHalf.h>
 #include <ATen/ATen.h>
-#include <c10/dpcpp/SYCL.h>
-#include <ATen/dpcpp/NumericLimits.h>
+#include <core/SYCL.h>
+#include <core/NumericLimits.h>
 template <typename T>
 struct THSYCLNumerics {
 };

@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLStorage.h"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLStorage.h"
 #else
 #define THSYCLStorage THStorage
 

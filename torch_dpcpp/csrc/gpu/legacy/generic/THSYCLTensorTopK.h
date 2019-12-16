@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorTopK.h"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorTopK.h"
 #else
 
 /* Returns the set of all kth smallest (or largest) elements, depending */

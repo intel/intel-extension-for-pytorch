@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorMathCompare.h"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorMathCompare.h"
 #else
 
 THSYCL_API void THSYCLTensor_(ltValue)(THSYCLState *state, THSyclBoolTensor *self_, THSYCLTensor *src, scalar_t value);

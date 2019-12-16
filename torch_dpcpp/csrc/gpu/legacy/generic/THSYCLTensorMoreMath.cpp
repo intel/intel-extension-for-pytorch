@@ -1,8 +1,8 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorMoreMath.cpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorMoreMath.cpp"
 #else
 
-#include <ATen/dpcpp/Runtime.h>
+#include <core/Runtime.h>
 
 using namespace mkldnn;
 

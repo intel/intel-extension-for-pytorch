@@ -1,11 +1,11 @@
-#include <THDP/THSYCLTensorIndex.h>
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLTensorCopy.h>
-#include <THDP/THSYCLTensor.hpp>
-#include <THDP/THSYCLStorage.hpp>
+#include <legacy/THSYCLTensorIndex.h>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLTensorCopy.h>
+#include <legacy/THSYCLTensor.hpp>
+#include <legacy/THSYCLStorage.hpp>
 
-#include <THDP/generic/THSYCLTensorIndex.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorIndex.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorIndex.cpp>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorIndex.cpp>
+#include <legacy/THSYCLGenerateBoolType.h>

@@ -13,7 +13,7 @@ TensorImpl *TensorImpl_new(caffe2::TypeMeta type_meta)
 {
   return c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
     c10::intrusive_ptr<at::StorageImpl>::reclaim(StorageImpl_new(type_meta)),
-    at::DPCPPTensorId()
+    at::torch_ipex::DPCPPTensorId()
   ).release();
 }
 

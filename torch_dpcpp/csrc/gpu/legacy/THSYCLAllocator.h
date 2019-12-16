@@ -1,6 +1,8 @@
 #ifndef THSYCL_DEVICE_ALLOCATOR_INC
 #define THSYCL_DEVICE_ALLOCATOR_INC
 
+#include <c10/core/Allocator.h>
+
 #ifdef __cplusplus
 #include <core/SYCLStream.h>
 #include <core/ATenSYCLGeneral.h>

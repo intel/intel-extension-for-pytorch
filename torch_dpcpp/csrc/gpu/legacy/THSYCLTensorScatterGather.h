@@ -1,11 +1,11 @@
 #ifndef TH_SYCL_TENSOR_SCATTERGATHER_INC
 #define TH_SYCL_TENSOR_SCATTERGATHER_INC
 
-#include <THDP/THSYCLTensor.h>
+#include <legacy/THSYCLTensor.h>
 
-#include <THDP/generic/THSYCLTensorScatterGather.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorScatterGather.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorScatterGather.h>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorScatterGather.h>
+#include <legacy/THSYCLGenerateBoolType.h>
 #endif

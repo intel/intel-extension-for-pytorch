@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorMathPointwise2.cpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorMathPointwise2.cpp"
 #else
 
 void THSYCLTensor_(cmax)(THSYCLState *state, THSYCLTensor *self, THSYCLTensor *src1, THSYCLTensor *src2) {

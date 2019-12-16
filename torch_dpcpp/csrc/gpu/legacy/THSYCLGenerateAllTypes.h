@@ -7,8 +7,8 @@
 #define THSYCLGenerateManyTypes
 #endif
 
-#include <THDP/THSYCLGenerateFloatTypes.h>
-#include <THDP/THSYCLGenerateIntTypes.h>
+#include <legacy/THSYCLGenerateFloatTypes.h>
+#include <legacy/THSYCLGenerateIntTypes.h>
 
 #ifdef THSYCLAllLocalGenerateManyTypes
 #undef THSYCLAllLocalGenerateManyTypes

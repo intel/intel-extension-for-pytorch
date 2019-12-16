@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorMathReduce.h"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorMathReduce.h"
 #else
 
 THSYCL_API scalar_t THSYCLTensor_(maxall)(THSYCLState *state, THSYCLTensor *self);

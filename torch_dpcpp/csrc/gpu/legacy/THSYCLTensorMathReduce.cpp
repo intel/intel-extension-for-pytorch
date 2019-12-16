@@ -1,12 +1,12 @@
-#include <THDP/THSYCLTensorMath.h>
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLTensorCopy.h>
-#include <THDP/THSYCLTensor.hpp>
-#include <THDP/THSYCLStorage.hpp>
-#include <THDP/THSYCLAlgorithm.h>
-#include <THDP/THSYCLReduce.h>
-#include <THDP/THSYCLReduceAll.h>
-#include <THDP/THSYCLTensorMathReduce.h>
+#include <legacy/THSYCLTensorMath.h>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLTensorCopy.h>
+#include <legacy/THSYCLTensor.hpp>
+#include <legacy/THSYCLStorage.hpp>
+#include <legacy/THSYCLAlgorithm.h>
+#include <legacy/THSYCLReduce.h>
+#include <legacy/THSYCLReduceAll.h>
+#include <legacy/THSYCLTensorMathReduce.h>
 
 THSYCL_API int
 THSyclByteTensor_logicalAndAll(THSYCLState *state, THSyclByteTensor *self) {
@@ -74,8 +74,8 @@ THSyclByteTensor_logicalAny(THSYCLState* state, THSyclByteTensor *self, THSyclBy
   THSYCLCheck(c10::sycl::syclGetDevice(&currentDevice));
 }
 
-#include <THDP/generic/THSYCLTensorMathReduce.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMathReduce.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLTensorMathReduce.cpp>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLTensorMathReduce.cpp>
+#include <legacy/THSYCLGenerateBoolType.h>

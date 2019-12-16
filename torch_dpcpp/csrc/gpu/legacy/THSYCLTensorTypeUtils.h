@@ -1,12 +1,12 @@
 #ifndef THSYCL_TENSOR_TYPE_UTILS_INC
 #define THSYCL_TENSOR_TYPE_UTILS_INC
 
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLTensor.hpp>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLTensor.hpp>
 
-#include <THDP/THSYCLTensorInfo.h>
+#include <core/TensorInfo.h>
 
-// Utility function for constructing TensorInfo structs. In this case, the 
+// Utility function for constructing TensorInfo structs. In this case, the
 // two template parameters are:
 //
 // 1. The TensorType, e.g. THSYCLTensor in generic functions, or THSyclTensor,
@@ -19,9 +19,9 @@
 // Internally we use the TensorUtils static functions to get the necessary
 // dims, sizes, stride etc.
 //
-// For example, suppose we have a THSyclTensor t, with dim = 2, size = [3, 4], 
+// For example, suppose we have a THSyclTensor t, with dim = 2, size = [3, 4],
 // stride = [4, 1], offset = 8, and we set our index type to be unsigned int.
-// Then we yield a TensorInfo struct templatized with float, unsigned int and 
+// Then we yield a TensorInfo struct templatized with float, unsigned int and
 // the following fields:
 //
 // data is a float* to the underlying storage at position 8

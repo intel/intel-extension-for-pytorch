@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorMode.h"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorMode.h"
 #else
 
 /* Returns the mode, and index of the mode, for the set of values

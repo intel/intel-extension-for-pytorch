@@ -7,11 +7,11 @@
 #define THSYCLGenerateManyTypes
 #endif
 
-#include <THDP/THSYCLGenerateByteType.h>
-#include <THDP/THSYCLGenerateCharType.h>
-#include <THDP/THSYCLGenerateShortType.h>
-#include <THDP/THSYCLGenerateIntType.h>
-#include <THDP/THSYCLGenerateLongType.h>
+#include <legacy/THSYCLGenerateByteType.h>
+#include <legacy/THSYCLGenerateCharType.h>
+#include <legacy/THSYCLGenerateShortType.h>
+#include <legacy/THSYCLGenerateIntType.h>
+#include <legacy/THSYCLGenerateLongType.h>
 
 #ifdef THSYCLIntLocalGenerateManyTypes
 #undef THSYCLIntLocalGenerateManyTypes

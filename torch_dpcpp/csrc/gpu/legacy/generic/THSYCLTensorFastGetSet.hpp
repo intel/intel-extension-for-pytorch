@@ -1,7 +1,7 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorFastGetSet.hpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorFastGetSet.hpp"
 #else
-#include <THDP/THSYCLDeviceTensor.h>
+#include <legacy/THSYCLDeviceTensor.h>
 
 static inline scalar_t THSYCLTensor_(fastGetLegacy1dNoScalars)(THSYCLDeviceTensor<1, scalar_t, cl::sycl::access::mode::read>  self, int64_t x0) {
   int64_t stride = self.dim() == 0 ? 1 : self.stride(0);

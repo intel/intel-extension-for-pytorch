@@ -161,7 +161,11 @@ set(C10_DISABLE_NUMA ${CAFFE2_DISABLE_NUMA})
 set(DPCPP_SRCS)
 set(DPCPP_ATEN_SRCS)
 add_subdirectory(torch_dpcpp/csrc/gpu/aten)
-set(DPCPP_SRCS ${DPCPP_ATEN_SRCS})
+list(APPEND DPCPP_SRCS ${DPCPP_ATEN_SRCS})
+
+set(DPCPP_LEGACY_SRCS)
+add_subdirectory(torch_dpcpp/csrc/gpu/legacy)
+list(APPEND DPCPP_SRCS ${DPCPP_LEGACY_SRCS})
 
 add_library(torch_dpcpp SHARED ${DPCPP_SRCS})
 # add_dependencies(torch_dpcpp ${DPCPP_DEP})

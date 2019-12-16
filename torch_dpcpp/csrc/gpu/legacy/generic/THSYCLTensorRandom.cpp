@@ -1,10 +1,10 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorRandom.cpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorRandom.cpp"
 #else
 
-#include <c10/dpcpp/SYCLStream.h>
-#include <c10/dpcpp/SYCLMemory.h>
-#include <c10/dpcpp/SYCLUtils.h>
+#include <core/SYCLStream.h>
+#include <core/SYCLMemory.h>
+#include <core/SYCLUtils.h>
 
 #include "THSYCLTensorRandomKernel.hpp"
 

@@ -1,5 +1,5 @@
-#include <THDP/THSYCL.h>
-#include <THDP/THSYCLTensor.hpp>
+#include <legacy/THSYCL.h>
+#include <legacy/THSYCLTensor.hpp>
 
-#include <THDP/generic/THSYCLTensorMode.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMode.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>

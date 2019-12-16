@@ -1,7 +1,7 @@
-#include <THDP/THSYCLTensorMathScan.h>
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/THSYCLTensor.hpp>
-#include <THDP/THSYCLStorage.hpp>
+#include <legacy/THSYCLTensorMathScan.h>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/THSYCLTensor.hpp>
+#include <legacy/THSYCLStorage.hpp>
 
-#include <THDP/generic/THSYCLTensorMathScan.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLTensorMathScan.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>

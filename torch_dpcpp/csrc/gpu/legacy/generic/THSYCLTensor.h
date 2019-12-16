@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensor.h"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensor.h"
 #else
 
 #define THSYCLTensor THTensor

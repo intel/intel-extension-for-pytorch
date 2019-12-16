@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensor.hpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensor.hpp"
 #else
 
 // STOP!!! Thinking of including this header directly?  Please

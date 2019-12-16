@@ -1,8 +1,8 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorMathBlas.cpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorMathBlas.cpp"
 #else
 
-#include <ATen/native/mkldnn/InnerProduct.hpp>
+#include <dnnl/InnerProduct.hpp>
 
 #define ERROR_ONLY_FP_TYPES(func) \
   THError("%s for SYCL tensors only supports floating-point types. Try converting the tensors with .float()", func);

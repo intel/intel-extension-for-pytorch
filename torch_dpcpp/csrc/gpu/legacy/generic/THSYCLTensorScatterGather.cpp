@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorScatterGather.cpp"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorScatterGather.cpp"
 #else
 
 #define RUN(TYPE, DIMS, REAL)                                           \

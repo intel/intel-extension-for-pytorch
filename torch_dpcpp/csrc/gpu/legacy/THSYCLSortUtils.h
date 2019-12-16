@@ -1,10 +1,10 @@
 #ifndef THSYCL_SORT_UTILS_INC
 #define THSYCL_SORT_UTILS_INC
-#include <c10/dpcpp/SYCLStream.h>
-#include <c10/dpcpp/SYCLMemory.h>
-#include <c10/dpcpp/SYCLUtils.h>
-#include <THDP/THSYCLTensorTypeUtils.h>
-#include <THDP/THSYCLNumerics.h>
+#include <core/SYCLStream.h>
+#include <core/SYCLMemory.h>
+#include <core/SYCLUtils.h>
+#include <legacy/THSYCLTensorTypeUtils.h>
+#include <legacy/THSYCLNumerics.h>
 
 static const auto write_mode = cl::sycl::access::mode::discard_write;
 static const auto read_mode = cl::sycl::access::mode::read;

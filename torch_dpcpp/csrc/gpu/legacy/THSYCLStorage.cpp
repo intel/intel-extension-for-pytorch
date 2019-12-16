@@ -1,14 +1,14 @@
-#include <THDP/THSYCLStorage.hpp>
-#include <THDP/THSYCLGeneral.h>
+#include <legacy/THSYCLStorage.hpp>
+#include <legacy/THSYCLGeneral.h>
 
-#include <THDP/generic/THSYCLStorage.cpp>
-#include <THDP/THSYCLGenerateAllTypes.h>
+#include <legacy/generic/THSYCLStorage.cpp>
+#include <legacy/THSYCLGenerateAllTypes.h>
 
-#include <THDP/generic/THSYCLStorage.cpp>
-#include <THDP/THSYCLGenerateBoolType.h>
+#include <legacy/generic/THSYCLStorage.cpp>
+#include <legacy/THSYCLGenerateBoolType.h>
 
 #include <c10/util/intrusive_ptr.h>
-#include <c10/dpcpp/SYCLException.h>
+#include <core/SYCLException.h>
 
 void THSYCLStorage_resize(THSYCLState *state, THSYCLStorage *self, ptrdiff_t size) {
   THArgCheck(size >= 0, 2, "invalid size");
@@ -22,12 +22,12 @@ void THSYCLStorage_resize(THSYCLState *state, THSYCLStorage *self, ptrdiff_t siz
   size_t itemsize = self->itemsize();
 
   if (size == 0) {
-    self->set_data_ptr(c10::DataPtr(nullptr, c10::Device(c10::DeviceType::SYCL, device)));
+    self->set_data_ptr(c10::DataPtr(nullptr, c10::Device(c10::DeviceType::DPCPP, device)));
     self->set_numel(0);
   } else {
     c10::DataPtr data =
       self->allocator()->allocate(size *itemsize);
-    
+
     if (self->data_ptr()) {
       syclMemcpyAsync(data.get(),
                       self->data(),

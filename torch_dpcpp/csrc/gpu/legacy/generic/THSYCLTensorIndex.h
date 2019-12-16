@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorIndex.h"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorIndex.h"
 #else
 
 THSYCL_API void THSYCLTensor_(indexSelect)(THSYCLState *state, THSYCLTensor *dst, THSYCLTensor *src, int dim, THSYCLTensor *indices);

@@ -1,18 +1,18 @@
 #ifndef THSYCL_TENSORMATH_REDUCE_H
 #define THSYCL_TENSORMATH_REDUCE_H
 
-#include <c10/dpcpp/SYCL.h>
-#include <THDP/THSYCLNumerics.h>
-#include <THDP/THSYCLTensor.h>
-#include <THDP/THSYCLGeneral.h>
-#include <THDP/generic/THSYCLTensorMathReduce.h>
-#include <THDP/THSYCLGenerateAllTypes.h>
-#include <THDP/THSYCLTensorCopy.hpp>
-#include <THDP/THSYCLTensorMath.h>
-#include <THDP/THSYCLAlgorithm.h>
-#include <THDP/THSYCLTensorMathReduce.h>
-#include <c10/dpcpp/SYCLMemory.h>
-#include <c10/dpcpp/SYCLUtils.h>
+#include <core/SYCL.h>
+#include <core/SYCLMemory.h>
+#include <core/SYCLUtils.h>
+#include <legacy/THSYCLNumerics.h>
+#include <legacy/THSYCLTensor.h>
+#include <legacy/THSYCLGeneral.h>
+#include <legacy/generic/THSYCLTensorMathReduce.h>
+#include <legacy/THSYCLGenerateAllTypes.h>
+#include <legacy/THSYCLTensorCopy.hpp>
+#include <legacy/THSYCLTensorMath.h>
+#include <legacy/THSYCLAlgorithm.h>
+#include <legacy/THSYCLTensorMathReduce.h>
 
 template <typename scalar_t>
 DP_DEVICE struct AddOp {

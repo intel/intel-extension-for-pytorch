@@ -1,8 +1,8 @@
 #ifndef THSYCL_TENSOR_TOPK_H
 #define THSYCL_TENSOR_TOPK_H
-#include <c10/dpcpp/SYCLStream.h>
-#include <c10/dpcpp/SYCLMemory.h>
-#include <c10/dpcpp/SYCLUtils.h>
+#include <core/SYCLStream.h>
+#include <core/SYCLMemory.h>
+#include <core/SYCLUtils.h>
 
 
 namespace {
@@ -13,7 +13,6 @@ using local_accessor_t = cl::sycl::accessor<T, 1, cl::sycl::access::mode::read_w
 
 template <typename T>
 using sycl_pointer_t = typename cl::sycl::global_ptr<T>::pointer_t;
- 
 
 template <typename T>
 struct TopKTypeConfig {};
@@ -22,7 +21,7 @@ template<>
 struct TopKTypeConfig<float> {
   typedef uint32_t RadixType;
   // Converts a float to an integer representation with the same
-  // sorting; i.e., for floats f1, f2: 
+  // sorting; i.e., for floats f1, f2:
   // if f1 < f2 then convert(f1) < convert(f2)
   // We use this to enable radix selection of floating-point values.
   // This also gives a relative order for NaNs, but that's ok, as they
@@ -499,8 +498,6 @@ void gatherTopK(TensorInfo<T, IndexType> input,
 
         });
   });
-
-
 }
 
 } //namepsace

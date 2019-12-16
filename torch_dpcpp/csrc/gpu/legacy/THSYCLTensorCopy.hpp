@@ -1,6 +1,6 @@
 #pragma once
 
-#include <THDP/THSYCLTensorCopy.h>
+#include <legacy/THSYCLTensorCopy.h>
 
 template <typename ScalarTypeDst, typename ScalarTypeSrc>
 void THSYCL_copyTensor(THSYCLState* state, THSYCLTensor* dst, THSYCLTensor* src);

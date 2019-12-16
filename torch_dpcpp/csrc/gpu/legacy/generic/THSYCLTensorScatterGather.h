@@ -1,5 +1,5 @@
 #ifndef THSYCL_GENERIC_FILE
-#define THSYCL_GENERIC_FILE "THDP/generic/THSYCLTensorScatterGather.h"
+#define THSYCL_GENERIC_FILE "legacy/generic/THSYCLTensorScatterGather.h"
 #else
 void THSYCLTensor_(gather)(THSYCLState* state, THSYCLTensor* tensor, THSYCLTensor* src, int dim, THSyclLongTensor* index);
 
