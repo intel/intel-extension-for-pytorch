@@ -5,7 +5,7 @@ set(CMAKE_INSTALL_MESSAGE NEVER)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_dpcpp/csrc/cpu")
+set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/cpu")
 
 # Define build type
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -100,8 +100,8 @@ else()
 endif()
 
 include_directories(${PROJECT_SOURCE_DIR})
-include_directories(${PROJECT_SOURCE_DIR}/torch_dpcpp)
-include_directories(${PROJECT_SOURCE_DIR}/torch_dpcpp/csrc/)
+include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
+include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
 
 # sources

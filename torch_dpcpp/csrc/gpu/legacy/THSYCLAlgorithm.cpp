@@ -1,1 +1,0 @@
-#include <THDP/THSYCLAlgorithm.h>

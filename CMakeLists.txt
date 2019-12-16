@@ -7,7 +7,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(PLUGIN_NAME intel_pytorch_extension)
 
-set(DPCPP_ROOT "${PROJECT_SOURCE_DIR}/torch_dpcpp/csrc")
+set(DPCPP_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc")
 set(DPCPP_THIRD_PARTY_ROOT "${PROJECT_SOURCE_DIR}/third_party")
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
