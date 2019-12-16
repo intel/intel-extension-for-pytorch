@@ -1,4 +1,4 @@
-#include "torch_dpcpp/csrc/ipex_tensor_impl.h"
+#include "torch_ipex/csrc/ipex_tensor_impl.h"
 
 #include <c10/core/ScalarType.h>
 #include <c10/core/impl/DeviceGuardImplInterface.h>
