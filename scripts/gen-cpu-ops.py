@@ -437,9 +437,27 @@ def type_core(t):
             if isinstance(c, lark.lexer.Token):
                 return c.value
             assert isinstance(c, lark.tree.Tree) and c.data == 'template'
+            if c.children[0].value == 'c10::optional':
+                type_list = c.children[1]
+                assert isinstance(type_list, lark.tree.Tree) and type_list.data == 'typelist'
+                return type_core(type_list.children[0])
             return c.children[0].value
     raise RuntimeError('Not a type tree: {}'.format(t))
 
+
+def type_is_optional(t):
+    assert isinstance(t, lark.tree.Tree)
+    for c in t.children:
+        if isinstance(c, lark.tree.Tree) and c.data == 'core_type':
+            c = c.children[0]
+            if isinstance(c, lark.lexer.Token):
+                return False
+            assert isinstance(c, lark.tree.Tree) and c.data == 'template'
+            if c.children[0].value == 'c10::optional':
+                return True
+            else:
+                return False
+    raise RuntimeError('Not a type tree: {}'.format(t))
 
 def type_is_const(t):
     assert isinstance(t, lark.tree.Tree)
@@ -753,6 +771,12 @@ def generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
             gcode, xname = rewrite_tensor_options(fname, pname)
             code += gcode
             param_vars.append(xname)
+        elif cptype == 'MemoryFormat':
+            if type_is_optional(ptype):
+                code += '  TORCH_CHECK({}.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);\n'.format(pname)
+            else:
+                code += '  TORCH_CHECK({} == c10::MemoryFormat::Contiguous);\n'.format(pname)
+            param_vars.append(pname)
         elif cptype != 'Tensor':
             param_vars.append(pname)
         elif type_is_const(ptype):
