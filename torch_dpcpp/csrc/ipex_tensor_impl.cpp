@@ -1,10 +1,13 @@
-#include "torch_dpcpp/csrc/tensor_impl.h"
+#include "torch_dpcpp/csrc/ipex_tensor_impl.h"
 
 #include <c10/core/ScalarType.h>
 #include <c10/core/impl/DeviceGuardImplInterface.h>
 #include <c10/macros/Macros.h>
 
+#include "utils.h"
+
 namespace torch_ipex {
+
 namespace {
 
 thread_local c10::Device g_current_device(at::DeviceType::DPCPP, 0);
@@ -36,7 +39,9 @@ struct IPEXGuardImpl : public c10::impl::DeviceGuardImplInterface {
   }
 
   c10::DeviceIndex deviceCount() const noexcept override {
-    return 1;
+    c10::DeviceIndex dev_count = -1;
+    get_device_count(g_current_device, &dev_count);
+    return dev_count;
   }
 };
 
@@ -48,5 +53,12 @@ IPEXTensorImpl::IPEXTensorImpl(const at::Tensor& tensor) :
     c10::TensorImpl(c10::TensorTypeSet(c10::TensorTypeId::DPCPPTensorId),
                     tensor.dtype(),
                     c10::Device(c10::DeviceType::DPCPP, 0)) {}
+
+c10::Device IPEXTensorImpl::GetCurrentAtenDevice() { return g_current_device; }
+
+c10::Device IPEXTensorImpl::SetCurrentAtenDevice(c10::Device device) {
+  std::swap(g_current_device, device);
+  return device;
+}
 
 }  // namespace torch_ipex

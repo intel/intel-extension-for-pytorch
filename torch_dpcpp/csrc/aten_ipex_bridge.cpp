@@ -63,7 +63,7 @@ at::Tensor upgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
   return _tensor;
 }
 
-void copyTensor(at::Tensor& dstTensor, const at::Tensor& scrTensor) {
+void copyTensor(at::Tensor& dstTensor, const at::Tensor& scrTensor, c10::DeviceType devType) {
   TORCH_CHECK(dstTensor.layout() == c10::kStrided);
   TORCH_CHECK(scrTensor.layout() == c10::kStrided);
   TORCH_CHECK(dstTensor.is_contiguous());
@@ -72,6 +72,8 @@ void copyTensor(at::Tensor& dstTensor, const at::Tensor& scrTensor) {
   TORCH_CHECK(dstTensor.dtype() == scrTensor.dtype());
   TORCH_CHECK(dstTensor.nbytes() == scrTensor.nbytes());
   TORCH_CHECK(dstTensor.layout() == scrTensor.layout());
+  TORCH_CHECK((devType == c10::DeviceType::CPU) || (devType == c10::DeviceType::DPCPP));
+  TORCH_CHECK(dstTensor.device().type() == devType);
   TORCH_CHECK((dstTensor.device().type() == c10::DeviceType::CPU) || (dstTensor.device().type() == c10::DeviceType::DPCPP));
   TORCH_CHECK((scrTensor.device().type() == c10::DeviceType::CPU) || (scrTensor.device().type() == c10::DeviceType::DPCPP));
   memcpy(dstTensor.unsafeGetTensorImpl()->data(), scrTensor.unsafeGetTensorImpl()->data(), dstTensor.nbytes());

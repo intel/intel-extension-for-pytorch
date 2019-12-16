@@ -5,9 +5,11 @@ LIST(APPEND DPCPP_COMMON_SRCS
     ${DPCPP_ROOT}/aten_ipex_bridge.cpp
     ${DPCPP_ROOT}/aten_ipex_type_default.cpp
     ${DPCPP_ROOT}/aten_ipex_type.cpp
+    ${DPCPP_ROOT}/dpcpp_allocator.cpp
     ${DPCPP_ROOT}/init_python_bindings.cpp
-    ${DPCPP_ROOT}/tensor_impl.cpp
+    ${DPCPP_ROOT}/ipex_tensor_impl.cpp
     ${DPCPP_ROOT}/version.cpp
+    ${DPCPP_ROOT}/utils.cpp
 )
 
 # Pass to parent

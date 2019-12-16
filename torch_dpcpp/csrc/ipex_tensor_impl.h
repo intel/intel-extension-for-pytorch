@@ -11,6 +11,9 @@ namespace torch_ipex {
 class IPEXTensorImpl : public c10::TensorImpl {
  public:
   explicit IPEXTensorImpl(const at::Tensor& tensor);
+
+  static c10::Device GetCurrentAtenDevice();
+  static c10::Device SetCurrentAtenDevice(c10::Device device);
 };
 
 } // namespace torch_ipex

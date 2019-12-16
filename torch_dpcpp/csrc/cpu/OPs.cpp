@@ -738,19 +738,25 @@ at::Tensor & AtenIpexCPUDefault::any_out(at::Tensor & out, const at::Tensor & se
 }
 
 at::Tensor AtenIpexCPUDefault::arange(at::Scalar end, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::arange(end, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::arange(end, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::arange(at::Scalar start, at::Scalar end, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::arange(start, end, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::arange(start, end, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::arange(at::Scalar start, at::Scalar end, at::Scalar step, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::arange(start, end, step, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::arange(start, end, step, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -952,13 +958,17 @@ at::Tensor & AtenIpexCPUDefault::baddbmm_out(at::Tensor & out, const at::Tensor 
 }
 
 at::Tensor AtenIpexCPUDefault::bartlett_window(int64_t window_length, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::bartlett_window(window_length, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::bartlett_window(window_length, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::bartlett_window(int64_t window_length, bool periodic, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::bartlett_window(window_length, periodic, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::bartlett_window(window_length, periodic, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -1264,13 +1274,17 @@ at::Tensor & AtenIpexCPUDefault::logical_xor_out(at::Tensor & out, const at::Ten
 }
 
 at::Tensor AtenIpexCPUDefault::blackman_window(int64_t window_length, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::blackman_window(window_length, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::blackman_window(window_length, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::blackman_window(int64_t window_length, bool periodic, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::blackman_window(window_length, periodic, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::blackman_window(window_length, periodic, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -2261,8 +2275,9 @@ at::Tensor AtenIpexCPUDefault::_embedding_bag_per_sample_weights_backward(const 
 }
 
 at::Tensor AtenIpexCPUDefault::empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::empty(size, o_options, memory_format);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::empty(size, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -2270,8 +2285,10 @@ at::Tensor AtenIpexCPUDefault::empty(at::IntArrayRef size, const at::TensorOptio
 at::Tensor AtenIpexCPUDefault::new_empty(const at::Tensor & self, at::IntArrayRef size, const at::TensorOptions & options) {
   TORCH_CHECK(self.layout() == c10::kStrided);
   TORCH_CHECK(self.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_self = bridge::fallbackToCPUTensor(self);
-  auto&& _ipex_result = _ipex_self.new_empty(size, options);
+  auto&& _ipex_result = _ipex_self.new_empty(size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -2279,8 +2296,10 @@ at::Tensor AtenIpexCPUDefault::new_empty(const at::Tensor & self, at::IntArrayRe
 at::Tensor AtenIpexCPUDefault::new_full(const at::Tensor & self, at::IntArrayRef size, at::Scalar fill_value, const at::TensorOptions & options) {
   TORCH_CHECK(self.layout() == c10::kStrided);
   TORCH_CHECK(self.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_self = bridge::fallbackToCPUTensor(self);
-  auto&& _ipex_result = _ipex_self.new_full(size, fill_value, options);
+  auto&& _ipex_result = _ipex_self.new_full(size, fill_value, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -2288,14 +2307,18 @@ at::Tensor AtenIpexCPUDefault::new_full(const at::Tensor & self, at::IntArrayRef
 at::Tensor AtenIpexCPUDefault::new_zeros(const at::Tensor & self, at::IntArrayRef size, const at::TensorOptions & options) {
   TORCH_CHECK(self.layout() == c10::kStrided);
   TORCH_CHECK(self.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_self = bridge::fallbackToCPUTensor(self);
-  auto&& _ipex_result = _ipex_self.new_zeros(size, options);
+  auto&& _ipex_result = _ipex_self.new_zeros(size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::_empty_affine_quantized(at::IntArrayRef size, const at::TensorOptions & options, double scale, int64_t zero_point, c10::optional<at::MemoryFormat> memory_format) {
-  auto&& _ipex_result = at::_empty_affine_quantized(size, options, scale, zero_point, memory_format);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::_empty_affine_quantized(size, _ipex_options, scale, zero_point, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -2305,9 +2328,11 @@ at::Tensor AtenIpexCPUDefault::_empty_per_channel_affine_quantized(at::IntArrayR
   TORCH_CHECK(scales.is_contiguous());
   TORCH_CHECK(zero_points.layout() == c10::kStrided);
   TORCH_CHECK(zero_points.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_scales = bridge::fallbackToCPUTensor(scales);
   auto&& _ipex_zero_points = bridge::fallbackToCPUTensor(zero_points);
-  auto&& _ipex_result = at::_empty_per_channel_affine_quantized(size, _ipex_scales, _ipex_zero_points, axis, options, memory_format);
+  auto&& _ipex_result = at::_empty_per_channel_affine_quantized(size, _ipex_scales, _ipex_zero_points, axis, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -2344,14 +2369,18 @@ at::Tensor AtenIpexCPUDefault::empty_like(const at::Tensor & self, c10::optional
 at::Tensor AtenIpexCPUDefault::empty_like(const at::Tensor & self, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_CHECK(self.layout() == c10::kStrided);
   TORCH_CHECK(self.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_self = bridge::fallbackToCPUTensor(self);
-  auto&& _ipex_result = at::empty_like(_ipex_self, options, memory_format);
+  auto&& _ipex_result = at::empty_like(_ipex_self, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::empty_strided(at::IntArrayRef size, at::IntArrayRef stride, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::empty_strided(size, stride, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::empty_strided(size, stride, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -2506,13 +2535,17 @@ at::Tensor AtenIpexCPUDefault::expand_as(const at::Tensor & self, const at::Tens
 }
 
 at::Tensor AtenIpexCPUDefault::eye(int64_t n, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::eye(n, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::eye(n, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::eye(int64_t n, int64_t m, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::eye(n, m, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::eye(n, m, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -2634,7 +2667,9 @@ at::Tensor & AtenIpexCPUDefault::frac_out(at::Tensor & out, const at::Tensor & s
 }
 
 at::Tensor AtenIpexCPUDefault::full(at::IntArrayRef size, at::Scalar fill_value, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::full(size, fill_value, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::full(size, fill_value, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -2661,14 +2696,18 @@ at::Tensor AtenIpexCPUDefault::full_like(const at::Tensor & self, at::Scalar fil
 at::Tensor AtenIpexCPUDefault::full_like(const at::Tensor & self, at::Scalar fill_value, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_CHECK(self.layout() == c10::kStrided);
   TORCH_CHECK(self.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_self = bridge::fallbackToCPUTensor(self);
-  auto&& _ipex_result = at::full_like(_ipex_self, fill_value, options, memory_format);
+  auto&& _ipex_result = at::full_like(_ipex_self, fill_value, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::from_file(std::string filename, c10::optional<bool> shared, c10::optional<int64_t> size, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::from_file(filename, shared, size, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::from_file(filename, shared, size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -2740,37 +2779,49 @@ std::tuple<at::Tensor,at::Tensor> AtenIpexCPUDefault::grid_sampler_3d_backward(c
 }
 
 at::Tensor AtenIpexCPUDefault::hann_window(int64_t window_length, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::hann_window(window_length, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::hann_window(window_length, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::hann_window(int64_t window_length, bool periodic, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::hann_window(window_length, periodic, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::hann_window(window_length, periodic, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::hamming_window(int64_t window_length, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::hamming_window(window_length, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::hamming_window(window_length, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::hamming_window(int64_t window_length, bool periodic, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::hamming_window(window_length, periodic, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::hamming_window(window_length, periodic, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::hamming_window(int64_t window_length, bool periodic, double alpha, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::hamming_window(window_length, periodic, alpha, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::hamming_window(window_length, periodic, alpha, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::hamming_window(int64_t window_length, bool periodic, double alpha, double beta, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::hamming_window(window_length, periodic, alpha, beta, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::hamming_window(window_length, periodic, alpha, beta, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -3315,8 +3366,9 @@ at::Tensor AtenIpexCPUDefault::fbgemm_pack_quantized_matrix(const at::Tensor & i
 }
 
 at::Tensor AtenIpexCPUDefault::linspace(at::Scalar start, at::Scalar end, int64_t steps, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::linspace(start, end, steps, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::linspace(start, end, steps, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -3469,8 +3521,9 @@ at::Tensor AtenIpexCPUDefault::logdet(const at::Tensor & self) {
 }
 
 at::Tensor AtenIpexCPUDefault::logspace(at::Scalar start, at::Scalar end, int64_t steps, double base, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::logspace(start, end, steps, base, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::logspace(start, end, steps, base, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -4514,7 +4567,9 @@ at::Tensor AtenIpexCPUDefault::_nnpack_spatial_convolution_backward_weight(const
 }
 
 at::Tensor AtenIpexCPUDefault::ones(at::IntArrayRef size, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::ones(size, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::ones(size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -4541,8 +4596,10 @@ at::Tensor AtenIpexCPUDefault::ones_like(const at::Tensor & self, c10::optional<
 at::Tensor AtenIpexCPUDefault::ones_like(const at::Tensor & self, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_CHECK(self.layout() == c10::kStrided);
   TORCH_CHECK(self.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_self = bridge::fallbackToCPUTensor(self);
-  auto&& _ipex_result = at::ones_like(_ipex_self, options, memory_format);
+  auto&& _ipex_result = at::ones_like(_ipex_self, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -4701,22 +4758,25 @@ at::Tensor AtenIpexCPUDefault::poisson_nll_loss(const at::Tensor & input, const 
 }
 
 at::Tensor AtenIpexCPUDefault::scalar_tensor(at::Scalar s, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::scalar_tensor(s, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::scalar_tensor(s, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::rand(at::IntArrayRef size, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::rand(size, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::rand(size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::rand(at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::rand(size, generator, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::rand(size, generator, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -4753,37 +4813,42 @@ at::Tensor AtenIpexCPUDefault::rand_like(const at::Tensor & self, c10::optional<
 at::Tensor AtenIpexCPUDefault::rand_like(const at::Tensor & self, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_CHECK(self.layout() == c10::kStrided);
   TORCH_CHECK(self.is_contiguous());
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_self = bridge::fallbackToCPUTensor(self);
-  auto&& _ipex_result = at::rand_like(_ipex_self, o_options, memory_format);
+  auto&& _ipex_result = at::rand_like(_ipex_self, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::randint(int64_t high, at::IntArrayRef size, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::randint(high, size, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::randint(high, size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::randint(int64_t high, at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::randint(high, size, generator, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::randint(high, size, generator, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::randint(int64_t low, int64_t high, at::IntArrayRef size, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::randint(low, high, size, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::randint(low, high, size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::randint(int64_t low, int64_t high, at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::randint(low, high, size, generator, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::randint(low, high, size, generator, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -4849,9 +4914,10 @@ at::Tensor AtenIpexCPUDefault::randint_like(const at::Tensor & self, int64_t low
 at::Tensor AtenIpexCPUDefault::randint_like(const at::Tensor & self, int64_t high, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_CHECK(self.layout() == c10::kStrided);
   TORCH_CHECK(self.is_contiguous());
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_self = bridge::fallbackToCPUTensor(self);
-  auto&& _ipex_result = at::randint_like(_ipex_self, high, o_options, memory_format);
+  auto&& _ipex_result = at::randint_like(_ipex_self, high, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -4859,23 +4925,26 @@ at::Tensor AtenIpexCPUDefault::randint_like(const at::Tensor & self, int64_t hig
 at::Tensor AtenIpexCPUDefault::randint_like(const at::Tensor & self, int64_t low, int64_t high, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_CHECK(self.layout() == c10::kStrided);
   TORCH_CHECK(self.is_contiguous());
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_self = bridge::fallbackToCPUTensor(self);
-  auto&& _ipex_result = at::randint_like(_ipex_self, low, high, o_options, memory_format);
+  auto&& _ipex_result = at::randint_like(_ipex_self, low, high, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::randn(at::IntArrayRef size, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::randn(size, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::randn(size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::randn(at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::randn(size, generator, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::randn(size, generator, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -4912,23 +4981,26 @@ at::Tensor AtenIpexCPUDefault::randn_like(const at::Tensor & self, c10::optional
 at::Tensor AtenIpexCPUDefault::randn_like(const at::Tensor & self, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_CHECK(self.layout() == c10::kStrided);
   TORCH_CHECK(self.is_contiguous());
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_self = bridge::fallbackToCPUTensor(self);
-  auto&& _ipex_result = at::randn_like(_ipex_self, o_options, memory_format);
+  auto&& _ipex_result = at::randn_like(_ipex_self, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::randperm(int64_t n, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::randperm(n, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::randperm(n, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::randperm(int64_t n, at::Generator * generator, const at::TensorOptions & options) {
-  at::TensorOptions o_options = options.device(at::DeviceType::DPCPP);
-  auto&& _ipex_result = at::randperm(n, generator, o_options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::randperm(n, generator, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -4954,13 +5026,17 @@ at::Tensor & AtenIpexCPUDefault::randperm_out(at::Tensor & out, int64_t n, at::G
 }
 
 at::Tensor AtenIpexCPUDefault::range(at::Scalar start, at::Scalar end, at::Scalar step, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::range(start, end, step, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::range(start, end, step, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::range(at::Scalar start, at::Scalar end, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::range(start, end, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::range(start, end, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -6329,7 +6405,9 @@ std::tuple<at::Tensor,at::Tensor> AtenIpexCPUDefault::_weight_norm_differentiabl
 }
 
 at::Tensor AtenIpexCPUDefault::zeros(at::IntArrayRef size, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::zeros(size, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::zeros(size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -6356,8 +6434,10 @@ at::Tensor AtenIpexCPUDefault::zeros_like(const at::Tensor & self, c10::optional
 at::Tensor AtenIpexCPUDefault::zeros_like(const at::Tensor & self, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_CHECK(self.layout() == c10::kStrided);
   TORCH_CHECK(self.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_self = bridge::fallbackToCPUTensor(self);
-  auto&& _ipex_result = at::zeros_like(_ipex_self, options, memory_format);
+  auto&& _ipex_result = at::zeros_like(_ipex_self, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -6811,7 +6891,9 @@ at::Tensor & AtenIpexCPUDefault::addmm_(at::Tensor & self, const at::Tensor & ma
 }
 
 at::Tensor AtenIpexCPUDefault::sparse_coo_tensor(at::IntArrayRef size, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::sparse_coo_tensor(size, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::sparse_coo_tensor(size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -6821,9 +6903,11 @@ at::Tensor AtenIpexCPUDefault::sparse_coo_tensor(const at::Tensor & indices, con
   TORCH_CHECK(indices.is_contiguous());
   TORCH_CHECK(values.layout() == c10::kStrided);
   TORCH_CHECK(values.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_indices = bridge::fallbackToCPUTensor(indices);
   auto&& _ipex_values = bridge::fallbackToCPUTensor(values);
-  auto&& _ipex_result = at::sparse_coo_tensor(_ipex_indices, _ipex_values, options);
+  auto&& _ipex_result = at::sparse_coo_tensor(_ipex_indices, _ipex_values, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -6833,9 +6917,11 @@ at::Tensor AtenIpexCPUDefault::sparse_coo_tensor(const at::Tensor & indices, con
   TORCH_CHECK(indices.is_contiguous());
   TORCH_CHECK(values.layout() == c10::kStrided);
   TORCH_CHECK(values.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_indices = bridge::fallbackToCPUTensor(indices);
   auto&& _ipex_values = bridge::fallbackToCPUTensor(values);
-  auto&& _ipex_result = at::sparse_coo_tensor(_ipex_indices, _ipex_values, size, options);
+  auto&& _ipex_result = at::sparse_coo_tensor(_ipex_indices, _ipex_values, size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -6845,15 +6931,19 @@ at::Tensor AtenIpexCPUDefault::_sparse_coo_tensor_unsafe(const at::Tensor & indi
   TORCH_CHECK(indices.is_contiguous());
   TORCH_CHECK(values.layout() == c10::kStrided);
   TORCH_CHECK(values.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_indices = bridge::fallbackToCPUTensor(indices);
   auto&& _ipex_values = bridge::fallbackToCPUTensor(values);
-  auto&& _ipex_result = at::_sparse_coo_tensor_unsafe(_ipex_indices, _ipex_values, size, options);
+  auto&& _ipex_result = at::_sparse_coo_tensor_unsafe(_ipex_indices, _ipex_values, size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::_sparse_coo_tensor_with_dims(int64_t sparse_dim, int64_t dense_dim, at::IntArrayRef size, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::_sparse_coo_tensor_with_dims(sparse_dim, dense_dim, size, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::_sparse_coo_tensor_with_dims(sparse_dim, dense_dim, size, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -6863,9 +6953,11 @@ at::Tensor AtenIpexCPUDefault::_sparse_coo_tensor_with_dims_and_tensors(int64_t 
   TORCH_CHECK(indices.is_contiguous());
   TORCH_CHECK(values.layout() == c10::kStrided);
   TORCH_CHECK(values.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_indices = bridge::fallbackToCPUTensor(indices);
   auto&& _ipex_values = bridge::fallbackToCPUTensor(values);
-  auto&& _ipex_result = at::_sparse_coo_tensor_with_dims_and_tensors(sparse_dim, dense_dim, size, _ipex_indices, _ipex_values, options);
+  auto&& _ipex_result = at::_sparse_coo_tensor_with_dims_and_tensors(sparse_dim, dense_dim, size, _ipex_indices, _ipex_values, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -7277,8 +7369,10 @@ at::Tensor AtenIpexCPUDefault::fake_quantize_per_channel_affine_backward(const a
 at::Tensor AtenIpexCPUDefault::to(const at::Tensor & self, const at::TensorOptions & options, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_CHECK(self.layout() == c10::kStrided);
   TORCH_CHECK(self.is_contiguous());
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
   auto&& _ipex_self = bridge::fallbackToCPUTensor(self);
-  auto&& _ipex_result = _ipex_self.to(options, non_blocking, copy, memory_format);
+  auto&& _ipex_result = _ipex_self.to(_ipex_options, non_blocking, copy, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -9086,13 +9180,17 @@ at::Tensor AtenIpexCPUDefault::tril(const at::Tensor & self, int64_t diagonal) {
 }
 
 at::Tensor AtenIpexCPUDefault::tril_indices(int64_t row, int64_t col, int64_t offset, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::tril_indices(row, col, offset, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::tril_indices(row, col, offset, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::triu_indices(int64_t row, int64_t col, int64_t offset, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::triu_indices(row, col, offset, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::triu_indices(row, col, offset, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
@@ -10867,7 +10965,9 @@ at::Tensor AtenIpexCPUDefault::normal(const at::Tensor & mean, const at::Tensor 
 }
 
 at::Tensor AtenIpexCPUDefault::normal(double mean, double std, at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options) {
-  auto&& _ipex_result = at::normal(mean, std, size, generator, options);
+  TORCH_CHECK(options.device().type() == at::DeviceType::DPCPP);
+  at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
+  auto&& _ipex_result = at::normal(mean, std, size, generator, _ipex_options);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::upgradeToDPCPPTensor(_ipex_result);
 }

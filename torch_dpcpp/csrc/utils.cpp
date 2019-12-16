@@ -60,4 +60,20 @@ bool check_device_by_device(const at::Device& device, DPCPPSubDev sub_dev) {
   return false;
 }
 
+bool get_device_count(c10::Device device, c10::DeviceIndex *count) {
+  TORCH_CHECK(device.type() == at::DeviceType::DPCPP);
+  TORCH_WARN(device.has_index());
+  if (device.index() == 0) {
+    // Always set cpu count to 1
+    *count = 1;
+    return true;
+  } else if (device.index() > 1) {
+    // TODO: get GPU device count here
+    AT_ASSERT(false);
+    return true;
+  } else {
+    return false;
+  }
 }
+
+} // namespace torch_ipex

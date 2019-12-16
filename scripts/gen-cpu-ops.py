@@ -637,11 +637,9 @@ def get_handling_function(ctx, fname, xla_ref_param, param_vars):
 
 
 def rewrite_tensor_options(fname, pname):
-    rw = _CTOR_FUNCTIONS.get(fname, None)
-    if rw is None:
-        return '', pname
-    xname = 'o_{}'.format(pname)
-    code = '  at::TensorOptions {} = {}{};\n'.format(xname, pname, rw)
+    xname = '_ipex_{}'.format(pname)
+    code = '  TORCH_CHECK({}.device().type() == at::DeviceType::DPCPP);\n'.format(pname)
+    code += '  at::TensorOptions {} = {}.device(at::DeviceType::CPU);\n'.format(xname, pname)
     return code, xname
 
 
