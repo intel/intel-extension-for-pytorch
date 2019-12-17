@@ -11,10 +11,6 @@ ELSE()
   MESSAGE(FATAL_ERROR "ComputeCpp not found. Compiling without SYCL support")
 ENDIF()
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_INCLUDES_DIRECTORY "${CMAKE_BINARY_DIR}/includes")
-
-
 # ---[ Build flags
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 14)
@@ -112,7 +108,6 @@ set(DPCPP_GPU_ATEN_SRC_ROOT "${DPCPP_GPU_ROOT}/aten")
 set(DPCPP_GPU_ATEN_GENERATED "${DPCPP_GPU_ROOT}/aten/generated")
 
 include_directories(${PYTORCH_INCLUDES})
-message("xxxxxxxxx" ${PYTORCH_INCLUDES})
 # include_directories(${PYTORCH_ATEN_SRC_ROOT})
 # include_directories(${PYTORCH_ATEN_INCLUDES})
 # include_directories(${PYTORCH_ATEN_CORE_INCLUDES})
@@ -173,6 +168,8 @@ add_subdirectory(torch_ipex/csrc/gpu/legacy_nn)
 list(APPEND DPCPP_SRCS ${DPCPP_LEGACY_NN_SRCS})
 
 add_library(torch_ipex SHARED ${DPCPP_SRCS})
+set_target_properties(torch_ipex PROPERTIES PREFIX "")
+set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME "_torch_ipex")
 # add_dependencies(torch_ipex ${DPCPP_DEP})
 # target_link_libraries(torch PUBLIC c10_sycl)
 # target_include_directories(torch INTERFACE $<INSTALL_INTERFACE:include>)

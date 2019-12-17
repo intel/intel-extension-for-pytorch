@@ -153,16 +153,24 @@ class DPCPPBuild(build_ext, object):
       os.mkdir(ext.build_dir)
 
     build_type = 'Release'
+
     if _check_env_flag('DEBUG'):
       build_type = 'Debug'
+
+    # install _torch_ipex.so as python module
+    if ext.name is 'torch_ipex' and _check_env_flag("USE_SYCL"):
+      ext_dir = ext_dir + '/torch_ipex'
+
     cmake_args = [
             '-DCMAKE_BUILD_TYPE=' + build_type,
             '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + ext_dir,
         ]
+
     if _check_env_flag("USE_SYCL"):
       cmake_args += ['-DUSE_SYCL=1']
+
     build_args = ['-j', str(multiprocessing.cpu_count())]
 
     env = os.environ.copy()
@@ -171,6 +179,7 @@ class DPCPPBuild(build_ext, object):
       check_call([self.cmake, ext.project_dir] + cmake_args, cwd=ext.build_dir, env=env)
     else:
       check_call([self.cmake, ext.project_dir] + cmake_args, cwd=ext.build_dir, env=env)
+
     build_args += ['VERBOSE=1']
     check_call(['make'] + build_args, cwd=ext.build_dir, env=env)
 
@@ -207,12 +216,9 @@ setup(
     url='https://github.com/pytorch/xla',
     author='Intel/PyTorch Dev Team',
     # Exclude the build files.
-    packages=find_packages(exclude=['build']),
-    package_data={
-        'torch_ipex': [
-            'build/*.so*',
-        ],
-    },
+    packages=['torch_ipex'],
+    package_dir={'torch_ipex': 'torch_ipex_py'},
+    zip_safe=False,
     ext_modules=[DPCPPExt('torch_ipex')],
     cmdclass={
         'build_ext': DPCPPBuild,
