@@ -201,19 +201,14 @@ def make_relative_rpath(path):
     return '-Wl,-rpath,$ORIGIN/' + path
 
 setup(
-    name='torch_ipex',
+    name='intel_pytorch_extension',
     version=version,
     description='Intel PyTorch Extension',
     url='https://github.com/pytorch/xla',
     author='Intel/PyTorch Dev Team',
     # Exclude the build files.
     packages=find_packages(exclude=['build']),
-    package_data={
-        'torch_ipex': [
-            'build/*.so*',
-        ],
-    },
-    ext_modules=[DPCPPExt('torch_ipex')],
+    ext_modules=[DPCPPExt('intel_pytorch_extension')],
     cmdclass={
         'build_ext': DPCPPBuild,
         'clean': DPCPPClean,
