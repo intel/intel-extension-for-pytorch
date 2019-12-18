@@ -33,4 +33,4 @@ void InitIpeBindings(py::module m) { InitIpeModuleBindings(m); }
 
 }  // namespace torch_ipex
 
-PYBIND11_MODULE(intel_pytorch_extension, m) { torch_ipex::InitIpeBindings(m); }
+PYBIND11_MODULE(_torch_ipex, m) { torch_ipex::InitIpeBindings(m); }
