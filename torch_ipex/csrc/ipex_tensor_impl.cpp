@@ -54,11 +54,33 @@ IPEXTensorImpl::IPEXTensorImpl(const at::Tensor& tensor) :
                     tensor.dtype(),
                     c10::Device(c10::DeviceType::DPCPP, 0)) {}
 
-c10::Device IPEXTensorImpl::GetCurrentAtenDevice() { return g_current_device; }
+c10::Device IPEXTensorImpl::GetCurrentAtenDevice() {
+  return g_current_device;
+}
 
 c10::Device IPEXTensorImpl::SetCurrentAtenDevice(c10::Device device) {
   std::swap(g_current_device, device);
   return device;
+}
+
+void IPEXTensorImpl::CopyMetadata(c10::TensorImpl *dest_impl, const c10::TensorImpl *src_impl, bool allow_tensor_metadata_change) {
+  dest_impl->set_sizes_and_strides(src_impl->sizes(), src_impl->strides());
+  dest_impl->set_storage_offset(src_impl->storage_offset());
+  if (dest_impl->dim() == 0) {
+    dest_impl->set_wrapped_number(src_impl->is_wrapped_number());
+  }
+  dest_impl->set_version_counter(src_impl->version_counter());
+  dest_impl->set_allow_tensor_metadata_change(allow_tensor_metadata_change);
+  if (src_impl->named_tensor_meta() != nullptr) {
+    dest_impl->set_named_tensor_meta(src_impl->named_tensor_meta()->clone());
+  }
+
+  // Refer to PyTorch TensonImpl.cpp. But some meta data cannot be covered because these 
+  // meta data is protected and there are no functions to set the meta data.
+  //     dest_impl->reserved_ = src_impl->reserved_;
+  //     dest_impl->data_type_ = src_impl->data_type_;
+  //     dest_impl->type_set_ = src_impl->type_set_;
+  //     
 }
 
 }  // namespace torch_ipex

@@ -619,19 +619,21 @@ def generate_return_stmt(t, rtype_str, fname, rname, params, param_vars,
     assert isinstance(t, lark.tree.Tree)
     rtype = t.children[0]
     ctype = type_core(rtype)
+    post_check = ''
     if ctype == 'std::tuple':
         retstr = get_tuple_return(rtype, rtype_str, rname, params, param_vars,
                                   ref_param, fnopts)
     elif ctype == 'std::vector':
         retstr = 'bridge::upgradeToDPCPPTensorVec({})'.format(rname)
     elif ctype == 'Tensor':
+        post_check = '  TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(rname)
         retstr = get_return_value(rtype, rname, params[0], param_vars[0], ref_param,
                                   fnopts)
     elif ctype == 'void' and not type_is_refptr(rtype, '*'):
         return ''
     else:
         retstr = rname
-    return '  return {};\n'.format(retstr)
+    return post_check + '  return {};\n'.format(retstr)
 
 
 def generate_result_assignment(t, rname):
@@ -656,7 +658,8 @@ def get_handling_function(ctx, fname, xla_ref_param, param_vars):
 
 def rewrite_tensor_options(fname, pname):
     xname = '_ipex_{}'.format(pname)
-    code = '  TORCH_CHECK({}.device().type() == at::DeviceType::DPCPP);\n'.format(pname)
+    check_cond = '{}.device().type() == at::DeviceType::DPCPP'.format(pname)
+    code = '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond)
     code += '  at::TensorOptions {} = {}.device(at::DeviceType::CPU);\n'.format(xname, pname)
     return code, xname
 
@@ -772,21 +775,28 @@ def generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
             code += gcode
             param_vars.append(xname)
         elif cptype == 'MemoryFormat':
+            check_cond = ''
             if type_is_optional(ptype):
-                code += '  TORCH_CHECK({}.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);\n'.format(pname)
+                check_cond = '{}.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous'.format(pname)
             else:
-                code += '  TORCH_CHECK({} == c10::MemoryFormat::Contiguous);\n'.format(pname)
+                check_cond = '{} == c10::MemoryFormat::Contiguous'.format(pname)
+            code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond)
             param_vars.append(pname)
         elif cptype != 'Tensor':
             param_vars.append(pname)
         elif type_is_const(ptype):
-            code += '  TORCH_CHECK({}.layout() == c10::kStrided);\n'.format(pname)
-            code += '  TORCH_CHECK({}.is_contiguous());\n'.format(pname)
+            check_cond_1 = '{}.layout() == c10::kStrided'.format(pname)
+            check_cond_2 = '{}.is_contiguous()'.format(pname)
+
+            code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond_1)
+            code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond_2)
             xname = tfetcher.add(pname, is_write_param(fnopts, pname, False))
             param_vars.append(xname)
         else:
-            code += '  TORCH_CHECK({}.layout() == c10::kStrided);\n'.format(pname)
-            code += '  TORCH_CHECK({}.is_contiguous());\n'.format(pname)
+            check_cond_1 = '{}.layout() == c10::kStrided'.format(pname)
+            check_cond_2 = '{}.is_contiguous()'.format(pname)
+            code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond_1)
+            code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond_2)
             xname = tfetcher.add(pname, is_write_param(fnopts, pname, True))
             param_vars.append(xname)
         if p == ref_param and not get_optional(fnopts, 'ref_param'):
