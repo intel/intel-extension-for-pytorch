@@ -63,9 +63,13 @@ c10::Device IPEXTensorImpl::SetCurrentAtenDevice(c10::Device device) {
   return device;
 }
 
-void IPEXTensorImpl::CopyMetadata(c10::TensorImpl *dest_impl, const c10::TensorImpl *src_impl, bool allow_tensor_metadata_change) {
+
+void IPEXTensorImpl::CopySizeStridesAndOffset(c10::TensorImpl *dest_impl, const c10::TensorImpl *src_impl, bool allow_tensor_metadata_change) {
   dest_impl->set_sizes_and_strides(src_impl->sizes(), src_impl->strides());
   dest_impl->set_storage_offset(src_impl->storage_offset());
+}
+
+void IPEXTensorImpl::CopyMetadata(c10::TensorImpl *dest_impl, const c10::TensorImpl *src_impl, bool allow_tensor_metadata_change) {
   if (dest_impl->dim() == 0) {
     dest_impl->set_wrapped_number(src_impl->is_wrapped_number());
   }

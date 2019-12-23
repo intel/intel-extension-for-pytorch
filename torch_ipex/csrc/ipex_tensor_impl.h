@@ -15,6 +15,7 @@ class IPEXTensorImpl : public c10::TensorImpl {
   static c10::Device GetCurrentAtenDevice();
   static c10::Device SetCurrentAtenDevice(c10::Device);
   static void CopyMetadata(c10::TensorImpl *, const c10::TensorImpl *, bool);
+  static void CopySizeStridesAndOffset(c10::TensorImpl *, const c10::TensorImpl *, bool);
 };
 
 } // namespace torch_ipex

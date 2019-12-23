@@ -7,9 +7,9 @@ namespace torch_ipex {
 
 bool check_device_by_tensor(const at::Tensor& tensor, DPCPPSubDev sub_dev) {
   auto dev_idx = tensor.get_device();
-  TORCH_CHECK(dev_idx >= 0);
+  //TORCH_WARN(dev_idx >= 0);
   if (sub_dev == DPCPPSubDev::CPU) {
-    return dev_idx > 0 ? false : true;
+    return dev_idx <= 0 ? true : false;
   }
   if (sub_dev == DPCPPSubDev::GPU) {
     return dev_idx > 0 ? true : false;
@@ -37,7 +37,7 @@ bool check_device_by_options(const at::TensorOptions& tensor_options, DPCPPSubDe
   if (dev.has_index())
     dev_idx = dev.index();
   if (sub_dev == DPCPPSubDev::CPU) {
-    return dev_idx > 0 ? false : true;
+    return dev_idx <= 0 ? true : false;
   }
   if (sub_dev == DPCPPSubDev::GPU) {
     return dev_idx > 0 ? true : false;
@@ -51,7 +51,7 @@ bool check_device_by_device(const at::Device& device, DPCPPSubDev sub_dev) {
   if (device.has_index())
     dev_idx = device.index();
   if (sub_dev == DPCPPSubDev::CPU) {
-    return dev_idx > 0 ? false : true;
+    return dev_idx <= 0 ? true : false;
   }
   if (sub_dev == DPCPPSubDev::GPU) {
     return dev_idx > 0 ? true : false;
@@ -63,7 +63,7 @@ bool check_device_by_device(const at::Device& device, DPCPPSubDev sub_dev) {
 bool get_device_count(c10::Device device, c10::DeviceIndex *count) {
   TORCH_CHECK(device.type() == at::DeviceType::DPCPP);
   TORCH_WARN(device.has_index());
-  if (device.index() == 0) {
+  if (device.index() <= 0) {
     // Always set cpu count to 1
     *count = 1;
     return true;
