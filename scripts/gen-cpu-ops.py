@@ -278,7 +278,7 @@ class TensorFetcher(object):
     def generate_fetches(self):
         ipex_code = ''
         for tensor in self.tensors:
-            ipex_code += '  auto&& _ipex_{} = bridge::fallbackToCPUTensor({});\n'.format(tensor, tensor)
+            ipex_code += '  auto&& _ipex_{} = bridge::fallbackToCPUTensor_({});\n'.format(tensor, tensor)
         return ipex_code
 
     def generate_updates(self):
@@ -562,7 +562,7 @@ def get_return_value(rtype, rname, param, var, ref_param, fnopts):
         # If instead the return type is a value Tensor, we create a new one by
         # wrapping the proper local variable which has been created by calling
         # into the CPU tensor implementation.
-        return 'bridge::upgradeToDPCPPTensor({})'.format(rname)
+        return 'bridge::upgradeToDPCPPTensor_({})'.format(rname)
 
 
 def get_reference_param(params, fnopts=None):
@@ -624,7 +624,7 @@ def generate_return_stmt(t, rtype_str, fname, rname, params, param_vars,
         retstr = get_tuple_return(rtype, rtype_str, rname, params, param_vars,
                                   ref_param, fnopts)
     elif ctype == 'std::vector':
-        retstr = 'bridge::upgradeToDPCPPTensorVec({})'.format(rname)
+        retstr = 'bridge::upgradeToDPCPPTensorVec_({})'.format(rname)
     elif ctype == 'Tensor':
         post_check = '  TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(rname)
         retstr = get_return_value(rtype, rname, params[0], param_vars[0], ref_param,
@@ -768,7 +768,7 @@ def generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
         pname = param_name(p)
         if cptype == 'TensorList':
             xname = '_ipex_{}'.format(pname)
-            code += ('  auto&& {} = bridge::fallbackToCPUTensorList({});\n').format(xname, pname)
+            code += ('  auto&& {} = bridge::fallbackToCPUTensorList_({});\n').format(xname, pname)
             param_vars.append(xname)
         elif cptype == 'TensorOptions':
             gcode, xname = rewrite_tensor_options(fname, pname)
