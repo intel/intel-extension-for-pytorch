@@ -76,6 +76,7 @@ void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl) {
   if (src_impl->named_tensor_meta() != nullptr) {
     this->set_named_tensor_meta(src_impl->named_tensor_meta()->clone());
   }
+  this->refresh_numel();
 }
 
 c10::Device IPEXTensorImpl::GetCurrentAtenDevice() {

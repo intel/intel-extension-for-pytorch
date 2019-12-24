@@ -13,6 +13,23 @@
 namespace torch_ipex {
 namespace bridge {
 
+#define CHECK_TENSOR(a, b) \
+  TORCH_INTERNAL_ASSERT(a.numel() == b.numel()); \
+  TORCH_INTERNAL_ASSERT(a.dtype() == b.dtype()); \
+  TORCH_INTERNAL_ASSERT(a.data_ptr() == b.data_ptr()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->sizes() == b.unsafeGetTensorImpl()->sizes()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->strides() == b.unsafeGetTensorImpl()->strides()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->storage_offset() == b.unsafeGetTensorImpl()->storage_offset()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->dtype() == b.unsafeGetTensorImpl()->dtype()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->type_set() == b.unsafeGetTensorImpl()->type_set()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->is_contiguous() == b.unsafeGetTensorImpl()->is_contiguous()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->is_contiguous(at::MemoryFormat::ChannelsLast) == b.unsafeGetTensorImpl()->is_contiguous(at::MemoryFormat::ChannelsLast)); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->is_strides_like_channels_last() == b.unsafeGetTensorImpl()->is_strides_like_channels_last()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->is_non_overlapping_and_dense() == b.unsafeGetTensorImpl()->is_non_overlapping_and_dense()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->is_wrapped_number() == b.unsafeGetTensorImpl()->is_wrapped_number()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->version_counter().current_version() == b.unsafeGetTensorImpl()->version_counter().current_version()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->allow_tensor_metadata_change() == b.unsafeGetTensorImpl()->allow_tensor_metadata_change())
+
 // Fallback DPCPP tensor to CPU Tensor.
 // It will allocate new memory buffer and then duplicate the DPCPP tensor buffer to create new CPU Tensor
 at::Tensor fallbackToCPUTensor(const at::Tensor& ipexTensor) {
@@ -68,21 +85,7 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   auto _tensor =  at::detail::make_tensor<at::TensorImpl>(storage_impl, at::TensorTypeId::CPUTensorId);
   IPEXTensorImpl::CopySizeStridesAndOffset(_tensor.unsafeGetTensorImpl(), ipexTensor.unsafeGetTensorImpl());
   IPEXTensorImpl::CopyMetadata(_tensor.unsafeGetTensorImpl(), ipexTensor.unsafeGetTensorImpl());
-
-  TORCH_INTERNAL_ASSERT(ipexTensor.dtype() == _tensor.dtype());
-  TORCH_INTERNAL_ASSERT(ipexTensor.data_ptr() == _tensor.data_ptr());
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->sizes() == _tensor.unsafeGetTensorImpl()->sizes());
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->strides() == _tensor.unsafeGetTensorImpl()->strides());
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->storage_offset() == _tensor.unsafeGetTensorImpl()->storage_offset());
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->dtype() == _tensor.unsafeGetTensorImpl()->dtype());
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->type_set() == _tensor.unsafeGetTensorImpl()->type_set());
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->is_contiguous() == _tensor.unsafeGetTensorImpl()->is_contiguous());
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->is_contiguous(at::MemoryFormat::ChannelsLast) == _tensor.unsafeGetTensorImpl()->is_contiguous(at::MemoryFormat::ChannelsLast));
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->is_strides_like_channels_last() == _tensor.unsafeGetTensorImpl()->is_strides_like_channels_last());
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->is_non_overlapping_and_dense() == _tensor.unsafeGetTensorImpl()->is_non_overlapping_and_dense());
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->is_wrapped_number() == _tensor.unsafeGetTensorImpl()->is_wrapped_number());
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->version_counter().current_version() == _tensor.unsafeGetTensorImpl()->version_counter().current_version());
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->allow_tensor_metadata_change() == _tensor.unsafeGetTensorImpl()->allow_tensor_metadata_change());
+  CHECK_TENSOR(ipexTensor, _tensor);
   //TODO: Cannot reserved_ 
   //dest_impl->reserved_ = src_impl->reserved_;
   return _tensor;
@@ -141,21 +144,7 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
   auto _tensor =  at::detail::make_tensor<IPEXTensorImpl>(cpuTensor, storage_impl, at::TensorTypeId::DPCPPTensorId);
   IPEXTensorImpl* impex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
   impex_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
-
-  TORCH_INTERNAL_ASSERT(_tensor.dtype() == cpuTensor.dtype());
-  TORCH_INTERNAL_ASSERT(_tensor.data_ptr() == cpuTensor.data_ptr());
-  TORCH_INTERNAL_ASSERT(_tensor.unsafeGetTensorImpl()->sizes() == cpuTensor.unsafeGetTensorImpl()->sizes());
-  TORCH_INTERNAL_ASSERT(_tensor.unsafeGetTensorImpl()->strides() == cpuTensor.unsafeGetTensorImpl()->strides());
-  TORCH_INTERNAL_ASSERT(_tensor.unsafeGetTensorImpl()->storage_offset() == cpuTensor.unsafeGetTensorImpl()->storage_offset());
-  TORCH_INTERNAL_ASSERT(_tensor.unsafeGetTensorImpl()->dtype() == cpuTensor.unsafeGetTensorImpl()->dtype());
-  TORCH_INTERNAL_ASSERT(_tensor.unsafeGetTensorImpl()->type_set() == cpuTensor.unsafeGetTensorImpl()->type_set());
-  TORCH_INTERNAL_ASSERT(_tensor.unsafeGetTensorImpl()->is_contiguous() == cpuTensor.unsafeGetTensorImpl()->is_contiguous());
-  TORCH_INTERNAL_ASSERT(_tensor.unsafeGetTensorImpl()->is_contiguous(at::MemoryFormat::ChannelsLast) == cpuTensor.unsafeGetTensorImpl()->is_contiguous(at::MemoryFormat::ChannelsLast));
-  TORCH_INTERNAL_ASSERT(_tensor.unsafeGetTensorImpl()->is_strides_like_channels_last() == cpuTensor.unsafeGetTensorImpl()->is_strides_like_channels_last());
-  TORCH_INTERNAL_ASSERT(_tensor.unsafeGetTensorImpl()->is_non_overlapping_and_dense() == cpuTensor.unsafeGetTensorImpl()->is_non_overlapping_and_dense());
-  TORCH_INTERNAL_ASSERT(_tensor.unsafeGetTensorImpl()->is_wrapped_number() == cpuTensor.unsafeGetTensorImpl()->is_wrapped_number());
-  TORCH_INTERNAL_ASSERT(_tensor.unsafeGetTensorImpl()->version_counter().current_version() == cpuTensor.unsafeGetTensorImpl()->version_counter().current_version());
-  TORCH_INTERNAL_ASSERT(_tensor.unsafeGetTensorImpl()->allow_tensor_metadata_change() == cpuTensor.unsafeGetTensorImpl()->allow_tensor_metadata_change());
+  CHECK_TENSOR(_tensor, cpuTensor);
   //TODO: Cannot reserved_ 
   //dest_impl->reserved_ = src_impl->reserved_;
   return _tensor;
