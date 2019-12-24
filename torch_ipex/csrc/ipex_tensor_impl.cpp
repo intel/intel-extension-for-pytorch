@@ -49,10 +49,34 @@ C10_REGISTER_GUARD_IMPL(DPCPP, IPEXGuardImpl);
 
 }  // namespace
 
-IPEXTensorImpl::IPEXTensorImpl(const at::Tensor& tensor) :
-    c10::TensorImpl(c10::TensorTypeSet(c10::TensorTypeId::DPCPPTensorId),
-                    tensor.dtype(),
-                    c10::Device(c10::DeviceType::DPCPP, 0)) {}
+IPEXTensorImpl::IPEXTensorImpl(at::Tensor tensor, at::Storage storage, at::TensorTypeId type_id) :
+    m_data_tensor(std::move(tensor)),
+    c10::TensorImpl(std::move(storage), type_id) {}
+
+
+void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl) {
+  /*
+  dest_impl->storage_ = src_impl->storage_;
+  dest_impl->device_opt_ = src_impl->device_opt_;
+  dest_impl->reserved_ = src_impl->reserved_;
+  */
+  this->sizes_ = src_impl->sizes();
+  this->strides_ = src_impl->strides();
+  this->storage_offset_ = src_impl->storage_offset();
+  this->data_type_ = src_impl->dtype();
+  this->type_set_ = src_impl->type_set();
+  this->is_contiguous_ = src_impl->is_contiguous();
+  this->is_channels_last_contiguous_ = src_impl->is_contiguous(at::MemoryFormat::ChannelsLast);
+  this->is_channels_last_ = src_impl->is_strides_like_channels_last();
+  this->is_non_overlapping_and_dense_ = src_impl->is_non_overlapping_and_dense();
+  this->is_wrapped_number_ = src_impl->is_wrapped_number();
+  this->set_version_counter(src_impl->version_counter().current_version());
+  bool allow_tensor_metadata_change_ = src_impl->allow_tensor_metadata_change();
+  this->set_allow_tensor_metadata_change(allow_tensor_metadata_change_);
+  if (src_impl->named_tensor_meta() != nullptr) {
+    this->set_named_tensor_meta(src_impl->named_tensor_meta()->clone());
+  }
+}
 
 c10::Device IPEXTensorImpl::GetCurrentAtenDevice() {
   return g_current_device;
@@ -63,28 +87,21 @@ c10::Device IPEXTensorImpl::SetCurrentAtenDevice(c10::Device device) {
   return device;
 }
 
-
-void IPEXTensorImpl::CopySizeStridesAndOffset(c10::TensorImpl *dest_impl, const c10::TensorImpl *src_impl, bool allow_tensor_metadata_change) {
+void IPEXTensorImpl::CopySizeStridesAndOffset(c10::TensorImpl *dest_impl, const c10::TensorImpl *src_impl) {
   dest_impl->set_sizes_and_strides(src_impl->sizes(), src_impl->strides());
   dest_impl->set_storage_offset(src_impl->storage_offset());
 }
 
-void IPEXTensorImpl::CopyMetadata(c10::TensorImpl *dest_impl, const c10::TensorImpl *src_impl, bool allow_tensor_metadata_change) {
-  if (dest_impl->dim() == 0) {
-    dest_impl->set_wrapped_number(src_impl->is_wrapped_number());
-  }
-  dest_impl->set_version_counter(src_impl->version_counter());
-  dest_impl->set_allow_tensor_metadata_change(allow_tensor_metadata_change);
+void IPEXTensorImpl::CopyMetadata(c10::TensorImpl *dest_impl, const c10::TensorImpl *src_impl) {
+  dest_impl->set_wrapped_number(src_impl->is_wrapped_number());
+  dest_impl->set_version_counter(src_impl->version_counter().current_version());
+
+  bool allow_tensor_metadata_change_ = src_impl->allow_tensor_metadata_change();
+  dest_impl->set_allow_tensor_metadata_change(allow_tensor_metadata_change_);
+
   if (src_impl->named_tensor_meta() != nullptr) {
     dest_impl->set_named_tensor_meta(src_impl->named_tensor_meta()->clone());
   }
-
-  // Refer to PyTorch TensonImpl.cpp. But some meta data cannot be covered because these 
-  // meta data is protected and there are no functions to set the meta data.
-  //     dest_impl->reserved_ = src_impl->reserved_;
-  //     dest_impl->data_type_ = src_impl->data_type_;
-  //     dest_impl->type_set_ = src_impl->type_set_;
-  //     
 }
 
 }  // namespace torch_ipex

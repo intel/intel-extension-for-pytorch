@@ -102,6 +102,11 @@ _FN_BLACKLIST_REGEX = [
     r'[^(]*mkldnn',
 ]
 
+_FALLBACK_TO_CPU_TENSOR_LIST = 'fallbackToCPUTensorList'
+_FALLBACK_TO_CPU_TENSOR = 'fallbackToCPUTensor'
+_UPGRADE_TO_DPCPP_TENSOR = 'upgradeToDPCPPTensor'
+_UPGRADE_TO_DPCPP_TENSOR_VEC = 'upgradeToDPCPPTensorVec'
+
 # List of tuples with the regex match first, and the corresponding FuncOpts()
 # second.
 # _FN_OUT_REGEX = {
@@ -278,7 +283,7 @@ class TensorFetcher(object):
     def generate_fetches(self):
         ipex_code = ''
         for tensor in self.tensors:
-            ipex_code += '  auto&& _ipex_{} = bridge::fallbackToCPUTensor_({});\n'.format(tensor, tensor)
+            ipex_code += '  auto&& _ipex_{} = bridge::{}({});\n'.format( tensor, _FALLBACK_TO_CPU_TENSOR, tensor)
         return ipex_code
 
     def generate_updates(self):
@@ -562,7 +567,7 @@ def get_return_value(rtype, rname, param, var, ref_param, fnopts):
         # If instead the return type is a value Tensor, we create a new one by
         # wrapping the proper local variable which has been created by calling
         # into the CPU tensor implementation.
-        return 'bridge::upgradeToDPCPPTensor_({})'.format(rname)
+        return 'bridge::{}({})'.format(_UPGRADE_TO_DPCPP_TENSOR, rname)
 
 
 def get_reference_param(params, fnopts=None):
@@ -624,7 +629,7 @@ def generate_return_stmt(t, rtype_str, fname, rname, params, param_vars,
         retstr = get_tuple_return(rtype, rtype_str, rname, params, param_vars,
                                   ref_param, fnopts)
     elif ctype == 'std::vector':
-        retstr = 'bridge::upgradeToDPCPPTensorVec_({})'.format(rname)
+        retstr = 'bridge::{}({})'.format(_UPGRADE_TO_DPCPP_TENSOR_VEC, rname)
     elif ctype == 'Tensor':
         post_check = '  TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(rname)
         retstr = get_return_value(rtype, rname, params[0], param_vars[0], ref_param,
@@ -768,7 +773,7 @@ def generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
         pname = param_name(p)
         if cptype == 'TensorList':
             xname = '_ipex_{}'.format(pname)
-            code += ('  auto&& {} = bridge::fallbackToCPUTensorList_({});\n').format(xname, pname)
+            code += ('  auto&& {} = bridge::{}({});\n').format(xname, _FALLBACK_TO_CPU_TENSOR_LIST, pname)
             param_vars.append(xname)
         elif cptype == 'TensorOptions':
             gcode, xname = rewrite_tensor_options(fname, pname)
@@ -820,7 +825,7 @@ def generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
     return code
 
 
-def get_xla_wrapper(fndef, ctx):
+def get_ipex_wrapper(fndef, ctx):
     tree = _PARSER.parse(fndef.cpp_sig)
     xtree = _XPARSER.parse(fndef.cpp_sig)
     mapsig = create_map_sig(xtree, fndef.cpp_sig)
@@ -985,6 +990,16 @@ def generate(args):
         file=sys.stderr)
     assert len(errors) == 0
 
+    if args.gen_class_mode == 1:
+        global _FALLBACK_TO_CPU_TENSOR_LIST
+        global _FALLBACK_TO_CPU_TENSOR
+        global _UPGRADE_TO_DPCPP_TENSOR
+        global _UPGRADE_TO_DPCPP_TENSOR_VEC
+        _FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
+        _FALLBACK_TO_CPU_TENSOR = 'shallowFallbackToCPUTensor'
+        _UPGRADE_TO_DPCPP_TENSOR = 'shallowUpgradeToDPCPPTensor'
+        _UPGRADE_TO_DPCPP_TENSOR_VEC = 'shallowUpgradeToDPCPPTensorVec'
+
     overrides = parse_local_overrides(args.ipex_cpu_type)
     print(
         '{} function overrides in {}'.format(len(overrides), args.ipex_cpu_type),
@@ -993,14 +1008,9 @@ def generate(args):
     fgens = []
     ctx = Context(args.functions)
     for ts in fndefs:
-    #try:
-        fgen = get_xla_wrapper(ts, ctx)
+        fgen = get_ipex_wrapper(ts, ctx)
         if fgen:
             fgens.append(fgen)
-    #except Exception as e:
-        # print(
-        #     'Failed to generate wrapper for {}: {}'.format(ts, e),
-        #     file=sys.stderr)
     print(
         'Generated {} wrappers for {}'.format(len(fgens), args.typedef),
         file=sys.stderr)
@@ -1022,6 +1032,13 @@ def generate(args):
 
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument(
+        '--gen_class_mode',
+        help='1: Use shallow bridge, 0: Use deep bridge',
+        choices=[0,1],
+        metavar='GEN_CLASS_MODE',
+        default=1,
+        type=int)
     arg_parser.add_argument('--output_folder', type=str)
     arg_parser.add_argument(
         'ipex_cpu_type',

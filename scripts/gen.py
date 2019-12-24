@@ -843,7 +843,7 @@ def generate_aten_to_xla(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
   return code
 
 
-def get_xla_wrapper(fndef, ctx):
+def get_ipex_wrapper(fndef, ctx):
   tree = _PARSER.parse(fndef.cpp_sig)
   xtree = _XPARSER.parse(fndef.cpp_sig)
   mapsig = create_map_sig(xtree, fndef.cpp_sig)
@@ -1028,7 +1028,7 @@ def generate(args):
   ctx = Context(args.functions)
   for ts in fndefs:
     try:
-      fgen = get_xla_wrapper(ts, ctx)
+      fgen = get_ipex_wrapper(ts, ctx)
       if fgen:
         fgens.append(fgen)
     except Exception as e:
