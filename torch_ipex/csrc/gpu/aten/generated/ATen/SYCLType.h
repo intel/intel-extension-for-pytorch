@@ -318,6 +318,8 @@ struct TORCH_API SYCLType final {
   static Tensor upsample_nearest2d_backward(const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size);
   static Tensor & tanh_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & output);
   static Tensor tanh_backward(const Tensor & grad_output, const Tensor & output);
+
+  static void register_aten_functions(void);
 };
 
 } // namespace at

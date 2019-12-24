@@ -4,6 +4,7 @@
 #include <core/SYCLMemory.h>
 #include <core/SYCLUtils.h>
 #include <core/SYCLContext.h>
+#include <core/SYCLState.h>
 
 #include <legacy/THSYCLGenerator.hpp>
 #include <legacy/generic/THSYCLTensorRandomKernel.hpp>
@@ -90,13 +91,13 @@ void bernoulli_tensor_sycl_kernel(
 
 };
 
-THSYCLGenerator* THSYCLRandom_getGenerator();
+THSYCLGenerator* THSYCLRandom_getGenerator(THSYCLState* state);
 
 namespace at {
 namespace native {
 
 Tensor& bernoulli_tensor_sycl_(Tensor &self, const Tensor& p_, Generator* gen) {
-  THSYCLGenerator *gen_ = THSYCLRandom_getGenerator();
+  THSYCLGenerator *gen_ = THSYCLRandom_getGenerator(getTHSYCLState());
   std::lock_guard<std::mutex> lock(gen_->mutex);
   // Call sycl kernel to generate bernoulli distribution
   AT_DISPATCH_FLOATING_TYPES(p_.scalar_type(), "bernoulli_tensor_sycl_kernel", [&] {
@@ -106,7 +107,7 @@ Tensor& bernoulli_tensor_sycl_(Tensor &self, const Tensor& p_, Generator* gen) {
 }
 
 Tensor& bernoulli_scalar_sycl_(Tensor &self, double p, Generator* gen) {
-  THSYCLGenerator *gen_ = THSYCLRandom_getGenerator();
+  THSYCLGenerator *gen_ = THSYCLRandom_getGenerator(getTHSYCLState());
   std::lock_guard<std::mutex> lock(gen_->mutex);
   // Call sycl kernel to generate bernoulli distribution
   AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "bernoulli_scalar_sycl_kernel", [&] {

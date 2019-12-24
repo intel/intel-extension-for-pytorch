@@ -7,6 +7,9 @@
 #include <CL/sycl.hpp>
 
 #include <c10/core/Device.h>
+#include <core/SYCLException.h>
+#include <core/SYCLUtils.h>
+
 
 namespace c10 { namespace sycl {
 
@@ -16,6 +19,12 @@ struct SYCLDevicePool {
   std::mutex devices_mutex;
   DeviceIndex cur_dev_index;
 };
+
+inline Device getDeviceFromPtr(void* ptr) {
+  c10::DeviceIndex  device;
+  C10_SYCL_CHECK(c10::sycl::syclGetDeviceIdFromPtr(&device, ptr));
+  return {DeviceType::DPCPP, static_cast<int16_t>(device)};
+}
 
 } // namespace sycl
 } // namespace c10

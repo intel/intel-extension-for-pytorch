@@ -47,10 +47,10 @@ bool maybeOverlappingIndices(const Tensor& t) {
 
       if (info[nonSize1Dims].stride < 1) {
         return true;
-      }   
+      }
 
       ++nonSize1Dims;
-    }   
+    }
   }
 
   // Short-circuits if tensor is a single element.

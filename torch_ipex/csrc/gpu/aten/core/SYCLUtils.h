@@ -10,9 +10,8 @@
 #include <c10/macros/Macros.h>
 #include <c10/core/Device.h>
 
-#include <core/SYCL.h>
 #include <core/virtual_ptr.h>
-
+#include <core/SYCL.h>
 
 namespace c10 {
 namespace sycl {

@@ -2,7 +2,6 @@
 
 #include <c10/macros/Macros.h>
 #include <c10/core/Device.h>
-
 #include <core/SYCLUtils.h>
 #include <core/SYCLDevice.h>
 #include <core/SYCLException.h>
