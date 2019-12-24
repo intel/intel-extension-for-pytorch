@@ -16,6 +16,7 @@ class IPEXTensorImpl : public c10::TensorImpl {
   }
 
   void copy_meta_info(const c10::TensorImpl *);
+  void set_dpcpp_tensor_id();
 
   static c10::Device GetCurrentAtenDevice();
   static c10::Device SetCurrentAtenDevice(c10::Device);

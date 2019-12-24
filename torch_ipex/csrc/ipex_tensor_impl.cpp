@@ -53,18 +53,22 @@ IPEXTensorImpl::IPEXTensorImpl(at::Tensor tensor, at::Storage storage, at::Tenso
     m_data_tensor(std::move(tensor)),
     c10::TensorImpl(std::move(storage), type_id) {}
 
+void IPEXTensorImpl::set_dpcpp_tensor_id() {
+  this->type_set_ = at::TensorTypeSet(at::TensorTypeId::DPCPPTensorId);
+  this->type_set_.add(at::TensorTypeId::VariableTensorId);
+}
 
 void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl) {
   /*
   dest_impl->storage_ = src_impl->storage_;
   dest_impl->device_opt_ = src_impl->device_opt_;
   dest_impl->reserved_ = src_impl->reserved_;
+  dest_impl->type_set_ = src_impl->type_set();
   */
   this->sizes_ = src_impl->sizes();
   this->strides_ = src_impl->strides();
   this->storage_offset_ = src_impl->storage_offset();
   this->data_type_ = src_impl->dtype();
-  this->type_set_ = src_impl->type_set();
   this->is_contiguous_ = src_impl->is_contiguous();
   this->is_channels_last_contiguous_ = src_impl->is_contiguous(at::MemoryFormat::ChannelsLast);
   this->is_channels_last_ = src_impl->is_strides_like_channels_last();
@@ -94,7 +98,10 @@ void IPEXTensorImpl::CopySizeStridesAndOffset(c10::TensorImpl *dest_impl, const 
 }
 
 void IPEXTensorImpl::CopyMetadata(c10::TensorImpl *dest_impl, const c10::TensorImpl *src_impl) {
-  dest_impl->set_wrapped_number(src_impl->is_wrapped_number());
+  if (dest_impl->dim() == 0) {
+    dest_impl->set_wrapped_number(src_impl->is_wrapped_number());
+  }
+
   dest_impl->set_version_counter(src_impl->version_counter().current_version());
 
   bool allow_tensor_metadata_change_ = src_impl->allow_tensor_metadata_change();

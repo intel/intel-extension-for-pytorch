@@ -16,12 +16,8 @@ namespace bridge {
 #define CHECK_TENSOR(a, b) \
   TORCH_INTERNAL_ASSERT(a.numel() == b.numel()); \
   TORCH_INTERNAL_ASSERT(a.dtype() == b.dtype()); \
-  TORCH_INTERNAL_ASSERT(a.data_ptr() == b.data_ptr()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->sizes() == b.unsafeGetTensorImpl()->sizes()); \
-  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->strides() == b.unsafeGetTensorImpl()->strides()); \
-  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->storage_offset() == b.unsafeGetTensorImpl()->storage_offset()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->dtype() == b.unsafeGetTensorImpl()->dtype()); \
-  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->type_set() == b.unsafeGetTensorImpl()->type_set()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->is_contiguous() == b.unsafeGetTensorImpl()->is_contiguous()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->is_contiguous(at::MemoryFormat::ChannelsLast) == b.unsafeGetTensorImpl()->is_contiguous(at::MemoryFormat::ChannelsLast)); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->is_strides_like_channels_last() == b.unsafeGetTensorImpl()->is_strides_like_channels_last()); \
@@ -30,9 +26,17 @@ namespace bridge {
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->version_counter().current_version() == b.unsafeGetTensorImpl()->version_counter().current_version()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->allow_tensor_metadata_change() == b.unsafeGetTensorImpl()->allow_tensor_metadata_change())
 
+#define CHECK_TENSOR_CRITICAL(a, b) \
+  TORCH_INTERNAL_ASSERT(a.data_ptr() == b.data_ptr()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->strides() == b.unsafeGetTensorImpl()->strides()); \
+  TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->storage_offset() == b.unsafeGetTensorImpl()->storage_offset()); \
+  CHECK_TENSOR(a, b)
+
 // Fallback DPCPP tensor to CPU Tensor.
 // It will allocate new memory buffer and then duplicate the DPCPP tensor buffer to create new CPU Tensor
 at::Tensor fallbackToCPUTensor(const at::Tensor& ipexTensor) {
+  TORCH_INTERNAL_ASSERT(ipexTensor.is_contiguous());
+  TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
   if (ipexTensor.device().is_cpu())
     return ipexTensor;
 
@@ -53,13 +57,12 @@ at::Tensor fallbackToCPUTensor(const at::Tensor& ipexTensor) {
   memcpy(storage_impl->data(), ipexTensor.unsafeGetTensorImpl()->data(), data_size);
 
   auto _tensor =  at::detail::make_tensor<at::TensorImpl>(storage_impl, at::TensorTypeId::CPUTensorId);
+  IPEXTensorImpl::CopyMetadata(_tensor.unsafeGetTensorImpl(), ipexTensor.unsafeGetTensorImpl());
   auto _tensor_sizes = ipexTensor.sizes();
   if (_tensor_sizes.size() != 1 || _tensor_sizes[0] != 0) {
     _tensor.unsafeGetTensorImpl()->set_sizes_contiguous(_tensor_sizes);
   }
-
-  IPEXTensorImpl::CopyMetadata(_tensor.unsafeGetTensorImpl(), ipexTensor.unsafeGetTensorImpl());
-  TORCH_INTERNAL_ASSERT(ipexTensor.dtype() == _tensor.dtype());
+  CHECK_TENSOR(_tensor, ipexTensor);
   return _tensor;
 }
 
@@ -79,13 +82,13 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
     ipexTensor.unsafeGetTensorImpl()->storage().numel(),
     std::move(cpu_data_ptr),
     allocator,
-    true
+    ipexTensor.unsafeGetTensorImpl()->storage().resizable()
   );
 
   auto _tensor =  at::detail::make_tensor<at::TensorImpl>(storage_impl, at::TensorTypeId::CPUTensorId);
   IPEXTensorImpl::CopySizeStridesAndOffset(_tensor.unsafeGetTensorImpl(), ipexTensor.unsafeGetTensorImpl());
   IPEXTensorImpl::CopyMetadata(_tensor.unsafeGetTensorImpl(), ipexTensor.unsafeGetTensorImpl());
-  CHECK_TENSOR(ipexTensor, _tensor);
+  CHECK_TENSOR_CRITICAL(ipexTensor, _tensor);
   //TODO: Cannot reserved_ 
   //dest_impl->reserved_ = src_impl->reserved_;
   return _tensor;
@@ -115,9 +118,8 @@ at::Tensor upgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
   if (_tensor_sizes.size() != 1 || _tensor_sizes[0] != 0) {
     _tensor.unsafeGetTensorImpl()->set_sizes_contiguous(_tensor_sizes);
   }
-
   IPEXTensorImpl::CopyMetadata(_tensor.unsafeGetTensorImpl(), cpuTensor.unsafeGetTensorImpl());
-  TORCH_INTERNAL_ASSERT(cpuTensor.dtype() == _tensor.dtype());
+  CHECK_TENSOR(_tensor, cpuTensor);
   return _tensor;
 }
 
@@ -138,13 +140,13 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     cpuTensor.unsafeGetTensorImpl()->storage().numel(),
     std::move(dpcpp_data_ptr),
     allocator,
-    true
+    cpuTensor.unsafeGetTensorImpl()->storage().resizable()
   );
 
   auto _tensor =  at::detail::make_tensor<IPEXTensorImpl>(cpuTensor, storage_impl, at::TensorTypeId::DPCPPTensorId);
   IPEXTensorImpl* impex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
   impex_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
-  CHECK_TENSOR(_tensor, cpuTensor);
+  CHECK_TENSOR_CRITICAL(_tensor, cpuTensor);
   //TODO: Cannot reserved_ 
   //dest_impl->reserved_ = src_impl->reserved_;
   return _tensor;
