@@ -11,6 +11,7 @@ namespace torch_ipex {
 class IPEXTensorImpl : public c10::TensorImpl {
  public:
   explicit IPEXTensorImpl(at::Tensor tensor, at::Storage storage, at::TensorTypeId type_id);
+  explicit IPEXTensorImpl(at::Storage storage, at::TensorTypeId type_id);
   ~IPEXTensorImpl() {
     static_cast<void>(0);
   }

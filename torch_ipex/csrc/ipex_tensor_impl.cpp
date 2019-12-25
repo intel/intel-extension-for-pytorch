@@ -49,8 +49,12 @@ C10_REGISTER_GUARD_IMPL(DPCPP, IPEXGuardImpl);
 
 }  // namespace
 
+
 IPEXTensorImpl::IPEXTensorImpl(at::Tensor tensor, at::Storage storage, at::TensorTypeId type_id) :
     m_data_tensor(std::move(tensor)),
+    c10::TensorImpl(std::move(storage), type_id) {}
+
+IPEXTensorImpl::IPEXTensorImpl(at::Storage storage, at::TensorTypeId type_id) :
     c10::TensorImpl(std::move(storage), type_id) {}
 
 void IPEXTensorImpl::set_dpcpp_tensor_id() {

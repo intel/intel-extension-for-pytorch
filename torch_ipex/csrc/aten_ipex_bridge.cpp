@@ -113,7 +113,7 @@ at::Tensor upgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     allocator,
     /*resizeable=*/true);
   memcpy(storage_impl->data(), cpuTensor.unsafeGetTensorImpl()->data(), data_size);
-  auto&& _tensor = at::detail::make_tensor<at::TensorImpl>(storage_impl, at::TensorTypeId::DPCPPTensorId);
+  auto&& _tensor = at::detail::make_tensor<IPEXTensorImpl>(storage_impl, at::TensorTypeId::DPCPPTensorId);
   auto _tensor_sizes = cpuTensor.sizes();
   if (_tensor_sizes.size() != 1 || _tensor_sizes[0] != 0) {
     _tensor.unsafeGetTensorImpl()->set_sizes_contiguous(_tensor_sizes);
@@ -132,6 +132,7 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
   }
 
   TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
+
   auto* allocator = c10::GetAllocator(c10::DeviceType::DPCPP);
   void* tensor_raw_data = cpuTensor.unsafeGetTensorImpl()->storage().data();
   c10::DataPtr dpcpp_data_ptr(tensor_raw_data, at::DeviceType::DPCPP);
