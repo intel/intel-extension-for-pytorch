@@ -3,7 +3,7 @@
 
 namespace torch_ipex {
 
-const char IPEX_GITREV[] = {"6e1404c165151b4463f6f45b39924749975a73cf"};
+const char IPEX_GITREV[] = {"698e84bc37e4eb94d297c0aab71dd63850a19885"};
 const char TORCH_GITREV[] = {""};
 
 }  // namespace torch_ipex
