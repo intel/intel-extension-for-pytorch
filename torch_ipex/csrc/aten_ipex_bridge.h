@@ -21,8 +21,8 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& ipexTensor);
 void copyTensor(at::Tensor& dstTensor, const at::Tensor& scrTensor, c10::DeviceType devType);
 
 // Convert number of DPCPP tensors to CPU tensor
-at::TensorList fallbackToCPUTensorList(const at::TensorList&);
-at::TensorList shallowFallbackToCPUTensorList(const at::TensorList&);
+std::vector<at::Tensor> fallbackToCPUTensorList(const at::TensorList&);
+std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList&);
 
 // Convert number of CPU tensors to DPCPP tensor
 std::vector<at::Tensor> upgradeToDPCPPTensorVec(const std::vector<at::Tensor> &);

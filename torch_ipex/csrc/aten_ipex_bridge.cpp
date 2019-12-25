@@ -154,43 +154,47 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
 
 
 void copyTensor(at::Tensor& dstTensor, const at::Tensor& scrTensor, c10::DeviceType devType) {
-  TORCH_CHECK(dstTensor.layout() == c10::kStrided);
-  TORCH_CHECK(scrTensor.layout() == c10::kStrided);
-  TORCH_CHECK(dstTensor.is_contiguous());
-  TORCH_CHECK(scrTensor.is_contiguous());
-  TORCH_CHECK(dstTensor.numel() == scrTensor.numel());
-  TORCH_CHECK(dstTensor.dtype() == scrTensor.dtype());
-  TORCH_CHECK(dstTensor.nbytes() == scrTensor.nbytes());
-  TORCH_CHECK(dstTensor.layout() == scrTensor.layout());
-  TORCH_CHECK((devType == c10::DeviceType::CPU) || (devType == c10::DeviceType::DPCPP));
-  TORCH_CHECK(dstTensor.device().type() == devType);
-  TORCH_CHECK((dstTensor.device().type() == c10::DeviceType::CPU) || (dstTensor.device().type() == c10::DeviceType::DPCPP));
-  TORCH_CHECK((scrTensor.device().type() == c10::DeviceType::CPU) || (scrTensor.device().type() == c10::DeviceType::DPCPP));
+  TORCH_INTERNAL_ASSERT(dstTensor.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT(scrTensor.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT(dstTensor.is_contiguous());
+  TORCH_INTERNAL_ASSERT(scrTensor.is_contiguous());
+  TORCH_INTERNAL_ASSERT(dstTensor.numel() == scrTensor.numel());
+  TORCH_INTERNAL_ASSERT(dstTensor.dtype() == scrTensor.dtype());
+  TORCH_INTERNAL_ASSERT(dstTensor.nbytes() == scrTensor.nbytes());
+  TORCH_INTERNAL_ASSERT(dstTensor.layout() == scrTensor.layout());
+  TORCH_INTERNAL_ASSERT((devType == c10::DeviceType::CPU) || (devType == c10::DeviceType::DPCPP));
+  TORCH_INTERNAL_ASSERT(dstTensor.device().type() == devType);
+  TORCH_INTERNAL_ASSERT((dstTensor.device().type() == c10::DeviceType::CPU) || (dstTensor.device().type() == c10::DeviceType::DPCPP));
+  TORCH_INTERNAL_ASSERT((scrTensor.device().type() == c10::DeviceType::CPU) || (scrTensor.device().type() == c10::DeviceType::DPCPP));
   memcpy(dstTensor.unsafeGetTensorImpl()->data(), scrTensor.unsafeGetTensorImpl()->data(), dstTensor.nbytes());
   IPEXTensorImpl::CopySizeStridesAndOffset(dstTensor.unsafeGetTensorImpl(), scrTensor.unsafeGetTensorImpl());
   IPEXTensorImpl::CopyMetadata(dstTensor.unsafeGetTensorImpl(), scrTensor.unsafeGetTensorImpl());
 }
 
 
-at::TensorList fallbackToCPUTensorList(const at::TensorList& tensor_list) {
-  std::vector<at::Tensor> dpcpp_tensor_vec;
-  for (const auto& tensor : tensor_list) {
+std::vector<at::Tensor> fallbackToCPUTensorList(const at::TensorList& tensor_list) {
+  std::vector<at::Tensor> dpcpp_tensor_vec(tensor_list.size());
+  for (size_t i = 0; i < tensor_list.size(); ++i) {
+    const at::Tensor& tensor = tensor_list[i];
+    TORCH_INTERNAL_ASSERT(tensor.defined());
     if (tensor.defined()) {
-      dpcpp_tensor_vec.push_back(fallbackToCPUTensor(tensor));
+      dpcpp_tensor_vec[i] = fallbackToCPUTensor(tensor);
     }
   }
-  return at::TensorList(dpcpp_tensor_vec);
+  return dpcpp_tensor_vec;
 }
 
 
-at::TensorList shallowFallbackToCPUTensorList(const at::TensorList& tensor_list) {
-  std::vector<at::Tensor> dpcpp_tensor_vec;
-  for (const auto& tensor : tensor_list) {
+std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& tensor_list) {
+  std::vector<at::Tensor> dpcpp_tensor_vec(tensor_list.size());
+  for (size_t i = 0; i < tensor_list.size(); ++i) {
+    const at::Tensor& tensor = tensor_list[i];
+    TORCH_INTERNAL_ASSERT(tensor.defined());
     if (tensor.defined()) {
-      dpcpp_tensor_vec.push_back(shallowFallbackToCPUTensor(tensor));
+      dpcpp_tensor_vec[i] = shallowFallbackToCPUTensor(tensor);
     }
   }
-  return at::TensorList(dpcpp_tensor_vec);
+  return dpcpp_tensor_vec;
 }
 
 
@@ -198,8 +202,9 @@ std::vector<at::Tensor> upgradeToDPCPPTensorVec(const std::vector<at::Tensor> &t
   std::vector<at::Tensor> ret_dpcpp_tensor_vec;
   for (size_t i = 0; i < tensor_vec.size(); i++) {
     auto&& cur_tensor = tensor_vec[i];
-    TORCH_CHECK(cur_tensor.layout() == c10::kStrided);
-    TORCH_CHECK(cur_tensor.is_contiguous());
+    TORCH_INTERNAL_ASSERT(cur_tensor.defined());
+    TORCH_INTERNAL_ASSERT(cur_tensor.layout() == c10::kStrided);
+    TORCH_INTERNAL_ASSERT(cur_tensor.is_contiguous());
     auto&& cur_dpcpp_tensor = upgradeToDPCPPTensor(cur_tensor);
     ret_dpcpp_tensor_vec.push_back(cur_dpcpp_tensor);
   }
@@ -211,8 +216,9 @@ std::vector<at::Tensor> shallowUpgradeToDPCPPTensorVec(const std::vector<at::Ten
   std::vector<at::Tensor> ret_dpcpp_tensor_vec;
   for (size_t i = 0; i < tensor_vec.size(); i++) {
     auto&& cur_tensor = tensor_vec[i];
-    TORCH_CHECK(cur_tensor.layout() == c10::kStrided);
-    TORCH_CHECK(cur_tensor.is_contiguous());
+    TORCH_INTERNAL_ASSERT(cur_tensor.defined());
+    TORCH_INTERNAL_ASSERT(cur_tensor.layout() == c10::kStrided);
+    TORCH_INTERNAL_ASSERT(cur_tensor.is_contiguous());
     auto&& cur_dpcpp_tensor = shallowUpgradeToDPCPPTensor(cur_tensor);
     ret_dpcpp_tensor_vec.push_back(cur_dpcpp_tensor);
   }
