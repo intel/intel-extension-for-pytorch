@@ -18,8 +18,12 @@ class IPEXTensorImpl : public c10::TensorImpl {
 
   void copy_meta_info(const c10::TensorImpl *);
   void set_data_tensor(at::Tensor);
-  void set_storage_data_ptr(c10::DataPtr&&);
+  void set_storage_data_ptr(c10::DataPtr);
   void set_dpcpp_tensor_id();
+
+  c10::Storage& get_storage() {
+    return this->storage_;
+  }
 
   static c10::Device GetCurrentAtenDevice();
   static c10::Device SetCurrentAtenDevice(c10::Device);

@@ -154,7 +154,7 @@ at::Tensor & AtenIpexCPUDefault::requires_grad_(at::Tensor & self, bool _require
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.requires_grad_(_requires_grad);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -211,7 +211,7 @@ at::Tensor & AtenIpexCPUDefault::_sobol_engine_ff_(at::Tensor & self, int64_t n,
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_sobolstate = bridge::shallowFallbackToCPUTensor(sobolstate);
   auto&& _ipex_result = at::_sobol_engine_ff_(_ipex_self, n, _ipex_sobolstate, dimension, num_generated);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -225,7 +225,7 @@ at::Tensor & AtenIpexCPUDefault::_sobol_engine_scramble_(at::Tensor & self, cons
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_ltm = bridge::shallowFallbackToCPUTensor(ltm);
   auto&& _ipex_result = at::_sobol_engine_scramble_(_ipex_self, _ipex_ltm, dimension);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -236,7 +236,7 @@ at::Tensor & AtenIpexCPUDefault::_sobol_engine_initialize_state_(at::Tensor & se
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::_sobol_engine_initialize_state_(_ipex_self, dimension);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -280,7 +280,7 @@ at::Tensor & AtenIpexCPUDefault::dropout_(at::Tensor & self, double p, bool trai
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::dropout_(_ipex_self, p, train);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -301,7 +301,7 @@ at::Tensor & AtenIpexCPUDefault::feature_dropout_(at::Tensor & self, double p, b
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::feature_dropout_(_ipex_self, p, train);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -322,7 +322,7 @@ at::Tensor & AtenIpexCPUDefault::alpha_dropout_(at::Tensor & self, double p, boo
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::alpha_dropout_(_ipex_self, p, train);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -343,7 +343,7 @@ at::Tensor & AtenIpexCPUDefault::feature_alpha_dropout_(at::Tensor & self, doubl
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::feature_alpha_dropout_(_ipex_self, p, train);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -364,7 +364,7 @@ at::Tensor & AtenIpexCPUDefault::abs_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::abs_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -378,7 +378,7 @@ at::Tensor & AtenIpexCPUDefault::abs_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::abs_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -402,7 +402,7 @@ at::Tensor & AtenIpexCPUDefault::angle_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::angle_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -426,7 +426,7 @@ at::Tensor & AtenIpexCPUDefault::real_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::real_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -450,7 +450,7 @@ at::Tensor & AtenIpexCPUDefault::imag_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::imag_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -474,7 +474,7 @@ at::Tensor & AtenIpexCPUDefault::conj_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::conj_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -495,7 +495,7 @@ at::Tensor & AtenIpexCPUDefault::acos_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::acos_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -509,7 +509,7 @@ at::Tensor & AtenIpexCPUDefault::acos_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::acos_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -565,7 +565,7 @@ at::Tensor & AtenIpexCPUDefault::add_(at::Tensor & self, const at::Tensor & othe
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.add_(_ipex_other, alpha);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -582,7 +582,7 @@ at::Tensor & AtenIpexCPUDefault::add_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::add_out(_ipex_out, _ipex_self, _ipex_other, alpha);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -603,7 +603,7 @@ at::Tensor & AtenIpexCPUDefault::add_(at::Tensor & self, at::Scalar other, at::S
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.add_(other, alpha);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -636,7 +636,7 @@ at::Tensor & AtenIpexCPUDefault::addmv_(at::Tensor & self, const at::Tensor & ma
   auto&& _ipex_mat = bridge::shallowFallbackToCPUTensor(mat);
   auto&& _ipex_vec = bridge::shallowFallbackToCPUTensor(vec);
   auto&& _ipex_result = at::addmv_(_ipex_self, _ipex_mat, _ipex_vec, beta, alpha);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -656,7 +656,7 @@ at::Tensor & AtenIpexCPUDefault::addmv_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_mat = bridge::shallowFallbackToCPUTensor(mat);
   auto&& _ipex_vec = bridge::shallowFallbackToCPUTensor(vec);
   auto&& _ipex_result = at::addmv_out(_ipex_out, _ipex_self, _ipex_mat, _ipex_vec, beta, alpha);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -689,7 +689,7 @@ at::Tensor & AtenIpexCPUDefault::addr_(at::Tensor & self, const at::Tensor & vec
   auto&& _ipex_vec1 = bridge::shallowFallbackToCPUTensor(vec1);
   auto&& _ipex_vec2 = bridge::shallowFallbackToCPUTensor(vec2);
   auto&& _ipex_result = _ipex_self.addr_(_ipex_vec1, _ipex_vec2, beta, alpha);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -709,7 +709,7 @@ at::Tensor & AtenIpexCPUDefault::addr_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_vec1 = bridge::shallowFallbackToCPUTensor(vec1);
   auto&& _ipex_vec2 = bridge::shallowFallbackToCPUTensor(vec2);
   auto&& _ipex_result = at::addr_out(_ipex_out, _ipex_self, _ipex_vec1, _ipex_vec2, beta, alpha);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -753,7 +753,7 @@ at::Tensor & AtenIpexCPUDefault::all_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::all_out(_ipex_out, _ipex_self, dim, keepdim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -789,7 +789,7 @@ at::Tensor & AtenIpexCPUDefault::any_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::any_out(_ipex_out, _ipex_self, dim, keepdim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -827,7 +827,7 @@ at::Tensor & AtenIpexCPUDefault::arange_out(at::Tensor & out, at::Scalar end) {
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::arange_out(_ipex_out, end);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -838,7 +838,7 @@ at::Tensor & AtenIpexCPUDefault::arange_out(at::Tensor & out, at::Scalar start, 
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::arange_out(_ipex_out, start, end, step);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -889,7 +889,7 @@ at::Tensor & AtenIpexCPUDefault::as_strided_(at::Tensor & self, at::IntArrayRef 
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::as_strided_(_ipex_self, size, stride, storage_offset);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -910,7 +910,7 @@ at::Tensor & AtenIpexCPUDefault::asin_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::asin_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -924,7 +924,7 @@ at::Tensor & AtenIpexCPUDefault::asin_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::asin_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -945,7 +945,7 @@ at::Tensor & AtenIpexCPUDefault::atan_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::atan_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -959,7 +959,7 @@ at::Tensor & AtenIpexCPUDefault::atan_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::atan_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -992,7 +992,7 @@ at::Tensor & AtenIpexCPUDefault::baddbmm_(at::Tensor & self, const at::Tensor & 
   auto&& _ipex_batch1 = bridge::shallowFallbackToCPUTensor(batch1);
   auto&& _ipex_batch2 = bridge::shallowFallbackToCPUTensor(batch2);
   auto&& _ipex_result = _ipex_self.baddbmm_(_ipex_batch1, _ipex_batch2, beta, alpha);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1009,7 +1009,7 @@ at::Tensor & AtenIpexCPUDefault::_baddbmm_mkl_(at::Tensor & self, const at::Tens
   auto&& _ipex_batch1 = bridge::shallowFallbackToCPUTensor(batch1);
   auto&& _ipex_batch2 = bridge::shallowFallbackToCPUTensor(batch2);
   auto&& _ipex_result = at::_baddbmm_mkl_(_ipex_self, _ipex_batch1, _ipex_batch2, beta, alpha);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1029,7 +1029,7 @@ at::Tensor & AtenIpexCPUDefault::baddbmm_out(at::Tensor & out, const at::Tensor 
   auto&& _ipex_batch1 = bridge::shallowFallbackToCPUTensor(batch1);
   auto&& _ipex_batch2 = bridge::shallowFallbackToCPUTensor(batch2);
   auto&& _ipex_result = at::baddbmm_out(_ipex_out, _ipex_self, _ipex_batch1, _ipex_batch2, beta, alpha);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1144,7 +1144,7 @@ at::Tensor & AtenIpexCPUDefault::bernoulli_out(at::Tensor & out, const at::Tenso
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::bernoulli_out(_ipex_out, _ipex_self, generator);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1158,7 +1158,7 @@ at::Tensor & AtenIpexCPUDefault::bernoulli_(at::Tensor & self, const at::Tensor 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_p = bridge::shallowFallbackToCPUTensor(p);
   auto&& _ipex_result = _ipex_self.bernoulli_(_ipex_p, generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1169,7 +1169,7 @@ at::Tensor & AtenIpexCPUDefault::bernoulli_(at::Tensor & self, double p, at::Gen
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.bernoulli_(p, generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1273,7 +1273,7 @@ at::Tensor & AtenIpexCPUDefault::bitwise_not_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.bitwise_not_();
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1287,7 +1287,7 @@ at::Tensor & AtenIpexCPUDefault::bitwise_not_out(at::Tensor & out, const at::Ten
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::bitwise_not_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1308,7 +1308,7 @@ at::Tensor & AtenIpexCPUDefault::logical_not_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.logical_not_();
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1322,7 +1322,7 @@ at::Tensor & AtenIpexCPUDefault::logical_not_out(at::Tensor & out, const at::Ten
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::logical_not_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1349,7 +1349,7 @@ at::Tensor & AtenIpexCPUDefault::logical_xor_(at::Tensor & self, const at::Tenso
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.logical_xor_(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1366,7 +1366,7 @@ at::Tensor & AtenIpexCPUDefault::logical_xor_out(at::Tensor & out, const at::Ten
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::logical_xor_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1414,7 +1414,7 @@ at::Tensor & AtenIpexCPUDefault::bmm_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_mat2 = bridge::shallowFallbackToCPUTensor(mat2);
   auto&& _ipex_result = at::bmm_out(_ipex_out, _ipex_self, _ipex_mat2);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1441,7 +1441,7 @@ at::Tensor & AtenIpexCPUDefault::cat_out(at::Tensor & out, at::TensorList tensor
   auto&& _ipex_tensors = bridge::shallowFallbackToCPUTensorList(tensors);
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::cat_out(_ipex_out, _ipex_tensors, dim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1462,7 +1462,7 @@ at::Tensor & AtenIpexCPUDefault::ceil_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::ceil_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1476,7 +1476,7 @@ at::Tensor & AtenIpexCPUDefault::ceil_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::ceil_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1514,7 +1514,7 @@ at::Tensor & AtenIpexCPUDefault::clamp_(at::Tensor & self, c10::optional<at::Sca
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::clamp_(_ipex_self, min, max);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1528,7 +1528,7 @@ at::Tensor & AtenIpexCPUDefault::clamp_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::clamp_out(_ipex_out, _ipex_self, min, max);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1549,7 +1549,7 @@ at::Tensor & AtenIpexCPUDefault::clamp_max_(at::Tensor & self, at::Scalar max) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::clamp_max_(_ipex_self, max);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1563,7 +1563,7 @@ at::Tensor & AtenIpexCPUDefault::clamp_max_out(at::Tensor & out, const at::Tenso
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::clamp_max_out(_ipex_out, _ipex_self, max);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1584,7 +1584,7 @@ at::Tensor & AtenIpexCPUDefault::clamp_min_(at::Tensor & self, at::Scalar min) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::clamp_min_(_ipex_self, min);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1598,7 +1598,7 @@ at::Tensor & AtenIpexCPUDefault::clamp_min_out(at::Tensor & out, const at::Tenso
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::clamp_min_out(_ipex_out, _ipex_self, min);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1866,7 +1866,7 @@ at::Tensor & AtenIpexCPUDefault::copy_(at::Tensor & self, const at::Tensor & src
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_src = bridge::shallowFallbackToCPUTensor(src);
   auto&& _ipex_result = _ipex_self.copy_(_ipex_src, non_blocking);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1900,7 +1900,7 @@ at::Tensor & AtenIpexCPUDefault::cos_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::cos_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1914,7 +1914,7 @@ at::Tensor & AtenIpexCPUDefault::cos_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::cos_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1935,7 +1935,7 @@ at::Tensor & AtenIpexCPUDefault::cosh_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::cosh_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -1949,7 +1949,7 @@ at::Tensor & AtenIpexCPUDefault::cosh_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::cosh_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -1989,7 +1989,7 @@ at::Tensor & AtenIpexCPUDefault::cumsum_out(at::Tensor & out, const at::Tensor &
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::cumsum_out(_ipex_out, _ipex_self, dim, dtype);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2013,7 +2013,7 @@ at::Tensor & AtenIpexCPUDefault::cumprod_out(at::Tensor & out, const at::Tensor 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::cumprod_out(_ipex_out, _ipex_self, dim, dtype);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2130,7 +2130,7 @@ at::Tensor & AtenIpexCPUDefault::fill_diagonal_(at::Tensor & self, at::Scalar fi
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.fill_diagonal_(fill_value, wrap);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2157,7 +2157,7 @@ at::Tensor & AtenIpexCPUDefault::div_(at::Tensor & self, const at::Tensor & othe
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.div_(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2174,7 +2174,7 @@ at::Tensor & AtenIpexCPUDefault::div_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::div_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2195,7 +2195,7 @@ at::Tensor & AtenIpexCPUDefault::div_(at::Tensor & self, at::Scalar other) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.div_(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2225,7 +2225,7 @@ at::Tensor & AtenIpexCPUDefault::dot_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_tensor = bridge::shallowFallbackToCPUTensor(tensor);
   auto&& _ipex_result = at::dot_out(_ipex_out, _ipex_self, _ipex_tensor);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2286,7 +2286,7 @@ at::Tensor & AtenIpexCPUDefault::embedding_renorm_(at::Tensor & self, const at::
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_result = at::embedding_renorm_(_ipex_self, _ipex_indices, max_norm, norm_type);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2521,7 +2521,7 @@ at::Tensor & AtenIpexCPUDefault::resize_(at::Tensor & self, at::IntArrayRef size
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.resize_(size);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2533,7 +2533,7 @@ at::Tensor & AtenIpexCPUDefault::empty_out(at::Tensor & out, at::IntArrayRef siz
   TORCH_INTERNAL_ASSERT(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::empty_out(_ipex_out, size, memory_format);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2587,7 +2587,7 @@ at::Tensor & AtenIpexCPUDefault::erf_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::erf_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2601,7 +2601,7 @@ at::Tensor & AtenIpexCPUDefault::erf_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::erf_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2622,7 +2622,7 @@ at::Tensor & AtenIpexCPUDefault::erfc_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::erfc_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2636,7 +2636,7 @@ at::Tensor & AtenIpexCPUDefault::erfc_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::erfc_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2657,7 +2657,7 @@ at::Tensor & AtenIpexCPUDefault::exp_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::exp_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2671,7 +2671,7 @@ at::Tensor & AtenIpexCPUDefault::exp_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::exp_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2692,7 +2692,7 @@ at::Tensor & AtenIpexCPUDefault::expm1_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::expm1_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2706,7 +2706,7 @@ at::Tensor & AtenIpexCPUDefault::expm1_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::expm1_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2758,7 +2758,7 @@ at::Tensor & AtenIpexCPUDefault::eye_out(at::Tensor & out, int64_t n) {
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::eye_out(_ipex_out, n);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2769,7 +2769,7 @@ at::Tensor & AtenIpexCPUDefault::eye_out(at::Tensor & out, int64_t n, int64_t m)
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::eye_out(_ipex_out, n, m);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2790,7 +2790,7 @@ at::Tensor & AtenIpexCPUDefault::fill_(at::Tensor & self, at::Scalar value) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::fill_(_ipex_self, value);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2804,7 +2804,7 @@ at::Tensor & AtenIpexCPUDefault::fill_(at::Tensor & self, const at::Tensor & val
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_value = bridge::shallowFallbackToCPUTensor(value);
   auto&& _ipex_result = at::fill_(_ipex_self, _ipex_value);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2825,7 +2825,7 @@ at::Tensor & AtenIpexCPUDefault::floor_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::floor_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2839,7 +2839,7 @@ at::Tensor & AtenIpexCPUDefault::floor_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::floor_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2860,7 +2860,7 @@ at::Tensor & AtenIpexCPUDefault::frac_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::frac_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -2874,7 +2874,7 @@ at::Tensor & AtenIpexCPUDefault::frac_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::frac_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -2894,7 +2894,7 @@ at::Tensor & AtenIpexCPUDefault::full_out(at::Tensor & out, at::IntArrayRef size
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::full_out(_ipex_out, size, fill_value);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -3093,7 +3093,7 @@ at::Tensor & AtenIpexCPUDefault::ger_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_vec2 = bridge::shallowFallbackToCPUTensor(vec2);
   auto&& _ipex_result = at::ger_out(_ipex_out, _ipex_self, _ipex_vec2);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -3187,7 +3187,7 @@ at::Tensor & AtenIpexCPUDefault::index_copy_(at::Tensor & self, int64_t dim, con
   auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
   auto&& _ipex_source = bridge::shallowFallbackToCPUTensor(source);
   auto&& _ipex_result = _ipex_self.index_copy_(dim, _ipex_index, _ipex_source);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -3218,7 +3218,7 @@ at::Tensor & AtenIpexCPUDefault::index_put_(at::Tensor & self, at::TensorList in
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_values = bridge::shallowFallbackToCPUTensor(values);
   auto&& _ipex_result = at::index_put_(_ipex_self, _ipex_indices, _ipex_values, accumulate);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -3247,7 +3247,7 @@ at::Tensor & AtenIpexCPUDefault::_index_put_impl_(at::Tensor & self, at::TensorL
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_values = bridge::shallowFallbackToCPUTensor(values);
   auto&& _ipex_result = at::_index_put_impl_(_ipex_self, _ipex_indices, _ipex_values, accumulate, unsafe);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -3293,7 +3293,7 @@ at::Tensor & AtenIpexCPUDefault::inverse_out(at::Tensor & out, const at::Tensor 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::inverse_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -3438,8 +3438,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::kthvalue_out(at::Tenso
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::kthvalue_out(_ipex_values, _ipex_indices, _ipex_self, k, dim, keepdim);
-  values = bridge::shallowUpgradeToDPCPPTensor(_ipex_values);
-  indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(values, _ipex_values);
+  bridge::shallowUpgradeToDPCPPTensorInplace(indices, _ipex_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(values, indices);
 }
@@ -3641,7 +3641,7 @@ at::Tensor & AtenIpexCPUDefault::linspace_out(at::Tensor & out, at::Scalar start
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::linspace_out(_ipex_out, start, end, steps);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -3662,7 +3662,7 @@ at::Tensor & AtenIpexCPUDefault::log_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::log_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -3676,7 +3676,7 @@ at::Tensor & AtenIpexCPUDefault::log_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::log_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -3697,7 +3697,7 @@ at::Tensor & AtenIpexCPUDefault::log10_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::log10_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -3711,7 +3711,7 @@ at::Tensor & AtenIpexCPUDefault::log10_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::log10_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -3732,7 +3732,7 @@ at::Tensor & AtenIpexCPUDefault::log1p_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::log1p_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -3746,7 +3746,7 @@ at::Tensor & AtenIpexCPUDefault::log1p_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::log1p_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -3767,7 +3767,7 @@ at::Tensor & AtenIpexCPUDefault::log2_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::log2_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -3781,7 +3781,7 @@ at::Tensor & AtenIpexCPUDefault::log2_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::log2_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -3811,7 +3811,7 @@ at::Tensor & AtenIpexCPUDefault::logspace_out(at::Tensor & out, at::Scalar start
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::logspace_out(_ipex_out, start, end, steps, base);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -3871,7 +3871,7 @@ at::Tensor & AtenIpexCPUDefault::logsumexp_out(at::Tensor & out, const at::Tenso
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::logsumexp_out(_ipex_out, _ipex_self, dim, keepdim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -3917,7 +3917,7 @@ at::Tensor & AtenIpexCPUDefault::matmul_out(at::Tensor & out, const at::Tensor &
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::matmul_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -3973,8 +3973,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::max_out(at::Tensor & m
   auto&& _ipex_max_values = bridge::shallowFallbackToCPUTensor(max_values);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::max_out(_ipex_max, _ipex_max_values, _ipex_self, dim, keepdim);
-  max = bridge::shallowUpgradeToDPCPPTensor(_ipex_max);
-  max_values = bridge::shallowUpgradeToDPCPPTensor(_ipex_max_values);
+  bridge::shallowUpgradeToDPCPPTensorInplace(max, _ipex_max);
+  bridge::shallowUpgradeToDPCPPTensorInplace(max_values, _ipex_max_values);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(max, max_values);
 }
@@ -4066,7 +4066,7 @@ at::Tensor & AtenIpexCPUDefault::mean_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::mean_out(_ipex_out, _ipex_self, dim, keepdim, dtype);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -4092,8 +4092,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::median_out(at::Tensor 
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::median_out(_ipex_values, _ipex_indices, _ipex_self, dim, keepdim);
-  values = bridge::shallowUpgradeToDPCPPTensor(_ipex_values);
-  indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(values, _ipex_values);
+  bridge::shallowUpgradeToDPCPPTensorInplace(indices, _ipex_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(values, indices);
 }
@@ -4118,8 +4118,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::min_out(at::Tensor & m
   auto&& _ipex_min_indices = bridge::shallowFallbackToCPUTensor(min_indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::min_out(_ipex_min, _ipex_min_indices, _ipex_self, dim, keepdim);
-  min = bridge::shallowUpgradeToDPCPPTensor(_ipex_min);
-  min_indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_min_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(min, _ipex_min);
+  bridge::shallowUpgradeToDPCPPTensorInplace(min_indices, _ipex_min_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(min, min_indices);
 }
@@ -4443,7 +4443,7 @@ at::Tensor & AtenIpexCPUDefault::mm_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_mat2 = bridge::shallowFallbackToCPUTensor(mat2);
   auto&& _ipex_result = at::mm_out(_ipex_out, _ipex_self, _ipex_mat2);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -4482,8 +4482,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::mode_out(at::Tensor & 
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::mode_out(_ipex_values, _ipex_indices, _ipex_self, dim, keepdim);
-  values = bridge::shallowUpgradeToDPCPPTensor(_ipex_values);
-  indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(values, _ipex_values);
+  bridge::shallowUpgradeToDPCPPTensorInplace(indices, _ipex_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(values, indices);
 }
@@ -4509,7 +4509,7 @@ at::Tensor & AtenIpexCPUDefault::mul_(at::Tensor & self, const at::Tensor & othe
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.mul_(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -4526,7 +4526,7 @@ at::Tensor & AtenIpexCPUDefault::mul_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::mul_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -4547,7 +4547,7 @@ at::Tensor & AtenIpexCPUDefault::mul_(at::Tensor & self, at::Scalar other) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.mul_(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -4577,7 +4577,7 @@ at::Tensor & AtenIpexCPUDefault::mv_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_vec = bridge::shallowFallbackToCPUTensor(vec);
   auto&& _ipex_result = at::mv_out(_ipex_out, _ipex_self, _ipex_vec);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -4598,7 +4598,7 @@ at::Tensor & AtenIpexCPUDefault::mvlgamma_(at::Tensor & self, int64_t p) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.mvlgamma_(p);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -4696,7 +4696,7 @@ at::Tensor & AtenIpexCPUDefault::batch_norm_elemt_out(at::Tensor & out, const at
   auto&& _ipex_mean = bridge::shallowFallbackToCPUTensor(mean);
   auto&& _ipex_invstd = bridge::shallowFallbackToCPUTensor(invstd);
   auto&& _ipex_result = at::batch_norm_elemt_out(_ipex_out, _ipex_input, _ipex_weight, _ipex_bias, _ipex_mean, _ipex_invstd, eps);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -4909,7 +4909,7 @@ at::Tensor & AtenIpexCPUDefault::ones_out(at::Tensor & out, at::IntArrayRef size
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::ones_out(_ipex_out, size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5137,7 +5137,7 @@ at::Tensor & AtenIpexCPUDefault::rand_out(at::Tensor & out, at::IntArrayRef size
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::rand_out(_ipex_out, size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5148,7 +5148,7 @@ at::Tensor & AtenIpexCPUDefault::rand_out(at::Tensor & out, at::IntArrayRef size
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::rand_out(_ipex_out, size, generator);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5219,7 +5219,7 @@ at::Tensor & AtenIpexCPUDefault::randint_out(at::Tensor & out, int64_t high, at:
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::randint_out(_ipex_out, high, size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5230,7 +5230,7 @@ at::Tensor & AtenIpexCPUDefault::randint_out(at::Tensor & out, int64_t high, at:
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::randint_out(_ipex_out, high, size, generator);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5241,7 +5241,7 @@ at::Tensor & AtenIpexCPUDefault::randint_out(at::Tensor & out, int64_t low, int6
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::randint_out(_ipex_out, low, high, size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5252,7 +5252,7 @@ at::Tensor & AtenIpexCPUDefault::randint_out(at::Tensor & out, int64_t low, int6
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::randint_out(_ipex_out, low, high, size, generator);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5329,7 +5329,7 @@ at::Tensor & AtenIpexCPUDefault::randn_out(at::Tensor & out, at::IntArrayRef siz
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::randn_out(_ipex_out, size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5340,7 +5340,7 @@ at::Tensor & AtenIpexCPUDefault::randn_out(at::Tensor & out, at::IntArrayRef siz
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::randn_out(_ipex_out, size, generator);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5393,7 +5393,7 @@ at::Tensor & AtenIpexCPUDefault::randperm_out(at::Tensor & out, int64_t n) {
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::randperm_out(_ipex_out, n);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5404,7 +5404,7 @@ at::Tensor & AtenIpexCPUDefault::randperm_out(at::Tensor & out, int64_t n, at::G
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::randperm_out(_ipex_out, n, generator);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5433,7 +5433,7 @@ at::Tensor & AtenIpexCPUDefault::range_out(at::Tensor & out, at::Scalar start, a
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::range_out(_ipex_out, start, end, step);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5454,7 +5454,7 @@ at::Tensor & AtenIpexCPUDefault::reciprocal_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::reciprocal_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -5468,7 +5468,7 @@ at::Tensor & AtenIpexCPUDefault::reciprocal_out(at::Tensor & out, const at::Tens
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::reciprocal_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5489,7 +5489,7 @@ at::Tensor & AtenIpexCPUDefault::neg_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::neg_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -5503,7 +5503,7 @@ at::Tensor & AtenIpexCPUDefault::neg_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::neg_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5590,7 +5590,7 @@ at::Tensor & AtenIpexCPUDefault::round_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::round_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -5604,7 +5604,7 @@ at::Tensor & AtenIpexCPUDefault::round_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::round_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5625,7 +5625,7 @@ at::Tensor & AtenIpexCPUDefault::rrelu_(at::Tensor & self, at::Scalar lower, at:
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::rrelu_(_ipex_self, lower, upper, training, generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -5646,7 +5646,7 @@ at::Tensor & AtenIpexCPUDefault::relu_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::relu_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -5741,7 +5741,7 @@ at::Tensor & AtenIpexCPUDefault::rsqrt_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::rsqrt_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -5755,7 +5755,7 @@ at::Tensor & AtenIpexCPUDefault::rsqrt_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::rsqrt_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5786,7 +5786,7 @@ at::Tensor & AtenIpexCPUDefault::selu_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::selu_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -5807,7 +5807,7 @@ at::Tensor & AtenIpexCPUDefault::celu_(at::Tensor & self, at::Scalar alpha) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::celu_(_ipex_self, alpha);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -5828,7 +5828,7 @@ at::Tensor & AtenIpexCPUDefault::sigmoid_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sigmoid_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -5842,7 +5842,7 @@ at::Tensor & AtenIpexCPUDefault::sigmoid_out(at::Tensor & out, const at::Tensor 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sigmoid_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5863,7 +5863,7 @@ at::Tensor & AtenIpexCPUDefault::sin_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sin_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -5877,7 +5877,7 @@ at::Tensor & AtenIpexCPUDefault::sin_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sin_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5898,7 +5898,7 @@ at::Tensor & AtenIpexCPUDefault::sinh_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sinh_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -5912,7 +5912,7 @@ at::Tensor & AtenIpexCPUDefault::sinh_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sinh_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -5933,7 +5933,7 @@ at::Tensor & AtenIpexCPUDefault::detach_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::detach_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -6059,7 +6059,7 @@ at::Tensor & AtenIpexCPUDefault::squeeze_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.squeeze_();
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -6070,7 +6070,7 @@ at::Tensor & AtenIpexCPUDefault::squeeze_(at::Tensor & self, int64_t dim) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.squeeze_(dim);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -6106,7 +6106,7 @@ at::Tensor & AtenIpexCPUDefault::sspaddmm_out(at::Tensor & out, const at::Tensor
   auto&& _ipex_mat1 = bridge::shallowFallbackToCPUTensor(mat1);
   auto&& _ipex_mat2 = bridge::shallowFallbackToCPUTensor(mat2);
   auto&& _ipex_result = at::sspaddmm_out(_ipex_out, _ipex_self, _ipex_mat1, _ipex_mat2, beta, alpha);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -6126,7 +6126,7 @@ at::Tensor & AtenIpexCPUDefault::stack_out(at::Tensor & out, at::TensorList tens
   auto&& _ipex_tensors = bridge::shallowFallbackToCPUTensorList(tensors);
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::stack_out(_ipex_out, _ipex_tensors, dim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -6182,7 +6182,7 @@ at::Tensor & AtenIpexCPUDefault::sum_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sum_out(_ipex_out, _ipex_self, dim, keepdim, dtype);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -6213,7 +6213,7 @@ at::Tensor & AtenIpexCPUDefault::sqrt_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sqrt_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -6227,7 +6227,7 @@ at::Tensor & AtenIpexCPUDefault::sqrt_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sqrt_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -6279,7 +6279,7 @@ at::Tensor & AtenIpexCPUDefault::std_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::std_out(_ipex_out, _ipex_self, dim, unbiased, keepdim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -6313,7 +6313,7 @@ at::Tensor & AtenIpexCPUDefault::prod_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::prod_out(_ipex_out, _ipex_self, dim, keepdim, dtype);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -6334,7 +6334,7 @@ at::Tensor & AtenIpexCPUDefault::t_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.t_();
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -6355,7 +6355,7 @@ at::Tensor & AtenIpexCPUDefault::tan_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::tan_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -6369,7 +6369,7 @@ at::Tensor & AtenIpexCPUDefault::tan_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::tan_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -6390,7 +6390,7 @@ at::Tensor & AtenIpexCPUDefault::tanh_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::tanh_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -6404,7 +6404,7 @@ at::Tensor & AtenIpexCPUDefault::tanh_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::tanh_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -6438,7 +6438,7 @@ at::Tensor & AtenIpexCPUDefault::threshold_(at::Tensor & self, at::Scalar thresh
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::threshold_(_ipex_self, threshold, value);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -6452,7 +6452,7 @@ at::Tensor & AtenIpexCPUDefault::threshold_out(at::Tensor & out, const at::Tenso
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::threshold_out(_ipex_out, _ipex_self, threshold, value);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -6486,7 +6486,7 @@ at::Tensor & AtenIpexCPUDefault::transpose_(at::Tensor & self, int64_t dim0, int
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.transpose_(dim0, dim1);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -6602,7 +6602,7 @@ at::Tensor & AtenIpexCPUDefault::trunc_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::trunc_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -6616,7 +6616,7 @@ at::Tensor & AtenIpexCPUDefault::trunc_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::trunc_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -6717,7 +6717,7 @@ at::Tensor & AtenIpexCPUDefault::unsqueeze_(at::Tensor & self, int64_t dim) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.unsqueeze_(dim);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -6751,7 +6751,7 @@ at::Tensor & AtenIpexCPUDefault::var_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::var_out(_ipex_out, _ipex_self, dim, unbiased, keepdim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -6914,7 +6914,7 @@ at::Tensor & AtenIpexCPUDefault::zeros_out(at::Tensor & out, at::IntArrayRef siz
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::zeros_out(_ipex_out, size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -7114,7 +7114,7 @@ at::Tensor & AtenIpexCPUDefault::norm_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::norm_out(_ipex_out, _ipex_self, p, dim, keepdim, dtype);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -7128,7 +7128,7 @@ at::Tensor & AtenIpexCPUDefault::norm_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::norm_out(_ipex_out, _ipex_self, p, dim, keepdim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -7162,7 +7162,7 @@ at::Tensor & AtenIpexCPUDefault::frobenius_norm_out(at::Tensor & out, const at::
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::frobenius_norm_out(_ipex_out, _ipex_self, dim, keepdim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -7186,7 +7186,7 @@ at::Tensor & AtenIpexCPUDefault::nuclear_norm_out(at::Tensor & out, const at::Te
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::nuclear_norm_out(_ipex_out, _ipex_self, keepdim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -7210,7 +7210,7 @@ at::Tensor & AtenIpexCPUDefault::nuclear_norm_out(at::Tensor & out, const at::Te
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::nuclear_norm_out(_ipex_out, _ipex_self, dim, keepdim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -7235,7 +7235,7 @@ at::Tensor & AtenIpexCPUDefault::resize_as_(at::Tensor & self, const at::Tensor 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_the_template = bridge::shallowFallbackToCPUTensor(the_template);
   auto&& _ipex_result = at::resize_as_(_ipex_self, _ipex_the_template);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -7249,7 +7249,7 @@ at::Tensor & AtenIpexCPUDefault::pow_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::pow_out(_ipex_out, _ipex_self, exponent);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -7270,7 +7270,7 @@ at::Tensor & AtenIpexCPUDefault::zero_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::zero_(_ipex_self);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -7287,7 +7287,7 @@ at::Tensor & AtenIpexCPUDefault::sub_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::sub_out(_ipex_out, _ipex_self, _ipex_other, alpha);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -7314,7 +7314,7 @@ at::Tensor & AtenIpexCPUDefault::sub_(at::Tensor & self, const at::Tensor & othe
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.sub_(_ipex_other, alpha);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -7335,7 +7335,7 @@ at::Tensor & AtenIpexCPUDefault::sub_(at::Tensor & self, at::Scalar other, at::S
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.sub_(other, alpha);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -7394,7 +7394,7 @@ at::Tensor & AtenIpexCPUDefault::addmm_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_mat1 = bridge::shallowFallbackToCPUTensor(mat1);
   auto&& _ipex_mat2 = bridge::shallowFallbackToCPUTensor(mat2);
   auto&& _ipex_result = at::addmm_out(_ipex_out, _ipex_self, _ipex_mat1, _ipex_mat2, beta, alpha);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -7427,7 +7427,7 @@ at::Tensor & AtenIpexCPUDefault::addmm_(at::Tensor & self, const at::Tensor & ma
   auto&& _ipex_mat1 = bridge::shallowFallbackToCPUTensor(mat1);
   auto&& _ipex_mat2 = bridge::shallowFallbackToCPUTensor(mat2);
   auto&& _ipex_result = _ipex_self.addmm_(_ipex_mat1, _ipex_mat2, beta, alpha);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -7516,7 +7516,7 @@ at::Tensor & AtenIpexCPUDefault::sparse_resize_(at::Tensor & self, at::IntArrayR
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.sparse_resize_(size, sparse_dim, dense_dim);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -7527,7 +7527,7 @@ at::Tensor & AtenIpexCPUDefault::sparse_resize_and_clear_(at::Tensor & self, at:
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.sparse_resize_and_clear_(size, sparse_dim, dense_dim);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -7658,7 +7658,7 @@ at::Tensor & AtenIpexCPUDefault::_coalesced_(at::Tensor & self, bool coalesced) 
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self._coalesced_(coalesced);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -7695,7 +7695,7 @@ at::Tensor & AtenIpexCPUDefault::hspmm_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_mat1 = bridge::shallowFallbackToCPUTensor(mat1);
   auto&& _ipex_mat2 = bridge::shallowFallbackToCPUTensor(mat2);
   auto&& _ipex_result = at::hspmm_out(_ipex_out, _ipex_mat1, _ipex_mat2);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -7722,7 +7722,7 @@ at::Tensor & AtenIpexCPUDefault::copy_sparse_to_sparse_(at::Tensor & self, const
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_src = bridge::shallowFallbackToCPUTensor(src);
   auto&& _ipex_result = at::copy_sparse_to_sparse_(_ipex_self, _ipex_src, non_blocking);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8649,7 +8649,7 @@ at::Tensor & AtenIpexCPUDefault::set_(at::Tensor & self, at::Storage source) {
   TORCH_INTERNAL_ASSERT(source.device_type() == c10::DeviceType::DPCPP);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.set_(source);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8661,7 +8661,7 @@ at::Tensor & AtenIpexCPUDefault::set_(at::Tensor & self, at::Storage source, int
   TORCH_INTERNAL_ASSERT(source.device_type() == c10::DeviceType::DPCPP);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.set_(source, storage_offset, size, stride);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8675,7 +8675,7 @@ at::Tensor & AtenIpexCPUDefault::set_(at::Tensor & self, const at::Tensor & sour
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_source = bridge::shallowFallbackToCPUTensor(source);
   auto&& _ipex_result = _ipex_self.set_(_ipex_source);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8686,7 +8686,7 @@ at::Tensor & AtenIpexCPUDefault::set_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.set_();
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8697,7 +8697,7 @@ at::Tensor & AtenIpexCPUDefault::set_quantizer_(at::Tensor & self, at::ConstQuan
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.set_quantizer_(quantizer);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8723,7 +8723,7 @@ at::Tensor & AtenIpexCPUDefault::masked_fill_(at::Tensor & self, const at::Tenso
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_mask = bridge::shallowFallbackToCPUTensor(mask);
   auto&& _ipex_result = _ipex_self.masked_fill_(_ipex_mask, value);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8753,7 +8753,7 @@ at::Tensor & AtenIpexCPUDefault::masked_fill_(at::Tensor & self, const at::Tenso
   auto&& _ipex_mask = bridge::shallowFallbackToCPUTensor(mask);
   auto&& _ipex_value = bridge::shallowFallbackToCPUTensor(value);
   auto&& _ipex_result = _ipex_self.masked_fill_(_ipex_mask, _ipex_value);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8786,7 +8786,7 @@ at::Tensor & AtenIpexCPUDefault::masked_scatter_(at::Tensor & self, const at::Te
   auto&& _ipex_mask = bridge::shallowFallbackToCPUTensor(mask);
   auto&& _ipex_source = bridge::shallowFallbackToCPUTensor(source);
   auto&& _ipex_result = _ipex_self.masked_scatter_(_ipex_mask, _ipex_source);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8829,7 +8829,7 @@ at::Tensor & AtenIpexCPUDefault::put_(at::Tensor & self, const at::Tensor & inde
   auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
   auto&& _ipex_source = bridge::shallowFallbackToCPUTensor(source);
   auto&& _ipex_result = _ipex_self.put_(_ipex_index, _ipex_source, accumulate);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8846,7 +8846,7 @@ at::Tensor & AtenIpexCPUDefault::index_add_(at::Tensor & self, int64_t dim, cons
   auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
   auto&& _ipex_source = bridge::shallowFallbackToCPUTensor(source);
   auto&& _ipex_result = _ipex_self.index_add_(dim, _ipex_index, _ipex_source);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8876,7 +8876,7 @@ at::Tensor & AtenIpexCPUDefault::index_fill_(at::Tensor & self, int64_t dim, con
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
   auto&& _ipex_result = _ipex_self.index_fill_(dim, _ipex_index, value);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8906,7 +8906,7 @@ at::Tensor & AtenIpexCPUDefault::index_fill_(at::Tensor & self, int64_t dim, con
   auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
   auto&& _ipex_value = bridge::shallowFallbackToCPUTensor(value);
   auto&& _ipex_result = _ipex_self.index_fill_(dim, _ipex_index, _ipex_value);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8939,7 +8939,7 @@ at::Tensor & AtenIpexCPUDefault::scatter_(at::Tensor & self, int64_t dim, const 
   auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
   auto&& _ipex_src = bridge::shallowFallbackToCPUTensor(src);
   auto&& _ipex_result = _ipex_self.scatter_(dim, _ipex_index, _ipex_src);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8969,7 +8969,7 @@ at::Tensor & AtenIpexCPUDefault::scatter_(at::Tensor & self, int64_t dim, const 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
   auto&& _ipex_result = _ipex_self.scatter_(dim, _ipex_index, value);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -8999,7 +8999,7 @@ at::Tensor & AtenIpexCPUDefault::scatter_add_(at::Tensor & self, int64_t dim, co
   auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
   auto&& _ipex_src = bridge::shallowFallbackToCPUTensor(src);
   auto&& _ipex_result = _ipex_self.scatter_add_(dim, _ipex_index, _ipex_src);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9026,7 +9026,7 @@ at::Tensor & AtenIpexCPUDefault::lt_(at::Tensor & self, at::Scalar other) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.lt_(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9040,7 +9040,7 @@ at::Tensor & AtenIpexCPUDefault::lt_(at::Tensor & self, const at::Tensor & other
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.lt_(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9051,7 +9051,7 @@ at::Tensor & AtenIpexCPUDefault::gt_(at::Tensor & self, at::Scalar other) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.gt_(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9065,7 +9065,7 @@ at::Tensor & AtenIpexCPUDefault::gt_(at::Tensor & self, const at::Tensor & other
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.gt_(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9076,7 +9076,7 @@ at::Tensor & AtenIpexCPUDefault::le_(at::Tensor & self, at::Scalar other) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.le_(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9090,7 +9090,7 @@ at::Tensor & AtenIpexCPUDefault::le_(at::Tensor & self, const at::Tensor & other
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.le_(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9101,7 +9101,7 @@ at::Tensor & AtenIpexCPUDefault::ge_(at::Tensor & self, at::Scalar other) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.ge_(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9115,7 +9115,7 @@ at::Tensor & AtenIpexCPUDefault::ge_(at::Tensor & self, const at::Tensor & other
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.ge_(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9126,7 +9126,7 @@ at::Tensor & AtenIpexCPUDefault::eq_(at::Tensor & self, at::Scalar other) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.eq_(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9140,7 +9140,7 @@ at::Tensor & AtenIpexCPUDefault::eq_(at::Tensor & self, const at::Tensor & other
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.eq_(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9151,7 +9151,7 @@ at::Tensor & AtenIpexCPUDefault::ne_(at::Tensor & self, at::Scalar other) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.ne_(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9165,7 +9165,7 @@ at::Tensor & AtenIpexCPUDefault::ne_(at::Tensor & self, const at::Tensor & other
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.ne_(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9178,7 +9178,7 @@ at::Tensor AtenIpexCPUDefault::__and__(const at::Tensor & self, at::Scalar other
   auto&& _ipex_result = at::__and__(_ipex_self, other);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+  return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::__and__(const at::Tensor & self, const at::Tensor & other) {
@@ -9191,7 +9191,7 @@ at::Tensor AtenIpexCPUDefault::__and__(const at::Tensor & self, const at::Tensor
   auto&& _ipex_result = at::__and__(_ipex_self, _ipex_other);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+  return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor & AtenIpexCPUDefault::__iand__(at::Tensor & self, at::Scalar other) {
@@ -9199,7 +9199,7 @@ at::Tensor & AtenIpexCPUDefault::__iand__(at::Tensor & self, at::Scalar other) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.__iand__(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9213,7 +9213,7 @@ at::Tensor & AtenIpexCPUDefault::__iand__(at::Tensor & self, const at::Tensor & 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.__iand__(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9226,7 +9226,7 @@ at::Tensor AtenIpexCPUDefault::__or__(const at::Tensor & self, at::Scalar other)
   auto&& _ipex_result = at::__or__(_ipex_self, other);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+  return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::__or__(const at::Tensor & self, const at::Tensor & other) {
@@ -9239,7 +9239,7 @@ at::Tensor AtenIpexCPUDefault::__or__(const at::Tensor & self, const at::Tensor 
   auto&& _ipex_result = at::__or__(_ipex_self, _ipex_other);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+  return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor & AtenIpexCPUDefault::__ior__(at::Tensor & self, at::Scalar other) {
@@ -9247,7 +9247,7 @@ at::Tensor & AtenIpexCPUDefault::__ior__(at::Tensor & self, at::Scalar other) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.__ior__(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9261,7 +9261,7 @@ at::Tensor & AtenIpexCPUDefault::__ior__(at::Tensor & self, const at::Tensor & o
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.__ior__(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9274,7 +9274,7 @@ at::Tensor AtenIpexCPUDefault::__xor__(const at::Tensor & self, at::Scalar other
   auto&& _ipex_result = at::__xor__(_ipex_self, other);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+  return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::__xor__(const at::Tensor & self, const at::Tensor & other) {
@@ -9287,7 +9287,7 @@ at::Tensor AtenIpexCPUDefault::__xor__(const at::Tensor & self, const at::Tensor
   auto&& _ipex_result = at::__xor__(_ipex_self, _ipex_other);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+  return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor & AtenIpexCPUDefault::__ixor__(at::Tensor & self, at::Scalar other) {
@@ -9295,7 +9295,7 @@ at::Tensor & AtenIpexCPUDefault::__ixor__(at::Tensor & self, at::Scalar other) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.__ixor__(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9309,7 +9309,7 @@ at::Tensor & AtenIpexCPUDefault::__ixor__(at::Tensor & self, const at::Tensor & 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.__ixor__(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9322,7 +9322,7 @@ at::Tensor AtenIpexCPUDefault::__lshift__(const at::Tensor & self, at::Scalar ot
   auto&& _ipex_result = at::__lshift__(_ipex_self, other);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+  return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::__lshift__(const at::Tensor & self, const at::Tensor & other) {
@@ -9335,7 +9335,7 @@ at::Tensor AtenIpexCPUDefault::__lshift__(const at::Tensor & self, const at::Ten
   auto&& _ipex_result = at::__lshift__(_ipex_self, _ipex_other);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+  return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor & AtenIpexCPUDefault::__ilshift__(at::Tensor & self, at::Scalar other) {
@@ -9343,7 +9343,7 @@ at::Tensor & AtenIpexCPUDefault::__ilshift__(at::Tensor & self, at::Scalar other
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.__ilshift__(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9357,7 +9357,7 @@ at::Tensor & AtenIpexCPUDefault::__ilshift__(at::Tensor & self, const at::Tensor
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.__ilshift__(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9370,7 +9370,7 @@ at::Tensor AtenIpexCPUDefault::__rshift__(const at::Tensor & self, at::Scalar ot
   auto&& _ipex_result = at::__rshift__(_ipex_self, other);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+  return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDefault::__rshift__(const at::Tensor & self, const at::Tensor & other) {
@@ -9383,7 +9383,7 @@ at::Tensor AtenIpexCPUDefault::__rshift__(const at::Tensor & self, const at::Ten
   auto&& _ipex_result = at::__rshift__(_ipex_self, _ipex_other);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+  return bridge::upgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor & AtenIpexCPUDefault::__irshift__(at::Tensor & self, at::Scalar other) {
@@ -9391,7 +9391,7 @@ at::Tensor & AtenIpexCPUDefault::__irshift__(at::Tensor & self, at::Scalar other
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.__irshift__(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9405,7 +9405,7 @@ at::Tensor & AtenIpexCPUDefault::__irshift__(at::Tensor & self, const at::Tensor
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.__irshift__(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9416,7 +9416,7 @@ at::Tensor & AtenIpexCPUDefault::lgamma_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.lgamma_();
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9430,7 +9430,7 @@ at::Tensor & AtenIpexCPUDefault::atan2_(at::Tensor & self, const at::Tensor & ot
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.atan2_(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9441,7 +9441,7 @@ at::Tensor & AtenIpexCPUDefault::tril_(at::Tensor & self, int64_t diagonal) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.tril_(diagonal);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9452,7 +9452,7 @@ at::Tensor & AtenIpexCPUDefault::triu_(at::Tensor & self, int64_t diagonal) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.triu_(diagonal);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9463,7 +9463,7 @@ at::Tensor & AtenIpexCPUDefault::digamma_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.digamma_();
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9474,7 +9474,7 @@ at::Tensor & AtenIpexCPUDefault::polygamma_(at::Tensor & self, int64_t n) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.polygamma_(n);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9485,7 +9485,7 @@ at::Tensor & AtenIpexCPUDefault::renorm_(at::Tensor & self, at::Scalar p, int64_
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.renorm_(p, dim, maxnorm);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9496,7 +9496,7 @@ at::Tensor & AtenIpexCPUDefault::pow_(at::Tensor & self, at::Scalar exponent) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.pow_(exponent);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9510,7 +9510,7 @@ at::Tensor & AtenIpexCPUDefault::pow_(at::Tensor & self, const at::Tensor & expo
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_exponent = bridge::shallowFallbackToCPUTensor(exponent);
   auto&& _ipex_result = _ipex_self.pow_(_ipex_exponent);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9524,7 +9524,7 @@ at::Tensor & AtenIpexCPUDefault::lerp_(at::Tensor & self, const at::Tensor & end
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_end = bridge::shallowFallbackToCPUTensor(end);
   auto&& _ipex_result = _ipex_self.lerp_(_ipex_end, weight);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9541,7 +9541,7 @@ at::Tensor & AtenIpexCPUDefault::lerp_(at::Tensor & self, const at::Tensor & end
   auto&& _ipex_end = bridge::shallowFallbackToCPUTensor(end);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_result = _ipex_self.lerp_(_ipex_end, _ipex_weight);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9552,7 +9552,7 @@ at::Tensor & AtenIpexCPUDefault::fmod_(at::Tensor & self, at::Scalar other) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.fmod_(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9566,7 +9566,7 @@ at::Tensor & AtenIpexCPUDefault::fmod_(at::Tensor & self, const at::Tensor & oth
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.fmod_(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9577,7 +9577,7 @@ at::Tensor & AtenIpexCPUDefault::remainder_(at::Tensor & self, at::Scalar other)
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.remainder_(other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9591,7 +9591,7 @@ at::Tensor & AtenIpexCPUDefault::remainder_(at::Tensor & self, const at::Tensor 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.remainder_(_ipex_other);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9608,7 +9608,7 @@ at::Tensor & AtenIpexCPUDefault::addbmm_(at::Tensor & self, const at::Tensor & b
   auto&& _ipex_batch1 = bridge::shallowFallbackToCPUTensor(batch1);
   auto&& _ipex_batch2 = bridge::shallowFallbackToCPUTensor(batch2);
   auto&& _ipex_result = _ipex_self.addbmm_(_ipex_batch1, _ipex_batch2, beta, alpha);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9628,7 +9628,7 @@ at::Tensor & AtenIpexCPUDefault::addbmm_out(at::Tensor & out, const at::Tensor &
   auto&& _ipex_batch1 = bridge::shallowFallbackToCPUTensor(batch1);
   auto&& _ipex_batch2 = bridge::shallowFallbackToCPUTensor(batch2);
   auto&& _ipex_result = at::addbmm_out(_ipex_out, _ipex_self, _ipex_batch1, _ipex_batch2, beta, alpha);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -9661,7 +9661,7 @@ at::Tensor & AtenIpexCPUDefault::addcdiv_(at::Tensor & self, const at::Tensor & 
   auto&& _ipex_tensor1 = bridge::shallowFallbackToCPUTensor(tensor1);
   auto&& _ipex_tensor2 = bridge::shallowFallbackToCPUTensor(tensor2);
   auto&& _ipex_result = _ipex_self.addcdiv_(_ipex_tensor1, _ipex_tensor2, value);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9672,7 +9672,7 @@ at::Tensor & AtenIpexCPUDefault::random_(at::Tensor & self, int64_t from, int64_
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.random_(from, to, generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9683,7 +9683,7 @@ at::Tensor & AtenIpexCPUDefault::random_(at::Tensor & self, int64_t to, at::Gene
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.random_(to, generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9694,7 +9694,7 @@ at::Tensor & AtenIpexCPUDefault::random_(at::Tensor & self, at::Generator * gene
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.random_(generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9705,7 +9705,7 @@ at::Tensor & AtenIpexCPUDefault::uniform_(at::Tensor & self, double from, double
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.uniform_(from, to, generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9716,7 +9716,7 @@ at::Tensor & AtenIpexCPUDefault::normal_(at::Tensor & self, double mean, double 
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.normal_(mean, std, generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9727,7 +9727,7 @@ at::Tensor & AtenIpexCPUDefault::cauchy_(at::Tensor & self, double median, doubl
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.cauchy_(median, sigma, generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9738,7 +9738,7 @@ at::Tensor & AtenIpexCPUDefault::log_normal_(at::Tensor & self, double mean, dou
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.log_normal_(mean, std, generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9749,7 +9749,7 @@ at::Tensor & AtenIpexCPUDefault::exponential_(at::Tensor & self, double lambd, a
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.exponential_(lambd, generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9760,7 +9760,7 @@ at::Tensor & AtenIpexCPUDefault::geometric_(at::Tensor & self, double p, at::Gen
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.geometric_(p, generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -9774,7 +9774,7 @@ at::Tensor & AtenIpexCPUDefault::diag_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::diag_out(_ipex_out, _ipex_self, diagonal);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -9801,7 +9801,7 @@ at::Tensor & AtenIpexCPUDefault::cross_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::cross_out(_ipex_out, _ipex_self, _ipex_other, dim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -9828,7 +9828,7 @@ at::Tensor & AtenIpexCPUDefault::triu_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::triu_out(_ipex_out, _ipex_self, diagonal);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -9852,7 +9852,7 @@ at::Tensor & AtenIpexCPUDefault::tril_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::tril_out(_ipex_out, _ipex_self, diagonal);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -9904,7 +9904,7 @@ at::Tensor & AtenIpexCPUDefault::ne_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::ne_out(_ipex_out, _ipex_self, other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -9931,7 +9931,7 @@ at::Tensor & AtenIpexCPUDefault::ne_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::ne_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -9958,7 +9958,7 @@ at::Tensor & AtenIpexCPUDefault::eq_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::eq_out(_ipex_out, _ipex_self, other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -9985,7 +9985,7 @@ at::Tensor & AtenIpexCPUDefault::eq_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::eq_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10012,7 +10012,7 @@ at::Tensor & AtenIpexCPUDefault::ge_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::ge_out(_ipex_out, _ipex_self, other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10039,7 +10039,7 @@ at::Tensor & AtenIpexCPUDefault::ge_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::ge_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10066,7 +10066,7 @@ at::Tensor & AtenIpexCPUDefault::le_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::le_out(_ipex_out, _ipex_self, other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10093,7 +10093,7 @@ at::Tensor & AtenIpexCPUDefault::le_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::le_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10120,7 +10120,7 @@ at::Tensor & AtenIpexCPUDefault::gt_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::gt_out(_ipex_out, _ipex_self, other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10147,7 +10147,7 @@ at::Tensor & AtenIpexCPUDefault::gt_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::gt_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10174,7 +10174,7 @@ at::Tensor & AtenIpexCPUDefault::lt_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::lt_out(_ipex_out, _ipex_self, other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10201,7 +10201,7 @@ at::Tensor & AtenIpexCPUDefault::lt_out(at::Tensor & out, const at::Tensor & sel
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::lt_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10231,7 +10231,7 @@ at::Tensor & AtenIpexCPUDefault::take_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
   auto&& _ipex_result = at::take_out(_ipex_out, _ipex_self, _ipex_index);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10261,7 +10261,7 @@ at::Tensor & AtenIpexCPUDefault::index_select_out(at::Tensor & out, const at::Te
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
   auto&& _ipex_result = at::index_select_out(_ipex_out, _ipex_self, dim, _ipex_index);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10291,7 +10291,7 @@ at::Tensor & AtenIpexCPUDefault::masked_select_out(at::Tensor & out, const at::T
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_mask = bridge::shallowFallbackToCPUTensor(mask);
   auto&& _ipex_result = at::masked_select_out(_ipex_out, _ipex_self, _ipex_mask);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10318,7 +10318,7 @@ at::Tensor & AtenIpexCPUDefault::nonzero_out(at::Tensor & out, const at::Tensor 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::nonzero_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10354,7 +10354,7 @@ at::Tensor & AtenIpexCPUDefault::gather_out(at::Tensor & out, const at::Tensor &
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
   auto&& _ipex_result = at::gather_out(_ipex_out, _ipex_self, dim, _ipex_index, sparse_grad);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10403,7 +10403,7 @@ at::Tensor & AtenIpexCPUDefault::addcmul_out(at::Tensor & out, const at::Tensor 
   auto&& _ipex_tensor1 = bridge::shallowFallbackToCPUTensor(tensor1);
   auto&& _ipex_tensor2 = bridge::shallowFallbackToCPUTensor(tensor2);
   auto&& _ipex_result = at::addcmul_out(_ipex_out, _ipex_self, _ipex_tensor1, _ipex_tensor2, value);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10436,7 +10436,7 @@ at::Tensor & AtenIpexCPUDefault::addcmul_(at::Tensor & self, const at::Tensor & 
   auto&& _ipex_tensor1 = bridge::shallowFallbackToCPUTensor(tensor1);
   auto&& _ipex_tensor2 = bridge::shallowFallbackToCPUTensor(tensor2);
   auto&& _ipex_result = _ipex_self.addcmul_(_ipex_tensor1, _ipex_tensor2, value);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -10456,7 +10456,7 @@ at::Tensor & AtenIpexCPUDefault::addcdiv_out(at::Tensor & out, const at::Tensor 
   auto&& _ipex_tensor1 = bridge::shallowFallbackToCPUTensor(tensor1);
   auto&& _ipex_tensor2 = bridge::shallowFallbackToCPUTensor(tensor2);
   auto&& _ipex_result = at::addcdiv_out(_ipex_out, _ipex_self, _ipex_tensor1, _ipex_tensor2, value);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10492,8 +10492,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::lstsq_out(at::Tensor &
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_A = bridge::shallowFallbackToCPUTensor(A);
   auto&& _ipex_result = at::lstsq_out(_ipex_X, _ipex_qr, _ipex_self, _ipex_A);
-  X = bridge::shallowUpgradeToDPCPPTensor(_ipex_X);
-  qr = bridge::shallowUpgradeToDPCPPTensor(_ipex_qr);
+  bridge::shallowUpgradeToDPCPPTensorInplace(X, _ipex_X);
+  bridge::shallowUpgradeToDPCPPTensorInplace(qr, _ipex_qr);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(X, qr);
 }
@@ -10524,8 +10524,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::triangular_solve_out(a
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_A = bridge::shallowFallbackToCPUTensor(A);
   auto&& _ipex_result = at::triangular_solve_out(_ipex_X, _ipex_M, _ipex_self, _ipex_A, upper, transpose, unitriangular);
-  X = bridge::shallowUpgradeToDPCPPTensor(_ipex_X);
-  M = bridge::shallowUpgradeToDPCPPTensor(_ipex_M);
+  bridge::shallowUpgradeToDPCPPTensorInplace(X, _ipex_X);
+  bridge::shallowUpgradeToDPCPPTensorInplace(M, _ipex_M);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(X, M);
 }
@@ -10565,8 +10565,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::symeig_out(at::Tensor 
   auto&& _ipex_V = bridge::shallowFallbackToCPUTensor(V);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::symeig_out(_ipex_e, _ipex_V, _ipex_self, eigenvectors, upper);
-  e = bridge::shallowUpgradeToDPCPPTensor(_ipex_e);
-  V = bridge::shallowUpgradeToDPCPPTensor(_ipex_V);
+  bridge::shallowUpgradeToDPCPPTensorInplace(e, _ipex_e);
+  bridge::shallowUpgradeToDPCPPTensorInplace(V, _ipex_V);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(e, V);
 }
@@ -10600,8 +10600,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::eig_out(at::Tensor & e
   auto&& _ipex_v = bridge::shallowFallbackToCPUTensor(v);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::eig_out(_ipex_e, _ipex_v, _ipex_self, eigenvectors);
-  e = bridge::shallowUpgradeToDPCPPTensor(_ipex_e);
-  v = bridge::shallowUpgradeToDPCPPTensor(_ipex_v);
+  bridge::shallowUpgradeToDPCPPTensorInplace(e, _ipex_e);
+  bridge::shallowUpgradeToDPCPPTensorInplace(v, _ipex_v);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(e, v);
 }
@@ -10629,9 +10629,9 @@ std::tuple<at::Tensor &,at::Tensor &,at::Tensor &> AtenIpexCPUDefault::svd_out(a
   auto&& _ipex_V = bridge::shallowFallbackToCPUTensor(V);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::svd_out(_ipex_U, _ipex_S, _ipex_V, _ipex_self, some, compute_uv);
-  U = bridge::shallowUpgradeToDPCPPTensor(_ipex_U);
-  S = bridge::shallowUpgradeToDPCPPTensor(_ipex_S);
-  V = bridge::shallowUpgradeToDPCPPTensor(_ipex_V);
+  bridge::shallowUpgradeToDPCPPTensorInplace(U, _ipex_U);
+  bridge::shallowUpgradeToDPCPPTensorInplace(S, _ipex_S);
+  bridge::shallowUpgradeToDPCPPTensorInplace(V, _ipex_V);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &,at::Tensor &>(U, S, V);
 }
@@ -10662,7 +10662,7 @@ at::Tensor & AtenIpexCPUDefault::cholesky_out(at::Tensor & out, const at::Tensor
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::cholesky_out(_ipex_out, _ipex_self, upper);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10699,7 +10699,7 @@ at::Tensor & AtenIpexCPUDefault::cholesky_solve_out(at::Tensor & out, const at::
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_input2 = bridge::shallowFallbackToCPUTensor(input2);
   auto&& _ipex_result = at::cholesky_solve_out(_ipex_out, _ipex_self, _ipex_input2, upper);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10757,8 +10757,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::solve_out(at::Tensor &
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_A = bridge::shallowFallbackToCPUTensor(A);
   auto&& _ipex_result = at::solve_out(_ipex_solution, _ipex_lu, _ipex_self, _ipex_A);
-  solution = bridge::shallowUpgradeToDPCPPTensor(_ipex_solution);
-  lu = bridge::shallowUpgradeToDPCPPTensor(_ipex_lu);
+  bridge::shallowUpgradeToDPCPPTensorInplace(solution, _ipex_solution);
+  bridge::shallowUpgradeToDPCPPTensorInplace(lu, _ipex_lu);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(solution, lu);
 }
@@ -10783,7 +10783,7 @@ at::Tensor & AtenIpexCPUDefault::cholesky_inverse_out(at::Tensor & out, const at
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::cholesky_inverse_out(_ipex_out, _ipex_self, upper);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10810,8 +10810,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::qr_out(at::Tensor & Q,
   auto&& _ipex_R = bridge::shallowFallbackToCPUTensor(R);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::qr_out(_ipex_Q, _ipex_R, _ipex_self, some);
-  Q = bridge::shallowUpgradeToDPCPPTensor(_ipex_Q);
-  R = bridge::shallowUpgradeToDPCPPTensor(_ipex_R);
+  bridge::shallowUpgradeToDPCPPTensorInplace(Q, _ipex_Q);
+  bridge::shallowUpgradeToDPCPPTensorInplace(R, _ipex_R);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(Q, R);
 }
@@ -10845,8 +10845,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::geqrf_out(at::Tensor &
   auto&& _ipex_tau = bridge::shallowFallbackToCPUTensor(tau);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::geqrf_out(_ipex_a, _ipex_tau, _ipex_self);
-  a = bridge::shallowUpgradeToDPCPPTensor(_ipex_a);
-  tau = bridge::shallowUpgradeToDPCPPTensor(_ipex_tau);
+  bridge::shallowUpgradeToDPCPPTensorInplace(a, _ipex_a);
+  bridge::shallowUpgradeToDPCPPTensorInplace(tau, _ipex_tau);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(a, tau);
 }
@@ -10871,7 +10871,7 @@ at::Tensor & AtenIpexCPUDefault::orgqr_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_input2 = bridge::shallowFallbackToCPUTensor(input2);
   auto&& _ipex_result = at::orgqr_out(_ipex_out, _ipex_self, _ipex_input2);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10904,7 +10904,7 @@ at::Tensor & AtenIpexCPUDefault::ormqr_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_input2 = bridge::shallowFallbackToCPUTensor(input2);
   auto&& _ipex_input3 = bridge::shallowFallbackToCPUTensor(input3);
   auto&& _ipex_result = at::ormqr_out(_ipex_out, _ipex_self, _ipex_input2, _ipex_input3, left, transpose);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10949,7 +10949,7 @@ at::Tensor & AtenIpexCPUDefault::lu_solve_out(at::Tensor & out, const at::Tensor
   auto&& _ipex_LU_data = bridge::shallowFallbackToCPUTensor(LU_data);
   auto&& _ipex_LU_pivots = bridge::shallowFallbackToCPUTensor(LU_pivots);
   auto&& _ipex_result = at::lu_solve_out(_ipex_out, _ipex_self, _ipex_LU_data, _ipex_LU_pivots);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -10995,7 +10995,7 @@ at::Tensor & AtenIpexCPUDefault::multinomial_out(at::Tensor & out, const at::Ten
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::multinomial_out(_ipex_out, _ipex_self, num_samples, replacement, generator);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11041,7 +11041,7 @@ at::Tensor & AtenIpexCPUDefault::lgamma_out(at::Tensor & out, const at::Tensor &
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::lgamma_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11065,7 +11065,7 @@ at::Tensor & AtenIpexCPUDefault::digamma_out(at::Tensor & out, const at::Tensor 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::digamma_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11089,7 +11089,7 @@ at::Tensor & AtenIpexCPUDefault::polygamma_out(at::Tensor & out, int64_t n, cons
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::polygamma_out(_ipex_out, n, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11120,7 +11120,7 @@ at::Tensor & AtenIpexCPUDefault::erfinv_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.erfinv_();
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -11134,7 +11134,7 @@ at::Tensor & AtenIpexCPUDefault::erfinv_out(at::Tensor & out, const at::Tensor &
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::erfinv_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11155,7 +11155,7 @@ at::Tensor & AtenIpexCPUDefault::sign_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.sign_();
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -11169,7 +11169,7 @@ at::Tensor & AtenIpexCPUDefault::sign_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sign_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11199,7 +11199,7 @@ at::Tensor & AtenIpexCPUDefault::atan2_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::atan2_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11229,7 +11229,7 @@ at::Tensor & AtenIpexCPUDefault::lerp_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_end = bridge::shallowFallbackToCPUTensor(end);
   auto&& _ipex_result = at::lerp_out(_ipex_out, _ipex_self, _ipex_end, weight);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11249,7 +11249,7 @@ at::Tensor & AtenIpexCPUDefault::lerp_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_end = bridge::shallowFallbackToCPUTensor(end);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_result = at::lerp_out(_ipex_out, _ipex_self, _ipex_end, _ipex_weight);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11292,7 +11292,7 @@ at::Tensor & AtenIpexCPUDefault::histc_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::histc_out(_ipex_out, _ipex_self, bins, min, max);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11316,7 +11316,7 @@ at::Tensor & AtenIpexCPUDefault::fmod_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::fmod_out(_ipex_out, _ipex_self, other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11343,7 +11343,7 @@ at::Tensor & AtenIpexCPUDefault::fmod_out(at::Tensor & out, const at::Tensor & s
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::fmod_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11370,7 +11370,7 @@ at::Tensor & AtenIpexCPUDefault::remainder_out(at::Tensor & out, const at::Tenso
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::remainder_out(_ipex_out, _ipex_self, other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11397,7 +11397,7 @@ at::Tensor & AtenIpexCPUDefault::remainder_out(at::Tensor & out, const at::Tenso
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::remainder_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11427,7 +11427,7 @@ at::Tensor & AtenIpexCPUDefault::min_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::min_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11467,7 +11467,7 @@ at::Tensor & AtenIpexCPUDefault::max_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::max_out(_ipex_out, _ipex_self, _ipex_other);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11517,8 +11517,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::sort_out(at::Tensor & 
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sort_out(_ipex_values, _ipex_indices, _ipex_self, dim, descending);
-  values = bridge::shallowUpgradeToDPCPPTensor(_ipex_values);
-  indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(values, _ipex_values);
+  bridge::shallowUpgradeToDPCPPTensorInplace(indices, _ipex_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(values, indices);
 }
@@ -11553,8 +11553,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::topk_out(at::Tensor & 
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::topk_out(_ipex_values, _ipex_indices, _ipex_self, k, dim, largest, sorted);
-  values = bridge::shallowUpgradeToDPCPPTensor(_ipex_values);
-  indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(values, _ipex_values);
+  bridge::shallowUpgradeToDPCPPTensorInplace(indices, _ipex_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(values, indices);
 }
@@ -11596,7 +11596,7 @@ at::Tensor & AtenIpexCPUDefault::renorm_out(at::Tensor & out, const at::Tensor &
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::renorm_out(_ipex_out, _ipex_self, p, dim, maxnorm);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11645,7 +11645,7 @@ at::Tensor & AtenIpexCPUDefault::pow_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_exponent = bridge::shallowFallbackToCPUTensor(exponent);
   auto&& _ipex_result = at::pow_out(_ipex_out, _ipex_self, _ipex_exponent);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11672,7 +11672,7 @@ at::Tensor & AtenIpexCPUDefault::pow_out(at::Tensor & out, at::Scalar self, cons
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_exponent = bridge::shallowFallbackToCPUTensor(exponent);
   auto&& _ipex_result = at::pow_out(_ipex_out, self, _ipex_exponent);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11696,7 +11696,7 @@ at::Tensor & AtenIpexCPUDefault::normal_out(at::Tensor & out, const at::Tensor &
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_mean = bridge::shallowFallbackToCPUTensor(mean);
   auto&& _ipex_result = at::normal_out(_ipex_out, _ipex_mean, std, generator);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11720,7 +11720,7 @@ at::Tensor & AtenIpexCPUDefault::normal_out(at::Tensor & out, double mean, const
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_std = bridge::shallowFallbackToCPUTensor(std);
   auto&& _ipex_result = at::normal_out(_ipex_out, mean, _ipex_std, generator);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11747,7 +11747,7 @@ at::Tensor & AtenIpexCPUDefault::normal_out(at::Tensor & out, const at::Tensor &
   auto&& _ipex_mean = bridge::shallowFallbackToCPUTensor(mean);
   auto&& _ipex_std = bridge::shallowFallbackToCPUTensor(std);
   auto&& _ipex_result = at::normal_out(_ipex_out, _ipex_mean, _ipex_std, generator);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11780,7 +11780,7 @@ at::Tensor & AtenIpexCPUDefault::normal_out(at::Tensor & out, double mean, doubl
   TORCH_INTERNAL_ASSERT(out.is_contiguous());
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::normal_out(_ipex_out, mean, std, size, generator);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11823,7 +11823,7 @@ at::Tensor & AtenIpexCPUDefault::_addr_(at::Tensor & self, const at::Tensor & ve
   auto&& _ipex_vec1 = bridge::shallowFallbackToCPUTensor(vec1);
   auto&& _ipex_vec2 = bridge::shallowFallbackToCPUTensor(vec2);
   auto&& _ipex_result = at::_addr_(_ipex_self, _ipex_vec1, _ipex_vec2, beta, alpha);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -11843,7 +11843,7 @@ at::Tensor & AtenIpexCPUDefault::_addr_out(at::Tensor & out, const at::Tensor & 
   auto&& _ipex_vec1 = bridge::shallowFallbackToCPUTensor(vec1);
   auto&& _ipex_vec2 = bridge::shallowFallbackToCPUTensor(vec2);
   auto&& _ipex_result = at::_addr_out(_ipex_out, _ipex_self, _ipex_vec1, _ipex_vec2, beta, alpha);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11860,7 +11860,7 @@ at::Tensor & AtenIpexCPUDefault::_index_copy_(at::Tensor & self, int64_t dim, co
   auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
   auto&& _ipex_source = bridge::shallowFallbackToCPUTensor(source);
   auto&& _ipex_result = at::_index_copy_(_ipex_self, dim, _ipex_index, _ipex_source);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -11884,7 +11884,7 @@ at::Tensor & AtenIpexCPUDefault::_cumsum_out(at::Tensor & out, const at::Tensor 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::_cumsum_out(_ipex_out, _ipex_self, dim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11908,7 +11908,7 @@ at::Tensor & AtenIpexCPUDefault::_cumprod_out(at::Tensor & out, const at::Tensor
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::_cumprod_out(_ipex_out, _ipex_self, dim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11948,7 +11948,7 @@ at::Tensor & AtenIpexCPUDefault::_cat_out(at::Tensor & out, at::TensorList tenso
   auto&& _ipex_tensors = bridge::shallowFallbackToCPUTensorList(tensors);
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::_cat_out(_ipex_out, _ipex_tensors, dim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -11974,8 +11974,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::_mode_out(at::Tensor &
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::_mode_out(_ipex_values, _ipex_indices, _ipex_self, dim, keepdim);
-  values = bridge::shallowUpgradeToDPCPPTensor(_ipex_values);
-  indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(values, _ipex_values);
+  bridge::shallowUpgradeToDPCPPTensorInplace(indices, _ipex_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(values, indices);
 }
@@ -12000,8 +12000,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::_max_out(at::Tensor & 
   auto&& _ipex_max_indices = bridge::shallowFallbackToCPUTensor(max_indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::_max_out(_ipex_max, _ipex_max_indices, _ipex_self, dim, keepdim);
-  max = bridge::shallowUpgradeToDPCPPTensor(_ipex_max);
-  max_indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_max_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(max, _ipex_max);
+  bridge::shallowUpgradeToDPCPPTensorInplace(max_indices, _ipex_max_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(max, max_indices);
 }
@@ -12026,8 +12026,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::_min_out(at::Tensor & 
   auto&& _ipex_min_indices = bridge::shallowFallbackToCPUTensor(min_indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::_min_out(_ipex_min, _ipex_min_indices, _ipex_self, dim, keepdim);
-  min = bridge::shallowUpgradeToDPCPPTensor(_ipex_min);
-  min_indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_min_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(min, _ipex_min);
+  bridge::shallowUpgradeToDPCPPTensorInplace(min_indices, _ipex_min_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(min, min_indices);
 }
@@ -12046,7 +12046,7 @@ at::Tensor & AtenIpexCPUDefault::binary_cross_entropy_out(at::Tensor & out, cons
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_result = at::binary_cross_entropy_out(_ipex_out, _ipex_self, _ipex_target, _ipex_weight, reduction);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -12085,7 +12085,7 @@ at::Tensor & AtenIpexCPUDefault::binary_cross_entropy_backward_out(at::Tensor & 
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_result = at::binary_cross_entropy_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_target, _ipex_weight, reduction);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -12121,7 +12121,7 @@ at::Tensor & AtenIpexCPUDefault::mse_loss_out(at::Tensor & out, const at::Tensor
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_result = at::mse_loss_out(_ipex_out, _ipex_self, _ipex_target, reduction);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -12154,7 +12154,7 @@ at::Tensor & AtenIpexCPUDefault::mse_loss_backward_out(at::Tensor & grad_input, 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_result = at::mse_loss_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_target, reduction);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -12187,7 +12187,7 @@ at::Tensor & AtenIpexCPUDefault::l1_loss_out(at::Tensor & out, const at::Tensor 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_result = at::l1_loss_out(_ipex_out, _ipex_self, _ipex_target, reduction);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -12220,7 +12220,7 @@ at::Tensor & AtenIpexCPUDefault::l1_loss_backward_out(at::Tensor & grad_input, c
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_result = at::l1_loss_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_target, reduction);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -12256,7 +12256,7 @@ at::Tensor & AtenIpexCPUDefault::multi_margin_loss_out(at::Tensor & out, const a
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_result = at::multi_margin_loss_out(_ipex_out, _ipex_self, _ipex_target, p, margin, _ipex_weight, reduction);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -12295,7 +12295,7 @@ at::Tensor & AtenIpexCPUDefault::multi_margin_loss_backward_out(at::Tensor & gra
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_result = at::multi_margin_loss_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_target, p, margin, _ipex_weight, reduction);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -12331,7 +12331,7 @@ at::Tensor & AtenIpexCPUDefault::multilabel_margin_loss_out(at::Tensor & out, co
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_result = at::multilabel_margin_loss_out(_ipex_out, _ipex_self, _ipex_target, reduction);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -12364,8 +12364,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::multilabel_margin_loss
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_result = at::multilabel_margin_loss_forward_out(_ipex_output, _ipex_is_target, _ipex_self, _ipex_target, reduction);
-  output = bridge::shallowUpgradeToDPCPPTensor(_ipex_output);
-  is_target = bridge::shallowUpgradeToDPCPPTensor(_ipex_is_target);
+  bridge::shallowUpgradeToDPCPPTensorInplace(output, _ipex_output);
+  bridge::shallowUpgradeToDPCPPTensorInplace(is_target, _ipex_is_target);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(output, is_target);
 }
@@ -12399,7 +12399,7 @@ at::Tensor & AtenIpexCPUDefault::multilabel_margin_loss_backward_out(at::Tensor 
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_is_target = bridge::shallowFallbackToCPUTensor(is_target);
   auto&& _ipex_result = at::multilabel_margin_loss_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_target, reduction, _ipex_is_target);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -12438,7 +12438,7 @@ at::Tensor & AtenIpexCPUDefault::nll_loss_out(at::Tensor & out, const at::Tensor
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_result = at::nll_loss_out(_ipex_out, _ipex_self, _ipex_target, _ipex_weight, reduction, ignore_index);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -12477,8 +12477,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::nll_loss_forward_out(a
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_result = at::nll_loss_forward_out(_ipex_output, _ipex_total_weight, _ipex_self, _ipex_target, _ipex_weight, reduction, ignore_index);
-  output = bridge::shallowUpgradeToDPCPPTensor(_ipex_output);
-  total_weight = bridge::shallowUpgradeToDPCPPTensor(_ipex_total_weight);
+  bridge::shallowUpgradeToDPCPPTensorInplace(output, _ipex_output);
+  bridge::shallowUpgradeToDPCPPTensorInplace(total_weight, _ipex_total_weight);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(output, total_weight);
 }
@@ -12518,7 +12518,7 @@ at::Tensor & AtenIpexCPUDefault::nll_loss_backward_out(at::Tensor & grad_input, 
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_total_weight = bridge::shallowFallbackToCPUTensor(total_weight);
   auto&& _ipex_result = at::nll_loss_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_target, _ipex_weight, reduction, ignore_index, _ipex_total_weight);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -12560,7 +12560,7 @@ at::Tensor & AtenIpexCPUDefault::nll_loss2d_out(at::Tensor & out, const at::Tens
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_result = at::nll_loss2d_out(_ipex_out, _ipex_self, _ipex_target, _ipex_weight, reduction, ignore_index);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -12599,8 +12599,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::nll_loss2d_forward_out
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_result = at::nll_loss2d_forward_out(_ipex_output, _ipex_total_weight, _ipex_self, _ipex_target, _ipex_weight, reduction, ignore_index);
-  output = bridge::shallowUpgradeToDPCPPTensor(_ipex_output);
-  total_weight = bridge::shallowUpgradeToDPCPPTensor(_ipex_total_weight);
+  bridge::shallowUpgradeToDPCPPTensorInplace(output, _ipex_output);
+  bridge::shallowUpgradeToDPCPPTensorInplace(total_weight, _ipex_total_weight);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(output, total_weight);
 }
@@ -12640,7 +12640,7 @@ at::Tensor & AtenIpexCPUDefault::nll_loss2d_backward_out(at::Tensor & grad_input
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_total_weight = bridge::shallowFallbackToCPUTensor(total_weight);
   auto&& _ipex_result = at::nll_loss2d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_target, _ipex_weight, reduction, ignore_index, _ipex_total_weight);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -12679,7 +12679,7 @@ at::Tensor & AtenIpexCPUDefault::smooth_l1_loss_out(at::Tensor & out, const at::
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_result = at::smooth_l1_loss_out(_ipex_out, _ipex_self, _ipex_target, reduction);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -12712,7 +12712,7 @@ at::Tensor & AtenIpexCPUDefault::smooth_l1_loss_backward_out(at::Tensor & grad_i
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_result = at::smooth_l1_loss_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_target, reduction);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -12745,7 +12745,7 @@ at::Tensor & AtenIpexCPUDefault::soft_margin_loss_out(at::Tensor & out, const at
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_result = at::soft_margin_loss_out(_ipex_out, _ipex_self, _ipex_target, reduction);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -12778,7 +12778,7 @@ at::Tensor & AtenIpexCPUDefault::soft_margin_loss_backward_out(at::Tensor & grad
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_target = bridge::shallowFallbackToCPUTensor(target);
   auto&& _ipex_result = at::soft_margin_loss_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_target, reduction);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -12808,7 +12808,7 @@ at::Tensor & AtenIpexCPUDefault::elu_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::elu_out(_ipex_out, _ipex_self, alpha, scale, input_scale);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -12835,7 +12835,7 @@ at::Tensor & AtenIpexCPUDefault::elu_backward_out(at::Tensor & grad_input, const
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_output = bridge::shallowFallbackToCPUTensor(output);
   auto&& _ipex_result = at::elu_backward_out(_ipex_grad_input, _ipex_grad_output, alpha, scale, input_scale, _ipex_output);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -12859,7 +12859,7 @@ at::Tensor & AtenIpexCPUDefault::elu_(at::Tensor & self, at::Scalar alpha, at::S
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::elu_(_ipex_self, alpha, scale, input_scale);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -12873,7 +12873,7 @@ at::Tensor & AtenIpexCPUDefault::glu_out(at::Tensor & out, const at::Tensor & se
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::glu_out(_ipex_out, _ipex_self, dim);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -12900,7 +12900,7 @@ at::Tensor & AtenIpexCPUDefault::glu_backward_out(at::Tensor & grad_input, const
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::glu_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, dim);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -12927,7 +12927,7 @@ at::Tensor & AtenIpexCPUDefault::hardtanh_out(at::Tensor & out, const at::Tensor
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::hardtanh_out(_ipex_out, _ipex_self, min_val, max_val);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -12954,7 +12954,7 @@ at::Tensor & AtenIpexCPUDefault::hardtanh_backward_out(at::Tensor & grad_input, 
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::hardtanh_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, min_val, max_val);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -12978,7 +12978,7 @@ at::Tensor & AtenIpexCPUDefault::hardtanh_(at::Tensor & self, at::Scalar min_val
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::hardtanh_(_ipex_self, min_val, max_val);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -12992,7 +12992,7 @@ at::Tensor & AtenIpexCPUDefault::leaky_relu_out(at::Tensor & out, const at::Tens
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::leaky_relu_out(_ipex_out, _ipex_self, negative_slope);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -13019,7 +13019,7 @@ at::Tensor & AtenIpexCPUDefault::leaky_relu_backward_out(at::Tensor & grad_input
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::leaky_relu_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, negative_slope);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13043,7 +13043,7 @@ at::Tensor & AtenIpexCPUDefault::leaky_relu_(at::Tensor & self, at::Scalar negat
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::leaky_relu_(_ipex_self, negative_slope);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -13057,7 +13057,7 @@ at::Tensor & AtenIpexCPUDefault::log_sigmoid_out(at::Tensor & out, const at::Ten
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::log_sigmoid_out(_ipex_out, _ipex_self);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -13084,8 +13084,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::log_sigmoid_forward_ou
   auto&& _ipex_buffer = bridge::shallowFallbackToCPUTensor(buffer);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::log_sigmoid_forward_out(_ipex_output, _ipex_buffer, _ipex_self);
-  output = bridge::shallowUpgradeToDPCPPTensor(_ipex_output);
-  buffer = bridge::shallowUpgradeToDPCPPTensor(_ipex_buffer);
+  bridge::shallowUpgradeToDPCPPTensorInplace(output, _ipex_output);
+  bridge::shallowUpgradeToDPCPPTensorInplace(buffer, _ipex_buffer);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(output, buffer);
 }
@@ -13113,7 +13113,7 @@ at::Tensor & AtenIpexCPUDefault::log_sigmoid_backward_out(at::Tensor & grad_inpu
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_buffer = bridge::shallowFallbackToCPUTensor(buffer);
   auto&& _ipex_result = at::log_sigmoid_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_buffer);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13146,7 +13146,7 @@ at::Tensor & AtenIpexCPUDefault::rrelu_with_noise_out(at::Tensor & out, const at
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_noise = bridge::shallowFallbackToCPUTensor(noise);
   auto&& _ipex_result = at::rrelu_with_noise_out(_ipex_out, _ipex_self, _ipex_noise, lower, upper, training, generator);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -13179,7 +13179,7 @@ at::Tensor & AtenIpexCPUDefault::rrelu_with_noise_backward_out(at::Tensor & grad
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_noise = bridge::shallowFallbackToCPUTensor(noise);
   auto&& _ipex_result = at::rrelu_with_noise_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_noise, lower, upper, training);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13209,7 +13209,7 @@ at::Tensor & AtenIpexCPUDefault::rrelu_with_noise_(at::Tensor & self, const at::
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_noise = bridge::shallowFallbackToCPUTensor(noise);
   auto&& _ipex_result = at::rrelu_with_noise_(_ipex_self, _ipex_noise, lower, upper, training, generator);
-  self = bridge::shallowUpgradeToDPCPPTensor(_ipex_self);
+  bridge::shallowUpgradeToDPCPPTensorInplace(self, _ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return self;
@@ -13223,7 +13223,7 @@ at::Tensor & AtenIpexCPUDefault::softplus_out(at::Tensor & out, const at::Tensor
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::softplus_out(_ipex_out, _ipex_self, beta, threshold);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -13253,7 +13253,7 @@ at::Tensor & AtenIpexCPUDefault::softplus_backward_out(at::Tensor & grad_input, 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_output = bridge::shallowFallbackToCPUTensor(output);
   auto&& _ipex_result = at::softplus_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, beta, threshold, _ipex_output);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13283,7 +13283,7 @@ at::Tensor & AtenIpexCPUDefault::softshrink_out(at::Tensor & out, const at::Tens
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::softshrink_out(_ipex_out, _ipex_self, lambd);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -13310,7 +13310,7 @@ at::Tensor & AtenIpexCPUDefault::softshrink_backward_out(at::Tensor & grad_input
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::softshrink_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, lambd);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13337,7 +13337,7 @@ at::Tensor & AtenIpexCPUDefault::adaptive_avg_pool2d_out(at::Tensor & out, const
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::adaptive_avg_pool2d_out(_ipex_out, _ipex_self, output_size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -13384,7 +13384,7 @@ at::Tensor & AtenIpexCPUDefault::adaptive_avg_pool3d_out(at::Tensor & out, const
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::adaptive_avg_pool3d_out(_ipex_out, _ipex_self, output_size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -13411,7 +13411,7 @@ at::Tensor & AtenIpexCPUDefault::adaptive_avg_pool3d_backward_out(at::Tensor & g
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::adaptive_avg_pool3d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13441,8 +13441,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::adaptive_max_pool2d_ou
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::adaptive_max_pool2d_out(_ipex_out, _ipex_indices, _ipex_self, output_size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
-  indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(indices, _ipex_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(out, indices);
 }
@@ -13470,7 +13470,7 @@ at::Tensor & AtenIpexCPUDefault::adaptive_max_pool2d_backward_out(at::Tensor & g
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_result = at::adaptive_max_pool2d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_indices);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13503,8 +13503,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::adaptive_max_pool3d_ou
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::adaptive_max_pool3d_out(_ipex_out, _ipex_indices, _ipex_self, output_size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
-  indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(indices, _ipex_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(out, indices);
 }
@@ -13532,7 +13532,7 @@ at::Tensor & AtenIpexCPUDefault::adaptive_max_pool3d_backward_out(at::Tensor & g
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_result = at::adaptive_max_pool3d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_indices);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13562,7 +13562,7 @@ at::Tensor & AtenIpexCPUDefault::avg_pool2d_out(at::Tensor & out, const at::Tens
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::avg_pool2d_out(_ipex_out, _ipex_self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -13589,7 +13589,7 @@ at::Tensor & AtenIpexCPUDefault::avg_pool2d_backward_out(at::Tensor & grad_input
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::avg_pool2d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13616,7 +13616,7 @@ at::Tensor & AtenIpexCPUDefault::avg_pool3d_out(at::Tensor & out, const at::Tens
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::avg_pool3d_out(_ipex_out, _ipex_self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -13643,7 +13643,7 @@ at::Tensor & AtenIpexCPUDefault::avg_pool3d_backward_out(at::Tensor & grad_input
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::avg_pool3d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13676,8 +13676,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::fractional_max_pool2d_
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_random_samples = bridge::shallowFallbackToCPUTensor(random_samples);
   auto&& _ipex_result = at::fractional_max_pool2d_out(_ipex_output, _ipex_indices, _ipex_self, kernel_size, output_size, _ipex_random_samples);
-  output = bridge::shallowUpgradeToDPCPPTensor(_ipex_output);
-  indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(output, _ipex_output);
+  bridge::shallowUpgradeToDPCPPTensorInplace(indices, _ipex_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(output, indices);
 }
@@ -13708,7 +13708,7 @@ at::Tensor & AtenIpexCPUDefault::fractional_max_pool2d_backward_out(at::Tensor &
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_result = at::fractional_max_pool2d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, kernel_size, output_size, _ipex_indices);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13744,8 +13744,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::fractional_max_pool3d_
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_random_samples = bridge::shallowFallbackToCPUTensor(random_samples);
   auto&& _ipex_result = at::fractional_max_pool3d_out(_ipex_output, _ipex_indices, _ipex_self, kernel_size, output_size, _ipex_random_samples);
-  output = bridge::shallowUpgradeToDPCPPTensor(_ipex_output);
-  indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(output, _ipex_output);
+  bridge::shallowUpgradeToDPCPPTensorInplace(indices, _ipex_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(output, indices);
 }
@@ -13776,7 +13776,7 @@ at::Tensor & AtenIpexCPUDefault::fractional_max_pool3d_backward_out(at::Tensor &
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_result = at::fractional_max_pool3d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, kernel_size, output_size, _ipex_indices);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13809,8 +13809,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::max_pool2d_with_indice
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::max_pool2d_with_indices_out(_ipex_out, _ipex_indices, _ipex_self, kernel_size, stride, padding, dilation, ceil_mode);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
-  indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(indices, _ipex_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(out, indices);
 }
@@ -13838,7 +13838,7 @@ at::Tensor & AtenIpexCPUDefault::max_pool2d_with_indices_backward_out(at::Tensor
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_result = at::max_pool2d_with_indices_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, kernel_size, stride, padding, dilation, ceil_mode, _ipex_indices);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13871,8 +13871,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::max_pool3d_with_indice
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::max_pool3d_with_indices_out(_ipex_out, _ipex_indices, _ipex_self, kernel_size, stride, padding, dilation, ceil_mode);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
-  indices = bridge::shallowUpgradeToDPCPPTensor(_ipex_indices);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(indices, _ipex_indices);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(out, indices);
 }
@@ -13900,7 +13900,7 @@ at::Tensor & AtenIpexCPUDefault::max_pool3d_with_indices_backward_out(at::Tensor
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_result = at::max_pool3d_with_indices_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, kernel_size, stride, padding, dilation, ceil_mode, _ipex_indices);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13933,7 +13933,7 @@ at::Tensor & AtenIpexCPUDefault::max_unpool2d_out(at::Tensor & out, const at::Te
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_result = at::max_unpool2d_out(_ipex_out, _ipex_self, _ipex_indices, output_size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -13966,7 +13966,7 @@ at::Tensor & AtenIpexCPUDefault::max_unpool2d_backward_out(at::Tensor & grad_inp
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_result = at::max_unpool2d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_indices, output_size);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -13999,7 +13999,7 @@ at::Tensor & AtenIpexCPUDefault::max_unpool3d_out(at::Tensor & out, const at::Te
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_result = at::max_unpool3d_out(_ipex_out, _ipex_self, _ipex_indices, output_size, stride, padding);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14032,7 +14032,7 @@ at::Tensor & AtenIpexCPUDefault::max_unpool3d_backward_out(at::Tensor & grad_inp
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
   auto&& _ipex_result = at::max_unpool3d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, _ipex_indices, output_size, stride, padding);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14062,7 +14062,7 @@ at::Tensor & AtenIpexCPUDefault::reflection_pad1d_out(at::Tensor & out, const at
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::reflection_pad1d_out(_ipex_out, _ipex_self, padding);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14089,7 +14089,7 @@ at::Tensor & AtenIpexCPUDefault::reflection_pad1d_backward_out(at::Tensor & grad
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::reflection_pad1d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, padding);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14116,7 +14116,7 @@ at::Tensor & AtenIpexCPUDefault::reflection_pad2d_out(at::Tensor & out, const at
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::reflection_pad2d_out(_ipex_out, _ipex_self, padding);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14143,7 +14143,7 @@ at::Tensor & AtenIpexCPUDefault::reflection_pad2d_backward_out(at::Tensor & grad
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::reflection_pad2d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, padding);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14170,7 +14170,7 @@ at::Tensor & AtenIpexCPUDefault::replication_pad1d_out(at::Tensor & out, const a
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::replication_pad1d_out(_ipex_out, _ipex_self, padding);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14197,7 +14197,7 @@ at::Tensor & AtenIpexCPUDefault::replication_pad1d_backward_out(at::Tensor & gra
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::replication_pad1d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, padding);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14224,7 +14224,7 @@ at::Tensor & AtenIpexCPUDefault::replication_pad2d_out(at::Tensor & out, const a
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::replication_pad2d_out(_ipex_out, _ipex_self, padding);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14251,7 +14251,7 @@ at::Tensor & AtenIpexCPUDefault::replication_pad2d_backward_out(at::Tensor & gra
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::replication_pad2d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, padding);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14278,7 +14278,7 @@ at::Tensor & AtenIpexCPUDefault::replication_pad3d_out(at::Tensor & out, const a
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::replication_pad3d_out(_ipex_out, _ipex_self, padding);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14305,7 +14305,7 @@ at::Tensor & AtenIpexCPUDefault::replication_pad3d_backward_out(at::Tensor & gra
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::replication_pad3d_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_self, padding);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14332,7 +14332,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_linear1d_out(at::Tensor & out, const a
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::upsample_linear1d_out(_ipex_out, _ipex_self, output_size, align_corners);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14356,7 +14356,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_linear1d_backward_out(at::Tensor & gra
   auto&& _ipex_grad_input = bridge::shallowFallbackToCPUTensor(grad_input);
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_result = at::upsample_linear1d_backward_out(_ipex_grad_input, _ipex_grad_output, output_size, input_size, align_corners);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14380,7 +14380,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_bilinear2d_out(at::Tensor & out, const
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::upsample_bilinear2d_out(_ipex_out, _ipex_self, output_size, align_corners);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14404,7 +14404,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_bilinear2d_backward_out(at::Tensor & g
   auto&& _ipex_grad_input = bridge::shallowFallbackToCPUTensor(grad_input);
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_result = at::upsample_bilinear2d_backward_out(_ipex_grad_input, _ipex_grad_output, output_size, input_size, align_corners);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14428,7 +14428,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_bicubic2d_out(at::Tensor & out, const 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::upsample_bicubic2d_out(_ipex_out, _ipex_self, output_size, align_corners);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14452,7 +14452,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_bicubic2d_backward_out(at::Tensor & gr
   auto&& _ipex_grad_input = bridge::shallowFallbackToCPUTensor(grad_input);
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_result = at::upsample_bicubic2d_backward_out(_ipex_grad_input, _ipex_grad_output, output_size, input_size, align_corners);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14476,7 +14476,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_trilinear3d_out(at::Tensor & out, cons
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::upsample_trilinear3d_out(_ipex_out, _ipex_self, output_size, align_corners);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14500,7 +14500,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_trilinear3d_backward_out(at::Tensor & 
   auto&& _ipex_grad_input = bridge::shallowFallbackToCPUTensor(grad_input);
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_result = at::upsample_trilinear3d_backward_out(_ipex_grad_input, _ipex_grad_output, output_size, input_size, align_corners);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14524,7 +14524,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_nearest1d_out(at::Tensor & out, const 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::upsample_nearest1d_out(_ipex_out, _ipex_self, output_size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14548,7 +14548,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_nearest1d_backward_out(at::Tensor & gr
   auto&& _ipex_grad_input = bridge::shallowFallbackToCPUTensor(grad_input);
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_result = at::upsample_nearest1d_backward_out(_ipex_grad_input, _ipex_grad_output, output_size, input_size);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14572,7 +14572,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_nearest2d_out(at::Tensor & out, const 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::upsample_nearest2d_out(_ipex_out, _ipex_self, output_size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14596,7 +14596,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_nearest2d_backward_out(at::Tensor & gr
   auto&& _ipex_grad_input = bridge::shallowFallbackToCPUTensor(grad_input);
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_result = at::upsample_nearest2d_backward_out(_ipex_grad_input, _ipex_grad_output, output_size, input_size);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14620,7 +14620,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_nearest3d_out(at::Tensor & out, const 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::upsample_nearest3d_out(_ipex_out, _ipex_self, output_size);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14644,7 +14644,7 @@ at::Tensor & AtenIpexCPUDefault::upsample_nearest3d_backward_out(at::Tensor & gr
   auto&& _ipex_grad_input = bridge::shallowFallbackToCPUTensor(grad_input);
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_result = at::upsample_nearest3d_backward_out(_ipex_grad_input, _ipex_grad_output, output_size, input_size);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14671,7 +14671,7 @@ at::Tensor & AtenIpexCPUDefault::sigmoid_backward_out(at::Tensor & grad_input, c
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_output = bridge::shallowFallbackToCPUTensor(output);
   auto&& _ipex_result = at::sigmoid_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_output);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14701,7 +14701,7 @@ at::Tensor & AtenIpexCPUDefault::tanh_backward_out(at::Tensor & grad_input, cons
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_output = bridge::shallowFallbackToCPUTensor(output);
   auto&& _ipex_result = at::tanh_backward_out(_ipex_grad_input, _ipex_grad_output, _ipex_output);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -14734,7 +14734,7 @@ at::Tensor & AtenIpexCPUDefault::slow_conv_transpose2d_out(at::Tensor & out, con
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
   auto&& _ipex_result = at::slow_conv_transpose2d_out(_ipex_out, _ipex_self, _ipex_weight, kernel_size, _ipex_bias, stride, padding, output_padding, dilation);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14782,9 +14782,9 @@ std::tuple<at::Tensor &,at::Tensor &,at::Tensor &> AtenIpexCPUDefault::slow_conv
   auto&& _ipex_columns = bridge::shallowFallbackToCPUTensor(columns);
   auto&& _ipex_ones = bridge::shallowFallbackToCPUTensor(ones);
   auto&& _ipex_result = at::slow_conv_transpose2d_backward_out(_ipex_grad_input, _ipex_grad_weight, _ipex_grad_bias, _ipex_grad_output, _ipex_self, _ipex_weight, kernel_size, stride, padding, output_padding, dilation, _ipex_columns, _ipex_ones);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
-  grad_weight = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_weight);
-  grad_bias = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_bias);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_weight, _ipex_grad_weight);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_bias, _ipex_grad_bias);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &,at::Tensor &>(grad_input, grad_weight, grad_bias);
 }
@@ -14824,7 +14824,7 @@ at::Tensor & AtenIpexCPUDefault::slow_conv_transpose3d_out(at::Tensor & out, con
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
   auto&& _ipex_result = at::slow_conv_transpose3d_out(_ipex_out, _ipex_self, _ipex_weight, kernel_size, _ipex_bias, stride, padding, output_padding, dilation);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14872,9 +14872,9 @@ std::tuple<at::Tensor &,at::Tensor &,at::Tensor &> AtenIpexCPUDefault::slow_conv
   auto&& _ipex_finput = bridge::shallowFallbackToCPUTensor(finput);
   auto&& _ipex_fgrad_input = bridge::shallowFallbackToCPUTensor(fgrad_input);
   auto&& _ipex_result = at::slow_conv_transpose3d_backward_out(_ipex_grad_input, _ipex_grad_weight, _ipex_grad_bias, _ipex_grad_output, _ipex_self, _ipex_weight, kernel_size, stride, padding, output_padding, dilation, _ipex_finput, _ipex_fgrad_input);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
-  grad_weight = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_weight);
-  grad_bias = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_bias);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_weight, _ipex_grad_weight);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_bias, _ipex_grad_bias);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &,at::Tensor &>(grad_input, grad_weight, grad_bias);
 }
@@ -14914,7 +14914,7 @@ at::Tensor & AtenIpexCPUDefault::thnn_conv2d_out(at::Tensor & out, const at::Ten
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
   auto&& _ipex_result = at::thnn_conv2d_out(_ipex_out, _ipex_self, _ipex_weight, kernel_size, _ipex_bias, stride, padding);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -14956,9 +14956,9 @@ std::tuple<at::Tensor &,at::Tensor &,at::Tensor &> AtenIpexCPUDefault::thnn_conv
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
   auto&& _ipex_result = at::thnn_conv2d_forward_out(_ipex_output, _ipex_finput, _ipex_fgrad_input, _ipex_self, _ipex_weight, kernel_size, _ipex_bias, stride, padding);
-  output = bridge::shallowUpgradeToDPCPPTensor(_ipex_output);
-  finput = bridge::shallowUpgradeToDPCPPTensor(_ipex_finput);
-  fgrad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_fgrad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(output, _ipex_output);
+  bridge::shallowUpgradeToDPCPPTensorInplace(finput, _ipex_finput);
+  bridge::shallowUpgradeToDPCPPTensorInplace(fgrad_input, _ipex_fgrad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &,at::Tensor &>(output, finput, fgrad_input);
 }
@@ -15004,9 +15004,9 @@ std::tuple<at::Tensor &,at::Tensor &,at::Tensor &> AtenIpexCPUDefault::thnn_conv
   auto&& _ipex_finput = bridge::shallowFallbackToCPUTensor(finput);
   auto&& _ipex_fgrad_input = bridge::shallowFallbackToCPUTensor(fgrad_input);
   auto&& _ipex_result = at::thnn_conv2d_backward_out(_ipex_grad_input, _ipex_grad_weight, _ipex_grad_bias, _ipex_grad_output, _ipex_self, _ipex_weight, kernel_size, stride, padding, _ipex_finput, _ipex_fgrad_input);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
-  grad_weight = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_weight);
-  grad_bias = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_bias);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_weight, _ipex_grad_weight);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_bias, _ipex_grad_bias);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &,at::Tensor &>(grad_input, grad_weight, grad_bias);
 }
@@ -15046,7 +15046,7 @@ at::Tensor & AtenIpexCPUDefault::thnn_conv_depthwise2d_out(at::Tensor & out, con
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
   auto&& _ipex_result = at::thnn_conv_depthwise2d_out(_ipex_out, _ipex_self, _ipex_weight, kernel_size, _ipex_bias, stride, padding, dilation);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -15082,7 +15082,7 @@ at::Tensor & AtenIpexCPUDefault::thnn_conv_depthwise2d_forward_out(at::Tensor & 
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
   auto&& _ipex_result = at::thnn_conv_depthwise2d_forward_out(_ipex_out, _ipex_self, _ipex_weight, kernel_size, _ipex_bias, stride, padding, dilation);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -15121,8 +15121,8 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::thnn_conv_depthwise2d_
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_result = at::thnn_conv_depthwise2d_backward_out(_ipex_grad_input, _ipex_grad_weight, _ipex_grad_output, _ipex_self, _ipex_weight, kernel_size, stride, padding, dilation);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
-  grad_weight = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_weight);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_weight, _ipex_grad_weight);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &>(grad_input, grad_weight);
 }
@@ -15156,7 +15156,7 @@ at::Tensor & AtenIpexCPUDefault::thnn_conv3d_out(at::Tensor & out, const at::Ten
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
   auto&& _ipex_result = at::thnn_conv3d_out(_ipex_out, _ipex_self, _ipex_weight, kernel_size, _ipex_bias, stride, padding);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -15198,9 +15198,9 @@ std::tuple<at::Tensor &,at::Tensor &,at::Tensor &> AtenIpexCPUDefault::thnn_conv
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
   auto&& _ipex_result = at::thnn_conv3d_forward_out(_ipex_output, _ipex_finput, _ipex_fgrad_input, _ipex_self, _ipex_weight, kernel_size, _ipex_bias, stride, padding);
-  output = bridge::shallowUpgradeToDPCPPTensor(_ipex_output);
-  finput = bridge::shallowUpgradeToDPCPPTensor(_ipex_finput);
-  fgrad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_fgrad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(output, _ipex_output);
+  bridge::shallowUpgradeToDPCPPTensorInplace(finput, _ipex_finput);
+  bridge::shallowUpgradeToDPCPPTensorInplace(fgrad_input, _ipex_fgrad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &,at::Tensor &>(output, finput, fgrad_input);
 }
@@ -15246,9 +15246,9 @@ std::tuple<at::Tensor &,at::Tensor &,at::Tensor &> AtenIpexCPUDefault::thnn_conv
   auto&& _ipex_finput = bridge::shallowFallbackToCPUTensor(finput);
   auto&& _ipex_fgrad_input = bridge::shallowFallbackToCPUTensor(fgrad_input);
   auto&& _ipex_result = at::thnn_conv3d_backward_out(_ipex_grad_input, _ipex_grad_weight, _ipex_grad_bias, _ipex_grad_output, _ipex_self, _ipex_weight, kernel_size, stride, padding, _ipex_finput, _ipex_fgrad_input);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
-  grad_weight = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_weight);
-  grad_bias = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_bias);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_weight, _ipex_grad_weight);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_bias, _ipex_grad_bias);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor &,at::Tensor &,at::Tensor &>(grad_input, grad_weight, grad_bias);
 }
@@ -15344,7 +15344,7 @@ at::Tensor & AtenIpexCPUDefault::col2im_out(at::Tensor & out, const at::Tensor &
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::col2im_out(_ipex_out, _ipex_self, output_size, kernel_size, dilation, padding, stride);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -15368,7 +15368,7 @@ at::Tensor & AtenIpexCPUDefault::col2im_backward_out(at::Tensor & grad_input, co
   auto&& _ipex_grad_input = bridge::shallowFallbackToCPUTensor(grad_input);
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_result = at::col2im_backward_out(_ipex_grad_input, _ipex_grad_output, kernel_size, dilation, padding, stride);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;
@@ -15392,7 +15392,7 @@ at::Tensor & AtenIpexCPUDefault::im2col_out(at::Tensor & out, const at::Tensor &
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::im2col_out(_ipex_out, _ipex_self, kernel_size, dilation, padding, stride);
-  out = bridge::shallowUpgradeToDPCPPTensor(_ipex_out);
+  bridge::shallowUpgradeToDPCPPTensorInplace(out, _ipex_out);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return out;
@@ -15416,7 +15416,7 @@ at::Tensor & AtenIpexCPUDefault::im2col_backward_out(at::Tensor & grad_input, co
   auto&& _ipex_grad_input = bridge::shallowFallbackToCPUTensor(grad_input);
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_result = at::im2col_backward_out(_ipex_grad_input, _ipex_grad_output, input_size, kernel_size, dilation, padding, stride);
-  grad_input = bridge::shallowUpgradeToDPCPPTensor(_ipex_grad_input);
+  bridge::shallowUpgradeToDPCPPTensorInplace(grad_input, _ipex_grad_input);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return grad_input;

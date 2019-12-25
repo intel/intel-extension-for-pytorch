@@ -102,9 +102,10 @@ _FN_BLACKLIST_REGEX = [
     r'[^(]*mkldnn',
 ]
 
-_FN_WITH_INPLACE = [
-    'view',
-    'data'
+_FN_WITH_INPLACE_SEMANTICS = [
+    'select',
+    #'view',
+    #'data'
 ]
 
 _FALLBACK_TO_CPU_TENSOR_LIST = 'fallbackToCPUTensorList'
@@ -114,6 +115,7 @@ _UPGRADE_TO_DPCPP_TENSOR_VEC = 'upgradeToDPCPPTensorVec'
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
 _SHALLOW_FALLBACK_TO_CPU_TENSOR = 'shallowFallbackToCPUTensor'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR = 'shallowUpgradeToDPCPPTensor'
+_SHALLOW_UPGRADE_TO_DPCPP_TENSOR_IN_PLACE = 'shallowUpgradeToDPCPPTensorInplace'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_VEC = 'shallowUpgradeToDPCPPTensorVec'
 
 # List of tuples with the regex match first, and the corresponding FuncOpts()
@@ -300,7 +302,9 @@ class TensorFetcher(object):
         ipex_code = ''
         if len(self.writeable_tensors) > 0:
             for (w_tensor_name, w_new_tensor_name) in self.writeable_tensors:
-                ipex_code += '  {} = bridge::{}({});\n'.format(w_tensor_name, _SHALLOW_UPGRADE_TO_DPCPP_TENSOR, w_new_tensor_name)
+                ipex_code += '  bridge::{}({}, {});\n'.format(_SHALLOW_UPGRADE_TO_DPCPP_TENSOR_IN_PLACE,
+                                                              w_tensor_name,
+                                                              w_new_tensor_name)
         return ipex_code
 
 
@@ -474,19 +478,26 @@ def type_is_optional(t):
                 return False
     raise RuntimeError('Not a type tree: {}'.format(t))
 
+
 def type_is_const(t):
     assert isinstance(t, lark.tree.Tree)
     c = t.children[0]
     return isinstance(c, lark.lexer.Token) and c.value == 'const'
 
-def fn_is_inplace(fnname):
-    if fnname.endswith('_'):
+
+def fn_is_inplace(fname):
+    if fname.endswith('_'):
         return True
     else:
-        if fnname in _FN_WITH_INPLACE:
-            return True
-        else:
-            return False
+        return False
+
+
+def fn_with_inplace_semantic(fname):
+    if fname in _FN_WITH_INPLACE_SEMANTICS:
+        return True
+    else:
+        return False
+
 
 def type_is_refptr(t, kind):
     assert isinstance(t, lark.tree.Tree)
@@ -585,8 +596,19 @@ def get_return_value(rtype, rname, param, var, ref_param, fnopts, fname):
         # If instead the return type is a value Tensor, we create a new one by
         # wrapping the proper local variable which has been created by calling
         # into the CPU tensor implementation.
-        upgrade_func = _SHALLOW_UPGRADE_TO_DPCPP_TENSOR if fn_is_inplace(fname) else _UPGRADE_TO_DPCPP_TENSOR
-        return 'bridge::{}({})'.format(upgrade_func, rname)
+        if fn_is_inplace(fname):
+            # Conver at::Tensor AtenIpexCPUDefault::__xxx__(const at::Tensor & xxx, ...) {
+            ptype = param_type(param)
+            if type_is_const(ptype):
+                return 'bridge::{}({})'.format(_UPGRADE_TO_DPCPP_TENSOR, rname)
+            else:
+                assert False
+                #org_param_name = param_name(param)
+                #return 'bridge::{}({}, {})'.format(_SHALLOW_UPGRADE_TO_DPCPP_TENSOR_IN_PLACE, rname, org_param_name)
+        elif fn_with_inplace_semantic(fname):
+            return 'bridge::{}({})'.format(_SHALLOW_UPGRADE_TO_DPCPP_TENSOR, rname)
+        else:
+            return 'bridge::{}({})'.format(_UPGRADE_TO_DPCPP_TENSOR, rname)
 
 
 def get_reference_param(params, fnopts=None):
@@ -799,6 +821,7 @@ def generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
     ref_param = get_reference_param(params, fnopts=fnopts)
 
     code = '{} {{\n'.format(sig)
+    #code += '  printf("AtenIpexCPUDefault::{}\\n");\n'.format(fname)
     xla_ref_param = param_name(ref_param) if ref_param else None
     tfetcher = TensorFetcher('xlatens')
     param_vars = []

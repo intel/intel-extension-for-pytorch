@@ -94,7 +94,7 @@ void IPEXTensorImpl::set_data_tensor(at::Tensor data_tensor) {
 
 // The storage of tensor impl cannot be accessed out of TensorImpl class. So we need to expose an interface
 // to set storage data ptr.
-void IPEXTensorImpl::set_storage_data_ptr(c10::DataPtr&& data_ptr) {
+void IPEXTensorImpl::set_storage_data_ptr(c10::DataPtr data_ptr) {
   this->storage_.set_data_ptr(std::move(data_ptr));
 }
 
