@@ -16,6 +16,7 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor);
 // Convert CPU tensor to DPCPP tensor
 at::Tensor upgradeToDPCPPTensor(const at::Tensor& ipexTensor);
 at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& ipexTensor);
+at::Tensor& shallowUpgradeToDPCPPTensorInplace(at::Tensor& ipexTensor, at::Tensor& cpuTensor);
 
 // Copy tensor raw data
 void copyTensor(at::Tensor& dstTensor, const at::Tensor& scrTensor, c10::DeviceType devType);

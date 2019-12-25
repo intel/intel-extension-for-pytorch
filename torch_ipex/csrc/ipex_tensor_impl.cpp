@@ -87,6 +87,17 @@ void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl) {
   this->refresh_numel();
 }
 
+// Keep data tensor in case the IPEXTensorImpl is shallow-copy from a stack variable.
+void IPEXTensorImpl::set_data_tensor(at::Tensor data_tensor) {
+  this->m_data_tensor = data_tensor;
+}
+
+// The storage of tensor impl cannot be accessed out of TensorImpl class. So we need to expose an interface
+// to set storage data ptr.
+void IPEXTensorImpl::set_storage_data_ptr(c10::DataPtr&& data_ptr) {
+  this->storage_.set_data_ptr(std::move(data_ptr));
+}
+
 c10::Device IPEXTensorImpl::GetCurrentAtenDevice() {
   return g_current_device;
 }

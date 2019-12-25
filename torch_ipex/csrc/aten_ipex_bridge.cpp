@@ -32,6 +32,7 @@ namespace bridge {
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->storage_offset() == b.unsafeGetTensorImpl()->storage_offset()); \
   CHECK_TENSOR(a, b)
 
+
 // Fallback DPCPP tensor to CPU Tensor.
 // It will allocate new memory buffer and then duplicate the DPCPP tensor buffer to create new CPU Tensor
 at::Tensor fallbackToCPUTensor(const at::Tensor& ipexTensor) {
@@ -151,6 +152,25 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
   //TODO: Cannot reserved_ 
   //dest_impl->reserved_ = src_impl->reserved_;
   return _tensor;
+}
+
+
+// Upgrade CPU tensor to DPCPP Tensor with shallow copy
+// It will not create an new DPCPP tensor but shares CPU tensor buffer
+at::Tensor& shallowUpgradeToDPCPPTensorInplace(at::Tensor& ipexTensor, at::Tensor& cpuTensor) {
+  TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
+  TORCH_INTERNAL_ASSERT(ipexTensor.device().type() == at::DeviceType::DPCPP);
+
+  // Get cpuTensor
+  void* tensor_raw_data = cpuTensor.unsafeGetTensorImpl()->storage().data();
+  c10::DataPtr dpcpp_data_ptr(tensor_raw_data, at::DeviceType::DPCPP);
+
+  IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
+  ipex_tensor_impl->set_storage_data_ptr(std::move(dpcpp_data_ptr));
+  ipex_tensor_impl->set_data_tensor(cpuTensor);
+  ipex_tensor_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
+  CHECK_TENSOR_CRITICAL(ipexTensor, cpuTensor);
+  return ipexTensor;
 }
 
 
