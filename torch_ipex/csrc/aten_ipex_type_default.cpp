@@ -9,6 +9,7 @@
 #include "aten_ipex_bridge.h"
 #include "utils.h"
 #include "cpu/OPs.h"
+#include "cpu/AliasOPs.h"
 
 namespace torch_ipex {
 
@@ -614,7 +615,7 @@ at::Tensor AtenIpexTypeDefault::argmin(const at::Tensor & self, c10::optional<in
 
 at::Tensor AtenIpexTypeDefault::as_strided(const at::Tensor & self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::as_strided(self, size, stride, storage_offset);
+    return cpu::AtenIpexCPUAlias::as_strided(self, size, stride, storage_offset);
   } else {
     AT_ASSERT(false);
   }
@@ -982,7 +983,7 @@ at::Tensor AtenIpexTypeDefault::chain_matmul(at::TensorList matrices) {
 
 std::vector<at::Tensor> AtenIpexTypeDefault::chunk(const at::Tensor & self, int64_t chunks, int64_t dim) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::chunk(self, chunks, dim);
+    return cpu::AtenIpexCPUAlias::chunk(self, chunks, dim);
   } else {
     AT_ASSERT(false);
   }
@@ -1350,7 +1351,7 @@ at::Tensor AtenIpexTypeDefault::diagflat(const at::Tensor & self, int64_t offset
 
 at::Tensor AtenIpexTypeDefault::diagonal(const at::Tensor & self, int64_t offset, int64_t dim1, int64_t dim2) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::diagonal(self, offset, dim1, dim2);
+    return cpu::AtenIpexCPUAlias::diagonal(self, offset, dim1, dim2);
   } else {
     AT_ASSERT(false);
   }
@@ -1702,7 +1703,7 @@ at::Tensor & AtenIpexTypeDefault::expm1_out(at::Tensor & out, const at::Tensor &
 
 at::Tensor AtenIpexTypeDefault::expand(const at::Tensor & self, at::IntArrayRef size, bool implicit) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::expand(self, size, implicit);
+    return cpu::AtenIpexCPUAlias::expand(self, size, implicit);
   } else {
     AT_ASSERT(false);
   }
@@ -2902,7 +2903,7 @@ at::Tensor AtenIpexTypeDefault::narrow_copy(const at::Tensor & self, int64_t dim
 
 at::Tensor AtenIpexTypeDefault::narrow(const at::Tensor & self, int64_t dim, int64_t start, int64_t length) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::narrow(self, dim, start, length);
+    return cpu::AtenIpexCPUAlias::narrow(self, dim, start, length);
   } else {
     AT_ASSERT(false);
   }
@@ -3110,7 +3111,7 @@ at::Tensor AtenIpexTypeDefault::cosine_similarity(const at::Tensor & x1, const a
 
 at::Tensor AtenIpexTypeDefault::permute(const at::Tensor & self, at::IntArrayRef dims) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::permute(self, dims);
+    return cpu::AtenIpexCPUAlias::permute(self, dims);
   } else {
     AT_ASSERT(false);
   }
@@ -3118,7 +3119,7 @@ at::Tensor AtenIpexTypeDefault::permute(const at::Tensor & self, at::IntArrayRef
 
 at::Tensor AtenIpexTypeDefault::numpy_T(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::numpy_T(self);
+    return cpu::AtenIpexCPUAlias::numpy_T(self);
   } else {
     AT_ASSERT(false);
   }
@@ -3646,7 +3647,7 @@ at::Tensor & AtenIpexTypeDefault::rsqrt_out(at::Tensor & out, const at::Tensor &
 
 at::Tensor AtenIpexTypeDefault::select(const at::Tensor & self, int64_t dim, int64_t index) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::select(self, dim, index);
+    return cpu::AtenIpexCPUAlias::select(self, dim, index);
   } else {
     AT_ASSERT(false);
   }
@@ -3782,7 +3783,7 @@ int64_t AtenIpexTypeDefault::size(const at::Tensor & self, int64_t dim) {
 
 at::Tensor AtenIpexTypeDefault::slice(const at::Tensor & self, int64_t dim, int64_t start, int64_t end, int64_t step) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::slice(self, dim, start, end, step);
+    return cpu::AtenIpexCPUAlias::slice(self, dim, start, end, step);
   } else {
     AT_ASSERT(false);
   }
@@ -3830,7 +3831,7 @@ at::Tensor AtenIpexTypeDefault::_softmax_backward_data(const at::Tensor & grad_o
 
 std::vector<at::Tensor> AtenIpexTypeDefault::split(const at::Tensor & self, int64_t split_size, int64_t dim) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::split(self, split_size, dim);
+    return cpu::AtenIpexCPUAlias::split(self, split_size, dim);
   } else {
     AT_ASSERT(false);
   }
@@ -3846,7 +3847,7 @@ std::vector<at::Tensor> AtenIpexTypeDefault::split_with_sizes(const at::Tensor &
 
 at::Tensor AtenIpexTypeDefault::squeeze(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::squeeze(self);
+    return cpu::AtenIpexCPUAlias::squeeze(self);
   } else {
     AT_ASSERT(false);
   }
@@ -3854,7 +3855,7 @@ at::Tensor AtenIpexTypeDefault::squeeze(const at::Tensor & self) {
 
 at::Tensor AtenIpexTypeDefault::squeeze(const at::Tensor & self, int64_t dim) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::squeeze(self, dim);
+    return cpu::AtenIpexCPUAlias::squeeze(self, dim);
   } else {
     AT_ASSERT(false);
   }
@@ -4046,7 +4047,7 @@ at::Tensor & AtenIpexTypeDefault::prod_out(at::Tensor & out, const at::Tensor & 
 
 at::Tensor AtenIpexTypeDefault::t(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::t(self);
+    return cpu::AtenIpexCPUAlias::t(self);
   } else {
     AT_ASSERT(false);
   }
@@ -4150,7 +4151,7 @@ at::Tensor AtenIpexTypeDefault::threshold_backward(const at::Tensor & grad_outpu
 
 at::Tensor AtenIpexTypeDefault::transpose(const at::Tensor & self, int64_t dim0, int64_t dim1) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::transpose(self, dim0, dim1);
+    return cpu::AtenIpexCPUAlias::transpose(self, dim0, dim1);
   } else {
     AT_ASSERT(false);
   }
@@ -4318,7 +4319,7 @@ at::Tensor AtenIpexTypeDefault::_unsafe_view(const at::Tensor & self, at::IntArr
 
 at::Tensor AtenIpexTypeDefault::unsqueeze(const at::Tensor & self, int64_t dim) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::unsqueeze(self, dim);
+    return cpu::AtenIpexCPUAlias::unsqueeze(self, dim);
   } else {
     AT_ASSERT(false);
   }
@@ -4942,7 +4943,7 @@ bool AtenIpexTypeDefault::is_coalesced(const at::Tensor & self) {
 
 at::Tensor AtenIpexTypeDefault::_indices(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::_indices(self);
+    return cpu::AtenIpexCPUAlias::_indices(self);
   } else {
     AT_ASSERT(false);
   }
@@ -4950,7 +4951,7 @@ at::Tensor AtenIpexTypeDefault::_indices(const at::Tensor & self) {
 
 at::Tensor AtenIpexTypeDefault::_values(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::_values(self);
+    return cpu::AtenIpexCPUAlias::_values(self);
   } else {
     AT_ASSERT(false);
   }
@@ -4966,7 +4967,7 @@ at::Tensor & AtenIpexTypeDefault::_coalesced_(at::Tensor & self, bool coalesced)
 
 at::Tensor AtenIpexTypeDefault::indices(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::indices(self);
+    return cpu::AtenIpexCPUAlias::indices(self);
   } else {
     AT_ASSERT(false);
   }
@@ -4974,7 +4975,7 @@ at::Tensor AtenIpexTypeDefault::indices(const at::Tensor & self) {
 
 at::Tensor AtenIpexTypeDefault::values(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::values(self);
+    return cpu::AtenIpexCPUAlias::values(self);
   } else {
     AT_ASSERT(false);
   }
@@ -5006,7 +5007,7 @@ at::Tensor & AtenIpexTypeDefault::copy_sparse_to_sparse_(at::Tensor & self, cons
 
 std::vector<at::Tensor> AtenIpexTypeDefault::unbind(const at::Tensor & self, int64_t dim) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::unbind(self, dim);
+    return cpu::AtenIpexCPUAlias::unbind(self, dim);
   } else {
     AT_ASSERT(false);
   }
@@ -5574,7 +5575,7 @@ at::Tensor AtenIpexTypeDefault::masked_scatter(const at::Tensor & self, const at
 
 at::Tensor AtenIpexTypeDefault::view(const at::Tensor & self, at::IntArrayRef size) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::view(self, size);
+    return cpu::AtenIpexCPUAlias::view(self, size);
   } else {
     AT_ASSERT(false);
   }
@@ -7270,7 +7271,7 @@ at::Tensor AtenIpexTypeDefault::renorm(const at::Tensor & self, at::Scalar p, in
 
 at::Tensor AtenIpexTypeDefault::unfold(const at::Tensor & self, int64_t dimension, int64_t size, int64_t step) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::unfold(self, dimension, size, step);
+    return cpu::AtenIpexCPUAlias::unfold(self, dimension, size, step);
   } else {
     AT_ASSERT(false);
   }
@@ -7382,7 +7383,7 @@ at::Tensor & AtenIpexTypeDefault::normal_out(at::Tensor & out, double mean, doub
 
 at::Tensor AtenIpexTypeDefault::alias(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::alias(self);
+    return cpu::AtenIpexCPUAlias::alias(self);
   } else {
     AT_ASSERT(false);
   }
