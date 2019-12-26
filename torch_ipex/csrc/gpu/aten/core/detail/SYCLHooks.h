@@ -1,4 +1,4 @@
-#include <ATen/detail/SYCLHooksInterface.h>
+#include <core/detail/SYCLHooksInterface.h>
 
 #include <ATen/Generator.h>
 

@@ -107,6 +107,7 @@ set(DPCPP_GPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/gpu")
 set(DPCPP_GPU_ATEN_SRC_ROOT "${DPCPP_GPU_ROOT}/aten")
 set(DPCPP_GPU_ATEN_GENERATED "${DPCPP_GPU_ROOT}/aten/generated")
 
+include_directories(${PYTHON_INCLUDE_DIR})
 include_directories(${PYTORCH_INCLUDES})
 # include_directories(${PYTORCH_ATEN_SRC_ROOT})
 # include_directories(${PYTORCH_ATEN_INCLUDES})
@@ -155,6 +156,7 @@ set(C10_DISABLE_NUMA ${CAFFE2_DISABLE_NUMA})
 
 # sources
 set(DPCPP_SRCS)
+
 set(DPCPP_ATEN_SRCS)
 add_subdirectory(torch_ipex/csrc/gpu/aten)
 list(APPEND DPCPP_SRCS ${DPCPP_ATEN_SRCS})
@@ -167,7 +169,13 @@ set(DPCPP_LEGACY_NN_SRCS)
 add_subdirectory(torch_ipex/csrc/gpu/legacy_nn)
 list(APPEND DPCPP_SRCS ${DPCPP_LEGACY_NN_SRCS})
 
+link_directories(${PYTORCH_INSTALL_DIR}/lib)
+
 add_library(torch_ipex SHARED ${DPCPP_SRCS})
+target_link_libraries(torch_ipex PUBLIC dnnl)
+target_link_libraries(torch_ipex PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
+target_link_libraries(torch_ipex PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
+
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME "_torch_ipex")
 # add_dependencies(torch_ipex ${DPCPP_DEP})
@@ -183,3 +191,5 @@ ENDIF()
 #   set_source_files_properties(${Caffe2_SYCL_SRCS} COMPILE_FLAGS "-fsycl -D__STRICT_ANSI__ -DUSE_DPCPP")
 #   target_link_libraries(torch PRIVATE "-fsycl")
 # endif()
+
+add_dependencies(torch_ipex dnnl)

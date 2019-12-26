@@ -1,11 +1,11 @@
 #include <core/detail/SYCLHooks.h>
 
-#include <ATen/SYCLGenerator.h>
+#include <core/SYCLGenerator.h>
 #include <ATen/Context.h>
 //#include <core/SYCLConfig.h>
 #include <ATen/Config.h>
 #include <core/SYCLDevice.h>
-#include <ATen/detail/SYCLHooksInterface.h>
+#include <core/detail/SYCLHooksInterface.h>
 #include <c10/util/Exception.h>
 
 #include <legacy/THSYCL.h>
@@ -37,7 +37,7 @@ Generator* SYCLHooks::getDefaultSYCLGenerator(DeviceIndex device_index) const {
 }
 
 Device SYCLHooks::getDeviceFromPtr(void* data) const {
-  return at::sycl::getDeviceFromPtr(data);
+  return c10::sycl::getDeviceFromPtr(data);
 }
 
 bool SYCLHooks::hasSYCL() const {
@@ -59,7 +59,11 @@ int SYCLHooks::getNumGPUs() const {
 }
 
 bool SYCLHooks::compiledWithSyCL() const {
-  return AT_SYCL_ENABLED();
+#ifndef USE_SYCL
+  return false;
+#else
+  return true;
+#endif
 }
 
 // Sigh, the registry doesn't su[[prt namespace :(

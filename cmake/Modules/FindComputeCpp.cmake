@@ -324,6 +324,7 @@ function(__build_ir)
   endif()
 
   # Add custom command for running compute++
+  message("@@@@@@@@@@@@@@@@" ${SDK_BUILD_IR_SOURCE})
   add_custom_command(
     OUTPUT ${outputSyclFile}
     COMMAND ${ComputeCpp_DEVICE_COMPILER_EXECUTABLE}

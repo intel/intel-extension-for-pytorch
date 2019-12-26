@@ -8,7 +8,7 @@
 #include <core/SYCLException.h>
 #include <core/SYCLMemory.h>
 #include <core/SYCLApplyUtils.h>
-#include <ATen/native/Copy.h>
+// #include <ATen/native/Copy.h>
 
 namespace at {
 namespace sycl {
@@ -147,8 +147,10 @@ void copy_to_cpu(TensorIterator& iter, bool non_blocking) {
     src_contig.data_ptr(),
     src.numel() * src.dtype().itemsize(),
     c10::sycl::DeviceToHost);
-  BUILD_TENSOR_ITER(dst, dst_contig, _iter);
-  copy_stub(kCPU, _iter, non_blocking);
+  // DispatchStub is not exposed by torch
+  // BUILD_TENSOR_ITER(dst, dst_contig, _iter);
+  // copy_stub(kCPU, _iter, non_blocking);
+  at::native::copy_(dst, dst_contig);
 }
 
 void copy_from_cpu_async_(TensorIterator& iter) {
@@ -219,8 +221,10 @@ void _copy__sycl(TensorIterator& iter, bool non_blocking) {
             } else {
               // Do a dtype converting copy on the CPU, then copy to device
               Tensor srcf = at::empty_like(src, src.options().dtype(dst.dtype()));
-              BUILD_TENSOR_ITER(srcf, src, iter1)
-              copy_stub(kCPU, iter1, non_blocking);
+              // DispatchStub is not exposed by torch
+              // BUILD_TENSOR_ITER(srcf, src, iter1)
+              // copy_stub(kCPU, iter1, non_blocking);
+              at::native::copy_(srcf, src);
               BUILD_TENSOR_ITER(dst, srcf, iter2)
               copy_from_cpu(iter2, non_blocking);
             }

@@ -13,6 +13,7 @@ from subprocess import check_call
 from setuptools import setup, Extension, find_packages, distutils
 from setuptools.command.build_ext import build_ext
 from distutils.spawn import find_executable
+from sysconfig import get_paths
 
 import distutils.ccompiler
 import distutils.command.clean
@@ -29,6 +30,7 @@ import sys
 
 pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
 base_dir = os.path.dirname(os.path.abspath(__file__))
+python_include_dir = get_paths()['include']
 
 
 def _check_env_flag(name, default=''):
@@ -165,7 +167,9 @@ class DPCPPBuild(build_ext, object):
             '-DCMAKE_BUILD_TYPE=' + build_type,
             '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
             '-DPYTHON_EXECUTABLE=' + sys.executable,
+            '-DCMAKE_INSTALL_PREFIX=' + ext_dir,
             '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + ext_dir,
+            '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
         ]
 
     if _check_env_flag("USE_SYCL"):
@@ -180,7 +184,7 @@ class DPCPPBuild(build_ext, object):
     else:
       check_call([self.cmake, ext.project_dir] + cmake_args, cwd=ext.build_dir, env=env)
 
-    build_args += ['VERBOSE=1']
+    # build_args += ['VERBOSE=1']
     check_call(['make'] + build_args, cwd=ext.build_dir, env=env)
 
 

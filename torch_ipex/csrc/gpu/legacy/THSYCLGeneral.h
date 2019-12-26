@@ -44,12 +44,7 @@
 #define THSYCL_CONCAT_4(x,y,z,w) THSYCL_CONCAT_4_EXPAND(x,y,z,w)
 
 /* Global state of THSYCL. */
-struct THSYCLState {
-  struct THSYCLRNGState* rngState;
-  int numDevices;
-  c10::Allocator* syclHostAllocator;
-  c10::Allocator* syclDeviceAllocator;
-};
+#include <core/SYCLState.h>
 
 typedef THSYCLState THSYCLState;
 struct THSYCLState;

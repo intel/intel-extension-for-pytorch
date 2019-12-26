@@ -8,4 +8,10 @@ struct THSYCLState {
   c10::Allocator* syclDeviceAllocator;
 };
 
+static inline THSYCLState* getTHSYCLState() {
+  static THSYCLState g_state;
+  // TODO: init g_state;
+  return &g_state;
+}
+
 #endif
