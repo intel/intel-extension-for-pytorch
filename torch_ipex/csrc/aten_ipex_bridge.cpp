@@ -92,8 +92,8 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   IPEXTensorImpl::CopySizeStridesAndOffset(_tensor.unsafeGetTensorImpl(), ipexTensor.unsafeGetTensorImpl());
   IPEXTensorImpl::CopyMetadata(_tensor.unsafeGetTensorImpl(), ipexTensor.unsafeGetTensorImpl());
   CHECK_TENSOR_CRITICAL(ipexTensor, _tensor);
-  //TODO: Cannot reserved_ 
-  //dest_impl->reserved_ = src_impl->reserved_;
+  // TODO: Cannot reserved_
+  //       dest_impl->reserved_ = src_impl->reserved_;
   return _tensor;
 }
 
@@ -154,7 +154,7 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
   impex_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
   CHECK_TENSOR_CRITICAL(_tensor, cpuTensor);
   //TODO: Cannot set reserved_ 
-  //  dest_impl->reserved_ = src_impl->reserved_;
+  //      dest_impl->reserved_ = src_impl->reserved_;
   return _tensor;
 }
 
@@ -165,6 +165,16 @@ at::Tensor& shallowUpgradeToDPCPPTensorInplace(at::Tensor& ipexTensor, at::Tenso
   TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
   TORCH_INTERNAL_ASSERT(ipexTensor.device().type() == at::DeviceType::DPCPP);
   TORCH_INTERNAL_ASSERT(ipexTensor.data_ptr() == cpuTensor.data_ptr());
+
+  // NOTE: Cannot set storage data_ptr by set_data_ptr.
+  //       set_data_ptr will release caller tensor's original data_ptr. It is wrong here because
+  //       the ipexTensor and cpuTensor share buffer here.
+  /*
+  void* tensor_raw_data = cpuTensor.unsafeGetTensorImpl()->storage().data();
+  c10::DataPtr dpcpp_data_ptr(tensor_raw_data, at::DeviceType::DPCPP);
+  ipexTensor.storage().set_data_ptr(std::move(dpcpp_data_ptr));
+  */
+
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
   ipex_tensor_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
   CHECK_TENSOR_CRITICAL(ipexTensor, cpuTensor);

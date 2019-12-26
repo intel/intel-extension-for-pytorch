@@ -51,18 +51,21 @@ C10_REGISTER_GUARD_IMPL(DPCPP, IPEXGuardImpl);
 
 
 IPEXTensorImpl::IPEXTensorImpl(at::Tensor tensor, at::Storage storage, at::TensorTypeId type_id) :
-    m_data_tensor(std::move(tensor)),
-    c10::TensorImpl(std::move(storage), type_id) {}
+    c10::TensorImpl(std::move(storage), type_id),
+    m_data_tensor(std::move(tensor)) {}
 
 IPEXTensorImpl::IPEXTensorImpl(at::Storage storage, at::TensorTypeId type_id) :
     c10::TensorImpl(std::move(storage), type_id) {}
 
 void IPEXTensorImpl::set_dpcpp_tensor_id() {
-  this->type_set_ = at::TensorTypeSet(at::TensorTypeId::DPCPPTensorId);
   this->type_set_.add(at::TensorTypeId::VariableTensorId);
 }
 
 void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl) {
+  // Port from copy_tensor_metadata of TensorImpl.cpp and bypass some fields: storage_, device_opt_, type_set_ and reserved_.
+  // NOTE: All these fields is specifically ignored except reserved_. Because there is no public interface to access it. Tthe
+  //       field may impact performance. Tensor resize will check the flag. "If tensor is reserved then don't claim its memeory
+  //       unless capacity() is smaller than new size"
   /*
   dest_impl->storage_ = src_impl->storage_;
   dest_impl->device_opt_ = src_impl->device_opt_;
