@@ -16,6 +16,13 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor);
 // Convert CPU tensor to DPCPP tensor
 at::Tensor upgradeToDPCPPTensor(const at::Tensor& ipexTensor);
 at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& ipexTensor);
+
+// The last character A means alias. This function is for aten alias
+//     ex: aten::select.int(Tensor(a) self, int dim, int index) -> Tensor(a)
+at::Tensor shallowUpgradeToDPCPPTensorA(const at::Tensor& ipexTensor, const at::Tensor& cpuTensor);
+// The last two character AW means alias and write. This function is for aten alias w/ write
+//     ex: aten::asin_(Tensor(a!) self) -> Tensor(a!)
+at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cpuTensor);
 at::Tensor& shallowUpgradeToDPCPPTensorInplace(at::Tensor& ipexTensor, at::Tensor& cpuTensor);
 
 // Copy tensor raw data

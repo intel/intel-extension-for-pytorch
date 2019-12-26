@@ -150,11 +150,25 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
   );
 
   auto _tensor =  at::detail::make_tensor<IPEXTensorImpl>(cpuTensor, storage_impl, at::TensorTypeId::DPCPPTensorId);
+  TORCH_INTERNAL_ASSERT(_tensor.device().type() == at::DeviceType::DPCPP);
   IPEXTensorImpl* impex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
   impex_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
   CHECK_TENSOR_CRITICAL(_tensor, cpuTensor);
   //TODO: Cannot set reserved_ 
   //      dest_impl->reserved_ = src_impl->reserved_;
+  return _tensor;
+}
+
+
+at::Tensor shallowUpgradeToDPCPPTensorA(const at::Tensor& ipexTensor, const at::Tensor& cpuTensor) {
+  TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
+  TORCH_INTERNAL_ASSERT(ipexTensor.device().type() == at::DeviceType::DPCPP);
+  TORCH_INTERNAL_ASSERT(ipexTensor.storage().data() == cpuTensor.storage().data());
+  auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(at::Storage(ipexTensor.storage()), at::TensorTypeId::DPCPPTensorId);
+  TORCH_INTERNAL_ASSERT(_tensor.device().type() == at::DeviceType::DPCPP);
+  IPEXTensorImpl* ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
+  ipex_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
+  CHECK_TENSOR_CRITICAL(_tensor, cpuTensor);
   return _tensor;
 }
 
