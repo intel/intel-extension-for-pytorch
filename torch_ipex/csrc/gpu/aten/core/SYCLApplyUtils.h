@@ -225,7 +225,7 @@ void kernelPointwiseApply1(detail::TensorInfo<scalar, IndexType> a,
 
   auto cgf = DP_Q_CGF(cgh) {
     auto a_acc = c10::sycl::SYCLAccessor<read_write_mode>(cgh, a.data);
-    cgh.parallel_for<PointwiseApply1<Op, scalar, IndexType, ADims,step> >(
+    cgh.parallel_for<PointwiseApply1<Op, scalar, IndexType, ADims, step> >(
             cl::sycl::nd_range<1>(cl::sycl::range<1>(tileSize), cl::sycl::range<1>(tileSize)),
             [=](cl::sycl::nd_item<1> item) {
               for (IndexType linearIndex = item.get_global_id(0) * step;

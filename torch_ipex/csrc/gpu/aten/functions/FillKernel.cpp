@@ -22,5 +22,20 @@ void fill_kernel_sycl(TensorIterator& iter, Scalar value) {
   });
 }
 
+Tensor& fill__sycl_out(Tensor& self, Scalar value) {
+  auto iter = TensorIterator::nullary_op(self);
+  fill_kernel_sycl(iter, value);
+  return self;
+}
+
+Tensor& fill__sycl(Tensor& self, Scalar value) {
+  return fill__sycl_out(self, value);
+}
+
+Tensor& fill__sycl(Tensor& self, const Tensor& value) {
+  TORCH_CHECK(value.dim() == 0, "fill_ only supports 0-dimension value tensor but got tensor with ", value.dim(), " dimensions.");
+  return fill__sycl_out(self, value.item());
+}
+
 } // namespace native
 } // namespace at
