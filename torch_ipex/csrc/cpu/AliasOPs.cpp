@@ -106,24 +106,19 @@ at::Tensor AtenIpexCPUAlias::numpy_T(const at::Tensor & self) {
 at::Tensor AtenIpexCPUAlias::select(const at::Tensor & self, int64_t dim, int64_t index) {
   DEBUG("AtenIpexCPUAlias::select\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::select(_ipex_self, dim, index);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return bridge::shallowUpgradeToDPCPPTensorA(self, _ipex_result);
 }
 
 at::Tensor AtenIpexCPUAlias::slice(const at::Tensor & self, int64_t dim, int64_t start, int64_t end, int64_t step) {
-  TORCH_INTERNAL_ASSERT(false);
   DEBUG("AtenIpexCPUAlias::slice\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::slice(_ipex_self, dim, start, end, step);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::upgradeToDPCPPTensor(_ipex_result);
+  return bridge::shallowUpgradeToDPCPPTensorA(self, _ipex_result);
 }
 
 std::vector<at::Tensor> AtenIpexCPUAlias::split(const at::Tensor & self, int64_t split_size, int64_t dim) {
@@ -162,15 +157,13 @@ at::Tensor AtenIpexCPUAlias::squeeze(const at::Tensor & self, int64_t dim) {
 }
 
 at::Tensor AtenIpexCPUAlias::t(const at::Tensor & self) {
-  TORCH_INTERNAL_ASSERT(false);
   DEBUG("AtenIpexCPUAlias::t\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::t(_ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::upgradeToDPCPPTensor(_ipex_result);
+  return bridge::shallowUpgradeToDPCPPTensorA(self, _ipex_result);
 }
 
 at::Tensor AtenIpexCPUAlias::transpose(const at::Tensor & self, int64_t dim0, int64_t dim1) {

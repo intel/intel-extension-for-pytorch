@@ -25,14 +25,7 @@ from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MK
 
 device = 'dpcpp:0'
 
-
-def test_select():
-    res1 = torch.ones(2, device=device)
-    print(res1)
-
-
 class RN50(TestCase):
-
     def test_ones(self):
         res1 = torch.ones(3, device=device)
         mask = torch.tensor([True, False, True], device=device)
@@ -50,6 +43,40 @@ class RN50(TestCase):
         for i in range(m1.size(1)):
             res2[i] = m1[1, i] + v1[i]
         self.assertEqual(res1, res2)
+
+        # non-contiguous
+        res1 = torch.add(m1[:, 4], v1)
+        res2 = res1.clone().zero_()
+        for i in range(m1.size(0)):
+            res2[i] = m1[i, 4] + v1[i]
+        self.assertEqual(res1, res2)
+
+        # [res] torch.add([res,] tensor, value)
+        m1 = torch.randn(10, 10, device=device)
+
+        # contiguous
+        res1 = m1.clone()
+        res1[3].add_(2)
+        res2 = m1.clone()
+        for i in range(m1.size(1)):
+            res2[3, i] = res2[3, i] + 2
+        self.assertEqual(res1, res2)
+
+        # non-contiguous
+        m1 = torch.randn(10, 10, device=device)
+        res1 = m1.clone()
+        res1[:, 3].add_(2)
+        res2 = m1.clone()
+        for i in range(m1.size(0)):
+            res2[i, 3] = res2[i, 3] + 2
+        self.assertEqual(res1, res2)
+
+        # contiguous + non-contiguous
+        m1 = torch.randn(10, 10, device=device)
+        m2 = torch.randn(10, 10, device=device).t()
+        res = m1 + m2
+        self.assertTrue(res.is_contiguous())
+        self.assertEqual(res, m1 + m2.contiguous())
 
     def test_sub(self):
         m1 = torch.tensor([2.34, 4.44], dtype=torch.float32, device=device)

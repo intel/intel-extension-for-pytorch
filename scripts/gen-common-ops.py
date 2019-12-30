@@ -148,7 +148,9 @@ namespace torch_ipex {{
 
 _FUNCTION_OPTIONS = {}
 
-_FN_WITH_INPLACE_SEMANTICS = [
+_FN_WITH_ALIAS_FEATURE = "Tensor(a)"
+
+_FN_WITH_ALIAS = [
     'as_strided',
     'chunk',
     'diagonal',
@@ -212,7 +214,7 @@ class StringEmit(object):
 
 
 def fn_with_inplace_semantic(fname):
-    if fname in _FN_WITH_INPLACE_SEMANTICS:
+    if fname in _FN_WITH_ALIAS:
         return True
     else:
         return False
@@ -451,6 +453,11 @@ def generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
 
     return code
 
+def fn_is_alias(fname):
+    if _FN_WITH_ALIAS_FEATURE in fname:
+        return True
+    else:
+        return False
 
 def get_ipex_wrapper(fndef, ctx):
     tree = _PARSER.parse(fndef.cpp_sig)
@@ -465,6 +472,11 @@ def get_ipex_wrapper(fndef, ctx):
         return 'AtenIpexTypeDefault::{}'.format(x)
 
     sig, fname, xfname = get_function_signature(rwxtree, rwsig, gen_fnname)
+
+    if fn_is_alias(fndef.aten_sig):
+        if fname not in _FN_WITH_ALIAS:
+            assert False
+
     if not is_blacklisted_fn(fname, mapsig):
         code = generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
     else:

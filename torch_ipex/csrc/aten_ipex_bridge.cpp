@@ -72,7 +72,6 @@ at::Tensor fallbackToCPUTensor(const at::Tensor& ipexTensor) {
 // Fallback CPU tensor to DPCPP Tensor with shallow copy
 // It will create an new CPU tensor but shares DPCPP tensor buffer
 at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
-  TORCH_INTERNAL_ASSERT(ipexTensor.is_contiguous());
   TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
   if (ipexTensor.device().is_cpu())
     return ipexTensor;
@@ -101,6 +100,8 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
 // Upgrade CPU tensor to DPCPP Tensor.
 // It will allocate new memory buffer and then duplicate the CPU tensor buffer to create new DPCPP Tensor
 at::Tensor upgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
+  TORCH_INTERNAL_ASSERT(cpuTensor.is_contiguous());
+  TORCH_INTERNAL_ASSERT(cpuTensor.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
   if (cpuTensor.device().type() == at::DeviceType::DPCPP) {
     return cpuTensor;
@@ -175,43 +176,25 @@ at::Tensor shallowUpgradeToDPCPPTensorA(const at::Tensor& ipexTensor, const at::
 
 // Upgrade CPU tensor to DPCPP Tensor with shallow copy
 // It will not create an new DPCPP tensor but shares CPU tensor buffer
-at::Tensor& shallowUpgradeToDPCPPTensorInplace(at::Tensor& ipexTensor, at::Tensor& cpuTensor) {
+at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cpuTensor) {
   TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
   TORCH_INTERNAL_ASSERT(ipexTensor.device().type() == at::DeviceType::DPCPP);
   TORCH_INTERNAL_ASSERT(ipexTensor.data_ptr() == cpuTensor.data_ptr());
 
   // NOTE: Cannot set storage data_ptr by set_data_ptr.
   //       set_data_ptr will release caller tensor's original data_ptr. It is wrong here because
-  //       the ipexTensor and cpuTensor share buffer here.
-  /*
-  void* tensor_raw_data = cpuTensor.unsafeGetTensorImpl()->storage().data();
-  c10::DataPtr dpcpp_data_ptr(tensor_raw_data, at::DeviceType::DPCPP);
-  ipexTensor.storage().set_data_ptr(std::move(dpcpp_data_ptr));
-  */
+  //       the ipexTensor and cpuTensor share same buffer here.
+  //
+  // [Wrong code]:
+  //   void* tensor_raw_data = cpuTensor.unsafeGetTensorImpl()->storage().data();
+  //   c10::DataPtr dpcpp_data_ptr(tensor_raw_data, at::DeviceType::DPCPP);
+  //   ipexTensor.storage().set_data_ptr(std::move(dpcpp_data_ptr));
+  //
 
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
   ipex_tensor_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
   CHECK_TENSOR_CRITICAL(ipexTensor, cpuTensor);
   return ipexTensor;
-}
-
-
-void copyTensor(at::Tensor& dstTensor, const at::Tensor& scrTensor, c10::DeviceType devType) {
-  TORCH_INTERNAL_ASSERT(dstTensor.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(scrTensor.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(dstTensor.is_contiguous());
-  TORCH_INTERNAL_ASSERT(scrTensor.is_contiguous());
-  TORCH_INTERNAL_ASSERT(dstTensor.numel() == scrTensor.numel());
-  TORCH_INTERNAL_ASSERT(dstTensor.dtype() == scrTensor.dtype());
-  TORCH_INTERNAL_ASSERT(dstTensor.nbytes() == scrTensor.nbytes());
-  TORCH_INTERNAL_ASSERT(dstTensor.layout() == scrTensor.layout());
-  TORCH_INTERNAL_ASSERT((devType == c10::DeviceType::CPU) || (devType == c10::DeviceType::DPCPP));
-  TORCH_INTERNAL_ASSERT(dstTensor.device().type() == devType);
-  TORCH_INTERNAL_ASSERT((dstTensor.device().type() == c10::DeviceType::CPU) || (dstTensor.device().type() == c10::DeviceType::DPCPP));
-  TORCH_INTERNAL_ASSERT((scrTensor.device().type() == c10::DeviceType::CPU) || (scrTensor.device().type() == c10::DeviceType::DPCPP));
-  memcpy(dstTensor.unsafeGetTensorImpl()->data(), scrTensor.unsafeGetTensorImpl()->data(), dstTensor.nbytes());
-  IPEXTensorImpl::CopySizeStridesAndOffset(dstTensor.unsafeGetTensorImpl(), scrTensor.unsafeGetTensorImpl());
-  IPEXTensorImpl::CopyMetadata(dstTensor.unsafeGetTensorImpl(), scrTensor.unsafeGetTensorImpl());
 }
 
 

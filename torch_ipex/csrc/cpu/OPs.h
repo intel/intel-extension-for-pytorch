@@ -83,7 +83,6 @@ class AtenIpexCPUDefault {
   static at::Tensor _dim_arange(const at::Tensor & like, int64_t dim);
   static at::Tensor argmax(const at::Tensor & self, c10::optional<int64_t> dim, bool keepdim);
   static at::Tensor argmin(const at::Tensor & self, c10::optional<int64_t> dim, bool keepdim);
-  static at::Tensor as_strided(const at::Tensor & self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset);
   static at::Tensor & as_strided_(at::Tensor & self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset);
   static at::Tensor asin(const at::Tensor & self);
   static at::Tensor & asin_(at::Tensor & self);
@@ -129,7 +128,6 @@ class AtenIpexCPUDefault {
   static at::Tensor & ceil_(at::Tensor & self);
   static at::Tensor & ceil_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor chain_matmul(at::TensorList matrices);
-  static std::vector<at::Tensor> chunk(const at::Tensor & self, int64_t chunks, int64_t dim);
   static at::Tensor clamp(const at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);
   static at::Tensor & clamp_(at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);
   static at::Tensor & clamp_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);
@@ -175,7 +173,6 @@ class AtenIpexCPUDefault {
   static at::Tensor det(const at::Tensor & self);
   static at::Tensor diag_embed(const at::Tensor & self, int64_t offset, int64_t dim1, int64_t dim2);
   static at::Tensor diagflat(const at::Tensor & self, int64_t offset);
-  static at::Tensor diagonal(const at::Tensor & self, int64_t offset, int64_t dim1, int64_t dim2);
   static at::Tensor & fill_diagonal_(at::Tensor & self, at::Scalar fill_value, bool wrap);
   static at::Tensor div(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & div_(at::Tensor & self, const at::Tensor & other);
@@ -219,7 +216,6 @@ class AtenIpexCPUDefault {
   static at::Tensor expm1(const at::Tensor & self);
   static at::Tensor & expm1_(at::Tensor & self);
   static at::Tensor & expm1_out(at::Tensor & out, const at::Tensor & self);
-  static at::Tensor expand(const at::Tensor & self, at::IntArrayRef size, bool implicit);
   static at::Tensor expand_as(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor eye(int64_t n, const at::TensorOptions & options);
   static at::Tensor eye(int64_t n, int64_t m, const at::TensorOptions & options);
@@ -369,7 +365,6 @@ class AtenIpexCPUDefault {
   static at::Tensor mvlgamma(const at::Tensor & self, int64_t p);
   static at::Tensor & mvlgamma_(at::Tensor & self, int64_t p);
   static at::Tensor narrow_copy(const at::Tensor & self, int64_t dim, int64_t start, int64_t length);
-  static at::Tensor narrow(const at::Tensor & self, int64_t dim, int64_t start, int64_t length);
   static std::tuple<at::Tensor,at::Tensor,at::Tensor> native_batch_norm(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, const at::Tensor & running_mean, const at::Tensor & running_var, bool training, double momentum, double eps);
   static std::tuple<at::Tensor,at::Tensor> batch_norm_stats(const at::Tensor & input, double eps);
   static at::Tensor batch_norm_elemt(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, const at::Tensor & mean, const at::Tensor & invstd, double eps);
@@ -395,8 +390,6 @@ class AtenIpexCPUDefault {
   static at::Tensor _pdist_forward(const at::Tensor & self, double p);
   static at::Tensor _pdist_backward(const at::Tensor & grad, const at::Tensor & self, double p, const at::Tensor & pdist);
   static at::Tensor cosine_similarity(const at::Tensor & x1, const at::Tensor & x2, int64_t dim, double eps);
-  static at::Tensor permute(const at::Tensor & self, at::IntArrayRef dims);
-  static at::Tensor numpy_T(const at::Tensor & self);
   static at::Tensor pixel_shuffle(const at::Tensor & self, int64_t upscale_factor);
   static bool is_pinned(const at::Tensor & self);
   static at::Tensor pin_memory(const at::Tensor & self);
@@ -462,7 +455,6 @@ class AtenIpexCPUDefault {
   static at::Tensor rsqrt(const at::Tensor & self);
   static at::Tensor & rsqrt_(at::Tensor & self);
   static at::Tensor & rsqrt_out(at::Tensor & out, const at::Tensor & self);
-  static at::Tensor select(const at::Tensor & self, int64_t dim, int64_t index);
   static at::Tensor selu(const at::Tensor & self);
   static at::Tensor & selu_(at::Tensor & self);
   static at::Tensor celu(const at::Tensor & self, at::Scalar alpha);
@@ -479,16 +471,12 @@ class AtenIpexCPUDefault {
   static at::Tensor detach(const at::Tensor & self);
   static at::Tensor & detach_(at::Tensor & self);
   static int64_t size(const at::Tensor & self, int64_t dim);
-  static at::Tensor slice(const at::Tensor & self, int64_t dim, int64_t start, int64_t end, int64_t step);
   static std::tuple<at::Tensor,at::Tensor> slogdet(const at::Tensor & self);
   static at::Tensor smm(const at::Tensor & self, const at::Tensor & mat2);
   static at::Tensor softmax(const at::Tensor & self, int64_t dim, c10::optional<at::ScalarType> dtype);
   static at::Tensor _softmax(const at::Tensor & self, int64_t dim, bool half_to_float);
   static at::Tensor _softmax_backward_data(const at::Tensor & grad_output, const at::Tensor & output, int64_t dim, const at::Tensor & self);
-  static std::vector<at::Tensor> split(const at::Tensor & self, int64_t split_size, int64_t dim);
   static std::vector<at::Tensor> split_with_sizes(const at::Tensor & self, at::IntArrayRef split_sizes, int64_t dim);
-  static at::Tensor squeeze(const at::Tensor & self);
-  static at::Tensor squeeze(const at::Tensor & self, int64_t dim);
   static at::Tensor & squeeze_(at::Tensor & self);
   static at::Tensor & squeeze_(at::Tensor & self, int64_t dim);
   static at::Tensor sspaddmm(const at::Tensor & self, const at::Tensor & mat1, const at::Tensor & mat2, at::Scalar beta, at::Scalar alpha);
@@ -512,7 +500,6 @@ class AtenIpexCPUDefault {
   static at::Tensor prod(const at::Tensor & self, c10::optional<at::ScalarType> dtype);
   static at::Tensor prod(const at::Tensor & self, int64_t dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   static at::Tensor & prod_out(at::Tensor & out, const at::Tensor & self, int64_t dim, bool keepdim, c10::optional<at::ScalarType> dtype);
-  static at::Tensor t(const at::Tensor & self);
   static at::Tensor & t_(at::Tensor & self);
   static at::Tensor tan(const at::Tensor & self);
   static at::Tensor & tan_(at::Tensor & self);
@@ -525,7 +512,6 @@ class AtenIpexCPUDefault {
   static at::Tensor & threshold_(at::Tensor & self, at::Scalar threshold, at::Scalar value);
   static at::Tensor & threshold_out(at::Tensor & out, const at::Tensor & self, at::Scalar threshold, at::Scalar value);
   static at::Tensor threshold_backward(const at::Tensor & grad_output, const at::Tensor & self, at::Scalar threshold);
-  static at::Tensor transpose(const at::Tensor & self, int64_t dim0, int64_t dim1);
   static at::Tensor & transpose_(at::Tensor & self, int64_t dim0, int64_t dim1);
   static at::Tensor one_hot(const at::Tensor & self, int64_t num_classes);
   static at::Tensor flip(const at::Tensor & self, at::IntArrayRef dims);
@@ -546,7 +532,6 @@ class AtenIpexCPUDefault {
   static std::tuple<at::Tensor,at::Tensor,at::Tensor> unique_dim_consecutive(const at::Tensor & self, int64_t dim, bool return_inverse, bool return_counts);
   static std::tuple<at::Tensor,at::Tensor,at::Tensor> _unique2(const at::Tensor & self, bool sorted, bool return_inverse, bool return_counts);
   static at::Tensor _unsafe_view(const at::Tensor & self, at::IntArrayRef size);
-  static at::Tensor unsqueeze(const at::Tensor & self, int64_t dim);
   static at::Tensor & unsqueeze_(at::Tensor & self, int64_t dim);
   static at::Tensor var(const at::Tensor & self, bool unbiased);
   static at::Tensor var(const at::Tensor & self, at::IntArrayRef dim, bool unbiased, bool keepdim);
@@ -624,15 +609,10 @@ class AtenIpexCPUDefault {
   static int64_t _nnz(const at::Tensor & self);
   static at::Tensor coalesce(const at::Tensor & self);
   static bool is_coalesced(const at::Tensor & self);
-  static at::Tensor _indices(const at::Tensor & self);
-  static at::Tensor _values(const at::Tensor & self);
   static at::Tensor & _coalesced_(at::Tensor & self, bool coalesced);
-  static at::Tensor indices(const at::Tensor & self);
-  static at::Tensor values(const at::Tensor & self);
   static at::Tensor & hspmm_out(at::Tensor & out, const at::Tensor & mat1, const at::Tensor & mat2);
   static at::Tensor hspmm(const at::Tensor & mat1, const at::Tensor & mat2);
   static at::Tensor & copy_sparse_to_sparse_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
-  static std::vector<at::Tensor> unbind(const at::Tensor & self, int64_t dim);
   static at::Tensor to_sparse(const at::Tensor & self, int64_t sparse_dim);
   static at::Tensor to_sparse(const at::Tensor & self);
   static at::Tensor quantize_per_tensor(const at::Tensor & self, double scale, int64_t zero_point, at::ScalarType dtype);
@@ -706,7 +686,6 @@ class AtenIpexCPUDefault {
   static at::Tensor masked_fill(const at::Tensor & self, const at::Tensor & mask, const at::Tensor & value);
   static at::Tensor & masked_scatter_(at::Tensor & self, const at::Tensor & mask, const at::Tensor & source);
   static at::Tensor masked_scatter(const at::Tensor & self, const at::Tensor & mask, const at::Tensor & source);
-  static at::Tensor view(const at::Tensor & self, at::IntArrayRef size);
   static at::Tensor & put_(at::Tensor & self, const at::Tensor & index, const at::Tensor & source, bool accumulate);
   static at::Tensor & index_add_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & source);
   static at::Tensor index_add(const at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & source);
@@ -918,7 +897,6 @@ class AtenIpexCPUDefault {
   static at::Tensor any(const at::Tensor & self);
   static at::Tensor & renorm_out(at::Tensor & out, const at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm);
   static at::Tensor renorm(const at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm);
-  static at::Tensor unfold(const at::Tensor & self, int64_t dimension, int64_t size, int64_t step);
   static bool equal(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & pow_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & exponent);
   static at::Tensor pow(const at::Tensor & self, const at::Tensor & exponent);
@@ -932,7 +910,6 @@ class AtenIpexCPUDefault {
   static at::Tensor normal(const at::Tensor & mean, const at::Tensor & std, at::Generator * generator);
   static at::Tensor normal(double mean, double std, at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options);
   static at::Tensor & normal_out(at::Tensor & out, double mean, double std, at::IntArrayRef size, at::Generator * generator);
-  static at::Tensor alias(const at::Tensor & self);
   static at::Tensor _addr(const at::Tensor & self, const at::Tensor & vec1, const at::Tensor & vec2, at::Scalar beta, at::Scalar alpha);
   static at::Tensor & _addr_(at::Tensor & self, const at::Tensor & vec1, const at::Tensor & vec2, at::Scalar beta, at::Scalar alpha);
   static at::Tensor & _addr_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & vec1, const at::Tensor & vec2, at::Scalar beta, at::Scalar alpha);

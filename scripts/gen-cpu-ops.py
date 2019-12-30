@@ -102,11 +102,7 @@ _FN_BLACKLIST_REGEX = [
     r'[^(]*mkldnn',
 ]
 
-_FN_WITH_INPLACE_SEMANTICS = [
-    'select',
-    #'view',
-    #'data'
-]
+_FN_WITH_ALIAS_FEATURE = 'Tensor(a)'
 
 _FALLBACK_TO_CPU_TENSOR_LIST = 'fallbackToCPUTensorList'
 _FALLBACK_TO_CPU_TENSOR = 'fallbackToCPUTensor'
@@ -114,8 +110,8 @@ _UPGRADE_TO_DPCPP_TENSOR = 'upgradeToDPCPPTensor'
 _UPGRADE_TO_DPCPP_TENSOR_VEC = 'upgradeToDPCPPTensorVec'
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
 _SHALLOW_FALLBACK_TO_CPU_TENSOR = 'shallowFallbackToCPUTensor'
-_SHALLOW_UPGRADE_TO_DPCPP_TENSOR = 'shallowUpgradeToDPCPPTensor'
-_SHALLOW_UPGRADE_TO_DPCPP_TENSOR_IN_PLACE = 'shallowUpgradeToDPCPPTensorInplace'
+_SHALLOW_UPGRADE_TO_DPCPP_TENSOR_A = 'shallowUpgradeToDPCPPTensorA'
+_SHALLOW_UPGRADE_TO_DPCPP_TENSOR_AW = 'shallowUpgradeToDPCPPTensorAW'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_VEC = 'shallowUpgradeToDPCPPTensorVec'
 
 # List of tuples with the regex match first, and the corresponding FuncOpts()
@@ -302,7 +298,7 @@ class TensorFetcher(object):
         ipex_code = ''
         if len(self.writeable_tensors) > 0:
             for (w_tensor_name, w_new_tensor_name) in self.writeable_tensors:
-                ipex_code += '  bridge::{}({}, {});\n'.format(_SHALLOW_UPGRADE_TO_DPCPP_TENSOR_IN_PLACE,
+                ipex_code += '  bridge::{}({}, {});\n'.format(_SHALLOW_UPGRADE_TO_DPCPP_TENSOR_AW,
                                                               w_tensor_name,
                                                               w_new_tensor_name)
         return ipex_code
@@ -492,8 +488,8 @@ def fn_is_inplace(fname):
         return False
 
 
-def fn_with_inplace_semantic(fname):
-    if fname in _FN_WITH_INPLACE_SEMANTICS:
+def fn_is_alias(fname):
+    if _FN_WITH_ALIAS_FEATURE in fname:
         return True
     else:
         return False
@@ -584,14 +580,15 @@ def get_optional(fnopts, name, defval=None):
 
 def get_return_value(rtype, rname, param, var, ref_param, fnopts, fname):
     crtype = type_core(rtype)
+    ret_check = ''
     if type_is_const(rtype) or type_is_refptr(rtype, '&'):
         # If the return type is a const or a reference, return the matching
         # parameter. In these cases we operated on IPEX tensors data (the ATEN one),
         # but the returned references are the input parameters.
         assert param
-        return param_name(param)
+        return ret_check, param_name(param)
     elif crtype != 'Tensor':
-        return rname
+        return ret_check, rname
     else:
         # If instead the return type is a value Tensor, we create a new one by
         # wrapping the proper local variable which has been created by calling
@@ -600,15 +597,13 @@ def get_return_value(rtype, rname, param, var, ref_param, fnopts, fname):
             # Conver at::Tensor AtenIpexCPUDefault::__xxx__(const at::Tensor & xxx, ...) {
             ptype = param_type(param)
             if type_is_const(ptype):
-                return 'bridge::{}({})'.format(_UPGRADE_TO_DPCPP_TENSOR, rname)
+                ret_check += '  TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(rname)
+                return ret_check, 'bridge::{}({})'.format(_UPGRADE_TO_DPCPP_TENSOR, rname)
             else:
                 assert False
-                #org_param_name = param_name(param)
-                #return 'bridge::{}({}, {})'.format(_SHALLOW_UPGRADE_TO_DPCPP_TENSOR_IN_PLACE, rname, org_param_name)
-        elif fn_with_inplace_semantic(fname):
-            return 'bridge::{}({})'.format(_SHALLOW_UPGRADE_TO_DPCPP_TENSOR, rname)
         else:
-            return 'bridge::{}({})'.format(_UPGRADE_TO_DPCPP_TENSOR, rname)
+            ret_check += '  TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(rname)
+            return ret_check, 'bridge::{}({})'.format(_UPGRADE_TO_DPCPP_TENSOR, rname)
 
 
 def get_reference_param(params, fnopts=None):
@@ -634,19 +629,23 @@ def get_reference_param(params, fnopts=None):
 
 def get_tuple_return(rtype, rtype_str, rname, params, param_vars, ref_param, fnopts, fname):
     types = tuple_type_list(rtype)
-    retstr = '{}('.format(rtype_str)
+    ret_check_str = ''
+    ret_str = '{}('.format(rtype_str)
     for i, ttype in enumerate(types):
         if i > 0:
-            retstr += ', '
+            ret_str += ', '
         tuple_var = 'std::get<{}>({})'.format(i, rname)
-        retstr += get_return_value(ttype,
-                                   tuple_var,
-                                   list_get(params, i),
-                                   list_get(param_vars, i),
-                                   ref_param,
-                                   fnopts,
-                                   fname)
-    return retstr + ')'
+        ret_check, ret = get_return_value(ttype,
+                                          tuple_var,
+                                          list_get(params, i),
+                                          list_get(param_vars, i),
+                                          ref_param,
+                                          fnopts,
+                                          fname)
+        ret_str += ret
+        ret_check_str += ret_check
+    ret_str += ')'
+    return ret_check_str, ret_str
 
 
 def get_return_type_str(t, orig_sig):
@@ -671,26 +670,27 @@ def generate_return_stmt(t, rtype_str, fname, rname, params, param_vars, ref_par
     post_check = ''
     if ctype == 'std::tuple':
         assert not fn_is_inplace(fname)
-        retstr = get_tuple_return(rtype,
-                                  rtype_str,
-                                  rname,
-                                  params,
-                                  param_vars,
-                                  ref_param,
-                                  fnopts,
-                                  fname)
+        ret_check_str, retstr = get_tuple_return(rtype,
+                                                 rtype_str,
+                                                 rname,
+                                                 params,
+                                                 param_vars,
+                                                 ref_param,
+                                                 fnopts,
+                                                 fname)
+        post_check += ret_check_str
     elif ctype == 'std::vector':
         assert not fn_is_inplace(fname)
         retstr = 'bridge::{}({})'.format(_UPGRADE_TO_DPCPP_TENSOR_VEC, rname)
     elif ctype == 'Tensor':
-        post_check = '  TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(rname)
-        retstr = get_return_value(rtype,
-                                  rname,
-                                  params[0],
-                                  param_vars[0],
-                                  ref_param,
-                                  fnopts,
-                                  fname)
+        ret_check_str, retstr = get_return_value(rtype,
+                                                 rname,
+                                                 params[0],
+                                                 param_vars[0],
+                                                 ref_param,
+                                                 fnopts,
+                                                 fname)
+        post_check += ret_check_str
     elif ctype == 'void' and not type_is_refptr(rtype, '*'):
         return ''
     else:
@@ -857,14 +857,14 @@ def generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
             check_cond_2 = '{}.is_contiguous()'.format(pname)
 
             code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond_1)
-            code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond_2)
+            #code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond_2)
             xname = tfetcher.add(pname, is_write_param(fnopts, pname, False))
             param_vars.append(xname)
         else:
             check_cond_1 = '{}.layout() == c10::kStrided'.format(pname)
             check_cond_2 = '{}.is_contiguous()'.format(pname)
             code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond_1)
-            code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond_2)
+            #code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond_2)
             xname = tfetcher.add(pname, is_write_param(fnopts, pname, True))
             param_vars.append(xname)
 
@@ -875,8 +875,7 @@ def generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
     result_assign = generate_result_assignment(tree, _RESULT_NAME)
     code += '  {}{};\n'.format(
         result_assign,
-        get_handling_function(ctx, fname, xla_ref_param, param_vars)
-    )
+        get_handling_function(ctx, fname, xla_ref_param, param_vars))
     code += tfetcher.generate_updates()
     if result_assign:
         code += ('  static_cast<void>({}); // Avoid warnings in case not used\n'.format(_RESULT_NAME))
@@ -904,6 +903,9 @@ def get_ipex_wrapper(fndef, ctx):
     rwxtree = _XPARSER.parse(rwsig)
     params = get_parameters(tree)
     fnopts = _FUNCTION_OPTIONS.get(mapsig, None)
+
+    if fn_is_alias(fndef.aten_sig):
+        return None
 
     def gen_fnname(x):
         return 'AtenIpexCPUDefault::{}'.format(x)
