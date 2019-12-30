@@ -1,4 +1,5 @@
 #include <Python.h>
+#include <ATen/aten_ipex_type_default.h>
 
 
 // static PyObject* M_PyInstanceMethod_New(PyObject *self, PyObject *func)
@@ -15,7 +16,9 @@
 // extern "C"{
 void torch_ipex_init() {
   // TODO:
-  printf("loading _torch_ipex.so ...\n");
+  printf("loading _torch_ipex.so ++\n");
+  torch_ipex::RegisterAtenTypeFunctions();
+  printf("loading _torch_ipex.so --\n");
 }
 // PyObject* PyInit__torch_ipex() {
 //   // TODO:
