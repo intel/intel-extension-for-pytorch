@@ -1510,8 +1510,10 @@ CAFFE2_API Tensor im2col_backward_cpu(const Tensor & grad_output, IntArrayRef in
 CAFFE2_API Tensor im2col_backward_cuda(const Tensor & grad_output, IntArrayRef input_size, IntArrayRef kernel_size, IntArrayRef dilation, IntArrayRef padding, IntArrayRef stride);
 
 // register for DispatchStub path
+Tensor & copy__sycl(Tensor& self, const Tensor& src, bool non_blocking);
 Tensor & fill__sycl(Tensor & self, Scalar value);
 Tensor & fill__sycl(Tensor & self, const Tensor & value);
+Tensor convolution_sycl(const Tensor & input_r, const Tensor & weight_r, const Tensor & bias_r, IntArrayRef stride_, IntArrayRef padding_, IntArrayRef dilation_, bool transposed_, IntArrayRef output_padding_, int64_t groups_);
 
 } // namespace native
 } // namespace at

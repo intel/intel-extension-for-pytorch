@@ -259,5 +259,19 @@ void copy_kernel_sycl(TensorIterator& iter, bool non_blocking) {
   );
 }
 
+Tensor & copy__sycl(Tensor& self, const Tensor& src, bool non_blocking) {
+  // TODO: valid check
+
+  BUILD_TENSOR_ITER(self, src, iter);
+
+  if (iter.numel() == 0) {
+    return self;
+  }
+
+  copy_kernel_sycl(iter, non_blocking);
+
+  return self;
+}
+
 } // namespace native
 } // namespace at

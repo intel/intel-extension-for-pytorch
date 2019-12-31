@@ -14,6 +14,10 @@ at::Tensor AtenIpexTypeDefault::empty(at::IntArrayRef size, const at::TensorOpti
   return at::native::empty_sycl(size, options, memory_format);
 }
 
+at::Tensor & AtenIpexTypeDefault::copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking) {
+  return at::native::copy__sycl(self, src, non_blocking);
+}
+
 at::Tensor & AtenIpexTypeDefault::fill_(at::Tensor & self, at::Scalar value) {
   return at::native::fill__sycl(self, value);
 }
@@ -23,7 +27,7 @@ at::Tensor & AtenIpexTypeDefault::fill_(at::Tensor & self, const at::Tensor & va
 }
 
 at::Tensor AtenIpexTypeDefault::convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
-  printf("%s\n", __func__);
+  return at::native::convolution_sycl(input, weight, bias, stride, padding, dilation, transposed, output_padding, groups);
 }
 
 void RegisterAtenTypeFunctions() {
@@ -31,6 +35,9 @@ void RegisterAtenTypeFunctions() {
   static auto dispatch = torch::RegisterOperators()
   .op(torch::RegisterOperators::options().schema("aten::empty.memory_format(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(at::IntArrayRef, const at::TensorOptions &, c10::optional<at::MemoryFormat>), &AtenIpexTypeDefault::empty>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, bool), &AtenIpexTypeDefault::copy_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::fill_.Scalar(Tensor(a!) self, Scalar value) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::fill_>(at::TensorTypeId::DPCPPTensorId)
