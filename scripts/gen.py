@@ -8,11 +8,13 @@ import re
 import string
 import sys
 
+from collections import namedtuple, Mapping
+
 
 def namedtuple_with_defaults(typename, field_names, default_values=()):
-  ntuple = collections.namedtuple(typename, field_names)
+  ntuple = namedtuple(typename, field_names)
   ntuple.__new__.__defaults__ = (None,) * len(ntuple._fields)
-  if isinstance(default_values, collections.Mapping):
+  if isinstance(default_values, Mapping):
     prototype = ntuple(**default_values)
   else:
     prototype = ntuple(*default_values)
@@ -851,6 +853,7 @@ def get_ipex_wrapper(fndef, ctx):
   rwxtree = _XPARSER.parse(rwsig)
   params = get_parameters(tree)
   fnopts = _FUNCTION_OPTIONS.get(mapsig, None)
+
 
   def gen_fnname(x):
     return 'AtenIpexTypeDefault::{}'.format(x)
