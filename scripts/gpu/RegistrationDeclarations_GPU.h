@@ -47,10 +47,6 @@ Tensor & baddbmm_out(Tensor & out, const Tensor & self, const Tensor & batch1, c
 
 Tensor & bernoulli_(Tensor & self, const Tensor & p, Generator * generator); // aten::bernoulli_.Tensor(Tensor(a!) self, Tensor p, *, Generator? generator=None) -> Tensor(a!)
 
-Tensor & bernoulli_(Tensor & self, const Tensor & p, Generator * generator); // aten::bernoulli_.Tensor(Tensor(a!) self, Tensor p, *, Generator? generator=None) -> Tensor(a!)
-
-Tensor & bernoulli_(Tensor & self, double p, Generator * generator); // aten::bernoulli_.float(Tensor(a!) self, float p=0.5, *, Generator? generator=None) -> Tensor(a!)
-
 Tensor & bernoulli_(Tensor & self, double p, Generator * generator); // aten::bernoulli_.float(Tensor(a!) self, float p=0.5, *, Generator? generator=None) -> Tensor(a!)
 
 Tensor bincount(const Tensor & self, const Tensor & weights, int64_t minlength); // aten::bincount(Tensor self, Tensor? weights=None, int minlength=0) -> Tensor
@@ -119,10 +115,6 @@ Tensor & expm1_out(Tensor & out, const Tensor & self); // aten::expm1.out(Tensor
 
 Tensor & eye_out(Tensor & out, int64_t n); // aten::eye.out(int n, *, Tensor(a!) out) -> Tensor(a!)
 
-Tensor & eye_out(Tensor & out, int64_t n); // aten::eye.out(int n, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor & eye_out(Tensor & out, int64_t n, int64_t m); // aten::eye.m_out(int n, int m, *, Tensor(a!) out) -> Tensor(a!)
-
 Tensor & eye_out(Tensor & out, int64_t n, int64_t m); // aten::eye.m_out(int n, int m, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor & floor_(Tensor & self); // aten::floor_(Tensor(a!) self) -> Tensor(a!)
@@ -161,11 +153,7 @@ Tensor _log_softmax_backward_data(const Tensor & grad_output, const Tensor & out
 
 std::tuple<Tensor,Tensor> max(const Tensor & self, int64_t dim, bool keepdim); // aten::max.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)
 
-std::tuple<Tensor,Tensor> max(const Tensor & self, int64_t dim, bool keepdim); // aten::max.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)
-
 std::tuple<Tensor,Tensor> median(const Tensor & self, int64_t dim, bool keepdim); // aten::median.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)
-
-std::tuple<Tensor,Tensor> min(const Tensor & self, int64_t dim, bool keepdim); // aten::min.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)
 
 std::tuple<Tensor,Tensor> min(const Tensor & self, int64_t dim, bool keepdim); // aten::min.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)
 
@@ -259,14 +247,6 @@ Tensor & resize_as_(Tensor & self, const Tensor & the_template); // aten::resize
 
 Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent); // aten::pow.Tensor_Scalar_out(Tensor self, Scalar exponent, *, Tensor(a!) out) -> Tensor(a!)
 
-Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent); // aten::pow.Tensor_Scalar_out(Tensor self, Scalar exponent, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent); // aten::pow.Tensor_Scalar_out(Tensor self, Scalar exponent, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor pow(const Tensor & self, Scalar exponent); // aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> Tensor
-
-Tensor pow(const Tensor & self, Scalar exponent); // aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> Tensor
-
 Tensor pow(const Tensor & self, Scalar exponent); // aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> Tensor
 
 Tensor & zero_(Tensor & self); // aten::zero_(Tensor(a!) self) -> Tensor(a!)
@@ -275,43 +255,15 @@ Scalar _local_scalar_dense(const Tensor & self); // aten::_local_scalar_dense(Te
 
 Tensor & set_(Tensor & self, Storage source); // aten::set_.source_Storage(Tensor(a!) self, Storage source) -> Tensor(a!)
 
-Tensor & set_(Tensor & self, Storage source); // aten::set_.source_Storage(Tensor(a!) self, Storage source) -> Tensor(a!)
-
-Tensor & set_(Tensor & self, Storage source); // aten::set_.source_Storage(Tensor(a!) self, Storage source) -> Tensor(a!)
-
-Tensor & set_(Tensor & self, Storage source); // aten::set_.source_Storage(Tensor(a!) self, Storage source) -> Tensor(a!)
-
-Tensor & set_(Tensor & self, Storage source, int64_t storage_offset, IntArrayRef size, IntArrayRef stride); // aten::set_.source_Storage_storage_offset(Tensor(a!) self, Storage source, int storage_offset, int[] size, int[] stride=[]) -> Tensor(a!)
-
-Tensor & set_(Tensor & self, Storage source, int64_t storage_offset, IntArrayRef size, IntArrayRef stride); // aten::set_.source_Storage_storage_offset(Tensor(a!) self, Storage source, int storage_offset, int[] size, int[] stride=[]) -> Tensor(a!)
-
-Tensor & set_(Tensor & self, Storage source, int64_t storage_offset, IntArrayRef size, IntArrayRef stride); // aten::set_.source_Storage_storage_offset(Tensor(a!) self, Storage source, int storage_offset, int[] size, int[] stride=[]) -> Tensor(a!)
-
 Tensor & set_(Tensor & self, Storage source, int64_t storage_offset, IntArrayRef size, IntArrayRef stride); // aten::set_.source_Storage_storage_offset(Tensor(a!) self, Storage source, int storage_offset, int[] size, int[] stride=[]) -> Tensor(a!)
 
 Tensor & set_(Tensor & self, const Tensor & source); // aten::set_.source_Tensor(Tensor(a!) self, Tensor source) -> Tensor(a!)
-
-Tensor & set_(Tensor & self, const Tensor & source); // aten::set_.source_Tensor(Tensor(a!) self, Tensor source) -> Tensor(a!)
-
-Tensor & set_(Tensor & self, const Tensor & source); // aten::set_.source_Tensor(Tensor(a!) self, Tensor source) -> Tensor(a!)
-
-Tensor & set_(Tensor & self, const Tensor & source); // aten::set_.source_Tensor(Tensor(a!) self, Tensor source) -> Tensor(a!)
-
-Tensor & set_(Tensor & self); // aten::set_(Tensor(a!) self) -> Tensor(a!)
-
-Tensor & set_(Tensor & self); // aten::set_(Tensor(a!) self) -> Tensor(a!)
-
-Tensor & set_(Tensor & self); // aten::set_(Tensor(a!) self) -> Tensor(a!)
 
 Tensor & set_(Tensor & self); // aten::set_(Tensor(a!) self) -> Tensor(a!)
 
 bool is_set_to(const Tensor & self, const Tensor & tensor); // aten::is_set_to(Tensor self, Tensor tensor) -> bool
 
 Tensor & masked_fill_(Tensor & self, const Tensor & mask, Scalar value); // aten::masked_fill_.Scalar(Tensor(a!) self, Tensor mask, Scalar value) -> Tensor(a!)
-
-Tensor & masked_fill_(Tensor & self, const Tensor & mask, Scalar value); // aten::masked_fill_.Scalar(Tensor(a!) self, Tensor mask, Scalar value) -> Tensor(a!)
-
-Tensor & masked_fill_(Tensor & self, const Tensor & mask, const Tensor & value); // aten::masked_fill_.Tensor(Tensor(a!) self, Tensor mask, Tensor value) -> Tensor(a!)
 
 Tensor & masked_fill_(Tensor & self, const Tensor & mask, const Tensor & value); // aten::masked_fill_.Tensor(Tensor(a!) self, Tensor mask, Tensor value) -> Tensor(a!)
 
@@ -323,17 +275,9 @@ Tensor & index_add_(Tensor & self, int64_t dim, const Tensor & index, const Tens
 
 Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, Scalar value); // aten::index_fill_.int_Scalar(Tensor(a!) self, int dim, Tensor index, Scalar value) -> Tensor(a!)
 
-Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, Scalar value); // aten::index_fill_.int_Scalar(Tensor(a!) self, int dim, Tensor index, Scalar value) -> Tensor(a!)
-
-Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & value); // aten::index_fill_.int_Tensor(Tensor(a!) self, int dim, Tensor index, Tensor value) -> Tensor(a!)
-
 Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & value); // aten::index_fill_.int_Tensor(Tensor(a!) self, int dim, Tensor index, Tensor value) -> Tensor(a!)
 
 Tensor & scatter_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & src); // aten::scatter_.src(Tensor(a!) self, int dim, Tensor index, Tensor src) -> Tensor(a!)
-
-Tensor & scatter_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & src); // aten::scatter_.src(Tensor(a!) self, int dim, Tensor index, Tensor src) -> Tensor(a!)
-
-Tensor & scatter_(Tensor & self, int64_t dim, const Tensor & index, Scalar value); // aten::scatter_.value(Tensor(a!) self, int dim, Tensor index, Scalar value) -> Tensor(a!)
 
 Tensor & scatter_(Tensor & self, int64_t dim, const Tensor & index, Scalar value); // aten::scatter_.value(Tensor(a!) self, int dim, Tensor index, Scalar value) -> Tensor(a!)
 
@@ -341,129 +285,65 @@ Tensor & scatter_add_(Tensor & self, int64_t dim, const Tensor & index, const Te
 
 Tensor & lt_(Tensor & self, Scalar other); // aten::lt_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
-Tensor & lt_(Tensor & self, Scalar other); // aten::lt_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
 Tensor & lt_(Tensor & self, const Tensor & other); // aten::lt_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-
-Tensor & lt_(Tensor & self, const Tensor & other); // aten::lt_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-
-Tensor & gt_(Tensor & self, Scalar other); // aten::gt_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
 Tensor & gt_(Tensor & self, Scalar other); // aten::gt_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
 Tensor & gt_(Tensor & self, const Tensor & other); // aten::gt_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
-Tensor & gt_(Tensor & self, const Tensor & other); // aten::gt_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-
 Tensor & le_(Tensor & self, Scalar other); // aten::le_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
-Tensor & le_(Tensor & self, Scalar other); // aten::le_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
-Tensor & le_(Tensor & self, const Tensor & other); // aten::le_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
 Tensor & le_(Tensor & self, const Tensor & other); // aten::le_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
 Tensor & ge_(Tensor & self, Scalar other); // aten::ge_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
-Tensor & ge_(Tensor & self, Scalar other); // aten::ge_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
 Tensor & ge_(Tensor & self, const Tensor & other); // aten::ge_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-
-Tensor & ge_(Tensor & self, const Tensor & other); // aten::ge_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-
-Tensor & eq_(Tensor & self, Scalar other); // aten::eq_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
 Tensor & eq_(Tensor & self, Scalar other); // aten::eq_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
 Tensor & eq_(Tensor & self, const Tensor & other); // aten::eq_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
-Tensor & eq_(Tensor & self, const Tensor & other); // aten::eq_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-
 Tensor & ne_(Tensor & self, Scalar other); // aten::ne_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
-Tensor & ne_(Tensor & self, Scalar other); // aten::ne_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
-Tensor & ne_(Tensor & self, const Tensor & other); // aten::ne_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
 Tensor & ne_(Tensor & self, const Tensor & other); // aten::ne_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
 Tensor __and__(const Tensor & self, Scalar other); // aten::__and__.Scalar(Tensor self, Scalar other) -> Tensor
 
-Tensor __and__(const Tensor & self, Scalar other); // aten::__and__.Scalar(Tensor self, Scalar other) -> Tensor
-
 Tensor __and__(const Tensor & self, const Tensor & other); // aten::__and__.Tensor(Tensor self, Tensor other) -> Tensor
-
-Tensor __and__(const Tensor & self, const Tensor & other); // aten::__and__.Tensor(Tensor self, Tensor other) -> Tensor
-
-Tensor & __iand__(Tensor & self, Scalar other); // aten::__iand__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
 Tensor & __iand__(Tensor & self, Scalar other); // aten::__iand__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
 Tensor & __iand__(Tensor & self, const Tensor & other); // aten::__iand__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
-Tensor & __iand__(Tensor & self, const Tensor & other); // aten::__iand__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-
 Tensor __or__(const Tensor & self, Scalar other); // aten::__or__.Scalar(Tensor self, Scalar other) -> Tensor
-
-Tensor __or__(const Tensor & self, Scalar other); // aten::__or__.Scalar(Tensor self, Scalar other) -> Tensor
-
-Tensor __or__(const Tensor & self, const Tensor & other); // aten::__or__.Tensor(Tensor self, Tensor other) -> Tensor
 
 Tensor __or__(const Tensor & self, const Tensor & other); // aten::__or__.Tensor(Tensor self, Tensor other) -> Tensor
 
 Tensor & __ior__(Tensor & self, Scalar other); // aten::__ior__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
-Tensor & __ior__(Tensor & self, Scalar other); // aten::__ior__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
 Tensor & __ior__(Tensor & self, const Tensor & other); // aten::__ior__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-
-Tensor & __ior__(Tensor & self, const Tensor & other); // aten::__ior__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-
-Tensor __xor__(const Tensor & self, Scalar other); // aten::__xor__.Scalar(Tensor self, Scalar other) -> Tensor
 
 Tensor __xor__(const Tensor & self, Scalar other); // aten::__xor__.Scalar(Tensor self, Scalar other) -> Tensor
 
 Tensor __xor__(const Tensor & self, const Tensor & other); // aten::__xor__.Tensor(Tensor self, Tensor other) -> Tensor
 
-Tensor __xor__(const Tensor & self, const Tensor & other); // aten::__xor__.Tensor(Tensor self, Tensor other) -> Tensor
-
 Tensor & __ixor__(Tensor & self, Scalar other); // aten::__ixor__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
-Tensor & __ixor__(Tensor & self, Scalar other); // aten::__ixor__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
-Tensor & __ixor__(Tensor & self, const Tensor & other); // aten::__ixor__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
 Tensor & __ixor__(Tensor & self, const Tensor & other); // aten::__ixor__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
 Tensor __lshift__(const Tensor & self, Scalar other); // aten::__lshift__.Scalar(Tensor self, Scalar other) -> Tensor
 
-Tensor __lshift__(const Tensor & self, Scalar other); // aten::__lshift__.Scalar(Tensor self, Scalar other) -> Tensor
-
 Tensor __lshift__(const Tensor & self, const Tensor & other); // aten::__lshift__.Tensor(Tensor self, Tensor other) -> Tensor
-
-Tensor __lshift__(const Tensor & self, const Tensor & other); // aten::__lshift__.Tensor(Tensor self, Tensor other) -> Tensor
-
-Tensor & __ilshift__(Tensor & self, Scalar other); // aten::__ilshift__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
 Tensor & __ilshift__(Tensor & self, Scalar other); // aten::__ilshift__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
 Tensor & __ilshift__(Tensor & self, const Tensor & other); // aten::__ilshift__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
-Tensor & __ilshift__(Tensor & self, const Tensor & other); // aten::__ilshift__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-
-Tensor __rshift__(const Tensor & self, Scalar other); // aten::__rshift__.Scalar(Tensor self, Scalar other) -> Tensor
-
 Tensor __rshift__(const Tensor & self, Scalar other); // aten::__rshift__.Scalar(Tensor self, Scalar other) -> Tensor
 
 Tensor __rshift__(const Tensor & self, const Tensor & other); // aten::__rshift__.Tensor(Tensor self, Tensor other) -> Tensor
 
-Tensor __rshift__(const Tensor & self, const Tensor & other); // aten::__rshift__.Tensor(Tensor self, Tensor other) -> Tensor
-
 Tensor & __irshift__(Tensor & self, Scalar other); // aten::__irshift__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
-Tensor & __irshift__(Tensor & self, Scalar other); // aten::__irshift__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
-Tensor & __irshift__(Tensor & self, const Tensor & other); // aten::__irshift__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
 Tensor & __irshift__(Tensor & self, const Tensor & other); // aten::__irshift__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
@@ -475,25 +355,13 @@ Tensor & digamma_(Tensor & self); // aten::digamma_(Tensor(a!) self) -> Tensor(a
 
 Tensor & pow_(Tensor & self, Scalar exponent); // aten::pow_.Scalar(Tensor(a!) self, Scalar exponent) -> Tensor(a!)
 
-Tensor & pow_(Tensor & self, Scalar exponent); // aten::pow_.Scalar(Tensor(a!) self, Scalar exponent) -> Tensor(a!)
-
 Tensor & pow_(Tensor & self, const Tensor & exponent); // aten::pow_.Tensor(Tensor(a!) self, Tensor exponent) -> Tensor(a!)
-
-Tensor & pow_(Tensor & self, const Tensor & exponent); // aten::pow_.Tensor(Tensor(a!) self, Tensor exponent) -> Tensor(a!)
-
-Tensor & fmod_(Tensor & self, Scalar other); // aten::fmod_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
 Tensor & fmod_(Tensor & self, Scalar other); // aten::fmod_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
 
 Tensor & fmod_(Tensor & self, const Tensor & other); // aten::fmod_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
-Tensor & fmod_(Tensor & self, const Tensor & other); // aten::fmod_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-
 Tensor & remainder_(Tensor & self, Scalar other); // aten::remainder_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
-Tensor & remainder_(Tensor & self, Scalar other); // aten::remainder_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-
-Tensor & remainder_(Tensor & self, const Tensor & other); // aten::remainder_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
 Tensor & remainder_(Tensor & self, const Tensor & other); // aten::remainder_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
 
@@ -521,97 +389,49 @@ Tensor trace(const Tensor & self); // aten::trace(Tensor self) -> Tensor
 
 Tensor & ne_out(Tensor & out, const Tensor & self, Scalar other); // aten::ne.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
 
-Tensor & ne_out(Tensor & out, const Tensor & self, Scalar other); // aten::ne.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
-
 Tensor ne(const Tensor & self, Scalar other); // aten::ne.Scalar(Tensor self, Scalar other) -> Tensor
-
-Tensor ne(const Tensor & self, Scalar other); // aten::ne.Scalar(Tensor self, Scalar other) -> Tensor
-
-Tensor & ne_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::ne.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor & ne_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::ne.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor ne(const Tensor & self, const Tensor & other); // aten::ne.Tensor(Tensor self, Tensor other) -> Tensor
 
-Tensor ne(const Tensor & self, const Tensor & other); // aten::ne.Tensor(Tensor self, Tensor other) -> Tensor
-
 Tensor & eq_out(Tensor & out, const Tensor & self, Scalar other); // aten::eq.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor & eq_out(Tensor & out, const Tensor & self, Scalar other); // aten::eq.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor eq(const Tensor & self, Scalar other); // aten::eq.Scalar(Tensor self, Scalar other) -> Tensor
 
 Tensor eq(const Tensor & self, Scalar other); // aten::eq.Scalar(Tensor self, Scalar other) -> Tensor
 
 Tensor & eq_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::eq.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 
-Tensor & eq_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::eq.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
-
 Tensor eq(const Tensor & self, const Tensor & other); // aten::eq.Tensor(Tensor self, Tensor other) -> Tensor
-
-Tensor eq(const Tensor & self, const Tensor & other); // aten::eq.Tensor(Tensor self, Tensor other) -> Tensor
-
-Tensor & ge_out(Tensor & out, const Tensor & self, Scalar other); // aten::ge.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor & ge_out(Tensor & out, const Tensor & self, Scalar other); // aten::ge.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor ge(const Tensor & self, Scalar other); // aten::ge.Scalar(Tensor self, Scalar other) -> Tensor
 
-Tensor ge(const Tensor & self, Scalar other); // aten::ge.Scalar(Tensor self, Scalar other) -> Tensor
-
 Tensor & ge_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::ge.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor & ge_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::ge.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor ge(const Tensor & self, const Tensor & other); // aten::ge.Tensor(Tensor self, Tensor other) -> Tensor
 
 Tensor ge(const Tensor & self, const Tensor & other); // aten::ge.Tensor(Tensor self, Tensor other) -> Tensor
 
 Tensor & le_out(Tensor & out, const Tensor & self, Scalar other); // aten::le.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
 
-Tensor & le_out(Tensor & out, const Tensor & self, Scalar other); // aten::le.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
-
 Tensor le(const Tensor & self, Scalar other); // aten::le.Scalar(Tensor self, Scalar other) -> Tensor
-
-Tensor le(const Tensor & self, Scalar other); // aten::le.Scalar(Tensor self, Scalar other) -> Tensor
-
-Tensor & le_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::le.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor & le_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::le.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor le(const Tensor & self, const Tensor & other); // aten::le.Tensor(Tensor self, Tensor other) -> Tensor
 
-Tensor le(const Tensor & self, const Tensor & other); // aten::le.Tensor(Tensor self, Tensor other) -> Tensor
-
 Tensor & gt_out(Tensor & out, const Tensor & self, Scalar other); // aten::gt.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor & gt_out(Tensor & out, const Tensor & self, Scalar other); // aten::gt.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor gt(const Tensor & self, Scalar other); // aten::gt.Scalar(Tensor self, Scalar other) -> Tensor
 
 Tensor gt(const Tensor & self, Scalar other); // aten::gt.Scalar(Tensor self, Scalar other) -> Tensor
 
 Tensor & gt_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::gt.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 
-Tensor & gt_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::gt.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
-
 Tensor gt(const Tensor & self, const Tensor & other); // aten::gt.Tensor(Tensor self, Tensor other) -> Tensor
-
-Tensor gt(const Tensor & self, const Tensor & other); // aten::gt.Tensor(Tensor self, Tensor other) -> Tensor
-
-Tensor & lt_out(Tensor & out, const Tensor & self, Scalar other); // aten::lt.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor & lt_out(Tensor & out, const Tensor & self, Scalar other); // aten::lt.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor lt(const Tensor & self, Scalar other); // aten::lt.Scalar(Tensor self, Scalar other) -> Tensor
 
-Tensor lt(const Tensor & self, Scalar other); // aten::lt.Scalar(Tensor self, Scalar other) -> Tensor
-
 Tensor & lt_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::lt.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor & lt_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::lt.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor lt(const Tensor & self, const Tensor & other); // aten::lt.Tensor(Tensor self, Tensor other) -> Tensor
 
 Tensor lt(const Tensor & self, const Tensor & other); // aten::lt.Tensor(Tensor self, Tensor other) -> Tensor
 
@@ -651,33 +471,17 @@ Tensor & sign_out(Tensor & out, const Tensor & self); // aten::sign.out(Tensor s
 
 Tensor & fmod_out(Tensor & out, const Tensor & self, Scalar other); // aten::fmod.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
 
-Tensor & fmod_out(Tensor & out, const Tensor & self, Scalar other); // aten::fmod.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
-
 Tensor fmod(const Tensor & self, Scalar other); // aten::fmod.Scalar(Tensor self, Scalar other) -> Tensor
-
-Tensor fmod(const Tensor & self, Scalar other); // aten::fmod.Scalar(Tensor self, Scalar other) -> Tensor
-
-Tensor & fmod_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::fmod.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor & fmod_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::fmod.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor fmod(const Tensor & self, const Tensor & other); // aten::fmod.Tensor(Tensor self, Tensor other) -> Tensor
 
-Tensor fmod(const Tensor & self, const Tensor & other); // aten::fmod.Tensor(Tensor self, Tensor other) -> Tensor
-
-Tensor & remainder_out(Tensor & out, const Tensor & self, Scalar other); // aten::remainder.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
-
 Tensor & remainder_out(Tensor & out, const Tensor & self, Scalar other); // aten::remainder.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor remainder(const Tensor & self, Scalar other); // aten::remainder.Scalar(Tensor self, Scalar other) -> Tensor
 
-Tensor remainder(const Tensor & self, Scalar other); // aten::remainder.Scalar(Tensor self, Scalar other) -> Tensor
-
 Tensor & remainder_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::remainder.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor & remainder_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::remainder.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor remainder(const Tensor & self, const Tensor & other); // aten::remainder.Tensor(Tensor self, Tensor other) -> Tensor
 
 Tensor remainder(const Tensor & self, const Tensor & other); // aten::remainder.Tensor(Tensor self, Tensor other) -> Tensor
 
@@ -685,19 +489,11 @@ Tensor & min_out(Tensor & out, const Tensor & self, const Tensor & other); // at
 
 Tensor min(const Tensor & self, const Tensor & other); // aten::min.other(Tensor self, Tensor other) -> Tensor
 
-Tensor min(const Tensor & self, const Tensor & other); // aten::min.other(Tensor self, Tensor other) -> Tensor
-
-Tensor min(const Tensor & self); // aten::min(Tensor self) -> Tensor
-
 Tensor min(const Tensor & self); // aten::min(Tensor self) -> Tensor
 
 Tensor & max_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::max.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor max(const Tensor & self, const Tensor & other); // aten::max.other(Tensor self, Tensor other) -> Tensor
-
-Tensor max(const Tensor & self, const Tensor & other); // aten::max.other(Tensor self, Tensor other) -> Tensor
-
-Tensor max(const Tensor & self); // aten::max(Tensor self) -> Tensor
 
 Tensor max(const Tensor & self); // aten::max(Tensor self) -> Tensor
 
@@ -715,25 +511,9 @@ bool equal(const Tensor & self, const Tensor & other); // aten::equal(Tensor sel
 
 Tensor & pow_out(Tensor & out, const Tensor & self, const Tensor & exponent); // aten::pow.Tensor_Tensor_out(Tensor self, Tensor exponent, *, Tensor(a!) out) -> Tensor(a!)
 
-Tensor & pow_out(Tensor & out, const Tensor & self, const Tensor & exponent); // aten::pow.Tensor_Tensor_out(Tensor self, Tensor exponent, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor & pow_out(Tensor & out, const Tensor & self, const Tensor & exponent); // aten::pow.Tensor_Tensor_out(Tensor self, Tensor exponent, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor pow(const Tensor & self, const Tensor & exponent); // aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -> Tensor
-
-Tensor pow(const Tensor & self, const Tensor & exponent); // aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -> Tensor
-
 Tensor pow(const Tensor & self, const Tensor & exponent); // aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -> Tensor
 
 Tensor & pow_out(Tensor & out, Scalar self, const Tensor & exponent); // aten::pow.Scalar_out(Scalar self, Tensor exponent, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor & pow_out(Tensor & out, Scalar self, const Tensor & exponent); // aten::pow.Scalar_out(Scalar self, Tensor exponent, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor & pow_out(Tensor & out, Scalar self, const Tensor & exponent); // aten::pow.Scalar_out(Scalar self, Tensor exponent, *, Tensor(a!) out) -> Tensor(a!)
-
-Tensor pow(Scalar self, const Tensor & exponent); // aten::pow.Scalar(Scalar self, Tensor exponent) -> Tensor
-
-Tensor pow(Scalar self, const Tensor & exponent); // aten::pow.Scalar(Scalar self, Tensor exponent) -> Tensor
 
 Tensor pow(Scalar self, const Tensor & exponent); // aten::pow.Scalar(Scalar self, Tensor exponent) -> Tensor
 

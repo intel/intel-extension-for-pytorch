@@ -121,7 +121,9 @@ def parse_override_keys(path):
   keys = []
   for fndef in functions:
     m = re.search(r'(\s.*)\(', fndef)
-    keys.append(m.group(1) + '\(')
+    new = m.group(1) + '\('
+    if new not in keys:
+      keys.append(new)
 
   return keys
 
