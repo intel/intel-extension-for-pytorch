@@ -96,7 +96,7 @@ def create_version_files(base_dir, version, ipex_git_sha, torch_git_sha):
 def generate_ipex_cpu_aten_code(base_dir):
   cur_dir = os.path.abspath(os.path.curdir)
   os.chdir(os.path.join(base_dir, 'scripts'))
-  generate_code_cmd = './gen-cpu-ops.sh'
+  generate_code_cmd = ['./gen-cpu-ops.sh', os.path.join(base_dir, 'torch_ipex', 'csrc', 'cpu')]
   if subprocess.call(generate_code_cmd) != 0:
     print("Failed to run '{}'".format(generate_code_cmd), file=sys.stderr)
     os.chdir(cur_dir)
