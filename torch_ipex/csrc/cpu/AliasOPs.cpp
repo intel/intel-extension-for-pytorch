@@ -142,15 +142,13 @@ at::Tensor AtenIpexCPUAlias::squeeze(const at::Tensor & self) {
 }
 
 at::Tensor AtenIpexCPUAlias::squeeze(const at::Tensor & self, int64_t dim) {
-  TORCH_INTERNAL_ASSERT(false);
   DEBUG("AtenIpexCPUAlias::squeeze\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::squeeze(_ipex_self, dim);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::upgradeToDPCPPTensor(_ipex_result);
+  return bridge::shallowUpgradeToDPCPPTensorA(self, _ipex_result);
 }
 
 at::Tensor AtenIpexCPUAlias::t(const at::Tensor & self) {

@@ -87,10 +87,10 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
     ipexTensor.unsafeGetTensorImpl()->storage().resizable()
   );
 
-  auto _tensor =  at::detail::make_tensor<at::TensorImpl>(storage_impl, at::TensorTypeId::CPUTensorId);
-  IPEXTensorImpl::CopySizeStridesAndOffset(_tensor.unsafeGetTensorImpl(), ipexTensor.unsafeGetTensorImpl());
-  IPEXTensorImpl::CopyMetadata(_tensor.unsafeGetTensorImpl(), ipexTensor.unsafeGetTensorImpl());
-  CHECK_TENSOR_CRITICAL(ipexTensor, _tensor);
+  auto _tensor =  at::detail::make_tensor<IPEXTensorImpl>(storage_impl, at::TensorTypeId::CPUTensorId);
+  IPEXTensorImpl* impex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
+  impex_impl->copy_meta_info(ipexTensor.unsafeGetTensorImpl());
+  CHECK_TENSOR_CRITICAL(_tensor, ipexTensor);
   // TODO: Cannot reserved_
   //       dest_impl->reserved_ = src_impl->reserved_;
   return _tensor;
