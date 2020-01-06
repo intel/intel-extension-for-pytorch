@@ -93,11 +93,15 @@ def create_version_files(base_dir, version, ipex_git_sha, torch_git_sha):
     f.write('}  // namespace torch_ipex\n')
 
 
-def generate_ipex_aten_code(base_dir):
-  generate_code_cmd = [os.path.join(base_dir, 'scripts', 'generate_code.sh'), pytorch_install_dir]
+def generate_ipex_cpu_aten_code(base_dir):
+  cur_dir = os.path.abspath(os.path.curdir)
+  os.chdir(os.path.join(base_dir, 'scripts'))
+  generate_code_cmd = './gen-cpu-ops.sh'
   if subprocess.call(generate_code_cmd) != 0:
     print("Failed to run '{}'".format(generate_code_cmd), file=sys.stderr)
+    os.chdir(cur_dir)
     sys.exit(1)
+  os.chdir(cur_dir)
 
 
 class DPCPPExt(Extension, object):
@@ -195,7 +199,7 @@ version = get_build_version(ipex_git_sha)
 create_version_files(base_dir, version, ipex_git_sha, torch_git_sha)
 
 # Generate the code before globbing!
-# generate_ipex_aten_code(base_dir)
+generate_ipex_cpu_aten_code(base_dir)
 
 # Constant known variables used throughout this file
 

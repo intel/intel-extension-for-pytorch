@@ -36,20 +36,6 @@ FuncOpts = namedtuple_with_defaults(
     'ref_param, device_param, wparams, outfn_template, outfn_name, shape_check_indices'
 )
 
-_ATEN_SIG_GRAMMAR = r"""
-   start: fnname "(" params ")" -> return_type
-   return_type: TENSOR_TNAME
-              | TENSOR_TNAME_ALIA
-              | 
-   core_type: TENSOR_TNAME
-            | "(" tensor_list ")"
-   tensor_list: TENSOR_TNAME
-              | TENSOR_TNAME "," tensor_list
-   TENSOR_TNAME: "Tensor"
-   TENSOR_TNAME_ALIA: "Tensor(a!)"
-   RW_TENSOR: "Tensor" 
-"""
-
 _GRAMMAR = r"""
     start: type fnname "(" params ")"
     type: CONST? core_type refspec?
@@ -122,41 +108,6 @@ _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_AW = 'shallowUpgradeToDPCPPTensorAW'
 #     r'[^(]*_out\(' : FuncOpts(),
 # }
 _FN_OUT_REGEX ={}
-
-_FN_REMAP = {
-    '_th_eq(Tensor, Scalar) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::eq'),
-    '_th_eq(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::eq'),
-    '_th_ge(Tensor, Scalar) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::ge'),
-    '_th_ge(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::ge'),
-    '_th_gt(Tensor, Scalar) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::gt'),
-    '_th_gt(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::gt'),
-    '_th_le(Tensor, Scalar) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::le'),
-    '_th_le(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::le'),
-    '_th_lt(Tensor, Scalar) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::lt'),
-    '_th_lt(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::lt'),
-    '_th_ne(Tensor, Scalar) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::ne'),
-    '_th_ne(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::ne'),
-    's__th_and(Tensor, Tensor) -> Tensor':
-        FuncOpts(
-            outfn_name='AtenXlaType::__and__', shape_check_indices=((0, 1),)),
-    's__th_or(Tensor, Tensor) -> Tensor':
-        FuncOpts(
-            outfn_name='AtenXlaType::__or__', shape_check_indices=((0, 1),)),
-    's__th_eq(Tensor, Tensor) -> Tensor':
-        FuncOpts(outfn_name='AtenXlaType::eq', shape_check_indices=((0, 1),)),
-}
 
 _TYPE_NSMAP = {
     'Tensor': 'at::Tensor',
@@ -321,13 +272,6 @@ def is_blacklisted_fn(fname, mapsig):
 def get_outfn_options(fname, mapsig):
     for frx, fnopts in _FN_OUT_REGEX.items():
         if re.match(frx, fname) or re.match(frx, mapsig):
-            return fnopts
-
-
-def get_remapfn_options(fname, mapsig):
-    for name in [fname, mapsig]:
-        fnopts = _FN_REMAP.get(name, None)
-        if fnopts is not None:
             return fnopts
 
 
@@ -659,11 +603,6 @@ def get_return_type_str(t, orig_sig):
     return orig_sig[0:token.column - 2]
 
 
-def generate_exit_debug_code(t, fname, rname, params, param_vars):
-    code = ''
-    return code
-
-
 def generate_return_stmt(t, rtype_str, fname, rname, params, param_vars, ref_param, fnopts):
     assert isinstance(t, lark.tree.Tree)
     rtype = t.children[0]
@@ -799,15 +738,11 @@ def generate_aten_out(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
     code += '  auto {} = {};\n'.format(tmp_result, fcall)
     if num_outputs is None:
         code += generate_outfn_result_copy(param_vars[0], tmp_result)
-        code += generate_exit_debug_code(tree, fname, param_vars[0], params,
-                                         param_vars)
         code += '  return {};\n'.format(param_vars[0])
     else:
         for i in range(0, num_outputs):
             code += generate_outfn_result_copy(
                 param_vars[i], 'std::get<{}>({})'.format(i, tmp_result))
-        code += generate_exit_debug_code(tree, fname, param_vars[0:num_outputs],
-                                         params, param_vars)
         code += '  return {}('.format(get_return_type_str(rwxtree, rwsig))
         for i in range(0, num_outputs):
             if i > 0:
@@ -880,11 +815,6 @@ def generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
     code += tfetcher.generate_updates()
     if result_assign:
         code += ('  static_cast<void>({}); // Avoid warnings in case not used\n'.format(_RESULT_NAME))
-    code += generate_exit_debug_code(tree,
-                                     fname,
-                                     _RESULT_NAME if result_assign else None,
-                                     params,
-                                     param_vars)
     code += generate_return_stmt(tree,
                                  get_return_type_str(rwxtree, rwsig),
                                  fname,
@@ -914,11 +844,8 @@ def get_ipex_wrapper(fndef, ctx):
     sig, fname, xfname = get_function_signature(rwxtree, rwsig, gen_fnname)
     if not is_blacklisted_fn(fname, mapsig):
         ofnopts = get_outfn_options(fname, mapsig)
-        rfnopts = get_remapfn_options(fname, mapsig)
         if ofnopts is not None:
             code = generate_aten_out(ctx, tree, rwxtree, fname, sig, rwsig, params, ofnopts)
-        elif rfnopts is not None:
-            code = generate_aten_remap(ctx, fname, sig, params, rfnopts)
         else:
             code = generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
     else:
@@ -1062,12 +989,6 @@ def generate(args):
         file=sys.stderr)
     assert len(errors) == 0
 
-    if args.gen_class_mode == 1:
-        global _FALLBACK_TO_CPU_TENSOR_LIST
-        global _FALLBACK_TO_CPU_TENSOR
-        global _UPGRADE_TO_DPCPP_TENSOR
-        global _UPGRADE_TO_DPCPP_TENSOR_VEC
-
     overrides = parse_local_overrides(args.ipex_cpu_type)
     print(
         '{} function overrides in {}'.format(len(overrides), args.ipex_cpu_type),
@@ -1100,13 +1021,6 @@ def generate(args):
 
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument(
-        '--gen_class_mode',
-        help='1: Use shallow bridge, 0: Use deep bridge',
-        choices=[0,1],
-        metavar='GEN_CLASS_MODE',
-        default=1,
-        type=int)
     arg_parser.add_argument('--output_folder', type=str)
     arg_parser.add_argument(
         'ipex_cpu_type',
