@@ -4,18 +4,47 @@
 #include <ATen/Context.h>
 #include <ATen/core/op_registration/op_registration.h>
 #include <c10/util/Exception.h>
+#include <generated/ATen/NativeFunctions.h>
 
 #include "utils.h"
 
 namespace torch_ipex {
 
+at::Tensor AtenIpexTypeDefault::empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
+  return at::native::empty_sycl(size, options, memory_format);
+}
+
+at::Tensor & AtenIpexTypeDefault::copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking) {
+  return at::native::copy__sycl(self, src, non_blocking);
+}
+
+at::Tensor & AtenIpexTypeDefault::fill_(at::Tensor & self, at::Scalar value) {
+  return at::native::fill__sycl(self, value);
+}
+
+at::Tensor & AtenIpexTypeDefault::fill_(at::Tensor & self, const at::Tensor & value) {
+  return at::native::fill__sycl(self, value);
+}
+
 at::Tensor AtenIpexTypeDefault::convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
-  printf("%s\n", __func__);
+  return at::native::convolution_sycl(input, weight, bias, stride, padding, dilation, transposed, output_padding, groups);
 }
 
 void RegisterAtenTypeFunctions() {
   printf("%s\n", __func__);
   static auto dispatch = torch::RegisterOperators()
+  .op(torch::RegisterOperators::options().schema("aten::empty.memory_format(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(at::IntArrayRef, const at::TensorOptions &, c10::optional<at::MemoryFormat>), &AtenIpexTypeDefault::empty>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, bool), &AtenIpexTypeDefault::copy_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::fill_.Scalar(Tensor(a!) self, Scalar value) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::fill_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::fill_.Tensor(Tensor(a!) self, Tensor value) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::fill_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::convolution_overrideable(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::IntArrayRef, at::IntArrayRef, at::IntArrayRef, bool, at::IntArrayRef, int64_t), &AtenIpexTypeDefault::convolution_overrideable>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA));
