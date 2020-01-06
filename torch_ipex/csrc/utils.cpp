@@ -21,7 +21,6 @@ bool check_device_by_tensor(const at::Tensor& tensor, DPCPPSubDev sub_dev) {
 bool check_device_by_tensor_list(const at::TensorList& tensor_list, DPCPPSubDev sub_dev) {
   for (const auto& tensor : tensor_list) {
     if (tensor.defined()) {
-        break;
         return check_device_by_tensor(tensor, sub_dev);
     }
   }
