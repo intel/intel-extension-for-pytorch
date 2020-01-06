@@ -17,7 +17,7 @@ class IPEXTensorImpl : public c10::TensorImpl {
   }
 
   void copy_meta_info(const c10::TensorImpl *);
-  void set_data_tensor(at::Tensor);
+  void keep_source_data_tensor(at::Tensor);
   void set_storage_data_ptr(c10::DataPtr);
   void set_dpcpp_tensor_id();
 
@@ -31,7 +31,9 @@ class IPEXTensorImpl : public c10::TensorImpl {
   static void CopySizeStridesAndOffset(c10::TensorImpl *, const c10::TensorImpl *);
 
 private:
-  c10::optional<at::Tensor> m_data_tensor;
+  // The main purpose of this tensor is to prevent the release of the source tensor. Because IPEXTensorImpl may share
+  // same buffer of the source tensor.
+  c10::optional<at::Tensor> m_src_data_tensor;
 };
 
 } // namespace torch_ipex

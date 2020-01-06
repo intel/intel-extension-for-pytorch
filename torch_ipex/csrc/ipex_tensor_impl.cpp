@@ -52,7 +52,7 @@ C10_REGISTER_GUARD_IMPL(DPCPP, IPEXGuardImpl);
 
 IPEXTensorImpl::IPEXTensorImpl(at::Tensor tensor, at::Storage storage, at::TensorTypeId type_id) :
     c10::TensorImpl(std::move(storage), type_id),
-    m_data_tensor(std::move(tensor)) {}
+    m_src_data_tensor(std::move(tensor)) {}
 
 IPEXTensorImpl::IPEXTensorImpl(at::Storage storage, at::TensorTypeId type_id) :
     c10::TensorImpl(std::move(storage), type_id) {}
@@ -91,8 +91,8 @@ void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl) {
 }
 
 // Keep data tensor in case the IPEXTensorImpl is shallow-copy from a stack variable.
-void IPEXTensorImpl::set_data_tensor(at::Tensor data_tensor) {
-  this->m_data_tensor = data_tensor;
+void IPEXTensorImpl::keep_source_data_tensor(at::Tensor data_tensor) {
+  this->m_src_data_tensor = data_tensor;
 }
 
 // The storage of tensor impl cannot be accessed out of TensorImpl class. So we need to expose an interface

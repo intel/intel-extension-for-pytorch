@@ -14,6 +14,7 @@
 namespace torch_ipex {
 namespace cpu {
 
+//#define DBG
 #if defined(DBG)
 #define DEBUG(fmt) printf(fmt);
 #else
@@ -56,15 +57,12 @@ at::Tensor AtenIpexCPUAlias::diagonal(const at::Tensor & self, int64_t offset, i
 }
 
 at::Tensor AtenIpexCPUAlias::expand(const at::Tensor & self, at::IntArrayRef size, bool implicit) {
-  TORCH_INTERNAL_ASSERT(false);
   DEBUG("AtenIpexCPUAlias::expand\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.expand(size, implicit);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::upgradeToDPCPPTensor(_ipex_result);
+  return bridge::shallowUpgradeToDPCPPTensorA(self, _ipex_result);
 }
 
 at::Tensor AtenIpexCPUAlias::narrow(const at::Tensor & self, int64_t dim, int64_t start, int64_t length) {
@@ -167,15 +165,12 @@ at::Tensor AtenIpexCPUAlias::t(const at::Tensor & self) {
 }
 
 at::Tensor AtenIpexCPUAlias::transpose(const at::Tensor & self, int64_t dim0, int64_t dim1) {
-  TORCH_INTERNAL_ASSERT(false);
   DEBUG("AtenIpexCPUAlias::transpose\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::transpose(_ipex_self, dim0, dim1);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::upgradeToDPCPPTensor(_ipex_result);
+  return bridge::shallowUpgradeToDPCPPTensorA(self, _ipex_result);
 }
 
 at::Tensor AtenIpexCPUAlias::unsqueeze(const at::Tensor & self, int64_t dim) {
@@ -252,11 +247,9 @@ std::vector<at::Tensor> AtenIpexCPUAlias::unbind(const at::Tensor & self, int64_
 at::Tensor AtenIpexCPUAlias::view(const at::Tensor & self, at::IntArrayRef size) {
   DEBUG("AtenIpexCPUAlias::view\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.view(size);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
   return bridge::shallowUpgradeToDPCPPTensorA(self, _ipex_result);
 }
 

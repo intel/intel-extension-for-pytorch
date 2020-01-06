@@ -110,9 +110,10 @@ _UPGRADE_TO_DPCPP_TENSOR = 'upgradeToDPCPPTensor'
 _UPGRADE_TO_DPCPP_TENSOR_VEC = 'upgradeToDPCPPTensorVec'
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
 _SHALLOW_FALLBACK_TO_CPU_TENSOR = 'shallowFallbackToCPUTensor'
+_SHALLOW_UPGRADE_TO_DPCPP_TENSOR = 'shallowUpgradeToDPCPPTensor'
+_SHALLOW_UPGRADE_TO_DPCPP_TENSOR_VEC = 'shallowUpgradeToDPCPPTensorVec'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_A = 'shallowUpgradeToDPCPPTensorA'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_AW = 'shallowUpgradeToDPCPPTensorAW'
-_SHALLOW_UPGRADE_TO_DPCPP_TENSOR_VEC = 'shallowUpgradeToDPCPPTensorVec'
 
 # List of tuples with the regex match first, and the corresponding FuncOpts()
 # second.
@@ -597,13 +598,13 @@ def get_return_value(rtype, rname, param, var, ref_param, fnopts, fname):
             # Conver at::Tensor AtenIpexCPUDefault::__xxx__(const at::Tensor & xxx, ...) {
             ptype = param_type(param)
             if type_is_const(ptype):
-                ret_check += '  TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(rname)
-                return ret_check, 'bridge::{}({})'.format(_UPGRADE_TO_DPCPP_TENSOR, rname)
+                # ret_check += '  TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(rname)
+                return ret_check, 'bridge::{}({})'.format(_SHALLOW_UPGRADE_TO_DPCPP_TENSOR, rname)
             else:
                 assert False
         else:
-            ret_check += '  TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(rname)
-            return ret_check, 'bridge::{}({})'.format(_UPGRADE_TO_DPCPP_TENSOR, rname)
+            # ret_check += '  TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(rname)
+            return ret_check, 'bridge::{}({})'.format(_SHALLOW_UPGRADE_TO_DPCPP_TENSOR, rname)
 
 
 def get_reference_param(params, fnopts=None):
@@ -681,7 +682,7 @@ def generate_return_stmt(t, rtype_str, fname, rname, params, param_vars, ref_par
         post_check += ret_check_str
     elif ctype == 'std::vector':
         assert not fn_is_inplace(fname)
-        retstr = 'bridge::{}({})'.format(_UPGRADE_TO_DPCPP_TENSOR_VEC, rname)
+        retstr = 'bridge::{}({})'.format(_SHALLOW_UPGRADE_TO_DPCPP_TENSOR_VEC, rname)
     elif ctype == 'Tensor':
         ret_check_str, retstr = get_return_value(rtype,
                                                  rname,
