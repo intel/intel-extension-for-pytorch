@@ -681,7 +681,15 @@ static auto view3d(const at::Tensor& tensor) -> at::Tensor {
   return tensor.squeeze(2);
 }
 
-Tensor convolution_sycl(const Tensor & input_r, const Tensor & weight_r, const Tensor & bias_r, IntArrayRef stride_, IntArrayRef padding_, IntArrayRef dilation_, bool transposed_, IntArrayRef output_padding_, int64_t groups_) {
+} // namespace native
+} // namespace at
+
+namespace at {
+namespace AtenIpexTypeDPCPP {
+
+using namespace at::native;
+
+Tensor convolution_overrideable(const Tensor & input_r, const Tensor & weight_r, const Tensor & bias_r, IntArrayRef stride_, IntArrayRef padding_, IntArrayRef dilation_, bool transposed_, IntArrayRef output_padding_, int64_t groups_) {
   auto input = input_r.contiguous();
   auto weight = weight_r;
   auto bias = bias_r;
@@ -729,5 +737,5 @@ Tensor convolution_sycl(const Tensor & input_r, const Tensor & weight_r, const T
   return output;
 }
 
-
-}}  // namespace at::native
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

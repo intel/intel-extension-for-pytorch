@@ -4,7 +4,7 @@
 
 namespace at {
 
-class AtenIpexTypeDefault {
+class AtenIpexTypeDPCPP {
  public:
   static at::Tensor convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups);
   static at::Tensor & copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
@@ -14,7 +14,5 @@ class AtenIpexTypeDefault {
 
 };
 
-void RegisterAtenTypeFunctions();
-
-}  // namespace at
+}  // namespace ipex
 
