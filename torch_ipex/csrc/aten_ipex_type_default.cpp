@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "cpu/OPs.h"
 #include "cpu/AliasOPs.h"
+#include "cpu/DevOPs.h"
 
 namespace torch_ipex {
 
@@ -1087,7 +1088,7 @@ at::Tensor AtenIpexTypeDefault::convolution(const at::Tensor & input, const at::
 
 at::Tensor AtenIpexTypeDefault::convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
   if (check_device_by_tensor(input, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::convolution_overrideable(input, weight, bias, stride, padding, dilation, transposed, output_padding, groups);
+    return cpu::AtenIpexCPUDev::convolution_overrideable(input, weight, bias, stride, padding, dilation, transposed, output_padding, groups);
   } else {
     AT_ASSERT(false);
   }

@@ -57,6 +57,9 @@ IPEXTensorImpl::IPEXTensorImpl(at::Tensor tensor, at::Storage storage, at::Tenso
 IPEXTensorImpl::IPEXTensorImpl(at::Storage storage, at::TensorTypeId type_id) :
     c10::TensorImpl(std::move(storage), type_id) {}
 
+IPEXTensorImpl::IPEXTensorImpl(at::TensorTypeSet type_set, const caffe2::TypeMeta& data_type, c10::optional<c10::Device> device_opt) :
+    c10::TensorImpl(type_set, data_type, device_opt) {}
+
 void IPEXTensorImpl::set_dpcpp_tensor_id() {
   this->type_set_.add(at::TensorTypeId::VariableTensorId);
 }

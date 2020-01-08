@@ -12,6 +12,7 @@ class IPEXTensorImpl : public c10::TensorImpl {
  public:
   explicit IPEXTensorImpl(at::Tensor tensor, at::Storage storage, at::TensorTypeId type_id);
   explicit IPEXTensorImpl(at::Storage storage, at::TensorTypeId type_id);
+  explicit IPEXTensorImpl(at::TensorTypeSet type_set, const caffe2::TypeMeta& data_type, c10::optional<c10::Device> device_opt);
   ~IPEXTensorImpl() {
     static_cast<void>(0);
   }

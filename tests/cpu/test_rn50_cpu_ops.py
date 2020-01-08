@@ -10,8 +10,11 @@ from functools import reduce
 import torch
 import intel_pytorch_extension as ipex
 import torch.nn as nn
+import torch.backends.cudnn as cudnn
 from torch.nn import Parameter
 import torch.nn.functional as F
+from torch.autograd import gradcheck
+from torch.autograd.gradcheck import gradgradcheck
 from torch._six import inf, nan
 
 from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MKL, \
@@ -20,11 +23,17 @@ from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MK
     IS_SANDCASTLE, load_tests, brute_pdist, brute_cdist, slowTest, \
     skipCUDANonDefaultStreamIf, skipCUDAMemoryLeakCheckIf
 
+def _assertGradAndGradgradChecks(test_case, apply_fn, inputs):
+    # call assert function rather than returning a bool since it's nicer
+    # if we get whether this failed on the gradcheck or the gradgradcheck.
+    test_case.assertTrue(gradcheck(apply_fn, inputs))
+    test_case.assertTrue(gradgradcheck(apply_fn, inputs))
 
 device = 'dpcpp:0'
+#device = 'cpu:0'
 SIZE = 100
 
-class RN50(TestCase):
+class TestOP(TestCase):
     def _make_tensors(self, shape, val_range=(-100, 100), use_floating=True, use_integral=True):
         float_types = [torch.double,
                        torch.float]
@@ -529,6 +538,25 @@ class TestBN(TestCase):
             with self.assertRaises(RuntimeError):
                 F.batch_norm(input, running_mean, running_var, bias=Parameter(torch.rand(size, device=device)))
 
+    def test_batchnorm_eval(self):
+        device = 'cpu:0'
+        torch.manual_seed(123)
+        input = torch.rand(2, 10, device=device)
+        running_var = torch.rand(10, device=device)
+        res1 = F.batch_norm(input, torch.rand(10, device=device), running_var)
+
+        device = 'dpcpp:0'
+        torch.manual_seed(123)
+        input = torch.rand(2, 10, device=device)
+        running_var = torch.rand(10, device=device)
+        res2 = F.batch_norm(input, torch.rand(10, device=device), running_var)
+
+        res1_clone = res1.clone().view(res1.numel())
+        res2_clone = res2.clone().view(res2.numel())
+        self.assertEqual(res1.size(), res2.size())
+        for i in range(0, res2.numel()):
+            assert (res1_clone[i] == res2_clone[i])
+
 
 class TestAvgMaxPool(TestCase):
     def _sum_pool2d(self, x, kernel_size):
@@ -628,6 +656,72 @@ class TestAvgMaxPool(TestCase):
                     except TypeError:
                         # some implementations do not support dilation
                         res = fn(x, 6, stride=2, padding=0)
+
+class TestConv(TestCase):
+    def run_conv_double_back_test(self, kern, stride, padding, chan_in, chan_out, batch_size,
+                                  inp_size, dilation, no_weight, groups=1, use_cuda=False,
+                                  use_bias=True, dtype=torch.double):
+        device = torch.device("dpcpp:0")
+        x = torch.randn(batch_size, chan_in, inp_size, inp_size, device=device,
+                        dtype=dtype, requires_grad=True)
+        weight = torch.randn(chan_out, chan_in // groups, kern, kern, device=device,
+                             dtype=dtype, requires_grad=not no_weight)
+        if use_bias:
+            bias = torch.randn(chan_out, device=device, dtype=dtype, requires_grad=True)
+        else:
+            bias = None
+
+        def func(*inputs):
+            if use_bias:
+                lx, lweight, lbias = inputs
+            else:
+                lx, lweight = inputs
+                lbias = None
+            # We disable cudnn during forward to avoid finite difference imprecision issues
+            with cudnn.flags(enabled=False):
+                out = F.conv2d(lx, lweight, lbias, stride, padding, dilation, groups)
+            return out
+
+        if use_bias:
+            inputs = x, weight, bias
+        else:
+            inputs = x, weight
+
+        dummy_out = func(*inputs)
+        grad_y = torch.randn_like(dummy_out, device=device, dtype=dtype, requires_grad=True)
+
+        # Issue #15353: test mkldnn double backward, don't run gradgradcheck due
+        # to imprecision issues
+        if dtype == torch.float:
+            g, = torch.autograd.grad(dummy_out.sum(), x, create_graph=True)
+            return g.requires_grad
+
+        return gradgradcheck(func, inputs, (grad_y,))
+
+    def test_noncontiguous_weight(self):
+        # Noncontiguous weights must be contiguous() before being
+        #device = 'cpu:0'
+        input = torch.tensor([1, 1, 1], dtype=torch.float32, device=device).view(1, 1, 3)
+        weights1 = torch.tensor([1], dtype=torch.float32, device=device).expand(1, 1, 2)
+        weights2 = torch.tensor([1], dtype=torch.float32, device=device).expand(1, 1, 2).contiguous()
+        res1 = F.conv1d(input, weights1, bias=None, stride=2, dilation=2)
+        res2 = F.conv1d(input, weights2, bias=None, stride=2, dilation=2)
+
+        res1_clone = res1.clone().view(res1.numel())
+        res2_clone = res2.clone().view(res2.numel())
+        self.assertEqual(res1.size(), res2.size())
+        for i in range(0, res2.numel()):
+           self.assertEqual(res1_clone[i], res2_clone[i])
+
+    def test_mismatch_shape_conv2d(self):
+        x = torch.randn(1, 10, 1, 28, 28, device=device)
+        w = torch.randn(6, 1, 5, 5, device=device)
+
+        with self.assertRaisesRegex(RuntimeError,
+                                    r'Expected 4-dimensional input for 4-dimensional weight 6 1 5 5,' +
+                                    r' but got 5-dimensional input of size \[1, 10, 1, 28, 28\] instead'):
+
+            F.conv2d(x, w)
 
 if __name__ == '__main__':
     test = unittest.main()
