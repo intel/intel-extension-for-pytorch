@@ -259,7 +259,13 @@ void copy_kernel_sycl(TensorIterator& iter, bool non_blocking) {
   );
 }
 
-Tensor & copy__sycl(Tensor& self, const Tensor& src, bool non_blocking) {
+} // namespace native
+} // namespace at
+
+namespace at {
+namespace AtenIpexTypeDPCPP {
+
+Tensor & copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   // TODO: valid check
 
   BUILD_TENSOR_ITER(self, src, iter);
@@ -268,10 +274,10 @@ Tensor & copy__sycl(Tensor& self, const Tensor& src, bool non_blocking) {
     return self;
   }
 
-  copy_kernel_sycl(iter, non_blocking);
+  at::native::copy_kernel_sycl(iter, non_blocking);
 
   return self;
 }
 
-} // namespace native
+} // namespace AtenIpexTypeDPCPP
 } // namespace at

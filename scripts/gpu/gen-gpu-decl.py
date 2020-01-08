@@ -62,7 +62,7 @@ def gen_output_file(args, name):
 
 
 def gen_decl_output_file(args):
-  return gen_output_file(args, 'RegistrationDeclarations_GPU.h')
+  return gen_output_file(args, 'RegistrationDeclarations_DPCPP.h')
 
 
 def is_tensor_api(fndef):
@@ -136,14 +136,32 @@ def generate(args):
       file=sys.stderr)
   assert len(errors) == 0
 
-  overrides = parse_override_keys(args.ipextype)
+  specific = parse_override_keys(args.ipextype)
   print(
-      '{} function overrides in {}'.format(len(overrides), args.ipextype),
+      '{} function dpcpp type in {}'.format(len(specific), args.ipextype),
+      file=sys.stderr)
+
+  dedicated = parse_override_keys(args.dedicatedtype)
+  print(
+      '{} function dedicated overrides in {}'.format(len(dedicated), args.dedicatedtype),
+      file=sys.stderr)
+
+  dispatchstub = parse_override_keys(args.dispatchstubtype)
+  print(
+      '{} function dispatchstub overrides in {}'.format(len(dispatchstub), args.dispatchstubtype),
       file=sys.stderr)
 
   ordecls = ''
   for fndef in fndefs:
-    for override in overrides:
+    for override in specific:
+      m = re.search(r"{}".format(override), fndef)
+      if m:
+        ordecls += '{}\n'.format(fndef)
+    for override in dedicated:
+      m = re.search(r"{}".format(override), fndef)
+      if m:
+        ordecls += '{}\n'.format(fndef)
+    for override in dispatchstub:
       m = re.search(r"{}".format(override), fndef)
       if m:
         ordecls += '{}\n'.format(fndef)
@@ -161,6 +179,16 @@ if __name__ == '__main__':
       type=str,
       metavar='IPEX_TYPE_FILE',
       help='The path to the IPEX ATEN overrides file')
+  arg_parser.add_argument(
+      'dedicatedtype',
+      type=str,
+      metavar='DEDICATED_TYPE_FILE',
+      help='The path to the DEDICATED ATEN file')
+  arg_parser.add_argument(
+      'dispatchstubtype',
+      type=str,
+      metavar='DISPATCH_STUB_TYPE_FILE',
+      help='The path to the DISPATCH STUB ATEN file')
   arg_parser.add_argument(
       'alldecl',
       type=str,

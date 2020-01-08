@@ -17,7 +17,7 @@
 void torch_ipex_init() {
   // TODO:
   printf("loading _torch_ipex.so ++\n");
-  torch_ipex::RegisterAtenTypeFunctions();
+  at::RegisterAtenTypeFunctions();
   printf("loading _torch_ipex.so --\n");
 }
 // PyObject* PyInit__torch_ipex() {
