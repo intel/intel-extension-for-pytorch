@@ -199,9 +199,19 @@ at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cp
   TORCH_INTERNAL_ASSERT(cpuTensor.defined());
   TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(cpuTensor.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT(ipexTensor.data_ptr() == cpuTensor.data_ptr());
+
+  // The dispatch priority of DPCPPTensorId is higher than other CPU tensor ids. So if a tensor is CPU and
+  // another tensor is DPCPP, it still will be disptached to DPCPP OPs.
+  //   ex, a = tensor(1, device='dpcpp')), a.to('cpu')
+  // The above code will call AtenIpexCPUDefault::copy_ and "self" parameter is cpu tensor and "src" parameter is dpcpp tensor.
+  if (ipexTensor.device().type() == cpuTensor.device().type()) {
+    TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
+    return ipexTensor;
+  }
+
   TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
   TORCH_INTERNAL_ASSERT(ipexTensor.device().type() == at::DeviceType::DPCPP);
-  TORCH_INTERNAL_ASSERT(ipexTensor.data_ptr() == cpuTensor.data_ptr());
 
   // NOTE: Cannot set storage data_ptr by set_data_ptr.
   //       set_data_ptr will release caller tensor's original data_ptr. It is wrong here because

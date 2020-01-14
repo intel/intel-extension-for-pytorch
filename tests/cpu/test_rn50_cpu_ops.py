@@ -502,6 +502,66 @@ class TestOP(TestCase):
         with self.assertRaisesRegex(ValueError, 'is not valid'):
             F.poisson_nll_loss(input, target, reduction='total')
 
+    def test_to_cpu(self):
+        def test_copy_behavior(t, non_blocking=False):
+            self.assertIs(t, t.to(t, non_blocking=non_blocking))
+            self.assertIs(t, t.to(t.dtype, non_blocking=non_blocking))
+            self.assertIs(t, t.to(torch.empty_like(t), non_blocking=non_blocking))
+            self.assertIsNot(t, t.to(t, non_blocking=non_blocking, copy=True))
+            self.assertIsNot(t, t.to(t.dtype, non_blocking=non_blocking, copy=True))
+            self.assertIsNot(t, t.to(torch.empty_like(t), non_blocking=non_blocking, copy=True))
+
+            devices = [t.device]
+            if t.device.type == 'cuda':
+                if t.device.index == -1:
+                    devices.append('cuda:{}'.format(torch.cuda.current_device()))
+                elif t.device.index == torch.cuda.current_device():
+                    devices.append('cuda')
+            for device in devices:
+                self.assertIs(t, t.to(device, non_blocking=non_blocking))
+                self.assertIs(t, t.to(device, t.dtype, non_blocking=non_blocking))
+                self.assertIsNot(t, t.to(device, non_blocking=non_blocking, copy=True))
+                self.assertIsNot(t, t.to(device, t.dtype, non_blocking=non_blocking, copy=True))
+
+        a = torch.tensor(5, device='cpu:0')
+        test_copy_behavior(a)
+        self.assertEqual(a.device, a.to('cpu:0').device)
+        self.assertEqual(a.device, a.to('cpu', dtype=torch.float32).device)
+        self.assertIs(torch.float32, a.to('cpu', dtype=torch.float32).dtype)
+        self.assertEqual(a.device, a.to(torch.float32).device)
+        self.assertIs(torch.float32, a.to(dtype=torch.float32).dtype)
+        self.assertEqual(a.data_ptr(), a.to('cpu').data_ptr())
+        self.assertEqual(a.data_ptr(), a.to(dtype=a.dtype, device=a.device, copy=False).data_ptr())
+        self.assertEqual(a.data_ptr(), a.to('cpu', copy=False).data_ptr())
+        self.assertNotEqual(a.data_ptr(), a.to('cpu', copy=True).data_ptr())
+
+    def test_to(self):
+        def test_copy_behavior(t, non_blocking=False):
+            self.assertIs(t, t.to(t, non_blocking=non_blocking))
+            self.assertIs(t, t.to(t.dtype, non_blocking=non_blocking))
+            self.assertIs(t, t.to(torch.empty_like(t), non_blocking=non_blocking))
+            self.assertIsNot(t, t.to(t, non_blocking=non_blocking, copy=True))
+            self.assertIsNot(t, t.to(t.dtype, non_blocking=non_blocking, copy=True))
+            self.assertIsNot(t, t.to(torch.empty_like(t), non_blocking=non_blocking, copy=True))
+
+            devices = [t.device]
+            for device in devices:
+                self.assertIs(t, t.to(device, non_blocking=non_blocking))
+                self.assertIs(t, t.to(device, t.dtype, non_blocking=non_blocking))
+                self.assertIsNot(t, t.to(device, non_blocking=non_blocking, copy=True))
+                self.assertIsNot(t, t.to(device, t.dtype, non_blocking=non_blocking, copy=True))
+
+        a = torch.tensor(5, device='cpu')
+        b = a.to('dpcpp:0')
+        a_clone = a.clone().view(a.numel())
+        b_clone = b.clone().view(b.numel())
+        self.assertEqual(a.size(), b.size())
+        for i in range(0, b.numel()):
+            assert (a_clone[i] == b_clone[i])
+
+        a = torch.tensor(5, device='dpcpp:0')
+        self.assertEqual(a.device, a.to('dpcpp:0').device)
+
 
 class TestBN(TestCase):
     def test_batchnorm_raises_error_if_running_mean_is_not_same_size_as_input(self):
@@ -657,6 +717,7 @@ class TestAvgMaxPool(TestCase):
                         # some implementations do not support dilation
                         res = fn(x, 6, stride=2, padding=0)
 
+
 class TestConv(TestCase):
     def run_conv_double_back_test(self, kern, stride, padding, chan_in, chan_out, batch_size,
                                   inp_size, dilation, no_weight, groups=1, use_cuda=False,
@@ -722,6 +783,20 @@ class TestConv(TestCase):
                                     r' but got 5-dimensional input of size \[1, 10, 1, 28, 28\] instead'):
 
             F.conv2d(x, w)
+
+    def test_Conv2d_with_cpu(self):
+        conv_dpcpp = torch.nn.Conv2d(3, 3, 3).to(device=device)
+        conv_cpu = torch.nn.Conv2d(3, 3, 3)
+        inputs_cpu = torch.randn(2, 3, 5, 5, requires_grad=True)
+        inputs_dpcpp = inputs_cpu.to(device=device)
+        tmp_bias = conv_cpu.bias.data.to(device=device)
+        conv_dpcpp.bias.data = tmp_bias
+        tmp_weight = conv_cpu.weight.data.to(device=device)
+        conv_dpcpp.weight.data = tmp_weight
+
+        out_dpcpp = conv_dpcpp(inputs_dpcpp)
+        out_cpu = conv_cpu(inputs_cpu)
+        self.assertEqual(out_dpcpp.to('cpu'), out_cpu, prec=0.0)
 
 if __name__ == '__main__':
     test = unittest.main()
