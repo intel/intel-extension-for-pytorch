@@ -153,18 +153,11 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     return cpuTensor;
   }
 
-  auto* allocator = c10::GetAllocator(c10::DeviceType::DPCPP);
-  void* tensor_raw_data = cpu_tensor_impl->storage().data();
-  c10::DataPtr dpcpp_data_ptr(tensor_raw_data, at::DeviceType::DPCPP);
-  auto storage_impl = c10::make_intrusive<at::StorageImpl>(
-    cpu_tensor_impl->storage().dtype(),
-    cpu_tensor_impl->storage().numel(),
-    std::move(dpcpp_data_ptr),
-    allocator,
-    cpu_tensor_impl->storage().resizable()
-  );
-
-  auto _tensor =  at::detail::make_tensor<IPEXTensorImpl>(cpuTensor, storage_impl, at::TensorTypeId::DPCPPTensorId);
+  auto cpu_storage = cpu_tensor_impl->storage().unsafeGetStorageImpl();
+  // [NOTE]: If the deleter of DPCPP::CPU is different form CPU deleter, we need to call
+  //         compare_exchange_deleter of DataPtr to update deleter
+  cpu_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
+  auto _tensor =  at::detail::make_tensor<IPEXTensorImpl>(cpuTensor.storage(), at::TensorTypeId::DPCPPTensorId);
   TORCH_INTERNAL_ASSERT(_tensor.device().type() == at::DeviceType::DPCPP);
   IPEXTensorImpl* impex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
   impex_impl->copy_meta_info(cpu_tensor_impl);

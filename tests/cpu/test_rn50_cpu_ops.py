@@ -789,10 +789,8 @@ class TestConv(TestCase):
         conv_cpu = torch.nn.Conv2d(3, 3, 3)
         inputs_cpu = torch.randn(2, 3, 5, 5, requires_grad=True)
         inputs_dpcpp = inputs_cpu.to(device=device)
-        tmp_bias = conv_cpu.bias.data.to(device=device)
-        conv_dpcpp.bias.data = tmp_bias
-        tmp_weight = conv_cpu.weight.data.to(device=device)
-        conv_dpcpp.weight.data = tmp_weight
+        conv_dpcpp.bias.data = conv_cpu.bias.data.to(device=device)
+        conv_dpcpp.weight.data = conv_cpu.weight.data.to(device=device)
 
         out_dpcpp = conv_dpcpp(inputs_dpcpp)
         out_cpu = conv_cpu(inputs_cpu)
