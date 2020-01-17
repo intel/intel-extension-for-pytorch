@@ -562,6 +562,16 @@ class TestOP(TestCase):
         a = torch.tensor(5, device='dpcpp:0')
         self.assertEqual(a.device, a.to('dpcpp:0').device)
 
+    def test_index(self):
+        s = [2, 3, 1, 8]
+        a = torch.randn(3, 10, device='cpu')
+        b = a.to('dpcpp:0')
+        self.assertEqual(a[:, s].to('dpcpp:0'), b[:, s])
+        self.assertEqual(a[1:, s].to('dpcpp:0'), b[1:, s])
+        self.assertEqual(a[:1, s].to('dpcpp:0'), b[:1, s])
+
+        
+
 
 class TestBN(TestCase):
     def test_batchnorm_raises_error_if_running_mean_is_not_same_size_as_input(self):

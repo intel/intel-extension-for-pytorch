@@ -240,7 +240,6 @@ std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& ten
   std::vector<at::Tensor> dpcpp_tensor_vec(tensor_list.size());
   for (size_t i = 0; i < tensor_list.size(); ++i) {
     const at::Tensor& tensor = tensor_list[i];
-    TORCH_INTERNAL_ASSERT(tensor.defined());
     if (tensor.defined()) {
       dpcpp_tensor_vec[i] = shallowFallbackToCPUTensor(tensor);
     }
