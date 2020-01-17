@@ -1,5 +1,5 @@
 diff --git a/c10/core/Backend.h b/c10/core/Backend.h
-index 26a277374c..6c62b28f1b 100644
+index 26a2773..d01618e 100644
 --- a/c10/core/Backend.h
 +++ b/c10/core/Backend.h
 @@ -25,12 +25,14 @@ namespace c10 {
@@ -155,7 +155,7 @@ index 26a277374c..6c62b28f1b 100644
      case Backend::SparseCUDA:
      case Backend::SparseHIP:
 diff --git a/c10/core/Device.cpp b/c10/core/Device.cpp
-index 1b936cd957..6730101011 100644
+index 1b936cd..29425d9 100644
 --- a/c10/core/Device.cpp
 +++ b/c10/core/Device.cpp
 @@ -13,7 +13,7 @@
@@ -185,7 +185,7 @@ index 1b936cd957..6730101011 100644
  } // namespace
  
 diff --git a/c10/core/DeviceType.cpp b/c10/core/DeviceType.cpp
-index 017267cd97..ab88a9100c 100644
+index 017267c..486b02e 100644
 --- a/c10/core/DeviceType.cpp
 +++ b/c10/core/DeviceType.cpp
 @@ -27,6 +27,8 @@ std::string DeviceTypeName(DeviceType d, bool lower_case) {
@@ -206,7 +206,7 @@ index 017267cd97..ab88a9100c 100644
      default:
        return false;
 diff --git a/c10/core/DeviceType.h b/c10/core/DeviceType.h
-index 9f759666d7..49c94386a5 100644
+index 9f75966..c74fe95 100644
 --- a/c10/core/DeviceType.h
 +++ b/c10/core/DeviceType.h
 @@ -23,11 +23,12 @@ enum class DeviceType : int16_t {
@@ -224,7 +224,7 @@ index 9f759666d7..49c94386a5 100644
  };
  
 diff --git a/c10/core/TensorOptions.h b/c10/core/TensorOptions.h
-index 90eb7e24dd..6c142cbc19 100644
+index 90eb7e2..8700abb 100644
 --- a/c10/core/TensorOptions.h
 +++ b/c10/core/TensorOptions.h
 @@ -381,6 +381,8 @@ struct C10_API TensorOptions {
@@ -255,7 +255,7 @@ index 90eb7e24dd..6c142cbc19 100644
      AT_ASSERTM(false, "Unknown TensorTypeId: ", tid);
    }
 diff --git a/c10/core/TensorTypeId.cpp b/c10/core/TensorTypeId.cpp
-index 9f63c3829b..46569c96e8 100644
+index 9f63c38..38d8efc 100644
 --- a/c10/core/TensorTypeId.cpp
 +++ b/c10/core/TensorTypeId.cpp
 @@ -40,6 +40,8 @@ const char* toString(TensorTypeId t) {
@@ -268,7 +268,7 @@ index 9f63c3829b..46569c96e8 100644
        return "TESTING_ONLY_GenericModeTensorId";
      case TensorTypeId::TESTING_ONLY_GenericWrapperTensorId:
 diff --git a/c10/core/TensorTypeId.h b/c10/core/TensorTypeId.h
-index e1bcbc2d26..21810a110e 100644
+index e1bcbc2..74eecd9 100644
 --- a/c10/core/TensorTypeId.h
 +++ b/c10/core/TensorTypeId.h
 @@ -42,6 +42,9 @@ enum class TensorTypeId : uint8_t {
@@ -281,3 +281,28 @@ index e1bcbc2d26..21810a110e 100644
    // WARNING! If you add more "wrapper" style tensor ids (tensor
    // ids which don't get kernels directly defined in native_functions.yaml;
    // examples are tracing or profiling) here, you need to also adjust
+diff --git a/torch/csrc/utils/tensor_layouts.cpp b/torch/csrc/utils/tensor_layouts.cpp
+index 8f51a7d..67fe6d1 100644
+--- a/torch/csrc/utils/tensor_layouts.cpp
++++ b/torch/csrc/utils/tensor_layouts.cpp
+@@ -23,6 +23,7 @@ void initializeLayouts() {
+   registerLayoutObject((THPLayout*)strided_layout, at::Backend::CUDA);
+   registerLayoutObject((THPLayout*)strided_layout, at::Backend::MSNPU);
+   registerLayoutObject((THPLayout*)strided_layout, at::Backend::XLA);
++  registerLayoutObject((THPLayout*)strided_layout, at::Backend::DPCPP);
+   registerLayoutObject((THPLayout*)strided_layout, at::Backend::QuantizedCPU);
+ 
+   PyObject *sparse_coo_layout = THPLayout_New(at::Layout::Sparse, "torch.sparse_coo");
+diff --git a/torch/csrc/utils/tensor_new.cpp b/torch/csrc/utils/tensor_new.cpp
+index 7265ccb..be05001 100644
+--- a/torch/csrc/utils/tensor_new.cpp
++++ b/torch/csrc/utils/tensor_new.cpp
+@@ -58,6 +58,8 @@ Backend backendToBackendOfDeviceType(Backend b, DeviceType d) {
+     case DeviceType::XLA:
+       TORCH_CHECK(!isSparse(b), "Sparse not implemented for XLA");
+       return Backend::XLA;
++    case DeviceType::DPCPP:
++      return Backend::DPCPP;
+     default:
+       AT_ERROR("Unknown device type");
+   }
