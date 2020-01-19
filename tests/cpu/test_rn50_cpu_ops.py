@@ -798,13 +798,16 @@ class TestConv(TestCase):
         conv_dpcpp = torch.nn.Conv2d(3, 3, 3).to(device=device)
         conv_cpu = torch.nn.Conv2d(3, 3, 3)
         inputs_cpu = torch.randn(2, 3, 5, 5, requires_grad=True)
-        inputs_dpcpp = inputs_cpu.to(device=device)
+        inputs_dpcpp = inputs_cpu.detach().to(device=device).requires_grad_(True)
         conv_dpcpp.bias.data = conv_cpu.bias.data.to(device=device)
         conv_dpcpp.weight.data = conv_cpu.weight.data.to(device=device)
 
         out_dpcpp = conv_dpcpp(inputs_dpcpp)
         out_cpu = conv_cpu(inputs_cpu)
         self.assertEqual(out_dpcpp.to('cpu'), out_cpu, prec=0.0)
+        out_dpcpp.sum().backward()
+        out_cpu.sum().backward()
+        self.assertEqual(inputs_dpcpp.grad.to('cpu'), inputs_cpu.grad, prec=0.0)
 
 if __name__ == '__main__':
     test = unittest.main()

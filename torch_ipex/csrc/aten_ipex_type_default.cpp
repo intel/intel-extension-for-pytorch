@@ -1096,7 +1096,7 @@ at::Tensor AtenIpexTypeDefault::convolution_overrideable(const at::Tensor & inpu
 
 std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexTypeDefault::convolution_backward_overrideable(const at::Tensor & grad_output, const at::Tensor & input, const at::Tensor & weight, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups, std::array<bool,3> output_mask) {
   if (check_device_by_tensor(grad_output, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::convolution_backward_overrideable(grad_output, input, weight, stride, padding, dilation, transposed, output_padding, groups, output_mask);
+    return cpu::AtenIpexCPUDev::convolution_backward_overrideable(grad_output, input, weight, stride, padding, dilation, transposed, output_padding, groups, output_mask);
   } else {
     AT_ASSERT(false);
   }
