@@ -153,7 +153,6 @@ at::Tensor AtenIpexCPUAlias::squeeze(const at::Tensor & self, int64_t dim) {
 at::Tensor AtenIpexCPUAlias::t(const at::Tensor & self) {
   DEBUG("AtenIpexCPUAlias::t\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(self.is_contiguous());
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::t(_ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used

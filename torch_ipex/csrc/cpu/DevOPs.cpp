@@ -42,5 +42,26 @@ at::Tensor AtenIpexCPUDev::mkldnn_convolution(const at::Tensor & self, const at:
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
 }
 
+std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::convolution_backward_overrideable(const at::Tensor & grad_output, const at::Tensor & input, const at::Tensor & weight, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups, std::array<bool,3> output_mask) {
+  DEBUG("AtenIpexCPUOptimized::convolution_backward_overrideable\n");
+  return mkldnn_convolution_backward(input, grad_output, weight, padding, stride, dilation, groups, output_mask);
+}
+
+std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::mkldnn_convolution_backward(const at::Tensor & self, const at::Tensor & grad_output, const at::Tensor & weight, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups, std::array<bool,3> output_mask) {
+  DEBUG("AtenIpexCPUOptimized::mkldnn_convolution_backward\n");
+  TORCH_INTERNAL_ASSERT(self.defined());
+  TORCH_INTERNAL_ASSERT(grad_output.defined());
+  TORCH_INTERNAL_ASSERT(weight.defined());
+  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT(grad_output.defined());
+  TORCH_INTERNAL_ASSERT(weight.layout() == c10::kStrided);
+  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
+  auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
+  auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
+  auto&& _ipex_result = at::mkldnn_convolution_backward(_ipex_self.contiguous(), _ipex_grad_output.contiguous(), _ipex_weight.contiguous(), padding, stride, dilation, groups, output_mask);
+  static_cast<void>(_ipex_result); // Avoid warnings in case not used
+  return std::tuple<at::Tensor,at::Tensor,at::Tensor>(bridge::shallowUpgradeToDPCPPTensor(std::get<0>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<1>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<2>(_ipex_result)));
+}
+
 }  // namespace cpu
 }  // namespace torch_ipex
