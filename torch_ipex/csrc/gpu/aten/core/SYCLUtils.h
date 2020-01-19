@@ -11,6 +11,7 @@
 #include <c10/core/Device.h>
 
 #include <core/virtual_ptr.h>
+#include <core/SYCLDevice.h>
 #include <core/SYCL.h>
 
 namespace c10 {
@@ -34,6 +35,8 @@ int syclSetDevice(DeviceIndex device_index);
 int syclGetDeviceIdFromPtr(DeviceIndex *device_id, void *ptr);
 
 cl::sycl::device syclGetRawDevice(DeviceIndex device_index);
+
+DPCPPDeviceSelector syclGetDeviceSelector(DeviceIndex device_index);
 
 cl::sycl::codeplay::PointerMapper &syclGetBufferMap();
 
@@ -81,5 +84,14 @@ static inline DP_DEVICE float __int_as_float(uint32_t val) {
   cn.in = val;
   return cn.out;
 }
+
+#include <core/SYCLException.h>
+static cl::sycl::async_handler syclAsyncHandler = [](cl::sycl::exception_list eL) {
+  for (auto& e : eL) {
+    C10_SYCL_TRY
+    std::rethrow_exception(e);
+    C10_SYCL_CATCH_RETHROW(__FILE__, __LINE__)
+  }
+};
 
 }} // namespace c10::sycl

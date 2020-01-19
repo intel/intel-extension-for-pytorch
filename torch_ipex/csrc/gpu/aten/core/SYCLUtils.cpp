@@ -6,6 +6,7 @@
 #include <core/SYCLDevice.h>
 #include <core/SYCLException.h>
 #include <core/SYCLStream.h>
+#include <core/SYCLContext.h>
 #include <cmath>
 
 namespace c10 {
@@ -14,25 +15,6 @@ namespace sycl {
 // Global device pool state
 static std::once_flag init_device_flag;
 static SYCLDevicePool gDevPool;
-
-// move to c10/dpcpp/SYCLFunctions.h
-// DeviceIndex device_count() {
-//   int count;
-//   C10_SYCL_CHECK(syclGetDeviceCount(&count));
-//   return static_cast<DeviceIndex>(count);
-// }
-
-// move to c10/dpcpp/SYCLFunctions.h
-// DeviceIndex current_device() {
-//   DeviceIndex cur_device;
-//   C10_SYCL_CHECK(syclGetDevice(&cur_device));
-//   return cur_device;
-// }
-
-// move to c10/dpcpp/SYCLFunctions.h
-// void set_device(DeviceIndex device) {
-//   C10_SYCL_CHECK(syclSetDevice(device));
-// }
 
 static void clearSyclDevices() {
   gDevPool.devices.clear();
@@ -47,11 +29,13 @@ static void initGlobalDevicePoolState() {
     for (const auto& device : device_list) {
       if (device.is_gpu()) {
         gDevPool.devices.push_back(device);
+        gDevPool.dev_sels.push_back({device});
       }
     }
   }
   TORCH_CHECK(gDevPool.devices.size() > 0, "SYCL Device count is zero");
   gDevPool.cur_dev_index = 0;
+
   // Note: SYCLRuntime's destruction happens before the destroy of the
   // global vars except the global vars with sycl type. This will make
   // our global device pool destruction crash. So we use atexit to
@@ -97,6 +81,15 @@ cl::sycl::device syclGetRawDevice(DeviceIndex device_index) {
     AT_ERROR("syclSetDevice: device_index is out of range");
   }
   return gDevPool.devices[device_index];
+}
+
+DPCPPDeviceSelector syclGetDeviceSelector(DeviceIndex device_index) {
+  initDevicePoolCallOnce();
+  std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
+  if (device_index >= (DeviceIndex)gDevPool.devices.size()) {
+    AT_ERROR("syclSetDevice: device_index is out of range");
+  }
+  return gDevPool.dev_sels[device_index];
 }
 
 /************************sycl memory buffer map pool****************/

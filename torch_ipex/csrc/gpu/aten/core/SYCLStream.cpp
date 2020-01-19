@@ -1,5 +1,7 @@
 #include <core/SYCLStream.h>
 #include <core/SYCLGuard.h>
+#include <core/SYCLUtils.h>
+#include <core/SYCLContext.h>
 #include <core/SYCLException.h>
 #include <c10/util/Exception.h>
 
@@ -24,18 +26,12 @@ enum class StreamType: uint8_t {
 static constexpr int syclStreamPoolShift = 5;
 static constexpr int syclStreamsPerPool = 32;
 
-static cl::sycl::async_handler syclAsyncHandler = [](cl::sycl::exception_list eL) {
-  for (auto& e : eL) {
-    C10_SYCL_TRY
-    std::rethrow_exception(e);
-    C10_SYCL_CATCH_RETHROW(__FILE__, __LINE__)
-  }
-};
-
 class SYCLStreamImpl {
 public:
   SYCLStreamImpl(DeviceIndex di, cl::sycl::async_handler asyncHandler = syclAsyncHandler):
-      queue_(syclGetRawDevice(di), asyncHandler), device_index_(di) {};
+      /* queue_(syclGetRawDevice(di), asyncHandler),*/
+      queue_(at::sycl::getGlobalContext(), syclGetDeviceSelector(di), asyncHandler),
+      device_index_(di) {};
   DeviceIndex getDeviceIndex() const { return device_index_; };
   cl::sycl::queue& get_sycl_queue() { return queue_; }
   ~SYCLStreamImpl() = default;

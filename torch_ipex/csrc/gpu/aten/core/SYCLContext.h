@@ -47,6 +47,8 @@ inline bool is_available() {
   return count > 0;
 }
 
+void createGlobalContext();
+cl::sycl::context getGlobalContext();
 CAFFE2_API Allocator* getSYCLDeviceAllocator();
 
 } // namespace sycl

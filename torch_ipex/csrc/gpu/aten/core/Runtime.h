@@ -82,8 +82,8 @@ protected:
     AT_ASSERT(device_count > 0);
     for (int i = 0; i < device_count; i++) {
       _gpu_engines.push_back({engine::kind::gpu,
-                              c10::sycl::getDefaultSYCLStream(i).sycl_queue().get_device(),
-                              c10::sycl::getDefaultSYCLStream(i).sycl_queue().get_context()});
+                              c10::sycl::syclGetRawDevice(i),
+                              at::sycl::getGlobalContext()});
     }
   }
   ~GpuEngineManager() {}
