@@ -1,8 +1,34 @@
+diff --git a/aten/src/ATen/SparseTensorImpl.cpp b/aten/src/ATen/SparseTensorImpl.cpp
+index 6af4b57..b6144b3 100644
+--- a/aten/src/ATen/SparseTensorImpl.cpp
++++ b/aten/src/ATen/SparseTensorImpl.cpp
+@@ -11,6 +11,8 @@ namespace {
+       return kCPU;
+     } else if (type_set.has(TensorTypeId::SparseCUDATensorId)) {
+       return kCUDA;
++    } else if (type_set.has(TensorTypeId::SparseDPCPPTensorId)) {
++      return kDPCPP;
+     } else {
+       AT_ERROR("Cannot construct SparseTensor with non-sparse tensor type ID ", type_set);
+     }
+diff --git a/aten/src/ATen/native/sparse/SparseTensor.cpp b/aten/src/ATen/native/sparse/SparseTensor.cpp
+index a7d71a8..e6125ee 100644
+--- a/aten/src/ATen/native/sparse/SparseTensor.cpp
++++ b/aten/src/ATen/native/sparse/SparseTensor.cpp
+@@ -76,6 +76,8 @@ SparseTensor new_sparse(const TensorOptions& options) {
+   TensorTypeId type_id;
+   if (options.device().is_cuda()) {
+     type_id = TensorTypeId::SparseCUDATensorId;
++  } else if (options.device().is_dpcpp()) {
++    type_id = TensorTypeId::SparseDPCPPTensorId;
+   } else {
+     type_id = TensorTypeId::SparseCPUTensorId;
+   }
 diff --git a/c10/core/Backend.h b/c10/core/Backend.h
-index 26a2773..d01618e 100644
+index 26a2773..a37d76a 100644
 --- a/c10/core/Backend.h
 +++ b/c10/core/Backend.h
-@@ -25,12 +25,14 @@ namespace c10 {
+@@ -25,18 +25,22 @@ namespace c10 {
   * or "SparseCUDA"; backend in torch.backends is something like "MKL" or
   * "CUDNN".
   */
@@ -18,7 +44,15 @@ index 26a2773..d01618e 100644
      case Backend::CUDA:
        return Backend::SparseCUDA;
      case Backend::HIP:
-@@ -58,6 +60,10 @@ static inline Backend toDense(Backend b) {
+       return Backend::SparseHIP;
+     case Backend::SparseCPU:
+       return Backend::SparseCPU;
++    case Backend::SparseDPCPP:
++      return Backend::SparseDPCPP;
+     case Backend::SparseCUDA:
+       return Backend::SparseCUDA;
+     case Backend::SparseHIP:
+@@ -58,6 +62,10 @@ static inline Backend toDense(Backend b) {
        return Backend::MSNPU;
      case Backend::XLA:
        return Backend::XLA;
@@ -29,7 +63,7 @@ index 26a2773..d01618e 100644
      case Backend::SparseCPU:
        return Backend::CPU;
      case Backend::SparseCUDA:
-@@ -86,6 +92,10 @@ static inline Backend tensorTypeIdToBackend(TensorTypeId t) {
+@@ -86,6 +94,10 @@ static inline Backend tensorTypeIdToBackend(TensorTypeId t) {
      return Backend::MSNPU;
    } else if (t == TensorTypeId::XLATensorId) {
      return Backend::XLA;
@@ -40,7 +74,7 @@ index 26a2773..d01618e 100644
    } else if (t == TensorTypeId::SparseCPUTensorId) {
      return Backend::SparseCPU;
    } else if (t == TensorTypeId::SparseCUDATensorId) {
-@@ -119,6 +129,10 @@ static inline TensorTypeId backendToTensorTypeId(Backend b) {
+@@ -119,6 +131,10 @@ static inline TensorTypeId backendToTensorTypeId(Backend b) {
        return TensorTypeId::MSNPUTensorId;
      case Backend::XLA:
        return TensorTypeId::XLATensorId;
@@ -51,17 +85,17 @@ index 26a2773..d01618e 100644
      case Backend::SparseCPU:
        return TensorTypeId::SparseCPUTensorId;
      case Backend::SparseCUDA:
-@@ -158,6 +172,9 @@ static inline DeviceType backendToDeviceType(Backend b) {
+@@ -158,6 +174,9 @@ static inline DeviceType backendToDeviceType(Backend b) {
        return DeviceType::CUDA;
      case Backend::SparseHIP:
        return DeviceType::HIP;
-+    case Backend::SparseDPCPP:
 +    case Backend::DPCPP:
++    case Backend::SparseDPCPP:
 +      return DeviceType::DPCPP;
      case Backend::MkldnnCPU:
      case Backend::QuantizedCPU:
      case Backend::ComplexCPU:
-@@ -173,12 +190,14 @@ static inline DeviceType backendToDeviceType(Backend b) {
+@@ -173,12 +192,14 @@ static inline DeviceType backendToDeviceType(Backend b) {
  
  static inline Backend backendToCPU(Backend b) {
    switch (b) {
@@ -76,7 +110,7 @@ index 26a2773..d01618e 100644
      case Backend::SparseCPU:
        return Backend::SparseCPU;
      case Backend::SparseCUDA:
-@@ -192,6 +211,7 @@ static inline Backend backendToCPU(Backend b) {
+@@ -192,6 +213,7 @@ static inline Backend backendToCPU(Backend b) {
        return Backend::MkldnnCPU;
      case Backend::QuantizedCPU:
        return Backend::QuantizedCPU;
@@ -84,7 +118,7 @@ index 26a2773..d01618e 100644
      case Backend::ComplexCPU:
      case Backend::ComplexCUDA:
        return Backend::ComplexCPU;
-@@ -204,16 +224,19 @@ static inline Backend backendToCPU(Backend b) {
+@@ -204,16 +226,19 @@ static inline Backend backendToCPU(Backend b) {
  
  static inline Backend backendToCUDA(Backend b) {
    switch (b) {
@@ -104,7 +138,7 @@ index 26a2773..d01618e 100644
      case Backend::ComplexCPU:
      case Backend::ComplexCUDA:
        return Backend::ComplexCUDA;
-@@ -226,12 +249,14 @@ static inline Backend backendToCUDA(Backend b) {
+@@ -226,12 +251,14 @@ static inline Backend backendToCUDA(Backend b) {
  
  static inline Backend backendToHIP(Backend b) {
    switch (b) {
@@ -119,7 +153,7 @@ index 26a2773..d01618e 100644
      case Backend::SparseCPU:
      case Backend::SparseCUDA:
      case Backend::SparseHIP:
-@@ -246,6 +271,8 @@ static inline Backend backendToHIP(Backend b) {
+@@ -246,6 +273,8 @@ static inline Backend backendToHIP(Backend b) {
  // TODO: This probably shouldn't actually be static inline
  static inline const char* toString(Backend b) {
    switch (b) {
@@ -128,7 +162,7 @@ index 26a2773..d01618e 100644
      case Backend::CPU:
        return "CPU";
      case Backend::CUDA:
-@@ -256,6 +283,8 @@ static inline const char* toString(Backend b) {
+@@ -256,6 +285,8 @@ static inline const char* toString(Backend b) {
        return "MSNPU";
      case Backend::XLA:
        return "XLA";
@@ -137,7 +171,7 @@ index 26a2773..d01618e 100644
      case Backend::SparseCPU:
        return "SparseCPU";
      case Backend::SparseCUDA:
-@@ -266,6 +295,8 @@ static inline const char* toString(Backend b) {
+@@ -266,6 +297,8 @@ static inline const char* toString(Backend b) {
        return "MkldnnCPU";
      case Backend::QuantizedCPU:
        return "QuantizedCPU";
@@ -146,7 +180,7 @@ index 26a2773..d01618e 100644
      case Backend::ComplexCPU:
        return "ComplexCPU";
      case Backend::ComplexCUDA:
-@@ -277,6 +308,7 @@ static inline const char* toString(Backend b) {
+@@ -277,6 +310,7 @@ static inline const char* toString(Backend b) {
  
  static inline bool isSparse(Backend b) {
    switch (b) {
@@ -184,6 +218,22 @@ index 1b936cd..29425d9 100644
  }
  } // namespace
  
+diff --git a/c10/core/Device.h b/c10/core/Device.h
+index 95295c1..5995b70 100644
+--- a/c10/core/Device.h
++++ b/c10/core/Device.h
+@@ -86,6 +86,11 @@ struct C10_API Device final {
+     return type_ == DeviceType::CPU;
+   }
+ 
++  /// Return true if the device is of DPCPP type.
++  bool is_dpcpp() const noexcept {
++    return type_ == DeviceType::DPCPP;
++  }
++
+  private:
+   DeviceType type_;
+   DeviceIndex index_ = -1;
 diff --git a/c10/core/DeviceType.cpp b/c10/core/DeviceType.cpp
 index 017267c..486b02e 100644
 --- a/c10/core/DeviceType.cpp
@@ -206,7 +256,7 @@ index 017267c..486b02e 100644
      default:
        return false;
 diff --git a/c10/core/DeviceType.h b/c10/core/DeviceType.h
-index 9f75966..c74fe95 100644
+index 9f75966..23f6808 100644
 --- a/c10/core/DeviceType.h
 +++ b/c10/core/DeviceType.h
 @@ -23,11 +23,12 @@ enum class DeviceType : int16_t {
@@ -223,8 +273,62 @@ index 9f75966..c74fe95 100644
    ONLY_FOR_TEST = 20901, // This device type is only for test.
  };
  
+@@ -36,6 +37,7 @@ constexpr DeviceType kCUDA = DeviceType::CUDA;
+ constexpr DeviceType kHIP = DeviceType::HIP;
+ constexpr DeviceType kMSNPU = DeviceType::MSNPU;
+ constexpr DeviceType kXLA = DeviceType::XLA;
++constexpr DeviceType kDPCPP = DeviceType::DPCPP;
+ 
+ // define explicit int constant
+ constexpr int COMPILE_TIME_MAX_DEVICE_TYPES =
+diff --git a/c10/core/Layout.h b/c10/core/Layout.h
+index c5ecc89..4aab440 100644
+--- a/c10/core/Layout.h
++++ b/c10/core/Layout.h
+@@ -15,6 +15,7 @@ constexpr auto kMkldnn = Layout::Mkldnn;
+ inline Layout layout_from_backend(Backend backend) {
+   switch (backend) {
+     case Backend::SparseCPU:
++    case Backend::SparseDPCPP:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
+       return Layout::Sparse;
+diff --git a/c10/core/TensorImpl.h b/c10/core/TensorImpl.h
+index 65f43ff..ae24ea5 100644
+--- a/c10/core/TensorImpl.h
++++ b/c10/core/TensorImpl.h
+@@ -425,7 +425,8 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+     // NB: This method is not virtual and avoid dispatches for performance reasons.
+     return type_set_.has(TensorTypeId::SparseCPUTensorId) ||
+            type_set_.has(TensorTypeId::SparseCUDATensorId) ||
+-           type_set_.has(TensorTypeId::SparseHIPTensorId);
++           type_set_.has(TensorTypeId::SparseHIPTensorId) ||
++           type_set_.has(TensorTypeId::SparseDPCPPTensorId);
+   }
+ 
+   bool is_quantized() const {
+@@ -449,6 +450,11 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+     return type_set_.has(TensorTypeId::MkldnnCPUTensorId);
+   }
+ 
++  bool is_dpcpp() const {
++    return type_set_.has(TensorTypeId::DPCPPTensorId) ||
++           type_set_.has(TensorTypeId::SparseDPCPPTensorId);
++  }
++
+   int64_t get_device() const {
+     TORCH_CHECK(
+         device_opt_.has_value(),
+@@ -918,6 +924,7 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+     };
+     auto is_sparse = [](TensorTypeSet ts) {
+       return ts.has(TensorTypeId::SparseCPUTensorId) ||
++             ts.has(TensorTypeId::SparseDPCPPTensorId) ||
+              ts.has(TensorTypeId::SparseCUDATensorId) ||
+              ts.has(TensorTypeId::SparseHIPTensorId);
+     };
 diff --git a/c10/core/TensorOptions.h b/c10/core/TensorOptions.h
-index 90eb7e2..8700abb 100644
+index 90eb7e2..6ab409b 100644
 --- a/c10/core/TensorOptions.h
 +++ b/c10/core/TensorOptions.h
 @@ -381,6 +381,8 @@ struct C10_API TensorOptions {
@@ -241,11 +345,22 @@ index 90eb7e2..8700abb 100644
            case DeviceType::HIP:
              return TensorTypeId::SparseHIPTensorId;
 +          case DeviceType::DPCPP:
-+            return TensorTypeId::DPCPPTensorId;
++            return TensorTypeId::SparseDPCPPTensorId;
            default:
              AT_ERROR("Unsupported device type for sparse layout: ", device().type());
          }
-@@ -599,6 +603,8 @@ inline DeviceType computeDeviceType(TensorTypeId tid) {
+@@ -587,6 +591,10 @@ inline DeviceType computeDeviceType(TensorTypeId tid) {
+     return DeviceType::MSNPU;
+   } else if (tid == TensorTypeId::XLATensorId) {
+     return DeviceType::XLA;
++  } else if (tid == TensorTypeId::DPCPPTensorId) {
++    return DeviceType::DPCPP;
++  } else if (tid == TensorTypeId::SparseDPCPPTensorId) {
++    return DeviceType::DPCPP;
+   } else if (tid == TensorTypeId::SparseCPUTensorId) {
+     return DeviceType::CPU;
+   } else if (tid == TensorTypeId::SparseCUDATensorId) {
+@@ -599,6 +607,8 @@ inline DeviceType computeDeviceType(TensorTypeId tid) {
      return DeviceType::CPU;
    } else if (tid == TensorTypeId::ComplexCUDATensorId) {
      return DeviceType::CUDA;
@@ -255,15 +370,17 @@ index 90eb7e2..8700abb 100644
      AT_ASSERTM(false, "Unknown TensorTypeId: ", tid);
    }
 diff --git a/c10/core/TensorTypeId.cpp b/c10/core/TensorTypeId.cpp
-index 9f63c38..38d8efc 100644
+index 9f63c38..5bdf7be 100644
 --- a/c10/core/TensorTypeId.cpp
 +++ b/c10/core/TensorTypeId.cpp
-@@ -40,6 +40,8 @@ const char* toString(TensorTypeId t) {
+@@ -40,6 +40,10 @@ const char* toString(TensorTypeId t) {
        return "ComplexCUDATensorId";
      case TensorTypeId::VariableTensorId:
        return "VariableTensorId";
 +    case TensorTypeId::DPCPPTensorId:
 +      return "DPCPPTensorId";
++    case TensorTypeId::SparseDPCPPTensorId:
++      return "SparseDPCPPTensorId";
      case TensorTypeId::TESTING_ONLY_GenericModeTensorId:
        return "TESTING_ONLY_GenericModeTensorId";
      case TensorTypeId::TESTING_ONLY_GenericWrapperTensorId:
