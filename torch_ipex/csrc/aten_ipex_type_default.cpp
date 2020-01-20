@@ -11,6 +11,7 @@
 #include "cpu/OPs.h"
 #include "cpu/AliasOPs.h"
 #include "cpu/DevOPs.h"
+#include "cpu/SparseOPs.h"
 
 namespace torch_ipex {
 
@@ -4672,7 +4673,11 @@ at::Tensor & AtenIpexTypeDefault::nuclear_norm_out(at::Tensor & out, const at::T
 
 at::Tensor AtenIpexTypeDefault::clone(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::clone(self, memory_format);
+    if (self.is_sparse()) {
+      return cpu::AtenIpexCPUSparse::clone(self, memory_format);
+    } else {
+      return cpu::AtenIpexCPUDefault::clone(self, memory_format);
+    }
   } else {
     AT_ASSERT(false);
   }
@@ -4888,7 +4893,7 @@ at::Tensor AtenIpexTypeDefault::to_dense_backward(const at::Tensor & grad, const
 
 int64_t AtenIpexTypeDefault::sparse_dim(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::sparse_dim(self);
+    return cpu::AtenIpexCPUSparse::sparse_dim(self);
   } else {
     AT_ASSERT(false);
   }
@@ -4904,7 +4909,7 @@ int64_t AtenIpexTypeDefault::_dimI(const at::Tensor & self) {
 
 int64_t AtenIpexTypeDefault::dense_dim(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::dense_dim(self);
+    return cpu::AtenIpexCPUSparse::dense_dim(self);
   } else {
     AT_ASSERT(false);
   }
@@ -4920,7 +4925,7 @@ int64_t AtenIpexTypeDefault::_dimV(const at::Tensor & self) {
 
 int64_t AtenIpexTypeDefault::_nnz(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::_nnz(self);
+    return cpu::AtenIpexCPUSparse::_nnz(self);
   } else {
     AT_ASSERT(false);
   }
@@ -4936,7 +4941,11 @@ at::Tensor AtenIpexTypeDefault::coalesce(const at::Tensor & self) {
 
 bool AtenIpexTypeDefault::is_coalesced(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::is_coalesced(self);
+    if (self.is_sparse()) {
+      return cpu::AtenIpexCPUSparse::is_coalesced(self);
+    } else {
+      return cpu::AtenIpexCPUDefault::is_coalesced(self);
+    }
   } else {
     AT_ASSERT(false);
   }
@@ -4944,7 +4953,7 @@ bool AtenIpexTypeDefault::is_coalesced(const at::Tensor & self) {
 
 at::Tensor AtenIpexTypeDefault::_indices(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUAlias::_indices(self);
+    return cpu::AtenIpexCPUSparse::_indices(self);
   } else {
     AT_ASSERT(false);
   }
@@ -4952,7 +4961,7 @@ at::Tensor AtenIpexTypeDefault::_indices(const at::Tensor & self) {
 
 at::Tensor AtenIpexTypeDefault::_values(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUAlias::_values(self);
+    return cpu::AtenIpexCPUSparse::_values(self);
   } else {
     AT_ASSERT(false);
   }
@@ -4960,7 +4969,7 @@ at::Tensor AtenIpexTypeDefault::_values(const at::Tensor & self) {
 
 at::Tensor & AtenIpexTypeDefault::_coalesced_(at::Tensor & self, bool coalesced) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::_coalesced_(self, coalesced);
+    return cpu::AtenIpexCPUSparse::_coalesced_(self, coalesced);
   } else {
     AT_ASSERT(false);
   }
@@ -11031,6 +11040,9 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::MemoryFormat>), &AtenIpexTypeDefault::clone>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::MemoryFormat>), &AtenIpexTypeDefault::clone>(at::TensorTypeId::SparseDPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::resize_as_(Tensor(a!) self, Tensor the_template) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::resize_as_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -11092,7 +11104,7 @@ void RegisterAtenTypeFunctions() {
       .impl_unboxedOnlyKernel<at::Tensor(int64_t, int64_t, at::IntArrayRef, const at::TensorOptions &), &AtenIpexTypeDefault::_sparse_coo_tensor_with_dims>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_sparse_coo_tensor_with_dims_and_tensors(int sparse_dim, int dense_dim, int[] size, Tensor indices, Tensor values, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False) -> Tensor")
-      .impl_unboxedOnlyKernel<at::Tensor(int64_t, int64_t, at::IntArrayRef, const at::Tensor &, const at::Tensor &, const at::TensorOptions &), &AtenIpexTypeDefault::_sparse_coo_tensor_with_dims_and_tensors>(at::TensorTypeId::DPCPPTensorId)
+      .impl_unboxedOnlyKernel<at::Tensor(int64_t, int64_t, at::IntArrayRef, const at::Tensor &, const at::Tensor &, const at::TensorOptions &), &AtenIpexTypeDefault::_sparse_coo_tensor_with_dims_and_tensors>(at::TensorTypeId::SparseDPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::sparse_resize_(Tensor(a!) self, int[] size, int sparse_dim, int dense_dim) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::IntArrayRef, int64_t, int64_t), &AtenIpexTypeDefault::sparse_resize_>(at::TensorTypeId::DPCPPTensorId)
@@ -11110,19 +11122,19 @@ void RegisterAtenTypeFunctions() {
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::to_dense_backward>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::sparse_dim(Tensor self) -> int")
-      .impl_unboxedOnlyKernel<int64_t(const at::Tensor &), &AtenIpexTypeDefault::sparse_dim>(at::TensorTypeId::DPCPPTensorId)
+      .impl_unboxedOnlyKernel<int64_t(const at::Tensor &), &AtenIpexTypeDefault::sparse_dim>(at::TensorTypeId::SparseDPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_dimI(Tensor self) -> int")
       .impl_unboxedOnlyKernel<int64_t(const at::Tensor &), &AtenIpexTypeDefault::_dimI>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::dense_dim(Tensor self) -> int")
-      .impl_unboxedOnlyKernel<int64_t(const at::Tensor &), &AtenIpexTypeDefault::dense_dim>(at::TensorTypeId::DPCPPTensorId)
+      .impl_unboxedOnlyKernel<int64_t(const at::Tensor &), &AtenIpexTypeDefault::dense_dim>(at::TensorTypeId::SparseDPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_dimV(Tensor self) -> int")
       .impl_unboxedOnlyKernel<int64_t(const at::Tensor &), &AtenIpexTypeDefault::_dimV>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_nnz(Tensor self) -> int")
-      .impl_unboxedOnlyKernel<int64_t(const at::Tensor &), &AtenIpexTypeDefault::_nnz>(at::TensorTypeId::DPCPPTensorId)
+      .impl_unboxedOnlyKernel<int64_t(const at::Tensor &), &AtenIpexTypeDefault::_nnz>(at::TensorTypeId::SparseDPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::coalesce(Tensor self) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::coalesce>(at::TensorTypeId::DPCPPTensorId)
@@ -11130,14 +11142,17 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::is_coalesced(Tensor self) -> bool")
       .impl_unboxedOnlyKernel<bool(const at::Tensor &), &AtenIpexTypeDefault::is_coalesced>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::is_coalesced(Tensor self) -> bool")
+      .impl_unboxedOnlyKernel<bool(const at::Tensor &), &AtenIpexTypeDefault::is_coalesced>(at::TensorTypeId::SparseDPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_indices(Tensor(a) self) -> Tensor(a)")
-      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::_indices>(at::TensorTypeId::DPCPPTensorId)
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::_indices>(at::TensorTypeId::SparseDPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_values(Tensor(a) self) -> Tensor(a)")
-      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::_values>(at::TensorTypeId::DPCPPTensorId)
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::_values>(at::TensorTypeId::SparseDPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_coalesced_(Tensor(a!) self, bool coalesced) -> Tensor(a!)")
-      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, bool), &AtenIpexTypeDefault::_coalesced_>(at::TensorTypeId::DPCPPTensorId)
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, bool), &AtenIpexTypeDefault::_coalesced_>(at::TensorTypeId::SparseDPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::indices(Tensor(a) self) -> Tensor(a)")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::indices>(at::TensorTypeId::DPCPPTensorId)

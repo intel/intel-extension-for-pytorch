@@ -37,10 +37,6 @@ class AtenIpexCPUAlias {
   static at::Tensor transpose(const at::Tensor & self, int64_t dim0, int64_t dim1);
   // aten::unsqueeze(Tensor(a) self, int dim) -> Tensor(a)
   static at::Tensor unsqueeze(const at::Tensor & self, int64_t dim);
-  // aten::_indices(Tensor(a) self) -> Tensor(a)
-  static at::Tensor _indices(const at::Tensor & self);
-  // aten::_values(Tensor(a) self) -> Tensor(a)
-  static at::Tensor _values(const at::Tensor & self);
   // aten::indices(Tensor(a) self) -> Tensor(a)
   static at::Tensor indices(const at::Tensor & self);
   // aten::values(Tensor(a) self) -> Tensor(a)
