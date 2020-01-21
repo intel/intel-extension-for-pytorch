@@ -4845,7 +4845,7 @@ at::Tensor AtenIpexTypeDefault::_sparse_coo_tensor_with_dims(int64_t sparse_dim,
 
 at::Tensor AtenIpexTypeDefault::_sparse_coo_tensor_with_dims_and_tensors(int64_t sparse_dim, int64_t dense_dim, at::IntArrayRef size, const at::Tensor & indices, const at::Tensor & values, const at::TensorOptions & options) {
   if (check_device_by_tensor(indices, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::_sparse_coo_tensor_with_dims_and_tensors(sparse_dim, dense_dim, size, indices, values, options);
+    return cpu::AtenIpexCPUSparse::_sparse_coo_tensor_with_dims_and_tensors(sparse_dim, dense_dim, size, indices, values, options);
   } else {
     AT_ASSERT(false);
   }

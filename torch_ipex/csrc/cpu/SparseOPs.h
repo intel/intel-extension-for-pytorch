@@ -17,6 +17,8 @@ class AtenIpexCPUSparse {
   static bool is_coalesced(const at::Tensor & self);
   static at::Tensor & _coalesced_(at::Tensor & self, bool coalesced);
   static at::Tensor clone(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format);
+  static at::Tensor _sparse_coo_tensor_with_dims_and_tensors(int64_t sparse_dim, int64_t dense_dim,
+      at::IntArrayRef size, const at::Tensor & indices, const at::Tensor & values, const at::TensorOptions & options);
 };
 
 }  // namespace cpu
