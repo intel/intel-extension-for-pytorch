@@ -16,7 +16,9 @@ namespace sycl {
 static std::once_flag init_device_flag;
 static SYCLDevicePool gDevPool;
 
-static void clearSyclDevices() {
+static void clearSyclContextAndDevices() {
+  at::sycl::clearGlobalContext();
+  gDevPool.dev_sels.clear();
   gDevPool.devices.clear();
 }
 
@@ -41,7 +43,7 @@ static void initGlobalDevicePoolState() {
   // our global device pool destruction crash. So we use atexit to
   // manually free all sycl devices. atexit callback happens before
   // SYCLRuntime destruction.
-  atexit(clearSyclDevices);
+  atexit(clearSyclContextAndDevices);
 }
 
 static void initDevicePoolCallOnce() {

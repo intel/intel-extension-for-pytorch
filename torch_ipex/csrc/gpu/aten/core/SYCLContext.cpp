@@ -9,7 +9,7 @@ namespace at {
 namespace sycl {
 
 static std::once_flag initFlag;
-static cl::sycl::context gContext;
+static std::unique_ptr<cl::sycl::context> gContext;
 
 static void initGlobalContext() {
   int cnt;
@@ -19,12 +19,16 @@ static void initGlobalContext() {
     devs.push_back(c10::sycl::syclGetRawDevice((int64_t)i));
   }
 
-  gContext = cl::sycl::context(devs, c10::sycl::syclAsyncHandler);
+  gContext.reset(new cl::sycl::context(devs, c10::sycl::syclAsyncHandler));
+}
+
+void clearGlobalContext() {
+  gContext.reset(NULL);
 }
 
 cl::sycl::context getGlobalContext() {
   std::call_once(initFlag, initGlobalContext);
-  return gContext;
+  return *gContext;
 }
 
 at::Allocator* getSYCLDeviceAllocator() {
