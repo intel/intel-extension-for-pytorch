@@ -249,6 +249,19 @@ class TestOP(TestCase):
         self.assertTrue(res.is_contiguous())
         self.assertEqual(res, m1 + m2.contiguous())
 
+        inputs1_cpu = torch.randn(100, 100, requires_grad=True)
+        inputs2_cpu = torch.randn(100, 100, requires_grad=True)
+        inputs1_dpcpp = inputs1_cpu.detach().to(device=device).requires_grad_(True)
+        inputs2_dpcpp = inputs2_cpu.detach().to(device=device).requires_grad_(True)
+        out_dpcpp = torch.add(inputs1_dpcpp, inputs2_dpcpp)
+        out_cpu = torch.add(inputs1_cpu, inputs2_cpu)
+        self.assertEqual(out_dpcpp.to('cpu'), out_cpu, prec=0.0)
+
+        out_dpcpp.sum().backward()
+        out_cpu.sum().backward()
+        self.assertEqual(inputs1_dpcpp.grad.to('cpu'), inputs1_cpu.grad, prec=0.0)
+        self.assertEqual(inputs2_dpcpp.grad.to('cpu'), inputs2_cpu.grad, prec=0.0)
+
     def test_sub(self):
         m1 = torch.tensor([2.34, 4.44], dtype=torch.float32, device=device)
         m2 = torch.tensor([1.23, 2.33], dtype=torch.float32, device=device)
@@ -398,6 +411,16 @@ class TestOP(TestCase):
         self.assertEqual(tensor.view(6, 2, 1), contig_tensor.view(6, 2, 1))
         self.assertEqual(tensor.view(1, 6, 2, 1), contig_tensor.view(1, 6, 2, 1))
 
+        inputs_cpu = torch.randn(0, 6, requires_grad=True)
+        inputs_dpcpp = inputs_cpu.detach().to(device=device).requires_grad_(True)
+        out_dpcpp = inputs_dpcpp.view(1, 0, 6, 1, 1)
+        out_cpu = inputs_cpu.view(1, 0, 6, 1, 1)
+        self.assertEqual(out_dpcpp.to('cpu'), out_cpu, prec=0.0)
+
+        out_dpcpp.sum().backward()
+        out_cpu.sum().backward()
+        self.assertEqual(inputs_dpcpp.grad.to('cpu'), inputs_cpu.grad, prec=0.0)
+
     def test_abs(self):
         def _test_abs(tensors_dict):
             for _category, tensors in tensors_dict.items():
@@ -476,12 +499,34 @@ class TestOP(TestCase):
         outf.sum().backward()
         self.assertEqual(inputf.grad.dtype, torch.float)
 
+        inputs_cpu = torch.rand(32, 100, requires_grad=True)
+        inputs_dpcpp = inputs_cpu.detach().to(device=device).requires_grad_(True)
+        out_dpcpp = F.log_softmax(inputs_dpcpp, dim=-1)
+        out_cpu = F.log_softmax(inputs_cpu, dim=-1)
+        self.assertEqual(out_dpcpp.to('cpu'), out_cpu, prec=0.0)
+
+        out_dpcpp.sum().backward()
+        out_cpu.sum().backward()
+        self.assertEqual(inputs_dpcpp.grad.to('cpu'), inputs_cpu.grad, prec=0.0)
+
     def test_nll_loss_mismatched_batch(self):
         x = torch.randn((10, 3), device=device, requires_grad=True)
         # t should have size (10,)
         t = torch.zeros((3,), device=device, dtype=torch.int64)
         with self.assertRaisesRegex(ValueError, 'Expected.*batch_size'):
             F.nll_loss(x, t)
+
+        inputs_cpu = torch.randn((10, 3), requires_grad=True)
+        inputs_dpcpp = inputs_cpu.detach().to(device=device).requires_grad_(True)
+        t_cpu = torch.zeros((10,), dtype=torch.int64)
+        t_dpcpp = t_cpu.to(device=device)
+        out_dpcpp = F.nll_loss(inputs_dpcpp, t_dpcpp)
+        out_cpu = F.nll_loss(inputs_cpu, t_cpu)
+        self.assertEqual(out_dpcpp.to('cpu'), out_cpu, prec=0.0)
+
+        out_dpcpp.sum().backward()
+        out_cpu.sum().backward()
+        self.assertEqual(inputs_dpcpp.grad.to('cpu'), inputs_cpu.grad, prec=0.0)
 
     # def test_nll_loss_out_of_bounds_ignore_index(self):
     #     x = torch.randn(6, 3, requires_grad=True)
@@ -570,7 +615,44 @@ class TestOP(TestCase):
         self.assertEqual(a[1:, s].to('dpcpp:0'), b[1:, s])
         self.assertEqual(a[:1, s].to('dpcpp:0'), b[:1, s])
 
-        
+    def test_addmm(self):
+        M_cpu = torch.randn(10, 25, requires_grad=True)
+        m1_cpu = torch.randn(10, 50, requires_grad=True)
+        m2_cpu = torch.randn(50, 25, requires_grad=True)
+        M_dpcpp = M_cpu.detach().to(device=device).requires_grad_(True)
+        m1_dpcpp = m1_cpu.detach().to(device=device).requires_grad_(True)
+        m2_dpcpp = m2_cpu.detach().to(device=device).requires_grad_(True)
+        out_dpcpp = torch.addmm(M_dpcpp, m1_dpcpp, m2_dpcpp)
+        out_cpu = torch.addmm(M_cpu, m1_cpu, m2_cpu)
+        self.assertEqual(out_dpcpp.to('cpu'), out_cpu, prec=0.0)
+
+        out_dpcpp.sum().backward()
+        out_cpu.sum().backward()
+        self.assertEqual(M_dpcpp.grad.to('cpu'), M_cpu.grad, prec=0.0)
+        self.assertEqual(m1_dpcpp.grad.to('cpu'), m1_cpu.grad, prec=0.0)
+        self.assertEqual(m2_dpcpp.grad.to('cpu'), m2_cpu.grad, prec=0.0)
+
+    def test_mean(self):
+        inputs_cpu = torch.randn(1, 2, 3, 4, requires_grad=True)
+        inputs_dpcpp = inputs_cpu.detach().to(device=device).requires_grad_(True)
+        out_dpcpp = inputs_dpcpp.mean()
+        out_cpu = inputs_cpu.mean()
+        self.assertEqual(out_dpcpp.to('cpu'), out_cpu, prec=0.0)
+
+        out_dpcpp.sum().backward()
+        out_cpu.sum().backward()
+        self.assertEqual(inputs_dpcpp.grad.to('cpu'), inputs_cpu.grad, prec=0.0)
+
+    def test_relu(self):
+        inputs_cpu = torch.randn(1, 2, 3, 4, requires_grad=True)
+        inputs_dpcpp = inputs_cpu.detach().to(device=device).requires_grad_(True)
+        out_dpcpp = inputs_dpcpp.relu()
+        out_cpu = inputs_cpu.relu()
+        self.assertEqual(out_dpcpp.to('cpu'), out_cpu, prec=0.0)
+
+        out_dpcpp.sum().backward()
+        out_cpu.sum().backward()
+        self.assertEqual(inputs_dpcpp.grad.to('cpu'), inputs_cpu.grad, prec=0.0)
 
 
 class TestBN(TestCase):
