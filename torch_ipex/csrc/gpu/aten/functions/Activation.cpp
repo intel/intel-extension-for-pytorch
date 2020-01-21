@@ -54,3 +54,35 @@ static void threshold_kernel(TensorIterator& iter, Scalar threshold_scalar, Scal
 }
 
 }} //namepsace at::native
+
+namespace at { namespace AtenIpexTypeDPCPP {
+
+static Tensor threshold_out(
+    optional<Tensor> opt_result,
+    const Tensor& self,
+    Scalar threshold,
+    Scalar value,
+    const Tensor& other) {
+  Tensor result = opt_result.value_or(Tensor());
+  auto iter = TensorIterator::binary_op(result, self, other);
+  at::native::threshold_kernel(iter, threshold, value);
+  return iter.output();
+}
+
+Tensor& threshold_(Tensor& self, Scalar threshold, Scalar value) {
+  threshold_out(make_optional(self), self, threshold, value, self);
+  return self;
+}
+
+Tensor threshold(const Tensor& self, Scalar threshold, Scalar value) {
+  return threshold_out(nullopt, self, threshold, value, self);
+}
+
+Tensor threshold_out(Tensor& result, const Tensor& self, Scalar threshold, Scalar value) {
+  threshold_out(make_optional(result), self, threshold, value, self);
+  return result;
+}
+
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

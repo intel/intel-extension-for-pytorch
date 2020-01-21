@@ -11,6 +11,9 @@ class AtenIpexTypeDefault {
   static at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format);
   static at::Tensor & fill_(at::Tensor & self, at::Scalar value);
   static at::Tensor & fill_(at::Tensor & self, const at::Tensor & value);
+  static at::Tensor threshold(const at::Tensor & self, at::Scalar threshold, at::Scalar value);
+  static at::Tensor & threshold_(at::Tensor & self, at::Scalar threshold, at::Scalar value);
+  static at::Tensor & threshold_out(at::Tensor & out, const at::Tensor & self, at::Scalar threshold, at::Scalar value);
 
 };
 
