@@ -44,7 +44,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & addmv_(Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha);
   // static Tensor & addmv_out(Tensor & out, const Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha);
   // static Tensor & arange_out(Tensor & out, Scalar start, Scalar end, Scalar step);
-  // static Tensor as_strided(const Tensor & self, IntArrayRef size, IntArrayRef stride, c10::optional<int64_t> storage_offset);
+  static Tensor as_strided(const Tensor & self, IntArrayRef size, IntArrayRef stride, c10::optional<int64_t> storage_offset);
   // static Tensor & asin_(Tensor & self);
   // static Tensor & asin_out(Tensor & out, const Tensor & self);
   // static Tensor & atan_(Tensor & self);
@@ -289,6 +289,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & _cumsum_out(Tensor & out, const Tensor & self, int64_t dim);
   // static Tensor _cumprod(const Tensor & self, int64_t dim);
   // static Tensor & _cumprod_out(Tensor & out, const Tensor & self, int64_t dim);
+  static Tensor addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);
   // static Tensor & _addmm_out(Tensor & out, const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);
   // static Tensor _addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);
   // static Tensor & _addmm_(Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);

@@ -460,5 +460,27 @@ bool TensorImpl_maybeOverlappingIndices(const at::TensorImpl* t) {
   return false;
 }
 
+SYCLDescBuff TensorImpl_sizeDesc(const at::TensorImpl *tensor) {
+  const int L = SYCL_DESC_BUFF_LEN;
+  SYCLDescBuff buf;
+  char *str = buf.str;
+  int n = 0;
+  n += snprintf(str, L-n, "[");
+  int i;
+  for(i = 0; i < tensor->dim(); i++) {
+    if(n >= L) break;
+    n += snprintf(str+n, L-n, "%" PRId64, tensor->size(i));
+    if(i < tensor->dim()-1) {
+      n += snprintf(str+n, L-n, " x ");
+    }
+  }
+  if(n < L - 2) {
+    snprintf(str+n, L-n, "]");
+  } else {
+    snprintf(str+L-5, 5, "...]");
+  }
+  return buf;
+}
+
 } // native::
 } // at::

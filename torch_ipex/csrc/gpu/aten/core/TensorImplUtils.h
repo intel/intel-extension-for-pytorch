@@ -5,6 +5,13 @@
 
 namespace at { namespace native {
 
+#define SYCL_DESC_BUFF_LEN 64
+
+typedef struct SYCLDescBuff
+{
+  char str[SYCL_DESC_BUFF_LEN];
+} SYCLDescBuff;
+
 TensorImpl *TensorImpl_new();
 at::Tensor TensorImpl_wrap(TensorImpl *tensor);
 int TensorImpl_nDimension(const at::TensorImpl *self);
@@ -39,6 +46,8 @@ bool TensorImpl_canUse32BitIndexMath(const at::TensorImpl* t, ptrdiff_t max_elem
 bool TensorImpl_all32BitIndexable(at::TensorImpl** inputs, int numInputs);
 void TensorImpl_preserveReduceDimSemantics(TensorImpl *tensor, int in_dims, int64_t dimension, int keepdim);
 bool TensorImpl_maybeOverlappingIndices(const at::TensorImpl* t);
+
+SYCLDescBuff TensorImpl_sizeDesc(const at::TensorImpl *tensor);
 
 } // native::
 } // at::
