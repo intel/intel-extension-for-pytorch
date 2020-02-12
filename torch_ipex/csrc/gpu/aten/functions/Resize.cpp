@@ -3,7 +3,6 @@
 #include <core/SYCLContext.h>
 #include <core/TensorImplUtils.h>
 
-
 namespace at { namespace native {
 
 Tensor& resize_sycl_(Tensor& self, IntArrayRef size) {
@@ -19,3 +18,14 @@ Tensor& resize_as_sycl_(Tensor& self, const Tensor& the_template) {
 
 }}
 
+
+namespace at { namespace AtenIpexTypeDPCPP {
+Tensor& resize_(Tensor & self, IntArrayRef size, c10::optional<MemoryFormat> memory_format){
+  at::native::resize_sycl_(self, size);
+  return self;
+}
+
+Tensor& resize_as_(Tensor& self, const Tensor& the_template, c10::optional<MemoryFormat> memory_format){
+  return resize_(self, the_template.sizes(), memory_format);
+}
+}}

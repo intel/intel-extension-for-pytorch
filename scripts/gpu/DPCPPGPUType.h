@@ -76,7 +76,8 @@ struct TORCH_API SYCLType final {
   // static std::tuple<Tensor,Tensor,Tensor,Tensor> _embedding_bag(const Tensor & weight, const Tensor & indices, const Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse, const Tensor & per_sample_weights);
   // static Tensor _embedding_bag_dense_backward(const Tensor & grad, const Tensor & indices, const Tensor & offsets, const Tensor & offset2bag, const Tensor & bag_size, const Tensor & maximum_indices, int64_t num_weights, bool scale_grad_by_freq, int64_t mode, const Tensor & per_sample_weights);
   static Tensor empty(IntArrayRef size, const TensorOptions & options, c10::optional<MemoryFormat> memory_format);
-  // static Tensor & resize_(Tensor & self, IntArrayRef size);
+   //static Tensor & resize_(Tensor & self, IntArrayRef size);
+   static Tensor & resize_(Tensor & self, IntArrayRef size, c10::optional<MemoryFormat> memory_format);
   // static Tensor empty_strided(IntArrayRef size, IntArrayRef stride, const TensorOptions & options);
   // static Tensor & erf_(Tensor & self);
   // static Tensor & erf_out(Tensor & out, const Tensor & self);
@@ -144,7 +145,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & trunc_out(Tensor & out, const Tensor & self);
   // static Tensor _s_where(const Tensor & condition, const Tensor & self, const Tensor & other);
   // static Tensor clone(const Tensor & self);
-  // static Tensor & resize_as_(Tensor & self, const Tensor & the_template);
+   static Tensor & resize_as_(Tensor & self, const Tensor & the_template, c10::optional<MemoryFormat> memory_format);
   // static Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent);
   // static Tensor pow(const Tensor & self, Scalar exponent);
   // static Tensor & zero_(Tensor & self);

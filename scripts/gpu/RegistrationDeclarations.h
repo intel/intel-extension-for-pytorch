@@ -218,7 +218,7 @@ Tensor new_full(const Tensor & self, IntArrayRef size, Scalar fill_value, const 
 Tensor new_zeros(const Tensor & self, IntArrayRef size, const TensorOptions & options); // aten::new_zeros(Tensor self, int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
 Tensor _empty_affine_quantized(IntArrayRef size, const TensorOptions & options, double scale, int64_t zero_point, c10::optional<MemoryFormat> memory_format); // aten::_empty_affine_quantized(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, float scale=1, int zero_point=0, MemoryFormat? memory_format=contiguous_format) -> Tensor
 Tensor _empty_per_channel_affine_quantized(IntArrayRef size, const Tensor & scales, const Tensor & zero_points, int64_t axis, const TensorOptions & options, c10::optional<MemoryFormat> memory_format); // aten::_empty_per_channel_affine_quantized(int[] size, *, Tensor scales, Tensor zero_points, int axis, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=contiguous_format) -> Tensor
-Tensor & resize_(Tensor & self, IntArrayRef size); // aten::resize_(Tensor(a!) self, int[] size) -> Tensor(a!)
+Tensor & resize_(Tensor & self, IntArrayRef size, c10::optional<MemoryFormat> memory_format); // aten::resize_(Tensor(a!) self, int[] size, *, MemoryFormat? memory_format=None) -> Tensor(a!)
 Tensor & empty_out(Tensor & out, IntArrayRef size, c10::optional<MemoryFormat> memory_format); // aten::empty.out(int[] size, *, MemoryFormat? memory_format=None, Tensor(a!) out) -> Tensor(a!)
 Tensor empty_like(const Tensor & self, c10::optional<MemoryFormat> memory_format); // aten::empty_like(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
 Tensor empty_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format); // aten::empty_like.dtype(Tensor self, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False, MemoryFormat? memory_format=None) -> Tensor
@@ -626,7 +626,7 @@ Tensor & nuclear_norm_out(Tensor & out, const Tensor & self, bool keepdim); // a
 Tensor nuclear_norm(const Tensor & self, IntArrayRef dim, bool keepdim); // aten::nuclear_norm.dim(Tensor self, int[2] dim, bool keepdim=False) -> Tensor
 Tensor & nuclear_norm_out(Tensor & out, const Tensor & self, IntArrayRef dim, bool keepdim); // aten::nuclear_norm.dim_out(Tensor self, int[2] dim, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
 Tensor clone(const Tensor & self, c10::optional<MemoryFormat> memory_format); // aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
-Tensor & resize_as_(Tensor & self, const Tensor & the_template); // aten::resize_as_(Tensor(a!) self, Tensor the_template) -> Tensor(a!)
+Tensor & resize_as_(Tensor & self, const Tensor & the_template, c10::optional<MemoryFormat> memory_format); // aten::resize_as_(Tensor(a!) self, Tensor the_template, *, int? memory_format=None) -> (Tensor(a!))
 Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent); // aten::pow.Tensor_Scalar_out(Tensor self, Scalar exponent, *, Tensor(a!) out) -> Tensor(a!)
 Tensor pow(const Tensor & self, Scalar exponent); // aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> Tensor
 Tensor & zero_(Tensor & self); // aten::zero_(Tensor(a!) self) -> Tensor(a!)

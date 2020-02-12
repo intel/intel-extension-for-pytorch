@@ -23,6 +23,10 @@ at::Tensor AtenIpexTypeDefault::empty(at::IntArrayRef size, const at::TensorOpti
   return AtenIpexTypeDPCPP::empty(size, options, memory_format);
 }
 
+at::Tensor & AtenIpexTypeDefault::resize_(at::Tensor & self, at::IntArrayRef size, c10::optional<at::MemoryFormat> memory_format) {
+  return AtenIpexTypeDPCPP::resize_(self, size, memory_format);
+}
+
 at::Tensor & AtenIpexTypeDefault::fill_(at::Tensor & self, at::Scalar value) {
   return AtenIpexTypeDPCPP::fill_(self, value);
 }
@@ -43,8 +47,13 @@ at::Tensor & AtenIpexTypeDefault::threshold_out(at::Tensor & out, const at::Tens
   return AtenIpexTypeDPCPP::threshold_out(out, self, threshold, value);
 }
 
+<<<<<<< Updated upstream
 at::Tensor AtenIpexTypeDefault::addmm(const at::Tensor & self, const at::Tensor & mat1, const at::Tensor & mat2, at::Scalar beta, at::Scalar alpha) {
   return AtenIpexTypeDPCPP::addmm(self, mat1, mat2, beta, alpha);
+=======
+at::Tensor & AtenIpexTypeDefault::resize_as_(at::Tensor & self, const at::Tensor & the_template, c10::optional<at::MemoryFormat> memory_format) {
+  return AtenIpexTypeDPCPP::resize_as_(self, the_template, memory_format);
+>>>>>>> Stashed changes
 }
 
 
@@ -63,6 +72,9 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::empty.memory_format(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(at::IntArrayRef, const at::TensorOptions &, c10::optional<at::MemoryFormat>), &AtenIpexTypeDefault::empty>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::resize_(Tensor(a!) self, int[] size, *, MemoryFormat? memory_format=None) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::IntArrayRef, c10::optional<at::MemoryFormat>), &AtenIpexTypeDefault::resize_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::fill_.Scalar(Tensor(a!) self, Scalar value) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::fill_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -78,8 +90,13 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::threshold.out(Tensor self, Scalar threshold, Scalar value, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::threshold_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+<<<<<<< Updated upstream
   .op(torch::RegisterOperators::options().schema("aten::addmm(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::addmm>(at::TensorTypeId::DPCPPTensorId)
+=======
+  .op(torch::RegisterOperators::options().schema("aten::resize_as_(Tensor(a!) self, Tensor the_template, *, int? memory_format=None) -> (Tensor(a!))")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, c10::optional<at::MemoryFormat>), &AtenIpexTypeDefault::resize_as_>(at::TensorTypeId::DPCPPTensorId)
+>>>>>>> Stashed changes
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
 ;
 }
