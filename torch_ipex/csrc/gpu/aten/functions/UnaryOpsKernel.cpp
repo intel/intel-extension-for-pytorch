@@ -46,3 +46,69 @@ void neg_kernel_sycl(TensorIterator& iter) {
 }
 
 }}
+
+namespace at { namespace AtenIpexTypeDPCPP {
+
+Tensor bitwise_not(const Tensor & self){
+  Tensor result = at::empty({0}, self.options());
+  return bitwise_not_out(result, self); 
+}
+
+Tensor & bitwise_not_(Tensor & self){
+  return bitwise_not_out(self, self);
+}
+
+Tensor & bitwise_not_out(Tensor & out, const Tensor & self){
+  auto iter = TensorIterator::unary_op(out, self,
+    /*check_mem_overlap=*/true);
+  at::native::bitwise_not_kernel_sycl(iter);
+  #ifdef BUILD_NAMEDTENSOR
+  at::namedinference::propagate_names(out, self);
+  #endif
+  return out;
+}
+
+Tensor logical_not(const Tensor& self) {
+  Tensor result = at::empty({0}, self.options().dtype(kBool));
+  return logical_not_out(result, self);
+}
+
+Tensor& logical_not_(Tensor& self) {
+  return logical_not_out(self, self);
+}
+
+Tensor& logical_not_out(Tensor& result, const Tensor& self) {
+  TensorIterator iter;
+  iter.dont_compute_common_dtype();
+  iter.set_check_mem_overlap(true);
+  iter.add_output(result);
+  iter.add_input(self);
+  iter.build();
+  at::native::logical_not_kernel_sycl(iter);
+  return result;
+}
+
+Tensor neg(const Tensor& self) {
+  Tensor result = at::empty({0}, self.options());
+  return neg_out(result, self);
+}
+
+Tensor& neg_(Tensor& self) {
+  return neg_out(self, self);
+}
+
+Tensor& neg_out(Tensor& result, const Tensor& self) {
+  TORCH_CHECK(self.scalar_type() != kBool,
+              "Negation, the `-` operator, on a bool tensor is not supported. "
+              "If you are trying to invert a mask, use the `~` or `logical_not()` operator instead.");
+  auto iter = TensorIterator::unary_op(result, self,
+    /*check_internal_overlap=*/true);
+  at::native::neg_kernel_sycl(iter);
+#ifdef BUILD_NAMEDTENSOR
+  at::namedinference::propagate_names(result, self);
+#endif
+  return result;
+}
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at
