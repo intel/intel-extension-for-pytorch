@@ -114,7 +114,7 @@ struct TORCH_API SYCLType final {
   // static Tensor mv(const Tensor & self, const Tensor & vec);
   // static Tensor & mv_out(Tensor & out, const Tensor & self, const Tensor & vec);
   // static Tensor narrow_copy(const Tensor & self, int64_t dim, int64_t start, int64_t length);
-  // static std::tuple<Tensor,Tensor,Tensor> native_batch_norm(const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & running_mean, const Tensor & running_var, bool training, double momentum, double eps);
+  static std::tuple<Tensor,Tensor,Tensor> native_batch_norm(const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & running_mean, const Tensor & running_var, bool training, double momentum, double eps);
   // static std::tuple<Tensor,Tensor,Tensor> native_batch_norm_backward(const Tensor & grad_out, const Tensor & input, const Tensor & weight, const Tensor & running_mean, const Tensor & running_var, const Tensor & save_mean, const Tensor & save_invstd, bool train, double eps, std::array<bool,3> output_mask);
   // static Tensor & range_out(Tensor & out, Scalar start, Scalar end, Scalar step);
   // static Tensor & neg_out(Tensor & out, const Tensor & self);

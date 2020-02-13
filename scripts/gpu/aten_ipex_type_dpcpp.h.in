@@ -19,6 +19,7 @@ class AtenIpexTypeDPCPP {
   static at::Tensor & resize_(at::Tensor & self, at::IntArrayRef size, c10::optional<at::MemoryFormat> memory_format);
   static at::Tensor & fill_(at::Tensor & self, at::Scalar value);
   static at::Tensor & fill_(at::Tensor & self, const at::Tensor & value);
+  static std::tuple<at::Tensor,at::Tensor,at::Tensor> native_batch_norm(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, const at::Tensor & running_mean, const at::Tensor & running_var, bool training, double momentum, double eps);
   static at::Tensor neg(const at::Tensor & self);
   static at::Tensor & neg_(at::Tensor & self);
   static at::Tensor & neg_out(at::Tensor & out, const at::Tensor & self);

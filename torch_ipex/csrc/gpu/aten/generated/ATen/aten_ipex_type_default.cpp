@@ -59,6 +59,10 @@ at::Tensor & AtenIpexTypeDefault::fill_(at::Tensor & self, const at::Tensor & va
   return AtenIpexTypeDPCPP::fill_(self, value);
 }
 
+std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexTypeDefault::native_batch_norm(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, const at::Tensor & running_mean, const at::Tensor & running_var, bool training, double momentum, double eps) {
+  return AtenIpexTypeDPCPP::native_batch_norm(input, weight, bias, running_mean, running_var, training, momentum, eps);
+}
+
 at::Tensor AtenIpexTypeDefault::neg(const at::Tensor & self) {
   return AtenIpexTypeDPCPP::neg(self);
 }
@@ -133,6 +137,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::fill_.Tensor(Tensor(a!) self, Tensor value) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::fill_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::native_batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps) -> (Tensor, Tensor, Tensor)")
+      .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor,at::Tensor>(const at::Tensor &, const at::Tensor &, const at::Tensor &, const at::Tensor &, const at::Tensor &, bool, double, double), &AtenIpexTypeDefault::native_batch_norm>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::neg(Tensor self) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::neg>(at::TensorTypeId::DPCPPTensorId)

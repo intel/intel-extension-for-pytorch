@@ -310,3 +310,18 @@ std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm_backward(
 }
 
 }} // at::native
+
+namespace at {
+namespace AtenIpexTypeDPCPP {
+
+std::tuple<at::Tensor,at::Tensor,at::Tensor>
+native_batch_norm(const at::Tensor & input, const at::Tensor & weight,
+    const at::Tensor & bias, const at::Tensor & running_mean,
+    const at::Tensor & running_var, bool training, double momentum, double eps) {
+  return at::native::sycl_batch_norm(
+      input, weight, bias, running_mean, running_var, training, momentum, eps);
+}
+
+} // AtenIpexTypeDPCPP
+} // at
+
