@@ -44,7 +44,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & addmv_(Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha);
   // static Tensor & addmv_out(Tensor & out, const Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha);
   // static Tensor & arange_out(Tensor & out, Scalar start, Scalar end, Scalar step);
-  static Tensor as_strided(const Tensor & self, IntArrayRef size, IntArrayRef stride, c10::optional<int64_t> storage_offset);
+  static Tensor as_strided(const Tensor & self, IntArrayRef size, IntArrayRef stride, c10::optional<int64_t> storage_offset); // aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> Tensor(a)
   // static Tensor & asin_(Tensor & self);
   // static Tensor & asin_out(Tensor & out, const Tensor & self);
   // static Tensor & atan_(Tensor & self);
@@ -75,9 +75,9 @@ struct TORCH_API SYCLType final {
   // static Tensor embedding_dense_backward(const Tensor & grad_output, const Tensor & indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq);
   // static std::tuple<Tensor,Tensor,Tensor,Tensor> _embedding_bag(const Tensor & weight, const Tensor & indices, const Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse, const Tensor & per_sample_weights);
   // static Tensor _embedding_bag_dense_backward(const Tensor & grad, const Tensor & indices, const Tensor & offsets, const Tensor & offset2bag, const Tensor & bag_size, const Tensor & maximum_indices, int64_t num_weights, bool scale_grad_by_freq, int64_t mode, const Tensor & per_sample_weights);
-  static Tensor empty(IntArrayRef size, const TensorOptions & options, c10::optional<MemoryFormat> memory_format);
+  static Tensor empty(IntArrayRef size, const TensorOptions & options, c10::optional<MemoryFormat> memory_format); // aten::empty.memory_format(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
    //static Tensor & resize_(Tensor & self, IntArrayRef size);
-   static Tensor & resize_(Tensor & self, IntArrayRef size, c10::optional<MemoryFormat> memory_format);
+  static Tensor & resize_(Tensor & self, IntArrayRef size, c10::optional<MemoryFormat> memory_format); // aten::resize_(Tensor(a!) self, int[] size, *, MemoryFormat? memory_format=None) -> Tensor(a!)
   // static Tensor empty_strided(IntArrayRef size, IntArrayRef stride, const TensorOptions & options);
   // static Tensor & erf_(Tensor & self);
   // static Tensor & erf_out(Tensor & out, const Tensor & self);
@@ -114,7 +114,7 @@ struct TORCH_API SYCLType final {
   // static Tensor mv(const Tensor & self, const Tensor & vec);
   // static Tensor & mv_out(Tensor & out, const Tensor & self, const Tensor & vec);
   // static Tensor narrow_copy(const Tensor & self, int64_t dim, int64_t start, int64_t length);
-  static std::tuple<Tensor,Tensor,Tensor> native_batch_norm(const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & running_mean, const Tensor & running_var, bool training, double momentum, double eps);
+  static std::tuple<Tensor,Tensor,Tensor> native_batch_norm(const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & running_mean, const Tensor & running_var, bool training, double momentum, double eps); // aten::native_batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps) -> (Tensor, Tensor, Tensor)
   // static std::tuple<Tensor,Tensor,Tensor> native_batch_norm_backward(const Tensor & grad_out, const Tensor & input, const Tensor & weight, const Tensor & running_mean, const Tensor & running_var, const Tensor & save_mean, const Tensor & save_invstd, bool train, double eps, std::array<bool,3> output_mask);
   // static Tensor & range_out(Tensor & out, Scalar start, Scalar end, Scalar step);
   // static Tensor & neg_out(Tensor & out, const Tensor & self);
@@ -145,7 +145,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & trunc_out(Tensor & out, const Tensor & self);
   // static Tensor _s_where(const Tensor & condition, const Tensor & self, const Tensor & other);
   // static Tensor clone(const Tensor & self);
-   static Tensor & resize_as_(Tensor & self, const Tensor & the_template, c10::optional<MemoryFormat> memory_format);
+   static Tensor & resize_as_(Tensor & self, const Tensor & the_template, c10::optional<MemoryFormat> memory_format); // aten::resize_as_(Tensor(a!) self, Tensor the_template, *, int? memory_format=None) -> (Tensor(a!))
   // static Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent);
   // static Tensor pow(const Tensor & self, Scalar exponent);
   // static Tensor & zero_(Tensor & self);
@@ -290,7 +290,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & _cumsum_out(Tensor & out, const Tensor & self, int64_t dim);
   // static Tensor _cumprod(const Tensor & self, int64_t dim);
   // static Tensor & _cumprod_out(Tensor & out, const Tensor & self, int64_t dim);
-  static Tensor addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);
+  static Tensor addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha); // aten::addmm(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1) -> Tensor
   // static Tensor & _addmm_out(Tensor & out, const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);
   // static Tensor _addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);
   // static Tensor & _addmm_(Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);

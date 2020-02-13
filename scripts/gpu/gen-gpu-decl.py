@@ -100,28 +100,19 @@ def get_mapsig_key(mapsig):
 
 def parse_override_keys(path):
   functions = []
-  fndef = None
   for line in open(path, 'r'):
     line = line.strip()
-    if not fndef:
-      m = re.match(r'static\s+(.*);', line)
+    m = re.match(r'static\s+(.*)', line)
+    if m:
+      m = re.match(r'(.*)aten[:][:](.*)>(.*)', line)
       if m:
-        functions.append(m.group(1))
-        continue
-      m = re.match(r'static\s+(.*)', line)
-      if m:
-        fndef = m.group(1)
-    else:
-      fndef = '{} {}'.format(fndef, line)
-      if fndef.endswith(';'):
-        functions.append(fndef[:-1])
-        fndef = None
-  assert fndef is None
+        functions.append(m.group(2))
+      else:
+        print("Please add schema for the Op >>> \"", line, "\"")
 
   keys = []
   for fndef in functions:
-    m = re.search(r'(\s.*)\(', fndef)
-    new = m.group(1) + '\('
+    new = "aten::" + fndef.split('(')[0] + '\('
     if new not in keys:
       keys.append(new)
 
