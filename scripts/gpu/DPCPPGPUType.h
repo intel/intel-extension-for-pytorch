@@ -49,7 +49,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & asin_out(Tensor & out, const Tensor & self);
   // static Tensor & atan_(Tensor & self);
   // static Tensor & atan_out(Tensor & out, const Tensor & self);
-  // static Tensor baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
+  static Tensor baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
   // static Tensor & baddbmm_(Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
   // static Tensor & baddbmm_out(Tensor & out, const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
   // static Tensor & bernoulli_(Tensor & self, const Tensor & p, Generator * generator);
