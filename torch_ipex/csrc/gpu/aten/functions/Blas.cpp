@@ -280,20 +280,7 @@ Tensor addmm(const Tensor & self, const Tensor & mat1,
 
   return r;
 }
-Tensor baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha) {
-  Tensor b_self;
-  std::tie(b_self) = expand_size(self, {batch1.size(0), batch2.size(1)}, "baddbmm_out");
-  Tensor r = at::empty({0}, self.options());
 
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "baddbmm_out",
-      [&]() {
-        at::native::baddbmm<scalar_t>(
-            r, beta.to<float>(), b_self, alpha.to<float>(), batch1, batch2);
-      }
-  );
-
-  return r;
-}
 }
 
 } // namespace at
