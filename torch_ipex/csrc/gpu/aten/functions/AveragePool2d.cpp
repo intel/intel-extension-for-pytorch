@@ -452,3 +452,33 @@ Tensor avg_pool2d_backward_sycl(
 
 } // at::native
 } // at
+
+namespace at {
+namespace AtenIpexTypeDPCPP {
+
+Tensor& avg_pool2d_out(
+  Tensor& output,
+  const Tensor& input,
+  IntArrayRef kernel_size,
+  IntArrayRef stride,
+  IntArrayRef padding,
+  bool ceil_mode,
+  bool count_include_pad,
+  c10::optional<int64_t> divisor_override) {
+  return at::native::avg_pool2d_out_sycl(output, input, kernel_size, stride,
+      padding, ceil_mode, count_include_pad, divisor_override);
+}
+
+Tensor avg_pool2d(
+  const Tensor& input,
+  IntArrayRef kernel_size,
+  IntArrayRef stride,
+  IntArrayRef padding,
+  bool ceil_mode,
+  bool count_include_pad,
+  c10::optional<int64_t> divisor_override) {
+  return at::native::avg_pool2d_sycl(input, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
+}
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at
