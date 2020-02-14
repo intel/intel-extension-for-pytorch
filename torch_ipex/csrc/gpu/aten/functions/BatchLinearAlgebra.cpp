@@ -118,3 +118,25 @@ Tensor& triu_sycl_(Tensor &self, int64_t k) {
 
 } // namespace native
 } // namespace at
+
+namespace at { namespace AtenIpexTypeDPCPP {
+Tensor & triu_out(Tensor & out, const Tensor & self, int64_t diagonal){
+  at::native::triu_sycl_out(out, self, diagonal);
+  return out;
+}
+
+Tensor & tril_out(Tensor & out, const Tensor & self, int64_t diagonal){
+  at::native::tril_sycl_out(out, self, diagonal);
+  return out;
+}
+
+Tensor & tril_(Tensor & self, int64_t diagonal){
+  return at::AtenIpexTypeDPCPP::tril_out(self, self, diagonal);
+}
+
+Tensor & triu_(Tensor & self, int64_t diagonal){
+  return at::AtenIpexTypeDPCPP::triu_out(self, self, diagonal);
+}
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

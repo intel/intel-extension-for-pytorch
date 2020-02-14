@@ -197,8 +197,8 @@ struct TORCH_API SYCLType final {
   // static Tensor __rshift__(const Tensor & self, const Tensor & other);
   // static Tensor & __irshift__(Tensor & self, Scalar other);
   // static Tensor & __irshift__(Tensor & self, const Tensor & other);
-  // static Tensor & tril_(Tensor & self, int64_t diagonal);
-  // static Tensor & triu_(Tensor & self, int64_t diagonal);
+   static Tensor & tril_(Tensor & self, int64_t diagonal); // aten::tril_(Tensor(a!) self, int diagonal=0) -> Tensor(a!)
+   static Tensor & triu_(Tensor & self, int64_t diagonal); // aten::triu_(Tensor(a!) self, int diagonal=0) -> Tensor(a!)
   // static Tensor & digamma_(Tensor & self);
   // static Tensor & erfinv_(Tensor & self);
   // static Tensor & pow_(Tensor & self, Scalar exponent);
@@ -214,8 +214,8 @@ struct TORCH_API SYCLType final {
   // static Tensor & normal_(Tensor & self, double mean, double std, Generator * generator);
   // static Tensor & diag_out(Tensor & out, const Tensor & self, int64_t diagonal);
   // static Tensor diag(const Tensor & self, int64_t diagonal);
-  // static Tensor & triu_out(Tensor & out, const Tensor & self, int64_t diagonal);
-  // static Tensor & tril_out(Tensor & out, const Tensor & self, int64_t diagonal);
+   static Tensor & triu_out(Tensor & out, const Tensor & self, int64_t diagonal); // aten::triu.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)
+   static Tensor & tril_out(Tensor & out, const Tensor & self, int64_t diagonal); // aten::tril.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)
   // static Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options);
   // static Tensor triu_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options);
   // static Tensor trace(const Tensor & self);
