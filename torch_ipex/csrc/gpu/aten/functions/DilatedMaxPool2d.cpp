@@ -513,3 +513,33 @@ Tensor max_pool2d_with_indices_backward_sycl(
 
 } // at::native
 } // at
+
+namespace at {
+namespace AtenIpexTypeDPCPP {
+
+std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
+  Tensor& output,
+  Tensor& indices,
+  const Tensor& input,
+  IntArrayRef kernel_size,
+  IntArrayRef stride,
+  IntArrayRef padding,
+  IntArrayRef dilation,
+  bool ceil_mode) {
+  return at::native::max_pool2d_with_indices_out_sycl(
+      output, indices, input, kernel_size, stride, padding, dilation, ceil_mode);
+}
+
+std::tuple<Tensor, Tensor> max_pool2d_with_indices(
+  const Tensor& input,
+  IntArrayRef kernel_size,
+  IntArrayRef stride,
+  IntArrayRef padding,
+  IntArrayRef dilation,
+  bool ceil_mode) {
+  return at::native::max_pool2d_with_indices_sycl(
+      input, kernel_size, stride, padding, dilation, ceil_mode);
+}
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

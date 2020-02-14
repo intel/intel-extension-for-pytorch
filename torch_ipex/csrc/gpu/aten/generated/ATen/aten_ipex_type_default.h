@@ -48,6 +48,8 @@ class AtenIpexTypeDefault {
   static at::Tensor rsub(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   static at::Tensor rsub(const at::Tensor & self, at::Scalar other, at::Scalar alpha);
   static at::Tensor addmm(const at::Tensor & self, const at::Tensor & mat1, const at::Tensor & mat2, at::Scalar beta, at::Scalar alpha);
+  static std::tuple<at::Tensor &,at::Tensor &> max_pool2d_with_indices_out(at::Tensor & out, at::Tensor & indices, const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode);
+  static std::tuple<at::Tensor,at::Tensor> max_pool2d_with_indices(const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode);
 
 };
 

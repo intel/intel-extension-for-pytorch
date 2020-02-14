@@ -27,7 +27,7 @@ y_cpu = bn2(y_cpu1)
 # y_cpu.backward(grad_cpu)
 
 
-print("x_cpu = ", y_cpu)
+print("y_cpu = ", y_cpu)
 # print("x_cpu.grad = ", x_cpu.grad)
 
 
