@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/Functions.h>
 
 #include <ATen/native/Activation.h>
 
@@ -56,6 +57,10 @@ static void threshold_kernel(TensorIterator& iter, Scalar threshold_scalar, Scal
 }} //namepsace at::native
 
 namespace at { namespace AtenIpexTypeDPCPP {
+
+Tensor & relu_(Tensor & self) {
+  return at::threshold_(self, 0, 0);
+}
 
 static Tensor threshold_out(
     optional<Tensor> opt_result,

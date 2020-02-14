@@ -122,7 +122,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & round_(Tensor & self);
   // static Tensor & round_out(Tensor & out, const Tensor & self);
   // static Tensor relu(const Tensor & self);
-  // static Tensor & relu_(Tensor & self);
+  static Tensor & relu_(Tensor & self); // aten::relu_(Tensor(a!) self) -> Tensor(a!)
   // static Tensor & rsqrt_(Tensor & self);
   // static Tensor & rsqrt_out(Tensor & out, const Tensor & self);
   // static Tensor sigmoid(const Tensor & self);

@@ -127,6 +127,10 @@ at::Tensor & AtenIpexTypeDefault::neg_out(at::Tensor & out, const at::Tensor & s
   return AtenIpexTypeDPCPP::neg_out(out, self);
 }
 
+at::Tensor & AtenIpexTypeDefault::relu_(at::Tensor & self) {
+  return AtenIpexTypeDPCPP::relu_(self);
+}
+
 at::Tensor AtenIpexTypeDefault::threshold(const at::Tensor & self, at::Scalar threshold, at::Scalar value) {
   return AtenIpexTypeDPCPP::threshold(self, threshold, value);
 }
@@ -292,6 +296,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::neg.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::neg_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::relu_(Tensor(a!) self) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::relu_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::threshold(Tensor self, Scalar threshold, Scalar value) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::threshold>(at::TensorTypeId::DPCPPTensorId)

@@ -36,6 +36,7 @@ class AtenIpexTypeDefault {
   static at::Tensor neg(const at::Tensor & self);
   static at::Tensor & neg_(at::Tensor & self);
   static at::Tensor & neg_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & relu_(at::Tensor & self);
   static at::Tensor threshold(const at::Tensor & self, at::Scalar threshold, at::Scalar value);
   static at::Tensor & threshold_(at::Tensor & self, at::Scalar threshold, at::Scalar value);
   static at::Tensor & threshold_out(at::Tensor & out, const at::Tensor & self, at::Scalar threshold, at::Scalar value);
