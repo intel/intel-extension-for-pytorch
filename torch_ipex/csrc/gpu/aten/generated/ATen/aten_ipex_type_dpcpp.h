@@ -27,6 +27,7 @@ class AtenIpexTypeDPCPP {
   static at::Tensor & resize_(at::Tensor & self, at::IntArrayRef size, c10::optional<at::MemoryFormat> memory_format);
   static at::Tensor & fill_(at::Tensor & self, at::Scalar value);
   static at::Tensor & fill_(at::Tensor & self, const at::Tensor & value);
+  static at::Tensor _log_softmax(const at::Tensor & self, int64_t dim, bool half_to_float);
   static at::Tensor mul(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & mul_(at::Tensor & self, const at::Tensor & other);
   static at::Tensor & mul_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);

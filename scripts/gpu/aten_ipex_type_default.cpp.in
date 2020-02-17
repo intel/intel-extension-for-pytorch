@@ -91,6 +91,10 @@ at::Tensor & AtenIpexTypeDefault::fill_(at::Tensor & self, const at::Tensor & va
   return AtenIpexTypeDPCPP::fill_(self, value);
 }
 
+at::Tensor AtenIpexTypeDefault::_log_softmax(const at::Tensor & self, int64_t dim, bool half_to_float) {
+  return AtenIpexTypeDPCPP::_log_softmax(self, dim, half_to_float);
+}
+
 at::Tensor AtenIpexTypeDefault::mul(const at::Tensor & self, const at::Tensor & other) {
   return AtenIpexTypeDPCPP::mul(self, other);
 }
@@ -281,6 +285,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::fill_.Tensor(Tensor(a!) self, Tensor value) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::fill_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::_log_softmax(Tensor self, int dim, bool half_to_float) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, int64_t, bool), &AtenIpexTypeDefault::_log_softmax>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::mul.Tensor(Tensor self, Tensor other) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::mul>(at::TensorTypeId::DPCPPTensorId)

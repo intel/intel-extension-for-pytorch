@@ -185,7 +185,7 @@ Tensor host_softmax(const Tensor &input_, const int64_t dim_, const bool half_to
           output.data_ptr<scalar_t>(), input.data_ptr<scalar_t>(), dim_size, outer_size);
       });
     } else {
- 
+
     }
   }
   return output;
@@ -247,3 +247,13 @@ Tensor softmax_backward_sycl(const Tensor &grad, const Tensor &output, int64_t d
 
 } // native
 } // at
+
+namespace at {
+namespace AtenIpexTypeDPCPP {
+
+at::Tensor _log_softmax(const at::Tensor & self, int64_t dim, bool half_to_float) {
+  return at::native::log_softmax_sycl(self, dim, half_to_float);
+}
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at
