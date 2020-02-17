@@ -8,5 +8,9 @@ at::Tensor as_strided(const at::Tensor & self, at::IntArrayRef size,
   return at::native::as_strided_tensorimpl(self, size, stride, storage_offset);
 }
 
+at::Tensor view(const at::Tensor & self, at::IntArrayRef size) {
+  return at::native::view(self, size);
+}
+
 } // AtenIpexTypeDPCPP
 } // at

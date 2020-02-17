@@ -158,7 +158,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & masked_fill_(Tensor & self, const Tensor & mask, Scalar value);
   // static Tensor & masked_fill_(Tensor & self, const Tensor & mask, const Tensor & value);
   // static Tensor & masked_scatter_(Tensor & self, const Tensor & mask, const Tensor & source);
-  // static Tensor view(const Tensor & self, IntArrayRef size);
+  static Tensor view(const Tensor & self, IntArrayRef size); // aten::view(Tensor(a) self, int[] size) -> Tensor(a)
   // static Tensor & index_add_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & source);
   // static Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, Scalar value);
   // static Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & value);

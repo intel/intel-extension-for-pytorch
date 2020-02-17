@@ -179,6 +179,10 @@ at::Tensor AtenIpexTypeDefault::addmm(const at::Tensor & self, const at::Tensor 
   return AtenIpexTypeDPCPP::addmm(self, mat1, mat2, beta, alpha);
 }
 
+at::Tensor AtenIpexTypeDefault::view(const at::Tensor & self, at::IntArrayRef size) {
+  return AtenIpexTypeDPCPP::view(self, size);
+}
+
 at::Tensor & AtenIpexTypeDefault::tril_(at::Tensor & self, int64_t diagonal) {
   return AtenIpexTypeDPCPP::tril_(self, diagonal);
 }
@@ -343,6 +347,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::addmm(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::addmm>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::view(Tensor(a) self, int[] size) -> Tensor(a)")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::view>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::tril_(Tensor(a!) self, int diagonal=0) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, int64_t), &AtenIpexTypeDefault::tril_>(at::TensorTypeId::DPCPPTensorId)

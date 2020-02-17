@@ -49,6 +49,7 @@ class AtenIpexTypeDefault {
   static at::Tensor rsub(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   static at::Tensor rsub(const at::Tensor & self, at::Scalar other, at::Scalar alpha);
   static at::Tensor addmm(const at::Tensor & self, const at::Tensor & mat1, const at::Tensor & mat2, at::Scalar beta, at::Scalar alpha);
+  static at::Tensor view(const at::Tensor & self, at::IntArrayRef size);
   static at::Tensor & tril_(at::Tensor & self, int64_t diagonal);
   static at::Tensor & triu_(at::Tensor & self, int64_t diagonal);
   static at::Tensor & triu_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
