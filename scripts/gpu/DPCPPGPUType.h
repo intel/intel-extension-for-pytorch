@@ -43,7 +43,7 @@ struct TORCH_API SYCLType final {
   // static Tensor addmv(const Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha);
   // static Tensor & addmv_(Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha);
   // static Tensor & addmv_out(Tensor & out, const Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha);
-  // static Tensor & arange_out(Tensor & out, Scalar start, Scalar end, Scalar step);
+   static Tensor & arange_out(Tensor & out, Scalar start, Scalar end, Scalar step);  // aten::arange.start_out(Scalar start, Scalar end, Scalar step=1, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor as_strided(const Tensor & self, IntArrayRef size, IntArrayRef stride, c10::optional<int64_t> storage_offset); // aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> Tensor(a)
   // static Tensor & asin_(Tensor & self);
   // static Tensor & asin_out(Tensor & out, const Tensor & self);
@@ -52,8 +52,8 @@ struct TORCH_API SYCLType final {
   // static Tensor baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
   // static Tensor & baddbmm_(Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
   // static Tensor & baddbmm_out(Tensor & out, const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
-  // static Tensor & bernoulli_(Tensor & self, const Tensor & p, Generator * generator);
-  // static Tensor & bernoulli_(Tensor & self, double p, Generator * generator);
+  // static Tensor & bernoulli_(Tensor & self, const Tensor & p, Generator * generator); // aten::bernoulli_.Tensor(Tensor(a!) self, Tensor p, *, Generator? generator=None) -> Tensor(a!)
+  // static Tensor & bernoulli_(Tensor & self, double p, Generator * generator); // aten::bernoulli_.float(Tensor(a!) self, float p=0.5, *, Generator? generator=None) -> Tensor(a!)
   // static Tensor bincount(const Tensor & self, const Tensor & weights, int64_t minlength);
   // static Tensor & bitwise_not_out(Tensor & out, const Tensor & self);
   // static Tensor & logical_not_out(Tensor & out, const Tensor & self);
@@ -94,7 +94,7 @@ struct TORCH_API SYCLType final {
   // static Tensor ger(const Tensor & self, const Tensor & vec2);
   // static Tensor & ger_out(Tensor & out, const Tensor & self, const Tensor & vec2);
   // static std::tuple<Tensor &,Tensor &> kthvalue_out(Tensor & values, Tensor & indices, const Tensor & self, int64_t k, int64_t dim, bool keepdim);
-  // static Tensor & linspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps);
+   static Tensor & linspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps);  // aten::linspace.out(Scalar start, Scalar end, int steps=100, *, Tensor(a!) out) -> Tensor(a!)
   // static Tensor & log_(Tensor & self);
   // static Tensor & log_out(Tensor & out, const Tensor & self);
   // static Tensor & log10_(Tensor & self);
@@ -103,7 +103,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & log1p_out(Tensor & out, const Tensor & self);
   // static Tensor & log2_(Tensor & self);
   // static Tensor & log2_out(Tensor & out, const Tensor & self);
-  // static Tensor & logspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps, double base);
+   static Tensor & logspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps, double base);  // aten::logspace.out(Scalar start, Scalar end, int steps=100, float base=10.0, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor _log_softmax(const Tensor & self, int64_t dim, bool half_to_float); // aten::_log_softmax(Tensor self, int dim, bool half_to_float) -> Tensor
   // static Tensor _log_softmax_backward_data(const Tensor & grad_output, const Tensor & output, int64_t dim, const Tensor & self);
   // static Tensor mm(const Tensor & self, const Tensor & mat2);
@@ -116,7 +116,7 @@ struct TORCH_API SYCLType final {
   // static Tensor narrow_copy(const Tensor & self, int64_t dim, int64_t start, int64_t length);
   static std::tuple<Tensor,Tensor,Tensor> native_batch_norm(const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & running_mean, const Tensor & running_var, bool training, double momentum, double eps); // aten::native_batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps) -> (Tensor, Tensor, Tensor)
   // static std::tuple<Tensor,Tensor,Tensor> native_batch_norm_backward(const Tensor & grad_out, const Tensor & input, const Tensor & weight, const Tensor & running_mean, const Tensor & running_var, const Tensor & save_mean, const Tensor & save_invstd, bool train, double eps, std::array<bool,3> output_mask);
-  // static Tensor & range_out(Tensor & out, Scalar start, Scalar end, Scalar step);
+   static Tensor & range_out(Tensor & out, Scalar start, Scalar end, Scalar step);  // aten::range.out(Scalar start, Scalar end, Scalar step=1, *, Tensor(a!) out) -> Tensor(a!)
   // static Tensor & neg_out(Tensor & out, const Tensor & self);
   // static Tensor repeat_interleave(const Tensor & repeats);
   // static Tensor & round_(Tensor & self);
@@ -165,18 +165,18 @@ struct TORCH_API SYCLType final {
   // static Tensor & scatter_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & src);
   // static Tensor & scatter_(Tensor & self, int64_t dim, const Tensor & index, Scalar value);
   // static Tensor & scatter_add_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & src);
-  // static Tensor & lt_(Tensor & self, Scalar other);
-  // static Tensor & lt_(Tensor & self, const Tensor & other);
-  // static Tensor & gt_(Tensor & self, Scalar other);
-  // static Tensor & gt_(Tensor & self, const Tensor & other);
-  // static Tensor & le_(Tensor & self, Scalar other);
-  // static Tensor & le_(Tensor & self, const Tensor & other);
-  // static Tensor & ge_(Tensor & self, Scalar other);
-  // static Tensor & ge_(Tensor & self, const Tensor & other);
-  // static Tensor & eq_(Tensor & self, Scalar other);
-  // static Tensor & eq_(Tensor & self, const Tensor & other);
-  // static Tensor & ne_(Tensor & self, Scalar other);
-  // static Tensor & ne_(Tensor & self, const Tensor & other);
+  // static Tensor & lt_(Tensor & self, Scalar other); // aten::lt_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
+  // static Tensor & lt_(Tensor & self, const Tensor & other); // aten::lt_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
+  // static Tensor & gt_(Tensor & self, Scalar other); // aten::gt_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
+  // static Tensor & gt_(Tensor & self, const Tensor & other); // aten::gt_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
+  // static Tensor & le_(Tensor & self, Scalar other); // aten::le_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
+  // static Tensor & le_(Tensor & self, const Tensor & other); // aten::le_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
+  // static Tensor & ge_(Tensor & self, Scalar other); // aten::ge_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
+  // static Tensor & ge_(Tensor & self, const Tensor & other); // aten::ge_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
+  // static Tensor & eq_(Tensor & self, Scalar other); // aten::eq_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
+  // static Tensor & eq_(Tensor & self, const Tensor & other); // aten::eq_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
+  // static Tensor & ne_(Tensor & self, Scalar other); // aten::ne_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
+  // static Tensor & ne_(Tensor & self, const Tensor & other); // aten::ne_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
   // static Tensor __and__(const Tensor & self, Scalar other);
   // static Tensor __and__(const Tensor & self, const Tensor & other);
   // static Tensor & __iand__(Tensor & self, Scalar other);

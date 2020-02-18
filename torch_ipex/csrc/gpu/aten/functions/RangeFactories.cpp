@@ -243,3 +243,27 @@ Tensor& arange_sycl_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
   return result;
 }
 }} // namespace at
+
+namespace at { namespace AtenIpexTypeDPCPP {
+Tensor & linspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps){
+  at::native::linspace_sycl_out(out, start, end, steps);
+  return out;
+}
+
+Tensor & logspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps, double base){
+  at::native::logspace_sycl_out(out, start, end, steps, base);
+  return out;
+}
+
+Tensor & range_out(Tensor & out, Scalar start, Scalar end, Scalar step){
+  at::native::range_sycl_out(out, start, end, step);
+  return out;
+}
+
+Tensor & arange_out(Tensor & out, Scalar start, Scalar end, Scalar step){
+  at::native::arange_sycl_out(out, start, end, step);
+  return out;
+}
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

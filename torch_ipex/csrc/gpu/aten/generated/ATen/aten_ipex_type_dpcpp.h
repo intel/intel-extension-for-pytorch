@@ -11,6 +11,7 @@ class AtenIpexTypeDPCPP {
   static at::Tensor & add_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   static at::Tensor add(const at::Tensor & self, at::Scalar other, at::Scalar alpha);
   static at::Tensor & add_(at::Tensor & self, at::Scalar other, at::Scalar alpha);
+  static at::Tensor & arange_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
   static at::Tensor as_strided(const at::Tensor & self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset);
   static at::Tensor bitwise_not(const at::Tensor & self);
   static at::Tensor & bitwise_not_(at::Tensor & self);
@@ -27,6 +28,8 @@ class AtenIpexTypeDPCPP {
   static at::Tensor & resize_(at::Tensor & self, at::IntArrayRef size, c10::optional<at::MemoryFormat> memory_format);
   static at::Tensor & fill_(at::Tensor & self, at::Scalar value);
   static at::Tensor & fill_(at::Tensor & self, const at::Tensor & value);
+  static at::Tensor & linspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps);
+  static at::Tensor & logspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps, double base);
   static at::Tensor _log_softmax(const at::Tensor & self, int64_t dim, bool half_to_float);
   static at::Tensor mul(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & mul_(at::Tensor & self, const at::Tensor & other);
@@ -34,6 +37,7 @@ class AtenIpexTypeDPCPP {
   static at::Tensor mul(const at::Tensor & self, at::Scalar other);
   static at::Tensor & mul_(at::Tensor & self, at::Scalar other);
   static std::tuple<at::Tensor,at::Tensor,at::Tensor> native_batch_norm(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, const at::Tensor & running_mean, const at::Tensor & running_var, bool training, double momentum, double eps);
+  static at::Tensor & range_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
   static at::Tensor neg(const at::Tensor & self);
   static at::Tensor & neg_(at::Tensor & self);
   static at::Tensor & neg_out(at::Tensor & out, const at::Tensor & self);
