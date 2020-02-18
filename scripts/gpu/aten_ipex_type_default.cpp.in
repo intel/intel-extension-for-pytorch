@@ -219,6 +219,10 @@ at::Tensor & AtenIpexTypeDefault::tril_out(at::Tensor & out, const at::Tensor & 
   return AtenIpexTypeDPCPP::tril_out(out, self, diagonal);
 }
 
+std::tuple<at::Tensor,at::Tensor> AtenIpexTypeDefault::nll_loss_forward(const at::Tensor & self, const at::Tensor & target, const at::Tensor & weight, int64_t reduction, int64_t ignore_index) {
+  return AtenIpexTypeDPCPP::nll_loss_forward(self, target, weight, reduction, ignore_index);
+}
+
 at::Tensor & AtenIpexTypeDefault::avg_pool2d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
   return AtenIpexTypeDPCPP::avg_pool2d_out(out, self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
 }
@@ -397,6 +401,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::tril.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, int64_t), &AtenIpexTypeDefault::tril_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::nll_loss_forward(Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index) -> (Tensor output, Tensor total_weight)")
+      .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor>(const at::Tensor &, const at::Tensor &, const at::Tensor &, int64_t, int64_t), &AtenIpexTypeDefault::nll_loss_forward>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::avg_pool2d.out(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=0, bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, at::IntArrayRef, at::IntArrayRef, bool, bool, c10::optional<int64_t>), &AtenIpexTypeDefault::avg_pool2d_out>(at::TensorTypeId::DPCPPTensorId)

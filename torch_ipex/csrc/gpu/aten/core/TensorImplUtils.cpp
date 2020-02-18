@@ -482,5 +482,9 @@ SYCLDescBuff TensorImpl_sizeDesc(const at::TensorImpl *tensor) {
   return buf;
 }
 
+at::TensorImpl *TensorImpl_Unwrap(const at::Tensor& tensor) {
+  return tensor.unsafeGetTensorImpl();
+}
+
 } // native::
 } // at::

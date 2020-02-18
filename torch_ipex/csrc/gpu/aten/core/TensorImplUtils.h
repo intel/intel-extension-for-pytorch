@@ -14,6 +14,7 @@ typedef struct SYCLDescBuff
 
 TensorImpl *TensorImpl_new();
 at::Tensor TensorImpl_wrap(TensorImpl *tensor);
+at::TensorImpl *TensorImpl_Unwrap(const at::Tensor& tensor);
 int TensorImpl_nDimension(const at::TensorImpl *self);
 int TensorImpl_nDimensionLegacyNoScalars(const at::TensorImpl *self);
 int TensorImpl_nDimensionLegacyAll(const at::TensorImpl *self);
