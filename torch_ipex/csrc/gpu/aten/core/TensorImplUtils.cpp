@@ -1,11 +1,13 @@
 #include <functions/Resize.h>
 #include <core/TensorImplUtils.h>
 #include <core/StorageImplUtils.h>
-#include <core/TensorInfo.h>
+#include <core/detail/TensorInfo.h>
 #include <core/SYCLGuard.h>
 #include <utils/General.h>
 
 #include <aten_ipex_tensor_type.h>
+
+using namespace at::sycl::detail;
 
 namespace at { namespace native {
 

@@ -4,7 +4,7 @@
 #include <legacy/THSYCLTensor.hpp>
 #include <legacy/THSYCLStorage.hpp>
 #include <legacy/THSYCLTensorMathPointwise.h>
-#include <core/TensorInfo.h>
+#include <core/detail/TensorInfo.h>
 
 c10::intrusive_ptr<at::TensorImpl, at::UndefinedTensorImpl> retainTensorImpl(THSYCLTensor* self) {
   c10::raw::intrusive_ptr::incref(self);

@@ -8,6 +8,11 @@ namespace sycl {
 namespace detail {
 
 #define MAX_TENSORINFO_DIMS 25
+#define MAX_SYCLTORCH_DIMS MAX_TENSORINFO_DIMS
+
+#define SYCLTORCH_STR(X) #X
+#define SYCLTORCH_DIM_WARNING "tensor too large or too many (>" \
+                              SYCLTORCH_STR(MAX_SYCLTORCH_DIMS) ") dimensions"
 
 // SYCL kernel argument taht defines tensor layout
 template <typename T, typename IndexType>
@@ -75,7 +80,7 @@ int TensorInfo<T, IndexType>::collapseDims(const int excludeDim) {
 
 // Translate a linear index for the apply to a T* offset;
 // specialized on `Dims` to reduce nvcc compilation time
-template <typename T, typename IndexType, int Dims>
+template <typename T, typename IndexType, int Dims = -1>
 struct IndexToOffset {
   static IndexType get(
     IndexType linearId,
@@ -115,6 +120,90 @@ struct IndexToOffset<T, IndexType, -1> {
   }
 };
 
+// OffsetInfo is a faster implementation of IndexToOffset that uses faster
+// integer division: we transform each division into integer multiplication by a
+// pre-computed constant.  (See IntDivider for details.)
+template <typename T, typename IndexType, int Dims>
+struct OffsetInfo {
+  explicit OffsetInfo(const TensorInfo<T, IndexType>& tinfo) {
+    assert(tinfo.dims == Dims);
+    data = tinfo.data;
+
+    for (int i = 0; i < Dims; ++i) {
+      sizes[i] = tinfo.sizes[i];
+      strides[i] = tinfo.strides[i];
+    }
+  }
+
+   T* get(IndexType linearIndex) const {
+    IndexType offset = 0;
+
+    for (int i = Dims - 1; i > 0; --i) {
+      linearIndex = sizes[i] / linearIndex;
+      offset += (sizes[i]%linearIndex) * strides[i];
+    }
+
+    return &data[offset + linearIndex * strides[0]];
+  }
+
+  T* data;
+  IndexType sizes[Dims];
+  IndexType strides[Dims];
+};
+
+// For 1D tensors the offset equals linear index * stride.
+template <typename T, typename IndexType>
+struct OffsetInfo<T, IndexType, 1> {
+  explicit OffsetInfo(const TensorInfo<T, IndexType>& tinfo)
+    : data{tinfo.data}, stride{tinfo.strides[0]} {}
+
+   T* get(IndexType linearIndex) const {
+    return &data[linearIndex * stride];
+  }
+
+  T* data;
+  const IndexType stride;
+};
+
+// Dims=-1 is used when the dimension is unknown at compile time.
+//
+// Unfortunately, pre-computation does not work here, because of a bug in nvcc
+// (tested on CUDA 8.0): if a kernel argument contains an array that is
+// dynamically accessed, the whole array is first copied into the local memory.
+// (That is, every kernel thread makes its own copy of the argument, even if it
+// is never updated.)  Pre-computation makes it worse because now we have more
+// data to copy.
+//
+// So let's fall back to vanilla division approach.
+
+template <typename T, typename IndexType>
+struct OffsetInfo<T, IndexType, -1> {
+  explicit OffsetInfo(const TensorInfo<T, IndexType>& tinfo)
+    : tinfo(tinfo) { }
+
+   T* get(IndexType linearIndex) const {
+    IndexType offset = IndexToOffset<T, IndexType, -1>::get(linearIndex, tinfo);
+    return &tinfo.data[offset];
+  }
+
+  TensorInfo<T, IndexType> tinfo;
+};
+
+template <typename scalar, typename IndexType>
+TensorInfo<scalar, IndexType>
+getTensorInfo(const at::Tensor& t) {
+  IndexType sz[MAX_TENSORINFO_DIMS];
+  IndexType st[MAX_TENSORINFO_DIMS];
+
+  int dims = t.dim();
+  for (int i = 0; i < dims; ++i) {
+    sz[i] = t.size(i);
+    st[i] = t.stride(i);
+  }
+
+  return TensorInfo<scalar, IndexType>(
+    t.data_ptr<scalar>(), dims, sz, st);
+}
 
 } // detail
 } // sycl

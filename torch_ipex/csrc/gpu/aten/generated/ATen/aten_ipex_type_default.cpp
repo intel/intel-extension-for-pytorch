@@ -271,6 +271,14 @@ at::Tensor AtenIpexTypeDefault::addcdiv(const at::Tensor & self, const at::Tenso
   return AtenIpexTypeDPCPP::addcdiv(self, tensor1, tensor2, value);
 }
 
+std::tuple<at::Tensor &,at::Tensor &> AtenIpexTypeDefault::topk_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted) {
+  return AtenIpexTypeDPCPP::topk_out(values, indices, self, k, dim, largest, sorted);
+}
+
+std::tuple<at::Tensor,at::Tensor> AtenIpexTypeDefault::topk(const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted) {
+  return AtenIpexTypeDPCPP::topk(self, k, dim, largest, sorted);
+}
+
 std::tuple<at::Tensor,at::Tensor> AtenIpexTypeDefault::nll_loss_forward(const at::Tensor & self, const at::Tensor & target, const at::Tensor & weight, int64_t reduction, int64_t ignore_index) {
   return AtenIpexTypeDPCPP::nll_loss_forward(self, target, weight, reduction, ignore_index);
 }
@@ -512,6 +520,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::addcdiv(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::addcdiv>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::topk.values(Tensor self, int k, int dim=-1, bool largest=True, bool sorted=True, *, Tensor(a!) values, Tensor(b!) indices) ->(Tensor(a!) values, Tensor(b!) indices)")
+      .impl_unboxedOnlyKernel<std::tuple<at::Tensor &,at::Tensor &>(at::Tensor &, at::Tensor &, const at::Tensor &, int64_t, int64_t, bool, bool), &AtenIpexTypeDefault::topk_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::topk(Tensor self, int k, int dim=-1, bool largest=True, bool sorted=True) -> (Tensor values, Tensor indices)")
+      .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor>(const at::Tensor &, int64_t, int64_t, bool, bool), &AtenIpexTypeDefault::topk>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::nll_loss_forward(Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index) -> (Tensor output, Tensor total_weight)")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor>(const at::Tensor &, const at::Tensor &, const at::Tensor &, int64_t, int64_t), &AtenIpexTypeDefault::nll_loss_forward>(at::TensorTypeId::DPCPPTensorId)

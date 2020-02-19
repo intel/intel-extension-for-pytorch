@@ -9,7 +9,7 @@
 #include <legacy/THSYCLGenerateBoolType.h>
 
 #include <core/TensorImplUtils.h>
-#include <core/TensorInfo.h>
+#include <core/detail/TensorInfo.h>
 
 #include <functions/Resize.h>
 
@@ -337,7 +337,7 @@ int compareSizeAndStride(const void* a, const void* b) {
 /* within the next one.                                        */
 bool THSYCLTensor_maybeOverlappingIndices(THSYCLState* state, const THSYCLTensor* t) {
   /* Extract size/stride arrays; only consider size >1 dims. */
-  SizeAndStride info[MAX_SYCLTORCH_DIMS];
+  SizeAndStride info[MAX_TENSORINFO_DIMS];
 
   int dims = THSYCLTensor_nDimensionLegacyAll(state, t);
   int nonSize1Dims = 0;

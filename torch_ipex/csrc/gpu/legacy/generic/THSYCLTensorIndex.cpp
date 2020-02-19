@@ -4,6 +4,8 @@
 
 #include <legacy/THSYCLTensorTypeUtils.h>
 
+// TensorInfo
+using namespace at::sycl::detail;
 
 void THSYCLTensor_(indexSelect)(THSYCLState *state,
     THSYCLTensor *dst, THSYCLTensor *src, int dim, THSyclLongTensor *indices)

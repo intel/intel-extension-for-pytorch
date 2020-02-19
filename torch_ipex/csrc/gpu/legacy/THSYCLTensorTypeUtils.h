@@ -4,7 +4,9 @@
 #include <legacy/THSYCLGeneral.h>
 #include <legacy/THSYCLTensor.hpp>
 
-#include <core/TensorInfo.h>
+#include <core/detail/TensorInfo.h>
+
+using namespace at::sycl::detail;
 
 // Utility function for constructing TensorInfo structs. In this case, the
 // two template parameters are:
@@ -35,8 +37,8 @@
 template <typename ScalarType, typename TensorType, typename IndexType>
 TensorInfo<ScalarType, IndexType>
 getTensorInfo(THSYCLState* state, TensorType* t) {
-  IndexType sz[MAX_SYCLTORCH_DIMS];
-  IndexType st[MAX_SYCLTORCH_DIMS];
+  IndexType sz[MAX_TENSORINFO_DIMS];
+  IndexType st[MAX_TENSORINFO_DIMS];
 
   int dims = THSYCLTensor_nDimensionLegacyNoScalars(state, t);
   for (int i = 0; i < dims; ++i) {

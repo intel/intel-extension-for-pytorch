@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core/detail/IndexUtils.h>
+#include <core/detail/TensorInfo.h>
 #include <ATen/TensorUtils.h>
 #include <ATen/LegacyTHFunctionsSYCL.h>
 
