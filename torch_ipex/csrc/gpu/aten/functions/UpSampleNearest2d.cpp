@@ -301,3 +301,15 @@ Tensor upsample_nearest2d_backward_sycl(
 
 } // namespace native
 } // namespace at
+
+namespace at { namespace AtenIpexTypeDPCPP {
+Tensor & upsample_nearest2d_out(Tensor & out, const Tensor & self, IntArrayRef output_size){
+  at::native::upsample_nearest2d_out_sycl(out, self, output_size);
+  return out;
+}
+Tensor upsample_nearest2d(const Tensor & self, IntArrayRef output_size){
+  return at::native::upsample_nearest2d_sycl(self, output_size);
+}
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at
