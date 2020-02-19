@@ -275,6 +275,18 @@ std::tuple<at::Tensor,at::Tensor> AtenIpexTypeDefault::nll_loss_forward(const at
   return AtenIpexTypeDPCPP::nll_loss_forward(self, target, weight, reduction, ignore_index);
 }
 
+at::Tensor & AtenIpexTypeDefault::adaptive_avg_pool2d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef output_size) {
+  return AtenIpexTypeDPCPP::adaptive_avg_pool2d_out(out, self, output_size);
+}
+
+at::Tensor AtenIpexTypeDefault::adaptive_avg_pool2d(const at::Tensor & self, at::IntArrayRef output_size) {
+  return AtenIpexTypeDPCPP::adaptive_avg_pool2d(self, output_size);
+}
+
+at::Tensor AtenIpexTypeDefault::_adaptive_avg_pool2d(const at::Tensor & self, at::IntArrayRef output_size) {
+  return AtenIpexTypeDPCPP::_adaptive_avg_pool2d(self, output_size);
+}
+
 at::Tensor & AtenIpexTypeDefault::avg_pool2d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
   return AtenIpexTypeDPCPP::avg_pool2d_out(out, self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
 }
@@ -503,6 +515,15 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::nll_loss_forward(Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index) -> (Tensor output, Tensor total_weight)")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor>(const at::Tensor &, const at::Tensor &, const at::Tensor &, int64_t, int64_t), &AtenIpexTypeDefault::nll_loss_forward>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::adaptive_avg_pool2d.out(Tensor self, int[2] output_size, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::adaptive_avg_pool2d_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::adaptive_avg_pool2d(Tensor self, int[2] output_size) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::adaptive_avg_pool2d>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::_adaptive_avg_pool2d(Tensor self, int[2] output_size) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::_adaptive_avg_pool2d>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::avg_pool2d.out(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=0, bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, at::IntArrayRef, at::IntArrayRef, bool, bool, c10::optional<int64_t>), &AtenIpexTypeDefault::avg_pool2d_out>(at::TensorTypeId::DPCPPTensorId)

@@ -318,3 +318,17 @@ static void adaptive_avg_pool2d_backward_out_sycl_frame(
   }
 } // at::native
 } // at
+
+namespace at { namespace AtenIpexTypeDPCPP {
+Tensor & adaptive_avg_pool2d_out(Tensor & out, const Tensor & self, IntArrayRef output_size){
+  at::native::adaptive_avg_pool2d_out_sycl(out, self, output_size);
+  return out;
+}
+Tensor _adaptive_avg_pool2d(const Tensor & self, IntArrayRef output_size){
+  return at::native::adaptive_avg_pool2d_sycl(self, output_size);
+}
+Tensor adaptive_avg_pool2d(const Tensor & self, IntArrayRef output_size){
+  return at::native::adaptive_avg_pool2d_sycl(self, output_size);
+}
+} // namespace AtenIpexTypeDPCPP
+} // namespace at
