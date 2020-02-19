@@ -42,5 +42,9 @@ Tensor& fill_(Tensor& self, const Tensor& value) {
   return fill_out(self, value.item());
 }
 
+Tensor& zero_(Tensor &self) {
+  return at::AtenIpexTypeDPCPP::fill_(self, 0);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

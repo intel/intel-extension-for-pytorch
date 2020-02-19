@@ -295,3 +295,24 @@ Tensor tril_indices_sycl(int64_t row, int64_t col, int64_t offset, const TensorO
 
 } // namespace native
 } // namespace at
+
+namespace at { namespace AtenIpexTypeDPCPP {
+Tensor empty_strided(IntArrayRef size, IntArrayRef stride, const TensorOptions & options){
+  return at::native::empty_strided_sycl(size, stride, options);
+}
+Tensor & eye_out(Tensor & out, int64_t n){
+  at::native::eye_out_sycl(out, n);
+  return out;
+}
+Tensor & eye_out(Tensor & out, int64_t n, int64_t m){
+  at::native::eye_out_sycl(out, n, m);
+  return out;
+}
+Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options){
+  return at::native::tril_indices_sycl(row, col, offset, options);
+}
+Tensor triu_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options){
+  return at::native::triu_indices_sycl(row, col, offset, options);
+}
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

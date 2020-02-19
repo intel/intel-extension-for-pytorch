@@ -78,7 +78,7 @@ struct TORCH_API SYCLType final {
   static Tensor empty(IntArrayRef size, const TensorOptions & options, c10::optional<MemoryFormat> memory_format); // aten::empty.memory_format(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
    //static Tensor & resize_(Tensor & self, IntArrayRef size);
   static Tensor & resize_(Tensor & self, IntArrayRef size, c10::optional<MemoryFormat> memory_format); // aten::resize_(Tensor(a!) self, int[] size, *, MemoryFormat? memory_format=None) -> Tensor(a!)
-  // static Tensor empty_strided(IntArrayRef size, IntArrayRef stride, const TensorOptions & options);
+   static Tensor empty_strided(IntArrayRef size, IntArrayRef stride, const TensorOptions & options);  // aten::empty_strided(int[] size, int[] stride, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
   // static Tensor & erf_(Tensor & self);
   // static Tensor & erf_out(Tensor & out, const Tensor & self);
   // static Tensor & erfc_(Tensor & self);
@@ -87,8 +87,8 @@ struct TORCH_API SYCLType final {
   // static Tensor & exp_out(Tensor & out, const Tensor & self);
   // static Tensor & expm1_(Tensor & self);
   // static Tensor & expm1_out(Tensor & out, const Tensor & self);
-  // static Tensor & eye_out(Tensor & out, int64_t n);
-  // static Tensor & eye_out(Tensor & out, int64_t n, int64_t m);
+   static Tensor & eye_out(Tensor & out, int64_t n); // aten::eye.out(int n, *, Tensor(a!) out) -> Tensor(a!)
+   static Tensor & eye_out(Tensor & out, int64_t n, int64_t m); // aten::eye.m_out(int n, int m, *, Tensor(a!) out) -> Tensor(a!)
   // static Tensor & floor_(Tensor & self);
   // static Tensor & floor_out(Tensor & out, const Tensor & self);
   // static Tensor ger(const Tensor & self, const Tensor & vec2);
@@ -140,7 +140,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & tan_out(Tensor & out, const Tensor & self);
   // static Tensor & tanh_(Tensor & self);
   // static Tensor & tanh_out(Tensor & out, const Tensor & self);
-  // static Tensor roll(const Tensor & self, IntArrayRef shifts, IntArrayRef dims);
+   static Tensor roll(const Tensor & self, IntArrayRef shifts, IntArrayRef dims); // aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> Tensor
   // static Tensor & trunc_(Tensor & self);
   // static Tensor & trunc_out(Tensor & out, const Tensor & self);
   // static Tensor _s_where(const Tensor & condition, const Tensor & self, const Tensor & other);
@@ -148,7 +148,7 @@ struct TORCH_API SYCLType final {
    static Tensor & resize_as_(Tensor & self, const Tensor & the_template, c10::optional<MemoryFormat> memory_format); // aten::resize_as_(Tensor(a!) self, Tensor the_template, *, int? memory_format=None) -> (Tensor(a!))
   // static Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent);
   // static Tensor pow(const Tensor & self, Scalar exponent);
-  // static Tensor & zero_(Tensor & self);
+   static Tensor & zero_(Tensor & self); // aten::zero_(Tensor(a!) self) -> Tensor(a!)
   // static Scalar _local_scalar_dense(const Tensor & self);
   // static Tensor & set_(Tensor & self, Storage source);
   // static Tensor & set_(Tensor & self, Storage source, int64_t storage_offset, IntArrayRef size, IntArrayRef stride);
@@ -216,8 +216,8 @@ struct TORCH_API SYCLType final {
   // static Tensor diag(const Tensor & self, int64_t diagonal);
    static Tensor & triu_out(Tensor & out, const Tensor & self, int64_t diagonal); // aten::triu.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)
    static Tensor & tril_out(Tensor & out, const Tensor & self, int64_t diagonal); // aten::tril.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)
-  // static Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options);
-  // static Tensor triu_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options);
+   static Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options); // aten::tril_indices(int row, int col, int offset=0, *, ScalarType? dtype=long, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+   static Tensor triu_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options); // aten::triu_indices(int row, int col, int offset=0, *, ScalarType? dtype=long, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
   // static Tensor trace(const Tensor & self);
   // static Tensor & ne_out(Tensor & out, const Tensor & self, Scalar other);
   // static Tensor ne(const Tensor & self, Scalar other);

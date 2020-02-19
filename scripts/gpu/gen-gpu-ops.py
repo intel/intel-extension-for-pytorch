@@ -82,13 +82,13 @@ _XPARSER = lark.Lark(
     _GRAMMAR, parser='lalr', propagate_positions=True, keep_all_tokens=True)
 
 _FN_BLACKLIST = set([
-    'numel',
-    'ones',
-    'ones_like',
-    'result_type',
-    'zero_',
-    'zeros',
-    'zeros_like',
+#    'numel',
+#    'ones',
+#    'ones_like',
+#    'result_type',
+#    'zero_',
+#    'zeros',
+#    'zeros_like',
 ])
 
 _FN_BLACKLIST_REGEX = [

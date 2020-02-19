@@ -81,3 +81,11 @@ Tensor roll_sycl(const Tensor& self, IntArrayRef shifts, IntArrayRef dims) {
 
 } // namespace native
 } // namespace at
+
+namespace at { namespace AtenIpexTypeDPCPP {
+Tensor roll(const Tensor & self, IntArrayRef shifts, IntArrayRef dims){
+  return at::native::roll_sycl(self, shifts, dims);
+}
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

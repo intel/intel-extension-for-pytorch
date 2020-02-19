@@ -25,6 +25,9 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & div_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
   at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format);
   at::Tensor & resize_(at::Tensor & self, at::IntArrayRef size, c10::optional<at::MemoryFormat> memory_format);
+  at::Tensor empty_strided(at::IntArrayRef size, at::IntArrayRef stride, const at::TensorOptions & options);
+  at::Tensor & eye_out(at::Tensor & out, int64_t n);
+  at::Tensor & eye_out(at::Tensor & out, int64_t n, int64_t m);
   at::Tensor & fill_(at::Tensor & self, at::Scalar value);
   at::Tensor & fill_(at::Tensor & self, const at::Tensor & value);
   at::Tensor & linspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps);
@@ -44,7 +47,9 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor threshold(const at::Tensor & self, at::Scalar threshold, at::Scalar value);
   at::Tensor & threshold_(at::Tensor & self, at::Scalar threshold, at::Scalar value);
   at::Tensor & threshold_out(at::Tensor & out, const at::Tensor & self, at::Scalar threshold, at::Scalar value);
+  at::Tensor roll(const at::Tensor & self, at::IntArrayRef shifts, at::IntArrayRef dims);
   at::Tensor & resize_as_(at::Tensor & self, const at::Tensor & the_template, c10::optional<at::MemoryFormat> memory_format);
+  at::Tensor & zero_(at::Tensor & self);
   at::Tensor & sub_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   at::Tensor sub(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   at::Tensor & sub_(at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
@@ -58,6 +63,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & triu_(at::Tensor & self, int64_t diagonal);
   at::Tensor & triu_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
   at::Tensor & tril_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
+  at::Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const at::TensorOptions & options);
+  at::Tensor triu_indices(int64_t row, int64_t col, int64_t offset, const at::TensorOptions & options);
   std::tuple<at::Tensor,at::Tensor> nll_loss_forward(const at::Tensor & self, const at::Tensor & target, const at::Tensor & weight, int64_t reduction, int64_t ignore_index);
   at::Tensor & avg_pool2d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override);
   at::Tensor avg_pool2d(const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override);
