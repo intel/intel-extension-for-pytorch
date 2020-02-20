@@ -67,6 +67,10 @@ class AtenIpexTypeDefault {
   static at::Tensor & tril_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
   static at::Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const at::TensorOptions & options);
   static at::Tensor triu_indices(int64_t row, int64_t col, int64_t offset, const at::TensorOptions & options);
+  static at::Tensor & eq_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
+  static at::Tensor eq(const at::Tensor & self, at::Scalar other);
+  static at::Tensor & eq_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
+  static at::Tensor eq(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & addcmul_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   static at::Tensor addcmul(const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   static at::Tensor & addcmul_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);

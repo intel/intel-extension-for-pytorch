@@ -223,6 +223,10 @@ struct TORCH_API SYCLType final {
   // static Tensor ne(const Tensor & self, Scalar other);
   // static Tensor & ne_out(Tensor & out, const Tensor & self, const Tensor & other);
   // static Tensor ne(const Tensor & self, const Tensor & other);
+  static Tensor & eq_out(Tensor & out, const Tensor & self, Scalar other); // aten::eq.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor eq(const Tensor & self, Scalar other); // aten::eq.Scalar(Tensor self, Scalar other) -> Tensor
+  static Tensor & eq_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::eq.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor eq(const Tensor & self, const Tensor & other); // aten::eq.Tensor(Tensor self, Tensor other) -> Tensor
   // static Tensor & eq_out(Tensor & out, const Tensor & self, Scalar other);
   // static Tensor eq(const Tensor & self, Scalar other);
   // static Tensor & eq_out(Tensor & out, const Tensor & self, const Tensor & other);
