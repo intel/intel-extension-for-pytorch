@@ -149,7 +149,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent);
   // static Tensor pow(const Tensor & self, Scalar exponent);
    static Tensor & zero_(Tensor & self); // aten::zero_(Tensor(a!) self) -> Tensor(a!)
-  // static Scalar _local_scalar_dense(const Tensor & self);
+  static Scalar _local_scalar_dense(const Tensor & self); // aten::_local_scalar_dense(Tensor self) -> Scalar
   // static Tensor & set_(Tensor & self, Storage source);
   // static Tensor & set_(Tensor & self, Storage source, int64_t storage_offset, IntArrayRef size, IntArrayRef stride);
   // static Tensor & set_(Tensor & self, const Tensor & source);

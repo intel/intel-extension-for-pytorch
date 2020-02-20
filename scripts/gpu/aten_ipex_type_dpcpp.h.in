@@ -61,6 +61,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor rsub(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   at::Tensor rsub(const at::Tensor & self, at::Scalar other, at::Scalar alpha);
   at::Tensor addmm(const at::Tensor & self, const at::Tensor & mat1, const at::Tensor & mat2, at::Scalar beta, at::Scalar alpha);
+  at::Scalar _local_scalar_dense(const at::Tensor & self);
   at::Tensor view(const at::Tensor & self, at::IntArrayRef size);
   at::Tensor & tril_(at::Tensor & self, int64_t diagonal);
   at::Tensor & triu_(at::Tensor & self, int64_t diagonal);

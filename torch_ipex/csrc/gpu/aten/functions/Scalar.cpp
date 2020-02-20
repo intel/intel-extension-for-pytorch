@@ -7,7 +7,8 @@
 
 
 namespace at {
-namespace native {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 Scalar _local_scalar_dense_sycl(const Tensor& self) {
   Scalar r;
@@ -20,4 +21,11 @@ Scalar _local_scalar_dense_sycl(const Tensor& self) {
   return r;
 }
 
-}} // at::native
+} // namespace impl
+
+Scalar _local_scalar_dense(const Tensor & self) {
+  return impl::_local_scalar_dense_sycl(self);
+}
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at
