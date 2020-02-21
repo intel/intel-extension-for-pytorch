@@ -501,5 +501,67 @@ Tensor sum(const Tensor & self, c10::optional<ScalarType> dtype) {
   return at::AtenIpexTypeDPCPP::sum(self, std::vector<int64_t>{}, false, dtype);
 }
 
+static Tensor& norm_out(Tensor &result, const Tensor &self, optional<Scalar> opt_p,
+                               IntArrayRef dim, bool keepdim, optional<ScalarType> opt_dtype) {
+  auto p = opt_p.value_or(2.0);
+  ScalarType scalarType = opt_dtype.has_value() ? opt_dtype.value() : self.scalar_type();
+  TORCH_CHECK(
+      at::isFloatingType(scalarType) || at::isComplexType(scalarType),
+      "Can only calculate the mean of floating types. Got ",
+      toString(scalarType),
+      " instead.");
+
+  ScalarType dtype = impl::get_dtype(result, self, opt_dtype, true);
+  auto iter = impl::make_reduction("norm", result, self, dim, keepdim, dtype);
+  if (iter.numel() == 0) {
+    result.zero_();
+  } else {
+    impl::norm_kernel_sycl(iter, p);
+  }
+  return result;
+}
+
+static Tensor norm(const Tensor& self, optional<Scalar> p, IntArrayRef dim, bool keepdim,
+            optional<ScalarType> opt_dtype) {
+  Tensor result;
+  return at::AtenIpexTypeDPCPP::norm_out(result, self, p, dim, keepdim, opt_dtype);
+}
+
+static inline Tensor _norm(const Tensor &self, Scalar p) {
+  if (self.is_sparse()) {
+    return at::native_norm(self, p);
+  } else {
+    TORCH_CHECK(at::isFloatingType(self.scalar_type()) || at::isComplexType(self.scalar_type()),
+                "norm only supports floating-point dtypes");
+
+    Tensor result;
+    return at::AtenIpexTypeDPCPP::norm_out(result, self, p, IntArrayRef{}, false, c10::nullopt);
+  }
+}
+
+Tensor& norm_out(Tensor& out, const Tensor& self, c10::optional<Scalar> p, IntArrayRef dim, bool keepdim, ScalarType dtype) {
+  return at::AtenIpexTypeDPCPP::norm_out(out, self, p, dim, keepdim, dtype);
+}
+
+Tensor& norm_out(Tensor& out, const Tensor& self, c10::optional<Scalar> p, IntArrayRef dim, bool keepdim) {
+  return at::AtenIpexTypeDPCPP::norm_out(out, self, p, dim, keepdim, c10::nullopt);
+}
+
+Tensor norm(const Tensor& self, c10::optional<Scalar> p, IntArrayRef dim, bool keepdim, ScalarType dtype) {
+  return at::AtenIpexTypeDPCPP::norm(self, p, dim, keepdim, optional<ScalarType>(dtype));
+}
+
+Tensor norm(const Tensor& self, c10::optional<Scalar> p, ScalarType dtype) {
+  return at::AtenIpexTypeDPCPP::norm(self, p, IntArrayRef{}, false, optional<ScalarType>(dtype));
+}
+
+Tensor norm(const Tensor& self, c10::optional<Scalar> p, IntArrayRef dim, bool keepdim) {
+  return at::AtenIpexTypeDPCPP::norm(self, p, dim, keepdim, c10::nullopt);
+}
+
+Tensor norm(const Tensor & self, Scalar p){
+  return at::AtenIpexTypeDPCPP::_norm(self, p);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

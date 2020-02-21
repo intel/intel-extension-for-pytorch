@@ -191,6 +191,30 @@ at::Tensor AtenIpexTypeDefault::roll(const at::Tensor & self, at::IntArrayRef sh
   return AtenIpexTypeDPCPP::roll(self, shifts, dims);
 }
 
+at::Tensor AtenIpexTypeDefault::norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::ScalarType dtype) {
+  return AtenIpexTypeDPCPP::norm(self, p, dtype);
+}
+
+at::Tensor AtenIpexTypeDefault::norm(const at::Tensor & self, at::Scalar p) {
+  return AtenIpexTypeDPCPP::norm(self, p);
+}
+
+at::Tensor AtenIpexTypeDefault::norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::IntArrayRef dim, bool keepdim, at::ScalarType dtype) {
+  return AtenIpexTypeDPCPP::norm(self, p, dim, keepdim, dtype);
+}
+
+at::Tensor AtenIpexTypeDefault::norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::IntArrayRef dim, bool keepdim) {
+  return AtenIpexTypeDPCPP::norm(self, p, dim, keepdim);
+}
+
+at::Tensor & AtenIpexTypeDefault::norm_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> p, at::IntArrayRef dim, bool keepdim, at::ScalarType dtype) {
+  return AtenIpexTypeDPCPP::norm_out(out, self, p, dim, keepdim, dtype);
+}
+
+at::Tensor & AtenIpexTypeDefault::norm_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> p, at::IntArrayRef dim, bool keepdim) {
+  return AtenIpexTypeDPCPP::norm_out(out, self, p, dim, keepdim);
+}
+
 at::Tensor & AtenIpexTypeDefault::resize_as_(at::Tensor & self, const at::Tensor & the_template, c10::optional<at::MemoryFormat> memory_format) {
   return AtenIpexTypeDPCPP::resize_as_(self, the_template, memory_format);
 }
@@ -572,6 +596,24 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, at::IntArrayRef), &AtenIpexTypeDefault::roll>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::norm.ScalarOpt_dtype(Tensor self, Scalar? p, *, ScalarType dtype) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::Scalar>, at::ScalarType), &AtenIpexTypeDefault::norm>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::norm.Scalar(Tensor self, Scalar p=2) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::norm>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::norm.ScalarOpt_dim_dtype(Tensor self, Scalar? p, int[1] dim, bool keepdim, *, ScalarType dtype) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::Scalar>, at::IntArrayRef, bool, at::ScalarType), &AtenIpexTypeDefault::norm>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::norm.ScalarOpt_dim(Tensor self, Scalar? p, int[1] dim, bool keepdim=False) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::Scalar>, at::IntArrayRef, bool), &AtenIpexTypeDefault::norm>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::norm.dtype_out(Tensor self, Scalar? p, int[1] dim, bool keepdim, *, ScalarType dtype, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, c10::optional<at::Scalar>, at::IntArrayRef, bool, at::ScalarType), &AtenIpexTypeDefault::norm_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::norm.out(Tensor self, Scalar? p, int[1] dim, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, c10::optional<at::Scalar>, at::IntArrayRef, bool), &AtenIpexTypeDefault::norm_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::resize_as_(Tensor(a!) self, Tensor the_template, *, int? memory_format=None) -> (Tensor(a!))")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, c10::optional<at::MemoryFormat>), &AtenIpexTypeDefault::resize_as_>(at::TensorTypeId::DPCPPTensorId)
