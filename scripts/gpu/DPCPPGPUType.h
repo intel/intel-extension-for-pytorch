@@ -219,34 +219,30 @@ struct TORCH_API SYCLType final {
    static Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options); // aten::tril_indices(int row, int col, int offset=0, *, ScalarType? dtype=long, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
    static Tensor triu_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options); // aten::triu_indices(int row, int col, int offset=0, *, ScalarType? dtype=long, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
   // static Tensor trace(const Tensor & self);
-  // static Tensor & ne_out(Tensor & out, const Tensor & self, Scalar other);
-  // static Tensor ne(const Tensor & self, Scalar other);
-  // static Tensor & ne_out(Tensor & out, const Tensor & self, const Tensor & other);
-  // static Tensor ne(const Tensor & self, const Tensor & other);
+   static Tensor & ne_out(Tensor & out, const Tensor & self, Scalar other); // aten::ne.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
+   static Tensor ne(const Tensor & self, Scalar other); // aten::ne.Scalar(Tensor self, Scalar other) -> Tensor
+   static Tensor & ne_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::ne.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+   static Tensor ne(const Tensor & self, const Tensor & other); // aten::ne.Tensor(Tensor self, Tensor other) -> Tensor
   static Tensor & eq_out(Tensor & out, const Tensor & self, Scalar other); // aten::eq.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor eq(const Tensor & self, Scalar other); // aten::eq.Scalar(Tensor self, Scalar other) -> Tensor
   static Tensor & eq_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::eq.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor eq(const Tensor & self, const Tensor & other); // aten::eq.Tensor(Tensor self, Tensor other) -> Tensor
-  // static Tensor & eq_out(Tensor & out, const Tensor & self, Scalar other);
-  // static Tensor eq(const Tensor & self, Scalar other);
-  // static Tensor & eq_out(Tensor & out, const Tensor & self, const Tensor & other);
-  // static Tensor eq(const Tensor & self, const Tensor & other);
-  // static Tensor & ge_out(Tensor & out, const Tensor & self, Scalar other);
-  // static Tensor ge(const Tensor & self, Scalar other);
-  // static Tensor & ge_out(Tensor & out, const Tensor & self, const Tensor & other);
-  // static Tensor ge(const Tensor & self, const Tensor & other);
-  // static Tensor & le_out(Tensor & out, const Tensor & self, Scalar other);
-  // static Tensor le(const Tensor & self, Scalar other);
-  // static Tensor & le_out(Tensor & out, const Tensor & self, const Tensor & other);
-  // static Tensor le(const Tensor & self, const Tensor & other);
-  // static Tensor & gt_out(Tensor & out, const Tensor & self, Scalar other);
-  // static Tensor gt(const Tensor & self, Scalar other);
-  // static Tensor & gt_out(Tensor & out, const Tensor & self, const Tensor & other);
-  // static Tensor gt(const Tensor & self, const Tensor & other);
-  // static Tensor & lt_out(Tensor & out, const Tensor & self, Scalar other);
-  // static Tensor lt(const Tensor & self, Scalar other);
-  // static Tensor & lt_out(Tensor & out, const Tensor & self, const Tensor & other);
-  // static Tensor lt(const Tensor & self, const Tensor & other);
+   static Tensor & ge_out(Tensor & out, const Tensor & self, Scalar other); // aten::ge.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
+   static Tensor ge(const Tensor & self, Scalar other); // aten::ge.Scalar(Tensor self, Scalar other) -> Tensor
+   static Tensor & ge_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::ge.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+   static Tensor ge(const Tensor & self, const Tensor & other); // aten::ge.Tensor(Tensor self, Tensor other) -> Tensor
+   static Tensor & le_out(Tensor & out, const Tensor & self, Scalar other); // aten::le.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
+   static Tensor le(const Tensor & self, Scalar other); // aten::le.Scalar(Tensor self, Scalar other) -> Tensor
+   static Tensor & le_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::le.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+   static Tensor le(const Tensor & self, const Tensor & other); // aten::le.Tensor(Tensor self, Tensor other) -> Tensor
+   static Tensor & gt_out(Tensor & out, const Tensor & self, Scalar other); // aten::gt.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
+   static Tensor gt(const Tensor & self, Scalar other); // aten::gt.Scalar(Tensor self, Scalar other) -> Tensor
+   static Tensor & gt_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::gt.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+   static Tensor gt(const Tensor & self, const Tensor & other); // aten::gt.Tensor(Tensor self, Tensor other) -> Tensor
+   static Tensor & lt_out(Tensor & out, const Tensor & self, Scalar other); // aten::lt.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
+   static Tensor lt(const Tensor & self, Scalar other); // aten::lt.Scalar(Tensor self, Scalar other) -> Tensor
+   static Tensor & lt_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::lt.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+   static Tensor lt(const Tensor & self, const Tensor & other); // aten::lt.Tensor(Tensor self, Tensor other) -> Tensor
   // static Tensor & take_out(Tensor & out, const Tensor & self, const Tensor & index);
   // static Tensor take(const Tensor & self, const Tensor & index);
   // static Tensor & index_select_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index);

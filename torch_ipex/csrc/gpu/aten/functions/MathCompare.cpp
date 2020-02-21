@@ -99,11 +99,40 @@ void THSYCLTensor_(geTensor)(THSYCLState *state, THSyclBoolTensor *self_, THSYCL
                                    bool>());
 }
 #endif
+template <typename scalar_t>
+void ltTensor(Tensor & self_, const Tensor & src1, const Tensor & src2)
+{
+  logicalTensor<bool, scalar_t>(self_, src1, src2, TensorLTOp<scalar_t, bool>());
+}
+
+template <typename scalar_t>
+void gtTensor(Tensor & self_, const Tensor & src1, const Tensor & src2)
+{
+  logicalTensor<bool, scalar_t>(self_, src1, src2, TensorGTOp<scalar_t, bool>());
+}
+
+template <typename scalar_t>
+void leTensor(Tensor & self_, const Tensor & src1, const Tensor & src2)
+{
+  logicalTensor<bool, scalar_t>(self_, src1, src2, TensorLEOp<scalar_t, bool>());
+}
+
+template <typename scalar_t>
+void geTensor(Tensor & self_, const Tensor & src1, const Tensor & src2)
+{
+  logicalTensor<bool, scalar_t>(self_, src1, src2, TensorGEOp<scalar_t, bool>());
+}
 
 template <typename scalar_t>
 void eqTensor(Tensor & self_, const Tensor & src1, const Tensor & src2)
 {
   logicalTensor<bool, scalar_t>(self_, src1, src2, TensorEQOp<scalar_t, bool>());
+}
+
+template <typename scalar_t>
+void neTensor(Tensor & self_, const Tensor & src1, const Tensor & src2)
+{
+  logicalTensor<bool, scalar_t>(self_, src1, src2, TensorNEOp<scalar_t, bool>());
 }
 
 #if COMPARE_PORTED
@@ -216,6 +245,111 @@ void THSYCLTensor_(neTensorByte)(THSYCLState *state, THSyclByteTensor *self_, TH
 #endif
 } // namespace impl
 
+//lt
+Tensor & lt_out(Tensor & out, const Tensor & self, Scalar other_){
+  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  other.unsafeGetTensorImpl()->set_wrapped_number(true);
+  at::lt_out(out, self, other);
+  return out;
+}
+Tensor lt(const Tensor & self, Scalar other_){
+  auto result = at::empty({0}, self.options().dtype(kBool));
+  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  other.unsafeGetTensorImpl()->set_wrapped_number(true);
+  return at::lt_out(result, self, other);
+}
+Tensor & lt_out(Tensor & out, const Tensor & self, const Tensor & other){
+    AT_DISPATCH_ALL_TYPES(self.scalar_type(), "ltTensor",
+      [&]() {
+        impl::ltTensor<scalar_t>(out, self, other);
+      }
+  );
+
+  return out;
+}
+Tensor lt(const Tensor & self, const Tensor & other){
+  Tensor result = at::empty({0}, self.options().dtype(kBool));
+  return at::lt_out(result, self, other);
+}
+//gt
+Tensor & gt_out(Tensor & out, const Tensor & self, Scalar other_){
+  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  other.unsafeGetTensorImpl()->set_wrapped_number(true);
+  at::gt_out(out, self, other);
+  return out;
+}
+Tensor gt(const Tensor & self, Scalar other_){
+  auto result = at::empty({0}, self.options().dtype(kBool));
+  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  other.unsafeGetTensorImpl()->set_wrapped_number(true);
+  return at::gt_out(result, self, other);
+}
+Tensor & gt_out(Tensor & out, const Tensor & self, const Tensor & other){
+    AT_DISPATCH_ALL_TYPES(self.scalar_type(), "gtTensor",
+      [&]() {
+        impl::gtTensor<scalar_t>(out, self, other);
+      }
+  );
+
+  return out;
+}
+Tensor gt(const Tensor & self, const Tensor & other){
+  Tensor result = at::empty({0}, self.options().dtype(kBool));
+  return at::gt_out(result, self, other);
+}
+//ge
+Tensor & ge_out(Tensor & out, const Tensor & self, Scalar other_){
+  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  other.unsafeGetTensorImpl()->set_wrapped_number(true);
+  at::ge_out(out, self, other);
+  return out;
+}
+Tensor ge(const Tensor & self, Scalar other_){
+  auto result = at::empty({0}, self.options().dtype(kBool));
+  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  other.unsafeGetTensorImpl()->set_wrapped_number(true);
+  return at::ge_out(result, self, other);
+}
+Tensor & ge_out(Tensor & out, const Tensor & self, const Tensor & other){
+    AT_DISPATCH_ALL_TYPES(self.scalar_type(), "geTensor",
+      [&]() {
+        impl::geTensor<scalar_t>(out, self, other);
+      }
+  );
+
+  return out;
+}
+Tensor ge(const Tensor & self, const Tensor & other){
+  Tensor result = at::empty({0}, self.options().dtype(kBool));
+  return at::ge_out(result, self, other);
+}
+//le
+Tensor & le_out(Tensor & out, const Tensor & self, Scalar other_){
+  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  other.unsafeGetTensorImpl()->set_wrapped_number(true);
+  at::le_out(out, self, other);
+  return out;
+}
+Tensor le(const Tensor & self, Scalar other_){
+  auto result = at::empty({0}, self.options().dtype(kBool));
+  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  other.unsafeGetTensorImpl()->set_wrapped_number(true);
+  return at::le_out(result, self, other);
+}
+Tensor & le_out(Tensor & out, const Tensor & self, const Tensor & other){
+    AT_DISPATCH_ALL_TYPES(self.scalar_type(), "leTensor",
+      [&]() {
+        impl::leTensor<scalar_t>(out, self, other);
+      }
+  );
+
+  return out;
+}
+Tensor le(const Tensor & self, const Tensor & other){
+  Tensor result = at::empty({0}, self.options().dtype(kBool));
+  return at::le_out(result, self, other);
+}
+//eq
 Tensor & eq_out(Tensor & out, const Tensor & self, Scalar other_) {
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
@@ -242,6 +376,32 @@ Tensor & eq_out(Tensor & out, const Tensor & self, const Tensor & other) {
 Tensor eq(const Tensor & self, const Tensor & other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
   return at::eq_out(result, self, other);
+}
+//ne
+Tensor & ne_out(Tensor & out, const Tensor & self, Scalar other_){
+  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  other.unsafeGetTensorImpl()->set_wrapped_number(true);
+  at::ne_out(out, self, other);
+  return out;
+}
+Tensor ne(const Tensor & self, Scalar other_){
+  auto result = at::empty({0}, self.options().dtype(kBool));
+  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  other.unsafeGetTensorImpl()->set_wrapped_number(true);
+  return at::ne_out(result, self, other);
+}
+Tensor & ne_out(Tensor & out, const Tensor & self, const Tensor & other){
+    AT_DISPATCH_ALL_TYPES(self.scalar_type(), "neTensor",
+      [&]() {
+        impl::neTensor<scalar_t>(out, self, other);
+      }
+  );
+
+  return out;
+}
+Tensor ne(const Tensor & self, const Tensor & other){
+  Tensor result = at::empty({0}, self.options().dtype(kBool));
+  return at::ne_out(result, self, other);
 }
 
 } // namespace AtenIpexTypeDPCPP
