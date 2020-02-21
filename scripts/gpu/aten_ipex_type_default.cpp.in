@@ -163,6 +163,18 @@ at::Tensor & AtenIpexTypeDefault::relu_(at::Tensor & self) {
   return AtenIpexTypeDPCPP::relu_(self);
 }
 
+at::Tensor AtenIpexTypeDefault::sigmoid(const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::sigmoid(self);
+}
+
+at::Tensor & AtenIpexTypeDefault::sigmoid_(at::Tensor & self) {
+  return AtenIpexTypeDPCPP::sigmoid_(self);
+}
+
+at::Tensor & AtenIpexTypeDefault::sigmoid_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::sigmoid_out(out, self);
+}
+
 at::Tensor AtenIpexTypeDefault::sum(const at::Tensor & self, c10::optional<at::ScalarType> dtype) {
   return AtenIpexTypeDPCPP::sum(self, dtype);
 }
@@ -575,6 +587,15 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::relu_(Tensor(a!) self) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::relu_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::sigmoid(Tensor self) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::sigmoid>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::sigmoid_(Tensor(a!) self) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::sigmoid_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::sigmoid.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::sigmoid_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::sum(Tensor self, *, ScalarType? dtype=None) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::ScalarType>), &AtenIpexTypeDefault::sum>(at::TensorTypeId::DPCPPTensorId)

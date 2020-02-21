@@ -51,3 +51,17 @@ Tensor & _sigmoid_out_sycl(Tensor & output, const Tensor & self) {
 
 }
 }
+namespace at { namespace AtenIpexTypeDPCPP {
+Tensor & sigmoid_out(Tensor & out, const Tensor & self){
+  return at::native::_sigmoid_out_sycl(out, self);
+}
+Tensor sigmoid(const Tensor & self){
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::sigmoid_out(result, self);
+}
+Tensor & sigmoid_(Tensor & self){
+  return at::AtenIpexTypeDPCPP::sigmoid_out(self, self);
+}
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

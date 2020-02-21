@@ -125,9 +125,9 @@ struct TORCH_API SYCLType final {
   static Tensor & relu_(Tensor & self); // aten::relu_(Tensor(a!) self) -> Tensor(a!)
   // static Tensor & rsqrt_(Tensor & self);
   // static Tensor & rsqrt_out(Tensor & out, const Tensor & self);
-  // static Tensor sigmoid(const Tensor & self);
-  // static Tensor & sigmoid_(Tensor & self);
-  // static Tensor & sigmoid_out(Tensor & out, const Tensor & self);
+   static Tensor sigmoid(const Tensor & self); // aten::sigmoid(Tensor self) -> Tensor
+   static Tensor & sigmoid_(Tensor & self); // aten::sigmoid_(Tensor(a!) self) -> Tensor(a!)
+   static Tensor & sigmoid_out(Tensor & out, const Tensor & self); // aten::sigmoid.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
   // static Tensor & sin_(Tensor & self);
   // static Tensor & sin_out(Tensor & out, const Tensor & self);
   // static Tensor & sinh_(Tensor & self);

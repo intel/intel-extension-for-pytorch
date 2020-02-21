@@ -44,6 +44,9 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & neg_(at::Tensor & self);
   at::Tensor & neg_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & relu_(at::Tensor & self);
+  at::Tensor sigmoid(const at::Tensor & self);
+  at::Tensor & sigmoid_(at::Tensor & self);
+  at::Tensor & sigmoid_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor sum(const at::Tensor & self, c10::optional<at::ScalarType> dtype);
   at::Tensor sum(const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   at::Tensor & sum_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
