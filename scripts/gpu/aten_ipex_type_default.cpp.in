@@ -7,6 +7,10 @@
 
 namespace at {
 
+at::Tensor & AtenIpexTypeDefault::abs_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::abs_out(out, self);
+}
+
 at::Tensor AtenIpexTypeDefault::add(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha) {
   return AtenIpexTypeDPCPP::add(self, other, alpha);
 }
@@ -471,6 +475,9 @@ at::Tensor AtenIpexTypeDefault::upsample_nearest2d(const at::Tensor & self, at::
 
 void RegisterAtenTypeFunctions() {
   static auto dispatch = torch::RegisterOperators()
+  .op(torch::RegisterOperators::options().schema("aten::abs.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::abs_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::add.Tensor(Tensor self, Tensor other, *, Scalar alpha=1) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::add>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))

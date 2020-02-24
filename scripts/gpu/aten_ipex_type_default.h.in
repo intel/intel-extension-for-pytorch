@@ -6,6 +6,7 @@ namespace at {
 
 class AtenIpexTypeDefault {
  public:
+  static at::Tensor & abs_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor add(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   static at::Tensor & add_(at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   static at::Tensor & add_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);

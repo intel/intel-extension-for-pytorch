@@ -5,6 +5,7 @@
 namespace at {
 
 namespace AtenIpexTypeDPCPP {
+  at::Tensor & abs_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor add(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   at::Tensor & add_(at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   at::Tensor & add_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);

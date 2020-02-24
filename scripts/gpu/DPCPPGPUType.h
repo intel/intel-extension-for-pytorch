@@ -33,8 +33,7 @@ using ConstQuantizerPtr = const c10::intrusive_ptr<Quantizer>&;
 struct TORCH_API SYCLType final {
   // static std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>> _sycl_rnn(const Tensor & self, const Tensor & hx_, const Tensor & cx_, TensorList params, bool has_biases, int64_t num_layers_, double dropout_p, bool train, bool bidirectional, bool batch_first);
   // static std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>> _sycl_rnn_backward(const Tensor & self, const Tensor & hx_, const Tensor & cx_, const Tensor & output, const Tensor & hy_, const Tensor & cy_, TensorList workspace, const Tensor & grad_output, const Tensor & grad_hy, const Tensor & grad_cy, TensorList params, bool has_biases, int64_t num_layers_, double dropout_p, bool train, bool bidirectional, bool batch_first);
-  // static Tensor & abs_(Tensor & self);
-  // static Tensor & abs_out(Tensor & out, const Tensor & self);
+  static Tensor & abs_out(Tensor & out, const Tensor & self); // aten::abs.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
   // static Tensor & acos_(Tensor & self);
   // static Tensor & acos_out(Tensor & out, const Tensor & self);
   // static Tensor add(const Tensor & self, const Tensor & other, Scalar alpha);
@@ -145,10 +144,10 @@ struct TORCH_API SYCLType final {
   // static Tensor & trunc_out(Tensor & out, const Tensor & self);
   // static Tensor _s_where(const Tensor & condition, const Tensor & self, const Tensor & other);
   // static Tensor clone(const Tensor & self);
-   static Tensor & resize_as_(Tensor & self, const Tensor & the_template, c10::optional<MemoryFormat> memory_format); // aten::resize_as_(Tensor(a!) self, Tensor the_template, *, int? memory_format=None) -> (Tensor(a!))
+  static Tensor & resize_as_(Tensor & self, const Tensor & the_template, c10::optional<MemoryFormat> memory_format); // aten::resize_as_(Tensor(a!) self, Tensor the_template, *, int? memory_format=None) -> (Tensor(a!))
   // static Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent);
   // static Tensor pow(const Tensor & self, Scalar exponent);
-   static Tensor & zero_(Tensor & self); // aten::zero_(Tensor(a!) self) -> Tensor(a!)
+  static Tensor & zero_(Tensor & self); // aten::zero_(Tensor(a!) self) -> Tensor(a!)
   static Scalar _local_scalar_dense(const Tensor & self); // aten::_local_scalar_dense(Tensor self) -> Scalar
   // static Tensor & set_(Tensor & self, Storage source);
   // static Tensor & set_(Tensor & self, Storage source, int64_t storage_offset, IntArrayRef size, IntArrayRef stride);
