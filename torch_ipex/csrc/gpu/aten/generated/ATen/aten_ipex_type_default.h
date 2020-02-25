@@ -7,6 +7,7 @@ namespace at {
 class AtenIpexTypeDefault {
  public:
   static at::Tensor & abs_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & acos_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor add(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   static at::Tensor & add_(at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   static at::Tensor & add_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
@@ -14,12 +15,14 @@ class AtenIpexTypeDefault {
   static at::Tensor & add_(at::Tensor & self, at::Scalar other, at::Scalar alpha);
   static at::Tensor & arange_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
   static at::Tensor as_strided(const at::Tensor & self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset);
+  static at::Tensor & asin_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor bitwise_not(const at::Tensor & self);
   static at::Tensor & bitwise_not_(at::Tensor & self);
   static at::Tensor & bitwise_not_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor logical_not(const at::Tensor & self);
   static at::Tensor & logical_not_(at::Tensor & self);
   static at::Tensor & logical_not_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & ceil_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups);
   static at::Tensor & copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
   static at::Tensor div(const at::Tensor & self, const at::Tensor & other);
@@ -28,10 +31,12 @@ class AtenIpexTypeDefault {
   static at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format);
   static at::Tensor & resize_(at::Tensor & self, at::IntArrayRef size, c10::optional<at::MemoryFormat> memory_format);
   static at::Tensor empty_strided(at::IntArrayRef size, at::IntArrayRef stride, const at::TensorOptions & options);
+  static at::Tensor & expm1_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & eye_out(at::Tensor & out, int64_t n);
   static at::Tensor & eye_out(at::Tensor & out, int64_t n, int64_t m);
   static at::Tensor & fill_(at::Tensor & self, at::Scalar value);
   static at::Tensor & fill_(at::Tensor & self, const at::Tensor & value);
+  static at::Tensor & floor_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & linspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps);
   static at::Tensor & logspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps, double base);
   static at::Tensor _log_softmax(const at::Tensor & self, int64_t dim, bool half_to_float);
@@ -42,9 +47,8 @@ class AtenIpexTypeDefault {
   static at::Tensor & mul_(at::Tensor & self, at::Scalar other);
   static std::tuple<at::Tensor,at::Tensor,at::Tensor> native_batch_norm(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, const at::Tensor & running_mean, const at::Tensor & running_var, bool training, double momentum, double eps);
   static at::Tensor & range_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
-  static at::Tensor neg(const at::Tensor & self);
-  static at::Tensor & neg_(at::Tensor & self);
   static at::Tensor & neg_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & round_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & relu_(at::Tensor & self);
   static at::Tensor sigmoid(const at::Tensor & self);
   static at::Tensor & sigmoid_(at::Tensor & self);
@@ -56,6 +60,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & threshold_(at::Tensor & self, at::Scalar threshold, at::Scalar value);
   static at::Tensor & threshold_out(at::Tensor & out, const at::Tensor & self, at::Scalar threshold, at::Scalar value);
   static at::Tensor roll(const at::Tensor & self, at::IntArrayRef shifts, at::IntArrayRef dims);
+  static at::Tensor & trunc_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::ScalarType dtype);
   static at::Tensor norm(const at::Tensor & self, at::Scalar p);
   static at::Tensor norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::IntArrayRef dim, bool keepdim, at::ScalarType dtype);

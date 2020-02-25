@@ -6,6 +6,7 @@ namespace at {
 
 namespace AtenIpexTypeDPCPP {
   at::Tensor & abs_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & acos_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor add(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   at::Tensor & add_(at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   at::Tensor & add_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
@@ -13,12 +14,14 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & add_(at::Tensor & self, at::Scalar other, at::Scalar alpha);
   at::Tensor & arange_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
   at::Tensor as_strided(const at::Tensor & self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset);
+  at::Tensor & asin_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor bitwise_not(const at::Tensor & self);
   at::Tensor & bitwise_not_(at::Tensor & self);
   at::Tensor & bitwise_not_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor logical_not(const at::Tensor & self);
   at::Tensor & logical_not_(at::Tensor & self);
   at::Tensor & logical_not_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & ceil_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups);
   at::Tensor & copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
   at::Tensor div(const at::Tensor & self, const at::Tensor & other);
@@ -27,10 +30,12 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format);
   at::Tensor & resize_(at::Tensor & self, at::IntArrayRef size, c10::optional<at::MemoryFormat> memory_format);
   at::Tensor empty_strided(at::IntArrayRef size, at::IntArrayRef stride, const at::TensorOptions & options);
+  at::Tensor & expm1_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & eye_out(at::Tensor & out, int64_t n);
   at::Tensor & eye_out(at::Tensor & out, int64_t n, int64_t m);
   at::Tensor & fill_(at::Tensor & self, at::Scalar value);
   at::Tensor & fill_(at::Tensor & self, const at::Tensor & value);
+  at::Tensor & floor_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & linspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps);
   at::Tensor & logspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps, double base);
   at::Tensor _log_softmax(const at::Tensor & self, int64_t dim, bool half_to_float);
@@ -41,9 +46,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & mul_(at::Tensor & self, at::Scalar other);
   std::tuple<at::Tensor,at::Tensor,at::Tensor> native_batch_norm(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, const at::Tensor & running_mean, const at::Tensor & running_var, bool training, double momentum, double eps);
   at::Tensor & range_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
-  at::Tensor neg(const at::Tensor & self);
-  at::Tensor & neg_(at::Tensor & self);
   at::Tensor & neg_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & round_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & relu_(at::Tensor & self);
   at::Tensor sigmoid(const at::Tensor & self);
   at::Tensor & sigmoid_(at::Tensor & self);
@@ -55,6 +59,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & threshold_(at::Tensor & self, at::Scalar threshold, at::Scalar value);
   at::Tensor & threshold_out(at::Tensor & out, const at::Tensor & self, at::Scalar threshold, at::Scalar value);
   at::Tensor roll(const at::Tensor & self, at::IntArrayRef shifts, at::IntArrayRef dims);
+  at::Tensor & trunc_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::ScalarType dtype);
   at::Tensor norm(const at::Tensor & self, at::Scalar p);
   at::Tensor norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::IntArrayRef dim, bool keepdim, at::ScalarType dtype);
