@@ -23,6 +23,12 @@ class AtenIpexTypeDefault {
   static at::Tensor & logical_not_(at::Tensor & self);
   static at::Tensor & logical_not_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & ceil_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & clamp_(at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);
+  static at::Tensor & clamp_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);
+  static at::Tensor & clamp_max_(at::Tensor & self, at::Scalar max);
+  static at::Tensor & clamp_max_out(at::Tensor & out, const at::Tensor & self, at::Scalar max);
+  static at::Tensor & clamp_min_(at::Tensor & self, at::Scalar min);
+  static at::Tensor & clamp_min_out(at::Tensor & out, const at::Tensor & self, at::Scalar min);
   static at::Tensor convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups);
   static at::Tensor & copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
   static at::Tensor div(const at::Tensor & self, const at::Tensor & other);

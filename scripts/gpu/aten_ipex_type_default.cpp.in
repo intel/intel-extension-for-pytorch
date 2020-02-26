@@ -75,6 +75,30 @@ at::Tensor & AtenIpexTypeDefault::ceil_out(at::Tensor & out, const at::Tensor & 
   return AtenIpexTypeDPCPP::ceil_out(out, self);
 }
 
+at::Tensor & AtenIpexTypeDefault::clamp_(at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max) {
+  return AtenIpexTypeDPCPP::clamp_(self, min, max);
+}
+
+at::Tensor & AtenIpexTypeDefault::clamp_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max) {
+  return AtenIpexTypeDPCPP::clamp_out(out, self, min, max);
+}
+
+at::Tensor & AtenIpexTypeDefault::clamp_max_(at::Tensor & self, at::Scalar max) {
+  return AtenIpexTypeDPCPP::clamp_max_(self, max);
+}
+
+at::Tensor & AtenIpexTypeDefault::clamp_max_out(at::Tensor & out, const at::Tensor & self, at::Scalar max) {
+  return AtenIpexTypeDPCPP::clamp_max_out(out, self, max);
+}
+
+at::Tensor & AtenIpexTypeDefault::clamp_min_(at::Tensor & self, at::Scalar min) {
+  return AtenIpexTypeDPCPP::clamp_min_(self, min);
+}
+
+at::Tensor & AtenIpexTypeDefault::clamp_min_out(at::Tensor & out, const at::Tensor & self, at::Scalar min) {
+  return AtenIpexTypeDPCPP::clamp_min_out(out, self, min);
+}
+
 at::Tensor AtenIpexTypeDefault::convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
   return AtenIpexTypeDPCPP::convolution_overrideable(input, weight, bias, stride, padding, dilation, transposed, output_padding, groups);
 }
@@ -545,6 +569,24 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::ceil.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::ceil_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::clamp_(Tensor(a!) self, Scalar? min=None, Scalar? max=None) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, c10::optional<at::Scalar>, c10::optional<at::Scalar>), &AtenIpexTypeDefault::clamp_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::clamp.out(Tensor self, Scalar? min=None, Scalar? max=None, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, c10::optional<at::Scalar>, c10::optional<at::Scalar>), &AtenIpexTypeDefault::clamp_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::clamp_max_(Tensor(a!) self, Scalar max) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::clamp_max_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::clamp_max.out(Tensor self, Scalar max, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::clamp_max_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::clamp_min_(Tensor(a!) self, Scalar min) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::clamp_min_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::clamp_min.out(Tensor self, Scalar min, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::clamp_min_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::convolution_overrideable(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::IntArrayRef, at::IntArrayRef, at::IntArrayRef, bool, at::IntArrayRef, int64_t), &AtenIpexTypeDefault::convolution_overrideable>(at::TensorTypeId::DPCPPTensorId)

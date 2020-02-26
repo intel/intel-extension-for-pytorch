@@ -22,6 +22,12 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & logical_not_(at::Tensor & self);
   at::Tensor & logical_not_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & ceil_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & clamp_(at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);
+  at::Tensor & clamp_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);
+  at::Tensor & clamp_max_(at::Tensor & self, at::Scalar max);
+  at::Tensor & clamp_max_out(at::Tensor & out, const at::Tensor & self, at::Scalar max);
+  at::Tensor & clamp_min_(at::Tensor & self, at::Scalar min);
+  at::Tensor & clamp_min_out(at::Tensor & out, const at::Tensor & self, at::Scalar min);
   at::Tensor convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups);
   at::Tensor & copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
   at::Tensor div(const at::Tensor & self, const at::Tensor & other);

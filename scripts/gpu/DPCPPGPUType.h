@@ -54,12 +54,12 @@ struct TORCH_API SYCLType final {
   // static Tensor & logical_xor_out(Tensor & out, const Tensor & self, const Tensor & other);
   // static Tensor bmm(const Tensor & self, const Tensor & mat2);
   // static Tensor & bmm_out(Tensor & out, const Tensor & self, const Tensor & mat2);
-  // static Tensor & clamp_(Tensor & self, c10::optional<Scalar> min, c10::optional<Scalar> max);
-  // static Tensor & clamp_out(Tensor & out, const Tensor & self, c10::optional<Scalar> min, c10::optional<Scalar> max);
-  // static Tensor & clamp_max_(Tensor & self, Scalar max);
-  // static Tensor & clamp_max_out(Tensor & out, const Tensor & self, Scalar max);
-  // static Tensor & clamp_min_(Tensor & self, Scalar min);
-  // static Tensor & clamp_min_out(Tensor & out, const Tensor & self, Scalar min);
+  static Tensor & clamp_(Tensor & self, c10::optional<Scalar> min, c10::optional<Scalar> max); // aten::clamp_(Tensor(a!) self, Scalar? min=None, Scalar? max=None) -> Tensor(a!)
+  static Tensor & clamp_out(Tensor & out, const Tensor & self, c10::optional<Scalar> min, c10::optional<Scalar> max); // aten::clamp.out(Tensor self, Scalar? min=None, Scalar? max=None, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor & clamp_max_(Tensor & self, Scalar max); // aten::clamp_max_(Tensor(a!) self, Scalar max) -> Tensor(a!)
+  static Tensor & clamp_max_out(Tensor & out, const Tensor & self, Scalar max); // aten::clamp_max.out(Tensor self, Scalar max, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor & clamp_min_(Tensor & self, Scalar min); // aten::clamp_min_(Tensor(a!) self, Scalar min) -> Tensor(a!)
+  static Tensor & clamp_min_out(Tensor & out, const Tensor & self, Scalar min); // aten::clamp_min.out(Tensor self, Scalar min, *, Tensor(a!) out) -> Tensor(a!)
   // static Tensor & cos_(Tensor & self);
   // static Tensor & cos_out(Tensor & out, const Tensor & self);
   // static Tensor & cosh_(Tensor & self);
