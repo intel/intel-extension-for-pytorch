@@ -49,8 +49,6 @@ struct TORCH_API SYCLType final {
   // static Tensor & bernoulli_(Tensor & self, const Tensor & p, Generator * generator); // aten::bernoulli_.Tensor(Tensor(a!) self, Tensor p, *, Generator? generator=None) -> Tensor(a!)
   // static Tensor & bernoulli_(Tensor & self, double p, Generator * generator); // aten::bernoulli_.float(Tensor(a!) self, float p=0.5, *, Generator? generator=None) -> Tensor(a!)
   // static Tensor bincount(const Tensor & self, const Tensor & weights, int64_t minlength);
-  // static Tensor & bitwise_not_out(Tensor & out, const Tensor & self);
-  // static Tensor & logical_not_out(Tensor & out, const Tensor & self);
   // static Tensor & logical_xor_out(Tensor & out, const Tensor & self, const Tensor & other);
   // static Tensor bmm(const Tensor & self, const Tensor & mat2);
   // static Tensor & bmm_out(Tensor & out, const Tensor & self, const Tensor & mat2);
@@ -68,7 +66,6 @@ struct TORCH_API SYCLType final {
   // static std::tuple<Tensor,Tensor,Tensor,Tensor> _embedding_bag(const Tensor & weight, const Tensor & indices, const Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse, const Tensor & per_sample_weights);
   // static Tensor _embedding_bag_dense_backward(const Tensor & grad, const Tensor & indices, const Tensor & offsets, const Tensor & offset2bag, const Tensor & bag_size, const Tensor & maximum_indices, int64_t num_weights, bool scale_grad_by_freq, int64_t mode, const Tensor & per_sample_weights);
   static Tensor empty(IntArrayRef size, const TensorOptions & options, c10::optional<MemoryFormat> memory_format); // aten::empty.memory_format(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
-   //static Tensor & resize_(Tensor & self, IntArrayRef size);
   static Tensor & resize_(Tensor & self, IntArrayRef size, c10::optional<MemoryFormat> memory_format); // aten::resize_(Tensor(a!) self, int[] size, *, MemoryFormat? memory_format=None) -> Tensor(a!)
    static Tensor empty_strided(IntArrayRef size, IntArrayRef stride, const TensorOptions & options);  // aten::empty_strided(int[] size, int[] stride, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
   // static Tensor & erf_(Tensor & self);
