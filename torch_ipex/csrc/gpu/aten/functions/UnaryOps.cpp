@@ -159,6 +159,10 @@ namespace impl {
 DEFINE_IPEX_OUT_ALL_TYPES_OPS(abs_out, Numerics<scalar_t>::abs, Real);
 DEFINE_IPEX_OUT_ALL_TYPES_OPS(neg_out, Numerics<scalar_t>::neg, Real);
 
+DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(cos_out, Numerics<scalar_t>::cos, Real);
+DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(sin_out, Numerics<scalar_t>::sin, Real);
+DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(cosh_out, Numerics<scalar_t>::cosh, Real);
+DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(sinh_out, Numerics<scalar_t>::sinh, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(acos_out, Numerics<scalar_t>::acos, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(asin_out, Numerics<scalar_t>::asin, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(floor_out, Numerics<scalar_t>::floor, Real);

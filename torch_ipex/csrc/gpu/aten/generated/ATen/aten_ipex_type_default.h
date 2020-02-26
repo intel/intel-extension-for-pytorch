@@ -31,6 +31,8 @@ class AtenIpexTypeDefault {
   static at::Tensor & clamp_min_out(at::Tensor & out, const at::Tensor & self, at::Scalar min);
   static at::Tensor convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups);
   static at::Tensor & copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
+  static at::Tensor & cos_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & cosh_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor div(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & div_(at::Tensor & self, const at::Tensor & other);
   static at::Tensor & div_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
@@ -59,6 +61,8 @@ class AtenIpexTypeDefault {
   static at::Tensor sigmoid(const at::Tensor & self);
   static at::Tensor & sigmoid_(at::Tensor & self);
   static at::Tensor & sigmoid_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & sin_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & sinh_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor sum(const at::Tensor & self, c10::optional<at::ScalarType> dtype);
   static at::Tensor sum(const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   static at::Tensor & sum_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);

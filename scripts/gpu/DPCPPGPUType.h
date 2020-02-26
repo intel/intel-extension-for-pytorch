@@ -58,10 +58,6 @@ struct TORCH_API SYCLType final {
   static Tensor & clamp_max_out(Tensor & out, const Tensor & self, Scalar max); // aten::clamp_max.out(Tensor self, Scalar max, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor & clamp_min_(Tensor & self, Scalar min); // aten::clamp_min_(Tensor(a!) self, Scalar min) -> Tensor(a!)
   static Tensor & clamp_min_out(Tensor & out, const Tensor & self, Scalar min); // aten::clamp_min.out(Tensor self, Scalar min, *, Tensor(a!) out) -> Tensor(a!)
-  // static Tensor & cos_(Tensor & self);
-  // static Tensor & cos_out(Tensor & out, const Tensor & self);
-  // static Tensor & cosh_(Tensor & self);
-  // static Tensor & cosh_out(Tensor & out, const Tensor & self);
   // static Tensor embedding_dense_backward(const Tensor & grad_output, const Tensor & indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq);
   // static std::tuple<Tensor,Tensor,Tensor,Tensor> _embedding_bag(const Tensor & weight, const Tensor & indices, const Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse, const Tensor & per_sample_weights);
   // static Tensor _embedding_bag_dense_backward(const Tensor & grad, const Tensor & indices, const Tensor & offsets, const Tensor & offset2bag, const Tensor & bag_size, const Tensor & maximum_indices, int64_t num_weights, bool scale_grad_by_freq, int64_t mode, const Tensor & per_sample_weights);
@@ -110,10 +106,6 @@ struct TORCH_API SYCLType final {
    static Tensor sigmoid(const Tensor & self); // aten::sigmoid(Tensor self) -> Tensor
    static Tensor & sigmoid_(Tensor & self); // aten::sigmoid_(Tensor(a!) self) -> Tensor(a!)
    static Tensor & sigmoid_out(Tensor & out, const Tensor & self); // aten::sigmoid.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-  // static Tensor & sin_(Tensor & self);
-  // static Tensor & sin_out(Tensor & out, const Tensor & self);
-  // static Tensor & sinh_(Tensor & self);
-  // static Tensor & sinh_out(Tensor & out, const Tensor & self);
   // static Tensor _softmax(const Tensor & self, int64_t dim, bool half_to_float);
   // static Tensor _softmax_backward_data(const Tensor & grad_output, const Tensor & output, int64_t dim, const Tensor & self);
   // static Tensor & sqrt_(Tensor & self);

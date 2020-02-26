@@ -30,6 +30,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & clamp_min_out(at::Tensor & out, const at::Tensor & self, at::Scalar min);
   at::Tensor convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups);
   at::Tensor & copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
+  at::Tensor & cos_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & cosh_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor div(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & div_(at::Tensor & self, const at::Tensor & other);
   at::Tensor & div_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
@@ -58,6 +60,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor sigmoid(const at::Tensor & self);
   at::Tensor & sigmoid_(at::Tensor & self);
   at::Tensor & sigmoid_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & sin_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & sinh_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor sum(const at::Tensor & self, c10::optional<at::ScalarType> dtype);
   at::Tensor sum(const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   at::Tensor & sum_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);

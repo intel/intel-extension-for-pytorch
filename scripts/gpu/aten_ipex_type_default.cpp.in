@@ -107,6 +107,14 @@ at::Tensor & AtenIpexTypeDefault::copy_(at::Tensor & self, const at::Tensor & sr
   return AtenIpexTypeDPCPP::copy_(self, src, non_blocking);
 }
 
+at::Tensor & AtenIpexTypeDefault::cos_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::cos_out(out, self);
+}
+
+at::Tensor & AtenIpexTypeDefault::cosh_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::cosh_out(out, self);
+}
+
 at::Tensor AtenIpexTypeDefault::div(const at::Tensor & self, const at::Tensor & other) {
   return AtenIpexTypeDPCPP::div(self, other);
 }
@@ -217,6 +225,14 @@ at::Tensor & AtenIpexTypeDefault::sigmoid_(at::Tensor & self) {
 
 at::Tensor & AtenIpexTypeDefault::sigmoid_out(at::Tensor & out, const at::Tensor & self) {
   return AtenIpexTypeDPCPP::sigmoid_out(out, self);
+}
+
+at::Tensor & AtenIpexTypeDefault::sin_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::sin_out(out, self);
+}
+
+at::Tensor & AtenIpexTypeDefault::sinh_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::sinh_out(out, self);
 }
 
 at::Tensor AtenIpexTypeDefault::sum(const at::Tensor & self, c10::optional<at::ScalarType> dtype) {
@@ -594,6 +610,12 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, bool), &AtenIpexTypeDefault::copy_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::cos.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::cos_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::cosh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::cosh_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::div.Tensor(Tensor self, Tensor other) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::div>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -677,6 +699,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::sigmoid.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::sigmoid_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::sin.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::sin_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::sinh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::sinh_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::sum(Tensor self, *, ScalarType? dtype=None) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::ScalarType>), &AtenIpexTypeDefault::sum>(at::TensorTypeId::DPCPPTensorId)
