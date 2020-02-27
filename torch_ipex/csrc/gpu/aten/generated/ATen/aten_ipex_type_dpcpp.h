@@ -40,6 +40,12 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format);
   at::Tensor & resize_(at::Tensor & self, at::IntArrayRef size, c10::optional<at::MemoryFormat> memory_format);
   at::Tensor empty_strided(at::IntArrayRef size, at::IntArrayRef stride, const at::TensorOptions & options);
+  at::Tensor & erf_(at::Tensor & self);
+  at::Tensor & erf_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & erfc_(at::Tensor & self);
+  at::Tensor & erfc_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & exp_(at::Tensor & self);
+  at::Tensor & exp_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & expm1_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & eye_out(at::Tensor & out, int64_t n);
   at::Tensor & eye_out(at::Tensor & out, int64_t n, int64_t m);

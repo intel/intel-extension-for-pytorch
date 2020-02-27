@@ -41,6 +41,12 @@ class AtenIpexTypeDefault {
   static at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format);
   static at::Tensor & resize_(at::Tensor & self, at::IntArrayRef size, c10::optional<at::MemoryFormat> memory_format);
   static at::Tensor empty_strided(at::IntArrayRef size, at::IntArrayRef stride, const at::TensorOptions & options);
+  static at::Tensor & erf_(at::Tensor & self);
+  static at::Tensor & erf_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & erfc_(at::Tensor & self);
+  static at::Tensor & erfc_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & exp_(at::Tensor & self);
+  static at::Tensor & exp_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & expm1_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & eye_out(at::Tensor & out, int64_t n);
   static at::Tensor & eye_out(at::Tensor & out, int64_t n, int64_t m);

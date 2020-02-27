@@ -61,3 +61,12 @@ print("trunc dpcpp", torch.trunc(y_dpcpp_float).cpu())
 
 print("clamp cpu", torch.clamp(y_cpu_float, min=-0.1, max=0.5))
 print("clamp dpcpp ", torch.clamp(y_dpcpp_float, min=-0.1, max=0.5).cpu())
+
+print("erf cpu", torch.erf(y_cpu_float))
+print("erf dpcpp", torch.erf(y_dpcpp_float).cpu())
+
+print("erfc cpu", torch.erfc(y_cpu_float))
+print("erfc dpcpp", torch.erfc(y_dpcpp_float).cpu())
+
+print("exp cpu", torch.exp(y_cpu_float))
+print("exp dpcpp", torch.exp(y_dpcpp_float).cpu())
