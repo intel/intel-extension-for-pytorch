@@ -47,6 +47,14 @@ at::Tensor & AtenIpexTypeDefault::asin_out(at::Tensor & out, const at::Tensor & 
   return AtenIpexTypeDPCPP::asin_out(out, self);
 }
 
+at::Tensor & AtenIpexTypeDefault::atan_(at::Tensor & self) {
+  return AtenIpexTypeDPCPP::atan_(self);
+}
+
+at::Tensor & AtenIpexTypeDefault::atan_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::atan_out(out, self);
+}
+
 at::Tensor AtenIpexTypeDefault::bitwise_not(const at::Tensor & self) {
   return AtenIpexTypeDPCPP::bitwise_not(self);
 }
@@ -245,6 +253,22 @@ at::Tensor AtenIpexTypeDefault::sum(const at::Tensor & self, at::IntArrayRef dim
 
 at::Tensor & AtenIpexTypeDefault::sum_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype) {
   return AtenIpexTypeDPCPP::sum_out(out, self, dim, keepdim, dtype);
+}
+
+at::Tensor & AtenIpexTypeDefault::tan_(at::Tensor & self) {
+  return AtenIpexTypeDPCPP::tan_(self);
+}
+
+at::Tensor & AtenIpexTypeDefault::tan_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::tan_out(out, self);
+}
+
+at::Tensor & AtenIpexTypeDefault::tanh_(at::Tensor & self) {
+  return AtenIpexTypeDPCPP::tanh_(self);
+}
+
+at::Tensor & AtenIpexTypeDefault::tanh_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::tanh_out(out, self);
 }
 
 at::Tensor AtenIpexTypeDefault::threshold(const at::Tensor & self, at::Scalar threshold, at::Scalar value) {
@@ -565,6 +589,12 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::asin.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::asin_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::atan_(Tensor(a!) self) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::atan_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::atan.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::atan_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::bitwise_not(Tensor self) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::bitwise_not>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -714,6 +744,18 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::sum.IntList_out(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, bool, c10::optional<at::ScalarType>), &AtenIpexTypeDefault::sum_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::tan_(Tensor(a!) self) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::tan_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::tan.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::tan_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::tanh_(Tensor(a!) self) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::tanh_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::tanh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::tanh_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::threshold(Tensor self, Scalar threshold, Scalar value) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::threshold>(at::TensorTypeId::DPCPPTensorId)

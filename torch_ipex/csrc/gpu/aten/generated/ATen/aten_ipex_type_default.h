@@ -16,6 +16,8 @@ class AtenIpexTypeDefault {
   static at::Tensor & arange_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
   static at::Tensor as_strided(const at::Tensor & self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset);
   static at::Tensor & asin_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & atan_(at::Tensor & self);
+  static at::Tensor & atan_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor bitwise_not(const at::Tensor & self);
   static at::Tensor & bitwise_not_(at::Tensor & self);
   static at::Tensor & bitwise_not_out(at::Tensor & out, const at::Tensor & self);
@@ -66,6 +68,10 @@ class AtenIpexTypeDefault {
   static at::Tensor sum(const at::Tensor & self, c10::optional<at::ScalarType> dtype);
   static at::Tensor sum(const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   static at::Tensor & sum_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
+  static at::Tensor & tan_(at::Tensor & self);
+  static at::Tensor & tan_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & tanh_(at::Tensor & self);
+  static at::Tensor & tanh_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor threshold(const at::Tensor & self, at::Scalar threshold, at::Scalar value);
   static at::Tensor & threshold_(at::Tensor & self, at::Scalar threshold, at::Scalar value);
   static at::Tensor & threshold_out(at::Tensor & out, const at::Tensor & self, at::Scalar threshold, at::Scalar value);

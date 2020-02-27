@@ -15,6 +15,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & arange_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
   at::Tensor as_strided(const at::Tensor & self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset);
   at::Tensor & asin_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & atan_(at::Tensor & self);
+  at::Tensor & atan_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor bitwise_not(const at::Tensor & self);
   at::Tensor & bitwise_not_(at::Tensor & self);
   at::Tensor & bitwise_not_out(at::Tensor & out, const at::Tensor & self);
@@ -65,6 +67,10 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor sum(const at::Tensor & self, c10::optional<at::ScalarType> dtype);
   at::Tensor sum(const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   at::Tensor & sum_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
+  at::Tensor & tan_(at::Tensor & self);
+  at::Tensor & tan_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & tanh_(at::Tensor & self);
+  at::Tensor & tanh_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor threshold(const at::Tensor & self, at::Scalar threshold, at::Scalar value);
   at::Tensor & threshold_(at::Tensor & self, at::Scalar threshold, at::Scalar value);
   at::Tensor & threshold_out(at::Tensor & out, const at::Tensor & self, at::Scalar threshold, at::Scalar value);

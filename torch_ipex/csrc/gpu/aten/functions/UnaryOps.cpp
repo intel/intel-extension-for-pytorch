@@ -41,6 +41,14 @@ namespace impl {
   }
 
 
+#define DEFINE_IPEX_OUT_INPLACE_FLOAT_TYPES_OPS(op, func, real)               \
+  DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(op##_out, func, real)                       \
+                                                                              \
+  Tensor & op##_(Tensor & self) {                                             \
+    return at::op##_out(self, self);                                          \
+  }
+
+
 #define DEFINE_IPEX_ALL_TYPES_CALLABLE_1_OPS(op, callable)                    \
   namespace impl {                                                            \
     IMPLEMENT_POINTWISE_CALLABLE_1(op, callable)                              \
@@ -161,10 +169,13 @@ DEFINE_IPEX_OUT_ALL_TYPES_OPS(neg_out, Numerics<scalar_t>::neg, Real);
 
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(cos_out, Numerics<scalar_t>::cos, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(sin_out, Numerics<scalar_t>::sin, Real);
+DEFINE_IPEX_OUT_INPLACE_FLOAT_TYPES_OPS(tan, Numerics<scalar_t>::tan, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(cosh_out, Numerics<scalar_t>::cosh, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(sinh_out, Numerics<scalar_t>::sinh, Real);
+DEFINE_IPEX_OUT_INPLACE_FLOAT_TYPES_OPS(tanh, Numerics<scalar_t>::tanh, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(acos_out, Numerics<scalar_t>::acos, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(asin_out, Numerics<scalar_t>::asin, Real);
+DEFINE_IPEX_OUT_INPLACE_FLOAT_TYPES_OPS(atan, Numerics<scalar_t>::atan, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(floor_out, Numerics<scalar_t>::floor, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(expm1_out, Numerics<scalar_t>::expm1, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);

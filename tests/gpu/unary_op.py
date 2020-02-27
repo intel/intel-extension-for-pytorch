@@ -26,17 +26,26 @@ print("cos dpcpp", torch.cos(y_dpcpp_float).cpu())
 print("sin cpu", torch.sin(y_cpu_float))
 print("sin dpcpp", torch.sin(y_dpcpp_float).cpu())
 
+print("tan cpu", torch.tan(y_cpu_float))
+print("tan dpcpp", torch.tan(y_dpcpp_float).cpu())
+
 print("cosh cpu", torch.cosh(y_cpu_float))
 print("cosh dpcpp", torch.cosh(y_dpcpp_float).cpu())
 
 print("sinh cpu", torch.sinh(y_cpu_float))
 print("sinh dpcpp", torch.sinh(y_dpcpp_float).cpu())
 
+print("tanh cpu", torch.tanh(y_cpu_float))
+print("tanh dpcpp", torch.tanh(y_dpcpp_float).cpu())
+
 print("acos cpu", torch.acos(y_cpu_float))
 print("acos dpcpp", torch.acos(y_dpcpp_float).cpu())
 
 print("asin cpu", torch.asin(y_cpu_float))
 print("asin dpcpp", torch.asin(y_dpcpp_float).cpu())
+
+print("atan cpu", torch.atan(y_cpu_float))
+print("atan dpcpp", torch.atan(y_dpcpp_float).cpu())
 
 print("ceil cpu", torch.ceil(y_cpu_float))
 print("ceil dpcpp", torch.ceil(y_dpcpp_float).cpu())

@@ -41,8 +41,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & addmv_out(Tensor & out, const Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha);
    static Tensor & arange_out(Tensor & out, Scalar start, Scalar end, Scalar step);  // aten::arange.start_out(Scalar start, Scalar end, Scalar step=1, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor as_strided(const Tensor & self, IntArrayRef size, IntArrayRef stride, c10::optional<int64_t> storage_offset); // aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> Tensor(a)
-  // static Tensor & atan_(Tensor & self);
-  // static Tensor & atan_out(Tensor & out, const Tensor & self);
+  static Tensor & atan_(Tensor & self); // aten::atan_(Tensor(a!) self) -> Tensor(a!)
   // static Tensor baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
   // static Tensor & baddbmm_(Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
   // static Tensor & baddbmm_out(Tensor & out, const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
@@ -103,18 +102,16 @@ struct TORCH_API SYCLType final {
   static Tensor & relu_(Tensor & self); // aten::relu_(Tensor(a!) self) -> Tensor(a!)
   // static Tensor & rsqrt_(Tensor & self);
   // static Tensor & rsqrt_out(Tensor & out, const Tensor & self);
-   static Tensor sigmoid(const Tensor & self); // aten::sigmoid(Tensor self) -> Tensor
-   static Tensor & sigmoid_(Tensor & self); // aten::sigmoid_(Tensor(a!) self) -> Tensor(a!)
-   static Tensor & sigmoid_out(Tensor & out, const Tensor & self); // aten::sigmoid.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor sigmoid(const Tensor & self); // aten::sigmoid(Tensor self) -> Tensor
+  static Tensor & sigmoid_(Tensor & self); // aten::sigmoid_(Tensor(a!) self) -> Tensor(a!)
+  static Tensor & sigmoid_out(Tensor & out, const Tensor & self); // aten::sigmoid.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
   // static Tensor _softmax(const Tensor & self, int64_t dim, bool half_to_float);
   // static Tensor _softmax_backward_data(const Tensor & grad_output, const Tensor & output, int64_t dim, const Tensor & self);
   // static Tensor & sqrt_(Tensor & self);
   // static Tensor & sqrt_out(Tensor & out, const Tensor & self);
-  // static Tensor & tan_(Tensor & self);
-  // static Tensor & tan_out(Tensor & out, const Tensor & self);
-  // static Tensor & tanh_(Tensor & self);
-  // static Tensor & tanh_out(Tensor & out, const Tensor & self);
-   static Tensor roll(const Tensor & self, IntArrayRef shifts, IntArrayRef dims); // aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> Tensor
+  static Tensor & tan_(Tensor & self); // aten::tan_(Tensor(a!) self) -> Tensor(a!)
+  static Tensor & tanh_(Tensor & self); // aten::tanh_(Tensor(a!) self) -> Tensor(a!)
+  static Tensor roll(const Tensor & self, IntArrayRef shifts, IntArrayRef dims); // aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> Tensor
   // static Tensor _s_where(const Tensor & condition, const Tensor & self, const Tensor & other);
   // static Tensor clone(const Tensor & self);
   static Tensor & resize_as_(Tensor & self, const Tensor & the_template, c10::optional<MemoryFormat> memory_format); // aten::resize_as_(Tensor(a!) self, Tensor the_template, *, int? memory_format=None) -> (Tensor(a!))
