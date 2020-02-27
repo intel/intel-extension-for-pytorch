@@ -103,6 +103,8 @@ include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
+include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
+include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
 
 # sources
 set(DPCPP_SRCS)
