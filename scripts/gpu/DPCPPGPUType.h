@@ -134,18 +134,6 @@ struct TORCH_API SYCLType final {
   // static Tensor & scatter_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & src);
   // static Tensor & scatter_(Tensor & self, int64_t dim, const Tensor & index, Scalar value);
   // static Tensor & scatter_add_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & src);
-  // static Tensor & lt_(Tensor & self, Scalar other); // aten::lt_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-  // static Tensor & lt_(Tensor & self, const Tensor & other); // aten::lt_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-  // static Tensor & gt_(Tensor & self, Scalar other); // aten::gt_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-  // static Tensor & gt_(Tensor & self, const Tensor & other); // aten::gt_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-  // static Tensor & le_(Tensor & self, Scalar other); // aten::le_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-  // static Tensor & le_(Tensor & self, const Tensor & other); // aten::le_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-  // static Tensor & ge_(Tensor & self, Scalar other); // aten::ge_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-  // static Tensor & ge_(Tensor & self, const Tensor & other); // aten::ge_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-  // static Tensor & eq_(Tensor & self, Scalar other); // aten::eq_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-  // static Tensor & eq_(Tensor & self, const Tensor & other); // aten::eq_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-  // static Tensor & ne_(Tensor & self, Scalar other); // aten::ne_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-  // static Tensor & ne_(Tensor & self, const Tensor & other); // aten::ne_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
   // static Tensor __and__(const Tensor & self, Scalar other);
   // static Tensor __and__(const Tensor & self, const Tensor & other);
   // static Tensor & __iand__(Tensor & self, Scalar other);
