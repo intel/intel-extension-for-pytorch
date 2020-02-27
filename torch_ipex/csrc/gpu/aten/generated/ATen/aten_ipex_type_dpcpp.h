@@ -53,6 +53,10 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & fill_(at::Tensor & self, const at::Tensor & value);
   at::Tensor & floor_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & linspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps);
+  at::Tensor & log_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & log10_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & log1p_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & log2_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & logspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps, double base);
   at::Tensor _log_softmax(const at::Tensor & self, int64_t dim, bool half_to_float);
   at::Tensor mul(const at::Tensor & self, const at::Tensor & other);

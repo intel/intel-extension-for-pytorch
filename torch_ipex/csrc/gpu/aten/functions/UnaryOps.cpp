@@ -178,6 +178,10 @@ DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(expm1_out, Numerics<scalar_t>::expm1, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(trunc_out, Numerics<scalar_t>::trunc, Real);
 DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(round_out, Numerics<scalar_t>::round, Real);
+DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(log_out, Numerics<scalar_t>::log, Real);
+DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(log10_out, Numerics<scalar_t>::log10, Real);
+DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(log1p_out, Numerics<scalar_t>::log1p, Real);
+DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(log2_out, Numerics<scalar_t>::log2, Real);
 
 DEFINE_IPEX_OUT_INPLACE_FLOAT_TYPES_OPS(tan, Numerics<scalar_t>::tan, Real);
 DEFINE_IPEX_OUT_INPLACE_FLOAT_TYPES_OPS(tanh, Numerics<scalar_t>::tanh, Real);
