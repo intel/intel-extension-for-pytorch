@@ -104,8 +104,6 @@ struct TORCH_API SYCLType final {
   // static Tensor _s_where(const Tensor & condition, const Tensor & self, const Tensor & other);
   // static Tensor clone(const Tensor & self);
   static Tensor & resize_as_(Tensor & self, const Tensor & the_template, c10::optional<MemoryFormat> memory_format); // aten::resize_as_(Tensor(a!) self, Tensor the_template, *, int? memory_format=None) -> (Tensor(a!))
-  // static Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent);
-  // static Tensor pow(const Tensor & self, Scalar exponent);
   static Tensor & zero_(Tensor & self); // aten::zero_(Tensor(a!) self) -> Tensor(a!)
   static Scalar _local_scalar_dense(const Tensor & self); // aten::_local_scalar_dense(Tensor self) -> Scalar
   // static Tensor & set_(Tensor & self, Storage source);
@@ -147,8 +145,6 @@ struct TORCH_API SYCLType final {
    static Tensor & triu_(Tensor & self, int64_t diagonal); // aten::triu_(Tensor(a!) self, int diagonal=0) -> Tensor(a!)
   // static Tensor & digamma_(Tensor & self);
   // static Tensor & erfinv_(Tensor & self);
-  // static Tensor & pow_(Tensor & self, Scalar exponent);
-  // static Tensor & pow_(Tensor & self, const Tensor & exponent);
   // static Tensor & sign_(Tensor & self);
   // static Tensor & fmod_(Tensor & self, Scalar other);
   // static Tensor & fmod_(Tensor & self, const Tensor & other);
@@ -219,10 +215,14 @@ struct TORCH_API SYCLType final {
   static std::tuple<Tensor,Tensor> topk(const Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted); // aten::topk(Tensor self, int k, int dim=-1, bool largest=True, bool sorted=True) -> (Tensor values, Tensor indices)
   // static Tensor unfold(const Tensor & self, int64_t dimension, int64_t size, int64_t step);
   // static bool equal(const Tensor & self, const Tensor & other);
-  // static Tensor & pow_out(Tensor & out, const Tensor & self, const Tensor & exponent);
-  // static Tensor pow(const Tensor & self, const Tensor & exponent);
-  // static Tensor & pow_out(Tensor & out, Scalar self, const Tensor & exponent);
-  // static Tensor pow(Scalar self, const Tensor & exponent);
+  static Tensor pow(const Tensor & self, Scalar exponent); // aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> Tensor
+  static Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent); // aten::pow.Tensor_Scalar_out(Tensor self, Scalar exponent, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor pow(const Tensor & self, const Tensor & exponent); // aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -> Tensor
+  static Tensor & pow_out(Tensor & out, const Tensor & self, const Tensor & exponent); // aten::pow.Tensor_Tensor_out(Tensor self, Tensor exponent, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor pow(Scalar self, const Tensor & exponent); // aten::pow.Scalar(Scalar self, Tensor exponent) -> Tensor
+  static Tensor & pow_out(Tensor & out, Scalar self, const Tensor & exponent); // aten::pow.Scalar_out(Scalar self, Tensor exponent, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor & pow_(Tensor & self, Scalar exponent); // aten::pow_.Scalar(Tensor(a!) self, Scalar exponent) -> Tensor(a!)
+  static Tensor & pow_(Tensor & self, const Tensor & exponent); // aten::pow_.Tensor(Tensor(a!) self, Tensor exponent) -> Tensor(a!)
   // static Tensor _addr(const Tensor & self, const Tensor & vec1, const Tensor & vec2, Scalar beta, Scalar alpha);
   // static Tensor & _addr_(Tensor & self, const Tensor & vec1, const Tensor & vec2, Scalar beta, Scalar alpha);
   // static Tensor & _addr_out(Tensor & out, const Tensor & self, const Tensor & vec1, const Tensor & vec2, Scalar beta, Scalar alpha);

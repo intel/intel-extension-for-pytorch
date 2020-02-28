@@ -93,6 +93,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & norm_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> p, at::IntArrayRef dim, bool keepdim, at::ScalarType dtype);
   at::Tensor & norm_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> p, at::IntArrayRef dim, bool keepdim);
   at::Tensor & resize_as_(at::Tensor & self, const at::Tensor & the_template, c10::optional<at::MemoryFormat> memory_format);
+  at::Tensor & pow_out(at::Tensor & out, const at::Tensor & self, at::Scalar exponent);
+  at::Tensor pow(const at::Tensor & self, at::Scalar exponent);
   at::Tensor & zero_(at::Tensor & self);
   at::Tensor & sub_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   at::Tensor sub(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
@@ -106,6 +108,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor view(const at::Tensor & self, at::IntArrayRef size);
   at::Tensor & tril_(at::Tensor & self, int64_t diagonal);
   at::Tensor & triu_(at::Tensor & self, int64_t diagonal);
+  at::Tensor & pow_(at::Tensor & self, at::Scalar exponent);
+  at::Tensor & pow_(at::Tensor & self, const at::Tensor & exponent);
   at::Tensor & addcdiv_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   at::Tensor & triu_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
   at::Tensor & tril_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
@@ -142,6 +146,10 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor addcdiv(const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   std::tuple<at::Tensor &,at::Tensor &> topk_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
   std::tuple<at::Tensor,at::Tensor> topk(const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
+  at::Tensor & pow_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & exponent);
+  at::Tensor pow(const at::Tensor & self, const at::Tensor & exponent);
+  at::Tensor & pow_out(at::Tensor & out, at::Scalar self, const at::Tensor & exponent);
+  at::Tensor pow(at::Scalar self, const at::Tensor & exponent);
   std::tuple<at::Tensor &,at::Tensor &> nll_loss_forward_out(at::Tensor & output, at::Tensor & total_weight, const at::Tensor & self, const at::Tensor & target, const at::Tensor & weight, int64_t reduction, int64_t ignore_index);
   std::tuple<at::Tensor,at::Tensor> nll_loss_forward(const at::Tensor & self, const at::Tensor & target, const at::Tensor & weight, int64_t reduction, int64_t ignore_index);
   at::Tensor & nll_loss_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & target, const at::Tensor & weight, int64_t reduction, int64_t ignore_index, const at::Tensor & total_weight);
