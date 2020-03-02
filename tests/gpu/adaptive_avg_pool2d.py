@@ -18,20 +18,21 @@ avg_pool = nn.AdaptiveAvgPool2d((2,2))
 
 
 
-x_cpu.requires_grad = True
+x_cpu.requires_grad_(True)
 
 #y_cpu = conv1(x_cpu)
 y_cpu = avg_pool(x_cpu)
 print("y_cpu", y_cpu)
 #conv1.zero_grad()
-#output_cpu = y_cpu.backward(grad_cpu)
-#print("x_cpu.grad", x_cpu.grad)
+output_cpu = y_cpu.backward(grad_cpu)
+print("x_cpu.grad", x_cpu.grad)
 
-x_sycl.requires_grad = True
+x_sycl.requires_grad_(True)
+avg_pool.to("dpcpp")
 #conv1 = conv1.sycl()
 #y_sycl = conv1(x_sycl)
 y_sycl = avg_pool(x_sycl)
 print("y_sycl", y_sycl.cpu())
 #conv1.zero_grad()
-#output_sycl = y_sycl.backward(grad_sycl)
-#print("x_sycl.grad", x_sycl.grad.cpu())
+output_sycl = y_sycl.backward(grad_sycl)
+print("x_sycl.grad", x_sycl.grad.cpu())

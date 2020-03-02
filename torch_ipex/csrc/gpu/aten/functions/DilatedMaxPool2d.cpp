@@ -44,11 +44,11 @@ static void max_pool2d_with_indices_out_frame(
   }
   auto format_nchw = memory::format_tag::nchw;
 
-  memory::dims input_tz = {nbatch, nInputPlane, inputWidth, inputHeight};
-  memory::dims output_tz = {nbatch, nInputPlane, outputWidth, outputHeight};
-  memory::dims kernel = {kW, kH};
-  memory::dims stride = {dW, dH};
-  memory::dims padding = {padW, padH};
+  memory::dims input_tz = {nbatch, nInputPlane, inputHeight, inputWidth};
+  memory::dims output_tz = {nbatch, nInputPlane, outputHeight, outputWidth};
+  memory::dims kernel = {kH, kW};
+  memory::dims stride = {dH, dW};
+  memory::dims padding = {padH, padW};
 
   // Currently, MKLDNN GPU doens't support format_any in pooling
   auto input_md = memory::desc({input_tz}, data_t, format_nchw);
@@ -156,11 +156,11 @@ static void max_pool2d_with_indices_backward_out_frame(
   auto data_t = memory::data_type::f32;
   auto format_nchw = memory::format_tag::nchw;
 
-  memory::dims input_tz = {nbatch, nInputPlane, inputWidth, inputHeight};
-  memory::dims output_tz = {nbatch, nInputPlane, outputWidth, outputHeight};
-  memory::dims kernel = {kW, kH};
-  memory::dims stride = {dW, dH};
-  memory::dims padding = {padW, padH};
+  memory::dims input_tz = {nbatch, nInputPlane, inputHeight, inputWidth};
+  memory::dims output_tz = {nbatch, nInputPlane, outputHeight, outputWidth};
+  memory::dims kernel = {kH, kW};
+  memory::dims stride = {dH, dW};
+  memory::dims padding = {padH, padW};
 
   // Currently, MKLDNN GPU doens't support format_any in pooling
   auto input_md = memory::desc({input_tz}, data_t, format_nchw);
@@ -540,6 +540,33 @@ std::tuple<Tensor, Tensor> max_pool2d_with_indices(
   return at::native::max_pool2d_with_indices_sycl(
       input, kernel_size, stride, padding, dilation, ceil_mode);
 }
+
+Tensor & max_pool2d_with_indices_backward_out(
+  Tensor & grad_input,
+  const Tensor & grad_output,
+  const Tensor & self,
+  IntArrayRef kernel_size,
+  IntArrayRef stride,
+  IntArrayRef padding,
+  IntArrayRef dilation,
+  bool ceil_mode,
+  const Tensor & indices) {
+  return at::native::max_pool2d_with_indices_backward_out_sycl(
+      grad_input, grad_output, self, kernel_size, stride, padding, dilation, ceil_mode, indices);
+  }
+
+Tensor max_pool2d_with_indices_backward(
+  const Tensor & grad_output,
+  const Tensor & self,
+  IntArrayRef kernel_size,
+  IntArrayRef stride,
+  IntArrayRef padding,
+  IntArrayRef dilation,
+  bool ceil_mode,
+  const Tensor & indices){
+  return at::native::max_pool2d_with_indices_backward_sycl(
+      grad_output, self, kernel_size, stride, padding, dilation, ceil_mode, indices);
+  }
 
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
