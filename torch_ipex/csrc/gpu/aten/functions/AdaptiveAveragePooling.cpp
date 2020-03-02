@@ -41,11 +41,11 @@ static void adaptive_avg_pool2d_out_sycl_frame(
   }
   auto format_nchw = memory::format_tag::nchw;
 
-  memory::dims input_tz = {nbatch, nInputPlane, inputWidth, inputHeight};
-  memory::dims output_tz = {nbatch, nInputPlane, outputWidth, outputHeight};
-  memory::dims kernel = {kW, kH};
-  memory::dims stride = {dW, dH};
-  memory::dims padding = {padW, padH};
+  memory::dims input_tz = {nbatch, nInputPlane, inputHeight, inputWidth};
+  memory::dims output_tz = {nbatch, nInputPlane, outputHeight, outputWidth};
+  memory::dims kernel = {kH, kW};
+  memory::dims stride = {dH, dW};
+  memory::dims padding = {padH, padW};
 
 
   // Currently, MKLDNN GPU doens't support format_any in pooling
@@ -126,11 +126,11 @@ static void adaptive_avg_pool2d_backward_out_sycl_frame(
   auto data_t = memory::data_type::f32;
   auto format_nchw = memory::format_tag::nchw;
 
-  memory::dims input_tz = {nbatch, nInputPlane, inputWidth, inputHeight};
-  memory::dims output_tz = {nbatch, nInputPlane, outputWidth, outputHeight};
-  memory::dims kernel = {kW, kH};
-  memory::dims stride = {dW, dH};
-  memory::dims padding = {padW, padH};
+  memory::dims input_tz = {nbatch, nInputPlane, inputHeight, inputWidth};
+  memory::dims output_tz = {nbatch, nInputPlane, outputHeight, outputWidth};
+  memory::dims kernel = {kH, kW};
+  memory::dims stride = {dH, dW};
+  memory::dims padding = {padH, padW};
 
   auto input_md = memory::desc({input_tz}, data_t, format_nchw);
   auto output_md = memory::desc({output_tz}, data_t, format_nchw);
@@ -212,6 +212,11 @@ static void adaptive_avg_pool2d_backward_out_sycl_frame(
     nInputPlane = input.size(1);
     batchSize = input.size(0);
 
+    TORCH_CHECK((nInputRows % nOutputRows == 0),
+      "row input size is not divisible by the output size is not supported yet");
+    TORCH_CHECK((nInputCols % nOutputCols == 0),
+      "column input size is not divisible by the output size is not supported yet");
+
     kW = nInputCols / nOutputCols;
     kH = nInputRows / nOutputRows;
     dW = kW;
@@ -254,6 +259,11 @@ static void adaptive_avg_pool2d_backward_out_sycl_frame(
     nInputRows = input.size(2);
     nInputPlane = input.size(1);
     batchSize = input.size(0);
+
+    TORCH_CHECK((nInputRows % nOutputRows == 0),
+      "row input size is not divisible by the output size is not supported yet");
+    TORCH_CHECK((nInputCols % nOutputCols == 0),
+      "column input size is not divisible by the output size is not supported yet");
 
     kW = nInputCols / nOutputCols;
     kH = nInputRows / nOutputRows;
@@ -324,11 +334,18 @@ Tensor & adaptive_avg_pool2d_out(Tensor & out, const Tensor & self, IntArrayRef 
   at::native::adaptive_avg_pool2d_out_sycl(out, self, output_size);
   return out;
 }
+
 Tensor _adaptive_avg_pool2d(const Tensor & self, IntArrayRef output_size){
   return at::native::adaptive_avg_pool2d_sycl(self, output_size);
 }
+
 Tensor adaptive_avg_pool2d(const Tensor & self, IntArrayRef output_size){
   return at::native::adaptive_avg_pool2d_sycl(self, output_size);
 }
+
+Tensor _adaptive_avg_pool2d_backward(const Tensor & grad_output, const Tensor & self){
+  return at::native::adaptive_avg_pool2d_backward_sycl(grad_output, self);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

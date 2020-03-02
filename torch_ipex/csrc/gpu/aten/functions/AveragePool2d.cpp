@@ -41,11 +41,11 @@ static void avg_pool2d_out_sycl_frame(
   }
   auto format_nchw = memory::format_tag::nchw;
 
-  memory::dims input_tz = {nbatch, nInputPlane, inputWidth, inputHeight};
-  memory::dims output_tz = {nbatch, nInputPlane, outputWidth, outputHeight};
-  memory::dims kernel = {kW, kH};
-  memory::dims stride = {dW, dH};
-  memory::dims padding = {padW, padH};
+  memory::dims input_tz = {nbatch, nInputPlane, inputHeight, inputWidth};
+  memory::dims output_tz = {nbatch, nInputPlane, outputHeight, outputWidth};
+  memory::dims kernel = {kH, kW};
+  memory::dims stride = {dH, dW};
+  memory::dims padding = {padH, padW};
 
 
   // Currently, MKLDNN GPU doens't support format_any in pooling
@@ -125,11 +125,11 @@ static void avg_pool2d_backward_out_sycl_frame(
   auto data_t = memory::data_type::f32;
   auto format_nchw = memory::format_tag::nchw;
 
-  memory::dims input_tz = {nbatch, nInputPlane, inputWidth, inputHeight};
-  memory::dims output_tz = {nbatch, nInputPlane, outputWidth, outputHeight};
-  memory::dims kernel = {kW, kH};
-  memory::dims stride = {dW, dH};
-  memory::dims padding = {padW, padH};
+  memory::dims input_tz = {nbatch, nInputPlane, inputHeight, inputWidth};
+  memory::dims output_tz = {nbatch, nInputPlane, outputHeight, outputWidth};
+  memory::dims kernel = {kH, kW};
+  memory::dims stride = {dH, dW};
+  memory::dims padding = {padH, padW};
 
   auto input_md = memory::desc({input_tz}, data_t, format_nchw);
   auto output_md = memory::desc({output_tz}, data_t, format_nchw);
@@ -478,6 +478,33 @@ Tensor avg_pool2d(
   bool count_include_pad,
   c10::optional<int64_t> divisor_override) {
   return at::native::avg_pool2d_sycl(input, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
+}
+
+Tensor & avg_pool2d_backward_out(
+  Tensor & grad_input,
+  const Tensor & grad_output,
+  const Tensor & input,
+  IntArrayRef kernel_size,
+  IntArrayRef stride,
+  IntArrayRef padding,
+  bool ceil_mode,
+  bool count_include_pad,
+  c10::optional<int64_t> divisor_override) {
+  return at::native::avg_pool2d_backward_out_sycl(grad_input, grad_output, input,
+    kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
+}
+
+Tensor avg_pool2d_backward(
+  const Tensor & grad_output,
+  const Tensor & input,
+  IntArrayRef kernel_size,
+  IntArrayRef stride,
+  IntArrayRef padding,
+  bool ceil_mode,
+  bool count_include_pad,
+  c10::optional<int64_t> divisor_override) {
+  return at::native::avg_pool2d_backward_sycl(grad_output, input, kernel_size,
+    stride, padding, ceil_mode, count_include_pad, divisor_override);
 }
 
 } // namespace AtenIpexTypeDPCPP
