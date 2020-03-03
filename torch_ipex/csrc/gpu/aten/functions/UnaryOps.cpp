@@ -5,6 +5,7 @@
 #include <core/SYCL.h>
 #include <utils/Numerics.h>
 #include <utils/Pointwise.h>
+#include <utils/Pairwise.h>
 #include <functions/Loops.h>
 
 
@@ -130,6 +131,28 @@ Tensor& logical_not_out(Tensor& result, const Tensor& self) {
   iter.build();
   impl::logical_not_kernel_sycl(iter);
   return result;
+}
+
+IPEX_OUT_INT_CALLABLE_1_UNARY_OPS(__and___out, TensorBitAndConstantOp);
+
+Tensor __and__(const Tensor & self, Scalar other) {
+  auto result = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::__and___out(result, self, other);
+}
+
+Tensor & __iand__(Tensor & self, Scalar other) {
+  return at::AtenIpexTypeDPCPP::__and___out(self, self, other);
+}
+
+IPEX_OUT_INT_CALLABLE_1_UNARY_OPS(__or___out, TensorBitOrConstantOp);
+
+Tensor __or__(const Tensor & self, Scalar other) {
+  auto result = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::__or___out(result, self, other);
+}
+
+Tensor & __ior__(Tensor & self, Scalar other) {
+  return at::AtenIpexTypeDPCPP::__or___out(self, self, other);
 }
 
 } // namespace AtenIpexTypeDPCPP
