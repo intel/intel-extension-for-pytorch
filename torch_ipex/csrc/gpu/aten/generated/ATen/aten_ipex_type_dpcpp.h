@@ -108,6 +108,10 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor addmm(const at::Tensor & self, const at::Tensor & mat1, const at::Tensor & mat2, at::Scalar beta, at::Scalar alpha);
   at::Scalar _local_scalar_dense(const at::Tensor & self);
   at::Tensor view(const at::Tensor & self, at::IntArrayRef size);
+  at::Tensor __and__(const at::Tensor & self, at::Scalar other);
+  at::Tensor & __iand__(at::Tensor & self, at::Scalar other);
+  at::Tensor __or__(const at::Tensor & self, at::Scalar other);
+  at::Tensor & __ior__(at::Tensor & self, at::Scalar other);
   at::Tensor & tril_(at::Tensor & self, int64_t diagonal);
   at::Tensor & triu_(at::Tensor & self, int64_t diagonal);
   at::Tensor & pow_(at::Tensor & self, at::Scalar exponent);

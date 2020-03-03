@@ -1,3 +1,6 @@
+#ifndef POINTWISE_INC
+#define POINTWISE_INC
+
 #include <ATen/ATen.h>
 
 #include <core/SYCL.h>
@@ -181,11 +184,17 @@
 #define IPEX_FLOAT_CALLABLE_1_UNARY_OPS(op, callable)                         \
     IPEX_CALLABLE_OPS(op, callable, FLOATING, 1, 11 /* inplace */, 1)
 
+#define IPEX_INT_CALLABLE_1_UNARY_OPS(op, callable)                           \
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 1, 11 /* inplace */, 1)
+
 #define IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(op, callable)                       \
     IPEX_CALLABLE_OPS(op, callable, ALL, 1, 2, 1)
 
 #define IPEX_OUT_FLOAT_CALLABLE_1_UNARY_OPS(op, callable)                     \
     IPEX_CALLABLE_OPS(op, callable, FLOATING, 1, 2, 1)
+
+#define IPEX_OUT_INT_CALLABLE_1_UNARY_OPS(op, callable)                       \
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 1, 2, 1)
 
 #define IPEX_ALL_CALLABLE_2_UNARY_OPS(op, callable)                           \
     IPEX_CALLABLE_OPS(op, callable, ALL, 1, 11 /* inplace */, 2)
@@ -193,30 +202,45 @@
 #define IPEX_FLOAT_CALLABLE_2_UNARY_OPS(op, callable)                         \
     IPEX_CALLABLE_OPS(op, callable, FLOATING, 1, 11 /* inplace */, 2)
 
+#define IPEX_INT_CALLABLE_2_UNARY_OPS(op, callable)                           \
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 1, 11 /* inplace */, 2)
+
 #define IPEX_OUT_ALL_CALLABLE_2_UNARY_OPS(op, callable)                       \
     IPEX_CALLABLE_OPS(op, callable, ALL, 1, 2, 2)
 
 #define IPEX_OUT_FLOAT_CALLABLE_2_UNARY_OPS(op, callable)                     \
     IPEX_CALLABLE_OPS(op, callable, FLOATING, 1, 2, 2)
 
+#define IPEX_OUT_INT_CALLABLE_2_UNARY_OPS(op, callable)                       \
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 1, 2, 2)
+
 // Binary
-#define IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(op, callable)                       \
+#define IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(op, callable)                      \
     IPEX_CALLABLE_OPS(op, callable, ALL, 2, 3, 0)
 
-#define IPEX_OUT_FLOAT_CALLABLE_0_BINARY_OPS(op, callable)                     \
+#define IPEX_OUT_FLOAT_CALLABLE_0_BINARY_OPS(op, callable)                    \
     IPEX_CALLABLE_OPS(op, callable, FLOATING, 2, 3, 0)
 
-#define IPEX_OUT_ALL_CALLABLE_1_BINARY_OPS(op, callable)                       \
+#define IPEX_OUT_INT_CALLABLE_0_BINARY_OPS(op, callable)                      \
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 2, 3, 0)
+
+#define IPEX_OUT_ALL_CALLABLE_1_BINARY_OPS(op, callable)                      \
     IPEX_CALLABLE_OPS(op, callable, ALL, 2, 3, 1)
 
-#define IPEX_OUT_FLOAT_CALLABLE_1_BINARY_OPS(op, callable)                     \
+#define IPEX_OUT_FLOAT_CALLABLE_1_BINARY_OPS(op, callable)                    \
     IPEX_CALLABLE_OPS(op, callable, FLOATING, 2, 3, 1)
 
-#define IPEX_OUT_ALL_CALLABLE_2_BINARY_OPS(op, callable)                       \
+#define IPEX_OUT_INT_CALLABLE_1_BINARY_OPS(op, callable)                      \
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 2, 3, 1)
+
+#define IPEX_OUT_ALL_CALLABLE_2_BINARY_OPS(op, callable)                      \
     IPEX_CALLABLE_OPS(op, callable, ALL, 2, 3, 2)
 
-#define IPEX_OUT_FLOAT_CALLABLE_2_BINARY_OPS(op, callable)                     \
+#define IPEX_OUT_FLOAT_CALLABLE_2_BINARY_OPS(op, callable)                    \
     IPEX_CALLABLE_OPS(op, callable, FLOATING, 2, 3, 2)
+
+#define IPEX_OUT_INT_CALLABLE_2_BINARY_OPS(op, callable)                      \
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 2, 3, 2)
 
 
 template <typename T>
@@ -857,3 +881,5 @@ struct TensorTPowOp {
 
   const T val;
 };
+
+#endif
