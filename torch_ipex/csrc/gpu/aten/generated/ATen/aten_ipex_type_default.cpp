@@ -263,6 +263,10 @@ at::Tensor & AtenIpexTypeDefault::relu_(at::Tensor & self) {
   return AtenIpexTypeDPCPP::relu_(self);
 }
 
+at::Tensor & AtenIpexTypeDefault::rsqrt_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::rsqrt_out(out, self);
+}
+
 at::Tensor AtenIpexTypeDefault::sigmoid(const at::Tensor & self) {
   return AtenIpexTypeDPCPP::sigmoid(self);
 }
@@ -293,6 +297,10 @@ at::Tensor AtenIpexTypeDefault::sum(const at::Tensor & self, at::IntArrayRef dim
 
 at::Tensor & AtenIpexTypeDefault::sum_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype) {
   return AtenIpexTypeDPCPP::sum_out(out, self, dim, keepdim, dtype);
+}
+
+at::Tensor & AtenIpexTypeDefault::sqrt_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::sqrt_out(out, self);
 }
 
 at::Tensor & AtenIpexTypeDefault::tan_(at::Tensor & self) {
@@ -871,6 +879,9 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::relu_(Tensor(a!) self) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::relu_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::rsqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::rsqrt_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::sigmoid(Tensor self) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::sigmoid>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -894,6 +905,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::sum.IntList_out(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, bool, c10::optional<at::ScalarType>), &AtenIpexTypeDefault::sum_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::sqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::sqrt_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::tan_(Tensor(a!) self) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::tan_>(at::TensorTypeId::DPCPPTensorId)

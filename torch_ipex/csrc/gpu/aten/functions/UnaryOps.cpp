@@ -1,8 +1,11 @@
 #include <ATen/ATen.h>
 #include <ATen/Dispatch.h>
+#include <ATen/native/TensorIterator.h>
 
+#include <core/SYCL.h>
 #include <utils/Numerics.h>
 #include <utils/Pointwise.h>
+#include <functions/Loops.h>
 
 
 using namespace at::native;
@@ -10,159 +13,33 @@ using namespace at::native;
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
+
+DP_DEF_K1(bitwise_not);
+void bitwise_not_kernel_sycl(TensorIterator& iter) {
+  if (iter.dtype() == ScalarType::Bool) {
+    sycl_kernel_for_tensor_iter<DP_K(bitwise_not)>(iter, [](bool a) -> bool {
+      return !a;
+    });
+  } else {
+    AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_not_sycl", [&]() {
+      sycl_kernel_for_tensor_iter<DP_K(bitwise_not)>(iter, [](scalar_t a) -> scalar_t {
+        return ~a;
+      });
+    });
+  }
+}
+
+DP_DEF_K1(logical_not);
+void logical_not_kernel_sycl(TensorIterator& iter) {
+  AT_DISPATCH_ALL_TYPES_AND2(kBool, kHalf, iter.dtype(1), "logical_not_sycl", [&]() {
+    using self_t = scalar_t;
+    AT_DISPATCH_ALL_TYPES_AND2(kBool, kHalf, iter.dtype(0), "logical_not_sycl", [&]() {
+      sycl_kernel_for_tensor_iter<DP_K(logical_not, self_t)>(iter, [](self_t a) -> scalar_t { return static_cast<scalar_t>(!a); });
+    });
+  });
+}
+
 } // namespace impl
-
-#define DEFINE_IPEX_OUT_ALL_TYPES_OPS(op, func, real)                         \
-  namespace impl {                                                            \
-    IMPLEMENT_POINTWISE_1_FUNC(op, func, real)                                  \
-  }                                                                           \
-                                                                              \
-  Tensor & op(Tensor & out, const Tensor & self) {                            \
-    AT_DISPATCH_ALL_TYPES(self.scalar_type(), #op,                            \
-        [&]() {                                                               \
-          impl::op<scalar_t>(out, self);                                      \
-        }                                                                     \
-    );                                                                        \
-    return out;                                                               \
-  }
-
-#define DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(op, func, real)                       \
-  namespace impl {                                                            \
-    IMPLEMENT_POINTWISE_1_FUNC(op, func, real)                                  \
-  }                                                                           \
-                                                                              \
-  Tensor & op(Tensor & out, const Tensor & self) {                            \
-    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), #op,                       \
-        [&]() {                                                               \
-          impl::op<scalar_t>(out, self);                                      \
-        }                                                                     \
-    );                                                                        \
-    return out;                                                               \
-  }
-
-
-#define DEFINE_IPEX_OUT_INPLACE_FLOAT_TYPES_OPS(op, func, real)               \
-  DEFINE_IPEX_OUT_FLOAT_TYPES_OPS(op##_out, func, real)                       \
-                                                                              \
-  Tensor & op##_(Tensor & self) {                                             \
-    return at::op##_out(self, self);                                          \
-  }
-
-
-#define DEFINE_IPEX_ALL_TYPES_CALLABLE_1_OPS(op, callable)                    \
-  namespace impl {                                                            \
-    IMPLEMENT_POINTWISE_1_CALLABLE_1(op, callable)                              \
-  }                                                                           \
-                                                                              \
-  Tensor & op(Tensor & self, Scalar value) {                                  \
-    AT_DISPATCH_ALL_TYPES(self.scalar_type(), #op,                            \
-        [&]() {                                                               \
-          impl::op<scalar_t>(self, self, value.to<scalar_t>());               \
-        }                                                                     \
-    );                                                                        \
-    return self;                                                              \
-  }
-
-#define DEFINE_IPEX_FLOAT_TYPES_CALLABLE_1_OPS(op, callable)                  \
-  namespace impl {                                                            \
-    IMPLEMENT_POINTWISE_1_CALLABLE_1(op, callable)                              \
-  }                                                                           \
-                                                                              \
-  Tensor & op(Tensor & self, Scalar value) {              \
-    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), #op,                       \
-        [&]() {                                                               \
-          impl::op<scalar_t>(self, self, value.to<scalar_t>());               \
-        }                                                                     \
-    );                                                                        \
-    return self;                                                              \
-  }
-
-
-#define DEFINE_IPEX_OUT_ALL_TYPES_CALLABLE_1_OPS(op, callable)                \
-  namespace impl {                                                            \
-    IMPLEMENT_POINTWISE_1_CALLABLE_1(op, callable)                              \
-  }                                                                           \
-                                                                              \
-  Tensor & op(Tensor & out, const Tensor & self, Scalar value) {              \
-    AT_DISPATCH_ALL_TYPES(self.scalar_type(), #op,                            \
-        [&]() {                                                               \
-          impl::op<scalar_t>(out, self, value.to<scalar_t>());                \
-        }                                                                     \
-    );                                                                        \
-    return out;                                                               \
-  }
-
-#define DEFINE_IPEX_OUT_FLOAT_TYPES_CALLABLE_1_OPS(op, callable)              \
-  namespace impl {                                                            \
-    IMPLEMENT_POINTWISE_1_CALLABLE_1(op, callable)                              \
-  }                                                                           \
-                                                                              \
-  Tensor & op(Tensor & out, const Tensor & self, Scalar value) {              \
-    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), #op,                       \
-        [&]() {                                                               \
-          impl::op<scalar_t>(out, self, value.to<scalar_t>());                \
-        }                                                                     \
-    );                                                                        \
-    return out;                                                               \
-  }
-
-
-#define DEFINE_IPEX_ALL_TYPES_CALLABLE_2_OPS(op, callable)                    \
-  namespace impl {                                                            \
-    IMPLEMENT_POINTWISE_1_CALLABLE_2(op, callable)                              \
-  }                                                                           \
-                                                                              \
-  Tensor & op(Tensor & self, Scalar val1, Scalar val2) {                      \
-    AT_DISPATCH_ALL_TYPES(self.scalar_type(), #op,                            \
-        [&]() {                                                               \
-          impl::op<scalar_t>(self, self, val1.to<scalar_t>(), val2.to<scalar_t>()); \
-        }                                                                     \
-    );                                                                        \
-    return self;                                                              \
-  }
-
-#define DEFINE_IPEX_FLOAT_TYPES_CALLABLE_2_OPS(op, callable)                  \
-  namespace impl {                                                            \
-    IMPLEMENT_POINTWISE_1_CALLABLE_2(op, callable)                              \
-  }                                                                           \
-                                                                              \
-  Tensor & op(Tensor & self, Scalar val1, Scalar val2) {                      \
-    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), #op,                       \
-        [&]() {                                                               \
-          impl::op<scalar_t>(self, self, val1.to<scalar_t>(), val2.to<scalar_t>()); \
-        }                                                                     \
-    );                                                                        \
-    return self;                                                              \
-  }
-
-
-#define DEFINE_IPEX_OUT_ALL_TYPES_CALLABLE_2_OPS(op, callable)                \
-  namespace impl {                                                            \
-    IMPLEMENT_POINTWISE_1_CALLABLE_2(op, callable)                              \
-  }                                                                           \
-                                                                              \
-  Tensor & op(Tensor & out, const Tensor & self, Scalar val1, Scalar val2) {  \
-    AT_DISPATCH_ALL_TYPES(self.scalar_type(), #op,                            \
-        [&]() {                                                               \
-          impl::op<scalar_t>(out, self, val1.to<scalar_t>(), val2.to<scalar_t>()); \
-        }                                                                     \
-    );                                                                        \
-    return out;                                                               \
-  }
-
-#define DEFINE_IPEX_OUT_FLOAT_TYPES_CALLABLE_2_OPS(op, callable)              \
-  namespace impl {                                                            \
-    IMPLEMENT_POINTWISE_1_CALLABLE_2(op, callable)                              \
-  }                                                                           \
-                                                                              \
-  Tensor & op(Tensor & out, const Tensor & self, Scalar val1, Scalar val2) {  \
-    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), #op,                       \
-        [&]() {                                                               \
-          impl::op<scalar_t>(out, self, val1.to<scalar_t>(), val2.to<scalar_t>());                \
-        }                                                                     \
-    );                                                                        \
-    return out;                                                               \
-  }
 
 IPEX_OUT_ALL_UNARY_FUNC_OPS(abs_out, Numerics<scalar_t>::abs, Real);
 IPEX_OUT_ALL_UNARY_FUNC_OPS(neg_out, Numerics<scalar_t>::neg, Real);
@@ -182,6 +59,8 @@ IPEX_OUT_FLOAT_UNARY_FUNC_OPS(log_out, Numerics<scalar_t>::log, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(log10_out, Numerics<scalar_t>::log10, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(log1p_out, Numerics<scalar_t>::log1p, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(log2_out, Numerics<scalar_t>::log2, Real);
+IPEX_OUT_FLOAT_UNARY_FUNC_OPS(rsqrt_out, Numerics<scalar_t>::rsqrt, Real);
+IPEX_OUT_FLOAT_UNARY_FUNC_OPS(sqrt_out, Numerics<scalar_t>::sqrt, Real);
 
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(tan, Numerics<scalar_t>::tan, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(tanh, Numerics<scalar_t>::tanh, Real);
@@ -212,6 +91,45 @@ Tensor & clamp_out(Tensor & result, const Tensor & self,
 
 Tensor & clamp_(Tensor & self, optional<Scalar> min, optional<Scalar> max) {
   return at::AtenIpexTypeDPCPP::clamp_out(self, self, min, max);
+}
+
+Tensor bitwise_not(const Tensor & self){
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::bitwise_not_out(result, self);
+}
+
+Tensor & bitwise_not_(Tensor & self){
+  return at::AtenIpexTypeDPCPP::bitwise_not_out(self, self);
+}
+
+Tensor & bitwise_not_out(Tensor & out, const Tensor & self){
+  auto iter = TensorIterator::unary_op(out, self,
+    /*check_mem_overlap=*/true);
+  impl::bitwise_not_kernel_sycl(iter);
+  #ifdef BUILD_NAMEDTENSOR
+  at::namedinference::propagate_names(out, self);
+  #endif
+  return out;
+}
+
+Tensor logical_not(const Tensor& self) {
+  Tensor result = at::empty({0}, self.options().dtype(kBool));
+  return at::AtenIpexTypeDPCPP::logical_not_out(result, self);
+}
+
+Tensor& logical_not_(Tensor& self) {
+  return at::AtenIpexTypeDPCPP::logical_not_out(self, self);
+}
+
+Tensor& logical_not_out(Tensor& result, const Tensor& self) {
+  TensorIterator iter;
+  iter.dont_compute_common_dtype();
+  iter.set_check_mem_overlap(true);
+  iter.add_output(result);
+  iter.add_input(self);
+  iter.build();
+  impl::logical_not_kernel_sycl(iter);
+  return result;
 }
 
 } // namespace AtenIpexTypeDPCPP
