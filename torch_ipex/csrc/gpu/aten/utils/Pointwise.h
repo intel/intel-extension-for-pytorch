@@ -45,6 +45,11 @@
 #define POINTWISE_ARGS_3 POINTWISE_ARGS_2, arg3
 #define POINTWISE_ARGS_11 POINTWISE_ARGS_1, POINTWISE_ARGS_1
 
+// oprand: arg1(self), arg2(self), arg3(other)
+#define POINTWISE_OPR_ARGS_1 arg1
+#define POINTWISE_OPR_ARGS_2 POINTWISE_ARGS_1, arg3
+#define POINTWISE_OPR_ARGS_3 POINTWISE_ARGS_1, arg3, arg4
+
 #define POINTWISE_ARGS_DECL_1 Tensor & arg1 // out
 #define POINTWISE_ARGS_DECL_2 POINTWISE_ARGS_DECL_1, const Tensor & arg2
 #define POINTWISE_ARGS_DECL_3 POINTWISE_ARGS_DECL_2, const Tensor & arg3
@@ -84,12 +89,12 @@
             CALLABLE_INIT_ARGS_DECL_##CALLABLE_ARGS_NUM) {                                               \
     if (CHECK_SAME_TENSOR()) {                                                                           \
       at::sycl::SYCL_tensor_apply##APPLY_NUM<REPEAT_AS_ARGLIST_##APPLY_NUM(scalar_t)>(                   \
-          POINTWISE_ARGS_##APPLY_NUM,                                                                    \
+          POINTWISE_OPR_ARGS_##APPLY_NUM,                                                                \
           CALLABLE<scalar_t>(CALLABLE_INIT_ARGS_##CALLABLE_ARGS_NUM));                                   \
     } else {                                                                                             \
       at::AtenIpexTypeDPCPP::resize_as_(POINTWISE_ARGS_2, c10::nullopt);                                 \
       at::sycl::SYCL_tensor_apply##APPLY_NUM_EXT<REPEAT_AS_ARGLIST_##APPLY_NUM_EXT(scalar_t)>(           \
-          POINTWISE_ARGS_##APPLY_NUM_EXT,                                                                \
+          POINTWISE_ARGS_##APPLY_NUM_EXT,                                                            \
           CALLABLE<scalar_t>(CALLABLE_INIT_ARGS_##CALLABLE_ARGS_NUM));                                   \
     }                                                                                                    \
   }

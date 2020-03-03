@@ -212,5 +212,27 @@ Tensor max(const Tensor & self, const Tensor & other) {
   return at::AtenIpexTypeDPCPP::max_out(out, self, other);
 }
 
+IPEX_OUT_INT_CALLABLE_0_BINARY_OPS(__and___out, TensorBitAndOp)
+
+Tensor __and__(const Tensor & self, const Tensor & other) {
+  auto result = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::__and___out(result, self, other);
+}
+
+Tensor & __iand__(Tensor & self, const Tensor & other) {
+  return at::AtenIpexTypeDPCPP::__and___out(self, self, other);
+}
+
+IPEX_OUT_INT_CALLABLE_0_BINARY_OPS(__or___out, TensorBitOrOp)
+
+Tensor __or__(const Tensor & self, const Tensor & other) {
+  auto result = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::__or___out(result, self, other);
+}
+
+Tensor & __ior__(Tensor & self, const Tensor & other) {
+  return at::AtenIpexTypeDPCPP::__or___out(self, self, other);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
