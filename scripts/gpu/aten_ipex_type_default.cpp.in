@@ -563,6 +563,22 @@ at::Tensor AtenIpexTypeDefault::addcdiv(const at::Tensor & self, const at::Tenso
   return AtenIpexTypeDPCPP::addcdiv(self, tensor1, tensor2, value);
 }
 
+at::Tensor & AtenIpexTypeDefault::min_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::min_out(out, self, other);
+}
+
+at::Tensor AtenIpexTypeDefault::min(const at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::min(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::max_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::max_out(out, self, other);
+}
+
+at::Tensor AtenIpexTypeDefault::max(const at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::max(self, other);
+}
+
 std::tuple<at::Tensor &,at::Tensor &> AtenIpexTypeDefault::topk_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted) {
   return AtenIpexTypeDPCPP::topk_out(values, indices, self, k, dim, largest, sorted);
 }
@@ -1079,6 +1095,18 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::addcdiv(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::addcdiv>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::min.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::min_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::min.other(Tensor self, Tensor other) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::min>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::max.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::max_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::max.other(Tensor self, Tensor other) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::max>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::topk.values(Tensor self, int k, int dim=-1, bool largest=True, bool sorted=True, *, Tensor(a!) values, Tensor(b!) indices) ->(Tensor(a!) values, Tensor(b!) indices)")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor &,at::Tensor &>(at::Tensor &, at::Tensor &, const at::Tensor &, int64_t, int64_t, bool, bool), &AtenIpexTypeDefault::topk_out>(at::TensorTypeId::DPCPPTensorId)
