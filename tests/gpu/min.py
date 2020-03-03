@@ -6,17 +6,17 @@ dpcpp_device = torch.device("dpcpp")
 
 #
 # Test minall OP.
-#
-# y = torch.randn(3, 3)
-# 
-# y_dpcpp = y.to("dpcpp")
-# z_dpcpp = torch.min(y_dpcpp)
-# 
-# print("Testing minall OP!\n")
-# print("For Tensor:", y)
-# print("torch.min on cpu returns", torch.min(y))
-# print("torch.min on dpcpp device returns", z_dpcpp.to("cpu"))
-# print("\n")
+
+y = torch.randn(3, 3)
+
+y_dpcpp = y.to("dpcpp")
+z_dpcpp = torch.min(y_dpcpp)
+
+print("Testing minall OP!\n")
+print("For Tensor:", y)
+print("torch.min on cpu returns", torch.min(y))
+print("torch.min on dpcpp device returns", z_dpcpp.to("cpu"))
+print("\n")
 
 #
 # Test cmin OP.

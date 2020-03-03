@@ -7,16 +7,16 @@ dpcpp_device = torch.device("dpcpp")
 #
 # Test maxall OP.
 #
-# y = torch.randn(3, 3)
-# 
-# y_dpcpp = y.to("dpcpp")
-# z_dpcpp = torch.max(y_dpcpp)
-# 
-# print("Testing maxall OP!\n")
-# print("For Tensor:", y)
-# print("torch.max on cpu returns", torch.max(y))
-# print("torch.max on dpcpp device returns", z_dpcpp.to("cpu"))
-# print("\n")
+y = torch.randn(3, 3)
+
+y_dpcpp = y.to("dpcpp")
+z_dpcpp = torch.max(y_dpcpp)
+
+print("Testing maxall OP!\n")
+print("For Tensor:", y)
+print("torch.max on cpu returns", torch.max(y))
+print("torch.max on dpcpp device returns", z_dpcpp.to("cpu"))
+print("\n")
 
 #
 # Test cmax OP.

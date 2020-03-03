@@ -202,10 +202,10 @@ struct TORCH_API SYCLType final {
   // static Tensor remainder(const Tensor & self, const Tensor & other);
   static Tensor & min_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::min.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor min(const Tensor & self, const Tensor & other); // aten::min.other(Tensor self, Tensor other) -> Tensor
-  // static Tensor min(const Tensor & self); // aten::min(Tensor self) -> Tensor
+  static Tensor min(const Tensor & self); // aten::min(Tensor self) -> Tensor
   static Tensor & max_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::max.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor max(const Tensor & self, const Tensor & other); // aten::max.other(Tensor self, Tensor other) -> Tensor
-  // static Tensor max(const Tensor & self); // aten::max(Tensor self) -> Tensor
+  static Tensor max(const Tensor & self); // aten::max(Tensor self) -> Tensor
   // static Tensor median(const Tensor & self);
   // static std::tuple<Tensor &,Tensor &> sort_out(Tensor & values, Tensor & indices, const Tensor & self, int64_t dim, bool descending);
   // static std::tuple<Tensor,Tensor> sort(const Tensor & self, int64_t dim, bool descending);

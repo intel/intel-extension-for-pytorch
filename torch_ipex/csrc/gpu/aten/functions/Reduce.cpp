@@ -6,6 +6,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/ReduceOps.h>
 
+#include <utils/Numerics.h>
 #include <functions/Loops.h>
 #include <functions/Reduce.h>
 
@@ -238,6 +239,22 @@ struct add_kernel{
 };
 
 template <typename acc_t>
+struct min_kernel{
+  min_kernel() {}
+  acc_t operator ()(acc_t a, acc_t b) const {
+    return (Numerics<acc_t>::lt(a, b) || Numerics<acc_t>::isnan(a)) ? a : b;
+  }
+};
+
+template <typename acc_t>
+struct max_kernel{
+  max_kernel() {}
+  acc_t operator ()(acc_t a, acc_t b) const {
+    return (Numerics<acc_t>::gt(a, b) || Numerics<acc_t>::isnan(a)) ? a : b;
+  }
+};
+
+template <typename acc_t>
 struct and_kernel{
   and_kernel() {}
   acc_t operator ()(acc_t a, acc_t b) const {
@@ -402,13 +419,23 @@ void std_var_kernel_impl<at::Half>(TensorIterator& iter, bool unbiased, bool tak
 
 template <typename scalar_t, typename acc_t=scalar_t, typename out_t=scalar_t>
 void sum_kernel_impl(TensorIterator& iter) {
-  sycl_reduce_kernel<scalar_t, out_t>(iter, func_wrapper<out_t> (add_kernel<acc_t>()));
+  sycl_reduce_kernel<scalar_t, out_t>(iter, func_wrapper<out_t>(add_kernel<acc_t>()));
 }
 
 template <typename scalar_t, typename acc_t=scalar_t, typename out_t=scalar_t>
 void mean_kernel_impl(TensorIterator& iter) {
   float factor = float(iter.num_output_elements()) / iter.numel();
   sycl_reduce_kernel<scalar_t, out_t>(iter, MeanOps<acc_t, float> {factor});
+}
+
+template <typename scalar_t, typename acc_t=scalar_t, typename out_t=scalar_t>
+void min_kernel_impl(TensorIterator& iter) {
+  sycl_reduce_kernel<scalar_t, out_t>(iter, func_wrapper<scalar_t>(min_kernel<scalar_t>()), Numerics<scalar_t>::upper_bound());
+}
+
+template <typename scalar_t, typename acc_t=scalar_t, typename out_t=scalar_t>
+void max_kernel_impl(TensorIterator& iter) {
+  sycl_reduce_kernel<scalar_t, out_t>(iter, func_wrapper<scalar_t>(max_kernel<scalar_t>()), Numerics<scalar_t>::lower_bound());
 }
 
 template <typename scalar_t, typename acc_t=scalar_t, typename out_t=scalar_t>
@@ -457,6 +484,18 @@ static void mean_kernel_sycl(TensorIterator& iter) {
   });
 }
 
+static void min_kernel_sycl(TensorIterator& iter) {
+  AT_DISPATCH_ALL_TYPES(iter.dtype(), "min", [&]() {
+    min_kernel_impl<scalar_t>(iter);
+  });
+}
+
+static void max_kernel_sycl(TensorIterator& iter) {
+  AT_DISPATCH_ALL_TYPES(iter.dtype(), "max", [&]() {
+    max_kernel_impl<scalar_t>(iter);
+  });
+}
+
 static void norm_kernel_sycl(TensorIterator& iter, Scalar p) {
   if (iter.dtype() == kHalf) {
     return norm_kernel_impl<at::Half, float>(iter, p);
@@ -501,8 +540,40 @@ Tensor sum(const Tensor & self, c10::optional<ScalarType> dtype) {
   return at::AtenIpexTypeDPCPP::sum(self, std::vector<int64_t>{}, false, dtype);
 }
 
+Tensor min_out(Tensor & result, const Tensor & self, IntArrayRef dim, bool keepdim) {
+  ScalarType dtype = impl::get_dtype(result, self, c10::nullopt);
+  auto iter = impl::make_reduction("min", result, self, dim, keepdim, dtype);
+  if (iter.numel() == 0) {
+    result.zero_();
+  } else {
+    impl::min_kernel_sycl(iter);
+  }
+  return result;
+}
+
+Tensor min(const Tensor & self) {
+  Tensor result;
+  return at::AtenIpexTypeDPCPP::min_out(result, self, std::vector<int64_t>{}, false);
+}
+
+Tensor max_out(Tensor & result, const Tensor & self, IntArrayRef dim, bool keepdim) {
+  ScalarType dtype = impl::get_dtype(result, self, c10::nullopt);
+  auto iter = impl::make_reduction("max", result, self, dim, keepdim, dtype);
+  if (iter.numel() == 0) {
+    result.zero_();
+  } else {
+    impl::max_kernel_sycl(iter);
+  }
+  return result;
+}
+
+Tensor max(const Tensor & self) {
+  Tensor result;
+  return at::AtenIpexTypeDPCPP::max_out(result, self, std::vector<int64_t>{}, false);
+}
+
 static Tensor& norm_out(Tensor &result, const Tensor &self, optional<Scalar> opt_p,
-                               IntArrayRef dim, bool keepdim, optional<ScalarType> opt_dtype) {
+                         IntArrayRef dim, bool keepdim, optional<ScalarType> opt_dtype) {
   auto p = opt_p.value_or(2.0);
   ScalarType scalarType = opt_dtype.has_value() ? opt_dtype.value() : self.scalar_type();
   TORCH_CHECK(
