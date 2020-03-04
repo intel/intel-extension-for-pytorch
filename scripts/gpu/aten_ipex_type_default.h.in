@@ -61,6 +61,10 @@ class AtenIpexTypeDefault {
   static at::Tensor & log2_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & logspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps, double base);
   static at::Tensor _log_softmax(const at::Tensor & self, int64_t dim, bool half_to_float);
+  static std::tuple<at::Tensor,at::Tensor> max(const at::Tensor & self, int64_t dim, bool keepdim);
+  static std::tuple<at::Tensor &,at::Tensor &> max_out(at::Tensor & max, at::Tensor & max_values, const at::Tensor & self, int64_t dim, bool keepdim);
+  static std::tuple<at::Tensor,at::Tensor> min(const at::Tensor & self, int64_t dim, bool keepdim);
+  static std::tuple<at::Tensor &,at::Tensor &> min_out(at::Tensor & min, at::Tensor & min_indices, const at::Tensor & self, int64_t dim, bool keepdim);
   static at::Tensor mul(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & mul_(at::Tensor & self, const at::Tensor & other);
   static at::Tensor & mul_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
@@ -168,6 +172,10 @@ class AtenIpexTypeDefault {
   static at::Tensor pow(const at::Tensor & self, const at::Tensor & exponent);
   static at::Tensor & pow_out(at::Tensor & out, at::Scalar self, const at::Tensor & exponent);
   static at::Tensor pow(at::Scalar self, const at::Tensor & exponent);
+  static std::tuple<at::Tensor,at::Tensor> _max(const at::Tensor & self, int64_t dim, bool keepdim);
+  static std::tuple<at::Tensor &,at::Tensor &> _max_out(at::Tensor & max, at::Tensor & max_indices, const at::Tensor & self, int64_t dim, bool keepdim);
+  static std::tuple<at::Tensor,at::Tensor> _min(const at::Tensor & self, int64_t dim, bool keepdim);
+  static std::tuple<at::Tensor &,at::Tensor &> _min_out(at::Tensor & min, at::Tensor & min_indices, const at::Tensor & self, int64_t dim, bool keepdim);
   static std::tuple<at::Tensor &,at::Tensor &> nll_loss_forward_out(at::Tensor & output, at::Tensor & total_weight, const at::Tensor & self, const at::Tensor & target, const at::Tensor & weight, int64_t reduction, int64_t ignore_index);
   static std::tuple<at::Tensor,at::Tensor> nll_loss_forward(const at::Tensor & self, const at::Tensor & target, const at::Tensor & weight, int64_t reduction, int64_t ignore_index);
   static at::Tensor & nll_loss_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & target, const at::Tensor & weight, int64_t reduction, int64_t ignore_index, const at::Tensor & total_weight);

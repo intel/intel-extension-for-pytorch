@@ -35,44 +35,42 @@ print("\n")
 #
 # Test min OP.
 #
-# print("Testing min OP!\n")
-# a_dpcpp = torch.randn((9, 5), device = dpcpp_device)
-# 
-# print("1-test (-2) dim")
-# a_cpu = a_dpcpp.to("cpu")
-# b_dpcpp, b_dpcpp_index = a_dpcpp.min(-2)
-# 
-# print("For Tensor:", a_cpu)
-# print("torch.min on cpu returns", torch.min(a_cpu, -2))
-# print("torch.min on dpcpp device returns", b_dpcpp.to("cpu"), b_dpcpp_index.to("cpu"))
-# print("\n")
-#  
-# print("2-test (-1) dim")
-# a_cpu = a_dpcpp.to("cpu")
-# b_dpcpp, b_dpcpp_index = a_dpcpp.min(-1)
-# 
-# print("For Tensor:", a_cpu)
-# print("torch.min on cpu returns", torch.min(a_cpu, -1))
-# print("torch.min on dpcpp device returns", b_dpcpp.to("cpu"), b_dpcpp_index.to("cpu"))
-# print("\n")
-# 
-# print("3-test (0) dim")
-# a_cpu = a_dpcpp.to("cpu")
-# b_dpcpp, b_dpcpp_index = torch.min(a_dpcpp, 0)
-# 
-# print("For Tensor:", a_cpu)
-# print("torch.min on cpu returns", torch.min(a_cpu, 0))
-# print("torch.min on dpcpp device returns", b_dpcpp.to("cpu"), b_dpcpp_index.to("cpu"))
-# print("\n")
-# 
-# 
-# print("4-test (1) dim")
-# a_cpu = a_dpcpp.to("cpu")
-# b_dpcpp, b_dpcpp_index = torch.min(a_dpcpp, 1)
-# 
-# print("For Tensor:", a_cpu)
-# print("torch.min on cpu returns", torch.min(a_cpu, 1))
-# print("torch.min on dpcpp device returns", b_dpcpp.to("cpu"), b_dpcpp_index.to("cpu"))
-# print("\n")
+print("Testing min OP!\n")
+a_dpcpp = torch.randn((9, 5)).to("dpcpp")
+
+print("1-test (-2) dim")
+a_cpu = a_dpcpp.to("cpu")
+b_dpcpp, b_dpcpp_index = a_dpcpp.min(-2)
+
+print("For Tensor:", a_cpu)
+print("torch.min on cpu returns", torch.min(a_cpu, -2))
+print("torch.min on dpcpp device returns", b_dpcpp.to("cpu"), b_dpcpp_index.to("cpu"))
+print("\n")
+
+print("2-test (-1) dim")
+a_cpu = a_dpcpp.to("cpu")
+b_dpcpp, b_dpcpp_index = a_dpcpp.min(-1)
+
+print("For Tensor:", a_cpu)
+print("torch.min on cpu returns", torch.min(a_cpu, -1))
+print("torch.min on dpcpp device returns", b_dpcpp.to("cpu"), b_dpcpp_index.to("cpu"))
+print("\n")
+
+print("3-test (0) dim")
+a_cpu = a_dpcpp.to("cpu")
+b_dpcpp, b_dpcpp_index = torch.min(a_dpcpp, 0)
+
+print("For Tensor:", a_cpu)
+print("torch.min on cpu returns", torch.min(a_cpu, 0))
+print("torch.min on dpcpp device returns", b_dpcpp.to("cpu"), b_dpcpp_index.to("cpu"))
+print("\n")
 
 
+print("4-test (1) dim")
+a_cpu = a_dpcpp.to("cpu")
+b_dpcpp, b_dpcpp_index = torch.min(a_dpcpp, 1)
+
+print("For Tensor:", a_cpu)
+print("torch.min on cpu returns", torch.min(a_cpu, 1))
+print("torch.min on dpcpp device returns", b_dpcpp.to("cpu"), b_dpcpp_index.to("cpu"))
+print("\n")

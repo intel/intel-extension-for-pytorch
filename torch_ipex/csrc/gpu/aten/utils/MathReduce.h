@@ -1,14 +1,18 @@
-#ifndef TENSORMATH_REDUCE_H
-#define TENSORMATH_REDUCE_H
+#ifndef REDUCEDIMINDEX_H
+#define REDUCEDIMINDEX_H
+
+#include <ATen/ATen.h>
 
 #include <core/SYCL.h>
 #include <core/SYCLMemory.h>
 #include <core/SYCLUtils.h>
 #include <core/TensorImplUtils.h>
-#include <core/TensorCopy.h>
-#include <utils/Algorithm.h>
-#include <utils/Numerics.h>
 
+#include <utils/Numerics.h>
+#include <utils/Algorithm.h>
+
+
+using namespace at::native;
 
 template <typename scalar_t>
 DP_DEVICE struct AddOp {
@@ -63,35 +67,30 @@ DP_DEF_K1(reduceOuterDimIndex);
 
 template <typename K,
           typename Index,
-          typename TensorTypeK,
-          typename TensorTypeIndex,
           class BinaryFunction>
-DP_DEVICE static inline void
-kernelTransformReduceInnermostDimIndex(K *tgtK,
-                                       Index *tgtI,
-                                       K *srcK,
-                                       TensorTypeK *tgt1,
-                                       TensorTypeIndex *tgt2,
-                                       TensorTypeK *src,
+DP_DEVICE void
+kernelTransformReduceInnermostDimIndex(at::Tensor & tgt1,
+                                       at::Tensor & tgt2,
+                                       at::Tensor & src,
                                        std::pair<K, Index> init,
                                        BinaryFunction binary_op) {
 
   auto queue         = c10::sycl::syclGetCurrentQueue();
   int64_t group_size = c10::sycl::syclMaxWorkGroupSize(queue);
-  auto totalElements = src->numel();
+  auto totalElements = src.numel();
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
-  auto tgt1_data     = tgt1->data();
-  auto tgt2_data     = tgt2->data();
-  auto tgt1_size     = (tgt1->numel()) * (tgt1->dtype().itemsize());
-  auto tgt2_size     = (tgt2->numel()) * (tgt2->dtype().itemsize());
-  auto src_data      = src->data();
-  auto src_size      = totalElements * (src->dtype().itemsize());
-  auto dim           = tgt1->dim() - 1;
+  auto tgt1_data     = tgt1.data<K>();
+  auto tgt2_data     = tgt2.data<Index>();
+  auto tgt1_size     = (tgt1.numel()) * (tgt1.itemsize());
+  auto tgt2_size     = (tgt2.numel()) * (tgt2.itemsize());
+  auto src_data      = src.data<K>();
+  auto src_size      = totalElements * (src.itemsize());
+  auto dim           = tgt1.dim() - 1;
 
-  int64_t n = src->size(dim);
-  int64_t stride = src->stride(dim);
+  int64_t n = src.size(dim);
+  int64_t stride = src.stride(dim);
   int64_t batch = totalElements / (n * stride);
 
   auto cgf = DP_Q_CGF(cgh) {
@@ -136,35 +135,30 @@ kernelTransformReduceInnermostDimIndex(K *tgtK,
 
 template <typename K,
           typename Index,
-          typename TensorTypeK,
-          typename TensorTypeIndex,
           class BinaryFunction>
-DP_DEVICE static inline void
-kernelTransformReduceOuterDimIndex(K *tgtK,
-                                   Index *tgtI,
-                                   K *srcK,
-                                   TensorTypeK *tgt1,
-                                   TensorTypeIndex *tgt2,
-                                   TensorTypeK *src,
+DP_DEVICE void
+kernelTransformReduceOuterDimIndex(at::Tensor & tgt1,
+                                   at::Tensor & tgt2,
+                                   at::Tensor & src,
                                    int64_t rdim,
                                    std::pair<K, Index> init,
                                    BinaryFunction binary_op) {
 
   auto queue         = c10::sycl::syclGetCurrentQueue();
   int64_t group_size = c10::sycl::syclMaxWorkGroupSize(queue);
-  auto totalElements = src->numel();
+  auto totalElements = src.numel();
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
-  auto tgt1_data     = tgt1->data();
-  auto tgt2_data     = tgt2->data();
-  auto tgt1_size     = (tgt1->numel()) * (tgt1->dtype().itemsize());
-  auto tgt2_size     = (tgt2->numel()) * (tgt2->dtype().itemsize());
-  auto src_data      = src->data();
-  auto src_size      = totalElements * (src->dtype().itemsize());
+  auto tgt1_data     = tgt1.data<K>();
+  auto tgt2_data     = tgt2.data<Index>();
+  auto tgt1_size     = (tgt1.numel()) * (tgt1.itemsize());
+  auto tgt2_size     = (tgt2.numel()) * (tgt2.itemsize());
+  auto src_data      = src.data<K>();
+  auto src_size      = totalElements * (src.itemsize());
 
-  int64_t n = src->size(rdim);
-  int64_t stride = src->stride(rdim);
+  int64_t n = src.size(rdim);
+  int64_t stride = src.stride(rdim);
   int64_t batch = totalElements / (n * stride);
 
   auto cgf = DP_Q_CGF(cgh) {
@@ -209,90 +203,73 @@ kernelTransformReduceOuterDimIndex(K *tgtK,
 
 template <typename ScalarTypeK,
           typename ScalarTypeIndex,
-          typename TensorTypeK,
-          typename TensorTypeIndex,
           typename BinaryFunction>
-DP_HOST static inline void
-transformReduceOuterDimIndex(TensorTypeK *tgt1,
-                             TensorTypeIndex *tgt2,
-                             TensorTypeK *src,
+DP_HOST void
+transformReduceOuterDimIndex(at::Tensor & tgt1,
+                             at::Tensor & tgt2,
+                             at::Tensor & src,
                              int64_t rdim,
                              const std::pair<ScalarTypeK, ScalarTypeIndex>& init,
                              BinaryFunction binary_op) {
-
-  kernelTransformReduceOuterDimIndex (
-    tgt1->template data<ScalarTypeK>(),
-    tgt2->template data<ScalarTypeIndex>(),
-    src->template data<ScalarTypeK>(),
-    tgt1, tgt2, src, rdim, init, binary_op);
+  kernelTransformReduceOuterDimIndex(tgt1, tgt2, src, rdim, init, binary_op);
 }
 
 template <typename ScalarTypeK,
           typename ScalarTypeIndex,
-          typename TensorTypeK,
-          typename TensorTypeIndex,
           typename BinaryFunction>
-DP_HOST static inline void
-transformReduceInnermostDimIndex(TensorTypeK *tgt1,
-                                 TensorTypeIndex *tgt2,
-                                 TensorTypeK *src,
+DP_HOST void
+transformReduceInnermostDimIndex(at::Tensor & tgt1,
+                                 at::Tensor & tgt2,
+                                 at::Tensor & src,
                                  const std::pair<ScalarTypeK, ScalarTypeIndex>& init,
                                  BinaryFunction binary_op) {
-
-  kernelTransformReduceInnermostDimIndex (
-    tgt1->template data<ScalarTypeK>(),
-    tgt2->template data<ScalarTypeIndex>(),
-    src->template data<ScalarTypeK>(),
-    tgt1, tgt2, src, init, binary_op);
+  kernelTransformReduceInnermostDimIndex(tgt1, tgt2, src, init, binary_op);
 }
 
 template <typename ScalarTypeK,
           typename ScalarTypeIndex,
-          typename TensorTypeK,
-          typename TensorTypeIndex,
           typename BinaryFunction>
-DP_HOST static inline void
-reduceDimIndex(TensorTypeK *tgt1_,
-               TensorTypeIndex *tgt2_,
-               TensorTypeK *src,
+DP_HOST void
+reduceDimIndex(at::Tensor & tgt1_,
+               at::Tensor & tgt2_,
+               const at::Tensor & src_,
                int64_t dimension,
                int keepdim,
                const std::pair<ScalarTypeK, ScalarTypeIndex> init,
-               BinaryFunction binary_op)
-{
-  TORCH_CHECK(dimension >= 0 &&
-              dimension < TensorImpl_nDimensionLegacyAll(src),
-              "dimension out of range");
+               BinaryFunction binary_op) {
+  TORCH_CHECK(dimension >= 0 && dimension < src_.dim(), "dimension out of range");
 
   // Unsqueeze tgt1_/tgt_2 if necessary so that their contiguity traits
   // are preserved if they are the same size as the correct reduction output.
-  int src_dims = TensorImpl_nDimensionLegacyAll(src);
+  int src_dims = src_.dim();
   TensorImpl_preserveReduceDimSemantics(
-      tgt1_, src_dims, dimension, keepdim);
+      TensorImpl_Unwrap(tgt1_), src_dims, dimension, keepdim);
   TensorImpl_preserveReduceDimSemantics(
-      tgt2_, src_dims, dimension, keepdim);
+      TensorImpl_Unwrap(tgt2_), src_dims, dimension, keepdim);
 
-  std::vector<int64_t> dim = TensorImpl_sizesLegacyNoScalars(src);
+
+  std::vector<int64_t> dim;
+  for (int i = 0; i < src_.dim(); i++)
+    dim.push_back(src_.sizes()[i]);
   dim[dimension] = 1;
-  TensorImpl_resize(tgt1_, dim, {});
-  TensorImpl_resize(tgt2_, dim, {});
+  tgt1_.resize_(dim);
+  tgt2_.resize_(dim);
 
-  TensorTypeK *tgt1 = (TensorTypeK*)at::native::TensorImpl_newContiguous<ScalarTypeK>(tgt1_);
-  TensorTypeIndex *tgt2 = (TensorTypeIndex*)at::native::TensorImpl_newContiguous<ScalarTypeIndex>(tgt2_);
-  src = (TensorTypeK*)at::native::TensorImpl_newContiguous<ScalarTypeK>(src);
+  auto tgt1 = tgt1_.contiguous();
+  auto tgt2 = tgt2_.contiguous();
+  auto src = src_.contiguous();
 
-  if (dimension == TensorImpl_nDimensionLegacyAll(src) - 1) {
+  if (dimension == ((src.dim() == 0 ? 1 : src.dim()) - 1)) {
     transformReduceInnermostDimIndex(tgt1, tgt2, src, init, binary_op);
   } else {
     transformReduceOuterDimIndex(tgt1, tgt2, src, dimension, init, binary_op);
   }
 
-  at::native::TensorImpl_free(src);
-  at::native::TensorImpl_freeCopyTo<ScalarTypeK>(tgt1, tgt1_);
-  at::native::TensorImpl_freeCopyTo<ScalarTypeIndex>(tgt2, tgt2_);
   if (!keepdim) {
-    at::native::TensorImpl_squeeze1d(tgt1_, tgt1_, dimension);
-    at::native::TensorImpl_squeeze1d(tgt2_, tgt2_, dimension);
+    TensorImpl_squeeze1d(
+        TensorImpl_Unwrap(tgt1_), TensorImpl_Unwrap(tgt1_), dimension);
+    TensorImpl_squeeze1d(
+        TensorImpl_Unwrap(tgt2_), TensorImpl_Unwrap(tgt2_), dimension);
   }
 }
 
