@@ -31,6 +31,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & clamp_min_(at::Tensor & self, at::Scalar min);
   at::Tensor & clamp_min_out(at::Tensor & out, const at::Tensor & self, at::Scalar min);
   at::Tensor convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups);
+  std::tuple<at::Tensor,at::Tensor,at::Tensor> convolution_backward_overrideable(const at::Tensor & grad_output, const at::Tensor & input, const at::Tensor & weight, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups, std::array<bool,3> output_mask);
   at::Tensor & copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
   at::Tensor & cos_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & cosh_out(at::Tensor & out, const at::Tensor & self);
