@@ -104,10 +104,10 @@ struct TORCH_API SYCLType final {
   static Tensor & resize_as_(Tensor & self, const Tensor & the_template, c10::optional<MemoryFormat> memory_format); // aten::resize_as_(Tensor(a!) self, Tensor the_template, *, int? memory_format=None) -> (Tensor(a!))
   static Tensor & zero_(Tensor & self); // aten::zero_(Tensor(a!) self) -> Tensor(a!)
   static Scalar _local_scalar_dense(const Tensor & self); // aten::_local_scalar_dense(Tensor self) -> Scalar
-  // static Tensor & set_(Tensor & self, Storage source);
-  // static Tensor & set_(Tensor & self, Storage source, int64_t storage_offset, IntArrayRef size, IntArrayRef stride);
-  // static Tensor & set_(Tensor & self, const Tensor & source);
-  // static Tensor & set_(Tensor & self);
+  static Tensor & set_(Tensor & self, Storage source); // aten::set_.source_Storage(Tensor(a!) self, Storage source) -> Tensor(a!)
+  static Tensor & set_(Tensor & self, Storage source, int64_t storage_offset, IntArrayRef size, IntArrayRef stride); // aten::set_.source_Storage_storage_offset(Tensor(a!) self, Storage source, int storage_offset, int[] size, int[] stride=[]) -> Tensor(a!)
+  static Tensor & set_(Tensor & self, const Tensor & source); // aten::set_.source_Tensor(Tensor(a!) self, Tensor source) -> Tensor(a!)
+  static Tensor & set_(Tensor & self); // aten::set_(Tensor(a!) self) -> Tensor(a!)
   // static bool is_set_to(const Tensor & self, const Tensor & tensor);
   // static Tensor & masked_fill_(Tensor & self, const Tensor & mask, Scalar value);
   // static Tensor & masked_fill_(Tensor & self, const Tensor & mask, const Tensor & value);
