@@ -72,8 +72,8 @@ struct TORCH_API SYCLType final {
    static Tensor & logspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps, double base);  // aten::logspace.out(Scalar start, Scalar end, int steps=100, float base=10.0, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor _log_softmax(const Tensor & self, int64_t dim, bool half_to_float); // aten::_log_softmax(Tensor self, int dim, bool half_to_float) -> Tensor
   // static Tensor _log_softmax_backward_data(const Tensor & grad_output, const Tensor & output, int64_t dim, const Tensor & self);
-  // static Tensor mm(const Tensor & self, const Tensor & mat2);
-  // static Tensor & mm_out(Tensor & out, const Tensor & self, const Tensor & mat2);
+  static Tensor mm(const Tensor & self, const Tensor & mat2); // aten::mm(Tensor self, Tensor mat2) -> Tensor
+  static Tensor & mm_out(Tensor & out, const Tensor & self, const Tensor & mat2); // aten::mm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> Tensor(a!)
   // static Tensor mv(const Tensor & self, const Tensor & vec);
   // static Tensor & mv_out(Tensor & out, const Tensor & self, const Tensor & vec);
   // static Tensor narrow_copy(const Tensor & self, int64_t dim, int64_t start, int64_t length);

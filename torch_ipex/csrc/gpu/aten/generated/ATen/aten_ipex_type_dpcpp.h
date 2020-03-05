@@ -64,6 +64,8 @@ namespace AtenIpexTypeDPCPP {
   std::tuple<at::Tensor &,at::Tensor &> max_out(at::Tensor & max, at::Tensor & max_values, const at::Tensor & self, int64_t dim, bool keepdim);
   std::tuple<at::Tensor,at::Tensor> min(const at::Tensor & self, int64_t dim, bool keepdim);
   std::tuple<at::Tensor &,at::Tensor &> min_out(at::Tensor & min, at::Tensor & min_indices, const at::Tensor & self, int64_t dim, bool keepdim);
+  at::Tensor mm(const at::Tensor & self, const at::Tensor & mat2);
+  at::Tensor & mm_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & mat2);
   at::Tensor mul(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & mul_(at::Tensor & self, const at::Tensor & other);
   at::Tensor & mul_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);

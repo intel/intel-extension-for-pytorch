@@ -8,8 +8,12 @@
 #define ERROR_ONLY_FP_TYPES(func) \
   AT_ERROR(#func, "for SYCL tensors only supports floating-point types. Try converting the tensors with .float()");
 
+
+using namespace at::native;
+
 namespace at {
-namespace native {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 template <typename scalar_t>
 void mkldnnGemmImpl(Tensor& r_, scalar_t beta,
@@ -261,9 +265,7 @@ void baddbmm(Tensor *result, scalar_t beta,
 }
 #endif
 
-} // namespace native
-
-namespace AtenIpexTypeDPCPP {
+} // namespace impl
 
 Tensor addmm(const Tensor & self, const Tensor & mat1,
     const Tensor & mat2, Scalar beta, Scalar alpha) {
@@ -273,7 +275,7 @@ Tensor addmm(const Tensor & self, const Tensor & mat1,
 
   AT_DISPATCH_ALL_TYPES(self.scalar_type(), "addmm_out",
       [&]() {
-        at::native::addmm<scalar_t>(
+        impl::addmm<scalar_t>(
             r, beta.to<float>(), b_self, alpha.to<float>(), mat1, mat2);
       }
   );
@@ -281,6 +283,23 @@ Tensor addmm(const Tensor & self, const Tensor & mat1,
   return r;
 }
 
+Tensor & mm_out(Tensor & result, const Tensor & self, const Tensor & mat2) {
+  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "mm_out",
+      [&]() {
+        impl::addmm<scalar_t>(
+            result, scalar_t(0), result, scalar_t(1), self, mat2);
+      }
+  );
+
+  return result;
 }
 
+Tensor mm(const Tensor & self, const Tensor & mat2) {
+  auto result = at::empty({0}, self.options());
+  result.resize_({self.size(0), mat2.size(1)});
+
+  return at::AtenIpexTypeDPCPP::mm_out(result, self, mat2);
+}
+
+} // namespace AtenIpexTypeDPCPP
 } // namespace at

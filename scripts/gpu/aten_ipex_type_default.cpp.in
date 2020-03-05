@@ -243,6 +243,14 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexTypeDefault::min_out(at::Tensor & 
   return AtenIpexTypeDPCPP::min_out(min, min_indices, self, dim, keepdim);
 }
 
+at::Tensor AtenIpexTypeDefault::mm(const at::Tensor & self, const at::Tensor & mat2) {
+  return AtenIpexTypeDPCPP::mm(self, mat2);
+}
+
+at::Tensor & AtenIpexTypeDefault::mm_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & mat2) {
+  return AtenIpexTypeDPCPP::mm_out(out, self, mat2);
+}
+
 at::Tensor AtenIpexTypeDefault::mul(const at::Tensor & self, const at::Tensor & other) {
   return AtenIpexTypeDPCPP::mul(self, other);
 }
@@ -995,6 +1003,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::min.dim_min(Tensor self, int dim, bool keepdim=False, *, Tensor(a!) min, Tensor(b!) min_indices) -> (Tensor(a!) values, Tensor(b!) indices)")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor &,at::Tensor &>(at::Tensor &, at::Tensor &, const at::Tensor &, int64_t, bool), &AtenIpexTypeDefault::min_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::mm(Tensor self, Tensor mat2) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::mm>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::mm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::mm_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::mul.Tensor(Tensor self, Tensor other) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::mul>(at::TensorTypeId::DPCPPTensorId)
