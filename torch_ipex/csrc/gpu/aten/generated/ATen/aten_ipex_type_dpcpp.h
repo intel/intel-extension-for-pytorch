@@ -201,6 +201,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor upsample_nearest2d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size);
   at::Tensor & sigmoid_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & output);
   at::Tensor sigmoid_backward(const at::Tensor & grad_output, const at::Tensor & output);
+  at::Tensor & tanh_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & output);
+  at::Tensor tanh_backward(const at::Tensor & grad_output, const at::Tensor & output);
 
 
 } // namespace AtenIpexTypeDPCPP

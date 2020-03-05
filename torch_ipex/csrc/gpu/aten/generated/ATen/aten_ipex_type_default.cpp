@@ -791,6 +791,14 @@ at::Tensor AtenIpexTypeDefault::sigmoid_backward(const at::Tensor & grad_output,
   return AtenIpexTypeDPCPP::sigmoid_backward(grad_output, output);
 }
 
+at::Tensor & AtenIpexTypeDefault::tanh_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & output) {
+  return AtenIpexTypeDPCPP::tanh_backward_out(grad_input, grad_output, output);
+}
+
+at::Tensor AtenIpexTypeDefault::tanh_backward(const at::Tensor & grad_output, const at::Tensor & output) {
+  return AtenIpexTypeDPCPP::tanh_backward(grad_output, output);
+}
+
 
 
 void RegisterAtenTypeFunctions() {
@@ -1382,6 +1390,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::sigmoid_backward(Tensor grad_output, Tensor output) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::sigmoid_backward>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::tanh_backward.grad_input(Tensor grad_output, Tensor output, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::tanh_backward_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::tanh_backward(Tensor grad_output, Tensor output) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::tanh_backward>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
 ;
 }

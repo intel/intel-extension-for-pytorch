@@ -3,6 +3,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/BinaryOps.h>
 
+#include <core/SYCL.h>
 #include <utils/Pointwise.h>
 #include <functions/Loops.h>
 
@@ -232,6 +233,31 @@ Tensor __or__(const Tensor & self, const Tensor & other) {
 
 Tensor & __ior__(Tensor & self, const Tensor & other) {
   return at::AtenIpexTypeDPCPP::__or___out(self, self, other);
+}
+
+DP_DEF_K1(tanh_backward);
+Tensor & tanh_backward_out(
+    Tensor & grad_input, const Tensor & grad_output, const Tensor & output) {
+  auto iter = at::TensorIterator();
+  iter.set_check_mem_overlap(true);
+  iter.add_output(grad_input);
+  iter.add_input(grad_output);
+  iter.add_input(output);
+  iter.build();
+
+  AT_DISPATCH_ALL_TYPES(iter.dtype(), "tanh_backward_out", [&]() {
+    sycl_kernel_for_tensor_iter<DP_K(tanh_backward)>(
+        iter, [](scalar_t z, scalar_t output) -> scalar_t {
+      return output * (1. - z*z);
+    });
+  });
+
+  return grad_input;
+}
+
+Tensor tanh_backward(const Tensor & grad_output, const Tensor & output) {
+  auto grad_input = at::empty({0}, grad_output.options());
+  return at::tanh_backward_out(grad_input, grad_output, output);
 }
 
 } // namespace AtenIpexTypeDPCPP
