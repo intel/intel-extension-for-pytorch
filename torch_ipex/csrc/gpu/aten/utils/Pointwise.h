@@ -268,6 +268,22 @@ struct TensorSigmoidOp {
   }
 };
 
+template <typename T>
+struct TensorSigmoidGradOp {
+  void operator()(T& gradInput, T& output, T& gradOutput) const {
+    gradInput = gradOutput * (1.f - output) * output;
+  }
+};
+
+template <>
+struct TensorSigmoidGradOp<at::Half> {
+  void operator()(at::Half& gradInput, at::Half& output, at::Half& gradOutput) const {
+    float out = (float)output;
+    float go = (float)gradOutput;
+    gradInput = (at::Half)(go * (1.f - out) * out);
+  }
+};
+
 /*
  * The following function was converted to SYCL form from code that comes
  * with the following copyright notice. It has been released under the BSD license.

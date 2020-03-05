@@ -775,6 +775,14 @@ at::Tensor AtenIpexTypeDefault::upsample_nearest2d(const at::Tensor & self, at::
   return AtenIpexTypeDPCPP::upsample_nearest2d(self, output_size);
 }
 
+at::Tensor & AtenIpexTypeDefault::sigmoid_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & output) {
+  return AtenIpexTypeDPCPP::sigmoid_backward_out(grad_input, grad_output, output);
+}
+
+at::Tensor AtenIpexTypeDefault::sigmoid_backward(const at::Tensor & grad_output, const at::Tensor & output) {
+  return AtenIpexTypeDPCPP::sigmoid_backward(grad_output, output);
+}
+
 
 
 void RegisterAtenTypeFunctions() {
@@ -1354,6 +1362,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::upsample_nearest2d(Tensor self, int[2] output_size) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::upsample_nearest2d>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::sigmoid_backward.grad_input(Tensor grad_output, Tensor output, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::sigmoid_backward_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::sigmoid_backward(Tensor grad_output, Tensor output) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::sigmoid_backward>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
 ;
 }

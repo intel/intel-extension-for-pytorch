@@ -275,8 +275,8 @@ struct TORCH_API SYCLType final {
   static Tensor upsample_nearest2d(const Tensor & self, IntArrayRef output_size); // aten::upsample_nearest2d(Tensor self, int[2] output_size) -> Tensor
   // static Tensor & upsample_nearest2d_backward_out(Tensor & grad_input, const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size);
   // static Tensor upsample_nearest2d_backward(const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size);
-  // static Tensor & sigmoid_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & output);
-  // static Tensor sigmoid_backward(const Tensor & grad_output, const Tensor & output);
+  static Tensor & sigmoid_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & output); // aten::sigmoid_backward.grad_input(Tensor grad_output, Tensor output, *, Tensor(a!) grad_input) -> Tensor(a!)
+  static Tensor sigmoid_backward(const Tensor & grad_output, const Tensor & output); // aten::sigmoid_backward(Tensor grad_output, Tensor output) -> Tensor
   // static Tensor & tanh_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & output);
   // static Tensor tanh_backward(const Tensor & grad_output, const Tensor & output);
 };

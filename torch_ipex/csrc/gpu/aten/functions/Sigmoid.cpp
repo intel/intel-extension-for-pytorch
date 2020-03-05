@@ -1,59 +1,64 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 
+#include <core/SYCL.h>
 #include <core/SYCLMemory.h>
 #include <core/SYCLUtils.h>
 #include <core/SYCLContext.h>
 #include <utils/Numerics.h>
+#include <utils/Pointwise.h>
+
 #include <functions/Resize.h>
 
 namespace at {
-namespace native {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 template <typename scalar_t>
-class sigmoid_sycl_ker {};
+class sigmoid_ker {};
 
 template <typename scalar_t>
-static inline void sigmoid_sycl(Tensor & output, const Tensor & self) {
-  static const auto write_mode = cl::sycl::access::mode::discard_write;
-  static const auto read_mode = cl::sycl::access::mode::read;
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+static inline void sigmoid(Tensor & output, const Tensor & self) {
+  auto queue = c10::sycl::syclGetCurrentQueue();
   int64_t rng, grng, tile_size, size;
+
   c10::sycl::parallel_for_setup(self.numel(), tile_size, rng, grng);
   size = self.numel() * sizeof(scalar_t);
-  resize_sycl_(output, self.sizes().vec());
+  output.resize_as_(self);
 
-  sycl_queue.submit([&](cl::sycl::handler& cgh) {
+  auto cgf = DP_Q_CGF(cgh) {
     auto in_acc =
-        c10::sycl::SYCLAccessor<read_mode>(cgh, self.data_ptr<scalar_t>(), size);
+        c10::sycl::SYCLAccessor<dp_r_mode>(cgh, self.data_ptr<scalar_t>(), size);
     auto out_acc =
-        c10::sycl::SYCLAccessor<write_mode>(cgh, output.data_ptr<scalar_t>(), size);
-    cgh.parallel_for<sigmoid_sycl_ker<scalar_t>>(cl::sycl::nd_range<1>(
-        cl::sycl::range<1>(grng), cl::sycl::range<1>(tile_size)),
-        [=](cl::sycl::nd_item<1> item) {
+        c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, output.data_ptr<scalar_t>(), size);
+    auto kfn = DP_Q_KFN(DP::nd_item<1> item) {
       size_t id = item.get_global_linear_id();
       auto in_ptr = in_acc.template get_pointer<scalar_t>();
       auto out_ptr = out_acc.template get_pointer<scalar_t>();
       if (id < size / sizeof(scalar_t))
         out_ptr[id] = 1 / (1 + Numerics<scalar_t>::exp(-static_cast<scalar_t>(in_ptr[id])));
-    });
-  });
+    };
+
+    cgh.parallel_for<sigmoid_ker<scalar_t>>(DP::nd_range<1>(
+        DP::range<1>(grng), DP::range<1>(tile_size)), kfn);
+  };
+
+  DP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-Tensor & _sigmoid_out_sycl(Tensor & output, const Tensor & self) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "_sigmoid_out_sycl",
+Tensor & _sigmoid_out(Tensor & output, const Tensor & self) {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "_sigmoid_out",
       [&] () {
-        sigmoid_sycl<scalar_t>(output, self);
+        impl::sigmoid<scalar_t>(output, self);
       }
   );
   return output;
 }
 
-}
-}
-namespace at { namespace AtenIpexTypeDPCPP {
+} // namespace impl
+
 Tensor & sigmoid_out(Tensor & out, const Tensor & self){
-  return at::native::_sigmoid_out_sycl(out, self);
+  return impl::_sigmoid_out(out, self);
 }
 Tensor sigmoid(const Tensor & self){
   Tensor result = at::empty({0}, self.options());
@@ -61,6 +66,25 @@ Tensor sigmoid(const Tensor & self){
 }
 Tensor & sigmoid_(Tensor & self){
   return at::AtenIpexTypeDPCPP::sigmoid_out(self, self);
+}
+
+Tensor & sigmoid_backward_out(
+    Tensor & grad_input, const Tensor & grad_output, const Tensor & output) {
+  TORCH_CHECK(output.numel() == grad_output.numel(), "different elements ...");
+  grad_input.resize_as_(output);
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(output.scalar_type(), "sigmoid_backward_out",
+      [&] () {
+        at::sycl::SYCL_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+            grad_input, output, grad_output, TensorSigmoidGradOp<scalar_t>());
+      }
+  );
+
+  return grad_input;
+}
+
+Tensor sigmoid_backward(const Tensor & grad_output, const Tensor & output) {
+  auto grad_input = at::empty({0}, grad_output.options());
+  return at::AtenIpexTypeDPCPP::sigmoid_backward_out(grad_input, grad_output, output);
 }
 
 } // namespace AtenIpexTypeDPCPP
