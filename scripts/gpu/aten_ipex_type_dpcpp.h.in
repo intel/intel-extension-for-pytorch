@@ -197,6 +197,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor max_pool2d_with_indices_backward(const at::Tensor & grad_output, const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode, const at::Tensor & indices);
   at::Tensor & upsample_nearest2d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef output_size);
   at::Tensor upsample_nearest2d(const at::Tensor & self, at::IntArrayRef output_size);
+  at::Tensor & upsample_nearest2d_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size);
+  at::Tensor upsample_nearest2d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size);
   at::Tensor & sigmoid_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & output);
   at::Tensor sigmoid_backward(const at::Tensor & grad_output, const at::Tensor & output);
 

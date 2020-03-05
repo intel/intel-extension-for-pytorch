@@ -7,9 +7,11 @@
 #include <functions/UpSample.h>
 
 
+using namespace at::native;
+
 namespace at {
-namespace native {
-namespace {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 template <typename scalar_t>
 static void upsample_nearest2d_out_frame(
@@ -72,7 +74,7 @@ static void upsample_nearest2d_out_frame(
 
     // kick off kernel
     cgh.parallel_for<DP_K(nearest_neighbor_4d_sycl_kernel, scalar_t)>(
-      cl::sycl::nd_range<1>(cl::sycl::range<1>(grng), cl::sycl::range<1>(tile_size)), kfn);
+      DP::nd_range<1>(DP::range<1>(grng), DP::range<1>(tile_size)), kfn);
   };
 
   // submit to SYCL queue
@@ -145,14 +147,14 @@ static void upsample_nearest2d_backward_out_frame(
 
     // kick off kernel
     cgh.parallel_for<DP_K(nearest_neighbor_4d_bwd_sycl_kernel, scalar_t)>(
-      cl::sycl::nd_range<1>(cl::sycl::range<1>(grng), cl::sycl::range<1>(tile_size)), kfn);
+      DP::nd_range<1>(DP::range<1>(grng), DP::range<1>(tile_size)), kfn);
   };
 
   // submit to SYCL queue
   DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
 }*/
 
-static void upsample_nearest2d_out_sycl_template(
+static void upsample_nearest2d_out_template(
     Tensor& output,
     const Tensor& input_,
     IntArrayRef output_size) {
@@ -204,7 +206,7 @@ static void upsample_nearest2d_out_sycl_template(
   });
 }
 
-static void upsample_nearest2d_backward_out_sycl_template(
+static void upsample_nearest2d_backward_out_template(
     Tensor& grad_input,
     const Tensor& grad_output_,
     IntArrayRef output_size,
@@ -263,52 +265,36 @@ static void upsample_nearest2d_backward_out_sycl_template(
 
       });
 }
-} // namespace
 
-Tensor& upsample_nearest2d_out_sycl(
-    Tensor& output,
-    const Tensor& input,
-    IntArrayRef output_size) {
-  upsample_nearest2d_out_sycl_template(output, input, output_size);
-  return output;
-}
+} // namespace impl
 
-Tensor upsample_nearest2d_sycl(const Tensor& input, IntArrayRef output_size) {
-  auto output = at::empty({0}, input.options());
-  upsample_nearest2d_out_sycl_template(output, input, output_size);
-  return output;
-}
-
-Tensor& upsample_nearest2d_backward_out_sycl(
+Tensor& upsample_nearest2d_backward_out(
     Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size) {
-  upsample_nearest2d_backward_out_sycl_template(
+  impl::upsample_nearest2d_backward_out_template(
       grad_input, grad_output, output_size, input_size);
   return grad_input;
 }
 
-Tensor upsample_nearest2d_backward_sycl(
+Tensor upsample_nearest2d_backward(
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size) {
   auto grad_input = at::zeros(input_size, grad_output.options());
-  upsample_nearest2d_backward_out_sycl_template(
+  return at::AtenIpexTypeDPCPP::upsample_nearest2d_backward_out(
       grad_input, grad_output, output_size, input_size);
-  return grad_input;
 }
 
-} // namespace native
-} // namespace at
 
-namespace at { namespace AtenIpexTypeDPCPP {
 Tensor & upsample_nearest2d_out(Tensor & out, const Tensor & self, IntArrayRef output_size){
-  at::native::upsample_nearest2d_out_sycl(out, self, output_size);
+  impl::upsample_nearest2d_out_template(out, self, output_size);
   return out;
 }
 Tensor upsample_nearest2d(const Tensor & self, IntArrayRef output_size){
-  return at::native::upsample_nearest2d_sycl(self, output_size);
+  auto output = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::upsample_nearest2d_out(output, self, output_size);
 }
 
 } // namespace AtenIpexTypeDPCPP
