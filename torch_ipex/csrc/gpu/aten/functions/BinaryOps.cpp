@@ -247,7 +247,7 @@ Tensor & tanh_backward_out(
 
   AT_DISPATCH_ALL_TYPES(iter.dtype(), "tanh_backward_out", [&]() {
     sycl_kernel_for_tensor_iter<DP_K(tanh_backward)>(
-        iter, [](scalar_t z, scalar_t output) -> scalar_t {
+        iter, [](scalar_t output, scalar_t z) -> scalar_t {
       return output * (1. - z*z);
     });
   });
