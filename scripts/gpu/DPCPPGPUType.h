@@ -33,9 +33,6 @@ using ConstQuantizerPtr = const c10::intrusive_ptr<Quantizer>&;
 struct TORCH_API SYCLType final {
   // static std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>> _sycl_rnn(const Tensor & self, const Tensor & hx_, const Tensor & cx_, TensorList params, bool has_biases, int64_t num_layers_, double dropout_p, bool train, bool bidirectional, bool batch_first);
   // static std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>> _sycl_rnn_backward(const Tensor & self, const Tensor & hx_, const Tensor & cx_, const Tensor & output, const Tensor & hy_, const Tensor & cy_, TensorList workspace, const Tensor & grad_output, const Tensor & grad_hy, const Tensor & grad_cy, TensorList params, bool has_biases, int64_t num_layers_, double dropout_p, bool train, bool bidirectional, bool batch_first);
-  // static Tensor add(const Tensor & self, const Tensor & other, Scalar alpha);
-  // static Tensor & add_(Tensor & self, const Tensor & other, Scalar alpha);
-  // static Tensor & add_out(Tensor & out, const Tensor & self, const Tensor & other, Scalar alpha);
   // static Tensor addmv(const Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha);
   // static Tensor & addmv_(Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha);
   // static Tensor & addmv_out(Tensor & out, const Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha);
@@ -77,9 +74,6 @@ struct TORCH_API SYCLType final {
   // static Tensor _log_softmax_backward_data(const Tensor & grad_output, const Tensor & output, int64_t dim, const Tensor & self);
   // static Tensor mm(const Tensor & self, const Tensor & mat2);
   // static Tensor & mm_out(Tensor & out, const Tensor & self, const Tensor & mat2);
-  // static Tensor mul(const Tensor & self, const Tensor & other);
-  // static Tensor & mul_(Tensor & self, const Tensor & other);
-  // static Tensor & mul_out(Tensor & out, const Tensor & self, const Tensor & other);
   // static Tensor mv(const Tensor & self, const Tensor & vec);
   // static Tensor & mv_out(Tensor & out, const Tensor & self, const Tensor & vec);
   // static Tensor narrow_copy(const Tensor & self, int64_t dim, int64_t start, int64_t length);
@@ -235,8 +229,6 @@ struct TORCH_API SYCLType final {
   // static Tensor & _addmm_(Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);
   // static Tensor _cat(TensorList tensors, int64_t dim);
   // static Tensor & _cat_out(Tensor & out, TensorList tensors, int64_t dim);
-  // static std::tuple<Tensor,Tensor> _mode(const Tensor & self, int64_t dim, bool keepdim);
-  // static std::tuple<Tensor &,Tensor &> _mode_out(Tensor & values, Tensor & indices, const Tensor & self, int64_t dim, bool keepdim);
   static std::tuple<Tensor,Tensor> max(const Tensor & self, int64_t dim, bool keepdim); // aten::max.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)
   static std::tuple<Tensor &,Tensor &> max_out(Tensor & max, Tensor & max_values, const Tensor & self, int64_t dim, bool keepdim); // aten::max.dim_max(Tensor self, int dim, bool keepdim=False, *, Tensor(a!) max, Tensor(b!) max_values) -> (Tensor(a!) values, Tensor(b!) indices)
   static std::tuple<Tensor,Tensor> _max(const Tensor & self, int64_t dim, bool keepdim); // aten::_max(Tensor self, int dim, bool keepdim=False) -> (Tensor, Tensor)
