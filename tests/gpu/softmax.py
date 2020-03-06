@@ -7,37 +7,37 @@ import torch_ipex
 
 dtype = torch.float
 cpu_device = torch.device("cpu")
-sycl_device = torch.device("dpcpp")
+dpcpp_device = torch.device("dpcpp")
 x_cpu = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device = cpu_device)
 y_cpu_output = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device = cpu_device)
 
-#x_cpu = torch.randn([2,500], device=cpu_device, dtype=dtype)
-#x_cpu = torch.tensor(x_cpu, requires_grad=True)
-y = F.log_softmax(x_cpu, 1)
-# y.backward(y_cpu_output)
-
 print("x:", x_cpu)
+
+y = F.log_softmax(x_cpu, 1)
+y.backward(y_cpu_output)
+
 print("log_softmax:", y)
-# print("log_softmax x_cpu_grad = ", x_cpu.grad)
+print("log_softmax x_cpu_grad = ", x_cpu.grad)
 
-# y = F.softmax(x_cpu, 1)
-# y.backward(y_cpu_output)
-# 
-# print("softmax:", y)
-# print("softmax x_cpu_grad = ", x_cpu.grad)
+y = F.softmax(x_cpu, 1)
+y.backward(y_cpu_output)
 
-x_sycl = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device = sycl_device)
-y_sycl_output = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device = sycl_device)
+print("softmax:", y)
+print("softmax x_cpu_grad = ", x_cpu.grad)
 
-y_sycl = F.log_softmax(x_sycl, 1)
-# y_sycl.backward(y_sycl_output)
+x_dpcpp = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device = dpcpp_device)
+y_dpcpp_output = torch.tensor([[0.5, 1.5, 0.1], [2.2, 1.3, 1.7]], requires_grad=True, device = dpcpp_device)
 
-print("x_sycl:", x_sycl.cpu())
-print("log_softmax sycl:", y_sycl.cpu())
-# print("log_softmax x_sycl_grad = ", x_sycl.grad.cpu())
+print("x_dpcpp:", x_dpcpp.cpu())
 
-# y_sycl = F.softmax(x_sycl, 1)
-# y_sycl.backward(y_sycl_output)
-# 
-# print("softmax sycl:", y_sycl.cpu())
-# print("softmax x_sycl_grad = ", x_sycl.grad.cpu())
+y_dpcpp = F.log_softmax(x_dpcpp, 1)
+y_dpcpp.backward(y_dpcpp_output)
+
+print("log_softmax dpcpp:", y_dpcpp.cpu())
+print("log_softmax x_dpcpp_grad = ", x_dpcpp.grad.cpu())
+
+y_dpcpp = F.softmax(x_dpcpp, 1)
+y_dpcpp.backward(y_dpcpp_output)
+
+print("softmax dpcpp:", y_dpcpp.cpu())
+print("softmax x_dpcpp_grad = ", x_dpcpp.grad.cpu())

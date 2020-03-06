@@ -61,6 +61,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & log2_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & logspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps, double base);
   static at::Tensor _log_softmax(const at::Tensor & self, int64_t dim, bool half_to_float);
+  static at::Tensor _log_softmax_backward_data(const at::Tensor & grad_output, const at::Tensor & output, int64_t dim, const at::Tensor & self);
   static std::tuple<at::Tensor,at::Tensor> max(const at::Tensor & self, int64_t dim, bool keepdim);
   static std::tuple<at::Tensor &,at::Tensor &> max_out(at::Tensor & max, at::Tensor & max_values, const at::Tensor & self, int64_t dim, bool keepdim);
   static std::tuple<at::Tensor,at::Tensor> min(const at::Tensor & self, int64_t dim, bool keepdim);
@@ -83,6 +84,8 @@ class AtenIpexTypeDefault {
   static at::Tensor & sigmoid_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & sin_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & sinh_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor _softmax(const at::Tensor & self, int64_t dim, bool half_to_float);
+  static at::Tensor _softmax_backward_data(const at::Tensor & grad_output, const at::Tensor & output, int64_t dim, const at::Tensor & self);
   static at::Tensor sum(const at::Tensor & self, c10::optional<at::ScalarType> dtype);
   static at::Tensor sum(const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   static at::Tensor & sum_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);

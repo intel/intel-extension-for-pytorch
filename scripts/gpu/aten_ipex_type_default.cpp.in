@@ -227,6 +227,10 @@ at::Tensor AtenIpexTypeDefault::_log_softmax(const at::Tensor & self, int64_t di
   return AtenIpexTypeDPCPP::_log_softmax(self, dim, half_to_float);
 }
 
+at::Tensor AtenIpexTypeDefault::_log_softmax_backward_data(const at::Tensor & grad_output, const at::Tensor & output, int64_t dim, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::_log_softmax_backward_data(grad_output, output, dim, self);
+}
+
 std::tuple<at::Tensor,at::Tensor> AtenIpexTypeDefault::max(const at::Tensor & self, int64_t dim, bool keepdim) {
   return AtenIpexTypeDPCPP::max(self, dim, keepdim);
 }
@@ -313,6 +317,14 @@ at::Tensor & AtenIpexTypeDefault::sin_out(at::Tensor & out, const at::Tensor & s
 
 at::Tensor & AtenIpexTypeDefault::sinh_out(at::Tensor & out, const at::Tensor & self) {
   return AtenIpexTypeDPCPP::sinh_out(out, self);
+}
+
+at::Tensor AtenIpexTypeDefault::_softmax(const at::Tensor & self, int64_t dim, bool half_to_float) {
+  return AtenIpexTypeDPCPP::_softmax(self, dim, half_to_float);
+}
+
+at::Tensor AtenIpexTypeDefault::_softmax_backward_data(const at::Tensor & grad_output, const at::Tensor & output, int64_t dim, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::_softmax_backward_data(grad_output, output, dim, self);
 }
 
 at::Tensor AtenIpexTypeDefault::sum(const at::Tensor & self, c10::optional<at::ScalarType> dtype) {
@@ -992,6 +1004,9 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::_log_softmax(Tensor self, int dim, bool half_to_float) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, int64_t, bool), &AtenIpexTypeDefault::_log_softmax>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::_log_softmax_backward_data(Tensor grad_output, Tensor output, int dim, Tensor self) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, int64_t, const at::Tensor &), &AtenIpexTypeDefault::_log_softmax_backward_data>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::max.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor>(const at::Tensor &, int64_t, bool), &AtenIpexTypeDefault::max>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -1057,6 +1072,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::sinh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::sinh_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::_softmax(Tensor self, int dim, bool half_to_float) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, int64_t, bool), &AtenIpexTypeDefault::_softmax>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::_softmax_backward_data(Tensor grad_output, Tensor output, int dim, Tensor self) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, int64_t, const at::Tensor &), &AtenIpexTypeDefault::_softmax_backward_data>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::sum(Tensor self, *, ScalarType? dtype=None) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::ScalarType>), &AtenIpexTypeDefault::sum>(at::TensorTypeId::DPCPPTensorId)
