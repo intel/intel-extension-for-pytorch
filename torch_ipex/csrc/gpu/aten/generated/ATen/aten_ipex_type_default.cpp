@@ -407,6 +407,10 @@ at::Tensor & AtenIpexTypeDefault::norm_out(at::Tensor & out, const at::Tensor & 
   return AtenIpexTypeDPCPP::norm_out(out, self, p, dim, keepdim);
 }
 
+at::Tensor AtenIpexTypeDefault::clone(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format) {
+  return AtenIpexTypeDPCPP::clone(self, memory_format);
+}
+
 at::Tensor & AtenIpexTypeDefault::resize_as_(at::Tensor & self, const at::Tensor & the_template, c10::optional<at::MemoryFormat> memory_format) {
   return AtenIpexTypeDPCPP::resize_as_(self, the_template, memory_format);
 }
@@ -685,6 +689,10 @@ at::Tensor AtenIpexTypeDefault::max(const at::Tensor & self, const at::Tensor & 
 
 at::Tensor AtenIpexTypeDefault::max(const at::Tensor & self) {
   return AtenIpexTypeDPCPP::max(self);
+}
+
+at::Tensor AtenIpexTypeDefault::median(const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::median(self);
 }
 
 std::tuple<at::Tensor &,at::Tensor &> AtenIpexTypeDefault::topk_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted) {
@@ -1143,6 +1151,9 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::norm.out(Tensor self, Scalar? p, int[1] dim, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, c10::optional<at::Scalar>, at::IntArrayRef, bool), &AtenIpexTypeDefault::norm_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::MemoryFormat>), &AtenIpexTypeDefault::clone>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::resize_as_(Tensor(a!) self, Tensor the_template, *, int? memory_format=None) -> (Tensor(a!))")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, c10::optional<at::MemoryFormat>), &AtenIpexTypeDefault::resize_as_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -1352,6 +1363,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::max(Tensor self) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::max>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::median(Tensor self) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::median>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::topk.values(Tensor self, int k, int dim=-1, bool largest=True, bool sorted=True, *, Tensor(a!) values, Tensor(b!) indices) ->(Tensor(a!) values, Tensor(b!) indices)")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor &,at::Tensor &>(at::Tensor &, at::Tensor &, const at::Tensor &, int64_t, int64_t, bool, bool), &AtenIpexTypeDefault::topk_out>(at::TensorTypeId::DPCPPTensorId)

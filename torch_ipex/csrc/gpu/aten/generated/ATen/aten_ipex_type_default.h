@@ -106,6 +106,7 @@ class AtenIpexTypeDefault {
   static at::Tensor norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::IntArrayRef dim, bool keepdim);
   static at::Tensor & norm_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> p, at::IntArrayRef dim, bool keepdim, at::ScalarType dtype);
   static at::Tensor & norm_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> p, at::IntArrayRef dim, bool keepdim);
+  static at::Tensor clone(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format);
   static at::Tensor & resize_as_(at::Tensor & self, const at::Tensor & the_template, c10::optional<at::MemoryFormat> memory_format);
   static at::Tensor & pow_out(at::Tensor & out, const at::Tensor & self, at::Scalar exponent);
   static at::Tensor pow(const at::Tensor & self, at::Scalar exponent);
@@ -176,6 +177,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & max_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
   static at::Tensor max(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor max(const at::Tensor & self);
+  static at::Tensor median(const at::Tensor & self);
   static std::tuple<at::Tensor &,at::Tensor &> topk_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
   static std::tuple<at::Tensor,at::Tensor> topk(const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
   static at::Tensor & pow_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & exponent);
