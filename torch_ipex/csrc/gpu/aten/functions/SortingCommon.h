@@ -1,3 +1,6 @@
+#ifndef SORTINGCOMMON_H
+#define SORTINGCOMMON_H
+
 #include <ATen/ATen.h>
 #include <ATen/native/SortingUtils.h>
 #include <assert.h>
@@ -92,3 +95,5 @@ void run_launcher(
         slice_size);
   }
 }
+
+#endif

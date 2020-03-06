@@ -8,16 +8,13 @@
 #include <utils/MathReduce.h>
 #include <functions/ScanKernel.h>
 #include <ATen/aten_ipex_type_dpcpp.h>
+#include "Sort.h"
 
 
 using namespace at::sycl::detail;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
-
-template <typename scalar_t>
-void SortKeyValueInplace(Tensor & key, Tensor & value, int dim, bool dir);
-
 namespace {
 
 template <typename T>

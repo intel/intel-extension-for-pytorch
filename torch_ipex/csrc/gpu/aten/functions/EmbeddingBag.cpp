@@ -1,13 +1,12 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 
-#include <legacy/THSYCLDeviceUtils.h>
-
 #include <core/DPCPPTensorUtils.h>
 #include <core/SYCL.h>
 #include <core/SYCLMemory.h>
 #include <core/SYCLUtils.h>
 #include <core/SYCLContext.h>
+#include <utils/Numerics.h>
 
 
 namespace at {
@@ -34,7 +33,7 @@ void EmbeddingBag_updateOutputKernel(
 
   using accscalar_t = acc_type<scalar_t, true>;
   auto queue = c10::sycl::syclGetCurrentQueue();
-  int64_t chunksPerBag = THSYCLCeilDiv(featureSize, (int64_t)32);
+  int64_t chunksPerBag = CeilDiv(featureSize, (int64_t)32);
   int64_t numChunks = numBags * chunksPerBag;
   int64_t kernel_range = 1024 * 64;
   bool per_sample_weights_defined = per_sample_weights ? true : false;
