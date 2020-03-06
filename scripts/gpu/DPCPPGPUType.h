@@ -117,18 +117,6 @@ struct TORCH_API SYCLType final {
   static Tensor __or__(const Tensor & self, const Tensor & other); // aten::__or__.Tensor(Tensor self, Tensor other) -> Tensor
   static Tensor & __ior__(Tensor & self, Scalar other); // aten::__ior__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
   static Tensor & __ior__(Tensor & self, const Tensor & other); // aten::__ior__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-  // static Tensor __xor__(const Tensor & self, Scalar other); // aten::__xor__.Scalar(Tensor self, Scalar other) -> Tensor
-  // static Tensor __xor__(const Tensor & self, const Tensor & other); // aten::__xor__.Tensor(Tensor self, Tensor other) -> Tensor
-  // static Tensor & __ixor__(Tensor & self, Scalar other); // aten::__ixor__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-  // static Tensor & __ixor__(Tensor & self, const Tensor & other); // aten::__ixor__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-  // static Tensor __lshift__(const Tensor & self, Scalar other); // aten::__lshift__.Scalar(Tensor self, Scalar other) -> Tensor
-  // static Tensor __lshift__(const Tensor & self, const Tensor & other); // aten::__lshift__.Tensor(Tensor self, Tensor other) -> Tensor
-  // static Tensor & __ilshift__(Tensor & self, Scalar other); // aten::__ilshift__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-  // static Tensor & __ilshift__(Tensor & self, const Tensor & other); // aten::__ilshift__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-  // static Tensor __rshift__(const Tensor & self, Scalar other); // aten::__rshift__.Scalar(Tensor self, Scalar other) -> Tensor
-  // static Tensor __rshift__(const Tensor & self, const Tensor & other); // aten::__rshift__.Tensor(Tensor self, Tensor other) -> Tensor
-  // static Tensor & __irshift__(Tensor & self, Scalar other); // aten::__irshift__.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-  // static Tensor & __irshift__(Tensor & self, const Tensor & other); // aten::__irshift__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
   static Tensor & tril_(Tensor & self, int64_t diagonal); // aten::tril_(Tensor(a!) self, int diagonal=0) -> Tensor(a!)
   static Tensor & triu_(Tensor & self, int64_t diagonal); // aten::triu_(Tensor(a!) self, int diagonal=0) -> Tensor(a!)
   // static Tensor & digamma_(Tensor & self);
