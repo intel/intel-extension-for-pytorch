@@ -74,6 +74,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor mul(const at::Tensor & self, at::Scalar other);
   at::Tensor & mul_(at::Tensor & self, at::Scalar other);
   std::tuple<at::Tensor,at::Tensor,at::Tensor> native_batch_norm(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, const at::Tensor & running_mean, const at::Tensor & running_var, bool training, double momentum, double eps);
+  std::tuple<at::Tensor,at::Tensor,at::Tensor> native_batch_norm_backward(const at::Tensor & grad_out, const at::Tensor & input, const at::Tensor & weight, const at::Tensor & running_mean, const at::Tensor & running_var, const at::Tensor & save_mean, const at::Tensor & save_invstd, bool train, double eps, std::array<bool,3> output_mask);
   at::Tensor & range_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
   at::Tensor & neg_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & round_out(at::Tensor & out, const at::Tensor & self);
