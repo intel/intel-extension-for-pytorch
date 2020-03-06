@@ -1,109 +1,109 @@
 #include <ATen/ATen.h>
 #include <ATen/native/SortingUtils.h>
-#include <assert.h>
 #include <c10/macros/Macros.h>
-#include <stdlib.h>
 
 #include <core/SYCL.h>
+
 #include <core/SYCLApplyUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
-
-#include <functions/SortingCommon.h>
-#include <functions/SortingRadixSelect.h>
 #include <utils/Numerics.h>
+#include "SortingCommon.h"
+#include "SortingRadixSelect.h"
 
+
+using namespace at::native;
+
+namespace at {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 DP_DEF_K2(gatherKthValueKernelName, typename scalar_t, typename index_t, int Dim);
 
-namespace at {
-namespace native {
-
 template <typename scalar_t, typename index_t, int Dim>
 void gatherKthValue(
-    sycl::detail::TensorInfo<scalar_t, index_t> input,
-    index_t inputSliceSize,
-    index_t k,
+  sycl::detail::TensorInfo<scalar_t, index_t> input,
+  index_t inputSliceSize,
+  index_t k,
 
-    index_t numInputSlices,
-    index_t inputWithinSliceStride,
+  index_t numInputSlices,
+  index_t inputWithinSliceStride,
 
-    sycl::detail::TensorInfo<scalar_t, index_t> kthValue,
-    sycl::detail::TensorInfo<int64_t, index_t> indices) {
-    // Indices are limited to integer fp precision, so counts can fit in
-    // int32, regardless of index_t
+  sycl::detail::TensorInfo<scalar_t, index_t> kthValue,
+  sycl::detail::TensorInfo<int64_t, index_t> indices) {
+  // Indices are limited to integer fp precision, so counts can fit in
+  // int32, regardless of index_t
 
-    auto sycl_queue = c10::sycl::syclGetCurrentQueue();
-    int64_t local_size = sycl_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
+  auto sycl_queue = c10::sycl::syclGetCurrentQueue();
+  int64_t local_size = sycl_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
 
-    auto cgf = DP_Q_CGF(cgh) {
-      auto in_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, input.data);
-      auto kth_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, kthValue.data);
-      auto indices_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, indices.data);
+  auto cgf = DP_Q_CGF(cgh) {
+    auto in_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, input.data);
+    auto kth_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, kthValue.data);
+    auto indices_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, indices.data);
 
-      auto smem = dp_local_acc_t<int>(32, cgh);
-        auto kfn = DP_Q_KFN(DP::nd_item<1> item) {
+    auto smem = dp_local_acc_t<int>(32, cgh);
+    auto kfn = DP_Q_KFN(DP::nd_item<1> item) {
 
-          index_t slice = item.get_group_linear_id(); 
+      index_t slice = item.get_group_linear_id();
 
-          // Find the start offset for our slice
-          auto sliceStartIndex =
-              sycl::detail::IndexToOffset<scalar_t, index_t, Dim>::get(slice, input);
-          auto kthValueSliceStartIndex =
-              sycl::detail::IndexToOffset<scalar_t, index_t, Dim>::get(slice, kthValue);
-          auto indicesSliceStartIndex =
-              sycl::detail::IndexToOffset<int64_t, index_t, Dim>::get(slice, indices);
+      // Find the start offset for our slice
+      auto sliceStartIndex =
+          sycl::detail::IndexToOffset<scalar_t, index_t, Dim>::get(slice, input);
+      auto kthValueSliceStartIndex =
+          sycl::detail::IndexToOffset<scalar_t, index_t, Dim>::get(slice, kthValue);
+      auto indicesSliceStartIndex =
+          sycl::detail::IndexToOffset<int64_t, index_t, Dim>::get(slice, indices);
 
-          scalar_t* inputSliceStart = in_acc.template get_pointer<scalar_t>() + sliceStartIndex;
-          scalar_t* kthValueSliceStart = kth_acc.template get_pointer<scalar_t>() + kthValueSliceStartIndex;
-          int64_t* indicesSliceStart = indices_acc.template get_pointer<int64_t>() + indicesSliceStartIndex;
+      scalar_t* inputSliceStart = in_acc.template get_pointer<scalar_t>() + sliceStartIndex;
+      scalar_t* kthValueSliceStart = kth_acc.template get_pointer<scalar_t>() + kthValueSliceStartIndex;
+      int64_t* indicesSliceStart = indices_acc.template get_pointer<int64_t>() + indicesSliceStartIndex;
 
 
-          // Find the k-th highest element in our input
-          scalar_t kValue = ScalarConvert<int, scalar_t>::to(0);
-          radixSelect<scalar_t, typename TopKTypeConfig<scalar_t>::RadixType, index_t, false>(
-             (dp_global_ptr_pt<scalar_t>)inputSliceStart,
-             k,
-             inputSliceSize,
-             inputWithinSliceStride,
-             smem,
-             &kValue,
-             item);
+      // Find the k-th highest element in our input
+      scalar_t kValue = ScalarConvert<int, scalar_t>::to(0);
+      radixSelect<scalar_t, typename TopKTypeConfig<scalar_t>::RadixType, index_t, false>(
+         (dp_global_ptr_pt<scalar_t>)inputSliceStart,
+         k,
+         inputSliceSize,
+         inputWithinSliceStride,
+         smem,
+         &kValue,
+         item);
 
-          // Find the index of the k-th highest element
-          index_t kValueIndex = 0;
-          bool foundKValue = false;
-  
-          for (index_t i = item.get_local_id(0); i < inputSliceSize; i += item.get_local_range(0)) {
-              bool inRange = (i < inputSliceSize);
-              scalar_t v = inRange ? inputSliceStart[i * inputWithinSliceStride]
-                                     : static_cast<scalar_t>(0);
-              bool isKValue = inRange && Numerics<scalar_t>::eq(v, kValue);
+      // Find the index of the k-th highest element
+      index_t kValueIndex = 0;
+      bool foundKValue = false;
 
-              if (isKValue) {
-                  kValueIndex = i;
-                  foundKValue = true;
-                  break;
-              }
-          }
-          if (foundKValue) {
-              kthValueSliceStart[0] = kValue;
-              indicesSliceStart[0] = kValueIndex;
-          }
-      };
+      for (index_t i = item.get_local_id(0); i < inputSliceSize; i += item.get_local_range(0)) {
+        bool inRange = (i < inputSliceSize);
+        scalar_t v = inRange ? inputSliceStart[i * inputWithinSliceStride]
+                               : static_cast<scalar_t>(0);
+        bool isKValue = inRange && Numerics<scalar_t>::eq(v, kValue);
 
-      cgh.parallel_for<DP_K(gatherKthValueKernelName, scalar_t, index_t, Dim)> (
-        DP::nd_range<1>(DP::range<1>(numInputSlices * local_size), DP::range<1>(local_size)), kfn);
+        if (isKValue) {
+          kValueIndex = i;
+          foundKValue = true;
+          break;
+        }
+      }
+      if (foundKValue) {
+        kthValueSliceStart[0] = kValue;
+        indicesSliceStart[0] = kValueIndex;
+      }
     };
 
-    DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+    cgh.parallel_for<DP_K(gatherKthValueKernelName, scalar_t, index_t, Dim)> (
+      DP::nd_range<1>(DP::range<1>(numInputSlices * local_size), DP::range<1>(local_size)), kfn);
+  };
+
+  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
 }
 
 struct KthValueLauncher {
   int64_t k;
 
   KthValueLauncher(int64_t k) : k(k) {}
-
 
   template <typename scalar_t, typename index_t, int all_dims>
   inline void launch(
@@ -131,7 +131,7 @@ struct KthValueLauncher {
 
 // this does not reduce to median with dim beause we don't want to copy twice
 template <typename scalar_t>
-Tensor median_sycl_template(const Tensor& self) {
+Tensor median_template(const Tensor& self) {
   TORCH_CHECK(self.numel() > 0, "median cannot be called with empty tensor");
   if (self.dim() == 0 && self.numel() == 1) {
     return self.clone();
@@ -167,11 +167,77 @@ Tensor median_sycl_template(const Tensor& self) {
   return values.view({});
 }
 
-Tensor median_sycl(const Tensor& self) {
+template <typename scalar_t>
+void kthvalue_template(
+    Tensor& values,
+    Tensor& indices,
+    const Tensor& self,
+    int64_t k,
+    int64_t dim_,
+    bool keepdim) {
+  int64_t dim = maybe_wrap_dim(dim_, self.dim());
+  int64_t slicesize = self.size(dim);
+  // FIXME: This seems bogus, I only do this because it was the old behaviour.
+  //        The reductions are fine, as long as the axis being reduced along
+  //        isn't of 0 elements (and the output has elements).
+  TORCH_CHECK(
+      self.numel() > 0,
+      "cannot perform reduction function kthvalue",
+      " on tensor with no elements because the operation does not have an identity");
+  TORCH_CHECK(k >= 1 && k <= slicesize, "selected number k out of range");
+
+  _reduction_with_indices_allocate_or_resize_output(
+      values, indices, self, dim, keepdim);
+  if (self.dim() == 0 && self.numel() == 1) {
+    values.copy_(self);
+    indices.zero_();
+    return;
+  }
+
+  TORCH_CHECK(
+      self.dim() <= MAX_TENSORINFO_DIMS,
+      "cannot operate on more than ",
+      MAX_TENSORINFO_DIMS,
+      " dimensions");
+
+  // Based on required index size, run the algorithm with the
+  // appropriate index type
+  if (sycl::detail::canUse32BitIndexMath(self) &&
+      sycl::detail::canUse32BitIndexMath(values) &&
+      sycl::detail::canUse32BitIndexMath(indices)) {
+    run_launcher<scalar_t, uint32_t>(
+        values, indices, self, dim, KthValueLauncher(k));
+  } else {
+    run_launcher<scalar_t, uint64_t>(
+        values, indices, self, dim, KthValueLauncher(k));
+  }
+
+  if (!keepdim) {
+    values.squeeze_(dim);
+    indices.squeeze_(dim);
+  }
+}
+
+} // namespace impl
+
+Tensor median(const Tensor& self) {
   return AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, self.scalar_type(), "median", [&] {
-    return native::median_sycl_template<scalar_t>(self);
+    return impl::median_template<scalar_t>(self);
   });
 }
 
-} // namespace native
+std::tuple<Tensor&, Tensor&> kthvalue_out(
+    Tensor& values,
+    Tensor& indices,
+    const Tensor& self,
+    int64_t k,
+    int64_t dim,
+    bool keepdim) {
+  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, self.scalar_type(), "kthvalue", [&] {
+    impl::kthvalue_template<scalar_t>(values, indices, self, k, dim, keepdim);
+  });
+  return std::forward_as_tuple(values, indices);
+}
+
+} // namespace AtenIpexTypeDPCPP
 } // namespace at

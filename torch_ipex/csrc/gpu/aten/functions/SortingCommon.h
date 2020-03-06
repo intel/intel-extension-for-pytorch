@@ -8,16 +8,10 @@
 #include <core/SYCLApplyUtils.h>
 #include <core/detail/TensorInfo.h>
 
-#include <legacy/THSYCLDeviceUtils.h> // only for THCRoundUp?
-#include <legacy/THSYCLScanUtils.h>
-
-#include <utils/MathReduce.h> // AddOp
-
-
-namespace at {
-namespace native {
 
 // Maximum size per grid dimension that we assume (compute capability >= 2.0)
+
+using namespace at;
 
 template <typename scalar_t, typename index_t, typename Launcher>
 void run_launcher(
@@ -26,9 +20,9 @@ void run_launcher(
     const Tensor& self,
     int64_t dim,
     Launcher l) {
-  auto self_info = sycl::detail::getTensorInfo<scalar_t, index_t>(self);
-  auto values_info = sycl::detail::getTensorInfo<scalar_t, index_t>(values);
-  auto indices_info = sycl::detail::getTensorInfo<int64_t, index_t>(indices);
+  auto self_info = at::sycl::detail::getTensorInfo<scalar_t, index_t>(self);
+  auto values_info = at::sycl::detail::getTensorInfo<scalar_t, index_t>(values);
+  auto indices_info = at::sycl::detail::getTensorInfo<int64_t, index_t>(indices);
 
   int64_t slice_size = self.size(dim);
   /* We use these structures solely to find the offset to */
@@ -98,6 +92,3 @@ void run_launcher(
         slice_size);
   }
 }
-
-} // namespace native
-} // namespace at

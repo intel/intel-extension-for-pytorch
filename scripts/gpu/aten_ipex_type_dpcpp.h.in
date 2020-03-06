@@ -53,6 +53,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & fill_(at::Tensor & self, at::Scalar value);
   at::Tensor & fill_(at::Tensor & self, const at::Tensor & value);
   at::Tensor & floor_out(at::Tensor & out, const at::Tensor & self);
+  std::tuple<at::Tensor &,at::Tensor &> kthvalue_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool keepdim);
   at::Tensor & linspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps);
   at::Tensor & log_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & log10_out(at::Tensor & out, const at::Tensor & self);

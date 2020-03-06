@@ -54,6 +54,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & fill_(at::Tensor & self, at::Scalar value);
   static at::Tensor & fill_(at::Tensor & self, const at::Tensor & value);
   static at::Tensor & floor_out(at::Tensor & out, const at::Tensor & self);
+  static std::tuple<at::Tensor &,at::Tensor &> kthvalue_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool keepdim);
   static at::Tensor & linspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps);
   static at::Tensor & log_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & log10_out(at::Tensor & out, const at::Tensor & self);
