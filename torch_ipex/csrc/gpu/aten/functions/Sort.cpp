@@ -41,7 +41,7 @@ sort_out(Tensor & sorted, Tensor & indices, const Tensor & input, long dim, bool
 
     // Sort using our in-place k/v kernel that supports arbitrary
     // layout
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(sorted.scalar_type(), "SortKeyValueInplace",
+    AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, sorted.scalar_type(), "SortKeyValueInplace",
         [&] () {
           SortKeyValueInplace<scalar_t>(sorted, indices, dim, order);
         }

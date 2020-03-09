@@ -24,8 +24,12 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
   TORCH_CHECK(idxDims <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
   TORCH_CHECK(idxDims <= 1,
            "Index is supposed to be an empty tensor or a vector");
-  TORCH_CHECK(idxDims < srcDims, "Indexing dim is out of bounds");
+  TORCH_CHECK(dim < srcDims, "Indexing dim is out of bounds");
   TORCH_CHECK(srcDims > 0, "Source tensor is empty");
+
+  TORCH_CHECK(indices.scalar_type() == ScalarType::Long, "index_select(): Expected dtype int64 for index");
+  TORCH_CHECK(src.scalar_type() == dst.scalar_type(),
+              "index_select(): Source and result must have the same scalar type");
 
   TensorInfo<int64_t, unsigned int> indices_info =
     getTensorInfo<int64_t, unsigned int>(indices);
@@ -129,7 +133,7 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
 } // namespace impl
 
 Tensor & index_select_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index) {
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "indexSelect", [&]() {
+  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Bool, self.scalar_type(), "indexSelect", [&]() {
     impl::indexSelect<scalar_t>(out, self, dim, index);
   });
   return out;
