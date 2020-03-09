@@ -139,6 +139,10 @@ at::Tensor & AtenIpexTypeDefault::div_out(at::Tensor & out, const at::Tensor & s
   return AtenIpexTypeDPCPP::div_out(out, self, other);
 }
 
+at::Tensor AtenIpexTypeDefault::embedding_dense_backward(const at::Tensor & grad_output, const at::Tensor & indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq) {
+  return AtenIpexTypeDPCPP::embedding_dense_backward(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq);
+}
+
 std::tuple<at::Tensor,at::Tensor,at::Tensor,at::Tensor> AtenIpexTypeDefault::_embedding_bag(const at::Tensor & weight, const at::Tensor & indices, const at::Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse, const at::Tensor & per_sample_weights) {
   return AtenIpexTypeDPCPP::_embedding_bag(weight, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights);
 }
@@ -1005,6 +1009,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::div.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::div_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::embedding_dense_backward(Tensor grad_output, Tensor indices, int num_weights, int padding_idx, bool scale_grad_by_freq) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, int64_t, int64_t, bool), &AtenIpexTypeDefault::embedding_dense_backward>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_embedding_bag(Tensor weight, Tensor indices, Tensor offsets, bool scale_grad_by_freq=False, int mode=0, bool sparse=False, Tensor? per_sample_weights=None) -> (Tensor, Tensor, Tensor, Tensor)")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor,at::Tensor,at::Tensor>(const at::Tensor &, const at::Tensor &, const at::Tensor &, bool, int64_t, bool, const at::Tensor &), &AtenIpexTypeDefault::_embedding_bag>(at::TensorTypeId::DPCPPTensorId)

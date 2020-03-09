@@ -39,6 +39,7 @@ class AtenIpexTypeDefault {
   static at::Tensor div(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & div_(at::Tensor & self, const at::Tensor & other);
   static at::Tensor & div_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
+  static at::Tensor embedding_dense_backward(const at::Tensor & grad_output, const at::Tensor & indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq);
   static std::tuple<at::Tensor,at::Tensor,at::Tensor,at::Tensor> _embedding_bag(const at::Tensor & weight, const at::Tensor & indices, const at::Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse, const at::Tensor & per_sample_weights);
   static at::Tensor _embedding_bag_dense_backward(const at::Tensor & grad, const at::Tensor & indices, const at::Tensor & offsets, const at::Tensor & offset2bag, const at::Tensor & bag_size, const at::Tensor & maximum_indices, int64_t num_weights, bool scale_grad_by_freq, int64_t mode, const at::Tensor & per_sample_weights);
   static at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format);

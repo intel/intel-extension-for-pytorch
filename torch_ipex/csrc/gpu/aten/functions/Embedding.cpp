@@ -6,7 +6,9 @@
 #include <core/SYCLUtils.h>
 #include <core/SYCLContext.h>
 
-namespace at { namespace native {
+namespace at {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 template <typename T>
 class embedding_dense_backeward_sycl_ker {};
@@ -125,4 +127,12 @@ Tensor embedding_dense_backward_sycl(const Tensor & grad_, const Tensor & indice
   return grad_weight;
 }
 
-}}
+} // namespace impl
+
+Tensor embedding_dense_backward(const Tensor & grad_output, const Tensor & indices,
+    int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq) {
+  return impl::embedding_dense_backward_sycl(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq);
+}
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at
