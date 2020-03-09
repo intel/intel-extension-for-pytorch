@@ -193,6 +193,8 @@ class AtenIpexTypeDefault {
   static at::Tensor pow(const at::Tensor & self, const at::Tensor & exponent);
   static at::Tensor & pow_out(at::Tensor & out, at::Scalar self, const at::Tensor & exponent);
   static at::Tensor pow(at::Scalar self, const at::Tensor & exponent);
+  static at::Tensor _cat(at::TensorList tensors, int64_t dim);
+  static at::Tensor & _cat_out(at::Tensor & out, at::TensorList tensors, int64_t dim);
   static std::tuple<at::Tensor,at::Tensor> _max(const at::Tensor & self, int64_t dim, bool keepdim);
   static std::tuple<at::Tensor &,at::Tensor &> _max_out(at::Tensor & max, at::Tensor & max_indices, const at::Tensor & self, int64_t dim, bool keepdim);
   static std::tuple<at::Tensor,at::Tensor> _min(const at::Tensor & self, int64_t dim, bool keepdim);
