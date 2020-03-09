@@ -157,8 +157,8 @@ struct TORCH_API SYCLType final {
   static Tensor lt(const Tensor & self, const Tensor & other); // aten::lt.Tensor(Tensor self, Tensor other) -> Tensor
   // static Tensor & take_out(Tensor & out, const Tensor & self, const Tensor & index);
   // static Tensor take(const Tensor & self, const Tensor & index);
-  // static Tensor & index_select_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index);
-  // static Tensor index_select(const Tensor & self, int64_t dim, const Tensor & index);
+  static Tensor & index_select_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index); // aten::index_select.out(Tensor self, int dim, Tensor index, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor index_select(const Tensor & self, int64_t dim, const Tensor & index); // aten::index_select(Tensor self, int dim, Tensor index) -> Tensor
   // static Tensor & masked_select_out(Tensor & out, const Tensor & self, const Tensor & mask);
   // static Tensor masked_select(const Tensor & self, const Tensor & mask);
   // static Tensor & nonzero_out(Tensor & out, const Tensor & self);

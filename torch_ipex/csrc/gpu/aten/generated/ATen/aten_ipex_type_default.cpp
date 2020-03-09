@@ -655,6 +655,14 @@ at::Tensor AtenIpexTypeDefault::lt(const at::Tensor & self, const at::Tensor & o
   return AtenIpexTypeDPCPP::lt(self, other);
 }
 
+at::Tensor & AtenIpexTypeDefault::index_select_out(at::Tensor & out, const at::Tensor & self, int64_t dim, const at::Tensor & index) {
+  return AtenIpexTypeDPCPP::index_select_out(out, self, dim, index);
+}
+
+at::Tensor AtenIpexTypeDefault::index_select(const at::Tensor & self, int64_t dim, const at::Tensor & index) {
+  return AtenIpexTypeDPCPP::index_select(self, dim, index);
+}
+
 at::Tensor & AtenIpexTypeDefault::addcmul_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value) {
   return AtenIpexTypeDPCPP::addcmul_out(out, self, tensor1, tensor2, value);
 }
@@ -1376,6 +1384,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::lt.Tensor(Tensor self, Tensor other) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::lt>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::index_select.out(Tensor self, int dim, Tensor index, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, int64_t, const at::Tensor &), &AtenIpexTypeDefault::index_select_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::index_select(Tensor self, int dim, Tensor index) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, int64_t, const at::Tensor &), &AtenIpexTypeDefault::index_select>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::addcmul.out(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::addcmul_out>(at::TensorTypeId::DPCPPTensorId)
