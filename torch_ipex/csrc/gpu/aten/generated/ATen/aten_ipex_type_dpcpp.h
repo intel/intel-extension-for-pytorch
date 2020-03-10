@@ -192,6 +192,7 @@ namespace AtenIpexTypeDPCPP {
   std::tuple<at::Tensor,at::Tensor> sort(const at::Tensor & self, int64_t dim, bool descending);
   std::tuple<at::Tensor &,at::Tensor &> topk_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
   std::tuple<at::Tensor,at::Tensor> topk(const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
+  at::Tensor unfold(const at::Tensor & self, int64_t dimension, int64_t size, int64_t step);
   at::Tensor & pow_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & exponent);
   at::Tensor pow(const at::Tensor & self, const at::Tensor & exponent);
   at::Tensor & pow_out(at::Tensor & out, at::Scalar self, const at::Tensor & exponent);

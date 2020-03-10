@@ -16,5 +16,9 @@ Tensor narrow_copy(const Tensor & self, int64_t dim, int64_t start, int64_t leng
   return at::native::narrow_copy_dense(self, dim, start, length);
 }
 
+Tensor unfold(const Tensor & self, int64_t dimension, int64_t size, int64_t step) {
+  return at::native::unfold(self, dimension, size, step);
+}
+
 } // AtenIpexTypeDPCPP
 } // at
