@@ -177,7 +177,7 @@ Tensor digamma(const Tensor & self) {
   return at::AtenIpexTypeDPCPP::digamma_out(result, self);
 }
 
-IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(remainder_out, TensorRemainderOp)
+IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(remainder_out, TensorRemainderOp);
 
 Tensor remainder(const Tensor & self, Scalar other) {
   auto out = at::empty_like(self);
@@ -188,7 +188,7 @@ Tensor & remainder_(Tensor & self, Scalar other) {
   return at::AtenIpexTypeDPCPP::remainder_out(self, self, other);
 }
 
-IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(fmod_out, TensorFmodOp)
+IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(fmod_out, TensorFmodOp);
 
 Tensor fmod(const Tensor & self, Scalar other) {
   auto out = at::empty_like(self);
@@ -197,6 +197,17 @@ Tensor fmod(const Tensor & self, Scalar other) {
 
 Tensor & fmod_(Tensor & self, Scalar other) {
   return at::AtenIpexTypeDPCPP::fmod_out(self, self, other);
+}
+
+IPEX_OUT_ALL_CALLABLE_0_UNARY_OPS(sign_out, TensorSignOp);
+
+Tensor sign(const Tensor & self) {
+  auto out = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::sign_out(out, self);
+}
+
+Tensor & sign_(Tensor & self) {
+  return at::AtenIpexTypeDPCPP::sign_out(self, self);
 }
 
 } // namespace AtenIpexTypeDPCPP

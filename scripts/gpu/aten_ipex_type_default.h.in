@@ -188,6 +188,9 @@ class AtenIpexTypeDefault {
   static at::Tensor erfinv(const at::Tensor & self);
   static at::Tensor & erfinv_(at::Tensor & self);
   static at::Tensor & erfinv_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor sign(const at::Tensor & self);
+  static at::Tensor & sign_(at::Tensor & self);
+  static at::Tensor & sign_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & fmod_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
   static at::Tensor fmod(const at::Tensor & self, at::Scalar other);
   static at::Tensor & fmod_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);

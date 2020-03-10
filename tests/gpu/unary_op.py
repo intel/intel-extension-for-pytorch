@@ -88,22 +88,24 @@ y_dpcpp_int8 = y_cpu_int8.to("dpcpp")
 # 
 # print("sqrt cpu", torch.sqrt(y_cpu_float))
 # print("sqrt dpcpp", torch.sqrt(y_dpcpp_float).cpu())
+# 
+# print("__and__ y_cpu", y_cpu_int8.__and__(3))
+# print("__and__ y_dpcpp", y_dpcpp_int8.__and__(3).to("cpu"))
+# 
+# print("__iand__ y_cpu", y_cpu_int8.__iand__(3))
+# print("__iand__ y_dpcpp", y_dpcpp_int8.__iand__(3).to("cpu"))
+# 
+# print("__or__ y_cpu", y_cpu_int8.__or__(3))
+# print("__or__ y_dpcpp", y_dpcpp_int8.__or__(3).to("cpu"))
+# 
+# print("__ior__ y_cpu", y_cpu_int8.__ior__(3))
+# print("__ior__ y_dpcpp", y_dpcpp_int8.__ior__(3).to("cpu"))
+# 
+# print("erfinv cpu ", torch.erfinv(y_cpu_float))
+# print("erfinv dpcpp", torch.erfinv(y_dpcpp_float.to("cpu")))
+# 
+# print("digamma cpu ", torch.digamma(y_cpu_float))
+# print("digamma dpcpp ", torch.digamma(y_dpcpp_float.to("cpu")))
 
-print("__and__ y_cpu", y_cpu_int8.__and__(3))
-print("__and__ y_dpcpp", y_dpcpp_int8.__and__(3).to("cpu"))
-
-print("__iand__ y_cpu", y_cpu_int8.__iand__(3))
-print("__iand__ y_dpcpp", y_dpcpp_int8.__iand__(3).to("cpu"))
-
-print("__or__ y_cpu", y_cpu_int8.__or__(3))
-print("__or__ y_dpcpp", y_dpcpp_int8.__or__(3).to("cpu"))
-
-print("__ior__ y_cpu", y_cpu_int8.__ior__(3))
-print("__ior__ y_dpcpp", y_dpcpp_int8.__ior__(3).to("cpu"))
-
-print("erfinv cpu ", torch.erfinv(y_cpu_float))
-print("erfinv dpcpp", torch.erfinv(y_dpcpp_float.to("cpu")))
-
-print("digamma cpu ", torch.digamma(y_cpu_float))
-print("digamma dpcpp ", torch.digamma(y_dpcpp_float.to("cpu")))
-
+print("sign cpu", torch.sign(y_cpu_float));
+print("sign dpcpp", torch.sign(y_dpcpp_float).to("cpu"));

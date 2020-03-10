@@ -183,6 +183,16 @@
   }
 
 // Unary
+#define IPEX_OUT_ALL_CALLABLE_0_UNARY_OPS(op, callable)                       \
+    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 2, 0)
+
+#define IPEX_OUT_FLOAT_CALLABLE_0_UNARY_OPS(op, callable)                     \
+    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 2, 0)
+
+#define IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(op, callable)            \
+    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND_HALF, 1, 2, 0)
+
+
 #define IPEX_ALL_CALLABLE_1_UNARY_OPS(op, callable)                           \
     IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 11 /* inplace */, 1)
 
@@ -194,9 +204,6 @@
 
 #define IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(op, callable)                       \
     IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 2, 1)
-
-#define IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(op, callable)                     \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND_HALF, 1, 2, 0)
 
 #define IPEX_OUT_FLOAT_CALLABLE_1_UNARY_OPS(op, callable)                     \
     IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 2, 1)

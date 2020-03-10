@@ -188,6 +188,9 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor erfinv(const at::Tensor & self);
   at::Tensor & erfinv_(at::Tensor & self);
   at::Tensor & erfinv_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor sign(const at::Tensor & self);
+  at::Tensor & sign_(at::Tensor & self);
+  at::Tensor & sign_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & fmod_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
   at::Tensor fmod(const at::Tensor & self, at::Scalar other);
   at::Tensor & fmod_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
