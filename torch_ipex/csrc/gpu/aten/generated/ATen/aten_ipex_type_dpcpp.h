@@ -193,6 +193,10 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor pow(const at::Tensor & self, const at::Tensor & exponent);
   at::Tensor & pow_out(at::Tensor & out, at::Scalar self, const at::Tensor & exponent);
   at::Tensor pow(at::Scalar self, const at::Tensor & exponent);
+  at::Tensor _cumsum(const at::Tensor & self, int64_t dim);
+  at::Tensor & _cumsum_out(at::Tensor & out, const at::Tensor & self, int64_t dim);
+  at::Tensor _cumprod(const at::Tensor & self, int64_t dim);
+  at::Tensor & _cumprod_out(at::Tensor & out, const at::Tensor & self, int64_t dim);
   at::Tensor _cat(at::TensorList tensors, int64_t dim);
   at::Tensor & _cat_out(at::Tensor & out, at::TensorList tensors, int64_t dim);
   std::tuple<at::Tensor,at::Tensor> _max(const at::Tensor & self, int64_t dim, bool keepdim);
