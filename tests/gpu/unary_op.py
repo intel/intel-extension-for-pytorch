@@ -101,3 +101,6 @@ print("__or__ y_dpcpp", y_dpcpp_int8.__or__(3).to("cpu"))
 print("__ior__ y_cpu", y_cpu_int8.__ior__(3))
 print("__ior__ y_dpcpp", y_dpcpp_int8.__ior__(3).to("cpu"))
 
+print("erfinv cpu ", torch.erfinv(y_cpu_float))
+print("erfinv dpcpp", torch.erfinv(y_dpcpp_float.to("cpu")))
+

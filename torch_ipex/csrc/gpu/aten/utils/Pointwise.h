@@ -125,7 +125,7 @@
   }                                                                           \
                                                                               \
   Tensor & op(Tensor & out, const Tensor & self) {                            \
-    AT_DISPATCH_##types##_TYPES(self.scalar_type(), #op,                      \
+    AT_DISPATCH_##types(self.scalar_type(), #op,                      \
         [&]() {                                                               \
           impl::op<scalar_t>(out, self);                                      \
         }                                                                     \
@@ -141,16 +141,16 @@
   }
 
 #define IPEX_OUT_ALL_UNARY_FUNC_OPS(op, func, real)                           \
-    IPEX_FUNC_OPS(op, func, real, ALL)
+    IPEX_FUNC_OPS(op, func, real, ALL_TYPES)
 
 #define IPEX_OUT_FLOAT_UNARY_FUNC_OPS(op, func, real)                         \
-    IPEX_FUNC_OPS(op, func, real, FLOATING)
+    IPEX_FUNC_OPS(op, func, real, FLOATING_TYPES)
 
 #define IPEX_OUT_INPLACE_ALL_UNARY_FUNC_OPS(op, func, real)                   \
-    IPEX_OUT_INPLACE_UNARY_FUNC_OPS(op, func, real, ALL)
+    IPEX_OUT_INPLACE_UNARY_FUNC_OPS(op, func, real, ALL_TYPES)
 
 #define IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(op, func, real)                 \
-    IPEX_OUT_INPLACE_UNARY_FUNC_OPS(op, func, real, FLOATING)
+    IPEX_OUT_INPLACE_UNARY_FUNC_OPS(op, func, real, FLOATING_TYPES)
 
 
 // Customized Callable Ops
@@ -172,7 +172,7 @@
   Tensor & op(POINTWISE_ARGS_DECL_##arg_num                                   \
               COMMA_##callable_args_num                                       \
               SCALAR_ARGS_DECL_##callable_args_num) {                         \
-    AT_DISPATCH_##types##_TYPES(POINTWISE_ARG_FOR_TYPE_##arg_num.scalar_type(), #op, \
+    AT_DISPATCH_##types(POINTWISE_ARG_FOR_TYPE_##arg_num.scalar_type(), #op, \
         [&]() {                                                               \
           impl::op<scalar_t>(POINTWISE_ARGS_##arg_num                         \
                              COMMA_##callable_args_num                        \
@@ -184,68 +184,71 @@
 
 // Unary
 #define IPEX_ALL_CALLABLE_1_UNARY_OPS(op, callable)                           \
-    IPEX_CALLABLE_OPS(op, callable, ALL, 1, 11 /* inplace */, 1)
+    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 11 /* inplace */, 1)
 
 #define IPEX_FLOAT_CALLABLE_1_UNARY_OPS(op, callable)                         \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING, 1, 11 /* inplace */, 1)
+    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 11 /* inplace */, 1)
 
 #define IPEX_INT_CALLABLE_1_UNARY_OPS(op, callable)                           \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 1, 11 /* inplace */, 1)
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 11 /* inplace */, 1)
 
 #define IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(op, callable)                       \
-    IPEX_CALLABLE_OPS(op, callable, ALL, 1, 2, 1)
+    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 2, 1)
+
+#define IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(op, callable)                     \
+    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND_HALF, 1, 2, 0)
 
 #define IPEX_OUT_FLOAT_CALLABLE_1_UNARY_OPS(op, callable)                     \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING, 1, 2, 1)
+    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 2, 1)
 
 #define IPEX_OUT_INT_CALLABLE_1_UNARY_OPS(op, callable)                       \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 1, 2, 1)
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 2, 1)
 
 #define IPEX_ALL_CALLABLE_2_UNARY_OPS(op, callable)                           \
-    IPEX_CALLABLE_OPS(op, callable, ALL, 1, 11 /* inplace */, 2)
+    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 11 /* inplace */, 2)
 
 #define IPEX_FLOAT_CALLABLE_2_UNARY_OPS(op, callable)                         \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING, 1, 11 /* inplace */, 2)
+    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 11 /* inplace */, 2)
 
 #define IPEX_INT_CALLABLE_2_UNARY_OPS(op, callable)                           \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 1, 11 /* inplace */, 2)
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 11 /* inplace */, 2)
 
 #define IPEX_OUT_ALL_CALLABLE_2_UNARY_OPS(op, callable)                       \
-    IPEX_CALLABLE_OPS(op, callable, ALL, 1, 2, 2)
+    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 2, 2)
 
 #define IPEX_OUT_FLOAT_CALLABLE_2_UNARY_OPS(op, callable)                     \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING, 1, 2, 2)
+    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 2, 2)
 
 #define IPEX_OUT_INT_CALLABLE_2_UNARY_OPS(op, callable)                       \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 1, 2, 2)
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 2, 2)
 
 // Binary
 #define IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(op, callable)                      \
-    IPEX_CALLABLE_OPS(op, callable, ALL, 2, 3, 0)
+    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 2, 3, 0)
 
 #define IPEX_OUT_FLOAT_CALLABLE_0_BINARY_OPS(op, callable)                    \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING, 2, 3, 0)
+    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 2, 3, 0)
 
 #define IPEX_OUT_INT_CALLABLE_0_BINARY_OPS(op, callable)                      \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 2, 3, 0)
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 0)
 
 #define IPEX_OUT_ALL_CALLABLE_1_BINARY_OPS(op, callable)                      \
-    IPEX_CALLABLE_OPS(op, callable, ALL, 2, 3, 1)
+    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 2, 3, 1)
 
 #define IPEX_OUT_FLOAT_CALLABLE_1_BINARY_OPS(op, callable)                    \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING, 2, 3, 1)
+    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 2, 3, 1)
 
 #define IPEX_OUT_INT_CALLABLE_1_BINARY_OPS(op, callable)                      \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 2, 3, 1)
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 1)
 
 #define IPEX_OUT_ALL_CALLABLE_2_BINARY_OPS(op, callable)                      \
-    IPEX_CALLABLE_OPS(op, callable, ALL, 2, 3, 2)
+    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 2, 3, 2)
 
 #define IPEX_OUT_FLOAT_CALLABLE_2_BINARY_OPS(op, callable)                    \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING, 2, 3, 2)
+    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 2, 3, 2)
 
 #define IPEX_OUT_INT_CALLABLE_2_BINARY_OPS(op, callable)                      \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL, 2, 3, 2)
+    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 2)
 
 
 template <typename T>
@@ -418,11 +421,11 @@ struct TensorDigammaOp {
 
 };
 
-template <typename T, typename accreal>
+template <typename T>
 struct TensorErfinvOp {
   void operator()(T& out, T& in) const {
 
-    using compute_type = typename std::conditional<std::is_same<T, at::Half>::value, accreal, T>::type;
+    using compute_type = typename std::conditional<std::is_same<T, at::Half>::value, float, T>::type;
     compute_type z, num, dem;
     static const double PI_f64 = 3.14159265358979323846;
     static const compute_type a[4]={ 0.886226899, -1.645349621,  0.914624893, -0.140543331};
@@ -458,7 +461,7 @@ struct TensorErfinvOp {
 
   void operator()(T& v) const {
 
-    using compute_type = typename std::conditional<std::is_same<T, at::Half>::value, accreal, T>::type;
+    using compute_type = typename std::conditional<std::is_same<T, at::Half>::value, float, T>::type;
     compute_type z, num, dem;
     static const double PI_f64 = 3.14159265358979323846;
     static const compute_type a[4]={ 0.886226899, -1.645349621,  0.914624893, -0.140543331};
