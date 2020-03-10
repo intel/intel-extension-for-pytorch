@@ -21,32 +21,38 @@ y_dpcpp2 = y_cpu2.to("dpcpp")
 y_dpcpp1_int = y_cpu1_int.to("dpcpp")
 y_dpcpp2_int = y_cpu2_int.to("dpcpp")
 
-print("add y_cpu", y_cpu1.add(y_cpu2))
-print("add y_dpcpp", y_dpcpp1.add(y_dpcpp2).to("cpu"))
+# print("add y_cpu", y_cpu1.add(y_cpu2))
+# print("add y_dpcpp", y_dpcpp1.add(y_dpcpp2).to("cpu"))
+# 
+# print("sub y_cpu", y_cpu1.sub(y_cpu2))
+# print("sub y_dpcpp", y_dpcpp1.sub(y_dpcpp2).to("cpu"))
+# 
+# print("mul y_cpu", y_cpu1.mul(y_cpu2))
+# print("mul y_dpcpp", y_dpcpp1.mul(y_dpcpp2).to("cpu"))
+# 
+# print("div y_cpu", y_cpu1.div(y_cpu2))
+# print("div y_dpcpp", y_dpcpp1.div(y_dpcpp2).to("cpu"))
+# 
+# print("__and__ y_cpu", y_cpu1_int.__and__(y_cpu2_int))
+# print("__and__ y_dpcpp", y_dpcpp1_int.__and__(y_dpcpp2_int).to("cpu"))
+# 
+# print("__iand__ y_cpu", y_cpu1_int.__iand__(y_cpu2_int))
+# print("__iand__ y_dpcpp", y_dpcpp1_int.__iand__(y_dpcpp2_int).to("cpu"))
+# 
+# print("__or__ y_cpu", y_cpu1_int.__or__(y_cpu2_int))
+# print("__or__ y_dpcpp", y_dpcpp1_int.__or__(y_dpcpp2_int).to("cpu"))
+# 
+# print("__ior__ y_cpu", y_cpu1_int.__ior__(y_cpu2_int))
+# print("__ior__ y_dpcpp", y_dpcpp1_int.__ior__(y_dpcpp2_int).to("cpu"))
+# 
+# print("remainder scalar y_cpu", torch.remainder(y_cpu1, 1.5))
+# print("remainder scalar y_dpcpp", torch.remainder(y_dpcpp1, 1.5).to("cpu"))
+# 
+# print("remainder tensor y_cpu", torch.remainder(y_cpu1, y_cpu2))
+# print("remainder tensor y_dpcpp", torch.remainder(y_dpcpp1, y_dpcpp2).to("cpu"))
 
-print("sub y_cpu", y_cpu1.sub(y_cpu2))
-print("sub y_dpcpp", y_dpcpp1.sub(y_dpcpp2).to("cpu"))
+print("fmod scalar y_cpu", torch.fmod(y_cpu1, 1.5))
+print("fmod scalar y_dpcpp", torch.fmod(y_dpcpp1, 1.5).to("cpu"))
 
-print("mul y_cpu", y_cpu1.mul(y_cpu2))
-print("mul y_dpcpp", y_dpcpp1.mul(y_dpcpp2).to("cpu"))
-
-print("div y_cpu", y_cpu1.div(y_cpu2))
-print("div y_dpcpp", y_dpcpp1.div(y_dpcpp2).to("cpu"))
-
-print("__and__ y_cpu", y_cpu1_int.__and__(y_cpu2_int))
-print("__and__ y_dpcpp", y_dpcpp1_int.__and__(y_dpcpp2_int).to("cpu"))
-
-print("__iand__ y_cpu", y_cpu1_int.__iand__(y_cpu2_int))
-print("__iand__ y_dpcpp", y_dpcpp1_int.__iand__(y_dpcpp2_int).to("cpu"))
-
-print("__or__ y_cpu", y_cpu1_int.__or__(y_cpu2_int))
-print("__or__ y_dpcpp", y_dpcpp1_int.__or__(y_dpcpp2_int).to("cpu"))
-
-print("__ior__ y_cpu", y_cpu1_int.__ior__(y_cpu2_int))
-print("__ior__ y_dpcpp", y_dpcpp1_int.__ior__(y_dpcpp2_int).to("cpu"))
-
-print("remainder scalar y_cpu", torch.remainder(y_cpu1, 1.5))
-print("remainder scalar y_dpcpp", torch.remainder(y_dpcpp1, 1.5).to("cpu"))
-
-print("remainder tensor y_cpu", torch.remainder(y_cpu1, y_cpu2))
-print("remainder tensor y_dpcpp", torch.remainder(y_dpcpp1, y_dpcpp2).to("cpu"))
+print("fmod tensor y_cpu", torch.fmod(y_cpu1, y_cpu2))
+print("fmod tensor y_dpcpp", torch.fmod(y_dpcpp1, y_dpcpp2).to("cpu"))

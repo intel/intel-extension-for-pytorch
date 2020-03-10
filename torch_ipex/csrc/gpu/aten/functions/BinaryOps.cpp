@@ -271,5 +271,16 @@ Tensor & remainder_(Tensor & self, const Tensor & other) {
   return at::AtenIpexTypeDPCPP::remainder_out(self, self, other);
 }
 
+IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(fmod_out, TensorCFmodOp)
+
+Tensor fmod(const Tensor & self, const Tensor & other) {
+  auto out = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::fmod_out(out, self, other);
+}
+
+Tensor & fmod_(Tensor & self, const Tensor & other) {
+  return at::AtenIpexTypeDPCPP::fmod_out(self, self, other);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

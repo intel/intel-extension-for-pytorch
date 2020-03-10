@@ -143,6 +143,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & digamma_(at::Tensor & self);
   at::Tensor & pow_(at::Tensor & self, at::Scalar exponent);
   at::Tensor & pow_(at::Tensor & self, const at::Tensor & exponent);
+  at::Tensor & fmod_(at::Tensor & self, at::Scalar other);
+  at::Tensor & fmod_(at::Tensor & self, const at::Tensor & other);
   at::Tensor & remainder_(at::Tensor & self, at::Scalar other);
   at::Tensor & remainder_(at::Tensor & self, const at::Tensor & other);
   at::Tensor & addcdiv_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
@@ -186,6 +188,10 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor erfinv(const at::Tensor & self);
   at::Tensor & erfinv_(at::Tensor & self);
   at::Tensor & erfinv_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & fmod_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
+  at::Tensor fmod(const at::Tensor & self, at::Scalar other);
+  at::Tensor & fmod_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
+  at::Tensor fmod(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & remainder_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
   at::Tensor remainder(const at::Tensor & self, at::Scalar other);
   at::Tensor & remainder_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);

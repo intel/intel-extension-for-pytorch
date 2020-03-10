@@ -143,6 +143,8 @@ class AtenIpexTypeDefault {
   static at::Tensor & digamma_(at::Tensor & self);
   static at::Tensor & pow_(at::Tensor & self, at::Scalar exponent);
   static at::Tensor & pow_(at::Tensor & self, const at::Tensor & exponent);
+  static at::Tensor & fmod_(at::Tensor & self, at::Scalar other);
+  static at::Tensor & fmod_(at::Tensor & self, const at::Tensor & other);
   static at::Tensor & remainder_(at::Tensor & self, at::Scalar other);
   static at::Tensor & remainder_(at::Tensor & self, const at::Tensor & other);
   static at::Tensor & addcdiv_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
@@ -186,6 +188,10 @@ class AtenIpexTypeDefault {
   static at::Tensor erfinv(const at::Tensor & self);
   static at::Tensor & erfinv_(at::Tensor & self);
   static at::Tensor & erfinv_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & fmod_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
+  static at::Tensor fmod(const at::Tensor & self, at::Scalar other);
+  static at::Tensor & fmod_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
+  static at::Tensor fmod(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & remainder_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
   static at::Tensor remainder(const at::Tensor & self, at::Scalar other);
   static at::Tensor & remainder_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);

@@ -184,8 +184,19 @@ Tensor remainder(const Tensor & self, Scalar other) {
   return at::AtenIpexTypeDPCPP::remainder_out(out, self, other);
 }
 
-Tensor & remainder(Tensor & self, Scalar other) {
+Tensor & remainder_(Tensor & self, Scalar other) {
   return at::AtenIpexTypeDPCPP::remainder_out(self, self, other);
+}
+
+IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(fmod_out, TensorFmodOp)
+
+Tensor fmod(const Tensor & self, Scalar other) {
+  auto out = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::fmod_out(out, self, other);
+}
+
+Tensor & fmod_(Tensor & self, Scalar other) {
+  return at::AtenIpexTypeDPCPP::fmod_out(self, self, other);
 }
 
 } // namespace AtenIpexTypeDPCPP
