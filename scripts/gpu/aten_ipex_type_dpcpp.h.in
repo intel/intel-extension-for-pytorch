@@ -140,6 +140,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & __ior__(at::Tensor & self, const at::Tensor & other);
   at::Tensor & tril_(at::Tensor & self, int64_t diagonal);
   at::Tensor & triu_(at::Tensor & self, int64_t diagonal);
+  at::Tensor & digamma_(at::Tensor & self);
   at::Tensor & pow_(at::Tensor & self, at::Scalar exponent);
   at::Tensor & pow_(at::Tensor & self, const at::Tensor & exponent);
   at::Tensor & remainder_(at::Tensor & self, at::Scalar other);
@@ -180,6 +181,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & addcmul_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   at::Tensor & addcdiv_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   at::Tensor addcdiv(const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
+  at::Tensor & digamma_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor digamma(const at::Tensor & self);
   at::Tensor erfinv(const at::Tensor & self);
   at::Tensor & erfinv_(at::Tensor & self);
   at::Tensor & erfinv_out(at::Tensor & out, const at::Tensor & self);

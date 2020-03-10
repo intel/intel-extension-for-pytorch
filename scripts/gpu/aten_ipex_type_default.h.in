@@ -140,6 +140,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & __ior__(at::Tensor & self, const at::Tensor & other);
   static at::Tensor & tril_(at::Tensor & self, int64_t diagonal);
   static at::Tensor & triu_(at::Tensor & self, int64_t diagonal);
+  static at::Tensor & digamma_(at::Tensor & self);
   static at::Tensor & pow_(at::Tensor & self, at::Scalar exponent);
   static at::Tensor & pow_(at::Tensor & self, const at::Tensor & exponent);
   static at::Tensor & remainder_(at::Tensor & self, at::Scalar other);
@@ -180,6 +181,8 @@ class AtenIpexTypeDefault {
   static at::Tensor & addcmul_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   static at::Tensor & addcdiv_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   static at::Tensor addcdiv(const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
+  static at::Tensor & digamma_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor digamma(const at::Tensor & self);
   static at::Tensor erfinv(const at::Tensor & self);
   static at::Tensor & erfinv_(at::Tensor & self);
   static at::Tensor & erfinv_out(at::Tensor & out, const at::Tensor & self);

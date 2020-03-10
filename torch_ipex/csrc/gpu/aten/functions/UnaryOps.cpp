@@ -166,6 +166,17 @@ Tensor erfinv(const Tensor & self) {
   return at::AtenIpexTypeDPCPP::erfinv_out(result, self);
 }
 
+IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(digamma_out, TensorDigammaOp);
+
+Tensor & digamma_(Tensor & self) {
+  return at::AtenIpexTypeDPCPP::digamma_out(self, self);
+}
+
+Tensor digamma(const Tensor & self) {
+  auto result = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::digamma_out(result, self);
+}
+
 IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(remainder_out, TensorRemainderOp)
 
 Tensor remainder(const Tensor & self, Scalar other) {
