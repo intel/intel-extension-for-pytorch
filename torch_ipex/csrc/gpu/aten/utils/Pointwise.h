@@ -294,11 +294,11 @@ struct TensorSigmoidGradOp<at::Half> {
  * Cephes Math Library Release 2.8:  June, 2000
  * Copyright 1984, 1987, 1992, 2000 by Stephen L. Moshier
  */
-template <typename T, typename accreal>
+template <typename T>
 struct TensorDigammaOp {
   void operator()(T& out, T& in) const {
 
-    using compute_type = typename std::conditional<std::is_same<T, at::Half>::value, accreal, T>::type;
+    using compute_type = typename std::conditional<std::is_same<T, at::Half>::value, float, T>::type;
     static const double PI_f64 = 3.14159265358979323846;
     static const compute_type PSI_10 = 2.25175258906672110764;
     static const compute_type A[] = {
@@ -359,7 +359,7 @@ struct TensorDigammaOp {
 
   void operator()(T& v) const {
 
-    using compute_type = typename std::conditional<std::is_same<T, at::Half>::value, accreal, T>::type;
+    using compute_type = typename std::conditional<std::is_same<T, at::Half>::value, float, T>::type;
     static const double PI_f64 = 3.14159265358979323846;
     static const compute_type PSI_10 = 2.25175258906672110764;
     static const compute_type A[] = {

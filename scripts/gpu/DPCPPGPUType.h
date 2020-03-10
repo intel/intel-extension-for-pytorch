@@ -119,7 +119,6 @@ struct TORCH_API SYCLType final {
   static Tensor & __ior__(Tensor & self, const Tensor & other); // aten::__ior__.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
   static Tensor & tril_(Tensor & self, int64_t diagonal); // aten::tril_(Tensor(a!) self, int diagonal=0) -> Tensor(a!)
   static Tensor & triu_(Tensor & self, int64_t diagonal); // aten::triu_(Tensor(a!) self, int diagonal=0) -> Tensor(a!)
-  // static Tensor & digamma_(Tensor & self);
   static Tensor & erfinv_(Tensor & self); // aten::erfinv_(Tensor(a!) self) -> Tensor(a!)
   // static Tensor & sign_(Tensor & self);
   // static Tensor & fmod_(Tensor & self, Scalar other);
@@ -165,7 +164,6 @@ struct TORCH_API SYCLType final {
   // static Tensor nonzero(const Tensor & self);
   // static Tensor & gather_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index, bool sparse_grad);
   // static Tensor gather(const Tensor & self, int64_t dim, const Tensor & index, bool sparse_grad);
-  // static Tensor digamma(const Tensor & self);
   static Tensor & erfinv_out(Tensor & out, const Tensor & self); // aten::erfinv.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor erfinv(const Tensor & self); // aten::erfinv(Tensor self) -> Tensor
   // static Tensor & sign_out(Tensor & out, const Tensor & self);

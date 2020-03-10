@@ -543,6 +543,10 @@ at::Tensor & AtenIpexTypeDefault::triu_(at::Tensor & self, int64_t diagonal) {
   return AtenIpexTypeDPCPP::triu_(self, diagonal);
 }
 
+at::Tensor & AtenIpexTypeDefault::digamma_(at::Tensor & self) {
+  return AtenIpexTypeDPCPP::digamma_(self);
+}
+
 at::Tensor & AtenIpexTypeDefault::pow_(at::Tensor & self, at::Scalar exponent) {
   return AtenIpexTypeDPCPP::pow_(self, exponent);
 }
@@ -701,6 +705,14 @@ at::Tensor & AtenIpexTypeDefault::addcdiv_out(at::Tensor & out, const at::Tensor
 
 at::Tensor AtenIpexTypeDefault::addcdiv(const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value) {
   return AtenIpexTypeDPCPP::addcdiv(self, tensor1, tensor2, value);
+}
+
+at::Tensor & AtenIpexTypeDefault::digamma_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::digamma_out(out, self);
+}
+
+at::Tensor AtenIpexTypeDefault::digamma(const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::digamma(self);
 }
 
 at::Tensor AtenIpexTypeDefault::erfinv(const at::Tensor & self) {
@@ -1377,6 +1389,9 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::triu_(Tensor(a!) self, int diagonal=0) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, int64_t), &AtenIpexTypeDefault::triu_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::digamma_(Tensor(a!) self) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::digamma_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::pow_.Scalar(Tensor(a!) self, Scalar exponent) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::pow_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -1496,6 +1511,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::addcdiv(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::addcdiv>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::digamma.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::digamma_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::digamma(Tensor self) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::digamma>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::erfinv(Tensor self) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::erfinv>(at::TensorTypeId::DPCPPTensorId)
