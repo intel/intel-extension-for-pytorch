@@ -267,5 +267,9 @@ Tensor remainder(const Tensor & self, const Tensor & other) {
   return at::AtenIpexTypeDPCPP::remainder_out(out, self, other);
 }
 
+Tensor & remainder_(Tensor & self, const Tensor & other) {
+  return at::AtenIpexTypeDPCPP::remainder_out(self, self, other);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

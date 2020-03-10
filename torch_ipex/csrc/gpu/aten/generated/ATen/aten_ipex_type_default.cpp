@@ -551,6 +551,14 @@ at::Tensor & AtenIpexTypeDefault::pow_(at::Tensor & self, const at::Tensor & exp
   return AtenIpexTypeDPCPP::pow_(self, exponent);
 }
 
+at::Tensor & AtenIpexTypeDefault::remainder_(at::Tensor & self, at::Scalar other) {
+  return AtenIpexTypeDPCPP::remainder_(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::remainder_(at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::remainder_(self, other);
+}
+
 at::Tensor & AtenIpexTypeDefault::addcdiv_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value) {
   return AtenIpexTypeDPCPP::addcdiv_(self, tensor1, tensor2, value);
 }
@@ -1374,6 +1382,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::pow_.Tensor(Tensor(a!) self, Tensor exponent) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::pow_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::remainder_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::remainder_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::remainder_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::remainder_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::addcdiv_(Tensor(a!) self, Tensor tensor1, Tensor tensor2, *, Scalar value=1) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::addcdiv_>(at::TensorTypeId::DPCPPTensorId)

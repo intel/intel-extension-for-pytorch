@@ -142,6 +142,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & triu_(at::Tensor & self, int64_t diagonal);
   at::Tensor & pow_(at::Tensor & self, at::Scalar exponent);
   at::Tensor & pow_(at::Tensor & self, const at::Tensor & exponent);
+  at::Tensor & remainder_(at::Tensor & self, at::Scalar other);
+  at::Tensor & remainder_(at::Tensor & self, const at::Tensor & other);
   at::Tensor & addcdiv_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   at::Tensor & triu_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
   at::Tensor & tril_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);

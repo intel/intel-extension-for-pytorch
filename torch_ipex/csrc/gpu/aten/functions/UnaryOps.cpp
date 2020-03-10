@@ -173,5 +173,9 @@ Tensor remainder(const Tensor & self, Scalar other) {
   return at::AtenIpexTypeDPCPP::remainder_out(out, self, other);
 }
 
+Tensor & remainder(Tensor & self, Scalar other) {
+  return at::AtenIpexTypeDPCPP::remainder_out(self, self, other);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

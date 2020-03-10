@@ -124,8 +124,8 @@ struct TORCH_API SYCLType final {
   // static Tensor & sign_(Tensor & self);
   // static Tensor & fmod_(Tensor & self, Scalar other);
   // static Tensor & fmod_(Tensor & self, const Tensor & other);
-  // static Tensor & remainder_(Tensor & self, Scalar other);
-  // static Tensor & remainder_(Tensor & self, const Tensor & other);
+  static Tensor & remainder_(Tensor & self, Scalar other); // aten::remainder_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
+  static Tensor & remainder_(Tensor & self, const Tensor & other); // aten::remainder_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
   // static Tensor & addbmm_(Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
   // static Tensor & addbmm_out(Tensor & out, const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
   // static Tensor addbmm(const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
