@@ -181,6 +181,10 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor erfinv(const at::Tensor & self);
   at::Tensor & erfinv_(at::Tensor & self);
   at::Tensor & erfinv_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & remainder_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
+  at::Tensor remainder(const at::Tensor & self, at::Scalar other);
+  at::Tensor & remainder_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
+  at::Tensor remainder(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & min_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
   at::Tensor min(const at::Tensor & self, const at::Tensor & other);
   at::Tensor min(const at::Tensor & self);

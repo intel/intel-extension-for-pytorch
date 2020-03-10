@@ -181,6 +181,10 @@ class AtenIpexTypeDefault {
   static at::Tensor erfinv(const at::Tensor & self);
   static at::Tensor & erfinv_(at::Tensor & self);
   static at::Tensor & erfinv_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & remainder_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
+  static at::Tensor remainder(const at::Tensor & self, at::Scalar other);
+  static at::Tensor & remainder_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
+  static at::Tensor remainder(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & min_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
   static at::Tensor min(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor min(const at::Tensor & self);

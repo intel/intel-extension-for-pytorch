@@ -260,5 +260,12 @@ Tensor tanh_backward(const Tensor & grad_output, const Tensor & output) {
   return at::tanh_backward_out(grad_input, grad_output, output);
 }
 
+IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(remainder_out, TensorCRemainderOp)
+
+Tensor remainder(const Tensor & self, const Tensor & other) {
+  auto out = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::remainder_out(out, self, other);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

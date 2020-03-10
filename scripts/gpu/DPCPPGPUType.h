@@ -174,10 +174,10 @@ struct TORCH_API SYCLType final {
   // static Tensor fmod(const Tensor & self, Scalar other);
   // static Tensor & fmod_out(Tensor & out, const Tensor & self, const Tensor & other);
   // static Tensor fmod(const Tensor & self, const Tensor & other);
-  // static Tensor & remainder_out(Tensor & out, const Tensor & self, Scalar other);
-  // static Tensor remainder(const Tensor & self, Scalar other);
-  // static Tensor & remainder_out(Tensor & out, const Tensor & self, const Tensor & other);
-  // static Tensor remainder(const Tensor & self, const Tensor & other);
+  static Tensor & remainder_out(Tensor & out, const Tensor & self, Scalar other); // aten::remainder.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor remainder(const Tensor & self, Scalar other); // aten::remainder.Scalar(Tensor self, Scalar other) -> Tensor
+  static Tensor & remainder_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::remainder.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor remainder(const Tensor & self, const Tensor & other); // aten::remainder.Tensor(Tensor self, Tensor other) -> Tensor
   static Tensor & min_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::min.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor min(const Tensor & self, const Tensor & other); // aten::min.other(Tensor self, Tensor other) -> Tensor
   static Tensor min(const Tensor & self); // aten::min(Tensor self) -> Tensor
