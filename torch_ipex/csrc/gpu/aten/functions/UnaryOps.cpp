@@ -155,5 +155,16 @@ Tensor & __ior__(Tensor & self, Scalar other) {
   return at::AtenIpexTypeDPCPP::__or___out(self, self, other);
 }
 
+IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(erfinv_out, TensorErfinvOp);
+
+Tensor & erfinv_(Tensor & self) {
+  return at::AtenIpexTypeDPCPP::erfinv_out(self, self);
+}
+
+Tensor erfinv(const Tensor & self) {
+  auto result = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::erfinv_out(result, self);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

@@ -178,6 +178,9 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & addcmul_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   at::Tensor & addcdiv_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   at::Tensor addcdiv(const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
+  at::Tensor erfinv(const at::Tensor & self);
+  at::Tensor & erfinv_(at::Tensor & self);
+  at::Tensor & erfinv_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & min_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
   at::Tensor min(const at::Tensor & self, const at::Tensor & other);
   at::Tensor min(const at::Tensor & self);

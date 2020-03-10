@@ -695,6 +695,18 @@ at::Tensor AtenIpexTypeDefault::addcdiv(const at::Tensor & self, const at::Tenso
   return AtenIpexTypeDPCPP::addcdiv(self, tensor1, tensor2, value);
 }
 
+at::Tensor AtenIpexTypeDefault::erfinv(const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::erfinv(self);
+}
+
+at::Tensor & AtenIpexTypeDefault::erfinv_(at::Tensor & self) {
+  return AtenIpexTypeDPCPP::erfinv_(self);
+}
+
+at::Tensor & AtenIpexTypeDefault::erfinv_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::erfinv_out(out, self);
+}
+
 at::Tensor & AtenIpexTypeDefault::min_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other) {
   return AtenIpexTypeDPCPP::min_out(out, self, other);
 }
@@ -1450,6 +1462,15 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::addcdiv(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::addcdiv>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::erfinv(Tensor self) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::erfinv>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::erfinv_(Tensor(a!) self) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::erfinv_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::erfinv.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::erfinv_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::min.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::min_out>(at::TensorTypeId::DPCPPTensorId)
