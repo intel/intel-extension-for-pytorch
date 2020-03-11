@@ -130,6 +130,9 @@ class AtenIpexTypeDefault {
   static at::Tensor & set_(at::Tensor & self, const at::Tensor & source);
   static at::Tensor & set_(at::Tensor & self);
   static at::Tensor view(const at::Tensor & self, at::IntArrayRef size);
+  static at::Tensor & index_add_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & source);
+  static at::Tensor & index_fill_(at::Tensor & self, int64_t dim, const at::Tensor & index, at::Scalar value);
+  static at::Tensor & index_fill_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & value);
   static at::Tensor __and__(const at::Tensor & self, at::Scalar other);
   static at::Tensor __and__(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & __iand__(at::Tensor & self, at::Scalar other);
