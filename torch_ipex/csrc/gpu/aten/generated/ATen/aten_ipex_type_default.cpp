@@ -63,6 +63,10 @@ at::Tensor & AtenIpexTypeDefault::bernoulli_(at::Tensor & self, double p, at::Ge
   return AtenIpexTypeDPCPP::bernoulli_(self, p, generator);
 }
 
+at::Tensor AtenIpexTypeDefault::bincount(const at::Tensor & self, const at::Tensor & weights, int64_t minlength) {
+  return AtenIpexTypeDPCPP::bincount(self, weights, minlength);
+}
+
 at::Tensor AtenIpexTypeDefault::bitwise_not(const at::Tensor & self) {
   return AtenIpexTypeDPCPP::bitwise_not(self);
 }
@@ -1096,6 +1100,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::bernoulli_.float(Tensor(a!) self, float p=0.5, *, Generator? generator=None) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, double, at::Generator *), &AtenIpexTypeDefault::bernoulli_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::bincount(Tensor self, Tensor? weights=None, int minlength=0) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, int64_t), &AtenIpexTypeDefault::bincount>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::bitwise_not(Tensor self) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::bitwise_not>(at::TensorTypeId::DPCPPTensorId)

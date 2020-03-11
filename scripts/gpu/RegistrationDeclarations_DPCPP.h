@@ -29,6 +29,8 @@ Tensor & bernoulli_(Tensor & self, const Tensor & p, Generator * generator); // 
 
 Tensor & bernoulli_(Tensor & self, double p, Generator * generator); // aten::bernoulli_.float(Tensor(a!) self, float p=0.5, *, Generator? generator=None) -> Tensor(a!)
 
+Tensor bincount(const Tensor & self, const Tensor & weights, int64_t minlength); // aten::bincount(Tensor self, Tensor? weights=None, int minlength=0) -> Tensor
+
 Tensor bitwise_not(const Tensor & self); // aten::bitwise_not(Tensor self) -> Tensor
 
 Tensor & bitwise_not_(Tensor & self); // aten::bitwise_not_(Tensor(a!) self) -> Tensor(a!)

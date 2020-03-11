@@ -20,6 +20,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & atan_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & bernoulli_(at::Tensor & self, const at::Tensor & p, at::Generator * generator);
   static at::Tensor & bernoulli_(at::Tensor & self, double p, at::Generator * generator);
+  static at::Tensor bincount(const at::Tensor & self, const at::Tensor & weights, int64_t minlength);
   static at::Tensor bitwise_not(const at::Tensor & self);
   static at::Tensor & bitwise_not_(at::Tensor & self);
   static at::Tensor & bitwise_not_out(at::Tensor & out, const at::Tensor & self);

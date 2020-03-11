@@ -8,8 +8,7 @@
 #include <core/SYCLContext.h>
 
 #include <utils/Numerics.h>
-
-#include <functions/Atomics.h>
+#include <utils/Atomics.h>
 
 using namespace at::native;
 namespace at {
