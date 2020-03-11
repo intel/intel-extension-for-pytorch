@@ -127,7 +127,7 @@ struct TORCH_API SYCLType final {
   // static Tensor & addbmm_(Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
   // static Tensor & addbmm_out(Tensor & out, const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
   // static Tensor addbmm(const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha);
-  // static Tensor & normal_(Tensor & self, double mean, double std, Generator * generator);
+  static Tensor & normal_(Tensor & self, double mean, double std, Generator * generator); // aten::normal_(Tensor(a!) self, float mean=0, float std=1, *, Generator? generator=None) -> Tensor(a!)
   // static Tensor & diag_out(Tensor & out, const Tensor & self, int64_t diagonal);
   // static Tensor diag(const Tensor & self, int64_t diagonal);
    static Tensor & triu_out(Tensor & out, const Tensor & self, int64_t diagonal); // aten::triu.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)

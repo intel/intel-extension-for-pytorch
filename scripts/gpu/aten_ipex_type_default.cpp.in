@@ -587,6 +587,10 @@ at::Tensor & AtenIpexTypeDefault::addcdiv_(at::Tensor & self, const at::Tensor &
   return AtenIpexTypeDPCPP::addcdiv_(self, tensor1, tensor2, value);
 }
 
+at::Tensor & AtenIpexTypeDefault::normal_(at::Tensor & self, double mean, double std, at::Generator * generator) {
+  return AtenIpexTypeDPCPP::normal_(self, mean, std, generator);
+}
+
 at::Tensor & AtenIpexTypeDefault::triu_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal) {
   return AtenIpexTypeDPCPP::triu_out(out, self, diagonal);
 }
@@ -1477,6 +1481,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::addcdiv_(Tensor(a!) self, Tensor tensor1, Tensor tensor2, *, Scalar value=1) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::addcdiv_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::normal_(Tensor(a!) self, float mean=0, float std=1, *, Generator? generator=None) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, double, double, at::Generator *), &AtenIpexTypeDefault::normal_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::triu.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, int64_t), &AtenIpexTypeDefault::triu_out>(at::TensorTypeId::DPCPPTensorId)
