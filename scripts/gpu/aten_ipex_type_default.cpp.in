@@ -55,6 +55,14 @@ at::Tensor & AtenIpexTypeDefault::atan_out(at::Tensor & out, const at::Tensor & 
   return AtenIpexTypeDPCPP::atan_out(out, self);
 }
 
+at::Tensor & AtenIpexTypeDefault::bernoulli_(at::Tensor & self, const at::Tensor & p, at::Generator * generator) {
+  return AtenIpexTypeDPCPP::bernoulli_(self, p, generator);
+}
+
+at::Tensor & AtenIpexTypeDefault::bernoulli_(at::Tensor & self, double p, at::Generator * generator) {
+  return AtenIpexTypeDPCPP::bernoulli_(self, p, generator);
+}
+
 at::Tensor AtenIpexTypeDefault::bitwise_not(const at::Tensor & self) {
   return AtenIpexTypeDPCPP::bitwise_not(self);
 }
@@ -1082,6 +1090,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::atan.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::atan_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::bernoulli_.Tensor(Tensor(a!) self, Tensor p, *, Generator? generator=None) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Generator *), &AtenIpexTypeDefault::bernoulli_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::bernoulli_.float(Tensor(a!) self, float p=0.5, *, Generator? generator=None) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, double, at::Generator *), &AtenIpexTypeDefault::bernoulli_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::bitwise_not(Tensor self) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::bitwise_not>(at::TensorTypeId::DPCPPTensorId)
