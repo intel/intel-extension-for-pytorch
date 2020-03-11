@@ -137,6 +137,9 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & index_add_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & source);
   at::Tensor & index_fill_(at::Tensor & self, int64_t dim, const at::Tensor & index, at::Scalar value);
   at::Tensor & index_fill_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & value);
+  at::Tensor & scatter_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & src);
+  at::Tensor & scatter_(at::Tensor & self, int64_t dim, const at::Tensor & index, at::Scalar value);
+  at::Tensor & scatter_add_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & src);
   at::Tensor __and__(const at::Tensor & self, at::Scalar other);
   at::Tensor __and__(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & __iand__(at::Tensor & self, at::Scalar other);
@@ -188,6 +191,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor index_select(const at::Tensor & self, int64_t dim, const at::Tensor & index);
   at::Tensor & nonzero_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor nonzero(const at::Tensor & self);
+  at::Tensor & gather_out(at::Tensor & out, const at::Tensor & self, int64_t dim, const at::Tensor & index, bool sparse_grad);
+  at::Tensor gather(const at::Tensor & self, int64_t dim, const at::Tensor & index, bool sparse_grad);
   at::Tensor & addcmul_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   at::Tensor addcmul(const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   at::Tensor & addcmul_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);

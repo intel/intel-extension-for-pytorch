@@ -137,6 +137,9 @@ class AtenIpexTypeDefault {
   static at::Tensor & index_add_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & source);
   static at::Tensor & index_fill_(at::Tensor & self, int64_t dim, const at::Tensor & index, at::Scalar value);
   static at::Tensor & index_fill_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & value);
+  static at::Tensor & scatter_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & src);
+  static at::Tensor & scatter_(at::Tensor & self, int64_t dim, const at::Tensor & index, at::Scalar value);
+  static at::Tensor & scatter_add_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & src);
   static at::Tensor __and__(const at::Tensor & self, at::Scalar other);
   static at::Tensor __and__(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & __iand__(at::Tensor & self, at::Scalar other);
@@ -188,6 +191,8 @@ class AtenIpexTypeDefault {
   static at::Tensor index_select(const at::Tensor & self, int64_t dim, const at::Tensor & index);
   static at::Tensor & nonzero_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor nonzero(const at::Tensor & self);
+  static at::Tensor & gather_out(at::Tensor & out, const at::Tensor & self, int64_t dim, const at::Tensor & index, bool sparse_grad);
+  static at::Tensor gather(const at::Tensor & self, int64_t dim, const at::Tensor & index, bool sparse_grad);
   static at::Tensor & addcmul_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   static at::Tensor addcmul(const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   static at::Tensor & addcmul_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
