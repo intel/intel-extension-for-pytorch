@@ -3,10 +3,15 @@
 #include <core/SYCL.h>
 #include <core/SYCLStream.h>
 #include <core/SYCLMemory.h>
+#include <core/TensorImplUtils.h>
 #include <core/detail/TensorInfo.h>
+#include <core/detail/IndexUtils.h>
+#include <utils/Numerics.h>
+#include "ParttenScan.h"
 
 
 using namespace at::sycl::detail;
+using namespace at::native;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -130,6 +135,81 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
   DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
   return;
 }
+
+DP_DEF_K1(nonzero_kernel);
+
+template<typename T>
+struct NonZeroOp {
+  NonZeroOp() {}
+  bool operator()(T lhs) const {
+    if(Numerics<T>::ne(lhs, ScalarConvert<float, T>::to(0.0))) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+};
+
+template <typename scalar_t>
+void nonzero(Tensor & tensor, const Tensor & self_) {
+  auto self = self_.contiguous();
+
+  int64_t num_dim = self.dim() == 0 ? 1 : self.dim();
+  int64_t N = self.numel();
+
+  // First to resize out tensor to full elements row
+
+  int64_t to_sizes[2] = {N, num_dim};
+  TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 2, to_sizes, nullptr);
+  tensor = tensor.contiguous();
+
+  // Prepare input tensor strides for calculating result index
+  if (N > 0) {
+    if (canUse32BitIndexMath(self)) {
+      TensorInfo<scalar_t, uint32_t> input = getTensorInfo<scalar_t, uint32_t>(self);
+      auto idx_fuc = idx_functor<uint32_t>(input);
+      input.collapseDims();
+
+      TensorInfo<long, uint32_t> output = getTensorInfo<long, uint32_t>(tensor);
+      output.collapseDims();
+
+      auto queue = c10::sycl::syclGetCurrentQueue();
+      auto num_nonzeros = pattern_scan(
+          queue,
+          input,
+          output,
+          static_cast<uint32_t>(N),
+          NonZeroOp<scalar_t>{},
+          idx_fuc);
+
+      // Resize the output tensor to the real size
+      int64_t real_sizes[2] = {(int64_t)num_nonzeros, (int64_t)num_dim};
+      TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 2, real_sizes, nullptr);
+    } else {
+      TensorInfo<scalar_t, uint64_t> input = getTensorInfo<scalar_t, uint64_t>(self);
+      auto idx_fuc = idx_functor<uint64_t>(input);
+      input.collapseDims();
+
+      TensorInfo<long, uint64_t> output = getTensorInfo<long, uint64_t>(tensor);
+      output.collapseDims();
+
+      auto queue = c10::sycl::syclGetCurrentQueue();
+      auto num_nonzeros = pattern_scan(
+          queue,
+          input,
+          output,
+          static_cast<uint64_t>(N),
+          NonZeroOp<scalar_t>{},
+          idx_fuc);
+
+      // Resize the output tensor to the real size
+      int64_t real_sizes[2] = {(int64_t)num_nonzeros, (int64_t)num_dim};
+      TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 2, real_sizes, nullptr);
+    }
+
+  }
+}
+
 } // namespace impl
 
 Tensor & index_select_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index) {
@@ -142,6 +222,19 @@ Tensor & index_select_out(Tensor & out, const Tensor & self, int64_t dim, const 
 Tensor index_select(const Tensor & self, int64_t dim, const Tensor & index) {
   auto out = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::index_select_out(out, self, dim, index);
+}
+
+Tensor & nonzero_out(Tensor & out, const Tensor & self) {
+  AT_DISPATCH_ALL_TYPES_AND2(at::ScalarType::Half,
+      at::ScalarType::Bool, self.scalar_type(), "indexSelect", [&]() {
+    impl::nonzero<scalar_t>(out, self);
+  });
+  return out;
+}
+
+Tensor nonzero(const at::Tensor & self) {
+  auto out = at::empty({0}, self.options().dtype(kLong));
+  return at::AtenIpexTypeDPCPP::nonzero_out(out, self);
 }
 
 } // namespace AtenIpexTypeDPCPP

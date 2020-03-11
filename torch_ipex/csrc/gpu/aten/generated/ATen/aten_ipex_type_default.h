@@ -178,6 +178,8 @@ class AtenIpexTypeDefault {
   static at::Tensor lt(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & index_select_out(at::Tensor & out, const at::Tensor & self, int64_t dim, const at::Tensor & index);
   static at::Tensor index_select(const at::Tensor & self, int64_t dim, const at::Tensor & index);
+  static at::Tensor & nonzero_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor nonzero(const at::Tensor & self);
   static at::Tensor & addcmul_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   static at::Tensor addcmul(const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   static at::Tensor & addcmul_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);

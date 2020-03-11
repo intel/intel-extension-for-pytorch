@@ -178,6 +178,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor lt(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & index_select_out(at::Tensor & out, const at::Tensor & self, int64_t dim, const at::Tensor & index);
   at::Tensor index_select(const at::Tensor & self, int64_t dim, const at::Tensor & index);
+  at::Tensor & nonzero_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor nonzero(const at::Tensor & self);
   at::Tensor & addcmul_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   at::Tensor addcmul(const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   at::Tensor & addcmul_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
