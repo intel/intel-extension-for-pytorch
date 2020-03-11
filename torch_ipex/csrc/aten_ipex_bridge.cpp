@@ -7,9 +7,11 @@
 #include <ATen/Tensor.h>
 #include <c10/core/StorageImpl.h>
 #include <c10/util/Exception.h>
+#include <c10/util/UniqueVoidPtr.h>
 
 #include "ipex_tensor_impl.h"
 #include "ipex_sparse_tensor_impl.h"
+#include "cpu/ShadeDataContext.h"
 
 namespace torch_ipex {
 namespace bridge {
@@ -81,6 +83,45 @@ at::Tensor fallbackToCPUTensor(const at::Tensor& ipexTensor) {
 }
 
 
+// Unpack CPU tensor from ipex tensor and return to caller directly
+at::Tensor shallowFallbackToCPUShadeTensor(const at::Tensor& ipexTensor) {
+  if (!(ipexTensor.defined())) {
+    return ipexTensor;
+  }
+
+  TORCH_INTERNAL_ASSERT(!ipexTensor.is_sparse());
+  TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
+  if (ipexTensor.device().is_cpu())
+    return ipexTensor;
+
+  auto* allocator = c10::GetAllocator(c10::DeviceType::CPU);
+  void* tensor_raw_data = nullptr;
+  void* data_context = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
+  TORCH_INTERNAL_ASSERT(data_context != nullptr);
+
+  // Unpack CPU raw data from shade data
+  cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_context;
+  if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
+    //TODO: Call reorder here
+    TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->unique_version());
+    dil::tensor &dil_tensor = shade_data_context->dil_tensor;
+    auto dims = dil_tensor.get_dims();
+    // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
+    at::Tensor cpu_tensor = at::empty(
+      std::vector<int64_t>(dims.begin(), dims.end()),
+      ipexTensor.options().device(c10::kCPU).layout(c10::kStrided));
+    // make sure that it is not a in-place tensor
+    TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->version_counter().current_version() == 1);
+    dil_tensor.to_public(cpu_tensor.data_ptr(), dil_tensor.get_data_type());
+    CHECK_TENSOR_CRITICAL(cpu_tensor, ipexTensor);
+    return cpu_tensor;
+  } else {
+    TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data == ipexTensor.data_ptr());
+    return shallowFallbackToCPUTensor(ipexTensor);
+  }
+}
+
+
 // Fallback CPU tensor to DPCPP Tensor with shallow copy
 // It will create an new CPU tensor but shares DPCPP tensor buffer
 at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
@@ -147,6 +188,31 @@ at::Tensor upgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
   return _tensor;
 }
 
+at::Tensor shallowUpgradeToDPCPPShadeTensor(const at::Tensor& cpuTensor) {
+  if (!(cpuTensor.defined())) {
+    return at::Tensor();
+  }
+  TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
+  if (cpuTensor.is_sparse()) shallowUpgradeToDPCPPTensor(cpuTensor);
+
+  auto cpu_storage_impl = cpuTensor.storage().unsafeGetStorageImpl();
+  auto& data_ptr = cpu_storage_impl->data_ptr();
+  auto cur_del_fn = data_ptr.get_deleter();
+  bool res = data_ptr.compare_exchange_deleter(cur_del_fn, &(c10::detail::deleteNothing));
+  TORCH_INTERNAL_ASSERT(res);
+  // Make sure that does not triger free resource for set_ptr
+  cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
+  shade_data_context->cpu_raw_data = data_ptr.get();
+  shade_data_context->cpu_del_run = cur_del_fn;
+  shade_data_context->data_type = cpu::SHADE_DATA_TYPE::CPU_RAW;
+  c10::DataPtr shade_data_ptr(
+    data_ptr.get(),
+    shade_data_context,
+    cpu::ShadeDataContext::freeShadeDataContext,
+    at::DeviceType::CPU);
+  cpuTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(shade_data_ptr));
+  return shallowUpgradeToDPCPPTensor(cpuTensor);
+}
 
 // Upgrade CPU tensor to DPCPP Tensor with shallow copy
 // It will create an new DPCPP tensor but shares CPU tensor buffer
