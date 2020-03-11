@@ -27,6 +27,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor logical_not(const at::Tensor & self);
   at::Tensor & logical_not_(at::Tensor & self);
   at::Tensor & logical_not_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & logical_xor_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
   at::Tensor & ceil_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & clamp_(at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);
   at::Tensor & clamp_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);

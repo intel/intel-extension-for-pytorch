@@ -91,6 +91,10 @@ at::Tensor & AtenIpexTypeDefault::logical_not_out(at::Tensor & out, const at::Te
   return AtenIpexTypeDPCPP::logical_not_out(out, self);
 }
 
+at::Tensor & AtenIpexTypeDefault::logical_xor_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::logical_xor_out(out, self, other);
+}
+
 at::Tensor & AtenIpexTypeDefault::ceil_out(at::Tensor & out, const at::Tensor & self) {
   return AtenIpexTypeDPCPP::ceil_out(out, self);
 }
@@ -1121,6 +1125,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::logical_not.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::logical_not_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::logical_xor.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::logical_xor_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::ceil.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::ceil_out>(at::TensorTypeId::DPCPPTensorId)

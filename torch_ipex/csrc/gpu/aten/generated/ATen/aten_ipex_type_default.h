@@ -27,6 +27,7 @@ class AtenIpexTypeDefault {
   static at::Tensor logical_not(const at::Tensor & self);
   static at::Tensor & logical_not_(at::Tensor & self);
   static at::Tensor & logical_not_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & logical_xor_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & ceil_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & clamp_(at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);
   static at::Tensor & clamp_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);
