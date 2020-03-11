@@ -10,8 +10,8 @@
 #include <functional>
 #include <memory>
 
-//Forward-declares THSYCLState
-struct THSYCLState;
+// Forward-declares THSYCLState
+// struct THSYCLState;
 
 namespace at {
 class Context;
@@ -30,9 +30,13 @@ struct CAFFE2_API SYCLHooksInterface {
   virtual ~SYCLHooksInterface() {}
 
   // Initialize THSYCLState and, transitively, the SYCL state
-  virtual std::unique_ptr<THSYCLState, void (*)(THSYCLState*)> initSYCL() const {
+  // virtual std::unique_ptr<THSYCLState, void (*)(THSYCLState*)> initSYCL() const {
+  //   TORCH_CHECK("Cannot initialize SYCL without ATen_sycl library.");
+  //   return {nullptr, nullptr};
+  // }
+
+  virtual void initSYCL() const {
     TORCH_CHECK("Cannot initialize SYCL without ATen_sycl library.");
-    return {nullptr, nullptr};
   }
 
   virtual Generator* getDefaultSYCLGenerator(DeviceIndex device_index = -1) const {

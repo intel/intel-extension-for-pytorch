@@ -4,7 +4,6 @@
 #include <core/SYCLMemory.h>
 #include <core/SYCLUtils.h>
 #include <core/SYCLContext.h>
-#include <core/SYCLState.h>
 #include <core/SYCLGenerator.h>
 #include "Random.h"
 

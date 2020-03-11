@@ -2,13 +2,10 @@
 
 #include <core/SYCLGenerator.h>
 #include <ATen/Context.h>
-//#include <core/SYCLConfig.h>
 #include <ATen/Config.h>
 #include <core/SYCLDevice.h>
 #include <core/detail/SYCLHooksInterface.h>
 #include <c10/util/Exception.h>
-
-#include <legacy/THSYCL.h>
 
 #include <core/SYCLUtils.h>
 #include <utils/General.h>
@@ -21,15 +18,9 @@ namespace at {
 namespace sycl {
 namespace detail {
 
-std::unique_ptr<THSYCLState, void (*)(THSYCLState*)> SYCLHooks::initSYCL() const {
-  THSYCLState* thsycl_state = THSYCLState_alloc();
-
-  THSyclInit(thsycl_state);
-  return std::unique_ptr<THSYCLState, void (*)(THSYCLState*)>(
-    thsycl_state, [](THSYCLState* p) {
-      if (p)
-        THSYCLState_free(p);
-    });
+void SYCLHooks::initSYCL() const {
+  // TODO:
+  // global state is removed
 }
 
 Generator* SYCLHooks::getDefaultSYCLGenerator(DeviceIndex device_index) const {
