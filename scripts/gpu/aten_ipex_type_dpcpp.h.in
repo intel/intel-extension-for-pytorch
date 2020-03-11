@@ -130,6 +130,9 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & set_(at::Tensor & self, const at::Tensor & source);
   at::Tensor & set_(at::Tensor & self);
   at::Tensor view(const at::Tensor & self, at::IntArrayRef size);
+  at::Tensor & index_add_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & source);
+  at::Tensor & index_fill_(at::Tensor & self, int64_t dim, const at::Tensor & index, at::Scalar value);
+  at::Tensor & index_fill_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & value);
   at::Tensor __and__(const at::Tensor & self, at::Scalar other);
   at::Tensor __and__(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & __iand__(at::Tensor & self, at::Scalar other);
