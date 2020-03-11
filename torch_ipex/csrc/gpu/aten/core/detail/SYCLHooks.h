@@ -10,7 +10,7 @@ namespace at { namespace sycl { namespace detail {
 // The real implementation of SYCLHooksInterface
 struct SYCLHooks : public at::SYCLHooksInterface {
   SYCLHooks(at::SYCLHooksArgs) {}
-  std::unique_ptr<THSYCLState, void(*)(THSYCLState*)> initSYCL() const override;
+  void initSYCL() const override;
   Device getDeviceFromPtr(void* data) const override;
   Generator* getDefaultSYCLGenerator(DeviceIndex device_index = -1) const override;
   bool hasSYCL() const override;

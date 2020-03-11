@@ -3,10 +3,16 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/BinaryOps.h>
 
+#include <core/SYCL.h>
+#include <utils/Pointwise.h>
 #include <functions/Loops.h>
 
 
-namespace at { namespace native {
+using namespace at::native;
+
+namespace at {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 //Note: sycl compiler does not support uname type in template.
 class SyclOpAdd{};
@@ -54,12 +60,7 @@ static void div_kernel_sycl(TensorIterator& iter) {
   }
 }
 
-}
-}
-
-namespace at { namespace AtenIpexTypeDPCPP {
-
-//alpha_check
+// alpha_check
 static inline void alpha_check(const TensorIterator& iter, Scalar alpha) {
   AT_CHECK(! alpha.isBoolean() || iter.dtype() == ScalarType::Bool,
               "Boolean alpha only supported for Boolean results.");
@@ -67,40 +68,11 @@ static inline void alpha_check(const TensorIterator& iter, Scalar alpha) {
               "For integral input tensors, argument alpha must not be a floating point number.");
 }
 
-//scalar to tensor
+// scalar to tensor
 static Tensor wrapped_scalar_tensor(Scalar scalar) {
   auto tensor = scalar_to_tensor(scalar);
   tensor.unsafeGetTensorImpl()->set_wrapped_number(true);
   return tensor;
-}
-
-Tensor& add_out(Tensor& result, const Tensor& self, const Tensor& other, Scalar alpha) {
-  auto iter = TensorIterator::binary_op(result, self, other,
-    /*check_mem_overlap=*/true);
-  alpha_check(iter, alpha);
-  at::native::add_kernel_sycl(iter,alpha);
-  TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
-  return result;
-}
-
-Tensor add(const Tensor& self, const Tensor& other, Scalar alpha) {
-  Tensor result;
-  auto iter = TensorIterator::binary_op(result, self, other);
-  alpha_check(iter, alpha);
-  at::native::add_kernel_sycl(iter,alpha);
-  return iter.output();
-}
-
-Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::add_out(self, self, other, alpha);
-}
-
-Tensor add(const Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::add(self, wrapped_scalar_tensor(other), alpha);
-}
-
-Tensor& add_(Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::add_(self, wrapped_scalar_tensor(other), alpha);
 }
 
 // Basic checking for all sub functions.
@@ -113,22 +85,53 @@ static inline void sub_check(const Tensor& self, const Tensor& other) {
               "If you are trying to invert a mask, use the `~` or `logical_not()` operator instead.");
 }
 
-Tensor& sub_out(Tensor& result, const Tensor& self, const Tensor& other, Scalar alpha) {
-  sub_check(self, other);
+} // namespace impl
+
+Tensor& add_out(Tensor& result, const Tensor& self, const Tensor& other, Scalar alpha) {
   auto iter = TensorIterator::binary_op(result, self, other,
     /*check_mem_overlap=*/true);
-  alpha_check(iter, alpha);
-  at::native::sub_kernel_sycl(iter,alpha);
+  impl::alpha_check(iter, alpha);
+  impl::add_kernel_sycl(iter,alpha);
+  TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
+  return result;
+}
+
+Tensor add(const Tensor& self, const Tensor& other, Scalar alpha) {
+  Tensor result;
+  auto iter = TensorIterator::binary_op(result, self, other);
+  impl::alpha_check(iter, alpha);
+  impl::add_kernel_sycl(iter,alpha);
+  return iter.output();
+}
+
+Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha) {
+  return at::AtenIpexTypeDPCPP::add_out(self, self, other, alpha);
+}
+
+Tensor add(const Tensor& self, Scalar other, Scalar alpha) {
+  return at::AtenIpexTypeDPCPP::add(self, impl::wrapped_scalar_tensor(other), alpha);
+}
+
+Tensor& add_(Tensor& self, Scalar other, Scalar alpha) {
+  return at::AtenIpexTypeDPCPP::add_(self, impl::wrapped_scalar_tensor(other), alpha);
+}
+
+Tensor& sub_out(Tensor& result, const Tensor& self, const Tensor& other, Scalar alpha) {
+  impl::sub_check(self, other);
+  auto iter = TensorIterator::binary_op(result, self, other,
+    /*check_mem_overlap=*/true);
+  impl::alpha_check(iter, alpha);
+  impl::sub_kernel_sycl(iter,alpha);
   TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
   return result;
 }
 
 Tensor sub(const Tensor& self, const Tensor& other, Scalar alpha) {
-  sub_check(self, other);
+  impl::sub_check(self, other);
   Tensor result;
   auto iter = TensorIterator::binary_op(result, self, other);
-  alpha_check(iter, alpha);
-  at::native::sub_kernel_sycl(iter,alpha);
+  impl::alpha_check(iter, alpha);
+  impl::sub_kernel_sycl(iter,alpha);
   return iter.output();
 }
 
@@ -141,28 +144,28 @@ Tensor rsub(const Tensor& self, const Tensor& other, Scalar alpha) {
 }
 
 Tensor sub(const Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::sub(self, wrapped_scalar_tensor(other), alpha);
+  return at::AtenIpexTypeDPCPP::sub(self, impl::wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& sub_(Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::sub_(self, wrapped_scalar_tensor(other), alpha);
+  return at::AtenIpexTypeDPCPP::sub_(self, impl::wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor rsub(const Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::rsub(self, wrapped_scalar_tensor(other), alpha);
+  return at::AtenIpexTypeDPCPP::rsub(self, impl::wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& mul_out(Tensor& result, const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_op(result, self, other,
     /*check_mem_overlap=*/true);
-  at::native::mul_kernel_sycl(iter);
+  impl::mul_kernel_sycl(iter);
   return result;
 }
 
 Tensor mul(const Tensor& self, const Tensor& other) {
   Tensor result;
   auto iter = TensorIterator::binary_op(result, self, other);
-  at::native::mul_kernel_sycl(iter);
+  impl::mul_kernel_sycl(iter);
   return iter.output();
 }
 
@@ -171,29 +174,112 @@ Tensor& mul_(Tensor& self, const Tensor& other) {
 }
 
 Tensor mul(const Tensor& self, Scalar other) {
-  return at::AtenIpexTypeDPCPP::mul(self, wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeDPCPP::mul(self, impl::wrapped_scalar_tensor(other));
 }
 
 Tensor& mul_(Tensor& self, Scalar other) {
-  return at::AtenIpexTypeDPCPP::mul_(self, wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeDPCPP::mul_(self, impl::wrapped_scalar_tensor(other));
 }
 
 Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_op(result, self, other,
     /*check_mem_overlap=*/true);
-  at::native::div_kernel_sycl(iter);
+  impl::div_kernel_sycl(iter);
   return result;
 }
 
 Tensor div(const Tensor& self, const Tensor& other) {
   Tensor result;
   auto iter = TensorIterator::binary_op(result, self, other);
-  at::native::div_kernel_sycl(iter);
+  impl::div_kernel_sycl(iter);
   return iter.output();
 }
 
 Tensor& div_(Tensor& self, const Tensor& other) {
   return at::AtenIpexTypeDPCPP::div_out(self, self, other);
+}
+
+IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(min_out, TensorMinOp)
+
+Tensor min(const Tensor & self, const Tensor & other) {
+  auto out = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::min_out(out, self, other);
+}
+
+IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(max_out, TensorMaxOp)
+
+Tensor max(const Tensor & self, const Tensor & other) {
+  auto out = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::max_out(out, self, other);
+}
+
+IPEX_OUT_INT_CALLABLE_0_BINARY_OPS(__and___out, TensorBitAndOp)
+
+Tensor __and__(const Tensor & self, const Tensor & other) {
+  auto result = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::__and___out(result, self, other);
+}
+
+Tensor & __iand__(Tensor & self, const Tensor & other) {
+  return at::AtenIpexTypeDPCPP::__and___out(self, self, other);
+}
+
+IPEX_OUT_INT_CALLABLE_0_BINARY_OPS(__or___out, TensorBitOrOp)
+
+Tensor __or__(const Tensor & self, const Tensor & other) {
+  auto result = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::__or___out(result, self, other);
+}
+
+Tensor & __ior__(Tensor & self, const Tensor & other) {
+  return at::AtenIpexTypeDPCPP::__or___out(self, self, other);
+}
+
+DP_DEF_K1(tanh_backward);
+Tensor & tanh_backward_out(
+    Tensor & grad_input, const Tensor & grad_output, const Tensor & output) {
+  auto iter = at::TensorIterator();
+  iter.set_check_mem_overlap(true);
+  iter.add_output(grad_input);
+  iter.add_input(grad_output);
+  iter.add_input(output);
+  iter.build();
+
+  AT_DISPATCH_ALL_TYPES(iter.dtype(), "tanh_backward_out", [&]() {
+    sycl_kernel_for_tensor_iter<DP_K(tanh_backward)>(
+        iter, [](scalar_t output, scalar_t z) -> scalar_t {
+      return output * (1. - z*z);
+    });
+  });
+
+  return grad_input;
+}
+
+Tensor tanh_backward(const Tensor & grad_output, const Tensor & output) {
+  auto grad_input = at::empty({0}, grad_output.options());
+  return at::tanh_backward_out(grad_input, grad_output, output);
+}
+
+IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(remainder_out, TensorCRemainderOp)
+
+Tensor remainder(const Tensor & self, const Tensor & other) {
+  auto out = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::remainder_out(out, self, other);
+}
+
+Tensor & remainder_(Tensor & self, const Tensor & other) {
+  return at::AtenIpexTypeDPCPP::remainder_out(self, self, other);
+}
+
+IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(fmod_out, TensorCFmodOp)
+
+Tensor fmod(const Tensor & self, const Tensor & other) {
+  auto out = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::fmod_out(out, self, other);
+}
+
+Tensor & fmod_(Tensor & self, const Tensor & other) {
+  return at::AtenIpexTypeDPCPP::fmod_out(self, self, other);
 }
 
 } // namespace AtenIpexTypeDPCPP

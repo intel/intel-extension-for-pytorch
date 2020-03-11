@@ -1,7 +1,6 @@
 #include <core/SYCLContext.h>
-#include <core/SYCLState.h>
 #include <core/SYCLUtils.h>
-#include <legacy/THSYCLAllocator.h>
+#include <core/Allocator.h>
 #include <CL/sycl.hpp>
 
 
@@ -32,7 +31,7 @@ cl::sycl::context getGlobalContext() {
 }
 
 at::Allocator* getSYCLDeviceAllocator() {
-  return THSYCLAllocator_get();
+  return DPCPPAllocator_get();
 }
 
 } // namespace sycl

@@ -752,7 +752,8 @@ inline void SYCL_tensor_apply1(at::Tensor a,
     //Ignore overlaps when copying back; if we use copy
     //instead, it will recursively try and invoke ourselves to make
     // old_dst contiguous
-    at::native::legacy::sycl::_th_copy_ignoring_overlaps_(oldA, a);
+    TORCH_CHECK(0, "not implemented THSYCLTensor_copyIgnoringOverlaps\n");
+    // at::native::legacy::sycl::_th_copy_ignoring_overlaps_(oldA, a);
   }
 
 }
@@ -871,9 +872,10 @@ inline void SYCL_tensor_apply2(at::Tensor dst,
 
   if (old_dst.defined()) {
     //Ignore overlaps when copying back; if we use copy
-  //instead, it will recursively try and invoke ourselves to make
-  // old_dst contiguous
-    at::native::legacy::sycl::_th_copy_ignoring_overlaps_(old_dst, dst);
+    //instead, it will recursively try and invoke ourselves to make
+    // old_dst contiguous
+    TORCH_CHECK(0, "not implemented THSYCLTensor_copyIgnoringOverlaps\n");
+    // at::native::legacy::sycl::_th_copy_ignoring_overlaps_(old_dst, dst);
   }
 
 }
@@ -1028,7 +1030,8 @@ inline void SYCL_tensor_apply3(at::Tensor dst,
     //Ignore overlaps when copying back; if we use copy
     //instead, it will recursively try and invoke ourselves to make
     // old_dst contiguous
-    at::native::legacy::sycl::_th_copy_ignoring_overlaps_(old_dst, dst);
+    TORCH_CHECK(0, "not implemented THSYCLTensor_copyIgnoringOverlaps\n");
+    // at::native::legacy::sycl::_th_copy_ignoring_overlaps_(old_dst, dst);
   }
 }
 
@@ -1207,7 +1210,8 @@ inline void SYCL_tensor_apply4(at::Tensor dst,
     // Ignore overlaps when copying back; if we use THCTensor_copy
     // instead, it will recursively try and invoke ourselves to make
     // old_dst contiguous.
-    at::native::legacy::sycl::_th_copy_ignoring_overlaps_(old_dst, dst);
+    TORCH_CHECK(0, "not implemented THSYCLTensor_copyIgnoringOverlaps\n");
+    // at::native::legacy::sycl::_th_copy_ignoring_overlaps_(old_dst, dst);
   }
 }
 

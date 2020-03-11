@@ -74,6 +74,14 @@
 # define M_PI 3.14159265358979323846
 #endif
 
+#define IS_FLOAT(scalar_t)                                         \
+    (std::is_same<scalar_t, float>::value ||                       \
+     std::is_same<scalar_t, double>::value ||                      \
+     std::is_same<scalar_t, at::Half>::value)
+
+#define IS_HALF(scalar_t)                                          \
+     (std::is_same<scalar_t, at::Half>::value)
+
 #if 0
 typedef void (*THErrorHandlerFunction)(const char *msg, void *data);
 typedef void (*THArgErrorHandlerFunction)(int argNumber, const char *msg, void *data);

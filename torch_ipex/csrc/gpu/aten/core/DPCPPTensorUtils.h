@@ -1,4 +1,4 @@
-#pragma onec
+#pragma once
 
 #include <ATen/TensorUtils.h>
 #include <c10/core/DeviceType.h>

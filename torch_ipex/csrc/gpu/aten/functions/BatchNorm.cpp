@@ -8,11 +8,14 @@
 
 
 using namespace mkldnn;
-namespace at { namespace native {
+using namespace at::native;
 
+namespace at {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 template<typename scalar_t>
-std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm_template (
+std::tuple<Tensor, Tensor, Tensor> batch_norm_template (
         const Tensor& input, const Tensor& weight, const Tensor& bias,
         const Tensor& running_mean /* optional */, const Tensor& running_var /* optional */,
         bool training, double momentum, double epsilon)
@@ -140,12 +143,14 @@ std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm_template (
     return std::tuple<Tensor, Tensor, Tensor>{output, save_mean, save_var};
 }
 
-std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm (
+}
+
+std::tuple<Tensor, Tensor, Tensor> native_batch_norm (
     const Tensor& input, const Tensor& weight,
     const Tensor& bias, const Tensor& running_mean, const Tensor& running_var,
     bool training, double momentum, double epsilon)
 {
-    checkBackend("sycl_batch_norm", {input, weight, bias, running_mean, running_var}, Backend::DPCPP);
+    checkBackend("batch_norm", {input, weight, bias, running_mean, running_var}, Backend::DPCPP);
 
     if (input.scalar_type() != at::ScalarType::Float && input.scalar_type() != at::ScalarType::Half) {
         //TODO: add more scalar type support.
@@ -155,12 +160,13 @@ std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm (
     }
     else
         return AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "batch_norm", [&] {
-            return sycl_batch_norm_template<scalar_t>(input, weight, bias, running_mean, running_var, training, momentum, epsilon);
+            return impl::batch_norm_template<scalar_t>(
+                input, weight, bias, running_mean, running_var, training, momentum, epsilon);
         });
 }
 
 
-std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm_backward(
+std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     const Tensor& grad_output, const Tensor& input, const Tensor& weight,
     // Unused: but we require them to be passed so that double backwards
     // has access
@@ -309,19 +315,6 @@ std::tuple<Tensor, Tensor, Tensor> sycl_batch_norm_backward(
   return std::make_tuple(grad_input, grad_weight, grad_bias);
 }
 
-}} // at::native
-
-namespace at {
-namespace AtenIpexTypeDPCPP {
-
-std::tuple<at::Tensor,at::Tensor,at::Tensor>
-native_batch_norm(const at::Tensor & input, const at::Tensor & weight,
-    const at::Tensor & bias, const at::Tensor & running_mean,
-    const at::Tensor & running_var, bool training, double momentum, double eps) {
-  return at::native::sycl_batch_norm(
-      input, weight, bias, running_mean, running_var, training, momentum, eps);
-}
-
-} // AtenIpexTypeDPCPP
-} // at
+} // namespace AtenIpexTypeDPCPP
+} // namespace at
 

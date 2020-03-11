@@ -737,5 +737,26 @@ Tensor convolution_overrideable(const Tensor & input_r, const Tensor & weight_r,
   return output;
 }
 
+std::tuple<Tensor,Tensor,Tensor> convolution_backward_overrideable(
+    const Tensor & grad_output, const Tensor & input, const Tensor & weight, IntArrayRef stride,
+    IntArrayRef padding, IntArrayRef dilation, bool transposed, IntArrayRef output_padding,
+    int64_t groups, std::array<bool,3> output_mask)
+{
+  Tensor grad_output_ = grad_output.contiguous();
+
+  Tensor grad_input, grad_weight, grad_bias;
+  if (output_mask[0]) {
+    grad_input = sycl_convolution_backward_input(
+      input.sizes(), grad_output_, weight, padding, stride, dilation, groups, output_mask[2]);
+  }
+  if (output_mask[1] || output_mask[2]) {
+    std::tie(grad_weight, grad_bias) = sycl_convolution_backward_weights(
+      weight.sizes(), grad_output_, input, padding, stride, dilation, groups, output_mask[2]);
+  }
+
+  return std::tuple<Tensor, Tensor, Tensor>{grad_input, grad_weight, grad_bias};
+}
+
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

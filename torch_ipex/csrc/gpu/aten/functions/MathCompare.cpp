@@ -245,19 +245,20 @@ void THSYCLTensor_(neTensorByte)(THSYCLState *state, THSyclByteTensor *self_, TH
 #endif
 } // namespace impl
 
-//lt
 Tensor & lt_out(Tensor & out, const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   at::lt_out(out, self, other);
   return out;
 }
+
 Tensor lt(const Tensor & self, Scalar other_){
   auto result = at::empty({0}, self.options().dtype(kBool));
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   return at::lt_out(result, self, other);
 }
+
 Tensor & lt_out(Tensor & out, const Tensor & self, const Tensor & other){
     AT_DISPATCH_ALL_TYPES(self.scalar_type(), "ltTensor",
       [&]() {
@@ -267,23 +268,26 @@ Tensor & lt_out(Tensor & out, const Tensor & self, const Tensor & other){
 
   return out;
 }
+
 Tensor lt(const Tensor & self, const Tensor & other){
   Tensor result = at::empty({0}, self.options().dtype(kBool));
   return at::lt_out(result, self, other);
 }
-//gt
+
 Tensor & gt_out(Tensor & out, const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   at::gt_out(out, self, other);
   return out;
 }
+
 Tensor gt(const Tensor & self, Scalar other_){
   auto result = at::empty({0}, self.options().dtype(kBool));
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   return at::gt_out(result, self, other);
 }
+
 Tensor & gt_out(Tensor & out, const Tensor & self, const Tensor & other){
     AT_DISPATCH_ALL_TYPES(self.scalar_type(), "gtTensor",
       [&]() {
@@ -293,23 +297,26 @@ Tensor & gt_out(Tensor & out, const Tensor & self, const Tensor & other){
 
   return out;
 }
+
 Tensor gt(const Tensor & self, const Tensor & other){
   Tensor result = at::empty({0}, self.options().dtype(kBool));
   return at::gt_out(result, self, other);
 }
-//ge
+
 Tensor & ge_out(Tensor & out, const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   at::ge_out(out, self, other);
   return out;
 }
+
 Tensor ge(const Tensor & self, Scalar other_){
   auto result = at::empty({0}, self.options().dtype(kBool));
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   return at::ge_out(result, self, other);
 }
+
 Tensor & ge_out(Tensor & out, const Tensor & self, const Tensor & other){
     AT_DISPATCH_ALL_TYPES(self.scalar_type(), "geTensor",
       [&]() {
@@ -319,23 +326,26 @@ Tensor & ge_out(Tensor & out, const Tensor & self, const Tensor & other){
 
   return out;
 }
+
 Tensor ge(const Tensor & self, const Tensor & other){
   Tensor result = at::empty({0}, self.options().dtype(kBool));
   return at::ge_out(result, self, other);
 }
-//le
+
 Tensor & le_out(Tensor & out, const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   at::le_out(out, self, other);
   return out;
 }
+
 Tensor le(const Tensor & self, Scalar other_){
   auto result = at::empty({0}, self.options().dtype(kBool));
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   return at::le_out(result, self, other);
 }
+
 Tensor & le_out(Tensor & out, const Tensor & self, const Tensor & other){
     AT_DISPATCH_ALL_TYPES(self.scalar_type(), "leTensor",
       [&]() {
@@ -345,11 +355,12 @@ Tensor & le_out(Tensor & out, const Tensor & self, const Tensor & other){
 
   return out;
 }
+
 Tensor le(const Tensor & self, const Tensor & other){
   Tensor result = at::empty({0}, self.options().dtype(kBool));
   return at::le_out(result, self, other);
 }
-//eq
+
 Tensor & eq_out(Tensor & out, const Tensor & self, Scalar other_) {
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
@@ -377,19 +388,21 @@ Tensor eq(const Tensor & self, const Tensor & other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
   return at::eq_out(result, self, other);
 }
-//ne
+
 Tensor & ne_out(Tensor & out, const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   at::ne_out(out, self, other);
   return out;
 }
+
 Tensor ne(const Tensor & self, Scalar other_){
   auto result = at::empty({0}, self.options().dtype(kBool));
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   return at::ne_out(result, self, other);
 }
+
 Tensor & ne_out(Tensor & out, const Tensor & self, const Tensor & other){
     AT_DISPATCH_ALL_TYPES(self.scalar_type(), "neTensor",
       [&]() {
@@ -399,6 +412,7 @@ Tensor & ne_out(Tensor & out, const Tensor & self, const Tensor & other){
 
   return out;
 }
+
 Tensor ne(const Tensor & self, const Tensor & other){
   Tensor result = at::empty({0}, self.options().dtype(kBool));
   return at::ne_out(result, self, other);

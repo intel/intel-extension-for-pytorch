@@ -3,9 +3,9 @@
 #include <array>
 #include <cstdint>
 #include <c10/macros/Macros.h>
-#include <legacy/THSYCLIntegerDivider.h>
 
 #include <core/Array.h>
+#include <utils/IntegerDivider.h>
 
 /// OffsetCalculator calculates the offset in bytes of a linear index for NARGS
 /// operands that share the same shape, but may have different strides.
