@@ -655,6 +655,10 @@ at::Tensor AtenIpexTypeDefault::triu_indices(int64_t row, int64_t col, int64_t o
   return AtenIpexTypeDPCPP::triu_indices(row, col, offset, options);
 }
 
+at::Tensor AtenIpexTypeDefault::trace(const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::trace(self);
+}
+
 at::Tensor & AtenIpexTypeDefault::ne_out(at::Tensor & out, const at::Tensor & self, at::Scalar other) {
   return AtenIpexTypeDPCPP::ne_out(out, self, other);
 }
@@ -1592,6 +1596,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::triu_indices(int row, int col, int offset=0, *, ScalarType? dtype=long, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(int64_t, int64_t, int64_t, const at::TensorOptions &), &AtenIpexTypeDefault::triu_indices>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::trace(Tensor self) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::trace>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::ne.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::ne_out>(at::TensorTypeId::DPCPPTensorId)
