@@ -159,6 +159,8 @@ class AtenIpexTypeDefault {
   static at::Tensor & remainder_(at::Tensor & self, const at::Tensor & other);
   static at::Tensor & addcdiv_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   static at::Tensor & normal_(at::Tensor & self, double mean, double std, at::Generator * generator);
+  static at::Tensor & diag_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
+  static at::Tensor diag(const at::Tensor & self, int64_t diagonal);
   static at::Tensor & triu_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
   static at::Tensor & tril_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
   static at::Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const at::TensorOptions & options);

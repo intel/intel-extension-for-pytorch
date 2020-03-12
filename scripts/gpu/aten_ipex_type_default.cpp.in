@@ -619,6 +619,14 @@ at::Tensor & AtenIpexTypeDefault::normal_(at::Tensor & self, double mean, double
   return AtenIpexTypeDPCPP::normal_(self, mean, std, generator);
 }
 
+at::Tensor & AtenIpexTypeDefault::diag_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal) {
+  return AtenIpexTypeDPCPP::diag_out(out, self, diagonal);
+}
+
+at::Tensor AtenIpexTypeDefault::diag(const at::Tensor & self, int64_t diagonal) {
+  return AtenIpexTypeDPCPP::diag(self, diagonal);
+}
+
 at::Tensor & AtenIpexTypeDefault::triu_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal) {
   return AtenIpexTypeDPCPP::triu_out(out, self, diagonal);
 }
@@ -1541,6 +1549,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::normal_(Tensor(a!) self, float mean=0, float std=1, *, Generator? generator=None) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, double, double, at::Generator *), &AtenIpexTypeDefault::normal_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::diag.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, int64_t), &AtenIpexTypeDefault::diag_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::diag(Tensor self, int diagonal=0) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, int64_t), &AtenIpexTypeDefault::diag>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::triu.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, int64_t), &AtenIpexTypeDefault::triu_out>(at::TensorTypeId::DPCPPTensorId)
