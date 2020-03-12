@@ -461,6 +461,75 @@ void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_sca
   DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
 }
 
+DP_DEF_K1(diag_from_sycl_ker);
+DP_DEF_K1(diag_to_sycl_ker);
+template <typename scalar_t>
+void Diag(Tensor & dst, const Tensor & src, int64_t k) {
+  int nDimension = src.dim() == 0 ? 1 : src.dim();
+  TORCH_CHECK((nDimension == 2) || (nDimension == 1), "expected a matrix or a vector");
+
+  if (nDimension == 2) {
+    int64_t stride0 = src.stride(0);
+    int64_t stride1 = src.stride(1);
+    int64_t size0 = src.size(0);
+    int64_t size1 = src.size(1);
+    int64_t size = (k > 0) ? cl::sycl::min((int64_t)size0, (int64_t)size1 - k) : cl::sycl::min((int64_t)size0 + k, (int64_t)size1);
+    int64_t size_[1] = {size};
+    TensorImpl_resizeNd(TensorImpl_Unwrap(dst), 1, size_, nullptr);
+    if (size > 0) {
+      int64_t strideSelf = dst.dim() == 0 ? 1 : dst.stride(0);
+      int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
+      static const auto write_mode = cl::sycl::access::mode::discard_write;
+      static const auto read_mode = cl::sycl::access::mode::read;
+      auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+
+      auto cgf = DP_Q_CGF(cgh) {
+        auto in_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, src.data_ptr<scalar_t>());
+        auto out_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, dst.data_ptr<scalar_t>());
+        auto kfn = DP_Q_KFN(DP::item<1> item_id) {
+          size_t id = item_id.get_id(0);
+          auto in_ptr = in_acc.template get_pointer<scalar_t>();
+          auto out_ptr = out_acc.template get_pointer<scalar_t>();
+          const int64_t bOffset = start + (stride0 + stride1) * id;
+          out_ptr[strideSelf * id] = in_ptr[bOffset];
+
+        };
+        cgh.parallel_for<DP_K(diag_from_sycl_ker, scalar_t)>(cl::sycl::range<1>(dst.numel()), kfn);
+      };
+      DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+    }
+  } else {
+    int64_t totalElements = src.numel();
+    int64_t size = (k > 0) ? totalElements + k : totalElements - k;
+    int64_t strideSrc = src.dim() == 0 ? 1 : src.stride(0);
+    int64_t size_[2] = {size, size};
+    TensorImpl_resizeNd(TensorImpl_Unwrap(dst), 2, size_, nullptr);
+    dst.zero_();
+    if (size > 0) {
+      int64_t stride0 = dst.stride(0);
+      int64_t stride1 = dst.stride(1);
+      int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
+      static const auto write_mode = cl::sycl::access::mode::discard_write;
+      static const auto read_mode = cl::sycl::access::mode::read;
+      auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+
+      auto cgf = DP_Q_CGF(cgh) {
+        auto in_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, src.data_ptr<scalar_t>());
+        auto out_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, dst.data_ptr<scalar_t>());
+        auto kfn = DP_Q_KFN(DP::item<1> item_id) {
+          size_t id = item_id.get_id(0);
+          auto in_ptr = in_acc.template get_pointer<scalar_t>();
+          auto out_ptr = out_acc.template get_pointer<scalar_t>();
+          const int64_t aOffset = start + (stride0 + stride1) * id;
+          out_ptr[aOffset] = in_ptr[strideSrc * id];
+        };
+        cgh.parallel_for<DP_K(diag_to_sycl_ker, scalar_t)>(cl::sycl::range<1>(dst.numel()), kfn);
+      };
+      DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+    }
+  }
+}
+
 } // namespace impl
 
 Tensor & index_select_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index) {
@@ -506,6 +575,19 @@ Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, const Ten
   TORCH_CHECK(value.dim() == 0, "index_fill_ only supports a 0-dimensional value tensor, but got tensor "
       "with ", value.dim(), " dimension(s).");
   return index_fill_(self, dim, index, value.item());
+}
+
+Tensor diag_out(Tensor & out, const Tensor & self, int64_t diagonal) {
+  AT_DISPATCH_ALL_TYPES_AND2(at::ScalarType::Half,
+      at::ScalarType::Bool, self.scalar_type(), "Diag", [&]() {
+    impl::Diag<scalar_t>(out, self, diagonal);
+  });
+  return out;
+}
+
+Tensor diag(const Tensor & self, int64_t diagonal) {
+  Tensor out = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::diag_out(out, self, diagonal);
 }
 
 } // namespace AtenIpexTypeDPCPP
