@@ -4,9 +4,15 @@
 #include <core/SYCLMemory.h>
 #include <core/SYCLUtils.h>
 
-DP_DEF_K1(ComputeDpcppKer);
 
-static void compute_dpcpp_kernel(int64_t *repeat_ptr, int64_t *cumsum_ptr, int64_t *result_ptr, int64_t size) {
+using namespace at::native;
+
+namespace at {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
+
+DP_DEF_K1(ComputeDpcppKer);
+static void repeat_interleave_dpcpp_kernel(int64_t *repeat_ptr, int64_t *cumsum_ptr, int64_t *result_ptr, int64_t size) {
   auto queue = c10::sycl::syclGetCurrentQueue();
   int64_t rng, grng, tile_size;
   c10::sycl::parallel_for_setup(size, tile_size, rng, grng);
@@ -38,14 +44,15 @@ static void compute_dpcpp_kernel(int64_t *repeat_ptr, int64_t *cumsum_ptr, int64
   DP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-static void compute_dpcpp(int64_t *repeat_ptr, int64_t *cumsum_ptr, int64_t *result_ptr, int64_t size) {
-    compute_dpcpp_kernel(repeat_ptr, cumsum_ptr, result_ptr, size);
+// static void repeat_interleave_dpcpp(int64_t *repeat_ptr, int64_t *cumsum_ptr, int64_t *result_ptr, int64_t size) {
+//   repeat_interleave_dpcpp_kernel(repeat_ptr, cumsum_ptr, result_ptr, size);
+// }
+
+} // impl
+
+Tensor repeat_interleave(const Tensor &repeat) {
+  return at::native::repeat_interleave_common<impl::repeat_interleave_dpcpp_kernel>(repeat);
 }
 
-namespace at { namespace native {
-
-Tensor repeat_interleave_dpcpp(const Tensor &repeat) {
-    return repeat_interleave_common<compute_dpcpp>(repeat);
-}
-
-}}
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

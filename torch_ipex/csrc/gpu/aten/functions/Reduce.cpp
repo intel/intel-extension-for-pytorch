@@ -4,6 +4,7 @@
 #include <ATen/core/DimVector.h>
 #include <c10/core/ScalarType.h>
 #include <ATen/native/TensorIterator.h>
+#include <ATen/native/ReduceOpsUtils.h>
 #include <ATen/native/ReduceOps.h>
 
 #include <utils/Numerics.h>
@@ -632,6 +633,45 @@ Tensor norm(const Tensor& self, c10::optional<Scalar> p, IntArrayRef dim, bool k
 
 Tensor norm(const Tensor & self, Scalar p){
   return at::AtenIpexTypeDPCPP::_norm(self, p);
+}
+
+inline Tensor & _all(Tensor & result, TensorIterator & iter) {
+  if (iter.numel() == 0) {
+    result.fill_(1);
+  } else {
+    impl::and_kernel_sycl(iter);
+  }
+
+  return result;
+}
+
+Tensor all(const at::Tensor & self) {
+  TORCH_CHECK(self.scalar_type() == at::ScalarType::Byte || self.scalar_type() == at::ScalarType::Bool,
+    "all only supports torch.uint8 and torch.bool dtypes");
+
+  Tensor result = at::empty({0}, self.options());
+  auto iter = impl::make_reduction(
+    "all", result, self, {}, false, self.scalar_type());
+
+  return at::AtenIpexTypeDPCPP::_all(result, iter);
+}
+
+Tensor &all_out(Tensor & result, const Tensor & self, int64_t dim, bool keepdim) {
+  TORCH_CHECK(self.scalar_type() == at::ScalarType::Byte || self.scalar_type() == at::ScalarType::Bool,
+    "all only supports torch.uint8 and torch.bool dtypes");
+  dim = maybe_wrap_dim(dim, self.dim());
+  if (_dimreduce_return_trivial(result, self, 1, dim, keepdim)) {
+    return result;
+  } else {
+    auto iter = impl::make_reduction(
+      "all", result, self, dim, keepdim, self.scalar_type());
+    return at::AtenIpexTypeDPCPP::_all(result, iter);
+  }
+}
+
+Tensor all(const Tensor & self, int64_t dim, bool keepdim) {
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::all_out(result, self, dim, keepdim);
 }
 
 } // namespace AtenIpexTypeDPCPP
