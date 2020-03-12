@@ -13,6 +13,8 @@ class AtenIpexTypeDefault {
   static at::Tensor & add_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   static at::Tensor add(const at::Tensor & self, at::Scalar other, at::Scalar alpha);
   static at::Tensor & add_(at::Tensor & self, at::Scalar other, at::Scalar alpha);
+  static at::Tensor all(const at::Tensor & self, int64_t dim, bool keepdim);
+  static at::Tensor & all_out(at::Tensor & out, const at::Tensor & self, int64_t dim, bool keepdim);
   static at::Tensor & arange_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
   static at::Tensor as_strided(const at::Tensor & self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset);
   static at::Tensor & asin_out(at::Tensor & out, const at::Tensor & self);
@@ -86,6 +88,7 @@ class AtenIpexTypeDefault {
   static std::tuple<at::Tensor,at::Tensor,at::Tensor> native_batch_norm_backward(const at::Tensor & grad_out, const at::Tensor & input, const at::Tensor & weight, const at::Tensor & running_mean, const at::Tensor & running_var, const at::Tensor & save_mean, const at::Tensor & save_invstd, bool train, double eps, std::array<bool,3> output_mask);
   static at::Tensor & range_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
   static at::Tensor & neg_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor repeat_interleave(const at::Tensor & repeats);
   static at::Tensor & round_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & relu_(at::Tensor & self);
   static at::Tensor & rsqrt_out(at::Tensor & out, const at::Tensor & self);
@@ -227,6 +230,7 @@ class AtenIpexTypeDefault {
   static std::tuple<at::Tensor,at::Tensor> sort(const at::Tensor & self, int64_t dim, bool descending);
   static std::tuple<at::Tensor &,at::Tensor &> topk_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
   static std::tuple<at::Tensor,at::Tensor> topk(const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
+  static at::Tensor all(const at::Tensor & self);
   static at::Tensor unfold(const at::Tensor & self, int64_t dimension, int64_t size, int64_t step);
   static at::Tensor & pow_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & exponent);
   static at::Tensor pow(const at::Tensor & self, const at::Tensor & exponent);
