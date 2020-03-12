@@ -25,6 +25,7 @@ struct ShadeDataContext {
     TORCH_INTERNAL_ASSERT((data_type == SHADE_DATA_TYPE::CPU_RAW) || (data_type == SHADE_DATA_TYPE::DIL));
     if (isDilTensor(raw_data)) { // DIL Tensor
       TORCH_INTERNAL_ASSERT(shade_data_ctx->cpu_raw_data == nullptr);
+      TORCH_INTERNAL_ASSERT(shade_data_ctx->cpu_del_run == nullptr);
     } else { // CPU Tensor here
       TORCH_INTERNAL_ASSERT(shade_data_ctx->cpu_raw_data != nullptr);
       TORCH_INTERNAL_ASSERT(shade_data_ctx->cpu_del_run != nullptr);

@@ -75,4 +75,42 @@ bool get_device_count(c10::Device device, c10::DeviceIndex *count) {
   }
 }
 
+dil::data_type get_dil_data_type(at::ScalarType at_dt) {
+  if (at_dt == at::ScalarType::BFloat16) {
+    return dil::data_type::bf16;
+  } else if (at_dt == at::ScalarType::Float) {
+    return dil::data_type::f32;
+  } else if (at_dt == at::ScalarType::Half) {
+    return dil::data_type::f16;
+  } else if (at_dt == at::ScalarType::Int) {
+    return dil::data_type::s32;
+  }  else if (at_dt == at::ScalarType::QInt8) {
+    return dil::data_type::s8;
+  }  else if (at_dt == at::ScalarType::QUInt8) {
+    return dil::data_type::u8;
+  } else {
+    AT_ASSERT(false);
+    return dil::data_type::undef;
+  }
+}
+
+at::ScalarType get_at_data_type(dil::data_type dil_dt) {
+  if (dil_dt == dil::data_type::bf16) {
+    return at::ScalarType::BFloat16;
+  } else if (dil_dt == dil::data_type::f32) {
+    return at::ScalarType::Float;
+  } else if (dil_dt == dil::data_type::f16) {
+    return at::ScalarType::Half;
+  } else if (dil_dt == dil::data_type::s32) {
+    return at::ScalarType::Int;
+  }  else if (dil_dt == dil::data_type::s8) {
+    return at::ScalarType::QInt8;
+  }  else if (dil_dt == dil::data_type::u8) {
+    return at::ScalarType::QUInt8;
+  } else {
+    AT_ASSERT(false);
+    return at::ScalarType::Undefined;
+  }
+}
+
 } // namespace torch_ipex
