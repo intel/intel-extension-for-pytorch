@@ -58,6 +58,10 @@ static void threshold_kernel(TensorIterator& iter, Scalar threshold_scalar, Scal
 
 namespace at { namespace AtenIpexTypeDPCPP {
 
+Tensor relu(const Tensor & self) {
+  return at::threshold(self, 0, 0);
+}
+
 Tensor & relu_(Tensor & self) {
   return at::threshold_(self, 0, 0);
 }

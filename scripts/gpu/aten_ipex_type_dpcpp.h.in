@@ -90,6 +90,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & neg_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor repeat_interleave(const at::Tensor & repeats);
   at::Tensor & round_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor relu(const at::Tensor & self);
   at::Tensor & relu_(at::Tensor & self);
   at::Tensor & rsqrt_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor sigmoid(const at::Tensor & self);

@@ -343,6 +343,10 @@ at::Tensor & AtenIpexTypeDefault::round_out(at::Tensor & out, const at::Tensor &
   return AtenIpexTypeDPCPP::round_out(out, self);
 }
 
+at::Tensor AtenIpexTypeDefault::relu(const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::relu(self);
+}
+
 at::Tensor & AtenIpexTypeDefault::relu_(at::Tensor & self) {
   return AtenIpexTypeDPCPP::relu_(self);
 }
@@ -1374,6 +1378,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::round.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::round_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::relu(Tensor self) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::relu>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::relu_(Tensor(a!) self) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::relu_>(at::TensorTypeId::DPCPPTensorId)

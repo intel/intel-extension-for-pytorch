@@ -169,6 +169,8 @@ Tensor repeat_interleave(const Tensor & repeats); // aten::repeat_interleave.Ten
 
 Tensor & round_out(Tensor & out, const Tensor & self); // aten::round.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 
+Tensor relu(const Tensor & self); // aten::relu(Tensor self) -> Tensor
+
 Tensor & relu_(Tensor & self); // aten::relu_(Tensor(a!) self) -> Tensor(a!)
 
 Tensor & rsqrt_out(Tensor & out, const Tensor & self); // aten::rsqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
