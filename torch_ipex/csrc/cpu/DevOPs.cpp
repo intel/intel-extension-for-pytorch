@@ -10,8 +10,11 @@
 #include "torch_ipex/csrc/aten_ipex_bridge.h"
 #include "torch_ipex/csrc/ipex_tensor_impl.h"
 #include "torch_ipex/csrc/utils.h"
-#include "dil/dil.hpp"
+#include "dbl/Common.h"
+#include "dbl/Conv.h"
 #include "ShadeDataContext.h"
+
+#include "dil/dil.hpp"
 
 namespace torch_ipex {
 namespace cpu {
@@ -23,117 +26,21 @@ namespace cpu {
 #define DEBUG(fmt)
 #endif
 
-std::vector<int64_t> conv_output_size(
-    at::IntArrayRef input_size,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef padding,
-    at::IntArrayRef stride,
-    at::IntArrayRef dilation) {
-  auto dim = input_size.size();
-  std::vector<int64_t> output_size(dim);
-  output_size[0] = input_size[0];
-  output_size[1] = kernel_size[0];
-  for (size_t d = 2; d < dim; ++d) {
-    auto kernel = dilation[d - 2] * (kernel_size[d] - 1) + 1;
-    output_size[d] = (input_size[d] + (2 * padding[d - 2]) - kernel) / stride[d - 2] + 1;
-  }
-  return output_size;
-}
-
-dil::tensor _dil_conv2d(
-    const dil::tensor& x,
-    const dil::tensor& w,
-    const c10::optional<dil::tensor>& b,
-    at::IntArrayRef padding,
-    at::IntArrayRef stride,
-    at::IntArrayRef dilation,
-    int64_t groups) {
-  std::vector<int64_t> kernel_size(x.ndims());
-  // mkldnn conv2d weights could have been re-ordered to 5d by
-  // mkldnn_reorder_conv2d_weight
-  if (w.ndims() == x.ndims() + 1) {
-    AT_ASSERTM(
-      groups > 1,
-      "Only group _mkldnn_conv2d weights could have been reordered to 5d");
-    kernel_size[0] = w.get_dim(0) * w.get_dim(1);
-    std::copy_n(w.get_dims().cbegin() + 2, x.ndims() - 1, kernel_size.begin() + 1);
-  } else {
-    std::copy_n(w.get_dims().cbegin(), x.ndims(), kernel_size.begin());
-  }
-
-  const dil::dims x_dims = x.get_dims();
-  std::vector<int64_t> input_size{x_dims.cbegin(), x_dims.cend()};
-  std::vector<int64_t> output_sizes = conv_output_size(input_size, kernel_size, padding, stride, dilation);
-
-  dil::tensor y;
-  if (b.has_value()) {
-    dil::convolution_forward::compute(
-      x,
-      w,
-      b.value(),
-      {output_sizes.cbegin(), output_sizes.cend()},
-      y,
-      {stride.begin(), stride.end()},
-      {dilation.begin(), dilation.end()},
-      {padding.begin(), padding.end()},
-      {padding.begin(), padding.end()},
-      groups);
-  } else {
-    dil::convolution_forward::compute(
-      x,
-      w,
-      {output_sizes.cbegin(), output_sizes.cend()},
-      y,
-      {stride.begin(), stride.end()},
-      {dilation.begin(), dilation.end()},
-      {padding.begin(), padding.end()},
-      {padding.begin(), padding.end()},
-      groups);
-  }
-  return y;
-}
-
-dil::tensor dil_tensor_view_from_dense(const at::Tensor& tensor) {
-  AT_ASSERTM(
-    tensor.device().type() == at::DeviceType::DPCPP,
-    "dil_tensor_view_from_dense expects CPU tensor input");
-  AT_ASSERTM(
-    tensor.layout() == at::Layout::Strided,
-    "dil_tensor_view_from_dense expects dense tensor input");
-  AT_ASSERTM(
-    !tensor.is_variable(),
-    "dil_tensor_view_from_dense: should not be a variable");
-  at::ScalarType cur_type = tensor.scalar_type();
-  return {{{tensor.sizes().cbegin(), tensor.sizes().cend()}, get_dil_data_type(cur_type)},
-          tensor.data_ptr()};
-}
-
 at::Tensor dil_convolution(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
   DEBUG("AtenIpexCPUOptimized::dil_convolution\n");
   dil::tensor dil_input;
   dil::tensor dil_weight;
   c10::optional<dil::tensor> dil_bias{c10::nullopt};
 
-  if (ShadeDataContext::isDilTensor(input)) {
-    TORCH_INTERNAL_ASSERT(ShadeDataContext::isDilTensor(weight));
-    dil_input = ShadeDataContext::getDilTensor(input);
-    dil_weight = ShadeDataContext::getDilTensor(weight);
-    if (bias.defined()) {
-      TORCH_INTERNAL_ASSERT(ShadeDataContext::isDilTensor(bias));
-      dil_bias = ShadeDataContext::getDilTensor(bias);
-    }
-  } else {
-    TORCH_INTERNAL_ASSERT(input.is_contiguous());
-    TORCH_INTERNAL_ASSERT(weight.is_contiguous());
-    dil_input = dil_tensor_view_from_dense(input);
-    dil_weight = dil_tensor_view_from_dense(weight);
-    if (bias.defined()) {
-      TORCH_INTERNAL_ASSERT(bias.is_contiguous());
-      dil_bias = dil_tensor_view_from_dense(bias);
-    }
+  TORCH_INTERNAL_ASSERT(input.defined());
+  TORCH_INTERNAL_ASSERT(weight.defined());
+  dil_input = dbl::comm::try_gen_dil_tensor(input);
+  dil_weight = dbl::comm::try_gen_dil_tensor(weight);
+  if (bias.defined()) {
+    dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
 
-  dil::tensor dil_output = _dil_conv2d(
+  dil::tensor dil_output = dbl::conv::conv2d_impl(
     dil_input,
     dil_weight,
     dil_bias,
@@ -141,24 +48,8 @@ at::Tensor dil_convolution(const at::Tensor & input, const at::Tensor & weight, 
     stride,
     dilation,
     groups);
-  // Generate new CPU Tensor and store dil tensor at its storage
-  cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
-  shade_data_context->dil_tensor = dil_output;
-  shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
-  c10::DataPtr shade_data_ptr(
-    nullptr,
-    shade_data_context,
-    cpu::ShadeDataContext::freeShadeDataContext,
-    at::DeviceType::DPCPP);
-  auto dims = dil_output.get_dims();
-  auto at_data_type = get_at_data_type(dil_output.get_data_type());
-  auto storage_impl = c10::make_intrusive<at::StorageImpl>(
-    at::scalarTypeToTypeMeta(at_data_type),
-    dil_output.get_nelems(),
-    std::move(shade_data_ptr),
-    nullptr,
-    /*resizeable=*/false);
-  return at::detail::make_tensor<IPEXTensorImpl>(storage_impl, at::TensorTypeId::DPCPPTensorId);
+
+  return dbl::comm::gen_aten_tensor_by(dil_output);
 }
 
 at::Tensor AtenIpexCPUDev::convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
