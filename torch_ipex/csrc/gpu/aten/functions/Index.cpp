@@ -7,6 +7,8 @@
 #include <core/detail/TensorInfo.h>
 #include <core/detail/IndexUtils.h>
 #include <utils/Numerics.h>
+
+#include <ATen/aten_ipex_type_dpcpp.h>
 #include "ParttenScan.h"
 
 
@@ -577,7 +579,7 @@ Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, const Ten
   return index_fill_(self, dim, index, value.item());
 }
 
-Tensor diag_out(Tensor & out, const Tensor & self, int64_t diagonal) {
+Tensor & diag_out(Tensor & out, const Tensor & self, int64_t diagonal) {
   AT_DISPATCH_ALL_TYPES_AND2(at::ScalarType::Half,
       at::ScalarType::Bool, self.scalar_type(), "Diag", [&]() {
     impl::Diag<scalar_t>(out, self, diagonal);
@@ -588,6 +590,14 @@ Tensor diag_out(Tensor & out, const Tensor & self, int64_t diagonal) {
 Tensor diag(const Tensor & self, int64_t diagonal) {
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::diag_out(out, self, diagonal);
+}
+
+Tensor trace(const Tensor & self) {
+  TORCH_CHECK(self.dim() == 2, "expected a matrix");
+  Tensor diag = at::AtenIpexTypeDPCPP::diag(self, 0);
+  optional<ScalarType> dtype;
+  Tensor out = at::AtenIpexTypeDPCPP::sum(diag, dtype);
+  return out;
 }
 
 } // namespace AtenIpexTypeDPCPP
