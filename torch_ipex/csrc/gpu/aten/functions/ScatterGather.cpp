@@ -45,7 +45,7 @@ void Gather(Tensor & tensor, const Tensor & src, int64_t dim, const Tensor & ind
   Tensor oldTensor;
   if (maybeOverlappingIndices(tensor)) {
     oldTensor = tensor;
-    tensor.contiguous();
+    tensor = tensor.contiguous();
   }
 
   if (totalElements > 0) {
@@ -137,7 +137,7 @@ void Scatter(Tensor & tensor, int64_t dim, const Tensor & index, const Tensor & 
   Tensor oldTensor;
   if (maybeOverlappingIndices(tensor)) {
     oldTensor = tensor;
-    tensor.contiguous();
+    tensor = tensor.contiguous();
   }
 
   if (totalElements > 0) {
@@ -224,7 +224,7 @@ void ScatterFill(Tensor & tensor, int64_t dim, const Tensor & index, Scalar valu
   Tensor oldTensor;
   if (maybeOverlappingIndices(tensor)) {
     oldTensor = tensor;
-    tensor.contiguous();
+    tensor = tensor.contiguous();
   }
 
   if (canUse32BitIndexMath(tensor) &&
@@ -311,7 +311,7 @@ ScatterAdd(Tensor & tensor, int64_t dim, const Tensor & index, const Tensor & sr
   Tensor oldTensor;
   if (maybeOverlappingIndices(tensor)) {
     oldTensor = tensor;
-    tensor.contiguous();
+    tensor = tensor.contiguous();
   }
 
   if (totalElements > 0) {

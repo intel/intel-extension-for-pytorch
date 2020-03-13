@@ -96,9 +96,9 @@ struct TORCH_API SYCLType final {
   static Tensor & set_(Tensor & self, const Tensor & source); // aten::set_.source_Tensor(Tensor(a!) self, Tensor source) -> Tensor(a!)
   static Tensor & set_(Tensor & self); // aten::set_(Tensor(a!) self) -> Tensor(a!)
   // static bool is_set_to(const Tensor & self, const Tensor & tensor);
-  // static Tensor & masked_fill_(Tensor & self, const Tensor & mask, Scalar value);
-  // static Tensor & masked_fill_(Tensor & self, const Tensor & mask, const Tensor & value);
-  // static Tensor & masked_scatter_(Tensor & self, const Tensor & mask, const Tensor & source);
+  static Tensor & masked_fill_(Tensor & self, const Tensor & mask, Scalar value); // aten::masked_fill_.Scalar(Tensor(a!) self, Tensor mask, Scalar value) -> Tensor(a!)
+  static Tensor & masked_fill_(Tensor & self, const Tensor & mask, const Tensor & value); // aten::masked_fill_.Tensor(Tensor(a!) self, Tensor mask, Tensor value) -> Tensor(a!)
+  static Tensor & masked_scatter_(Tensor & self, const Tensor & mask, const Tensor & source); // aten::masked_scatter_(Tensor(a!) self, Tensor mask, Tensor source) -> Tensor(a!)
   static Tensor view(const Tensor & self, IntArrayRef size); // aten::view(Tensor(a) self, int[] size) -> Tensor(a)
   static Tensor & index_add_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & source); // aten::index_add_(Tensor(a!) self, int dim, Tensor index, Tensor source) -> Tensor(a!)
   static Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, Scalar value); // aten::index_fill_.int_Scalar(Tensor(a!) self, int dim, Tensor index, Scalar value) -> Tensor(a!)
