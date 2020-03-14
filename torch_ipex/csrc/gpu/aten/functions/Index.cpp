@@ -643,6 +643,110 @@ void MaskedScatter(Tensor & tensor, const Tensor & mask, const Tensor & src) {
   DP_Q_ASYNC_SUBMIT(sycl_queue, cgfMaskedScatter);
 }
 
+DP_DEF_K1(maskedSelect_scan_sycl_ker);
+DP_DEF_K1(TensorMaskedSelectOp);
+template <typename scalar_t>
+void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
+  TORCH_CHECK(mask.numel() == src.numel(), "sizes do not match");
+
+  // Determine our output size
+  c10::optional<ScalarType> dtype;
+  int totalElements = at::AtenIpexTypeDPCPP::sum(mask, dtype).item().to<int>();
+  int64_t real_sizes[1] = {(int64_t)totalElements};
+  if (totalElements == 0) {
+    TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 1, real_sizes, nullptr);
+    return ;
+  }
+
+  Tensor tensorContig = tensor.contiguous();
+
+  TensorImpl_resizeNd(TensorImpl_Unwrap(tensorContig), 1, real_sizes, nullptr);
+  if (&tensor != &tensorContig) {
+    TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 1, real_sizes, nullptr);
+  }
+  
+  Tensor maskLong = at::empty({0}, mask.options().dtype(kLong));
+  maskLong.resize_(mask.sizes());
+  maskLong.copy_(mask);
+
+  // Use a prefix sum to determine the output locations of the masked elements
+  Tensor maskPrefixSum = at::empty(mask.sizes(), mask.options().dtype(kLong));
+
+  auto maskLong_data = maskLong.data_ptr();
+  auto maskLong_size = maskLong.numel() * (maskLong.dtype().itemsize());
+  auto maskPrefixSum_data = maskPrefixSum.data_ptr();
+  auto maskPrefixSum_size = maskPrefixSum.numel() * (maskPrefixSum.dtype().itemsize());
+  int64_t size = maskLong.numel();
+
+  auto sycl_queue = c10::sycl::syclGetCurrentQueue();
+  int64_t rng, GRange, tileSize;
+  c10::sycl::parallel_for_setup(size, tileSize, rng, GRange);
+
+  // command group functions
+  auto cgf = DP_Q_CGF(cgh) {
+    auto acc_maskLong = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, maskLong_data, maskLong_size);
+    auto acc_maskPrefixSum = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, maskPrefixSum_data, maskPrefixSum_size);
+
+    // kernel function per work-item
+    auto kfn = DP_Q_KFN() {
+      dp_global_ptr_cpt<int64_t> maskLong_ptr = acc_maskLong.template get_pointer<int64_t>();
+      dp_global_ptr_pt<int64_t> maskPrefixSum_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
+      sycl_inclusive_scan(maskLong_ptr, maskLong_ptr + size, maskPrefixSum_ptr, AddOp<int64_t>());
+    };
+    // kick off kernel
+    // (TODO) single_task need replaced due to low efficiency
+    cgh.single_task<DP_K(maskedSelect_scan_sycl_ker, scalar_t)>(kfn);
+  };
+
+    // submit to SYCL queue
+    DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+
+    TensorInfo<scalar_t, uint64_t> src_info =
+            getTensorInfo<scalar_t, uint64_t>(src);
+    src_info.collapseDims();
+
+    TensorInfo<bool, uint64_t> mask_info =
+            getTensorInfo<bool, uint64_t>(mask);
+    mask_info.collapseDims();
+
+  // command group function
+  auto cgfMaskedSelect = DP_Q_CGF(cgh) {
+    auto acc_src = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, src.data_ptr<scalar_t>());
+    auto acc_mask = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, mask.data_ptr<bool>());
+    auto acc_maskPrefixSum = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
+    auto acc_tensor = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, tensorContig.data_ptr<scalar_t>());
+
+    // kernel function per work-item
+    auto kfn = DP_Q_KFN(DP::nd_item<1> item){
+      int64_t linear_index = item.get_global_linear_id();
+
+      dp_global_ptr_pt<scalar_t> src_ptr = acc_src.template get_pointer<scalar_t>();
+      dp_global_ptr_pt<bool> mask_ptr = acc_mask.template get_pointer<bool>();
+      dp_global_ptr_pt<int64_t> maskPrefix_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
+      dp_global_ptr_pt<scalar_t> tensor_ptr = acc_tensor.template get_pointer<scalar_t>();
+
+      if (linear_index < size) {
+          // The mask tensor maybe not contiguos.
+          auto mask_offset = IndexToOffset<bool, uint64_t>().get(linear_index, mask_info);
+        if (mask_ptr[mask_offset]) {
+          // The src tensor maybe not contiguos.
+          auto src_offset = IndexToOffset<scalar_t, uint64_t>().get(linear_index, src_info);
+          tensor_ptr[maskPrefix_ptr[linear_index] - 1] = src_ptr[src_offset];
+        }
+      }
+    };
+    cgh.parallel_for<DP_K(TensorMaskedSelectOp, scalar_t)>(
+      DP::nd_range<1>(DP::range<1>(GRange), DP::range<1>(tileSize)), kfn);
+  };
+
+  // submit to SYCL queue
+  DP_Q_ASYNC_SUBMIT(sycl_queue, cgfMaskedSelect);
+
+  if (&tensor != &tensorContig) {
+    tensor.copy_(tensorContig);
+  }
+}
+
 } // namespace impl
 
 Tensor & index_select_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index) {
@@ -687,7 +791,7 @@ Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, Scalar va
 Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & value) {
   TORCH_CHECK(value.dim() == 0, "index_fill_ only supports a 0-dimensional value tensor, but got tensor "
       "with ", value.dim(), " dimension(s).");
-  return index_fill_(self, dim, index, value.item());
+  return at::AtenIpexTypeDPCPP::index_fill_(self, dim, index, value.item());
 }
 
 Tensor & diag_out(Tensor & out, const Tensor & self, int64_t diagonal) {
@@ -719,7 +823,7 @@ Tensor & masked_fill_(Tensor & self, const Tensor & mask, Scalar value) {
 }
 
 Tensor & masked_fill_(Tensor & self, const Tensor & mask, const Tensor & value) {
-  return masked_fill_(self, mask, value.item());
+  return at::AtenIpexTypeDPCPP::masked_fill_(self, mask, value.item());
 }
 
 Tensor & masked_scatter_(Tensor & self, const Tensor & mask, const Tensor & source) {
@@ -727,6 +831,18 @@ Tensor & masked_scatter_(Tensor & self, const Tensor & mask, const Tensor & sour
     impl::MaskedScatter<scalar_t>(self, mask, source);
   });
   return self;
+}
+
+Tensor & masked_select_out(Tensor & out, const Tensor & self, const Tensor & mask) {
+  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, self.scalar_type(), "MaskedSelect", [&]() {
+    impl::MaskedSelect<scalar_t>(out, self, mask);
+  });
+  return out;
+}
+
+Tensor masked_select(const Tensor & self, const Tensor & mask) {
+  Tensor out = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::masked_select_out(out, self, mask);
 }
 
 } // namespace AtenIpexTypeDPCPP

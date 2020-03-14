@@ -154,8 +154,8 @@ struct TORCH_API SYCLType final {
   // static Tensor take(const Tensor & self, const Tensor & index);
   static Tensor & index_select_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index); // aten::index_select.out(Tensor self, int dim, Tensor index, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor index_select(const Tensor & self, int64_t dim, const Tensor & index); // aten::index_select(Tensor self, int dim, Tensor index) -> Tensor
-  // static Tensor & masked_select_out(Tensor & out, const Tensor & self, const Tensor & mask);
-  // static Tensor masked_select(const Tensor & self, const Tensor & mask);
+  static Tensor & masked_select_out(Tensor & out, const Tensor & self, const Tensor & mask); // aten::masked_select.out(Tensor self, Tensor mask, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor masked_select(const Tensor & self, const Tensor & mask); // aten::masked_select(Tensor self, Tensor mask) -> Tensor
   static Tensor & nonzero_out(Tensor & out, const Tensor & self); // aten::nonzero.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor nonzero(const Tensor & self); // aten::nonzero(Tensor self) -> Tensor
   static Tensor & gather_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index, bool sparse_grad); // aten::gather.out(Tensor self, int dim, Tensor index, *, bool sparse_grad=False, Tensor(a!) out) -> Tensor(a!)
