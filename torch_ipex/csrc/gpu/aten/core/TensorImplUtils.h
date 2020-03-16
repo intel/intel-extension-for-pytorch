@@ -35,6 +35,7 @@ void TensorImpl_stealAndSetStoragePtr(at::TensorImpl* tensor, at::StorageImpl* s
 void TensorImpl_set(at::TensorImpl *self, at::TensorImpl *src);
 void TensorImpl_setStorage(at::TensorImpl *self, at::StorageImpl *storage_, ptrdiff_t storageOffset_, at::IntArrayRef size_, at::IntArrayRef stride_);
 void TensorImpl_setStorageNd(at::TensorImpl *self, at::StorageImpl *storage, ptrdiff_t storageOffset, int nDimension, const int64_t *size, const int64_t *stride);
+bool TensorImpl_isSetTo(const at::TensorImpl *self, const at::TensorImpl *src);
 void TensorImpl_squeeze1d(at::TensorImpl *self, at::TensorImpl *src, int dimension);
 void TensorImpl_unsqueeze1d(at::TensorImpl *self, at::TensorImpl *src, int dimension);
 bool TensorImpl_allContiguous(at::TensorImpl **inputs, int numInputs);

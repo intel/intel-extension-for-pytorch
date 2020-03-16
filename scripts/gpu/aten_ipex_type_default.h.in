@@ -137,6 +137,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & set_(at::Tensor & self, at::Storage source, int64_t storage_offset, at::IntArrayRef size, at::IntArrayRef stride);
   static at::Tensor & set_(at::Tensor & self, const at::Tensor & source);
   static at::Tensor & set_(at::Tensor & self);
+  static bool is_set_to(const at::Tensor & self, const at::Tensor & tensor);
   static at::Tensor & masked_fill_(at::Tensor & self, const at::Tensor & mask, at::Scalar value);
   static at::Tensor & masked_fill_(at::Tensor & self, const at::Tensor & mask, const at::Tensor & value);
   static at::Tensor & masked_scatter_(at::Tensor & self, const at::Tensor & mask, const at::Tensor & source);
