@@ -137,6 +137,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & set_(at::Tensor & self, at::Storage source, int64_t storage_offset, at::IntArrayRef size, at::IntArrayRef stride);
   at::Tensor & set_(at::Tensor & self, const at::Tensor & source);
   at::Tensor & set_(at::Tensor & self);
+  bool is_set_to(const at::Tensor & self, const at::Tensor & tensor);
   at::Tensor & masked_fill_(at::Tensor & self, const at::Tensor & mask, at::Scalar value);
   at::Tensor & masked_fill_(at::Tensor & self, const at::Tensor & mask, const at::Tensor & value);
   at::Tensor & masked_scatter_(at::Tensor & self, const at::Tensor & mask, const at::Tensor & source);

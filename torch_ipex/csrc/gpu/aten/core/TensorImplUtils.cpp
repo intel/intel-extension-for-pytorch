@@ -252,6 +252,23 @@ void TensorImpl_setStorageNd(at::TensorImpl *self, at::StorageImpl *storage,
   TensorImpl_resizeNd(self, nDimension, size, stride);
 }
 
+bool TensorImpl_isSetTo(const at::TensorImpl *self, const at::TensorImpl *src)
+{
+  if (TensorImpl_getStoragePtr(self) == TensorImpl_getStoragePtr(src) &&
+      self->storage_offset() == src->storage_offset() &&
+      self->dim() == src->dim())
+  {
+    int d;
+    for (d = 0; d < self->dim(); ++d)
+    {
+      if (self->size(d) != src->size(d) || self->stride(d) != src->stride(d))
+        return false;
+    }
+    return true;
+  }
+  return false;
+}
+
 void TensorImpl_squeeze1d(at::TensorImpl *self, at::TensorImpl *src, int dimension) {
   int d;
 

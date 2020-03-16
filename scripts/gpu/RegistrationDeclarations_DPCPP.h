@@ -263,6 +263,8 @@ Tensor & set_(Tensor & self, const Tensor & source); // aten::set_.source_Tensor
 
 Tensor & set_(Tensor & self); // aten::set_(Tensor(a!) self) -> Tensor(a!)
 
+bool is_set_to(const Tensor & self, const Tensor & tensor); // aten::is_set_to(Tensor self, Tensor tensor) -> bool
+
 Tensor & masked_fill_(Tensor & self, const Tensor & mask, Scalar value); // aten::masked_fill_.Scalar(Tensor(a!) self, Tensor mask, Scalar value) -> Tensor(a!)
 
 Tensor & masked_fill_(Tensor & self, const Tensor & mask, const Tensor & value); // aten::masked_fill_.Tensor(Tensor(a!) self, Tensor mask, Tensor value) -> Tensor(a!)

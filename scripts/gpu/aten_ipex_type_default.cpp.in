@@ -531,6 +531,10 @@ at::Tensor & AtenIpexTypeDefault::set_(at::Tensor & self) {
   return AtenIpexTypeDPCPP::set_(self);
 }
 
+bool AtenIpexTypeDefault::is_set_to(const at::Tensor & self, const at::Tensor & tensor) {
+  return AtenIpexTypeDPCPP::is_set_to(self, tensor);
+}
+
 at::Tensor & AtenIpexTypeDefault::masked_fill_(at::Tensor & self, const at::Tensor & mask, at::Scalar value) {
   return AtenIpexTypeDPCPP::masked_fill_(self, mask, value);
 }
@@ -1527,6 +1531,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::set_(Tensor(a!) self) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::set_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::is_set_to(Tensor self, Tensor tensor) -> bool")
+      .impl_unboxedOnlyKernel<bool(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::is_set_to>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::masked_fill_.Scalar(Tensor(a!) self, Tensor mask, Scalar value) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::masked_fill_>(at::TensorTypeId::DPCPPTensorId)
