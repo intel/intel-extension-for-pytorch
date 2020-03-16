@@ -63,6 +63,18 @@ at::Tensor & AtenIpexTypeDefault::atan_out(at::Tensor & out, const at::Tensor & 
   return AtenIpexTypeDPCPP::atan_out(out, self);
 }
 
+at::Tensor AtenIpexTypeDefault::baddbmm(const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, at::Scalar beta, at::Scalar alpha) {
+  return AtenIpexTypeDPCPP::baddbmm(self, batch1, batch2, beta, alpha);
+}
+
+at::Tensor & AtenIpexTypeDefault::baddbmm_(at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, at::Scalar beta, at::Scalar alpha) {
+  return AtenIpexTypeDPCPP::baddbmm_(self, batch1, batch2, beta, alpha);
+}
+
+at::Tensor & AtenIpexTypeDefault::baddbmm_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, at::Scalar beta, at::Scalar alpha) {
+  return AtenIpexTypeDPCPP::baddbmm_out(out, self, batch1, batch2, beta, alpha);
+}
+
 at::Tensor & AtenIpexTypeDefault::bernoulli_(at::Tensor & self, const at::Tensor & p, at::Generator * generator) {
   return AtenIpexTypeDPCPP::bernoulli_(self, p, generator);
 }
@@ -101,6 +113,14 @@ at::Tensor & AtenIpexTypeDefault::logical_not_out(at::Tensor & out, const at::Te
 
 at::Tensor & AtenIpexTypeDefault::logical_xor_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other) {
   return AtenIpexTypeDPCPP::logical_xor_out(out, self, other);
+}
+
+at::Tensor AtenIpexTypeDefault::bmm(const at::Tensor & self, const at::Tensor & mat2) {
+  return AtenIpexTypeDPCPP::bmm(self, mat2);
+}
+
+at::Tensor & AtenIpexTypeDefault::bmm_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & mat2) {
+  return AtenIpexTypeDPCPP::bmm_out(out, self, mat2);
 }
 
 at::Tensor & AtenIpexTypeDefault::ceil_out(at::Tensor & out, const at::Tensor & self) {
@@ -1185,6 +1205,15 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::atan.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::atan_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::baddbmm(Tensor self, Tensor batch1, Tensor batch2, *, Scalar beta=1, Scalar alpha=1) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::baddbmm>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::baddbmm_(Tensor(a!) self, Tensor batch1, Tensor batch2, *, Scalar beta=1, Scalar alpha=1) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::baddbmm_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::baddbmm.out(Tensor self, Tensor batch1, Tensor batch2, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::baddbmm_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::bernoulli_.Tensor(Tensor(a!) self, Tensor p, *, Generator? generator=None) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Generator *), &AtenIpexTypeDefault::bernoulli_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -1214,6 +1243,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::logical_xor.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::logical_xor_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::bmm(Tensor self, Tensor mat2) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::bmm>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::bmm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::bmm_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::ceil.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::ceil_out>(at::TensorTypeId::DPCPPTensorId)

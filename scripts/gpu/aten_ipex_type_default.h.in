@@ -20,6 +20,9 @@ class AtenIpexTypeDefault {
   static at::Tensor & asin_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & atan_(at::Tensor & self);
   static at::Tensor & atan_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor baddbmm(const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, at::Scalar beta, at::Scalar alpha);
+  static at::Tensor & baddbmm_(at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, at::Scalar beta, at::Scalar alpha);
+  static at::Tensor & baddbmm_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, at::Scalar beta, at::Scalar alpha);
   static at::Tensor & bernoulli_(at::Tensor & self, const at::Tensor & p, at::Generator * generator);
   static at::Tensor & bernoulli_(at::Tensor & self, double p, at::Generator * generator);
   static at::Tensor bincount(const at::Tensor & self, const at::Tensor & weights, int64_t minlength);
@@ -30,6 +33,8 @@ class AtenIpexTypeDefault {
   static at::Tensor & logical_not_(at::Tensor & self);
   static at::Tensor & logical_not_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & logical_xor_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
+  static at::Tensor bmm(const at::Tensor & self, const at::Tensor & mat2);
+  static at::Tensor & bmm_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & mat2);
   static at::Tensor & ceil_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & clamp_(at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);
   static at::Tensor & clamp_out(at::Tensor & out, const at::Tensor & self, c10::optional<at::Scalar> min, c10::optional<at::Scalar> max);
