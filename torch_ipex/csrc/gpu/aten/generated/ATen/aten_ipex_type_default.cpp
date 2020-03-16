@@ -435,6 +435,10 @@ at::Tensor & AtenIpexTypeDefault::trunc_out(at::Tensor & out, const at::Tensor &
   return AtenIpexTypeDPCPP::trunc_out(out, self);
 }
 
+at::Tensor AtenIpexTypeDefault::_s_where(const at::Tensor & condition, const at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::_s_where(condition, self, other);
+}
+
 at::Tensor AtenIpexTypeDefault::norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::ScalarType dtype) {
   return AtenIpexTypeDPCPP::norm(self, p, dtype);
 }
@@ -1459,6 +1463,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::trunc.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::trunc_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::_s_where(Tensor condition, Tensor self, Tensor other) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::_s_where>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::norm.ScalarOpt_dtype(Tensor self, Scalar? p, *, ScalarType dtype) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::Scalar>, at::ScalarType), &AtenIpexTypeDefault::norm>(at::TensorTypeId::DPCPPTensorId)

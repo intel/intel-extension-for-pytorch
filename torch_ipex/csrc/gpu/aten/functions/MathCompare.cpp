@@ -215,9 +215,8 @@ Tensor & lt_out(Tensor & out, const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   // TODO: broadcast
-  other.resize_as_(self);
-  other.fill_(other_);
-  at::lt_out(out, self, other);
+  auto new_other = other.resize_as_(self).fill_(other_).toType(self.scalar_type());
+  at::lt_out(out, self, new_other);
   return out;
 }
 
@@ -226,9 +225,8 @@ Tensor lt(const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   // TODO: broadcast
-  other.resize_as_(self);
-  other.fill_(other_);
-  return at::lt_out(result, self, other);
+  auto new_other = other.resize_as_(self).fill_(other_).toType(self.scalar_type());
+  return at::lt_out(result, self, new_other);
 }
 
 Tensor & lt_out(Tensor & out, const Tensor & self, const Tensor & other){
@@ -250,9 +248,8 @@ Tensor & gt_out(Tensor & out, const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   // TODO: broadcast
-  other.resize_as_(self);
-  other.fill_(other_);
-  at::gt_out(out, self, other);
+  auto new_other = other.resize_as_(self).fill_(other_).toType(self.scalar_type());
+  at::gt_out(out, self, new_other);
   return out;
 }
 
@@ -261,9 +258,9 @@ Tensor gt(const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   // TODO: broadcast
-  other.resize_as_(self);
-  other.fill_(other_);
-  return at::gt_out(result, self, other);
+  auto new_other = other.resize_as_(self).fill_(other_).toType(self.scalar_type());
+  at::gt_out(result, self, new_other);
+  return result;
 }
 
 Tensor & gt_out(Tensor & out, const Tensor & self, const Tensor & other){
@@ -285,9 +282,8 @@ Tensor & ge_out(Tensor & out, const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   // TODO: broadcast
-  other.resize_as_(self);
-  other.fill_(other_);
-  at::ge_out(out, self, other);
+  auto new_other = other.resize_as_(self).fill_(other_).toType(self.scalar_type());
+  at::ge_out(out, self, new_other);
   return out;
 }
 
@@ -296,9 +292,8 @@ Tensor ge(const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   // TODO: broadcast
-  other.resize_as_(self);
-  other.fill_(other_);
-  return at::ge_out(result, self, other);
+  auto new_other = other.resize_as_(self).fill_(other_).toType(self.scalar_type());
+  return at::ge_out(result, self, new_other);
 }
 
 Tensor & ge_out(Tensor & out, const Tensor & self, const Tensor & other){
@@ -320,9 +315,8 @@ Tensor & le_out(Tensor & out, const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   // TODO: broadcast
-  other.resize_as_(self);
-  other.fill_(other_);
-  at::le_out(out, self, other);
+  auto new_other = other.resize_as_(self).fill_(other_).toType(self.scalar_type());
+  at::le_out(out, self, new_other);
   return out;
 }
 
@@ -331,9 +325,8 @@ Tensor le(const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   // TODO: broadcast
-  other.resize_as_(self);
-  other.fill_(other_);
-  return at::le_out(result, self, other);
+  auto new_other = other.resize_as_(self).fill_(other_).toType(self.scalar_type());
+  return at::le_out(result, self, new_other);
 }
 
 Tensor & le_out(Tensor & out, const Tensor & self, const Tensor & other){
@@ -355,9 +348,8 @@ Tensor & eq_out(Tensor & out, const Tensor & self, Scalar other_) {
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   // TODO: broadcast
-  other.resize_as_(self);
-  other.fill_(other_);
-  return at::eq_out(out, self, other);
+  auto new_other = other.resize_as_(self).fill_(other_).toType(self.scalar_type());
+  return at::eq_out(out, self, new_other);
 }
 
 Tensor eq(const Tensor & self, Scalar other_) {
@@ -365,9 +357,8 @@ Tensor eq(const Tensor & self, Scalar other_) {
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   // TODO: broadcast
-  other.resize_as_(self);
-  other.fill_(other_);
-  return at::eq_out(result, self, other);
+  auto new_other = other.resize_as_(self).fill_(other_).toType(self.scalar_type());
+  return at::eq_out(result, self, new_other);
 }
 
 Tensor & eq_out(Tensor & out, const Tensor & self, const Tensor & other) {
@@ -389,9 +380,8 @@ Tensor & ne_out(Tensor & out, const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   // TODO: broadcast
-  other.resize_as_(self);
-  other.fill_(other_);
-  at::ne_out(out, self, other);
+  auto new_other = other.resize_as_(self).fill_(other_).toType(self.scalar_type());
+  at::ne_out(out, self, new_other);
   return out;
 }
 
@@ -400,9 +390,8 @@ Tensor ne(const Tensor & self, Scalar other_){
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
   // TODO: broadcast
-  other.resize_as_(self);
-  other.fill_(other_);
-  return at::ne_out(result, self, other);
+  auto new_other = other.resize_as_(self).fill_(other_).toType(self.scalar_type());
+  return at::ne_out(result, self, new_other);
 }
 
 Tensor & ne_out(Tensor & out, const Tensor & self, const Tensor & other){

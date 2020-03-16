@@ -6,8 +6,12 @@
 #include <core/SYCLUtils.h>
 #include <core/SYCLApplyUtils.h>
 
+using namespace at::sycl;
+
 namespace at {
-namespace sycl {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
+
 template <typename scalar_t, typename scalar1_t>
 class where_functor {
  public:
@@ -21,14 +25,8 @@ class where_functor {
   }
 };
 
-} // namespace sycl
-} // namespace at
-
-namespace {
-using namespace at;
-using namespace at::sycl;
 template <typename scalar_t>
-void where_sycl(
+void _s_where(
     at::Tensor& ret,
     const at::Tensor& condition,
     const at::Tensor& self,
@@ -41,20 +39,19 @@ void where_sycl(
         ret, condition, self, other, where_functor<scalar_t, bool>());
   }
 }
-} // namespace
 
-namespace at {
-namespace native {
-Tensor _s_where_sycl(
+} // namespace impl
+
+Tensor _s_where(
     const Tensor& condition,
     const Tensor& self,
     const Tensor& other) {
   Tensor ret = at::empty(self.sizes(), self.options());
   AT_DISPATCH_ALL_TYPES_AND2(at::ScalarType::Half, at::ScalarType::Bool, ret.scalar_type(), "where", [&] {
-    where_sycl<scalar_t>(ret, condition, self, other);
+    impl::_s_where<scalar_t>(ret, condition, self, other);
   });
   return ret;
 }
 
-} // namespace native
+} // namespace AtenIpexTypeDPCPP
 } // namespace at

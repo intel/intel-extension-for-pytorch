@@ -113,6 +113,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & threshold_out(at::Tensor & out, const at::Tensor & self, at::Scalar threshold, at::Scalar value);
   at::Tensor roll(const at::Tensor & self, at::IntArrayRef shifts, at::IntArrayRef dims);
   at::Tensor & trunc_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor _s_where(const at::Tensor & condition, const at::Tensor & self, const at::Tensor & other);
   at::Tensor norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::ScalarType dtype);
   at::Tensor norm(const at::Tensor & self, at::Scalar p);
   at::Tensor norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::IntArrayRef dim, bool keepdim, at::ScalarType dtype);
