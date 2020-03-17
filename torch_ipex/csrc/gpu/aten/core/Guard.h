@@ -4,8 +4,8 @@
 #include <c10/core/impl/InlineDeviceGuard.h>
 #include <c10/core/impl/InlineStreamGuard.h>
 
-#include <core/SYCLGuardImpl.h>
-#include <core/SYCLMacros.h>
+#include <core/GuardImpl.h>
+#include <core/Macros.h>
 #include <cstddef>
 
 namespace c10 { namespace sycl {

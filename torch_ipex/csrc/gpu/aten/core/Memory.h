@@ -1,9 +1,9 @@
 #pragma once
 
 #include <CL/sycl.hpp>
-#include <core/SYCLUtils.h>
-#include <core/SYCLStream.h>
-#include <core/SYCLMemory.h>
+#include <core/Utils.h>
+#include <core/Stream.h>
+#include <core/Memory.h>
 
 DP_DEF_K1(memory_copy);
 #define SyclConvertToActualTypePtr(Scalar, buf_acc) static_cast<Scalar*>(static_cast<void*>(((buf_acc.get_pointer().get()))))

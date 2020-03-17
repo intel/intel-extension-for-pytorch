@@ -6,8 +6,8 @@
 #include <c10/util/Exception.h>
 #include <c10/core/Stream.h>
 
-#include <core/SYCLMacros.h>
-#include <core/SYCLUtils.h>
+#include <core/Macros.h>
+#include <core/Utils.h>
 
 /*
 * Stream pool note.

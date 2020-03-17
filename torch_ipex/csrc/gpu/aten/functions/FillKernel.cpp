@@ -3,7 +3,7 @@
 #include <ATen/native/Fill.h>
 
 #include <functions/Loops.h>
-#include <core/SYCLApplyUtils.h>
+#include <core/ApplyUtils.h>
 #include <core/detail/IndexUtils.h>
 
 

@@ -3,9 +3,9 @@
 
 #include <ATen/ATen.h>
 
-#include <core/SYCL.h>
-#include <core/SYCLMemory.h>
-#include <core/SYCLUtils.h>
+#include <core/DPCPP.h>
+#include <core/Memory.h>
+#include <core/Utils.h>
 #include <core/TensorImplUtils.h>
 
 #include <utils/Numerics.h>

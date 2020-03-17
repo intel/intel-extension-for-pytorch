@@ -1,7 +1,7 @@
 #include <ATen/Context.h>
 #include <ATen/native/TensorIterator.h>
 #include <core/detail/IndexUtils.h>
-#include <core/SYCL.h>
+#include <core/DPCPP.h>
 #include <utils/Atomics.h>
 #include "Loops.h"
 

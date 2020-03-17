@@ -1,6 +1,6 @@
 #pragma once
 #include <CL/sycl.hpp>
-#include <core/SYCLUtils.h>
+#include <core/Utils.h>
 
 namespace c10 {
 namespace sycl {

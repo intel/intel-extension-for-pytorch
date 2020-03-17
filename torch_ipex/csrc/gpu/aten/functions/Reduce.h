@@ -6,9 +6,9 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <core/SYCL.h>
-#include <core/SYCLMemory.h>
-#include <core/SYCLContext.h>
+#include <core/DPCPP.h>
+#include <core/Memory.h>
+#include <core/Context.h>
 #include <core/Array.h>
 #include <core/detail/OffsetCalculator.h>
 #include <functions/Loops.h>

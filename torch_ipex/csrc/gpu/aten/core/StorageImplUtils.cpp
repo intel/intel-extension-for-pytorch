@@ -1,9 +1,9 @@
 #include <c10/util/intrusive_ptr.h>
 
-#include <core/SYCLException.h>
-#include <core/SYCLMemory.h>
-#include <core/SYCLUtils.h>
-#include <core/SYCLContext.h>
+#include <core/Exception.h>
+#include <core/Memory.h>
+#include <core/Utils.h>
+#include <core/Context.h>
 #include <utils/General.h>
 
 namespace at { namespace native {

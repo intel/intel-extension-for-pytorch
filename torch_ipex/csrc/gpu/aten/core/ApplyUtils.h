@@ -5,7 +5,7 @@
 #include <ATen/TensorUtils.h>
 #include <ATen/LegacyTHFunctionsSYCL.h>
 
-#include <core/SYCLContext.h>
+#include <core/Context.h>
 
 #include <math.h>
 

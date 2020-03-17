@@ -1,5 +1,5 @@
 #include <core/TensorImplUtils.h>
-#include <core/SYCLApplyUtils.h>
+#include <core/ApplyUtils.h>
 #include <utils/Numerics.h>
 #include <utils/Pointwise.h>
 #include <utils/General.h>

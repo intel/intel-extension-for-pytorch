@@ -3,7 +3,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/Config.h>
 
-#include <core/SYCLUtils.h>
+#include <core/Utils.h>
 #include <core/Runtime.h>
 
 

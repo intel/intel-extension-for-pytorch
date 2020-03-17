@@ -4,9 +4,9 @@
 #include <ATen/ATen.h>
 #include <ATen/TensorUtils.h>
 
-#include <core/SYCL.h>
-#include <core/SYCLMemory.h>
-#include <core/SYCLUtils.h>
+#include <core/DPCPP.h>
+#include <core/Memory.h>
+#include <core/Utils.h>
 #include <core/TensorImplUtils.h>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
@@ -34,7 +34,6 @@ void ClassNLLCriterion_updateOutput(
     Tensor& total_weight,
     int64_t reduction,
     int64_t ignore_index) {
-  
   TORCH_CHECK(
       input.dim() > 0 && input.dim() <= 2, "input tensor should be 1D or 2D");
   TORCH_CHECK(

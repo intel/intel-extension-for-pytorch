@@ -1,7 +1,7 @@
-#include <core/SYCL.h>
-#include <core/SYCLUtils.h>
-#include <core/SYCLMemory.h>
-#include <core/SYCLContext.h>
+#include <core/DPCPP.h>
+#include <core/Utils.h>
+#include <core/Memory.h>
+#include <core/Context.h>
 
 
 using namespace at::sycl::detail;

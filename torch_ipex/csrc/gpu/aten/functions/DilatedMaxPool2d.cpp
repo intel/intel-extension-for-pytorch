@@ -4,7 +4,7 @@
 #include <tuple>
 
 #include <core/Runtime.h>
-#include <core/SYCLMath.h>
+#include <utils/Math.h>
 
 using namespace mkldnn;
 namespace at {

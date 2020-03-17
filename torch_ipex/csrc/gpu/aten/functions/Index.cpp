@@ -1,12 +1,12 @@
 #include <ATen/ATen.h>
 
-#include <core/SYCL.h>
-#include <core/SYCLStream.h>
-#include <core/SYCLMemory.h>
+#include <core/DPCPP.h>
+#include <core/Stream.h>
+#include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <core/detail/IndexUtils.h>
-#include <core/SYCLApplyUtils.h>
+#include <core/ApplyUtils.h>
 #include <utils/Numerics.h>
 #include <utils/MathReduce.h>
 

@@ -3,9 +3,10 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/Indexing.h>
 
-#include <core/SYCL.h>
-#include <functions/Loops.h>
+#include <core/DPCPP.h>
 #include <utils/Atomics.h>
+
+#include "Loops.h"
 
 
 DP_DEF_K1(index_kernel);

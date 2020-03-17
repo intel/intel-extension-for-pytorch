@@ -3,8 +3,8 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/AccumulateType.h>
 
-#include <core/SYCL.h>
-#include <core/SYCLMemory.h>
+#include <core/DPCPP.h>
+#include <core/Memory.h>
 #include <utils/Algorithm.h>
 #include <utils/Numerics.h>
 

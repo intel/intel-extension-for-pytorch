@@ -3,12 +3,12 @@
 
 #include <ATen/native/TensorIterator.h>
 
-#include <core/SYCLGuard.h>
-#include <core/SYCLStream.h>
-#include <core/SYCLException.h>
-#include <core/SYCLMemory.h>
-#include <core/SYCLApplyUtils.h>
-// #include <ATen/native/Copy.h>
+#include <core/Guard.h>
+#include <core/Stream.h>
+#include <core/Exception.h>
+#include <core/Memory.h>
+#include <core/ApplyUtils.h>
+
 
 namespace at {
 namespace sycl {

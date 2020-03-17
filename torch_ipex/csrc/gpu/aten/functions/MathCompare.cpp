@@ -1,9 +1,9 @@
 #include <ATen/ScalarOps.h>
 #include <ATen/Functions.h>
 
+#include <core/ApplyUtils.h>
 #include <utils/Numerics.h>
 #include <ATen/aten_ipex_type_dpcpp.h>
-#include <core/SYCLApplyUtils.h>
 
 
 namespace at {

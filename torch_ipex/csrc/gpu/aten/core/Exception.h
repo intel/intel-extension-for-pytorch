@@ -1,8 +1,9 @@
 #pragma once
 #include <CL/sycl.hpp>
 
-#include "c10/util/Exception.h"
-#include "core/SYCLMacros.h"
+#include <c10/util/Exception.h>
+#include <core/Macros.h>
+
 
 #define C10_SYCL_TRY                                       \
   try {

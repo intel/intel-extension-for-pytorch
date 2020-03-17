@@ -11,8 +11,8 @@
 #include <c10/core/Device.h>
 
 #include <core/virtual_ptr.h>
-#include <core/SYCLDevice.h>
-#include <core/SYCL.h>
+#include <core/Device.h>
+#include <core/DPCPP.h>
 
 namespace c10 {
 namespace sycl {
@@ -85,7 +85,7 @@ static inline DP_DEVICE float __int_as_float(uint32_t val) {
   return cn.out;
 }
 
-#include <core/SYCLException.h>
+#include <core/Exception.h>
 static cl::sycl::async_handler syclAsyncHandler = [](cl::sycl::exception_list eL) {
   for (auto& e : eL) {
     C10_SYCL_TRY

@@ -2,7 +2,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 
-#include <core/SYCLUtils.h>
+#include <core/Utils.h>
 #include <core/Runtime.h>
 
 using namespace mkldnn;

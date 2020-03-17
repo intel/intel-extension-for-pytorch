@@ -3,8 +3,8 @@
 
 #include <ATen/ATen.h>
 
-#include <core/SYCL.h>
-#include <core/SYCLUtils.h>
+#include <core/DPCPP.h>
+#include <core/Utils.h>
 #include <core/NumericLimits.h>
 
 

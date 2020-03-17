@@ -3,9 +3,9 @@
 #include <ATen/native/TensorTransformations.h>
 #include <ATen/NativeFunctions.h>
 
-#include <core/SYCLMemory.h>
-#include <core/SYCLUtils.h>
-#include <core/SYCLContext.h>
+#include <core/Memory.h>
+#include <core/Utils.h>
+#include <core/Context.h>
 
 #include <cstddef>
 #include <vector>

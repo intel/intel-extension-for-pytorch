@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 
-#include <core/SYCL.h>
-#include <core/SYCLMemory.h>
+#include <core/DPCPP.h>
+#include <core/Memory.h>
 #include <utils/MathReduce.h>
 #include <utils/General.h>
 #include <utils/Numerics.h>

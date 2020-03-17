@@ -1,7 +1,7 @@
 #ifndef ALGORITHM_INC
 #define ALGORITHM_INC
 
-#include <core/SYCL.h>
+#include <core/DPCPP.h>
 #include <utils/General.h>
 #include <utils/Numerics.h>
 

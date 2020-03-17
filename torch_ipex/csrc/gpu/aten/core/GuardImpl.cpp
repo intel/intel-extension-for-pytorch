@@ -1,4 +1,4 @@
-#include <core/SYCLGuardImpl.h>
+#include <core/GuardImpl.h>
 
 namespace c10 {
 namespace sycl {

@@ -3,10 +3,10 @@
 #include <c10/core/impl/DeviceGuardImplInterface.h>
 #include <c10/macros/Macros.h>
 
-#include <core/SYCLStream.h>
-#include <core/SYCLUtils.h>
-#include <core/SYCLException.h>
-#include <core/SYCLFunctions.h>
+#include <core/Stream.h>
+#include <core/Utils.h>
+#include <core/Exception.h>
+#include <core/Functions.h>
 
 
 namespace c10 {

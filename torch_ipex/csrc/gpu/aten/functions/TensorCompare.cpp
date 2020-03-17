@@ -1,10 +1,10 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 
-#include <core/SYCLContext.h>
-#include <core/SYCLMemory.h>
-#include <core/SYCLUtils.h>
-#include <core/SYCLApplyUtils.h>
+#include <core/Context.h>
+#include <core/Memory.h>
+#include <core/Utils.h>
+#include <core/ApplyUtils.h>
 
 using namespace at::sycl;
 

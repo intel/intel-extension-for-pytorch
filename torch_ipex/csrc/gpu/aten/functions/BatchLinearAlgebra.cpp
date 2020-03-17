@@ -3,8 +3,8 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/LinearAlgebraUtils.h>
 
-#include <core/SYCLApplyUtils.h>
-#include <core/SYCLContext.h>
+#include <core/ApplyUtils.h>
+#include <core/Context.h>
 #include <utils/Numerics.h>
 
 DP_DEF_K2(triuTrilSycl, typename scalar_t, typename IndexType, bool upper);

@@ -1,10 +1,10 @@
 #include <ATen/ATen.h>
 
-#include <core/SYCL.h>
-#include <core/SYCLStream.h>
-#include <core/SYCLMemory.h>
-#include <core/SYCLUtils.h>
-#include <core/SYCLGenerator.h>
+#include <core/DPCPP.h>
+#include <core/Stream.h>
+#include <core/Memory.h>
+#include <core/Utils.h>
+#include <core/Generator.h>
 #include "Random.h"
 
 

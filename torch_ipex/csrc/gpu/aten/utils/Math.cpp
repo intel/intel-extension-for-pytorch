@@ -1,6 +1,8 @@
-#include <core/SYCLStream.h>
-#include <core/SYCLMath.h>
-#include <core/SYCLMemory.h>
+#include <core/Stream.h>
+#include <core/Memory.h>
+
+#include "Math.h"
+
 
 DP_DEF_K1(memory_scale);
 DP_DEF_K1(memory_scale1);

@@ -3,12 +3,12 @@
 
 #include <ATen/ATen.h>
 
-#include <core/SYCL.h>
-
+#include <core/DPCPP.h>
 #include <core/TensorImplUtils.h>
-#include <core/SYCLApplyUtils.h>
-#include <ATen/aten_ipex_type_dpcpp.h>
+#include <core/ApplyUtils.h>
 #include <utils/Numerics.h>
+
+#include <ATen/aten_ipex_type_dpcpp.h>
 
 
 #define IMPLEMENT_POINTWISE_FUNC_(NAME, CFUNC, REAL)               \

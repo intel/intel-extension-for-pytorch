@@ -2,8 +2,8 @@
 #include <ATen/Dispatch.h>
 #include <ATen/NativeFunctions.h>
 
-#include <core/SYCL.h>
-#include <core/SYCLMemory.h>
+#include <core/DPCPP.h>
+#include <core/Memory.h>
 #include <functions/UpSample.h>
 
 

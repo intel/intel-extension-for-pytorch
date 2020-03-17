@@ -3,8 +3,8 @@
 
 #include <ATen/ATen.h>
 
-#include <core/SYCLMemory.h>
-#include <core/SYCL.h>
+#include <core/Memory.h>
+#include <core/DPCPP.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <utils/Numerics.h>

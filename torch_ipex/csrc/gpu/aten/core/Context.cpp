@@ -1,5 +1,5 @@
-#include <core/SYCLContext.h>
-#include <core/SYCLUtils.h>
+#include <core/Context.h>
+#include <core/Utils.h>
 #include <core/Allocator.h>
 #include <CL/sycl.hpp>
 

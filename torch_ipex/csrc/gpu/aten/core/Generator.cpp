@@ -1,5 +1,5 @@
-#include <core/SYCLGenerator.h>
-#include <core/SYCLFunctions.h>
+#include <core/Generator.h>
+#include <core/Functions.h>
 
 
 namespace at {

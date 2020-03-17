@@ -1,8 +1,8 @@
-#include <core/SYCLStream.h>
-#include <core/SYCLGuard.h>
-#include <core/SYCLUtils.h>
-#include <core/SYCLContext.h>
-#include <core/SYCLException.h>
+#include <core/Stream.h>
+#include <core/Guard.h>
+#include <core/Utils.h>
+#include <core/Context.h>
+#include <core/Exception.h>
 #include <c10/util/Exception.h>
 
 #include <mutex>
@@ -14,6 +14,7 @@
 #include <memory>
 
 #include <cstdlib>
+
 
 namespace c10 {
 namespace sycl {

@@ -1,6 +1,6 @@
-#include <core/SYCLUtils.h>
-#include <core/SYCLMemory.h>
-#include <core/SYCLException.h>
+#include <core/Utils.h>
+#include <core/Memory.h>
+#include <core/Exception.h>
 #include <c10/core/Allocator.h>
 #include <mutex>
 

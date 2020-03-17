@@ -7,7 +7,7 @@
 #include <CL/sycl.hpp>
 
 #include <c10/core/Device.h>
-#include <core/SYCLException.h>
+#include <core/Exception.h>
 
 
 namespace c10 { namespace sycl {

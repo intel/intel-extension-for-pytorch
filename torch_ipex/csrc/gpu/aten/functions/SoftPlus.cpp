@@ -2,7 +2,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <core/SYCL.h>
+#include <core/DPCPP.h>
 #include <utils/Numerics.h>
 #include <functions/Loops.h>
 

@@ -2,11 +2,12 @@
 #include <ATen/Dispatch.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <core/SYCL.h>
+#include <core/DPCPP.h>
 #include <utils/Numerics.h>
 #include <utils/Pointwise.h>
 #include <utils/Pairwise.h>
-#include <functions/Loops.h>
+
+#include "Loops.h"
 
 
 using namespace at::native;

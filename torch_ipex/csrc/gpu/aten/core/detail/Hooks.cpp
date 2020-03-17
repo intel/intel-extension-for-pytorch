@@ -1,18 +1,18 @@
-#include <core/detail/SYCLHooks.h>
-
-#include <core/SYCLGenerator.h>
 #include <ATen/Context.h>
 #include <ATen/Config.h>
-#include <core/SYCLDevice.h>
-#include <core/detail/SYCLHooksInterface.h>
 #include <c10/util/Exception.h>
 
-#include <core/SYCLUtils.h>
+#include <core/Utils.h>
+#include <core/Generator.h>
+#include <core/Device.h>
+#include <core/detail/Hooks.h>
+#include <core/detail/HooksInterface.h>
 #include <utils/General.h>
 
 #include <cstddef>
 #include <functional>
 #include <memory>
+
 
 namespace at {
 namespace sycl {

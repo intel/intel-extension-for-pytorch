@@ -1,8 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/native/Repeat.h>
 
-#include <core/SYCLMemory.h>
-#include <core/SYCLUtils.h>
+#include <core/Memory.h>
+#include <core/Utils.h>
 
 
 using namespace at::native;

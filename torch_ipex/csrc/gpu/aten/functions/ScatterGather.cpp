@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 
-#include <core/SYCL.h>
+#include <core/DPCPP.h>
 #include <core/detail/TensorInfo.h>
 #include <core/detail/IndexUtils.h>
 #include <core/TensorImplUtils.h>

@@ -1,8 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 
-#include <core/SYCLContext.h>
-#include <core/SYCLMemory.h>
+#include <core/Context.h>
+#include <core/Memory.h>
 
 
 using namespace at::native;

@@ -7,8 +7,8 @@
 #include <c10/macros/Macros.h>
 #include <stdlib.h>
 
-#include <core/SYCL.h>
-#include <core/SYCLApplyUtils.h>
+#include <core/DPCPP.h>
+#include <core/ApplyUtils.h>
 #include <core/detail/TensorInfo.h>
 
 

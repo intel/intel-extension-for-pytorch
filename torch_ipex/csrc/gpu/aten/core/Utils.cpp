@@ -2,11 +2,11 @@
 
 #include <c10/macros/Macros.h>
 #include <c10/core/Device.h>
-#include <core/SYCLUtils.h>
-#include <core/SYCLDevice.h>
-#include <core/SYCLException.h>
-#include <core/SYCLStream.h>
-#include <core/SYCLContext.h>
+#include <core/Utils.h>
+#include <core/Device.h>
+#include <core/Exception.h>
+#include <core/Stream.h>
+#include <core/Context.h>
 #include <cmath>
 
 namespace c10 {

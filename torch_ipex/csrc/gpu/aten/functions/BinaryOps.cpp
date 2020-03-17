@@ -3,7 +3,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/BinaryOps.h>
 
-#include <core/SYCL.h>
+#include <core/DPCPP.h>
 #include <utils/Pointwise.h>
 #include <functions/Loops.h>
 

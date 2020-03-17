@@ -3,8 +3,8 @@
 #include <ATen/Config.h>
 
 #include <core/Runtime.h>
-#include <core/SYCLMemory.h>
-#include <core/SYCLMath.h>
+#include <core/Memory.h>
+#include <utils/Math.h>
 
 
 using namespace mkldnn;

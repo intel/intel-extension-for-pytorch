@@ -1,9 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
 
-#include <core/SYCLMemory.h>
-#include <core/SYCLUtils.h>
-#include <core/SYCLContext.h>
+#include <core/Memory.h>
+#include <core/Utils.h>
+#include <core/Context.h>
 
 
 namespace at {

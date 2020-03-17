@@ -2,12 +2,12 @@
 #include <ATen/native/SortingUtils.h>
 #include <c10/macros/Macros.h>
 
-#include <core/SYCL.h>
-
-#include <core/SYCLApplyUtils.h>
+#include <core/DPCPP.h>
+#include <core/ApplyUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <utils/Numerics.h>
+
 #include "SortingCommon.h"
 #include "SortingRadixSelect.h"
 

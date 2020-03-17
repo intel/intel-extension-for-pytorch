@@ -2,9 +2,9 @@
 
 #include <ATen/Config.h>
 
-#include <core/SYCLMemory.h>
-#include <core/SYCLUtils.h>
-#include <core/SYCLContext.h>
+#include <core/Memory.h>
+#include <core/Utils.h>
+#include <core/Context.h>
 
 #include <vector>
 #include <mkldnn.hpp>

@@ -6,9 +6,9 @@
 #include <ATen/detail/FunctionTraits.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <core/SYCLMemory.h>
-#include <core/SYCLUtils.h>
-#include <core/SYCLContext.h>
+#include <core/Memory.h>
+#include <core/Utils.h>
+#include <core/Context.h>
 
 
 namespace at { namespace native {

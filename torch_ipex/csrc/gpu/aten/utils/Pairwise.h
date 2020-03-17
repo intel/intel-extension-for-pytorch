@@ -2,7 +2,7 @@
 #define PAIRWISE_INC
 
 #include <ATen/ATen.h>
-#include <core/SYCL.h>
+#include <core/DPCPP.h>
 #include <utils/Pointwise.h>
 
 

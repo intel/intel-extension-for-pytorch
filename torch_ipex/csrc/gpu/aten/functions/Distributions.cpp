@@ -1,10 +1,10 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 
-#include <core/SYCLMemory.h>
-#include <core/SYCLUtils.h>
-#include <core/SYCLContext.h>
-#include <core/SYCLGenerator.h>
+#include <core/Memory.h>
+#include <core/Utils.h>
+#include <core/Context.h>
+#include <core/Generator.h>
 #include "Random.h"
 
 

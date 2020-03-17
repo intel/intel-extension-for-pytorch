@@ -1,4 +1,4 @@
-#include <core/SYCL.h>
+#include <core/DPCPP.h>
 
 // Collection of in-kernel scan / prefix sum utilities
 

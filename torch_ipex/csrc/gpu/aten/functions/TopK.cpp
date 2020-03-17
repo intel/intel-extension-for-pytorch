@@ -1,13 +1,14 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/WrapDimUtils.h>
 
-#include <core/SYCLMemory.h>
+#include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
 #include <core/detail/IndexUtils.h>
 #include <utils/Numerics.h>
 #include <utils/MathReduce.h>
-#include <functions/ScanKernel.h>
+
 #include <ATen/aten_ipex_type_dpcpp.h>
+#include "ScanKernel.h"
 #include "Sort.h"
 
 

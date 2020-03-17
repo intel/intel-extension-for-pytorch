@@ -1,9 +1,8 @@
-#include <core/SYCL.h>
-#include <core/SYCLStream.h>
-#include <core/SYCLMemory.h>
-
+#include <core/DPCPP.h>
+#include <core/Stream.h>
+#include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
-#include <core/SYCLApplyUtils.h>
+#include <core/ApplyUtils.h>
 
 #include <utils/Atomics.h>
 #include <utils/Numerics.h>

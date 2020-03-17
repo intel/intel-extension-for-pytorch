@@ -2,7 +2,7 @@
 #include <core/TensorImplUtils.h>
 #include <core/StorageImplUtils.h>
 #include <core/detail/TensorInfo.h>
-#include <core/SYCLGuard.h>
+#include <core/Guard.h>
 #include <utils/General.h>
 
 #include <aten_ipex_tensor_type.h>

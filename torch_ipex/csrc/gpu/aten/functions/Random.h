@@ -1,5 +1,5 @@
-#include <core/SYCL.h>
-#include <core/SYCLMemory.h>
+#include <core/DPCPP.h>
+#include <core/Memory.h>
 
 using namespace cl::sycl;
 using ACC_1D_RW_G = accessor<c10::sycl::buffer_data_type_t, 1, access::mode::read_write, access::target::global_buffer>;

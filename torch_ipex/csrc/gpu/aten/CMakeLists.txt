@@ -1,5 +1,5 @@
 FILE(GLOB aten_functions_src "functions/*.cpp")
-FILE(GLOB aten_core_src "py_init.cpp" "torch_ipex_wrap.cxx" "core/*.cpp" "core/detail/*.cpp")
+FILE(GLOB aten_core_src "py_init.cpp" "torch_ipex_wrap.cxx" "utils/*.cpp" "core/*.cpp" "core/detail/*.cpp")
 
 set(PROJECT_ATEN_GEN "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/gpu/aten/generated/ATen")
 set(aten_generate_src

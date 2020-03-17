@@ -6,7 +6,7 @@
 
 #include <aten_ipex_tensor_type.h>
 
-#include <core/SYCLContext.h>
+#include <core/Context.h>
 #include <core/TensorImplUtils.h>
 #include <utils/Numerics.h>
 #include <functions/Resize.h>

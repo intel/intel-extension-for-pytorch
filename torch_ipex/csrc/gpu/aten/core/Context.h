@@ -3,10 +3,10 @@
 #include <ATen/core/ATenGeneral.h>
 #include <ATen/Context.h>
 
-#include <core/SYCLStream.h>
-#include <core/SYCLFunctions.h>
-#include <core/SYCLMemory.h>
-#include <core/SYCLUtils.h>
+#include <core/Stream.h>
+#include <core/Functions.h>
+#include <core/Memory.h>
+#include <core/Utils.h>
 
 namespace at {
 namespace sycl {
