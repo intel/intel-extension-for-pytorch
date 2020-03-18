@@ -167,6 +167,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & digamma_(at::Tensor & self);
   at::Tensor & pow_(at::Tensor & self, at::Scalar exponent);
   at::Tensor & pow_(at::Tensor & self, const at::Tensor & exponent);
+  at::Tensor & lerp_(at::Tensor & self, const at::Tensor & end, at::Scalar weight);
+  at::Tensor & lerp_(at::Tensor & self, const at::Tensor & end, const at::Tensor & weight);
   at::Tensor & fmod_(at::Tensor & self, at::Scalar other);
   at::Tensor & fmod_(at::Tensor & self, const at::Tensor & other);
   at::Tensor & remainder_(at::Tensor & self, at::Scalar other);
@@ -225,6 +227,10 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor sign(const at::Tensor & self);
   at::Tensor & sign_(at::Tensor & self);
   at::Tensor & sign_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & lerp_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & end, at::Scalar weight);
+  at::Tensor & lerp_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & end, const at::Tensor & weight);
+  at::Tensor lerp(const at::Tensor & self, const at::Tensor & end, at::Scalar weight);
+  at::Tensor lerp(const at::Tensor & self, const at::Tensor & end, const at::Tensor & weight);
   at::Tensor & fmod_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
   at::Tensor fmod(const at::Tensor & self, at::Scalar other);
   at::Tensor & fmod_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
