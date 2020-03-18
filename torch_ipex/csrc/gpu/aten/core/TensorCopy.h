@@ -8,15 +8,15 @@ using namespace at;
 namespace at {
 namespace native {
 
-void TensorImpl_copy(TensorImpl *dst, TensorImpl *src);
+void TensorImpl_copy(TensorImpl* dst, TensorImpl* src);
 template <typename ScalarType>
-TensorImpl *TensorImpl_newClone(TensorImpl *self);
+TensorImpl* TensorImpl_newClone(TensorImpl* self);
 template <typename ScalarType>
-TensorImpl *TensorImpl_newContiguous(TensorImpl *self);
+TensorImpl* TensorImpl_newContiguous(TensorImpl* self);
 template <typename ScalarType>
-void TensorImpl_freeCopyTo(TensorImpl *self, TensorImpl *dst);
+void TensorImpl_freeCopyTo(TensorImpl* self, TensorImpl* dst);
 template <typename ScalarType>
-void TensorImpl_copyIgnoringOverlaps(TensorImpl *dst, TensorImpl *src);
+void TensorImpl_copyIgnoringOverlaps(TensorImpl* dst, TensorImpl* src);
 }
 }
 

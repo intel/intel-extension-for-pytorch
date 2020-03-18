@@ -22,8 +22,9 @@ DPCPP_DEF_K1(logspace_dpcpp_ker);
 DPCPP_DEF_K1(range_dpcpp_ker);
 DPCPP_DEF_K1(arange_dpcpp_ker);
 
-template <typename T, typename accT = T> class LinspaceOp {
-public:
+template <typename T, typename accT = T>
+class LinspaceOp {
+ public:
   LinspaceOp(accT start, accT step) : start_(start), step_(step) {}
   T operator()(ptrdiff_t index) {
     accT increment = step_ * static_cast<accT>(index);
@@ -34,7 +35,8 @@ public:
   const accT start_, step_;
 };
 
-template <typename T, typename accT = T> struct LogspaceOp {
+template <typename T, typename accT = T>
+struct LogspaceOp {
   LogspaceOp(accT start, accT step, accT base)
       : start_(start), step_(step), base_(base) {}
   T operator()(ptrdiff_t index) {
@@ -46,8 +48,11 @@ template <typename T, typename accT = T> struct LogspaceOp {
   const accT start_, step_, base_;
 };
 
-Tensor &linspace_dpcpp_out(Tensor &result, Scalar start, Scalar end,
-                           int64_t steps) {
+Tensor& linspace_dpcpp_out(
+    Tensor& result,
+    Scalar start,
+    Scalar end,
+    int64_t steps) {
   TORCH_CHECK(steps >= 0, "number of steps must be non-negative");
 
   if (result.numel() != steps) {
@@ -93,8 +98,12 @@ Tensor &linspace_dpcpp_out(Tensor &result, Scalar start, Scalar end,
   return result;
 }
 
-Tensor &logspace_dpcpp_out(Tensor &result, Scalar start, Scalar end,
-                           int64_t steps, double base) {
+Tensor& logspace_dpcpp_out(
+    Tensor& result,
+    Scalar start,
+    Scalar end,
+    int64_t steps,
+    double base) {
   TORCH_CHECK(steps >= 0, "number of steps must be non-negative");
 
   if (result.numel() != steps) {
@@ -142,7 +151,7 @@ Tensor &logspace_dpcpp_out(Tensor &result, Scalar start, Scalar end,
   return result;
 }
 
-Tensor &range_dpcpp_out(Tensor &result, Scalar start, Scalar end, Scalar step) {
+Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
   AT_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, result.scalar_type(), "range_dpcpp", [&]() {
         using accscalar_t = at::acc_type<scalar_t, true>;
@@ -151,12 +160,17 @@ Tensor &range_dpcpp_out(Tensor &result, Scalar start, Scalar end, Scalar step) {
         auto xstep = step.to<accscalar_t>();
 
         TORCH_CHECK(xstep > 0 || xstep < 0, "step must be nonzero");
-        TORCH_CHECK(std::isfinite(static_cast<double>(xstart)) &&
-                        std::isfinite(static_cast<double>(xend)),
-                    "unsupported range: ", xstart, " -> ", xend);
-        TORCH_CHECK(((xstep > 0) && (xend >= xstart)) ||
-                        ((xstep < 0) && (xend <= xstart)),
-                    "upper bound and larger bound inconsistent with step sign");
+        TORCH_CHECK(
+            std::isfinite(static_cast<double>(xstart)) &&
+                std::isfinite(static_cast<double>(xend)),
+            "unsupported range: ",
+            xstart,
+            " -> ",
+            xend);
+        TORCH_CHECK(
+            ((xstep > 0) && (xend >= xstart)) ||
+                ((xstep < 0) && (xend <= xstart)),
+            "upper bound and larger bound inconsistent with step sign");
         int64_t size = static_cast<int64_t>(((xend - xstart) / xstep) + 1);
         if (result.numel() != size) {
           result.resize_({size});
@@ -191,8 +205,11 @@ Tensor &range_dpcpp_out(Tensor &result, Scalar start, Scalar end, Scalar step) {
   return result;
 }
 
-Tensor &arange_dpcpp_out(Tensor &result, Scalar start, Scalar end,
-                         Scalar step) {
+Tensor& arange_dpcpp_out(
+    Tensor& result,
+    Scalar start,
+    Scalar end,
+    Scalar step) {
   AT_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, result.scalar_type(), "arange_dpcpp", [&]() {
         using accscalar_t = at::acc_type<scalar_t, true>;
@@ -212,9 +229,10 @@ Tensor &arange_dpcpp_out(Tensor &result, Scalar start, Scalar end,
         // higher precision than double
         double size_d;
         if (std::is_same<scalar_t, int64_t>::value) {
-          size_d = std::ceil(static_cast<double>(end.to<accscalar_t>() -
-                                                 start.to<accscalar_t>()) /
-                             step.to<accscalar_t>());
+          size_d = std::ceil(
+              static_cast<double>(
+                  end.to<accscalar_t>() - start.to<accscalar_t>()) /
+              step.to<accscalar_t>());
         } else {
           size_d = std::ceil(
               static_cast<double>(end.to<double>() - start.to<double>()) /
@@ -222,17 +240,23 @@ Tensor &arange_dpcpp_out(Tensor &result, Scalar start, Scalar end,
         }
 
         TORCH_CHECK(xstep > 0 || xstep < 0, "step must be nonzero");
-        TORCH_CHECK(std::isfinite(static_cast<double>(xstart)) &&
-                        std::isfinite(static_cast<double>(xend)),
-                    "unsupported range: ", xstart, " -> ", xend);
-        TORCH_CHECK(((xstep > 0) && (xend >= xstart)) ||
-                        ((xstep < 0) && (xend <= xstart)),
-                    "upper bound and larger bound inconsistent with step sign");
+        TORCH_CHECK(
+            std::isfinite(static_cast<double>(xstart)) &&
+                std::isfinite(static_cast<double>(xend)),
+            "unsupported range: ",
+            xstart,
+            " -> ",
+            xend);
+        TORCH_CHECK(
+            ((xstep > 0) && (xend >= xstart)) ||
+                ((xstep < 0) && (xend <= xstart)),
+            "upper bound and larger bound inconsistent with step sign");
 
-        TORCH_CHECK(size_d >= 0 &&
-                        size_d <= static_cast<double>(
-                                      std::numeric_limits<int64_t>::max()),
-                    "invalid size, possible overflow?");
+        TORCH_CHECK(
+            size_d >= 0 &&
+                size_d <=
+                    static_cast<double>(std::numeric_limits<int64_t>::max()),
+            "invalid size, possible overflow?");
         int64_t size = static_cast<int64_t>(size_d);
 
         if (result.numel() != size) {
@@ -266,23 +290,27 @@ Tensor &arange_dpcpp_out(Tensor &result, Scalar start, Scalar end,
 
 } // namespace impl
 
-Tensor &linspace_out(Tensor &out, Scalar start, Scalar end, int64_t steps) {
+Tensor& linspace_out(Tensor& out, Scalar start, Scalar end, int64_t steps) {
   impl::linspace_dpcpp_out(out, start, end, steps);
   return out;
 }
 
-Tensor &logspace_out(Tensor &out, Scalar start, Scalar end, int64_t steps,
-                     double base) {
+Tensor& logspace_out(
+    Tensor& out,
+    Scalar start,
+    Scalar end,
+    int64_t steps,
+    double base) {
   impl::logspace_dpcpp_out(out, start, end, steps, base);
   return out;
 }
 
-Tensor &range_out(Tensor &out, Scalar start, Scalar end, Scalar step) {
+Tensor& range_out(Tensor& out, Scalar start, Scalar end, Scalar step) {
   impl::range_dpcpp_out(out, start, end, step);
   return out;
 }
 
-Tensor &arange_out(Tensor &out, Scalar start, Scalar end, Scalar step) {
+Tensor& arange_out(Tensor& out, Scalar start, Scalar end, Scalar step) {
   impl::arange_dpcpp_out(out, start, end, step);
   return out;
 }

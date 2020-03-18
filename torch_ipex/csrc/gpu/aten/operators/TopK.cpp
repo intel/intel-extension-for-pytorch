@@ -7,9 +7,9 @@
 #include <utils/MathReduce.h>
 #include <utils/Numerics.h>
 
+#include <ATen/aten_ipex_type_dpcpp.h>
 #include "ScanKernel.h"
 #include "Sort.h"
-#include <ATen/aten_ipex_type_dpcpp.h>
 
 using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
@@ -18,9 +18,11 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace {
 
-template <typename T> struct TopKTypeConfig {};
+template <typename T>
+struct TopKTypeConfig {};
 
-template <> struct TopKTypeConfig<float> {
+template <>
+struct TopKTypeConfig<float> {
   typedef uint32_t RadixType;
   // Converts a float to an integer representation with the same
   // sorting; i.e., for floats f1, f2:
@@ -29,7 +31,7 @@ template <> struct TopKTypeConfig<float> {
   // This also gives a relative order for NaNs, but that's ok, as they
   // will all be adjacent
   static inline RadixType convert(float v) {
-    RadixType x = *((uint32_t *)&v);
+    RadixType x = *((uint32_t*)&v);
     RadixType mask = (x & 0x80000000) ? 0xffffffff : 0x80000000;
     return (x ^ mask);
   }
@@ -37,43 +39,64 @@ template <> struct TopKTypeConfig<float> {
   static inline float deconvert(RadixType v) {
     RadixType mask = (v & 0x80000000) ? 0x80000000 : 0xffffffff;
     auto v_de = v ^ mask;
-    return *((float *)&v_de);
+    return *((float*)&v_de);
   }
 };
 
-template <> struct TopKTypeConfig<uint8_t> {
+template <>
+struct TopKTypeConfig<uint8_t> {
   typedef uint32_t RadixType;
 
-  static inline RadixType convert(uint8_t v) { return v; }
+  static inline RadixType convert(uint8_t v) {
+    return v;
+  }
 
-  static inline uint8_t deconvert(RadixType v) { return v; }
+  static inline uint8_t deconvert(RadixType v) {
+    return v;
+  }
 };
 
-template <> struct TopKTypeConfig<int8_t> {
+template <>
+struct TopKTypeConfig<int8_t> {
   typedef uint32_t RadixType;
 
-  static inline RadixType convert(int8_t v) { return 128u + v; }
+  static inline RadixType convert(int8_t v) {
+    return 128u + v;
+  }
 
-  static inline int8_t deconvert(RadixType v) { return v - 128; }
+  static inline int8_t deconvert(RadixType v) {
+    return v - 128;
+  }
 };
 
-template <> struct TopKTypeConfig<int16_t> {
+template <>
+struct TopKTypeConfig<int16_t> {
   typedef uint32_t RadixType;
 
-  static inline RadixType convert(int16_t v) { return 32768u + v; }
+  static inline RadixType convert(int16_t v) {
+    return 32768u + v;
+  }
 
-  static inline int16_t deconvert(RadixType v) { return v - 32768; }
+  static inline int16_t deconvert(RadixType v) {
+    return v - 32768;
+  }
 };
 
-template <> struct TopKTypeConfig<int32_t> {
+template <>
+struct TopKTypeConfig<int32_t> {
   typedef uint32_t RadixType;
 
-  static inline RadixType convert(int32_t v) { return 2147483648u + v; }
+  static inline RadixType convert(int32_t v) {
+    return 2147483648u + v;
+  }
 
-  static inline int32_t deconvert(RadixType v) { return v - 2147483648u; }
+  static inline int32_t deconvert(RadixType v) {
+    return v - 2147483648u;
+  }
 };
 
-template <> struct TopKTypeConfig<int64_t> {
+template <>
+struct TopKTypeConfig<int64_t> {
   typedef uint64_t RadixType;
 
   static inline RadixType convert(int64_t v) {
@@ -86,11 +109,12 @@ template <> struct TopKTypeConfig<int64_t> {
   }
 };
 
-template <> struct TopKTypeConfig<double> {
+template <>
+struct TopKTypeConfig<double> {
   typedef uint64_t RadixType;
 
   static inline RadixType convert(double v) {
-    RadixType x = *((uint64_t *)&v);
+    RadixType x = *((uint64_t*)&v);
     RadixType mask = -((x >> 63)) | 0x8000000000000000;
     return (x ^ mask);
   }
@@ -98,15 +122,16 @@ template <> struct TopKTypeConfig<double> {
   static inline double deconvert(RadixType v) {
     RadixType mask = ((v >> 63) - 1) | 0x8000000000000000;
     auto v_de = v ^ mask;
-    return *((double *)&v_de);
+    return *((double*)&v_de);
   }
 };
 
-template <> struct TopKTypeConfig<at::Half> {
+template <>
+struct TopKTypeConfig<at::Half> {
   typedef uint32_t RadixType;
 
   static inline RadixType convert(at::Half v) {
-    RadixType x = *((uint16_t *)&v);
+    RadixType x = *((uint16_t*)&v);
     RadixType mask = -((x >> 15)) | 0x8000;
     return (x ^ mask);
   }
@@ -114,13 +139,15 @@ template <> struct TopKTypeConfig<at::Half> {
   static inline at::Half deconvert(RadixType v) {
     RadixType mask = ((v >> 15) - 1) | 0x8000;
     auto v_de = v ^ mask;
-    return *((at::Half *)&v_de);
+    return *((at::Half*)&v_de);
   }
 };
 
-template <typename T> struct Bitfield {};
+template <typename T>
+struct Bitfield {};
 
-template <> struct Bitfield<unsigned int> {
+template <>
+struct Bitfield<unsigned int> {
   static inline unsigned int getBitfield(unsigned int val, int pos, int len) {
     pos &= 0xff;
     len &= 0xff;
@@ -128,8 +155,11 @@ template <> struct Bitfield<unsigned int> {
     return (val >> pos) & m;
   }
 
-  static inline unsigned int
-  setBitfield(unsigned int val, unsigned int toInsert, int pos, int len) {
+  static inline unsigned int setBitfield(
+      unsigned int val,
+      unsigned int toInsert,
+      int pos,
+      int len) {
     pos &= 0xff;
     len &= 0xff;
     unsigned int m = (1u << len) - 1u;
@@ -140,7 +170,8 @@ template <> struct Bitfield<unsigned int> {
   }
 };
 
-template <> struct Bitfield<uint64_t> {
+template <>
+struct Bitfield<uint64_t> {
   static inline uint64_t getBitfield(uint64_t val, int pos, int len) {
     pos &= 0xff;
     len &= 0xff;
@@ -149,8 +180,11 @@ template <> struct Bitfield<uint64_t> {
     return (val >> pos) & m;
   }
 
-  static inline uint64_t setBitfield(uint64_t val, uint64_t toInsert, int pos,
-                                     int len) {
+  static inline uint64_t setBitfield(
+      uint64_t val,
+      uint64_t toInsert,
+      int pos,
+      int len) {
     pos &= 0xff;
     len &= 0xff;
 
@@ -173,13 +207,16 @@ template <> struct Bitfield<uint64_t> {
 // This produces and broadcasts the seen counts for a single block only.
 // `smem` must have at least `RadixSize` elements.
 template <typename DataType, typename BitDataType, typename IndexType>
-DPCPP_DEVICE void
-countRadixUsingMask(int counts[RADIX_SIZE],
-                    const dpcpp_local_acc_t<int> &smem_acc, BitDataType desired,
-                    BitDataType desiredMask, int radixDigitPos,
-                    IndexType sliceSize, IndexType withinSliceStride,
-                    const dpcpp_global_ptr_pt<DataType> &data_ptr,
-                    const DPCPP::nd_item<1> &item_id) {
+DPCPP_DEVICE void countRadixUsingMask(
+    int counts[RADIX_SIZE],
+    const dpcpp_local_acc_t<int>& smem_acc,
+    BitDataType desired,
+    BitDataType desiredMask,
+    int radixDigitPos,
+    IndexType sliceSize,
+    IndexType withinSliceStride,
+    const dpcpp_global_ptr_pt<DataType>& data_ptr,
+    const DPCPP::nd_item<1>& item_id) {
   // Clear out per-thread counts from a previous round
   auto local_id = item_id.get_local_id(0);
   for (int i = 0; i < RADIX_SIZE; ++i) {
@@ -222,12 +259,14 @@ countRadixUsingMask(int counts[RADIX_SIZE],
 // This finds the unique value 'v' that matches the pattern
 // ((v & desired) == desiredMask) in our sorted in format
 template <typename DataType, typename BitDataType, typename IndexType>
-DPCPP_DEVICE DataType findPattern(const dpcpp_local_acc_t<int> &smem_acc,
-                                  const dpcpp_global_ptr_pt<DataType> &data_ptr,
-                                  IndexType sliceSize,
-                                  IndexType withinSliceStride,
-                                  BitDataType desired, BitDataType desiredMask,
-                                  const DPCPP::nd_item<1> &item_id) {
+DPCPP_DEVICE DataType findPattern(
+    const dpcpp_local_acc_t<int>& smem_acc,
+    const dpcpp_global_ptr_pt<DataType>& data_ptr,
+    IndexType sliceSize,
+    IndexType withinSliceStride,
+    BitDataType desired,
+    BitDataType desiredMask,
+    const DPCPP::nd_item<1>& item_id) {
   auto local_id = item_id.get_local_id(0);
   auto smem_ptr = SyclConvertToActualTypePtr(DataType, smem_acc);
   if (local_id < RADIX_SIZE) {
@@ -262,13 +301,18 @@ DPCPP_DEVICE DataType findPattern(const dpcpp_local_acc_t<int> &smem_acc,
   return ScalarConvert<int, DataType>::to(0);
 }
 
-template <typename DataType, typename BitDataType, typename IndexType,
+template <typename DataType,
+          typename BitDataType,
+          typename IndexType,
           bool Order>
-DPCPP_DEVICE void
-radixSelect(const dpcpp_global_ptr_pt<DataType> &data_ptr, const IndexType k,
-            const IndexType sliceSize, const IndexType withinSliceStride,
-            const dpcpp_local_acc_t<int> &smem_acc, DataType *topK,
-            const DPCPP::nd_item<1> &item_id) {
+DPCPP_DEVICE void radixSelect(
+    const dpcpp_global_ptr_pt<DataType>& data_ptr,
+    const IndexType k,
+    const IndexType sliceSize,
+    const IndexType withinSliceStride,
+    const dpcpp_local_acc_t<int>& smem_acc,
+    DataType* topK,
+    const DPCPP::nd_item<1>& item_id) {
   // Per-thread buckets into which we accumulate digit counts in our radix
   int counts[RADIX_SIZE];
 
@@ -290,45 +334,57 @@ radixSelect(const dpcpp_global_ptr_pt<DataType> &data_ptr, const IndexType k,
     // Count radix distribution for the current position and reduce
     // across all threads
     countRadixUsingMask<DataType, BitDataType, IndexType>(
-        counts, smem_acc, desired, desiredMask, digitPos, sliceSize,
-        withinSliceStride, data_ptr, item_id);
+        counts,
+        smem_acc,
+        desired,
+        desiredMask,
+        digitPos,
+        sliceSize,
+        withinSliceStride,
+        data_ptr,
+        item_id);
 // All threads participate in the comparisions below to know the
 // final result
-#define CHECK_RADIX(i)                                                         \
-  int count = counts[i];                                                       \
-                                                                               \
-  /* All threads have the same value in counts here, so all */                 \
-  /* threads will return from the function. */                                 \
-  if (count == 1 && kToFind == 1) {                                            \
-    /* There is a unique answer. */                                            \
-    desired =                                                                  \
-        Bitfield<BitDataType>::setBitfield(desired, i, digitPos, RADIX_BITS);  \
-    desiredMask = Bitfield<BitDataType>::setBitfield(desiredMask, RADIX_MASK,  \
-                                                     digitPos, RADIX_BITS);    \
-    /* The answer is now the unique element v such that: */                    \
-    /* (v & desiredMask) == desired */                                         \
-    /* However, we do not yet know what the actual element is. We */           \
-    /* need to perform a search through the data to find the */                \
-    /* element that matches this pattern. */                                   \
-    *topK = findPattern<DataType, BitDataType, IndexType>(                     \
-        smem_acc, data_ptr, sliceSize, withinSliceStride, desired,             \
-        desiredMask, item_id);                                                 \
-    return;                                                                    \
-  }                                                                            \
-                                                                               \
-  if (count >= kToFind) {                                                      \
-    desired =                                                                  \
-        Bitfield<BitDataType>::setBitfield(desired, i, digitPos, RADIX_BITS);  \
-    desiredMask = Bitfield<BitDataType>::setBitfield(desiredMask, RADIX_MASK,  \
-                                                     digitPos, RADIX_BITS);    \
-                                                                               \
-    /* The top-Kth element v must now be one such that: */                     \
-    /* (v & desiredMask == desired) */                                         \
-    /* but we haven't narrowed it down; we must check the next */              \
-    /* least-significant digit */                                              \
-    break;                                                                     \
-  }                                                                            \
-                                                                               \
+#define CHECK_RADIX(i)                                                        \
+  int count = counts[i];                                                      \
+                                                                              \
+  /* All threads have the same value in counts here, so all */                \
+  /* threads will return from the function. */                                \
+  if (count == 1 && kToFind == 1) {                                           \
+    /* There is a unique answer. */                                           \
+    desired =                                                                 \
+        Bitfield<BitDataType>::setBitfield(desired, i, digitPos, RADIX_BITS); \
+    desiredMask = Bitfield<BitDataType>::setBitfield(                         \
+        desiredMask, RADIX_MASK, digitPos, RADIX_BITS);                       \
+    /* The answer is now the unique element v such that: */                   \
+    /* (v & desiredMask) == desired */                                        \
+    /* However, we do not yet know what the actual element is. We */          \
+    /* need to perform a search through the data to find the */               \
+    /* element that matches this pattern. */                                  \
+    *topK = findPattern<DataType, BitDataType, IndexType>(                    \
+        smem_acc,                                                             \
+        data_ptr,                                                             \
+        sliceSize,                                                            \
+        withinSliceStride,                                                    \
+        desired,                                                              \
+        desiredMask,                                                          \
+        item_id);                                                             \
+    return;                                                                   \
+  }                                                                           \
+                                                                              \
+  if (count >= kToFind) {                                                     \
+    desired =                                                                 \
+        Bitfield<BitDataType>::setBitfield(desired, i, digitPos, RADIX_BITS); \
+    desiredMask = Bitfield<BitDataType>::setBitfield(                         \
+        desiredMask, RADIX_MASK, digitPos, RADIX_BITS);                       \
+                                                                              \
+    /* The top-Kth element v must now be one such that: */                    \
+    /* (v & desiredMask == desired) */                                        \
+    /* but we haven't narrowed it down; we must check the next */             \
+    /* least-significant digit */                                             \
+    break;                                                                    \
+  }                                                                           \
+                                                                              \
   kToFind -= count;
 
     if (Order) {
@@ -354,13 +410,17 @@ template <typename T, typename IndexType, int Dim, bool Order>
 class gatherTopKKernelName {};
 
 template <typename T, typename IndexType, int Dim, bool Order>
-void gatherTopK(TensorInfo<T, IndexType> input, IndexType inputSliceSize,
-                IndexType outputSliceSize, // aka `k`
-                IndexType numInputSlices, IndexType inputWithinSliceStride,
-                TensorInfo<T, IndexType> topK, IndexType numTopKSlices,
-                IndexType topKWithinSliceStride,
-                TensorInfo<int64_t, IndexType> indices,
-                IndexType indicesWithinSliceStride) {
+void gatherTopK(
+    TensorInfo<T, IndexType> input,
+    IndexType inputSliceSize,
+    IndexType outputSliceSize, // aka `k`
+    IndexType numInputSlices,
+    IndexType inputWithinSliceStride,
+    TensorInfo<T, IndexType> topK,
+    IndexType numTopKSlices,
+    IndexType topKWithinSliceStride,
+    TensorInfo<int64_t, IndexType> indices,
+    IndexType indicesWithinSliceStride) {
   auto queue = dpcppGetCurrentQueue();
   int64_t local_size =
       queue.get_device()
@@ -381,16 +441,20 @@ void gatherTopK(TensorInfo<T, IndexType> input, IndexType inputSliceSize,
           IndexToOffset<T, IndexType, Dim>::get(slice, topK);
       IndexType indicesSliceStartIndex =
           IndexToOffset<int64_t, IndexType, Dim>::get(slice, indices);
-      T *inputSliceStart = in_acc.template get_pointer<T>() + sliceStartIndex;
-      T *topKSliceStart =
+      T* inputSliceStart = in_acc.template get_pointer<T>() + sliceStartIndex;
+      T* topKSliceStart =
           topk_acc.template get_pointer<T>() + topKSliceStartIndex;
-      int64_t *indicesSliceStart =
+      int64_t* indicesSliceStart =
           indices_acc.template get_pointer<int64_t>() + indicesSliceStartIndex;
       // Find the k-th highest element in our input
       T topKValue = 0;
       radixSelect<T, typename TopKTypeConfig<T>::RadixType, IndexType, Order>(
-          (dpcpp_global_ptr_pt<T>)inputSliceStart, outputSliceSize,
-          inputSliceSize, inputWithinSliceStride, smem_acc, &topKValue,
+          (dpcpp_global_ptr_pt<T>)inputSliceStart,
+          outputSliceSize,
+          inputSliceSize,
+          inputWithinSliceStride,
+          smem_acc,
+          &topKValue,
           item_id);
       // (depending on sort dir) in sorted int format is in the top-K.
       // The top-K value itself might not be unique.
@@ -417,8 +481,8 @@ void gatherTopK(TensorInfo<T, IndexType> input, IndexType inputSliceSize,
         }
         int index;
         int carry;
-        exclusivePrefixScan<int>(smem_scan_acc, hasTopK, &index, &carry,
-                                 AddOp<int>(), item_id);
+        exclusivePrefixScan<int>(
+            smem_scan_acc, hasTopK, &index, &carry, AddOp<int>(), item_id);
         if (hasTopK) {
           int writeIndex = writeIndexStart + index;
 
@@ -446,8 +510,8 @@ void gatherTopK(TensorInfo<T, IndexType> input, IndexType inputSliceSize,
         bool hasTopK = inRange && Numerics<T>::eq(v, topKValue);
         int index;
         int carry;
-        exclusivePrefixScan<int>(smem_scan_acc, hasTopK, &index, &carry,
-                                 AddOp<int>(), item_id);
+        exclusivePrefixScan<int>(
+            smem_scan_acc, hasTopK, &index, &carry, AddOp<int>(), item_id);
 
         if (hasTopK && static_cast<IndexType>(index) < topKRemaining) {
           int writeIndex = writeIndexStart + index;
@@ -469,8 +533,9 @@ void gatherTopK(TensorInfo<T, IndexType> input, IndexType inputSliceSize,
     };
 
     cgh.parallel_for<gatherTopKKernelName<T, IndexType, Dim, Order>>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(numInputSlices * local_size),
-                           DPCPP::range<1>(local_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(numInputSlices * local_size),
+            DPCPP::range<1>(local_size)),
         kfn);
   };
 
@@ -478,10 +543,17 @@ void gatherTopK(TensorInfo<T, IndexType> input, IndexType inputSliceSize,
 }
 
 template <typename scalar_t>
-void Topk(Tensor &topK, Tensor &indices, const Tensor &input_, int64_t k,
-          int dim, int dir, int sorted) {
-  TORCH_CHECK(topK.defined() && indices.defined() && input_.defined(),
-              "invalid inputs");
+void Topk(
+    Tensor& topK,
+    Tensor& indices,
+    const Tensor& input_,
+    int64_t k,
+    int dim,
+    int dir,
+    int sorted) {
+  TORCH_CHECK(
+      topK.defined() && indices.defined() && input_.defined(),
+      "invalid inputs");
   TORCH_CHECK(topK.dim() <= MAX_DPCPPTORCH_DIMS, "invalid topK dim");
   int64_t dims = indices.dim() == 0 ? 1 : indices.dim();
   TORCH_CHECK(dims <= MAX_DPCPPTORCH_DIMS, "invalid indices dim");
@@ -506,75 +578,79 @@ void Topk(Tensor &topK, Tensor &indices, const Tensor &input_, int64_t k,
 
 // static_cast is required to ensure that the correct type (INDEX_T)
 // is provided to the kernel for the arguments.
-#define RUN_K(INDEX_T, DIM, DIR)                                                 \
-  gatherTopK<scalar_t, INDEX_T, DIM, DIR>(                                       \
-      inputInfo, static_cast<INDEX_T>(sliceSize), static_cast<INDEX_T>(k),       \
-      static_cast<INDEX_T>(inputSlices),                                         \
+#define RUN_K(INDEX_T, DIM, DIR)                                                                                                                                         \
+  gatherTopK<scalar_t, INDEX_T, DIM, DIR>(                                                                                                                               \
+      inputInfo,                                                                                                                                                         \
+      static_cast<INDEX_T>(sliceSize),                                                                                                                                   \
+      static_cast<INDEX_T>(k),                                                                                                                                           \
+      static_cast<INDEX_T>(inputSlices),                                                                                                                                 \
       /* The actual dimension that the k-selection is        \
-                           running in */ /* may have       \
-                                                                  changed from   \
-                                                                  collapseDims() \
-                                                                  */             \
-      static_cast<INDEX_T>(inputInfo.strides[collapseInputDim]),                 \
-      topKInfo, static_cast<INDEX_T>(topKSlices),                                \
-      static_cast<INDEX_T>(topKInfo.strides[collapseTopKDim]), indicesInfo,      \
+                           running in */ /* may have                                                                                               \
+                                                                                                                                                          changed from   \
+                                                                                                                                                          collapseDims() \
+                                                                                                                                                          */             \
+      static_cast<INDEX_T>(inputInfo.strides[collapseInputDim]),                                                                                                         \
+      topKInfo,                                                                                                                                                          \
+      static_cast<INDEX_T>(topKSlices),                                                                                                                                  \
+      static_cast<INDEX_T>(topKInfo.strides[collapseTopKDim]),                                                                                                           \
+      indicesInfo,                                                                                                                                                       \
       static_cast<INDEX_T>(indicesInfo.strides[collapseIndicesDim]))
 
-#define RUN_DIR(INDEX_T, DIM)                                                  \
-  if (dir) {                                                                   \
-    RUN_K(INDEX_T, DIM, true);                                                 \
-  } else {                                                                     \
-    RUN_K(INDEX_T, DIM, false);                                                \
+#define RUN_DIR(INDEX_T, DIM)   \
+  if (dir) {                    \
+    RUN_K(INDEX_T, DIM, true);  \
+  } else {                      \
+    RUN_K(INDEX_T, DIM, false); \
   }
 
-#define RUN_DIM(INDEX_T)                                                       \
-  if (allDims == 1) {                                                          \
-    RUN_DIR(INDEX_T, 1);                                                       \
-  } else if (allDims == 2) {                                                   \
-    RUN_DIR(INDEX_T, 2);                                                       \
-  } else if (allDims == 3) {                                                   \
-    RUN_DIR(INDEX_T, 3);                                                       \
-  } else {                                                                     \
-    RUN_DIR(INDEX_T, -1);                                                      \
+#define RUN_DIM(INDEX_T)     \
+  if (allDims == 1) {        \
+    RUN_DIR(INDEX_T, 1);     \
+  } else if (allDims == 2) { \
+    RUN_DIR(INDEX_T, 2);     \
+  } else if (allDims == 3) { \
+    RUN_DIR(INDEX_T, 3);     \
+  } else {                   \
+    RUN_DIR(INDEX_T, -1);    \
   }
 
-#define RUN_T(INDEX_T)                                                         \
-  TensorInfo<scalar_t, INDEX_T> inputInfo =                                    \
-      getTensorInfo<scalar_t, INDEX_T>(input);                                 \
-  TensorInfo<scalar_t, INDEX_T> topKInfo =                                     \
-      getTensorInfo<scalar_t, INDEX_T>(topK);                                  \
-  TensorInfo<int64_t, INDEX_T> indicesInfo =                                   \
-      getTensorInfo<int64_t, INDEX_T>(indices);                                \
-                                                                               \
-  /* We use these structures solely to find the offset to */                   \
-  /* each slice we are operating on */                                         \
-  inputInfo.sizes[dim] = 1;                                                    \
-  topKInfo.sizes[dim] = 1;                                                     \
-  indicesInfo.sizes[dim] = 1;                                                  \
-                                                                               \
-  /* Collapse all other dims */                                                \
-  int collapseInputDim = inputInfo.collapseDims(dim);                          \
-  int collapseTopKDim = topKInfo.collapseDims(dim);                            \
-  int collapseIndicesDim = indicesInfo.collapseDims(dim);                      \
-                                                                               \
-  int64_t inputSlices = 1;                                                     \
-  for (int i = 0; i < inputInfo.dims; ++i) {                                   \
-    inputSlices *= inputInfo.sizes[i];                                         \
-  }                                                                            \
-  int64_t topKSlices = 1;                                                      \
-  for (int i = 0; i < topKInfo.dims; ++i) {                                    \
-    topKSlices *= topKInfo.sizes[i];                                           \
-  }                                                                            \
-                                                                               \
-  /* This is used as a template parameter to calculate indices. */             \
-  /* We only specialize it if all collapsed dim sizes are the */               \
-  /* same; otherwise, we use -1 which is the specialization */                 \
-  /* parameter for arbitrary dimensions */                                     \
-  int allDims = inputInfo.dims;                                                \
-  if (topKInfo.dims != allDims || indicesInfo.dims != allDims) {               \
-    allDims = -1;                                                              \
-  }                                                                            \
-                                                                               \
+#define RUN_T(INDEX_T)                                             \
+  TensorInfo<scalar_t, INDEX_T> inputInfo =                        \
+      getTensorInfo<scalar_t, INDEX_T>(input);                     \
+  TensorInfo<scalar_t, INDEX_T> topKInfo =                         \
+      getTensorInfo<scalar_t, INDEX_T>(topK);                      \
+  TensorInfo<int64_t, INDEX_T> indicesInfo =                       \
+      getTensorInfo<int64_t, INDEX_T>(indices);                    \
+                                                                   \
+  /* We use these structures solely to find the offset to */       \
+  /* each slice we are operating on */                             \
+  inputInfo.sizes[dim] = 1;                                        \
+  topKInfo.sizes[dim] = 1;                                         \
+  indicesInfo.sizes[dim] = 1;                                      \
+                                                                   \
+  /* Collapse all other dims */                                    \
+  int collapseInputDim = inputInfo.collapseDims(dim);              \
+  int collapseTopKDim = topKInfo.collapseDims(dim);                \
+  int collapseIndicesDim = indicesInfo.collapseDims(dim);          \
+                                                                   \
+  int64_t inputSlices = 1;                                         \
+  for (int i = 0; i < inputInfo.dims; ++i) {                       \
+    inputSlices *= inputInfo.sizes[i];                             \
+  }                                                                \
+  int64_t topKSlices = 1;                                          \
+  for (int i = 0; i < topKInfo.dims; ++i) {                        \
+    topKSlices *= topKInfo.sizes[i];                               \
+  }                                                                \
+                                                                   \
+  /* This is used as a template parameter to calculate indices. */ \
+  /* We only specialize it if all collapsed dim sizes are the */   \
+  /* same; otherwise, we use -1 which is the specialization */     \
+  /* parameter for arbitrary dimensions */                         \
+  int allDims = inputInfo.dims;                                    \
+  if (topKInfo.dims != allDims || indicesInfo.dims != allDims) {   \
+    allDims = -1;                                                  \
+  }                                                                \
+                                                                   \
   RUN_DIM(INDEX_T);
 
   if (input.numel() > 0) {
@@ -611,9 +687,14 @@ void Topk(Tensor &topK, Tensor &indices, const Tensor &input_, int64_t k,
 
 } // namespace
 
-std::tuple<at::Tensor &, at::Tensor &>
-topk_out(at::Tensor &values, at::Tensor &indices, const at::Tensor &self,
-         int64_t k, int64_t dim, bool largest, bool sorted) {
+std::tuple<at::Tensor&, at::Tensor&> topk_out(
+    at::Tensor& values,
+    at::Tensor& indices,
+    const at::Tensor& self,
+    int64_t k,
+    int64_t dim,
+    bool largest,
+    bool sorted) {
   auto dim_ = maybe_wrap_dim(dim, TensorImpl_Unwrap(self));
   AT_DISPATCH_ALL_TYPES(self.scalar_type(), "Topk", [&]() {
     Topk<scalar_t>(values, indices, self, k, dim_, largest, sorted);
@@ -622,9 +703,12 @@ topk_out(at::Tensor &values, at::Tensor &indices, const at::Tensor &self,
   return std::forward_as_tuple(values, indices);
 }
 
-std::tuple<at::Tensor, at::Tensor> topk(const at::Tensor &self, int64_t k,
-                                        int64_t dim, bool largest,
-                                        bool sorted) {
+std::tuple<at::Tensor, at::Tensor> topk(
+    const at::Tensor& self,
+    int64_t k,
+    int64_t dim,
+    bool largest,
+    bool sorted) {
   return at::native::topk(self, k, dim, largest, sorted);
 }
 

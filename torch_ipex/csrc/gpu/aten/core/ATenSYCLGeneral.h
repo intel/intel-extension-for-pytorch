@@ -1,7 +1,7 @@
 #pragma once
 
 #ifdef _WIN32
-#if defined(ATen_dpcpp_EXPORTS) || defined(caffe2_dpcpp_EXPORTS) ||            \
+#if defined(ATen_dpcpp_EXPORTS) || defined(caffe2_dpcpp_EXPORTS) || \
     defined(CAFFE2_DPCPP_BUILD_MAIN_LIB)
 #define AT_DPCPP_API __declspec(dllexport)
 #else

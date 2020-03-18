@@ -30,34 +30,44 @@ struct DPCPPGuard {
   explicit DPCPPGuard(Device device) : guard_(device) {}
 
   // Copy is not allowed
-  DPCPPGuard(const DPCPPGuard &) = delete;
-  DPCPPGuard &operator=(const DPCPPGuard &) = delete;
+  DPCPPGuard(const DPCPPGuard&) = delete;
+  DPCPPGuard& operator=(const DPCPPGuard&) = delete;
 
   // Move is not allowed (there is no uninitialized state)
-  DPCPPGuard(DPCPPGuard &&other) = delete;
-  DPCPPGuard &operator=(DPCPPGuard &&other) = delete;
+  DPCPPGuard(DPCPPGuard&& other) = delete;
+  DPCPPGuard& operator=(DPCPPGuard&& other) = delete;
 
   /// Sets the DPCPP device to the given device.  Errors if the given device
   /// is not a DPCPP device.
-  void set_device(Device device) { guard_.set_device(device); }
+  void set_device(Device device) {
+    guard_.set_device(device);
+  }
 
   /// Sets the DPCPP device to the given device.  Errors if the given device
   /// is not a DPCPP device.  (This method is provided for uniformity with
   /// DeviceGuard).
-  void reset_device(Device device) { guard_.reset_device(device); }
+  void reset_device(Device device) {
+    guard_.reset_device(device);
+  }
 
   /// Sets the DPCPP device to the given device index.
-  void set_index(DeviceIndex device_index) { guard_.set_index(device_index); }
+  void set_index(DeviceIndex device_index) {
+    guard_.set_index(device_index);
+  }
 
   /// Returns the device that was set upon construction of the guard
-  Device original_device() const { return guard_.original_device(); }
+  Device original_device() const {
+    return guard_.original_device();
+  }
 
   /// Returns the last device that was set via `set_device`, if any, otherwise
   /// the
   /// device passed during construction.
-  Device current_device() const { return guard_.current_device(); }
+  Device current_device() const {
+    return guard_.current_device();
+  }
 
-private:
+ private:
   /// The guard for the current device.
   c10::impl::InlineDeviceGuard<impl::DPCPPGuardImpl> guard_;
 };
@@ -78,44 +88,56 @@ struct OptionalDPCPPGuard {
       : guard_(device_index_opt) {}
 
   // Copy is not allowed
-  OptionalDPCPPGuard(const OptionalDPCPPGuard &) = delete;
-  OptionalDPCPPGuard &operator=(const OptionalDPCPPGuard &) = delete;
+  OptionalDPCPPGuard(const OptionalDPCPPGuard&) = delete;
+  OptionalDPCPPGuard& operator=(const OptionalDPCPPGuard&) = delete;
 
   // See Note [Move construction for RAII guards is tricky]
-  OptionalDPCPPGuard(OptionalDPCPPGuard &&other) = delete;
+  OptionalDPCPPGuard(OptionalDPCPPGuard&& other) = delete;
 
   // See Note [Move assignment for RAII guards is tricky]
-  OptionalDPCPPGuard &operator=(OptionalDPCPPGuard &&other) = delete;
+  OptionalDPCPPGuard& operator=(OptionalDPCPPGuard&& other) = delete;
 
   /// Sets the DPCPP device to the given device, initializing the guard if it
   /// is not already initialized.  Errors if the given device is not a DPCPP
   /// device.
-  void set_device(Device device) { guard_.set_device(device); }
+  void set_device(Device device) {
+    guard_.set_device(device);
+  }
 
   /// Sets the DPCPP device to the given device, initializing the guard if it is
   /// not already initialized.  Errors if the given device is not a DPCPP
   /// device.
   /// (This method is provided for uniformity with OptionalDeviceGuard).
-  void reset_device(Device device) { guard_.reset_device(device); }
+  void reset_device(Device device) {
+    guard_.reset_device(device);
+  }
 
   /// Sets the DPCPP device to the given device index, initializing the guard if
   /// it is not already initialized.
-  void set_index(DeviceIndex device_index) { guard_.set_index(device_index); }
+  void set_index(DeviceIndex device_index) {
+    guard_.set_index(device_index);
+  }
 
   /// Returns the device that was set immediately prior to initialization of the
   /// guard, or nullopt if the guard is uninitialized.
-  optional<Device> original_device() const { return guard_.original_device(); }
+  optional<Device> original_device() const {
+    return guard_.original_device();
+  }
 
   /// Returns the most recent device that was set using this device guard,
   /// either from construction, or via set_device, if the guard is initialized,
   /// or nullopt if the guard is uninitialized.
-  optional<Device> current_device() const { return guard_.current_device(); }
+  optional<Device> current_device() const {
+    return guard_.current_device();
+  }
 
   /// Restore the original DPCPP device, resetting this guard to uninitialized
   /// state.
-  void reset() { guard_.reset(); }
+  void reset() {
+    guard_.reset();
+  }
 
-private:
+ private:
   c10::impl::InlineOptionalDeviceGuard<impl::DPCPPGuardImpl> guard_;
 };
 
@@ -132,14 +154,14 @@ struct DPCPPStreamGuard {
   explicit DPCPPStreamGuard(Stream stream) : guard_(stream) {}
 
   /// Copy is disallowed
-  DPCPPStreamGuard(const DPCPPStreamGuard &) = delete;
-  DPCPPStreamGuard &operator=(const DPCPPStreamGuard &) = delete;
+  DPCPPStreamGuard(const DPCPPStreamGuard&) = delete;
+  DPCPPStreamGuard& operator=(const DPCPPStreamGuard&) = delete;
 
   /// Move is disallowed, as DPCPPStreamGuard does not have an uninitialized
   /// state,
   /// which is required for moves on types with nontrivial destructors.
-  DPCPPStreamGuard(DPCPPStreamGuard &&other) = delete;
-  DPCPPStreamGuard &operator=(DPCPPStreamGuard &&other) = delete;
+  DPCPPStreamGuard(DPCPPStreamGuard&& other) = delete;
+  DPCPPStreamGuard& operator=(DPCPPStreamGuard&& other) = delete;
 
   /// Resets the currently set stream to the original stream and
   /// the currently set device to the original device.  Then,
@@ -153,7 +175,9 @@ struct DPCPPStreamGuard {
   /// WARNING: reset_stream does NOT preserve previously set streams on
   /// different devices.  If you need to set streams on multiple devices
   /// on DPCPP, use DPCPPMultiStreamGuard instead.
-  void reset_stream(Stream stream) { guard_.reset_stream(stream); }
+  void reset_stream(Stream stream) {
+    guard_.reset_stream(stream);
+  }
 
   /// Returns the DPCPP stream that was set at the time the guard was
   /// constructed.
@@ -169,13 +193,17 @@ struct DPCPPStreamGuard {
 
   /// Returns the most recent DPCPP device that was set using this device guard,
   /// either from construction, or via set_device/reset_device/set_index.
-  Device current_device() const { return guard_.current_device(); }
+  Device current_device() const {
+    return guard_.current_device();
+  }
 
   /// Returns the DPCPP device that was set at the most recent reset_stream(),
   /// or otherwise the device at construction time.
-  Device original_device() const { return guard_.original_device(); }
+  Device original_device() const {
+    return guard_.original_device();
+  }
 
-private:
+ private:
   c10::impl::InlineStreamGuard<impl::DPCPPGuardImpl> guard_;
 };
 
@@ -199,23 +227,24 @@ struct OptionalDPCPPStreamGuard {
       : guard_(stream_opt) {}
 
   /// Copy is disallowed
-  OptionalDPCPPStreamGuard(const OptionalDPCPPStreamGuard &) = delete;
-  OptionalDPCPPStreamGuard &
-  operator=(const OptionalDPCPPStreamGuard &) = delete;
+  OptionalDPCPPStreamGuard(const OptionalDPCPPStreamGuard&) = delete;
+  OptionalDPCPPStreamGuard& operator=(const OptionalDPCPPStreamGuard&) = delete;
 
   // See Note [Move construction for RAII guards is tricky]
-  OptionalDPCPPStreamGuard(OptionalDPCPPStreamGuard &&other) = delete;
+  OptionalDPCPPStreamGuard(OptionalDPCPPStreamGuard&& other) = delete;
 
   // See Note [Move assignment for RAII guards is tricky]
-  OptionalDPCPPStreamGuard &
-  operator=(OptionalDPCPPStreamGuard &&other) = delete;
+  OptionalDPCPPStreamGuard& operator=(OptionalDPCPPStreamGuard&& other) =
+      delete;
 
   /// Resets the currently set DPCPP stream to the original stream and
   /// the currently set device to the original device.  Then,
   /// set the current device to the device associated with the passed stream,
   /// and set the current stream on that device to the passed stream.
   /// Initializes the guard if it was not previously initialized.
-  void reset_stream(Stream stream) { guard_.reset_stream(stream); }
+  void reset_stream(Stream stream) {
+    guard_.reset_stream(stream);
+  }
 
   /// Returns the DPCPP stream that was set at the time the guard was most
   /// recently
@@ -244,9 +273,11 @@ struct OptionalDPCPPStreamGuard {
 
   /// Restore the original DPCPP device and stream, resetting this guard to
   /// uninitialized state.
-  void reset() { guard_.reset(); }
+  void reset() {
+    guard_.reset();
+  }
 
-private:
+ private:
   c10::impl::InlineOptionalStreamGuard<impl::DPCPPGuardImpl> guard_;
 };
 } // namespace dpcpp

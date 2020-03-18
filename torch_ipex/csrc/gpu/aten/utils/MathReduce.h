@@ -14,14 +14,16 @@
 using namespace at::native;
 using namespace at::dpcpp;
 
-template <typename scalar_t> DPCPP_DEVICE struct AddOp {
-  scalar_t operator()(const scalar_t &lhs, const scalar_t &rhs) const {
+template <typename scalar_t>
+DPCPP_DEVICE struct AddOp {
+  scalar_t operator()(const scalar_t& lhs, const scalar_t& rhs) const {
     return lhs + rhs;
   }
 };
 
-template <typename scalar_t> DPCPP_DEVICE struct MulOp {
-  scalar_t operator()(const scalar_t &lhs, const scalar_t &rhs) const {
+template <typename scalar_t>
+DPCPP_DEVICE struct MulOp {
+  scalar_t operator()(const scalar_t& lhs, const scalar_t& rhs) const {
     return lhs * rhs;
   }
 };
@@ -38,17 +40,22 @@ DPCPP_DEVICE struct LogicalAny {
   }
 };
 
-template <typename T> DPCPP_DEVICE struct ReduceAdd {
-  T operator()(const T a, const T b) const { return Numerics<T>::add(a, b); }
+template <typename T>
+DPCPP_DEVICE struct ReduceAdd {
+  T operator()(const T a, const T b) const {
+    return Numerics<T>::add(a, b);
+  }
 };
 
-template <typename T> DPCPP_DEVICE struct ReduceMin {
+template <typename T>
+DPCPP_DEVICE struct ReduceMin {
   T operator()(T a, T b) const {
     return (Numerics<T>::lt(a, b) || Numerics<T>::isnan(a)) ? a : b;
   }
 };
 
-template <typename T> DPCPP_DEVICE struct ReduceMax {
+template <typename T>
+DPCPP_DEVICE struct ReduceMax {
   T operator()(T a, T b) const {
     return (Numerics<T>::gt(a, b) || Numerics<T>::isnan(a)) ? a : b;
   }
@@ -60,9 +67,11 @@ DPCPP_DEF_K1(reduceOuterDimIndex);
 
 template <typename K, typename Index, class BinaryFunction>
 DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
-    at::Tensor &tgt1, at::Tensor &tgt2, at::Tensor &src,
-    std::pair<K, Index> init, BinaryFunction binary_op) {
-
+    at::Tensor& tgt1,
+    at::Tensor& tgt2,
+    at::Tensor& src,
+    std::pair<K, Index> init,
+    BinaryFunction binary_op) {
   auto queue = dpcppGetCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto totalElements = src.numel();
@@ -116,10 +125,10 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
     };
 
     // kick off kernel
-    cgh.parallel_for<DPCPP_K(reduceInnermostDimIndex, K, Index,
-                             BinaryFunction)>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(total_items),
-                           DPCPP::range<1>(group_size)),
+    cgh.parallel_for<DPCPP_K(
+        reduceInnermostDimIndex, K, Index, BinaryFunction)>(
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
 
@@ -129,9 +138,12 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
 
 template <typename K, typename Index, class BinaryFunction>
 DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
-    at::Tensor &tgt1, at::Tensor &tgt2, at::Tensor &src, int64_t rdim,
-    std::pair<K, Index> init, BinaryFunction binary_op) {
-
+    at::Tensor& tgt1,
+    at::Tensor& tgt2,
+    at::Tensor& src,
+    int64_t rdim,
+    std::pair<K, Index> init,
+    BinaryFunction binary_op) {
   auto queue = dpcppGetCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto totalElements = src.numel();
@@ -186,8 +198,8 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
 
     // kick off kernel
     cgh.parallel_for<DPCPP_K(reduceOuterDimIndex, K, Index, BinaryFunction)>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(total_items),
-                           DPCPP::range<1>(group_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
 
@@ -195,41 +207,52 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 };
 
-template <typename ScalarTypeK, typename ScalarTypeIndex,
+template <typename ScalarTypeK,
+          typename ScalarTypeIndex,
           typename BinaryFunction>
 DPCPP_HOST void transformReduceOuterDimIndex(
-    at::Tensor &tgt1, at::Tensor &tgt2, at::Tensor &src, int64_t rdim,
-    const std::pair<ScalarTypeK, ScalarTypeIndex> &init,
+    at::Tensor& tgt1,
+    at::Tensor& tgt2,
+    at::Tensor& src,
+    int64_t rdim,
+    const std::pair<ScalarTypeK, ScalarTypeIndex>& init,
     BinaryFunction binary_op) {
   kernelTransformReduceOuterDimIndex(tgt1, tgt2, src, rdim, init, binary_op);
 }
 
-template <typename ScalarTypeK, typename ScalarTypeIndex,
+template <typename ScalarTypeK,
+          typename ScalarTypeIndex,
           typename BinaryFunction>
 DPCPP_HOST void transformReduceInnermostDimIndex(
-    at::Tensor &tgt1, at::Tensor &tgt2, at::Tensor &src,
-    const std::pair<ScalarTypeK, ScalarTypeIndex> &init,
+    at::Tensor& tgt1,
+    at::Tensor& tgt2,
+    at::Tensor& src,
+    const std::pair<ScalarTypeK, ScalarTypeIndex>& init,
     BinaryFunction binary_op) {
   kernelTransformReduceInnermostDimIndex(tgt1, tgt2, src, init, binary_op);
 }
 
-template <typename ScalarTypeK, typename ScalarTypeIndex,
+template <typename ScalarTypeK,
+          typename ScalarTypeIndex,
           typename BinaryFunction>
-DPCPP_HOST void
-reduceDimIndex(at::Tensor &tgt1_, at::Tensor &tgt2_, const at::Tensor &src_,
-               int64_t dimension, int keepdim,
-               const std::pair<ScalarTypeK, ScalarTypeIndex> init,
-               BinaryFunction binary_op) {
-  TORCH_CHECK(dimension >= 0 && dimension < src_.dim(),
-              "dimension out of range");
+DPCPP_HOST void reduceDimIndex(
+    at::Tensor& tgt1_,
+    at::Tensor& tgt2_,
+    const at::Tensor& src_,
+    int64_t dimension,
+    int keepdim,
+    const std::pair<ScalarTypeK, ScalarTypeIndex> init,
+    BinaryFunction binary_op) {
+  TORCH_CHECK(
+      dimension >= 0 && dimension < src_.dim(), "dimension out of range");
 
   // Unsqueeze tgt1_/tgt_2 if necessary so that their contiguity traits
   // are preserved if they are the same size as the correct reduction output.
   int src_dims = src_.dim();
-  TensorImpl_preserveReduceDimSemantics(TensorImpl_Unwrap(tgt1_), src_dims,
-                                        dimension, keepdim);
-  TensorImpl_preserveReduceDimSemantics(TensorImpl_Unwrap(tgt2_), src_dims,
-                                        dimension, keepdim);
+  TensorImpl_preserveReduceDimSemantics(
+      TensorImpl_Unwrap(tgt1_), src_dims, dimension, keepdim);
+  TensorImpl_preserveReduceDimSemantics(
+      TensorImpl_Unwrap(tgt2_), src_dims, dimension, keepdim);
 
   std::vector<int64_t> dim;
   for (int i = 0; i < src_.dim(); i++)
@@ -249,28 +272,32 @@ reduceDimIndex(at::Tensor &tgt1_, at::Tensor &tgt2_, const at::Tensor &src_,
   }
 
   if (!keepdim) {
-    TensorImpl_squeeze1d(TensorImpl_Unwrap(tgt1_), TensorImpl_Unwrap(tgt1_),
-                         dimension);
-    TensorImpl_squeeze1d(TensorImpl_Unwrap(tgt2_), TensorImpl_Unwrap(tgt2_),
-                         dimension);
+    TensorImpl_squeeze1d(
+        TensorImpl_Unwrap(tgt1_), TensorImpl_Unwrap(tgt1_), dimension);
+    TensorImpl_squeeze1d(
+        TensorImpl_Unwrap(tgt2_), TensorImpl_Unwrap(tgt2_), dimension);
   }
 }
 
-template <typename T, typename Index> struct MaxValuePair {
-  std::pair<T, Index> operator()(const std::pair<T, Index> a,
-                                 const std::pair<T, Index> b) const {
+template <typename T, typename Index>
+struct MaxValuePair {
+  std::pair<T, Index> operator()(
+      const std::pair<T, Index> a,
+      const std::pair<T, Index> b) const {
     return (Numerics<T>::ge(a.first, b.first) || Numerics<T>::isnan(a.first))
-               ? a
-               : b;
+        ? a
+        : b;
   }
 };
 
-template <typename T, typename Index> struct MinValuePair {
-  std::pair<T, Index> operator()(const std::pair<T, Index> a,
-                                 const std::pair<T, Index> b) const {
+template <typename T, typename Index>
+struct MinValuePair {
+  std::pair<T, Index> operator()(
+      const std::pair<T, Index> a,
+      const std::pair<T, Index> b) const {
     return (Numerics<T>::le(a.first, b.first) || Numerics<T>::isnan(a.first))
-               ? a
-               : b;
+        ? a
+        : b;
   }
 };
 

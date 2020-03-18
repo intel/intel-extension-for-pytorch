@@ -32,9 +32,11 @@ DPCPP_DEF_K2(sum_and_scatter_dpcpp, typename scalar_t);
 DPCPP_DEF_K2(EmbeddingbagSycl, typename scalar_t);
 DPCPP_DEF_K2(AccGradParametersKernel_max_Sycl, typename scalar_t);
 
-void krn_partials_per_segment(int64_t *ret, const int64_t *segment_offsets,
-                              int64_t num_of_segments, int64_t numel) {
-
+void krn_partials_per_segment(
+    int64_t* ret,
+    const int64_t* segment_offsets,
+    int64_t num_of_segments,
+    int64_t numel) {
   auto queue = dpcppGetCurrentQueue();
   int64_t group_size = 32;
   auto num_groups = CeilDiv(num_of_segments, group_size);
@@ -58,19 +60,19 @@ void krn_partials_per_segment(int64_t *ret, const int64_t *segment_offsets,
 
     // kick off kernel
     cgh.parallel_for<DPCPP_K(partials_per_segment_dpcpp)>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(total_items),
-                           DPCPP::range<1>(group_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-void krn_partial_segment_offset(int64_t *ret,
-                                const int64_t *partials_per_segment,
-                                const int64_t *partials_per_segment_offset,
-                                const int64_t *segment_offsets,
-                                int64_t num_of_segments) {
-
+void krn_partial_segment_offset(
+    int64_t* ret,
+    const int64_t* partials_per_segment,
+    const int64_t* partials_per_segment_offset,
+    const int64_t* segment_offsets,
+    int64_t num_of_segments) {
   auto queue = dpcppGetCurrentQueue();
   int64_t group_size = 32;
   auto num_groups = CeilDiv(num_of_segments, group_size);
@@ -106,14 +108,14 @@ void krn_partial_segment_offset(int64_t *ret,
 
     // kick off kernel
     cgh.parallel_for<DPCPP_K(partial_segment_offset_dpcpp)>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(total_items),
-                           DPCPP::range<1>(group_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-int64_t exclusive_scan(int64_t *out, int64_t *in, int64_t num_of_segments) {
+int64_t exclusive_scan(int64_t* out, int64_t* in, int64_t num_of_segments) {
   static const auto write_mode = DPCPP::access::mode::write;
   static const auto read_mode = DPCPP::access::mode::read;
   auto in_ptr = dpcppGetBufferMap().template get_buffer<int64_t>(in);
@@ -129,13 +131,21 @@ int64_t exclusive_scan(int64_t *out, int64_t *in, int64_t num_of_segments) {
 
 template <typename scalar_t>
 void compute_grad_weight_bags(
-    int64_t *indices, scalar_t *gradOutput, int64_t *offset2bag, int64_t *count,
-    int64_t numel, int64_t stride, int mode_mean, const int64_t *bag_size,
-    scalar_t *per_sample_weights, int64_t per_sample_weights_stride,
-    int64_t *segment_offsets, int64_t num_of_segments,
-    acc_type<scalar_t, true> *grad_weight_per_segment, bool scale_grad_by_freq,
+    int64_t* indices,
+    scalar_t* gradOutput,
+    int64_t* offset2bag,
+    int64_t* count,
+    int64_t numel,
+    int64_t stride,
+    int mode_mean,
+    const int64_t* bag_size,
+    scalar_t* per_sample_weights,
+    int64_t per_sample_weights_stride,
+    int64_t* segment_offsets,
+    int64_t num_of_segments,
+    acc_type<scalar_t, true>* grad_weight_per_segment,
+    bool scale_grad_by_freq,
     bool per_sample_weight_defined) {
-
   auto queue = dpcppGetCurrentQueue();
   int64_t stride_warped = CeilDiv(stride, WARP_SIZE) * WARP_SIZE;
   int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));
@@ -151,10 +161,9 @@ void compute_grad_weight_bags(
     auto acc_offset2bag = DPCPPAccessor<dpcpp_r_mode>(cgh, offset2bag);
     auto acc_count = DPCPPAccessor<dpcpp_r_mode>(cgh, count);
     auto acc_bag_size = DPCPPAccessor<dpcpp_r_mode>(cgh, bag_size);
-    auto acc_per_sample_weights =
-        per_sample_weight_defined
-            ? DPCPPAccessor<dpcpp_r_mode>(cgh, per_sample_weights)
-            : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer);
+    auto acc_per_sample_weights = per_sample_weight_defined
+        ? DPCPPAccessor<dpcpp_r_mode>(cgh, per_sample_weights)
+        : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer);
     auto acc_segment_offsets =
         DPCPPAccessor<dpcpp_r_mode>(cgh, segment_offsets);
 
@@ -167,10 +176,9 @@ void compute_grad_weight_bags(
       auto offset2bag_ptr = acc_offset2bag.template get_pointer<int64_t>();
       auto count_ptr = acc_count.template get_pointer<int64_t>();
       auto bag_size_ptr = acc_bag_size.template get_pointer<int64_t>();
-      auto per_sample_weights_ptr =
-          per_sample_weight_defined
-              ? acc_per_sample_weights.template get_pointer<scalar_t>()
-              : NULL;
+      auto per_sample_weights_ptr = per_sample_weight_defined
+          ? acc_per_sample_weights.template get_pointer<scalar_t>()
+          : NULL;
       auto segment_offsets_ptr =
           acc_segment_offsets.template get_pointer<int64_t>();
 
@@ -211,20 +219,26 @@ void compute_grad_weight_bags(
 
     // kick off kernel
     cgh.parallel_for<DPCPP_K(compute_grad_weight_bags_dpcpp, scalar_t)>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(total_items),
-                           DPCPP::range<1>(group_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
-void compute_grad_weight(int64_t *indices, int64_t *sort, scalar_t *gradOutput,
-                         int64_t *count, ptrdiff_t numel, int64_t stride,
-                         int64_t *segment_offsets, int64_t num_of_segments,
-                         acc_type<scalar_t, true> *grad_weight_per_segment,
-                         int padding_idx, bool scale_grad_by_fred) {
-
+void compute_grad_weight(
+    int64_t* indices,
+    int64_t* sort,
+    scalar_t* gradOutput,
+    int64_t* count,
+    ptrdiff_t numel,
+    int64_t stride,
+    int64_t* segment_offsets,
+    int64_t num_of_segments,
+    acc_type<scalar_t, true>* grad_weight_per_segment,
+    int padding_idx,
+    bool scale_grad_by_fred) {
   auto queue = dpcppGetCurrentQueue();
   int64_t stride_warped = CeilDiv(stride, WARP_SIZE) * WARP_SIZE;
   int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));
@@ -279,20 +293,23 @@ void compute_grad_weight(int64_t *indices, int64_t *sort, scalar_t *gradOutput,
 
     // kick off kernel
     cgh.parallel_for<DPCPP_K(compute_grad_weight_dpcpp, scalar_t)>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(total_items),
-                           DPCPP::range<1>(group_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
-void sum_and_scatter(int64_t *input, scalar_t *gradWeight, int64_t stride,
-                     int64_t *segment_offsets, int64_t num_of_segments,
-                     const acc_type<scalar_t, true> *grad_weight_per_segment,
-                     const int64_t *segment_sizes_offsets,
-                     int64_t num_of_partial_segments) {
-
+void sum_and_scatter(
+    int64_t* input,
+    scalar_t* gradWeight,
+    int64_t stride,
+    int64_t* segment_offsets,
+    int64_t num_of_segments,
+    const acc_type<scalar_t, true>* grad_weight_per_segment,
+    const int64_t* segment_sizes_offsets,
+    int64_t num_of_partial_segments) {
   auto queue = dpcppGetCurrentQueue();
   int64_t stride_warped = CeilDiv(stride, WARP_SIZE) * WARP_SIZE;
   int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));
@@ -333,8 +350,8 @@ void sum_and_scatter(int64_t *input, scalar_t *gradWeight, int64_t stride,
 
       const int idx_begin = segment_sizes_offsets_ptr[id];
       const int idx_end = (id == num_of_segments - 1)
-                              ? num_of_partial_segments
-                              : segment_sizes_offsets_ptr[id + 1];
+          ? num_of_partial_segments
+          : segment_sizes_offsets_ptr[id + 1];
       acc_type<scalar_t, true> weight = 0;
       for (int idx = idx_begin; idx < idx_end; idx++) {
         weight += grad_weight_per_segment_ptr[idx * stride + startFeature];
@@ -345,20 +362,27 @@ void sum_and_scatter(int64_t *input, scalar_t *gradWeight, int64_t stride,
 
     // kick off kernel
     cgh.parallel_for<DPCPP_K(sum_and_scatter_dpcpp, scalar_t)>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(total_items),
-                           DPCPP::range<1>(group_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 Tensor embedding_bag_backward_dpcpp_kernel(
-    const Tensor &grad, const Tensor &sorted_indices, const Tensor &ind_sort,
-    const Tensor &count, const Tensor &segment_offset, int64_t num_weights,
-    int64_t num_segments, int padding_idx, bool scale_grad_by_freq,
-    bool mode_mean, const Tensor &offset2bag, const Tensor &bag_size,
-    const Tensor &per_sample_weights) {
-
+    const Tensor& grad,
+    const Tensor& sorted_indices,
+    const Tensor& ind_sort,
+    const Tensor& count,
+    const Tensor& segment_offset,
+    int64_t num_weights,
+    int64_t num_segments,
+    int padding_idx,
+    bool scale_grad_by_freq,
+    bool mode_mean,
+    const Tensor& offset2bag,
+    const Tensor& bag_size,
+    const Tensor& per_sample_weights) {
   const int64_t numel = sorted_indices.numel();
   auto grad_weight = at::zeros({num_weights, grad.size(-1)}, grad.options());
   const int64_t stride = grad_weight.stride(0);
@@ -366,27 +390,33 @@ Tensor embedding_bag_backward_dpcpp_kernel(
   auto partials_per_segment =
       at::empty({num_segments}, sorted_indices.options());
 
-  krn_partials_per_segment(partials_per_segment.data_ptr<int64_t>(),
-                           segment_offset.data_ptr<int64_t>(), num_segments,
-                           numel);
+  krn_partials_per_segment(
+      partials_per_segment.data_ptr<int64_t>(),
+      segment_offset.data_ptr<int64_t>(),
+      num_segments,
+      numel);
   auto partials_per_segment_offset =
       at::empty({num_segments}, sorted_indices.options());
 
   // The total number of partial-segments is the sum of
   // `partials_per_segment_offset`
-  auto num_of_partial_segments =
-      exclusive_scan(partials_per_segment_offset.data_ptr<int64_t>(),
-                     partials_per_segment.data_ptr<int64_t>(), num_segments);
+  auto num_of_partial_segments = exclusive_scan(
+      partials_per_segment_offset.data_ptr<int64_t>(),
+      partials_per_segment.data_ptr<int64_t>(),
+      num_segments);
 
   auto partial_segment_offset =
       at::empty({num_of_partial_segments}, sorted_indices.options());
-  krn_partial_segment_offset(partial_segment_offset.data_ptr<int64_t>(),
-                             partials_per_segment.data_ptr<int64_t>(),
-                             partials_per_segment_offset.data_ptr<int64_t>(),
-                             segment_offset.data_ptr<int64_t>(), num_segments);
+  krn_partial_segment_offset(
+      partial_segment_offset.data_ptr<int64_t>(),
+      partials_per_segment.data_ptr<int64_t>(),
+      partials_per_segment_offset.data_ptr<int64_t>(),
+      segment_offset.data_ptr<int64_t>(),
+      num_segments);
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      grad.scalar_type(), "embedding_bag_backward_dpcpp_compute_grad_weight",
+      grad.scalar_type(),
+      "embedding_bag_backward_dpcpp_compute_grad_weight",
       [&] {
         // For numerical stability, the dtype of `grad_weight_per_segment`
         // should match `acc_type`
@@ -402,9 +432,14 @@ Tensor embedding_bag_backward_dpcpp_kernel(
         // Compute the sum of each partial-segment and handle bags
         if (offset2bag.defined()) {
           compute_grad_weight_bags<scalar_t>(
-              sorted_indices.data_ptr<int64_t>(), grad.data_ptr<scalar_t>(),
-              offset2bag.data_ptr<int64_t>(), count.data_ptr<int64_t>(), numel,
-              stride, mode_mean, bag_size.data_ptr<int64_t>(),
+              sorted_indices.data_ptr<int64_t>(),
+              grad.data_ptr<scalar_t>(),
+              offset2bag.data_ptr<int64_t>(),
+              count.data_ptr<int64_t>(),
+              numel,
+              stride,
+              mode_mean,
+              bag_size.data_ptr<int64_t>(),
               per_sample_weights.defined()
                   ? per_sample_weights.data_ptr<scalar_t>()
                   : NULL,
@@ -412,14 +447,20 @@ Tensor embedding_bag_backward_dpcpp_kernel(
               partial_segment_offset.data_ptr<int64_t>(),
               num_of_partial_segments,
               grad_weight_per_segment.data_ptr<partial_weight_t>(),
-              scale_grad_by_freq, per_sample_weights.defined());
+              scale_grad_by_freq,
+              per_sample_weights.defined());
         } else {
           compute_grad_weight<scalar_t>(
-              sorted_indices.data_ptr<int64_t>(), ind_sort.data_ptr<int64_t>(),
-              grad.data_ptr<scalar_t>(), count.data_ptr<int64_t>(), numel,
-              stride, partial_segment_offset.data_ptr<int64_t>(),
+              sorted_indices.data_ptr<int64_t>(),
+              ind_sort.data_ptr<int64_t>(),
+              grad.data_ptr<scalar_t>(),
+              count.data_ptr<int64_t>(),
+              numel,
+              stride,
+              partial_segment_offset.data_ptr<int64_t>(),
               num_of_partial_segments,
-              grad_weight_per_segment.data_ptr<partial_weight_t>(), padding_idx,
+              grad_weight_per_segment.data_ptr<partial_weight_t>(),
+              padding_idx,
               scale_grad_by_freq);
         }
 
@@ -428,8 +469,10 @@ Tensor embedding_bag_backward_dpcpp_kernel(
 
         sum_and_scatter<scalar_t>(
             sorted_indices.data_ptr<int64_t>(),
-            grad_weight.data_ptr<scalar_t>(), stride,
-            segment_offset.data_ptr<int64_t>(), num_segments,
+            grad_weight.data_ptr<scalar_t>(),
+            stride,
+            segment_offset.data_ptr<int64_t>(),
+            num_segments,
             grad_weight_per_segment.data_ptr<partial_weight_t>(),
             partials_per_segment_offset.data_ptr<int64_t>(),
             num_of_partial_segments);
@@ -443,12 +486,21 @@ Tensor embedding_bag_backward_dpcpp_kernel(
 // per_sample_weights are contiguous.
 template <typename scalar_t>
 void EmbeddingBag_updateOutputKernel(
-    int64_t *input, int64_t *offsets, scalar_t *weight, scalar_t *output,
-    int64_t *offset2bag, int64_t numIndices, int64_t numBags,
-    int64_t featureSize, int64_t weight_stide0, int64_t weight_stride1,
-    int mode, int64_t *bag_size, int64_t *max_indices,
-    scalar_t *per_sample_weights, int64_t per_sample_weights_stride) {
-
+    int64_t* input,
+    int64_t* offsets,
+    scalar_t* weight,
+    scalar_t* output,
+    int64_t* offset2bag,
+    int64_t numIndices,
+    int64_t numBags,
+    int64_t featureSize,
+    int64_t weight_stide0,
+    int64_t weight_stride1,
+    int mode,
+    int64_t* bag_size,
+    int64_t* max_indices,
+    scalar_t* per_sample_weights,
+    int64_t per_sample_weights_stride) {
   // the strategy here is that each bag x feature is handled by a single thread
 
   using accscalar_t = acc_type<scalar_t, true>;
@@ -466,13 +518,12 @@ void EmbeddingBag_updateOutputKernel(
     auto output_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, output);
     auto offset2bag_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, offset2bag);
     auto bag_size_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, bag_size);
-    auto per_sample_weights_acc =
-        per_sample_weights_defined
-            ? DPCPPAccessor<dpcpp_r_mode>(cgh, per_sample_weights)
-            : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer);
+    auto per_sample_weights_acc = per_sample_weights_defined
+        ? DPCPPAccessor<dpcpp_r_mode>(cgh, per_sample_weights)
+        : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer);
     auto max_indices_acc = mode == MODE_MAX
-                               ? DPCPPAccessor<dpcpp_w_mode>(cgh, max_indices)
-                               : DPCPPAccessor<dpcpp_w_mode>(cgh, dummy_buffer);
+        ? DPCPPAccessor<dpcpp_w_mode>(cgh, max_indices)
+        : DPCPPAccessor<dpcpp_w_mode>(cgh, dummy_buffer);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
       auto input_ptr = in_acc.template get_pointer<int64_t>();
@@ -481,24 +532,23 @@ void EmbeddingBag_updateOutputKernel(
       auto output_ptr = output_acc.template get_pointer<scalar_t>();
       auto offset2bag_ptr = offset2bag_acc.template get_pointer<int64_t>();
       auto bag_size_ptr = bag_size_acc.template get_pointer<int64_t>();
-      auto per_sample_weights_ptr =
-          per_sample_weights_defined
-              ? per_sample_weights_acc.template get_pointer<scalar_t>()
-              : NULL;
-      auto max_indices_ptr =
-          mode == MODE_MAX ? max_indices_acc.template get_pointer<int64_t>()
-                           : NULL;
+      auto per_sample_weights_ptr = per_sample_weights_defined
+          ? per_sample_weights_acc.template get_pointer<scalar_t>()
+          : NULL;
+      auto max_indices_ptr = mode == MODE_MAX
+          ? max_indices_acc.template get_pointer<int64_t>()
+          : NULL;
 
       int64_t chunkOffset = item.get_group()[0] * item.get_local_range()[1] +
-                            item.get_local_id()[1];
+          item.get_local_id()[1];
 
       for (int64_t chunk = chunkOffset; chunk < numChunks;
            chunk += item.get_group_range()[0] * item.get_global_range()[1]) {
         int64_t featureDim = (chunk % chunksPerBag) * item.get_local_range(0) +
-                             item.get_local_id(0);
+            item.get_local_id(0);
         if (featureDim < featureSize) {
           int64_t bag = chunk / chunksPerBag;
-          scalar_t *weightFeat = weight_ptr + featureDim * weight_stride1;
+          scalar_t* weightFeat = weight_ptr + featureDim * weight_stride1;
           int64_t begin = offsets_ptr[bag];
           int64_t end =
               (bag < numBags - 1) ? (offsets_ptr[bag + 1]) : numIndices;
@@ -560,14 +610,14 @@ void EmbeddingBag_updateOutputKernel(
 
     // kick off kernel
     cgh.parallel_for<DPCPP_K(EmbeddingbagSycl, scalar_t)>(
-        DPCPP::nd_range<2>(DPCPP::range<2>(kernel_range, 4),
-                           DPCPP::range<2>(64, 4)),
+        DPCPP::nd_range<2>(
+            DPCPP::range<2>(kernel_range, 4), DPCPP::range<2>(64, 4)),
         kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-void compute_counts(int64_t *counts, int64_t *indice, int64_t indice_length) {
+void compute_counts(int64_t* counts, int64_t* indice, int64_t indice_length) {
   static const auto write_mode = DPCPP::access::mode::write;
   static const auto read_mode = DPCPP::access::mode::read;
   auto in_ptr = dpcppGetBufferMap().template get_buffer<int64_t>(indice);
@@ -588,8 +638,11 @@ void compute_counts(int64_t *counts, int64_t *indice, int64_t indice_length) {
 //
 // The unique indices can be found at index 0, 3, 4, 6.
 
-int64_t compute_counts_uniq(int64_t *counts_uniq, int64_t *indice,
-                            int64_t *counts, int64_t indices_length) {
+int64_t compute_counts_uniq(
+    int64_t* counts_uniq,
+    int64_t* indice,
+    int64_t* counts,
+    int64_t indices_length) {
   static const auto write_mode = DPCPP::access::mode::write;
   static const auto read_mode = DPCPP::access::mode::read;
   auto in_ptr = dpcppGetBufferMap().template get_buffer<int64_t>(indice);
@@ -611,11 +664,16 @@ int64_t compute_counts_uniq(int64_t *counts_uniq, int64_t *indice,
 }
 
 Tensor embedding_bag_backward_dpcpp_sum_avg(
-    const Tensor &grad, const Tensor &indices_, const Tensor &offsets_,
-    const Tensor &offset2bag__, const Tensor &bag_size, int64_t num_weights,
-    bool scale_grad_by_freq, int64_t mode, const Tensor &per_sample_weights__) {
-
-  Tensor &offset2bag_ = const_cast<Tensor &>(offset2bag__);
+    const Tensor& grad,
+    const Tensor& indices_,
+    const Tensor& offsets_,
+    const Tensor& offset2bag__,
+    const Tensor& bag_size,
+    int64_t num_weights,
+    bool scale_grad_by_freq,
+    int64_t mode,
+    const Tensor& per_sample_weights__) {
+  Tensor& offset2bag_ = const_cast<Tensor&>(offset2bag__);
 
   auto ind_sort_ = indices_.sort();
   auto indices = std::get<0>(ind_sort_);
@@ -624,35 +682,47 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
 
   Tensor per_sample_weights;
   if (per_sample_weights__.defined()) {
-    Tensor &per_sample_weights_ = const_cast<Tensor &>(per_sample_weights__);
+    Tensor& per_sample_weights_ = const_cast<Tensor&>(per_sample_weights__);
     per_sample_weights = per_sample_weights_.index_select(0, ind_sort);
   }
 
   Tensor counts = at::zeros({num_weights}, indices.options());
   int64_t numel = indices.numel();
-  compute_counts(counts.data_ptr<int64_t>(), indices.data_ptr<int64_t>(),
-                 numel);
+  compute_counts(
+      counts.data_ptr<int64_t>(), indices.data_ptr<int64_t>(), numel);
 
   Tensor next_unique_index_idx = at::empty_like(indices);
   int64_t num_segments;
-  num_segments = compute_counts_uniq(next_unique_index_idx.data_ptr<int64_t>(),
-                                     indices.data_ptr<int64_t>(),
-                                     counts.data_ptr<int64_t>(), numel);
+  num_segments = compute_counts_uniq(
+      next_unique_index_idx.data_ptr<int64_t>(),
+      indices.data_ptr<int64_t>(),
+      counts.data_ptr<int64_t>(),
+      numel);
 
   return embedding_bag_backward_dpcpp_kernel(
-      grad, indices, ind_sort, counts, next_unique_index_idx, num_weights,
+      grad,
+      indices,
+      ind_sort,
+      counts,
+      next_unique_index_idx,
+      num_weights,
       num_segments,
-      /* padding_idx= */ -1, scale_grad_by_freq, mode == MODE_MEAN, offset2bag,
-      bag_size, per_sample_weights__.defined() ? per_sample_weights
-                                               : per_sample_weights__);
+      /* padding_idx= */ -1,
+      scale_grad_by_freq,
+      mode == MODE_MEAN,
+      offset2bag,
+      bag_size,
+      per_sample_weights__.defined() ? per_sample_weights
+                                     : per_sample_weights__);
 }
 
 template <typename scalar_t>
-void EmbeddingBag_accGradParametersKernel_max(int64_t *max_indices,
-                                              scalar_t *gradOutput,
-                                              scalar_t *gradWeight,
-                                              int64_t stride, int64_t numBags) {
-
+void EmbeddingBag_accGradParametersKernel_max(
+    int64_t* max_indices,
+    scalar_t* gradOutput,
+    scalar_t* gradWeight,
+    int64_t stride,
+    int64_t numBags) {
   using accscalar_t = acc_type<scalar_t, true>;
   auto queue = dpcppGetCurrentQueue();
   int64_t chunksPerBag = CeilDiv(stride, (int64_t)64);
@@ -670,20 +740,21 @@ void EmbeddingBag_accGradParametersKernel_max(int64_t *max_indices,
       auto gradWeight_ptr = gradWeight_acc.template get_pointer<scalar_t>();
 
       int64_t chunkOffset = item.get_group()[0] * item.get_local_range()[1] +
-                            item.get_local_id()[1];
+          item.get_local_id()[1];
 
       for (int64_t chunk = chunkOffset; chunk < numChunks;
            chunk += item.get_group_range()[0] * item.get_global_range()[1]) {
         int64_t featureDim = (chunk % chunksPerBag) * item.get_local_range(0) +
-                             item.get_local_id(0);
+            item.get_local_id(0);
         if (featureDim < stride) {
           int64_t bag = chunk / chunksPerBag;
 
           int64_t word_idx = max_indices_ptr[bag * stride + featureDim];
           if (word_idx >= 0) {
             // If bag is empty, we have max_indices[idx] set to -1 in forward.
-            atomicAdd(&(gradWeight_ptr[word_idx * stride + featureDim]),
-                      gradOutput_ptr[bag * stride + featureDim]);
+            atomicAdd(
+                &(gradWeight_ptr[word_idx * stride + featureDim]),
+                gradOutput_ptr[bag * stride + featureDim]);
           }
         }
       }
@@ -691,17 +762,17 @@ void EmbeddingBag_accGradParametersKernel_max(int64_t *max_indices,
 
     // kick off kernel
     cgh.parallel_for<DPCPP_K(AccGradParametersKernel_max_Sycl, scalar_t)>(
-        DPCPP::nd_range<2>(DPCPP::range<2>(kernel_range, 4),
-                           DPCPP::range<2>(64, 4)),
+        DPCPP::nd_range<2>(
+            DPCPP::range<2>(kernel_range, 4), DPCPP::range<2>(64, 4)),
         kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-Tensor embedding_bag_backward_dpcpp_max(const Tensor &grad,
-                                        const Tensor &max_indices,
-                                        int64_t num_weights) {
-
+Tensor embedding_bag_backward_dpcpp_max(
+    const Tensor& grad,
+    const Tensor& max_indices,
+    int64_t num_weights) {
   auto grad_weight = at::zeros({num_weights, grad.size(1)}, grad.options());
 
   int64_t stride = grad_weight.stride(0);
@@ -710,8 +781,11 @@ Tensor embedding_bag_backward_dpcpp_max(const Tensor &grad,
 
   // for atomicAdd, only support float datatype.
   EmbeddingBag_accGradParametersKernel_max<float>(
-      max_indices.data_ptr<int64_t>(), grad.data_ptr<float>(),
-      grad_weight.data_ptr<float>(), stride, numBags);
+      max_indices.data_ptr<int64_t>(),
+      grad.data_ptr<float>(),
+      grad_weight.data_ptr<float>(),
+      stride,
+      numBags);
 
   return grad_weight;
 }
@@ -719,11 +793,14 @@ Tensor embedding_bag_backward_dpcpp_max(const Tensor &grad,
 // Assumes all input tensors are contiguous.
 // See NOTE [ embedding_bag Native Functions ] in native_functions.yaml for
 // details
-std::tuple<Tensor, Tensor, Tensor, Tensor>
-_embedding_bag_dpcpp(const Tensor &weight, const Tensor &indices,
-                     const Tensor &offsets, const bool scale_grad_by_freq,
-                     const int64_t mode, bool sparse,
-                     const Tensor &per_sample_weights) {
+std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
+    const Tensor& weight,
+    const Tensor& indices,
+    const Tensor& offsets,
+    const bool scale_grad_by_freq,
+    const int64_t mode,
+    bool sparse,
+    const Tensor& per_sample_weights) {
   auto indices_arg = TensorArg(indices, "indices", 1);
   checkScalarType("embedding_bag_dpcpp", indices_arg, kLong);
   auto offsets_arg = TensorArg(offsets, "offsets", 1);
@@ -737,8 +814,9 @@ _embedding_bag_dpcpp(const Tensor &weight, const Tensor &indices,
   int64_t featureSize = weight.size(1);
 
   auto bag_size = at::zeros(offsets.sizes(), indices.options());
-  auto offset2bag = at::zeros({indices.size(0)},
-                              indices.options()); // offset2bag = [0 0 0 0 0]
+  auto offset2bag = at::zeros(
+      {indices.size(0)},
+      indices.options()); // offset2bag = [0 0 0 0 0]
 
   auto output = at::zeros({offsets.size(0), weight.size(1)}, weight.options());
 
@@ -749,10 +827,17 @@ _embedding_bag_dpcpp(const Tensor &weight, const Tensor &indices,
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
       weight.scalar_type(), "embedding_bag_dpcpp", [&] {
         EmbeddingBag_updateOutputKernel<scalar_t>(
-            indices.data_ptr<int64_t>(), offsets.data_ptr<int64_t>(),
-            weight.data_ptr<scalar_t>(), output.data_ptr<scalar_t>(),
-            offset2bag.data_ptr<int64_t>(), numIndices, numBags, featureSize,
-            weight.stride(0), weight.stride(1), mode,
+            indices.data_ptr<int64_t>(),
+            offsets.data_ptr<int64_t>(),
+            weight.data_ptr<scalar_t>(),
+            output.data_ptr<scalar_t>(),
+            offset2bag.data_ptr<int64_t>(),
+            numIndices,
+            numBags,
+            featureSize,
+            weight.stride(0),
+            weight.stride(1),
+            mode,
             bag_size.data_ptr<int64_t>(),
             mode == MODE_MAX ? max_indices.data_ptr<int64_t>() : NULL,
             per_sample_weights.defined()
@@ -761,54 +846,90 @@ _embedding_bag_dpcpp(const Tensor &weight, const Tensor &indices,
             per_sample_weights.defined() ? per_sample_weights.stride(0) : 0);
       });
 
-  return std::tuple<Tensor, Tensor, Tensor, Tensor>(output, offset2bag,
-                                                    bag_size, max_indices);
+  return std::tuple<Tensor, Tensor, Tensor, Tensor>(
+      output, offset2bag, bag_size, max_indices);
 }
 
 Tensor _embedding_bag_dense_backward_dpcpp(
-    const Tensor &grad_, const Tensor &indices, const Tensor &offsets,
-    const Tensor &offset2bag, const Tensor &bag_size_,
-    const Tensor &max_indices, int64_t num_weights, bool scale_grad_by_freq,
-    int64_t mode, const Tensor &per_sample_weights) {
+    const Tensor& grad_,
+    const Tensor& indices,
+    const Tensor& offsets,
+    const Tensor& offset2bag,
+    const Tensor& bag_size_,
+    const Tensor& max_indices,
+    int64_t num_weights,
+    bool scale_grad_by_freq,
+    int64_t mode,
+    const Tensor& per_sample_weights) {
   Tensor grad = grad_.contiguous();
 
   switch (mode) {
-  case MODE_SUM:
-  case MODE_MEAN:
-    if (mode == MODE_MEAN)
+    case MODE_SUM:
+    case MODE_MEAN:
+      if (mode == MODE_MEAN)
+        AT_ASSERT(!per_sample_weights.defined());
+      return embedding_bag_backward_dpcpp_sum_avg(
+          grad,
+          indices,
+          offsets,
+          offset2bag,
+          bag_size_,
+          num_weights,
+          scale_grad_by_freq,
+          mode,
+          per_sample_weights);
+
+    case MODE_MAX:
       AT_ASSERT(!per_sample_weights.defined());
-    return embedding_bag_backward_dpcpp_sum_avg(
-        grad, indices, offsets, offset2bag, bag_size_, num_weights,
-        scale_grad_by_freq, mode, per_sample_weights);
+      return embedding_bag_backward_dpcpp_max(grad, max_indices, num_weights);
 
-  case MODE_MAX:
-    AT_ASSERT(!per_sample_weights.defined());
-    return embedding_bag_backward_dpcpp_max(grad, max_indices, num_weights);
-
-  default:
-    AT_ERROR("Unknown mode for embedding_bag_backward_dpcpp ", mode);
+    default:
+      AT_ERROR("Unknown mode for embedding_bag_backward_dpcpp ", mode);
   }
 }
 
 } // impl
 
-std::tuple<Tensor, Tensor, Tensor, Tensor>
-_embedding_bag(const Tensor &weight, const Tensor &indices,
-               const Tensor &offsets, bool scale_grad_by_freq, int64_t mode,
-               bool sparse, const Tensor &per_sample_weights) {
-  return impl::_embedding_bag_dpcpp(weight, indices, offsets,
-                                    scale_grad_by_freq, mode, sparse,
-                                    per_sample_weights);
+std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag(
+    const Tensor& weight,
+    const Tensor& indices,
+    const Tensor& offsets,
+    bool scale_grad_by_freq,
+    int64_t mode,
+    bool sparse,
+    const Tensor& per_sample_weights) {
+  return impl::_embedding_bag_dpcpp(
+      weight,
+      indices,
+      offsets,
+      scale_grad_by_freq,
+      mode,
+      sparse,
+      per_sample_weights);
 }
 
 Tensor _embedding_bag_dense_backward(
-    const Tensor &grad, const Tensor &indices, const Tensor &offsets,
-    const Tensor &offset2bag, const Tensor &bag_size,
-    const Tensor &maximum_indices, int64_t num_weights, bool scale_grad_by_freq,
-    int64_t mode, const Tensor &per_sample_weights) {
+    const Tensor& grad,
+    const Tensor& indices,
+    const Tensor& offsets,
+    const Tensor& offset2bag,
+    const Tensor& bag_size,
+    const Tensor& maximum_indices,
+    int64_t num_weights,
+    bool scale_grad_by_freq,
+    int64_t mode,
+    const Tensor& per_sample_weights) {
   return impl::_embedding_bag_dense_backward_dpcpp(
-      grad, indices, offsets, offset2bag, bag_size, maximum_indices,
-      num_weights, scale_grad_by_freq, mode, per_sample_weights);
+      grad,
+      indices,
+      offsets,
+      offset2bag,
+      bag_size,
+      maximum_indices,
+      num_weights,
+      scale_grad_by_freq,
+      mode,
+      per_sample_weights);
 }
 
 } // namespace AtenIpexTypeDPCPP

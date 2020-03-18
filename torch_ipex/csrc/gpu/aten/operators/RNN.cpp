@@ -12,12 +12,17 @@ using namespace at::dpcpp;
 namespace at {
 namespace AtenIpexTypeDPCPP {
 
-std::tuple<Tensor, Tensor, Tensor>
-_dpcpp_impl(const Tensor &input, const Tensor &hx_, const Tensor &cx_,
-            TensorList params, bool has_biases, int64_t num_layers_,
-            double dropout_p, bool train, bool bidirectional,
-            bool batch_first) {
-
+std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
+    const Tensor& input,
+    const Tensor& hx_,
+    const Tensor& cx_,
+    TensorList params,
+    bool has_biases,
+    int64_t num_layers_,
+    double dropout_p,
+    bool train,
+    bool bidirectional,
+    bool batch_first) {
   TORCH_CHECK(!batch_first, "_mkldnn_rnn: don't support batch first input");
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
@@ -81,16 +86,16 @@ _dpcpp_impl(const Tensor &input, const Tensor &hx_, const Tensor &cx_,
   auto format_ldigo = memory::format_tag::ldigo;
   auto format_ldgo = memory::format_tag::ldgo;
 
-  memory::dims weights_layer_0_dims = {1, 1, input_size, num_gate,
-                                       hidden_size}; // layer = 0
-  memory::dims weights_layer_1_dims = {1, 1, hidden_size * num_directions,
-                                       num_gate, hidden_size};
+  memory::dims weights_layer_0_dims = {
+      1, 1, input_size, num_gate, hidden_size}; // layer = 0
+  memory::dims weights_layer_1_dims = {
+      1, 1, hidden_size * num_directions, num_gate, hidden_size};
   memory::dims weights_iter_dims = {1, 1, hidden_size, num_gate, hidden_size};
   memory::dims bias_dims = {1, 1, num_gate, hidden_size};
-  memory::dims src_layer_0_dims = {seq_length, mini_batch,
-                                   input_size}; // layer = 0
-  memory::dims src_layer_1_dims = {seq_length, mini_batch,
-                                   hidden_size * num_directions};
+  memory::dims src_layer_0_dims = {
+      seq_length, mini_batch, input_size}; // layer = 0
+  memory::dims src_layer_1_dims = {
+      seq_length, mini_batch, hidden_size * num_directions};
   memory::dims src_iter_dims = {1, 1, mini_batch, hidden_size};
   memory::dims src_iter_c_dims = {1, 1, mini_batch, hidden_size};
   memory::dims dst_layer_dims = {seq_length, mini_batch, hidden_size};
@@ -137,10 +142,20 @@ _dpcpp_impl(const Tensor &input, const Tensor &hx_, const Tensor &cx_,
           memory::desc({dst_iter_c_dims}, data_t, memory::format_tag::any);
 
       std::shared_ptr<lstm_forward::desc> lstm_forward_desc;
-      lstm_forward_desc.reset(new lstm_forward::desc(
-          prop_kind::forward_inference, dir, src_layer_md, src_iter_md,
-          src_iter_c_md, weights_layer_md, weights_iter_md, bias_md,
-          dst_layer_md, dst_iter_md, dst_iter_c_md, rnn_flags::undef));
+      lstm_forward_desc.reset(
+          new lstm_forward::desc(
+              prop_kind::forward_inference,
+              dir,
+              src_layer_md,
+              src_iter_md,
+              src_iter_c_md,
+              weights_layer_md,
+              weights_iter_md,
+              bias_md,
+              dst_layer_md,
+              dst_iter_md,
+              dst_iter_c_md,
+              rnn_flags::undef));
 
       std::shared_ptr<lstm_forward::primitive_desc> lstm_forward_pd;
       lstm_forward_pd.reset(
@@ -148,13 +163,13 @@ _dpcpp_impl(const Tensor &input, const Tensor &hx_, const Tensor &cx_,
 
       auto weights_layer_usr_memory =
           memory({{{weights_layer_dims}, data_t, format_ldigo}, engine});
-      dpcpp_set_mkldnn_buffer(weight_arr_i[index].data_ptr(),
-                              weights_layer_usr_memory);
+      dpcpp_set_mkldnn_buffer(
+          weight_arr_i[index].data_ptr(), weights_layer_usr_memory);
 
       auto weights_iter_usr_memory =
           memory({{{weights_iter_dims}, data_t, format_ldigo}, engine});
-      dpcpp_set_mkldnn_buffer(weight_arr_h[index].data_ptr(),
-                              weights_iter_usr_memory);
+      dpcpp_set_mkldnn_buffer(
+          weight_arr_h[index].data_ptr(), weights_iter_usr_memory);
 
       auto bias_usr_memory =
           memory({{{bias_dims}, data_t, format_ldgo}, engine});
@@ -170,13 +185,13 @@ _dpcpp_impl(const Tensor &input, const Tensor &hx_, const Tensor &cx_,
 
       auto src_iter_c_usr_memory =
           memory({{{src_iter_c_dims}, data_t, format_ldnc}, engine});
-      dpcpp_set_mkldnn_buffer(layer_cx[index].data_ptr(),
-                              src_iter_c_usr_memory);
+      dpcpp_set_mkldnn_buffer(
+          layer_cx[index].data_ptr(), src_iter_c_usr_memory);
 
       auto dst_layer_usr_memory =
           memory({{{dst_layer_dims}, data_t, format_tnc}, engine});
-      dpcpp_set_mkldnn_buffer(layer_y[direction].data_ptr(),
-                              dst_layer_usr_memory);
+      dpcpp_set_mkldnn_buffer(
+          layer_y[direction].data_ptr(), dst_layer_usr_memory);
 
       auto dst_iter_usr_memory =
           memory({{{dst_iter_dims}, data_t, format_ldnc}, engine});
@@ -260,16 +275,17 @@ _dpcpp_impl(const Tensor &input, const Tensor &hx_, const Tensor &cx_,
 
       std::shared_ptr<lstm_forward> lstm1_forward;
       lstm1_forward.reset(new lstm_forward(*lstm_forward_pd));
-      lstm1_forward->execute(strm,
-                             {{DNNL_ARG_SRC_LAYER, src_layer_memory},
-                              {DNNL_ARG_SRC_ITER, src_iter_memory},
-                              {DNNL_ARG_SRC_ITER_C, src_iter_c_memory},
-                              {DNNL_ARG_WEIGHTS_LAYER, weights_layer_memory},
-                              {DNNL_ARG_WEIGHTS_ITER, weights_iter_memory},
-                              {DNNL_ARG_BIAS, bias_memory},
-                              {DNNL_ARG_DST_LAYER, dst_layer_memory},
-                              {DNNL_ARG_DST_ITER, dst_iter_memory},
-                              {DNNL_ARG_DST_ITER_C, dst_iter_c_memory}});
+      lstm1_forward->execute(
+          strm,
+          {{DNNL_ARG_SRC_LAYER, src_layer_memory},
+           {DNNL_ARG_SRC_ITER, src_iter_memory},
+           {DNNL_ARG_SRC_ITER_C, src_iter_c_memory},
+           {DNNL_ARG_WEIGHTS_LAYER, weights_layer_memory},
+           {DNNL_ARG_WEIGHTS_ITER, weights_iter_memory},
+           {DNNL_ARG_BIAS, bias_memory},
+           {DNNL_ARG_DST_LAYER, dst_layer_memory},
+           {DNNL_ARG_DST_ITER, dst_iter_memory},
+           {DNNL_ARG_DST_ITER_C, dst_iter_c_memory}});
 
       if (dst_layer_memory != dst_layer_usr_memory) {
         reorder(dst_layer_memory, dst_layer_usr_memory)
@@ -302,12 +318,30 @@ _dpcpp_impl(const Tensor &input, const Tensor &hx_, const Tensor &cx_,
   return std::make_tuple(output, hy, cy);
 }
 
-void lstm_dpcpp(Tensor &output, Tensor &hy, Tensor &cy, const Tensor &input,
-                TensorList hx, TensorList params, bool has_biases,
-                int64_t num_layers, double dropout_p, bool train,
-                bool bidirectional, bool batch_first) {
-  auto result = _dpcpp_impl(input, hx[0], hx[1], params, has_biases, num_layers,
-                            dropout_p, train, bidirectional, batch_first);
+void lstm_dpcpp(
+    Tensor& output,
+    Tensor& hy,
+    Tensor& cy,
+    const Tensor& input,
+    TensorList hx,
+    TensorList params,
+    bool has_biases,
+    int64_t num_layers,
+    double dropout_p,
+    bool train,
+    bool bidirectional,
+    bool batch_first) {
+  auto result = _dpcpp_impl(
+      input,
+      hx[0],
+      hx[1],
+      params,
+      has_biases,
+      num_layers,
+      dropout_p,
+      train,
+      bidirectional,
+      batch_first);
   std::tie(output, hy, cy) = result;
 }
 }

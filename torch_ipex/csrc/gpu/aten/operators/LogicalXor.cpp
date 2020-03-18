@@ -9,7 +9,7 @@ namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 DPCPP_DEF_K1(logical_xor);
-static void logical_xor_kernel(TensorIterator &iter) {
+static void logical_xor_kernel(TensorIterator& iter) {
   AT_DISPATCH_ALL_TYPES_AND2(
       kBool, kHalf, iter.dtype(1), "logical_xor_dpcpp", [&]() {
         using self_t = scalar_t;
@@ -18,8 +18,8 @@ static void logical_xor_kernel(TensorIterator &iter) {
               using other_t = scalar_t;
               AT_DISPATCH_ALL_TYPES_AND2(
                   kBool, kHalf, iter.dtype(0), "logical_xor_dpcpp", [&]() {
-                    dpcpp_kernel_for_tensor_iter<DPCPP_K(logical_xor, self_t,
-                                                         other_t)>(
+                    dpcpp_kernel_for_tensor_iter<DPCPP_K(
+                        logical_xor, self_t, other_t)>(
                         iter, [](self_t a, other_t b) -> scalar_t {
                           return static_cast<scalar_t>(bool(a) != bool(b));
                         });
@@ -30,8 +30,10 @@ static void logical_xor_kernel(TensorIterator &iter) {
 
 } // namespace impl
 
-Tensor &logical_xor_out(Tensor &result, const Tensor &self,
-                        const Tensor &other) {
+Tensor& logical_xor_out(
+    Tensor& result,
+    const Tensor& self,
+    const Tensor& other) {
   TensorIterator iter;
   iter.dont_compute_common_dtype();
   iter.set_check_mem_overlap(true);

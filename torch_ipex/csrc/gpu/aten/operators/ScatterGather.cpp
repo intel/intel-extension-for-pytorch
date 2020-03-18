@@ -16,16 +16,20 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-#define RUN(TYPE, DIMS, REAL)                                                  \
-  THDPCPPTensor_gatherKernel<TYPE, REAL, DIMS>(tensorInfo, srcInfo, indexInfo, \
-                                               dim, (TYPE)totalElements);
+#define RUN(TYPE, DIMS, REAL)                   \
+  THDPCPPTensor_gatherKernel<TYPE, REAL, DIMS>( \
+      tensorInfo, srcInfo, indexInfo, dim, (TYPE)totalElements);
 
 template <typename scalar_t>
-void Gather(Tensor &tensor, const Tensor &src, int64_t dim,
-            const Tensor &index) {
-  TORCH_CHECK(TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(index)) ==
-                  TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(src)),
-              "Index tensor must have same dimensions as input tensor");
+void Gather(
+    Tensor& tensor,
+    const Tensor& src,
+    int64_t dim,
+    const Tensor& index) {
+  TORCH_CHECK(
+      TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(index)) ==
+          TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(src)),
+      "Index tensor must have same dimensions as input tensor");
   TORCH_CHECK(
       TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(index)) ==
           TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)),
@@ -51,9 +55,10 @@ void Gather(Tensor &tensor, const Tensor &src, int64_t dim,
     }
   }
 
-  TORCH_CHECK(TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)) <=
-                  MAX_DPCPPTORCH_DIMS,
-              DPCPPTORCH_DIM_WARNING);
+  TORCH_CHECK(
+      TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)) <=
+          MAX_DPCPPTORCH_DIMS,
+      DPCPPTORCH_DIM_WARNING);
 
   const ptrdiff_t totalElements = index.numel();
 
@@ -74,18 +79,18 @@ void Gather(Tensor &tensor, const Tensor &src, int64_t dim,
           getTensorInfo<int64_t, unsigned int>(index);
       // Specialize for a small number of dimensions.
       switch (indexInfo.dims) {
-      case 1:
-        RUN(unsigned int, 1, scalar_t);
-        break;
-      case 2:
-        RUN(unsigned int, 2, scalar_t);
-        break;
-      case 3:
-        RUN(unsigned int, 3, scalar_t);
-        break;
-      default:
-        RUN(unsigned int, -1, scalar_t);
-        break;
+        case 1:
+          RUN(unsigned int, 1, scalar_t);
+          break;
+        case 2:
+          RUN(unsigned int, 2, scalar_t);
+          break;
+        case 3:
+          RUN(unsigned int, 3, scalar_t);
+          break;
+        default:
+          RUN(unsigned int, -1, scalar_t);
+          break;
       }
     } else {
       TensorInfo<scalar_t, uint64_t> tensorInfo =
@@ -108,13 +113,16 @@ void Gather(Tensor &tensor, const Tensor &src, int64_t dim,
 
 #undef RUN
 
-#define RUN(TYPE, DIMS, REAL)                                                  \
-  THSyclTensor_scatterKernel<TYPE, REAL, DIMS>(tensorInfo, srcInfo, indexInfo, \
-                                               dim, (TYPE)totalElements);
+#define RUN(TYPE, DIMS, REAL)                   \
+  THSyclTensor_scatterKernel<TYPE, REAL, DIMS>( \
+      tensorInfo, srcInfo, indexInfo, dim, (TYPE)totalElements);
 
 template <typename scalar_t>
-void Scatter(Tensor &tensor, int64_t dim, const Tensor &index,
-             const Tensor &src) {
+void Scatter(
+    Tensor& tensor,
+    int64_t dim,
+    const Tensor& index,
+    const Tensor& src) {
   int index_ndim_legacy_all =
       TensorImpl_nDimensionLegacyAll(TensorImpl_Unwrap(index));
   TORCH_CHECK(
@@ -142,18 +150,24 @@ void Scatter(Tensor &tensor, int64_t dim, const Tensor &index,
     int64_t indexSizeD =
         TensorImpl_sizeLegacyNoScalars(TensorImpl_Unwrap(index), d);
     if (d != dim) {
-      TORCH_CHECK(indexSizeD <= TensorImpl_sizeLegacyNoScalars(
-                                    TensorImpl_Unwrap(tensor), d),
-                  "Index tensor must not have larger size than output tensor "
-                  "apart from the specified dimension ",
-                  dim, ", but got index ", index.sizes(), " output ",
-                  tensor.sizes());
+      TORCH_CHECK(
+          indexSizeD <=
+              TensorImpl_sizeLegacyNoScalars(TensorImpl_Unwrap(tensor), d),
+          "Index tensor must not have larger size than output tensor "
+          "apart from the specified dimension ",
+          dim,
+          ", but got index ",
+          index.sizes(),
+          " output ",
+          tensor.sizes());
     }
-    TORCH_CHECK(indexSizeD <=
-                    TensorImpl_sizeLegacyNoScalars(TensorImpl_Unwrap(src), d),
-                "Index tensor must not have larger size than input tensor, but "
-                "got index ",
-                index.sizes(), "input", src.sizes());
+    TORCH_CHECK(
+        indexSizeD <= TensorImpl_sizeLegacyNoScalars(TensorImpl_Unwrap(src), d),
+        "Index tensor must not have larger size than input tensor, but "
+        "got index ",
+        index.sizes(),
+        "input",
+        src.sizes());
   }
 
   TORCH_CHECK(tensor.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
@@ -177,18 +191,18 @@ void Scatter(Tensor &tensor, int64_t dim, const Tensor &index,
           getTensorInfo<int64_t, unsigned int>(index);
       // Specialize for a small number of dimensions.
       switch (indexInfo.dims) {
-      case 1:
-        RUN(unsigned int, 1, scalar_t);
-        break;
-      case 2:
-        RUN(unsigned int, 2, scalar_t);
-        break;
-      case 3:
-        RUN(unsigned int, 3, scalar_t);
-        break;
-      default:
-        RUN(unsigned int, -1, scalar_t);
-        break;
+        case 1:
+          RUN(unsigned int, 1, scalar_t);
+          break;
+        case 2:
+          RUN(unsigned int, 2, scalar_t);
+          break;
+        case 3:
+          RUN(unsigned int, 3, scalar_t);
+          break;
+        default:
+          RUN(unsigned int, -1, scalar_t);
+          break;
       }
     } else {
       TensorInfo<scalar_t, uint64_t> tensorInfo =
@@ -211,14 +225,16 @@ void Scatter(Tensor &tensor, int64_t dim, const Tensor &index,
 
 #undef RUN
 
-#define RUN(TYPE, DIMS, REAL)                                                  \
-  THSyclTensor_scatterFillKernel<TYPE, REAL, DIMS>(                            \
+#define RUN(TYPE, DIMS, REAL)                       \
+  THSyclTensor_scatterFillKernel<TYPE, REAL, DIMS>( \
       tensorInfo, indexInfo, value, dim, (TYPE)totalElements);
 
 template <typename scalar_t>
-void ScatterFill(Tensor &tensor, int64_t dim, const Tensor &index,
-                 Scalar value_scalar) {
-
+void ScatterFill(
+    Tensor& tensor,
+    int64_t dim,
+    const Tensor& index,
+    Scalar value_scalar) {
   int index_ndim_legacy_all =
       TensorImpl_nDimensionLegacyAll(TensorImpl_Unwrap(index));
   TORCH_CHECK(
@@ -243,12 +259,16 @@ void ScatterFill(Tensor &tensor, int64_t dim, const Tensor &index,
     int64_t indexSizeD =
         TensorImpl_sizeLegacyNoScalars(TensorImpl_Unwrap(index), d);
     if (d != dim) {
-      TORCH_CHECK(indexSizeD <= TensorImpl_sizeLegacyNoScalars(
-                                    TensorImpl_Unwrap(tensor), d),
-                  "Index tensor must not have larger size than output tensor "
-                  "apart from the specified dimension ",
-                  dim, ", but got index ", index.sizes(), " output ",
-                  tensor.sizes());
+      TORCH_CHECK(
+          indexSizeD <=
+              TensorImpl_sizeLegacyNoScalars(TensorImpl_Unwrap(tensor), d),
+          "Index tensor must not have larger size than output tensor "
+          "apart from the specified dimension ",
+          dim,
+          ", but got index ",
+          index.sizes(),
+          " output ",
+          tensor.sizes());
     }
   }
 
@@ -270,18 +290,18 @@ void ScatterFill(Tensor &tensor, int64_t dim, const Tensor &index,
 
     // Specialize for a small number of dimensions.
     switch (indexInfo.dims) {
-    case 1:
-      RUN(unsigned int, 1, scalar_t);
-      break;
-    case 2:
-      RUN(unsigned int, 2, scalar_t);
-      break;
-    case 3:
-      RUN(unsigned int, 3, scalar_t);
-      break;
-    default:
-      RUN(unsigned int, -1, scalar_t);
-      break;
+      case 1:
+        RUN(unsigned int, 1, scalar_t);
+        break;
+      case 2:
+        RUN(unsigned int, 2, scalar_t);
+        break;
+      case 3:
+        RUN(unsigned int, 3, scalar_t);
+        break;
+      default:
+        RUN(unsigned int, -1, scalar_t);
+        break;
     }
   } else {
     TensorInfo<scalar_t, uint64_t> tensorInfo =
@@ -301,14 +321,17 @@ void ScatterFill(Tensor &tensor, int64_t dim, const Tensor &index,
 
 #undef RUN
 
-#define RUN(TYPE, DIMS, REAL)                                                  \
-  THSyclTensor_scatterAddKernel<TYPE, REAL, DIMS>(                             \
+#define RUN(TYPE, DIMS, REAL)                      \
+  THSyclTensor_scatterAddKernel<TYPE, REAL, DIMS>( \
       tensorInfo, srcInfo, indexInfo, dim, (TYPE)totalElements);
 
 template <typename scalar_t>
 typename std::enable_if<IS_FLOAT32(scalar_t) || IS_INT(scalar_t), void>::type
-ScatterAdd(Tensor &tensor, int64_t dim, const Tensor &index,
-           const Tensor &src) {
+ScatterAdd(
+    Tensor& tensor,
+    int64_t dim,
+    const Tensor& index,
+    const Tensor& src) {
   int index_ndim_legacy_all =
       TensorImpl_nDimensionLegacyAll(TensorImpl_Unwrap(index));
   TORCH_CHECK(
@@ -336,18 +359,24 @@ ScatterAdd(Tensor &tensor, int64_t dim, const Tensor &index,
     int64_t indexSizeD =
         TensorImpl_sizeLegacyNoScalars(TensorImpl_Unwrap(index), d);
     if (d != dim) {
-      TORCH_CHECK(indexSizeD <= TensorImpl_sizeLegacyNoScalars(
-                                    TensorImpl_Unwrap(tensor), d),
-                  "Index tensor must not have larger size than output tensor "
-                  "apart from the specified dimension ",
-                  dim, ", but got index ", index.sizes(), " output ",
-                  tensor.sizes());
+      TORCH_CHECK(
+          indexSizeD <=
+              TensorImpl_sizeLegacyNoScalars(TensorImpl_Unwrap(tensor), d),
+          "Index tensor must not have larger size than output tensor "
+          "apart from the specified dimension ",
+          dim,
+          ", but got index ",
+          index.sizes(),
+          " output ",
+          tensor.sizes());
     }
-    TORCH_CHECK(indexSizeD <=
-                    TensorImpl_sizeLegacyNoScalars(TensorImpl_Unwrap(src), d),
-                "Index tensor must not have larger size than input tensor, but "
-                "got index ",
-                index.sizes(), "input", src.sizes());
+    TORCH_CHECK(
+        indexSizeD <= TensorImpl_sizeLegacyNoScalars(TensorImpl_Unwrap(src), d),
+        "Index tensor must not have larger size than input tensor, but "
+        "got index ",
+        index.sizes(),
+        "input",
+        src.sizes());
   }
 
   TORCH_CHECK(tensor.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
@@ -371,18 +400,18 @@ ScatterAdd(Tensor &tensor, int64_t dim, const Tensor &index,
           getTensorInfo<int64_t, unsigned int>(index);
       // Specialize for a small number of dimensions.
       switch (indexInfo.dims) {
-      case 1:
-        RUN(unsigned int, 1, scalar_t);
-        break;
-      case 2:
-        RUN(unsigned int, 2, scalar_t);
-        break;
-      case 3:
-        RUN(unsigned int, 3, scalar_t);
-        break;
-      default:
-        RUN(unsigned int, -1, scalar_t);
-        break;
+        case 1:
+          RUN(unsigned int, 1, scalar_t);
+          break;
+        case 2:
+          RUN(unsigned int, 2, scalar_t);
+          break;
+        case 3:
+          RUN(unsigned int, 3, scalar_t);
+          break;
+        default:
+          RUN(unsigned int, -1, scalar_t);
+          break;
       }
     } else {
       TensorInfo<scalar_t, uint64_t> tensorInfo =
@@ -405,8 +434,11 @@ ScatterAdd(Tensor &tensor, int64_t dim, const Tensor &index,
 
 template <typename scalar_t>
 typename std::enable_if<!(IS_FLOAT32(scalar_t) || IS_INT(scalar_t)), void>::type
-ScatterAdd(Tensor &tensor, int64_t dim, const Tensor &index,
-           const Tensor &src) {
+ScatterAdd(
+    Tensor& tensor,
+    int64_t dim,
+    const Tensor& index,
+    const Tensor& src) {
   TORCH_CHECK("scatter add only supports float and int type");
 }
 
@@ -414,39 +446,56 @@ ScatterAdd(Tensor &tensor, int64_t dim, const Tensor &index,
 
 } // namespace impl
 
-Tensor &scatter_(Tensor &self, int64_t dim, const Tensor &index,
-                 const Tensor &src) {
+Tensor& scatter_(
+    Tensor& self,
+    int64_t dim,
+    const Tensor& index,
+    const Tensor& src) {
   AT_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Bool, self.scalar_type(), "Scatter",
-      [&]() { impl::Scatter<scalar_t>(self, dim, index, src); });
+      at::ScalarType::Bool, self.scalar_type(), "Scatter", [&]() {
+        impl::Scatter<scalar_t>(self, dim, index, src);
+      });
   return self;
 }
 
-Tensor &scatter_(Tensor &self, int64_t dim, const Tensor &index, Scalar value) {
+Tensor& scatter_(Tensor& self, int64_t dim, const Tensor& index, Scalar value) {
   AT_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Bool, self.scalar_type(), "ScatterFill",
-      [&]() { impl::ScatterFill<scalar_t>(self, dim, index, value); });
+      at::ScalarType::Bool, self.scalar_type(), "ScatterFill", [&]() {
+        impl::ScatterFill<scalar_t>(self, dim, index, value);
+      });
   return self;
 }
 
-Tensor &scatter_add_(Tensor &self, int64_t dim, const Tensor &index,
-                     const Tensor &src) {
+Tensor& scatter_add_(
+    Tensor& self,
+    int64_t dim,
+    const Tensor& index,
+    const Tensor& src) {
   AT_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Bool, self.scalar_type(), "ScatterAdd",
-      [&]() { impl::ScatterAdd<scalar_t>(self, dim, index, src); });
+      at::ScalarType::Bool, self.scalar_type(), "ScatterAdd", [&]() {
+        impl::ScatterAdd<scalar_t>(self, dim, index, src);
+      });
   return self;
 }
 
-Tensor &gather_out(Tensor &out, const Tensor &self, int64_t dim,
-                   const Tensor &index, bool sparse_grad) {
+Tensor& gather_out(
+    Tensor& out,
+    const Tensor& self,
+    int64_t dim,
+    const Tensor& index,
+    bool sparse_grad) {
   AT_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Bool, self.scalar_type(), "Gather",
-      [&]() { impl::Gather<scalar_t>(out, self, dim, index); });
+      at::ScalarType::Bool, self.scalar_type(), "Gather", [&]() {
+        impl::Gather<scalar_t>(out, self, dim, index);
+      });
   return out;
 }
 
-Tensor gather(const Tensor &self, int64_t dim, const Tensor &index,
-              bool sparse_grad) {
+Tensor gather(
+    const Tensor& self,
+    int64_t dim,
+    const Tensor& index,
+    bool sparse_grad) {
   Tensor out = at::empty({0}, self.options());
   out.resize_(index.sizes());
   return at::AtenIpexTypeDPCPP::gather_out(out, self, dim, index, sparse_grad);

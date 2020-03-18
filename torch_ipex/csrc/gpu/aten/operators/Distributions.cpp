@@ -1,11 +1,11 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 
-#include "Random.h"
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
 #include <core/Generator.h>
 #include <core/Memory.h>
+#include "Random.h"
 
 using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
@@ -14,35 +14,37 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-template <typename scalar_t> class bernoulli_tensor_dpcpp_ker {};
-
-template <typename scalar_t> class bernoulli_scalar_dpcpp_ker {};
+template <typename scalar_t>
+class bernoulli_tensor_dpcpp_ker {};
 
 template <typename scalar_t>
-void bernoulli_scalar_kernel(Tensor &ret, double p_, uint64_t seed) {
-  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+class bernoulli_scalar_dpcpp_ker {};
+
+template <typename scalar_t>
+void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto size = ret.numel() * sizeof(scalar_t);
   // First fill self with random number within range [0.0 - 1.0]
-  dpcpp_queue.submit([&](DPCPP::handler &cgh) {
+  dpcpp_queue.submit([&](DPCPP::handler& cgh) {
     auto acc = DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size)
                    .get_access();
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
-    auto num_work_items = DPCPP::nd_range<1>(DPCPP::range<1>(global_range),
-                                             DPCPP::range<1>(tile_size));
+    auto num_work_items = DPCPP::nd_range<1>(
+        DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
     FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
     cgh.parallel_for(num_work_items, uniform_rnd_filler);
   });
 
   // Generate final bernoulli distributions
-  dpcpp_queue.submit([&](DPCPP::handler &cgh) {
+  dpcpp_queue.submit([&](DPCPP::handler& cgh) {
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
     auto out_acc =
         DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size);
     cgh.parallel_for<bernoulli_scalar_dpcpp_ker<scalar_t>>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(global_range),
-                           DPCPP::range<1>(tile_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size)),
         [=](DPCPP::nd_item<1> item) {
           int64_t id = item.get_global_linear_id();
           auto out_ptr = out_acc.template get_pointer<scalar_t>();
@@ -54,8 +56,8 @@ void bernoulli_scalar_kernel(Tensor &ret, double p_, uint64_t seed) {
 }
 
 template <typename scalar_t>
-void bernoulli_tensor_kernel(Tensor &ret, const Tensor &p, uint64_t seed) {
-  auto &queue = getCurrentDPCPPStream().dpcpp_queue();
+void bernoulli_tensor_kernel(Tensor& ret, const Tensor& p, uint64_t seed) {
+  auto& queue = getCurrentDPCPPStream().dpcpp_queue();
   auto size = ret.numel() * sizeof(scalar_t);
 
   // First fill self with random number within range [0.0 - 1.0]
@@ -64,8 +66,8 @@ void bernoulli_tensor_kernel(Tensor &ret, const Tensor &p, uint64_t seed) {
                    .get_access();
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
-    auto num_work_items = DPCPP::nd_range<1>(DPCPP::range<1>(global_range),
-                                             DPCPP::range<1>(tile_size));
+    auto num_work_items = DPCPP::nd_range<1>(
+        DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
     FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
     cgh.parallel_for(num_work_items, uniform_rnd_filler);
   };
@@ -90,8 +92,8 @@ void bernoulli_tensor_kernel(Tensor &ret, const Tensor &p, uint64_t seed) {
     };
 
     cgh.parallel_for<bernoulli_tensor_dpcpp_ker<scalar_t>>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(global_range),
-                           DPCPP::range<1>(tile_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size)),
         kfn);
   };
 
@@ -100,7 +102,7 @@ void bernoulli_tensor_kernel(Tensor &ret, const Tensor &p, uint64_t seed) {
 
 } // namespace impl
 
-Tensor &bernoulli_(Tensor &self, const Tensor &p_, Generator *_generator) {
+Tensor& bernoulli_(Tensor& self, const Tensor& p_, Generator* _generator) {
   auto gen = at::get_generator_or_default<at::DPCPPGenerator>(
       _generator, getDefaultDPCPPGenerator());
   std::lock_guard<std::mutex> lock(gen->mutex_);
@@ -111,7 +113,7 @@ Tensor &bernoulli_(Tensor &self, const Tensor &p_, Generator *_generator) {
   return self;
 }
 
-Tensor &bernoulli_(Tensor &self, double p, Generator *_generator) {
+Tensor& bernoulli_(Tensor& self, double p, Generator* _generator) {
   auto gen = at::get_generator_or_default<at::DPCPPGenerator>(
       _generator, getDefaultDPCPPGenerator());
   std::lock_guard<std::mutex> lock(gen->mutex_);

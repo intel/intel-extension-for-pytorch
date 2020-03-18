@@ -16,7 +16,7 @@ namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 DPCPP_DEF_K1(bitwise_not);
-void bitwise_not_kernel_dpcpp(TensorIterator &iter) {
+void bitwise_not_kernel_dpcpp(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
     dpcpp_kernel_for_tensor_iter<DPCPP_K(bitwise_not)>(
         iter, [](bool a) -> bool { return !a; });
@@ -29,7 +29,7 @@ void bitwise_not_kernel_dpcpp(TensorIterator &iter) {
 }
 
 DPCPP_DEF_K1(logical_not);
-void logical_not_kernel(TensorIterator &iter) {
+void logical_not_kernel(TensorIterator& iter) {
   AT_DISPATCH_ALL_TYPES_AND2(
       kBool, kHalf, iter.dtype(1), "logical_not_dpcpp", [&]() {
         using self_t = scalar_t;
@@ -79,8 +79,11 @@ IPEX_ALL_CALLABLE_1_UNARY_OPS(clamp_min_, TensorMaxValueOp);
 IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(clamp_min_out, TensorMaxValueOp);
 IPEX_OUT_ALL_CALLABLE_2_UNARY_OPS(clamp_min_max, TensorClampOp);
 
-Tensor &clamp_out(Tensor &result, const Tensor &self, optional<Scalar> min,
-                  optional<Scalar> max) {
+Tensor& clamp_out(
+    Tensor& result,
+    const Tensor& self,
+    optional<Scalar> min,
+    optional<Scalar> max) {
   if (min && max) {
     at::AtenIpexTypeDPCPP::clamp_min_max(result, self, *min, *max);
   } else if (max) {
@@ -93,22 +96,24 @@ Tensor &clamp_out(Tensor &result, const Tensor &self, optional<Scalar> min,
   return result;
 }
 
-Tensor &clamp_(Tensor &self, optional<Scalar> min, optional<Scalar> max) {
+Tensor& clamp_(Tensor& self, optional<Scalar> min, optional<Scalar> max) {
   return at::AtenIpexTypeDPCPP::clamp_out(self, self, min, max);
 }
 
-Tensor bitwise_not(const Tensor &self) {
+Tensor bitwise_not(const Tensor& self) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::bitwise_not_out(result, self);
 }
 
-Tensor &bitwise_not_(Tensor &self) {
+Tensor& bitwise_not_(Tensor& self) {
   return at::AtenIpexTypeDPCPP::bitwise_not_out(self, self);
 }
 
-Tensor &bitwise_not_out(Tensor &out, const Tensor &self) {
-  auto iter = TensorIterator::unary_op(out, self,
-                                       /*check_mem_overlap=*/true);
+Tensor& bitwise_not_out(Tensor& out, const Tensor& self) {
+  auto iter = TensorIterator::unary_op(
+      out,
+      self,
+      /*check_mem_overlap=*/true);
   impl::bitwise_not_kernel_dpcpp(iter);
 #ifdef BUILD_NAMEDTENSOR
   at::namedinference::propagate_names(out, self);
@@ -116,16 +121,16 @@ Tensor &bitwise_not_out(Tensor &out, const Tensor &self) {
   return out;
 }
 
-Tensor logical_not(const Tensor &self) {
+Tensor logical_not(const Tensor& self) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
   return at::AtenIpexTypeDPCPP::logical_not_out(result, self);
 }
 
-Tensor &logical_not_(Tensor &self) {
+Tensor& logical_not_(Tensor& self) {
   return at::AtenIpexTypeDPCPP::logical_not_out(self, self);
 }
 
-Tensor &logical_not_out(Tensor &result, const Tensor &self) {
+Tensor& logical_not_out(Tensor& result, const Tensor& self) {
   TensorIterator iter;
   iter.dont_compute_common_dtype();
   iter.set_check_mem_overlap(true);
@@ -138,78 +143,78 @@ Tensor &logical_not_out(Tensor &result, const Tensor &self) {
 
 IPEX_OUT_INT_CALLABLE_1_UNARY_OPS(__and___out, TensorBitAndConstantOp);
 
-Tensor __and__(const Tensor &self, Scalar other) {
+Tensor __and__(const Tensor& self, Scalar other) {
   auto result = at::empty_like(self);
   return at::AtenIpexTypeDPCPP::__and___out(result, self, other);
 }
 
-Tensor &__iand__(Tensor &self, Scalar other) {
+Tensor& __iand__(Tensor& self, Scalar other) {
   return at::AtenIpexTypeDPCPP::__and___out(self, self, other);
 }
 
 IPEX_OUT_INT_CALLABLE_1_UNARY_OPS(__or___out, TensorBitOrConstantOp);
 
-Tensor __or__(const Tensor &self, Scalar other) {
+Tensor __or__(const Tensor& self, Scalar other) {
   auto result = at::empty_like(self);
   return at::AtenIpexTypeDPCPP::__or___out(result, self, other);
 }
 
-Tensor &__ior__(Tensor &self, Scalar other) {
+Tensor& __ior__(Tensor& self, Scalar other) {
   return at::AtenIpexTypeDPCPP::__or___out(self, self, other);
 }
 
 IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(erfinv_out, TensorErfinvOp);
 
-Tensor &erfinv_(Tensor &self) {
+Tensor& erfinv_(Tensor& self) {
   return at::AtenIpexTypeDPCPP::erfinv_out(self, self);
 }
 
-Tensor erfinv(const Tensor &self) {
+Tensor erfinv(const Tensor& self) {
   auto result = at::empty_like(self);
   return at::AtenIpexTypeDPCPP::erfinv_out(result, self);
 }
 
 IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(digamma_out, TensorDigammaOp);
 
-Tensor &digamma_(Tensor &self) {
+Tensor& digamma_(Tensor& self) {
   return at::AtenIpexTypeDPCPP::digamma_out(self, self);
 }
 
-Tensor digamma(const Tensor &self) {
+Tensor digamma(const Tensor& self) {
   auto result = at::empty_like(self);
   return at::AtenIpexTypeDPCPP::digamma_out(result, self);
 }
 
 IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(remainder_out, TensorRemainderOp);
 
-Tensor remainder(const Tensor &self, Scalar other) {
+Tensor remainder(const Tensor& self, Scalar other) {
   auto out = at::empty_like(self);
   return at::AtenIpexTypeDPCPP::remainder_out(out, self, other);
 }
 
-Tensor &remainder_(Tensor &self, Scalar other) {
+Tensor& remainder_(Tensor& self, Scalar other) {
   return at::AtenIpexTypeDPCPP::remainder_out(self, self, other);
 }
 
 IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(fmod_out, TensorFmodOp);
 
-Tensor fmod(const Tensor &self, Scalar other) {
+Tensor fmod(const Tensor& self, Scalar other) {
   auto out = at::empty_like(self);
   return at::AtenIpexTypeDPCPP::fmod_out(out, self, other);
 }
 
-Tensor &fmod_(Tensor &self, Scalar other) {
+Tensor& fmod_(Tensor& self, Scalar other) {
   return at::AtenIpexTypeDPCPP::fmod_out(self, self, other);
 }
 
 IPEX_OUT_ALL_CALLABLE_0_UNARY_OPS(sign_out, TensorSignOp);
 
-Tensor sign(const Tensor &self) {
+Tensor sign(const Tensor& self) {
   auto out = at::empty_like(self);
   return at::AtenIpexTypeDPCPP::sign_out(out, self);
 }
 
-Tensor &sign_(Tensor &self) {
+Tensor& sign_(Tensor& self) {
   return at::AtenIpexTypeDPCPP::sign_out(self, self);
 }
 

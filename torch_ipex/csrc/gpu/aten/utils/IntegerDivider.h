@@ -48,7 +48,8 @@
 //    - http://ridiculousfish.com/blog/posts/labor-of-division-episode-i.html
 
 // Result of div/mod operation stored together.
-template <typename Value> struct DivMod {
+template <typename Value>
+struct DivMod {
   Value div, mod;
 
   DivMod(Value div, Value mod) : div(div), mod(mod) {}
@@ -56,12 +57,17 @@ template <typename Value> struct DivMod {
 
 // Base case: we only have an implementation for uint32_t for now.  For
 // everything else, we use plain division.
-template <typename Value> struct IntDivider {
+template <typename Value>
+struct IntDivider {
   IntDivider() {} // Dummy constructor for arrays.
   IntDivider(Value d) : divisor(d) {}
 
-  inline Value div(Value n) const { return n / divisor; }
-  inline Value mod(Value n) const { return n % divisor; }
+  inline Value div(Value n) const {
+    return n / divisor;
+  }
+  inline Value mod(Value n) const {
+    return n % divisor;
+  }
   inline DivMod<Value> divmod(Value n) const {
     return DivMod<Value>(n / divisor, n % divisor);
   }
@@ -70,7 +76,8 @@ template <typename Value> struct IntDivider {
 };
 
 // Implement fast integer division.
-template <> struct IntDivider<unsigned int> {
+template <>
+struct IntDivider<unsigned int> {
   static_assert(sizeof(unsigned int) == 4, "Assumes 32-bit unsigned int.");
 
   IntDivider() {} // Dummy constructor for arrays.
@@ -97,7 +104,9 @@ template <> struct IntDivider<unsigned int> {
     return (t + n) >> shift;
   }
 
-  inline unsigned int mod(unsigned int n) const { return n - div(n) * divisor; }
+  inline unsigned int mod(unsigned int n) const {
+    return n - div(n) * divisor;
+  }
 
   inline DivMod<unsigned int> divmod(unsigned int n) const {
     unsigned int q = div(n);
@@ -105,8 +114,8 @@ template <> struct IntDivider<unsigned int> {
   }
 
   unsigned int divisor; // d above.
-  unsigned int m1;      // Magic number: m' above.
-  unsigned int shift;   // Shift amounts.
+  unsigned int m1; // Magic number: m' above.
+  unsigned int shift; // Shift amounts.
 };
 
 #endif // THDPCPP_INTEGER_DIVIDER_INC

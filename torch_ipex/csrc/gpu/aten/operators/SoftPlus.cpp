@@ -15,8 +15,11 @@ namespace AtenIpexTypeDPCPP {
 DPCPP_DEF_K1(softplus_forward);
 DPCPP_DEF_K1(softplus_backward);
 
-Tensor &softplus_out(Tensor &out, const Tensor &self, Scalar beta,
-                     Scalar threshold) {
+Tensor& softplus_out(
+    Tensor& out,
+    const Tensor& self,
+    Scalar beta,
+    Scalar threshold) {
   checkBackend("softplus_forward", {out}, self.type().backend());
   auto iter = at::TensorIterator();
   iter.set_check_mem_overlap(true);
@@ -29,25 +32,32 @@ Tensor &softplus_out(Tensor &out, const Tensor &self, Scalar beta,
     auto t = threshold.to<scalar_t>();
     dpcpp_kernel_for_tensor_iter<DPCPP_K(softplus_forward)>(
         iter, [=](scalar_t a) -> scalar_t {
-          return (a * b > t ? a : Numerics<scalar_t>::log1p(
-                                      Numerics<scalar_t>::exp(a * b)) /
-                                      b);
+          return (
+              a * b > t ? a : Numerics<scalar_t>::log1p(
+                                  Numerics<scalar_t>::exp(a * b)) /
+                      b);
         });
   });
 
   return out;
 }
 
-Tensor softplus(const Tensor &self, Scalar beta, Scalar threshold) {
+Tensor softplus(const Tensor& self, Scalar beta, Scalar threshold) {
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::softplus_out(out, self, beta, threshold);
 }
 
-Tensor &softplus_backward_out(Tensor &grad_input, const Tensor &grad_output,
-                              const Tensor &self, Scalar beta, Scalar threshold,
-                              const Tensor &output) {
-  checkBackend("softplus_backward", {grad_input, grad_output, output},
-               self.type().backend());
+Tensor& softplus_backward_out(
+    Tensor& grad_input,
+    const Tensor& grad_output,
+    const Tensor& self,
+    Scalar beta,
+    Scalar threshold,
+    const Tensor& output) {
+  checkBackend(
+      "softplus_backward",
+      {grad_input, grad_output, output},
+      self.type().backend());
   auto iter = at::TensorIterator();
   iter.set_check_mem_overlap(true);
   iter.add_output(grad_input);
@@ -70,8 +80,12 @@ Tensor &softplus_backward_out(Tensor &grad_input, const Tensor &grad_output,
   return grad_input;
 }
 
-Tensor softplus_backward(const Tensor &grad_output, const Tensor &self,
-                         Scalar beta, Scalar threshold, const Tensor &output) {
+Tensor softplus_backward(
+    const Tensor& grad_output,
+    const Tensor& self,
+    Scalar beta,
+    Scalar threshold,
+    const Tensor& output) {
   Tensor grad_input = at::empty({0}, grad_output.options());
   return at::AtenIpexTypeDPCPP::softplus_backward_out(
       grad_input, grad_output, self, beta, threshold, output);

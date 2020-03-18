@@ -20,14 +20,18 @@ static void initGlobalContext() {
   gContext.reset(new DPCPP::context(devs, at::dpcpp::dpcppAsyncHandler));
 }
 
-void clearGlobalContext() { gContext.reset(NULL); }
+void clearGlobalContext() {
+  gContext.reset(NULL);
+}
 
 DPCPP::context getGlobalContext() {
   std::call_once(initFlag, initGlobalContext);
   return *gContext;
 }
 
-at::Allocator *getDPCPPDeviceAllocator() { return DPCPPAllocator_get(); }
+at::Allocator* getDPCPPDeviceAllocator() {
+  return DPCPPAllocator_get();
+}
 
 } // namespace dpcpp
 } // namespace at

@@ -17,8 +17,12 @@ namespace impl {
 struct DPCPPGuardImpl final : public c10::impl::DeviceGuardImplInterface {
   static constexpr DeviceType static_type = DeviceType::DPCPP;
   DPCPPGuardImpl() {}
-  DPCPPGuardImpl(DeviceType t) { AT_ASSERT(t == DeviceType::DPCPP); }
-  DeviceType type() const override { return DeviceType::DPCPP; }
+  DPCPPGuardImpl(DeviceType t) {
+    AT_ASSERT(t == DeviceType::DPCPP);
+  }
+  DeviceType type() const override {
+    return DeviceType::DPCPP;
+  }
   Device exchangeDevice(Device d) const override {
     AT_ASSERT(d.type() == DeviceType::DPCPP);
     Device old_device = getDevice();
@@ -52,7 +56,9 @@ struct DPCPPGuardImpl final : public c10::impl::DeviceGuardImplInterface {
     setCurrentDPCPPStream(cs);
     return old_stream.unwrap();
   }
-  DeviceIndex deviceCount() const noexcept override { return device_count(); }
+  DeviceIndex deviceCount() const noexcept override {
+    return device_count();
+  }
 };
 }
 }

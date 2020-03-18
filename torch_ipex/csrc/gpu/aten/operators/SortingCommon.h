@@ -16,8 +16,12 @@
 using namespace at;
 
 template <typename scalar_t, typename index_t, typename Launcher>
-void run_launcher(Tensor &values, Tensor &indices, const Tensor &self,
-                  int64_t dim, Launcher l) {
+void run_launcher(
+    Tensor& values,
+    Tensor& indices,
+    const Tensor& self,
+    int64_t dim,
+    Launcher l) {
   auto self_info = at::dpcpp::detail::getTensorInfo<scalar_t, index_t>(self);
   auto values_info =
       at::dpcpp::detail::getTensorInfo<scalar_t, index_t>(values);
@@ -52,20 +56,44 @@ void run_launcher(Tensor &values, Tensor &indices, const Tensor &self,
 
   if (all_dims == 1) {
     l.template launch<scalar_t, index_t, 1>(
-        values_info, collapse_values_dim, indices_info, collapse_indices_dim,
-        self_info, collapse_self_dim, num_slices, slice_size);
+        values_info,
+        collapse_values_dim,
+        indices_info,
+        collapse_indices_dim,
+        self_info,
+        collapse_self_dim,
+        num_slices,
+        slice_size);
   } else if (all_dims == 2) {
     l.template launch<scalar_t, index_t, 2>(
-        values_info, collapse_values_dim, indices_info, collapse_indices_dim,
-        self_info, collapse_self_dim, num_slices, slice_size);
+        values_info,
+        collapse_values_dim,
+        indices_info,
+        collapse_indices_dim,
+        self_info,
+        collapse_self_dim,
+        num_slices,
+        slice_size);
   } else if (all_dims == 3) {
     l.template launch<scalar_t, index_t, 3>(
-        values_info, collapse_values_dim, indices_info, collapse_indices_dim,
-        self_info, collapse_self_dim, num_slices, slice_size);
+        values_info,
+        collapse_values_dim,
+        indices_info,
+        collapse_indices_dim,
+        self_info,
+        collapse_self_dim,
+        num_slices,
+        slice_size);
   } else {
     l.template launch<scalar_t, index_t, -1>(
-        values_info, collapse_values_dim, indices_info, collapse_indices_dim,
-        self_info, collapse_self_dim, num_slices, slice_size);
+        values_info,
+        collapse_values_dim,
+        indices_info,
+        collapse_indices_dim,
+        self_info,
+        collapse_self_dim,
+        num_slices,
+        slice_size);
   }
 }
 

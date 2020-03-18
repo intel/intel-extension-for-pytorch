@@ -11,14 +11,14 @@ namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 template <typename scalar_t>
-static inline bool is_contiguous(const int64_t *strides) {
+static inline bool is_contiguous(const int64_t* strides) {
   return strides[0] == sizeof(scalar_t) && strides[1] == sizeof(scalar_t) &&
-         strides[2] == sizeof(scalar_t);
+      strides[2] == sizeof(scalar_t);
 }
 
 template <typename scalar_t>
-static void dpcpp_threshold_kernel(TensorIterator &iter) {
-  auto loop = [&](char **data, const int64_t *strides, int64_t n) {
+static void dpcpp_threshold_kernel(TensorIterator& iter) {
+  auto loop = [&](char** data, const int64_t* strides, int64_t n) {
     dpcpp_eltwise_backward<mkldnn::algorithm::eltwise_relu>(
         data[0], data[1], data[2], n, 0.0f, 0.0f);
   };
@@ -28,8 +28,10 @@ static void dpcpp_threshold_kernel(TensorIterator &iter) {
 // Note: dpcpp compiler does not support uname type in template.
 class SyclOpThreshold {};
 
-static void threshold_kernel(TensorIterator &iter, Scalar threshold_scalar,
-                             Scalar value_scalar) {
+static void threshold_kernel(
+    TensorIterator& iter,
+    Scalar threshold_scalar,
+    Scalar value_scalar) {
   AT_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, iter.dtype(), "threshold", [&] {
         scalar_t threshold = threshold_scalar.to<scalar_t>();
@@ -57,30 +59,40 @@ static void threshold_kernel(TensorIterator &iter, Scalar threshold_scalar,
 
 } // namepsace impl
 
-Tensor relu(const Tensor &self) { return at::threshold(self, 0, 0); }
+Tensor relu(const Tensor& self) {
+  return at::threshold(self, 0, 0);
+}
 
-Tensor &relu_(Tensor &self) { return at::threshold_(self, 0, 0); }
+Tensor& relu_(Tensor& self) {
+  return at::threshold_(self, 0, 0);
+}
 
-static Tensor threshold_out(optional<Tensor> opt_result, const Tensor &self,
-                            Scalar threshold, Scalar value,
-                            const Tensor &other) {
+static Tensor threshold_out(
+    optional<Tensor> opt_result,
+    const Tensor& self,
+    Scalar threshold,
+    Scalar value,
+    const Tensor& other) {
   Tensor result = opt_result.value_or(Tensor());
   auto iter = TensorIterator::binary_op(result, self, other);
   impl::threshold_kernel(iter, threshold, value);
   return iter.output();
 }
 
-Tensor &threshold_(Tensor &self, Scalar threshold, Scalar value) {
+Tensor& threshold_(Tensor& self, Scalar threshold, Scalar value) {
   threshold_out(make_optional(self), self, threshold, value, self);
   return self;
 }
 
-Tensor threshold(const Tensor &self, Scalar threshold, Scalar value) {
+Tensor threshold(const Tensor& self, Scalar threshold, Scalar value) {
   return threshold_out(nullopt, self, threshold, value, self);
 }
 
-Tensor threshold_out(Tensor &result, const Tensor &self, Scalar threshold,
-                     Scalar value) {
+Tensor threshold_out(
+    Tensor& result,
+    const Tensor& self,
+    Scalar threshold,
+    Scalar value) {
   threshold_out(make_optional(result), self, threshold, value, self);
   return result;
 }

@@ -2,12 +2,12 @@
 
 #include <c10/core/Device.h>
 #include <c10/macros/Macros.h>
-#include <cmath>
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
 #include <core/Device.h>
 #include <core/Exception.h>
 #include <core/Stream.h>
+#include <cmath>
 
 namespace at {
 namespace dpcpp {
@@ -26,9 +26,9 @@ static void clearDPCPPContextAndDevices() {
 static void initGlobalDevicePoolState() {
   auto plaform_list = DPCPP::platform::get_platforms();
   DeviceIndex devIndex = 0;
-  for (const auto &platform : plaform_list) {
+  for (const auto& platform : plaform_list) {
     auto device_list = platform.get_devices();
-    for (const auto &device : device_list) {
+    for (const auto& device : device_list) {
       if (device.is_gpu()) {
         gDevPool.devices.push_back(device);
         gDevPool.dev_sels.push_back({device});
@@ -50,14 +50,14 @@ static void initDevicePoolCallOnce() {
   std::call_once(init_device_flag, initGlobalDevicePoolState);
 }
 
-int dpcppGetDeviceCount(int *deviceCount) {
+int dpcppGetDeviceCount(int* deviceCount) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
   *deviceCount = (int)gDevPool.devices.size();
   return DPCPP_SUCCESS;
 }
 
-int dpcppGetDevice(DeviceIndex *pDI) {
+int dpcppGetDevice(DeviceIndex* pDI) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
   TORCH_CHECK(pDI != NULL);
@@ -98,7 +98,7 @@ DPCPPDeviceSelector dpcppGetDeviceSelector(DeviceIndex device_index) {
 #define MAX_DPCPP_MEM_PER_DEVICE 17179869184 // 16*1024*1024*1024 -- 16GB
 // Global buffer map pool state
 static std::once_flag init_buffer_map_flag;
-static std::vector<cl::sycl::codeplay::PointerMapper *> gBufferMapPoolPtr;
+static std::vector<cl::sycl::codeplay::PointerMapper*> gBufferMapPoolPtr;
 static void initBufferMapPoolStates() {
   int device_count;
   AT_DPCPP_CHECK(dpcppGetDeviceCount(&device_count));
@@ -113,14 +113,14 @@ static void initBufferMapPoolCallOnce() {
   std::call_once(init_buffer_map_flag, initBufferMapPoolStates);
 }
 
-cl::sycl::codeplay::PointerMapper &dpcppGetBufferMap() {
+cl::sycl::codeplay::PointerMapper& dpcppGetBufferMap() {
   initBufferMapPoolCallOnce();
   DeviceIndex device_id;
   AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
   return *gBufferMapPoolPtr[device_id];
 }
 
-int dpcppGetDeviceIdFromPtr(DeviceIndex *device_id, void *ptr) {
+int dpcppGetDeviceIdFromPtr(DeviceIndex* device_id, void* ptr) {
   int device_index = reinterpret_cast<uint64_t>(ptr) / MAX_DPCPP_MEM_PER_DEVICE;
   int device_count;
   dpcppGetDeviceCount(&device_count);
@@ -136,31 +136,34 @@ int dpcppGetDeviceIdFromPtr(DeviceIndex *device_id, void *ptr) {
   return DPCPP_SUCCESS;
 }
 
-DPCPP::queue &dpcppGetCurrentQueue() {
+DPCPP::queue& dpcppGetCurrentQueue() {
   return getCurrentDPCPPStream().dpcpp_queue();
 }
 
-int64_t dpcppMaxWorkGroupSize(DPCPP::queue &queue) {
+int64_t dpcppMaxWorkGroupSize(DPCPP::queue& queue) {
   return queue.get_device().get_info<dpcpp_dev_max_wgroup_size>();
 }
 
 int64_t dpcppMaxWorkGroupSize() {
-  auto &queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   return dpcppMaxWorkGroupSize(queue);
 }
 
-int64_t dpcppMaxComputeUnitSize(DPCPP::queue &queue) {
+int64_t dpcppMaxComputeUnitSize(DPCPP::queue& queue) {
   return queue.get_device()
       .template get_info<DPCPP::info::device::max_compute_units>();
 }
 
 int64_t dpcppMaxComputeUnitSize() {
-  auto &queue = dpcppGetCurrentQueue();
+  auto& queue = dpcppGetCurrentQueue();
   return dpcppMaxComputeUnitSize(queue);
 }
 
-void parallel_for_setup(int64_t n, int64_t &tileSize, int64_t &rng,
-                        int64_t &GRange) {
+void parallel_for_setup(
+    int64_t n,
+    int64_t& tileSize,
+    int64_t& rng,
+    int64_t& GRange) {
   tileSize = dpcppMaxWorkGroupSize();
   rng = n;
   if (rng == 0) {
@@ -178,9 +181,15 @@ void parallel_for_setup(int64_t n, int64_t &tileSize, int64_t &rng,
   }
 }
 
-void parallel_for_setup(int64_t dim0, int64_t dim1, int64_t &tileSize0,
-                        int64_t &tileSize1, int64_t &rng0, int64_t &rng1,
-                        int64_t &GRange0, int64_t &GRange1) {
+void parallel_for_setup(
+    int64_t dim0,
+    int64_t dim1,
+    int64_t& tileSize0,
+    int64_t& tileSize1,
+    int64_t& rng0,
+    int64_t& rng1,
+    int64_t& GRange0,
+    int64_t& GRange1) {
   int64_t max_workgroup_Size = dpcppMaxWorkGroupSize();
   int64_t pow_of_2 = static_cast<int64_t>(std::log2(max_workgroup_Size));
   tileSize1 =
@@ -217,11 +226,19 @@ void parallel_for_setup(int64_t dim0, int64_t dim1, int64_t &tileSize0,
   }
 }
 
-void parallel_for_setup(int64_t dim0, int64_t dim1, int64_t dim2,
-                        int64_t &tileSize0, int64_t &tileSize1,
-                        int64_t &tileSize2, int64_t &rng0, int64_t &rng1,
-                        int64_t &rng2, int64_t &GRange0, int64_t &GRange1,
-                        int64_t &GRange2) {
+void parallel_for_setup(
+    int64_t dim0,
+    int64_t dim1,
+    int64_t dim2,
+    int64_t& tileSize0,
+    int64_t& tileSize1,
+    int64_t& tileSize2,
+    int64_t& rng0,
+    int64_t& rng1,
+    int64_t& rng2,
+    int64_t& GRange0,
+    int64_t& GRange1,
+    int64_t& GRange2) {
   int64_t max_workgroup_Size = dpcppMaxWorkGroupSize();
   int64_t pow_of_2 = static_cast<int64_t>(std::log2(max_workgroup_Size));
   tileSize2 =

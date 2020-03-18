@@ -12,9 +12,11 @@ namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 DPCPP_DEF_K1(ComputeDpcppKer);
-static void repeat_interleave_dpcpp_kernel(int64_t *repeat_ptr,
-                                           int64_t *cumsum_ptr,
-                                           int64_t *result_ptr, int64_t size) {
+static void repeat_interleave_dpcpp_kernel(
+    int64_t* repeat_ptr,
+    int64_t* cumsum_ptr,
+    int64_t* result_ptr,
+    int64_t size) {
   auto queue = dpcppGetCurrentQueue();
   int64_t rng, grng, tile_size;
   parallel_for_setup(size, tile_size, rng, grng);
@@ -55,7 +57,7 @@ static void repeat_interleave_dpcpp_kernel(int64_t *repeat_ptr,
 
 } // impl
 
-Tensor repeat_interleave(const Tensor &repeat) {
+Tensor repeat_interleave(const Tensor& repeat) {
   return repeat_interleave_common<impl::repeat_interleave_dpcpp_kernel>(repeat);
 }
 

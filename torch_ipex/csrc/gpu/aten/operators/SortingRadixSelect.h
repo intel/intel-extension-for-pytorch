@@ -3,9 +3,11 @@
 namespace at {
 namespace dpcpp {
 
-template <typename scalar_t> struct TopKTypeConfig {};
+template <typename scalar_t>
+struct TopKTypeConfig {};
 
-template <> struct TopKTypeConfig<float> {
+template <>
+struct TopKTypeConfig<float> {
   typedef uint32_t RadixType;
 
   // Converts a float to an integer representation with the same
@@ -19,7 +21,7 @@ template <> struct TopKTypeConfig<float> {
   // pos nan: signbit=0 exp=ff fraction>0 --> radix = 1 ff x>0
   // neg nan: signbit=1 exp=ff fraction>0 --> radix = 0 00 x<ff...
   static inline RadixType convert(float v) {
-    RadixType x = *((uint32_t *)&v);
+    RadixType x = *((uint32_t*)&v);
     RadixType mask = (x & 0x80000000) ? 0xffffffff : 0x80000000;
     return (x ^ mask);
   }
@@ -27,43 +29,64 @@ template <> struct TopKTypeConfig<float> {
   static inline float deconvert(RadixType v) {
     RadixType mask = (v & 0x80000000) ? 0x80000000 : 0xffffffff;
     auto v_de = v ^ mask;
-    return *((float *)&v_de);
+    return *((float*)&v_de);
   }
 };
 
-template <> struct TopKTypeConfig<uint8_t> {
+template <>
+struct TopKTypeConfig<uint8_t> {
   typedef uint32_t RadixType;
 
-  static inline RadixType convert(uint8_t v) { return v; }
+  static inline RadixType convert(uint8_t v) {
+    return v;
+  }
 
-  static inline uint8_t deconvert(RadixType v) { return v; }
+  static inline uint8_t deconvert(RadixType v) {
+    return v;
+  }
 };
 
-template <> struct TopKTypeConfig<int8_t> {
+template <>
+struct TopKTypeConfig<int8_t> {
   typedef uint32_t RadixType;
 
-  static inline RadixType convert(int8_t v) { return 128u + v; }
+  static inline RadixType convert(int8_t v) {
+    return 128u + v;
+  }
 
-  static inline int8_t deconvert(RadixType v) { return v - 128; }
+  static inline int8_t deconvert(RadixType v) {
+    return v - 128;
+  }
 };
 
-template <> struct TopKTypeConfig<int16_t> {
+template <>
+struct TopKTypeConfig<int16_t> {
   typedef uint32_t RadixType;
 
-  static inline RadixType convert(int16_t v) { return 32768u + v; }
+  static inline RadixType convert(int16_t v) {
+    return 32768u + v;
+  }
 
-  static inline int16_t deconvert(RadixType v) { return v - 32768; }
+  static inline int16_t deconvert(RadixType v) {
+    return v - 32768;
+  }
 };
 
-template <> struct TopKTypeConfig<int32_t> {
+template <>
+struct TopKTypeConfig<int32_t> {
   typedef uint32_t RadixType;
 
-  static inline RadixType convert(int32_t v) { return 2147483648u + v; }
+  static inline RadixType convert(int32_t v) {
+    return 2147483648u + v;
+  }
 
-  static inline int32_t deconvert(RadixType v) { return v - 2147483648u; }
+  static inline int32_t deconvert(RadixType v) {
+    return v - 2147483648u;
+  }
 };
 
-template <> struct TopKTypeConfig<int64_t> {
+template <>
+struct TopKTypeConfig<int64_t> {
   typedef uint64_t RadixType;
 
   static inline RadixType convert(int64_t v) {
@@ -75,11 +98,12 @@ template <> struct TopKTypeConfig<int64_t> {
   }
 };
 
-template <> struct TopKTypeConfig<double> {
+template <>
+struct TopKTypeConfig<double> {
   typedef uint64_t RadixType;
 
   static inline RadixType convert(double v) {
-    RadixType x = *((uint64_t *)&v);
+    RadixType x = *((uint64_t*)&v);
     RadixType mask = -((x >> 63)) | 0x8000000000000000;
     return (x ^ mask);
   }
@@ -87,21 +111,28 @@ template <> struct TopKTypeConfig<double> {
   static inline double deconvert(RadixType v) {
     RadixType mask = ((v >> 63) - 1) | 0x8000000000000000;
     auto v_de = v ^ mask;
-    return *((double *)&v_de);
+    return *((double*)&v_de);
   }
 };
 
-template <> struct TopKTypeConfig<at::Half> {
+template <>
+struct TopKTypeConfig<at::Half> {
   typedef uint32_t RadixType;
 
-  static inline RadixType convert(at::Half v) { return 0u; }
+  static inline RadixType convert(at::Half v) {
+    return 0u;
+  }
 
-  static inline at::Half deconvert(RadixType v) { return 0; }
+  static inline at::Half deconvert(RadixType v) {
+    return 0;
+  }
 };
 
-template <typename T> struct Bitfield {};
+template <typename T>
+struct Bitfield {};
 
-template <> struct Bitfield<unsigned int> {
+template <>
+struct Bitfield<unsigned int> {
   static inline unsigned int getBitfield(unsigned int val, int pos, int len) {
     pos &= 0xff;
     len &= 0xff;
@@ -109,8 +140,11 @@ template <> struct Bitfield<unsigned int> {
     return (val >> pos) & m;
   }
 
-  static inline unsigned int
-  setBitfield(unsigned int val, unsigned int toInsert, int pos, int len) {
+  static inline unsigned int setBitfield(
+      unsigned int val,
+      unsigned int toInsert,
+      int pos,
+      int len) {
     pos &= 0xff;
     len &= 0xff;
     unsigned int m = (1u << len) - 1u;
@@ -121,7 +155,8 @@ template <> struct Bitfield<unsigned int> {
   }
 };
 
-template <> struct Bitfield<uint64_t> {
+template <>
+struct Bitfield<uint64_t> {
   static inline uint64_t getBitfield(uint64_t val, int pos, int len) {
     pos &= 0xff;
     len &= 0xff;
@@ -130,8 +165,11 @@ template <> struct Bitfield<uint64_t> {
     return (val >> pos) & m;
   }
 
-  static inline uint64_t setBitfield(uint64_t val, uint64_t toInsert, int pos,
-                                     int len) {
+  static inline uint64_t setBitfield(
+      uint64_t val,
+      uint64_t toInsert,
+      int pos,
+      int len) {
     pos &= 0xff;
     len &= 0xff;
 
@@ -148,14 +186,22 @@ template <> struct Bitfield<uint64_t> {
 // those that pass the filter `((v & desiredMask) == desired)`.
 // This produces and broadcasts the seen counts for a single block only.
 // `smem` must have at least `RadixSize` elements.
-template <typename scalar_t, typename bitwise_t, typename index_t,
-          typename CountType, int RadixSize, int RadixBits>
-void countRadixUsingMask(CountType counts[RadixSize],
-                         const dpcpp_local_acc_t<int> &smem, bitwise_t desired,
-                         bitwise_t desiredMask, int radixDigitPos,
-                         index_t sliceSize, index_t withinSliceStride,
-                         const dpcpp_global_ptr_pt<scalar_t> &data,
-                         DPCPP::nd_item<1> &item_id) {
+template <typename scalar_t,
+          typename bitwise_t,
+          typename index_t,
+          typename CountType,
+          int RadixSize,
+          int RadixBits>
+void countRadixUsingMask(
+    CountType counts[RadixSize],
+    const dpcpp_local_acc_t<int>& smem,
+    bitwise_t desired,
+    bitwise_t desiredMask,
+    int radixDigitPos,
+    index_t sliceSize,
+    index_t withinSliceStride,
+    const dpcpp_global_ptr_pt<scalar_t>& data,
+    DPCPP::nd_item<1>& item_id) {
   // Clear out per-thread counts from a previous round
   for (int i = 0; i < RadixSize; ++i) {
     counts[i] = 0;
@@ -205,12 +251,14 @@ constexpr int RADIX_MASK = (RADIX_SIZE - 1);
 // This finds the unique value `v` that matches the pattern
 // ((v & desired) == desiredMask) in our sorted int format
 template <typename scalar_t, typename bitwise_t, typename index_t>
-scalar_t findPattern(const dpcpp_local_acc_t<int> &smem,
-                     const dpcpp_global_ptr_pt<scalar_t> &data,
-                     index_t sliceSize, index_t withinSliceStride,
-                     bitwise_t desired, bitwise_t desiredMask,
-                     DPCPP::nd_item<1> &item_id) {
-
+scalar_t findPattern(
+    const dpcpp_local_acc_t<int>& smem,
+    const dpcpp_global_ptr_pt<scalar_t>& data,
+    index_t sliceSize,
+    index_t withinSliceStride,
+    bitwise_t desired,
+    bitwise_t desiredMask,
+    DPCPP::nd_item<1>& item_id) {
   auto local_id = item_id.get_local_id(0);
 
   auto smem_ptr = SyclConvertToActualTypePtr(scalar_t, smem);
@@ -258,10 +306,14 @@ scalar_t findPattern(const dpcpp_local_acc_t<int> &smem,
 
 // Returns the top-Kth element found in the data using radix selection
 template <typename scalar_t, typename bitwise_t, typename index_t, bool Order>
-void radixSelect(const dpcpp_global_ptr_pt<scalar_t> &data, index_t k,
-                 index_t sliceSize, index_t withinSliceStride,
-                 const dpcpp_local_acc_t<int> &smem, scalar_t *topK,
-                 DPCPP::nd_item<1> &item_id) {
+void radixSelect(
+    const dpcpp_global_ptr_pt<scalar_t>& data,
+    index_t k,
+    index_t sliceSize,
+    index_t withinSliceStride,
+    const dpcpp_local_acc_t<int>& smem,
+    scalar_t* topK,
+    DPCPP::nd_item<1>& item_id) {
   // Per-thread buckets into which we accumulate digit counts in our
   // radix
   int counts[RADIX_SIZE];
@@ -283,10 +335,21 @@ void radixSelect(const dpcpp_global_ptr_pt<scalar_t> &data, index_t k,
        digitPos -= RADIX_BITS) {
     // Count radix distribution for the current position and reduce
     // across all threads
-    countRadixUsingMask<scalar_t, bitwise_t, index_t, int, RADIX_SIZE,
-                        RADIX_BITS>(counts, smem, desired, desiredMask,
-                                    digitPos, sliceSize, withinSliceStride,
-                                    data, item_id);
+    countRadixUsingMask<scalar_t,
+                        bitwise_t,
+                        index_t,
+                        int,
+                        RADIX_SIZE,
+                        RADIX_BITS>(
+        counts,
+        smem,
+        desired,
+        desiredMask,
+        digitPos,
+        sliceSize,
+        withinSliceStride,
+        data,
+        item_id);
 
     auto found_unique = [&](int i, int count) -> bool {
       /* All threads have the same value in counts here, so all */
@@ -295,8 +358,8 @@ void radixSelect(const dpcpp_global_ptr_pt<scalar_t> &data, index_t k,
         /* There is a unique answer. */
         desired =
             Bitfield<bitwise_t>::setBitfield(desired, i, digitPos, RADIX_BITS);
-        desiredMask = Bitfield<bitwise_t>::setBitfield(desiredMask, RADIX_MASK,
-                                                       digitPos, RADIX_BITS);
+        desiredMask = Bitfield<bitwise_t>::setBitfield(
+            desiredMask, RADIX_MASK, digitPos, RADIX_BITS);
 
         /* The answer is now the unique element v such that: */
         /* (v & desiredMask) == desired */
@@ -304,7 +367,12 @@ void radixSelect(const dpcpp_global_ptr_pt<scalar_t> &data, index_t k,
         /* need to perform a search through the data to find the */
         /* element that matches this pattern. */
         *topK = findPattern<scalar_t, bitwise_t, index_t>(
-            smem, data, sliceSize, withinSliceStride, desired, desiredMask,
+            smem,
+            data,
+            sliceSize,
+            withinSliceStride,
+            desired,
+            desiredMask,
             item_id);
         return true;
       }
@@ -314,8 +382,8 @@ void radixSelect(const dpcpp_global_ptr_pt<scalar_t> &data, index_t k,
       if (count >= kToFind) {
         desired =
             Bitfield<bitwise_t>::setBitfield(desired, i, digitPos, RADIX_BITS);
-        desiredMask = Bitfield<bitwise_t>::setBitfield(desiredMask, RADIX_MASK,
-                                                       digitPos, RADIX_BITS);
+        desiredMask = Bitfield<bitwise_t>::setBitfield(
+            desiredMask, RADIX_MASK, digitPos, RADIX_BITS);
 
         /* The top-Kth element v must now be one such that: */
         /* (v & desiredMask == desired) */

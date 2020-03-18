@@ -11,11 +11,14 @@ namespace at {
 namespace dpcpp {
 
 // dst = src * alpha
-void dpcppMemoryScale(void *dst, const void *src, size_t n_elements,
-                      const float alpha) {
+void dpcppMemoryScale(
+    void* dst,
+    const void* src,
+    size_t n_elements,
+    const float alpha) {
   static constexpr auto write_mode = DPCPP::access::mode::discard_write;
   static constexpr auto read_mode = DPCPP::access::mode::read;
-  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto total_threads =
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 
@@ -37,11 +40,14 @@ void dpcppMemoryScale(void *dst, const void *src, size_t n_elements,
 }
 
 // dst = src * eps + dst * (1 - eps)
-void dpcppMemoryScale1(void *dst, const void *src, size_t n_elements,
-                       const double eps) {
+void dpcppMemoryScale1(
+    void* dst,
+    const void* src,
+    size_t n_elements,
+    const double eps) {
   static constexpr auto write_mode = DPCPP::access::mode::discard_write;
   static constexpr auto read_mode = DPCPP::access::mode::read;
-  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto total_threads =
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 
@@ -63,11 +69,15 @@ void dpcppMemoryScale1(void *dst, const void *src, size_t n_elements,
 }
 
 // dst = src * alpha * eps + dst * (1 - eps)
-void dpcppMemoryScale2(void *dst, const void *src, size_t n_elements,
-                       const float alpha, const double eps) {
+void dpcppMemoryScale2(
+    void* dst,
+    const void* src,
+    size_t n_elements,
+    const float alpha,
+    const double eps) {
   static constexpr auto write_mode = DPCPP::access::mode::discard_write;
   static constexpr auto read_mode = DPCPP::access::mode::read;
-  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto total_threads =
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 

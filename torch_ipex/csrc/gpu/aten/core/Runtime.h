@@ -17,7 +17,7 @@ namespace dpcpp {
 //
 // convert vptr to MKL-DNN's DPCPP buffer
 //
-static inline void dpcpp_set_mkldnn_buffer(void *vptr, mkldnn::memory &memory) {
+static inline void dpcpp_set_mkldnn_buffer(void* vptr, mkldnn::memory& memory) {
   //
   // TODO: check size mismatch between vptr and mkldnn::memory
   //
@@ -66,38 +66,40 @@ static inline memory::data_type dt_to_dnnl(const ScalarType scalar_type) {
 
 // GpuEngineManager singleton
 struct GpuEngineManager {
-  static GpuEngineManager &Instance() {
+  static GpuEngineManager& Instance() {
     static GpuEngineManager myInstance;
     return myInstance;
   }
 
-  engine &get_engine(const Device &device) {
+  engine& get_engine(const Device& device) {
     AT_ASSERT(device.type() == kDPCPP);
     AT_ASSERT(device.index() < at::dpcpp::device_count());
     return _gpu_engines[device.index()];
   }
 
-  GpuEngineManager(GpuEngineManager const &) = delete;
-  GpuEngineManager &operator=(GpuEngineManager const &) = delete;
+  GpuEngineManager(GpuEngineManager const&) = delete;
+  GpuEngineManager& operator=(GpuEngineManager const&) = delete;
 
-protected:
+ protected:
   GpuEngineManager() {
     int device_count = (int)at::dpcpp::device_count();
     AT_ASSERT(device_count > 0);
     for (int i = 0; i < device_count; i++) {
-      _gpu_engines.push_back({engine::kind::gpu, dpcppGetRawDevice(i),
-                              at::dpcpp::getGlobalContext()});
+      _gpu_engines.push_back(
+          {engine::kind::gpu,
+           dpcppGetRawDevice(i),
+           at::dpcpp::getGlobalContext()});
     }
   }
   ~GpuEngineManager() {}
 
-private:
+ private:
   std::vector<engine> _gpu_engines;
 };
 
 // Stream singleton
 struct GpuStreamManager {
-  static GpuStreamManager &Instance() {
+  static GpuStreamManager& Instance() {
     static thread_local GpuStreamManager myInstance;
     return myInstance;
   };
@@ -108,10 +110,10 @@ struct GpuStreamManager {
         GpuEngineManager::Instance().get_engine({kDPCPP, current_device()}),
         getDefaultDPCPPStream(device_index).dpcpp_queue());
   }
-  GpuStreamManager(GpuStreamManager const &) = delete;
-  GpuStreamManager &operator=(GpuStreamManager const &) = delete;
+  GpuStreamManager(GpuStreamManager const&) = delete;
+  GpuStreamManager& operator=(GpuStreamManager const&) = delete;
 
-protected:
+ protected:
   GpuStreamManager(){};
   ~GpuStreamManager(){};
 };

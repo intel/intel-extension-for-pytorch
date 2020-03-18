@@ -8,28 +8,28 @@ namespace DPCPP = cl::sycl;
 // macros for dpcpp command queue and kernel function
 #define DPCPP_K_NAME(x) __##x##_dpcpp_kernel
 #define DPCPP_K(k, ...) DPCPP_K_NAME(k)<char, ##__VA_ARGS__>
-#define DPCPP_DEF_K1(k)                                                        \
-  template <typename __dummy_typename_dpcpp, typename...>                      \
+#define DPCPP_DEF_K1(k)                                   \
+  template <typename __dummy_typename_dpcpp, typename...> \
   class DPCPP_K_NAME(k) {}
-#define DPCPP_DEF_K2(k, ...)                                                   \
-  template <typename __dummy_typename_dpcpp, ##__VA_ARGS__>                    \
+#define DPCPP_DEF_K2(k, ...)                                \
+  template <typename __dummy_typename_dpcpp, ##__VA_ARGS__> \
   class DPCPP_K_NAME(k) {}
 
 #define DPCPP_Q_KFN(...) [=](__VA_ARGS__)
 #define DPCPP_Q_CGF(h) [&](DPCPP::handler & h)
 #define DPCPP_Q_SUBMIT(q, cgf, ...) q.submit(cgf, ##__VA_ARGS__)
-#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)                                       \
-  {                                                                            \
-    auto e = DPCPP_Q_SUBMIT(q, cgf, ##__VA_ARGS__);                            \
-    e.wait();                                                                  \
+#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)            \
+  {                                                 \
+    auto e = DPCPP_Q_SUBMIT(q, cgf, ##__VA_ARGS__); \
+    e.wait();                                       \
   }
-#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)                                      \
+#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...) \
   { DPCPP_Q_SUBMIT(q, cgf, ##__VA_ARGS__); }
 
 // the descriptor as entity attribute
-#define DPCPP_HOST   // for host only
+#define DPCPP_HOST // for host only
 #define DPCPP_DEVICE // for device only
-#define DPCPP_BOTH   // for both host and device
+#define DPCPP_BOTH // for both host and device
 
 // dpcpp device configuration
 // TODO: set subgourp size with api get_max_sub_group_size
@@ -189,12 +189,14 @@ DPCPP_DEVICE using dpcpp_multi_ptr_crt =
     typename dpcpp_multi_ptr<T, Space>::const_reference_t;
 
 // dpcpp accessor type
-template <typename ScalarType, DPCPP::access::mode Mode = dpcpp_rw_mode,
+template <typename ScalarType,
+          DPCPP::access::mode Mode = dpcpp_rw_mode,
           int Dims = 1>
 DPCPP_DEVICE using dpcpp_local_acc_t =
     DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_local_buf>;
 
-template <typename ScalarType, DPCPP::access::mode Mode = dpcpp_rw_mode,
+template <typename ScalarType,
+          DPCPP::access::mode Mode = dpcpp_rw_mode,
           int Dims = 1>
 DPCPP_DEVICE using dpcpp_global_acc_t =
     DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_global_buf>;
@@ -203,7 +205,8 @@ template <typename ScalarType, int Dims = 1>
 DPCPP_DEVICE using dpcpp_const_acc_t =
     DPCPP::accessor<ScalarType, Dims, dpcpp_r_mode, dpcpp_const_buf>;
 
-template <typename ScalarType, DPCPP::access::mode Mode = dpcpp_rw_mode,
+template <typename ScalarType,
+          DPCPP::access::mode Mode = dpcpp_rw_mode,
           int Dims = 1>
 DPCPP_HOST using dpcpp_host_acc_t =
     DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_host_buf>;

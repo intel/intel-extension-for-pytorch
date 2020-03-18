@@ -16,11 +16,15 @@ using namespace at::dpcpp;
 // This version uses a static number of dimensions.
 template <typename IndexType, typename Real, int Dims>
 struct IndexToScatterGatherOffsets {
-  static DPCPP_DEVICE void
-  compute(IndexType linearId, const int dim,
-          const TensorInfo<int64_t, IndexType> &index, IndexType *indexOffset,
-          const TensorInfo<Real, IndexType> &t1, IndexType *t1Offset,
-          const TensorInfo<Real, IndexType> &t2, IndexType *t2Offset) {
+  static DPCPP_DEVICE void compute(
+      IndexType linearId,
+      const int dim,
+      const TensorInfo<int64_t, IndexType>& index,
+      IndexType* indexOffset,
+      const TensorInfo<Real, IndexType>& t1,
+      IndexType* t1Offset,
+      const TensorInfo<Real, IndexType>& t2,
+      IndexType* t2Offset) {
     for (int d = Dims - 1; d >= 0; d--) {
       IndexType curDimIndex = linearId % index.sizes[d];
       *indexOffset += curDimIndex * index.strides[d];
@@ -32,11 +36,13 @@ struct IndexToScatterGatherOffsets {
     }
   }
 
-  static DPCPP_DEVICE void compute(IndexType linearId, const int dim,
-                                   const TensorInfo<int64_t, IndexType> &index,
-                                   IndexType *indexOffset,
-                                   const TensorInfo<Real, IndexType> &t2,
-                                   IndexType *t2Offset) {
+  static DPCPP_DEVICE void compute(
+      IndexType linearId,
+      const int dim,
+      const TensorInfo<int64_t, IndexType>& index,
+      IndexType* indexOffset,
+      const TensorInfo<Real, IndexType>& t2,
+      IndexType* t2Offset) {
     for (int d = Dims - 1; d >= 0; d--) {
       IndexType curDimIndex = linearId % index.sizes[d];
       *indexOffset += curDimIndex * index.strides[d];
@@ -51,11 +57,15 @@ struct IndexToScatterGatherOffsets {
 // Same as above but using a dynamic number of dimensions.
 template <typename IndexType, typename Real>
 struct IndexToScatterGatherOffsets<IndexType, Real, -1> {
-  static DPCPP_DEVICE void
-  compute(IndexType linearId, const int dim,
-          const TensorInfo<int64_t, IndexType> &index, IndexType *indexOffset,
-          const TensorInfo<Real, IndexType> &t1, IndexType *t1Offset,
-          const TensorInfo<Real, IndexType> &t2, IndexType *t2Offset) {
+  static DPCPP_DEVICE void compute(
+      IndexType linearId,
+      const int dim,
+      const TensorInfo<int64_t, IndexType>& index,
+      IndexType* indexOffset,
+      const TensorInfo<Real, IndexType>& t1,
+      IndexType* t1Offset,
+      const TensorInfo<Real, IndexType>& t2,
+      IndexType* t2Offset) {
     for (int d = index.dims - 1; d >= 0; d--) {
       IndexType curDimIndex = linearId % index.sizes[d];
       *indexOffset += curDimIndex * index.strides[d];
@@ -67,11 +77,13 @@ struct IndexToScatterGatherOffsets<IndexType, Real, -1> {
     }
   }
 
-  static DPCPP_DEVICE void compute(IndexType linearId, const int dim,
-                                   const TensorInfo<int64_t, IndexType> &index,
-                                   IndexType *indexOffset,
-                                   const TensorInfo<Real, IndexType> &t2,
-                                   IndexType *t2Offset) {
+  static DPCPP_DEVICE void compute(
+      IndexType linearId,
+      const int dim,
+      const TensorInfo<int64_t, IndexType>& index,
+      IndexType* indexOffset,
+      const TensorInfo<Real, IndexType>& t2,
+      IndexType* t2Offset) {
     for (int d = index.dims - 1; d >= 0; d--) {
       IndexType curDimIndex = linearId % index.sizes[d];
       *indexOffset += curDimIndex * index.strides[d];
@@ -87,12 +99,13 @@ struct IndexToScatterGatherOffsets<IndexType, Real, -1> {
 template <typename IndexType, typename Real, int Dims>
 class dpcpp_gather_kernel {};
 template <typename IndexType, typename Real, int Dims>
-void THDPCPPTensor_gatherKernel(TensorInfo<Real, IndexType> tensor,
-                                TensorInfo<Real, IndexType> src,
-                                TensorInfo<int64_t, IndexType> index,
-                                const int dim, const IndexType totalElements) {
-
-  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+void THDPCPPTensor_gatherKernel(
+    TensorInfo<Real, IndexType> tensor,
+    TensorInfo<Real, IndexType> src,
+    TensorInfo<int64_t, IndexType> index,
+    const int dim,
+    const IndexType totalElements) {
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
   using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
@@ -114,7 +127,13 @@ void THDPCPPTensor_gatherKernel(TensorInfo<Real, IndexType> tensor,
       IndexType indexOffset = 0;
 
       IndexToScatterGatherOffsets<IndexType, Real, Dims>::compute(
-          linear_idx, dim, index, &indexOffset, tensor, &tensorOffset, src,
+          linear_idx,
+          dim,
+          index,
+          &indexOffset,
+          tensor,
+          &tensorOffset,
+          src,
           &srcOffset);
 
       int64_t indexValue = index_data[indexOffset];
@@ -137,11 +156,12 @@ void THDPCPPTensor_gatherKernel(TensorInfo<Real, IndexType> tensor,
 
 DPCPP_DEF_K2(scatterSycl, typename IndexType, typename Real, int Dims);
 template <typename IndexType, typename Real, int Dims>
-void THSyclTensor_scatterKernel(TensorInfo<Real, IndexType> tensor,
-                                TensorInfo<Real, IndexType> src,
-                                TensorInfo<int64_t, IndexType> index,
-                                const int dim, const IndexType totalElements) {
-
+void THSyclTensor_scatterKernel(
+    TensorInfo<Real, IndexType> tensor,
+    TensorInfo<Real, IndexType> src,
+    TensorInfo<int64_t, IndexType> index,
+    const int dim,
+    const IndexType totalElements) {
   auto queue = dpcppGetCurrentQueue();
   IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(queue);
   auto num_groups = CeilDiv(totalElements, group_size);
@@ -163,7 +183,13 @@ void THSyclTensor_scatterKernel(TensorInfo<Real, IndexType> tensor,
         IndexType indexOffset = 0;
 
         IndexToScatterGatherOffsets<IndexType, Real, Dims>::compute(
-            linearIndex, dim, index, &indexOffset, src, &srcOffset, tensor,
+            linearIndex,
+            dim,
+            index,
+            &indexOffset,
+            src,
+            &srcOffset,
+            tensor,
             &tensorOffset);
 
         int64_t indexValue = index_ptr[indexOffset];
@@ -176,8 +202,8 @@ void THSyclTensor_scatterKernel(TensorInfo<Real, IndexType> tensor,
 
     // kick off kernel
     cgh.parallel_for<DPCPP_K(scatterSycl, IndexType, Real, Dims)>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(total_items),
-                           DPCPP::range<1>(group_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
 
@@ -186,12 +212,12 @@ void THSyclTensor_scatterKernel(TensorInfo<Real, IndexType> tensor,
 
 DPCPP_DEF_K2(scatterAddSycl, typename IndexType, typename Real, int Dims);
 template <typename IndexType, typename Real, int Dims>
-void THSyclTensor_scatterAddKernel(TensorInfo<Real, IndexType> tensor,
-                                   TensorInfo<Real, IndexType> src,
-                                   TensorInfo<int64_t, IndexType> index,
-                                   const int dim,
-                                   const IndexType totalElements) {
-
+void THSyclTensor_scatterAddKernel(
+    TensorInfo<Real, IndexType> tensor,
+    TensorInfo<Real, IndexType> src,
+    TensorInfo<int64_t, IndexType> index,
+    const int dim,
+    const IndexType totalElements) {
   auto queue = dpcppGetCurrentQueue();
   IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(queue);
   auto num_groups = CeilDiv(totalElements, group_size);
@@ -214,7 +240,13 @@ void THSyclTensor_scatterAddKernel(TensorInfo<Real, IndexType> tensor,
         IndexType indexOffset = 0;
 
         IndexToScatterGatherOffsets<IndexType, Real, Dims>::compute(
-            linearIndex, dim, index, &indexOffset, src, &srcOffset, tensor,
+            linearIndex,
+            dim,
+            index,
+            &indexOffset,
+            src,
+            &srcOffset,
+            tensor,
             &tensorOffset);
 
         int64_t indexValue = index_ptr[indexOffset];
@@ -227,8 +259,8 @@ void THSyclTensor_scatterAddKernel(TensorInfo<Real, IndexType> tensor,
 
     // kick off kernel
     cgh.parallel_for<DPCPP_K(scatterAddSycl, IndexType, Real, Dims)>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(total_items),
-                           DPCPP::range<1>(group_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
@@ -236,11 +268,12 @@ void THSyclTensor_scatterAddKernel(TensorInfo<Real, IndexType> tensor,
 
 DPCPP_DEF_K2(scatterFillSycl, typename IndexType, typename Real, int Dims);
 template <typename IndexType, typename Real, int Dims>
-void THSyclTensor_scatterFillKernel(TensorInfo<Real, IndexType> tensor,
-                                    TensorInfo<int64_t, IndexType> index,
-                                    Real value, const int dim,
-                                    const IndexType totalElements) {
-
+void THSyclTensor_scatterFillKernel(
+    TensorInfo<Real, IndexType> tensor,
+    TensorInfo<int64_t, IndexType> index,
+    Real value,
+    const int dim,
+    const IndexType totalElements) {
   auto queue = dpcppGetCurrentQueue();
   IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(queue);
   auto num_groups = CeilDiv(totalElements, group_size);
@@ -271,8 +304,8 @@ void THSyclTensor_scatterFillKernel(TensorInfo<Real, IndexType> tensor,
 
     // kick off kernel
     cgh.parallel_for<DPCPP_K(scatterFillSycl, IndexType, Real, Dims)>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(total_items),
-                           DPCPP::range<1>(group_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
 

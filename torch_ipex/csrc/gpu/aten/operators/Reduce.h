@@ -29,20 +29,28 @@ DPCPP_DEF_K1(reduce_kernel);
 namespace at {
 namespace dpcpp {
 
-static inline int64_t div_up(int64_t a, int64_t b) { return (a + b - 1) / b; }
+static inline int64_t div_up(int64_t a, int64_t b) {
+  return (a + b - 1) / b;
+}
 
 struct ReduceConfig {
   static constexpr int LANE = 0;
   static constexpr int SUB_GROUP = 1;
   static constexpr int WORK_GROUP = 2;
 
-  ReduceConfig(int element_size_bytes, int num_outputs, int num_inputs,
-               int num_total, int work_group_size)
-      : element_size_bytes(element_size_bytes), num_inputs(num_inputs),
-        num_outputs(num_outputs), num_total(num_total),
+  ReduceConfig(
+      int element_size_bytes,
+      int num_outputs,
+      int num_inputs,
+      int num_total,
+      int work_group_size)
+      : element_size_bytes(element_size_bytes),
+        num_inputs(num_inputs),
+        num_outputs(num_outputs),
+        num_total(num_total),
         work_group_size(work_group_size) {}
 
-  ReduceConfig(const ReduceConfig &rhs) = default;
+  ReduceConfig(const ReduceConfig& rhs) = default;
 
   int element_size_bytes;
   int num_inputs;
@@ -79,41 +87,49 @@ struct ReduceConfig {
         wg_per_output * work_group_size / DPCPP_SUB_GROUP_SIZE);
   }
 
-  bool should_sg_reduce() const { return input_mult[LANE] != 0; }
-
-  bool should_wg_reduce() const { return input_mult[SUB_GROUP] != 0; }
-
-  bool should_global_reduce() const { return input_mult[WORK_GROUP] != 0; }
-
-  bool should_store(int output_idx, const DPCPP::nd_item<2> &item_id) const {
-    return output_idx < num_outputs &&
-           (!should_sg_reduce() || item_id.get_local_id(0) == 0) &&
-           (!should_wg_reduce() || item_id.get_local_id(1) == 0);
+  bool should_sg_reduce() const {
+    return input_mult[LANE] != 0;
   }
 
-  int input_idx(const DPCPP::nd_item<2> &item_id) const {
+  bool should_wg_reduce() const {
+    return input_mult[SUB_GROUP] != 0;
+  }
+
+  bool should_global_reduce() const {
+    return input_mult[WORK_GROUP] != 0;
+  }
+
+  bool should_store(int output_idx, const DPCPP::nd_item<2>& item_id) const {
+    return output_idx < num_outputs &&
+        (!should_sg_reduce() || item_id.get_local_id(0) == 0) &&
+        (!should_wg_reduce() || item_id.get_local_id(1) == 0);
+  }
+
+  int input_idx(const DPCPP::nd_item<2>& item_id) const {
     int lane = item_id.get_local_id(0);
     int sg = item_id.get_local_id(1);
     int wg2 = item_id.get_group(1);
-    return (lane * input_mult[LANE] + sg * input_mult[SUB_GROUP] +
-            wg2 * input_mult[WORK_GROUP]);
+    return (
+        lane * input_mult[LANE] + sg * input_mult[SUB_GROUP] +
+        wg2 * input_mult[WORK_GROUP]);
   }
 
-  int output_idx(const DPCPP::nd_item<2> &item_id) const {
+  int output_idx(const DPCPP::nd_item<2>& item_id) const {
     int lane = item_id.get_local_id(0);
     int sg = item_id.get_local_id(1);
     int wg1 = item_id.get_group(0);
-    return (lane * output_mult[LANE] + sg * output_mult[SUB_GROUP] +
-            wg1 * step_output);
+    return (
+        lane * output_mult[LANE] + sg * output_mult[SUB_GROUP] +
+        wg1 * step_output);
   }
 
-  int shared_memory_offset(int offset, const DPCPP::nd_item<2> &item_id) const {
+  int shared_memory_offset(int offset, const DPCPP::nd_item<2>& item_id) const {
     int lane = item_id.get_local_id(0);
     int sg = item_id.get_local_id(1);
     return lane + (sg + offset) * item_id.get_local_range(0);
   }
 
-  int staging_memory_offset(int wg2, const DPCPP::nd_item<2> &item_id) const {
+  int staging_memory_offset(int wg2, const DPCPP::nd_item<2>& item_id) const {
     int offset = wg2 + item_id.get_group(0) * item_id.get_group_range(1);
     if (!should_sg_reduce()) {
       offset = item_id.get_local_id(0) + offset * item_id.get_local_range(0);
@@ -147,17 +163,19 @@ struct ReduceConfig {
     return sizeof(int) * get_global_size()[0] / DPCPP_SUB_GROUP_SIZE;
   }
 
-  int values_per_thread() const { return div_up(num_inputs, step_input); }
+  int values_per_thread() const {
+    return div_up(num_inputs, step_input);
+  }
 };
 
 template <typename index_t>
-static OffsetCalculator<2, index_t>
-make_output_calculator(const TensorIterator &iter) {
+static OffsetCalculator<2, index_t> make_output_calculator(
+    const TensorIterator& iter) {
   int num_reduce_dims = iter.num_reduce_dims();
   int num_output_dims = iter.ndim() - num_reduce_dims;
   int input_index = iter.ntensors() - 1;
   int output_index = 0;
-  std::array<const int64_t *, 2> strides = {
+  std::array<const int64_t*, 2> strides = {
       iter.strides(output_index).data() + num_reduce_dims,
       iter.strides(input_index).data() + num_reduce_dims,
   };
@@ -166,15 +184,15 @@ make_output_calculator(const TensorIterator &iter) {
 }
 
 template <typename index_t>
-static OffsetCalculator<1, index_t>
-make_input_calculator(const TensorIterator &iter) {
+static OffsetCalculator<1, index_t> make_input_calculator(
+    const TensorIterator& iter) {
   int num_reduce_dims = iter.num_reduce_dims();
   int input_index = iter.ntensors() - 1;
-  std::array<const int64_t *, 1> strides = {
+  std::array<const int64_t*, 1> strides = {
       iter.strides(input_index).data(),
   };
-  return OffsetCalculator<1, index_t>(num_reduce_dims, iter.shape().data(),
-                                      strides.data());
+  return OffsetCalculator<1, index_t>(
+      num_reduce_dims, iter.shape().data(), strides.data());
 }
 
 template <int vt, typename index_t, typename func_t>
@@ -195,43 +213,58 @@ void strided_iterate(func_t f, index_t begin, index_t end, index_t stride) {
 }
 
 template <int vt, typename index_t, typename type_t, typename foo_t>
-Array<type_t, vt> load_memory(const dpcpp_global_ptr_pt<type_t> &in,
-                              index_t begin, index_t end, index_t stride,
-                              foo_t foo) {
+Array<type_t, vt> load_memory(
+    const dpcpp_global_ptr_pt<type_t>& in,
+    index_t begin,
+    index_t end,
+    index_t stride,
+    foo_t foo) {
   Array<type_t, vt> res;
-  strided_iterate<vt>([&](index_t i, index_t idx) { res[i] = in[foo(idx)]; },
-                      begin, end, stride);
+  strided_iterate<vt>(
+      [&](index_t i, index_t idx) { res[i] = in[foo(idx)]; },
+      begin,
+      end,
+      stride);
   return res;
 }
 
 template <int vt, typename index_t, typename type_t>
-Array<type_t, vt> load_memory(const dpcpp_global_ptr_pt<type_t> &in,
-                              index_t begin, index_t end, index_t stride) {
-  return load_memory<vt, index_t, type_t>(in, begin, end, stride,
-                                          [](index_t idx) { return idx; });
+Array<type_t, vt> load_memory(
+    const dpcpp_global_ptr_pt<type_t>& in,
+    index_t begin,
+    index_t end,
+    index_t stride) {
+  return load_memory<vt, index_t, type_t>(
+      in, begin, end, stride, [](index_t idx) { return idx; });
 }
 
-template <typename out_scalar_t, typename func_t> struct func_wrapper_t {
+template <typename out_scalar_t, typename func_t>
+struct func_wrapper_t {
   using arg_t = typename binary_function_traits<func_t>::arg2_t;
   func_t reduce;
   func_t combine;
-  static inline out_scalar_t project(arg_t arg) { return (out_scalar_t)arg; }
+  static inline out_scalar_t project(arg_t arg) {
+    return (out_scalar_t)arg;
+  }
   static inline arg_t sg_shfl_down(arg_t arg, int offset) {
     // TODO: replace following function with sub_group api when it's available
     // return WARP_SHFL_DOWN(arg, offset);
     return arg;
   }
 
-  func_wrapper_t(const func_t &op) : reduce(op), combine(op) {}
+  func_wrapper_t(const func_t& op) : reduce(op), combine(op) {}
 };
 
 template <typename scalar_t, typename func_t>
-func_wrapper_t<scalar_t, func_t> func_wrapper(const func_t &op) {
+func_wrapper_t<scalar_t, func_t> func_wrapper(const func_t& op) {
   return func_wrapper_t<scalar_t, func_t>{op};
 }
 
-template <typename scalar_t, typename ops_t, typename index_t,
-          typename out_scalar_t = scalar_t, int vt0 = 4>
+template <typename scalar_t,
+          typename ops_t,
+          typename index_t,
+          typename out_scalar_t = scalar_t,
+          int vt0 = 4>
 struct ReduceOp {
   using traits = binary_function_traits<decltype(&ops_t::reduce)>;
   using arg_t = typename std::remove_const<
@@ -249,29 +282,48 @@ struct ReduceOp {
   ReduceConfig config;
   InputCalculator input_calc;
   OutputCalculator output_calc;
-  const void *src;
-  void *dst0;
-  void *dst1;
-  void *buffer;
-  int *semaphores;
+  const void* src;
+  void* dst0;
+  void* dst1;
+  void* buffer;
+  int* semaphores;
   bool accumulate;
   int noutputs;
 
-  ReduceOp(ops_t ops, ReduceConfig config, InputCalculator input_calc,
-           OutputCalculator output_calc, const void *src, void *dst0,
-           void *dst1, void *buffer, int *semaphores, arg_t ident, int noutputs)
-      : ops(ops), ident(ident), config(config), input_calc(input_calc),
-        output_calc(output_calc), src(src), dst0(dst0), dst1(dst1),
-        buffer(buffer), semaphores(semaphores), noutputs(noutputs) {}
+  ReduceOp(
+      ops_t ops,
+      ReduceConfig config,
+      InputCalculator input_calc,
+      OutputCalculator output_calc,
+      const void* src,
+      void* dst0,
+      void* dst1,
+      void* buffer,
+      int* semaphores,
+      arg_t ident,
+      int noutputs)
+      : ops(ops),
+        ident(ident),
+        config(config),
+        input_calc(input_calc),
+        output_calc(output_calc),
+        src(src),
+        dst0(dst0),
+        dst1(dst1),
+        buffer(buffer),
+        semaphores(semaphores),
+        noutputs(noutputs) {}
 
-  Array<scalar_t, vt0> load_inputs(const dpcpp_global_ptr_pt<scalar_t> &data,
-                                   index_t offset) const {
+  Array<scalar_t, vt0> load_inputs(
+      const dpcpp_global_ptr_pt<scalar_t>& data,
+      index_t offset) const {
     index_t end = config.num_inputs;
     index_t stride = input_calc.strides_[0][0] / sizeof(scalar_t);
     if (input_calc.dims == 1) {
       return load_memory<vt0, index_t, scalar_t>(
-          data, offset, end, config.step_input,
-          [&](index_t idx) { return idx * stride; });
+          data, offset, end, config.step_input, [&](index_t idx) {
+            return idx * stride;
+          });
     } else {
       return load_memory<vt0, index_t, scalar_t>(
           data, offset, end, config.step_input, [&](index_t idx) {
@@ -280,20 +332,24 @@ struct ReduceOp {
     }
   }
 
-  arg_t thread_reduce_once(const dpcpp_global_ptr_pt<scalar_t> &data,
-                           index_t offset) const {
+  arg_t thread_reduce_once(
+      const dpcpp_global_ptr_pt<scalar_t>& data,
+      index_t offset) const {
     auto values = load_inputs(data, offset);
 
     arg_t value = ident;
     strided_iterate<vt0, index_t>(
         [&](index_t i, index_t idx) { value = ops.reduce(value, values[i]); },
-        offset, config.num_inputs, config.step_input);
+        offset,
+        config.num_inputs,
+        config.step_input);
 
     return value;
   }
 
-  arg_t thread_reduce(const dpcpp_global_ptr_pt<scalar_t> &data,
-                      const DPCPP::nd_item<2> &item_id) const {
+  arg_t thread_reduce(
+      const dpcpp_global_ptr_pt<scalar_t>& data,
+      const DPCPP::nd_item<2>& item_id) const {
     arg_t value = ident;
     index_t idx = config.input_idx(item_id);
     while (idx < static_cast<index_t>(config.num_inputs)) {
@@ -312,12 +368,13 @@ struct ReduceOp {
     return value;
   }
 
-  arg_t work_group_reduce(arg_t value,
-                          const dpcpp_local_ptr_pt<arg_t> &local_ptr,
-                          const DPCPP::nd_item<2> &item_id) const {
+  arg_t work_group_reduce(
+      arg_t value,
+      const dpcpp_local_ptr_pt<arg_t>& local_ptr,
+      const DPCPP::nd_item<2>& item_id) const {
     local_ptr[config.shared_memory_offset(0, item_id)] = value;
     int num_sg = (item_id.get_local_range(0) * item_id.get_local_range(1)) /
-                 DPCPP_SUB_GROUP_SIZE;
+        DPCPP_SUB_GROUP_SIZE;
     for (int64_t offset = num_sg / 2; offset > 0; offset >>= 1) {
       item_id.barrier(dpcpp_global_and_local_fence);
       if (static_cast<int64_t>(item_id.get_local_id(1)) < offset &&
@@ -330,17 +387,19 @@ struct ReduceOp {
     return value;
   }
 
-  bool mark_block_finished(const dpcpp_local_ptr_pt<int> &last_wg_done_ptr,
-                           const dpcpp_global_ptr_pt<int> &smem,
-                           const DPCPP::nd_item<2> &item_id) const {
+  bool mark_block_finished(
+      const dpcpp_local_ptr_pt<int>& last_wg_done_ptr,
+      const dpcpp_global_ptr_pt<int>& smem,
+      const DPCPP::nd_item<2>& item_id) const {
     item_id.barrier(dpcpp_global_and_local_fence);
     if (item_id.get_local_linear_id() == 0) {
       dpcpp_multi_ptr<int, dpcpp_global_space> sema_multi_ptr(smem);
       DPCPP::atomic<int> at_var(sema_multi_ptr + item_id.get_group(0));
       int prev_blocks_finished = at_var.fetch_add(1);
 
-      last_wg_done_ptr[0] = (prev_blocks_finished ==
-                             static_cast<int>(item_id.get_group_range(1) - 1));
+      last_wg_done_ptr[0] =
+          (prev_blocks_finished ==
+           static_cast<int>(item_id.get_group_range(1) - 1));
     }
     item_id.barrier(dpcpp_global_and_local_fence);
     bool is_last_block_done = last_wg_done_ptr[0];
@@ -350,8 +409,9 @@ struct ReduceOp {
 
   template <bool can_acc>
   arg_t accumulate_in_output(
-      const dpcpp_global_ptr_pt<out_scalar_t> &out, arg_t value,
-      typename std::enable_if<can_acc>::type * = nullptr) const {
+      const dpcpp_global_ptr_pt<out_scalar_t>& out,
+      arg_t value,
+      typename std::enable_if<can_acc>::type* = nullptr) const {
     return ops.combine(*out, value);
   }
 
@@ -360,23 +420,27 @@ struct ReduceOp {
   // when accumulation in the output is not possible.
   template <bool can_acc>
   arg_t accumulate_in_output(
-      const dpcpp_global_ptr_pt<out_scalar_t> &out, arg_t,
-      typename std::enable_if<!can_acc>::type * = nullptr) const {
+      const dpcpp_global_ptr_pt<out_scalar_t>& out,
+      arg_t,
+      typename std::enable_if<!can_acc>::type* = nullptr) const {
     // TODO: Replace following assert with dpcpp counterparts.
     // assert(false); // can't use AT_ASSERT in Cuda.
     return arg_t{};
   }
 
   template <class T>
-  void set_results(const T x, const dpcpp_global_ptr_pt<out_scalar_t> &out0,
-                   const dpcpp_global_ptr_pt<out_scalar_t> &out1) const {
+  void set_results(
+      const T x,
+      const dpcpp_global_ptr_pt<out_scalar_t>& out0,
+      const dpcpp_global_ptr_pt<out_scalar_t>& out1) const {
     *out0 = x;
   }
 
   template <class T>
-  void set_results(const std::pair<T, T> x,
-                   const dpcpp_global_ptr_pt<out_scalar_t> &out0,
-                   const dpcpp_global_ptr_pt<out_scalar_t> &out1) const {
+  void set_results(
+      const std::pair<T, T> x,
+      const dpcpp_global_ptr_pt<out_scalar_t>& out0,
+      const dpcpp_global_ptr_pt<out_scalar_t>& out1) const {
     if (noutputs >= 1) {
       *out0 = x.first;
     }
@@ -385,21 +449,22 @@ struct ReduceOp {
     }
   }
 
-  void
-  set_results_to_output(arg_t value,
-                        const dpcpp_global_ptr_pt<out_scalar_t> &out0,
-                        const dpcpp_global_ptr_pt<out_scalar_t> &out1) const {
+  void set_results_to_output(
+      arg_t value,
+      const dpcpp_global_ptr_pt<out_scalar_t>& out0,
+      const dpcpp_global_ptr_pt<out_scalar_t>& out1) const {
     set_results(ops.project(value), out0, out1);
   }
 
-  arg_t global_reduce(arg_t value,
-                      const dpcpp_global_ptr_pt<out_scalar_t> &out0,
-                      const dpcpp_global_ptr_pt<out_scalar_t> &out1,
-                      const dpcpp_local_ptr_pt<arg_t> &local_ptr,
-                      const dpcpp_global_ptr_pt<char> &global_reduce_buf,
-                      const dpcpp_global_ptr_pt<int> &smem,
-                      const DPCPP::nd_item<2> &item_id) const {
-    arg_t *reduce_buffer = (arg_t *)global_reduce_buf;
+  arg_t global_reduce(
+      arg_t value,
+      const dpcpp_global_ptr_pt<out_scalar_t>& out0,
+      const dpcpp_global_ptr_pt<out_scalar_t>& out1,
+      const dpcpp_local_ptr_pt<arg_t>& local_ptr,
+      const dpcpp_global_ptr_pt<char>& global_reduce_buf,
+      const dpcpp_global_ptr_pt<int>& smem,
+      const DPCPP::nd_item<2>& item_id) const {
+    arg_t* reduce_buffer = (arg_t*)global_reduce_buf;
     bool should_store =
         config.should_store(config.output_idx(item_id), item_id);
     if (should_store) {
@@ -415,8 +480,7 @@ struct ReduceOp {
     if (is_last_block_done) {
       value = arg_t{};
       if (config.should_sg_reduce()) {
-        index_t input_offset =
-            item_id.get_local_id(0) +
+        index_t input_offset = item_id.get_local_id(0) +
             item_id.get_local_id(1) * item_id.get_local_range(0);
         index_t step = item_id.get_local_range(0) * item_id.get_local_range(1);
         for (; input_offset < static_cast<index_t>(config.wg_per_output);
@@ -450,20 +514,21 @@ struct ReduceOp {
     return value;
   }
 
-  void run(const dpcpp_global_ptr_pt<char> &input,
-           const dpcpp_global_ptr_pt<char> &output0,
-           const dpcpp_global_ptr_pt<char> &output1,
-           const dpcpp_local_ptr_pt<arg_t> &local_ptr,
-           const dpcpp_global_ptr_pt<char> &global_reduce_buf,
-           const dpcpp_global_ptr_pt<int> &smem,
-           const DPCPP::nd_item<2> &item_id) const {
+  void run(
+      const dpcpp_global_ptr_pt<char>& input,
+      const dpcpp_global_ptr_pt<char>& output0,
+      const dpcpp_global_ptr_pt<char>& output1,
+      const dpcpp_local_ptr_pt<arg_t>& local_ptr,
+      const dpcpp_global_ptr_pt<char>& global_reduce_buf,
+      const dpcpp_global_ptr_pt<int>& smem,
+      const DPCPP::nd_item<2>& item_id) const {
     index_t output_idx = config.output_idx(item_id);
     index_t input_idx = config.input_idx(item_id);
     auto base_offsets = output_calc.get(output_idx);
     arg_t value = ident;
     if (output_idx < static_cast<index_t>(config.num_outputs) &&
         input_idx < static_cast<index_t>(config.num_inputs)) {
-      auto input_slice = (char *)input + base_offsets[1];
+      auto input_slice = (char*)input + base_offsets[1];
       value =
           thread_reduce((dpcpp_global_ptr_pt<scalar_t>)input_slice, item_id);
     }
@@ -476,26 +541,34 @@ struct ReduceOp {
       value = sub_group_reduce(value);
     }
 
-    auto out0 = (out_scalar_t *)(output0 + base_offsets[0]);
-    auto out1 = (out_scalar_t *)(output1 + base_offsets[0]);
+    auto out0 = (out_scalar_t*)(output0 + base_offsets[0]);
+    auto out1 = (out_scalar_t*)(output1 + base_offsets[0]);
     if (config.should_global_reduce()) {
-      value = global_reduce(value, (dpcpp_global_ptr_pt<out_scalar_t>)out0,
-                            (dpcpp_global_ptr_pt<out_scalar_t>)out1, local_ptr,
-                            global_reduce_buf, smem, item_id);
+      value = global_reduce(
+          value,
+          (dpcpp_global_ptr_pt<out_scalar_t>)out0,
+          (dpcpp_global_ptr_pt<out_scalar_t>)out1,
+          local_ptr,
+          global_reduce_buf,
+          smem,
+          item_id);
     } else if (config.should_store(output_idx, item_id)) {
       if (accumulate) {
         value = accumulate_in_output<can_accumulate_in_output>(
             (dpcpp_global_ptr_pt<out_scalar_t>)out0, value);
       }
-      set_results_to_output(value, (dpcpp_global_ptr_pt<out_scalar_t>)out0,
-                            (dpcpp_global_ptr_pt<out_scalar_t>)out1);
+      set_results_to_output(
+          value,
+          (dpcpp_global_ptr_pt<out_scalar_t>)out0,
+          (dpcpp_global_ptr_pt<out_scalar_t>)out1);
     }
   }
 };
 
 template <typename DataType, typename R>
-static void launch_reduce_kernel(const ReduceConfig &config,
-                                 const R reduction) {
+static void launch_reduce_kernel(
+    const ReduceConfig& config,
+    const R reduction) {
   using acc_t = typename R::arg_t;
   using output_t = typename R::out_t;
   auto queue = dpcppGetCurrentQueue();
@@ -512,22 +585,19 @@ static void launch_reduce_kernel(const ReduceConfig &config,
     auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, reduction.src);
     auto out0_acc = DPCPPAccessor<dpcpp_discard_w_mode>(
         cgh, reduction.dst0, sizeof(output_t) * config.num_outputs);
-    auto out1_acc =
-        reduction.noutputs <= 1
-            ? DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dummy_buffer)
-            : // dummy
-            DPCPPAccessor<dpcpp_discard_w_mode>(
-                cgh, reduction.dst1, sizeof(output_t) * config.num_outputs);
+    auto out1_acc = reduction.noutputs <= 1
+        ? DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dummy_buffer)
+        : // dummy
+        DPCPPAccessor<dpcpp_discard_w_mode>(
+            cgh, reduction.dst1, sizeof(output_t) * config.num_outputs);
     auto local_acc = dpcpp_local_acc_t<acc_t>(config.work_group_size, cgh);
 
-    auto global_reduce_acc =
-        config.should_global_reduce()
-            ? DPCPPAccessor<dpcpp_rw_mode>(cgh, reduction.buffer)
-            : DPCPPAccessor<dpcpp_rw_mode>(cgh, dummy_buffer); // dummy
-    auto sema_acc =
-        config.should_global_reduce()
-            ? DPCPPAccessor<dpcpp_rw_mode>(cgh, reduction.semaphores)
-            : DPCPPAccessor<dpcpp_rw_mode>(cgh, dummy_buffer); // dummy
+    auto global_reduce_acc = config.should_global_reduce()
+        ? DPCPPAccessor<dpcpp_rw_mode>(cgh, reduction.buffer)
+        : DPCPPAccessor<dpcpp_rw_mode>(cgh, dummy_buffer); // dummy
+    auto sema_acc = config.should_global_reduce()
+        ? DPCPPAccessor<dpcpp_rw_mode>(cgh, reduction.semaphores)
+        : DPCPPAccessor<dpcpp_rw_mode>(cgh, dummy_buffer); // dummy
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
       auto in_ptr = in_acc.template get_pointer<char>();
@@ -536,8 +606,14 @@ static void launch_reduce_kernel(const ReduceConfig &config,
       auto local_ptr = (dpcpp_local_ptr_pt<acc_t>)local_acc.get_pointer().get();
       auto global_reduce_ptr = global_reduce_acc.template get_pointer<char>();
       auto sema_ptr = sema_acc.template get_pointer<int>();
-      reduction.run(in_ptr, out0_ptr, out1_ptr, local_ptr, global_reduce_ptr,
-                    sema_ptr, item_id);
+      reduction.run(
+          in_ptr,
+          out0_ptr,
+          out1_ptr,
+          local_ptr,
+          global_reduce_ptr,
+          sema_ptr,
+          item_id);
     };
 
     cgh.parallel_for<DPCPP_K(reduce_kernel, DataType, R)>(
@@ -548,12 +624,18 @@ static void launch_reduce_kernel(const ReduceConfig &config,
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-template <typename scalar_t, typename out_scalar_t, int vt0 = 4, typename ops_t,
+template <typename scalar_t,
+          typename out_scalar_t,
+          int vt0 = 4,
+          typename ops_t,
           typename ident_t = double>
-inline void dpcpp_reduce_kernel(TensorIterator &iter, const ops_t &ops,
-                                ident_t ident = 0) {
-  AT_ASSERT(iter.numel() > 0 && iter.ntensors() - iter.noutputs() == 1 &&
-            iter.noutputs() >= 1);
+inline void dpcpp_reduce_kernel(
+    TensorIterator& iter,
+    const ops_t& ops,
+    ident_t ident = 0) {
+  AT_ASSERT(
+      iter.numel() > 0 && iter.ntensors() - iter.noutputs() == 1 &&
+      iter.noutputs() >= 1);
 
   using traits = binary_function_traits<decltype(&ops_t::reduce)>;
   using arg_t = typename traits::arg1_t;
@@ -562,18 +644,18 @@ inline void dpcpp_reduce_kernel(TensorIterator &iter, const ops_t &ops,
 
   bool can_use_32bit_indexing = iter.can_use_32bit_indexing();
   if (can_accumulate_in_output && !can_use_32bit_indexing) {
-    for (auto &sub_iter : iter.with_32bit_indexing()) {
+    for (auto& sub_iter : iter.with_32bit_indexing()) {
       dpcpp_reduce_kernel<scalar_t, out_scalar_t, vt0>(sub_iter, ops, ident);
     }
     return;
   }
 
-  char *out_data = (char *)iter.data_ptr(0);
-  const char *in_data = (char *)iter.data_ptr(iter.ntensors() - 1);
-  char *out_data_extra;
+  char* out_data = (char*)iter.data_ptr(0);
+  const char* in_data = (char*)iter.data_ptr(iter.ntensors() - 1);
+  char* out_data_extra;
   const auto noutputs = iter.noutputs();
   if (noutputs > 1) {
-    out_data_extra = (char *)iter.data_ptr(1);
+    out_data_extra = (char*)iter.data_ptr(1);
   } else {
     out_data_extra = nullptr;
   }
@@ -590,8 +672,8 @@ inline void dpcpp_reduce_kernel(TensorIterator &iter, const ops_t &ops,
   int64_t inputs_per_output = iter.numel() / num_outputs;
   int input_index = iter.ntensors() - 1;
 
-  auto config = ReduceConfig(sizeof(arg_t), num_outputs, inputs_per_output,
-                             iter.numel(), wg_size);
+  auto config = ReduceConfig(
+      sizeof(arg_t), num_outputs, inputs_per_output, iter.numel(), wg_size);
 
   // TODO: Currently subgroup and its corresponding logic doesn't work well.
   // We will re-enable it when subgroup api is available
@@ -622,7 +704,7 @@ inline void dpcpp_reduce_kernel(TensorIterator &iter, const ops_t &ops,
   at::DataPtr buffer;
   at::DataPtr semaphores;
   if (config.should_global_reduce()) {
-    auto &allocator = *dpcpp::getDPCPPDeviceAllocator();
+    auto& allocator = *dpcpp::getDPCPPDeviceAllocator();
     buffer = allocator.allocate(config.global_memory_size());
     semaphores = allocator.allocate(config.semaphore_size());
     dpcppMemset(semaphores.get(), 0, config.semaphore_size());
@@ -632,16 +714,34 @@ inline void dpcpp_reduce_kernel(TensorIterator &iter, const ops_t &ops,
     auto output_calc = make_output_calculator<uint32_t>(iter);
     auto input_calc = make_input_calculator<uint32_t>(iter);
     auto reduce = ReduceOp<scalar_t, ops_t, uint32_t, out_scalar_t, vt0>(
-        ops, config, input_calc, output_calc, in_data, out_data, out_data_extra,
-        buffer.get(), (int *)semaphores.get(), ident, noutputs);
+        ops,
+        config,
+        input_calc,
+        output_calc,
+        in_data,
+        out_data,
+        out_data_extra,
+        buffer.get(),
+        (int*)semaphores.get(),
+        ident,
+        noutputs);
     reduce.accumulate = iter.should_accumulate();
     launch_reduce_kernel<scalar_t>(config, reduce);
   } else {
     auto output_calc = make_output_calculator<uint64_t>(iter);
     auto input_calc = make_input_calculator<uint64_t>(iter);
     auto reduce = ReduceOp<scalar_t, ops_t, uint64_t, out_scalar_t, vt0>(
-        ops, config, input_calc, output_calc, in_data, out_data, out_data_extra,
-        buffer.get(), (int *)semaphores.get(), ident, noutputs);
+        ops,
+        config,
+        input_calc,
+        output_calc,
+        in_data,
+        out_data,
+        out_data_extra,
+        buffer.get(),
+        (int*)semaphores.get(),
+        ident,
+        noutputs);
     AT_ASSERT(!iter.should_accumulate());
     reduce.accumulate = false;
     launch_reduce_kernel<scalar_t>(config, reduce);

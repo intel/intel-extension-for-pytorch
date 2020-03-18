@@ -34,18 +34,18 @@
 #ifdef _WIN32
 #if !defined(AT_CORE_STATIC_WINDOWS)
 // TODO: unfiy the controlling macros.
-#if defined(CAFFE2_BUILD_MAIN_LIBS) || defined(ATen_cpu_EXPORTS) ||            \
+#if defined(CAFFE2_BUILD_MAIN_LIBS) || defined(ATen_cpu_EXPORTS) || \
     defined(caffe2_EXPORTS)
 #define TH_CPP_API __declspec(dllexport)
 #else // defined(CAFFE2_BUILD_MAIN_LIBS) || defined(ATen_cpu_EXPORTS) ||
 // defined(caffe2_EXPORTS)
 #define TH_CPP_API __declspec(dllimport)
 #endif // defined(CAFFE2_BUILD_MAIN_LIBS) || defined(ATen_cpu_EXPORTS) ||
-       // defined(caffe2_EXPORTS)
-#else  // !defined(AT_CORE_STATIC_WINDOWS)
+// defined(caffe2_EXPORTS)
+#else // !defined(AT_CORE_STATIC_WINDOWS)
 #define TH_CPP_API
 #endif // !defined(AT_CORE_STATIC_WINDOWS)
-#else  // _WIN32
+#else // _WIN32
 #if defined(__GNUC__)
 #define TH_CPP_API __attribute__((__visibility__("default")))
 #endif // defined(__GNUC__)
@@ -61,7 +61,7 @@
 #define TH_UNREACHABLE __builtin_unreachable();
 #endif
 
-#if defined(__GNUC__) &&                                                       \
+#if defined(__GNUC__) && \
     ((__GNUC__ > 2) || (__GNUC__ == 2 && __GNUC_MINOR__ > 4))
 #define TH_UNUSED __attribute__((unused))
 #else
@@ -69,7 +69,7 @@
 #endif
 
 #if defined(__clang__)
-#define __ubsan_ignore_float_divide_by_zero__                                  \
+#define __ubsan_ignore_float_divide_by_zero__ \
   __attribute__((no_sanitize("float-divide-by-zero")))
 #else
 #define __ubsan_ignore_float_divide_by_zero__
@@ -111,36 +111,36 @@ TH_API void THHeapUpdate(ptrdiff_t size);
 
 #define THCleanup(...) __VA_ARGS__
 
-#define THArgCheck(...)                                                        \
-  do {                                                                         \
-    _THArgCheck(__FILE__, __LINE__, __VA_ARGS__);                              \
+#define THArgCheck(...)                           \
+  do {                                            \
+    _THArgCheck(__FILE__, __LINE__, __VA_ARGS__); \
   } while (0)
 
-#define THArgError(...)                                                        \
-  do {                                                                         \
-    _THArgCheck(__FILE__, __LINE__, false, __VA_ARGS__);                       \
-    TH_UNREACHABLE                                                             \
+#define THArgError(...)                                  \
+  do {                                                   \
+    _THArgCheck(__FILE__, __LINE__, false, __VA_ARGS__); \
+    TH_UNREACHABLE                                       \
   } while (0)
 
-#define THArgCheckWithCleanup(condition, cleanup, ...)                         \
-  do                                                                           \
-    if (!(condition)) {                                                        \
-      cleanup _THArgCheck(__FILE__, __LINE__, 0, __VA_ARGS__);                 \
-    }                                                                          \
+#define THArgCheckWithCleanup(condition, cleanup, ...)         \
+  do                                                           \
+    if (!(condition)) {                                        \
+      cleanup _THArgCheck(__FILE__, __LINE__, 0, __VA_ARGS__); \
+    }                                                          \
   while (0)
 
-#define THAssert(exp)                                                          \
-  do {                                                                         \
-    if (!(exp)) {                                                              \
-      _THAssertionFailed(__FILE__, __LINE__, #exp, "");                        \
-    }                                                                          \
+#define THAssert(exp)                                   \
+  do {                                                  \
+    if (!(exp)) {                                       \
+      _THAssertionFailed(__FILE__, __LINE__, #exp, ""); \
+    }                                                   \
   } while (0)
 
-#define THAssertMsg(exp, ...)                                                  \
-  do {                                                                         \
-    if (!(exp)) {                                                              \
-      _THAssertionFailed(__FILE__, __LINE__, #exp, __VA_ARGS__);               \
-    }                                                                          \
+#define THAssertMsg(exp, ...)                                    \
+  do {                                                           \
+    if (!(exp)) {                                                \
+      _THAssertionFailed(__FILE__, __LINE__, #exp, __VA_ARGS__); \
+    }                                                            \
   } while (0)
 #endif
 
@@ -167,21 +167,33 @@ TH_API void THHeapUpdate(ptrdiff_t size);
 
 #if (defined(_MSC_VER) || defined(__MINGW32__))
 #if defined(_MSC_VER)
-__inline double log1p(double x) { return THLog1p(x); }
+__inline double log1p(double x) {
+  return THLog1p(x);
+}
 #else
-inline double log1p(double x) { return THLog1p(x); }
+inline double log1p(double x) {
+  return THLog1p(x);
+}
 #endif
 
 #if defined(_MSC_VER)
-__inline double log2(double x) { return THLog2(x); }
+__inline double log2(double x) {
+  return THLog2(x);
+}
 #else
-inline double log2(double x) { return THLog2(x); }
+inline double log2(double x) {
+  return THLog2(x);
+}
 #endif
 
 #if defined(_MSC_VER)
-__inline double expm1(double x) { return THExpm1(x); }
+__inline double expm1(double x) {
+  return THExpm1(x);
+}
 #else
-inline double expm1(double x) { return THExpm1(x); }
+inline double expm1(double x) {
+  return THExpm1(x);
+}
 #endif
 
 #define snprintf _snprintf

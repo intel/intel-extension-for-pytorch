@@ -11,7 +11,7 @@ using namespace at::dpcpp::detail;
 namespace at {
 namespace dpcpp {
 
-TensorImpl *TensorImpl_new(caffe2::TypeMeta type_meta) {
+TensorImpl* TensorImpl_new(caffe2::TypeMeta type_meta) {
   return c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
              c10::intrusive_ptr<at::StorageImpl>::reclaim(
                  StorageImpl_new(type_meta)),
@@ -19,14 +19,16 @@ TensorImpl *TensorImpl_new(caffe2::TypeMeta type_meta) {
       .release();
 }
 
-at::Tensor TensorImpl_wrap(TensorImpl *tensor) {
+at::Tensor TensorImpl_wrap(TensorImpl* tensor) {
   c10::raw::intrusive_ptr::incref(tensor);
   return at::Tensor(c10::intrusive_ptr<at::TensorImpl>::reclaim(tensor));
 }
 
-int TensorImpl_nDimension(const at::TensorImpl *self) { return self->dim(); }
+int TensorImpl_nDimension(const at::TensorImpl* self) {
+  return self->dim();
+}
 
-int TensorImpl_nDimensionLegacyNoScalars(const at::TensorImpl *self) {
+int TensorImpl_nDimensionLegacyNoScalars(const at::TensorImpl* self) {
   if (self->dim() == 0) {
     return 1;
   } else {
@@ -34,7 +36,7 @@ int TensorImpl_nDimensionLegacyNoScalars(const at::TensorImpl *self) {
   }
 }
 
-int TensorImpl_nDimensionLegacyAll(const at::TensorImpl *self) {
+int TensorImpl_nDimensionLegacyAll(const at::TensorImpl* self) {
   if (self->is_empty()) {
     return 0;
   } else if (self->dim() == 0) {
@@ -44,24 +46,26 @@ int TensorImpl_nDimensionLegacyAll(const at::TensorImpl *self) {
   }
 }
 
-const int64_t *TensorImpl_getSizePtr(at::TensorImpl *self) {
+const int64_t* TensorImpl_getSizePtr(at::TensorImpl* self) {
   return self->sizes().data();
 }
 
-int64_t TensorImpl_size(const at::TensorImpl *self, int dim) {
+int64_t TensorImpl_size(const at::TensorImpl* self, int dim) {
   TORCH_CHECK((dim >= 0) && (dim < self->dim()), "out of range");
   return self->size(dim);
 }
 
-int64_t TensorImpl_sizeLegacyNoScalars(const at::TensorImpl *self, int dim) {
-  TORCH_CHECK((dim >= 0) && (dim < TensorImpl_nDimensionLegacyNoScalars(self)),
-              "dimension %d out of range of %dD tensor", dim,
-              TensorImpl_nDimensionLegacyNoScalars(self));
+int64_t TensorImpl_sizeLegacyNoScalars(const at::TensorImpl* self, int dim) {
+  TORCH_CHECK(
+      (dim >= 0) && (dim < TensorImpl_nDimensionLegacyNoScalars(self)),
+      "dimension %d out of range of %dD tensor",
+      dim,
+      TensorImpl_nDimensionLegacyNoScalars(self));
   return self->dim() == 0 ? 1 : self->size(dim);
 }
 
-std::vector<int64_t>
-TensorImpl_sizesLegacyNoScalars(const at::TensorImpl *self) {
+std::vector<int64_t> TensorImpl_sizesLegacyNoScalars(
+    const at::TensorImpl* self) {
   if (self->dim() == 0) {
     return {1};
   } else {
@@ -69,25 +73,29 @@ TensorImpl_sizesLegacyNoScalars(const at::TensorImpl *self) {
   }
 }
 
-const int64_t *TensorImpl_getStridePtr(at::TensorImpl *self) {
+const int64_t* TensorImpl_getStridePtr(at::TensorImpl* self) {
   return self->strides().data();
 }
 
-int64_t TensorImpl_stride(const at::TensorImpl *self, int dim) {
+int64_t TensorImpl_stride(const at::TensorImpl* self, int dim) {
   TORCH_CHECK((dim >= 0) && (dim < self->dim()), "out of range");
   return self->stride(dim);
 }
 
-int64_t TensorImpl_strideLegacyNoScalars(const at::TensorImpl *self, int dim) {
-  TORCH_CHECK((dim >= 0) && (dim < TensorImpl_nDimensionLegacyNoScalars(self)),
-              "dimension %d out of range of %dD tensor", dim,
-              TensorImpl_nDimensionLegacyNoScalars(self));
+int64_t TensorImpl_strideLegacyNoScalars(const at::TensorImpl* self, int dim) {
+  TORCH_CHECK(
+      (dim >= 0) && (dim < TensorImpl_nDimensionLegacyNoScalars(self)),
+      "dimension %d out of range of %dD tensor",
+      dim,
+      TensorImpl_nDimensionLegacyNoScalars(self));
   return self->dim() == 0 ? 1 : self->stride(dim);
 }
 
-TensorImpl *TensorImpl_resizeImpl(at::TensorImpl *self, at::IntArrayRef size,
-                                  c10::optional<IntArrayRef> stride,
-                                  bool device_guard) {
+TensorImpl* TensorImpl_resizeImpl(
+    at::TensorImpl* self,
+    at::IntArrayRef size,
+    c10::optional<IntArrayRef> stride,
+    bool device_guard) {
   if (self->sizes() == size && (!stride || self->strides() == stride)) {
     return self;
   }
@@ -122,15 +130,18 @@ TensorImpl *TensorImpl_resizeImpl(at::TensorImpl *self, at::IntArrayRef size,
       AT_ERROR("Tensor: invalid null storage");
     }
     if (storage_size + self->storage_offset() > self->storage().numel()) {
-      StorageImpl_resize(TensorImpl_getStoragePtr(self),
-                         storage_size + self->storage_offset());
+      StorageImpl_resize(
+          TensorImpl_getStoragePtr(self),
+          storage_size + self->storage_offset());
     }
   }
   return self;
 }
 
-void TensorImpl_resize(at::TensorImpl *self, at::IntArrayRef size,
-                       at::IntArrayRef stride) {
+void TensorImpl_resize(
+    at::TensorImpl* self,
+    at::IntArrayRef size,
+    at::IntArrayRef stride) {
   if (stride.data()) {
     TORCH_CHECK(stride.size() == size.size(), "invalid stride");
   }
@@ -141,7 +152,7 @@ void TensorImpl_resize(at::TensorImpl *self, at::IntArrayRef size,
   TensorImpl_resizeNd(self, size.size(), size.data(), stride.data());
 }
 
-void TensorImpl_resizeAs(at::TensorImpl *self, TensorImpl *src) {
+void TensorImpl_resizeAs(at::TensorImpl* self, TensorImpl* src) {
   int isSame = 0;
   int d;
   if (self->dim() == src->dim()) {
@@ -158,8 +169,11 @@ void TensorImpl_resizeAs(at::TensorImpl *self, TensorImpl *src) {
     TensorImpl_resizeNd(self, src->dim(), TensorImpl_getSizePtr(src), NULL);
 }
 
-void TensorImpl_resizeNd(at::TensorImpl *self, int nDimension,
-                         const int64_t *size, const int64_t *stride) {
+void TensorImpl_resizeNd(
+    at::TensorImpl* self,
+    int nDimension,
+    const int64_t* size,
+    const int64_t* stride) {
   TORCH_CHECK(nDimension >= 0, "resizeNd nDimension must be non-negative");
   at::IntArrayRef sizes(size, nDimension);
   at::optional<at::IntArrayRef> strides;
@@ -169,7 +183,7 @@ void TensorImpl_resizeNd(at::TensorImpl *self, int nDimension,
   TensorImpl_resizeImpl(self, sizes, strides, /*device_guard=*/false);
 }
 
-at::StorageImpl *TensorImpl_getStoragePtr(const at::TensorImpl *tensor) {
+at::StorageImpl* TensorImpl_getStoragePtr(const at::TensorImpl* tensor) {
   // Within PyTorch, the invariant is that storage_ is always
   // initialized; we never have tensors that don't have any storage.
   // However, for Caffe2, this is not true, because they have permitted
@@ -187,8 +201,9 @@ at::StorageImpl *TensorImpl_getStoragePtr(const at::TensorImpl *tensor) {
 }
 
 // NB: Steals ownership of storage
-void TensorImpl_stealAndSetStoragePtr(at::TensorImpl *tensor,
-                                      at::StorageImpl *storage) {
+void TensorImpl_stealAndSetStoragePtr(
+    at::TensorImpl* tensor,
+    at::StorageImpl* storage) {
   // Caffe2 might have tensors whose storages are null, but we
   // don't allow it in PyTorch.
   AT_ASSERT(storage);
@@ -197,37 +212,55 @@ void TensorImpl_stealAndSetStoragePtr(at::TensorImpl *tensor,
 
   // We used to allow this, but this breaks device caching.
   // Let's put an actual error message for this one.
-  TORCH_CHECK(tensor->storage().device() == storage->device(),
-              "Attempted to set the storage of a tensor on device \"",
-              tensor->storage().device(),
-              "\" to a storage on different device \"", storage->device(),
-              "\".  This is no longer allowed; the devices must match.");
+  TORCH_CHECK(
+      tensor->storage().device() == storage->device(),
+      "Attempted to set the storage of a tensor on device \"",
+      tensor->storage().device(),
+      "\" to a storage on different device \"",
+      storage->device(),
+      "\".  This is no longer allowed; the devices must match.");
   tensor->set_storage(
       at::Storage(c10::intrusive_ptr<at::StorageImpl>::reclaim(storage)));
 }
 
-void TensorImpl_set(at::TensorImpl *self, at::TensorImpl *src) {
+void TensorImpl_set(at::TensorImpl* self, at::TensorImpl* src) {
   if (self != src)
     TensorImpl_setStorageNd(
-        self, TensorImpl_getStoragePtr(src), src->storage_offset(), src->dim(),
-        TensorImpl_getSizePtr(src), TensorImpl_getStridePtr(src));
+        self,
+        TensorImpl_getStoragePtr(src),
+        src->storage_offset(),
+        src->dim(),
+        TensorImpl_getSizePtr(src),
+        TensorImpl_getStridePtr(src));
 }
 
-void TensorImpl_setStorage(at::TensorImpl *self, at::StorageImpl *storage_,
-                           ptrdiff_t storageOffset_, at::IntArrayRef size_,
-                           at::IntArrayRef stride_) {
+void TensorImpl_setStorage(
+    at::TensorImpl* self,
+    at::StorageImpl* storage_,
+    ptrdiff_t storageOffset_,
+    at::IntArrayRef size_,
+    at::IntArrayRef stride_) {
   if (stride_.data()) {
-    TORCH_CHECK(size_.size() == stride_.size(),
-                "inconsistent size/stride sizes");
+    TORCH_CHECK(
+        size_.size() == stride_.size(), "inconsistent size/stride sizes");
   }
 
-  TensorImpl_setStorageNd(self, storage_, storageOffset_, size_.size(),
-                          size_.data(), stride_.data());
+  TensorImpl_setStorageNd(
+      self,
+      storage_,
+      storageOffset_,
+      size_.size(),
+      size_.data(),
+      stride_.data());
 }
 
-void TensorImpl_setStorageNd(at::TensorImpl *self, at::StorageImpl *storage,
-                             ptrdiff_t storageOffset, int nDimension,
-                             const int64_t *size, const int64_t *stride) {
+void TensorImpl_setStorageNd(
+    at::TensorImpl* self,
+    at::StorageImpl* storage,
+    ptrdiff_t storageOffset,
+    int nDimension,
+    const int64_t* size,
+    const int64_t* stride) {
   /* storage */
   if (TensorImpl_getStoragePtr(self) != storage) {
     if (!TensorImpl_getStoragePtr(self)) {
@@ -252,7 +285,7 @@ void TensorImpl_setStorageNd(at::TensorImpl *self, at::StorageImpl *storage,
   TensorImpl_resizeNd(self, nDimension, size, stride);
 }
 
-bool TensorImpl_isSetTo(const at::TensorImpl *self, const at::TensorImpl *src) {
+bool TensorImpl_isSetTo(const at::TensorImpl* self, const at::TensorImpl* src) {
   if (TensorImpl_getStoragePtr(self) == TensorImpl_getStoragePtr(src) &&
       self->storage_offset() == src->storage_offset() &&
       self->dim() == src->dim()) {
@@ -266,8 +299,10 @@ bool TensorImpl_isSetTo(const at::TensorImpl *self, const at::TensorImpl *src) {
   return false;
 }
 
-void TensorImpl_squeeze1d(at::TensorImpl *self, at::TensorImpl *src,
-                          int dimension) {
+void TensorImpl_squeeze1d(
+    at::TensorImpl* self,
+    at::TensorImpl* src,
+    int dimension) {
   int d;
 
   if (!src)
@@ -286,15 +321,17 @@ void TensorImpl_squeeze1d(at::TensorImpl *self, at::TensorImpl *src,
   }
 }
 
-void TensorImpl_unsqueeze1d(at::TensorImpl *self, at::TensorImpl *src,
-                            int dimension) {
+void TensorImpl_unsqueeze1d(
+    at::TensorImpl* self,
+    at::TensorImpl* src,
+    int dimension) {
   int d;
 
   if (!src)
     src = self;
 
-  TORCH_CHECK((dimension >= 0) && (dimension <= src->dim()),
-              "dimension out of range");
+  TORCH_CHECK(
+      (dimension >= 0) && (dimension <= src->dim()), "dimension out of range");
 
   TensorImpl_set(self, src);
 
@@ -304,15 +341,15 @@ void TensorImpl_unsqueeze1d(at::TensorImpl *self, at::TensorImpl *src,
     self->set_stride(d, self->stride(d - 1));
   }
   if (dimension + 1 < self->dim()) {
-    self->set_stride(dimension,
-                     self->size(dimension + 1) * self->stride(dimension + 1));
+    self->set_stride(
+        dimension, self->size(dimension + 1) * self->stride(dimension + 1));
   } else {
     self->set_stride(dimension, 1);
   }
   self->set_size(dimension, 1);
 }
 
-bool TensorImpl_allContiguous(at::TensorImpl **inputs, int numInputs) {
+bool TensorImpl_allContiguous(at::TensorImpl** inputs, int numInputs) {
   TORCH_INTERNAL_ASSERT(numInputs > 0);
   for (int i = 0; i < numInputs; ++i) {
     if (!inputs[i]->is_contiguous()) {
@@ -322,7 +359,7 @@ bool TensorImpl_allContiguous(at::TensorImpl **inputs, int numInputs) {
   return true;
 }
 
-int64_t TensorImpl_nElement(const at::TensorImpl *self) {
+int64_t TensorImpl_nElement(const at::TensorImpl* self) {
   if (TensorImpl_nDimensionLegacyAll(self) == 0) {
     return 0;
   } else {
@@ -331,23 +368,23 @@ int64_t TensorImpl_nElement(const at::TensorImpl *self) {
 }
 
 // NB: It is INVALID to call this on an UndefinedTensor
-void TensorImpl_retain(at::TensorImpl *self) {
+void TensorImpl_retain(at::TensorImpl* self) {
   at::raw::intrusive_ptr::incref(self);
 }
 
-void TensorImpl_free(at::TensorImpl *self) {
+void TensorImpl_free(at::TensorImpl* self) {
   if (!self)
     return;
   c10::raw::intrusive_ptr::decref(self);
 }
 
-int TensorImpl_getDevice(const at::TensorImpl *tensor) {
+int TensorImpl_getDevice(const at::TensorImpl* tensor) {
   if (!TensorImpl_getStoragePtr(tensor))
     return -1;
   return StorageImpl_getDevice(TensorImpl_getStoragePtr(tensor));
 }
 
-bool TensorImpl_allSameDevice(at::TensorImpl **inputs, int numInputs) {
+bool TensorImpl_allSameDevice(at::TensorImpl** inputs, int numInputs) {
   TORCH_INTERNAL_ASSERT(numInputs > 0);
   int device = TensorImpl_getDevice(inputs[0]);
   for (int i = 1; i < numInputs; ++i) {
@@ -358,8 +395,9 @@ bool TensorImpl_allSameDevice(at::TensorImpl **inputs, int numInputs) {
   return true;
 }
 
-bool TensorImpl_canUse32BitIndexMath(const at::TensorImpl *t,
-                                     ptrdiff_t max_elem) {
+bool TensorImpl_canUse32BitIndexMath(
+    const at::TensorImpl* t,
+    ptrdiff_t max_elem) {
   ptrdiff_t elements = TensorImpl_nElement(t);
   if (elements >= max_elem) {
     return false;
@@ -385,7 +423,7 @@ bool TensorImpl_canUse32BitIndexMath(const at::TensorImpl *t,
   return true;
 }
 
-bool TensorImpl_all32BitIndexable(at::TensorImpl **inputs, int numInputs) {
+bool TensorImpl_all32BitIndexable(at::TensorImpl** inputs, int numInputs) {
   for (int i = 0; i < numInputs; ++i) {
     if (!TensorImpl_canUse32BitIndexMath(inputs[i])) {
       return false;
@@ -421,9 +459,9 @@ struct SizeAndStride {
  A comparator that will sort SizeAndStride structs by stride,
  in ascending order.
  */
-int compareSizeAndStride(const void *a, const void *b) {
-  const SizeAndStride *aS = (const SizeAndStride *)a;
-  const SizeAndStride *bS = (const SizeAndStride *)b;
+int compareSizeAndStride(const void* a, const void* b) {
+  const SizeAndStride* aS = (const SizeAndStride*)a;
+  const SizeAndStride* bS = (const SizeAndStride*)b;
 
   if (aS->stride < bS->stride)
     return -1;
@@ -442,7 +480,7 @@ int compareSizeAndStride(const void *a, const void *b) {
 /* that there exists an ordering of the tensor's dimensions    */
 /* that is nicely "nested," with each dimension contained      */
 /* within the next one.                                        */
-bool TensorImpl_maybeOverlappingIndices(const at::TensorImpl *t) {
+bool TensorImpl_maybeOverlappingIndices(const at::TensorImpl* t) {
   /* Extract size/stride arrays; only consider size >1 dims. */
   SizeAndStride info[MAX_DPCPPTORCH_DIMS];
 
@@ -480,10 +518,10 @@ bool TensorImpl_maybeOverlappingIndices(const at::TensorImpl *t) {
   return false;
 }
 
-DPCPPDescBuff TensorImpl_sizeDesc(const at::TensorImpl *tensor) {
+DPCPPDescBuff TensorImpl_sizeDesc(const at::TensorImpl* tensor) {
   const int L = DPCPP_DESC_BUFF_LEN;
   DPCPPDescBuff buf;
-  char *str = buf.str;
+  char* str = buf.str;
   int n = 0;
   n += snprintf(str, L - n, "[");
   int i;
@@ -503,7 +541,7 @@ DPCPPDescBuff TensorImpl_sizeDesc(const at::TensorImpl *tensor) {
   return buf;
 }
 
-at::TensorImpl *TensorImpl_Unwrap(const at::Tensor &tensor) {
+at::TensorImpl* TensorImpl_Unwrap(const at::Tensor& tensor) {
   return tensor.unsafeGetTensorImpl();
 }
 

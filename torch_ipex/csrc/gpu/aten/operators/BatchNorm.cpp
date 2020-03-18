@@ -14,12 +14,15 @@ namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 template <typename scalar_t>
-std::tuple<Tensor, Tensor, Tensor>
-batch_norm_template(const Tensor &input, const Tensor &weight,
-                    const Tensor &bias,
-                    const Tensor &running_mean /* optional */,
-                    const Tensor &running_var /* optional */, bool training,
-                    double momentum, double epsilon) {
+std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    const Tensor& running_mean /* optional */,
+    const Tensor& running_var /* optional */,
+    bool training,
+    double momentum,
+    double epsilon) {
   auto output = at::empty_like(input);
 
   Device curDevice = Device(kDPCPP, current_device());
@@ -105,11 +108,16 @@ batch_norm_template(const Tensor &input, const Tensor &weight,
     Tensor _bias = bias.to(ScalarType::Float);
 
     if (mkldnn_use_scaleshift) {
-      dpcppMemcpyAsync(weight_bias.data_ptr(), _weight.data_ptr(),
-                       ic * sizeof(float), DeviceToDevice);
-      dpcppMemcpyAsync(static_cast<uint8_t *>(weight_bias.data_ptr()) +
-                           ic * sizeof(float),
-                       _bias.data_ptr(), ic * sizeof(float), DeviceToDevice);
+      dpcppMemcpyAsync(
+          weight_bias.data_ptr(),
+          _weight.data_ptr(),
+          ic * sizeof(float),
+          DeviceToDevice);
+      dpcppMemcpyAsync(
+          static_cast<uint8_t*>(weight_bias.data_ptr()) + ic * sizeof(float),
+          _bias.data_ptr(),
+          ic * sizeof(float),
+          DeviceToDevice);
       dpcpp_set_mkldnn_buffer(weight_bias.data_ptr(), weight_bias_memory);
     }
 
@@ -138,25 +146,36 @@ batch_norm_template(const Tensor &input, const Tensor &weight,
   bn_fwd->execute(strm, args);
 
   if (training && running_mean.defined() && running_var.defined()) {
-    dpcppMemoryScale1(running_mean.data_ptr(), save_mean.data_ptr(), ic,
-                      momentum);
+    dpcppMemoryScale1(
+        running_mean.data_ptr(), save_mean.data_ptr(), ic, momentum);
     size_t orig_size = n * ih * iw;
     size_t adjust_size = orig_size - 1;
     float adjust_factor = (static_cast<float>(orig_size)) / adjust_size;
-    dpcppMemoryScale2(running_var.data_ptr(), save_var.data_ptr(), ic,
-                      adjust_factor, momentum);
+    dpcppMemoryScale2(
+        running_var.data_ptr(),
+        save_var.data_ptr(),
+        ic,
+        adjust_factor,
+        momentum);
   }
 
   return std::tuple<Tensor, Tensor, Tensor>{output, save_mean, save_var};
 }
 }
 
-std::tuple<Tensor, Tensor, Tensor>
-native_batch_norm(const Tensor &input, const Tensor &weight, const Tensor &bias,
-                  const Tensor &running_mean, const Tensor &running_var,
-                  bool training, double momentum, double epsilon) {
-  checkBackend("batch_norm", {input, weight, bias, running_mean, running_var},
-               Backend::DPCPP);
+std::tuple<Tensor, Tensor, Tensor> native_batch_norm(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    const Tensor& running_mean,
+    const Tensor& running_var,
+    bool training,
+    double momentum,
+    double epsilon) {
+  checkBackend(
+      "batch_norm",
+      {input, weight, bias, running_mean, running_var},
+      Backend::DPCPP);
 
   if (input.scalar_type() != at::ScalarType::Float &&
       input.scalar_type() != at::ScalarType::Half) {
@@ -169,19 +188,30 @@ native_batch_norm(const Tensor &input, const Tensor &weight, const Tensor &bias,
     return AT_DISPATCH_FLOATING_TYPES_AND_HALF(
         input.scalar_type(), "batch_norm", [&] {
           return impl::batch_norm_template<scalar_t>(
-              input, weight, bias, running_mean, running_var, training,
-              momentum, epsilon);
+              input,
+              weight,
+              bias,
+              running_mean,
+              running_var,
+              training,
+              momentum,
+              epsilon);
         });
 }
 
 std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
-    const Tensor &grad_output, const Tensor &input, const Tensor &weight,
+    const Tensor& grad_output,
+    const Tensor& input,
+    const Tensor& weight,
     // Unused: but we require them to be passed so that double backwards
     // has access
-    const Tensor &running_mean, const Tensor &running_var,
-    const Tensor &save_mean, const Tensor &save_var, bool training,
-    double epsilon, std::array<bool, 3> grad_input_mask) {
-
+    const Tensor& running_mean,
+    const Tensor& running_var,
+    const Tensor& save_mean,
+    const Tensor& save_var,
+    bool training,
+    double epsilon,
+    std::array<bool, 3> grad_input_mask) {
   Tensor grad_input;
   Tensor grad_weight;
   Tensor grad_bias;
@@ -199,7 +229,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto flags = normalization_flags::use_scale_shift; // backward only support
-                                                     // training mode
+  // training mode
 
   if (!(grad_input_mask[1] && grad_input_mask[2])) {
     flags &=
@@ -265,8 +295,8 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     p_kind = prop_kind::backward_data;
   }
 
-  auto bwd_desc = batch_normalization_backward::desc(p_kind, grad_output_md,
-                                                     input_md, epsilon, flags);
+  auto bwd_desc = batch_normalization_backward::desc(
+      p_kind, grad_output_md, input_md, epsilon, flags);
   auto bn_bwd_pd = batch_normalization_backward::primitive_desc(
       bwd_desc, engine, batch_norm_forward_pd);
 
@@ -304,18 +334,22 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     auto weight_bias_memory =
         memory(batch_norm_forward_pd.weights_desc(), engine);
     auto weight_bias = at::empty(2 * ic, weight.options());
-    dpcppMemcpyAsync(weight_bias.data_ptr(), weight.data_ptr(),
-                     ic * sizeof(float), DeviceToDevice);
-    dpcppMemsetAsync(static_cast<uint8_t *>(weight_bias.data_ptr()) +
-                         ic * sizeof(float),
-                     0, ic * sizeof(float));
+    dpcppMemcpyAsync(
+        weight_bias.data_ptr(),
+        weight.data_ptr(),
+        ic * sizeof(float),
+        DeviceToDevice);
+    dpcppMemsetAsync(
+        static_cast<uint8_t*>(weight_bias.data_ptr()) + ic * sizeof(float),
+        0,
+        ic * sizeof(float));
     dpcpp_set_mkldnn_buffer(weight_bias.data_ptr(), weight_bias_memory);
 
     auto grad_weight_bias_memory =
         memory(bn_bwd_pd.diff_weights_desc(), engine);
     grad_weight_bias = at::empty(2 * ic, weight.options());
-    dpcpp_set_mkldnn_buffer(grad_weight_bias.data_ptr(),
-                            grad_weight_bias_memory);
+    dpcpp_set_mkldnn_buffer(
+        grad_weight_bias.data_ptr(), grad_weight_bias_memory);
 
     args.insert({MKLDNN_ARG_SCALE_SHIFT, weight_bias_memory});
     args.insert({MKLDNN_ARG_DIFF_SCALE_SHIFT, grad_weight_bias_memory});
@@ -324,12 +358,16 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   bn_bwd->execute(strm, args);
 
   if ((bool)(flags & normalization_flags::use_scale_shift)) {
-    dpcppMemcpyAsync(grad_weight.data_ptr(), grad_weight_bias.data_ptr(),
-                     ic * sizeof(float), DeviceToDevice);
-    dpcppMemcpyAsync(grad_bias.data_ptr(),
-                     static_cast<uint8_t *>(grad_weight_bias.data_ptr()) +
-                         ic * sizeof(float),
-                     ic * sizeof(float), DeviceToDevice);
+    dpcppMemcpyAsync(
+        grad_weight.data_ptr(),
+        grad_weight_bias.data_ptr(),
+        ic * sizeof(float),
+        DeviceToDevice);
+    dpcppMemcpyAsync(
+        grad_bias.data_ptr(),
+        static_cast<uint8_t*>(grad_weight_bias.data_ptr()) + ic * sizeof(float),
+        ic * sizeof(float),
+        DeviceToDevice);
   }
   return std::make_tuple(grad_input, grad_weight, grad_bias);
 }

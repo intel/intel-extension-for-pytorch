@@ -58,7 +58,7 @@ const dpcpp_acc_mode default_acc_mode = dpcpp_acc_mode::read_write;
  *
  */
 class PointerMapper {
-public:
+ public:
   using base_ptr_t = std::uintptr_t;
 
   /* Structure of a virtual pointer
@@ -75,36 +75,45 @@ public:
     /** Conversions from virtual_pointer_t to
      * void * should just reinterpret_cast the integer number
      */
-    operator void *() const { return reinterpret_cast<void *>(m_contents); }
+    operator void*() const {
+      return reinterpret_cast<void*>(m_contents);
+    }
 
     /**
      * Convert back to the integer number.
      */
-    operator base_ptr_t() const { return m_contents; }
+    operator base_ptr_t() const {
+      return m_contents;
+    }
 
     /**
      * Add a certain value to the pointer to create a
      * new pointer to that offset
      */
-    virtual_pointer_t operator+(size_t off) { return m_contents + off; }
+    virtual_pointer_t operator+(size_t off) {
+      return m_contents + off;
+    }
 
     /* Numerical order for sorting pointers in containers. */
     bool operator<(virtual_pointer_t rhs) const {
-      return (static_cast<base_ptr_t>(m_contents) <
-              static_cast<base_ptr_t>(rhs.m_contents));
+      return (
+          static_cast<base_ptr_t>(m_contents) <
+          static_cast<base_ptr_t>(rhs.m_contents));
     }
 
     bool operator>(virtual_pointer_t rhs) const {
-      return (static_cast<base_ptr_t>(m_contents) >
-              static_cast<base_ptr_t>(rhs.m_contents));
+      return (
+          static_cast<base_ptr_t>(m_contents) >
+          static_cast<base_ptr_t>(rhs.m_contents));
     }
 
     /**
      * Numerical order for sorting pointers in containers
      */
     bool operator==(virtual_pointer_t rhs) const {
-      return (static_cast<base_ptr_t>(m_contents) ==
-              static_cast<base_ptr_t>(rhs.m_contents));
+      return (
+          static_cast<base_ptr_t>(m_contents) ==
+          static_cast<base_ptr_t>(rhs.m_contents));
     }
 
     /**
@@ -120,7 +129,7 @@ public:
      * already a virtual_pointer_t, but we have no way of
      * checking
      */
-    virtual_pointer_t(const void *ptr)
+    virtual_pointer_t(const void* ptr)
         : m_contents(reinterpret_cast<base_ptr_t>(ptr)){};
 
     /**
@@ -139,7 +148,7 @@ public:
    * A pointer is nullptr if the value is of null_virtual_ptr
    */
   static inline bool is_nullptr(virtual_pointer_t ptr) {
-    return (static_cast<void *>(ptr) == nullptr);
+    return (static_cast<void*>(ptr) == nullptr);
   }
 
   /* basic type for all buffers
@@ -161,7 +170,9 @@ public:
       m_buffer.set_final_data(nullptr);
     }
 
-    bool operator<=(const pMapNode_t &rhs) { return (m_size <= rhs.m_size); }
+    bool operator<=(const pMapNode_t& rhs) {
+      return (m_size <= rhs.m_size);
+    }
   };
 
   /** Storage of the pointer / buffer tree
@@ -237,7 +248,7 @@ public:
     // We can do this without the `buffer_mem` being a pointer, as we
     // only declare member variables in the base class (`buffer_mem`) and not in
     // the child class (`buffer<>).
-    return *((dpcpp_buffer_t *)(&get_node(ptr)->second.m_buffer));
+    return *((dpcpp_buffer_t*)(&get_node(ptr)->second.m_buffer));
   }
 
   /**
@@ -249,8 +260,8 @@ public:
   template <dpcpp_acc_mode access_mode = default_acc_mode,
             dpcpp_acc_target access_target = default_acc_target,
             typename buffer_data_type = buffer_data_type_t>
-  DPCPP::accessor<buffer_data_type, 1, access_mode, access_target>
-  get_access(const virtual_pointer_t ptr) {
+  DPCPP::accessor<buffer_data_type, 1, access_mode, access_target> get_access(
+      const virtual_pointer_t ptr) {
     auto buf = get_buffer<buffer_data_type>(ptr);
     return buf.template get_access<access_mode>();
   }
@@ -266,8 +277,9 @@ public:
   template <dpcpp_acc_mode access_mode = default_acc_mode,
             dpcpp_acc_target access_target = default_acc_target,
             typename buffer_data_type = buffer_data_type_t>
-  DPCPP::accessor<buffer_data_type, 1, access_mode, access_target>
-  get_access(const virtual_pointer_t ptr, DPCPP::handler &cgh) {
+  DPCPP::accessor<buffer_data_type, 1, access_mode, access_target> get_access(
+      const virtual_pointer_t ptr,
+      DPCPP::handler& cgh) {
     auto buf = get_buffer<buffer_data_type>(ptr);
     return buf.template get_access<access_mode, access_target>(cgh);
   }
@@ -303,7 +315,7 @@ public:
   /**
    * PointerMapper cannot be copied or moved
    */
-  PointerMapper(const PointerMapper &) = delete;
+  PointerMapper(const PointerMapper&) = delete;
 
   /**
   * Empty the pointer list
@@ -316,14 +328,14 @@ public:
   /* add_pointer.
    * Adds an existing pointer to the map and returns the virtual pointer id.
    */
-  inline virtual_pointer_t add_pointer(const buffer_t &b) {
+  inline virtual_pointer_t add_pointer(const buffer_t& b) {
     return add_pointer_impl(b);
   }
 
   /* add_pointer.
    * Adds a pointer to the map and returns the virtual pointer id.
    */
-  inline virtual_pointer_t add_pointer(buffer_t &&b) {
+  inline virtual_pointer_t add_pointer(buffer_t&& b) {
     return add_pointer_impl(b);
   }
 
@@ -333,7 +345,7 @@ public:
    *
    * @param node A reference to the free node to be fused
    */
-  void fuse_forward(typename pointerMap_t::iterator &node) {
+  void fuse_forward(typename pointerMap_t::iterator& node) {
     while (node != std::prev(m_pointerMap.end())) {
       // if following node is free
       // remove it and extend the current node with its size
@@ -355,7 +367,7 @@ public:
    *
    * @param node A reference to the free node to be fused
    */
-  void fuse_backward(typename pointerMap_t::iterator &node) {
+  void fuse_backward(typename pointerMap_t::iterator& node) {
     while (node != m_pointerMap.begin()) {
       // if previous node is free, extend it
       // with the size of the current one
@@ -405,14 +417,17 @@ public:
    * Return the number of active pointers (i.e, pointers that
    * have been malloc but not freed).
    */
-  size_t count() const { return (m_pointerMap.size() - m_freeList.size()); }
+  size_t count() const {
+    return (m_pointerMap.size() - m_freeList.size());
+  }
 
-private:
+ private:
   /* add_pointer_impl.
    * Adds a pointer to the map and returns the virtual pointer id.
    * BufferT is either a const buffer_t& or a buffer_t&&.
    */
-  template <class BufferT> virtual_pointer_t add_pointer_impl(BufferT b) {
+  template <class BufferT>
+  virtual_pointer_t add_pointer_impl(BufferT b) {
     virtual_pointer_t retVal = nullptr;
     size_t bufSize = b.get_count();
     pMapNode_t p{b, bufSize, false};
@@ -459,10 +474,11 @@ private:
    * the size of the allocation on the device.
    */
   struct SortBySize {
-    bool operator()(typename pointerMap_t::iterator a,
-                    typename pointerMap_t::iterator b) const {
+    bool operator()(
+        typename pointerMap_t::iterator a,
+        typename pointerMap_t::iterator b) const {
       return ((a->first < b->first) && (a->second <= b->second)) ||
-             ((a->first < b->first) && (b->second <= a->second));
+          ((a->first < b->first) && (b->second <= a->second));
     }
   };
 
@@ -498,8 +514,10 @@ inline void PointerMapper::remove_pointer<false>(const virtual_pointer_t ptr) {
  * \param size Size in bytes of the desired allocation
  * \throw DPCPP::exception if error while creating the buffer
  */
-inline void *DPCPPmalloc(size_t size, PointerMapper &pMap,
-                         const property_list &pList = {}) {
+inline void* DPCPPmalloc(
+    size_t size,
+    PointerMapper& pMap,
+    const property_list& pList = {}) {
   if (size == 0) {
     return nullptr;
   }
@@ -508,7 +526,7 @@ inline void *DPCPPmalloc(size_t size, PointerMapper &pMap,
   auto thePointer =
       pMap.add_pointer(dpcpp_buffer_t(DPCPP::range<1>{size}, pList));
   // Store the buffer on the global list
-  return static_cast<void *>(thePointer);
+  return static_cast<void*>(thePointer);
 }
 
 /**
@@ -519,7 +537,7 @@ inline void *DPCPPmalloc(size_t size, PointerMapper &pMap,
  * it should be false only for sub-buffers.
  */
 template <bool ReUse = true, typename PointerMapper>
-inline void DPCPPfree(void *ptr, PointerMapper &pMap) {
+inline void DPCPPfree(void* ptr, PointerMapper& pMap) {
   pMap.template remove_pointer<ReUse>(ptr);
 }
 
@@ -527,7 +545,7 @@ inline void DPCPPfree(void *ptr, PointerMapper &pMap) {
  * Clear all the memory allocated by DPCPP.
  */
 template <typename PointerMapper>
-inline void DPCPPfreeAll(PointerMapper &pMap) {
+inline void DPCPPfreeAll(PointerMapper& pMap) {
   pMap.clear();
 }
 

@@ -36,7 +36,9 @@ namespace dpcpp {
  */
 
 /* Device info */
-inline int64_t getNumGPUs() { return device_count(); }
+inline int64_t getNumGPUs() {
+  return device_count();
+}
 
 /**
  * In some situations, you may have compiled with DPCPP, but no DPCPP
@@ -51,7 +53,7 @@ inline bool is_available() {
 void createGlobalContext();
 void clearGlobalContext();
 DPCPP::context getGlobalContext();
-CAFFE2_API Allocator *getDPCPPDeviceAllocator();
+CAFFE2_API Allocator* getDPCPPDeviceAllocator();
 
 } // namespace dpcpp
 } // namespace at

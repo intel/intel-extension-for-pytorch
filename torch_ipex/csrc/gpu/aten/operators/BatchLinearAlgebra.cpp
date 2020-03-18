@@ -16,10 +16,13 @@ namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 template <typename scalar_t, typename IndexType, bool upper>
-void triu_tril_dpcpp_kernel(scalar_t *result, const scalar_t *src,
-                            const IndexType stride0, const IndexType stride1,
-                            const int64_t k, const int64_t N) {
-
+void triu_tril_dpcpp_kernel(
+    scalar_t* result,
+    const scalar_t* src,
+    const IndexType stride0,
+    const IndexType stride1,
+    const int64_t k,
+    const int64_t N) {
   auto queue = dpcppGetCurrentQueue();
   int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto num_groups = CeilDiv(N, group_size);
@@ -52,8 +55,8 @@ void triu_tril_dpcpp_kernel(scalar_t *result, const scalar_t *src,
 
     // kick off kernel
     cgh.parallel_for<DPCPP_K(triuTrilSycl, scalar_t, IndexType, upper)>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(total_items),
-                           DPCPP::range<1>(group_size)),
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
         kfn);
   };
 
@@ -61,32 +64,46 @@ void triu_tril_dpcpp_kernel(scalar_t *result, const scalar_t *src,
 }
 
 template <bool upper>
-Tensor &triu_tril_dpcpp_template(Tensor &result, const Tensor &self, int64_t k,
-                                 const char *name) {
+Tensor& triu_tril_dpcpp_template(
+    Tensor& result,
+    const Tensor& self,
+    int64_t k,
+    const char* name) {
   int64_t N = self.numel();
 
   AT_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half, at::ScalarType::Bool, self.scalar_type(), name,
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      name,
       [&] {
         if (dpcpp::detail::canUse32BitIndexMath(self)) {
           auto self_info =
               dpcpp::detail::getTensorInfo<scalar_t, int32_t>(self);
           triu_tril_dpcpp_kernel<scalar_t, int32_t, upper>(
-              result.data_ptr<scalar_t>(), self.data_ptr<scalar_t>(),
-              self_info.strides[0], self_info.strides[1], k, N);
+              result.data_ptr<scalar_t>(),
+              self.data_ptr<scalar_t>(),
+              self_info.strides[0],
+              self_info.strides[1],
+              k,
+              N);
         } else {
           auto self_info =
               dpcpp::detail::getTensorInfo<scalar_t, int64_t>(self);
           triu_tril_dpcpp_kernel<scalar_t, int64_t, upper>(
-              result.data_ptr<scalar_t>(), self.data_ptr<scalar_t>(),
-              self_info.strides[0], self_info.strides[1], k, N);
+              result.data_ptr<scalar_t>(),
+              self.data_ptr<scalar_t>(),
+              self_info.strides[0],
+              self_info.strides[1],
+              k,
+              N);
         }
       });
 
   return result;
 }
 
-Tensor &tril_dpcpp_out(Tensor &result, const Tensor &self, int64_t k) {
+Tensor& tril_dpcpp_out(Tensor& result, const Tensor& self, int64_t k) {
   if (result.sizes() != self.sizes()) {
     result.resize_as_(self);
   }
@@ -97,11 +114,11 @@ Tensor &tril_dpcpp_out(Tensor &result, const Tensor &self, int64_t k) {
   return triu_tril_dpcpp_template<false>(result, self, k, "tril");
 }
 
-Tensor &tril_dpcpp_(Tensor &self, int64_t k) {
+Tensor& tril_dpcpp_(Tensor& self, int64_t k) {
   return tril_dpcpp_out(self, self, k);
 }
 
-Tensor &triu_dpcpp_out(Tensor &result, const Tensor &self, int64_t k) {
+Tensor& triu_dpcpp_out(Tensor& result, const Tensor& self, int64_t k) {
   if (result.sizes() != self.sizes()) {
     result.resize_as_(self);
   }
@@ -111,27 +128,27 @@ Tensor &triu_dpcpp_out(Tensor &result, const Tensor &self, int64_t k) {
   return triu_tril_dpcpp_template<true>(result, self, k, "triu");
 }
 
-Tensor &triu_dpcpp_(Tensor &self, int64_t k) {
+Tensor& triu_dpcpp_(Tensor& self, int64_t k) {
   return triu_dpcpp_out(self, self, k);
 }
 
 } // namespace impl
 
-Tensor &triu_out(Tensor &out, const Tensor &self, int64_t diagonal) {
+Tensor& triu_out(Tensor& out, const Tensor& self, int64_t diagonal) {
   impl::triu_dpcpp_out(out, self, diagonal);
   return out;
 }
 
-Tensor &tril_out(Tensor &out, const Tensor &self, int64_t diagonal) {
+Tensor& tril_out(Tensor& out, const Tensor& self, int64_t diagonal) {
   impl::tril_dpcpp_out(out, self, diagonal);
   return out;
 }
 
-Tensor &tril_(Tensor &self, int64_t diagonal) {
+Tensor& tril_(Tensor& self, int64_t diagonal) {
   return at::AtenIpexTypeDPCPP::tril_out(self, self, diagonal);
 }
 
-Tensor &triu_(Tensor &self, int64_t diagonal) {
+Tensor& triu_(Tensor& self, int64_t diagonal) {
   return at::AtenIpexTypeDPCPP::triu_out(self, self, diagonal);
 }
 

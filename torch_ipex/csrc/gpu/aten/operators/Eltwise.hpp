@@ -14,8 +14,11 @@ namespace at {
 namespace dpcpp {
 
 template <algorithm alg_kind>
-void dpcpp_eltwise(at::Tensor &output, const at::Tensor &input, float alpha,
-                   float beta) {
+void dpcpp_eltwise(
+    at::Tensor& output,
+    const at::Tensor& input,
+    float alpha,
+    float beta) {
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
@@ -30,8 +33,8 @@ void dpcpp_eltwise(at::Tensor &output, const at::Tensor &input, float alpha,
   memory::dims input_tz = {n, ic, ih, iw};
   auto input_md = memory::desc({input_tz}, data_t, format_nchw);
 
-  eltwise_forward::desc eltwise_eltwiseFwd_desc(prop_kind::forward, alg_kind,
-                                                input_md, alpha, beta);
+  eltwise_forward::desc eltwise_eltwiseFwd_desc(
+      prop_kind::forward, alg_kind, input_md, alpha, beta);
   auto eltwise_forward_pd =
       eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, engine);
 
@@ -44,13 +47,20 @@ void dpcpp_eltwise(at::Tensor &output, const at::Tensor &input, float alpha,
   auto strm = GpuStreamManager::Instance().get_stream();
   std::shared_ptr<mkldnn::primitive> eltwise_fwd;
   eltwise_fwd.reset(new mkldnn::eltwise_forward(eltwise_forward_pd));
-  eltwise_fwd->execute(strm, {{MKLDNN_ARG_SRC, input_usr_memory},
-                              {MKLDNN_ARG_DST, output_usr_memory}});
+  eltwise_fwd->execute(
+      strm,
+      {{MKLDNN_ARG_SRC, input_usr_memory},
+       {MKLDNN_ARG_DST, output_usr_memory}});
 }
 
 template <algorithm alg_kind>
-void dpcpp_eltwise_backward(char *diff_src, char *src, char *diff_dst,
-                            int32_t len, float alpha, float beta) {
+void dpcpp_eltwise_backward(
+    char* diff_src,
+    char* src,
+    char* diff_dst,
+    int32_t len,
+    float alpha,
+    float beta) {
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
@@ -65,12 +75,12 @@ void dpcpp_eltwise_backward(char *diff_src, char *src, char *diff_dst,
   auto src_md = memory::desc({input_tz}, data_t, format_nchw);
   auto diff_dst_md = memory::desc({input_tz}, data_t, format_nchw);
 
-  eltwise_forward::desc eltwise_eltwiseFwd_desc(prop_kind::forward_training,
-                                                alg_kind, src_md, alpha, beta);
+  eltwise_forward::desc eltwise_eltwiseFwd_desc(
+      prop_kind::forward_training, alg_kind, src_md, alpha, beta);
   auto eltwise_forward_pd =
       eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, engine);
-  eltwise_backward::desc eltwise_reluBwd_desc(alg_kind, diff_dst_md, src_md,
-                                              alpha, beta);
+  eltwise_backward::desc eltwise_reluBwd_desc(
+      alg_kind, diff_dst_md, src_md, alpha, beta);
   auto eltwise_backward_pd = eltwise_backward::primitive_desc(
       eltwise_reluBwd_desc, engine, eltwise_forward_pd);
 
@@ -86,9 +96,11 @@ void dpcpp_eltwise_backward(char *diff_src, char *src, char *diff_dst,
   auto strm = GpuStreamManager::Instance().get_stream();
   std::shared_ptr<mkldnn::primitive> eltwise_bwd;
   eltwise_bwd.reset(new mkldnn::eltwise_backward(eltwise_backward_pd));
-  eltwise_bwd->execute(strm, {{MKLDNN_ARG_SRC, src_usr_memory},
-                              {MKLDNN_ARG_DIFF_DST, diff_dst_memory},
-                              {MKLDNN_ARG_DIFF_SRC, diff_src_memory}});
+  eltwise_bwd->execute(
+      strm,
+      {{MKLDNN_ARG_SRC, src_usr_memory},
+       {MKLDNN_ARG_DIFF_DST, diff_dst_memory},
+       {MKLDNN_ARG_DIFF_SRC, diff_src_memory}});
 }
 }
 } // at::dpcpp
