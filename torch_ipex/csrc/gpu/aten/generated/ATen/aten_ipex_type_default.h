@@ -165,6 +165,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & tril_(at::Tensor & self, int64_t diagonal);
   static at::Tensor & triu_(at::Tensor & self, int64_t diagonal);
   static at::Tensor & digamma_(at::Tensor & self);
+  static at::Tensor & renorm_(at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm);
   static at::Tensor & pow_(at::Tensor & self, at::Scalar exponent);
   static at::Tensor & pow_(at::Tensor & self, const at::Tensor & exponent);
   static at::Tensor & lerp_(at::Tensor & self, const at::Tensor & end, at::Scalar weight);
@@ -251,6 +252,8 @@ class AtenIpexTypeDefault {
   static std::tuple<at::Tensor &,at::Tensor &> topk_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
   static std::tuple<at::Tensor,at::Tensor> topk(const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
   static at::Tensor all(const at::Tensor & self);
+  static at::Tensor & renorm_out(at::Tensor & out, const at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm);
+  static at::Tensor renorm(const at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm);
   static at::Tensor unfold(const at::Tensor & self, int64_t dimension, int64_t size, int64_t step);
   static at::Tensor & pow_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & exponent);
   static at::Tensor pow(const at::Tensor & self, const at::Tensor & exponent);
