@@ -8,8 +8,9 @@
 #include <ATen/native/ReduceOps.h>
 
 #include <utils/Numerics.h>
-#include <functions/Loops.h>
-#include <functions/Reduce.h>
+
+#include "Loops.h"
+#include "Reduce.h"
 
 #include <iostream>
 

@@ -5,7 +5,8 @@
 
 #include <core/DPCPP.h>
 #include <utils/Pointwise.h>
-#include <functions/Loops.h>
+
+#include "Loops.h"
 
 
 using namespace at::dpcpp;

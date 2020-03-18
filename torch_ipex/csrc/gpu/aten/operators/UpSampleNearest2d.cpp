@@ -4,7 +4,8 @@
 
 #include <core/DPCPP.h>
 #include <core/Memory.h>
-#include <functions/UpSample.h>
+
+#include "UpSample.h"
 
 
 using namespace at::dpcpp;

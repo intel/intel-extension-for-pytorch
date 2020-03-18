@@ -4,7 +4,8 @@
 #include <ATen/native/PointwiseOps.h>
 
 #include <core/DPCPP.h>
-#include <functions/Loops.h>
+
+#include "Loops.h"
 
 
 DPCPP_DEF_K1(addcmul);

@@ -5,15 +5,16 @@
 #include <assert.h>
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
+#include <ATen/detail/FunctionTraits.h>
 
 #include <core/DPCPP.h>
 #include <core/Memory.h>
 #include <core/Context.h>
 #include <core/Array.h>
 #include <core/detail/OffsetCalculator.h>
-#include <functions/Loops.h>
 
-#include <ATen/detail/FunctionTraits.h>
+#include "Loops.h"
+
 #include <functional>
 #include <iosfwd>
 #include <tuple>

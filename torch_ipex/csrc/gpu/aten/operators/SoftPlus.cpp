@@ -4,7 +4,8 @@
 
 #include <core/DPCPP.h>
 #include <utils/Numerics.h>
-#include <functions/Loops.h>
+
+#include "Loops.h"
 
 
 using namespace at::dpcpp;

@@ -3,8 +3,8 @@
 
 #include <ATen/native/Activation.h>
 
-#include <functions/Eltwise.hpp>
-#include <functions/Loops.h>
+#include "Eltwise.hpp"
+#include "Loops.h"
 
 
 namespace at {
