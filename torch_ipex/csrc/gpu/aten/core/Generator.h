@@ -20,7 +20,7 @@ struct CAFFE2_API DPCPPGenerator : public Generator {
   static DeviceType device_type();
 
 private:
-  DPCPPGenerator* clone_impl() const override;
+  DPCPPGenerator *clone_impl() const override;
   uint64_t seed_ = default_rng_seed_val;
   uint64_t philox_offset_per_thread_ = 0;
 };
@@ -28,8 +28,10 @@ private:
 namespace dpcpp {
 namespace detail {
 
-  CAFFE2_API DPCPPGenerator* getDefaultDPCPPGenerator(DeviceIndex device_index = -1);
-  CAFFE2_API std::shared_ptr<DPCPPGenerator> createDPCPPGenerator(DeviceIndex device_index = -1);
+CAFFE2_API DPCPPGenerator *
+getDefaultDPCPPGenerator(DeviceIndex device_index = -1);
+CAFFE2_API std::shared_ptr<DPCPPGenerator>
+createDPCPPGenerator(DeviceIndex device_index = -1);
 
 } // namespace detail
 } // namespace dpcpp

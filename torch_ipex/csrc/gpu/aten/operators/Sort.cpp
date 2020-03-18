@@ -1,12 +1,11 @@
-#include <core/Memory.h>
+#include <ATen/aten_ipex_type_dpcpp.h>
 #include <core/DPCPP.h>
+#include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <utils/Numerics.h>
-#include <ATen/aten_ipex_type_dpcpp.h>
 
 #include "Sort.h"
-
 
 using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
@@ -14,8 +13,9 @@ using namespace at::dpcpp;
 namespace at {
 namespace AtenIpexTypeDPCPP {
 
-std::tuple<Tensor &, Tensor &>
-sort_out(Tensor & sorted, Tensor & indices, const Tensor & input, long dim, bool order) {
+std::tuple<Tensor &, Tensor &> sort_out(Tensor &sorted, Tensor &indices,
+                                        const Tensor &input, long dim,
+                                        bool order) {
   int64_t dims = sorted.dim() == 0 ? 1 : sorted.dim();
   TORCH_CHECK(dims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   dims = input.dim() == 0 ? 1 : input.dim();
@@ -42,11 +42,9 @@ sort_out(Tensor & sorted, Tensor & indices, const Tensor & input, long dim, bool
 
     // Sort using our in-place k/v kernel that supports arbitrary
     // layout
-    AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, sorted.scalar_type(), "SortKeyValueInplace",
-        [&] () {
-          SortKeyValueInplace<scalar_t>(sorted, indices, dim, order);
-        }
-    );
+    AT_DISPATCH_ALL_TYPES_AND(
+        at::ScalarType::Half, sorted.scalar_type(), "SortKeyValueInplace",
+        [&]() { SortKeyValueInplace<scalar_t>(sorted, indices, dim, order); });
   } else {
     // TODO
   }
@@ -54,11 +52,12 @@ sort_out(Tensor & sorted, Tensor & indices, const Tensor & input, long dim, bool
   return std::tuple<Tensor &, Tensor &>(sorted, indices);
 }
 
-std::tuple<at::Tensor,at::Tensor>
-sort(const at::Tensor & self, int64_t dim, bool descending) {
+std::tuple<at::Tensor, at::Tensor> sort(const at::Tensor &self, int64_t dim,
+                                        bool descending) {
   auto sorted = at::empty_like(self);
   auto indices = at::empty({0}, self.options().dtype(kLong));
-  return at::AtenIpexTypeDPCPP::sort_out(sorted, indices, self, dim, descending);
+  return at::AtenIpexTypeDPCPP::sort_out(sorted, indices, self, dim,
+                                         descending);
 }
 
 } // namespace AtenIpexTypeDPCPP

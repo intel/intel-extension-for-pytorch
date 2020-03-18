@@ -48,19 +48,17 @@
 //    - http://ridiculousfish.com/blog/posts/labor-of-division-episode-i.html
 
 // Result of div/mod operation stored together.
-template <typename Value>
-struct DivMod {
+template <typename Value> struct DivMod {
   Value div, mod;
 
-  DivMod(Value div, Value mod) : div(div), mod(mod) { }
+  DivMod(Value div, Value mod) : div(div), mod(mod) {}
 };
 
 // Base case: we only have an implementation for uint32_t for now.  For
 // everything else, we use plain division.
-template <typename Value>
-struct IntDivider {
-  IntDivider() { }  // Dummy constructor for arrays.
-  IntDivider(Value d) : divisor(d) { }
+template <typename Value> struct IntDivider {
+  IntDivider() {} // Dummy constructor for arrays.
+  IntDivider(Value d) : divisor(d) {}
 
   inline Value div(Value n) const { return n / divisor; }
   inline Value mod(Value n) const { return n % divisor; }
@@ -72,18 +70,19 @@ struct IntDivider {
 };
 
 // Implement fast integer division.
-template <>
-struct IntDivider<unsigned int> {
+template <> struct IntDivider<unsigned int> {
   static_assert(sizeof(unsigned int) == 4, "Assumes 32-bit unsigned int.");
 
-  IntDivider() { }  // Dummy constructor for arrays.
+  IntDivider() {} // Dummy constructor for arrays.
 
   IntDivider(unsigned int d) : divisor(d) {
     // TODO: replace following when dpcpp has counterpart assert
     // assert(divisor >= 1 && divisor <= INT32_MAX);
 
     // TODO: gcc/clang has __builtin_clz() but it's not portable.
-    for (shift = 0; shift < 32; shift++) if ((1U << shift) >= divisor) break;
+    for (shift = 0; shift < 32; shift++)
+      if ((1U << shift) >= divisor)
+        break;
 
     uint64_t one = 1;
     uint64_t magic = ((one << 32) * ((one << shift) - divisor)) / divisor + 1;
@@ -94,22 +93,20 @@ struct IntDivider<unsigned int> {
 
   inline unsigned int div(unsigned int n) const {
     // Using uint64_t so that the addition does not overflow.
-    uint64_t t = ((uint64_t) n * m1) >> 32;
+    uint64_t t = ((uint64_t)n * m1) >> 32;
     return (t + n) >> shift;
   }
 
-  inline unsigned int mod(unsigned int n) const {
-    return n - div(n) * divisor;
-  }
+  inline unsigned int mod(unsigned int n) const { return n - div(n) * divisor; }
 
   inline DivMod<unsigned int> divmod(unsigned int n) const {
     unsigned int q = div(n);
     return DivMod<unsigned int>(q, n - q * divisor);
   }
 
-  unsigned int divisor;  // d above.
-  unsigned int m1;  // Magic number: m' above.
-  unsigned int shift;  // Shift amounts.
+  unsigned int divisor; // d above.
+  unsigned int m1;      // Magic number: m' above.
+  unsigned int shift;   // Shift amounts.
 };
 
 #endif // THDPCPP_INTEGER_DIVIDER_INC

@@ -1,18 +1,17 @@
 #include <ATen/ATen.h>
 
-#include <core/DPCPP.h>
-#include <core/Stream.h>
-#include <core/Memory.h>
-#include <core/TensorImplUtils.h>
-#include <core/detail/TensorInfo.h>
-#include <core/detail/IndexUtils.h>
 #include <core/ApplyUtils.h>
-#include <utils/Numerics.h>
+#include <core/DPCPP.h>
+#include <core/Memory.h>
+#include <core/Stream.h>
+#include <core/TensorImplUtils.h>
+#include <core/detail/IndexUtils.h>
+#include <core/detail/TensorInfo.h>
 #include <utils/MathReduce.h>
+#include <utils/Numerics.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
 #include "ParttenScan.h"
-
+#include <ATen/aten_ipex_type_dpcpp.h>
 
 using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
@@ -23,7 +22,8 @@ namespace impl {
 
 DPCPP_DEF_K1(index_select_ker);
 template <typename scalar_t>
-void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indices) {
+void indexSelect(Tensor &dst, const Tensor &src, int dim,
+                 const Tensor &indices) {
   int srcDims = src.dim() == 0 ? 1 : src.dim();
   int dstDims = dst.dim() == 0 ? 1 : dst.dim();
   int idxDims = indices.dim() == 0 ? 1 : indices.dim();
@@ -32,16 +32,18 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
   TORCH_CHECK(dstDims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(idxDims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(idxDims <= 1,
-           "Index is supposed to be an empty tensor or a vector");
+              "Index is supposed to be an empty tensor or a vector");
   TORCH_CHECK(dim < srcDims, "Indexing dim is out of bounds");
   TORCH_CHECK(srcDims > 0, "Source tensor is empty");
 
-  TORCH_CHECK(indices.scalar_type() == ScalarType::Long, "index_select(): Expected dtype int64 for index");
-  TORCH_CHECK(src.scalar_type() == dst.scalar_type(),
-              "index_select(): Source and result must have the same scalar type");
+  TORCH_CHECK(indices.scalar_type() == ScalarType::Long,
+              "index_select(): Expected dtype int64 for index");
+  TORCH_CHECK(
+      src.scalar_type() == dst.scalar_type(),
+      "index_select(): Source and result must have the same scalar type");
 
   TensorInfo<int64_t, unsigned int> indices_info =
-    getTensorInfo<int64_t, unsigned int>(indices);
+      getTensorInfo<int64_t, unsigned int>(indices);
   indices_info.collapseDims();
 
   auto new_size = src.sizes().vec();
@@ -68,17 +70,19 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
   // total size of the tensor ignoring dimension `dim`;
   // -the number of indices we are choosing, which is the total size
   // of the tensor `indices`.
-  // TODO: if the slice number is to large. Need to balance the work group and work item number.
+  // TODO: if the slice number is to large. Need to balance the work group and
+  // work item number.
   // Make the work balance based on the MCU number.
-  // auto __mcu = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_units>();
+  // auto __mcu = dpcpp_queue.get_device().template
+  // get_info<dpcpp_dev_max_units>();
   uint64_t num_slices = indices.numel();
 
   auto slice_size = dst_num_elem / num_slices;
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  auto wgroup_size = dpcpp_queue.get_device().template \
-          get_info<dpcpp_dev_max_wgroup_size>();
+  auto wgroup_size =
+      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(slice_size), wgroup_size);
 
@@ -93,47 +97,51 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto src_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, src_data, src_size);
-    auto dst_acc = DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data, dst_size);
+    auto dst_acc =
+        DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data, dst_size);
     auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data, idx_size);
 
     __cgh.parallel_for_work_group<DPCPP_K(index_select_ker, scalar_t)>(
-      DPCPP::range</*dim=*/1>(num_slices),
-      DPCPP::range</*dim=*/1>(wgroup_size),
-      [=](DPCPP::group<1> group_id) {
-        auto src_ptr = src_acc.template get_pointer<scalar_t>();
-        auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
-        auto idx_ptr = idx_acc.template get_pointer<long>();
+        DPCPP::range</*dim=*/1>(num_slices),
+        DPCPP::range</*dim=*/1>(wgroup_size), [=](DPCPP::group<1> group_id) {
+          auto src_ptr = src_acc.template get_pointer<scalar_t>();
+          auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
+          auto idx_ptr = idx_acc.template get_pointer<long>();
 
-        auto dst_slice_id = group_id.get_id()[0];
+          auto dst_slice_id = group_id.get_id()[0];
 
-        auto slice_off = IndexToOffset<int64_t, unsigned int>::get(dst_slice_id, indices_info);
-        auto src_slice_id = idx_ptr[slice_off]/* - TH_INDEX_BASE*/;
+          auto slice_off = IndexToOffset<int64_t, unsigned int>::get(
+              dst_slice_id, indices_info);
+          auto src_slice_id = idx_ptr[slice_off] /* - TH_INDEX_BASE*/;
 
-        auto g_src_ptr = src_ptr + src_slice_id * src_info.strides[src_select_dim];
-        auto g_dst_ptr = dst_ptr + dst_slice_id * dst_info.strides[dst_select_dim];
+          auto g_src_ptr =
+              src_ptr + src_slice_id * src_info.strides[src_select_dim];
+          auto g_dst_ptr =
+              dst_ptr + dst_slice_id * dst_info.strides[dst_select_dim];
 
-        group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
+          group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
 
-          auto ii_ = item_id.get_logical_local_id()[0];
-          auto src_offset_ =
-                  IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
-          auto dst_offset_ =
-                  IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
+            auto ii_ = item_id.get_logical_local_id()[0];
+            auto src_offset_ =
+                IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
+            auto dst_offset_ =
+                IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
 
-          g_dst_ptr[ dst_offset_ ] = g_src_ptr[ src_offset_ ];
+            g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
 
-          for (int iter = 1; iter < n_work_item_iter;iter++) {
-            auto __inner_idx = iter * wgroup_size + ii_;
-            if (__inner_idx < slice_size) {
-              src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, src_info);
-              dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, dst_info);
+            for (int iter = 1; iter < n_work_item_iter; iter++) {
+              auto __inner_idx = iter * wgroup_size + ii_;
+              if (__inner_idx < slice_size) {
+                src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
+                    __inner_idx, src_info);
+                dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
+                    __inner_idx, dst_info);
 
-              g_dst_ptr[ dst_offset_ ] = g_src_ptr[ src_offset_ ];
+                g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
+              }
             }
-          }
+          });
         });
-      }
-    );
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -142,11 +150,10 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
 
 DPCPP_DEF_K1(nonzero_kernel);
 
-template<typename T>
-struct NonZeroOp {
+template <typename T> struct NonZeroOp {
   NonZeroOp() {}
   bool operator()(T lhs) const {
-    if(Numerics<T>::ne(lhs, ScalarConvert<float, T>::to(0.0))) {
+    if (Numerics<T>::ne(lhs, ScalarConvert<float, T>::to(0.0))) {
       return true;
     } else {
       return false;
@@ -154,8 +161,7 @@ struct NonZeroOp {
   }
 };
 
-template <typename scalar_t>
-void nonzero(Tensor & tensor, const Tensor & self_) {
+template <typename scalar_t> void nonzero(Tensor &tensor, const Tensor &self_) {
   auto self = self_.contiguous();
 
   int64_t num_dim = self.dim() == 0 ? 1 : self.dim();
@@ -170,7 +176,8 @@ void nonzero(Tensor & tensor, const Tensor & self_) {
   // Prepare input tensor strides for calculating result index
   if (N > 0) {
     if (canUse32BitIndexMath(self)) {
-      TensorInfo<scalar_t, uint32_t> input = getTensorInfo<scalar_t, uint32_t>(self);
+      TensorInfo<scalar_t, uint32_t> input =
+          getTensorInfo<scalar_t, uint32_t>(self);
       auto idx_fuc = idx_functor<uint32_t>(input);
       input.collapseDims();
 
@@ -178,19 +185,16 @@ void nonzero(Tensor & tensor, const Tensor & self_) {
       output.collapseDims();
 
       auto queue = dpcppGetCurrentQueue();
-      auto num_nonzeros = pattern_scan(
-          queue,
-          input,
-          output,
-          static_cast<uint32_t>(N),
-          NonZeroOp<scalar_t>{},
-          idx_fuc);
+      auto num_nonzeros =
+          pattern_scan(queue, input, output, static_cast<uint32_t>(N),
+                       NonZeroOp<scalar_t>{}, idx_fuc);
 
       // Resize the output tensor to the real size
       int64_t real_sizes[2] = {(int64_t)num_nonzeros, (int64_t)num_dim};
       TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 2, real_sizes, nullptr);
     } else {
-      TensorInfo<scalar_t, uint64_t> input = getTensorInfo<scalar_t, uint64_t>(self);
+      TensorInfo<scalar_t, uint64_t> input =
+          getTensorInfo<scalar_t, uint64_t>(self);
       auto idx_fuc = idx_functor<uint64_t>(input);
       input.collapseDims();
 
@@ -198,37 +202,35 @@ void nonzero(Tensor & tensor, const Tensor & self_) {
       output.collapseDims();
 
       auto queue = dpcppGetCurrentQueue();
-      auto num_nonzeros = pattern_scan(
-          queue,
-          input,
-          output,
-          static_cast<uint64_t>(N),
-          NonZeroOp<scalar_t>{},
-          idx_fuc);
+      auto num_nonzeros =
+          pattern_scan(queue, input, output, static_cast<uint64_t>(N),
+                       NonZeroOp<scalar_t>{}, idx_fuc);
 
       // Resize the output tensor to the real size
       int64_t real_sizes[2] = {(int64_t)num_nonzeros, (int64_t)num_dim};
       TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 2, real_sizes, nullptr);
     }
-
   }
 }
 
-
 DPCPP_DEF_K1(index_add_ker);
 template <typename scalar_t>
-void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & src) {
+void indexAdd(Tensor &dst, int64_t dim, const Tensor &indices,
+              const Tensor &src) {
   dim = maybe_wrap_dim(dim, dst.dim());
 
   auto numIndices = indices.numel();
-  TORCH_CHECK(indices.dim() <= 1, "index_add_(): Index is supposed to be a vector");
-  TORCH_CHECK(indices.scalar_type() == ScalarType::Long, "index_add_(): Expected dtype int64 for index");
+  TORCH_CHECK(indices.dim() <= 1,
+              "index_add_(): Index is supposed to be a vector");
+  TORCH_CHECK(indices.scalar_type() == ScalarType::Long,
+              "index_add_(): Expected dtype int64 for index");
   TORCH_CHECK(dst.scalar_type() == src.scalar_type(),
               "index_add_(): self and source must have the same scalar type");
-  TORCH_CHECK(dim == 0 || dim < src.dim(),
-              "index_add_(): Indexing dim ", dim, " is out of bounds of tensor");
-  TORCH_CHECK(numIndices == (src.dim() == 0 ? 1 : src.size(dim)),
-              "index_add_(): Number of indices should be equal to self.size(dim)");
+  TORCH_CHECK(dim == 0 || dim < src.dim(), "index_add_(): Indexing dim ", dim,
+              " is out of bounds of tensor");
+  TORCH_CHECK(
+      numIndices == (src.dim() == 0 ? 1 : src.size(dim)),
+      "index_add_(): Number of indices should be equal to self.size(dim)");
 
   TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(src.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
@@ -251,18 +253,21 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
   ptrdiff_t srcSliceSize = 1;
   bool mismatch = false;
 
-  if (dstDims != srcDims) mismatch = true;
+  if (dstDims != srcDims)
+    mismatch = true;
 
   for (int d = 0; d < srcDims; d++) {
     if (d != dim) {
       srcSliceSize *= src.dim() == 0 ? 1 : src.size(d);
-      if (!mismatch && (dst.dim() == 0 ? 1 : dst.size(d)) != (src.dim() == 0 ? 1 : src.size(d)))
+      if (!mismatch &&
+          (dst.dim() == 0 ? 1 : dst.size(d)) !=
+              (src.dim() == 0 ? 1 : src.size(d)))
         mismatch = true;
     }
   }
 
   TORCH_CHECK(dstSliceSize == srcSliceSize,
-    "Source/destination tensor have different slice sizes");
+              "Source/destination tensor have different slice sizes");
 
   if (mismatch) {
     static bool warningShown = false;
@@ -277,7 +282,7 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
   ptrdiff_t sliceSize = dstSliceSize;
   ptrdiff_t srcTotalSize = src.numel();
   int64_t dstAddDimSize = dst.dim() == 0 ? 1 : dst.size(dim);
-  
+
   if (sliceSize == 0) {
     return;
   }
@@ -285,21 +290,21 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
   TensorInfo<int64_t, unsigned int> indices_info =
       getTensorInfo<int64_t, unsigned int>(indices);
   indices_info.collapseDims();
-  
+
   TensorInfo<scalar_t, unsigned int> dst_info =
-        getTensorInfo<scalar_t, unsigned int>(dst);
+      getTensorInfo<scalar_t, unsigned int>(dst);
   int dst_add_dim = dst_info.collapseDims(dim);
   dst_info.reduceDim(dst_add_dim);
 
   TensorInfo<scalar_t, unsigned int> src_info =
-        getTensorInfo<scalar_t, unsigned int>(src);
+      getTensorInfo<scalar_t, unsigned int>(src);
   int src_add_dim = src_info.collapseDims(dim);
   src_info.reduceDim(src_add_dim);
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  auto wgroup_size = dpcpp_queue.get_device().template \
-          get_info<dpcpp_dev_max_wgroup_size>();
+  auto wgroup_size =
+      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
 
@@ -308,58 +313,57 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
   auto src_data = src.data_ptr();
   auto dst_data = dst.data_ptr();
   auto idx_data = indices.data_ptr();
-  auto src_size = src.storage().numel() * \
-          (src.dtype().itemsize());
-  auto dst_size = dst.storage().numel() * \
-          (dst.dtype().itemsize());
-  auto idx_size = indices.storage().numel() * \
-          (indices.dtype().itemsize());
+  auto src_size = src.storage().numel() * (src.dtype().itemsize());
+  auto dst_size = dst.storage().numel() * (dst.dtype().itemsize());
+  auto idx_size = indices.storage().numel() * (indices.dtype().itemsize());
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto src_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, src_data, src_size);
-    auto dst_acc = DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data, dst_size);
+    auto dst_acc =
+        DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data, dst_size);
     auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data, idx_size);
 
     __cgh.parallel_for_work_group<DPCPP_K(index_add_ker, scalar_t)>(
-      DPCPP::range</*dim=*/1>(numIndices),
-      DPCPP::range</*dim=*/1>(wgroup_size),
-      [=](DPCPP::group<1> group_id) {
-        auto src_ptr = src_acc.template get_pointer<scalar_t>();
-        auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
-        auto idx_ptr = idx_acc.template get_pointer<long>();
+        DPCPP::range</*dim=*/1>(numIndices),
+        DPCPP::range</*dim=*/1>(wgroup_size), [=](DPCPP::group<1> group_id) {
+          auto src_ptr = src_acc.template get_pointer<scalar_t>();
+          auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
+          auto idx_ptr = idx_acc.template get_pointer<long>();
 
-        auto dst_slice_id = group_id.get_id()[0];
-        //auto slice_off = IndexToOffset<int64_t, unsigned int>::get(dst_slice_id, indices_info);
-        auto g_idx_ptr = idx_ptr;
-        auto g_dst_ptr = dst_ptr + g_idx_ptr[ dst_slice_id ] * dst_info.strides[dst_add_dim];
-        auto g_src_ptr = src_ptr + dst_slice_id * src_info.strides[src_add_dim];
+          auto dst_slice_id = group_id.get_id()[0];
+          // auto slice_off = IndexToOffset<int64_t, unsigned
+          // int>::get(dst_slice_id, indices_info);
+          auto g_idx_ptr = idx_ptr;
+          auto g_dst_ptr =
+              dst_ptr + g_idx_ptr[dst_slice_id] * dst_info.strides[dst_add_dim];
+          auto g_src_ptr =
+              src_ptr + dst_slice_id * src_info.strides[src_add_dim];
 
-        group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
+          group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
 
-          auto ii_ = item_id.get_logical_local_id()[0];
-          auto dst_offset_ =
-                  IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
-          auto src_offset_ = 
-                  IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
-          g_dst_ptr[ dst_offset_ ] += g_src_ptr[ src_offset_ ];
+            auto ii_ = item_id.get_logical_local_id()[0];
+            auto dst_offset_ =
+                IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
+            auto src_offset_ =
+                IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
+            g_dst_ptr[dst_offset_] += g_src_ptr[src_offset_];
 
-          for (int iter = 1; iter < n_work_item_iter;iter++)
-          {
-            auto idx_offset_ = 
+            for (int iter = 1; iter < n_work_item_iter; iter++) {
+              auto idx_offset_ =
                   IndexToOffset<int64_t, unsigned int>::get(iter, indices_info);
-            auto __inner_idx = g_idx_ptr[ idx_offset_ ] * wgroup_size + ii_;
-            auto __src_idx = idx_offset_ * wgroup_size + ii_;
+              auto __inner_idx = g_idx_ptr[idx_offset_] * wgroup_size + ii_;
+              auto __src_idx = idx_offset_ * wgroup_size + ii_;
 
-            if (__src_idx < srcTotalSize)
-            {
-              dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, dst_info);
-              src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(__src_idx, src_info);
-              g_dst_ptr[ dst_offset_ ] += g_src_ptr[ src_offset_ ];
+              if (__src_idx < srcTotalSize) {
+                dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
+                    __inner_idx, dst_info);
+                src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
+                    __src_idx, src_info);
+                g_dst_ptr[dst_offset_] += g_src_ptr[src_offset_];
+              }
             }
-          }
+          });
         });
-      }
-    );
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -367,7 +371,8 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
 
 DPCPP_DEF_K1(index_fill_ker);
 template <typename scalar_t>
-void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_scalar) {
+void indexFill(Tensor &dst, int64_t dim, const Tensor &indices,
+               Scalar val_scalar) {
   TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(indices.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
 
@@ -380,7 +385,7 @@ void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_sca
 
   TORCH_CHECK(indices.dim() <= 1, "expecting vector of indices");
   TORCH_CHECK(dim >= 0 && dim < dstDims, "Indexing dim is out of bounds");
-  
+
   auto val = val_scalar.to<scalar_t>();
   ptrdiff_t sliceSize = 1;
   for (int d = 0; d < dstDims; d++) {
@@ -399,16 +404,16 @@ void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_sca
   TensorInfo<int64_t, unsigned int> indices_info =
       getTensorInfo<int64_t, unsigned int>(indices);
   indices_info.collapseDims();
-  
+
   TensorInfo<scalar_t, unsigned int> dst_info =
-        getTensorInfo<scalar_t, unsigned int>(dst);
+      getTensorInfo<scalar_t, unsigned int>(dst);
   int dst_fill_dim = dst_info.collapseDims(dim);
   dst_info.reduceDim(dst_fill_dim);
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  auto wgroup_size = dpcpp_queue.get_device().template \
-          get_info<dpcpp_dev_max_wgroup_size>();
+  auto wgroup_size =
+      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
 
@@ -416,50 +421,49 @@ void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_sca
 
   auto dst_data = dst.data_ptr();
   auto idx_data = indices.data_ptr();
-  auto dst_size = dst.storage().numel() * \
-          (dst.dtype().itemsize());
-  auto idx_size = indices.storage().numel() * \
-          (indices.dtype().itemsize());
+  auto dst_size = dst.storage().numel() * (dst.dtype().itemsize());
+  auto idx_size = indices.storage().numel() * (indices.dtype().itemsize());
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto dst_acc = DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data, dst_size);
+    auto dst_acc =
+        DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data, dst_size);
     auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data, idx_size);
 
     __cgh.parallel_for_work_group<DPCPP_K(index_fill_ker, scalar_t)>(
-      DPCPP::range</*dim=*/1>(numIndices),
-      DPCPP::range</*dim=*/1>(wgroup_size),
-      [=](DPCPP::group<1> group_id) {
-        auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
-        auto idx_ptr = idx_acc.template get_pointer<long>();
+        DPCPP::range</*dim=*/1>(numIndices),
+        DPCPP::range</*dim=*/1>(wgroup_size), [=](DPCPP::group<1> group_id) {
+          auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
+          auto idx_ptr = idx_acc.template get_pointer<long>();
 
-        auto dst_slice_id = group_id.get_id()[0];
-        //auto slice_off = IndexToOffset<int64_t, unsigned int>::get(dst_slice_id, indices_info);
-        auto g_idx_ptr = idx_ptr;
-        auto g_dst_ptr = dst_ptr + g_idx_ptr[ dst_slice_id ] * dst_info.strides[dst_fill_dim];
+          auto dst_slice_id = group_id.get_id()[0];
+          // auto slice_off = IndexToOffset<int64_t, unsigned
+          // int>::get(dst_slice_id, indices_info);
+          auto g_idx_ptr = idx_ptr;
+          auto g_dst_ptr =
+              dst_ptr +
+              g_idx_ptr[dst_slice_id] * dst_info.strides[dst_fill_dim];
 
-        group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
+          group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
 
-          auto ii_ = item_id.get_logical_local_id()[0];
-          auto dst_offset_ =
-                  IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
-          g_dst_ptr[ dst_offset_ ] = val;
+            auto ii_ = item_id.get_logical_local_id()[0];
+            auto dst_offset_ =
+                IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
+            g_dst_ptr[dst_offset_] = val;
 
-          for (int iter = 1; iter < n_work_item_iter;iter++)
-          {
-            auto idx_offset_ = 
+            for (int iter = 1; iter < n_work_item_iter; iter++) {
+              auto idx_offset_ =
                   IndexToOffset<int64_t, unsigned int>::get(iter, indices_info);
-            auto __inner_idx = g_idx_ptr[ idx_offset_ ] * wgroup_size + ii_;
+              auto __inner_idx = g_idx_ptr[idx_offset_] * wgroup_size + ii_;
 
-            if (__inner_idx < dstTotalSize)
-            {
-              dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, dst_info);
+              if (__inner_idx < dstTotalSize) {
+                dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
+                    __inner_idx, dst_info);
 
-              g_dst_ptr[ dst_offset_ ] = val;
+                g_dst_ptr[dst_offset_] = val;
+              }
             }
-          }
+          });
         });
-      }
-    );
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -468,16 +472,18 @@ void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_sca
 DPCPP_DEF_K1(diag_from_dpcpp_ker);
 DPCPP_DEF_K1(diag_to_dpcpp_ker);
 template <typename scalar_t>
-void Diag(Tensor & dst, const Tensor & src, int64_t k) {
+void Diag(Tensor &dst, const Tensor &src, int64_t k) {
   int nDimension = src.dim() == 0 ? 1 : src.dim();
-  TORCH_CHECK((nDimension == 2) || (nDimension == 1), "expected a matrix or a vector");
+  TORCH_CHECK((nDimension == 2) || (nDimension == 1),
+              "expected a matrix or a vector");
 
   if (nDimension == 2) {
     int64_t stride0 = src.stride(0);
     int64_t stride1 = src.stride(1);
     int64_t size0 = src.size(0);
     int64_t size1 = src.size(1);
-    int64_t size = (k > 0) ? DPCPP::min((int64_t)size0, (int64_t)size1 - k) : DPCPP::min((int64_t)size0 + k, (int64_t)size1);
+    int64_t size = (k > 0) ? DPCPP::min((int64_t)size0, (int64_t)size1 - k)
+                           : DPCPP::min((int64_t)size0 + k, (int64_t)size1);
     int64_t size_[1] = {size};
     TensorImpl_resizeNd(TensorImpl_Unwrap(dst), 1, size_, nullptr);
     if (size > 0) {
@@ -485,7 +491,7 @@ void Diag(Tensor & dst, const Tensor & src, int64_t k) {
       int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
       static const auto write_mode = DPCPP::access::mode::discard_write;
       static const auto read_mode = DPCPP::access::mode::read;
-      auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+      auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
         auto in_acc = DPCPPAccessor<read_mode>(cgh, src.data_ptr<scalar_t>());
@@ -496,9 +502,9 @@ void Diag(Tensor & dst, const Tensor & src, int64_t k) {
           auto out_ptr = out_acc.template get_pointer<scalar_t>();
           const int64_t bOffset = start + (stride0 + stride1) * id;
           out_ptr[strideSelf * id] = in_ptr[bOffset];
-
         };
-        cgh.parallel_for<DPCPP_K(diag_from_dpcpp_ker, scalar_t)>(DPCPP::range<1>(dst.numel()), kfn);
+        cgh.parallel_for<DPCPP_K(diag_from_dpcpp_ker, scalar_t)>(
+            DPCPP::range<1>(dst.numel()), kfn);
       };
       DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
     }
@@ -515,7 +521,7 @@ void Diag(Tensor & dst, const Tensor & src, int64_t k) {
       int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
       static const auto write_mode = DPCPP::access::mode::discard_write;
       static const auto read_mode = DPCPP::access::mode::read;
-      auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+      auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
         auto in_acc = DPCPPAccessor<read_mode>(cgh, src.data_ptr<scalar_t>());
@@ -527,17 +533,17 @@ void Diag(Tensor & dst, const Tensor & src, int64_t k) {
           const int64_t aOffset = start + (stride0 + stride1) * id;
           out_ptr[aOffset] = in_ptr[strideSrc * id];
         };
-        cgh.parallel_for<DPCPP_K(diag_to_dpcpp_ker, scalar_t)>(DPCPP::range<1>(dst.numel()), kfn);
+        cgh.parallel_for<DPCPP_K(diag_to_dpcpp_ker, scalar_t)>(
+            DPCPP::range<1>(dst.numel()), kfn);
       };
       DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
     }
   }
 }
 
-template <typename T, typename MaskT>
-struct TensorMaskedFillOp {
+template <typename T, typename MaskT> struct TensorMaskedFillOp {
   TensorMaskedFillOp(T v) : value(v) {}
-  inline void operator()(T& t, MaskT& mask) const{
+  inline void operator()(T &t, MaskT &mask) const {
     if (mask) {
       t = value;
     }
@@ -547,23 +553,25 @@ struct TensorMaskedFillOp {
 };
 
 template <typename scalar_t>
-void MaskedFill(Tensor & tensor, const Tensor & mask, Scalar value_scalar) {
+void MaskedFill(Tensor &tensor, const Tensor &mask, Scalar value_scalar) {
   auto value = value_scalar.to<scalar_t>();
   TORCH_CHECK(tensor.numel() == mask.numel(), "sizes do not match");
-  at::dpcpp::DPCPP_tensor_apply2<scalar_t, bool>(tensor, mask, TensorMaskedFillOp<scalar_t, bool>(value));
+  at::dpcpp::DPCPP_tensor_apply2<scalar_t, bool>(
+      tensor, mask, TensorMaskedFillOp<scalar_t, bool>(value));
 }
 
 DPCPP_DEF_K1(maskedScatter_scan_dpcpp_ker);
 DPCPP_DEF_K1(TensorMaskedScatterOp);
 template <typename scalar_t>
-void MaskedScatter(Tensor & tensor, const Tensor & mask, const Tensor & src) {
+void MaskedScatter(Tensor &tensor, const Tensor &mask, const Tensor &src) {
   auto maskSize = mask.numel();
   auto tensorSize = tensor.numel();
   auto srcSize = src.numel();
   TORCH_CHECK(mask.numel() == src.numel(), "sizes do not match");
 
   // `mask` and `tensor` must have the same number of elements
-  TORCH_CHECK(maskSize == tensorSize, "mask and tensor must have the same number of elements");
+  TORCH_CHECK(maskSize == tensorSize,
+              "mask and tensor must have the same number of elements");
 
   // Determine our output size
   c10::optional<ScalarType> dtype;
@@ -585,7 +593,8 @@ void MaskedScatter(Tensor & tensor, const Tensor & mask, const Tensor & src) {
   auto maskLong_data = maskLong.data_ptr();
   auto maskLong_size = maskLong.numel() * (maskLong.dtype().itemsize());
   auto maskPrefixSum_data = maskPrefixSum.data_ptr();
-  auto maskPrefixSum_size = maskPrefixSum.numel() * (maskPrefixSum.dtype().itemsize());
+  auto maskPrefixSum_size =
+      maskPrefixSum.numel() * (maskPrefixSum.dtype().itemsize());
   int64_t size = maskLong.numel();
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
@@ -594,39 +603,51 @@ void MaskedScatter(Tensor & tensor, const Tensor & mask, const Tensor & src) {
 
   // command group functions
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_maskLong = DPCPPAccessor<dpcpp_r_mode>(cgh, maskLong_data, maskLong_size);
-    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, maskPrefixSum_data, maskPrefixSum_size);
+    auto acc_maskLong =
+        DPCPPAccessor<dpcpp_r_mode>(cgh, maskLong_data, maskLong_size);
+    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_discard_w_mode>(
+        cgh, maskPrefixSum_data, maskPrefixSum_size);
 
     // kernel function per work-item
     auto kfn = DPCPP_Q_KFN() {
-      dpcpp_global_ptr_cpt<int64_t> maskLong_ptr = acc_maskLong.template get_pointer<int64_t>();
-      dpcpp_global_ptr_pt<int64_t> maskPrefixSum_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
-      dpcpp_exclusive_scan(maskLong_ptr, maskLong_ptr + size, maskPrefixSum_ptr, static_cast<int64_t>(0), AddOp<int64_t>());
+      dpcpp_global_ptr_cpt<int64_t> maskLong_ptr =
+          acc_maskLong.template get_pointer<int64_t>();
+      dpcpp_global_ptr_pt<int64_t> maskPrefixSum_ptr =
+          acc_maskPrefixSum.template get_pointer<int64_t>();
+      dpcpp_exclusive_scan(maskLong_ptr, maskLong_ptr + size, maskPrefixSum_ptr,
+                           static_cast<int64_t>(0), AddOp<int64_t>());
     };
     // kick off kernel
     // (TODO) single_task need replaced due to low efficiency
     cgh.single_task<DPCPP_K(maskedScatter_scan_dpcpp_ker, scalar_t)>(kfn);
   };
-    // submit to DPCPP queue
+  // submit to DPCPP queue
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
   Tensor contigSrc = src.contiguous();
-  
+
   // command group function
   // copy src to tensor according to mask
   auto cgfMaskedScatter = DPCPP_Q_CGF(cgh) {
-    auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, contigSrc.data_ptr<scalar_t>());
+    auto acc_src =
+        DPCPPAccessor<dpcpp_r_mode>(cgh, contigSrc.data_ptr<scalar_t>());
     auto acc_mask = DPCPPAccessor<dpcpp_r_mode>(cgh, mask.data_ptr<bool>());
-    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
-    auto acc_tensor = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tensor.data_ptr<scalar_t>());
+    auto acc_maskPrefixSum =
+        DPCPPAccessor<dpcpp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
+    auto acc_tensor =
+        DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tensor.data_ptr<scalar_t>());
 
     // kernel function
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item){
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       int64_t linear_index = item.get_global_linear_id();
-      dpcpp_global_ptr_pt<scalar_t> src_ptr = acc_src.template get_pointer<scalar_t>();
-      dpcpp_global_ptr_pt<bool> mask_ptr = acc_mask.template get_pointer<bool>();
-      dpcpp_global_ptr_pt<int64_t> maskPrefix_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
-      dpcpp_global_ptr_pt<scalar_t> tensor_ptr = acc_tensor.template get_pointer<scalar_t>();
+      dpcpp_global_ptr_pt<scalar_t> src_ptr =
+          acc_src.template get_pointer<scalar_t>();
+      dpcpp_global_ptr_pt<bool> mask_ptr =
+          acc_mask.template get_pointer<bool>();
+      dpcpp_global_ptr_pt<int64_t> maskPrefix_ptr =
+          acc_maskPrefixSum.template get_pointer<int64_t>();
+      dpcpp_global_ptr_pt<scalar_t> tensor_ptr =
+          acc_tensor.template get_pointer<scalar_t>();
       if (linear_index < size) {
         if (mask_ptr[linear_index]) {
           tensor_ptr[linear_index] = src_ptr[maskPrefix_ptr[linear_index]];
@@ -635,7 +656,8 @@ void MaskedScatter(Tensor & tensor, const Tensor & mask, const Tensor & src) {
     };
 
     cgh.parallel_for<DPCPP_K(TensorMaskedScatterOp, scalar_t)>(
-      DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)), kfn);
+        DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
+        kfn);
   };
 
   // submit to DPCPP queue
@@ -645,7 +667,7 @@ void MaskedScatter(Tensor & tensor, const Tensor & mask, const Tensor & src) {
 DPCPP_DEF_K1(maskedSelect_scan_dpcpp_ker);
 DPCPP_DEF_K1(TensorMaskedSelectOp);
 template <typename scalar_t>
-void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
+void MaskedSelect(Tensor &tensor, const Tensor &src, const Tensor &mask) {
   TORCH_CHECK(mask.numel() == src.numel(), "sizes do not match");
 
   // Determine our output size
@@ -654,7 +676,7 @@ void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
   int64_t real_sizes[1] = {(int64_t)totalElements};
   if (totalElements == 0) {
     TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 1, real_sizes, nullptr);
-    return ;
+    return;
   }
 
   Tensor tensorContig = tensor.contiguous();
@@ -663,7 +685,7 @@ void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
   if (&tensor != &tensorContig) {
     TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 1, real_sizes, nullptr);
   }
-  
+
   Tensor maskLong = at::empty({0}, mask.options().dtype(kLong));
   maskLong.resize_(mask.sizes());
   maskLong.copy_(mask);
@@ -674,7 +696,8 @@ void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
   auto maskLong_data = maskLong.data_ptr();
   auto maskLong_size = maskLong.numel() * (maskLong.dtype().itemsize());
   auto maskPrefixSum_data = maskPrefixSum.data_ptr();
-  auto maskPrefixSum_size = maskPrefixSum.numel() * (maskPrefixSum.dtype().itemsize());
+  auto maskPrefixSum_size =
+      maskPrefixSum.numel() * (maskPrefixSum.dtype().itemsize());
   int64_t size = maskLong.numel();
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
@@ -683,59 +706,72 @@ void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
 
   // command group functions
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_maskLong = DPCPPAccessor<dpcpp_r_mode>(cgh, maskLong_data, maskLong_size);
-    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, maskPrefixSum_data, maskPrefixSum_size);
+    auto acc_maskLong =
+        DPCPPAccessor<dpcpp_r_mode>(cgh, maskLong_data, maskLong_size);
+    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_discard_w_mode>(
+        cgh, maskPrefixSum_data, maskPrefixSum_size);
 
     // kernel function per work-item
     auto kfn = DPCPP_Q_KFN() {
-      dpcpp_global_ptr_cpt<int64_t> maskLong_ptr = acc_maskLong.template get_pointer<int64_t>();
-      dpcpp_global_ptr_pt<int64_t> maskPrefixSum_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
-      dpcpp_inclusive_scan(maskLong_ptr, maskLong_ptr + size, maskPrefixSum_ptr, AddOp<int64_t>());
+      dpcpp_global_ptr_cpt<int64_t> maskLong_ptr =
+          acc_maskLong.template get_pointer<int64_t>();
+      dpcpp_global_ptr_pt<int64_t> maskPrefixSum_ptr =
+          acc_maskPrefixSum.template get_pointer<int64_t>();
+      dpcpp_inclusive_scan(maskLong_ptr, maskLong_ptr + size, maskPrefixSum_ptr,
+                           AddOp<int64_t>());
     };
     // kick off kernel
     // (TODO) single_task need replaced due to low efficiency
     cgh.single_task<DPCPP_K(maskedSelect_scan_dpcpp_ker, scalar_t)>(kfn);
   };
 
-    // submit to DPCPP queue
-    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  // submit to DPCPP queue
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
-    TensorInfo<scalar_t, uint64_t> src_info =
-            getTensorInfo<scalar_t, uint64_t>(src);
-    src_info.collapseDims();
+  TensorInfo<scalar_t, uint64_t> src_info =
+      getTensorInfo<scalar_t, uint64_t>(src);
+  src_info.collapseDims();
 
-    TensorInfo<bool, uint64_t> mask_info =
-            getTensorInfo<bool, uint64_t>(mask);
-    mask_info.collapseDims();
+  TensorInfo<bool, uint64_t> mask_info = getTensorInfo<bool, uint64_t>(mask);
+  mask_info.collapseDims();
 
   // command group function
   auto cgfMaskedSelect = DPCPP_Q_CGF(cgh) {
     auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
     auto acc_mask = DPCPPAccessor<dpcpp_r_mode>(cgh, mask.data_ptr<bool>());
-    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
-    auto acc_tensor = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tensorContig.data_ptr<scalar_t>());
+    auto acc_maskPrefixSum =
+        DPCPPAccessor<dpcpp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
+    auto acc_tensor = DPCPPAccessor<dpcpp_discard_w_mode>(
+        cgh, tensorContig.data_ptr<scalar_t>());
 
     // kernel function per work-item
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item){
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       int64_t linear_index = item.get_global_linear_id();
 
-      dpcpp_global_ptr_pt<scalar_t> src_ptr = acc_src.template get_pointer<scalar_t>();
-      dpcpp_global_ptr_pt<bool> mask_ptr = acc_mask.template get_pointer<bool>();
-      dpcpp_global_ptr_pt<int64_t> maskPrefix_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
-      dpcpp_global_ptr_pt<scalar_t> tensor_ptr = acc_tensor.template get_pointer<scalar_t>();
+      dpcpp_global_ptr_pt<scalar_t> src_ptr =
+          acc_src.template get_pointer<scalar_t>();
+      dpcpp_global_ptr_pt<bool> mask_ptr =
+          acc_mask.template get_pointer<bool>();
+      dpcpp_global_ptr_pt<int64_t> maskPrefix_ptr =
+          acc_maskPrefixSum.template get_pointer<int64_t>();
+      dpcpp_global_ptr_pt<scalar_t> tensor_ptr =
+          acc_tensor.template get_pointer<scalar_t>();
 
       if (linear_index < size) {
-          // The mask tensor maybe not contiguos.
-          auto mask_offset = IndexToOffset<bool, uint64_t>().get(linear_index, mask_info);
+        // The mask tensor maybe not contiguos.
+        auto mask_offset =
+            IndexToOffset<bool, uint64_t>().get(linear_index, mask_info);
         if (mask_ptr[mask_offset]) {
           // The src tensor maybe not contiguos.
-          auto src_offset = IndexToOffset<scalar_t, uint64_t>().get(linear_index, src_info);
+          auto src_offset =
+              IndexToOffset<scalar_t, uint64_t>().get(linear_index, src_info);
           tensor_ptr[maskPrefix_ptr[linear_index] - 1] = src_ptr[src_offset];
         }
       }
     };
     cgh.parallel_for<DPCPP_K(TensorMaskedSelectOp, scalar_t)>(
-      DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)), kfn);
+        DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
+        kfn);
   };
 
   // submit to DPCPP queue
@@ -748,65 +784,70 @@ void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
 
 } // namespace impl
 
-Tensor & index_select_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index) {
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Bool, self.scalar_type(), "indexSelect", [&]() {
-    impl::indexSelect<scalar_t>(out, self, dim, index);
-  });
+Tensor &index_select_out(Tensor &out, const Tensor &self, int64_t dim,
+                         const Tensor &index) {
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::Bool, self.scalar_type(), "indexSelect",
+      [&]() { impl::indexSelect<scalar_t>(out, self, dim, index); });
   return out;
 }
 
-Tensor index_select(const Tensor & self, int64_t dim, const Tensor & index) {
+Tensor index_select(const Tensor &self, int64_t dim, const Tensor &index) {
   auto out = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::index_select_out(out, self, dim, index);
 }
 
-Tensor & nonzero_out(Tensor & out, const Tensor & self) {
-  AT_DISPATCH_ALL_TYPES_AND2(at::ScalarType::Half,
-      at::ScalarType::Bool, self.scalar_type(), "indexSelect", [&]() {
-    impl::nonzero<scalar_t>(out, self);
-  });
+Tensor &nonzero_out(Tensor &out, const Tensor &self) {
+  AT_DISPATCH_ALL_TYPES_AND2(at::ScalarType::Half, at::ScalarType::Bool,
+                             self.scalar_type(), "indexSelect",
+                             [&]() { impl::nonzero<scalar_t>(out, self); });
   return out;
 }
 
-Tensor nonzero(const at::Tensor & self) {
+Tensor nonzero(const at::Tensor &self) {
   auto out = at::empty({0}, self.options().dtype(kLong));
   return at::AtenIpexTypeDPCPP::nonzero_out(out, self);
 }
 
-Tensor & index_add_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & source) {
+Tensor &index_add_(Tensor &self, int64_t dim, const Tensor &index,
+                   const Tensor &source) {
   AT_DISPATCH_ALL_TYPES(self.scalar_type(), "indexAdd", [&]() {
     impl::indexAdd<scalar_t>(self, dim, index, source);
   });
   return self;
 }
 
-Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, Scalar value) {
+Tensor &index_fill_(Tensor &self, int64_t dim, const Tensor &index,
+                    Scalar value) {
   AT_DISPATCH_ALL_TYPES(self.scalar_type(), "indexFill", [&]() {
     impl::indexFill<scalar_t>(self, dim, index, value);
   });
   return self;
 }
 
-Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & value) {
-  TORCH_CHECK(value.dim() == 0, "index_fill_ only supports a 0-dimensional value tensor, but got tensor "
-      "with ", value.dim(), " dimension(s).");
+Tensor &index_fill_(Tensor &self, int64_t dim, const Tensor &index,
+                    const Tensor &value) {
+  TORCH_CHECK(
+      value.dim() == 0,
+      "index_fill_ only supports a 0-dimensional value tensor, but got tensor "
+      "with ",
+      value.dim(), " dimension(s).");
   return at::AtenIpexTypeDPCPP::index_fill_(self, dim, index, value.item());
 }
 
-Tensor & diag_out(Tensor & out, const Tensor & self, int64_t diagonal) {
-  AT_DISPATCH_ALL_TYPES_AND2(at::ScalarType::Half,
-      at::ScalarType::Bool, self.scalar_type(), "Diag", [&]() {
-    impl::Diag<scalar_t>(out, self, diagonal);
-  });
+Tensor &diag_out(Tensor &out, const Tensor &self, int64_t diagonal) {
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half, at::ScalarType::Bool, self.scalar_type(), "Diag",
+      [&]() { impl::Diag<scalar_t>(out, self, diagonal); });
   return out;
 }
 
-Tensor diag(const Tensor & self, int64_t diagonal) {
+Tensor diag(const Tensor &self, int64_t diagonal) {
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::diag_out(out, self, diagonal);
 }
 
-Tensor trace(const Tensor & self) {
+Tensor trace(const Tensor &self) {
   TORCH_CHECK(self.dim() == 2, "expected a matrix");
   Tensor diag = at::AtenIpexTypeDPCPP::diag(self, 0);
   optional<ScalarType> dtype;
@@ -814,32 +855,33 @@ Tensor trace(const Tensor & self) {
   return out;
 }
 
-Tensor & masked_fill_(Tensor & self, const Tensor & mask, Scalar value) {
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, self.scalar_type(), "MaskedFill", [&]() {
-    impl::MaskedFill<scalar_t>(self, mask, value);
-  });
+Tensor &masked_fill_(Tensor &self, const Tensor &mask, Scalar value) {
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::Half, self.scalar_type(), "MaskedFill",
+      [&]() { impl::MaskedFill<scalar_t>(self, mask, value); });
   return self;
 }
 
-Tensor & masked_fill_(Tensor & self, const Tensor & mask, const Tensor & value) {
+Tensor &masked_fill_(Tensor &self, const Tensor &mask, const Tensor &value) {
   return at::AtenIpexTypeDPCPP::masked_fill_(self, mask, value.item());
 }
 
-Tensor & masked_scatter_(Tensor & self, const Tensor & mask, const Tensor & source) {
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, self.scalar_type(), "MaskedScatter", [&]() {
-    impl::MaskedScatter<scalar_t>(self, mask, source);
-  });
+Tensor &masked_scatter_(Tensor &self, const Tensor &mask,
+                        const Tensor &source) {
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::Half, self.scalar_type(), "MaskedScatter",
+      [&]() { impl::MaskedScatter<scalar_t>(self, mask, source); });
   return self;
 }
 
-Tensor & masked_select_out(Tensor & out, const Tensor & self, const Tensor & mask) {
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, self.scalar_type(), "MaskedSelect", [&]() {
-    impl::MaskedSelect<scalar_t>(out, self, mask);
-  });
+Tensor &masked_select_out(Tensor &out, const Tensor &self, const Tensor &mask) {
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::Half, self.scalar_type(), "MaskedSelect",
+      [&]() { impl::MaskedSelect<scalar_t>(out, self, mask); });
   return out;
 }
 
-Tensor masked_select(const Tensor & self, const Tensor & mask) {
+Tensor masked_select(const Tensor &self, const Tensor &mask) {
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::masked_select_out(out, self, mask);
 }

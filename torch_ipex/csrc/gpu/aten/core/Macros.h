@@ -1,6 +1,5 @@
 #pragma once
 
-
 // See c10/macros/Export.h for a detailed explanation of what the function
 // of these macros are.  We need one set of macros for every separate library
 // we build.
@@ -29,4 +28,4 @@
 #define AT_DPCPP_API AT_DPCPP_IMPORT
 #endif
 
-#define DPCPP_SUCCESS  0
+#define DPCPP_SUCCESS 0

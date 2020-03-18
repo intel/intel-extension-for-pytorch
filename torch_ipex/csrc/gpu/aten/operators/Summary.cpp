@@ -1,58 +1,53 @@
+#include "Loops.h"
 #include <ATen/Context.h>
 #include <ATen/native/TensorIterator.h>
-#include <core/detail/IndexUtils.h>
 #include <core/DPCPP.h>
+#include <core/detail/IndexUtils.h>
 #include <utils/Atomics.h>
-#include "Loops.h"
-
 
 using namespace at::dpcpp;
 
-template <bool has_weight, typename ...> class histogram_kernel {};
+template <bool has_weight, typename...> class histogram_kernel {};
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-template<typename input_t, typename IndexType>
-static IndexType getBin(input_t bVal, input_t minvalue, input_t maxvalue, int nbins) {
+template <typename input_t, typename IndexType>
+static IndexType getBin(input_t bVal, input_t minvalue, input_t maxvalue,
+                        int nbins) {
   IndexType bin = (int)((bVal - minvalue) * nbins / (maxvalue - minvalue));
   // (only applicable for histc)
-  // while each bin is inclusive at the lower end and exclusive at the higher, i.e. [start, end)
-  // the last bin is inclusive at both, i.e. [start, end], in order to include maxvalue if exists
+  // while each bin is inclusive at the lower end and exclusive at the higher,
+  // i.e. [start, end)
+  // the last bin is inclusive at both, i.e. [start, end], in order to include
+  // maxvalue if exists
   // therefore when bin == nbins, adjust bin to the last bin
-  if (bin == nbins) bin -= 1;
+  if (bin == nbins)
+    bin -= 1;
   return bin;
 }
 
 /*
   Kernel for computing the histogram of the input.
  */
-template <
-        typename output_t,
-        typename input_t,
-        typename IndexType,
-        int ADims,
-        bool has_weight,
-        typename Op>
+template <typename output_t, typename input_t, typename IndexType, int ADims,
+          bool has_weight, typename Op>
 void kernelHistogram1D(
-        dpcpp::detail::TensorInfo<output_t, IndexType> a, /* output */
-        dpcpp::detail::TensorInfo<input_t, IndexType> b, /* input */
-        dpcpp::detail::TensorInfo<output_t, IndexType> c, /* weight */
-        int nbins,
-        input_t minvalue,
-        input_t maxvalue,
-        IndexType totalElements,
-        Op getOp) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+    dpcpp::detail::TensorInfo<output_t, IndexType> a, /* output */
+    dpcpp::detail::TensorInfo<input_t, IndexType> b,  /* input */
+    dpcpp::detail::TensorInfo<output_t, IndexType> c, /* weight */
+    int nbins, input_t minvalue, input_t maxvalue, IndexType totalElements,
+    Op getOp) {
+  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   using out_accessor_t = DPCPPAccessor<dpcpp_rw_mode>;
   using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    out_accessor_t out_acc = out_accessor_t (__cgh, a.data);
-    in_accessor_t in_acc = in_accessor_t (__cgh, b.data);
-    in_accessor_t weight_acc = in_accessor_t (__cgh, c.data);
+    out_accessor_t out_acc = out_accessor_t(__cgh, a.data);
+    in_accessor_t in_acc = in_accessor_t(__cgh, b.data);
+    in_accessor_t weight_acc = in_accessor_t(__cgh, c.data);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
       auto out_ptr = out_acc.template get_pointer<output_t>();
@@ -62,27 +57,31 @@ void kernelHistogram1D(
       auto linearIndex = item_id.get_id(0);
       // Convert `linearIndex` into an offset of `b`
       const IndexType bOffset =
-              dpcpp::detail::IndexToOffset<input_t, IndexType>::get(linearIndex, b);
+          dpcpp::detail::IndexToOffset<input_t, IndexType>::get(linearIndex, b);
       const auto bVal = in_ptr[bOffset];
       if (bVal >= minvalue && bVal <= maxvalue) {
         // Use value at `b` as an offset of `a`
-        const IndexType bin = getBin<input_t, IndexType>(bVal, minvalue, maxvalue, nbins);
+        const IndexType bin =
+            getBin<input_t, IndexType>(bVal, minvalue, maxvalue, nbins);
         const IndexType aOffset =
-                dpcpp::detail::IndexToOffset<output_t, IndexType, ADims>::get(bin, a);
+            dpcpp::detail::IndexToOffset<output_t, IndexType, ADims>::get(bin,
+                                                                          a);
         atomicAdd(&out_ptr[aOffset], getOp(weight_ptr, linearIndex));
       }
     };
 
-    __cgh.parallel_for<histogram_kernel<has_weight, output_t, input_t, IndexType>>(
-            DPCPP::range</*dim=*/1>(totalElements), kfn);
+    __cgh.parallel_for<
+        histogram_kernel<has_weight, output_t, input_t, IndexType>>(
+        DPCPP::range</*dim=*/1>(totalElements), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-#define HANDLE_CASE(WEIGHTS_OP, WITH_WEIGHT)                   \
-  kernelHistogram1D<output_t, input_t, IndexType, 1, WITH_WEIGHT>    \
-          (aInfo, bInfo, cInfo, nbins, minvalue, maxvalue, totalElements, WEIGHTS_OP);
+#define HANDLE_CASE(WEIGHTS_OP, WITH_WEIGHT)                                   \
+  kernelHistogram1D<output_t, input_t, IndexType, 1, WITH_WEIGHT>(             \
+      aInfo, bInfo, cInfo, nbins, minvalue, maxvalue, totalElements,           \
+      WEIGHTS_OP);
 
 /*
   Calculate the frequency of the input values.
@@ -93,13 +92,10 @@ void kernelHistogram1D(
   See `help torch.bincount` for details on the math.
  */
 template <typename output_t, typename input_t, bool HasWeights>
-bool dpcpp_tensor_histogram(
-        at::Tensor a, /* output */
-        at::Tensor b, /* input */
-        at::Tensor c, /* weights(optional) */
-        int64_t nbins,
-        input_t minvalue,
-        input_t maxvalue) {
+bool dpcpp_tensor_histogram(at::Tensor a, /* output */
+                            at::Tensor b, /* input */
+                            at::Tensor c, /* weights(optional) */
+                            int64_t nbins, input_t minvalue, input_t maxvalue) {
   checkBackend("dpcpp_tensor_histogram", {a, b}, Backend::DPCPP);
   if (HasWeights) {
     checkBackend("dpcpp_tensor_histogram", {c}, Backend::DPCPP);
@@ -112,9 +108,11 @@ bool dpcpp_tensor_histogram(
   auto bInfo = dpcpp::detail::getTensorInfo<input_t, IndexType>(b);
   if (HasWeights) {
     auto cInfo = dpcpp::detail::getTensorInfo<output_t, IndexType>(c);
-    const auto getWeightsOp = [cInfo] (dpcpp_global_ptr_pt<output_t> cPtr, IndexType cIndex) {
+    const auto getWeightsOp = [cInfo](dpcpp_global_ptr_pt<output_t> cPtr,
+                                      IndexType cIndex) {
       const IndexType cOffset =
-              dpcpp::detail::IndexToOffset<output_t, IndexType, 1>::get(cIndex, cInfo);
+          dpcpp::detail::IndexToOffset<output_t, IndexType, 1>::get(cIndex,
+                                                                    cInfo);
       return cPtr[cOffset];
     };
     HANDLE_CASE(getWeightsOp, true);
@@ -122,7 +120,10 @@ bool dpcpp_tensor_histogram(
     dpcpp::detail::TensorInfo<output_t, IndexType> cInfo;
     // set the dummy cinfo with the ptr to the output
     cInfo.data = aInfo.data;
-    static const auto getDummyOp = [] (dpcpp_global_ptr_pt<output_t>, IndexType) { return static_cast<output_t>(1); };
+    static const auto getDummyOp = [](dpcpp_global_ptr_pt<output_t>,
+                                      IndexType) {
+      return static_cast<output_t>(1);
+    };
     HANDLE_CASE(getDummyOp, false);
   }
 
@@ -131,19 +132,16 @@ bool dpcpp_tensor_histogram(
 
 ///////////////// bincount /////////////////
 template <typename input_t, typename weights_t>
-Tensor bincount_template(
-        const Tensor& self,
-        const Tensor& weights,
-        int64_t minlength) {
+Tensor bincount_template(const Tensor &self, const Tensor &weights,
+                         int64_t minlength) {
   if (minlength < 0) {
     AT_ERROR("minlength should be >= 0");
   }
   if (self.dim() == 1 && self.numel() == 0) {
     return native::zeros({minlength}, device(kDPCPP).dtype(kLong));
   }
-  if (self.dim() != 1 ||
-      (!std::is_same<input_t, uint8_t>::value &&
-       *self.min().cpu().data_ptr<input_t>() < 0)) {
+  if (self.dim() != 1 || (!std::is_same<input_t, uint8_t>::value &&
+                          *self.min().cpu().data_ptr<input_t>() < 0)) {
     AT_ERROR("bincount only supports 1-d non-negative integral inputs.");
   }
 
@@ -152,7 +150,8 @@ Tensor bincount_template(
     AT_ERROR("input and weights should have the same length");
   }
 
-  const int64_t nbins = std::max(*self.max().cpu().data_ptr<input_t>() + (int64_t)1, minlength);
+  const int64_t nbins =
+      std::max(*self.max().cpu().data_ptr<input_t>() + (int64_t)1, minlength);
   const input_t minvalue = 0;
   const input_t maxvalue = nbins;
   // alloc output counter on GPU
@@ -160,25 +159,26 @@ Tensor bincount_template(
   if (has_weights) {
     output = native::zeros({nbins}, weights.options());
     auto ret = dpcpp_tensor_histogram<weights_t, input_t, true>(
-            output, self, weights, nbins, minvalue, maxvalue);
+        output, self, weights, nbins, minvalue, maxvalue);
   } else {
     output = native::zeros({nbins}, device(DeviceType::DPCPP).dtype(kInt));
     auto ret = dpcpp_tensor_histogram<int, input_t, false>(
-            output, self, weights, nbins, minvalue, maxvalue);
+        output, self, weights, nbins, minvalue, maxvalue);
   }
   return output;
 }
 
 } // namespace impl
 
-Tensor bincount(const Tensor& self, const Tensor& weights, int64_t minlength) {
+Tensor bincount(const Tensor &self, const Tensor &weights, int64_t minlength) {
   return AT_DISPATCH_INTEGRAL_TYPES(self.scalar_type(), "bincount_dpcpp", [&] {
     const auto scalar = weights.scalar_type();
     if (scalar == ScalarType::Undefined || scalar == ScalarType::Float)
       return impl::bincount_template<scalar_t, float>(self, weights, minlength);
     else if (scalar == ScalarType::Int)
       return impl::bincount_template<scalar_t, float>(self, weights, minlength);
-    TORCH_CHECK(0, "bincount_dpcpp not implemented for weight type '", toString(scalar), "'");
+    TORCH_CHECK(0, "bincount_dpcpp not implemented for weight type '",
+                toString(scalar), "'");
   });
 }
 

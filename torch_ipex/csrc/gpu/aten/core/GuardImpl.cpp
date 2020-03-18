@@ -7,5 +7,6 @@ namespace impl {
 constexpr DeviceType DPCPPGuardImpl::static_type;
 
 C10_REGISTER_GUARD_IMPL(DPCPP, DPCPPGuardImpl);
-
-}}} // namespace at::dpcpp::impl
+}
+}
+} // namespace at::dpcpp::impl

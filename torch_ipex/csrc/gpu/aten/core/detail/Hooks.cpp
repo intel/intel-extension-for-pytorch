@@ -1,10 +1,10 @@
-#include <ATen/Context.h>
 #include <ATen/Config.h>
+#include <ATen/Context.h>
 #include <c10/util/Exception.h>
 
 #include <core/DPCPPUtils.h>
-#include <core/Generator.h>
 #include <core/Device.h>
+#include <core/Generator.h>
 #include <core/detail/Hooks.h>
 #include <core/detail/HooksInterface.h>
 #include <utils/General.h>
@@ -12,7 +12,6 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
-
 
 namespace at {
 namespace dpcpp {
@@ -23,11 +22,12 @@ void DPCPPHooks::initDPCPP() const {
   // global state is removed
 }
 
-Generator* DPCPPHooks::getDefaultDPCPPGenerator(DeviceIndex device_index) const {
+Generator *
+DPCPPHooks::getDefaultDPCPPGenerator(DeviceIndex device_index) const {
   return at::dpcpp::detail::getDefaultDPCPPGenerator(device_index);
 }
 
-Device DPCPPHooks::getDeviceFromPtr(void* data) const {
+Device DPCPPHooks::getDeviceFromPtr(void *data) const {
   return getDeviceFromPtr(data);
 }
 
@@ -38,7 +38,7 @@ bool DPCPPHooks::hasDPCPP() const {
 }
 
 int64_t DPCPPHooks::current_device() const {
-  c10::DeviceIndex  device;
+  c10::DeviceIndex device;
   dpcppGetDevice(&device);
   return device;
 }

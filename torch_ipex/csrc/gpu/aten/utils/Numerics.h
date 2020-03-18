@@ -6,17 +6,13 @@
 #include <core/DPCPP.h>
 #include <core/NumericLimits.h>
 
+template <typename T> struct Numerics {};
 
-template <typename T>
-struct Numerics {
-};
-
-template <typename T>
-static inline T powi(T a, T b) {
+template <typename T> static inline T powi(T a, T b) {
   T result = 1;
   while (b) {
     if (b & 1) {
-       result *= a;
+      result *= a;
     }
     b /= 2;
     a *= a;
@@ -24,12 +20,14 @@ static inline T powi(T a, T b) {
   return result;
 }
 
+template <> struct Numerics<uint8_t> {
 
-template <>
-struct Numerics<uint8_t> {
-
-  static inline uint8_t lower_bound() { return at::numeric_limits<uint8_t>::lower_bound(); }
-  static inline uint8_t upper_bound() { return at::numeric_limits<uint8_t>::upper_bound(); }
+  static inline uint8_t lower_bound() {
+    return at::numeric_limits<uint8_t>::lower_bound();
+  }
+  static inline uint8_t upper_bound() {
+    return at::numeric_limits<uint8_t>::upper_bound();
+  }
 
   static inline bool lt(uint8_t a, uint8_t b) { return a < b; }
   static inline bool le(uint8_t a, uint8_t b) { return a <= b; }
@@ -44,16 +42,20 @@ struct Numerics<uint8_t> {
   static inline uint8_t mul(uint8_t a, uint8_t b) { return a * b; }
   static inline uint8_t sub(uint8_t a, uint8_t b) { return a - b; }
   static inline uint8_t div(uint8_t a, uint8_t b) { return a / b; }
-  static inline uint8_t pow(uint8_t a, uint8_t b) { return powi<uint8_t>(a, b); }
+  static inline uint8_t pow(uint8_t a, uint8_t b) {
+    return powi<uint8_t>(a, b);
+  }
   static inline bool isnan(uint8_t a) { return false; }
   static inline bool isinf(uint8_t a) { return false; }
-
 };
 
-template <>
-struct Numerics<bool> {
-  static inline bool lower_bound() { return at::numeric_limits<bool>::lower_bound(); }
-  static inline bool upper_bound() { return at::numeric_limits<bool>::upper_bound(); }
+template <> struct Numerics<bool> {
+  static inline bool lower_bound() {
+    return at::numeric_limits<bool>::lower_bound();
+  }
+  static inline bool upper_bound() {
+    return at::numeric_limits<bool>::upper_bound();
+  }
 
   static inline bool lt(bool a, bool b) { return a < b; }
   static inline bool le(bool a, bool b) { return a <= b; }
@@ -70,10 +72,13 @@ struct Numerics<bool> {
   static inline bool isinf(bool a) { return false; }
 };
 
-template <>
-struct Numerics<int8_t> {
-  static inline int8_t lower_bound() { return at::numeric_limits<int8_t>::lower_bound(); }
-  static inline int8_t upper_bound() { return at::numeric_limits<int8_t>::upper_bound(); }
+template <> struct Numerics<int8_t> {
+  static inline int8_t lower_bound() {
+    return at::numeric_limits<int8_t>::lower_bound();
+  }
+  static inline int8_t upper_bound() {
+    return at::numeric_limits<int8_t>::upper_bound();
+  }
 
   static inline bool lt(int8_t a, int8_t b) { return a < b; }
   static inline bool le(int8_t a, int8_t b) { return a <= b; }
@@ -91,13 +96,15 @@ struct Numerics<int8_t> {
   static inline int8_t pow(int8_t a, int8_t b) { return powi<int8_t>(a, b); }
   static inline bool isnan(int8_t a) { return false; }
   static inline bool isinf(int8_t a) { return false; }
-
 };
 
-template <>
-struct Numerics<int16_t> {
-  static inline int16_t lower_bound() { return at::numeric_limits<int16_t>::lower_bound(); }
-  static inline int16_t upper_bound() { return at::numeric_limits<int16_t>::upper_bound(); }
+template <> struct Numerics<int16_t> {
+  static inline int16_t lower_bound() {
+    return at::numeric_limits<int16_t>::lower_bound();
+  }
+  static inline int16_t upper_bound() {
+    return at::numeric_limits<int16_t>::upper_bound();
+  }
 
   static inline bool lt(int16_t a, int16_t b) { return a < b; }
   static inline bool le(int16_t a, int16_t b) { return a <= b; }
@@ -112,17 +119,22 @@ struct Numerics<int16_t> {
   static inline int16_t sub(int16_t a, int16_t b) { return a - b; }
   static inline int16_t div(int16_t a, int16_t b) { return a / b; }
   static inline int16_t abs(int16_t a) { return DPCPP::abs(a); }
-  static inline int16_t pow(int16_t a, int16_t b) { return powi<int16_t>(a, b); }
+  static inline int16_t pow(int16_t a, int16_t b) {
+    return powi<int16_t>(a, b);
+  }
 
   static inline bool isnan(int16_t a) { return false; }
 };
 
-template <>
-struct Numerics<int32_t> {
-  static inline int32_t lower_bound() { return at::numeric_limits<int32_t>::lower_bound(); }
-  static inline int32_t upper_bound() { return at::numeric_limits<int32_t>::upper_bound(); }
+template <> struct Numerics<int32_t> {
+  static inline int32_t lower_bound() {
+    return at::numeric_limits<int32_t>::lower_bound();
+  }
+  static inline int32_t upper_bound() {
+    return at::numeric_limits<int32_t>::upper_bound();
+  }
 
-  static inline bool lt(int32_t a, int32_t b) { return a < b ;}
+  static inline bool lt(int32_t a, int32_t b) { return a < b; }
   static inline bool le(int32_t a, int32_t b) { return a <= b; }
   static inline bool gt(int32_t a, int32_t b) { return a > b; }
   static inline bool ge(int32_t a, int32_t b) { return a >= b; }
@@ -135,15 +147,20 @@ struct Numerics<int32_t> {
   static inline int32_t sub(int32_t a, int32_t b) { return a - b; }
   static inline int32_t div(int32_t a, int32_t b) { return a / b; }
   static inline int32_t abs(int32_t a) { return DPCPP::abs(a); }
-  static inline int32_t pow(int32_t a, int32_t b) { return powi<int32_t>(a, b); }
+  static inline int32_t pow(int32_t a, int32_t b) {
+    return powi<int32_t>(a, b);
+  }
 
   static inline bool isnan(int32_t a) { return false; }
 };
 
-template <>
-struct Numerics<int64_t> {
-  static inline int64_t lower_bound() { return at::numeric_limits<int64_t>::lower_bound(); }
-  static inline int64_t upper_bound() { return at::numeric_limits<int64_t>::upper_bound(); }
+template <> struct Numerics<int64_t> {
+  static inline int64_t lower_bound() {
+    return at::numeric_limits<int64_t>::lower_bound();
+  }
+  static inline int64_t upper_bound() {
+    return at::numeric_limits<int64_t>::upper_bound();
+  }
 
   static inline bool lt(int64_t a, int64_t b) { return a < b; }
   static inline bool le(int64_t a, int64_t b) { return a <= b; }
@@ -158,17 +175,20 @@ struct Numerics<int64_t> {
   static inline int64_t sub(int64_t a, int64_t b) { return a - b; }
   static inline int64_t div(int64_t a, int64_t b) { return a / b; }
   static inline int64_t abs(int64_t a) { return DPCPP::abs(a); }
-  static inline int64_t pow(int64_t a, int64_t b) { return powi<int64_t>(a, b); }
+  static inline int64_t pow(int64_t a, int64_t b) {
+    return powi<int64_t>(a, b);
+  }
 
   static inline bool isnan(int64_t a) { return false; }
-
-
 };
 
-template <>
-struct Numerics<at::Half> {
-  static inline at::Half lower_bound() { return at::numeric_limits<at::Half>::lower_bound(); }
-  static inline at::Half upper_bound() { return at::numeric_limits<at::Half>::upper_bound(); }
+template <> struct Numerics<at::Half> {
+  static inline at::Half lower_bound() {
+    return at::numeric_limits<at::Half>::lower_bound();
+  }
+  static inline at::Half upper_bound() {
+    return at::numeric_limits<at::Half>::upper_bound();
+  }
 
   static inline bool lt(at::Half a, at::Half b) { return a < b; }
   static inline bool le(at::Half a, at::Half b) { return a <= b; }
@@ -190,43 +210,52 @@ struct Numerics<at::Half> {
   static inline at::Half cos(at::Half a) { return DPCPP::cos(float(a)); }
   static inline at::Half sqrt(at::Half a) { return DPCPP::sqrt(float(a)); }
   static inline at::Half rsqrt(at::Half a) { return DPCPP::rsqrt(float(a)); }
-  static inline at::Half ceil(at::Half a) { return DPCPP::ceil(float(a));}
-  static inline at::Half floor(at::Half a) { return DPCPP::floor(float(a));}
-  static inline at::Half trunc(at::Half a) { return DPCPP::trunc(float(a));}
-  static inline at::Half acos(at::Half a) { return DPCPP::acos(float(a));}
-  static inline at::Half cosh(at::Half a) { return DPCPP::cosh(float(a));}
-  static inline at::Half asin(at::Half a) { return DPCPP::asin(float(a));}
-  static inline at::Half sinh(at::Half a) { return DPCPP::sinh(float(a));}
-  static inline at::Half tan(at::Half a) { return DPCPP::tan(float(a));}
-  static inline at::Half atan(at::Half a) { return DPCPP::atan(float(a));}
+  static inline at::Half ceil(at::Half a) { return DPCPP::ceil(float(a)); }
+  static inline at::Half floor(at::Half a) { return DPCPP::floor(float(a)); }
+  static inline at::Half trunc(at::Half a) { return DPCPP::trunc(float(a)); }
+  static inline at::Half acos(at::Half a) { return DPCPP::acos(float(a)); }
+  static inline at::Half cosh(at::Half a) { return DPCPP::cosh(float(a)); }
+  static inline at::Half asin(at::Half a) { return DPCPP::asin(float(a)); }
+  static inline at::Half sinh(at::Half a) { return DPCPP::sinh(float(a)); }
+  static inline at::Half tan(at::Half a) { return DPCPP::tan(float(a)); }
+  static inline at::Half atan(at::Half a) { return DPCPP::atan(float(a)); }
   static inline at::Half tanh(float a) { return DPCPP::tanh(float(a)); }
   static inline at::Half erf(float a) { return DPCPP::erf(float(a)); }
   static inline at::Half erfc(float a) { return DPCPP::erfc(float(a)); }
   static inline at::Half round(float a) { return DPCPP::round(float(a)); }
- 
-  static inline at::Half frac(at::Half a) { return a - DPCPP::trunc(float(a));}
-  static inline at::Half atan2(at::Half a, at::Half b) { return DPCPP::atan2(float(a), float(b)); }
-  static inline at::Half cinv(at::Half a) { return 1.0f / a;}
+
+  static inline at::Half frac(at::Half a) { return a - DPCPP::trunc(float(a)); }
+  static inline at::Half atan2(at::Half a, at::Half b) {
+    return DPCPP::atan2(float(a), float(b));
+  }
+  static inline at::Half cinv(at::Half a) { return 1.0f / a; }
 
   static inline at::Half add(at::Half a, at::Half b) { return a + b; }
   static inline at::Half div(at::Half a, at::Half b) { return a / b; }
   static inline at::Half mul(at::Half a, at::Half b) { return a * b; }
   static inline at::Half sub(at::Half a, at::Half b) { return a - b; }
-  static inline at::Half pow(at::Half a, at::Half b) { return DPCPP::pow(float(a), float(b)); }
+  static inline at::Half pow(at::Half a, at::Half b) {
+    return DPCPP::pow(float(a), float(b));
+  }
   static inline at::Half abs(at::Half a) { return DPCPP::fabs(float(a)); }
 
-  static inline bool isnan(at::Half a) { return DPCPP::isnan((float) a); }
+  static inline bool isnan(at::Half a) { return DPCPP::isnan((float)a); }
 };
 
-template <>
-struct Numerics<float> {
-  static inline float lower_bound() { return at::numeric_limits<float>::lower_bound(); }
-  static inline float upper_bound() { return at::numeric_limits<float>::upper_bound(); }
+template <> struct Numerics<float> {
+  static inline float lower_bound() {
+    return at::numeric_limits<float>::lower_bound();
+  }
+  static inline float upper_bound() {
+    return at::numeric_limits<float>::upper_bound();
+  }
 
   static inline bool lt(float a, float b) { return DPCPP::isless(a, b); }
   static inline bool le(float a, float b) { return DPCPP::islessequal(a, b); }
   static inline bool gt(float a, float b) { return DPCPP::isgreater(a, b); }
-  static inline bool ge(float a, float b) { return DPCPP::isgreaterequal(a, b); }
+  static inline bool ge(float a, float b) {
+    return DPCPP::isgreaterequal(a, b);
+  }
   static inline bool eq(float a, float b) { return DPCPP::isequal(a, b); }
   static inline bool ne(float a, float b) { return DPCPP::isnotequal(a, b); }
 
@@ -258,31 +287,33 @@ struct Numerics<float> {
   static inline float erfc(float a) { return DPCPP::erfc(a); }
   static inline float round(float a) { return DPCPP::round(a); }
 
-  static inline float frac(float a) {return a - DPCPP::trunc(a);}
-  static inline float cinv(float a) {return 1.0f / a;}
-  static inline float add  (float a, float b) { return a + b; }
-  static inline float div  (float a, float b) { return a / b; }
-  static inline float mul  (float a, float b) { return a * b; }
-  static inline float sub  (float a, float b) { return a - b; }
-  static inline float pow  (float a, float b) { return DPCPP::pow(a, b); }
+  static inline float frac(float a) { return a - DPCPP::trunc(a); }
+  static inline float cinv(float a) { return 1.0f / a; }
+  static inline float add(float a, float b) { return a + b; }
+  static inline float div(float a, float b) { return a / b; }
+  static inline float mul(float a, float b) { return a * b; }
+  static inline float sub(float a, float b) { return a - b; }
+  static inline float pow(float a, float b) { return DPCPP::pow(a, b); }
   static inline float atan2(float a, float b) { return DPCPP::atan2(a, b); }
   static inline float abs(float a) { return DPCPP::fabs(a); }
 
-
   static inline bool isnan(float a) { return DPCPP::isnan(a); }
-
-
 };
 
-template <>
-struct Numerics<double> {
-  static inline double lower_bound() { return at::numeric_limits<double>::lower_bound(); }
-  static inline double upper_bound() { return at::numeric_limits<double>::upper_bound(); }
+template <> struct Numerics<double> {
+  static inline double lower_bound() {
+    return at::numeric_limits<double>::lower_bound();
+  }
+  static inline double upper_bound() {
+    return at::numeric_limits<double>::upper_bound();
+  }
 
   static inline bool lt(double a, double b) { return DPCPP::isless(a, b); }
   static inline bool le(double a, double b) { return DPCPP::islessequal(a, b); }
   static inline bool gt(double a, double b) { return DPCPP::isgreater(a, b); }
-  static inline bool ge(double a, double b) { return DPCPP::isgreaterequal(a, b); }
+  static inline bool ge(double a, double b) {
+    return DPCPP::isgreaterequal(a, b);
+  }
   static inline bool eq(double a, double b) { return DPCPP::isequal(a, b); }
   static inline bool ne(double a, double b) { return DPCPP::isnotequal(a, b); }
 
@@ -313,45 +344,47 @@ struct Numerics<double> {
   static inline double erfc(double a) { return DPCPP::erfc(a); }
   static inline double round(double a) { return DPCPP::round(a); }
 
-  static inline double frac(double a) {return a - DPCPP::trunc(a);}
-  static inline double cinv(double a) {return 1.0f / a;}
-  static inline double add  (double a, double b) { return a + b; }
-  static inline double div  (double a, double b) { return a / b; }
-  static inline double mul  (double a, double b) { return a * b; }
-  static inline double sub  (double a, double b) { return a - b; }
-  static inline double pow  (double a, double b) { return DPCPP::pow(a, b); }
+  static inline double frac(double a) { return a - DPCPP::trunc(a); }
+  static inline double cinv(double a) { return 1.0f / a; }
+  static inline double add(double a, double b) { return a + b; }
+  static inline double div(double a, double b) { return a / b; }
+  static inline double mul(double a, double b) { return a * b; }
+  static inline double sub(double a, double b) { return a - b; }
+  static inline double pow(double a, double b) { return DPCPP::pow(a, b); }
   static inline double atan2(double a, double b) { return DPCPP::atan2(a, b); }
 
   static inline double abs(double a) { return DPCPP::fabs(a); }
 
   static inline bool isnan(double a) { return DPCPP::isnan(a); }
-
 };
 
-template <typename In, typename Out>
-struct ScalarConvert {
-    static Out to(const In v) { return (Out) v; }
+template <typename In, typename Out> struct ScalarConvert {
+  static Out to(const In v) { return (Out)v; }
 };
 
 template <typename T, typename U> T scalar_cast(U u) {
   return ScalarConvert<U, T>::to(u);
 }
 
-template <typename T>
-DPCPP_BOTH inline T Min(T a, T b) { return (a < b) ? a : b; }
+template <typename T> DPCPP_BOTH inline T Min(T a, T b) {
+  return (a < b) ? a : b;
+}
 
-template <typename T>
-DPCPP_BOTH inline T Max(T a, T b) { return (a > b) ? a : b; }
+template <typename T> DPCPP_BOTH inline T Max(T a, T b) {
+  return (a > b) ? a : b;
+}
 
-template <typename T>
-DPCPP_BOTH inline T CeilDiv(T a, T b) { return (a + b - 1) / b; }
+template <typename T> DPCPP_BOTH inline T CeilDiv(T a, T b) {
+  return (a + b - 1) / b;
+}
 
 /**
  *    Computes ceil(a / b) * b; i.e., rounds up `a` to the next highest
  *       multiple of b
  *       */
 
-template <typename T>
-DPCPP_BOTH inline T RoundUp(T a, T b) { return CeilDiv(a, b) * b; }
+template <typename T> DPCPP_BOTH inline T RoundUp(T a, T b) {
+  return CeilDiv(a, b) * b;
+}
 
 #endif

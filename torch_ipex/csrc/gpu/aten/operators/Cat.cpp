@@ -2,18 +2,17 @@
 
 #include <core/TensorImplUtils.h>
 
-
 using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-void check_shape_except_dim(Tensor & first, Tensor & second, int dimension) {
+void check_shape_except_dim(Tensor &first, Tensor &second, int dimension) {
   int first_dims = first.dim();
   int second_dims = second.dim();
   TORCH_CHECK(first_dims == second_dims,
-      "Tensors must have same number of dimensions");
+              "Tensors must have same number of dimensions");
   for (int dim = 0; dim < first_dims; dim++) {
     if (dim == dimension) {
       continue;
@@ -21,22 +20,27 @@ void check_shape_except_dim(Tensor & first, Tensor & second, int dimension) {
     int64_t first_dim_size = first.size(dim);
     int64_t second_dim_size = second.size(dim);
     TORCH_CHECK(first_dim_size == second_dim_size,
-        "Sizes of tensors must match except in dimension");
+                "Sizes of tensors must match except in dimension");
   }
 }
 
-static void cat(Tensor & result, TensorList inputs, int numInputs, int dimension)
-{
-  // previously, size [0] tensors were the only possible empty tensors; thus, it wasn't possible
-  // to cat empty tensors unless all the other tensors were 1-dimensional, so we allowed these tensors
-  // to be "skipped".  We maintain this behavior for backwards compatibility, but only for this specific
+static void cat(Tensor &result, TensorList inputs, int numInputs,
+                int dimension) {
+  // previously, size [0] tensors were the only possible empty tensors; thus, it
+  // wasn't possible
+  // to cat empty tensors unless all the other tensors were 1-dimensional, so we
+  // allowed these tensors
+  // to be "skipped".  We maintain this behavior for backwards compatibility,
+  // but only for this specific
   // size (i.e. other empty sizes are not skipped).
   // FIXME: warn if this is the case
   int i, j;
   int64_t offset;
   bool hasSkippedInput = false;
-  Tensor notSkippedTensor;  // non-owning reference
-  auto should_skip = [](const Tensor & t) { return !t.defined() && t.dim() == 1; };
+  Tensor notSkippedTensor; // non-owning reference
+  auto should_skip = [](const Tensor &t) {
+    return !t.defined() && t.dim() == 1;
+  };
   int nDims = 0;
 
   for (i = 0; i < numInputs; i++) {
@@ -81,14 +85,14 @@ static void cat(Tensor & result, TensorList inputs, int numInputs, int dimension
 
   offset = 0;
   for (j = 0; j < numInputs; j++) {
-    if (should_skip(inputs[j])) continue;
+    if (should_skip(inputs[j]))
+      continue;
     int64_t dimSize = inputs[j].size(dimension);
     auto nt = at::empty_like(result);
     auto result_impl = TensorImpl_Unwrap(result);
     TensorImpl_setStorageNd(TensorImpl_Unwrap(nt),
                             TensorImpl_getStoragePtr(result_impl),
-                            result.storage_offset(),
-                            result.dim(),
+                            result.storage_offset(), result.dim(),
                             TensorImpl_getSizePtr(result_impl),
                             TensorImpl_getStridePtr(result_impl));
     nt = nt.narrow(dimension, offset, dimSize);
@@ -99,7 +103,7 @@ static void cat(Tensor & result, TensorList inputs, int numInputs, int dimension
 
 } // namespace impl
 
-Tensor & _cat_out(Tensor & out, TensorList tensors, int64_t dim) {
+Tensor &_cat_out(Tensor &out, TensorList tensors, int64_t dim) {
   impl::cat(out, tensors, tensors.size(), dim);
   return out;
 }

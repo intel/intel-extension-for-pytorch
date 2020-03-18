@@ -1,12 +1,12 @@
 #pragma once
 
-#include <ATen/core/ATenGeneral.h>
 #include <ATen/Context.h>
+#include <ATen/core/ATenGeneral.h>
 
-#include <core/Stream.h>
+#include <core/DPCPPUtils.h>
 #include <core/Functions.h>
 #include <core/Memory.h>
-#include <core/DPCPPUtils.h>
+#include <core/Stream.h>
 
 namespace at {
 namespace dpcpp {
@@ -14,17 +14,20 @@ namespace dpcpp {
 /*
  * A common DPCPP interface for ATen.
  *
- * This interface is distinct from DPCPPHooks, which defines an interface that links
+ * This interface is distinct from DPCPPHooks, which defines an interface that
+ * links
  * to both CPU-only and DPCPP builds. That interface is intended for runtime
  * dispatch and should be used from files that are included in both CPU-only and
  * DPCPP builds.
  *
- * DPCPPContext, on the other hand, should be preferred by files only included in
+ * DPCPPContext, on the other hand, should be preferred by files only included
+ * in
  * DPCPP builds. It is intended to expose DPCPP functionality in a consistent
  * manner.
  *
  * This means there is some overlap between the DPCPPContext and DPCPPHooks, but
- * the choice of which to use is simple: use DPCPPContext when in a DPCPP-only file,
+ * the choice of which to use is simple: use DPCPPContext when in a DPCPP-only
+ * file,
  * use DPCPPHooks otherwise.
  *
  * Note that DPCPPContext simply defines an interface with no associated class.
@@ -33,9 +36,7 @@ namespace dpcpp {
  */
 
 /* Device info */
-inline int64_t getNumGPUs() {
-  return device_count();
-}
+inline int64_t getNumGPUs() { return device_count(); }
 
 /**
  * In some situations, you may have compiled with DPCPP, but no DPCPP
@@ -50,7 +51,7 @@ inline bool is_available() {
 void createGlobalContext();
 void clearGlobalContext();
 DPCPP::context getGlobalContext();
-CAFFE2_API Allocator* getDPCPPDeviceAllocator();
+CAFFE2_API Allocator *getDPCPPDeviceAllocator();
 
 } // namespace dpcpp
 } // namespace at

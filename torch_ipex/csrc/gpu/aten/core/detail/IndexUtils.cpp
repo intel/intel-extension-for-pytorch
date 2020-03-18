@@ -14,12 +14,14 @@ struct SizeAndStride {
  A comparator that will sort SizeAndStride structs by stride,
  in ascending order.
  */
- int compareSizeAndStride(const void* a, const void* b) {
-  const SizeAndStride* aS = (const SizeAndStride*) a;
-  const SizeAndStride* bS = (const SizeAndStride*) b;
+int compareSizeAndStride(const void *a, const void *b) {
+  const SizeAndStride *aS = (const SizeAndStride *)a;
+  const SizeAndStride *bS = (const SizeAndStride *)b;
 
-  if (aS->stride < bS->stride) return -1;
-  if (aS->stride == bS->stride) return 0;
+  if (aS->stride < bS->stride)
+    return -1;
+  if (aS->stride == bS->stride)
+    return 0;
   return 1;
 }
 
@@ -34,7 +36,7 @@ that there exists an ordering of the tensor's dimensions
 that is nicely "nested," with each dimension contained
 within the next one.
 */
-bool maybeOverlappingIndices(const Tensor& t) {
+bool maybeOverlappingIndices(const Tensor &t) {
   /* Extract size/stride arrays; only consider size >1 dims. */
   std::vector<SizeAndStride> info(t.dim());
   int dims = t.dim();
@@ -70,7 +72,7 @@ bool maybeOverlappingIndices(const Tensor& t) {
   return false;
 }
 
-bool canUse32BitIndexMath(const Tensor& t, int64_t max_elem) {
+bool canUse32BitIndexMath(const Tensor &t, int64_t max_elem) {
   int64_t elements = t.numel();
   if (elements >= max_elem) {
     return false;
@@ -96,4 +98,3 @@ bool canUse32BitIndexMath(const Tensor& t, int64_t max_elem) {
 } // detail
 } // dpcpp
 } // at
-
