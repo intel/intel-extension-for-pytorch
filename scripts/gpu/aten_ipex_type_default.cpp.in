@@ -643,6 +643,10 @@ at::Tensor & AtenIpexTypeDefault::digamma_(at::Tensor & self) {
   return AtenIpexTypeDPCPP::digamma_(self);
 }
 
+at::Tensor & AtenIpexTypeDefault::renorm_(at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm) {
+  return AtenIpexTypeDPCPP::renorm_(self, p, dim, maxnorm);
+}
+
 at::Tensor & AtenIpexTypeDefault::pow_(at::Tensor & self, at::Scalar exponent) {
   return AtenIpexTypeDPCPP::pow_(self, exponent);
 }
@@ -985,6 +989,14 @@ std::tuple<at::Tensor,at::Tensor> AtenIpexTypeDefault::topk(const at::Tensor & s
 
 at::Tensor AtenIpexTypeDefault::all(const at::Tensor & self) {
   return AtenIpexTypeDPCPP::all(self);
+}
+
+at::Tensor & AtenIpexTypeDefault::renorm_out(at::Tensor & out, const at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm) {
+  return AtenIpexTypeDPCPP::renorm_out(out, self, p, dim, maxnorm);
+}
+
+at::Tensor AtenIpexTypeDefault::renorm(const at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm) {
+  return AtenIpexTypeDPCPP::renorm(self, p, dim, maxnorm);
 }
 
 at::Tensor AtenIpexTypeDefault::unfold(const at::Tensor & self, int64_t dimension, int64_t size, int64_t step) {
@@ -1664,6 +1676,9 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::digamma_(Tensor(a!) self) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::digamma_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::renorm_(Tensor(a!) self, Scalar p, int dim, Scalar maxnorm) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar, int64_t, at::Scalar), &AtenIpexTypeDefault::renorm_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::pow_.Scalar(Tensor(a!) self, Scalar exponent) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::pow_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -1921,6 +1936,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::all(Tensor self) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::all>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::renorm.out(Tensor self, Scalar p, int dim, Scalar maxnorm, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar, int64_t, at::Scalar), &AtenIpexTypeDefault::renorm_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::renorm(Tensor self, Scalar p, int dim, Scalar maxnorm) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::Scalar, int64_t, at::Scalar), &AtenIpexTypeDefault::renorm>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::unfold(Tensor(a) self, int dimension, int size, int step) -> Tensor(a)")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, int64_t, int64_t, int64_t), &AtenIpexTypeDefault::unfold>(at::TensorTypeId::DPCPPTensorId)

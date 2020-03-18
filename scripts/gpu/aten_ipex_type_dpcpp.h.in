@@ -165,6 +165,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & tril_(at::Tensor & self, int64_t diagonal);
   at::Tensor & triu_(at::Tensor & self, int64_t diagonal);
   at::Tensor & digamma_(at::Tensor & self);
+  at::Tensor & renorm_(at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm);
   at::Tensor & pow_(at::Tensor & self, at::Scalar exponent);
   at::Tensor & pow_(at::Tensor & self, const at::Tensor & exponent);
   at::Tensor & lerp_(at::Tensor & self, const at::Tensor & end, at::Scalar weight);
@@ -251,6 +252,8 @@ namespace AtenIpexTypeDPCPP {
   std::tuple<at::Tensor &,at::Tensor &> topk_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
   std::tuple<at::Tensor,at::Tensor> topk(const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
   at::Tensor all(const at::Tensor & self);
+  at::Tensor & renorm_out(at::Tensor & out, const at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm);
+  at::Tensor renorm(const at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm);
   at::Tensor unfold(const at::Tensor & self, int64_t dimension, int64_t size, int64_t step);
   at::Tensor & pow_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & exponent);
   at::Tensor pow(const at::Tensor & self, const at::Tensor & exponent);

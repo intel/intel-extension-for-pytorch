@@ -578,22 +578,22 @@ void Topk(
 
 // static_cast is required to ensure that the correct type (INDEX_T)
 // is provided to the kernel for the arguments.
-#define RUN_K(INDEX_T, DIM, DIR)                                                                                                                                         \
-  gatherTopK<scalar_t, INDEX_T, DIM, DIR>(                                                                                                                               \
-      inputInfo,                                                                                                                                                         \
-      static_cast<INDEX_T>(sliceSize),                                                                                                                                   \
-      static_cast<INDEX_T>(k),                                                                                                                                           \
-      static_cast<INDEX_T>(inputSlices),                                                                                                                                 \
+#define RUN_K(INDEX_T, DIM, DIR)                                                                                                                                                               \
+  gatherTopK<scalar_t, INDEX_T, DIM, DIR>(                                                                                                                                                     \
+      inputInfo,                                                                                                                                                                               \
+      static_cast<INDEX_T>(sliceSize),                                                                                                                                                         \
+      static_cast<INDEX_T>(k),                                                                                                                                                                 \
+      static_cast<INDEX_T>(inputSlices),                                                                                                                                                       \
       /* The actual dimension that the k-selection is        \
-                           running in */ /* may have                                                                                               \
-                                                                                                                                                          changed from   \
-                                                                                                                                                          collapseDims() \
-                                                                                                                                                          */             \
-      static_cast<INDEX_T>(inputInfo.strides[collapseInputDim]),                                                                                                         \
-      topKInfo,                                                                                                                                                          \
-      static_cast<INDEX_T>(topKSlices),                                                                                                                                  \
-      static_cast<INDEX_T>(topKInfo.strides[collapseTopKDim]),                                                                                                           \
-      indicesInfo,                                                                                                                                                       \
+                           running in */ /* may have                                                                                                                     \
+                                                                                                                                                                                changed from   \
+                                                                                                                                                                                collapseDims() \
+                                                                                                                                                                                */             \
+      static_cast<INDEX_T>(inputInfo.strides[collapseInputDim]),                                                                                                                               \
+      topKInfo,                                                                                                                                                                                \
+      static_cast<INDEX_T>(topKSlices),                                                                                                                                                        \
+      static_cast<INDEX_T>(topKInfo.strides[collapseTopKDim]),                                                                                                                                 \
+      indicesInfo,                                                                                                                                                                             \
       static_cast<INDEX_T>(indicesInfo.strides[collapseIndicesDim]))
 
 #define RUN_DIR(INDEX_T, DIM)   \

@@ -9,6 +9,7 @@
 
 #include <utils/Numerics.h>
 
+#include <ATen/aten_ipex_type_dpcpp.h>
 #include "Loops.h"
 #include "Reduce.h"
 
@@ -790,6 +791,68 @@ Tensor& all_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
 Tensor all(const Tensor& self, int64_t dim, bool keepdim) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::all_out(result, self, dim, keepdim);
+}
+
+class OpRenorm {};
+
+Tensor& renorm_out(
+    Tensor& out,
+    const Tensor& self,
+    Scalar p,
+    int64_t dim,
+    Scalar maxnorm) {
+  TORCH_CHECK(!self.is_sparse(), "renorm(sycl_sparse) is not supported.");
+  TORCH_CHECK(dim >= 0 && dim < self.dim(), "invalid dimension dim=", dim);
+  TORCH_CHECK(p.toFloat() > 0, "non-positive-norm not supported");
+  TORCH_CHECK(self.dim() > 1, "need at least 2 dimensions, got ", self.dim());
+
+  // Calculate the p-norm of the input.
+  auto norm_vec_sz = self.size(dim);
+  Tensor norm = at::empty(norm_vec_sz, self.options().dtype(kFloat));
+  at::AtenIpexTypeDPCPP::norm_out(
+      norm,
+      self.transpose(0, dim).reshape({norm_vec_sz, -1}),
+      p,
+      IntArrayRef(1),
+      false,
+      c10::nullopt);
+
+  // Compare the norm and maxnorm value.
+  auto iter = TensorIterator();
+  iter.add_output(norm);
+  iter.add_input(norm);
+  iter.set_check_mem_overlap(true);
+  iter.build();
+  float maxnorm_ = maxnorm.toFloat();
+  dpcpp_kernel_for_tensor_iter<OpRenorm>(iter, [=](float norm) -> float {
+    if (norm > maxnorm_)
+      return maxnorm_ / (norm + 1e-7);
+    return 1;
+  });
+
+  // Broadcast mul
+  std::vector<int64_t> sizes_;
+  sizes_.push_back(norm_vec_sz);
+  size_t tailing_dims = self.dim() - (dim + 1);
+  for (size_t dimension = 0; dimension < tailing_dims; ++dimension) {
+    sizes_.push_back(1);
+  }
+
+  return at::AtenIpexTypeDPCPP::mul_out(
+      out, self, norm.contiguous().view(sizes_));
+}
+
+Tensor renorm(const Tensor& self, Scalar p, int64_t dim, Scalar maxnorm) {
+  TORCH_CHECK(!self.is_sparse(), "renorm(sycl_sparse) is not supported.");
+
+  Tensor result;
+  result = at::empty(self.sizes(), self.options());
+  at::AtenIpexTypeDPCPP::renorm_out(result, self, p, dim, maxnorm);
+  return result;
+}
+
+Tensor& renorm_(Tensor& self, Scalar p, int64_t dim, Scalar maxnorm) {
+  return at::AtenIpexTypeDPCPP::renorm_out(self, self, p, dim, maxnorm);
 }
 
 } // namespace AtenIpexTypeDPCPP
