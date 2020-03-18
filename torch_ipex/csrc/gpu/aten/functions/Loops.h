@@ -149,7 +149,7 @@ dereference(ptr_t data[], const index_t strides[], int i) {
 
 #define REPEAT_PATTERN( n, f ) CHR( REPEAT_, DEC( n ) )( DEC( n ), f )
 
-DP_DEF_K1(dpcpp_loops_kernel_impl);
+DPCPP_DEF_K1(dpcpp_loops_kernel_impl);
 template <typename kernel_name, typename func_t>
 void dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
   using traits = function_traits<func_t>;
@@ -171,11 +171,11 @@ void dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
 
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = DPCPPAccessor<dp_discard_w_mode>;
-  using in_accessor_t = DPCPPAccessor<dp_r_mode>;
-  using in_ptr_t = typename DP::global_ptr<char>::pointer_t;
+  using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
+  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
+  using in_ptr_t = typename DPCPP::global_ptr<char>::pointer_t;
 
-  auto cgf = DP_Q_CGF(__cgh) {
+  auto cgf = DPCPP_Q_CGF(__cgh) {
     out_accessor_t out_acc = out_accessor_t (__cgh, out_data);
 
 #define ACCESSOR_DEFINE(n) in_accessor_t in_acc_##n = in_accessor_t ( __cgh, in_data[n]);
@@ -186,7 +186,7 @@ void dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
     REPEAT_PATTERN(MAX_TOTAL_TENSOR_NUM, OFFSET_DEFINE)
 #undef OFFSET_DEFINE
 
-    auto kfn = DP_Q_KFN(DP::item<1> item_id)  {
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id)  {
       auto out_ptr = out_acc.template get_pointer<char>();
       at::detail::Array<in_ptr_t, MAX_INPUT_TENSOR_NUM> in_ptr;
       at::detail::Array<uint32_t , MAX_TOTAL_TENSOR_NUM> offsets;
@@ -207,11 +207,11 @@ void dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
               1));
     };
 
-    __cgh.parallel_for<DP_K(dpcpp_loops_kernel_impl, kernel_name, ret_t)>(
-            DP::range</*dim=*/1>(numel), kfn);
+    __cgh.parallel_for<DPCPP_K(dpcpp_loops_kernel_impl, kernel_name, ret_t)>(
+            DPCPP::range</*dim=*/1>(numel), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 
@@ -285,19 +285,19 @@ class KernelName {};
 template <class op_type, typename func_t>
 static inline void dpcpp_binary_loop(char** data, const int64_t* strides, int64_t i, int64_t n,  const func_t op) {
   LOOP_HEADER(func_t, data, strides)
-  static const auto write_mode = DP::access::mode::discard_write;
-  static const auto read_mode = DP::access::mode::read;
+  static const auto write_mode = DPCPP::access::mode::discard_write;
+  static const auto read_mode = DPCPP::access::mode::read;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   int64_t rng, GRange, tileSize;
   parallel_for_setup(n, tileSize, rng, GRange);
-  dpcpp_queue.submit([&](DP::handler& cgh) {
+  dpcpp_queue.submit([&](DPCPP::handler& cgh) {
 
     auto in1_Acc = DPCPPAccessor<read_mode>(cgh, in1_ptr, n * s1);
     auto in2_Acc = DPCPPAccessor<read_mode>(cgh, in2_ptr, n * s2);
     auto out_Acc = DPCPPAccessor<write_mode>(cgh, out_ptr, n * s0);
     cgh.parallel_for<KernelName<op_type, arg0_t, arg1_t, arg2_t> >(
-            DP::nd_range<1>(DP::range<1>(GRange), DP::range<1>(tileSize)),
-            [=](DP::nd_item<1> item){
+            DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
+            [=](DPCPP::nd_item<1> item){
               int64_t globalid = item.get_global_linear_id();
               auto input1_ptr = in1_Acc.template get_pointer<arg1_t>();
               auto input2_ptr = in2_Acc.template get_pointer<arg2_t>();
@@ -345,7 +345,7 @@ void dpcpp_binary_kernel(TensorIterator& iter, const func_t& op) {
   });
 }
 
-DP_DEF_K1(dpcpp_index_kernel);
+DPCPP_DEF_K1(dpcpp_index_kernel);
 template <typename kernel_name, typename func_t>
 void dpcpp_index_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRef index_stride, const func_t f) {
   auto numel = iter.numel();
@@ -380,11 +380,11 @@ void dpcpp_index_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRe
 
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = DPCPPAccessor<dp_discard_w_mode>;
-  using in_accessor_t = DPCPPAccessor<dp_r_mode>;
-  using dpcpp_ptr_t = typename DP::global_ptr<char>::pointer_t;
+  using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
+  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
+  using dpcpp_ptr_t = typename DPCPP::global_ptr<char>::pointer_t;
 
-  auto cgf = DP_Q_CGF(__cgh) {
+  auto cgf = DPCPP_Q_CGF(__cgh) {
     out_accessor_t out_acc = out_accessor_t (__cgh, out_data);
     in_accessor_t in_acc = in_accessor_t (__cgh, in_data);
 
@@ -394,7 +394,7 @@ void dpcpp_index_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRe
 
     auto offset_calc = make_offset_calculator<3>(iter);
 
-    auto kfn = DP_Q_KFN(DP::item<1> item_id)  {
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id)  {
       auto out_ptr = out_acc.template get_pointer<char>();
       auto in_ptr = in_acc.template get_pointer<char>();
       at::detail::Array<dpcpp_ptr_t, MAX_TENSORINFO_DIMS> index_ptr;
@@ -424,10 +424,10 @@ void dpcpp_index_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRe
       f(out_ptr, in_ptr, offset);
     };
 
-    __cgh.parallel_for<DP_K(dpcpp_index_kernel, kernel_name)>(
-            DP::range</*dim=*/1>(numel), kfn);
+    __cgh.parallel_for<DPCPP_K(dpcpp_index_kernel, kernel_name)>(
+            DPCPP::range</*dim=*/1>(numel), kfn);
   };
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 }} // namespace at::dpcpp

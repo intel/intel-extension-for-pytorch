@@ -109,11 +109,11 @@ void mkldnnGemmImpl(Tensor & r_, scalar_t beta,
 
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 #if defined(THDPCPP_REAL_IS_HALF)
-  auto m1_sb = dpcppGetBufferMap().template get_buffer<DP::half>(
+  auto m1_sb = dpcppGetBufferMap().template get_buffer<DPCPP::half>(
       m1.data<scalar_t>());
-  auto m2_sb = dpcppGetBufferMap().template get_buffer<DP::half>(
+  auto m2_sb = dpcppGetBufferMap().template get_buffer<DPCPP::half>(
       m2.data<scalar_t>());
-  auto r_sb = dpcppGetBufferMap().template get_buffer<DP::half>(
+  auto r_sb = dpcppGetBufferMap().template get_buffer<DPCPP::half>(
       r_.data<scalar_t>());
 #else
   auto m1_sb = dpcppGetBufferMap().template get_buffer<float>(

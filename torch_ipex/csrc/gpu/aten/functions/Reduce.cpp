@@ -170,8 +170,8 @@ struct WelfordData {
   scalar_t m2;
   index_t n;
   combine_t nf;
-  DP_BOTH WelfordData() : mean(0), m2(0), n(0), nf(0)  {}
-  DP_DEVICE WelfordData(scalar_t mean, scalar_t m2, index_t n, combine_t nf) : mean(mean), m2(m2), n(n), nf(nf) {}
+  DPCPP_BOTH WelfordData() : mean(0), m2(0), n(0), nf(0)  {}
+  DPCPP_DEVICE WelfordData(scalar_t mean, scalar_t m2, index_t n, combine_t nf) : mean(mean), m2(m2), n(n), nf(nf) {}
 };
 
 template <typename scalar_t, typename acc_scalar_t, typename index_t, typename combine_t, typename res_t>
@@ -180,7 +180,7 @@ struct WelfordOps {
   bool take_sqrt;
  public:
   using acc_t = WelfordData<acc_scalar_t, index_t, combine_t>;
-  inline DP_DEVICE acc_t reduce(acc_t acc, scalar_t data) const {
+  inline DPCPP_DEVICE acc_t reduce(acc_t acc, scalar_t data) const {
     acc_scalar_t delta = data - acc.mean;
     // using acc.nf(combine_t) here, as acc.n(index_t) would still be converted
     // accumulation in reduce is done through index_T
@@ -193,7 +193,7 @@ struct WelfordOps {
       combine_t(acc.n + 1), // accumulate for combine_t uses index_t
     };
   }
-  inline DP_DEVICE acc_t combine(acc_t a, acc_t b) const {
+  inline DPCPP_DEVICE acc_t combine(acc_t a, acc_t b) const {
     if (a.nf == 0) {
       return b;
     }
@@ -212,17 +212,17 @@ struct WelfordOps {
       new_count
     };
   }
-  inline DP_DEVICE res_t project(acc_t acc) const {
+  inline DPCPP_DEVICE res_t project(acc_t acc) const {
     auto mean = acc.mean;
     combine_t divisor = unbiased ? (acc.nf - 1) : acc.nf;
     auto ret = (divisor > 0) ?
-      (take_sqrt ? DP::sqrt(acc.m2 / divisor) : (acc.m2 / divisor))
+      (take_sqrt ? DPCPP::sqrt(acc.m2 / divisor) : (acc.m2 / divisor))
       : NAN;
 
     std::pair<scalar_t, scalar_t> results{(scalar_t) ret, (scalar_t) mean};
     return results;
   }
-  inline DP_DEVICE acc_t sg_shfl_down(acc_t arg, int offset) const {
+  inline DPCPP_DEVICE acc_t sg_shfl_down(acc_t arg, int offset) const {
     // FIXME:
     return arg;
   }
@@ -302,7 +302,7 @@ struct NormOps {
   acc_t norm;
 
   inline acc_t reduce(acc_t acc, acc_t data) const {
-    return acc + DP::pow(DP::fabs(data), norm);
+    return acc + DPCPP::pow(DPCPP::fabs(data), norm);
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
@@ -310,7 +310,7 @@ struct NormOps {
   }
 
   inline acc_t project(acc_t a) const {
-    return DP::pow(a, acc_t(1.0)/norm);
+    return DPCPP::pow(a, acc_t(1.0)/norm);
   }
 
   inline acc_t sg_shfl_down(acc_t arg, int offset) const {
@@ -346,7 +346,7 @@ struct NormZeroOps {
 template <typename acc_t>
 struct NormOneOps {
   inline acc_t reduce(acc_t acc, acc_t data) const {
-    return acc + DP::fabs(data);
+    return acc + DPCPP::fabs(data);
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
@@ -367,11 +367,11 @@ template <typename acc_t>
 struct AbsMinOps {
 
   inline acc_t reduce(acc_t acc, acc_t data) const {
-    return DP::min(acc, DP::fabs(data));
+    return DPCPP::min(acc, DPCPP::fabs(data));
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
-    return DP::min(a, b);
+    return DPCPP::min(a, b);
   }
 
   inline acc_t project(acc_t a) const {
@@ -388,11 +388,11 @@ template <typename acc_t>
 struct AbsMaxOps {
 
   inline acc_t reduce(acc_t acc, acc_t data) const {
-    return DP::max(acc, DP::fabs(data));
+    return DPCPP::max(acc, DPCPP::fabs(data));
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
-    return DP::max(a, b);
+    return DPCPP::max(a, b);
   }
 
   inline acc_t project(acc_t a) const {

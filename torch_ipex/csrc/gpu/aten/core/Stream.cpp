@@ -30,17 +30,17 @@ static constexpr int dpcppStreamsPerPool = 32;
 
 class DPCPPStreamImpl {
 public:
-  DPCPPStreamImpl(DeviceIndex di, DP::async_handler asyncHandler = dpcppAsyncHandler):
+  DPCPPStreamImpl(DeviceIndex di, DPCPP::async_handler asyncHandler = dpcppAsyncHandler):
       /* queue_(dpcppGetRawDevice(di), asyncHandler),*/
       queue_(at::dpcpp::getGlobalContext(), dpcppGetDeviceSelector(di), asyncHandler),
       device_index_(di) {};
   DeviceIndex getDeviceIndex() const { return device_index_; };
-  DP::queue& get_dpcpp_queue() { return queue_; }
+  DPCPP::queue& get_dpcpp_queue() { return queue_; }
   ~DPCPPStreamImpl() = default;
   DPCPPStreamImpl() = default;
   C10_DISABLE_COPY_AND_ASSIGN(DPCPPStreamImpl);
 private:
-  DP::queue   queue_;
+  DPCPP::queue   queue_;
   DeviceIndex       device_index_;
 };
 
@@ -174,7 +174,7 @@ DPCPPStream DPCPPStreamImplToDPCPPStream(const DPCPPStreamImpl *ptr) {
                      DPCPPStream_getStreamId(ptr)));
 }
 
-DP::queue& DPCPPStream::dpcpp_queue() const {
+DPCPP::queue& DPCPPStream::dpcpp_queue() const {
   auto streamImpl = DPCPPStreamToDPCPPStreamImpl(*this);
   return streamImpl->get_dpcpp_queue();
 }

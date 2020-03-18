@@ -28,21 +28,21 @@ int dpcppSetDevice(DeviceIndex device_index);
 
 int dpcppGetDeviceIdFromPtr(DeviceIndex *device_id, void *ptr);
 
-DP::device dpcppGetRawDevice(DeviceIndex device_index);
+DPCPP::device dpcppGetRawDevice(DeviceIndex device_index);
 
 DPCPPDeviceSelector dpcppGetDeviceSelector(DeviceIndex device_index);
 
-DP::codeplay::PointerMapper &dpcppGetBufferMap();
+DPCPP::codeplay::PointerMapper &dpcppGetBufferMap();
 
-DP::queue &dpcppGetCurrentQueue();
+DPCPP::queue &dpcppGetCurrentQueue();
 
 int64_t dpcppMaxWorkGroupSize();
 
-int64_t dpcppMaxWorkGroupSize(DP::queue &queue);
+int64_t dpcppMaxWorkGroupSize(DPCPP::queue &queue);
 
 int64_t dpcppMaxComputeUnitSize();
 
-int64_t dpcppMaxComputeUnitSize(DP::queue& queue);
+int64_t dpcppMaxComputeUnitSize(DPCPP::queue& queue);
 
 
 void parallel_for_setup(int64_t n, int64_t &tileSize, int64_t &rng, int64_t &GRange);
@@ -67,20 +67,20 @@ union f32_to_u32{
   uint32_t out;
 };
 
-static inline DP_DEVICE uint32_t __float_as_int(float val){
+static inline DPCPP_DEVICE uint32_t __float_as_int(float val){
   f32_to_u32 cn;
   cn.in = val;
   return cn.out;
 }
 
-static inline DP_DEVICE float __int_as_float(uint32_t val) {
+static inline DPCPP_DEVICE float __int_as_float(uint32_t val) {
   u32_to_f32 cn;
   cn.in = val;
   return cn.out;
 }
 
 #include <core/Exception.h>
-static DP::async_handler dpcppAsyncHandler = [](DP::exception_list eL) {
+static DPCPP::async_handler dpcppAsyncHandler = [](DPCPP::exception_list eL) {
   for (auto& e : eL) {
     AT_DPCPP_TRY
     std::rethrow_exception(e);

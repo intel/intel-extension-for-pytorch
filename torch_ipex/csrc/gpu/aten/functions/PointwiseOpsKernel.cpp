@@ -7,8 +7,8 @@
 #include <functions/Loops.h>
 
 
-DP_DEF_K1(addcmul);
-DP_DEF_K1(addcdiv);
+DPCPP_DEF_K1(addcmul);
+DPCPP_DEF_K1(addcdiv);
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -17,7 +17,7 @@ namespace impl {
 static void addcmul_kernel(TensorIterator &iter, Scalar value) {
   AT_DISPATCH_ALL_TYPES(iter.dtype(), "addcmul_dpcpp", [&]() {
     auto alpha = value.to<scalar_t>();
-    dpcpp_kernel_for_tensor_iter<DP_K(addcmul)>(iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
+    dpcpp_kernel_for_tensor_iter<DPCPP_K(addcmul)>(iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
       return a + alpha * b * c;
     });
   });
@@ -26,7 +26,7 @@ static void addcmul_kernel(TensorIterator &iter, Scalar value) {
 static void addcdiv_kernel(TensorIterator& iter, Scalar value) {
   AT_DISPATCH_ALL_TYPES(iter.dtype(), "addcdiv_dpcpp", [&]() {
     auto alpha = value.to<scalar_t>();
-    dpcpp_kernel_for_tensor_iter<DP_K(addcdiv)>(iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
+    dpcpp_kernel_for_tensor_iter<DPCPP_K(addcdiv)>(iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
       return a + alpha * (b / c);
     });
   });

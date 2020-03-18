@@ -26,23 +26,23 @@ void bernoulli_scalar_kernel(Tensor &ret, double p_, uint64_t seed) {
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto size = ret.numel() * sizeof(scalar_t);
   // First fill self with random number within range [0.0 - 1.0]
-  dpcpp_queue.submit([&](DP::handler &cgh){
-    auto acc = DPCPPAccessor<dp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size).get_access();
+  dpcpp_queue.submit([&](DPCPP::handler &cgh){
+    auto acc = DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size).get_access();
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
-    auto num_work_items = DP::nd_range<1>(DP::range<1>(global_range), DP::range<1>(tile_size));
+    auto num_work_items = DPCPP::nd_range<1>(DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
     FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
     cgh.parallel_for(num_work_items, uniform_rnd_filler);
   });
 
   // Generate final bernoulli distributions
-  dpcpp_queue.submit([&](DP::handler& cgh) {
+  dpcpp_queue.submit([&](DPCPP::handler& cgh) {
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
-    auto out_acc = DPCPPAccessor<dp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size);
-    cgh.parallel_for<bernoulli_scalar_dpcpp_ker<scalar_t>>(DP::nd_range<1>(
-      DP::range<1>(global_range), DP::range<1>(tile_size)),
-      [=](DP::nd_item<1> item) {
+    auto out_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size);
+    cgh.parallel_for<bernoulli_scalar_dpcpp_ker<scalar_t>>(DPCPP::nd_range<1>(
+      DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size)),
+      [=](DPCPP::nd_item<1> item) {
         int64_t id = item.get_global_linear_id();
         auto out_ptr = out_acc.template get_pointer<scalar_t>();
         if (id < range) {
@@ -59,24 +59,24 @@ void bernoulli_tensor_kernel(Tensor &ret, const Tensor& p, uint64_t seed) {
   auto size = ret.numel() * sizeof(scalar_t);
 
   // First fill self with random number within range [0.0 - 1.0]
-  auto cgf1 = DP_Q_CGF(cgh) {
-    auto acc = DPCPPAccessor<dp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size).get_access();
+  auto cgf1 = DPCPP_Q_CGF(cgh) {
+    auto acc = DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size).get_access();
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
-    auto num_work_items = DP::nd_range<1>(DP::range<1>(global_range), DP::range<1>(tile_size));
+    auto num_work_items = DPCPP::nd_range<1>(DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
     FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
     cgh.parallel_for(num_work_items, uniform_rnd_filler);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf1);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf1);
 
   // Generate final bernoulli distributions
-  auto cgf2 = DP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<dp_r_mode>(cgh, p.data_ptr<scalar_t>(), size);
-    auto out_acc = DPCPPAccessor<dp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size);
+  auto cgf2 = DPCPP_Q_CGF(cgh) {
+    auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, p.data_ptr<scalar_t>(), size);
+    auto out_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size);
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
-    auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1>item) {
       int64_t id = item.get_global_linear_id();
       auto in_ptr = in_acc.template get_pointer<scalar_t>();
       auto out_ptr = out_acc.template get_pointer<scalar_t>();
@@ -85,11 +85,11 @@ void bernoulli_tensor_kernel(Tensor &ret, const Tensor& p, uint64_t seed) {
       }
     };
 
-    cgh.parallel_for<bernoulli_tensor_dpcpp_ker<scalar_t>>(DP::nd_range<1>(
-      DP::range<1>(global_range), DP::range<1>(tile_size)), kfn);
+    cgh.parallel_for<bernoulli_tensor_dpcpp_ker<scalar_t>>(DPCPP::nd_range<1>(
+      DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf2);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf2);
 }
 
 } // namespace impl

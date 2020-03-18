@@ -19,7 +19,7 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-DP_DEF_K2(gatherKthValueKernelName, typename scalar_t, typename index_t, int Dim);
+DPCPP_DEF_K2(gatherKthValueKernelName, typename scalar_t, typename index_t, int Dim);
 
 template <typename scalar_t, typename index_t, int Dim>
 void gatherKthValue(
@@ -36,15 +36,15 @@ void gatherKthValue(
   // int32, regardless of index_t
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
-  int64_t local_size = dpcpp_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
+  int64_t local_size = dpcpp_queue.get_device(). template get_info<dpcpp_dev_max_wgroup_size>();
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<dp_r_mode>(cgh, input.data);
-    auto kth_acc = DPCPPAccessor<dp_w_mode>(cgh, kthValue.data);
-    auto indices_acc = DPCPPAccessor<dp_w_mode>(cgh, indices.data);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input.data);
+    auto kth_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, kthValue.data);
+    auto indices_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, indices.data);
 
-    auto smem = dp_local_acc_t<int>(32, cgh);
-    auto kfn = DP_Q_KFN(DP::nd_item<1> item) {
+    auto smem = dpcpp_local_acc_t<int>(32, cgh);
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
 
       index_t slice = item.get_group_linear_id();
 
@@ -64,7 +64,7 @@ void gatherKthValue(
       // Find the k-th highest element in our input
       scalar_t kValue = ScalarConvert<int, scalar_t>::to(0);
       radixSelect<scalar_t, typename TopKTypeConfig<scalar_t>::RadixType, index_t, false>(
-         (dp_global_ptr_pt<scalar_t>)inputSliceStart,
+         (dpcpp_global_ptr_pt<scalar_t>)inputSliceStart,
          k,
          inputSliceSize,
          inputWithinSliceStride,
@@ -94,11 +94,11 @@ void gatherKthValue(
       }
     };
 
-    cgh.parallel_for<DP_K(gatherKthValueKernelName, scalar_t, index_t, Dim)> (
-      DP::nd_range<1>(DP::range<1>(numInputSlices * local_size), DP::range<1>(local_size)), kfn);
+    cgh.parallel_for<DPCPP_K(gatherKthValueKernelName, scalar_t, index_t, Dim)> (
+      DPCPP::nd_range<1>(DPCPP::range<1>(numInputSlices * local_size), DPCPP::range<1>(local_size)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 struct KthValueLauncher {

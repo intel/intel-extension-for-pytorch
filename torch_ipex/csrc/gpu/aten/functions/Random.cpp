@@ -23,17 +23,17 @@ void uniform(Tensor & self, Generator *_generator, double a, double b) {
 
   auto queue = dpcppGetCurrentQueue();
 
-  auto cgf = DP_Q_CGF(cgh) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
     auto self_data_size = self.nbytes();
     void *self_data_ptr = self.data_ptr<scalar_t>();
 
-    auto acc = DPCPPAccessor<dp_w_mode>(
+    auto acc = DPCPPAccessor<dpcpp_w_mode>(
         cgh, self_data_ptr, self_data_size).get_access();
 
     int64_t tile_size, range, global_range;
     parallel_for_setup(self.numel(), tile_size, range, global_range);
-    auto num_work_items = DP::nd_range<1>(DP::range<1>(
-        global_range), DP::range<1>(tile_size));
+    auto num_work_items = DPCPP::nd_range<1>(DPCPP::range<1>(
+        global_range), DPCPP::range<1>(tile_size));
 
     if (std::is_same<scalar_t, float>::value) {
       FloatRandomFiller uniform_rnd_filler(acc, range, gen->current_seed(), a, b);
@@ -47,7 +47,7 @@ void uniform(Tensor & self, Generator *_generator, double a, double b) {
     }
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
   queue.wait_and_throw();
 }
 
@@ -64,24 +64,24 @@ void normal(Tensor & self, double mean, double stdv, Generator *_generator) {
 
   auto queue = dpcppGetCurrentQueue();
 
-  auto cgf = DP_Q_CGF(cgh) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
     auto self_data_size = self.nbytes();
     void *self_data_ptr = self.data_ptr<scalar_t>();
 
-    auto acc = DPCPPAccessor<dp_rw_mode>(
+    auto acc = DPCPPAccessor<dpcpp_rw_mode>(
         cgh, self_data_ptr, self_data_size).get_access();
     int64_t tile_size, range, global_range;
 
     bool recompute = ((self.numel() % 2) != 0);
     int64_t compute_num = recompute ? (self.numel() / 2 + 1) : (self.numel() / 2); // We will generate two normal element per time
     parallel_for_setup(compute_num, tile_size, range, global_range);
-    auto num_work_items = DP::nd_range<1>(DP::range<1>(global_range), DP::range<1>(tile_size));
+    auto num_work_items = DPCPP::nd_range<1>(DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
 
     NormalRandomFiller<accreal> normal_rnd_filler(acc, compute_num, stdv, mean);
     cgh.parallel_for(num_work_items, normal_rnd_filler);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
   queue.wait_and_throw();
 }
 

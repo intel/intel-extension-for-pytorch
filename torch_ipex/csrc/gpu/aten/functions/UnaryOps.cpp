@@ -16,27 +16,27 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-DP_DEF_K1(bitwise_not);
+DPCPP_DEF_K1(bitwise_not);
 void bitwise_not_kernel_dpcpp(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    dpcpp_kernel_for_tensor_iter<DP_K(bitwise_not)>(iter, [](bool a) -> bool {
+    dpcpp_kernel_for_tensor_iter<DPCPP_K(bitwise_not)>(iter, [](bool a) -> bool {
       return !a;
     });
   } else {
     AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_not_dpcpp", [&]() {
-      dpcpp_kernel_for_tensor_iter<DP_K(bitwise_not)>(iter, [](scalar_t a) -> scalar_t {
+      dpcpp_kernel_for_tensor_iter<DPCPP_K(bitwise_not)>(iter, [](scalar_t a) -> scalar_t {
         return ~a;
       });
     });
   }
 }
 
-DP_DEF_K1(logical_not);
+DPCPP_DEF_K1(logical_not);
 void logical_not_kernel(TensorIterator& iter) {
   AT_DISPATCH_ALL_TYPES_AND2(kBool, kHalf, iter.dtype(1), "logical_not_dpcpp", [&]() {
     using self_t = scalar_t;
     AT_DISPATCH_ALL_TYPES_AND2(kBool, kHalf, iter.dtype(0), "logical_not_dpcpp", [&]() {
-      dpcpp_kernel_for_tensor_iter<DP_K(logical_not, self_t)>(iter, [](self_t a) -> scalar_t { return static_cast<scalar_t>(!a); });
+      dpcpp_kernel_for_tensor_iter<DPCPP_K(logical_not, self_t)>(iter, [](self_t a) -> scalar_t { return static_cast<scalar_t>(!a); });
     });
   });
 }

@@ -52,17 +52,17 @@ inline void bitonicSwap(K& kA, V& vA, bool& validA,
 
 template <typename Comparator, typename K, typename V,
          typename IndexType, int Power2SortSize>
-inline void bitonicSort(const dp_local_acc_t<K> &keys_smem,
-                        const dp_local_acc_t<V> &values_smem,
-                        const dp_local_acc_t<bool> &valid_smem,
+inline void bitonicSort(const dpcpp_local_acc_t<K> &keys_smem,
+                        const dpcpp_local_acc_t<V> &values_smem,
+                        const dpcpp_local_acc_t<bool> &valid_smem,
                         const Comparator& comp,
-                        const DP::nd_item<1> &item_id) {
+                        const DPCPP::nd_item<1> &item_id) {
   auto thread_id = item_id.get_local_id(0);
   for (unsigned int size = 2; size < Power2SortSize; size *= 2) {
     bool flag = ((thread_id & (size / 2)) != 0);
 
     for (unsigned int stride = size / 2; stride > 0; stride /=2 ) {
-      item_id.barrier(dp_local_fence);
+      item_id.barrier(dpcpp_local_fence);
       unsigned int pos  = 2 * thread_id - (thread_id & (stride -1));
       bitonicSwap<Comparator, K, V>(keys_smem[pos], values_smem[pos], valid_smem[pos],
       keys_smem[pos + stride], values_smem[pos + stride], valid_smem[pos + stride], flag, comp);
@@ -71,13 +71,13 @@ inline void bitonicSort(const dp_local_acc_t<K> &keys_smem,
   }
 
   for (unsigned int stride = Power2SortSize / 2; stride > 0; stride /= 2) {
-    item_id.barrier(dp_local_fence);
+    item_id.barrier(dpcpp_local_fence);
     unsigned int pos = 2 * thread_id - (thread_id & (stride - 1));
     bitonicSwap<Comparator, K, V>(keys_smem[pos], values_smem[pos], valid_smem[pos],
       keys_smem[pos + stride], values_smem[pos + stride], valid_smem[pos + stride], false, comp);
   }
 
-  item_id.barrier(dp_local_fence);
+  item_id.barrier(dpcpp_local_fence);
 }
 
 template <typename K, typename V,
@@ -100,14 +100,14 @@ void bitonicSortKVInPlace(TensorInfo<K, IndexType> keys,
   auto queue = dpcppGetCurrentQueue();
   int64_t local_size = Power2SortSize / 2;
   int64_t global_size = keySlices * local_size;
-  auto cgf = DP_Q_CGF(cgh) {
-    auto keys_acc = DPCPPAccessor<dp_rw_mode>(cgh, keys.data);
-    auto values_acc = DPCPPAccessor<dp_rw_mode>(cgh, values.data);
-    auto sharedKeys_acc = dp_local_acc_t<K>(Power2SortSize, cgh);
-    auto sharedValues_acc = dp_local_acc_t<V>(Power2SortSize, cgh);
-    auto sharedValid_acc = dp_local_acc_t<bool>(Power2SortSize, cgh);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto keys_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, keys.data);
+    auto values_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, values.data);
+    auto sharedKeys_acc = dpcpp_local_acc_t<K>(Power2SortSize, cgh);
+    auto sharedValues_acc = dpcpp_local_acc_t<V>(Power2SortSize, cgh);
+    auto sharedValid_acc = dpcpp_local_acc_t<bool>(Power2SortSize, cgh);
 
-    auto kfn = DP_Q_KFN(DP::nd_item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       auto thread_id = item_id.get_local_id(0);
       auto group_id = item_id.get_group_linear_id();
       const IndexType keyStartOffset = IndexToOffset<K, IndexType, KeyDims>::get(group_id, keys);
@@ -151,11 +151,11 @@ void bitonicSortKVInPlace(TensorInfo<K, IndexType> keys,
 
     cgh.parallel_for<binarySortKVInplaceKernelName<
         K, V, KeyDims, ValueDims, Comparator, IndexType, Power2SortSize>> (
-            DP::nd_range<1>(DP::range<1>(global_size),
-                            DP::range<1>(local_size)), kfn);
+            DPCPP::nd_range<1>(DPCPP::range<1>(global_size),
+                            DPCPP::range<1>(local_size)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 // Returns 2^(ceil(lg(n)) from Stanford bit twiddling hacks

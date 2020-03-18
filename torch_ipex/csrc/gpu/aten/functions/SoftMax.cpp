@@ -20,7 +20,7 @@ class SoftmaxBackwardKernelName {};
 template <typename T>
 struct LogSoftMaxForwardEpilogue {
   LogSoftMaxForwardEpilogue(T max_input, T sum)
-    : logsum(max_input + DP::log(static_cast<float>(sum))) {}
+    : logsum(max_input + DPCPP::log(static_cast<float>(sum))) {}
   T operator() (T input) const {
     return static_cast<T>(input - logsum);
   }
@@ -32,7 +32,7 @@ struct LogSoftMaxBackwardEpilogue {
   LogSoftMaxBackwardEpilogue(T sum)
     : sum(sum) {}
   T operator() (T gradOutput, T output) const {
-    return static_cast<T>(gradOutput - DP::exp(static_cast<T>(output)) * sum);
+    return static_cast<T>(gradOutput - DPCPP::exp(static_cast<T>(output)) * sum);
   }
 
   const T sum;
@@ -44,7 +44,7 @@ struct SoftMaxForwardEpilogue {
     : max_input(max_input)
     , sum(sum) {}
   T operator() (T input) const {
-    return static_cast<T>(DP::exp(static_cast<float>(input - max_input)) / sum);
+    return static_cast<T>(DPCPP::exp(static_cast<float>(input - max_input)) / sum);
   }
 
   const T max_input;
@@ -67,20 +67,20 @@ struct SoftMaxBackwardEpilogue {
 template <typename scalar_t, template <typename> class Epilogue>
 void SoftMaxForward(scalar_t *output, scalar_t *input, int classes, int out_size)
 {
-  static const auto write_mode = DP::access::mode::discard_write;
-  static const auto read_mode = DP::access::mode::read;
-  using local_accessor_t = DP::accessor<scalar_t, 1, DP::access::mode::read_write, DP::access::target::local>;
+  static const auto write_mode = DPCPP::access::mode::discard_write;
+  static const auto read_mode = DPCPP::access::mode::read;
+  using local_accessor_t = DPCPP::accessor<scalar_t, 1, DPCPP::access::mode::read_write, DPCPP::access::target::local>;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  int64_t local_size = dpcpp_queue.get_device(). template get_info<DP::info::device::max_work_group_size>();
+  int64_t local_size = dpcpp_queue.get_device(). template get_info<DPCPP::info::device::max_work_group_size>();
   int64_t global_size = out_size * local_size;
-  dpcpp_queue.submit([&](DP::handler &cgh) {
+  dpcpp_queue.submit([&](DPCPP::handler &cgh) {
     auto in_acc = DPCPPAccessor<read_mode>(cgh, input, out_size*classes * sizeof(scalar_t));
     auto out_acc = DPCPPAccessor<write_mode>(cgh, output, out_size*classes * sizeof(scalar_t));
     auto local_acc_max = local_accessor_t(local_size, cgh);
     auto local_acc_sum = local_accessor_t(local_size, cgh);
     cgh.parallel_for<SoftmaxForwardKernelName<scalar_t, Epilogue> > (
-      DP::nd_range<1>(DP::range<1>(global_size), DP::range<1>(local_size)),
-      [=](DP::nd_item<1> item_id){
+      DPCPP::nd_range<1>(DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)),
+      [=](DPCPP::nd_item<1> item_id){
         int64_t local_id = item_id.get_local_id(0);
         auto group_id = item_id.get_group(0);
         auto in_ptr = in_acc.template get_pointer<scalar_t>() + classes * group_id;
@@ -88,30 +88,30 @@ void SoftMaxForward(scalar_t *output, scalar_t *input, int classes, int out_size
         // get max
         auto max_input = in_ptr[0];
         for (int i = local_id; i < classes; i += local_size) {
-          max_input = DP::max(static_cast<float>(max_input), static_cast<float>(in_ptr[i]));
+          max_input = DPCPP::max(static_cast<float>(max_input), static_cast<float>(in_ptr[i]));
         }
         local_acc_max[local_id] = max_input;
 
         for(int i = (local_size >> 1); i > 0; i >>= 1) {
-          item_id.barrier(DP::access::fence_space::local_space);
+          item_id.barrier(DPCPP::access::fence_space::local_space);
           if (local_id < i)
-            local_acc_max[local_id] = DP::max(static_cast<float>(local_acc_max[local_id]), static_cast<float>(local_acc_max[local_id + i]));
+            local_acc_max[local_id] = DPCPP::max(static_cast<float>(local_acc_max[local_id]), static_cast<float>(local_acc_max[local_id + i]));
         }
-        item_id.barrier(DP::access::fence_space::local_space);
+        item_id.barrier(DPCPP::access::fence_space::local_space);
 
         // get sum
         auto sum_input = static_cast<scalar_t>(0);
         for (int i = local_id; i < classes; i += local_size) {
-          sum_input += DP::exp(static_cast<float>(in_ptr[i]) - static_cast<float>(local_acc_max[0]));
+          sum_input += DPCPP::exp(static_cast<float>(in_ptr[i]) - static_cast<float>(local_acc_max[0]));
         }
         local_acc_sum[local_id] = sum_input;
 
         for(int i = (local_size >> 1); i > 0; i >>= 1) {
-          item_id.barrier(DP::access::fence_space::local_space);
+          item_id.barrier(DPCPP::access::fence_space::local_space);
           if (local_id < i)
             local_acc_sum[local_id] += local_acc_sum[local_id + i];
         }
-        item_id.barrier(DP::access::fence_space::local_space);
+        item_id.barrier(DPCPP::access::fence_space::local_space);
         Epilogue<scalar_t> epilogue(local_acc_max[0], local_acc_sum[0]);
 
         for (int i = local_id; i < classes; i += local_size) {
@@ -123,20 +123,20 @@ void SoftMaxForward(scalar_t *output, scalar_t *input, int classes, int out_size
 
 template <typename scalar_t, template <typename> class Epilogue>
 void SoftMaxBackward(scalar_t* gradInput, scalar_t *output, scalar_t *gradOutput, int classes, int out_size) {
-  static const auto write_mode = DP::access::mode::discard_write;
-  static const auto read_mode = DP::access::mode::read;
-  using local_accessor_t = DP::accessor<scalar_t, 1, DP::access::mode::read_write, DP::access::target::local>;
+  static const auto write_mode = DPCPP::access::mode::discard_write;
+  static const auto read_mode = DPCPP::access::mode::read;
+  using local_accessor_t = DPCPP::accessor<scalar_t, 1, DPCPP::access::mode::read_write, DPCPP::access::target::local>;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  int64_t local_size = dpcpp_queue.get_device(). template get_info<DP::info::device::max_work_group_size>();
+  int64_t local_size = dpcpp_queue.get_device(). template get_info<DPCPP::info::device::max_work_group_size>();
   int64_t global_size = out_size * local_size;
-  dpcpp_queue.submit([&](DP::handler &cgh) {
+  dpcpp_queue.submit([&](DPCPP::handler &cgh) {
     auto gradInput_acc = DPCPPAccessor<write_mode>(cgh, gradInput, out_size*classes * sizeof(scalar_t));
     auto output_acc = DPCPPAccessor<read_mode>(cgh, output, out_size*classes * sizeof(scalar_t));
     auto gradOutput_acc = DPCPPAccessor<read_mode>(cgh, gradOutput, out_size*classes * sizeof(scalar_t));
     auto local_acc_sum = local_accessor_t(local_size, cgh);
     cgh.parallel_for<SoftmaxBackwardKernelName<scalar_t, Epilogue> > (
-        DP::nd_range<1>(DP::range<1>(global_size), DP::range<1>(local_size)),
-        [=](DP::nd_item<1> item_id){
+        DPCPP::nd_range<1>(DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)),
+        [=](DPCPP::nd_item<1> item_id){
           int64_t local_id = item_id.get_local_id(0);
           auto group_id = item_id.get_group(0);
           auto gradInput_ptr = gradInput_acc.template get_pointer<scalar_t>() + classes * group_id;
@@ -149,7 +149,7 @@ void SoftMaxBackward(scalar_t* gradInput, scalar_t *output, scalar_t *gradOutput
           }
           local_acc_sum[local_id] = thread_sum;
           for (int64_t i = (local_size >> 1); i > 0; i >>=1 ) {
-            item_id.barrier(DP::access::fence_space::local_space);
+            item_id.barrier(DPCPP::access::fence_space::local_space);
             if (local_id < i)
               local_acc_sum[local_id] += local_acc_sum[local_id + i];
           }

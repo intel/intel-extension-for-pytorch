@@ -106,7 +106,7 @@ struct scan
     decltype(__group_size) __k = 1;
     do
     {
-      __item_id.barrier(DP::access::fence_space::local_space);
+      __item_id.barrier(DPCPP::access::fence_space::local_space);
       if (__local_idx % (2 * __k) == 0 && __local_idx + __k < __group_size && __global_idx < __n &&
           __global_idx + __k < __n)
       {
@@ -115,7 +115,7 @@ struct scan
       }
       __k *= 2;
     } while (__k < __group_size);
-    __item_id.barrier(DP::access::fence_space::local_space);
+    __item_id.barrier(DPCPP::access::fence_space::local_space);
 
     // 2. scan
     auto __partial_sums = __local_mem[__local_idx];
@@ -130,9 +130,9 @@ struct scan
       }
       __k *= 2;
     } while (__k < __group_size);
-    __item_id.barrier(DP::access::fence_space::local_space);
+    __item_id.barrier(DPCPP::access::fence_space::local_space);
     __local_mem[__local_idx] = __partial_sums;
-    __item_id.barrier(DP::access::fence_space::local_space);
+    __item_id.barrier(DPCPP::access::fence_space::local_space);
 
     //4. Write result to global memory
     write_to_global<_Inclusive>(__item_id, __global_idx, __n, __local_mem, __input, __result,
@@ -156,7 +156,7 @@ struct reduce
     decltype(__group_size) __k = 1;
     do
     {
-      __item_id.barrier(DP::access::fence_space::local_space);
+      __item_id.barrier(DPCPP::access::fence_space::local_space);
       if (__local_idx % (2 * __k) == 0 && __local_idx + __k < __group_size && __global_idx < __n &&
           __global_idx + __k < __n)
       {
@@ -219,7 +219,7 @@ template <typename ...T> class __init_kernel_name_2{};
 // returns the last partial sum
 template <typename InputType, typename OutputType, typename IndexType, typename _BinaryOperation, typename _Transform, typename _Reduce, typename _Scan>
 IndexType
-parallel_transform_scan(DP::queue& queue, TensorInfo<InputType, IndexType>& input,
+parallel_transform_scan(DPCPP::queue& queue, TensorInfo<InputType, IndexType>& input,
                         TensorInfo<OutputType, IndexType>& output, IndexType num_elements, _BinaryOperation __binary_op, IndexType __init,
                         _Transform __brick_transform, _Reduce __brick_reduce, _Scan __brick_scan)
 {
@@ -240,39 +240,39 @@ parallel_transform_scan(DP::queue& queue, TensorInfo<InputType, IndexType>& inpu
   auto __ready_flags = allocator.allocate(sizeof(_AtomicType) * __n_groups); // temporary storage for global atomic
 
   // 1. Initialize temp buffer
-  auto cgf_1 = DP_Q_CGF(cgh) {
-    auto __ready_flags_acc = DPCPPAccessor<dp_rw_mode>(cgh, __ready_flags.get());
+  auto cgf_1 = DPCPP_Q_CGF(cgh) {
+    auto __ready_flags_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, __ready_flags.get());
 
-    auto kfn = DP_Q_KFN(DP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
       auto __ready_flags_ptr = __ready_flags_acc.template get_pointer<_AtomicType>();
       int64_t gid = item_id.get_linear_id();
 
       __ready_flags_ptr[gid] = 0;
     };
 
-    cgh.parallel_for<__init_kernel_name_1<InputType, OutputType, IndexType>>(DP::range</*dim=*/1>(__n_groups), kfn);
+    cgh.parallel_for<__init_kernel_name_1<InputType, OutputType, IndexType>>(DPCPP::range</*dim=*/1>(__n_groups), kfn);
   };
 
   //launch kernel
-  DP_Q_SYNC_SUBMIT(queue, cgf_1);
+  DPCPP_Q_SYNC_SUBMIT(queue, cgf_1);
 
   uint32_t __for_dynamic_id = 0;
   auto __dynamic_id_buf =
-          DP::buffer<uint32_t, /*dim=*/1>(&__for_dynamic_id, 1); // temporary storage for group_id atomic
+          DPCPP::buffer<uint32_t, /*dim=*/1>(&__for_dynamic_id, 1); // temporary storage for group_id atomic
   // Main parallel_for
-  auto cgf_2 = DP_Q_CGF(cgh) {
-    auto __acc = DPCPPAccessor<dp_r_mode>(cgh, __target_buffer);
-    auto __dynamic_id_acc = __dynamic_id_buf.template get_access<dp_rw_mode>(cgh);
-    auto __local_sums_acc = DPCPPAccessor<dp_rw_mode>(cgh, __local_sums.get());
-    auto __result_acc = DPCPPAccessor<dp_w_mode>(cgh, __result_buffer);
-    auto __ready_flags_acc = DPCPPAccessor<dp_rw_mode>(cgh, __ready_flags.get());
+  auto cgf_2 = DPCPP_Q_CGF(cgh) {
+    auto __acc = DPCPPAccessor<dpcpp_r_mode>(cgh, __target_buffer);
+    auto __dynamic_id_acc = __dynamic_id_buf.template get_access<dpcpp_rw_mode>(cgh);
+    auto __local_sums_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, __local_sums.get());
+    auto __result_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, __result_buffer);
+    auto __ready_flags_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, __ready_flags.get());
 
     // create local accessors
-    DP::accessor<uint32_t, 1, dp_rw_mode, DP::access::target::local> __group_id_local(1, cgh);
-    DP::accessor<IndexType, 1, dp_rw_mode, DP::access::target::local> __transform_local(__wgroup_size, cgh);
-    DP::accessor<IndexType, 1, dp_rw_mode, DP::access::target::local> __reduce_local_mem(__wgroup_size, cgh);
+    DPCPP::accessor<uint32_t, 1, dpcpp_rw_mode, DPCPP::access::target::local> __group_id_local(1, cgh);
+    DPCPP::accessor<IndexType, 1, dpcpp_rw_mode, DPCPP::access::target::local> __transform_local(__wgroup_size, cgh);
+    DPCPP::accessor<IndexType, 1, dpcpp_rw_mode, DPCPP::access::target::local> __reduce_local_mem(__wgroup_size, cgh);
 
-    auto kfn = DP_Q_KFN(DP::nd_item</*dim=*/1> item_id) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item</*dim=*/1> item_id) {
       auto __local_idx = item_id.get_local_id(0);
       auto __group_size = item_id.get_local_range().size();
       auto __acc_ptr = __acc.template get_pointer<InputType>();
@@ -280,16 +280,16 @@ parallel_transform_scan(DP::queue& queue, TensorInfo<InputType, IndexType>& inpu
       auto __dynamic_id_ptr = GET_ACC_PTR(__dynamic_id_acc, uint32_t);
       auto __ready_flags_ptr = __ready_flags_acc.template get_pointer<_AtomicType>();
       auto __local_sums_ptr = __local_sums_acc.template get_pointer<IndexType>();
-      dp_multi_ptr<_AtomicType, dp_global_space> __ready_flags_atomic_ptr(__ready_flags_ptr);
-      dp_multi_ptr<uint32_t, dp_global_space> __dynamic_id_atomic_ptr(__dynamic_id_ptr);
+      dpcpp_multi_ptr<_AtomicType, dpcpp_global_space> __ready_flags_atomic_ptr(__ready_flags_ptr);
+      dpcpp_multi_ptr<uint32_t, dpcpp_global_space> __dynamic_id_atomic_ptr(__dynamic_id_ptr);
 
       // dynamic group_id
       if (__local_idx == 0)
       {
         // add 1 to __dynamic_id_acc atomically
-        __group_id_local[0] = DP::atomic<uint32_t>(__dynamic_id_atomic_ptr).fetch_add(uint32_t(1));
+        __group_id_local[0] = DPCPP::atomic<uint32_t>(__dynamic_id_atomic_ptr).fetch_add(uint32_t(1));
       }
-      item_id.barrier(DP::access::fence_space::local_space);
+      item_id.barrier(DPCPP::access::fence_space::local_space);
       auto __group_id = __group_id_local[0];
       auto __global_idx = (__group_id * __group_size) + __local_idx;
 
@@ -298,7 +298,7 @@ parallel_transform_scan(DP::queue& queue, TensorInfo<InputType, IndexType>& inpu
 
       // copy to another memory to save the state
       __reduce_local_mem[__local_idx] = __transform_local[__local_idx];
-      item_id.barrier(DP::access::fence_space::local_space);
+      item_id.barrier(DPCPP::access::fence_space::local_space);
 
       // TODO: think about the model Scan-Add. It will help us to get rid of 2 reduce calls
       // and __reduce_local_mem won't be needed
@@ -308,9 +308,9 @@ parallel_transform_scan(DP::queue& queue, TensorInfo<InputType, IndexType>& inpu
       {
         // the next 2 lines might be swapped
         __local_sums_ptr[0] = __binary_op(__init, __local_reduce);
-        DP::atomic<_AtomicType>(__ready_flags_atomic_ptr).store(1);
+        DPCPP::atomic<_AtomicType>(__ready_flags_atomic_ptr).store(1);
       }
-      item_id.barrier(DP::access::fence_space::local_space);
+      item_id.barrier(DPCPP::access::fence_space::local_space);
 
       // 4. get reduced value from the previous work group
       IndexType __new_init = __init;
@@ -319,38 +319,38 @@ parallel_transform_scan(DP::queue& queue, TensorInfo<InputType, IndexType>& inpu
         _AtomicType __temp;
         // wait for updating atomic from the previous work group
         while (
-                (__temp = DP::atomic<_AtomicType>(__ready_flags_atomic_ptr + __group_id - 1).load()) ==
+                (__temp = DPCPP::atomic<_AtomicType>(__ready_flags_atomic_ptr + __group_id - 1).load()) ==
                 0)
         {
         }
         auto __new_res = __binary_op(__local_sums_ptr[__group_id - 1], __local_reduce);
         // the next 2 lines might be swapped
         __local_sums_ptr[__group_id] = __new_res;
-        DP::atomic<_AtomicType>(__ready_flags_atomic_ptr  + __group_id).store(1);
+        DPCPP::atomic<_AtomicType>(__ready_flags_atomic_ptr  + __group_id).store(1);
         __new_init = __local_sums_ptr[__group_id - 1];
       }
-      item_id.barrier(DP::access::fence_space::local_space);
+      item_id.barrier(DPCPP::access::fence_space::local_space);
 
       // 5. local scan and putting down to __result
       __brick_scan(item_id, __global_idx, __n, __transform_local, __acc_ptr, __result_ptr,  __new_init);
     };
 
-    cgh.parallel_for<__init_kernel_name_2<InputType, OutputType, IndexType>>(DP::nd_range</*dim=*/1>(DP::range</*dim=*/1>(__n_groups * __wgroup_size),
-                                                                   DP::range</*dim=*/1>(__wgroup_size)), kfn);
+    cgh.parallel_for<__init_kernel_name_2<InputType, OutputType, IndexType>>(DPCPP::nd_range</*dim=*/1>(DPCPP::range</*dim=*/1>(__n_groups * __wgroup_size),
+                                                                   DPCPP::range</*dim=*/1>(__wgroup_size)), kfn);
   };
 
   //launch kernel
-  DP_Q_SYNC_SUBMIT(queue, cgf_2);
+  DPCPP_Q_SYNC_SUBMIT(queue, cgf_2);
 
   auto sb = dpcppGetBufferMap().template get_buffer<IndexType>(__local_sums.get());
-  auto host_acc = sb.template get_access<dp_r_mode>();
+  auto host_acc = sb.template get_access<dpcpp_r_mode>();
   auto __last_reduced_value = host_acc[__n_groups - 1];
   return __last_reduced_value;
 }
 
 template <typename InputType, typename OutputType, typename IndexType, typename _CreateMaskOp, typename _CopyByMaskOp>
 IndexType
-pattern_scan_copy(DP::queue& queue, TensorInfo<InputType, IndexType>& input,
+pattern_scan_copy(DPCPP::queue& queue, TensorInfo<InputType, IndexType>& input,
                   TensorInfo<OutputType, IndexType>& output, IndexType num_elements, _CreateMaskOp __create_mask_op, _CopyByMaskOp __copy_by_mask_op)
 {
   using _ReduceOp = std::plus<IndexType>;
@@ -421,7 +421,7 @@ private:
 
 template <typename InputType, typename OutputType, typename IndexType, typename Predicate, typename CopyMaskOp>
 IndexType
-pattern_scan(DP::queue& queue, TensorInfo<InputType, IndexType>& input,
+pattern_scan(DPCPP::queue& queue, TensorInfo<InputType, IndexType>& input,
              TensorInfo<OutputType, IndexType>& output, IndexType num_elements,
              Predicate __pred, CopyMaskOp __copy_by_mask_op)
 {

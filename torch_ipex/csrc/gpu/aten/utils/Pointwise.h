@@ -324,7 +324,7 @@ struct TensorDigammaOp {
       return;
     }
 
-    bool x_is_integer = (x == DP::floor(x));
+    bool x_is_integer = (x == DPCPP::floor(x));
     compute_type result = 0;
 
     if (x < 0) {
@@ -336,7 +336,7 @@ struct TensorDigammaOp {
       // Rounding errors in tan's input can really affect the output
       // for extreme values, so we always perform this computation in double.
       result = scalar_cast<compute_type>(
-          - PI_f64 / DP::tan(PI_f64 * scalar_cast<double>(x)));
+          - PI_f64 / DPCPP::tan(PI_f64 * scalar_cast<double>(x)));
       x = 1 - x;
     }
 
@@ -360,7 +360,7 @@ struct TensorDigammaOp {
       y = z * polevl_result;
     }
 
-    out = scalar_cast<T>(DP::log(x) - (0.5 / x) - y + result);
+    out = scalar_cast<T>(DPCPP::log(x) - (0.5 / x) - y + result);
     return;
   }
 
@@ -385,7 +385,7 @@ struct TensorDigammaOp {
       return;
     }
 
-    bool x_is_integer = (x == DP::floor(x));
+    bool x_is_integer = (x == DPCPP::floor(x));
     compute_type result = 0;
 
     if (x < 0) {
@@ -397,7 +397,7 @@ struct TensorDigammaOp {
       // Rounding errors in tan's input can really affect the output
       // for extreme values, so we always perform this computation in double.
       result = scalar_cast<compute_type>(
-          - PI_f64 / DP::tan(PI_f64 * scalar_cast<double>(x)));
+          - PI_f64 / DPCPP::tan(PI_f64 * scalar_cast<double>(x)));
       x = 1 - x;
     }
 
@@ -421,7 +421,7 @@ struct TensorDigammaOp {
       y = z * polevl_result;
     }
 
-    v = scalar_cast<T>(DP::log(x) - (0.5 / x) - y + result);
+    v = scalar_cast<T>(DPCPP::log(x) - (0.5 / x) - y + result);
     return;
   }
 
@@ -441,28 +441,28 @@ struct TensorErfinvOp {
     static const compute_type d[2]={ 3.543889200,  1.637067800};
 
     auto x = scalar_cast<compute_type>(in);
-    if(DP::fabs(x) > 1.0) {
+    if(DPCPP::fabs(x) > 1.0) {
       out = scalar_cast<T>(NAN);
       return;
     }
-    if(DP::fabs(x) == 1.0) {
-      out = scalar_cast<T>((DP::copysign(1.0, scalar_cast<double>(x))) * (scalar_cast<double>(INFINITY)));
+    if(DPCPP::fabs(x) == 1.0) {
+      out = scalar_cast<T>((DPCPP::copysign(1.0, scalar_cast<double>(x))) * (scalar_cast<double>(INFINITY)));
       return;
     }
-    if(DP::fabs(x) <= 0.7){
+    if(DPCPP::fabs(x) <= 0.7){
       z = x * x;
       num = (((a[3]*z + a[2])*z + a[1])*z + a[0]);
       dem = ((((b[3]*z + b[2])*z + b[1])*z +b[0])*z + scalar_cast<compute_type>(1.0));
       out = x * num / dem;
     }
     else {
-      z = scalar_cast<compute_type>(DP::sqrt(-DP::log((1.0-DP::fabs(x))/2.0)));
+      z = scalar_cast<compute_type>(DPCPP::sqrt(-DPCPP::log((1.0-DPCPP::fabs(x))/2.0)));
       num = ((c[3]*z + c[2])*z + c[1])*z + c[0];
       dem = (d[1]*z + d[0])*z + scalar_cast<compute_type>(1.0);
-      out = scalar_cast<T>(scalar_cast<compute_type>(DP::copysign(1.0,scalar_cast<double>(x)))*num/dem);
+      out = scalar_cast<T>(scalar_cast<compute_type>(DPCPP::copysign(1.0,scalar_cast<double>(x)))*num/dem);
     }
-    out = out - scalar_cast<T>((DP::erf(scalar_cast<double>(out)) - x)/((2.0/DP::sqrt(PI_f64))*DP::exp(-x*x)));
-    out = out - scalar_cast<T>((DP::erf(scalar_cast<double>(out)) - x)/((2.0/DP::sqrt(PI_f64))*DP::exp(-x*x)));
+    out = out - scalar_cast<T>((DPCPP::erf(scalar_cast<double>(out)) - x)/((2.0/DPCPP::sqrt(PI_f64))*DPCPP::exp(-x*x)));
+    out = out - scalar_cast<T>((DPCPP::erf(scalar_cast<double>(out)) - x)/((2.0/DPCPP::sqrt(PI_f64))*DPCPP::exp(-x*x)));
     return;
   }
 
@@ -477,28 +477,28 @@ struct TensorErfinvOp {
     static const compute_type d[2]={ 3.543889200,  1.637067800};
 
     auto x = scalar_cast<compute_type>(v);
-    if(DP::fabs(x) > 1.0) {
+    if(DPCPP::fabs(x) > 1.0) {
       v = scalar_cast<T>(NAN);
       return;
     }
-    if(DP::fabs(x) == 1.0){
-      v = scalar_cast<T>((DP::copysign(1.0, scalar_cast<double>(x))) * (scalar_cast<double>(INFINITY)));
+    if(DPCPP::fabs(x) == 1.0){
+      v = scalar_cast<T>((DPCPP::copysign(1.0, scalar_cast<double>(x))) * (scalar_cast<double>(INFINITY)));
       return;
     }
-    if(DP::fabs(x) <= 0.7){
+    if(DPCPP::fabs(x) <= 0.7){
       z = x * x;
       num = (((a[3]*z + a[2])*z + a[1])*z + a[0]);
       dem = ((((b[3]*z + b[2])*z + b[1])*z +b[0])*z + scalar_cast<compute_type>(1.0));
       v = x * num / dem;
     }
     else {
-      z = scalar_cast<compute_type>(DP::sqrt(-DP::log((1.0-DP::fabs(x))/2.0)));
+      z = scalar_cast<compute_type>(DPCPP::sqrt(-DPCPP::log((1.0-DPCPP::fabs(x))/2.0)));
       num = ((c[3]*z + c[2])*z + c[1])*z + c[0];
       dem = (d[1]*z + d[0])*z + scalar_cast<compute_type>(1.0);
-      v = scalar_cast<T>(scalar_cast<compute_type>(DP::copysign(1.0,scalar_cast<double>(x)))*num/dem);
+      v = scalar_cast<T>(scalar_cast<compute_type>(DPCPP::copysign(1.0,scalar_cast<double>(x)))*num/dem);
     }
-    v = v - scalar_cast<T>((DP::erf(scalar_cast<double>(v)) - x)/((2.0/DP::sqrt(PI_f64))*DP::exp(-x*x)));
-    v = v - scalar_cast<T>((DP::erf(scalar_cast<double>(v)) - x)/((2.0/DP::sqrt(PI_f64))*DP::exp(-x*x)));
+    v = v - scalar_cast<T>((DPCPP::erf(scalar_cast<double>(v)) - x)/((2.0/DPCPP::sqrt(PI_f64))*DPCPP::exp(-x*x)));
+    v = v - scalar_cast<T>((DPCPP::erf(scalar_cast<double>(v)) - x)/((2.0/DPCPP::sqrt(PI_f64))*DPCPP::exp(-x*x)));
     return;
   }
 };
@@ -728,33 +728,33 @@ struct TensorCRemainderOp {
 template <>
 struct TensorCRemainderOp<float> {
   void operator()(float& out, float& in) const {
-    out = in != 0.f ? out - in * DP::floor(out / in) : NAN;
+    out = in != 0.f ? out - in * DPCPP::floor(out / in) : NAN;
   }
 
   void operator()(float& out, float& in1, float& in2) const {
-    out = in2 != 0.f ? in1 - in2 * DP::floor(in1 / in2) : NAN;
+    out = in2 != 0.f ? in1 - in2 * DPCPP::floor(in1 / in2) : NAN;
   }
 };
 
 template <>
 struct TensorCRemainderOp<double> {
   void operator()(double& out, double& in) const {
-    out = in != 0. ? out - in * DP::floor(out / in) : NAN;
+    out = in != 0. ? out - in * DPCPP::floor(out / in) : NAN;
   }
 
   void operator()(double& out, double& in1, double& in2) const {
-    out = in2 != 0. ? in1 - in2 * DP::floor(in1 / in2) : NAN;
+    out = in2 != 0. ? in1 - in2 * DPCPP::floor(in1 / in2) : NAN;
   }
 };
 
 template <>
 struct TensorCRemainderOp<at::Half> {
   void operator()(at::Half& out, at::Half& in) const {
-    out = in != 0.f ? out - in * DP::floor(float(out / in)) : NAN;
+    out = in != 0.f ? out - in * DPCPP::floor(float(out / in)) : NAN;
   }
 
   void operator()(at::Half& out, at::Half& in1, at::Half& in2) const {
-    out = in2 != 0.f ? in1 - in2 * DP::floor(float(in1 / in2)) : NAN;
+    out = in2 != 0.f ? in1 - in2 * DPCPP::floor(float(in1 / in2)) : NAN;
   }
 };
 
@@ -773,22 +773,22 @@ struct TensorCFmodOp {
 template <>
 struct TensorCFmodOp<float> {
   void operator()(float& out, float& in) const {
-    out = DP::fmod(out, in);
+    out = DPCPP::fmod(out, in);
   }
 
   void operator()(float& out, float& in1, float& in2) const {
-    out = DP::fmod(in1, in2);
+    out = DPCPP::fmod(in1, in2);
   }
 };
 
 template <>
 struct TensorCFmodOp<double> {
   void operator()(double& out, double& in) const {
-    out = DP::fmod(out, in);
+    out = DPCPP::fmod(out, in);
   }
 
   void operator()(double& out, double& in1, double& in2) const {
-    out = DP::fmod(in1, in2);
+    out = DPCPP::fmod(in1, in2);
   }
 };
 
@@ -796,11 +796,11 @@ struct TensorCFmodOp<double> {
 template <>
 struct TensorCFmodOp<at::Half> {
   void operator()(at::Half& out, at::Half& in) const {
-    out = DP::fmod(float(out), float(in));
+    out = DPCPP::fmod(float(out), float(in));
   }
 
   void operator()(at::Half& out, at::Half& in1, at::Half& in2) const {
-    out = DP::fmod(float(in1), float(in2));
+    out = DPCPP::fmod(float(in1), float(in2));
   }
 };
 
@@ -818,22 +818,22 @@ struct TensorCPowOp {
 template <>
 struct TensorCPowOp<float> {
   void operator()(float &out, float &in) const{
-    out = DP::pow(out, in);
+    out = DPCPP::pow(out, in);
   }
 
   void operator()(float &out, float &in1, float &in2) const{
-    out = DP::pow(in1, in2);
+    out = DPCPP::pow(in1, in2);
   }
 };
 
 template <>
 struct TensorCPowOp<double> {
   void operator()(double &out, double &in) const{
-    out = DP::pow(out, in);
+    out = DPCPP::pow(out, in);
   }
 
   void operator()(double &out, double &in1, double &in2) const{
-    out = DP::pow(in1, in2);
+    out = DPCPP::pow(in1, in2);
   }
 };
 

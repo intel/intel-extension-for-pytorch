@@ -49,7 +49,7 @@ inline bool is_available() {
 
 void createGlobalContext();
 void clearGlobalContext();
-DP::context getGlobalContext();
+DPCPP::context getGlobalContext();
 CAFFE2_API Allocator* getDPCPPDeviceAllocator();
 
 } // namespace dpcpp

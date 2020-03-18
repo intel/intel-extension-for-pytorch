@@ -47,7 +47,7 @@ static inline void dpcpp_exclusive_scan(InputIterator first,
 
 // alternative for cude thrust::identity
 template <typename T>
-DP_DEVICE struct dpcpp_identity {
+DPCPP_DEVICE struct dpcpp_identity {
   T const &operator()(T const &t) const {
     return t;
   }

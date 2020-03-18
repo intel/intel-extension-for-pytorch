@@ -9,8 +9,8 @@
 #include "Loops.h"
 
 
-DP_DEF_K1(index_kernel);
-DP_DEF_K1(index_put_kernel);
+DPCPP_DEF_K1(index_kernel);
+DPCPP_DEF_K1(index_put_kernel);
 
 namespace at { namespace dpcpp {
 
@@ -21,9 +21,9 @@ template <int N> struct alignas(N) OpaqueType { char data[N]; };
 static void index_kernel_dpcpp(TensorIterator& iter, IntArrayRef index_size, IntArrayRef index_stride) {
   AT_DISPATCH_ALL_TYPES(iter.dtype(), "index", [&] {
     using dtype = OpaqueType<sizeof(scalar_t)>;
-    dpcpp_index_kernel<DP_K(index_kernel, scalar_t)>(iter, index_size, index_stride,
+    dpcpp_index_kernel<DPCPP_K(index_kernel, scalar_t)>(iter, index_size, index_stride,
             // This lambda function only works in dpcpp kernel.
-                                                    [](dp_global_ptr_pt<char> out_data, dp_global_ptr_pt<char> in_data, int64_t offset) {
+                                                    [](dpcpp_global_ptr_pt<char> out_data, dpcpp_global_ptr_pt<char> in_data, int64_t offset) {
                                                       *(dtype*)out_data = *(dtype*)(in_data + offset);
                                                     }
     );
@@ -46,10 +46,10 @@ static void index_kernel_dpcpp(TensorIterator& iter, IntArrayRef index_size, Int
 static void index_put_kernel_dpcpp(TensorIterator& iter, IntArrayRef index_size, IntArrayRef index_stride, bool accumulate) {
   if (accumulate) {
     AT_DISPATCH_ALL_ATOMIC_TYPES(iter.dtype(), "index_put", [&] {
-      dpcpp_index_kernel<DP_K(index_put_kernel, scalar_t, /*accumulate=*/bool)>(iter, index_size, index_stride,
+      dpcpp_index_kernel<DPCPP_K(index_put_kernel, scalar_t, /*accumulate=*/bool)>(iter, index_size, index_stride,
               // This lambda function only works in dpcpp kernel.
-                                                          [](dp_global_ptr_pt<char> out_data, dp_global_ptr_pt<char> in_data, int64_t offset) {
-                                                            dp_global_ptr_pt<scalar_t> out_ptr = (dp_global_ptr_pt<scalar_t>) (out_data + offset);
+                                                          [](dpcpp_global_ptr_pt<char> out_data, dpcpp_global_ptr_pt<char> in_data, int64_t offset) {
+                                                            dpcpp_global_ptr_pt<scalar_t> out_ptr = (dpcpp_global_ptr_pt<scalar_t>) (out_data + offset);
                                                             auto in = *(scalar_t*)in_data;
                                                             atomicAdd(out_ptr, in);
                                                           }
@@ -58,9 +58,9 @@ static void index_put_kernel_dpcpp(TensorIterator& iter, IntArrayRef index_size,
   } else {
     AT_DISPATCH_ALL_TYPES(iter.dtype(), "index_put", [&] {
       using dtype = OpaqueType<sizeof(scalar_t)>;
-      dpcpp_index_kernel<DP_K(index_put_kernel, scalar_t)>(iter, index_size, index_stride,
+      dpcpp_index_kernel<DPCPP_K(index_put_kernel, scalar_t)>(iter, index_size, index_stride,
               // This lambda function only works in dpcpp kernel.
-                                                          [](dp_global_ptr_pt<char> out_data, dp_global_ptr_pt<char> in_data, int64_t offset) {
+                                                          [](dpcpp_global_ptr_pt<char> out_data, dpcpp_global_ptr_pt<char> in_data, int64_t offset) {
                                                             *(dtype*)(out_data + offset) = *(dtype*)in_data;
                                                           }
       );

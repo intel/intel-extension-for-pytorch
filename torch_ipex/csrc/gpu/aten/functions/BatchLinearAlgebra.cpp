@@ -10,7 +10,7 @@
 
 using namespace at::dpcpp;
 
-DP_DEF_K2(triuTrilSycl, typename scalar_t, typename IndexType, bool upper);
+DPCPP_DEF_K2(triuTrilSycl, typename scalar_t, typename IndexType, bool upper);
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -30,11 +30,11 @@ void triu_tril_dpcpp_kernel(
   auto num_groups    = CeilDiv(N, group_size);
   auto total_items   = num_groups * group_size;
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto result_acc = DPCPPAccessor<dp_w_mode>(cgh, result);
-    auto src_acc = DPCPPAccessor<dp_w_mode>(cgh, src);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto result_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, result);
+    auto src_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, src);
 
-    auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1>item) {
       auto result_ptr = result_acc.template get_pointer<scalar_t>();
       auto src_ptr = src_acc.template get_pointer<scalar_t>();
 
@@ -56,12 +56,12 @@ void triu_tril_dpcpp_kernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(triuTrilSycl, scalar_t, IndexType, upper)>(
-      DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
+    cgh.parallel_for<DPCPP_K(triuTrilSycl, scalar_t, IndexType, upper)>(
+      DPCPP::nd_range<1>(DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)), kfn);
 
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 template <bool upper>

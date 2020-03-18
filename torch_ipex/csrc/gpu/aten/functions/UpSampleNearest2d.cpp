@@ -32,13 +32,13 @@ static void upsample_nearest2d_out_frame(
   parallel_for_setup(onum, tile_size, rng, grng);
 
   // command group functions
-  auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<dp_r_mode>(cgh, idata);
-    auto out_acc = DPCPPAccessor<dp_w_mode>(cgh, odata);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, idata);
+    auto out_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, odata);
     const int n = output_height * output_width;
 
     // kernel function per work-item
-    auto kfn = DP_Q_KFN(DP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto in_ptr = in_acc.template get_pointer<scalar_t>();
       auto out_ptr = out_acc.template get_pointer<scalar_t>();
       int global_id = item.get_global_linear_id();
@@ -73,12 +73,12 @@ static void upsample_nearest2d_out_frame(
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(nearest_neighbor_4d_dpcpp_kernel, scalar_t)>(
-      DP::nd_range<1>(DP::range<1>(grng), DP::range<1>(tile_size)), kfn);
+    cgh.parallel_for<DPCPP_K(nearest_neighbor_4d_dpcpp_kernel, scalar_t)>(
+      DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)), kfn);
   };
 
   // submit to DPCPP queue
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 /*template <typename scalar_t>
@@ -100,13 +100,13 @@ static void upsample_nearest2d_backward_out_frame(
   parallel_for_setup(onum, tile_size, rng, grng);
 
   // command group functions
-  auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<dp_w_mode>(cgh, idata); 
-    auto out_acc = DPCPPAccessor<dp_r_mode>(cgh, odata); 
-    auto in_acc_read = DPCPPAccessor<dp_r_mode>(cgh, odata); 
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto in_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, idata);
+    auto out_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, odata);
+    auto in_acc_read = DPCPPAccessor<dpcpp_r_mode>(cgh, odata);
 
     // kernel function per work-item
-    auto kfn = DP_Q_KFN(DP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto in_ptr = in_acc.template get_pointer<scalar_t>();
       auto out_ptr = out_acc.template get_pointer<scalar_t>();
       auto in_read_ptr = in_acc_read.template get_pointer<scalar_t>();
@@ -146,12 +146,12 @@ static void upsample_nearest2d_backward_out_frame(
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(nearest_neighbor_4d_bwd_dpcpp_kernel, scalar_t)>(
-      DP::nd_range<1>(DP::range<1>(grng), DP::range<1>(tile_size)), kfn);
+    cgh.parallel_for<DPCPP_K(nearest_neighbor_4d_bwd_dpcpp_kernel, scalar_t)>(
+      DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)), kfn);
   };
 
   // submit to DPCPP queue
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }*/
 
 static void upsample_nearest2d_out_template(

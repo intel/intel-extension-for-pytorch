@@ -16,60 +16,60 @@ using namespace at::native;
 using namespace at::dpcpp;
 
 template <typename scalar_t>
-DP_DEVICE struct AddOp {
+DPCPP_DEVICE struct AddOp {
   scalar_t operator() (const scalar_t& lhs, const scalar_t& rhs) const {
     return lhs + rhs;
   }
 };
 
 template <typename scalar_t>
-DP_DEVICE struct MulOp {
+DPCPP_DEVICE struct MulOp {
   scalar_t operator() (const scalar_t& lhs, const scalar_t& rhs) const {
     return lhs * rhs;
   }
 };
 
-DP_DEVICE struct LogicalAll {
+DPCPP_DEVICE struct LogicalAll {
   unsigned char operator()(unsigned char const x, unsigned char const y) const {
     return (x && y);
   }
 };
 
-DP_DEVICE struct LogicalAny {
+DPCPP_DEVICE struct LogicalAny {
   unsigned char operator()(unsigned char const x, unsigned char const y) const {
     return (x || y);
   }
 };
 
 template <typename T>
-DP_DEVICE struct ReduceAdd {
+DPCPP_DEVICE struct ReduceAdd {
   T operator()(const T a, const T b) const {
     return Numerics<T>::add(a, b);
   }
 };
 
 template <typename T>
-DP_DEVICE struct ReduceMin {
+DPCPP_DEVICE struct ReduceMin {
   T operator()(T a, T b) const {
     return (Numerics<T>::lt(a, b) || Numerics<T>::isnan(a)) ? a : b;
   }
 };
 
 template <typename T>
-DP_DEVICE struct ReduceMax {
+DPCPP_DEVICE struct ReduceMax {
   T operator()(T a, T b) const {
     return (Numerics<T>::gt(a, b) || Numerics<T>::isnan(a)) ? a : b;
   }
 };
 
-DP_DEF_K1(reduceInnermostDimIndex);
+DPCPP_DEF_K1(reduceInnermostDimIndex);
 
-DP_DEF_K1(reduceOuterDimIndex);
+DPCPP_DEF_K1(reduceOuterDimIndex);
 
 template <typename K,
           typename Index,
           class BinaryFunction>
-DP_DEVICE void
+DPCPP_DEVICE void
 kernelTransformReduceInnermostDimIndex(at::Tensor & tgt1,
                                        at::Tensor & tgt2,
                                        at::Tensor & src,
@@ -94,12 +94,12 @@ kernelTransformReduceInnermostDimIndex(at::Tensor & tgt1,
   int64_t stride = src.stride(dim);
   int64_t batch = totalElements / (n * stride);
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto src_acc  = DPCPPAccessor<dp_r_mode>(cgh, src_data, src_size);
-    auto tgt1_acc = DPCPPAccessor<dp_w_mode>(cgh, tgt1_data, tgt1_size);
-    auto tgt2_acc = DPCPPAccessor<dp_w_mode>(cgh, tgt2_data, tgt2_size);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto src_acc  = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data, src_size);
+    auto tgt1_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tgt1_data, tgt1_size);
+    auto tgt2_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tgt2_data, tgt2_size);
 
-    auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1>item) {
       auto src_ptr  = src_acc.template get_pointer<K>();
       auto tgt1_ptr = tgt1_acc.template get_pointer<K>();
       auto tgt2_ptr = tgt2_acc.template get_pointer<Index>();
@@ -126,18 +126,18 @@ kernelTransformReduceInnermostDimIndex(at::Tensor & tgt1,
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(reduceInnermostDimIndex, K, Index, BinaryFunction)>(
-      DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
+    cgh.parallel_for<DPCPP_K(reduceInnermostDimIndex, K, Index, BinaryFunction)>(
+      DPCPP::nd_range<1>(DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)), kfn);
   };
 
   // submit to DPCPP queue
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 template <typename K,
           typename Index,
           class BinaryFunction>
-DP_DEVICE void
+DPCPP_DEVICE void
 kernelTransformReduceOuterDimIndex(at::Tensor & tgt1,
                                    at::Tensor & tgt2,
                                    at::Tensor & src,
@@ -162,12 +162,12 @@ kernelTransformReduceOuterDimIndex(at::Tensor & tgt1,
   int64_t stride = src.stride(rdim);
   int64_t batch = totalElements / (n * stride);
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto src_acc  = DPCPPAccessor<dp_r_mode>(cgh, src_data, src_size);
-    auto tgt1_acc = DPCPPAccessor<dp_w_mode>(cgh, tgt1_data, tgt1_size);
-    auto tgt2_acc = DPCPPAccessor<dp_w_mode>(cgh, tgt2_data, tgt2_size);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto src_acc  = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data, src_size);
+    auto tgt1_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tgt1_data, tgt1_size);
+    auto tgt2_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tgt2_data, tgt2_size);
 
-    auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1>item) {
       auto src_ptr  = src_acc.template get_pointer<K>();
       auto tgt1_ptr = tgt1_acc.template get_pointer<K>();
       auto tgt2_ptr = tgt2_acc.template get_pointer<Index>();
@@ -194,18 +194,18 @@ kernelTransformReduceOuterDimIndex(at::Tensor & tgt1,
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(reduceOuterDimIndex, K, Index, BinaryFunction)>(
-      DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
+    cgh.parallel_for<DPCPP_K(reduceOuterDimIndex, K, Index, BinaryFunction)>(
+      DPCPP::nd_range<1>(DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)), kfn);
   };
 
   // submit to DPCPP queue
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 };
 
 template <typename ScalarTypeK,
           typename ScalarTypeIndex,
           typename BinaryFunction>
-DP_HOST void
+DPCPP_HOST void
 transformReduceOuterDimIndex(at::Tensor & tgt1,
                              at::Tensor & tgt2,
                              at::Tensor & src,
@@ -218,7 +218,7 @@ transformReduceOuterDimIndex(at::Tensor & tgt1,
 template <typename ScalarTypeK,
           typename ScalarTypeIndex,
           typename BinaryFunction>
-DP_HOST void
+DPCPP_HOST void
 transformReduceInnermostDimIndex(at::Tensor & tgt1,
                                  at::Tensor & tgt2,
                                  at::Tensor & src,
@@ -230,7 +230,7 @@ transformReduceInnermostDimIndex(at::Tensor & tgt1,
 template <typename ScalarTypeK,
           typename ScalarTypeIndex,
           typename BinaryFunction>
-DP_HOST void
+DPCPP_HOST void
 reduceDimIndex(at::Tensor & tgt1_,
                at::Tensor & tgt2_,
                const at::Tensor & src_,

@@ -200,15 +200,15 @@ struct Bitfield<uint64_t> {
 // This produces and broadcasts the seen counts for a single block only.
 // `smem` must have at least `RadixSize` elements.
 template <typename DataType, typename BitDataType, typename IndexType>
-DP_DEVICE void countRadixUsingMask(int counts[RADIX_SIZE],
-             const dp_local_acc_t<int> &smem_acc,
+DPCPP_DEVICE void countRadixUsingMask(int counts[RADIX_SIZE],
+             const dpcpp_local_acc_t<int> &smem_acc,
              BitDataType desired,
              BitDataType desiredMask,
              int radixDigitPos,
              IndexType sliceSize,
              IndexType withinSliceStride,
-             const dp_global_ptr_pt<DataType> &data_ptr,
-             const DP::nd_item<1> &item_id) {
+             const dpcpp_global_ptr_pt<DataType> &data_ptr,
+             const DPCPP::nd_item<1> &item_id) {
   // Clear out per-thread counts from a previous round
   auto local_id = item_id.get_local_id(0);
   for (int i = 0; i < RADIX_SIZE; ++i) {
@@ -220,7 +220,7 @@ DP_DEVICE void countRadixUsingMask(int counts[RADIX_SIZE],
     }
   }
 
-  item_id.barrier(dp_local_fence);
+  item_id.barrier(dpcpp_local_fence);
 
   // scan over all the data, counts per each digit, maybe optimized
   // with dpcpp subgroup in the future.
@@ -233,35 +233,35 @@ DP_DEVICE void countRadixUsingMask(int counts[RADIX_SIZE],
   }
 
   for (unsigned int i = 0; i < RADIX_SIZE; i++) {
-    DP::atomic<int, dp_local_space> smem_var(smem_acc.get_pointer() + i);
+    DPCPP::atomic<int, dpcpp_local_space> smem_var(smem_acc.get_pointer() + i);
     smem_var.fetch_add(counts[i]);
   }
 
-  item_id.barrier(dp_local_fence);
+  item_id.barrier(dpcpp_local_fence);
 
   // For each thread, read in the total counts
   for (unsigned int i = 0; i < RADIX_SIZE; ++i) {
     counts[i] = smem_acc[i];
   }
-  item_id.barrier(dp_local_fence);
+  item_id.barrier(dpcpp_local_fence);
 }
 
 // This finds the unique value 'v' that matches the pattern
 // ((v & desired) == desiredMask) in our sorted in format
 template <typename DataType, typename BitDataType, typename IndexType>
-DP_DEVICE DataType findPattern(const dp_local_acc_t<int> &smem_acc,
-           const dp_global_ptr_pt<DataType> &data_ptr,
+DPCPP_DEVICE DataType findPattern(const dpcpp_local_acc_t<int> &smem_acc,
+           const dpcpp_global_ptr_pt<DataType> &data_ptr,
            IndexType sliceSize,
            IndexType withinSliceStride,
            BitDataType desired,
            BitDataType desiredMask,
-           const DP::nd_item<1> &item_id) {
+           const DPCPP::nd_item<1> &item_id) {
   auto local_id = item_id.get_local_id(0);
   auto smem_ptr = SyclConvertToActualTypePtr(DataType, smem_acc);
   if (local_id < RADIX_SIZE) {
     smem_ptr[RADIX_SIZE] = ScalarConvert<int, DataType>::to(0);
   }
-  item_id.barrier(dp_local_fence);
+  item_id.barrier(dpcpp_local_fence);
   // All threads participate in the loop, in order to sync on the flag
   IndexType numIterations = RoundUp(sliceSize, (IndexType)item_id.get_local_range(0));
   for (IndexType i = local_id; i < numIterations; i += item_id.get_local_range(0)) {
@@ -273,12 +273,12 @@ DP_DEVICE DataType findPattern(const dp_local_acc_t<int> &smem_acc,
     }
   }
 
-  item_id.barrier(dp_local_fence);
+  item_id.barrier(dpcpp_local_fence);
 
   auto found = smem_ptr[0];
   auto val = smem_ptr[1];
 
-  item_id.barrier(dp_local_fence);
+  item_id.barrier(dpcpp_local_fence);
   if (Numerics<DataType>::ne(found, ScalarConvert<int, DataType>::to(0))) {
     return val;
   }
@@ -287,13 +287,13 @@ DP_DEVICE DataType findPattern(const dp_local_acc_t<int> &smem_acc,
 }
 
 template <typename DataType, typename BitDataType, typename IndexType, bool Order>
-DP_DEVICE void radixSelect(const dp_global_ptr_pt<DataType> &data_ptr,
+DPCPP_DEVICE void radixSelect(const dpcpp_global_ptr_pt<DataType> &data_ptr,
                  const IndexType k,
                  const IndexType sliceSize,
                  const IndexType withinSliceStride,
-                 const dp_local_acc_t<int> &smem_acc,
+                 const dpcpp_local_acc_t<int> &smem_acc,
                  DataType* topK,
-                 const DP::nd_item<1> &item_id) {
+                 const DPCPP::nd_item<1> &item_id) {
   // Per-thread buckets into which we accumulate digit counts in our radix
   int counts[RADIX_SIZE];
 
@@ -390,14 +390,14 @@ void gatherTopK(TensorInfo<T, IndexType> input,
                 IndexType indicesWithinSliceStride) {
   auto queue = dpcppGetCurrentQueue();
   int64_t local_size = queue.get_device().
-      template get_info<DP::info::device::max_work_group_size>();
-  auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<dp_r_mode>(cgh, input.data);
-    auto topk_acc = DPCPPAccessor<dp_w_mode>(cgh, topK.data);
-    auto indices_acc = DPCPPAccessor<dp_w_mode>(cgh, indices.data);
-    auto smem_acc = dp_local_acc_t<int>(32, cgh);
-    auto smem_scan_acc = dp_local_acc_t<int>(local_size, cgh);
-    auto kfn = DP_Q_KFN(DP::nd_item<1> item_id) {
+      template get_info<DPCPP::info::device::max_work_group_size>();
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input.data);
+    auto topk_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, topK.data);
+    auto indices_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, indices.data);
+    auto smem_acc = dpcpp_local_acc_t<int>(32, cgh);
+    auto smem_scan_acc = dpcpp_local_acc_t<int>(local_size, cgh);
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       IndexType local_id = item_id.get_local_id(0);
       // Find the start offset for our slice
       IndexType slice = item_id.get_group_linear_id();
@@ -413,7 +413,7 @@ void gatherTopK(TensorInfo<T, IndexType> input,
       // Find the k-th highest element in our input
       T topKValue = 0;
       radixSelect<T, typename TopKTypeConfig<T>::RadixType, IndexType, Order>(
-          (dp_global_ptr_pt<T>)inputSliceStart,
+          (dpcpp_global_ptr_pt<T>)inputSliceStart,
           outputSliceSize,
           inputSliceSize,
           inputWithinSliceStride,
@@ -497,11 +497,11 @@ void gatherTopK(TensorInfo<T, IndexType> input,
     };
 
     cgh.parallel_for<gatherTopKKernelName<T, IndexType, Dim, Order> > (
-        DP::nd_range<1>(DP::range<1>(numInputSlices * local_size),
-                        DP::range<1>(local_size)), kfn);
+        DPCPP::nd_range<1>(DPCPP::range<1>(numInputSlices * local_size),
+                        DPCPP::range<1>(local_size)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>

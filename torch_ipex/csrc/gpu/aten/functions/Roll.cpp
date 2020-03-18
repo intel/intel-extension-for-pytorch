@@ -25,18 +25,18 @@ template <typename scalar_t>
 void roll_dpcpp_kernel(const Tensor& in_tensor, Tensor& out_tensor, int64_t N,
                       int64_t roll_dim, int64_t start,
                       int64_t size, int64_t stride, int64_t total_dims) {
-  static const auto write_mode = DP::access::mode::discard_write;
-  static const auto read_mode = DP::access::mode::read;
+  static const auto write_mode = DPCPP::access::mode::discard_write;
+  static const auto read_mode = DPCPP::access::mode::read;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   int64_t rng, GRange, tileSize;
   auto offset = ((size - start) * stride);
   parallel_for_setup(N, tileSize, rng, GRange);
-  dpcpp_queue.submit([&](DP::handler& cgh) {
+  dpcpp_queue.submit([&](DPCPP::handler& cgh) {
     auto in_acc = DPCPPAccessor<read_mode>(cgh, in_tensor.data_ptr<scalar_t>());
     auto out_acc = DPCPPAccessor<write_mode>(cgh, out_tensor.data_ptr<scalar_t>());
     cgh.parallel_for<roll_dpcpp_ker<scalar_t>>(
-        DP::nd_range<1>(DP::range<1>(GRange), DP::range<1>(tileSize)),
-        [=](DP::nd_item<1> item) {
+        DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
+        [=](DPCPP::nd_item<1> item) {
           int64_t linear_index = item.get_global_id(0);
           auto in_ptr = in_acc.template get_pointer<scalar_t>();
           auto out_ptr = out_acc.template get_pointer<scalar_t>();

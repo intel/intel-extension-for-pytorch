@@ -12,13 +12,13 @@
 #include <ATen/aten_ipex_type_dpcpp.h>
 
 
-DP_DEF_K2(updateOutputName, typename scalar_t);
-DP_DEF_K2(updateOutputKernel1Name, typename scalar_t);
-DP_DEF_K2(updateOutputKernelName, typename scalar_t);
+DPCPP_DEF_K2(updateOutputName, typename scalar_t);
+DPCPP_DEF_K2(updateOutputKernel1Name, typename scalar_t);
+DPCPP_DEF_K2(updateOutputKernelName, typename scalar_t);
 
-DP_DEF_K2(updateGradInputName, typename scalar_t);
-DP_DEF_K2(updateGradInputKernel1Name, typename scalar_t);
-DP_DEF_K2(updateGradInputKernelName, typename scalar_t);
+DPCPP_DEF_K2(updateGradInputName, typename scalar_t);
+DPCPP_DEF_K2(updateGradInputKernel1Name, typename scalar_t);
+DPCPP_DEF_K2(updateGradInputKernelName, typename scalar_t);
 
 using namespace at::dpcpp;
 
@@ -70,20 +70,20 @@ void ClassNLLCriterion_updateOutput(
     auto weights_cont = weights.defined() ? weights.contiguous() : weights;
 
     auto queue = dpcppGetCurrentQueue();
-    int64_t local_size = queue.get_device(). template get_info<DP::info::device::max_work_group_size>();
+    int64_t local_size = queue.get_device(). template get_info<DPCPP::info::device::max_work_group_size>();
     bool has_weights = weights.defined() ? true : false; //dpcpp kernel can not accept host pointer
-    DP::buffer<uint8_t, 1> dummy_buffer(DP::range<1>(1));
+    DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
     auto output_stride_0 = output.stride(0);
     auto input_stride_0 = input.stride(0);
     auto input_stride_1 = input.stride(1);
-    auto cgf = DP_Q_CGF(cgh) {
-      auto input_acc = DPCPPAccessor<dp_r_mode>(cgh, input.data_ptr<scalar_t>());
-      auto target_acc = DPCPPAccessor<dp_r_mode>(cgh, target.data_ptr<int64_t>());
-      auto weights_acc = has_weights ? DPCPPAccessor<dp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>()) :
-                                       DPCPPAccessor<dp_r_mode>(cgh, dummy_buffer); // dummy weights
-      auto output_acc = DPCPPAccessor<dp_w_mode>(cgh, output.data_ptr<scalar_t>());
-      auto kfn = DP_Q_KFN(DP::item<1> item_id) {
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto input_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input.data_ptr<scalar_t>());
+      auto target_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target.data_ptr<int64_t>());
+      auto weights_acc = has_weights ? DPCPPAccessor<dpcpp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>()) :
+                                       DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
+      auto output_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, output.data_ptr<scalar_t>());
+      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
         auto input_ptr = input_acc.template get_pointer<scalar_t>();
         auto target_ptr = target_acc.template get_pointer<int64_t>();
         auto weights_ptr = has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
@@ -102,10 +102,10 @@ void ClassNLLCriterion_updateOutput(
         }
       };
 
-      cgh.parallel_for<DP_K(updateOutputName, scalar_t)>(DP::range<1>(local_size), kfn);
+      cgh.parallel_for<DPCPP_K(updateOutputName, scalar_t)>(DPCPP::range<1>(local_size), kfn);
     };
 
-    DP_Q_ASYNC_SUBMIT(queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
     return;
   }
 
@@ -126,16 +126,16 @@ void ClassNLLCriterion_updateOutput(
 
   if (input_cont.dim() == 1 || input_cont.dim() == 0) {
     int64_t local_size = 1;
-    DP::buffer<uint8_t, 1> dummy_buffer(DP::range<1>(1));
+    DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
-    auto cgf = DP_Q_CGF(cgh) {
-      auto input_acc = DPCPPAccessor<dp_r_mode>(cgh, input_data);
-      auto weights_acc = has_weights ? DPCPPAccessor<dp_r_mode>(cgh, weights_data) :
-          DPCPPAccessor<dp_r_mode>(cgh, dummy_buffer); // dummy weights
-      auto target_acc = DPCPPAccessor<dp_r_mode>(cgh, target_data);
-      auto total_weight_acc = DPCPPAccessor<dp_w_mode>(cgh, total_weight_data);
-      auto output_acc = DPCPPAccessor<dp_w_mode>(cgh, output_data);
-      auto kfn = DP_Q_KFN(DP::item<1> item_id) {
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto input_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input_data);
+      auto weights_acc = has_weights ? DPCPPAccessor<dpcpp_r_mode>(cgh, weights_data) :
+          DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
+      auto target_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target_data);
+      auto total_weight_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, total_weight_data);
+      auto output_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, output_data);
+      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
         auto input_ptr = input_acc.template get_pointer<scalar_t>();
         auto target_ptr = target_acc.template get_pointer<int64_t>();
         auto weights_ptr = has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
@@ -151,28 +151,28 @@ void ClassNLLCriterion_updateOutput(
           output_ptr[0] /= total_weight_ptr[0];
         }
       };
-      cgh.parallel_for<DP_K(updateOutputKernel1Name, scalar_t)>(
-          DP::range<1>(local_size), kfn);
+      cgh.parallel_for<DPCPP_K(updateOutputKernel1Name, scalar_t)>(
+          DPCPP::range<1>(local_size), kfn);
     };
 
-    DP_Q_ASYNC_SUBMIT(queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
   } else if (input.dim() == 2) {
     int batch_size = input.size(0);
     int n_target = input.size(1);
-    size_t local_size = queue.get_device().template get_info<DP::info::device::max_work_group_size>();
-    DP::buffer<uint8_t, 1> dummy_buffer(DP::range<1>(1));
+    size_t local_size = queue.get_device().template get_info<DPCPP::info::device::max_work_group_size>();
+    DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
-    auto cgf = DP_Q_CGF(cgh) {
-      auto input_acc = DPCPPAccessor<dp_r_mode>(cgh, input_data);
-      auto weights_acc = has_weights ? DPCPPAccessor<dp_r_mode>(cgh, weights_data)
-                                     : DPCPPAccessor<dp_r_mode>(cgh, dummy_buffer); // Dummy weight
-      auto target_acc = DPCPPAccessor<dp_r_mode>(cgh, target_data);
-      auto total_weight_acc = DPCPPAccessor<dp_r_mode>(cgh, total_weight_data);
-      auto output_acc = DPCPPAccessor<dp_r_mode>(cgh, output_data);
-      auto local_output_acc = dp_local_acc_t<scalar_t>(local_size, cgh);
-      auto local_total_weight_acc = dp_local_acc_t<scalar_t>(local_size, cgh);
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto input_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input_data);
+      auto weights_acc = has_weights ? DPCPPAccessor<dpcpp_r_mode>(cgh, weights_data)
+                                     : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer); // Dummy weight
+      auto target_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target_data);
+      auto total_weight_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, total_weight_data);
+      auto output_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, output_data);
+      auto local_output_acc = dpcpp_local_acc_t<scalar_t>(local_size, cgh);
+      auto local_total_weight_acc = dpcpp_local_acc_t<scalar_t>(local_size, cgh);
 
-      auto kfn = DP_Q_KFN(DP::item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
         auto input_ptr = input_acc.template get_pointer<scalar_t>();
         auto target_ptr = target_acc.template get_pointer<int64_t>();
         auto weights_ptr = has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
@@ -206,11 +206,11 @@ void ClassNLLCriterion_updateOutput(
           output_ptr[0] /= total_weight_ptr[0];
         }
       };
-      cgh.parallel_for<DP_K(updateOutputKernelName, scalar_t)>(
-          DP::range<1>{local_size}, kfn);
+      cgh.parallel_for<DPCPP_K(updateOutputKernelName, scalar_t)>(
+          DPCPP::range<1>{local_size}, kfn);
     };
 
-    DP_Q_ASYNC_SUBMIT(queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
   }
 }
 
@@ -253,21 +253,21 @@ void ClassNLLCriterion_updateGradInput(
     auto weights_cont = weights.defined() ? weights.contiguous() : weights;
 
     auto queue = dpcppGetCurrentQueue();
-    int64_t local_size = queue.get_device(). template get_info<DP::info::device::max_work_group_size>();
+    int64_t local_size = queue.get_device(). template get_info<DPCPP::info::device::max_work_group_size>();
     int64_t global_size = ((batch_size + local_size -1) /local_size ) * local_size;
     bool has_weights = weights.defined() ? true : false;
-    DP::buffer<uint8_t, 1> dummy_buffer(DP::range<1>(1));
+    DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
     auto gradInput_stride_0 = gradInput.stride(0);
     auto gradInput_stride_1 = gradInput.stride(1);
     auto gradOutput_stride_0 = gradOutput.stride(0);
-    auto cgf = DP_Q_CGF(cgh) {
-      auto target_acc = DPCPPAccessor<dp_r_mode>(cgh, target.data_ptr<int64_t>());
-      auto gradOutput_acc = DPCPPAccessor<dp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
-      auto weights_acc = has_weights ? DPCPPAccessor<dp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>()) :
-                                       DPCPPAccessor<dp_r_mode>(cgh, dummy_buffer); // dummy weights
-      auto gradInput_acc = DPCPPAccessor<dp_w_mode>(cgh, gradInput.data_ptr<scalar_t>());
-      auto kfn = DP_Q_KFN(DP::nd_item<1> item_id) {
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto target_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target.data_ptr<int64_t>());
+      auto gradOutput_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
+      auto weights_acc = has_weights ? DPCPPAccessor<dpcpp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>()) :
+                                       DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
+      auto gradInput_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, gradInput.data_ptr<scalar_t>());
+      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
         auto target_ptr = target_acc.template get_pointer<int64_t>();
         auto gradOutput_ptr = gradOutput_acc.template get_pointer<scalar_t>();
         auto weights_ptr = has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
@@ -286,11 +286,11 @@ void ClassNLLCriterion_updateGradInput(
         }
       };
 
-      cgh.parallel_for<DP_K(updateGradInputName, scalar_t)>(DP::nd_range<1>(DP::range<1>(global_size), DP::range<1>(local_size)), kfn);
+      cgh.parallel_for<DPCPP_K(updateGradInputName, scalar_t)>(DPCPP::nd_range<1>(DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)), kfn);
 
     };
 
-    DP_Q_ASYNC_SUBMIT(queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
     return;
   }
 
@@ -305,16 +305,16 @@ void ClassNLLCriterion_updateGradInput(
 
   auto queue = dpcppGetCurrentQueue();
   if (input.dim() == 1) {
-    DP::buffer<uint8_t, 1> dummy_buffer(DP::range<1>(1));
+    DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
-    auto cgf = DP_Q_CGF(cgh) {
-      auto gradOutput_acc = DPCPPAccessor<dp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
-      auto weights_acc = has_weights ? DPCPPAccessor<dp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>()) :
-                                       DPCPPAccessor<dp_r_mode>(cgh, dummy_buffer); // dummy weights
-      auto gradInput_acc = DPCPPAccessor<dp_w_mode>(cgh, gradInput.data_ptr<scalar_t>());
-      auto target_acc = DPCPPAccessor<dp_r_mode>(cgh, target_cont.data_ptr<int64_t>());
-      auto total_weight_acc = DPCPPAccessor<dp_r_mode>(cgh, total_weight.data_ptr<scalar_t>());
-      auto kfn = DP_Q_KFN(DP::item<1> item_id) {
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto gradOutput_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
+      auto weights_acc = has_weights ? DPCPPAccessor<dpcpp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>()) :
+                                       DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
+      auto gradInput_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, gradInput.data_ptr<scalar_t>());
+      auto target_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target_cont.data_ptr<int64_t>());
+      auto total_weight_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, total_weight.data_ptr<scalar_t>());
+      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
         auto gradOutput_ptr = gradOutput_acc.template get_pointer<scalar_t>();
         auto weights_ptr = has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
         auto gradInput_ptr = gradInput_acc.template get_pointer<scalar_t>();
@@ -330,23 +330,23 @@ void ClassNLLCriterion_updateGradInput(
         }
         
       };
-      cgh.parallel_for<DP_K(updateGradInputKernel1Name, scalar_t)>(DP::range<1>(1), kfn);
+      cgh.parallel_for<DPCPP_K(updateGradInputKernel1Name, scalar_t)>(DPCPP::range<1>(1), kfn);
       
     };
-    DP_Q_ASYNC_SUBMIT(queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
   } else {
     int nframe = input.size(0);
     int ndim = input.size(1);
     int64_t local_size = 32;
-    DP::buffer<uint8_t, 1> dummy_buffer(DP::range<1>(1));
-    auto cgf = DP_Q_CGF(cgh) {
-      auto gradOutput_acc = DPCPPAccessor<dp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
-      auto weights_acc = has_weights ? DPCPPAccessor<dp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>()) :
-                                       DPCPPAccessor<dp_r_mode>(cgh, dummy_buffer); // dummy weights
-      auto gradInput_acc = DPCPPAccessor<dp_w_mode>(cgh, gradInput.data_ptr<scalar_t>());
-      auto target_acc = DPCPPAccessor<dp_r_mode>(cgh, target_cont.data_ptr<int64_t>());
-      auto total_weight_acc = DPCPPAccessor<dp_r_mode>(cgh, total_weight.data_ptr<scalar_t>());
-      auto kfn = DP_Q_KFN(DP::item<1> item_id) {
+    DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto gradOutput_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
+      auto weights_acc = has_weights ? DPCPPAccessor<dpcpp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>()) :
+                                       DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
+      auto gradInput_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, gradInput.data_ptr<scalar_t>());
+      auto target_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target_cont.data_ptr<int64_t>());
+      auto total_weight_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, total_weight.data_ptr<scalar_t>());
+      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
         auto gradOutput_ptr = gradOutput_acc.template get_pointer<scalar_t>();
         auto weights_ptr = has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
         auto gradInput_ptr = gradInput_acc.template get_pointer<scalar_t>();
@@ -367,11 +367,11 @@ void ClassNLLCriterion_updateGradInput(
           }
         }
       };
-      cgh.parallel_for<DP_K(updateGradInputKernelName, scalar_t)>(
-          DP::range<1>(local_size), kfn);
+      cgh.parallel_for<DPCPP_K(updateGradInputKernelName, scalar_t)>(
+          DPCPP::range<1>(local_size), kfn);
     };
 
-    DP_Q_ASYNC_SUBMIT(queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
   }
 }
 
@@ -392,7 +392,7 @@ std::tuple<Tensor&, Tensor&> nll_loss_forward_out(
             self, target, output, weight, total_weight, reduction, ignore_index);
       }
   );
-  
+
   return std::tuple<Tensor&, Tensor&>(output, total_weight);
 }
 

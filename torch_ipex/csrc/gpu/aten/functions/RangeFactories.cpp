@@ -18,10 +18,10 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-DP_DEF_K1(linspace_dpcpp_ker);
-DP_DEF_K1(logspace_dpcpp_ker);
-DP_DEF_K1(range_dpcpp_ker);
-DP_DEF_K1(arange_dpcpp_ker);
+DPCPP_DEF_K1(linspace_dpcpp_ker);
+DPCPP_DEF_K1(logspace_dpcpp_ker);
+DPCPP_DEF_K1(range_dpcpp_ker);
+DPCPP_DEF_K1(arange_dpcpp_ker);
 
 template <typename T, typename accT = T>
 class LinspaceOp {
@@ -68,20 +68,20 @@ Tensor& linspace_dpcpp_out(Tensor& result, Scalar start, Scalar end, int64_t ste
       scalar_t step = (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
       LinspaceOp<scalar_t> linspace_method(scalar_start, step);
       auto dpcpp_queue = dpcppGetCurrentQueue();
-      auto cgf = DP_Q_CGF(cgh) {
-        auto acc = DPCPPAccessor<dp_discard_w_mode>(cgh, r.data_ptr<scalar_t>());
+      auto cgf = DPCPP_Q_CGF(cgh) {
+        auto acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, r.data_ptr<scalar_t>());
         // kernel function per work-item
-        auto kfn = DP_Q_KFN() {
-          dp_global_ptr_pt<scalar_t> ptr = acc.template get_pointer<scalar_t>();
+        auto kfn = DPCPP_Q_KFN() {
+          dpcpp_global_ptr_pt<scalar_t> ptr = acc.template get_pointer<scalar_t>();
           dpcpp_tabulate(ptr, ptr + steps, linspace_method);
         };
         // kick off kernel
         // (TODO) single_task need replaced due to low efficiency
-        cgh.single_task<DP_K(linspace_dpcpp_ker, scalar_t)>(kfn);
+        cgh.single_task<DPCPP_K(linspace_dpcpp_ker, scalar_t)>(kfn);
       };
 
       // submit to DPCPP queue
-      DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
     });
   }
@@ -113,20 +113,20 @@ Tensor& logspace_dpcpp_out(Tensor& result, Scalar start, Scalar end, int64_t ste
       scalar_t step = (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
       LogspaceOp<scalar_t> logspace_method(scalar_start, step, scalar_base);
       auto dpcpp_queue = dpcppGetCurrentQueue();
-      auto cgf = DP_Q_CGF(cgh) {
-        auto acc = DPCPPAccessor<dp_discard_w_mode>(cgh, r.data_ptr<scalar_t>());
+      auto cgf = DPCPP_Q_CGF(cgh) {
+        auto acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, r.data_ptr<scalar_t>());
         // kernel function per work-item
-        auto kfn = DP_Q_KFN() {
-          dp_global_ptr_pt<scalar_t> ptr = acc.template get_pointer<scalar_t>();
+        auto kfn = DPCPP_Q_KFN() {
+          dpcpp_global_ptr_pt<scalar_t> ptr = acc.template get_pointer<scalar_t>();
           dpcpp_tabulate(ptr, ptr + steps, logspace_method);
         };
         // kick off kernel
         // (TODO) single_task need replaced due to low efficiency
-        cgh.single_task<DP_K(logspace_dpcpp_ker, scalar_t)>(kfn);
+        cgh.single_task<DPCPP_K(logspace_dpcpp_ker, scalar_t)>(kfn);
       };
 
       // submit to DPCPP queue
-      DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
     });
   }
@@ -160,22 +160,22 @@ Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
     auto dpcpp_queue = dpcppGetCurrentQueue();
 
     // command group functions
-    auto cgf = DP_Q_CGF(cgh) {
-        auto acc = DPCPPAccessor<dp_r_mode>(cgh, r.data_ptr<scalar_t>());
+    auto cgf = DPCPP_Q_CGF(cgh) {
+        auto acc = DPCPPAccessor<dpcpp_r_mode>(cgh, r.data_ptr<scalar_t>());
 
         // kernel function per work-item
-        auto kfn = DP_Q_KFN() {
-          dp_global_ptr_pt<scalar_t> ptr =
+        auto kfn = DPCPP_Q_KFN() {
+          dpcpp_global_ptr_pt<scalar_t> ptr =
               acc.template get_pointer<scalar_t>();
           dpcpp_tabulate(ptr, ptr + size, linspace_method);
         };
         // kick off kernel
         // (TODO) single_task need replaced due to low efficiency
-        cgh.single_task<DP_K(range_dpcpp_ker, scalar_t)>(kfn);
+        cgh.single_task<DPCPP_K(range_dpcpp_ker, scalar_t)>(kfn);
     };
 
     // submit to DPCPP queue
-    DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
     if (!result.is_contiguous()) {
       result.copy_(r);
@@ -226,22 +226,22 @@ Tensor& arange_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) 
     auto dpcpp_queue = dpcppGetCurrentQueue();
 
     // command group functions
-    auto cgf = DP_Q_CGF(cgh) {
-        auto acc = DPCPPAccessor<dp_r_mode>(cgh, result.data_ptr<scalar_t>());
+    auto cgf = DPCPP_Q_CGF(cgh) {
+        auto acc = DPCPPAccessor<dpcpp_r_mode>(cgh, result.data_ptr<scalar_t>());
 
         // kernel function per work-item
-        auto kfn = DP_Q_KFN() {
-          dp_global_ptr_pt<scalar_t> ptr =
+        auto kfn = DPCPP_Q_KFN() {
+          dpcpp_global_ptr_pt<scalar_t> ptr =
               acc.template get_pointer<scalar_t>();
           dpcpp_tabulate(ptr, ptr + size, linspace_method);
         };
         // kick off kernel
         // (TODO) single_task need replaced due to low efficiency
-        cgh.single_task<DP_K(arange_dpcpp_ker, scalar_t)>(kfn);
+        cgh.single_task<DPCPP_K(arange_dpcpp_ker, scalar_t)>(kfn);
     };
 
     // submit to DPCPP queue
-    DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
   });
   return result;

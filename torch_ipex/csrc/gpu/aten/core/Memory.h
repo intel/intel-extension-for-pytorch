@@ -5,7 +5,7 @@
 #include <core/Stream.h>
 #include <core/Memory.h>
 
-DP_DEF_K1(memory_copy);
+DPCPP_DEF_K1(memory_copy);
 #define SyclConvertToActualTypePtr(Scalar, buf_acc) static_cast<Scalar*>(static_cast<void*>(((buf_acc.get_pointer().get()))))
 #define SyclConvertToActualOffset(Scalar, offset) offset/sizeof(Scalar)
 
@@ -30,10 +30,10 @@ void dpcppFree(void* ptr);
 void dpcppFreeAll();
 
 /*
- * When we need to write a dpcpp kernel, we need to create DPCPPAccessor object first, then 
+ * When we need to write a dpcpp kernel, we need to create DPCPPAccessor object first, then
  * use get_pointer() to get the raw pointer in the dpcpp kernel code. If we need to use
  * cgh handler like .copy(), .fill() which only accept accessor, we can use .get_access()
- * to get accessor. 
+ * to get accessor.
  * Example:
  *   Acc = DPCPPAccessor(cgh, virtual_ptr, n_bytes);
  *   kernel{
@@ -42,21 +42,21 @@ void dpcppFreeAll();
  *   }
 */
 
-template <DP::access::mode AccMode, typename ScalarT = uint8_t>
+template <DPCPP::access::mode AccMode, typename ScalarT = uint8_t>
 class DPCPPAccessor {
- static constexpr auto global_access = DP::access::target::global_buffer;
- using Accessor = DP::accessor<ScalarT, 1, AccMode, global_access>;
+ static constexpr auto global_access = DPCPP::access::target::global_buffer;
+ using Accessor = DPCPP::accessor<ScalarT, 1, AccMode, global_access>;
  public:
-    DPCPPAccessor(DP::handler &cgh, DP::buffer<ScalarT, 1> &buffer) 
+    DPCPPAccessor(DPCPP::handler &cgh, DPCPP::buffer<ScalarT, 1> &buffer) 
       : accessor_(buffer.template get_access<AccMode, global_access>(cgh)) {}
 
-    DPCPPAccessor(DP::handler &cgh,  const void* virtual_ptr) 
+    DPCPPAccessor(DPCPP::handler &cgh,  const void* virtual_ptr) 
       : offset_(dpcppGetBufferMap().get_offset(virtual_ptr)),
         accessor_(dpcppGetBufferMap().template get_buffer<ScalarT>(virtual_ptr).template get_access<AccMode, global_access>(cgh)) {}
 
-    DPCPPAccessor(DP::handler &cgh, const void* virtual_ptr, size_t n_bytes)
+    DPCPPAccessor(DPCPP::handler &cgh, const void* virtual_ptr, size_t n_bytes)
       : offset_(dpcppGetBufferMap().get_offset(virtual_ptr)),
-        accessor_(dpcppGetBufferMap().template get_buffer<ScalarT>(virtual_ptr).template get_access<AccMode, global_access>(cgh, DP::range<1>(n_bytes), DP::id<1>(offset_))) {}
+        accessor_(dpcppGetBufferMap().template get_buffer<ScalarT>(virtual_ptr).template get_access<AccMode, global_access>(cgh, DPCPP::range<1>(n_bytes), DPCPP::id<1>(offset_))) {}
 
    const Accessor& get_access() const {
      return accessor_;
@@ -64,8 +64,8 @@ class DPCPPAccessor {
 
    // get_pointer should only be used in dpcpp kernel.
    template<typename T>
-   typename DP::global_ptr<T>::pointer_t const get_pointer() const {
-     return (typename DP::global_ptr<T>::pointer_t const)(SyclConvertToActualTypePtr(T, accessor_) + SyclConvertToActualOffset(T, offset_));
+   typename DPCPP::global_ptr<T>::pointer_t const get_pointer() const {
+     return (typename DPCPP::global_ptr<T>::pointer_t const)(SyclConvertToActualTypePtr(T, accessor_) + SyclConvertToActualOffset(T, offset_));
    }
 
  private:
@@ -76,17 +76,15 @@ class DPCPPAccessor {
 template<typename scalar1, typename scalar2>
 void dpcppMemoryCopyType(scalar1 * dst, const scalar2 * src, size_t n_elements)
 {
-  static constexpr auto write_mode = DP::access::mode::discard_write;
-  static constexpr auto read_mode = DP::access::mode::read;
   auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  auto total_threads = dpcpp_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
+  auto total_threads = dpcpp_queue.get_device(). template get_info<dpcpp_dev_max_wgroup_size>();
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<read_mode>(cgh, src);
-    auto out_acc = DPCPPAccessor<write_mode>(cgh, dst);
-    cgh.parallel_for<DP_K(memory_copy, scalar1, scalar2)>(
-            DP::range<1>(total_threads),
-            [=](DP::item<1> itemId) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto in_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, src);
+    auto out_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, dst);
+    cgh.parallel_for<DPCPP_K(memory_copy, scalar1, scalar2)>(
+            DPCPP::range<1>(total_threads),
+            [=](DPCPP::item<1> itemId) {
               auto in_ptr = in_acc.template get_pointer<scalar2>();
               auto out_ptr = out_acc.template get_pointer<scalar1>();
               auto id = itemId.get_id(0);
@@ -97,7 +95,7 @@ void dpcppMemoryCopyType(scalar1 * dst, const scalar2 * src, size_t n_elements)
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 }// namespace dpcpp
 }// namespace c10

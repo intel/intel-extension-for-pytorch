@@ -12,15 +12,15 @@
 
 namespace at { namespace dpcpp {
 
-class DPCPPDeviceSelector : public DP::device_selector {
+class DPCPPDeviceSelector : public DPCPP::device_selector {
 public:
-  DPCPPDeviceSelector(const DP::device &dev) :
+  DPCPPDeviceSelector(const DPCPP::device &dev) :
       m_target_device(dev.get()) {}
 
   DPCPPDeviceSelector(const DPCPPDeviceSelector &other) :
       m_target_device(other.get_target_device()) {}
 
-  int operator()(const DP::device& candidate) const override {
+  int operator()(const DPCPP::device& candidate) const override {
     if (candidate.is_gpu() && candidate.get() == m_target_device)
       return 100;
     else
@@ -37,7 +37,7 @@ private:
 
 struct DPCPPDevicePool {
   DPCPPDevicePool(): cur_dev_index(-1) {}
-  std::vector<DP::device> devices;
+  std::vector<DPCPP::device> devices;
   std::vector<DPCPPDeviceSelector> dev_sels;
   std::mutex devices_mutex;
   DeviceIndex cur_dev_index;

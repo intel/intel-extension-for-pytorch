@@ -9,14 +9,14 @@
   try {
 
 #define AT_DPCPP_CATCH_RETHROW(filename, lineno)           \
-  } catch (DP::exception &e) {                       \
+  } catch (DPCPP::exception &e) {                       \
     AT_WARN("DPCPP Exception: ", e.what(),                  \
             "file = ", filename, "line = ", lineno);       \
     throw;                                                 \
   }
 
 #define AT_DPCPP_CATCH_NOTHROW(filename, lineno)           \
-  } catch (DP::exception &e) {                       \
+  } catch (DPCPP::exception &e) {                       \
     AT_WARN("DPCPP Exception: ", e.what(),                  \
             "file = ", filename, "line = ", lineno);       \
   }

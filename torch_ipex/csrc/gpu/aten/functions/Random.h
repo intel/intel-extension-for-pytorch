@@ -1,10 +1,10 @@
 #include <core/DPCPP.h>
 #include <core/Memory.h>
 
-using namespace DP;
+using namespace DPCPP;
 using namespace at::dpcpp;
-using ACC_1D_RW_G = accessor<buffer_data_type_t, 1, access::mode::read_write, DP::access::target::global_buffer>;
-using ACC_1D_W_G = accessor<buffer_data_type_t, 1, access::mode::write, DP::access::target::global_buffer>;
+using ACC_1D_RW_G = accessor<buffer_data_type_t, 1, access::mode::read_write, DPCPP::access::target::global_buffer>;
+using ACC_1D_W_G = accessor<buffer_data_type_t, 1, access::mode::write, DPCPP::access::target::global_buffer>;
 
 #define RANDOM_NUM (200000)
 #define NUM_PER_RND (624)
@@ -157,11 +157,11 @@ public:
       const META_TYPE u1 = 1 - real_ptr[g_id]; // [0, 1) -> (0, 1] for log.
       const META_TYPE u2 = real_ptr[g_id + m_compute_num];
 
-      const META_TYPE radius = DP::sqrt(-2 * DP::log(u1));
+      const META_TYPE radius = DPCPP::sqrt(-2 * DPCPP::log(u1));
       const META_TYPE theta = 2.0f * M_PI * u2;
 
-      real_ptr[g_id] = radius * DP::cos(theta) * m_stdv + m_mean;
-      real_ptr[g_id + m_compute_num] = radius * DP::sin(theta) * m_stdv + m_mean;
+      real_ptr[g_id] = radius * DPCPP::cos(theta) * m_stdv + m_mean;
+      real_ptr[g_id + m_compute_num] = radius * DPCPP::sin(theta) * m_stdv + m_mean;
     }
   }
 

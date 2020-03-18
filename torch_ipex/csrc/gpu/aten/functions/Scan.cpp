@@ -33,9 +33,9 @@ scanThrust(Tensor & dst, Tensor & src, BinaryFunction binary_op) {
   ptrdiff_t size = src.numel();
 
   auto& queue = getCurrentDPCPPStream().dpcpp_queue();
-  auto cgf = DP_Q_CGF(cgh) {
-    auto acc_src = DPCPPAccessor<dp_r_mode>(cgh, src_data, src_size);
-    auto acc_dst = DPCPPAccessor<dp_discard_w_mode>(cgh, dst_data, dst_size);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data, src_size);
+    auto acc_dst = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dst_data, dst_size);
     // (TODO) single_task need replaced due to low efficiency
     cgh.single_task<scanthrust_dpcpp_ker<scalar_t, BinaryFunction>>([=]() {
       auto ptr_dst = acc_dst.template get_pointer<scalar_t>();
@@ -44,7 +44,7 @@ scanThrust(Tensor & dst, Tensor & src, BinaryFunction binary_op) {
     });
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 template<typename scalar_t, class BinaryOp>
@@ -63,11 +63,11 @@ void scanOuterDim(Tensor & tgt, Tensor & src, int dimension,
   int64_t rng, GRange, tileSize;
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto src_acc = DPCPPAccessor<dp_r_mode>(cgh, src_data, src_size);
-    auto tgt_acc = DPCPPAccessor<dp_discard_w_mode>(cgh, tgt_data, tgt_size);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data, src_size);
+    auto tgt_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tgt_data, tgt_size);
 
-    auto kfn = DP_Q_KFN(DP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto src_ptr = src_acc.template get_pointer<scalar_t>();
       auto tgt_ptr = tgt_acc.template get_pointer<scalar_t>();
       for (int64_t linearIndex = item.get_global_id(0);
@@ -83,10 +83,10 @@ void scanOuterDim(Tensor & tgt, Tensor & src, int dimension,
     };
 
     cgh.parallel_for<scanOuterDim_dpcpp_kernel<scalar_t, BinaryOp>>(
-        DP::nd_range<1>(DP::range<1>(tileSize), DP::range<1>(tileSize)), kfn);
+        DPCPP::nd_range<1>(DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 template<typename scalar_t, class BinaryFunction>
@@ -106,11 +106,11 @@ void scanInnermostDim(Tensor & tgt, Tensor & src, scalar_t init, BinaryFunction 
   int64_t rng, GRange, tileSize;
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto src_acc = DPCPPAccessor<dp_r_mode>(cgh, src_data, src_size);
-    auto tgt_acc = DPCPPAccessor<dp_discard_w_mode>(cgh, tgt_data, tgt_size);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data, src_size);
+    auto tgt_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tgt_data, tgt_size);
 
-    auto kfn = DP_Q_KFN(DP::nd_item<1> item) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto src_ptr = src_acc.template get_pointer<scalar_t>();
       auto tgt_ptr = tgt_acc.template get_pointer<scalar_t>();
 
@@ -126,10 +126,10 @@ void scanInnermostDim(Tensor & tgt, Tensor & src, scalar_t init, BinaryFunction 
     };
 
     cgh.parallel_for<scanInnerDim_dpcpp_kernel<scalar_t, BinaryFunction>>(
-        DP::nd_range<1>(DP::range<1>(tileSize), DP::range<1>(tileSize)), kfn);
+        DPCPP::nd_range<1>(DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 template<typename scalar_t, class BinaryFunction>

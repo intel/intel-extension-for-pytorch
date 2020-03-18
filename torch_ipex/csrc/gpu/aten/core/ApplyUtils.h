@@ -41,19 +41,6 @@ template <typename Op,
           int step>
 class PointwiseApply3 {};
 
-// remove anonymous namespace to satisfy dpcpp kernel name's requirement:
-// Global unique and visible.
-// namespace {
-
-static constexpr auto write_mode = DP::access::mode::discard_write;
-static constexpr auto read_mode = DP::access::mode::read;
-static constexpr auto read_write_mode = DP::access::mode::read_write;
-
-
-// Rearrange dimensions for pointwise operations so that strides are in
-// decreasing order as much as possible, so that kernels have better memory
-// access patterns.
-// See CUDAApplyUtils.cuh for more details
 template <typename T1, typename IndexType,
           typename T2 = void, typename T3 = void, typename T4 = void>
 inline void rearrangeDims(detail::TensorInfo<T1, IndexType>* aInfo,
@@ -141,7 +128,7 @@ struct ApplyOp1 {
 
 inline static void apply(const detail::TensorInfo<scalar, IndexType> &a,
                          const Op &op,
-                         const DPCPPAccessor<read_write_mode> &a_acc,
+                         const DPCPPAccessor<dpcpp_rw_mode> &a_acc,
                          int n, IndexType linearIndex,
                          Offsets... aOffsets) {
   // Convert 'linearIndex' into an offset of 'a'
@@ -163,7 +150,7 @@ template <typename Op,
 struct ApplyOp1<Op, scalar, IndexType, ADims, false, 0, Offset> {
   inline static void apply(const detail::TensorInfo<scalar, IndexType> &a,
                            const Op &op,
-                           const DPCPPAccessor<read_write_mode> &a_acc,
+                           const DPCPPAccessor<dpcpp_rw_mode> &a_acc,
                            int n, IndexType linearIndex,
                            Offset aOffset) {
     auto a_ptr = a_acc.template get_pointer<scalar>();
@@ -182,7 +169,7 @@ template <typename Op,
 struct ApplyOp1<Op, scalar, IndexType, ADims, true, 0, Offset> {
   inline static void apply(const detail::TensorInfo<scalar, IndexType> &a,
                            const Op &op,
-                           const DPCPPAccessor<read_write_mode> &a_acc,
+                           const DPCPPAccessor<dpcpp_rw_mode> &a_acc,
                            int n, IndexType linearIndex,
                            Offset aOffset) {
     auto a_ptr = a_acc.template get_pointer<scalar>();
@@ -200,7 +187,7 @@ template <typename Op,
 struct ApplyOp1<Op, scalar, IndexType, ADims, with_offset, 0, Offsets...> {
 inline static void apply(const detail::TensorInfo<scalar, IndexType> &a,
                          const Op &op,
-                         const DPCPPAccessor<read_write_mode> &a_acc,
+                         const DPCPPAccessor<dpcpp_rw_mode> &a_acc,
                          int n, IndexType linearIndex,
                          Offsets... aOffsets) {
   auto a_ptr = a_acc.template get_pointer<scalar>();
@@ -223,22 +210,22 @@ void kernelPointwiseApply1(detail::TensorInfo<scalar, IndexType> a,
   int64_t rng, GRange, tileSize;
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto a_acc = DPCPPAccessor<read_write_mode>(cgh, a.data);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto a_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, a.data);
     cgh.parallel_for<PointwiseApply1<Op, scalar, IndexType, ADims, step> >(
-            DP::nd_range<1>(DP::range<1>(tileSize), DP::range<1>(tileSize)),
-            [=](DP::nd_item<1> item) {
+            DPCPP::nd_range<1>(DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
+            [=](DPCPP::nd_item<1> item) {
               for (IndexType linearIndex = item.get_global_id(0) * step;
                    linearIndex < totalElements; linearIndex += item.get_global_range()[0] * step) {
                 ApplyOp1<Op, scalar,  IndexType, ADims, with_offset, step>::apply(
-                        a, op, a_acc, DP::min(step, static_cast<int>(totalElements - linearIndex)),
+                        a, op, a_acc, DPCPP::min(step, static_cast<int>(totalElements - linearIndex)),
                         linearIndex);
               }
             });
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 
@@ -256,8 +243,8 @@ struct ApplyOp2 {
 inline static void apply(const detail::TensorInfo<scalar1, IndexType> &a,
                          const detail::TensorInfo<scalar2, IndexType> &b,
                          const Op &op,
-                         const DPCPPAccessor<write_mode> &a_acc,
-                         const DPCPPAccessor<read_mode> &b_acc,
+                         const DPCPPAccessor<dpcpp_discard_w_mode> &a_acc,
+                         const DPCPPAccessor<dpcpp_r_mode> &b_acc,
                          int n, IndexType linearIndex,
                          Offsets... aOffsets, Offsets... bOffsets) {
   // Convert 'linearIndex' into an offset of 'a'
@@ -284,8 +271,8 @@ struct ApplyOp2<Op, scalar1, scalar2, IndexType, ADims, BDims, false, 0, Offset>
   inline static void apply(const detail::TensorInfo<scalar1, IndexType> &a,
                            const detail::TensorInfo<scalar2, IndexType> &b,
                            const Op &op,
-                           const DPCPPAccessor<write_mode> &a_acc,
-                           const DPCPPAccessor<read_mode> &b_acc,
+                           const DPCPPAccessor<dpcpp_discard_w_mode> &a_acc,
+                           const DPCPPAccessor<dpcpp_r_mode> &b_acc,
                            int n, IndexType linearIndex,
                            Offset aOffset, Offset bOffset) {
     auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -307,8 +294,8 @@ struct ApplyOp2<Op, scalar1, scalar2, IndexType, ADims, BDims, true, 0, Offset> 
   inline static void apply(const detail::TensorInfo<scalar1, IndexType> &a,
                            const detail::TensorInfo<scalar2, IndexType> &b,
                            const Op &op,
-                           const DPCPPAccessor<write_mode> &a_acc,
-                           const DPCPPAccessor<read_mode> &b_acc,
+                           const DPCPPAccessor<dpcpp_discard_w_mode> &a_acc,
+                           const DPCPPAccessor<dpcpp_r_mode> &b_acc,
                            int n, IndexType linearIndex,
                            Offset aOffset, Offset bOffset) {
     auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -330,8 +317,8 @@ struct ApplyOp2<Op, scalar1, scalar2, IndexType, ADims, BDims, with_offset, 0, O
 inline static void apply(const detail::TensorInfo<scalar1, IndexType> &a,
                          const detail::TensorInfo<scalar2, IndexType> &b,
                          const Op &op,
-                         const DPCPPAccessor<write_mode> &a_acc,
-                         const DPCPPAccessor<read_mode> &b_acc,
+                         const DPCPPAccessor<dpcpp_discard_w_mode> &a_acc,
+                         const DPCPPAccessor<dpcpp_r_mode> &b_acc,
                          int n, IndexType linearIndex,
                          Offsets... aOffsets, Offsets... bOffsets) {
   auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -357,23 +344,23 @@ void kernelPointwiseApply2(detail::TensorInfo<scalar1, IndexType> output,
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   // 1. Initialize temp buffer
-  auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<read_mode>(cgh, input.data);
-    auto out_acc =  DPCPPAccessor<write_mode>(cgh, output.data);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input.data);
+    auto out_acc =  DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output.data);
     cgh.parallel_for<PointwiseApply2<Op, scalar1, scalar2, IndexType, ADims, BDims, step> >(
-            DP::nd_range<1>(DP::range<1>(tileSize), DP::range<1>(tileSize)),
-            [=](DP::nd_item<1> item) {
+            DPCPP::nd_range<1>(DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
+            [=](DPCPP::nd_item<1> item) {
               for (IndexType linearIndex = item.get_global_id(0) * step;
                    linearIndex < totalElements; linearIndex += item.get_global_range()[0] * step) {
                 ApplyOp2<Op, scalar1, scalar2, IndexType, ADims, BDims, with_offset, step>::apply(
-                        output, input, op, out_acc, in_acc, DP::min(step, static_cast<int>(totalElements - linearIndex)),
+                        output, input, op, out_acc, in_acc, DPCPP::min(step, static_cast<int>(totalElements - linearIndex)),
                         linearIndex);
               }
             });
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename Op,
@@ -392,9 +379,9 @@ inline static void apply(const detail::TensorInfo<scalar1, IndexType> &a,
                          const detail::TensorInfo<scalar2, IndexType> &b,
                          const detail::TensorInfo<scalar3, IndexType> &c,
                          const Op &op,
-                         const DPCPPAccessor<write_mode> &a_acc,
-                         const DPCPPAccessor<read_mode> &b_acc,
-                         const DPCPPAccessor<read_mode> &c_acc,
+                         const DPCPPAccessor<dpcpp_discard_w_mode> &a_acc,
+                         const DPCPPAccessor<dpcpp_r_mode> &b_acc,
+                         const DPCPPAccessor<dpcpp_r_mode> &c_acc,
                          int n, IndexType linearIndex,
                          Offsets... aOffsets, Offsets... bOffsets, Offsets... cOffsets) {
   // Convert 'linearIndex' into an offset of 'a'
@@ -430,9 +417,9 @@ struct ApplyOp3<Op, scalar1, scalar2, scalar3, IndexType, ADims, BDims, CDims, 0
                            const detail::TensorInfo<scalar2, IndexType> &b,
                const detail::TensorInfo<scalar3, IndexType> &c,
                            const Op &op,
-                           const DPCPPAccessor<write_mode> &a_acc,
-                           const DPCPPAccessor<read_mode> &b_acc,
-               const DPCPPAccessor<read_mode> &c_acc,
+                           const DPCPPAccessor<dpcpp_discard_w_mode> &a_acc,
+                           const DPCPPAccessor<dpcpp_r_mode> &b_acc,
+               const DPCPPAccessor<dpcpp_r_mode> &c_acc,
                            int n, IndexType linearIndex,
                            Offset aOffset, Offset bOffset, Offset cOffset) {
     auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -456,9 +443,9 @@ inline static void apply(const detail::TensorInfo<scalar1, IndexType> &a,
                          const detail::TensorInfo<scalar2, IndexType> &b,
              const detail::TensorInfo<scalar3, IndexType> &c,
                          const Op &op,
-                         const DPCPPAccessor<write_mode> &a_acc,
-                         const DPCPPAccessor<read_mode> &b_acc,
-               const DPCPPAccessor<read_mode> &c_acc,
+                         const DPCPPAccessor<dpcpp_discard_w_mode> &a_acc,
+                         const DPCPPAccessor<dpcpp_r_mode> &b_acc,
+               const DPCPPAccessor<dpcpp_r_mode> &c_acc,
                          int n, IndexType linearIndex,
                          Offsets... aOffsets, Offsets... bOffsets, Offsets... cOffsets) {
   auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -485,23 +472,23 @@ void kernelPointwiseApply3(detail::TensorInfo<scalar1, IndexType> output,
   int64_t rng, GRange, tileSize;
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto in1_acc = DPCPPAccessor<read_mode>(cgh, input1.data);
-    auto in2_acc = DPCPPAccessor<read_mode>(cgh, input2.data);
-    auto out_acc =  DPCPPAccessor<write_mode>(cgh, output.data);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto in1_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input1.data);
+    auto in2_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input2.data);
+    auto out_acc =  DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output.data);
     cgh.parallel_for<PointwiseApply3<Op, scalar1, scalar2, scalar3, IndexType, ADims, BDims, CDims, step> >(
-            DP::nd_range<1>(DP::range<1>(tileSize), DP::range<1>(tileSize)),
-            [=](DP::nd_item<1> item) {
+            DPCPP::nd_range<1>(DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
+            [=](DPCPP::nd_item<1> item) {
               for (IndexType linearIndex = item.get_global_id(0) * step;
                    linearIndex < totalElements; linearIndex += item.get_global_range()[0] * step) {
                 ApplyOp3<Op, scalar1, scalar2, scalar3, IndexType, ADims, BDims, CDims, step>::apply(
-                        output, input1, input2, op, out_acc, in1_acc, in2_acc, DP::min(step, static_cast<int>(totalElements - linearIndex)), linearIndex);
+                        output, input1, input2, op, out_acc, in1_acc, in2_acc, DPCPP::min(step, static_cast<int>(totalElements - linearIndex)), linearIndex);
               }
             });
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename Op,
@@ -520,10 +507,10 @@ struct ApplyOp4 {
       const detail::TensorInfo<scalar3, IndexType>& c,
       const detail::TensorInfo<scalar3, IndexType>& d,
       const Op& op,
-      const DPCPPAccessor<write_mode>& a_acc,
-      const DPCPPAccessor<read_mode>& b_acc,
-      const DPCPPAccessor<read_mode>& c_acc,
-      const DPCPPAccessor<read_mode>& d_acc,
+      const DPCPPAccessor<dpcpp_discard_w_mode>& a_acc,
+      const DPCPPAccessor<dpcpp_r_mode>& b_acc,
+      const DPCPPAccessor<dpcpp_r_mode>& c_acc,
+      const DPCPPAccessor<dpcpp_r_mode>& d_acc,
       int n, IndexType linearIndex,
       Offsets... aOffsets, Offsets... bOffsets, Offsets... cOffsets, Offsets... dOffsets) {
     // Convert 'linearIndex' into an offset of 'a'
@@ -564,10 +551,10 @@ struct ApplyOp4<Op, scalar1, scalar2, scalar3, scalar4, IndexType, ADims, BDims,
                const detail::TensorInfo<scalar3, IndexType> &c,
                            const detail::TensorInfo<scalar3, IndexType> &d,
                            const Op &op,
-                           const DPCPPAccessor<write_mode> &a_acc,
-                           const DPCPPAccessor<read_mode> &b_acc,
-               const DPCPPAccessor<read_mode> &c_acc,
-                           const DPCPPAccessor<read_mode> &d_acc,
+                           const DPCPPAccessor<dpcpp_discard_w_mode> &a_acc,
+                           const DPCPPAccessor<dpcpp_r_mode> &b_acc,
+               const DPCPPAccessor<dpcpp_r_mode> &c_acc,
+                           const DPCPPAccessor<dpcpp_r_mode> &d_acc,
                            int n, IndexType linearIndex,
                            Offset aOffset, Offset bOffset, Offset cOffset, Offset dOffset) {
     auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -592,10 +579,10 @@ struct ApplyOp4<Op, scalar1, scalar2, scalar3, scalar4, IndexType, ADims, BDims,
                const detail::TensorInfo<scalar3, IndexType> &c,
                            const detail::TensorInfo<scalar3, IndexType> &d,
                            const Op &op,
-                           const DPCPPAccessor<write_mode> &a_acc,
-                           const DPCPPAccessor<read_mode> &b_acc,
-               const DPCPPAccessor<read_mode> &c_acc,
-                           const DPCPPAccessor<read_mode> &d_acc,
+                           const DPCPPAccessor<dpcpp_discard_w_mode> &a_acc,
+                           const DPCPPAccessor<dpcpp_r_mode> &b_acc,
+               const DPCPPAccessor<dpcpp_r_mode> &c_acc,
+                           const DPCPPAccessor<dpcpp_r_mode> &d_acc,
                            int n, IndexType linearIndex,
                            Offsets... aOffsets, Offsets... bOffsets, Offsets... cOffsets, Offsets... dOffsets) {
     auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -635,26 +622,26 @@ void kernelPointwiseApply4(
   int64_t rng, GRange, tileSize;
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto in1_acc = DPCPPAccessor<read_mode>(cgh, input1.data);
-    auto in2_acc = DPCPPAccessor<read_mode>(cgh, input2.data);
-    auto in3_acc = DPCPPAccessor<read_mode>(cgh, input3.data);
-    auto out_acc = DPCPPAccessor<write_mode>(cgh, output.data);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto in1_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input1.data);
+    auto in2_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input2.data);
+    auto in3_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input3.data);
+    auto out_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output.data);
     cgh.parallel_for<PointwiseApply4<
             Op, scalar1, scalar2, scalar3, scalar4, IndexType, ADims, BDims, CDims, DDims, step> >(
-            DP::nd_range<1>(DP::range<1>(tileSize), DP::range<1>(tileSize)),
-            [=](DP::nd_item<1> item) {
+            DPCPP::nd_range<1>(DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
+            [=](DPCPP::nd_item<1> item) {
               for (IndexType linearIndex = item.get_global_id(0) * step;
                    linearIndex < totalElements; linearIndex += item.get_global_range()[0] * step) {
                 ApplyOp4<Op, scalar1, scalar2, scalar3, scalar4, IndexType, ADims, BDims, CDims, DDims, step>::apply(
                         output, input1, input2, input3, op, out_acc, in1_acc, in2_acc, in3_acc,
-                        DP::min(step, static_cast<int>(totalElements - linearIndex)), linearIndex);
+                        DPCPP::min(step, static_cast<int>(totalElements - linearIndex)), linearIndex);
               }
             });
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 // } // namespace

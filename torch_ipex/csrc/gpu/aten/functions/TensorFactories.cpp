@@ -61,17 +61,17 @@ namespace triangle_dpcpp {
 //
 // The following solution uses sqrt directly for most cases, and would only
 // special handle it if there is indeed precision loss.
-DP_DEVICE
+DPCPP_DEVICE
 inline int64_t resolve_root_int(int64_t b, int64_t cX4, int64_t x, int32_t sign) {
 
   int64_t bXb_cX4 = b*b - cX4;
   // potential precision loss could occur here when casting int64_t (63 bits
   // precision) to double (52 bits precision)
-  double sr = DP::sqrt((double)bXb_cX4);
+  double sr = DPCPP::sqrt((double)bXb_cX4);
   //
   // TODO: CUDA uses ::__double2ll_rd. No corresponding API in DPCPP.
   // uses std::llround or std::ceil or std::float will cause error:
-  // terminate called after throwing an instance of 'DP::compile_program_error'.
+  // terminate called after throwing an instance of 'DPCPP::compile_program_error'.
   //
   int64_t res = static_cast<int64_t>((-b + sign * sr)/2);
 
@@ -84,7 +84,7 @@ inline int64_t resolve_root_int(int64_t b, int64_t cX4, int64_t x, int32_t sign)
   return res;
 }
 
-DP_DEVICE
+DPCPP_DEVICE
 inline void get_coordinate_in_triu_trapezoid(
     int64_t f, int64_t x, int64_t & row, int64_t & col) {
   f <<= 1; // all statements use 2f, so only calculate it once here.
@@ -94,7 +94,7 @@ inline void get_coordinate_in_triu_trapezoid(
   col = x - ((f - row + 1) * row >> 1) + row;
 }
 
-DP_DEVICE
+DPCPP_DEVICE
 inline void get_coordinate_in_tril_trapezoid(
     int64_t f, int64_t x, int64_t & row, int64_t & col) {
   f <<= 1; // all statements use 2f, so only calculate it once here.
@@ -106,8 +106,8 @@ inline void get_coordinate_in_tril_trapezoid(
 
 } // end of namespace
 
-DP_DEF_K1(triuIndicesSycl);
-DP_DEF_K1(trilIndicesSycl);
+DPCPP_DEF_K1(triuIndicesSycl);
+DPCPP_DEF_K1(trilIndicesSycl);
 
 template <typename scalar_t>
 void
@@ -124,10 +124,10 @@ triu_indices_dpcpp_kernel(scalar_t * tensor,
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto acc = DPCPPAccessor<dp_w_mode>(cgh, tensor);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tensor);
 
-    auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1>item) {
       auto tensor_ptr = acc.template get_pointer<scalar_t>();
       int64_t r, c;
       for (int64_t linearIndex = item.get_global_id(0);
@@ -148,11 +148,11 @@ triu_indices_dpcpp_kernel(scalar_t * tensor,
       }
     };
     // kick off kernel
-    cgh.parallel_for<DP_K(triuIndicesSycl, scalar_t)>(
-      DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
+    cgh.parallel_for<DPCPP_K(triuIndicesSycl, scalar_t)>(
+      DPCPP::nd_range<1>(DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 template <typename scalar_t>
@@ -170,10 +170,10 @@ tril_indices_dpcpp_kernel(scalar_t * tensor,
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto acc = DPCPPAccessor<dp_w_mode>(cgh, tensor);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tensor);
 
-    auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1>item) {
       auto tensor_ptr = acc.template get_pointer<scalar_t>();
       int64_t r, c;
       for (int64_t linearIndex = item.get_global_id(0);
@@ -195,11 +195,11 @@ tril_indices_dpcpp_kernel(scalar_t * tensor,
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(trilIndicesSycl, scalar_t)>(
-      DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
+    cgh.parallel_for<DPCPP_K(trilIndicesSycl, scalar_t)>(
+      DPCPP::nd_range<1>(DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 Tensor triu_indices_dpcpp(int64_t row, int64_t col, int64_t offset, const TensorOptions& options) {

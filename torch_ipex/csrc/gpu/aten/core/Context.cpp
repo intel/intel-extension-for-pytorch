@@ -8,24 +8,24 @@ namespace at {
 namespace dpcpp {
 
 static std::once_flag initFlag;
-static std::unique_ptr<DP::context> gContext;
+static std::unique_ptr<DPCPP::context> gContext;
 
 static void initGlobalContext() {
   int cnt;
-  DP::vector_class<DP::device> devs;
+  DPCPP::vector_class<DPCPP::device> devs;
   at::dpcpp::dpcppGetDeviceCount(&cnt);
   for (int i = 0; i < cnt; i++) {
     devs.push_back(at::dpcpp::dpcppGetRawDevice((int64_t)i));
   }
 
-  gContext.reset(new DP::context(devs, at::dpcpp::dpcppAsyncHandler));
+  gContext.reset(new DPCPP::context(devs, at::dpcpp::dpcppAsyncHandler));
 }
 
 void clearGlobalContext() {
   gContext.reset(NULL);
 }
 
-DP::context getGlobalContext() {
+DPCPP::context getGlobalContext() {
   std::call_once(initFlag, initGlobalContext);
   return *gContext;
 }

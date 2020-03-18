@@ -21,7 +21,7 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-DP_DEF_K1(index_select_ker);
+DPCPP_DEF_K1(index_select_ker);
 template <typename scalar_t>
 void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indices) {
   int srcDims = src.dim() == 0 ? 1 : src.dim();
@@ -70,7 +70,7 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
   // of the tensor `indices`.
   // TODO: if the slice number is to large. Need to balance the work group and work item number.
   // Make the work balance based on the MCU number.
-  // auto __mcu = dpcpp_queue.get_device().template get_info<dp_dev_max_units>();
+  // auto __mcu = dpcpp_queue.get_device().template get_info<dpcpp_dev_max_units>();
   uint64_t num_slices = indices.numel();
 
   auto slice_size = dst_num_elem / num_slices;
@@ -78,7 +78,7 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   auto wgroup_size = dpcpp_queue.get_device().template \
-          get_info<dp_dev_max_wgroup_size>();
+          get_info<dpcpp_dev_max_wgroup_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(slice_size), wgroup_size);
 
@@ -91,15 +91,15 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
   auto dst_size = dst.nbytes();
   auto idx_size = dst.nbytes();
 
-  auto cgf = DP_Q_CGF(__cgh) {
-    auto src_acc = DPCPPAccessor<dp_r_mode>(__cgh, src_data, src_size);
-    auto dst_acc = DPCPPAccessor<dp_discard_w_mode>(__cgh, dst_data, dst_size);
-    auto idx_acc = DPCPPAccessor<dp_r_mode>(__cgh, idx_data, idx_size);
+  auto cgf = DPCPP_Q_CGF(__cgh) {
+    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, src_data, src_size);
+    auto dst_acc = DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data, dst_size);
+    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data, idx_size);
 
-    __cgh.parallel_for_work_group<DP_K(index_select_ker, scalar_t)>(
-      DP::range</*dim=*/1>(num_slices),
-      DP::range</*dim=*/1>(wgroup_size),
-      [=](DP::group<1> group_id) {
+    __cgh.parallel_for_work_group<DPCPP_K(index_select_ker, scalar_t)>(
+      DPCPP::range</*dim=*/1>(num_slices),
+      DPCPP::range</*dim=*/1>(wgroup_size),
+      [=](DPCPP::group<1> group_id) {
         auto src_ptr = src_acc.template get_pointer<scalar_t>();
         auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
         auto idx_ptr = idx_acc.template get_pointer<long>();
@@ -112,7 +112,7 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
         auto g_src_ptr = src_ptr + src_slice_id * src_info.strides[src_select_dim];
         auto g_dst_ptr = dst_ptr + dst_slice_id * dst_info.strides[dst_select_dim];
 
-        group_id.parallel_for_work_item([=](DP::h_item<1> item_id) {
+        group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
 
           auto ii_ = item_id.get_logical_local_id()[0];
           auto src_offset_ =
@@ -136,11 +136,11 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
     );
   };
 
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
   return;
 }
 
-DP_DEF_K1(nonzero_kernel);
+DPCPP_DEF_K1(nonzero_kernel);
 
 template<typename T>
 struct NonZeroOp {
@@ -215,7 +215,7 @@ void nonzero(Tensor & tensor, const Tensor & self_) {
 }
 
 
-DP_DEF_K1(index_add_ker);
+DPCPP_DEF_K1(index_add_ker);
 template <typename scalar_t>
 void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & src) {
   dim = maybe_wrap_dim(dim, dst.dim());
@@ -299,7 +299,7 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   auto wgroup_size = dpcpp_queue.get_device().template \
-          get_info<dp_dev_max_wgroup_size>();
+          get_info<dpcpp_dev_max_wgroup_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
 
@@ -315,15 +315,15 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
   auto idx_size = indices.storage().numel() * \
           (indices.dtype().itemsize());
 
-  auto cgf = DP_Q_CGF(__cgh) {
-    auto src_acc = DPCPPAccessor<dp_r_mode>(__cgh, src_data, src_size);
-    auto dst_acc = DPCPPAccessor<dp_discard_w_mode>(__cgh, dst_data, dst_size);
-    auto idx_acc = DPCPPAccessor<dp_r_mode>(__cgh, idx_data, idx_size);
+  auto cgf = DPCPP_Q_CGF(__cgh) {
+    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, src_data, src_size);
+    auto dst_acc = DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data, dst_size);
+    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data, idx_size);
 
-    __cgh.parallel_for_work_group<DP_K(index_add_ker, scalar_t)>(
-      DP::range</*dim=*/1>(numIndices),
-      DP::range</*dim=*/1>(wgroup_size),
-      [=](DP::group<1> group_id) {
+    __cgh.parallel_for_work_group<DPCPP_K(index_add_ker, scalar_t)>(
+      DPCPP::range</*dim=*/1>(numIndices),
+      DPCPP::range</*dim=*/1>(wgroup_size),
+      [=](DPCPP::group<1> group_id) {
         auto src_ptr = src_acc.template get_pointer<scalar_t>();
         auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
         auto idx_ptr = idx_acc.template get_pointer<long>();
@@ -334,7 +334,7 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
         auto g_dst_ptr = dst_ptr + g_idx_ptr[ dst_slice_id ] * dst_info.strides[dst_add_dim];
         auto g_src_ptr = src_ptr + dst_slice_id * src_info.strides[src_add_dim];
 
-        group_id.parallel_for_work_item([=](DP::h_item<1> item_id) {
+        group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
 
           auto ii_ = item_id.get_logical_local_id()[0];
           auto dst_offset_ =
@@ -362,10 +362,10 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
     );
   };
 
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-DP_DEF_K1(index_fill_ker);
+DPCPP_DEF_K1(index_fill_ker);
 template <typename scalar_t>
 void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_scalar) {
   TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
@@ -408,7 +408,7 @@ void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_sca
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   auto wgroup_size = dpcpp_queue.get_device().template \
-          get_info<dp_dev_max_wgroup_size>();
+          get_info<dpcpp_dev_max_wgroup_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
 
@@ -421,14 +421,14 @@ void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_sca
   auto idx_size = indices.storage().numel() * \
           (indices.dtype().itemsize());
 
-  auto cgf = DP_Q_CGF(__cgh) {
-    auto dst_acc = DPCPPAccessor<dp_discard_w_mode>(__cgh, dst_data, dst_size);
-    auto idx_acc = DPCPPAccessor<dp_r_mode>(__cgh, idx_data, idx_size);
+  auto cgf = DPCPP_Q_CGF(__cgh) {
+    auto dst_acc = DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data, dst_size);
+    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data, idx_size);
 
-    __cgh.parallel_for_work_group<DP_K(index_fill_ker, scalar_t)>(
-      DP::range</*dim=*/1>(numIndices),
-      DP::range</*dim=*/1>(wgroup_size),
-      [=](DP::group<1> group_id) {
+    __cgh.parallel_for_work_group<DPCPP_K(index_fill_ker, scalar_t)>(
+      DPCPP::range</*dim=*/1>(numIndices),
+      DPCPP::range</*dim=*/1>(wgroup_size),
+      [=](DPCPP::group<1> group_id) {
         auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
         auto idx_ptr = idx_acc.template get_pointer<long>();
 
@@ -437,7 +437,7 @@ void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_sca
         auto g_idx_ptr = idx_ptr;
         auto g_dst_ptr = dst_ptr + g_idx_ptr[ dst_slice_id ] * dst_info.strides[dst_fill_dim];
 
-        group_id.parallel_for_work_item([=](DP::h_item<1> item_id) {
+        group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
 
           auto ii_ = item_id.get_logical_local_id()[0];
           auto dst_offset_ =
@@ -462,11 +462,11 @@ void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_sca
     );
   };
 
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-DP_DEF_K1(diag_from_dpcpp_ker);
-DP_DEF_K1(diag_to_dpcpp_ker);
+DPCPP_DEF_K1(diag_from_dpcpp_ker);
+DPCPP_DEF_K1(diag_to_dpcpp_ker);
 template <typename scalar_t>
 void Diag(Tensor & dst, const Tensor & src, int64_t k) {
   int nDimension = src.dim() == 0 ? 1 : src.dim();
@@ -477,20 +477,20 @@ void Diag(Tensor & dst, const Tensor & src, int64_t k) {
     int64_t stride1 = src.stride(1);
     int64_t size0 = src.size(0);
     int64_t size1 = src.size(1);
-    int64_t size = (k > 0) ? DP::min((int64_t)size0, (int64_t)size1 - k) : DP::min((int64_t)size0 + k, (int64_t)size1);
+    int64_t size = (k > 0) ? DPCPP::min((int64_t)size0, (int64_t)size1 - k) : DPCPP::min((int64_t)size0 + k, (int64_t)size1);
     int64_t size_[1] = {size};
     TensorImpl_resizeNd(TensorImpl_Unwrap(dst), 1, size_, nullptr);
     if (size > 0) {
       int64_t strideSelf = dst.dim() == 0 ? 1 : dst.stride(0);
       int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
-      static const auto write_mode = DP::access::mode::discard_write;
-      static const auto read_mode = DP::access::mode::read;
+      static const auto write_mode = DPCPP::access::mode::discard_write;
+      static const auto read_mode = DPCPP::access::mode::read;
       auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-      auto cgf = DP_Q_CGF(cgh) {
+      auto cgf = DPCPP_Q_CGF(cgh) {
         auto in_acc = DPCPPAccessor<read_mode>(cgh, src.data_ptr<scalar_t>());
         auto out_acc = DPCPPAccessor<write_mode>(cgh, dst.data_ptr<scalar_t>());
-        auto kfn = DP_Q_KFN(DP::item<1> item_id) {
+        auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
           size_t id = item_id.get_id(0);
           auto in_ptr = in_acc.template get_pointer<scalar_t>();
           auto out_ptr = out_acc.template get_pointer<scalar_t>();
@@ -498,9 +498,9 @@ void Diag(Tensor & dst, const Tensor & src, int64_t k) {
           out_ptr[strideSelf * id] = in_ptr[bOffset];
 
         };
-        cgh.parallel_for<DP_K(diag_from_dpcpp_ker, scalar_t)>(DP::range<1>(dst.numel()), kfn);
+        cgh.parallel_for<DPCPP_K(diag_from_dpcpp_ker, scalar_t)>(DPCPP::range<1>(dst.numel()), kfn);
       };
-      DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
     }
   } else {
     int64_t totalElements = src.numel();
@@ -513,23 +513,23 @@ void Diag(Tensor & dst, const Tensor & src, int64_t k) {
       int64_t stride0 = dst.stride(0);
       int64_t stride1 = dst.stride(1);
       int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
-      static const auto write_mode = DP::access::mode::discard_write;
-      static const auto read_mode = DP::access::mode::read;
+      static const auto write_mode = DPCPP::access::mode::discard_write;
+      static const auto read_mode = DPCPP::access::mode::read;
       auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-      auto cgf = DP_Q_CGF(cgh) {
+      auto cgf = DPCPP_Q_CGF(cgh) {
         auto in_acc = DPCPPAccessor<read_mode>(cgh, src.data_ptr<scalar_t>());
         auto out_acc = DPCPPAccessor<write_mode>(cgh, dst.data_ptr<scalar_t>());
-        auto kfn = DP_Q_KFN(DP::item<1> item_id) {
+        auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
           size_t id = item_id.get_id(0);
           auto in_ptr = in_acc.template get_pointer<scalar_t>();
           auto out_ptr = out_acc.template get_pointer<scalar_t>();
           const int64_t aOffset = start + (stride0 + stride1) * id;
           out_ptr[aOffset] = in_ptr[strideSrc * id];
         };
-        cgh.parallel_for<DP_K(diag_to_dpcpp_ker, scalar_t)>(DP::range<1>(dst.numel()), kfn);
+        cgh.parallel_for<DPCPP_K(diag_to_dpcpp_ker, scalar_t)>(DPCPP::range<1>(dst.numel()), kfn);
       };
-      DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+      DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
     }
   }
 }
@@ -553,8 +553,8 @@ void MaskedFill(Tensor & tensor, const Tensor & mask, Scalar value_scalar) {
   at::dpcpp::DPCPP_tensor_apply2<scalar_t, bool>(tensor, mask, TensorMaskedFillOp<scalar_t, bool>(value));
 }
 
-DP_DEF_K1(maskedScatter_scan_dpcpp_ker);
-DP_DEF_K1(TensorMaskedScatterOp);
+DPCPP_DEF_K1(maskedScatter_scan_dpcpp_ker);
+DPCPP_DEF_K1(TensorMaskedScatterOp);
 template <typename scalar_t>
 void MaskedScatter(Tensor & tensor, const Tensor & mask, const Tensor & src) {
   auto maskSize = mask.numel();
@@ -593,40 +593,40 @@ void MaskedScatter(Tensor & tensor, const Tensor & mask, const Tensor & src) {
   parallel_for_setup(size, tileSize, rng, GRange);
 
   // command group functions
-  auto cgf = DP_Q_CGF(cgh) {
-    auto acc_maskLong = DPCPPAccessor<dp_r_mode>(cgh, maskLong_data, maskLong_size);
-    auto acc_maskPrefixSum = DPCPPAccessor<dp_discard_w_mode>(cgh, maskPrefixSum_data, maskPrefixSum_size);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto acc_maskLong = DPCPPAccessor<dpcpp_r_mode>(cgh, maskLong_data, maskLong_size);
+    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, maskPrefixSum_data, maskPrefixSum_size);
 
     // kernel function per work-item
-    auto kfn = DP_Q_KFN() {
-      dp_global_ptr_cpt<int64_t> maskLong_ptr = acc_maskLong.template get_pointer<int64_t>();
-      dp_global_ptr_pt<int64_t> maskPrefixSum_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
+    auto kfn = DPCPP_Q_KFN() {
+      dpcpp_global_ptr_cpt<int64_t> maskLong_ptr = acc_maskLong.template get_pointer<int64_t>();
+      dpcpp_global_ptr_pt<int64_t> maskPrefixSum_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
       dpcpp_exclusive_scan(maskLong_ptr, maskLong_ptr + size, maskPrefixSum_ptr, static_cast<int64_t>(0), AddOp<int64_t>());
     };
     // kick off kernel
     // (TODO) single_task need replaced due to low efficiency
-    cgh.single_task<DP_K(maskedScatter_scan_dpcpp_ker, scalar_t)>(kfn);
+    cgh.single_task<DPCPP_K(maskedScatter_scan_dpcpp_ker, scalar_t)>(kfn);
   };
     // submit to DPCPP queue
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
   Tensor contigSrc = src.contiguous();
   
   // command group function
   // copy src to tensor according to mask
-  auto cgfMaskedScatter = DP_Q_CGF(cgh) {
-    auto acc_src = DPCPPAccessor<dp_r_mode>(cgh, contigSrc.data_ptr<scalar_t>());
-    auto acc_mask = DPCPPAccessor<dp_r_mode>(cgh, mask.data_ptr<bool>());
-    auto acc_maskPrefixSum = DPCPPAccessor<dp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
-    auto acc_tensor = DPCPPAccessor<dp_discard_w_mode>(cgh, tensor.data_ptr<scalar_t>());
+  auto cgfMaskedScatter = DPCPP_Q_CGF(cgh) {
+    auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, contigSrc.data_ptr<scalar_t>());
+    auto acc_mask = DPCPPAccessor<dpcpp_r_mode>(cgh, mask.data_ptr<bool>());
+    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
+    auto acc_tensor = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tensor.data_ptr<scalar_t>());
 
     // kernel function
-    auto kfn = DP_Q_KFN(DP::nd_item<1> item){
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item){
       int64_t linear_index = item.get_global_linear_id();
-      dp_global_ptr_pt<scalar_t> src_ptr = acc_src.template get_pointer<scalar_t>();
-      dp_global_ptr_pt<bool> mask_ptr = acc_mask.template get_pointer<bool>();
-      dp_global_ptr_pt<int64_t> maskPrefix_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
-      dp_global_ptr_pt<scalar_t> tensor_ptr = acc_tensor.template get_pointer<scalar_t>();
+      dpcpp_global_ptr_pt<scalar_t> src_ptr = acc_src.template get_pointer<scalar_t>();
+      dpcpp_global_ptr_pt<bool> mask_ptr = acc_mask.template get_pointer<bool>();
+      dpcpp_global_ptr_pt<int64_t> maskPrefix_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
+      dpcpp_global_ptr_pt<scalar_t> tensor_ptr = acc_tensor.template get_pointer<scalar_t>();
       if (linear_index < size) {
         if (mask_ptr[linear_index]) {
           tensor_ptr[linear_index] = src_ptr[maskPrefix_ptr[linear_index]];
@@ -634,16 +634,16 @@ void MaskedScatter(Tensor & tensor, const Tensor & mask, const Tensor & src) {
       }
     };
 
-    cgh.parallel_for<DP_K(TensorMaskedScatterOp, scalar_t)>(
-      DP::nd_range<1>(DP::range<1>(GRange), DP::range<1>(tileSize)), kfn);
+    cgh.parallel_for<DPCPP_K(TensorMaskedScatterOp, scalar_t)>(
+      DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)), kfn);
   };
 
   // submit to DPCPP queue
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgfMaskedScatter);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgfMaskedScatter);
 }
 
-DP_DEF_K1(maskedSelect_scan_dpcpp_ker);
-DP_DEF_K1(TensorMaskedSelectOp);
+DPCPP_DEF_K1(maskedSelect_scan_dpcpp_ker);
+DPCPP_DEF_K1(TensorMaskedSelectOp);
 template <typename scalar_t>
 void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
   TORCH_CHECK(mask.numel() == src.numel(), "sizes do not match");
@@ -682,23 +682,23 @@ void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
   parallel_for_setup(size, tileSize, rng, GRange);
 
   // command group functions
-  auto cgf = DP_Q_CGF(cgh) {
-    auto acc_maskLong = DPCPPAccessor<dp_r_mode>(cgh, maskLong_data, maskLong_size);
-    auto acc_maskPrefixSum = DPCPPAccessor<dp_discard_w_mode>(cgh, maskPrefixSum_data, maskPrefixSum_size);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto acc_maskLong = DPCPPAccessor<dpcpp_r_mode>(cgh, maskLong_data, maskLong_size);
+    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, maskPrefixSum_data, maskPrefixSum_size);
 
     // kernel function per work-item
-    auto kfn = DP_Q_KFN() {
-      dp_global_ptr_cpt<int64_t> maskLong_ptr = acc_maskLong.template get_pointer<int64_t>();
-      dp_global_ptr_pt<int64_t> maskPrefixSum_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
+    auto kfn = DPCPP_Q_KFN() {
+      dpcpp_global_ptr_cpt<int64_t> maskLong_ptr = acc_maskLong.template get_pointer<int64_t>();
+      dpcpp_global_ptr_pt<int64_t> maskPrefixSum_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
       dpcpp_inclusive_scan(maskLong_ptr, maskLong_ptr + size, maskPrefixSum_ptr, AddOp<int64_t>());
     };
     // kick off kernel
     // (TODO) single_task need replaced due to low efficiency
-    cgh.single_task<DP_K(maskedSelect_scan_dpcpp_ker, scalar_t)>(kfn);
+    cgh.single_task<DPCPP_K(maskedSelect_scan_dpcpp_ker, scalar_t)>(kfn);
   };
 
     // submit to DPCPP queue
-    DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
     TensorInfo<scalar_t, uint64_t> src_info =
             getTensorInfo<scalar_t, uint64_t>(src);
@@ -709,20 +709,20 @@ void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
     mask_info.collapseDims();
 
   // command group function
-  auto cgfMaskedSelect = DP_Q_CGF(cgh) {
-    auto acc_src = DPCPPAccessor<dp_r_mode>(cgh, src.data_ptr<scalar_t>());
-    auto acc_mask = DPCPPAccessor<dp_r_mode>(cgh, mask.data_ptr<bool>());
-    auto acc_maskPrefixSum = DPCPPAccessor<dp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
-    auto acc_tensor = DPCPPAccessor<dp_discard_w_mode>(cgh, tensorContig.data_ptr<scalar_t>());
+  auto cgfMaskedSelect = DPCPP_Q_CGF(cgh) {
+    auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
+    auto acc_mask = DPCPPAccessor<dpcpp_r_mode>(cgh, mask.data_ptr<bool>());
+    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
+    auto acc_tensor = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tensorContig.data_ptr<scalar_t>());
 
     // kernel function per work-item
-    auto kfn = DP_Q_KFN(DP::nd_item<1> item){
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item){
       int64_t linear_index = item.get_global_linear_id();
 
-      dp_global_ptr_pt<scalar_t> src_ptr = acc_src.template get_pointer<scalar_t>();
-      dp_global_ptr_pt<bool> mask_ptr = acc_mask.template get_pointer<bool>();
-      dp_global_ptr_pt<int64_t> maskPrefix_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
-      dp_global_ptr_pt<scalar_t> tensor_ptr = acc_tensor.template get_pointer<scalar_t>();
+      dpcpp_global_ptr_pt<scalar_t> src_ptr = acc_src.template get_pointer<scalar_t>();
+      dpcpp_global_ptr_pt<bool> mask_ptr = acc_mask.template get_pointer<bool>();
+      dpcpp_global_ptr_pt<int64_t> maskPrefix_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
+      dpcpp_global_ptr_pt<scalar_t> tensor_ptr = acc_tensor.template get_pointer<scalar_t>();
 
       if (linear_index < size) {
           // The mask tensor maybe not contiguos.
@@ -734,12 +734,12 @@ void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
         }
       }
     };
-    cgh.parallel_for<DP_K(TensorMaskedSelectOp, scalar_t)>(
-      DP::nd_range<1>(DP::range<1>(GRange), DP::range<1>(tileSize)), kfn);
+    cgh.parallel_for<DPCPP_K(TensorMaskedSelectOp, scalar_t)>(
+      DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)), kfn);
   };
 
   // submit to DPCPP queue
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgfMaskedSelect);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgfMaskedSelect);
 
   if (&tensor != &tensorContig) {
     tensor.copy_(tensorContig);

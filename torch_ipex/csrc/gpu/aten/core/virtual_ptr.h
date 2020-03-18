@@ -42,8 +42,8 @@ namespace cl {
 namespace sycl {
 namespace codeplay {
 
-using dpcpp_acc_target = DP::access::target;
-using dpcpp_acc_mode = DP::access::mode;
+using dpcpp_acc_target = DPCPP::access::target;
+using dpcpp_acc_mode = DPCPP::access::mode;
 
 /**
  * Default values for template arguments
@@ -144,7 +144,7 @@ class PointerMapper {
 
   /* basic type for all buffers
    */
-  using buffer_t = DP::buffer<buffer_data_type_t>;
+  using buffer_t = DPCPP::buffer<buffer_data_type_t>;
 
   /**
    * Node that stores information about a device allocation.
@@ -230,9 +230,9 @@ class PointerMapper {
    * Returns a buffer from the map using the pointer address
    */
   template <typename buffer_data_type = buffer_data_type_t>
-  DP::buffer<buffer_data_type, 1> get_buffer(
+  DPCPP::buffer<buffer_data_type, 1> get_buffer(
       const virtual_pointer_t ptr) {
-    using dpcpp_buffer_t = DP::buffer<buffer_data_type, 1>;
+    using dpcpp_buffer_t = DPCPP::buffer<buffer_data_type, 1>;
 
     // get_node() returns a `buffer_mem`, so we need to cast it to a `buffer<>`.
     // We can do this without the `buffer_mem` being a pointer, as we
@@ -250,7 +250,7 @@ class PointerMapper {
   template <dpcpp_acc_mode access_mode = default_acc_mode,
             dpcpp_acc_target access_target = default_acc_target,
             typename buffer_data_type = buffer_data_type_t>
-  DP::accessor<buffer_data_type, 1, access_mode, access_target>
+  DPCPP::accessor<buffer_data_type, 1, access_mode, access_target>
   get_access(const virtual_pointer_t ptr) {
     auto buf = get_buffer<buffer_data_type>(ptr);
     return buf.template get_access<access_mode>();
@@ -267,8 +267,8 @@ class PointerMapper {
   template <dpcpp_acc_mode access_mode = default_acc_mode,
             dpcpp_acc_target access_target = default_acc_target,
             typename buffer_data_type = buffer_data_type_t>
-  DP::accessor<buffer_data_type, 1, access_mode, access_target>
-  get_access(const virtual_pointer_t ptr, DP::handler& cgh) {
+  DPCPP::accessor<buffer_data_type, 1, access_mode, access_target>
+  get_access(const virtual_pointer_t ptr, DPCPP::handler& cgh) {
     auto buf = get_buffer<buffer_data_type>(ptr);
     return buf.template get_access<access_mode, access_target>(cgh);
   }
@@ -498,15 +498,15 @@ inline void PointerMapper::remove_pointer<false>(const virtual_pointer_t ptr) {
  * Given a size, creates a byte-typed buffer and returns a
  * fake pointer to keep track of it.
  * \param size Size in bytes of the desired allocation
- * \throw DP::exception if error while creating the buffer
+ * \throw DPCPP::exception if error while creating the buffer
  */
 inline void* DPCPPmalloc(size_t size, PointerMapper& pMap, const property_list &pList = {}) {
   if (size == 0) {
     return nullptr;
   }
   // Create a generic buffer of the given size
-  using dpcpp_buffer_t = DP::buffer<buffer_data_type_t, 1>;
-  auto thePointer = pMap.add_pointer(dpcpp_buffer_t(DP::range<1>{size}, pList));
+  using dpcpp_buffer_t = DPCPP::buffer<buffer_data_type_t, 1>;
+  auto thePointer = pMap.add_pointer(dpcpp_buffer_t(DPCPP::range<1>{size}, pList));
   // Store the buffer on the global list
   return static_cast<void*>(thePointer);
 }

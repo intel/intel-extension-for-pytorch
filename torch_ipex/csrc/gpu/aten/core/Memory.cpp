@@ -5,74 +5,71 @@
 namespace at {
 namespace dpcpp {
 
-static void memcpyHostToDevice(void *dst, const void *src, size_t n_bytes, bool async, DP::queue &dpcpp_queue) {
-  static const auto write_mode = DP::access::mode::discard_write;
+static void memcpyHostToDevice(void *dst, const void *src, size_t n_bytes, bool async, DPCPP::queue &dpcpp_queue) {
   if (n_bytes == 0)
     return;
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto dst_acc = DPCPPAccessor<write_mode>(cgh, dst, n_bytes).get_access();
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto dst_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dst, n_bytes).get_access();
     cgh.copy(src, dst_acc);
   };
 
   //launch kernel
   if (async) {
-    DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
   } else {
-    DP_Q_SYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_SYNC_SUBMIT(dpcpp_queue, cgf);
   }
 }
 
-static void memcpyDeviceToHost(void *dst, const void *src, size_t n_bytes, bool async, DP::queue &dpcpp_queue) {
-  static const auto read_mode = DP::access::mode::read;
+static void memcpyDeviceToHost(void *dst, const void *src, size_t n_bytes, bool async, DPCPP::queue &dpcpp_queue) {
+  static const auto read_mode = DPCPP::access::mode::read;
   if (n_bytes == 0)
     return;
 
-  auto cgf = DP_Q_CGF(cgh) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
     auto src_acc = DPCPPAccessor<read_mode>(cgh, src, n_bytes).get_access();
     cgh.copy(src_acc, dst);
   };
 
   //launch kernel
   if (async) {
-    DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
   } else {
-    DP_Q_SYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_SYNC_SUBMIT(dpcpp_queue, cgf);
   }
 }
 
-static void memcpyDeviceToDevice(void *dst, const void *src, size_t n_bytes, bool async, DP::queue &dpcpp_queue) {
-  static const auto read_mode = DP::access::mode::read;
-  static const auto write_mode = DP::access::mode::discard_write;
+static void memcpyDeviceToDevice(void *dst, const void *src, size_t n_bytes, bool async, DPCPP::queue &dpcpp_queue) {
+  static const auto read_mode = DPCPP::access::mode::read;
   if (n_bytes == 0)
     return;
-  auto cgf = DP_Q_CGF(cgh) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
     auto src_acc = DPCPPAccessor<read_mode>(cgh, src, n_bytes).get_access();
-    auto dst_acc = DPCPPAccessor<write_mode>(cgh, dst, n_bytes).get_access();
+    auto dst_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, dst, n_bytes).get_access();
     cgh.copy(src_acc, dst_acc);
   };
 
   //launch kernel
   if (async) {
-    DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
   } else {
-    DP_Q_SYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_SYNC_SUBMIT(dpcpp_queue, cgf);
   }
 }
 
-static void memsetDevice(void* dst, int value, size_t n_bytes, bool async, DP::queue &dpcpp_queue) {
-  static const auto write_mode = DP::access::mode::write;
+static void memsetDevice(void* dst, int value, size_t n_bytes, bool async, DPCPP::queue &dpcpp_queue) {
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto dst_acc = DPCPPAccessor<write_mode>(cgh, dst, n_bytes).get_access();
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto dst_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, dst, n_bytes).get_access();
     cgh.fill(dst_acc, (static_cast<uint8_t>(value)));
   };
 
   //launch kernel
   if (async) {
-    DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
   } else {
-    DP_Q_SYNC_SUBMIT(dpcpp_queue, cgf);
+    DPCPP_Q_SYNC_SUBMIT(dpcpp_queue, cgf);
   }
 }
 

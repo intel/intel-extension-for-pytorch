@@ -3,28 +3,28 @@
 #include <CL/sycl.hpp>
 
 // alias for dpcpp namespace
-namespace DP = cl::sycl;
+namespace DPCPP = cl::sycl;
 
 // macros for dpcpp command queue and kernel function
-#define DP_K_NAME(x)        __##x##_dpcpp_kernel
-#define DP_K(k, ...)        DP_K_NAME(k)<char, ##__VA_ARGS__>
-#define DP_DEF_K1(k)        template <typename __dummy_typename_dpcpp, typename ...> class DP_K_NAME(k) {}
-#define DP_DEF_K2(k, ...)   template <typename __dummy_typename_dpcpp, ##__VA_ARGS__> class DP_K_NAME(k) {}
+#define DPCPP_K_NAME(x)        __##x##_dpcpp_kernel
+#define DPCPP_K(k, ...)        DPCPP_K_NAME(k)<char, ##__VA_ARGS__>
+#define DPCPP_DEF_K1(k)        template <typename __dummy_typename_dpcpp, typename ...> class DPCPP_K_NAME(k) {}
+#define DPCPP_DEF_K2(k, ...)   template <typename __dummy_typename_dpcpp, ##__VA_ARGS__> class DPCPP_K_NAME(k) {}
 
-#define DP_Q_KFN(...)                   [=](__VA_ARGS__)
-#define DP_Q_CGF(h)                     [&](DP::handler &h)
-#define DP_Q_SUBMIT(q, cgf, ...)        q.submit(cgf, ##__VA_ARGS__)
-#define DP_Q_SYNC_SUBMIT(q, cgf, ...)   { auto e = DP_Q_SUBMIT(q, cgf, ##__VA_ARGS__); e.wait(); }
-#define DP_Q_ASYNC_SUBMIT(q, cgf, ...)  { DP_Q_SUBMIT(q, cgf, ##__VA_ARGS__); }
+#define DPCPP_Q_KFN(...)                   [=](__VA_ARGS__)
+#define DPCPP_Q_CGF(h)                     [&](DPCPP::handler &h)
+#define DPCPP_Q_SUBMIT(q, cgf, ...)        q.submit(cgf, ##__VA_ARGS__)
+#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)   { auto e = DPCPP_Q_SUBMIT(q, cgf, ##__VA_ARGS__); e.wait(); }
+#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)  { DPCPP_Q_SUBMIT(q, cgf, ##__VA_ARGS__); }
 
 // the descriptor as entity attribute
-#define DP_HOST     // for host only
-#define DP_DEVICE   // for device only
-#define DP_BOTH     // for both host and device
+#define DPCPP_HOST     // for host only
+#define DPCPP_DEVICE   // for device only
+#define DPCPP_BOTH     // for both host and device
 
 // dpcpp device configuration
 // TODO: set subgourp size with api get_max_sub_group_size
-#define DP_SUB_GROUP_SIZE (1L)
+#define DPCPP_SUB_GROUP_SIZE (1L)
 
 // dpcpp get ptr from accessor
 #if defined(USE_DPCPP)
@@ -34,129 +34,129 @@ namespace DP = cl::sycl;
 #endif
 
 // dpcpp device info
-static constexpr auto dp_dev_type             = DP::info::device::device_type;
-static constexpr auto dp_dev_max_units        = DP::info::device::max_compute_units;
-static constexpr auto dp_dev_max_item_dims    = DP::info::device::max_work_item_dimensions;
-static constexpr auto dp_dev_max_item_sizes   = DP::info::device::max_work_item_sizes;
-static constexpr auto dp_dev_max_wgroup_size  = DP::info::device::max_work_group_size;
-static constexpr auto dp_dev_max_malloc_size  = DP::info::device::max_mem_alloc_size;
-static constexpr auto dp_dev_local_mem_type   = DP::info::device::local_mem_type;
-static constexpr auto dp_dev_local_mem_size   = DP::info::device::local_mem_size;
-static constexpr auto dp_dev_global_mem_size  = DP::info::device::global_mem_size;
+static constexpr auto dpcpp_dev_type             = DPCPP::info::device::device_type;
+static constexpr auto dpcpp_dev_max_units        = DPCPP::info::device::max_compute_units;
+static constexpr auto dpcpp_dev_max_item_dims    = DPCPP::info::device::max_work_item_dimensions;
+static constexpr auto dpcpp_dev_max_item_sizes   = DPCPP::info::device::max_work_item_sizes;
+static constexpr auto dpcpp_dev_max_wgroup_size  = DPCPP::info::device::max_work_group_size;
+static constexpr auto dpcpp_dev_max_malloc_size  = DPCPP::info::device::max_mem_alloc_size;
+static constexpr auto dpcpp_dev_local_mem_type   = DPCPP::info::device::local_mem_type;
+static constexpr auto dpcpp_dev_local_mem_size   = DPCPP::info::device::local_mem_size;
+static constexpr auto dpcpp_dev_global_mem_size  = DPCPP::info::device::global_mem_size;
 
 // dpcpp access mode
-static constexpr auto dp_r_mode           = DP::access::mode::read;
-static constexpr auto dp_w_mode           = DP::access::mode::write;
-static constexpr auto dp_rw_mode          = DP::access::mode::read_write;
-static constexpr auto dp_atomic_rw_mode   = DP::access::mode::atomic;
-static constexpr auto dp_discard_w_mode   = DP::access::mode::discard_write;
-static constexpr auto dp_discard_rw_mode  = DP::access::mode::discard_read_write;
+static constexpr auto dpcpp_r_mode           = DPCPP::access::mode::read;
+static constexpr auto dpcpp_w_mode           = DPCPP::access::mode::write;
+static constexpr auto dpcpp_rw_mode          = DPCPP::access::mode::read_write;
+static constexpr auto dpcpp_atomic_rw_mode   = DPCPP::access::mode::atomic;
+static constexpr auto dpcpp_discard_w_mode   = DPCPP::access::mode::discard_write;
+static constexpr auto dpcpp_discard_rw_mode  = DPCPP::access::mode::discard_read_write;
 
 // dpcpp access address space
-static constexpr auto dp_priv_space   = DP::access::address_space::private_space;
-static constexpr auto dp_const_space  = DP::access::address_space::constant_space;
-static constexpr auto dp_local_space  = DP::access::address_space::local_space;
-static constexpr auto dp_global_space = DP::access::address_space::global_space;
+static constexpr auto dpcpp_priv_space   = DPCPP::access::address_space::private_space;
+static constexpr auto dpcpp_const_space  = DPCPP::access::address_space::constant_space;
+static constexpr auto dpcpp_local_space  = DPCPP::access::address_space::local_space;
+static constexpr auto dpcpp_global_space = DPCPP::access::address_space::global_space;
 
 // dpcpp access fence space
-static constexpr auto dp_local_fence            = DP::access::fence_space::local_space;
-static constexpr auto dp_global_fence           = DP::access::fence_space::global_space;
-static constexpr auto dp_global_and_local_fence = DP::access::fence_space::global_and_local;
+static constexpr auto dpcpp_local_fence            = DPCPP::access::fence_space::local_space;
+static constexpr auto dpcpp_global_fence           = DPCPP::access::fence_space::global_space;
+static constexpr auto dpcpp_global_and_local_fence = DPCPP::access::fence_space::global_and_local;
 
 // dpcpp access target
-static constexpr auto dp_host_buf   = DP::access::target::host_buffer;
-static constexpr auto dp_const_buf  = DP::access::target::constant_buffer;
-static constexpr auto dp_local_buf  = DP::access::target::local;
-static constexpr auto dp_global_buf = DP::access::target::global_buffer;
+static constexpr auto dpcpp_host_buf   = DPCPP::access::target::host_buffer;
+static constexpr auto dpcpp_const_buf  = DPCPP::access::target::constant_buffer;
+static constexpr auto dpcpp_local_buf  = DPCPP::access::target::local;
+static constexpr auto dpcpp_global_buf = DPCPP::access::target::global_buffer;
 
 // dpcpp ptr type
 template <typename T>
-DP_DEVICE using dp_local_ptr = typename DP::local_ptr<T>;
+DPCPP_DEVICE using dpcpp_local_ptr = typename DPCPP::local_ptr<T>;
 
 template <typename T>
-DP_DEVICE using dp_priv_ptr = typename DP::private_ptr<T>;
+DPCPP_DEVICE using dpcpp_priv_ptr = typename DPCPP::private_ptr<T>;
 
 template <typename T>
-DP_DEVICE using dp_global_ptr = typename DP::global_ptr<T>;
+DPCPP_DEVICE using dpcpp_global_ptr = typename DPCPP::global_ptr<T>;
 
 template <typename T>
-DP_DEVICE using dp_const_ptr = typename DP::constant_ptr<T>;
+DPCPP_DEVICE using dpcpp_const_ptr = typename DPCPP::constant_ptr<T>;
 
-template <typename T, DP::access::address_space Space = dp_global_space>
-DP_DEVICE using dp_multi_ptr = typename DP::multi_ptr<T, Space>;
+template <typename T, DPCPP::access::address_space Space = dpcpp_global_space>
+DPCPP_DEVICE using dpcpp_multi_ptr = typename DPCPP::multi_ptr<T, Space>;
 
 // dpcpp pointer type
 template <typename T>
-DP_DEVICE using dp_local_ptr_pt = typename dp_local_ptr<T>::pointer_t;
+DPCPP_DEVICE using dpcpp_local_ptr_pt = typename dpcpp_local_ptr<T>::pointer_t;
 
 template <typename T>
-DP_DEVICE using dp_priv_ptr_pt = typename dp_priv_ptr<T>::pointer_t;
+DPCPP_DEVICE using dpcpp_priv_ptr_pt = typename dpcpp_priv_ptr<T>::pointer_t;
 
 template <typename T>
-DP_DEVICE using dp_global_ptr_pt = typename dp_global_ptr<T>::pointer_t;
+DPCPP_DEVICE using dpcpp_global_ptr_pt = typename dpcpp_global_ptr<T>::pointer_t;
 
 template <typename T>
-DP_DEVICE using dp_const_ptr_pt = typename dp_const_ptr<T>::pointer_t;
+DPCPP_DEVICE using dpcpp_const_ptr_pt = typename dpcpp_const_ptr<T>::pointer_t;
 
-template <typename T, DP::access::address_space Space = dp_global_space>
-DP_DEVICE using dp_multi_ptr_pt = typename dp_multi_ptr<T, Space>::pointer_t;
-
-template <typename T>
-DP_DEVICE using dp_local_ptr_cpt = typename dp_local_ptr<T>::const_pointer_t;
+template <typename T, DPCPP::access::address_space Space = dpcpp_global_space>
+DPCPP_DEVICE using dpcpp_multi_ptr_pt = typename dpcpp_multi_ptr<T, Space>::pointer_t;
 
 template <typename T>
-DP_DEVICE using dp_priv_ptr_cpt = typename dp_priv_ptr<T>::const_pointer_t;
+DPCPP_DEVICE using dpcpp_local_ptr_cpt = typename dpcpp_local_ptr<T>::const_pointer_t;
 
 template <typename T>
-DP_DEVICE using dp_global_ptr_cpt = typename dp_global_ptr<T>::const_pointer_t;
+DPCPP_DEVICE using dpcpp_priv_ptr_cpt = typename dpcpp_priv_ptr<T>::const_pointer_t;
 
 template <typename T>
-DP_DEVICE using dp_const_ptr_cpt = typename dp_const_ptr<T>::const_pointer_t;
+DPCPP_DEVICE using dpcpp_global_ptr_cpt = typename dpcpp_global_ptr<T>::const_pointer_t;
 
-template <typename T, DP::access::address_space Space = dp_global_space>
-DP_DEVICE using dp_multi_ptr_cpt = typename dp_multi_ptr<T, Space>::const_pointer_t;
+template <typename T>
+DPCPP_DEVICE using dpcpp_const_ptr_cpt = typename dpcpp_const_ptr<T>::const_pointer_t;
+
+template <typename T, DPCPP::access::address_space Space = dpcpp_global_space>
+DPCPP_DEVICE using dpcpp_multi_ptr_cpt = typename dpcpp_multi_ptr<T, Space>::const_pointer_t;
 
 // dpcpp reference type
 template <typename T>
-DP_DEVICE using dp_local_ptr_rt = typename dp_local_ptr<T>::reference_t;
+DPCPP_DEVICE using dpcpp_local_ptr_rt = typename dpcpp_local_ptr<T>::reference_t;
 
 template <typename T>
-DP_DEVICE using dp_priv_ptr_rt = typename dp_priv_ptr<T>::reference_t;
+DPCPP_DEVICE using dpcpp_priv_ptr_rt = typename dpcpp_priv_ptr<T>::reference_t;
 
 template <typename T>
-DP_DEVICE using dp_global_ptr_rt = typename dp_global_ptr<T>::reference_t;
+DPCPP_DEVICE using dpcpp_global_ptr_rt = typename dpcpp_global_ptr<T>::reference_t;
 
 template <typename T>
-DP_DEVICE using dp_const_ptr_rt = typename dp_const_ptr<T>::reference_t;
+DPCPP_DEVICE using dpcpp_const_ptr_rt = typename dpcpp_const_ptr<T>::reference_t;
 
-template <typename T, DP::access::address_space Space = dp_global_space>
-DP_DEVICE using dp_multi_ptr_rt = typename dp_multi_ptr<T, Space>::reference_t;
-
-template <typename T>
-DP_DEVICE using dp_local_ptr_crt = typename dp_local_ptr<T>::const_reference_t;
+template <typename T, DPCPP::access::address_space Space = dpcpp_global_space>
+DPCPP_DEVICE using dpcpp_multi_ptr_rt = typename dpcpp_multi_ptr<T, Space>::reference_t;
 
 template <typename T>
-DP_DEVICE using dp_priv_ptr_crt = typename dp_priv_ptr<T>::const_reference_t;
+DPCPP_DEVICE using dpcpp_local_ptr_crt = typename dpcpp_local_ptr<T>::const_reference_t;
 
 template <typename T>
-DP_DEVICE using dp_global_ptr_crt = typename dp_global_ptr<T>::const_reference_t;
+DPCPP_DEVICE using dpcpp_priv_ptr_crt = typename dpcpp_priv_ptr<T>::const_reference_t;
 
 template <typename T>
-DP_DEVICE using dp_const_ptr_crt = typename dp_const_ptr<T>::const_reference_t;
+DPCPP_DEVICE using dpcpp_global_ptr_crt = typename dpcpp_global_ptr<T>::const_reference_t;
 
-template <typename T, DP::access::address_space Space = dp_global_space>
-DP_DEVICE using dp_multi_ptr_crt = typename dp_multi_ptr<T, Space>::const_reference_t;
+template <typename T>
+DPCPP_DEVICE using dpcpp_const_ptr_crt = typename dpcpp_const_ptr<T>::const_reference_t;
+
+template <typename T, DPCPP::access::address_space Space = dpcpp_global_space>
+DPCPP_DEVICE using dpcpp_multi_ptr_crt = typename dpcpp_multi_ptr<T, Space>::const_reference_t;
 
 // dpcpp accessor type
-template <typename ScalarType, DP::access::mode Mode = dp_rw_mode, int Dims = 1>
-DP_DEVICE using dp_local_acc_t = DP::accessor<ScalarType, Dims, Mode, dp_local_buf>;
+template <typename ScalarType, DPCPP::access::mode Mode = dpcpp_rw_mode, int Dims = 1>
+DPCPP_DEVICE using dpcpp_local_acc_t = DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_local_buf>;
 
-template <typename ScalarType, DP::access::mode Mode = dp_rw_mode, int Dims = 1>
-DP_DEVICE using dp_global_acc_t = DP::accessor<ScalarType, Dims, Mode, dp_global_buf>;
+template <typename ScalarType, DPCPP::access::mode Mode = dpcpp_rw_mode, int Dims = 1>
+DPCPP_DEVICE using dpcpp_global_acc_t = DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_global_buf>;
 
 template <typename ScalarType, int Dims = 1>
-DP_DEVICE using dp_const_acc_t = DP::accessor<ScalarType, Dims, dp_r_mode, dp_const_buf>;
+DPCPP_DEVICE using dpcpp_const_acc_t = DPCPP::accessor<ScalarType, Dims, dpcpp_r_mode, dpcpp_const_buf>;
 
-template <typename ScalarType, DP::access::mode Mode = dp_rw_mode, int Dims = 1>
-DP_HOST using dp_host_acc_t = DP::accessor<ScalarType, Dims, Mode, dp_host_buf>;
+template <typename ScalarType, DPCPP::access::mode Mode = dpcpp_rw_mode, int Dims = 1>
+DPCPP_HOST using dpcpp_host_acc_t = DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_host_buf>;
 

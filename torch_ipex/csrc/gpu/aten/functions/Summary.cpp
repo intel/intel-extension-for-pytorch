@@ -46,15 +46,15 @@ void kernelHistogram1D(
         Op getOp) {
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = DPCPPAccessor<dp_rw_mode>;
-  using in_accessor_t = DPCPPAccessor<dp_r_mode>;
+  using out_accessor_t = DPCPPAccessor<dpcpp_rw_mode>;
+  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
 
-  auto cgf = DP_Q_CGF(__cgh) {
+  auto cgf = DPCPP_Q_CGF(__cgh) {
     out_accessor_t out_acc = out_accessor_t (__cgh, a.data);
     in_accessor_t in_acc = in_accessor_t (__cgh, b.data);
     in_accessor_t weight_acc = in_accessor_t (__cgh, c.data);
 
-    auto kfn = DP_Q_KFN(DP::item<1> item_id) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
       auto out_ptr = out_acc.template get_pointer<output_t>();
       auto in_ptr = in_acc.template get_pointer<input_t>();
       auto weight_ptr = weight_acc.template get_pointer<output_t>();
@@ -74,10 +74,10 @@ void kernelHistogram1D(
     };
 
     __cgh.parallel_for<histogram_kernel<has_weight, output_t, input_t, IndexType>>(
-            DP::range</*dim=*/1>(totalElements), kfn);
+            DPCPP::range</*dim=*/1>(totalElements), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 #define HANDLE_CASE(WEIGHTS_OP, WITH_WEIGHT)                   \
@@ -112,7 +112,7 @@ bool dpcpp_tensor_histogram(
   auto bInfo = dpcpp::detail::getTensorInfo<input_t, IndexType>(b);
   if (HasWeights) {
     auto cInfo = dpcpp::detail::getTensorInfo<output_t, IndexType>(c);
-    const auto getWeightsOp = [cInfo] (dp_global_ptr_pt<output_t> cPtr, IndexType cIndex) {
+    const auto getWeightsOp = [cInfo] (dpcpp_global_ptr_pt<output_t> cPtr, IndexType cIndex) {
       const IndexType cOffset =
               dpcpp::detail::IndexToOffset<output_t, IndexType, 1>::get(cIndex, cInfo);
       return cPtr[cOffset];
@@ -122,7 +122,7 @@ bool dpcpp_tensor_histogram(
     dpcpp::detail::TensorInfo<output_t, IndexType> cInfo;
     // set the dummy cinfo with the ptr to the output
     cInfo.data = aInfo.data;
-    static const auto getDummyOp = [] (dp_global_ptr_pt<output_t>, IndexType) { return static_cast<output_t>(1); };
+    static const auto getDummyOp = [] (dpcpp_global_ptr_pt<output_t>, IndexType) { return static_cast<output_t>(1); };
     HANDLE_CASE(getDummyOp, false);
   }
 

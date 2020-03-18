@@ -38,10 +38,10 @@ void fillSliceWithIndex(TensorInfo<int64_t, IndexType> out,
                    IndexType sliceSize,
                    IndexType sliceStride) {
   auto &queue = getCurrentDPCPPStream().dpcpp_queue();
-  int64_t local_size = queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
-  auto cgf = DP_Q_CGF(cgh) {
-    auto out_acc = DPCPPAccessor<dp_w_mode>(cgh, out.data);
-    auto kfn = DP_Q_KFN(DP::nd_item<1> item_id) {
+  int64_t local_size = queue.get_device(). template get_info<dpcpp_dev_max_wgroup_size>();
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto out_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, out.data);
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       IndexType local_id = item_id.get_local_id(0);
       IndexType slice = item_id.get_group_linear_id();
       const uint64_t offset =
@@ -54,11 +54,11 @@ void fillSliceWithIndex(TensorInfo<int64_t, IndexType> out,
       }
     };
     cgh.parallel_for<fill_slice_dpcpp_ker<IndexType, Dim>>(
-      DP::nd_range<1>(DP::range<1>(totalSlices*local_size),
-      DP::range<1>(local_size)), kfn);
+      DPCPP::nd_range<1>(DPCPP::range<1>(totalSlices*local_size),
+      DPCPP::range<1>(local_size)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 } // impl

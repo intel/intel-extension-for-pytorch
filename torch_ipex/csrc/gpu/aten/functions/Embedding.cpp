@@ -23,16 +23,16 @@ static inline void embedding_backward_dpcpp_kernel(
     int64_t* indices_data, const scalar_t* __restrict__ grad_data,
     scalar_t* __restrict__ grad_weight_data, int num_indices, int64_t stride,
     int padding_idx, int numel_weights, bool scale_grad_by_freq) {
-  static const auto atomic_rw_mode = DP::access::mode::atomic;
-  static const auto read_mode = DP::access::mode::read;
-  static const auto write_mode = DP::access::mode::write;
-  static const auto rw_mode = DP::access::mode::discard_read_write;
-  static const auto gbuffer_target = DP::access::target::global_buffer;
+  static const auto atomic_rw_mode = DPCPP::access::mode::atomic;
+  static const auto read_mode = DPCPP::access::mode::read;
+  static const auto write_mode = DPCPP::access::mode::write;
+  static const auto rw_mode = DPCPP::access::mode::discard_read_write;
+  static const auto gbuffer_target = DPCPP::access::target::global_buffer;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto row_num_weights = numel_weights / stride;
-  DP::buffer<uint32_t, 1> idx_cnt(DP::range<1>{(size_t)row_num_weights});
+  DPCPP::buffer<uint32_t, 1> idx_cnt(DPCPP::range<1>{(size_t)row_num_weights});
 
-  dpcpp_queue.submit([&](DP::handler & cgh) {
+  dpcpp_queue.submit([&](DPCPP::handler & cgh) {
     int64_t rng, GRange, tileSize;
 
     // KER1: calc indices count for each
@@ -42,14 +42,14 @@ static inline void embedding_backward_dpcpp_kernel(
     if (scale_grad_by_freq) {
       auto idx_cnt_acc = idx_cnt.get_access<write_mode>(cgh);
       cgh.template fill(idx_cnt_acc, static_cast<uint32_t>(0));
-      DP::accessor<uint32_t, 1, atomic_rw_mode, gbuffer_target>
-          idx_cnt_ptr(idx_cnt, cgh, DP::range<1>(row_num_weights), 0);
+      DPCPP::accessor<uint32_t, 1, atomic_rw_mode, gbuffer_target>
+          idx_cnt_ptr(idx_cnt, cgh, DPCPP::range<1>(row_num_weights), 0);
 
       parallel_for_setup(num_indices, tileSize, rng, GRange);
       cgh.parallel_for<embedding_dense_backeward_dpcpp_idx_cnt_ker<scalar_t>> (
-          DP::nd_range<1>(DP::range<1>(GRange),
-          DP::range<1>(tileSize)),
-          [=](DP::nd_item<1> item) {
+          DPCPP::nd_range<1>(DPCPP::range<1>(GRange),
+          DPCPP::range<1>(tileSize)),
+          [=](DPCPP::nd_item<1> item) {
         int64_t gid = item.get_global_linear_id();
         auto idx_ptr = idx_acc.template get_pointer<int64_t>();
         if (gid < num_indices)
@@ -66,9 +66,9 @@ static inline void embedding_backward_dpcpp_kernel(
 
     parallel_for_setup(stride, tileSize, rng, GRange);
     cgh.parallel_for<embedding_dense_backeward_dpcpp_ker<scalar_t>> (
-        DP::nd_range<1>(DP::range<1>(GRange),
-        DP::range<1>(tileSize)),
-        [=](DP::nd_item<1> item) {
+        DPCPP::nd_range<1>(DPCPP::range<1>(GRange),
+        DPCPP::range<1>(tileSize)),
+        [=](DPCPP::nd_item<1> item) {
       int64_t gid = item.get_global_linear_id();
       if (gid < stride) {
         auto idx_ptr = idx_acc.template get_pointer<int64_t>();

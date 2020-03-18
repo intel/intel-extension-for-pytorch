@@ -27,12 +27,12 @@ static inline void sigmoid(Tensor & output, const Tensor & self) {
   size = self.numel() * sizeof(scalar_t);
   output.resize_as_(self);
 
-  auto cgf = DP_Q_CGF(cgh) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_acc =
-        DPCPPAccessor<dp_r_mode>(cgh, self.data_ptr<scalar_t>(), size);
+        DPCPPAccessor<dpcpp_r_mode>(cgh, self.data_ptr<scalar_t>(), size);
     auto out_acc =
-        DPCPPAccessor<dp_discard_w_mode>(cgh, output.data_ptr<scalar_t>(), size);
-    auto kfn = DP_Q_KFN(DP::nd_item<1> item) {
+        DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output.data_ptr<scalar_t>(), size);
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       size_t id = item.get_global_linear_id();
       auto in_ptr = in_acc.template get_pointer<scalar_t>();
       auto out_ptr = out_acc.template get_pointer<scalar_t>();
@@ -40,11 +40,11 @@ static inline void sigmoid(Tensor & output, const Tensor & self) {
         out_ptr[id] = 1 / (1 + Numerics<scalar_t>::exp(-static_cast<scalar_t>(in_ptr[id])));
     };
 
-    cgh.parallel_for<sigmoid_ker<scalar_t>>(DP::nd_range<1>(
-        DP::range<1>(grng), DP::range<1>(tile_size)), kfn);
+    cgh.parallel_for<sigmoid_ker<scalar_t>>(DPCPP::nd_range<1>(
+        DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 Tensor & _sigmoid_out(Tensor & output, const Tensor & self) {

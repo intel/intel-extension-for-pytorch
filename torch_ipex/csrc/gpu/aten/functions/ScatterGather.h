@@ -7,6 +7,7 @@
 #include <utils/Atomics.h>
 #include <utils/Numerics.h>
 
+
 using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
 
@@ -16,7 +17,7 @@ using namespace at::dpcpp;
 // This version uses a static number of dimensions.
 template <typename IndexType, typename Real, int Dims>
 struct IndexToScatterGatherOffsets {
-  static DP_DEVICE void compute(
+  static DPCPP_DEVICE void compute(
           IndexType linearId, const int dim,
           const TensorInfo<int64_t, IndexType>& index, IndexType* indexOffset,
           const TensorInfo<Real, IndexType>& t1, IndexType* t1Offset,
@@ -32,7 +33,7 @@ struct IndexToScatterGatherOffsets {
     }
   }
 
-  static DP_DEVICE void compute(
+  static DPCPP_DEVICE void compute(
           IndexType linearId, const int dim,
           const TensorInfo<int64_t, IndexType>& index, IndexType* indexOffset,
           const TensorInfo<Real, IndexType>& t2, IndexType* t2Offset) {
@@ -50,7 +51,7 @@ struct IndexToScatterGatherOffsets {
 // Same as above but using a dynamic number of dimensions.
 template <typename IndexType, typename Real>
 struct IndexToScatterGatherOffsets<IndexType, Real, -1> {
-  static DP_DEVICE void compute(
+  static DPCPP_DEVICE void compute(
       IndexType linearId, const int dim,
       const TensorInfo<int64_t, IndexType>& index, IndexType* indexOffset,
       const TensorInfo<Real, IndexType>& t1, IndexType* t1Offset,
@@ -66,7 +67,7 @@ struct IndexToScatterGatherOffsets<IndexType, Real, -1> {
     }
   }
 
-  static DP_DEVICE void compute(
+  static DPCPP_DEVICE void compute(
       IndexType linearId, const int dim,
       const TensorInfo<int64_t, IndexType>& index, IndexType* indexOffset,
       const TensorInfo<Real, IndexType>& t2, IndexType* t2Offset) {
@@ -81,7 +82,7 @@ struct IndexToScatterGatherOffsets<IndexType, Real, -1> {
   }
 };
 
-//DP_DEF_K1(dpcpp_gather_kernel);
+//DPCPP_DEF_K1(dpcpp_gather_kernel);
 template <typename IndexType, typename Real, int Dims> class dpcpp_gather_kernel{};
 template <typename IndexType, typename Real, int Dims>
 void THDPCPPTensor_gatherKernel(
@@ -93,15 +94,15 @@ void THDPCPPTensor_gatherKernel(
 
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = DPCPPAccessor<dp_discard_w_mode>;
-  using in_accessor_t = DPCPPAccessor<dp_r_mode>;
+  using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
+  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
 
-  auto cgf = DP_Q_CGF(__cgh) {
+  auto cgf = DPCPP_Q_CGF(__cgh) {
     out_accessor_t tensor_acc = out_accessor_t (__cgh, tensor.data);
     in_accessor_t src_acc = in_accessor_t (__cgh, src.data);
     in_accessor_t index_acc = in_accessor_t (__cgh, index.data);
 
-    auto kfn = DP_Q_KFN(DP::item<1> item_id)  {
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id)  {
       auto tensor_data = tensor_acc.template get_pointer<Real>();
       auto src_data = src_acc.template get_pointer<Real>();
       auto index_data = index_acc.template get_pointer<int64_t>();
@@ -128,15 +129,15 @@ void THDPCPPTensor_gatherKernel(
 
     };
 
-    __cgh.parallel_for</*DP_K(dpcpp_gather_kernel, Real, IndexType, Dims)*/
+    __cgh.parallel_for</*DPCPP_K(dpcpp_gather_kernel, Real, IndexType, Dims)*/
             dpcpp_gather_kernel<Real, IndexType, Dims>>(
-            DP::range</*dim=*/1>(totalElements), kfn);
+            DPCPP::range</*dim=*/1>(totalElements), kfn);
   };
-  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
 }
 
-DP_DEF_K2(scatterSycl, typename IndexType, typename Real, int Dims);
+DPCPP_DEF_K2(scatterSycl, typename IndexType, typename Real, int Dims);
 template <typename IndexType, typename Real, int Dims>
 void THSyclTensor_scatterKernel(
     TensorInfo<Real, IndexType> tensor,
@@ -150,11 +151,11 @@ void THSyclTensor_scatterKernel(
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto acc_out = DPCPPAccessor<dp_w_mode>(cgh, tensor.data);
-    auto acc_src = DPCPPAccessor<dp_r_mode>(cgh, src.data);
-    auto acc_index = DPCPPAccessor<dp_r_mode>(cgh, index.data);
-    auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto acc_out = DPCPPAccessor<dpcpp_w_mode>(cgh, tensor.data);
+    auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, src.data);
+    auto acc_index = DPCPPAccessor<dpcpp_r_mode>(cgh, index.data);
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1>item) {
       auto tensor_ptr = acc_out.template get_pointer<Real>();
       auto src_ptr = acc_src.template get_pointer<Real>();
       auto index_ptr = acc_index.template get_pointer<int64_t>();
@@ -178,15 +179,15 @@ void THSyclTensor_scatterKernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(scatterSycl, IndexType, Real, Dims)>(
-      DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
+    cgh.parallel_for<DPCPP_K(scatterSycl, IndexType, Real, Dims)>(
+      DPCPP::nd_range<1>(DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);  
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);  
 
 }
 
-DP_DEF_K2(scatterAddSycl, typename IndexType, typename Real, int Dims);
+DPCPP_DEF_K2(scatterAddSycl, typename IndexType, typename Real, int Dims);
 template <typename IndexType, typename Real, int Dims>
 void THSyclTensor_scatterAddKernel(
     TensorInfo<Real, IndexType> tensor,
@@ -200,11 +201,11 @@ void THSyclTensor_scatterAddKernel(
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto acc_out = DPCPPAccessor<dp_w_mode>(cgh, tensor.data);
-    auto acc_src = DPCPPAccessor<dp_r_mode>(cgh, src.data);
-    auto acc_index = DPCPPAccessor<dp_r_mode>(cgh, index.data);
-    auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto acc_out = DPCPPAccessor<dpcpp_w_mode>(cgh, tensor.data);
+    auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, src.data);
+    auto acc_index = DPCPPAccessor<dpcpp_r_mode>(cgh, index.data);
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1>item) {
       auto tensor_ptr = acc_out.template get_pointer<Real>();
       auto src_ptr = acc_src.template get_pointer<Real>();
       auto index_ptr = acc_index.template get_pointer<int64_t>();
@@ -229,13 +230,13 @@ void THSyclTensor_scatterAddKernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(scatterAddSycl, IndexType, Real, Dims)>(
-      DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
+    cgh.parallel_for<DPCPP_K(scatterAddSycl, IndexType, Real, Dims)>(
+      DPCPP::nd_range<1>(DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)), kfn);
   };
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-DP_DEF_K2(scatterFillSycl, typename IndexType, typename Real, int Dims);
+DPCPP_DEF_K2(scatterFillSycl, typename IndexType, typename Real, int Dims);
 template <typename IndexType, typename Real, int Dims>
 void THSyclTensor_scatterFillKernel(
         TensorInfo<Real, IndexType> tensor,
@@ -249,10 +250,10 @@ void THSyclTensor_scatterFillKernel(
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto acc_out = DPCPPAccessor<dp_w_mode>(cgh, tensor.data);
-    auto acc_index = DPCPPAccessor<dp_r_mode>(cgh, index.data);
-    auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto acc_out = DPCPPAccessor<dpcpp_w_mode>(cgh, tensor.data);
+    auto acc_index = DPCPPAccessor<dpcpp_r_mode>(cgh, index.data);
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1>item) {
       auto tensor_ptr = acc_out.template get_pointer<Real>();
       auto index_ptr = acc_index.template get_pointer<int64_t>();
       for (IndexType linearIndex = (IndexType)item.get_global_id(0);
@@ -273,9 +274,9 @@ void THSyclTensor_scatterFillKernel(
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(scatterFillSycl, IndexType, Real, Dims)>(
-            DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
+    cgh.parallel_for<DPCPP_K(scatterFillSycl, IndexType, Real, Dims)>(
+            DPCPP::nd_range<1>(DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }

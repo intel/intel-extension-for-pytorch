@@ -189,14 +189,14 @@ template <
     int RadixBits>
     void countRadixUsingMask(
     CountType counts[RadixSize],
-    const dp_local_acc_t<int> &smem,
+    const dpcpp_local_acc_t<int> &smem,
     bitwise_t desired,
     bitwise_t desiredMask,
     int radixDigitPos,
     index_t sliceSize,
     index_t withinSliceStride,
-    const dp_global_ptr_pt<scalar_t> &data,
-    DP::nd_item<1> &item_id) {
+    const dpcpp_global_ptr_pt<scalar_t> &data,
+    DPCPP::nd_item<1> &item_id) {
   // Clear out per-thread counts from a previous round
   for (int i = 0; i < RadixSize; ++i) {
     counts[i] = 0;
@@ -208,7 +208,7 @@ template <
   }
 
 
-  item_id.barrier(DP::access::fence_space::local_space);
+  item_id.barrier(DPCPP::access::fence_space::local_space);
   // Scan over all the data. Upon a read, the warp will accumulate
   // counts per each digit in the radix using warp voting.
   for (index_t i = local_id; i < sliceSize; i += item_id.get_local_range(0)) {
@@ -224,18 +224,18 @@ template <
   }
 
     for (uint32_t i = 0; i < RadixSize; ++i) {
-      DP::atomic<int, DP::access::address_space::local_space> smem_var(smem.get_pointer() + i);
+      DPCPP::atomic<int, DPCPP::access::address_space::local_space> smem_var(smem.get_pointer() + i);
       smem_var.fetch_add(counts[i]);
     }
 
-  item_id.barrier(DP::access::fence_space::local_space);
+  item_id.barrier(DPCPP::access::fence_space::local_space);
 
   // For each thread, read in the total counts
   for (uint32_t i = 0; i < RadixSize; ++i) {
     counts[i] = smem[i];
   }
 
-  item_id.barrier(DP::access::fence_space::local_space);
+  item_id.barrier(DPCPP::access::fence_space::local_space);
 }
 
 // Over what radix we are selecting values
@@ -247,13 +247,13 @@ constexpr int RADIX_MASK = (RADIX_SIZE - 1);
 // ((v & desired) == desiredMask) in our sorted int format
 template <typename scalar_t, typename bitwise_t, typename index_t>
 scalar_t findPattern(
-    const dp_local_acc_t<int> &smem,
-    const dp_global_ptr_pt<scalar_t> &data,
+    const dpcpp_local_acc_t<int> &smem,
+    const dpcpp_global_ptr_pt<scalar_t> &data,
     index_t sliceSize,
     index_t withinSliceStride,
     bitwise_t desired,
     bitwise_t desiredMask,
-    DP::nd_item<1> &item_id) {
+    DPCPP::nd_item<1> &item_id) {
 
  auto local_id = item_id.get_local_id(0);
 
@@ -263,7 +263,7 @@ scalar_t findPattern(
     smem_ptr[RADIX_SIZE] = ScalarConvert<int, scalar_t>::to(0);
   }
 
-  item_id.barrier(DP::access::fence_space::local_space);
+  item_id.barrier(DPCPP::access::fence_space::local_space);
 
   // All threads participate in the loop, in order to sync on the flag
   index_t numIterations =
@@ -281,12 +281,12 @@ scalar_t findPattern(
       smem_ptr[1] = v; // can't use val as the flag, since it could be 0
     }
 
-    item_id.barrier(DP::access::fence_space::local_space);
+    item_id.barrier(DPCPP::access::fence_space::local_space);
 
     scalar_t found = smem_ptr[0];
     scalar_t val = smem_ptr[1];
 
-    item_id.barrier(DP::access::fence_space::local_space);
+    item_id.barrier(DPCPP::access::fence_space::local_space);
 
     // Check to see if a thread found the value
     if (Numerics<scalar_t>::ne(found, ScalarConvert<int, scalar_t>::to(0))) {
@@ -302,13 +302,13 @@ scalar_t findPattern(
 // Returns the top-Kth element found in the data using radix selection
 template <typename scalar_t, typename bitwise_t, typename index_t, bool Order>
 void radixSelect(
-    const dp_global_ptr_pt<scalar_t> &data,
+    const dpcpp_global_ptr_pt<scalar_t> &data,
     index_t k,
     index_t sliceSize,
     index_t withinSliceStride,
-    const dp_local_acc_t<int> &smem,
+    const dpcpp_local_acc_t<int> &smem,
     scalar_t* topK,
-    DP::nd_item<1> &item_id) {
+    DPCPP::nd_item<1> &item_id) {
   // Per-thread buckets into which we accumulate digit counts in our
   // radix
   int counts[RADIX_SIZE];

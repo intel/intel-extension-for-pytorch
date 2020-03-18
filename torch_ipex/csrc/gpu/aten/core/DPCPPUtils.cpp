@@ -24,7 +24,7 @@ static void clearDPCPPContextAndDevices() {
 
 // It should be call only once. (std::call_once)
 static void initGlobalDevicePoolState() {
-  auto plaform_list = DP::platform::get_platforms();
+  auto plaform_list = DPCPP::platform::get_platforms();
   DeviceIndex devIndex = 0;
   for (const auto& platform : plaform_list) {
     auto device_list = platform.get_devices();
@@ -76,7 +76,7 @@ int dpcppSetDevice(DeviceIndex device_index) {
   return DPCPP_SUCCESS;
 }
 
-DP::device dpcppGetRawDevice(DeviceIndex device_index) {
+DPCPP::device dpcppGetRawDevice(DeviceIndex device_index) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
   if (device_index >= (DeviceIndex)gDevPool.devices.size()) {
@@ -136,12 +136,12 @@ int dpcppGetDeviceIdFromPtr(DeviceIndex* device_id, void* ptr) {
   return DPCPP_SUCCESS;
 }
 
-DP::queue& dpcppGetCurrentQueue() {
+DPCPP::queue& dpcppGetCurrentQueue() {
   return getCurrentDPCPPStream().dpcpp_queue();
 }
 
-int64_t dpcppMaxWorkGroupSize(DP::queue& queue) {
-  return queue.get_device().get_info<dp_dev_max_wgroup_size>();
+int64_t dpcppMaxWorkGroupSize(DPCPP::queue& queue) {
+  return queue.get_device().get_info<dpcpp_dev_max_wgroup_size>();
 }
 
 int64_t dpcppMaxWorkGroupSize() {
@@ -149,8 +149,8 @@ int64_t dpcppMaxWorkGroupSize() {
   return dpcppMaxWorkGroupSize(queue);
 }
 
-int64_t dpcppMaxComputeUnitSize(DP::queue& queue) {
-  return queue.get_device().template get_info<DP::info::device::max_compute_units>();
+int64_t dpcppMaxComputeUnitSize(DPCPP::queue& queue) {
+  return queue.get_device().template get_info<DPCPP::info::device::max_compute_units>();
 }
 
 int64_t dpcppMaxComputeUnitSize() {

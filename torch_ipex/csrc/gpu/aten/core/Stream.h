@@ -123,7 +123,7 @@ public:
     return DPCPPStream(Stream::unpack(bits));
   }
 
-	DP::queue& dpcpp_queue() const;
+	DPCPP::queue& dpcpp_queue() const;
 
   // Explicit conversion to dpcppStream_t
   dpcppStream_t stream() const { return (dpcppStream_t)this->dpcpp_queue().get(); }
