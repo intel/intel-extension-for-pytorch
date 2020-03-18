@@ -6,13 +6,15 @@
 #include <vector>
 
 using namespace mkldnn;
-namespace at {
-namespace native {
+using namespace at::dpcpp;
+using namespace at::native;
 
-namespace {
+namespace at {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 template <typename scalar_t>
-static void avg_pool2d_out_sycl_frame(
+static void avg_pool2d_out_dpcpp_frame(
           scalar_t *input_data,
           scalar_t *output_data,
           int64_t nbatch,
@@ -30,7 +32,7 @@ static void avg_pool2d_out_sycl_frame(
           algorithm alg_kind,
           prop_kind prop_kind)
 {
-  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -53,10 +55,10 @@ static void avg_pool2d_out_sycl_frame(
   auto output_md = memory::desc({output_tz}, data_t, format_nchw);
 
   auto input_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(input_data, input_usr_memory);
+  dpcpp_set_mkldnn_buffer(input_data, input_usr_memory);
 
   auto output_usr_memory = memory({{{output_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(output_data, output_usr_memory);
+  dpcpp_set_mkldnn_buffer(output_data, output_usr_memory);
 
   std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
   pooling_forward_desc.reset(new pooling_forward::desc(
@@ -70,7 +72,7 @@ static void avg_pool2d_out_sycl_frame(
   // auto input_d = pooling_forward_pd->src_desc();
   auto input_memory = input_usr_memory;
 
-  // Currently, SYCL path doesn't support internal format.
+  // Currently, DPCPP path doesn't support internal format.
   // input has the same format with input_usr.
   // if (input_usr_memory.get_desc() != input_d) {
   //   input_memory = memory(input_d, engine);
@@ -100,7 +102,7 @@ static void avg_pool2d_out_sycl_frame(
 }
 
 template <typename scalar_t>
-static void avg_pool2d_backward_out_sycl_frame(
+static void avg_pool2d_backward_out_dpcpp_frame(
           scalar_t *gradInput_data,
           scalar_t *gradOutput_data,
           int64_t nbatch,
@@ -118,7 +120,7 @@ static void avg_pool2d_backward_out_sycl_frame(
           algorithm alg_kind,
           prop_kind prop_kind)
 {
-  at::Device curDevice = at::Device(at::kDPCPP, c10::sycl::current_device());
+  at::Device curDevice = at::Device(at::kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -135,10 +137,10 @@ static void avg_pool2d_backward_out_sycl_frame(
   auto output_md = memory::desc({output_tz}, data_t, format_nchw);
 
   auto diff_dst_usr_memory = memory({{{output_tz}, data_t, format_nchw}, engine});
-  at::native::sycl_set_mkldnn_buffer(gradOutput_data, diff_dst_usr_memory);
+  dpcpp_set_mkldnn_buffer(gradOutput_data, diff_dst_usr_memory);
 
   auto diff_src_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  at::native::sycl_set_mkldnn_buffer(gradInput_data, diff_src_usr_memory);
+  dpcpp_set_mkldnn_buffer(gradInput_data, diff_src_usr_memory);
 
   std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
   pooling_forward_desc.reset(new pooling_forward::desc(
@@ -160,7 +162,7 @@ static void avg_pool2d_backward_out_sycl_frame(
   // auto diff_dst_md = pooling_backward_pd->diff_dst_desc();
   auto diff_dst_memory = diff_dst_usr_memory;
 
-  // Currently, SYCL path doesn't support internal format.
+  // Currently, DPCPP path doesn't support internal format.
   // diff_dst has the same format with dst.
   // if (diff_dst_usr_memory.get_desc() != diff_dst_md) {
   //   diff_dst_memory = memory(diff_dst_md, engine);
@@ -191,7 +193,7 @@ static void avg_pool2d_backward_out_sycl_frame(
 }
 
 
-void avg_pool2d_out_sycl_template(
+void avg_pool2d_out_dpcpp_template(
   Tensor& output,
   const Tensor& input_,
   IntArrayRef kernel_size,
@@ -218,7 +220,7 @@ void avg_pool2d_out_sycl_template(
   const int padW = padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
 
   TORCH_CHECK((input_.ndimension() == 4),
-    "only support 4 dims on SYCL device now!");
+    "only support 4 dims on DPCPP device now!");
 
 
   /* sizes */
@@ -247,12 +249,12 @@ void avg_pool2d_out_sycl_template(
   auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(),
-    "avg_pool2d_out_sycl_frame",
+    "avg_pool2d_out_dpcpp_frame",
     [&] {
       scalar_t *input_data = input.data_ptr<scalar_t>();
       scalar_t *output_data = output.data_ptr<scalar_t>();
 
-      avg_pool2d_out_sycl_frame(
+      avg_pool2d_out_dpcpp_frame(
         input_data,
         output_data,
         nbatch,
@@ -268,7 +270,7 @@ void avg_pool2d_out_sycl_template(
   );
 }
 
-Tensor& avg_pool2d_backward_out_sycl_template(
+Tensor& avg_pool2d_backward_out_dpcpp_template(
   Tensor& gradInput,
   const Tensor& gradOutput_,
   const Tensor& input,
@@ -297,7 +299,7 @@ Tensor& avg_pool2d_backward_out_sycl_template(
 
   const int64_t ndim = input.ndimension();
   TORCH_CHECK((ndim == 4),
-    "only support 4 dims on SYCL device now!");
+    "only support 4 dims on DPCPP device now!");
 
 
   /* sizes */
@@ -329,12 +331,12 @@ Tensor& avg_pool2d_backward_out_sycl_template(
   auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES(input.scalar_type(),
-    "avg_pool2d_backward_out_sycl_frame",
+    "avg_pool2d_backward_out_dpcpp_frame",
     [&] {
        scalar_t *gradInput_data = gradInput.data_ptr<scalar_t>();
        scalar_t *gradOutput_data = gradOutput.data_ptr<scalar_t>();
 
-       avg_pool2d_backward_out_sycl_frame(
+       avg_pool2d_backward_out_dpcpp_frame(
          gradInput_data,
          gradOutput_data,
          nbatch,
@@ -350,10 +352,8 @@ Tensor& avg_pool2d_backward_out_sycl_template(
   );
   return gradInput;
 }
-} // namespace
 
-
-Tensor& avg_pool2d_out_sycl(
+Tensor& avg_pool2d_out_dpcpp(
   Tensor& output,
   const Tensor& input,
   IntArrayRef kernel_size,
@@ -364,8 +364,8 @@ Tensor& avg_pool2d_out_sycl(
   c10::optional<int64_t> divisor_override)
 {
   TORCH_CHECK(!divisor_override.has_value(),
-          "sycl_avg_pool2d operator does not support divisor");
-  avg_pool2d_out_sycl_template(
+          "dpcpp_avg_pool2d operator does not support divisor");
+  avg_pool2d_out_dpcpp_template(
     output,
     input,
     kernel_size,
@@ -376,7 +376,7 @@ Tensor& avg_pool2d_out_sycl(
   return output;
 }
 
-Tensor avg_pool2d_sycl(
+Tensor avg_pool2d_dpcpp(
   const Tensor& input,
   IntArrayRef kernel_size,
   IntArrayRef stride,
@@ -386,9 +386,9 @@ Tensor avg_pool2d_sycl(
   c10::optional<int64_t> divisor_override)
 {
   TORCH_CHECK(!divisor_override.has_value(),
-          "sycl_avg_pool2d operator does not support divisor");
+          "dpcpp_avg_pool2d operator does not support divisor");
   Tensor output = at::empty({0}, input.options());
-  avg_pool2d_out_sycl_template(
+  avg_pool2d_out_dpcpp_template(
     output,
     input,
     kernel_size,
@@ -399,7 +399,7 @@ Tensor avg_pool2d_sycl(
   return output;
 }
 
-Tensor& avg_pool2d_backward_out_sycl(
+Tensor& avg_pool2d_backward_out_dpcpp(
   Tensor& gradInput,
   const Tensor& gradOutput_,
   const Tensor& input,
@@ -411,8 +411,8 @@ Tensor& avg_pool2d_backward_out_sycl(
   c10::optional<int64_t> divisor_override)
 {
   TORCH_CHECK(!divisor_override.has_value(),
-          "sycl_avg_pool2d operator does not support divisor");
-  avg_pool2d_backward_out_sycl_template(
+          "dpcpp_avg_pool2d operator does not support divisor");
+  avg_pool2d_backward_out_dpcpp_template(
     gradInput,
     gradOutput_,
     input,
@@ -424,7 +424,7 @@ Tensor& avg_pool2d_backward_out_sycl(
   return gradInput;
 }
 
-Tensor avg_pool2d_backward_sycl(
+Tensor avg_pool2d_backward_dpcpp(
   const Tensor& gradOutput_,
   const Tensor& input,
   IntArrayRef kernel_size,
@@ -435,10 +435,10 @@ Tensor avg_pool2d_backward_sycl(
   c10::optional<int64_t> divisor_override)
 {
   TORCH_CHECK(!divisor_override.has_value(),
-          "sycl_avg_pool2d operator does not support divisor");
+          "dpcpp_avg_pool2d operator does not support divisor");
   auto gradInput = at::zeros_like(input);
 
-  avg_pool2d_backward_out_sycl_template(
+  avg_pool2d_backward_out_dpcpp_template(
     gradInput,
     gradOutput_,
     input,
@@ -450,11 +450,7 @@ Tensor avg_pool2d_backward_sycl(
   return gradInput;
 }
 
-} // at::native
-} // at
-
-namespace at {
-namespace AtenIpexTypeDPCPP {
+} // namespace impl
 
 Tensor& avg_pool2d_out(
   Tensor& output,
@@ -465,7 +461,7 @@ Tensor& avg_pool2d_out(
   bool ceil_mode,
   bool count_include_pad,
   c10::optional<int64_t> divisor_override) {
-  return at::native::avg_pool2d_out_sycl(output, input, kernel_size, stride,
+  return impl::avg_pool2d_out_dpcpp(output, input, kernel_size, stride,
       padding, ceil_mode, count_include_pad, divisor_override);
 }
 
@@ -477,7 +473,7 @@ Tensor avg_pool2d(
   bool ceil_mode,
   bool count_include_pad,
   c10::optional<int64_t> divisor_override) {
-  return at::native::avg_pool2d_sycl(input, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
+  return impl::avg_pool2d_dpcpp(input, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
 }
 
 Tensor & avg_pool2d_backward_out(
@@ -490,7 +486,7 @@ Tensor & avg_pool2d_backward_out(
   bool ceil_mode,
   bool count_include_pad,
   c10::optional<int64_t> divisor_override) {
-  return at::native::avg_pool2d_backward_out_sycl(grad_input, grad_output, input,
+  return impl::avg_pool2d_backward_out_dpcpp(grad_input, grad_output, input,
     kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
 }
 
@@ -503,7 +499,7 @@ Tensor avg_pool2d_backward(
   bool ceil_mode,
   bool count_include_pad,
   c10::optional<int64_t> divisor_override) {
-  return at::native::avg_pool2d_backward_sycl(grad_output, input, kernel_size,
+  return impl::avg_pool2d_backward_dpcpp(grad_output, input, kernel_size,
     stride, padding, ceil_mode, count_include_pad, divisor_override);
 }
 

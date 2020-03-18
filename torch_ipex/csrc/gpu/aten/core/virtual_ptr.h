@@ -20,7 +20,7 @@
  *  virtual_ptr.hpp
  *
  *  Description:
- *    Interface for SYCL buffers to behave as a non-dereferenceable pointer
+ *    Interface for DPCPP buffers to behave as a non-dereferenceable pointer
  *
  * Authors:
  *
@@ -30,7 +30,7 @@
  *
  **************************************************************************/
 
-#include <CL/sycl.hpp>
+#include <core/DPCPP.h>
 
 #include <cstddef>
 #include <queue>
@@ -42,15 +42,15 @@ namespace cl {
 namespace sycl {
 namespace codeplay {
 
-using sycl_acc_target = cl::sycl::access::target;
-using sycl_acc_mode = cl::sycl::access::mode;
+using dpcpp_acc_target = DP::access::target;
+using dpcpp_acc_mode = DP::access::mode;
 
 /**
  * Default values for template arguments
  */
 using buffer_data_type_t = uint8_t;
-const sycl_acc_target default_acc_target = sycl_acc_target::global_buffer;
-const sycl_acc_mode default_acc_mode = sycl_acc_mode::read_write;
+const dpcpp_acc_target default_acc_target = dpcpp_acc_target::global_buffer;
+const dpcpp_acc_mode default_acc_mode = dpcpp_acc_mode::read_write;
 
 /**
  * PointerMapper
@@ -144,7 +144,7 @@ class PointerMapper {
 
   /* basic type for all buffers
    */
-  using buffer_t = cl::sycl::buffer<buffer_data_type_t>;
+  using buffer_t = DP::buffer<buffer_data_type_t>;
 
   /**
    * Node that stores information about a device allocation.
@@ -230,15 +230,15 @@ class PointerMapper {
    * Returns a buffer from the map using the pointer address
    */
   template <typename buffer_data_type = buffer_data_type_t>
-  cl::sycl::buffer<buffer_data_type, 1> get_buffer(
+  DP::buffer<buffer_data_type, 1> get_buffer(
       const virtual_pointer_t ptr) {
-    using sycl_buffer_t = cl::sycl::buffer<buffer_data_type, 1>;
+    using dpcpp_buffer_t = DP::buffer<buffer_data_type, 1>;
 
     // get_node() returns a `buffer_mem`, so we need to cast it to a `buffer<>`.
     // We can do this without the `buffer_mem` being a pointer, as we
     // only declare member variables in the base class (`buffer_mem`) and not in
     // the child class (`buffer<>).
-    return *((sycl_buffer_t*)(&get_node(ptr)->second.m_buffer));
+    return *((dpcpp_buffer_t*)(&get_node(ptr)->second.m_buffer));
   }
 
   /**
@@ -247,10 +247,10 @@ class PointerMapper {
    * @param accessTarget
    * @param ptr The virtual pointer
    */
-  template <sycl_acc_mode access_mode = default_acc_mode,
-            sycl_acc_target access_target = default_acc_target,
+  template <dpcpp_acc_mode access_mode = default_acc_mode,
+            dpcpp_acc_target access_target = default_acc_target,
             typename buffer_data_type = buffer_data_type_t>
-  cl::sycl::accessor<buffer_data_type, 1, access_mode, access_target>
+  DP::accessor<buffer_data_type, 1, access_mode, access_target>
   get_access(const virtual_pointer_t ptr) {
     auto buf = get_buffer<buffer_data_type>(ptr);
     return buf.template get_access<access_mode>();
@@ -264,11 +264,11 @@ class PointerMapper {
    * @param ptr The virtual pointer
    * @param cgh Reference to the command group scope
    */
-  template <sycl_acc_mode access_mode = default_acc_mode,
-            sycl_acc_target access_target = default_acc_target,
+  template <dpcpp_acc_mode access_mode = default_acc_mode,
+            dpcpp_acc_target access_target = default_acc_target,
             typename buffer_data_type = buffer_data_type_t>
-  cl::sycl::accessor<buffer_data_type, 1, access_mode, access_target>
-  get_access(const virtual_pointer_t ptr, cl::sycl::handler& cgh) {
+  DP::accessor<buffer_data_type, 1, access_mode, access_target>
+  get_access(const virtual_pointer_t ptr, DP::handler& cgh) {
     auto buf = get_buffer<buffer_data_type>(ptr);
     return buf.template get_access<access_mode, access_target>(cgh);
   }
@@ -498,15 +498,15 @@ inline void PointerMapper::remove_pointer<false>(const virtual_pointer_t ptr) {
  * Given a size, creates a byte-typed buffer and returns a
  * fake pointer to keep track of it.
  * \param size Size in bytes of the desired allocation
- * \throw cl::sycl::exception if error while creating the buffer
+ * \throw DP::exception if error while creating the buffer
  */
-inline void* SYCLmalloc(size_t size, PointerMapper& pMap, const property_list &pList = {}) {
+inline void* DPCPPmalloc(size_t size, PointerMapper& pMap, const property_list &pList = {}) {
   if (size == 0) {
     return nullptr;
   }
   // Create a generic buffer of the given size
-  using sycl_buffer_t = cl::sycl::buffer<buffer_data_type_t, 1>;
-  auto thePointer = pMap.add_pointer(sycl_buffer_t(cl::sycl::range<1>{size}, pList));
+  using dpcpp_buffer_t = DP::buffer<buffer_data_type_t, 1>;
+  auto thePointer = pMap.add_pointer(dpcpp_buffer_t(DP::range<1>{size}, pList));
   // Store the buffer on the global list
   return static_cast<void*>(thePointer);
 }
@@ -519,18 +519,18 @@ inline void* SYCLmalloc(size_t size, PointerMapper& pMap, const property_list &p
  * it should be false only for sub-buffers.
  */
 template <bool ReUse = true, typename PointerMapper>
-inline void SYCLfree(void* ptr, PointerMapper& pMap) {
+inline void DPCPPfree(void* ptr, PointerMapper& pMap) {
   pMap.template remove_pointer<ReUse>(ptr);
 }
 
 /**
- * Clear all the memory allocated by SYCL.
+ * Clear all the memory allocated by DPCPP.
  */
 template <typename PointerMapper>
-inline void SYCLfreeAll(PointerMapper& pMap) {
+inline void DPCPPfreeAll(PointerMapper& pMap) {
   pMap.clear();
 }
 
 }  // codeplay
-}  // sycl
+}  // dpcpp
 }  // cl

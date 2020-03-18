@@ -7,15 +7,17 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <core/Memory.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Context.h>
 
 
-namespace at { namespace native {
+using namespace at::dpcpp;
+
+namespace at { namespace dpcpp {
 
 #define MAX_INPUT_TENSOR_NUM 3
 #define MAX_TOTAL_TENSOR_NUM 4
-// Work around for passing the offsets to the sycl kernel instead of using OffsetCalculator.
+// Work around for passing the offsets to the dpcpp kernel instead of using OffsetCalculator.
 // Need to change it back to OffsetCalculator with dpcpp
 template <typename IndexType = uint32_t>
 struct SyclOffsetCal {
@@ -79,11 +81,11 @@ dereference(ptr_t data[], const index_t strides[], int i) {
 }
 
 // This is a workaround for the compute cpp's issue and limitation.
-// 1. The SYCLAccessor cannot be put in container because there is no default constructor in accessor.
-// 2. The SYCLAccessor cannot be *new* because the sycl kernel doesn't accept host pointer.
-// 3. The SYCLAccessor cannot be in tuples because the sycl kernel doesn't accept the std::tuple. (But also variance template class)
-// 4. The SYCLAccessor cannot be passed to sycl kernel in array like: SYCLAccessor acc[1] = {SYCLAccessor(cgh, vptr)}.
-//    Because of unknown compute cpp bug, the sycl kernel always got random data by passing SYCLAccessor array.
+// 1. The DPCPPAccessor cannot be put in container because there is no default constructor in accessor.
+// 2. The DPCPPAccessor cannot be *new* because the dpcpp kernel doesn't accept host pointer.
+// 3. The DPCPPAccessor cannot be in tuples because the dpcpp kernel doesn't accept the std::tuple. (But also variance template class)
+// 4. The DPCPPAccessor cannot be passed to dpcpp kernel in array like: DPCPPAccessor acc[1] = {DPCPPAccessor(cgh, vptr)}.
+//    Because of unknown compute cpp bug, the dpcpp kernel always got random data by passing DPCPPAccessor array.
 // To add the repeating accessor and pointer code pair in macro.
 #define CHR1( x, y ) x##y
 #define CHR( x, y ) CHR1( x, y )
@@ -147,9 +149,9 @@ dereference(ptr_t data[], const index_t strides[], int i) {
 
 #define REPEAT_PATTERN( n, f ) CHR( REPEAT_, DEC( n ) )( DEC( n ), f )
 
-DP_DEF_K1(sycl_loops_kernel_impl);
+DP_DEF_K1(dpcpp_loops_kernel_impl);
 template <typename kernel_name, typename func_t>
-void sycl_loops_kernel_impl(TensorIterator& iter, const func_t f) {
+void dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
   using traits = function_traits<func_t>;
   TORCH_INTERNAL_ASSERT(iter.can_use_32bit_indexing());
   TORCH_INTERNAL_ASSERT(iter.ntensors() == traits::arity + 1);
@@ -167,11 +169,11 @@ void sycl_loops_kernel_impl(TensorIterator& iter, const func_t f) {
     in_data[i] = (char*)iter.data_ptr(i + 1);
   }
 
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = c10::sycl::SYCLAccessor<dp_discard_w_mode>;
-  using in_accessor_t = c10::sycl::SYCLAccessor<dp_r_mode>;
-  using in_ptr_t = typename cl::sycl::global_ptr<char>::pointer_t;
+  using out_accessor_t = DPCPPAccessor<dp_discard_w_mode>;
+  using in_accessor_t = DPCPPAccessor<dp_r_mode>;
+  using in_ptr_t = typename DP::global_ptr<char>::pointer_t;
 
   auto cgf = DP_Q_CGF(__cgh) {
     out_accessor_t out_acc = out_accessor_t (__cgh, out_data);
@@ -205,16 +207,16 @@ void sycl_loops_kernel_impl(TensorIterator& iter, const func_t f) {
               1));
     };
 
-    __cgh.parallel_for<DP_K(sycl_loops_kernel_impl, kernel_name, ret_t)>(
+    __cgh.parallel_for<DP_K(dpcpp_loops_kernel_impl, kernel_name, ret_t)>(
             DP::range</*dim=*/1>(numel), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 
 template <typename scalar_t, typename func_t>
-void sycl_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
+void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
 
   for (int arg = 0; arg < iter.ntensors(); arg++) {
     TORCH_INTERNAL_ASSERT(iter.device(arg).type() == at::kDPCPP);
@@ -226,12 +228,12 @@ void sycl_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
 
   if (!iter.can_use_32bit_indexing()) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
-      sycl_kernel_for_tensor_iter<scalar_t > (sub_iter, f);
+      dpcpp_kernel_for_tensor_iter<scalar_t > (sub_iter, f);
     }
     return;
   }
 
-  sycl_loops_kernel_impl<scalar_t>(iter, f);
+  dpcpp_loops_kernel_impl<scalar_t>(iter, f);
 }
 
 
@@ -281,21 +283,21 @@ template<class op_type, typename arg0_t, typename arg1_t, typename arg2_t>
 class KernelName {};
 
 template <class op_type, typename func_t>
-static inline void sycl_binary_loop(char** data, const int64_t* strides, int64_t i, int64_t n,  const func_t op) {
+static inline void dpcpp_binary_loop(char** data, const int64_t* strides, int64_t i, int64_t n,  const func_t op) {
   LOOP_HEADER(func_t, data, strides)
-  static const auto write_mode = cl::sycl::access::mode::discard_write;
-  static const auto read_mode = cl::sycl::access::mode::read;
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  static const auto write_mode = DP::access::mode::discard_write;
+  static const auto read_mode = DP::access::mode::read;
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   int64_t rng, GRange, tileSize;
-  c10::sycl::parallel_for_setup(n, tileSize, rng, GRange);
-  sycl_queue.submit([&](cl::sycl::handler& cgh) {
+  parallel_for_setup(n, tileSize, rng, GRange);
+  dpcpp_queue.submit([&](DP::handler& cgh) {
 
-    auto in1_Acc = c10::sycl::SYCLAccessor<read_mode>(cgh, in1_ptr, n * s1);
-    auto in2_Acc = c10::sycl::SYCLAccessor<read_mode>(cgh, in2_ptr, n * s2);
-    auto out_Acc = c10::sycl::SYCLAccessor<write_mode>(cgh, out_ptr, n * s0);
+    auto in1_Acc = DPCPPAccessor<read_mode>(cgh, in1_ptr, n * s1);
+    auto in2_Acc = DPCPPAccessor<read_mode>(cgh, in2_ptr, n * s2);
+    auto out_Acc = DPCPPAccessor<write_mode>(cgh, out_ptr, n * s0);
     cgh.parallel_for<KernelName<op_type, arg0_t, arg1_t, arg2_t> >(
-            cl::sycl::nd_range<1>(cl::sycl::range<1>(GRange), cl::sycl::range<1>(tileSize)),
-            [=](cl::sycl::nd_item<1> item){
+            DP::nd_range<1>(DP::range<1>(GRange), DP::range<1>(tileSize)),
+            [=](DP::nd_item<1> item){
               int64_t globalid = item.get_global_linear_id();
               auto input1_ptr = in1_Acc.template get_pointer<arg1_t>();
               auto input2_ptr = in2_Acc.template get_pointer<arg2_t>();
@@ -310,7 +312,7 @@ static inline void sycl_binary_loop(char** data, const int64_t* strides, int64_t
 }
 
 template<class op_type, typename func_t>
-void sycl_binary_kernel(TensorIterator& iter, const func_t& op) {
+void dpcpp_binary_kernel(TensorIterator& iter, const func_t& op) {
   using traits = binary_function_traits<func_t>;
   static_assert(
           std::is_same<typename traits::result_type, typename traits::arg1_t>::value,
@@ -332,20 +334,20 @@ void sycl_binary_kernel(TensorIterator& iter, const func_t& op) {
 
   iter.for_each([&](char** data, const int64_t* strides, int64_t n) {
     if (is_binary_contiguous<traits>(strides)) {
-      sycl_binary_loop<op_type>(data, strides, 0, n, op);
+      dpcpp_binary_loop<op_type>(data, strides, 0, n, op);
     } else if (is_binary_contiguous_s1<traits>(strides)) {
-      sycl_binary_loop<op_type>(data, strides, 0, n, op);
+      dpcpp_binary_loop<op_type>(data, strides, 0, n, op);
     } else if (is_binary_contiguous_s2<traits>(strides)) {
-      sycl_binary_loop<op_type>(data, strides, 0, n, op);
+      dpcpp_binary_loop<op_type>(data, strides, 0, n, op);
     } else{
-      sycl_binary_loop<op_type>(data, strides, 0, n, op);
+      dpcpp_binary_loop<op_type>(data, strides, 0, n, op);
     }
   });
 }
 
-DP_DEF_K1(sycl_index_kernel);
+DP_DEF_K1(dpcpp_index_kernel);
 template <typename kernel_name, typename func_t>
-void sycl_index_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRef index_stride, const func_t f) {
+void dpcpp_index_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRef index_stride, const func_t f) {
   auto numel = iter.numel();
 
   if (iter.numel() == 0) {
@@ -354,7 +356,7 @@ void sycl_index_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRef
 
   if (!iter.can_use_32bit_indexing()) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
-      sycl_index_kernel<kernel_name>(sub_iter, index_size, index_stride, f);
+      dpcpp_index_kernel<kernel_name>(sub_iter, index_size, index_stride, f);
     }
     return;
   }
@@ -376,11 +378,11 @@ void sycl_index_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRef
     index_ptrs[i] = (char*)iter.data_ptr(i + 2);
   }
 
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = c10::sycl::SYCLAccessor<dp_discard_w_mode>;
-  using in_accessor_t = c10::sycl::SYCLAccessor<dp_r_mode>;
-  using sycl_ptr_t = typename cl::sycl::global_ptr<char>::pointer_t;
+  using out_accessor_t = DPCPPAccessor<dp_discard_w_mode>;
+  using in_accessor_t = DPCPPAccessor<dp_r_mode>;
+  using dpcpp_ptr_t = typename DP::global_ptr<char>::pointer_t;
 
   auto cgf = DP_Q_CGF(__cgh) {
     out_accessor_t out_acc = out_accessor_t (__cgh, out_data);
@@ -395,7 +397,7 @@ void sycl_index_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRef
     auto kfn = DP_Q_KFN(DP::item<1> item_id)  {
       auto out_ptr = out_acc.template get_pointer<char>();
       auto in_ptr = in_acc.template get_pointer<char>();
-      at::detail::Array<sycl_ptr_t, MAX_TENSORINFO_DIMS> index_ptr;
+      at::detail::Array<dpcpp_ptr_t, MAX_TENSORINFO_DIMS> index_ptr;
 
 #define ACCESSOR_DEREFER(n) index_ptr[n] = in_acc_##n.template get_pointer<char>();
       REPEAT_PATTERN(MAX_TENSORINFO_DIMS, ACCESSOR_DEREFER)
@@ -422,10 +424,10 @@ void sycl_index_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRef
       f(out_ptr, in_ptr, offset);
     };
 
-    __cgh.parallel_for<DP_K(sycl_index_kernel, kernel_name)>(
+    __cgh.parallel_for<DP_K(dpcpp_index_kernel, kernel_name)>(
             DP::range</*dim=*/1>(numel), kfn);
   };
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-}} // namespace at::native
+}} // namespace at::dpcpp

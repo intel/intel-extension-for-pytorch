@@ -7,7 +7,9 @@
 #include <utils/Atomics.h>
 #include <utils/Numerics.h>
 
-using namespace at::sycl::detail;
+using namespace at::dpcpp::detail;
+using namespace at::dpcpp;
+
 // Compute the offsets into the given tensors for a linear index. For the 't2'
 // tensor, dimension 'dim' is skipped. The tensors are assumed to have the same
 // size (with the exception of 't2' in dimension 'dim').
@@ -79,20 +81,20 @@ struct IndexToScatterGatherOffsets<IndexType, Real, -1> {
   }
 };
 
-//DP_DEF_K1(sycl_gather_kernel);
-template <typename IndexType, typename Real, int Dims> class sycl_gather_kernel{};
+//DP_DEF_K1(dpcpp_gather_kernel);
+template <typename IndexType, typename Real, int Dims> class dpcpp_gather_kernel{};
 template <typename IndexType, typename Real, int Dims>
-void THSYCLTensor_gatherKernel(
+void THDPCPPTensor_gatherKernel(
         TensorInfo<Real, IndexType> tensor,
         TensorInfo<Real, IndexType> src,
         TensorInfo<int64_t, IndexType> index,
         const int dim,
         const IndexType totalElements) {
 
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = c10::sycl::SYCLAccessor<dp_discard_w_mode>;
-  using in_accessor_t = c10::sycl::SYCLAccessor<dp_r_mode>;
+  using out_accessor_t = DPCPPAccessor<dp_discard_w_mode>;
+  using in_accessor_t = DPCPPAccessor<dp_r_mode>;
 
   auto cgf = DP_Q_CGF(__cgh) {
     out_accessor_t tensor_acc = out_accessor_t (__cgh, tensor.data);
@@ -126,11 +128,11 @@ void THSYCLTensor_gatherKernel(
 
     };
 
-    __cgh.parallel_for</*DP_K(sycl_gather_kernel, Real, IndexType, Dims)*/
-            sycl_gather_kernel<Real, IndexType, Dims>>(
+    __cgh.parallel_for</*DP_K(dpcpp_gather_kernel, Real, IndexType, Dims)*/
+            dpcpp_gather_kernel<Real, IndexType, Dims>>(
             DP::range</*dim=*/1>(totalElements), kfn);
   };
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
 }
 
@@ -143,15 +145,15 @@ void THSyclTensor_scatterKernel(
     const int dim,
     const IndexType totalElements) {
 
-  auto queue         = c10::sycl::syclGetCurrentQueue();
-  IndexType group_size = (IndexType)c10::sycl::syclMaxWorkGroupSize(queue);
+  auto queue         = dpcppGetCurrentQueue();
+  IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(queue);
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto acc_out = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, tensor.data);
-    auto acc_src = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, src.data);
-    auto acc_index = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, index.data);
+    auto acc_out = DPCPPAccessor<dp_w_mode>(cgh, tensor.data);
+    auto acc_src = DPCPPAccessor<dp_r_mode>(cgh, src.data);
+    auto acc_index = DPCPPAccessor<dp_r_mode>(cgh, index.data);
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto tensor_ptr = acc_out.template get_pointer<Real>();
       auto src_ptr = acc_src.template get_pointer<Real>();
@@ -193,15 +195,15 @@ void THSyclTensor_scatterAddKernel(
     const int dim,
     const IndexType totalElements) {
   
-  auto queue         = c10::sycl::syclGetCurrentQueue();
-  IndexType group_size = (IndexType)c10::sycl::syclMaxWorkGroupSize(queue);
+  auto queue         = dpcppGetCurrentQueue();
+  IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(queue);
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto acc_out = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, tensor.data);
-    auto acc_src = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, src.data);
-    auto acc_index = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, index.data);
+    auto acc_out = DPCPPAccessor<dp_w_mode>(cgh, tensor.data);
+    auto acc_src = DPCPPAccessor<dp_r_mode>(cgh, src.data);
+    auto acc_index = DPCPPAccessor<dp_r_mode>(cgh, index.data);
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto tensor_ptr = acc_out.template get_pointer<Real>();
       auto src_ptr = acc_src.template get_pointer<Real>();
@@ -242,14 +244,14 @@ void THSyclTensor_scatterFillKernel(
         const int dim,
         const IndexType totalElements) {
 
-  auto queue         = c10::sycl::syclGetCurrentQueue();
-  IndexType group_size = (IndexType)c10::sycl::syclMaxWorkGroupSize(queue);
+  auto queue         = dpcppGetCurrentQueue();
+  IndexType group_size = (IndexType)dpcppMaxWorkGroupSize(queue);
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto acc_out = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, tensor.data);
-    auto acc_index = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, index.data);
+    auto acc_out = DPCPPAccessor<dp_w_mode>(cgh, tensor.data);
+    auto acc_index = DPCPPAccessor<dp_r_mode>(cgh, index.data);
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto tensor_ptr = acc_out.template get_pointer<Real>();
       auto index_ptr = acc_index.template get_pointer<int64_t>();

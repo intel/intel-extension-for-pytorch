@@ -1,9 +1,11 @@
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/Exception.h>
 #include <c10/core/Allocator.h>
 #include <mutex>
 
+
+using namespace at::dpcpp;
 
 struct NaiveAllocator {
   //lock around all operations
@@ -11,18 +13,18 @@ struct NaiveAllocator {
 
   void* malloc(size_t num_bytes) {
     std::lock_guard<std::mutex> lock(mutex_);
-    auto ptr = c10::sycl::syclMalloc(num_bytes);
+    auto ptr = dpcppMalloc(num_bytes);
     return static_cast<void*>(ptr);
   }
 
   void free(void* p) {
     std::lock_guard<std::mutex> lock(mutex_);
-    c10::sycl::syclFree(p);
+    dpcppFree(p);
   }
 
   void free_all() {
     std::lock_guard<std::mutex> lock(mutex_);
-    c10::sycl::syclFreeAll();
+    dpcppFreeAll();
   }
 };
 
@@ -36,7 +38,7 @@ struct DPCPPDefaultAllocator : public at::Allocator {
 
   at::DataPtr allocate(size_t size) const override {
     at::DeviceIndex device;
-    C10_SYCL_CHECK(c10::sycl::syclGetDevice(&device));
+    AT_DPCPP_CHECK(dpcppGetDevice(&device));
     void* p = nullptr;
     if (size != 0) {
       p = naive_allocator.malloc(size);

@@ -2,7 +2,7 @@
 
 #include <c10/core/StorageImpl.h>
 
-namespace at { namespace native {
+namespace at { namespace dpcpp {
 
 void StorageImpl_resize(at::StorageImpl *self, ptrdiff_t size);
 int StorageImpl_getDevice(const at::StorageImpl* storage);

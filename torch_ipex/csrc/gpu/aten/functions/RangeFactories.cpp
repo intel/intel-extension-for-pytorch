@@ -11,13 +11,17 @@
 #include <cmath>
 #include <limits>
 
-namespace at {
-namespace native {
 
-DP_DEF_K1(linspace_sycl_ker);
-DP_DEF_K1(logspace_sycl_ker);
-DP_DEF_K1(range_sycl_ker);
-DP_DEF_K1(arange_sycl_ker);
+using namespace at::dpcpp;
+
+namespace at {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
+
+DP_DEF_K1(linspace_dpcpp_ker);
+DP_DEF_K1(logspace_dpcpp_ker);
+DP_DEF_K1(range_dpcpp_ker);
+DP_DEF_K1(arange_dpcpp_ker);
 
 template <typename T, typename accT = T>
 class LinspaceOp {
@@ -45,7 +49,7 @@ struct LogspaceOp {
   const accT start_, step_, base_;
 };
 
-Tensor& linspace_sycl_out(Tensor& result, Scalar start, Scalar end, int64_t steps) {
+Tensor& linspace_dpcpp_out(Tensor& result, Scalar start, Scalar end, int64_t steps) {
   TORCH_CHECK(steps >= 0, "number of steps must be non-negative");
 
   if (result.numel() != steps) {
@@ -58,26 +62,26 @@ Tensor& linspace_sycl_out(Tensor& result, Scalar start, Scalar end, int64_t step
   } else if (steps == 1) {
     r.fill_(start);
   } else {
-    AT_DISPATCH_FLOATING_TYPES(r.scalar_type(), "linspace_sycl", [&]() {
+    AT_DISPATCH_FLOATING_TYPES(r.scalar_type(), "linspace_dpcpp", [&]() {
       scalar_t scalar_start = start.to<scalar_t>();
       scalar_t scalar_end = end.to<scalar_t>();
       scalar_t step = (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
       LinspaceOp<scalar_t> linspace_method(scalar_start, step);
-      auto sycl_queue = c10::sycl::syclGetCurrentQueue();
+      auto dpcpp_queue = dpcppGetCurrentQueue();
       auto cgf = DP_Q_CGF(cgh) {
-        auto acc = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, r.data_ptr<scalar_t>());
+        auto acc = DPCPPAccessor<dp_discard_w_mode>(cgh, r.data_ptr<scalar_t>());
         // kernel function per work-item
         auto kfn = DP_Q_KFN() {
           dp_global_ptr_pt<scalar_t> ptr = acc.template get_pointer<scalar_t>();
-          sycl_tabulate(ptr, ptr + steps, linspace_method);
+          dpcpp_tabulate(ptr, ptr + steps, linspace_method);
         };
         // kick off kernel
         // (TODO) single_task need replaced due to low efficiency
-        cgh.single_task<DP_K(linspace_sycl_ker, scalar_t)>(kfn);
+        cgh.single_task<DP_K(linspace_dpcpp_ker, scalar_t)>(kfn);
       };
 
-      // submit to SYCL queue
-      DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+      // submit to DPCPP queue
+      DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
     });
   }
@@ -89,7 +93,7 @@ Tensor& linspace_sycl_out(Tensor& result, Scalar start, Scalar end, int64_t step
 
 }
 
-Tensor& logspace_sycl_out(Tensor& result, Scalar start, Scalar end, int64_t steps, double base) {
+Tensor& logspace_dpcpp_out(Tensor& result, Scalar start, Scalar end, int64_t steps, double base) {
   TORCH_CHECK(steps >= 0, "number of steps must be non-negative");
 
   if (result.numel() != steps) {
@@ -102,27 +106,27 @@ Tensor& logspace_sycl_out(Tensor& result, Scalar start, Scalar end, int64_t step
   } else if (steps == 1) {
     r.fill_(Numerics<double>::pow(10.0, start.to<double>()));
   } else {
-    AT_DISPATCH_FLOATING_TYPES(r.scalar_type(), "logspace_sycl", [&]() {
+    AT_DISPATCH_FLOATING_TYPES(r.scalar_type(), "logspace_dpcpp", [&]() {
       scalar_t scalar_base = static_cast<scalar_t>(base);
       scalar_t scalar_start = start.to<scalar_t>();
       scalar_t scalar_end = end.to<scalar_t>();
       scalar_t step = (scalar_end - scalar_start) / static_cast<scalar_t>(steps - 1);
       LogspaceOp<scalar_t> logspace_method(scalar_start, step, scalar_base);
-      auto sycl_queue = c10::sycl::syclGetCurrentQueue();
+      auto dpcpp_queue = dpcppGetCurrentQueue();
       auto cgf = DP_Q_CGF(cgh) {
-        auto acc = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, r.data_ptr<scalar_t>());
+        auto acc = DPCPPAccessor<dp_discard_w_mode>(cgh, r.data_ptr<scalar_t>());
         // kernel function per work-item
         auto kfn = DP_Q_KFN() {
           dp_global_ptr_pt<scalar_t> ptr = acc.template get_pointer<scalar_t>();
-          sycl_tabulate(ptr, ptr + steps, logspace_method);
+          dpcpp_tabulate(ptr, ptr + steps, logspace_method);
         };
         // kick off kernel
         // (TODO) single_task need replaced due to low efficiency
-        cgh.single_task<DP_K(logspace_sycl_ker, scalar_t)>(kfn);
+        cgh.single_task<DP_K(logspace_dpcpp_ker, scalar_t)>(kfn);
       };
 
-      // submit to SYCL queue
-      DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+      // submit to DPCPP queue
+      DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
     });
   }
@@ -134,8 +138,8 @@ Tensor& logspace_sycl_out(Tensor& result, Scalar start, Scalar end, int64_t step
   return result;
 }
 
-Tensor& range_sycl_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, result.scalar_type(), "range_sycl", [&]() {
+Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
+  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, result.scalar_type(), "range_dpcpp", [&]() {
     using accscalar_t = at::acc_type<scalar_t, true>;
     auto xstart = start.to<accscalar_t>();
     auto xend = end.to<accscalar_t>();
@@ -153,25 +157,25 @@ Tensor& range_sycl_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
     }
     Tensor r = result.is_contiguous() ? result : result.contiguous();
     LinspaceOp<scalar_t, accscalar_t> linspace_method(xstart, xstep);
-    auto sycl_queue = c10::sycl::syclGetCurrentQueue();
+    auto dpcpp_queue = dpcppGetCurrentQueue();
 
     // command group functions
     auto cgf = DP_Q_CGF(cgh) {
-        auto acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, r.data_ptr<scalar_t>());
+        auto acc = DPCPPAccessor<dp_r_mode>(cgh, r.data_ptr<scalar_t>());
 
         // kernel function per work-item
         auto kfn = DP_Q_KFN() {
           dp_global_ptr_pt<scalar_t> ptr =
               acc.template get_pointer<scalar_t>();
-          sycl_tabulate(ptr, ptr + size, linspace_method);
+          dpcpp_tabulate(ptr, ptr + size, linspace_method);
         };
         // kick off kernel
         // (TODO) single_task need replaced due to low efficiency
-        cgh.single_task<DP_K(range_sycl_ker, scalar_t)>(kfn);
+        cgh.single_task<DP_K(range_dpcpp_ker, scalar_t)>(kfn);
     };
 
-    // submit to SYCL queue
-    DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+    // submit to DPCPP queue
+    DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
     if (!result.is_contiguous()) {
       result.copy_(r);
@@ -181,8 +185,8 @@ Tensor& range_sycl_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
   return result;
 }
 
-Tensor& arange_sycl_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, result.scalar_type(), "arange_sycl", [&]() {
+Tensor& arange_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
+  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, result.scalar_type(), "arange_dpcpp", [&]() {
     using accscalar_t = at::acc_type<scalar_t, true>;
     auto xstart = start.to<accscalar_t>();
     auto xend = end.to<accscalar_t>();
@@ -219,49 +223,49 @@ Tensor& arange_sycl_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
       result.resize_({size});
     }
     LinspaceOp<scalar_t, accscalar_t> linspace_method(xstart, xstep);
-    auto sycl_queue = c10::sycl::syclGetCurrentQueue();
+    auto dpcpp_queue = dpcppGetCurrentQueue();
 
     // command group functions
     auto cgf = DP_Q_CGF(cgh) {
-        auto acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, result.data_ptr<scalar_t>());
+        auto acc = DPCPPAccessor<dp_r_mode>(cgh, result.data_ptr<scalar_t>());
 
         // kernel function per work-item
         auto kfn = DP_Q_KFN() {
           dp_global_ptr_pt<scalar_t> ptr =
               acc.template get_pointer<scalar_t>();
-          sycl_tabulate(ptr, ptr + size, linspace_method);
+          dpcpp_tabulate(ptr, ptr + size, linspace_method);
         };
         // kick off kernel
         // (TODO) single_task need replaced due to low efficiency
-        cgh.single_task<DP_K(arange_sycl_ker, scalar_t)>(kfn);
+        cgh.single_task<DP_K(arange_dpcpp_ker, scalar_t)>(kfn);
     };
 
-    // submit to SYCL queue
-    DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+    // submit to DPCPP queue
+    DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
   });
   return result;
 }
-}} // namespace at
 
-namespace at { namespace AtenIpexTypeDPCPP {
+} // namespace impl
+
 Tensor & linspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps){
-  at::native::linspace_sycl_out(out, start, end, steps);
+  impl::linspace_dpcpp_out(out, start, end, steps);
   return out;
 }
 
 Tensor & logspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps, double base){
-  at::native::logspace_sycl_out(out, start, end, steps, base);
+  impl::logspace_dpcpp_out(out, start, end, steps, base);
   return out;
 }
 
 Tensor & range_out(Tensor & out, Scalar start, Scalar end, Scalar step){
-  at::native::range_sycl_out(out, start, end, step);
+  impl::range_dpcpp_out(out, start, end, step);
   return out;
 }
 
 Tensor & arange_out(Tensor & out, Scalar start, Scalar end, Scalar step){
-  at::native::arange_sycl_out(out, start, end, step);
+  impl::arange_dpcpp_out(out, start, end, step);
   return out;
 }
 

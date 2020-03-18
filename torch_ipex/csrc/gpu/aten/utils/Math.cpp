@@ -8,20 +8,20 @@ DP_DEF_K1(memory_scale);
 DP_DEF_K1(memory_scale1);
 DP_DEF_K1(memory_scale2);
 
-namespace c10 {
-namespace sycl {
+namespace at {
+namespace dpcpp {
 
 // dst = src * alpha
-void syclMemoryScale(void * dst, const void * src, size_t n_elements, const float alpha)
+void dpcppMemoryScale(void * dst, const void * src, size_t n_elements, const float alpha)
 {
   static constexpr auto write_mode = DP::access::mode::discard_write;
   static constexpr auto read_mode = DP::access::mode::read;
-  auto &sycl_queue = getCurrentSYCLStream().sycl_queue();
-  auto total_threads = sycl_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
+  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto total_threads = dpcpp_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, src);
-    auto out_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, dst);
+    auto in_acc = DPCPPAccessor<read_mode>(cgh, src);
+    auto out_acc = DPCPPAccessor<write_mode>(cgh, dst);
     cgh.parallel_for<DP_K(memory_scale)>(
             DP::range<1>(total_threads),
             [=](DP::item<1> itemId) {
@@ -34,20 +34,20 @@ void syclMemoryScale(void * dst, const void * src, size_t n_elements, const floa
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 // dst = src * eps + dst * (1 - eps)
-void syclMemoryScale1(void * dst, const void * src, size_t n_elements, const double eps)
+void dpcppMemoryScale1(void * dst, const void * src, size_t n_elements, const double eps)
 {
   static constexpr auto write_mode = DP::access::mode::discard_write;
   static constexpr auto read_mode = DP::access::mode::read;
-  auto &sycl_queue = getCurrentSYCLStream().sycl_queue();
-  auto total_threads = sycl_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
+  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto total_threads = dpcpp_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, src);
-    auto out_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, dst);
+    auto in_acc = DPCPPAccessor<read_mode>(cgh, src);
+    auto out_acc = DPCPPAccessor<write_mode>(cgh, dst);
     cgh.parallel_for<DP_K(memory_scale1)>(
             DP::range<1>(total_threads),
             [=](DP::item<1> itemId) {
@@ -60,20 +60,20 @@ void syclMemoryScale1(void * dst, const void * src, size_t n_elements, const dou
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 // dst = src * alpha * eps + dst * (1 - eps)
-void syclMemoryScale2(void * dst, const void * src, size_t n_elements, const float alpha, const double eps)
+void dpcppMemoryScale2(void * dst, const void * src, size_t n_elements, const float alpha, const double eps)
 {
   static constexpr auto write_mode = DP::access::mode::discard_write;
   static constexpr auto read_mode = DP::access::mode::read;
-  auto &sycl_queue = getCurrentSYCLStream().sycl_queue();
-  auto total_threads = sycl_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
+  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto total_threads = dpcpp_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, src);
-    auto out_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, dst);
+    auto in_acc = DPCPPAccessor<read_mode>(cgh, src);
+    auto out_acc = DPCPPAccessor<write_mode>(cgh, dst);
     cgh.parallel_for<DP_K(memory_scale2)>(
             DP::range<1>(total_threads),
             [=](DP::item<1> itemId) {
@@ -86,9 +86,9 @@ void syclMemoryScale2(void * dst, const void * src, size_t n_elements, const flo
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 
-}//sycl
-}//c10
+} // namespace dpcpp
+} // namespace at

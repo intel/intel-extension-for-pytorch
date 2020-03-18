@@ -3,21 +3,22 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/Config.h>
 
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
 
 
 using namespace mkldnn;
+using namespace at::dpcpp;
 
-namespace at { namespace native {
+namespace at { namespace AtenIpexTypeDPCPP {
 
-std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
+std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
       const Tensor& input, const Tensor& hx_, const Tensor& cx_,
       TensorList params, bool has_biases,
       int64_t num_layers_, double dropout_p, bool train, bool bidirectional, bool batch_first) {
 
   TORCH_CHECK(!batch_first, "_mkldnn_rnn: don't support batch first input");
-  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -136,31 +137,31 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
         *lstm_forward_desc, engine));
 
       auto weights_layer_usr_memory = memory({{{weights_layer_dims}, data_t, format_ldigo}, engine});
-      sycl_set_mkldnn_buffer(weight_arr_i[index].data_ptr(), weights_layer_usr_memory);
+      dpcpp_set_mkldnn_buffer(weight_arr_i[index].data_ptr(), weights_layer_usr_memory);
 
       auto weights_iter_usr_memory = memory({{{weights_iter_dims}, data_t, format_ldigo}, engine});
-      sycl_set_mkldnn_buffer(weight_arr_h[index].data_ptr(), weights_iter_usr_memory);
+      dpcpp_set_mkldnn_buffer(weight_arr_h[index].data_ptr(), weights_iter_usr_memory);
 
       auto bias_usr_memory = memory({{{bias_dims}, data_t, format_ldgo}, engine});
-      sycl_set_mkldnn_buffer(bias_arr[index].data_ptr(), bias_usr_memory);
+      dpcpp_set_mkldnn_buffer(bias_arr[index].data_ptr(), bias_usr_memory);
 
       auto src_layer_usr_memory = memory({{{src_layer_dims}, data_t, format_tnc}, engine});
-      sycl_set_mkldnn_buffer(layer_x.data_ptr(), src_layer_usr_memory);
+      dpcpp_set_mkldnn_buffer(layer_x.data_ptr(), src_layer_usr_memory);
 
       auto src_iter_usr_memory = memory({{{src_iter_dims}, data_t, format_ldnc}, engine});
-      sycl_set_mkldnn_buffer(layer_hx[index].data_ptr(), src_iter_usr_memory);
+      dpcpp_set_mkldnn_buffer(layer_hx[index].data_ptr(), src_iter_usr_memory);
 
       auto src_iter_c_usr_memory = memory({{{src_iter_c_dims}, data_t, format_ldnc}, engine});
-      sycl_set_mkldnn_buffer(layer_cx[index].data_ptr(), src_iter_c_usr_memory);
+      dpcpp_set_mkldnn_buffer(layer_cx[index].data_ptr(), src_iter_c_usr_memory);
 
       auto dst_layer_usr_memory = memory({{{dst_layer_dims}, data_t, format_tnc}, engine});
-      sycl_set_mkldnn_buffer(layer_y[direction].data_ptr(), dst_layer_usr_memory);
+      dpcpp_set_mkldnn_buffer(layer_y[direction].data_ptr(), dst_layer_usr_memory);
 
       auto dst_iter_usr_memory = memory({{{dst_iter_dims}, data_t, format_ldnc}, engine});
-      sycl_set_mkldnn_buffer(hy_arr[index].data_ptr(), dst_iter_usr_memory);
+      dpcpp_set_mkldnn_buffer(hy_arr[index].data_ptr(), dst_iter_usr_memory);
 
       auto dst_iter_c_usr_memory = memory({{{dst_iter_c_dims}, data_t, format_ldnc}, engine});
-      sycl_set_mkldnn_buffer(cy_arr[index].data_ptr(), dst_iter_c_usr_memory);
+      dpcpp_set_mkldnn_buffer(cy_arr[index].data_ptr(), dst_iter_c_usr_memory);
 
       auto expected_weights_layer_md = lstm_forward_pd->weights_layer_desc();
       auto weights_layer_memory = weights_layer_usr_memory;
@@ -277,14 +278,12 @@ std::tuple<Tensor, Tensor, Tensor> _sycl_impl(
   return std::make_tuple(output, hy, cy);
 }
 
-void lstm_sycl(Tensor& output, Tensor& hy, Tensor& cy,
+void lstm_dpcpp(Tensor& output, Tensor& hy, Tensor& cy,
       const Tensor& input, TensorList hx,
       TensorList params, bool has_biases,
       int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
-  auto result = _sycl_impl(input, hx[0], hx[1], params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+  auto result = _dpcpp_impl(input, hx[0], hx[1], params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
   std::tie(output, hy, cy) = result;
 }
 
-// REGISTER_SYCL_DISPATCH(lstm_sycl_stub, &lstm_sycl);
-
-}} // namespace at::native
+}} // namespace at::AtenIpexTypeDPCPP

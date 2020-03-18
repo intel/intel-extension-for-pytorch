@@ -1,21 +1,21 @@
 #pragma once
 
-// This header provides C++ wrappers around commonly used SYCL API functions.
+// This header provides C++ wrappers around commonly used DPCPP API functions.
 // The benefit of using C++ here is that we can raise an exception in the
 // event of an error, rather than explicitly pass around error codes.  This
 // leads to more natural APIs.
 //
 // The naming convention used here matches the naming convention of torch.dpcpp
 
-// #include <sycl_runtime_api.h>
+// #include <dpcpp_runtime_api.h>
 
 #include <c10/macros/Macros.h>
 #include <c10/core/Device.h>
 #include <core/Exception.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 
-namespace c10 {
-namespace sycl {
+namespace at {
+namespace dpcpp {
 
 inline DeviceIndex device_count() noexcept {
   int count;
@@ -24,20 +24,20 @@ inline DeviceIndex device_count() noexcept {
   // interacting with users, it seems that people basically ~never want this
   // function to fail; it should just return zero if things are not working.
   // Oblige them.
-  int err = syclGetDeviceCount(&count);
-  if (err != SYCL_SUCCESS)
+  int err = dpcppGetDeviceCount(&count);
+  if (err != DPCPP_SUCCESS)
     return 0;
   return static_cast<DeviceIndex>(count);
 }
 
 inline DeviceIndex current_device() {
   DeviceIndex cur_device;
-  C10_SYCL_CHECK(syclGetDevice(&cur_device));
+  AT_DPCPP_CHECK(dpcppGetDevice(&cur_device));
   return static_cast<DeviceIndex>(cur_device);
 }
 
 inline void set_device(DeviceIndex device) {
-  C10_SYCL_CHECK(syclSetDevice(static_cast<int>(device)));
+  AT_DPCPP_CHECK(dpcppSetDevice(static_cast<int>(device)));
 }
 
-}} // namespace c10::sycl
+}} // namespace at::dpcpp

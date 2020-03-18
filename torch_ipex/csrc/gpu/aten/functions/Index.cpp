@@ -10,13 +10,12 @@
 #include <utils/Numerics.h>
 #include <utils/MathReduce.h>
 
-
 #include <ATen/aten_ipex_type_dpcpp.h>
 #include "ParttenScan.h"
 
 
-using namespace at::sycl::detail;
-using namespace at::native;
+using namespace at::dpcpp::detail;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -29,9 +28,9 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
   int dstDims = dst.dim() == 0 ? 1 : dst.dim();
   int idxDims = indices.dim() == 0 ? 1 : indices.dim();
 
-  TORCH_CHECK(srcDims <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
-  TORCH_CHECK(dstDims <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
-  TORCH_CHECK(idxDims <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
+  TORCH_CHECK(srcDims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
+  TORCH_CHECK(dstDims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
+  TORCH_CHECK(idxDims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(idxDims <= 1,
            "Index is supposed to be an empty tensor or a vector");
   TORCH_CHECK(dim < srcDims, "Indexing dim is out of bounds");
@@ -71,14 +70,14 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
   // of the tensor `indices`.
   // TODO: if the slice number is to large. Need to balance the work group and work item number.
   // Make the work balance based on the MCU number.
-  // auto __mcu = sycl_queue.get_device().template get_info<dp_dev_max_units>();
+  // auto __mcu = dpcpp_queue.get_device().template get_info<dp_dev_max_units>();
   uint64_t num_slices = indices.numel();
 
   auto slice_size = dst_num_elem / num_slices;
 
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  auto wgroup_size = sycl_queue.get_device().template \
+  auto wgroup_size = dpcpp_queue.get_device().template \
           get_info<dp_dev_max_wgroup_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(slice_size), wgroup_size);
@@ -93,9 +92,9 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
   auto idx_size = dst.nbytes();
 
   auto cgf = DP_Q_CGF(__cgh) {
-    auto src_acc = c10::sycl::SYCLAccessor<dp_r_mode>(__cgh, src_data, src_size);
-    auto dst_acc = c10::sycl::SYCLAccessor<dp_discard_w_mode>(__cgh, dst_data, dst_size);
-    auto idx_acc = c10::sycl::SYCLAccessor<dp_r_mode>(__cgh, idx_data, idx_size);
+    auto src_acc = DPCPPAccessor<dp_r_mode>(__cgh, src_data, src_size);
+    auto dst_acc = DPCPPAccessor<dp_discard_w_mode>(__cgh, dst_data, dst_size);
+    auto idx_acc = DPCPPAccessor<dp_r_mode>(__cgh, idx_data, idx_size);
 
     __cgh.parallel_for_work_group<DP_K(index_select_ker, scalar_t)>(
       DP::range</*dim=*/1>(num_slices),
@@ -137,7 +136,7 @@ void indexSelect(Tensor & dst, const Tensor & src, int dim, const Tensor & indic
     );
   };
 
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
   return;
 }
 
@@ -178,7 +177,7 @@ void nonzero(Tensor & tensor, const Tensor & self_) {
       TensorInfo<long, uint32_t> output = getTensorInfo<long, uint32_t>(tensor);
       output.collapseDims();
 
-      auto queue = c10::sycl::syclGetCurrentQueue();
+      auto queue = dpcppGetCurrentQueue();
       auto num_nonzeros = pattern_scan(
           queue,
           input,
@@ -198,7 +197,7 @@ void nonzero(Tensor & tensor, const Tensor & self_) {
       TensorInfo<long, uint64_t> output = getTensorInfo<long, uint64_t>(tensor);
       output.collapseDims();
 
-      auto queue = c10::sycl::syclGetCurrentQueue();
+      auto queue = dpcppGetCurrentQueue();
       auto num_nonzeros = pattern_scan(
           queue,
           input,
@@ -231,8 +230,8 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
   TORCH_CHECK(numIndices == (src.dim() == 0 ? 1 : src.size(dim)),
               "index_add_(): Number of indices should be equal to self.size(dim)");
 
-  TORCH_CHECK(dst.dim() <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
-  TORCH_CHECK(src.dim() <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
+  TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
+  TORCH_CHECK(src.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
 
   // The `src` is partitioned into two parts:
   // -the size of each slice we are indexing, which is the
@@ -297,9 +296,9 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
   int src_add_dim = src_info.collapseDims(dim);
   src_info.reduceDim(src_add_dim);
 
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  auto wgroup_size = sycl_queue.get_device().template \
+  auto wgroup_size = dpcpp_queue.get_device().template \
           get_info<dp_dev_max_wgroup_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
@@ -317,9 +316,9 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
           (indices.dtype().itemsize());
 
   auto cgf = DP_Q_CGF(__cgh) {
-    auto src_acc = c10::sycl::SYCLAccessor<dp_r_mode>(__cgh, src_data, src_size);
-    auto dst_acc = c10::sycl::SYCLAccessor<dp_discard_w_mode>(__cgh, dst_data, dst_size);
-    auto idx_acc = c10::sycl::SYCLAccessor<dp_r_mode>(__cgh, idx_data, idx_size);
+    auto src_acc = DPCPPAccessor<dp_r_mode>(__cgh, src_data, src_size);
+    auto dst_acc = DPCPPAccessor<dp_discard_w_mode>(__cgh, dst_data, dst_size);
+    auto idx_acc = DPCPPAccessor<dp_r_mode>(__cgh, idx_data, idx_size);
 
     __cgh.parallel_for_work_group<DP_K(index_add_ker, scalar_t)>(
       DP::range</*dim=*/1>(numIndices),
@@ -363,14 +362,14 @@ void indexAdd(Tensor & dst, int64_t dim, const Tensor & indices, const Tensor & 
     );
   };
 
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 DP_DEF_K1(index_fill_ker);
 template <typename scalar_t>
 void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_scalar) {
-  TORCH_CHECK(dst.dim() <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
-  TORCH_CHECK(indices.dim() <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
+  TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
+  TORCH_CHECK(indices.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
 
   // The `src` is partitioned into two parts:
   // -the size of each slice we are indexing, which is the
@@ -406,9 +405,9 @@ void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_sca
   int dst_fill_dim = dst_info.collapseDims(dim);
   dst_info.reduceDim(dst_fill_dim);
 
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  auto wgroup_size = sycl_queue.get_device().template \
+  auto wgroup_size = dpcpp_queue.get_device().template \
           get_info<dp_dev_max_wgroup_size>();
 
   wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
@@ -423,8 +422,8 @@ void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_sca
           (indices.dtype().itemsize());
 
   auto cgf = DP_Q_CGF(__cgh) {
-    auto dst_acc = c10::sycl::SYCLAccessor<dp_discard_w_mode>(__cgh, dst_data, dst_size);
-    auto idx_acc = c10::sycl::SYCLAccessor<dp_r_mode>(__cgh, idx_data, idx_size);
+    auto dst_acc = DPCPPAccessor<dp_discard_w_mode>(__cgh, dst_data, dst_size);
+    auto idx_acc = DPCPPAccessor<dp_r_mode>(__cgh, idx_data, idx_size);
 
     __cgh.parallel_for_work_group<DP_K(index_fill_ker, scalar_t)>(
       DP::range</*dim=*/1>(numIndices),
@@ -463,11 +462,11 @@ void indexFill(Tensor & dst, int64_t dim, const Tensor & indices, Scalar val_sca
     );
   };
 
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-DP_DEF_K1(diag_from_sycl_ker);
-DP_DEF_K1(diag_to_sycl_ker);
+DP_DEF_K1(diag_from_dpcpp_ker);
+DP_DEF_K1(diag_to_dpcpp_ker);
 template <typename scalar_t>
 void Diag(Tensor & dst, const Tensor & src, int64_t k) {
   int nDimension = src.dim() == 0 ? 1 : src.dim();
@@ -478,19 +477,19 @@ void Diag(Tensor & dst, const Tensor & src, int64_t k) {
     int64_t stride1 = src.stride(1);
     int64_t size0 = src.size(0);
     int64_t size1 = src.size(1);
-    int64_t size = (k > 0) ? cl::sycl::min((int64_t)size0, (int64_t)size1 - k) : cl::sycl::min((int64_t)size0 + k, (int64_t)size1);
+    int64_t size = (k > 0) ? DP::min((int64_t)size0, (int64_t)size1 - k) : DP::min((int64_t)size0 + k, (int64_t)size1);
     int64_t size_[1] = {size};
     TensorImpl_resizeNd(TensorImpl_Unwrap(dst), 1, size_, nullptr);
     if (size > 0) {
       int64_t strideSelf = dst.dim() == 0 ? 1 : dst.stride(0);
       int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
-      static const auto write_mode = cl::sycl::access::mode::discard_write;
-      static const auto read_mode = cl::sycl::access::mode::read;
-      auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+      static const auto write_mode = DP::access::mode::discard_write;
+      static const auto read_mode = DP::access::mode::read;
+      auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
       auto cgf = DP_Q_CGF(cgh) {
-        auto in_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, src.data_ptr<scalar_t>());
-        auto out_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, dst.data_ptr<scalar_t>());
+        auto in_acc = DPCPPAccessor<read_mode>(cgh, src.data_ptr<scalar_t>());
+        auto out_acc = DPCPPAccessor<write_mode>(cgh, dst.data_ptr<scalar_t>());
         auto kfn = DP_Q_KFN(DP::item<1> item_id) {
           size_t id = item_id.get_id(0);
           auto in_ptr = in_acc.template get_pointer<scalar_t>();
@@ -499,9 +498,9 @@ void Diag(Tensor & dst, const Tensor & src, int64_t k) {
           out_ptr[strideSelf * id] = in_ptr[bOffset];
 
         };
-        cgh.parallel_for<DP_K(diag_from_sycl_ker, scalar_t)>(cl::sycl::range<1>(dst.numel()), kfn);
+        cgh.parallel_for<DP_K(diag_from_dpcpp_ker, scalar_t)>(DP::range<1>(dst.numel()), kfn);
       };
-      DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+      DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
     }
   } else {
     int64_t totalElements = src.numel();
@@ -514,13 +513,13 @@ void Diag(Tensor & dst, const Tensor & src, int64_t k) {
       int64_t stride0 = dst.stride(0);
       int64_t stride1 = dst.stride(1);
       int64_t start = (k >= 0 ? k * stride1 : -k * stride0);
-      static const auto write_mode = cl::sycl::access::mode::discard_write;
-      static const auto read_mode = cl::sycl::access::mode::read;
-      auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+      static const auto write_mode = DP::access::mode::discard_write;
+      static const auto read_mode = DP::access::mode::read;
+      auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
       auto cgf = DP_Q_CGF(cgh) {
-        auto in_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, src.data_ptr<scalar_t>());
-        auto out_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, dst.data_ptr<scalar_t>());
+        auto in_acc = DPCPPAccessor<read_mode>(cgh, src.data_ptr<scalar_t>());
+        auto out_acc = DPCPPAccessor<write_mode>(cgh, dst.data_ptr<scalar_t>());
         auto kfn = DP_Q_KFN(DP::item<1> item_id) {
           size_t id = item_id.get_id(0);
           auto in_ptr = in_acc.template get_pointer<scalar_t>();
@@ -528,9 +527,9 @@ void Diag(Tensor & dst, const Tensor & src, int64_t k) {
           const int64_t aOffset = start + (stride0 + stride1) * id;
           out_ptr[aOffset] = in_ptr[strideSrc * id];
         };
-        cgh.parallel_for<DP_K(diag_to_sycl_ker, scalar_t)>(cl::sycl::range<1>(dst.numel()), kfn);
+        cgh.parallel_for<DP_K(diag_to_dpcpp_ker, scalar_t)>(DP::range<1>(dst.numel()), kfn);
       };
-      DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+      DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
     }
   }
 }
@@ -551,10 +550,10 @@ template <typename scalar_t>
 void MaskedFill(Tensor & tensor, const Tensor & mask, Scalar value_scalar) {
   auto value = value_scalar.to<scalar_t>();
   TORCH_CHECK(tensor.numel() == mask.numel(), "sizes do not match");
-  at::sycl::SYCL_tensor_apply2<scalar_t, bool>(tensor, mask, TensorMaskedFillOp<scalar_t, bool>(value));
+  at::dpcpp::DPCPP_tensor_apply2<scalar_t, bool>(tensor, mask, TensorMaskedFillOp<scalar_t, bool>(value));
 }
 
-DP_DEF_K1(maskedScatter_scan_sycl_ker);
+DP_DEF_K1(maskedScatter_scan_dpcpp_ker);
 DP_DEF_K1(TensorMaskedScatterOp);
 template <typename scalar_t>
 void MaskedScatter(Tensor & tensor, const Tensor & mask, const Tensor & src) {
@@ -589,37 +588,37 @@ void MaskedScatter(Tensor & tensor, const Tensor & mask, const Tensor & src) {
   auto maskPrefixSum_size = maskPrefixSum.numel() * (maskPrefixSum.dtype().itemsize());
   int64_t size = maskLong.numel();
 
-  auto sycl_queue = c10::sycl::syclGetCurrentQueue();
+  auto dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
-  c10::sycl::parallel_for_setup(size, tileSize, rng, GRange);
+  parallel_for_setup(size, tileSize, rng, GRange);
 
   // command group functions
   auto cgf = DP_Q_CGF(cgh) {
-    auto acc_maskLong = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, maskLong_data, maskLong_size);
-    auto acc_maskPrefixSum = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, maskPrefixSum_data, maskPrefixSum_size);
+    auto acc_maskLong = DPCPPAccessor<dp_r_mode>(cgh, maskLong_data, maskLong_size);
+    auto acc_maskPrefixSum = DPCPPAccessor<dp_discard_w_mode>(cgh, maskPrefixSum_data, maskPrefixSum_size);
 
     // kernel function per work-item
     auto kfn = DP_Q_KFN() {
       dp_global_ptr_cpt<int64_t> maskLong_ptr = acc_maskLong.template get_pointer<int64_t>();
       dp_global_ptr_pt<int64_t> maskPrefixSum_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
-      sycl_exclusive_scan(maskLong_ptr, maskLong_ptr + size, maskPrefixSum_ptr, static_cast<int64_t>(0), AddOp<int64_t>());
+      dpcpp_exclusive_scan(maskLong_ptr, maskLong_ptr + size, maskPrefixSum_ptr, static_cast<int64_t>(0), AddOp<int64_t>());
     };
     // kick off kernel
     // (TODO) single_task need replaced due to low efficiency
-    cgh.single_task<DP_K(maskedScatter_scan_sycl_ker, scalar_t)>(kfn);
+    cgh.single_task<DP_K(maskedScatter_scan_dpcpp_ker, scalar_t)>(kfn);
   };
-    // submit to SYCL queue
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+    // submit to DPCPP queue
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
   Tensor contigSrc = src.contiguous();
   
   // command group function
   // copy src to tensor according to mask
   auto cgfMaskedScatter = DP_Q_CGF(cgh) {
-    auto acc_src = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, contigSrc.data_ptr<scalar_t>());
-    auto acc_mask = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, mask.data_ptr<bool>());
-    auto acc_maskPrefixSum = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
-    auto acc_tensor = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, tensor.data_ptr<scalar_t>());
+    auto acc_src = DPCPPAccessor<dp_r_mode>(cgh, contigSrc.data_ptr<scalar_t>());
+    auto acc_mask = DPCPPAccessor<dp_r_mode>(cgh, mask.data_ptr<bool>());
+    auto acc_maskPrefixSum = DPCPPAccessor<dp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
+    auto acc_tensor = DPCPPAccessor<dp_discard_w_mode>(cgh, tensor.data_ptr<scalar_t>());
 
     // kernel function
     auto kfn = DP_Q_KFN(DP::nd_item<1> item){
@@ -639,11 +638,11 @@ void MaskedScatter(Tensor & tensor, const Tensor & mask, const Tensor & src) {
       DP::nd_range<1>(DP::range<1>(GRange), DP::range<1>(tileSize)), kfn);
   };
 
-  // submit to SYCL queue
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgfMaskedScatter);
+  // submit to DPCPP queue
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgfMaskedScatter);
 }
 
-DP_DEF_K1(maskedSelect_scan_sycl_ker);
+DP_DEF_K1(maskedSelect_scan_dpcpp_ker);
 DP_DEF_K1(TensorMaskedSelectOp);
 template <typename scalar_t>
 void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
@@ -678,28 +677,28 @@ void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
   auto maskPrefixSum_size = maskPrefixSum.numel() * (maskPrefixSum.dtype().itemsize());
   int64_t size = maskLong.numel();
 
-  auto sycl_queue = c10::sycl::syclGetCurrentQueue();
+  auto dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, GRange, tileSize;
-  c10::sycl::parallel_for_setup(size, tileSize, rng, GRange);
+  parallel_for_setup(size, tileSize, rng, GRange);
 
   // command group functions
   auto cgf = DP_Q_CGF(cgh) {
-    auto acc_maskLong = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, maskLong_data, maskLong_size);
-    auto acc_maskPrefixSum = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, maskPrefixSum_data, maskPrefixSum_size);
+    auto acc_maskLong = DPCPPAccessor<dp_r_mode>(cgh, maskLong_data, maskLong_size);
+    auto acc_maskPrefixSum = DPCPPAccessor<dp_discard_w_mode>(cgh, maskPrefixSum_data, maskPrefixSum_size);
 
     // kernel function per work-item
     auto kfn = DP_Q_KFN() {
       dp_global_ptr_cpt<int64_t> maskLong_ptr = acc_maskLong.template get_pointer<int64_t>();
       dp_global_ptr_pt<int64_t> maskPrefixSum_ptr = acc_maskPrefixSum.template get_pointer<int64_t>();
-      sycl_inclusive_scan(maskLong_ptr, maskLong_ptr + size, maskPrefixSum_ptr, AddOp<int64_t>());
+      dpcpp_inclusive_scan(maskLong_ptr, maskLong_ptr + size, maskPrefixSum_ptr, AddOp<int64_t>());
     };
     // kick off kernel
     // (TODO) single_task need replaced due to low efficiency
-    cgh.single_task<DP_K(maskedSelect_scan_sycl_ker, scalar_t)>(kfn);
+    cgh.single_task<DP_K(maskedSelect_scan_dpcpp_ker, scalar_t)>(kfn);
   };
 
-    // submit to SYCL queue
-    DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+    // submit to DPCPP queue
+    DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
     TensorInfo<scalar_t, uint64_t> src_info =
             getTensorInfo<scalar_t, uint64_t>(src);
@@ -711,10 +710,10 @@ void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
 
   // command group function
   auto cgfMaskedSelect = DP_Q_CGF(cgh) {
-    auto acc_src = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, src.data_ptr<scalar_t>());
-    auto acc_mask = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, mask.data_ptr<bool>());
-    auto acc_maskPrefixSum = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
-    auto acc_tensor = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, tensorContig.data_ptr<scalar_t>());
+    auto acc_src = DPCPPAccessor<dp_r_mode>(cgh, src.data_ptr<scalar_t>());
+    auto acc_mask = DPCPPAccessor<dp_r_mode>(cgh, mask.data_ptr<bool>());
+    auto acc_maskPrefixSum = DPCPPAccessor<dp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
+    auto acc_tensor = DPCPPAccessor<dp_discard_w_mode>(cgh, tensorContig.data_ptr<scalar_t>());
 
     // kernel function per work-item
     auto kfn = DP_Q_KFN(DP::nd_item<1> item){
@@ -739,8 +738,8 @@ void MaskedSelect(Tensor & tensor, const Tensor & src, const Tensor & mask) {
       DP::nd_range<1>(DP::range<1>(GRange), DP::range<1>(tileSize)), kfn);
   };
 
-  // submit to SYCL queue
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgfMaskedSelect);
+  // submit to DPCPP queue
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgfMaskedSelect);
 
   if (&tensor != &tensorContig) {
     tensor.copy_(tensorContig);

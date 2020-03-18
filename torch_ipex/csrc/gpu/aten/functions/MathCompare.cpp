@@ -6,6 +6,8 @@
 #include <ATen/aten_ipex_type_dpcpp.h>
 
 
+using namespace at::dpcpp;
+
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
@@ -59,7 +61,7 @@ void logicalTensor(Tensor & self_, const Tensor & src1, const Tensor & src2, Op 
   at::AtenIpexTypeDPCPP::resize_as_(self_, src1, c10::nullopt);
 
   TORCH_CHECK(src1.numel() == src2.numel(), "sizes do not match");
-  at::sycl::SYCL_tensor_apply3<ScalarTypeOut, ScalarType, ScalarType>(
+  at::dpcpp::DPCPP_tensor_apply3<ScalarTypeOut, ScalarType, ScalarType>(
       self_, src1, src2, op);
 }
 
@@ -102,109 +104,109 @@ void neTensor(Tensor & self_, const Tensor & src1, const Tensor & src2)
 }
 
 #if COMPARE_PORTED
-void THSYCLTensor_(neTensor)(THSYCLState *state, THSyclBoolTensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+void THDPCPPTensor_(neTensor)(THDPCPPState *state, THSyclBoolTensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 {
-  THSYCLAssertSameGPU(THSYCLTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THSYCL_logicalTensor<bool, scalar_t>(state, self_, src1, src2,
+  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
+  THDPCPP_logicalTensor<bool, scalar_t>(state, self_, src1, src2,
                                    TensorNEOp<scalar_t,
                                    bool>());
 }
 
-void THSYCLTensor_(ltTensorT)(THSYCLState *state, THSYCLTensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+void THDPCPPTensor_(ltTensorT)(THDPCPPState *state, THDPCPPTensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 {
-  THSYCLAssertSameGPU(THSYCLTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THSYCL_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
+  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
+  THDPCPP_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
                                 TensorLTOp<scalar_t,
                                 scalar_t>());
 }
 
-void THSYCLTensor_(gtTensorT)(THSYCLState *state, THSYCLTensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+void THDPCPPTensor_(gtTensorT)(THDPCPPState *state, THDPCPPTensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 {
-  THSYCLAssertSameGPU(THSYCLTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THSYCL_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
+  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
+  THDPCPP_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
                                 TensorGTOp<scalar_t,
                                 scalar_t>());
 }
 
-void THSYCLTensor_(leTensorT)(THSYCLState *state, THSYCLTensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+void THDPCPPTensor_(leTensorT)(THDPCPPState *state, THDPCPPTensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 {
-  THSYCLAssertSameGPU(THSYCLTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THSYCL_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
+  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
+  THDPCPP_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
                                 TensorLEOp<scalar_t,
                                 scalar_t>());
 }
 
-void THSYCLTensor_(geTensorT)(THSYCLState *state, THSYCLTensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+void THDPCPPTensor_(geTensorT)(THDPCPPState *state, THDPCPPTensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 {
-  THSYCLAssertSameGPU(THSYCLTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THSYCL_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
+  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
+  THDPCPP_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
                                 TensorGEOp<scalar_t,
                                 scalar_t>());
 }
 #endif
 
-// void eqTensorT(Tensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+// void eqTensorT(Tensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 // {
-//   THSYCL_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
+//   THDPCPP_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
 //                                 TensorEQOp<scalar_t,
 //                                 scalar_t>());
 // }
 
 #if COMPARE_PORTED
-void THSYCLTensor_(neTensorT)(THSYCLState *state, THSYCLTensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+void THDPCPPTensor_(neTensorT)(THDPCPPState *state, THDPCPPTensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 {
-  THSYCLAssertSameGPU(THSYCLTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THSYCL_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
+  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
+  THDPCPP_logicalTensor<scalar_t, scalar_t>(state, self_, src1, src2,
                                 TensorNEOp<scalar_t,
                                 scalar_t>());
 }
 
-void THSYCLTensor_(ltTensorByte)(THSYCLState *state, THSyclByteTensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+void THDPCPPTensor_(ltTensorByte)(THDPCPPState *state, THSyclByteTensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 {
-  THSYCLAssertSameGPU(THSYCLTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THSYCL_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
+  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
+  THDPCPP_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
                                              TensorLTOp<scalar_t,
                                              unsigned char>());
 }
 
-void THSYCLTensor_(gtTensorByte)(THSYCLState *state, THSyclByteTensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+void THDPCPPTensor_(gtTensorByte)(THDPCPPState *state, THSyclByteTensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 {
-  THSYCLAssertSameGPU(THSYCLTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THSYCL_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
+  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
+  THDPCPP_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
                                              TensorGTOp<scalar_t,
                                              unsigned char>());
 }
 
-void THSYCLTensor_(leTensorByte)(THSYCLState *state, THSyclByteTensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+void THDPCPPTensor_(leTensorByte)(THDPCPPState *state, THSyclByteTensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 {
-  THSYCLAssertSameGPU(THSYCLTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THSYCL_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
+  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
+  THDPCPP_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
                                              TensorLEOp<scalar_t,
                                              unsigned char>());
 }
 
-void THSYCLTensor_(geTensorByte)(THSYCLState *state, THSyclByteTensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+void THDPCPPTensor_(geTensorByte)(THDPCPPState *state, THSyclByteTensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 {
-  THSYCLAssertSameGPU(THSYCLTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THSYCL_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
+  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
+  THDPCPP_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
                                              TensorGEOp<scalar_t,
                                              unsigned char>());
 }
 #endif
 
-// void THSYCLTensor_(eqTensorByte)(THSYCLState *state, THSyclByteTensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+// void THDPCPPTensor_(eqTensorByte)(THDPCPPState *state, THSyclByteTensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 // {
-//   THSYCLAssertSameGPU(THSYCLTensor_(checkGPU)(state, 3, self_, src1, src2));
-//   THSYCL_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
+//   THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
+//   THDPCPP_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
 //                                              TensorEQOp<scalar_t,
 //                                              unsigned char>());
 // }
 
 #if COMPARE_PORTED
-void THSYCLTensor_(neTensorByte)(THSYCLState *state, THSyclByteTensor *self_, THSYCLTensor *src1, THSYCLTensor *src2)
+void THDPCPPTensor_(neTensorByte)(THDPCPPState *state, THSyclByteTensor *self_, THDPCPPTensor *src1, THDPCPPTensor *src2)
 {
-  THSYCLAssertSameGPU(THSYCLTensor_(checkGPU)(state, 3, self_, src1, src2));
-  THSYCL_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
+  THDPCPPAssertSameGPU(THDPCPPTensor_(checkGPU)(state, 3, self_, src1, src2));
+  THDPCPP_logicalTensor<unsigned char, scalar_t>(state, self_, src1, src2,
                                              TensorNEOp<scalar_t,
                                              unsigned char>());
 }

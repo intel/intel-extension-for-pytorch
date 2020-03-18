@@ -1,10 +1,11 @@
 #include <core/DPCPP.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/Context.h>
 
 
-using namespace at::sycl::detail;
+using namespace at::dpcpp::detail;
+using namespace at::dpcpp;
 
 template <typename T>
 struct TensorFillOp {
@@ -218,14 +219,14 @@ template <typename ...T> class __init_kernel_name_2{};
 // returns the last partial sum
 template <typename InputType, typename OutputType, typename IndexType, typename _BinaryOperation, typename _Transform, typename _Reduce, typename _Scan>
 IndexType
-parallel_transform_scan(cl::sycl::queue& queue, TensorInfo<InputType, IndexType>& input,
+parallel_transform_scan(DP::queue& queue, TensorInfo<InputType, IndexType>& input,
                         TensorInfo<OutputType, IndexType>& output, IndexType num_elements, _BinaryOperation __binary_op, IndexType __init,
                         _Transform __brick_transform, _Reduce __brick_reduce, _Scan __brick_scan)
 {
   auto __target_buffer = input.data;
   auto __result_buffer = output.data;
-  auto __wgroup_size = c10::sycl::syclMaxWorkGroupSize(queue);
-  auto __mcu = c10::sycl::syclMaxComputeUnitSize(queue);
+  auto __wgroup_size = dpcppMaxWorkGroupSize(queue);
+  auto __mcu = dpcppMaxComputeUnitSize(queue);
   auto __n = num_elements;
 
   auto __n_groups = (__n - 1) / __wgroup_size + 1;
@@ -234,13 +235,13 @@ parallel_transform_scan(cl::sycl::queue& queue, TensorInfo<InputType, IndexType>
   // TODO: try to replace with int8_t
   using _AtomicType = int32_t;
   // 0. Create temporary global buffer to store temporary value
-  auto &allocator = *at::sycl::getSYCLDeviceAllocator();
+  auto &allocator = *at::dpcpp::getDPCPPDeviceAllocator();
   auto __local_sums = allocator.allocate(sizeof(IndexType) * __n_groups); // temporary storage for global atomic
   auto __ready_flags = allocator.allocate(sizeof(_AtomicType) * __n_groups); // temporary storage for global atomic
 
   // 1. Initialize temp buffer
   auto cgf_1 = DP_Q_CGF(cgh) {
-    auto __ready_flags_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, __ready_flags.get());
+    auto __ready_flags_acc = DPCPPAccessor<dp_rw_mode>(cgh, __ready_flags.get());
 
     auto kfn = DP_Q_KFN(DP::item<1> item_id) {
       auto __ready_flags_ptr = __ready_flags_acc.template get_pointer<_AtomicType>();
@@ -257,14 +258,14 @@ parallel_transform_scan(cl::sycl::queue& queue, TensorInfo<InputType, IndexType>
 
   uint32_t __for_dynamic_id = 0;
   auto __dynamic_id_buf =
-          cl::sycl::buffer<uint32_t, /*dim=*/1>(&__for_dynamic_id, 1); // temporary storage for group_id atomic
+          DP::buffer<uint32_t, /*dim=*/1>(&__for_dynamic_id, 1); // temporary storage for group_id atomic
   // Main parallel_for
   auto cgf_2 = DP_Q_CGF(cgh) {
-    auto __acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, __target_buffer);
+    auto __acc = DPCPPAccessor<dp_r_mode>(cgh, __target_buffer);
     auto __dynamic_id_acc = __dynamic_id_buf.template get_access<dp_rw_mode>(cgh);
-    auto __local_sums_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, __local_sums.get());
-    auto __result_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, __result_buffer);
-    auto __ready_flags_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, __ready_flags.get());
+    auto __local_sums_acc = DPCPPAccessor<dp_rw_mode>(cgh, __local_sums.get());
+    auto __result_acc = DPCPPAccessor<dp_w_mode>(cgh, __result_buffer);
+    auto __ready_flags_acc = DPCPPAccessor<dp_rw_mode>(cgh, __ready_flags.get());
 
     // create local accessors
     DP::accessor<uint32_t, 1, dp_rw_mode, DP::access::target::local> __group_id_local(1, cgh);
@@ -341,7 +342,7 @@ parallel_transform_scan(cl::sycl::queue& queue, TensorInfo<InputType, IndexType>
   //launch kernel
   DP_Q_SYNC_SUBMIT(queue, cgf_2);
 
-  auto sb = c10::sycl::syclGetBufferMap().template get_buffer<IndexType>(__local_sums.get());
+  auto sb = dpcppGetBufferMap().template get_buffer<IndexType>(__local_sums.get());
   auto host_acc = sb.template get_access<dp_r_mode>();
   auto __last_reduced_value = host_acc[__n_groups - 1];
   return __last_reduced_value;
@@ -349,7 +350,7 @@ parallel_transform_scan(cl::sycl::queue& queue, TensorInfo<InputType, IndexType>
 
 template <typename InputType, typename OutputType, typename IndexType, typename _CreateMaskOp, typename _CopyByMaskOp>
 IndexType
-pattern_scan_copy(cl::sycl::queue& queue, TensorInfo<InputType, IndexType>& input,
+pattern_scan_copy(DP::queue& queue, TensorInfo<InputType, IndexType>& input,
                   TensorInfo<OutputType, IndexType>& output, IndexType num_elements, _CreateMaskOp __create_mask_op, _CopyByMaskOp __copy_by_mask_op)
 {
   using _ReduceOp = std::plus<IndexType>;
@@ -389,12 +390,12 @@ template <typename IndexType>
 struct idx_functor
 {
   int dims;
-  IndexType sz[MAX_SYCLTORCH_DIMS];
-  IndexType st[MAX_SYCLTORCH_DIMS];
+  IndexType sz[MAX_DPCPPTORCH_DIMS];
+  IndexType st[MAX_DPCPPTORCH_DIMS];
 
   template <typename T>
   idx_functor(const TensorInfo<T, IndexType>& t_info):
-    idx_functor(t_info, c10::guts::make_index_sequence<MAX_SYCLTORCH_DIMS>{}) {}
+    idx_functor(t_info, c10::guts::make_index_sequence<MAX_DPCPPTORCH_DIMS>{}) {}
 
   template <typename _Value, typename _Idx, typename _InAcc, typename _OutAcc>
   void
@@ -420,7 +421,7 @@ private:
 
 template <typename InputType, typename OutputType, typename IndexType, typename Predicate, typename CopyMaskOp>
 IndexType
-pattern_scan(cl::sycl::queue& queue, TensorInfo<InputType, IndexType>& input,
+pattern_scan(DP::queue& queue, TensorInfo<InputType, IndexType>& input,
              TensorInfo<OutputType, IndexType>& output, IndexType num_elements,
              Predicate __pred, CopyMaskOp __copy_by_mask_op)
 {

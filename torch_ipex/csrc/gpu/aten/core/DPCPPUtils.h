@@ -1,12 +1,5 @@
 #pragma once
 
-// This header provides C++ wrappers around commonly used SYCL API functions.
-// The benefit of using C++ here is that we can raise an exception in the
-// event of an error, rather than explicitly pass around error codes.  This
-// leads to more natural APIs.
-//
-// The naming convention used here matches the naming convention of torch.dpcpp
-
 #include <c10/macros/Macros.h>
 #include <c10/core/Device.h>
 
@@ -14,41 +7,42 @@
 #include <core/Device.h>
 #include <core/DPCPP.h>
 
-namespace c10 {
-namespace sycl {
 
-// move to c10/dpcpp/SYCLFunctions.h
+namespace at {
+namespace dpcpp {
+
+// move to c10/dpcpp/DPCPPFunctions.h
 // DeviceIndex device_count();
 
-// move to c10/dpcpp/SYCLFunctions.h
+// move to c10/dpcpp/DPCPPFunctions.h
 // DeviceIndex current_device();
 
-// move to c10/dpcpp/SYCLFunctions.h
+// move to c10/dpcpp/DPCPPFunctions.h
 // void set_device(DeviceIndex device);
 
-int syclGetDeviceCount(int *deviceCount);
+int dpcppGetDeviceCount(int *deviceCount);
 
-int syclGetDevice(DeviceIndex *pDI);
+int dpcppGetDevice(DeviceIndex *pDI);
 
-int syclSetDevice(DeviceIndex device_index);
+int dpcppSetDevice(DeviceIndex device_index);
 
-int syclGetDeviceIdFromPtr(DeviceIndex *device_id, void *ptr);
+int dpcppGetDeviceIdFromPtr(DeviceIndex *device_id, void *ptr);
 
-cl::sycl::device syclGetRawDevice(DeviceIndex device_index);
+DP::device dpcppGetRawDevice(DeviceIndex device_index);
 
-DPCPPDeviceSelector syclGetDeviceSelector(DeviceIndex device_index);
+DPCPPDeviceSelector dpcppGetDeviceSelector(DeviceIndex device_index);
 
-cl::sycl::codeplay::PointerMapper &syclGetBufferMap();
+DP::codeplay::PointerMapper &dpcppGetBufferMap();
 
-cl::sycl::queue &syclGetCurrentQueue();
+DP::queue &dpcppGetCurrentQueue();
 
-int64_t syclMaxWorkGroupSize();
+int64_t dpcppMaxWorkGroupSize();
 
-int64_t syclMaxWorkGroupSize(cl::sycl::queue &queue);
+int64_t dpcppMaxWorkGroupSize(DP::queue &queue);
 
-int64_t syclMaxComputeUnitSize();
+int64_t dpcppMaxComputeUnitSize();
 
-int64_t syclMaxComputeUnitSize(cl::sycl::queue& queue);
+int64_t dpcppMaxComputeUnitSize(DP::queue& queue);
 
 
 void parallel_for_setup(int64_t n, int64_t &tileSize, int64_t &rng, int64_t &GRange);
@@ -86,12 +80,12 @@ static inline DP_DEVICE float __int_as_float(uint32_t val) {
 }
 
 #include <core/Exception.h>
-static cl::sycl::async_handler syclAsyncHandler = [](cl::sycl::exception_list eL) {
+static DP::async_handler dpcppAsyncHandler = [](DP::exception_list eL) {
   for (auto& e : eL) {
-    C10_SYCL_TRY
+    AT_DPCPP_TRY
     std::rethrow_exception(e);
-    C10_SYCL_CATCH_RETHROW(__FILE__, __LINE__)
+    AT_DPCPP_CATCH_RETHROW(__FILE__, __LINE__)
   }
 };
 
-}} // namespace c10::sycl
+}} // namespace at::dpcpp

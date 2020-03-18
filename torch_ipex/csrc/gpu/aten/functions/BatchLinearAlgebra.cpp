@@ -7,13 +7,17 @@
 #include <core/Context.h>
 #include <utils/Numerics.h>
 
+
+using namespace at::dpcpp;
+
 DP_DEF_K2(triuTrilSycl, typename scalar_t, typename IndexType, bool upper);
 
 namespace at {
-namespace native {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 template <typename scalar_t, typename IndexType, bool upper>
-void triu_tril_sycl_kernel(
+void triu_tril_dpcpp_kernel(
     scalar_t *result,
     const scalar_t *src,
     const IndexType stride0,
@@ -21,14 +25,14 @@ void triu_tril_sycl_kernel(
     const int64_t k,
     const int64_t N) {
 
-  auto queue         = c10::sycl::syclGetCurrentQueue();
-  int64_t group_size = c10::sycl::syclMaxWorkGroupSize(queue);
+  auto queue         = dpcppGetCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto num_groups    = CeilDiv(N, group_size);
   auto total_items   = num_groups * group_size;
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto result_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, result);
-    auto src_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, src);
+    auto result_acc = DPCPPAccessor<dp_w_mode>(cgh, result);
+    auto src_acc = DPCPPAccessor<dp_w_mode>(cgh, src);
 
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto result_ptr = result_acc.template get_pointer<scalar_t>();
@@ -61,21 +65,21 @@ void triu_tril_sycl_kernel(
 }
 
 template <bool upper>
-Tensor& triu_tril_sycl_template(Tensor& result, const Tensor& self, int64_t k, const char* name) {
+Tensor& triu_tril_dpcpp_template(Tensor& result, const Tensor& self, int64_t k, const char* name) {
   int64_t N = self.numel();
 
   AT_DISPATCH_ALL_TYPES_AND2(at::ScalarType::Half, at::ScalarType::Bool, self.scalar_type(), name, [&]{
-   if (sycl::detail::canUse32BitIndexMath(self)) {
-      auto self_info = sycl::detail::getTensorInfo<scalar_t, int32_t>(self);
-      triu_tril_sycl_kernel<scalar_t, int32_t, upper>(
+   if (dpcpp::detail::canUse32BitIndexMath(self)) {
+      auto self_info = dpcpp::detail::getTensorInfo<scalar_t, int32_t>(self);
+      triu_tril_dpcpp_kernel<scalar_t, int32_t, upper>(
         result.data_ptr<scalar_t>(),
         self.data_ptr<scalar_t>(),
         self_info.strides[0],
         self_info.strides[1],
         k, N);
     } else {
-      auto self_info = sycl::detail::getTensorInfo<scalar_t, int64_t>(self);
-      triu_tril_sycl_kernel<scalar_t, int64_t, upper>(
+      auto self_info = dpcpp::detail::getTensorInfo<scalar_t, int64_t>(self);
+      triu_tril_dpcpp_kernel<scalar_t, int64_t, upper>(
         result.data_ptr<scalar_t>(),
         self.data_ptr<scalar_t>(),
         self_info.strides[0],
@@ -87,7 +91,7 @@ Tensor& triu_tril_sycl_template(Tensor& result, const Tensor& self, int64_t k, c
   return result;
 }
 
-Tensor& tril_sycl_out(Tensor &result, const Tensor& self, int64_t k) {
+Tensor& tril_dpcpp_out(Tensor &result, const Tensor& self, int64_t k) {
   if (result.sizes() != self.sizes()) {
     result.resize_as_(self);
   }
@@ -95,38 +99,36 @@ Tensor& tril_sycl_out(Tensor &result, const Tensor& self, int64_t k) {
     return result;
   }
 
-  return triu_tril_sycl_template<false>(result, self, k, "tril");
+  return triu_tril_dpcpp_template<false>(result, self, k, "tril");
 }
 
-Tensor& tril_sycl_(Tensor &self, int64_t k) {
-  return tril_sycl_out(self, self, k);
+Tensor& tril_dpcpp_(Tensor &self, int64_t k) {
+  return tril_dpcpp_out(self, self, k);
 }
 
-Tensor& triu_sycl_out(Tensor &result, const Tensor& self, int64_t k) {
+Tensor& triu_dpcpp_out(Tensor &result, const Tensor& self, int64_t k) {
   if (result.sizes() != self.sizes()) {
     result.resize_as_(self);
   }
   if (self.numel() == 0) {
     return result;
   }
-  return triu_tril_sycl_template<true>(result, self, k, "triu");
+  return triu_tril_dpcpp_template<true>(result, self, k, "triu");
 }
 
-Tensor& triu_sycl_(Tensor &self, int64_t k) {
-  return triu_sycl_out(self, self, k);
+Tensor& triu_dpcpp_(Tensor &self, int64_t k) {
+  return triu_dpcpp_out(self, self, k);
 }
 
-} // namespace native
-} // namespace at
+} // namespace impl
 
-namespace at { namespace AtenIpexTypeDPCPP {
 Tensor & triu_out(Tensor & out, const Tensor & self, int64_t diagonal){
-  at::native::triu_sycl_out(out, self, diagonal);
+  impl::triu_dpcpp_out(out, self, diagonal);
   return out;
 }
 
 Tensor & tril_out(Tensor & out, const Tensor & self, int64_t diagonal){
-  at::native::tril_sycl_out(out, self, diagonal);
+  impl::tril_dpcpp_out(out, self, diagonal);
   return out;
 }
 

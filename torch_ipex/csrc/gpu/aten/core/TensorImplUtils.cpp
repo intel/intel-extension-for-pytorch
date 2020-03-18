@@ -1,4 +1,3 @@
-#include <functions/Resize.h>
 #include <core/TensorImplUtils.h>
 #include <core/StorageImplUtils.h>
 #include <core/detail/TensorInfo.h>
@@ -7,9 +6,9 @@
 
 #include <aten_ipex_tensor_type.h>
 
-using namespace at::sycl::detail;
+using namespace at::dpcpp::detail;
 
-namespace at { namespace native {
+namespace at { namespace dpcpp {
 
 TensorImpl *TensorImpl_new(caffe2::TypeMeta type_meta)
 {
@@ -91,7 +90,7 @@ TensorImpl* TensorImpl_resizeImpl(at::TensorImpl* self, at::IntArrayRef size,
   }
 
   // NB: We don't need to hold device guard when calling from TH
-  c10::sycl::OptionalSYCLGuard guard;
+  OptionalDPCPPGuard guard;
   if (device_guard) {
     guard.set_index(self->storage().device().index());
   }
@@ -443,7 +442,7 @@ int compareSizeAndStride(const void* a, const void* b) {
 /* within the next one.                                        */
 bool TensorImpl_maybeOverlappingIndices(const at::TensorImpl* t) {
   /* Extract size/stride arrays; only consider size >1 dims. */
-  SizeAndStride info[MAX_SYCLTORCH_DIMS];
+  SizeAndStride info[MAX_DPCPPTORCH_DIMS];
 
   int dims = TensorImpl_nDimensionLegacyAll(t);
   int nonSize1Dims = 0;
@@ -479,9 +478,9 @@ bool TensorImpl_maybeOverlappingIndices(const at::TensorImpl* t) {
   return false;
 }
 
-SYCLDescBuff TensorImpl_sizeDesc(const at::TensorImpl *tensor) {
-  const int L = SYCL_DESC_BUFF_LEN;
-  SYCLDescBuff buf;
+DPCPPDescBuff TensorImpl_sizeDesc(const at::TensorImpl *tensor) {
+  const int L = DPCPP_DESC_BUFF_LEN;
+  DPCPPDescBuff buf;
   char *str = buf.str;
   int n = 0;
   n += snprintf(str, L-n, "[");
@@ -505,5 +504,5 @@ at::TensorImpl *TensorImpl_Unwrap(const at::Tensor& tensor) {
   return tensor.unsafeGetTensorImpl();
 }
 
-} // native::
+} // dpcpp::
 } // at::

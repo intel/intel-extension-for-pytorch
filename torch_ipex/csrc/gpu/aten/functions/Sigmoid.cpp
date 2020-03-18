@@ -3,13 +3,13 @@
 
 #include <core/DPCPP.h>
 #include <core/Memory.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Context.h>
 #include <utils/Numerics.h>
 #include <utils/Pointwise.h>
 
-#include "Resize.h"
 
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -20,18 +20,18 @@ class sigmoid_ker {};
 
 template <typename scalar_t>
 static inline void sigmoid(Tensor & output, const Tensor & self) {
-  auto queue = c10::sycl::syclGetCurrentQueue();
+  auto queue = dpcppGetCurrentQueue();
   int64_t rng, grng, tile_size, size;
 
-  c10::sycl::parallel_for_setup(self.numel(), tile_size, rng, grng);
+  parallel_for_setup(self.numel(), tile_size, rng, grng);
   size = self.numel() * sizeof(scalar_t);
   output.resize_as_(self);
 
   auto cgf = DP_Q_CGF(cgh) {
     auto in_acc =
-        c10::sycl::SYCLAccessor<dp_r_mode>(cgh, self.data_ptr<scalar_t>(), size);
+        DPCPPAccessor<dp_r_mode>(cgh, self.data_ptr<scalar_t>(), size);
     auto out_acc =
-        c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, output.data_ptr<scalar_t>(), size);
+        DPCPPAccessor<dp_discard_w_mode>(cgh, output.data_ptr<scalar_t>(), size);
     auto kfn = DP_Q_KFN(DP::nd_item<1> item) {
       size_t id = item.get_global_linear_id();
       auto in_ptr = in_acc.template get_pointer<scalar_t>();
@@ -75,7 +75,7 @@ Tensor & sigmoid_backward_out(
   grad_input.resize_as_(output);
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(output.scalar_type(), "sigmoid_backward_out",
       [&] () {
-        at::sycl::SYCL_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+        at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
             grad_input, output, grad_output, TensorSigmoidGradOp<scalar_t>());
       }
   );

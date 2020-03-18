@@ -2,7 +2,7 @@
 #include <ATen/Config.h>
 #include <c10/util/Exception.h>
 
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Generator.h>
 #include <core/Device.h>
 #include <core/detail/Hooks.h>
@@ -15,42 +15,42 @@
 
 
 namespace at {
-namespace sycl {
+namespace dpcpp {
 namespace detail {
 
-void SYCLHooks::initSYCL() const {
+void DPCPPHooks::initDPCPP() const {
   // TODO:
   // global state is removed
 }
 
-Generator* SYCLHooks::getDefaultSYCLGenerator(DeviceIndex device_index) const {
-  return at::sycl::detail::getDefaultSYCLGenerator(device_index);
+Generator* DPCPPHooks::getDefaultDPCPPGenerator(DeviceIndex device_index) const {
+  return at::dpcpp::detail::getDefaultDPCPPGenerator(device_index);
 }
 
-Device SYCLHooks::getDeviceFromPtr(void* data) const {
-  return c10::sycl::getDeviceFromPtr(data);
+Device DPCPPHooks::getDeviceFromPtr(void* data) const {
+  return getDeviceFromPtr(data);
 }
 
-bool SYCLHooks::hasSYCL() const {
+bool DPCPPHooks::hasDPCPP() const {
   int count;
-  c10::sycl::syclGetDeviceCount(&count);
+  dpcppGetDeviceCount(&count);
   return true;
 }
 
-int64_t SYCLHooks::current_device() const {
+int64_t DPCPPHooks::current_device() const {
   c10::DeviceIndex  device;
-  c10::sycl::syclGetDevice(&device);
+  dpcppGetDevice(&device);
   return device;
 }
 
-int SYCLHooks::getNumGPUs() const {
+int DPCPPHooks::getNumGPUs() const {
   int count;
-  c10::sycl::syclGetDeviceCount(&count);
+  dpcppGetDeviceCount(&count);
   return count;
 }
 
-bool SYCLHooks::compiledWithSyCL() const {
-#ifndef USE_SYCL
+bool DPCPPHooks::compiledWithSyCL() const {
+#ifndef USE_DPCPP
   return false;
 #else
   return true;
@@ -58,11 +58,11 @@ bool SYCLHooks::compiledWithSyCL() const {
 }
 
 // Sigh, the registry doesn't su[[prt namespace :(
-using at::SYCLHooksRegistry;
-using at::RegistererSYCLHooksRegistry;
+using at::DPCPPHooksRegistry;
+using at::RegistererDPCPPHooksRegistry;
 
-REGISTER_SYCL_HOOKS(SYCLHooks);
+REGISTER_DPCPP_HOOKS(DPCPPHooks);
 
 } // detail
-} // sycl
+} // dpcpp
 } // namespace

@@ -1,6 +1,7 @@
+#include <core/DPCPP.h>
+#include <core/DPCPPUtils.h>
 #include <core/Stream.h>
 #include <core/Guard.h>
-#include <core/Utils.h>
 #include <core/Context.h>
 #include <core/Exception.h>
 #include <c10/util/Exception.h>
@@ -16,37 +17,37 @@
 #include <cstdlib>
 
 
-namespace c10 {
-namespace sycl {
+namespace at {
+namespace dpcpp {
 
 enum class StreamType: uint8_t {
   DEFAULT = 0x0,
   RESERVE = 0x1,
 };
 
-static constexpr int syclStreamPoolShift = 5;
-static constexpr int syclStreamsPerPool = 32;
+static constexpr int dpcppStreamPoolShift = 5;
+static constexpr int dpcppStreamsPerPool = 32;
 
-class SYCLStreamImpl {
+class DPCPPStreamImpl {
 public:
-  SYCLStreamImpl(DeviceIndex di, cl::sycl::async_handler asyncHandler = syclAsyncHandler):
-      /* queue_(syclGetRawDevice(di), asyncHandler),*/
-      queue_(at::sycl::getGlobalContext(), syclGetDeviceSelector(di), asyncHandler),
+  DPCPPStreamImpl(DeviceIndex di, DP::async_handler asyncHandler = dpcppAsyncHandler):
+      /* queue_(dpcppGetRawDevice(di), asyncHandler),*/
+      queue_(at::dpcpp::getGlobalContext(), dpcppGetDeviceSelector(di), asyncHandler),
       device_index_(di) {};
   DeviceIndex getDeviceIndex() const { return device_index_; };
-  cl::sycl::queue& get_sycl_queue() { return queue_; }
-  ~SYCLStreamImpl() = default;
-  SYCLStreamImpl() = default;
-  C10_DISABLE_COPY_AND_ASSIGN(SYCLStreamImpl);
+  DP::queue& get_dpcpp_queue() { return queue_; }
+  ~DPCPPStreamImpl() = default;
+  DPCPPStreamImpl() = default;
+  C10_DISABLE_COPY_AND_ASSIGN(DPCPPStreamImpl);
 private:
-  cl::sycl::queue   queue_;
+  DP::queue   queue_;
   DeviceIndex       device_index_;
 };
 
-static int sycl_num_devices;
+static int dpcpp_num_devices;
 static std::once_flag init_flag;
-static std::vector<std::shared_ptr<SYCLStreamImpl> > default_streams;
-static std::vector<std::array<std::shared_ptr<SYCLStreamImpl>, syclStreamsPerPool>> reserve_streams;
+static std::vector<std::shared_ptr<DPCPPStreamImpl> > default_streams;
+static std::vector<std::array<std::shared_ptr<DPCPPStreamImpl>, dpcppStreamsPerPool>> reserve_streams;
 static std::deque<std::atomic<uint32_t> > reserve_counters;
 
 std::ostream& operator<<(std::ostream& stream, StreamType s) {
@@ -65,18 +66,18 @@ std::ostream& operator<<(std::ostream& stream, StreamType s) {
 }
 
 static inline StreamType streamType(StreamId s) {
-  return static_cast<StreamType>(s >> syclStreamPoolShift);
+  return static_cast<StreamType>(s >> dpcppStreamPoolShift);
 }
 
 static inline size_t streamIdIndex(StreamId s) {
-    return static_cast<size_t>(s & ((1 << syclStreamPoolShift) - 1));
+    return static_cast<size_t>(s & ((1 << dpcppStreamPoolShift) - 1));
 }
 
 StreamId makeStreamId(StreamType st, size_t si) {
-  return (static_cast<StreamId>(st) << syclStreamPoolShift) | static_cast<StreamId>(si);
+  return (static_cast<StreamId>(st) << dpcppStreamPoolShift) | static_cast<StreamId>(si);
 }
 
-static StreamId SYCLStream_getStreamId(const SYCLStreamImpl *ptr) {
+static StreamId DPCPPStream_getStreamId(const DPCPPStreamImpl *ptr) {
   DeviceIndex di = ptr->getDeviceIndex();
   if (ptr == default_streams[di].get()) {
     return makeStreamId(StreamType::DEFAULT, 0);
@@ -92,65 +93,65 @@ static StreamId SYCLStream_getStreamId(const SYCLStreamImpl *ptr) {
                 " (something has gone horribly wrong!)");
 }
 
-static thread_local SYCLStreamImpl** current_streams = nullptr;
+static thread_local DPCPPStreamImpl** current_streams = nullptr;
 
 static void clearSyclStreams() {
   default_streams.clear();
   reserve_streams.clear();
 }
 
-static void initSYCLStreams() {
-  C10_SYCL_CHECK(syclGetDeviceCount(&sycl_num_devices));
-  TORCH_CHECK(sycl_num_devices > 0, "Number of sycl devices should be greater than zero!");
+static void initDPCPPStreams() {
+  AT_DPCPP_CHECK(dpcppGetDeviceCount(&dpcpp_num_devices));
+  TORCH_CHECK(dpcpp_num_devices > 0, "Number of dpcpp devices should be greater than zero!");
 
   if (default_streams.size() == 0) {
-    default_streams.resize(sycl_num_devices);
-    reserve_counters.resize(sycl_num_devices);
-    reserve_streams.resize(sycl_num_devices);
+    default_streams.resize(dpcpp_num_devices);
+    reserve_counters.resize(dpcpp_num_devices);
+    reserve_streams.resize(dpcpp_num_devices);
   }
 
   // init default streams
-  for (int i = 0; i < sycl_num_devices; ++i) {
-    default_streams[i] = std::make_shared<SYCLStreamImpl>(i);
+  for (int i = 0; i < dpcpp_num_devices; ++i) {
+    default_streams[i] = std::make_shared<DPCPPStreamImpl>(i);
   }
 
   // init reserve stream pool
-  for (int di = 0; di < sycl_num_devices; ++di) {
-    for (auto pi = decltype(syclStreamsPerPool){0}; pi < syclStreamsPerPool; ++pi) {
-      reserve_streams[di][pi] = std::make_shared<SYCLStreamImpl>(di);
+  for (int di = 0; di < dpcpp_num_devices; ++di) {
+    for (auto pi = decltype(dpcppStreamsPerPool){0}; pi < dpcppStreamsPerPool; ++pi) {
+      reserve_streams[di][pi] = std::make_shared<DPCPPStreamImpl>(di);
     }
     reserve_counters[di] = 0;
   }
 
-  // Note: SYCLRuntime's destruction happens before the destroy of the
-  // global vars except the global vars with sycl type. This will make
+  // Note: DPCPPRuntime's destruction happens before the destroy of the
+  // global vars except the global vars with dpcpp type. This will make
   // our global device pool destruction crash. So we use atexit to
-  // manually free all sycl streams. atexit callback happens before
-  // SYCLRuntime destruction.
+  // manually free all dpcpp streams. atexit callback happens before
+  // DPCPPRuntime destruction.
   atexit(clearSyclStreams);
 }
 
-static void initSYCLStreamsOnce() {
-  std::call_once(init_flag, initSYCLStreams);
+static void initDPCPPStreamsOnce() {
+  std::call_once(init_flag, initDPCPPStreams);
 
   if (current_streams) return;
 
-  current_streams = (SYCLStreamImpl**)malloc(sycl_num_devices * sizeof(SYCLStreamImpl*));
-  for (int di = 0; di < sycl_num_devices; ++di) {
+  current_streams = (DPCPPStreamImpl**)malloc(dpcpp_num_devices * sizeof(DPCPPStreamImpl*));
+  for (int di = 0; di < dpcpp_num_devices; ++di) {
     current_streams[di] = default_streams[di].get();
   }
 }
 
 static inline void check_num_devices(DeviceIndex device_index) {
-  AT_ASSERT(device_index >= 0 && device_index < sycl_num_devices);
+  AT_ASSERT(device_index >= 0 && device_index < dpcpp_num_devices);
 }
 
 static uint32_t get_stream_index(std::atomic<uint32_t> &counter) {
   auto raw_idx = counter++;
-  return raw_idx % syclStreamsPerPool;
+  return raw_idx % dpcppStreamsPerPool;
 }
 
-SYCLStreamImpl* SYCLStreamToSYCLStreamImpl(SYCLStream stream) {
+DPCPPStreamImpl* DPCPPStreamToDPCPPStreamImpl(DPCPPStream stream) {
   c10::DeviceIndex di = stream.device_index();
   StreamType st = streamType(stream.unwrap().id());
   size_t si = streamIdIndex(stream.unwrap().id());
@@ -166,64 +167,64 @@ SYCLStreamImpl* SYCLStreamToSYCLStreamImpl(SYCLStream stream) {
   }
 }
 
-SYCLStream SYCLStreamImplToSYCLStream(const SYCLStreamImpl *ptr) {
-  return SYCLStream(SYCLStream::UNCHECKED,
+DPCPPStream DPCPPStreamImplToDPCPPStream(const DPCPPStreamImpl *ptr) {
+  return DPCPPStream(DPCPPStream::UNCHECKED,
               Stream(Stream::UNSAFE,
                      c10::Device(DeviceType::DPCPP, ptr->getDeviceIndex()),
-                     SYCLStream_getStreamId(ptr)));
+                     DPCPPStream_getStreamId(ptr)));
 }
 
-cl::sycl::queue& SYCLStream::sycl_queue() const {
-  auto streamImpl = SYCLStreamToSYCLStreamImpl(*this);
-  return streamImpl->get_sycl_queue();
+DP::queue& DPCPPStream::dpcpp_queue() const {
+  auto streamImpl = DPCPPStreamToDPCPPStreamImpl(*this);
+  return streamImpl->get_dpcpp_queue();
 }
 
-SYCLStream getSYCLStreamFromPool(const bool isDefault, DeviceIndex device_index) {
-  initSYCLStreamsOnce();
+DPCPPStream getDPCPPStreamFromPool(const bool isDefault, DeviceIndex device_index) {
+  initDPCPPStreamsOnce();
   if (device_index == -1) device_index = current_device();
   check_num_devices(device_index);
 
   if (isDefault) {
-    return getDefaultSYCLStream(device_index);
+    return getDefaultDPCPPStream(device_index);
   }
 
   const auto si = get_stream_index(reserve_counters[device_index]);
-  return SYCLStreamImplToSYCLStream(reserve_streams[device_index][si].get());
+  return DPCPPStreamImplToDPCPPStream(reserve_streams[device_index][si].get());
 }
 
-SYCLStream getDefaultSYCLStream(DeviceIndex device_index) {
-  initSYCLStreamsOnce();
+DPCPPStream getDefaultDPCPPStream(DeviceIndex device_index) {
+  initDPCPPStreamsOnce();
   if (device_index == -1) device_index = current_device();
   check_num_devices(device_index);
-  return SYCLStreamImplToSYCLStream(default_streams[device_index].get());
+  return DPCPPStreamImplToDPCPPStream(default_streams[device_index].get());
 }
 
-SYCLStream getCurrentSYCLStream(DeviceIndex device_index) {
-  initSYCLStreamsOnce();
+DPCPPStream getCurrentDPCPPStream(DeviceIndex device_index) {
+  initDPCPPStreamsOnce();
   if (device_index == -1) device_index = current_device();
   check_num_devices(device_index);
-  return SYCLStreamImplToSYCLStream(current_streams[device_index]);
+  return DPCPPStreamImplToDPCPPStream(current_streams[device_index]);
 }
 
-void setCurrentSYCLStream(SYCLStream stream) {
-  initSYCLStreamsOnce();
-  auto ptr = SYCLStreamToSYCLStreamImpl(stream);
+void setCurrentDPCPPStream(DPCPPStream stream) {
+  initDPCPPStreamsOnce();
+  auto ptr = DPCPPStreamToDPCPPStreamImpl(stream);
   AT_ASSERT(ptr);
   current_streams[ptr->getDeviceIndex()] = ptr;
 }
 
-SYCLStream getSYCLStreamOnDevice(DeviceIndex device_index, int stream_index) {
-  initSYCLStreamsOnce();
+DPCPPStream getDPCPPStreamOnDevice(DeviceIndex device_index, int stream_index) {
+  initDPCPPStreamsOnce();
   if (device_index == -1) device_index = current_device();
   check_num_devices(device_index);
-  if (stream_index == 0) return getDefaultSYCLStream(device_index);
-  AT_ASSERT(stream_index <= syclStreamsPerPool);
-  return SYCLStreamImplToSYCLStream(reserve_streams[device_index][stream_index-1].get());
+  if (stream_index == 0) return getDefaultDPCPPStream(device_index);
+  AT_ASSERT(stream_index <= dpcppStreamsPerPool);
+  return DPCPPStreamImplToDPCPPStream(reserve_streams[device_index][stream_index-1].get());
 }
 
-std::ostream& operator<<(std::ostream& stream, const SYCLStream& s) {
+std::ostream& operator<<(std::ostream& stream, const DPCPPStream& s) {
     return stream << s.unwrap();
 }
 
-} // namespace sycl
+} // namespace dpcpp
 } // namespace at

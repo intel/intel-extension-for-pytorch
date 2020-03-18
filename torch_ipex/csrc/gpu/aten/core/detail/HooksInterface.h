@@ -10,8 +10,8 @@
 #include <functional>
 #include <memory>
 
-// Forward-declares THSYCLState
-// struct THSYCLState;
+// Forward-declares THDPCPPState
+// struct THDPCPPState;
 
 namespace at {
 class Context;
@@ -20,34 +20,34 @@ class Context;
 //NB: Class must live in "at" due to limitations of Registry.h.
 namespace at {
 
-// The SYCLHooksInterface is an omnibus interface for any SYCL functionality
+// The DPCPPHooksInterface is an omnibus interface for any DPCPP functionality
 // which we may want to call into from CPU code (and thus must be dynamically
-// dispatched, to allow for separate compilation of SYCL code). See
+// dispatched, to allow for separate compilation of DPCPP code). See
 // CUDAHooksInterface for more detailed motivation.
-struct CAFFE2_API SYCLHooksInterface {
+struct CAFFE2_API DPCPPHooksInterface {
   // This should never actually be implemented, but it is used to
   // squelch -Werror=non-virtual-dtor
-  virtual ~SYCLHooksInterface() {}
+  virtual ~DPCPPHooksInterface() {}
 
-  // Initialize THSYCLState and, transitively, the SYCL state
-  // virtual std::unique_ptr<THSYCLState, void (*)(THSYCLState*)> initSYCL() const {
-  //   TORCH_CHECK("Cannot initialize SYCL without ATen_sycl library.");
+  // Initialize THDPCPPState and, transitively, the DPCPP state
+  // virtual std::unique_ptr<THDPCPPState, void (*)(THDPCPPState*)> initDPCPP() const {
+  //   TORCH_CHECK("Cannot initialize DPCPP without ATen_dpcpp library.");
   //   return {nullptr, nullptr};
   // }
 
-  virtual void initSYCL() const {
-    TORCH_CHECK("Cannot initialize SYCL without ATen_sycl library.");
+  virtual void initDPCPP() const {
+    TORCH_CHECK("Cannot initialize DPCPP without ATen_dpcpp library.");
   }
 
-  virtual Generator* getDefaultSYCLGenerator(DeviceIndex device_index = -1) const {
-    TORCH_CHECK(false, "Cannot get default SYCL generator without ATen_sycl library. ");
+  virtual Generator* getDefaultDPCPPGenerator(DeviceIndex device_index = -1) const {
+    TORCH_CHECK(false, "Cannot get default DPCPP generator without ATen_dpcpp library. ");
   }
 
   virtual Device getDeviceFromPtr(void* data) const {
-    TORCH_CHECK(false, "Cannot get device of pointer on SYCL without ATen_sycl library. ");
+    TORCH_CHECK(false, "Cannot get device of pointer on DPCPP without ATen_dpcpp library. ");
   }
 
-  virtual bool hasSYCL() const {
+  virtual bool hasDPCPP() const {
     return false;
   }
 
@@ -56,7 +56,7 @@ struct CAFFE2_API SYCLHooksInterface {
   }
 
   virtual Allocator* getPinnedMemoryAllocator() const {
-    AT_ERROR("SYCL currently not support Pinned Memory");
+    AT_ERROR("DPCPP currently not support Pinned Memory");
   }
 
   virtual int getNumGPUs() const {
@@ -70,13 +70,13 @@ struct CAFFE2_API SYCLHooksInterface {
 
 //NB: dummy argument to suppress "ISO C++11 requires at least one argument
 //for the "..." in a variadic macro"
-struct CAFFE2_API SYCLHooksArgs {};
+struct CAFFE2_API DPCPPHooksArgs {};
 
-C10_DECLARE_REGISTRY(SYCLHooksRegistry, SYCLHooksInterface, SYCLHooksArgs);
-#define REGISTER_SYCL_HOOKS(clsname) \
-  C10_REGISTER_CLASS(SYCLHooksRegistry, clsname, clsname)
+C10_DECLARE_REGISTRY(DPCPPHooksRegistry, DPCPPHooksInterface, DPCPPHooksArgs);
+#define REGISTER_DPCPP_HOOKS(clsname) \
+  C10_REGISTER_CLASS(DPCPPHooksRegistry, clsname, clsname)
 
 namespace detail {
-CAFFE2_API const SYCLHooksInterface& getSYCLHooks();
+CAFFE2_API const DPCPPHooksInterface& getDPCPPHooks();
 } // namespace detail
 } // namespace at

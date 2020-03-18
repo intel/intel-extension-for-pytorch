@@ -3,7 +3,7 @@
 #include <core/TensorImplUtils.h>
 
 
-using namespace at::native;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -78,25 +78,6 @@ static void cat(Tensor & result, TensorList inputs, int numInputs, int dimension
     size[dim] = result_dim_size;
   }
   result.resize_(size);
-
-  // auto narrow = [](TensorImpl *self, TensorImpl *src, int dimension, int64_t firstIndex, int64_t size) {
-  //   if(!src)
-  //     src = self;
-
-  //   TORCH_CHECK( (dimension >= 0) && (dimension < src->dim()), "out of range");
-  //   TORCH_CHECK( firstIndex >= 0, "out of range");
-  //   TORCH_CHECK( size >= 0, "out of range");
-  //   TORCH_CHECK(firstIndex+size <= src->size(dimension), "out of range");
-
-  //   self._set(src);
-  //   // THSYCLTensor_(set)(state, self, src);
-
-  //   if (firstIndex > 0) {
-  //     self->set_storage_offset(self->storage_offset() + firstIndex*self->stride(dimension));
-  //   }
-
-  //   self->set_size(dimension, size);
-  // };
 
   offset = 0;
   for (j = 0; j < numInputs; j++) {

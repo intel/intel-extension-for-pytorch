@@ -1,7 +1,7 @@
 #include <utils/Numerics.h>
 
 namespace at {
-namespace native {
+namespace dpcpp {
 
 template <typename scalar_t>
 struct TopKTypeConfig {};
@@ -156,7 +156,7 @@ struct Bitfield<uint64_t> {
   static inline uint64_t getBitfield(uint64_t val, int pos, int len) {
     pos &= 0xff;
     len &= 0xff;
-    
+
     uint64_t m = (1u << len) - 1u;
     return (val >> pos) & m;
   }
@@ -164,7 +164,7 @@ struct Bitfield<uint64_t> {
   static inline uint64_t setBitfield(uint64_t val, uint64_t toInsert, int pos, int len) {
     pos &= 0xff;
     len &= 0xff;
-    
+
     uint64_t m = (1u << len) - 1u;
     toInsert &=m;
     toInsert <<= pos;
@@ -196,7 +196,7 @@ template <
     index_t sliceSize,
     index_t withinSliceStride,
     const dp_global_ptr_pt<scalar_t> &data,
-    cl::sycl::nd_item<1> &item_id) {
+    DP::nd_item<1> &item_id) {
   // Clear out per-thread counts from a previous round
   for (int i = 0; i < RadixSize; ++i) {
     counts[i] = 0;
@@ -208,7 +208,7 @@ template <
   }
 
 
-  item_id.barrier(cl::sycl::access::fence_space::local_space);
+  item_id.barrier(DP::access::fence_space::local_space);
   // Scan over all the data. Upon a read, the warp will accumulate
   // counts per each digit in the radix using warp voting.
   for (index_t i = local_id; i < sliceSize; i += item_id.get_local_range(0)) {
@@ -224,18 +224,18 @@ template <
   }
 
     for (uint32_t i = 0; i < RadixSize; ++i) {
-      cl::sycl::atomic<int, cl::sycl::access::address_space::local_space> smem_var(smem.get_pointer() + i);
+      DP::atomic<int, DP::access::address_space::local_space> smem_var(smem.get_pointer() + i);
       smem_var.fetch_add(counts[i]);
     }
 
-  item_id.barrier(cl::sycl::access::fence_space::local_space);
+  item_id.barrier(DP::access::fence_space::local_space);
 
   // For each thread, read in the total counts
   for (uint32_t i = 0; i < RadixSize; ++i) {
     counts[i] = smem[i];
   }
 
-  item_id.barrier(cl::sycl::access::fence_space::local_space);
+  item_id.barrier(DP::access::fence_space::local_space);
 }
 
 // Over what radix we are selecting values
@@ -263,7 +263,7 @@ scalar_t findPattern(
     smem_ptr[RADIX_SIZE] = ScalarConvert<int, scalar_t>::to(0);
   }
 
-  item_id.barrier(cl::sycl::access::fence_space::local_space);
+  item_id.barrier(DP::access::fence_space::local_space);
 
   // All threads participate in the loop, in order to sync on the flag
   index_t numIterations =
@@ -281,12 +281,12 @@ scalar_t findPattern(
       smem_ptr[1] = v; // can't use val as the flag, since it could be 0
     }
 
-    item_id.barrier(cl::sycl::access::fence_space::local_space);
+    item_id.barrier(DP::access::fence_space::local_space);
 
     scalar_t found = smem_ptr[0];
     scalar_t val = smem_ptr[1];
 
-    item_id.barrier(cl::sycl::access::fence_space::local_space);
+    item_id.barrier(DP::access::fence_space::local_space);
 
     // Check to see if a thread found the value
     if (Numerics<scalar_t>::ne(found, ScalarConvert<int, scalar_t>::to(0))) {
@@ -422,5 +422,5 @@ void radixSelect(
   // matching `desired` exactly
   *topK = TopKTypeConfig<scalar_t>::deconvert(desired);
 }
-} // namespace native
+} // namespace dpcpp
 } // namespace at

@@ -5,7 +5,7 @@
 
 #include <core/DPCPP.h>
 #include <core/Memory.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/TensorImplUtils.h>
 
 #include <utils/Numerics.h>
@@ -13,6 +13,7 @@
 
 
 using namespace at::native;
+using namespace at::dpcpp;
 
 template <typename scalar_t>
 DP_DEVICE struct AddOp {
@@ -75,8 +76,8 @@ kernelTransformReduceInnermostDimIndex(at::Tensor & tgt1,
                                        std::pair<K, Index> init,
                                        BinaryFunction binary_op) {
 
-  auto queue         = c10::sycl::syclGetCurrentQueue();
-  int64_t group_size = c10::sycl::syclMaxWorkGroupSize(queue);
+  auto queue         = dpcppGetCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto totalElements = src.numel();
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
@@ -94,9 +95,9 @@ kernelTransformReduceInnermostDimIndex(at::Tensor & tgt1,
   int64_t batch = totalElements / (n * stride);
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto src_acc  = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, src_data, src_size);
-    auto tgt1_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, tgt1_data, tgt1_size);
-    auto tgt2_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, tgt2_data, tgt2_size);
+    auto src_acc  = DPCPPAccessor<dp_r_mode>(cgh, src_data, src_size);
+    auto tgt1_acc = DPCPPAccessor<dp_w_mode>(cgh, tgt1_data, tgt1_size);
+    auto tgt2_acc = DPCPPAccessor<dp_w_mode>(cgh, tgt2_data, tgt2_size);
 
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto src_ptr  = src_acc.template get_pointer<K>();
@@ -129,7 +130,7 @@ kernelTransformReduceInnermostDimIndex(at::Tensor & tgt1,
       DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
   };
 
-  // submit to SYCL queue
+  // submit to DPCPP queue
   DP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
@@ -144,8 +145,8 @@ kernelTransformReduceOuterDimIndex(at::Tensor & tgt1,
                                    std::pair<K, Index> init,
                                    BinaryFunction binary_op) {
 
-  auto queue         = c10::sycl::syclGetCurrentQueue();
-  int64_t group_size = c10::sycl::syclMaxWorkGroupSize(queue);
+  auto queue         = dpcppGetCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto totalElements = src.numel();
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
@@ -162,9 +163,9 @@ kernelTransformReduceOuterDimIndex(at::Tensor & tgt1,
   int64_t batch = totalElements / (n * stride);
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto src_acc  = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, src_data, src_size);
-    auto tgt1_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, tgt1_data, tgt1_size);
-    auto tgt2_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, tgt2_data, tgt2_size);
+    auto src_acc  = DPCPPAccessor<dp_r_mode>(cgh, src_data, src_size);
+    auto tgt1_acc = DPCPPAccessor<dp_w_mode>(cgh, tgt1_data, tgt1_size);
+    auto tgt2_acc = DPCPPAccessor<dp_w_mode>(cgh, tgt2_data, tgt2_size);
 
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto src_ptr  = src_acc.template get_pointer<K>();
@@ -197,7 +198,7 @@ kernelTransformReduceOuterDimIndex(at::Tensor & tgt1,
       DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
   };
 
-  // submit to SYCL queue
+  // submit to DPCPP queue
   DP_Q_ASYNC_SUBMIT(queue, cgf);
 };
 

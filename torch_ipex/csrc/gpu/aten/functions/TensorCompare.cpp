@@ -3,10 +3,10 @@
 
 #include <core/Context.h>
 #include <core/Memory.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/ApplyUtils.h>
 
-using namespace at::sycl;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -32,10 +32,10 @@ void _s_where(
     const at::Tensor& self,
     const at::Tensor& other) {
   if (condition.scalar_type() == at::ScalarType::Byte) {
-    SYCL_tensor_apply4<scalar_t, uint8_t, scalar_t, scalar_t>(
+    DPCPP_tensor_apply4<scalar_t, uint8_t, scalar_t, scalar_t>(
         ret, condition, self, other, where_functor<scalar_t, uint8_t>());
   } else {
-    SYCL_tensor_apply4<scalar_t, bool, scalar_t, scalar_t>(
+    DPCPP_tensor_apply4<scalar_t, bool, scalar_t, scalar_t>(
         ret, condition, self, other, where_functor<scalar_t, bool>());
   }
 }

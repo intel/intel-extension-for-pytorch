@@ -6,13 +6,13 @@
 
 using namespace mkldnn;
 
-namespace at { namespace native {
+namespace at { namespace dpcpp {
 
 template <typename data_type, bool use_bias>
 void mkldnn_inner_product(int M, int N, int K, data_type* output, data_type* input, data_type* weight, data_type* bias)
 {
 #ifndef DNNL_CPU_ONLY
-  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 #else
   auto engine = CpuEngine::Instance().get_engine();

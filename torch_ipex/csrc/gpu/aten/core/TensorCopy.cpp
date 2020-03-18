@@ -3,10 +3,11 @@
 
 #include <core/TensorImplUtils.h>
 #include <core/TensorCopy.h>
-#include <functions/Copy.h>
+
+#include <ATen/aten_ipex_type_dpcpp.h>
 
 namespace at {
-namespace native {
+namespace dpcpp {
 
 #define BUILD_TENSOR_ITER(dst, src, iter) \
   auto iter = TensorIterator();           \
@@ -18,20 +19,18 @@ namespace native {
 
 void TensorImpl_copy(TensorImpl* dst, TensorImpl* src) {
   if (dst == src) return;
-  at::Tensor dst_wrap = TensorImpl_wrap(dst);
-  at::Tensor src_wrap = TensorImpl_wrap(src);
-  BUILD_TENSOR_ITER(dst_wrap, src_wrap, iter)
-  at::native::copy_kernel_sycl(iter);
+  auto dst_ = TensorImpl_wrap(dst);
+  auto src_ = TensorImpl_wrap(src);
+  at::AtenIpexTypeDPCPP::copy_(dst_, src_, false);
 }
 
 template <typename scalar_t>
 TensorImpl *TensorImpl_newClone(TensorImpl *self) {
   TensorImpl* tensor = TensorImpl_new();
   TensorImpl_resizeAs(tensor, self);
-  at::Tensor tensor_wrap = TensorImpl_wrap(tensor);
-  at::Tensor self_wrap = TensorImpl_wrap(self);
-  BUILD_TENSOR_ITER(tensor_wrap, self_wrap, iter)
-  at::native::copy_kernel_sycl(iter);
+  auto dst_ = TensorImpl_wrap(tensor);
+  auto src_ = TensorImpl_wrap(self);
+  at::AtenIpexTypeDPCPP::copy_(dst_, src_, false);
   return tensor;
 }
 
@@ -50,10 +49,9 @@ TensorImpl *TensorImpl_newContiguous(TensorImpl *self)
 template <typename scalar_t>
 void TensorImpl_freeCopyTo(TensorImpl *self, TensorImpl *dst) {
   if(self != dst) {
-    at::Tensor dst_wrap = TensorImpl_wrap(dst);
-    at::Tensor self_wrap = TensorImpl_wrap(self);
-    BUILD_TENSOR_ITER(dst_wrap, self_wrap, iter)
-    at::native::copy_kernel_sycl(iter);
+    auto dst_ = TensorImpl_wrap(dst);
+    auto src_ = TensorImpl_wrap(self);
+    at::AtenIpexTypeDPCPP::copy_(dst_, src_, false);
   }
 
   TensorImpl_free(self);
@@ -69,7 +67,7 @@ void TensorImpl_copyIgnoringOverlaps(TensorImpl* dst, TensorImpl* src) {
   // case that there are write overlaps.
   // FIXME: really, overlapping writes should be illegal/an error in Torch
 #if 0
- THSYCL_pointwiseApply2<scalar_t, scalar_t>(
+ THDPCPP_pointwiseApply2<scalar_t, scalar_t>(
     dst, src,
     CopyOp<scalar_t, scalar_t>(),
     ReadOnly, /* ignore overwrites */
@@ -77,5 +75,5 @@ void TensorImpl_copyIgnoringOverlaps(TensorImpl* dst, TensorImpl* src) {
 #endif
 }
 
-} // namespace native
+} // namespace dpcpp
 } // namespace at

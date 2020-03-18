@@ -5,6 +5,9 @@
 #include <utils/Atomics.h>
 #include "Loops.h"
 
+
+using namespace at::dpcpp;
+
 template <bool has_weight, typename ...> class histogram_kernel {};
 
 namespace at {
@@ -33,18 +36,18 @@ template <
         bool has_weight,
         typename Op>
 void kernelHistogram1D(
-        sycl::detail::TensorInfo<output_t, IndexType> a, /* output */
-        sycl::detail::TensorInfo<input_t, IndexType> b, /* input */
-        sycl::detail::TensorInfo<output_t, IndexType> c, /* weight */
+        dpcpp::detail::TensorInfo<output_t, IndexType> a, /* output */
+        dpcpp::detail::TensorInfo<input_t, IndexType> b, /* input */
+        dpcpp::detail::TensorInfo<output_t, IndexType> c, /* weight */
         int nbins,
         input_t minvalue,
         input_t maxvalue,
         IndexType totalElements,
         Op getOp) {
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = c10::sycl::SYCLAccessor<dp_rw_mode>;
-  using in_accessor_t = c10::sycl::SYCLAccessor<dp_r_mode>;
+  using out_accessor_t = DPCPPAccessor<dp_rw_mode>;
+  using in_accessor_t = DPCPPAccessor<dp_r_mode>;
 
   auto cgf = DP_Q_CGF(__cgh) {
     out_accessor_t out_acc = out_accessor_t (__cgh, a.data);
@@ -59,13 +62,13 @@ void kernelHistogram1D(
       auto linearIndex = item_id.get_id(0);
       // Convert `linearIndex` into an offset of `b`
       const IndexType bOffset =
-              sycl::detail::IndexToOffset<input_t, IndexType>::get(linearIndex, b);
+              dpcpp::detail::IndexToOffset<input_t, IndexType>::get(linearIndex, b);
       const auto bVal = in_ptr[bOffset];
       if (bVal >= minvalue && bVal <= maxvalue) {
         // Use value at `b` as an offset of `a`
         const IndexType bin = getBin<input_t, IndexType>(bVal, minvalue, maxvalue, nbins);
         const IndexType aOffset =
-                sycl::detail::IndexToOffset<output_t, IndexType, ADims>::get(bin, a);
+                dpcpp::detail::IndexToOffset<output_t, IndexType, ADims>::get(bin, a);
         atomicAdd(&out_ptr[aOffset], getOp(weight_ptr, linearIndex));
       }
     };
@@ -74,7 +77,7 @@ void kernelHistogram1D(
             DP::range</*dim=*/1>(totalElements), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 #define HANDLE_CASE(WEIGHTS_OP, WITH_WEIGHT)                   \
@@ -105,18 +108,18 @@ bool dpcpp_tensor_histogram(
   auto totalElements = b.numel();
 
   using IndexType = int64_t;
-  auto aInfo = sycl::detail::getTensorInfo<output_t, IndexType>(a);
-  auto bInfo = sycl::detail::getTensorInfo<input_t, IndexType>(b);
+  auto aInfo = dpcpp::detail::getTensorInfo<output_t, IndexType>(a);
+  auto bInfo = dpcpp::detail::getTensorInfo<input_t, IndexType>(b);
   if (HasWeights) {
-    auto cInfo = sycl::detail::getTensorInfo<output_t, IndexType>(c);
+    auto cInfo = dpcpp::detail::getTensorInfo<output_t, IndexType>(c);
     const auto getWeightsOp = [cInfo] (dp_global_ptr_pt<output_t> cPtr, IndexType cIndex) {
       const IndexType cOffset =
-              sycl::detail::IndexToOffset<output_t, IndexType, 1>::get(cIndex, cInfo);
+              dpcpp::detail::IndexToOffset<output_t, IndexType, 1>::get(cIndex, cInfo);
       return cPtr[cOffset];
     };
     HANDLE_CASE(getWeightsOp, true);
   } else {
-    sycl::detail::TensorInfo<output_t, IndexType> cInfo;
+    dpcpp::detail::TensorInfo<output_t, IndexType> cInfo;
     // set the dummy cinfo with the ptr to the output
     cInfo.data = aInfo.data;
     static const auto getDummyOp = [] (dp_global_ptr_pt<output_t>, IndexType) { return static_cast<output_t>(1); };
@@ -169,13 +172,13 @@ Tensor bincount_template(
 } // namespace impl
 
 Tensor bincount(const Tensor& self, const Tensor& weights, int64_t minlength) {
-  return AT_DISPATCH_INTEGRAL_TYPES(self.scalar_type(), "bincount_sycl", [&] {
+  return AT_DISPATCH_INTEGRAL_TYPES(self.scalar_type(), "bincount_dpcpp", [&] {
     const auto scalar = weights.scalar_type();
     if (scalar == ScalarType::Undefined || scalar == ScalarType::Float)
       return impl::bincount_template<scalar_t, float>(self, weights, minlength);
     else if (scalar == ScalarType::Int)
       return impl::bincount_template<scalar_t, float>(self, weights, minlength);
-    TORCH_CHECK(0, "bincount_sycl not implemented for weight type '", toString(scalar), "'");
+    TORCH_CHECK(0, "bincount_dpcpp not implemented for weight type '", toString(scalar), "'");
   });
 }
 

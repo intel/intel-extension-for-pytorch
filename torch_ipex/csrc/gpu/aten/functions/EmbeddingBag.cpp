@@ -3,14 +3,16 @@
 
 #include <core/DPCPPTensorUtils.h>
 #include <core/DPCPP.h>
+#include <core/DPCPPUtils.h>
 #include <core/Memory.h>
-#include <core/Utils.h>
 #include <core/Context.h>
 
 #include <utils/Numerics.h>
 #include <utils/Atomics.h>
 
-using namespace at::native;
+
+using namespace at::dpcpp;
+
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
@@ -22,11 +24,11 @@ constexpr int MODE_MAX = 2;
 constexpr int64_t NROWS_PER_THREAD = 10;
 constexpr int64_t WARP_SIZE = 64;
 
-DP_DEF_K1(partials_per_segment_sycl);
-DP_DEF_K1(partial_segment_offset_sycl);
-DP_DEF_K2(compute_grad_weight_bags_sycl, typename scalar_t);
-DP_DEF_K2(compute_grad_weight_sycl, typename scalar_t);
-DP_DEF_K2(sum_and_scatter_sycl, typename scalar_t);
+DP_DEF_K1(partials_per_segment_dpcpp);
+DP_DEF_K1(partial_segment_offset_dpcpp);
+DP_DEF_K2(compute_grad_weight_bags_dpcpp, typename scalar_t);
+DP_DEF_K2(compute_grad_weight_dpcpp, typename scalar_t);
+DP_DEF_K2(sum_and_scatter_dpcpp, typename scalar_t);
 
 DP_DEF_K2(EmbeddingbagSycl, typename scalar_t);
 DP_DEF_K2(AccGradParametersKernel_max_Sycl, typename scalar_t);
@@ -34,14 +36,14 @@ DP_DEF_K2(AccGradParametersKernel_max_Sycl, typename scalar_t);
 void krn_partials_per_segment(int64_t *ret, const int64_t *segment_offsets,
                               int64_t num_of_segments, int64_t numel) {
 
-  auto queue         = c10::sycl::syclGetCurrentQueue();
+  auto queue         = dpcppGetCurrentQueue();
   int64_t group_size = 32;
   auto num_groups    = CeilDiv(num_of_segments, group_size);
   auto total_items   = num_groups * group_size;
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto acc_ret = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, ret);
-    auto acc_offsets = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, segment_offsets);
+    auto acc_ret = DPCPPAccessor<dp_w_mode>(cgh, ret);
+    auto acc_offsets = DPCPPAccessor<dp_r_mode>(cgh, segment_offsets);
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto ret_ptr = acc_ret.template get_pointer<int64_t>();
       auto offsets_ptr = acc_offsets.template get_pointer<int64_t>();
@@ -55,7 +57,7 @@ void krn_partials_per_segment(int64_t *ret, const int64_t *segment_offsets,
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(partials_per_segment_sycl)>(
+    cgh.parallel_for<DP_K(partials_per_segment_dpcpp)>(
       DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
   };
   DP_Q_ASYNC_SUBMIT(queue, cgf);
@@ -68,16 +70,16 @@ void krn_partial_segment_offset(
         const int64_t *segment_offsets,
         int64_t num_of_segments) {
 
-  auto queue         = c10::sycl::syclGetCurrentQueue();
+  auto queue         = dpcppGetCurrentQueue();
   int64_t group_size = 32;
   auto num_groups    = CeilDiv(num_of_segments, group_size);
   auto total_items   = num_groups * group_size;
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto acc_ret = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, ret);
-    auto acc_partials_per_segment = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, partials_per_segment);
-    auto acc_partials_per_segment_offset = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, partials_per_segment_offset);
-    auto acc_segment_offsets = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, segment_offsets);
+    auto acc_ret = DPCPPAccessor<dp_w_mode>(cgh, ret);
+    auto acc_partials_per_segment = DPCPPAccessor<dp_r_mode>(cgh, partials_per_segment);
+    auto acc_partials_per_segment_offset = DPCPPAccessor<dp_r_mode>(cgh, partials_per_segment_offset);
+    auto acc_segment_offsets = DPCPPAccessor<dp_r_mode>(cgh, segment_offsets);
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto ret_ptr = acc_ret.template get_pointer<int64_t>();
       auto partials_per_segment_ptr = acc_partials_per_segment.template get_pointer<int64_t>();
@@ -96,17 +98,17 @@ void krn_partial_segment_offset(
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(partial_segment_offset_sycl)>(
+    cgh.parallel_for<DP_K(partial_segment_offset_dpcpp)>(
       DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
   };
   DP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 int64_t exclusive_scan(int64_t * out, int64_t * in, int64_t num_of_segments) {
-  static const auto write_mode = cl::sycl::access::mode::write;
-  static const auto read_mode = cl::sycl::access::mode::read;
-  auto in_ptr = c10::sycl::syclGetBufferMap().template get_buffer<int64_t>(in);
-  auto out_ptr = c10::sycl::syclGetBufferMap().template get_buffer<int64_t>(out);
+  static const auto write_mode = DP::access::mode::write;
+  static const auto read_mode = DP::access::mode::read;
+  auto in_ptr = dpcppGetBufferMap().template get_buffer<int64_t>(in);
+  auto out_ptr = dpcppGetBufferMap().template get_buffer<int64_t>(out);
   auto acc_in = in_ptr.get_access<read_mode>();
   auto acc_out = out_ptr.get_access<write_mode>();
   acc_out[0] = 0;
@@ -127,23 +129,23 @@ void compute_grad_weight_bags(
     acc_type<scalar_t, true> *grad_weight_per_segment,
     bool scale_grad_by_freq, bool per_sample_weight_defined) {
 
-  auto queue         = c10::sycl::syclGetCurrentQueue();
+  auto queue         = dpcppGetCurrentQueue();
   int64_t stride_warped = CeilDiv(stride, WARP_SIZE)*WARP_SIZE;
-  int64_t group_size = std::min(stride_warped, c10::sycl::syclMaxWorkGroupSize(queue));
+  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));
   auto num_groups    = CeilDiv(num_of_segments*stride_warped, group_size);
   auto total_items   = num_groups * group_size;
   DP::buffer<uint8_t, 1> dummy_buffer(DP::range<1>(1)); 
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto acc_grad_weight_per_segment = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, grad_weight_per_segment);
-    auto acc_indices = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, indices);
-    auto acc_gradOutput = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, gradOutput);
-    auto acc_offset2bag = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, offset2bag);
-    auto acc_count = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, count);
-    auto acc_bag_size = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, bag_size);
-    auto acc_per_sample_weights = per_sample_weight_defined ? c10::sycl::SYCLAccessor<dp_r_mode>(cgh, per_sample_weights) :
-                                                       c10::sycl::SYCLAccessor<dp_r_mode>(cgh, dummy_buffer);
-    auto acc_segment_offsets = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, segment_offsets);
+    auto acc_grad_weight_per_segment = DPCPPAccessor<dp_w_mode>(cgh, grad_weight_per_segment);
+    auto acc_indices = DPCPPAccessor<dp_r_mode>(cgh, indices);
+    auto acc_gradOutput = DPCPPAccessor<dp_r_mode>(cgh, gradOutput);
+    auto acc_offset2bag = DPCPPAccessor<dp_r_mode>(cgh, offset2bag);
+    auto acc_count = DPCPPAccessor<dp_r_mode>(cgh, count);
+    auto acc_bag_size = DPCPPAccessor<dp_r_mode>(cgh, bag_size);
+    auto acc_per_sample_weights = per_sample_weight_defined ? DPCPPAccessor<dp_r_mode>(cgh, per_sample_weights) :
+                                                       DPCPPAccessor<dp_r_mode>(cgh, dummy_buffer);
+    auto acc_segment_offsets = DPCPPAccessor<dp_r_mode>(cgh, segment_offsets);
 
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto grad_weight_per_segment_ptr = acc_grad_weight_per_segment.template get_pointer<acc_type<scalar_t, true>>();
@@ -188,7 +190,7 @@ void compute_grad_weight_bags(
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(compute_grad_weight_bags_sycl, scalar_t)>(
+    cgh.parallel_for<DP_K(compute_grad_weight_bags_dpcpp, scalar_t)>(
       DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
   };
   DP_Q_ASYNC_SUBMIT(queue, cgf);  
@@ -208,19 +210,19 @@ void compute_grad_weight(
     int padding_idx,
     bool scale_grad_by_fred) {
 
-  auto queue         = c10::sycl::syclGetCurrentQueue();
+  auto queue         = dpcppGetCurrentQueue();
   int64_t stride_warped = CeilDiv(stride, WARP_SIZE)*WARP_SIZE;
-  int64_t group_size = std::min(stride_warped, c10::sycl::syclMaxWorkGroupSize(queue));
+  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));
   auto num_groups    = CeilDiv(num_of_segments*stride_warped, group_size);
   auto total_items   = num_groups * group_size;
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto acc_grad_weight_per_segment = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, grad_weight_per_segment);
-    auto acc_indices = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, indices);
-    auto acc_sort = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, sort);
-    auto acc_gradOutput = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, gradOutput);
-    auto acc_count = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, count);
-    auto acc_segment_offsets = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, segment_offsets);
+    auto acc_grad_weight_per_segment = DPCPPAccessor<dp_w_mode>(cgh, grad_weight_per_segment);
+    auto acc_indices = DPCPPAccessor<dp_r_mode>(cgh, indices);
+    auto acc_sort = DPCPPAccessor<dp_r_mode>(cgh, sort);
+    auto acc_gradOutput = DPCPPAccessor<dp_r_mode>(cgh, gradOutput);
+    auto acc_count = DPCPPAccessor<dp_r_mode>(cgh, count);
+    auto acc_segment_offsets = DPCPPAccessor<dp_r_mode>(cgh, segment_offsets);
 
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto grad_weight_per_segment_ptr = acc_grad_weight_per_segment.template get_pointer<acc_type<scalar_t, true>>();
@@ -254,7 +256,7 @@ void compute_grad_weight(
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(compute_grad_weight_sycl, scalar_t)>(
+    cgh.parallel_for<DP_K(compute_grad_weight_dpcpp, scalar_t)>(
       DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
   };
   DP_Q_ASYNC_SUBMIT(queue, cgf);
@@ -267,18 +269,18 @@ void sum_and_scatter(
     const acc_type<scalar_t, true> *grad_weight_per_segment,
     const int64_t *segment_sizes_offsets, int64_t num_of_partial_segments) {
 
-  auto queue         = c10::sycl::syclGetCurrentQueue();
+  auto queue         = dpcppGetCurrentQueue();
   int64_t stride_warped = CeilDiv(stride, WARP_SIZE)*WARP_SIZE;
-  int64_t group_size = std::min(stride_warped, c10::sycl::syclMaxWorkGroupSize(queue));;
+  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));;
   auto num_groups    = CeilDiv(num_of_segments*stride_warped, group_size);
   auto total_items   = num_groups * group_size;
   
   auto cgf = DP_Q_CGF(cgh) {
-    auto acc_gradWeight = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, gradWeight);
-    auto acc_input = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, input);
-    auto acc_segment_offsets = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, segment_offsets);
-    auto acc_grad_weight_per_segment = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, grad_weight_per_segment);
-    auto acc_segment_sizes_offsets = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, segment_sizes_offsets);
+    auto acc_gradWeight = DPCPPAccessor<dp_w_mode>(cgh, gradWeight);
+    auto acc_input = DPCPPAccessor<dp_r_mode>(cgh, input);
+    auto acc_segment_offsets = DPCPPAccessor<dp_r_mode>(cgh, segment_offsets);
+    auto acc_grad_weight_per_segment = DPCPPAccessor<dp_r_mode>(cgh, grad_weight_per_segment);
+    auto acc_segment_sizes_offsets = DPCPPAccessor<dp_r_mode>(cgh, segment_sizes_offsets);
     
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto gradWeight_ptr = acc_gradWeight.template get_pointer<scalar_t>();
@@ -308,13 +310,13 @@ void sum_and_scatter(
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(sum_and_scatter_sycl, scalar_t)>(
+    cgh.parallel_for<DP_K(sum_and_scatter_dpcpp, scalar_t)>(
       DP::nd_range<1>(DP::range<1>(total_items), DP::range<1>(group_size)), kfn);
   };
   DP_Q_ASYNC_SUBMIT(queue, cgf);  
 }
 
-Tensor embedding_bag_backward_sycl_kernel(
+Tensor embedding_bag_backward_dpcpp_kernel(
         const Tensor &grad,
         const Tensor &sorted_indices,
         const Tensor &ind_sort,
@@ -350,7 +352,7 @@ Tensor embedding_bag_backward_sycl_kernel(
 
   
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-    grad.scalar_type(), "embedding_bag_backward_sycl_compute_grad_weight", [&] {
+    grad.scalar_type(), "embedding_bag_backward_dpcpp_compute_grad_weight", [&] {
       // For numerical stability, the dtype of `grad_weight_per_segment`
       // should match `acc_type`
       using partial_weight_t = acc_type<scalar_t, true>;
@@ -419,7 +421,7 @@ void EmbeddingBag_updateOutputKernel(
   // the strategy here is that each bag x feature is handled by a single thread
   
   using accscalar_t = acc_type<scalar_t, true>;
-  auto queue = c10::sycl::syclGetCurrentQueue();
+  auto queue = dpcppGetCurrentQueue();
   int64_t chunksPerBag = CeilDiv(featureSize, (int64_t)64);
   int64_t numChunks = numBags * chunksPerBag;
   int64_t kernel_range = 1024 * 64;
@@ -427,16 +429,16 @@ void EmbeddingBag_updateOutputKernel(
   DP::buffer<uint8_t, 1> dummy_buffer(DP::range<1>(1)); 
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, input);
-    auto offset_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, offsets);
-    auto weight_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, weight);
-    auto output_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, output);
-    auto offset2bag_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, offset2bag);
-    auto bag_size_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, bag_size);
-    auto per_sample_weights_acc = per_sample_weights_defined ? c10::sycl::SYCLAccessor<dp_r_mode>(cgh, per_sample_weights) :
-                                                               c10::sycl::SYCLAccessor<dp_r_mode>(cgh, dummy_buffer);
-    auto max_indices_acc = mode == MODE_MAX ? c10::sycl::SYCLAccessor<dp_w_mode>(cgh, max_indices) :
-                                              c10::sycl::SYCLAccessor<dp_w_mode>(cgh, dummy_buffer);
+    auto in_acc = DPCPPAccessor<dp_r_mode>(cgh, input);
+    auto offset_acc = DPCPPAccessor<dp_r_mode>(cgh, offsets);
+    auto weight_acc = DPCPPAccessor<dp_r_mode>(cgh, weight);
+    auto output_acc = DPCPPAccessor<dp_w_mode>(cgh, output);
+    auto offset2bag_acc = DPCPPAccessor<dp_w_mode>(cgh, offset2bag);
+    auto bag_size_acc = DPCPPAccessor<dp_w_mode>(cgh, bag_size);
+    auto per_sample_weights_acc = per_sample_weights_defined ? DPCPPAccessor<dp_r_mode>(cgh, per_sample_weights) :
+                                                               DPCPPAccessor<dp_r_mode>(cgh, dummy_buffer);
+    auto max_indices_acc = mode == MODE_MAX ? DPCPPAccessor<dp_w_mode>(cgh, max_indices) :
+                                              DPCPPAccessor<dp_w_mode>(cgh, dummy_buffer);
     
     auto kfn = DP_Q_KFN(DP::nd_item<2>item) {
       auto input_ptr = in_acc.template get_pointer<int64_t>();
@@ -519,10 +521,10 @@ DP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
 void compute_counts(int64_t * counts, int64_t * indice, int64_t indice_length) {
-  static const auto write_mode = cl::sycl::access::mode::write;
-  static const auto read_mode = cl::sycl::access::mode::read;
-  auto in_ptr = c10::sycl::syclGetBufferMap().template get_buffer<int64_t>(indice);
-  auto co_ptr = c10::sycl::syclGetBufferMap().template get_buffer<int64_t>(counts);
+  static const auto write_mode = DP::access::mode::write;
+  static const auto read_mode = DP::access::mode::read;
+  auto in_ptr = dpcppGetBufferMap().template get_buffer<int64_t>(indice);
+  auto co_ptr = dpcppGetBufferMap().template get_buffer<int64_t>(counts);
   auto acc_in = in_ptr.get_access<read_mode>();
   auto acc_co = co_ptr.get_access<write_mode>();
   for (int64_t i = 0; i < indice_length; i++)
@@ -540,11 +542,11 @@ void compute_counts(int64_t * counts, int64_t * indice, int64_t indice_length) {
 // The unique indices can be found at index 0, 3, 4, 6.
 
 int64_t compute_counts_uniq(int64_t * counts_uniq, int64_t * indice, int64_t * counts, int64_t indices_length) {
-  static const auto write_mode = cl::sycl::access::mode::write;
-  static const auto read_mode = cl::sycl::access::mode::read;
-  auto in_ptr = c10::sycl::syclGetBufferMap().template get_buffer<int64_t>(indice);
-  auto co_ptr = c10::sycl::syclGetBufferMap().template get_buffer<int64_t>(counts);
-  auto out_ptr = c10::sycl::syclGetBufferMap().template get_buffer<int64_t>(counts_uniq);
+  static const auto write_mode = DP::access::mode::write;
+  static const auto read_mode = DP::access::mode::read;
+  auto in_ptr = dpcppGetBufferMap().template get_buffer<int64_t>(indice);
+  auto co_ptr = dpcppGetBufferMap().template get_buffer<int64_t>(counts);
+  auto out_ptr = dpcppGetBufferMap().template get_buffer<int64_t>(counts_uniq);
   auto acc_in = in_ptr.get_access<read_mode>();
   auto acc_co = co_ptr.get_access<read_mode>();
   auto acc_out = out_ptr.get_access<write_mode>();
@@ -560,7 +562,7 @@ int64_t compute_counts_uniq(int64_t * counts_uniq, int64_t * indice, int64_t * c
   return o;
 }
 
-Tensor embedding_bag_backward_sycl_sum_avg(
+Tensor embedding_bag_backward_dpcpp_sum_avg(
                                    const Tensor &grad,
                                    const Tensor &indices_,
                                    const Tensor& offsets_,
@@ -591,10 +593,10 @@ Tensor embedding_bag_backward_sycl_sum_avg(
   int64_t num_segments;
   num_segments = compute_counts_uniq(next_unique_index_idx.data_ptr<int64_t>(), indices.data_ptr<int64_t>(), counts.data_ptr<int64_t>(), numel);
 
-  return embedding_bag_backward_sycl_kernel(grad, indices, ind_sort,
+  return embedding_bag_backward_dpcpp_kernel(grad, indices, ind_sort,
       counts, next_unique_index_idx, num_weights, num_segments,
        /* padding_idx= */ -1, scale_grad_by_freq,
-      mode == MODE_MEAN, offset2bag, bag_size, 
+      mode == MODE_MEAN, offset2bag, bag_size,
       per_sample_weights__.defined() ? per_sample_weights : per_sample_weights__);
 }
 
@@ -604,21 +606,21 @@ void EmbeddingBag_accGradParametersKernel_max(
     scalar_t *gradWeight, int64_t stride, int64_t numBags) {
 
   using accscalar_t = acc_type<scalar_t, true>;
-  auto queue = c10::sycl::syclGetCurrentQueue();
+  auto queue = dpcppGetCurrentQueue();
   int64_t chunksPerBag = CeilDiv(stride, (int64_t)64);
   int64_t numChunks = numBags * chunksPerBag;
   int64_t kernel_range = 1024 * 64;
-  
+
   auto cgf = DP_Q_CGF(cgh) {
-    auto max_indices_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, max_indices);
-    auto gradOutput_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, gradOutput);
-    auto gradWeight_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, gradWeight);
-    
+    auto max_indices_acc = DPCPPAccessor<dp_r_mode>(cgh, max_indices);
+    auto gradOutput_acc = DPCPPAccessor<dp_r_mode>(cgh, gradOutput);
+    auto gradWeight_acc = DPCPPAccessor<dp_w_mode>(cgh, gradWeight);
+
     auto kfn = DP_Q_KFN(DP::nd_item<2>item) {
       auto max_indices_ptr = max_indices_acc.template get_pointer<int64_t>();
       auto gradOutput_ptr = gradOutput_acc.template get_pointer<scalar_t>();
       auto gradWeight_ptr = gradWeight_acc.template get_pointer<scalar_t>();
-      
+
       int64_t chunkOffset = item.get_group()[0] * item.get_local_range()[1] + item.get_local_id()[1];
 
       for (int64_t chunk = chunkOffset; chunk < numChunks; chunk += item.get_group_range()[0] * item.get_global_range()[1]) {
@@ -644,7 +646,7 @@ void EmbeddingBag_accGradParametersKernel_max(
 }
 
 
-Tensor embedding_bag_backward_sycl_max(const Tensor &grad,
+Tensor embedding_bag_backward_dpcpp_max(const Tensor &grad,
                                    const Tensor &max_indices,
                                    int64_t num_weights) {
 
@@ -666,17 +668,17 @@ Tensor embedding_bag_backward_sycl_max(const Tensor &grad,
 // Assumes all input tensors are contiguous.
 // See NOTE [ embedding_bag Native Functions ] in native_functions.yaml for details
 std::tuple<Tensor, Tensor, Tensor, Tensor>
-_embedding_bag_sycl(const Tensor &weight, const Tensor &indices,
+_embedding_bag_dpcpp(const Tensor &weight, const Tensor &indices,
                    const Tensor &offsets, const bool scale_grad_by_freq,
                    const int64_t mode, bool sparse,
                    const Tensor& per_sample_weights) {
   auto indices_arg = TensorArg(indices, "indices", 1);
-  checkScalarType("embedding_bag_sycl", indices_arg, kLong);
+  checkScalarType("embedding_bag_dpcpp", indices_arg, kLong);
   auto offsets_arg = TensorArg(offsets, "offsets", 1);
-  checkScalarType("embedding_bag_sycl", offsets_arg, kLong);
+  checkScalarType("embedding_bag_dpcpp", offsets_arg, kLong);
   auto weight_arg = TensorArg(weight, "weight", 1);
-  checkSameDPCPP("embedding_bag_sycl", weight_arg, indices_arg);
-  checkSameDPCPP("embedding_bag_sycl", weight_arg, offsets_arg);
+  checkSameDPCPP("embedding_bag_dpcpp", weight_arg, indices_arg);
+  checkSameDPCPP("embedding_bag_dpcpp", weight_arg, offsets_arg);
   
   int64_t numIndices = indices.size(0);
   int64_t numBags = offsets.size(0);
@@ -693,7 +695,7 @@ _embedding_bag_sycl(const Tensor &weight, const Tensor &indices,
   max_indices = at::zeros({offsets.size(0), weight.size(1)}, indices.options());
   
   
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(weight.scalar_type(), "embedding_bag_sycl", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(weight.scalar_type(), "embedding_bag_dpcpp", [&] {
     EmbeddingBag_updateOutputKernel<scalar_t>(
         indices.data_ptr<int64_t>(), offsets.data_ptr<int64_t>(),
         weight.data_ptr<scalar_t>(), output.data_ptr<scalar_t>(),
@@ -707,7 +709,7 @@ _embedding_bag_sycl(const Tensor &weight, const Tensor &indices,
   return std::tuple<Tensor, Tensor, Tensor, Tensor>(output, offset2bag, bag_size, max_indices);
 }
 
-Tensor _embedding_bag_dense_backward_sycl(const Tensor &grad_, const Tensor &indices,
+Tensor _embedding_bag_dense_backward_dpcpp(const Tensor &grad_, const Tensor &indices,
                                    const Tensor &offsets,
                                    const Tensor &offset2bag,
                                    const Tensor &bag_size_,
@@ -722,16 +724,16 @@ Tensor _embedding_bag_dense_backward_sycl(const Tensor &grad_, const Tensor &ind
     case MODE_MEAN:
       if (mode == MODE_MEAN)
         AT_ASSERT(!per_sample_weights.defined());
-      return embedding_bag_backward_sycl_sum_avg(grad, indices, offsets, offset2bag,
+      return embedding_bag_backward_dpcpp_sum_avg(grad, indices, offsets, offset2bag,
               bag_size_, num_weights, scale_grad_by_freq, mode, per_sample_weights);
 
     case MODE_MAX:
       AT_ASSERT(!per_sample_weights.defined());
-      return embedding_bag_backward_sycl_max(grad, max_indices, num_weights);
+      return embedding_bag_backward_dpcpp_max(grad, max_indices, num_weights);
 
     default:
       AT_ERROR(
-          "Unknown mode for embedding_bag_backward_sycl ", mode);
+          "Unknown mode for embedding_bag_backward_dpcpp ", mode);
   }
 }
 
@@ -740,14 +742,14 @@ Tensor _embedding_bag_dense_backward_sycl(const Tensor &grad_, const Tensor &ind
 std::tuple<Tensor,Tensor,Tensor,Tensor> _embedding_bag(const Tensor & weight,
     const Tensor & indices, const Tensor & offsets, bool scale_grad_by_freq,
     int64_t mode, bool sparse, const Tensor & per_sample_weights) {
-return impl::_embedding_bag_sycl(weight, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights);
+return impl::_embedding_bag_dpcpp(weight, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights);
 }
 
 Tensor _embedding_bag_dense_backward(const Tensor & grad, const Tensor & indices,
     const Tensor & offsets, const Tensor & offset2bag, const Tensor & bag_size,
     const Tensor & maximum_indices, int64_t num_weights, bool scale_grad_by_freq,
     int64_t mode, const Tensor & per_sample_weights) {
-return  impl::_embedding_bag_dense_backward_sycl(grad, indices, offsets, offset2bag, bag_size, maximum_indices,
+return  impl::_embedding_bag_dense_backward_dpcpp(grad, indices, offsets, offset2bag, bag_size, maximum_indices,
             num_weights, scale_grad_by_freq, mode, per_sample_weights);
 }
 

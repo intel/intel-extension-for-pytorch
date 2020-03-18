@@ -4,15 +4,15 @@
 #include <ATen/TensorUtils.h>
 
 namespace at {
-namespace native {
+namespace dpcpp {
 
 template <typename scalar_t>
 DP_DEVICE inline scalar_t min(scalar_t a, scalar_t b) {
   return a < b ? a : b;
 }
 
-DP_DEF_K1(nearest_neighbor_4d_sycl_kernel);
-DP_DEF_K1(nearest_neighbor_4d_bwd_sycl_kernel);
+DP_DEF_K1(nearest_neighbor_4d_dpcpp_kernel);
+DP_DEF_K1(nearest_neighbor_4d_bwd_dpcpp_kernel);
 
 static inline void upsample_2d_shape_check(
     const Tensor& input,
@@ -55,7 +55,7 @@ DP_DEVICE static int nearest_neighbor_compute_source_index(
     int dst_index,
     int input_size) {
   const int src_index =
-      min(static_cast<int>(cl::sycl::floor(dst_index * scale)), input_size - 1);
+      min(static_cast<int>(DP::floor(dst_index * scale)), input_size - 1);
   return src_index;
 }
 

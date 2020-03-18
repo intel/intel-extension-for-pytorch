@@ -9,15 +9,15 @@
 
 #include "ScatterGather.h"
 
-using namespace at::sycl::detail;
-using namespace at::native;
+using namespace at::dpcpp::detail;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 #define RUN(TYPE, DIMS, REAL)                                           \
-  THSYCLTensor_gatherKernel<TYPE, REAL, DIMS>                           \
+  THDPCPPTensor_gatherKernel<TYPE, REAL, DIMS>                           \
   (tensorInfo, srcInfo, indexInfo, dim, (TYPE)totalElements);
 
 template <typename scalar_t>
@@ -38,7 +38,7 @@ void Gather(Tensor & tensor, const Tensor & src, int64_t dim, const Tensor & ind
     }
   }
 
-  TORCH_CHECK(TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)) <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
+  TORCH_CHECK(TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)) <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
 
   const ptrdiff_t totalElements = index.numel();
 
@@ -130,7 +130,7 @@ void Scatter(Tensor & tensor, int64_t dim, const Tensor & index, const Tensor & 
               src.sizes());
   }
 
-  TORCH_CHECK(tensor.dim() <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
+  TORCH_CHECK(tensor.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   
   const ptrdiff_t totalElements = index.numel();
 
@@ -217,7 +217,7 @@ void ScatterFill(Tensor & tensor, int64_t dim, const Tensor & index, Scalar valu
     }
   }
 
-  TORCH_CHECK(tensor.dim() <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
+  TORCH_CHECK(tensor.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
 
   const ptrdiff_t totalElements = index.numel();
 
@@ -304,8 +304,8 @@ ScatterAdd(Tensor & tensor, int64_t dim, const Tensor & index, const Tensor & sr
               src.sizes());
   }
 
-  TORCH_CHECK(tensor.dim() <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
-  
+  TORCH_CHECK(tensor.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
+
   const ptrdiff_t totalElements = index.numel();
 
   Tensor oldTensor;

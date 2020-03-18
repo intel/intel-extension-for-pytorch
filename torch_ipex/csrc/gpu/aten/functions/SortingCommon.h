@@ -23,9 +23,9 @@ void run_launcher(
     const Tensor& self,
     int64_t dim,
     Launcher l) {
-  auto self_info = at::sycl::detail::getTensorInfo<scalar_t, index_t>(self);
-  auto values_info = at::sycl::detail::getTensorInfo<scalar_t, index_t>(values);
-  auto indices_info = at::sycl::detail::getTensorInfo<int64_t, index_t>(indices);
+  auto self_info = at::dpcpp::detail::getTensorInfo<scalar_t, index_t>(self);
+  auto values_info = at::dpcpp::detail::getTensorInfo<scalar_t, index_t>(values);
+  auto indices_info = at::dpcpp::detail::getTensorInfo<int64_t, index_t>(indices);
 
   int64_t slice_size = self.size(dim);
   /* We use these structures solely to find the offset to */

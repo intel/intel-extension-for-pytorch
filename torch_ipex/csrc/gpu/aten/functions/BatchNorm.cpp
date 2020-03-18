@@ -8,7 +8,7 @@
 
 
 using namespace mkldnn;
-using namespace at::native;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -22,7 +22,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template (
 {
     auto output = at::empty_like(input);
 
-    Device curDevice = Device(kDPCPP, c10::sycl::current_device());
+    Device curDevice = Device(kDPCPP, current_device());
     auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
     auto propagation = training ? prop_kind::forward_training: prop_kind::forward_inference;
@@ -64,7 +64,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template (
         iw = input.size(3);
     } else {
         std::stringstream ss;
-        ss << "SYCL batch_norm backend got shape=" << input_sizes
+        ss << "DPCPP batch_norm backend got shape=" << input_sizes
            << ", expected input with rank 3 [n, c, h*w] or rank 4 [n, c, h, w]shape ";
         AT_ERROR(ss.str());
     }
@@ -79,10 +79,10 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template (
     auto batch_norm_forward_pd  = batch_normalization_forward::primitive_desc(batch_norm_forward_desc, engine);
 
     auto input_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-    sycl_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
+    dpcpp_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
 
     auto output_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-    sycl_set_mkldnn_buffer(output.data_ptr(), output_usr_memory);
+    dpcpp_set_mkldnn_buffer(output.data_ptr(), output_usr_memory);
 
     std::shared_ptr<mkldnn::primitive> bn_fwd;
     auto strm = GpuStreamManager::Instance().get_stream();
@@ -100,11 +100,11 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template (
         Tensor _bias = bias.to(ScalarType::Float);
 
         if (mkldnn_use_scaleshift) {
-            c10::sycl::syclMemcpyAsync(weight_bias.data_ptr(), _weight.data_ptr(), ic * sizeof(float),
-                    c10::sycl::DeviceToDevice);
-            c10::sycl::syclMemcpyAsync(static_cast<uint8_t*>(weight_bias.data_ptr()) + ic * sizeof(float),
-                    _bias.data_ptr(), ic * sizeof(float), c10::sycl::DeviceToDevice);
-            sycl_set_mkldnn_buffer(weight_bias.data_ptr(), weight_bias_memory);
+            dpcppMemcpyAsync(weight_bias.data_ptr(), _weight.data_ptr(), ic * sizeof(float),
+                    DeviceToDevice);
+            dpcppMemcpyAsync(static_cast<uint8_t*>(weight_bias.data_ptr()) + ic * sizeof(float),
+                    _bias.data_ptr(), ic * sizeof(float), DeviceToDevice);
+            dpcpp_set_mkldnn_buffer(weight_bias.data_ptr(), weight_bias_memory);
         }
 
         args.insert({MKLDNN_ARG_SCALE_SHIFT, weight_bias_memory});
@@ -119,12 +119,12 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template (
     auto var_memory = memory(batch_norm_forward_pd.variance_desc(), engine);
 
     if ((bool)(flag & normalization_flags::use_global_stats)) {
-        sycl_set_mkldnn_buffer(running_mean.data_ptr(), mean_memory);
-        sycl_set_mkldnn_buffer(running_var.data_ptr(), var_memory);
+        dpcpp_set_mkldnn_buffer(running_mean.data_ptr(), mean_memory);
+        dpcpp_set_mkldnn_buffer(running_var.data_ptr(), var_memory);
     }
     else {
-        sycl_set_mkldnn_buffer(save_mean.data_ptr(), mean_memory);
-        sycl_set_mkldnn_buffer(save_var.data_ptr(), var_memory);
+        dpcpp_set_mkldnn_buffer(save_mean.data_ptr(), mean_memory);
+        dpcpp_set_mkldnn_buffer(save_var.data_ptr(), var_memory);
     }
 
     args.insert({MKLDNN_ARG_MEAN, mean_memory});
@@ -133,11 +133,11 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template (
     bn_fwd->execute(strm, args);
 
     if (training && running_mean.defined() && running_var.defined()) {
-        c10::sycl::syclMemoryScale1(running_mean.data_ptr(), save_mean.data_ptr(), ic, momentum);
+        dpcppMemoryScale1(running_mean.data_ptr(), save_mean.data_ptr(), ic, momentum);
         size_t  orig_size = n * ih * iw;
         size_t adjust_size = orig_size - 1;
         float adjust_factor = (static_cast<float>(orig_size)) / adjust_size;
-        c10::sycl::syclMemoryScale2(running_var.data_ptr(), save_var.data_ptr(), ic, adjust_factor, momentum);
+        dpcppMemoryScale2(running_var.data_ptr(), save_var.data_ptr(), ic, adjust_factor, momentum);
     }
 
     return std::tuple<Tensor, Tensor, Tensor>{output, save_mean, save_var};
@@ -155,7 +155,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm (
     if (input.scalar_type() != at::ScalarType::Float && input.scalar_type() != at::ScalarType::Half) {
         //TODO: add more scalar type support.
         std::stringstream ss;
-        ss << "SYCL batch_norm backend got unsupported type=" << input.scalar_type();
+        ss << "DPCPP batch_norm backend got unsupported type=" << input.scalar_type();
         AT_ERROR(ss.str());
     }
     else
@@ -189,7 +189,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     grad_bias = at::empty_like(weight);
   }
 
-  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto flags = normalization_flags::use_scale_shift; // backward only support training mode
 
@@ -221,7 +221,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     iw = input.size(3);
   } else {
     std::stringstream ss;
-    ss << "SYCL batch_norm backend got shape=" << input_sizes
+    ss << "DPCPP batch_norm backend got shape=" << input_sizes
        << ", expected input with rank 3 [n, c, h*w] or rank 4 [n, c, h, w]shape ";
     AT_ERROR(ss.str());
   }
@@ -259,19 +259,19 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   auto bn_bwd_pd = batch_normalization_backward::primitive_desc(bwd_desc, engine, batch_norm_forward_pd);
 
   auto input_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
+  dpcpp_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
 
   auto grad_output_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(grad_output.data_ptr(), grad_output_memory);
+  dpcpp_set_mkldnn_buffer(grad_output.data_ptr(), grad_output_memory);
 
   auto mean_memory = memory(batch_norm_forward_pd.mean_desc(), engine);
-  sycl_set_mkldnn_buffer(save_mean.data_ptr(), mean_memory);
+  dpcpp_set_mkldnn_buffer(save_mean.data_ptr(), mean_memory);
 
   auto var_memory = memory(batch_norm_forward_pd.variance_desc(), engine);
-  sycl_set_mkldnn_buffer(save_var.data_ptr(), var_memory);
+  dpcpp_set_mkldnn_buffer(save_var.data_ptr(), var_memory);
 
   auto grad_input_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(grad_input.data_ptr(), grad_input_memory);
+  dpcpp_set_mkldnn_buffer(grad_input.data_ptr(), grad_input_memory);
 
   auto strm = GpuStreamManager::Instance().get_stream();
   std::shared_ptr<mkldnn::primitive> bn_bwd;
@@ -291,13 +291,13 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   if ((bool)(flags & normalization_flags::use_scale_shift)) {
     auto weight_bias_memory = memory(batch_norm_forward_pd.weights_desc(), engine);
     auto weight_bias = at::empty(2*ic, weight.options());
-    c10::sycl::syclMemcpyAsync(weight_bias.data_ptr(), weight.data_ptr(), ic * sizeof(float), c10::sycl::DeviceToDevice);
-    c10::sycl::syclMemsetAsync(static_cast<uint8_t*>(weight_bias.data_ptr()) + ic * sizeof(float), 0, ic * sizeof(float));
-    sycl_set_mkldnn_buffer(weight_bias.data_ptr(), weight_bias_memory);
+    dpcppMemcpyAsync(weight_bias.data_ptr(), weight.data_ptr(), ic * sizeof(float), DeviceToDevice);
+    dpcppMemsetAsync(static_cast<uint8_t*>(weight_bias.data_ptr()) + ic * sizeof(float), 0, ic * sizeof(float));
+    dpcpp_set_mkldnn_buffer(weight_bias.data_ptr(), weight_bias_memory);
 
     auto grad_weight_bias_memory = memory(bn_bwd_pd.diff_weights_desc(), engine);
     grad_weight_bias = at::empty(2*ic, weight.options());
-    sycl_set_mkldnn_buffer(grad_weight_bias.data_ptr(), grad_weight_bias_memory);
+    dpcpp_set_mkldnn_buffer(grad_weight_bias.data_ptr(), grad_weight_bias_memory);
 
     args.insert({MKLDNN_ARG_SCALE_SHIFT, weight_bias_memory});
     args.insert({MKLDNN_ARG_DIFF_SCALE_SHIFT, grad_weight_bias_memory});
@@ -306,11 +306,11 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   bn_bwd->execute(strm, args);
 
   if ((bool)(flags & normalization_flags::use_scale_shift)) {
-    c10::sycl::syclMemcpyAsync(grad_weight.data_ptr(), grad_weight_bias.data_ptr(), ic * sizeof(float),
-                               c10::sycl::DeviceToDevice);
-    c10::sycl::syclMemcpyAsync(grad_bias.data_ptr(),
+    dpcppMemcpyAsync(grad_weight.data_ptr(), grad_weight_bias.data_ptr(), ic * sizeof(float),
+                               DeviceToDevice);
+    dpcppMemcpyAsync(grad_bias.data_ptr(),
                                static_cast<uint8_t *>(grad_weight_bias.data_ptr()) + ic * sizeof(float),
-                               ic * sizeof(float), c10::sycl::DeviceToDevice);
+                               ic * sizeof(float), DeviceToDevice);
   }
   return std::make_tuple(grad_input, grad_weight, grad_bias);
 }

@@ -3,14 +3,14 @@
 #include <c10/core/TensorImpl.h>
 #include <c10/core/StorageImpl.h>
 
-namespace at { namespace native {
+namespace at { namespace dpcpp {
 
-#define SYCL_DESC_BUFF_LEN 64
+#define DPCPP_DESC_BUFF_LEN 64
 
-typedef struct SYCLDescBuff
+typedef struct DPCPPDescBuff
 {
-  char str[SYCL_DESC_BUFF_LEN];
-} SYCLDescBuff;
+  char str[DPCPP_DESC_BUFF_LEN];
+} DPCPPDescBuff;
 
 TensorImpl *TensorImpl_new();
 at::Tensor TensorImpl_wrap(TensorImpl *tensor);
@@ -25,7 +25,7 @@ std::vector<int64_t> TensorImpl_sizesLegacyNoScalars(const at::TensorImpl *self)
 const int64_t* TensorImpl_getStridePtr(at::TensorImpl* tensor);
 int64_t TensorImpl_stride(const at::TensorImpl *self, int dim);
 int64_t TensorImpl_strideLegacyNoScalars(const at::TensorImpl *self, int dim);
-// THSYCL_API THSYCLTensor *THSYCLTensor_new(THSYCLState *state, caffe2::TypeMeta type_meta);
+// THDPCPP_API THDPCPPTensor *THDPCPPTensor_new(THDPCPPState *state, caffe2::TypeMeta type_meta);
 TensorImpl* TensorImpl_resizeImpl(at::TensorImpl* self, at::IntArrayRef size, c10::optional<IntArrayRef> stride, bool device_guard = true);
 void TensorImpl_resize(at::TensorImpl *self, at::IntArrayRef size, at::IntArrayRef stride);
 void TensorImpl_resizeAs(at::TensorImpl *self, TensorImpl *src);
@@ -49,7 +49,7 @@ bool TensorImpl_all32BitIndexable(at::TensorImpl** inputs, int numInputs);
 void TensorImpl_preserveReduceDimSemantics(TensorImpl *tensor, int in_dims, int64_t dimension, int keepdim);
 bool TensorImpl_maybeOverlappingIndices(const at::TensorImpl* t);
 
-SYCLDescBuff TensorImpl_sizeDesc(const at::TensorImpl *tensor);
+DPCPPDescBuff TensorImpl_sizeDesc(const at::TensorImpl *tensor);
 
-} // native::
+} // dpcpp::
 } // at::

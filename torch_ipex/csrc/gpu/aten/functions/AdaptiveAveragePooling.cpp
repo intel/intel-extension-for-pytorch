@@ -5,14 +5,15 @@
 #include <core/Runtime.h>
 #include <vector>
 
-using namespace mkldnn;
-namespace at {
-namespace native {
 
-namespace {
+using namespace mkldnn;
+using namespace at::dpcpp;
+namespace at {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 template <typename scalar_t>
-static void adaptive_avg_pool2d_out_sycl_frame(
+static void adaptive_avg_pool2d_out_dpcpp_frame(
           scalar_t *input_data,
           scalar_t *output_data,
           int64_t nbatch,
@@ -30,7 +31,7 @@ static void adaptive_avg_pool2d_out_sycl_frame(
           algorithm alg_kind,
           prop_kind prop_kind)
 {
-  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -53,10 +54,10 @@ static void adaptive_avg_pool2d_out_sycl_frame(
   auto output_md = memory::desc({output_tz}, data_t, format_nchw);
 
   auto input_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(input_data, input_usr_memory);
+  dpcpp_set_mkldnn_buffer(input_data, input_usr_memory);
 
   auto output_usr_memory = memory({{{output_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(output_data, output_usr_memory);
+  dpcpp_set_mkldnn_buffer(output_data, output_usr_memory);
 
   std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
   pooling_forward_desc.reset(new pooling_forward::desc(
@@ -70,7 +71,7 @@ static void adaptive_avg_pool2d_out_sycl_frame(
   // auto input_d = pooling_forward_pd->src_desc();
   auto input_memory = input_usr_memory;
 
-  // Currently, SYCL path doesn't support internal format.
+  // Currently, DPCPP path doesn't support internal format.
   // input has the same format with input_usr.
   // if (input_usr_memory.get_desc() != input_d) {
   //   input_memory = memory(input_d, engine);
@@ -101,7 +102,7 @@ static void adaptive_avg_pool2d_out_sycl_frame(
 }
 
 template <typename scalar_t>
-static void adaptive_avg_pool2d_backward_out_sycl_frame(
+static void adaptive_avg_pool2d_backward_out_dpcpp_frame(
           scalar_t *gradInput_data,
           scalar_t *gradOutput_data,
           int64_t nbatch,
@@ -119,7 +120,7 @@ static void adaptive_avg_pool2d_backward_out_sycl_frame(
           algorithm alg_kind,
           prop_kind prop_kind)
 {
-  at::Device curDevice = at::Device(at::kDPCPP, c10::sycl::current_device());
+  at::Device curDevice = at::Device(at::kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -136,10 +137,10 @@ static void adaptive_avg_pool2d_backward_out_sycl_frame(
   auto output_md = memory::desc({output_tz}, data_t, format_nchw);
 
   auto diff_dst_usr_memory = memory({{{output_tz}, data_t, format_nchw}, engine});
-  at::native::sycl_set_mkldnn_buffer(gradOutput_data, diff_dst_usr_memory);
+  dpcpp_set_mkldnn_buffer(gradOutput_data, diff_dst_usr_memory);
 
   auto diff_src_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  at::native::sycl_set_mkldnn_buffer(gradInput_data, diff_src_usr_memory);
+  dpcpp_set_mkldnn_buffer(gradInput_data, diff_src_usr_memory);
 
   std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
   pooling_forward_desc.reset(new pooling_forward::desc(
@@ -161,7 +162,7 @@ static void adaptive_avg_pool2d_backward_out_sycl_frame(
   // auto diff_dst_md = pooling_backward_pd->diff_dst_desc();
   auto diff_dst_memory = diff_dst_usr_memory;
 
-  // Currently, SYCL path doesn't support internal format.
+  // Currently, DPCPP path doesn't support internal format.
   // diff_dst has the same format with dst.
   // if (diff_dst_usr_memory.get_desc() != diff_dst_md) {
   //   diff_dst_memory = memory(diff_dst_md, engine);
@@ -191,160 +192,158 @@ static void adaptive_avg_pool2d_backward_out_sycl_frame(
   // }
 }
 
-  void adaptive_avg_pool2d_out_sycl_template(
-    Tensor& output,
-    const Tensor& input,
-    IntArrayRef output_size)
-  {
-    TORCH_CHECK((input.ndimension() == 4),
-      "only support 4 dims on SYCL device now!");
-    int kW, kH, dW, dH;
-    int64_t nInputCols, nInputRows, nInputPlane, batchSize;
-    int padW = 0;
-    int padH = 0;
-    // bool ceil_mode = false;
-    int64_t nOutputCols = output_size[1];
-    int64_t nOutputRows = output_size[0];
+void adaptive_avg_pool2d_out_dpcpp_template(
+  Tensor& output,
+  const Tensor& input,
+  IntArrayRef output_size)
+{
+  TORCH_CHECK((input.ndimension() == 4),
+    "only support 4 dims on DPCPP device now!");
+  int kW, kH, dW, dH;
+  int64_t nInputCols, nInputRows, nInputPlane, batchSize;
+  int padW = 0;
+  int padH = 0;
+  // bool ceil_mode = false;
+  int64_t nOutputCols = output_size[1];
+  int64_t nOutputRows = output_size[0];
 
-    // Input is NCHW format
-    nInputCols = input.size(3);
-    nInputRows = input.size(2);
-    nInputPlane = input.size(1);
-    batchSize = input.size(0);
+  // Input is NCHW format
+  nInputCols = input.size(3);
+  nInputRows = input.size(2);
+  nInputPlane = input.size(1);
+  batchSize = input.size(0);
 
-    TORCH_CHECK((nInputRows % nOutputRows == 0),
-      "row input size is not divisible by the output size is not supported yet");
-    TORCH_CHECK((nInputCols % nOutputCols == 0),
-      "column input size is not divisible by the output size is not supported yet");
+  TORCH_CHECK((nInputRows % nOutputRows == 0),
+    "row input size is not divisible by the output size is not supported yet");
+  TORCH_CHECK((nInputCols % nOutputCols == 0),
+    "column input size is not divisible by the output size is not supported yet");
 
-    kW = nInputCols / nOutputCols;
-    kH = nInputRows / nOutputRows;
-    dW = kW;
-    dH = kH;
+  kW = nInputCols / nOutputCols;
+  kH = nInputRows / nOutputRows;
+  dW = kW;
+  dH = kH;
 
-    auto alg_kind = algorithm::pooling_avg;
-    auto prop_kind = dnnl::prop_kind::forward_training;
+  auto alg_kind = algorithm::pooling_avg;
+  auto prop_kind = dnnl::prop_kind::forward_training;
 
-    output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols});
+  output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols});
 
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "adaptive_avg_pool2d_sycl", [&] {
-          auto input_data = input.data_ptr<scalar_t>();
-          auto output_data = output.data_ptr<scalar_t>();
-          adaptive_avg_pool2d_out_sycl_frame<scalar_t>(input_data, output_data,
-                                                  batchSize, nInputPlane,
-                                                  nInputCols, nInputRows,
-                                                  nOutputCols, nOutputRows,
-                                                  kW, kH, dW, dH, padW, padH, alg_kind, prop_kind);
-        }
-      );
-  }
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "adaptive_avg_pool2d_dpcpp", [&] {
+        auto input_data = input.data_ptr<scalar_t>();
+        auto output_data = output.data_ptr<scalar_t>();
+        adaptive_avg_pool2d_out_dpcpp_frame<scalar_t>(input_data, output_data,
+                                                batchSize, nInputPlane,
+                                                nInputCols, nInputRows,
+                                                nOutputCols, nOutputRows,
+                                                kW, kH, dW, dH, padW, padH, alg_kind, prop_kind);
+      }
+    );
+}
 
-  void adaptive_avg_pool2d_backward_out_sycl_template(
-    Tensor& gradInput,
-    const Tensor& gradOutput,
-    const Tensor& input)
-  {
-    TORCH_CHECK((input.ndimension() == 4),
-      "only support 4 dims on SYCL device now!");
-    int kW, kH, dW, dH;
-    int64_t nInputCols, nInputRows, nInputPlane, batchSize;
-    int padW = 0;
-    int padH = 0;
-    auto output_size_vec = gradOutput.sizes();
-    int64_t nOutputCols = output_size_vec[3];
-    int64_t nOutputRows = output_size_vec[2];
+void adaptive_avg_pool2d_backward_out_dpcpp_template(
+  Tensor& gradInput,
+  const Tensor& gradOutput,
+  const Tensor& input)
+{
+  TORCH_CHECK((input.ndimension() == 4),
+    "only support 4 dims on DPCPP device now!");
+  int kW, kH, dW, dH;
+  int64_t nInputCols, nInputRows, nInputPlane, batchSize;
+  int padW = 0;
+  int padH = 0;
+  auto output_size_vec = gradOutput.sizes();
+  int64_t nOutputCols = output_size_vec[3];
+  int64_t nOutputRows = output_size_vec[2];
 
-    // Input is NCHW format
-    nInputCols = input.size(3);
-    nInputRows = input.size(2);
-    nInputPlane = input.size(1);
-    batchSize = input.size(0);
+  // Input is NCHW format
+  nInputCols = input.size(3);
+  nInputRows = input.size(2);
+  nInputPlane = input.size(1);
+  batchSize = input.size(0);
 
-    TORCH_CHECK((nInputRows % nOutputRows == 0),
-      "row input size is not divisible by the output size is not supported yet");
-    TORCH_CHECK((nInputCols % nOutputCols == 0),
-      "column input size is not divisible by the output size is not supported yet");
+  TORCH_CHECK((nInputRows % nOutputRows == 0),
+    "row input size is not divisible by the output size is not supported yet");
+  TORCH_CHECK((nInputCols % nOutputCols == 0),
+    "column input size is not divisible by the output size is not supported yet");
 
-    kW = nInputCols / nOutputCols;
-    kH = nInputRows / nOutputRows;
-    dW = kW;
-    dH = kH;
+  kW = nInputCols / nOutputCols;
+  kH = nInputRows / nOutputRows;
+  dW = kW;
+  dH = kH;
 
-    auto alg_kind = algorithm::pooling_avg;
-    auto prop_kind = dnnl::prop_kind::forward_training;
+  auto alg_kind = algorithm::pooling_avg;
+  auto prop_kind = dnnl::prop_kind::forward_training;
 
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "adaptive_avg_pool2d_backward_sycl", [&] {
-          auto gradOutput_data = gradOutput.data_ptr<scalar_t>();
-          auto gradInput_data = gradInput.data_ptr<scalar_t>();
-          adaptive_avg_pool2d_backward_out_sycl_frame<scalar_t>(gradInput_data, gradOutput_data,
-                                                  batchSize, nInputPlane,
-                                                  nInputCols, nInputRows,
-                                                  nOutputCols, nOutputRows,
-                                                  kW, kH, dW, dH, padW, padH, alg_kind, prop_kind);
-        }
-      );
-  }
-} // namespace
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "adaptive_avg_pool2d_backward_dpcpp", [&] {
+        auto gradOutput_data = gradOutput.data_ptr<scalar_t>();
+        auto gradInput_data = gradInput.data_ptr<scalar_t>();
+        adaptive_avg_pool2d_backward_out_dpcpp_frame<scalar_t>(gradInput_data, gradOutput_data,
+                                                batchSize, nInputPlane,
+                                                nInputCols, nInputRows,
+                                                nOutputCols, nOutputRows,
+                                                kW, kH, dW, dH, padW, padH, alg_kind, prop_kind);
+      }
+    );
+}
 
-  Tensor& adaptive_avg_pool2d_out_sycl(
-    Tensor& output,
-    const Tensor& input,
-    IntArrayRef output_size)
-  {
-    adaptive_avg_pool2d_out_sycl_template(
-      output, input, output_size);
-    return output;
-  }
+Tensor& adaptive_avg_pool2d_out_dpcpp(
+  Tensor& output,
+  const Tensor& input,
+  IntArrayRef output_size)
+{
+  adaptive_avg_pool2d_out_dpcpp_template(
+    output, input, output_size);
+  return output;
+}
 
-  Tensor adaptive_avg_pool2d_sycl(
-    at::Tensor const& input,
-    IntArrayRef output_size)
-  {
-    auto output = at::empty({0}, input.options());
-    adaptive_avg_pool2d_out_sycl_template(
-      output, input, output_size);
-    return output;
-  }
+Tensor adaptive_avg_pool2d_dpcpp(
+  at::Tensor const& input,
+  IntArrayRef output_size)
+{
+  auto output = at::empty({0}, input.options());
+  adaptive_avg_pool2d_out_dpcpp_template(
+    output, input, output_size);
+  return output;
+}
 
-  Tensor& adaptive_avg_pool2d_backward_out_sycl(
-    Tensor& gradInput,
-    const Tensor& gradOutput,
-    const Tensor& input)
-  {
-    gradInput.resize_as_(input);
-    adaptive_avg_pool2d_backward_out_sycl_template(
-      gradInput, gradOutput, input);
-    return gradInput;
-  }
+Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
+  Tensor& gradInput,
+  const Tensor& gradOutput,
+  const Tensor& input)
+{
+  gradInput.resize_as_(input);
+  adaptive_avg_pool2d_backward_out_dpcpp_template(
+    gradInput, gradOutput, input);
+  return gradInput;
+}
 
-  Tensor adaptive_avg_pool2d_backward_sycl(
-    const Tensor& gradOutput,
-    const Tensor& input)
-  {
-    auto gradInput = at::zeros_like(input);
-    adaptive_avg_pool2d_backward_out_sycl_template(
-      gradInput, gradOutput, input);
-    return gradInput;
-  }
-} // at::native
-} // at
+Tensor adaptive_avg_pool2d_backward_dpcpp(
+  const Tensor& gradOutput,
+  const Tensor& input)
+{
+  auto gradInput = at::zeros_like(input);
+  adaptive_avg_pool2d_backward_out_dpcpp_template(
+    gradInput, gradOutput, input);
+  return gradInput;
+}
 
-namespace at { namespace AtenIpexTypeDPCPP {
+} // namespace impl
+
 Tensor & adaptive_avg_pool2d_out(Tensor & out, const Tensor & self, IntArrayRef output_size){
-  at::native::adaptive_avg_pool2d_out_sycl(out, self, output_size);
+  impl::adaptive_avg_pool2d_out_dpcpp(out, self, output_size);
   return out;
 }
 
 Tensor _adaptive_avg_pool2d(const Tensor & self, IntArrayRef output_size){
-  return at::native::adaptive_avg_pool2d_sycl(self, output_size);
+  return impl::adaptive_avg_pool2d_dpcpp(self, output_size);
 }
 
 Tensor adaptive_avg_pool2d(const Tensor & self, IntArrayRef output_size){
-  return at::native::adaptive_avg_pool2d_sycl(self, output_size);
+  return impl::adaptive_avg_pool2d_dpcpp(self, output_size);
 }
 
 Tensor _adaptive_avg_pool2d_backward(const Tensor & grad_output, const Tensor & self){
-  return at::native::adaptive_avg_pool2d_backward_sycl(grad_output, self);
+  return impl::adaptive_avg_pool2d_backward_dpcpp(grad_output, self);
 }
 
 } // namespace AtenIpexTypeDPCPP

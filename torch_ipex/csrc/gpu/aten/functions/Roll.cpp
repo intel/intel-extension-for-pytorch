@@ -4,34 +4,39 @@
 #include <ATen/NativeFunctions.h>
 
 #include <core/Memory.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Context.h>
 
 #include <cstddef>
 #include <vector>
 
+
+using namespace at::dpcpp;
+using namespace at::native;
+
 namespace at {
-namespace native {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 template <typename scalar_t>
-class roll_sycl_ker {};
+class roll_dpcpp_ker {};
 
 template <typename scalar_t>
-void roll_sycl_kernel(const Tensor& in_tensor, Tensor& out_tensor, int64_t N,
+void roll_dpcpp_kernel(const Tensor& in_tensor, Tensor& out_tensor, int64_t N,
                       int64_t roll_dim, int64_t start,
                       int64_t size, int64_t stride, int64_t total_dims) {
-  static const auto write_mode = cl::sycl::access::mode::discard_write;
-  static const auto read_mode = cl::sycl::access::mode::read;
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  static const auto write_mode = DP::access::mode::discard_write;
+  static const auto read_mode = DP::access::mode::read;
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   int64_t rng, GRange, tileSize;
   auto offset = ((size - start) * stride);
-  c10::sycl::parallel_for_setup(N, tileSize, rng, GRange);
-  sycl_queue.submit([&](cl::sycl::handler& cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, in_tensor.data_ptr<scalar_t>());
-    auto out_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, out_tensor.data_ptr<scalar_t>());
-    cgh.parallel_for<roll_sycl_ker<scalar_t>>(
-        cl::sycl::nd_range<1>(cl::sycl::range<1>(GRange), cl::sycl::range<1>(tileSize)),
-        [=](cl::sycl::nd_item<1> item) {
+  parallel_for_setup(N, tileSize, rng, GRange);
+  dpcpp_queue.submit([&](DP::handler& cgh) {
+    auto in_acc = DPCPPAccessor<read_mode>(cgh, in_tensor.data_ptr<scalar_t>());
+    auto out_acc = DPCPPAccessor<write_mode>(cgh, out_tensor.data_ptr<scalar_t>());
+    cgh.parallel_for<roll_dpcpp_ker<scalar_t>>(
+        DP::nd_range<1>(DP::range<1>(GRange), DP::range<1>(tileSize)),
+        [=](DP::nd_item<1> item) {
           int64_t linear_index = item.get_global_id(0);
           auto in_ptr = in_acc.template get_pointer<scalar_t>();
           auto out_ptr = out_acc.template get_pointer<scalar_t>();
@@ -52,7 +57,7 @@ void roll_sycl_kernel(const Tensor& in_tensor, Tensor& out_tensor, int64_t N,
 }
 
 // Roll a tensor along a dimension
-Tensor roll_sycl(const Tensor& self, IntArrayRef shifts, IntArrayRef dims) {
+Tensor roll_dpcpp(const Tensor& self, IntArrayRef shifts, IntArrayRef dims) {
   if (dims.size() != 1 || shifts.size() != 1) {
     return roll_common(self, shifts, dims);
   }
@@ -72,19 +77,17 @@ Tensor roll_sycl(const Tensor& self, IntArrayRef shifts, IntArrayRef dims) {
   if (start < 0) start += size;
 
   auto total_dims = in_tensor.dim();
-  AT_DISPATCH_FLOATING_TYPES(in_tensor.scalar_type(), "roll_sycl", [&] {
-    roll_sycl_kernel<scalar_t>(in_tensor, out_tensor, N,
+  AT_DISPATCH_FLOATING_TYPES(in_tensor.scalar_type(), "roll_dpcpp", [&] {
+    roll_dpcpp_kernel<scalar_t>(in_tensor, out_tensor, N,
         dim, start, size, in_tensor.stride(dim), total_dims);
   });
   return out_tensor;
 }
 
-} // namespace native
-} // namespace at
+} // namespace impl
 
-namespace at { namespace AtenIpexTypeDPCPP {
 Tensor roll(const Tensor & self, IntArrayRef shifts, IntArrayRef dims){
-  return at::native::roll_sycl(self, shifts, dims);
+  return impl::roll_dpcpp(self, shifts, dims);
 }
 
 } // namespace AtenIpexTypeDPCPP

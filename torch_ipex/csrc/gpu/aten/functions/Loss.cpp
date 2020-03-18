@@ -6,7 +6,7 @@
 
 #include <core/DPCPP.h>
 #include <core/Memory.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/TensorImplUtils.h>
 #include <core/ApplyUtils.h>
 #include <core/Runtime.h>
@@ -16,7 +16,8 @@
 #include <ATen/aten_ipex_type_dpcpp.h>
 
 
-using namespace at::native;
+using namespace at::dpcpp;
+
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
@@ -104,9 +105,9 @@ void dnnl_inner_product_forward_frame(
     scalar_t *input_data,
     scalar_t *target_data,
     scalar_t *output_data) {
-  at::Device curDevice = at::Device(kDPCPP, c10::sycl::current_device());
-  auto engine = at::native::GpuEngineManager::Instance().get_engine(curDevice);
-  auto strm = at::native::GpuStreamManager::Instance().get_stream();
+  at::Device curDevice = at::Device(kDPCPP, current_device());
+  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
+  auto strm = GpuStreamManager::Instance().get_stream();
 
   int32_t ic = K;
   memory::data_type data_t;
@@ -133,13 +134,13 @@ void dnnl_inner_product_forward_frame(
   auto ip_forward_pd = inner_product_forward::primitive_desc(*ipFwd_desc, engine);
 
   auto input_usr_memory = memory({{{input_tz}, data_t, format_nc}, engine});
-  at::native::sycl_set_mkldnn_buffer(input_data, input_usr_memory);
+  dpcpp_set_mkldnn_buffer(input_data, input_usr_memory);
 
   auto weight_usr_memory = memory({{{weight_tz}, data_t, format_oi}, engine});
-  at::native::sycl_set_mkldnn_buffer(target_data, weight_usr_memory);
+  dpcpp_set_mkldnn_buffer(target_data, weight_usr_memory);
 
   auto output_usr_memory = memory({{{output_tz}, data_t, format_nc}, engine});
-  at::native::sycl_set_mkldnn_buffer(output_data, output_usr_memory);
+  dpcpp_set_mkldnn_buffer(output_data, output_usr_memory);
 
   std::shared_ptr<inner_product_forward> ip_forward;
   std::shared_ptr<memory> bias_usr_memory;
@@ -171,7 +172,7 @@ void BCECriterion_updateOutput(
   if (reduction == at::Reduction::None) {
     output.resize_as_(input);
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "binary_cross_entropy_loss", [&] {
-      at::sycl::SYCL_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+      at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         output, input, target, TensorBCEOp<scalar_t>()
       );
     });
@@ -188,7 +189,7 @@ void BCECriterion_updateOutput(
   if (weights.defined()) {
     Tensor t0 = at::empty_like(input);
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "binary_cross_entropy_loss", [&] {
-      at::sycl::SYCL_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+      at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         t0, input, target, TensorBCEOp<scalar_t>()
       );
     });
@@ -211,7 +212,7 @@ void BCECriterion_updateOutput(
     Tensor t2 = at::empty_like(input);
     Tensor o1 = at::zeros_like(output);
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "tensor_log1", [&] {
-      at::sycl::SYCL_tensor_apply2<scalar_t, scalar_t>(
+      at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
         t1, input, TensorLog1Op<scalar_t>()
       );
     });
@@ -230,12 +231,12 @@ void BCECriterion_updateOutput(
       }
     );
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "tensor_log2", [&] {
-      at::sycl::SYCL_tensor_apply2<scalar_t, scalar_t>(
+      at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
         t1, input, TensorLog2Op<scalar_t>()
       );
     });
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "tensor_sub2", [&] {
-      at::sycl::SYCL_tensor_apply2<scalar_t, scalar_t>(
+      at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
         t2, target, TensorSub2Op<scalar_t>()
       );
     });
@@ -281,14 +282,14 @@ void BCECriterion_updateGradInput(
     TORCH_CHECK(
         input.numel() == gradOutput.numel(), "input and gradOutput have different number of elements");
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "binary_cross_entropy_loss_backward", [&] {
-      at::sycl::SYCL_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+      at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         gradInput, input, target, TensorBCEGradOp<scalar_t>()
       );
     });
     
     if (weights.defined()) {
       AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "binary_cross_entropy_loss_backward_weights", [&] {
-        at::sycl::SYCL_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+        at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
           gradInput, weights, gradOutput, TensorBCEWeightsOp<scalar_t>()
         );
       });
@@ -307,7 +308,7 @@ void BCECriterion_updateGradInput(
   norm.copy_(gradOutput);
   norm.mul_(reduction == Reduction::Mean ? 1./((int)input.numel()) : 1.);
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "binary_cross_entropy_loss_backward", [&] {
-    at::sycl::SYCL_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
       gradInput, input, target, TensorBCEGradOp<scalar_t>()
     );
   });
@@ -333,7 +334,7 @@ void MSECriterion_updateOutput(
     Tensor in = at::empty_like(input);
 
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "tensor_sub", [&] {
-      at::sycl::SYCL_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+      at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         in, input, target, TensorSubOp<scalar_t>()
       );
     });
@@ -358,10 +359,10 @@ void MSECriterion_updateOutput(
     }
     return;
   }
-  
+
   output.resize_as_(input);
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "mse_loss", [&] {
-    at::sycl::SYCL_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
       output, input, target, TensorMSEOp<scalar_t>()
     );
   });

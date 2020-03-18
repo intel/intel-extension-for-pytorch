@@ -10,21 +10,21 @@
 #include "Loops.h"
 
 
-using namespace at::native;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 DP_DEF_K1(bitwise_not);
-void bitwise_not_kernel_sycl(TensorIterator& iter) {
+void bitwise_not_kernel_dpcpp(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
-    sycl_kernel_for_tensor_iter<DP_K(bitwise_not)>(iter, [](bool a) -> bool {
+    dpcpp_kernel_for_tensor_iter<DP_K(bitwise_not)>(iter, [](bool a) -> bool {
       return !a;
     });
   } else {
-    AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_not_sycl", [&]() {
-      sycl_kernel_for_tensor_iter<DP_K(bitwise_not)>(iter, [](scalar_t a) -> scalar_t {
+    AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_not_dpcpp", [&]() {
+      dpcpp_kernel_for_tensor_iter<DP_K(bitwise_not)>(iter, [](scalar_t a) -> scalar_t {
         return ~a;
       });
     });
@@ -32,11 +32,11 @@ void bitwise_not_kernel_sycl(TensorIterator& iter) {
 }
 
 DP_DEF_K1(logical_not);
-void logical_not_kernel_sycl(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES_AND2(kBool, kHalf, iter.dtype(1), "logical_not_sycl", [&]() {
+void logical_not_kernel(TensorIterator& iter) {
+  AT_DISPATCH_ALL_TYPES_AND2(kBool, kHalf, iter.dtype(1), "logical_not_dpcpp", [&]() {
     using self_t = scalar_t;
-    AT_DISPATCH_ALL_TYPES_AND2(kBool, kHalf, iter.dtype(0), "logical_not_sycl", [&]() {
-      sycl_kernel_for_tensor_iter<DP_K(logical_not, self_t)>(iter, [](self_t a) -> scalar_t { return static_cast<scalar_t>(!a); });
+    AT_DISPATCH_ALL_TYPES_AND2(kBool, kHalf, iter.dtype(0), "logical_not_dpcpp", [&]() {
+      dpcpp_kernel_for_tensor_iter<DP_K(logical_not, self_t)>(iter, [](self_t a) -> scalar_t { return static_cast<scalar_t>(!a); });
     });
   });
 }
@@ -107,7 +107,7 @@ Tensor & bitwise_not_(Tensor & self){
 Tensor & bitwise_not_out(Tensor & out, const Tensor & self){
   auto iter = TensorIterator::unary_op(out, self,
     /*check_mem_overlap=*/true);
-  impl::bitwise_not_kernel_sycl(iter);
+  impl::bitwise_not_kernel_dpcpp(iter);
   #ifdef BUILD_NAMEDTENSOR
   at::namedinference::propagate_names(out, self);
   #endif
@@ -130,7 +130,7 @@ Tensor& logical_not_out(Tensor& result, const Tensor& self) {
   iter.add_output(result);
   iter.add_input(self);
   iter.build();
-  impl::logical_not_kernel_sycl(iter);
+  impl::logical_not_kernel(iter);
   return result;
 }
 

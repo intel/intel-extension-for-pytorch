@@ -4,13 +4,13 @@
 
 namespace at {
 
-struct CAFFE2_API SYCLGenerator : public Generator {
+struct CAFFE2_API DPCPPGenerator : public Generator {
   // Constructors
-  SYCLGenerator(DeviceIndex device_index = -1);
-  ~SYCLGenerator() = default;
+  DPCPPGenerator(DeviceIndex device_index = -1);
+  ~DPCPPGenerator() = default;
 
-  // SYCLGenerator methods
-  std::shared_ptr<SYCLGenerator> clone() const;
+  // DPCPPGenerator methods
+  std::shared_ptr<DPCPPGenerator> clone() const;
   void set_current_seed(uint64_t seed) override;
   uint64_t current_seed() const override;
   uint64_t seed() override;
@@ -20,17 +20,17 @@ struct CAFFE2_API SYCLGenerator : public Generator {
   static DeviceType device_type();
 
 private:
-  SYCLGenerator* clone_impl() const override;
+  DPCPPGenerator* clone_impl() const override;
   uint64_t seed_ = default_rng_seed_val;
   uint64_t philox_offset_per_thread_ = 0;
 };
 
-namespace sycl {
+namespace dpcpp {
 namespace detail {
 
-  CAFFE2_API SYCLGenerator* getDefaultSYCLGenerator(DeviceIndex device_index = -1);
-  CAFFE2_API std::shared_ptr<SYCLGenerator> createSYCLGenerator(DeviceIndex device_index = -1);
+  CAFFE2_API DPCPPGenerator* getDefaultDPCPPGenerator(DeviceIndex device_index = -1);
+  CAFFE2_API std::shared_ptr<DPCPPGenerator> createDPCPPGenerator(DeviceIndex device_index = -1);
 
 } // namespace detail
-} // namespace sycl
+} // namespace dpcpp
 } // namespace at

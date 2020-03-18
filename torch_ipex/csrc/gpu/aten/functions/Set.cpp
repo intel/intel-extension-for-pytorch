@@ -1,7 +1,7 @@
 #include <core/TensorImplUtils.h>
 
 
-using namespace at::native;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {

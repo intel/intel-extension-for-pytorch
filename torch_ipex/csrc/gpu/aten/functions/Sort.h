@@ -11,7 +11,8 @@
 
 
 using namespace at;
-using namespace at::sycl::detail;
+using namespace at::dpcpp::detail;
+using namespace at::dpcpp;
 
 // Collection of kernel sort routimes
 // Collection of kernel sort routines
@@ -96,12 +97,12 @@ void bitonicSortKVInPlace(TensorInfo<K, IndexType> keys,
                           IndexType valueSliceStride,
                           Comparator comp) {
   // Find the slice of the tensor that we are sorting
-  auto queue = c10::sycl::syclGetCurrentQueue();
+  auto queue = dpcppGetCurrentQueue();
   int64_t local_size = Power2SortSize / 2;
   int64_t global_size = keySlices * local_size;
   auto cgf = DP_Q_CGF(cgh) {
-    auto keys_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, keys.data);
-    auto values_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, values.data);
+    auto keys_acc = DPCPPAccessor<dp_rw_mode>(cgh, keys.data);
+    auto values_acc = DPCPPAccessor<dp_rw_mode>(cgh, values.data);
     auto sharedKeys_acc = dp_local_acc_t<K>(Power2SortSize, cgh);
     auto sharedValues_acc = dp_local_acc_t<V>(Power2SortSize, cgh);
     auto sharedValid_acc = dp_local_acc_t<bool>(Power2SortSize, cgh);
@@ -181,9 +182,9 @@ inline void SortKeyValueInplace(Tensor & key, Tensor & value, int dim, bool dir)
   TORCH_CHECK(key.sizes().equals(value.sizes()),
              "Key tensor must have same size as value tensor");
   int dims = value.dim() == 0 ? 1 : value.dim();
-  TORCH_CHECK(dims <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
+  TORCH_CHECK(dims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   dims = key.dim() == 0 ? 1 : key.dim();
-  TORCH_CHECK(dims <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
+  TORCH_CHECK(dims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
 
   ptrdiff_t inElements = key.numel();
 

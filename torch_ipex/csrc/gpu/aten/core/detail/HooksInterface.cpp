@@ -9,21 +9,21 @@
 namespace at {
 namespace detail {
 
-static SYCLHooksInterface* sycl_hooks = nullptr;
+static DPCPPHooksInterface* dpcpp_hooks = nullptr;
 
 // See getCUDAHooks for some more commentary
-const SYCLHooksInterface& getSYCLHooks() {
+const DPCPPHooksInterface& getDPCPPHooks() {
   static std::once_flag once;
   std::call_once(once, [] {
-    sycl_hooks = SYCLHooksRegistry()->Create("SYCLHooks", SYCLHooksArgs{}).release();
-    if (!sycl_hooks) {
-      sycl_hooks = new SYCLHooksInterface();
+    dpcpp_hooks = DPCPPHooksRegistry()->Create("DPCPPHooks", DPCPPHooksArgs{}).release();
+    if (!dpcpp_hooks) {
+      dpcpp_hooks = new DPCPPHooksInterface();
     }
   });
-  return *sycl_hooks;
+  return *dpcpp_hooks;
 }
 } // namespace detail
 
-C10_DEFINE_REGISTRY(SYCLHooksRegistry, SYCLHooksInterface, SYCLHooksArgs)
+C10_DEFINE_REGISTRY(DPCPPHooksRegistry, DPCPPHooksInterface, DPCPPHooksArgs)
 
 } // namespace at

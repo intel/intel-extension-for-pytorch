@@ -2,17 +2,17 @@
 
 #include <core/Exception.h>
 #include <core/Memory.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Context.h>
 #include <utils/General.h>
 
-namespace at { namespace native {
+namespace at { namespace dpcpp {
 
 void StorageImpl_resize(at::StorageImpl *self, ptrdiff_t size) {
   TORCH_CHECK(size >= 0, "invalid size");
   TORCH_INTERNAL_ASSERT(self->allocator() != nullptr);
   c10::DeviceIndex device;
-  C10_SYCL_CHECK(c10::sycl::syclGetDevice(&device));
+  AT_DPCPP_CHECK(dpcppGetDevice(&device));
 
   if (!self->resizable())
     TORCH_CHECK(false, "Trying to resize storage that is not resizable");;
@@ -26,10 +26,10 @@ void StorageImpl_resize(at::StorageImpl *self, ptrdiff_t size) {
     c10::DataPtr data = self->allocator()->allocate(size *itemsize);
 
     if (self->data_ptr()) {
-      syclMemcpyAsync(data.get(),
+      dpcppMemcpyAsync(data.get(),
                       self->data(),
                       THMin(self->numel(), size) * itemsize,
-                      c10::sycl::DeviceToDevice);
+                      DeviceToDevice);
     }
     self->set_data_ptr(std::move(data));
     self->set_numel(size);
@@ -44,10 +44,10 @@ at::StorageImpl* StorageImpl_new(caffe2::TypeMeta data_type) {
   at::StorageImpl *storage = c10::make_intrusive<at::StorageImpl> (
       data_type,
       0,
-      at::sycl::getSYCLDeviceAllocator(),
+      at::dpcpp::getDPCPPDeviceAllocator(),
       true).release();
   return storage;
 }
 
-} // native::
+} // dpcpp::
 } // at::

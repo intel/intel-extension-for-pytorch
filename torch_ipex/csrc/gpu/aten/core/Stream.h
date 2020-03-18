@@ -7,12 +7,12 @@
 #include <c10/core/Stream.h>
 
 #include <core/Macros.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 
 /*
 * Stream pool note.
 *
-* A SYCLStream is an abstraction of an actual cuStream on the GPU. SYCLStreams
+* A DPCPPStream is an abstraction of an actual cuStream on the GPU. DPCPPStreams
 * are backed by cuStreams, but they use several pools to minimize the costs
 * associated with creating, retaining, and destroying cuStreams.
 *
@@ -46,58 +46,58 @@
 * (every OS thread has a separate current stream, as one might expect),
 * the stream pool is global across all threads; stream 0 is always stream 0
 * no matter which thread you use it on.  Multiple threads can synchronize
-* on the same stream.  Although the SYCL documentation is not very clear
+* on the same stream.  Although the DPCPP documentation is not very clear
 * on the matter, streams are thread safe; e.g., it is safe to enqueue
 * a kernel on the same stream from two different threads.
 */
 
-namespace c10 {
-namespace sycl {
+namespace at {
+namespace dpcpp {
 
-#define syclStream_t  unsigned long
+#define dpcppStream_t  unsigned long
 
-#define SYCL_STREAM_COMPUTATION_INDEX 0
-#define SYCL_STREAM_IO_INDEX 1
-#define SYCL_STREAM_NETWORK_INDEX 2
-#define SYCL_STREAM_MAX_INDEX 32
+#define DPCPP_STREAM_COMPUTATION_INDEX 0
+#define DPCPP_STREAM_IO_INDEX 1
+#define DPCPP_STREAM_NETWORK_INDEX 2
+#define DPCPP_STREAM_MAX_INDEX 32
 
-// Value object representing a SYCL stream.  This is just a wrapper
-// around c10::Stream, but it comes with a little extra SYCL-specific
-// functionality (conversion to syclStream_t), and a guarantee that
-// the wrapped c10::Stream really is a SYCL stream.
-class C10_SYCL_API SYCLStream {
+// Value object representing a DPCPP stream.  This is just a wrapper
+// around c10::Stream, but it comes with a little extra DPCPP-specific
+// functionality (conversion to dpcppStream_t), and a guarantee that
+// the wrapped c10::Stream really is a DPCPP stream.
+class AT_DPCPP_API DPCPPStream {
 public:
 
   enum Unchecked { UNCHECKED };
 
-  /// Construct a SYCLStream from a Stream.  This construction is checked,
-  /// and will raise an error if the Stream is not, in fact, a SYCL stream.
-  explicit SYCLStream(Stream stream) : stream_(stream) {
+  /// Construct a DPCPPStream from a Stream.  This construction is checked,
+  /// and will raise an error if the Stream is not, in fact, a DPCPP stream.
+  explicit DPCPPStream(Stream stream) : stream_(stream) {
     TORCH_CHECK(stream_.device_type() == DeviceType::DPCPP);
   }
 
-  /// Construct a SYCLStream from a Stream with no error checking.
+  /// Construct a DPCPPStream from a Stream with no error checking.
   /// This constructor uses the "named" constructor idiom, and can
-  /// be invoked as: SYCLStream(SYCLStream::UNCHECKED, stream)
-  explicit SYCLStream(Unchecked, Stream stream) : stream_(stream) {}
+  /// be invoked as: DPCPPStream(DPCPPStream::UNCHECKED, stream)
+  explicit DPCPPStream(Unchecked, Stream stream) : stream_(stream) {}
 
-  bool operator==(const SYCLStream& other) const noexcept {
+  bool operator==(const DPCPPStream& other) const noexcept {
     return unwrap() == other.unwrap();
   }
 
-  bool operator!=(const SYCLStream& other) const noexcept {
+  bool operator!=(const DPCPPStream& other) const noexcept {
     return unwrap() != other.unwrap();
   }
 
   /// Implicit conversion to Stream (a.k.a., forget that the stream is a
-  /// SYCL stream).
+  /// DPCPP stream).
   operator Stream() const { return unwrap(); }
 
-  /// Get the SYCL device index that this stream is associated with.
+  /// Get the DPCPP device index that this stream is associated with.
   DeviceIndex device_index() const { return stream_.device_index(); }
 
   /// Get the full Device that this stream is associated with.  The Device
-  /// is guaranteed to be a SYCL device.
+  /// is guaranteed to be a DPCPP device.
   Device device() const { return Device(DeviceType::DPCPP, device_index()); }
 
   /// Return the stream ID corresponding to this particular stream.
@@ -106,54 +106,54 @@ public:
   /// Explicit conversion to Stream.
   Stream unwrap() const { return stream_; }
 
-  /// Reversibly pack a SYCLStream into a uint64_t representation.  This may
-  /// be helpful when storing a SYCLStream in a C struct, where you cannot
-  /// conveniently place the SYCLStream object itself (which is morally
+  /// Reversibly pack a DPCPPStream into a uint64_t representation.  This may
+  /// be helpful when storing a DPCPPStream in a C struct, where you cannot
+  /// conveniently place the DPCPPStream object itself (which is morally
   /// equivalent, but unfortunately is not POD due to the fact that it
   /// has constructors.)
   ///
-  /// The SYCLStream can be unpacked using unpack().  The format of
+  /// The DPCPPStream can be unpacked using unpack().  The format of
   /// the uint64_t is unspecified and may be changed.
   uint64_t pack() const noexcept {
     return stream_.pack();
   }
 
-  // Unpack a SYCLStream from the uint64_t representation generated by pack().
-  static SYCLStream unpack(uint64_t bits) {
-    return SYCLStream(Stream::unpack(bits));
+  // Unpack a DPCPPStream from the uint64_t representation generated by pack().
+  static DPCPPStream unpack(uint64_t bits) {
+    return DPCPPStream(Stream::unpack(bits));
   }
 
-	cl::sycl::queue& sycl_queue() const;
+	DP::queue& dpcpp_queue() const;
 
-  // Explicit conversion to syclStream_t
-  syclStream_t stream() const { return (syclStream_t)this->sycl_queue().get(); }
+  // Explicit conversion to dpcppStream_t
+  dpcppStream_t stream() const { return (dpcppStream_t)this->dpcpp_queue().get(); }
 
-  // Deleted for now; use SYCLEvent::block instead
-  // void synchronize_with(const SYCLEvent& event) const;
+  // Deleted for now; use DPCPPEvent::block instead
+  // void synchronize_with(const DPCPPEvent& event) const;
 
 private:
   Stream stream_;
 };
 
-CAFFE2_API SYCLStream getSYCLStreamFromPool(const bool isDefault = false, DeviceIndex device_index = -1);
+CAFFE2_API DPCPPStream getDPCPPStreamFromPool(const bool isDefault = false, DeviceIndex device_index = -1);
 
-CAFFE2_API SYCLStream getDefaultSYCLStream(DeviceIndex device_index = -1);
+CAFFE2_API DPCPPStream getDefaultDPCPPStream(DeviceIndex device_index = -1);
 
-CAFFE2_API SYCLStream getCurrentSYCLStream(DeviceIndex device_index = -1);
+CAFFE2_API DPCPPStream getCurrentDPCPPStream(DeviceIndex device_index = -1);
 
-CAFFE2_API void setCurrentSYCLStream(SYCLStream stream);
+CAFFE2_API void setCurrentDPCPPStream(DPCPPStream stream);
 
-CAFFE2_API SYCLStream getSYCLStreamOnDevice(DeviceIndex device_index, int stream_index);
+CAFFE2_API DPCPPStream getDPCPPStreamOnDevice(DeviceIndex device_index, int stream_index);
 
-C10_API std::ostream& operator<<(std::ostream& stream, const SYCLStream& s);
+C10_API std::ostream& operator<<(std::ostream& stream, const DPCPPStream& s);
 
-} // namespace sycl
+} // namespace dpcpp
 } // namespace at
 
 namespace std {
   template <>
-  struct hash<c10::sycl::SYCLStream> {
-    size_t operator()(c10::sycl::SYCLStream s) const noexcept {
+  struct hash<at::dpcpp::DPCPPStream> {
+    size_t operator()(at::dpcpp::DPCPPStream s) const noexcept {
       return std::hash<c10::Stream>{}(s.unwrap());
     }
   };

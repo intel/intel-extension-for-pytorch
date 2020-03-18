@@ -1,39 +1,38 @@
 #include <core/Context.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Allocator.h>
 #include <CL/sycl.hpp>
 
 
 namespace at {
-namespace sycl {
+namespace dpcpp {
 
 static std::once_flag initFlag;
-static std::unique_ptr<cl::sycl::context> gContext;
+static std::unique_ptr<DP::context> gContext;
 
 static void initGlobalContext() {
   int cnt;
-  cl::sycl::vector_class<cl::sycl::device> devs;
-  c10::sycl::syclGetDeviceCount(&cnt);
+  DP::vector_class<DP::device> devs;
+  at::dpcpp::dpcppGetDeviceCount(&cnt);
   for (int i = 0; i < cnt; i++) {
-    devs.push_back(c10::sycl::syclGetRawDevice((int64_t)i));
+    devs.push_back(at::dpcpp::dpcppGetRawDevice((int64_t)i));
   }
 
-  gContext.reset(new cl::sycl::context(devs, c10::sycl::syclAsyncHandler));
+  gContext.reset(new DP::context(devs, at::dpcpp::dpcppAsyncHandler));
 }
 
 void clearGlobalContext() {
   gContext.reset(NULL);
 }
 
-cl::sycl::context getGlobalContext() {
+DP::context getGlobalContext() {
   std::call_once(initFlag, initGlobalContext);
   return *gContext;
 }
 
-at::Allocator* getSYCLDeviceAllocator() {
+at::Allocator* getDPCPPDeviceAllocator() {
   return DPCPPAllocator_get();
 }
 
-} // namespace sycl
-
+} // namespace dpcpp
 } // namespace at

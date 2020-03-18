@@ -10,8 +10,12 @@
 #include <core/ApplyUtils.h>
 
 
+using namespace at;
+using namespace at::dpcpp;
+
 namespace at {
-namespace sycl {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 template <typename T>
 struct inter_copy_type {
@@ -34,7 +38,6 @@ class copy_functor {
       dst_val = static_cast<dst_T>(static_cast<inter_copy_type_t<dst_T>>(src_val));
     }
 };
-}}
 
 #define BUILD_TENSOR_ITER(dst, src, iter) \
   auto iter = TensorIterator();           \
@@ -44,21 +47,11 @@ class copy_functor {
   iter.dont_compute_common_dtype();       \
   iter.build();
 
-namespace at {
-namespace native {
-
-void copy_kernel_sycl(TensorIterator& iter, bool non_blocking);
-
-namespace {
-
-using namespace at;
-using namespace at::sycl;
-
 // Copy operator for the pointerwise apply kernel
 template <typename dst_T, typename src_T>
 struct CopyOp {
   static void apply(Tensor& dst, const Tensor& src) {
-    SYCL_tensor_apply2<dst_T, src_T>(dst, src, copy_functor<dst_T, src_T>());
+    DPCPP_tensor_apply2<dst_T, src_T>(dst, src, copy_functor<dst_T, src_T>());
   }
 };
 
@@ -82,7 +75,7 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
 
   Device dst_device = iter.device(0);
   Device src_device = iter.device(1);
-  c10::sycl::SYCLGuard device_guard(src_device);
+  DPCPPGuard device_guard(src_device);
   //FIXME:: figure out how to copy buffer between two device
   TORCH_CHECK(src_device == dst_device, "device not match");
 
@@ -91,11 +84,11 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   }
 
   if (memcpy_eligible) {
-    c10::sycl::syclMemcpyAsync(
+    dpcppMemcpyAsync(
         iter.data_ptr(0),
         iter.data_ptr(1),
         numel * iter.element_size(0),
-        c10::sycl::DeviceToDevice);
+        DeviceToDevice);
   } else {
   //auto src_contig = at::empty_like(iter.tensor(0),
   //      iter.tensor(1).options().dtype(iter.tensor(0).dtype()));
@@ -119,11 +112,11 @@ void copy_from_cpu(TensorIterator& iter, bool non_blocking) {
   Tensor dst_contig = dst.contiguous();
   Tensor src_contig = src.contiguous();
 
-  c10::sycl::syclMemcpy(
+  dpcppMemcpy(
       dst_contig.data_ptr(),
       src_contig.data_ptr(),
       src.numel() * src.dtype().itemsize(),
-      c10::sycl::HostToDevice);
+      HostToDevice);
   AT_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half, at::ScalarType::Bool, src.scalar_type(), "copy_from_cpu", [&]() {
         //FIXME: [Remove Me] Make ComputeCPP happy
@@ -141,12 +134,12 @@ void copy_to_cpu(TensorIterator& iter, bool non_blocking) {
   Tensor dst_contig = dst.contiguous();
   Tensor src_contig = src.contiguous();
 
-  c10::sycl::SYCLGuard device_guard(src.device());
-  c10::sycl::syclMemcpy(
+  DPCPPGuard device_guard(src.device());
+  dpcppMemcpy(
     dst_contig.data_ptr(),
     src_contig.data_ptr(),
     src.numel() * src.dtype().itemsize(),
-    c10::sycl::DeviceToHost);
+    DeviceToHost);
   // DispatchStub is not exposed by torch
   // BUILD_TENSOR_ITER(dst, dst_contig, _iter);
   // copy_stub(kCPU, _iter, non_blocking);
@@ -164,14 +157,14 @@ void copy_from_cpu_async_(TensorIterator& iter) {
     return;
   }
 
-  c10::sycl::SYCLGuard device_guard(dst.device());
+  DPCPPGuard device_guard(dst.device());
   AT_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half, at::ScalarType::Bool, src.scalar_type(), "copy_from_cpu_async", [&]() {
-        syclMemcpyAsync(
+        dpcppMemcpyAsync(
           dst.data_ptr<scalar_t>(),
           src.data_ptr<scalar_t>(),
           src.numel() * sizeof(scalar_t),
-          c10::sycl::HostToDevice);
+          HostToDevice);
       }
   );
 }
@@ -187,27 +180,29 @@ void copy_to_cpu_async_(TensorIterator& iter) {
     return;
   }
 
-  c10::sycl::SYCLGuard device_guard(src.device());
+  DPCPPGuard device_guard(src.device());
 
   AT_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half, at::ScalarType::Bool, src.scalar_type(), "copy_to_cpu_async", [&]() {
-        syclMemcpyAsync(
+        dpcppMemcpyAsync(
           dst.data_ptr<scalar_t>(),
           src.data_ptr<scalar_t>(),
           src.numel() * sizeof(scalar_t),
-          c10::sycl::DeviceToHost);
+          DeviceToHost);
       }
   );
 }
 
+void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking);
+
 template <typename dst_T>
-void _copy__sycl(TensorIterator& iter, bool non_blocking) {
+void _copy__dpcpp(TensorIterator& iter, bool non_blocking) {
   Tensor& dst = iter.tensor(0);
   Tensor& src = iter.tensor(1);
 
   TORCH_CHECK(dst.numel() == src.numel(),"sizes do not match");
   AT_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half, at::ScalarType::Bool, src.scalar_type(), "_copy_sycl", [&]() {
+      at::ScalarType::Half, at::ScalarType::Bool, src.scalar_type(), "_copy_dpcpp", [&]() {
         if (dst.device().type() == at::kDPCPP && src.device().type() == at::kDPCPP) {
           copy_device_to_device(iter, non_blocking);
         } else {
@@ -241,7 +236,7 @@ void _copy__sycl(TensorIterator& iter, bool non_blocking) {
               BUILD_TENSOR_ITER(srcf, src, iter1)
               copy_to_cpu(iter1, non_blocking);
               BUILD_TENSOR_ITER(dst, srcf, iter2)
-              at::native::copy_kernel_sycl(iter2, non_blocking);
+              copy_kernel_dpcpp(iter2, non_blocking);
             }
           }
         }
@@ -249,21 +244,15 @@ void _copy__sycl(TensorIterator& iter, bool non_blocking) {
   );
 }
 
-} //namespace
-
-void copy_kernel_sycl(TensorIterator& iter, bool non_blocking) {
+void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   AT_DISPATCH_ALL_TYPES_AND2(
-      ScalarType::Half, ScalarType::Bool, iter.tensor(0).scalar_type(), "_copy__sycl", [&]() {
-        _copy__sycl<scalar_t>(iter, non_blocking);
+      ScalarType::Half, ScalarType::Bool, iter.tensor(0).scalar_type(), "_copy__dpcpp", [&]() {
+        _copy__dpcpp<scalar_t>(iter, non_blocking);
       }
   );
 }
 
-} // namespace native
-} // namespace at
-
-namespace at {
-namespace AtenIpexTypeDPCPP {
+} // impl
 
 Tensor & copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   // TODO: valid check
@@ -274,7 +263,7 @@ Tensor & copy_(Tensor& self, const Tensor& src, bool non_blocking) {
     return self;
   }
 
-  at::native::copy_kernel_sycl(iter, non_blocking);
+  impl::copy_kernel_dpcpp(iter, non_blocking);
 
   return self;
 }

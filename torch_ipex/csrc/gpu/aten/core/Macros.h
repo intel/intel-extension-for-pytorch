@@ -6,27 +6,27 @@
 // we build.
 
 #ifdef _WIN32
-#if defined(C10_SYCL_BUILD_SHARED_LIBS)
-#define C10_SYCL_EXPORT __declspec(dllexport)
-#define C10_SYCL_IMPORT __declspec(dllimport)
+#if defined(AT_DPCPP_BUILD_SHARED_LIBS)
+#define AT_DPCPP_EXPORT __declspec(dllexport)
+#define AT_DPCPP_IMPORT __declspec(dllimport)
 #else
-#define C10_SYCL_EXPORT
-#define C10_SYCL_IMPORT
+#define AT_DPCPP_EXPORT
+#define AT_DPCPP_IMPORT
 #endif
 #else // _WIN32
 #if defined(__GNUC__)
-#define C10_SYCL_EXPORT __attribute__((__visibility__("default")))
+#define AT_DPCPP_EXPORT __attribute__((__visibility__("default")))
 #else // defined(__GNUC__)
-#define C10_SYCL_EXPORT
+#define AT_DPCPP_EXPORT
 #endif // defined(__GNUC__)
-#define C10_SYCL_IMPORT C10_SYCL_EXPORT
+#define AT_DPCPP_IMPORT AT_DPCPP_EXPORT
 #endif // _WIN32
 
 // This one is being used by libc10_cuda.so
-#ifdef C10_SYCL_BUILD_MAIN_LIB
-#define C10_SYCL_API C10_SYCL_EXPORT
+#ifdef AT_DPCPP_BUILD_MAIN_LIB
+#define AT_DPCPP_API AT_DPCPP_EXPORT
 #else
-#define C10_SYCL_API C10_SYCL_IMPORT
+#define AT_DPCPP_API AT_DPCPP_IMPORT
 #endif
 
-#define SYCL_SUCCESS  0
+#define DPCPP_SUCCESS  0

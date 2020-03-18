@@ -2,7 +2,7 @@
 #include <vector>
 
 namespace at {
-namespace sycl {
+namespace dpcpp {
 namespace detail {
 
 struct SizeAndStride {
@@ -94,6 +94,6 @@ bool canUse32BitIndexMath(const Tensor& t, int64_t max_elem) {
 }
 
 } // detail
-} // sycl
+} // dpcpp
 } // at
 

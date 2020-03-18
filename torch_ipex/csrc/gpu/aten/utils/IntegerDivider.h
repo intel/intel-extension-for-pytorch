@@ -1,5 +1,5 @@
-#ifndef THSYCL_INTEGER_DIVIDER_INC
-#define THSYCL_INTEGER_DIVIDER_INC
+#ifndef THDPCPP_INTEGER_DIVIDER_INC
+#define THDPCPP_INTEGER_DIVIDER_INC
 
 #include <assert.h>
 
@@ -79,7 +79,7 @@ struct IntDivider<unsigned int> {
   IntDivider() { }  // Dummy constructor for arrays.
 
   IntDivider(unsigned int d) : divisor(d) {
-    // TODO: replace following when sycl has counterpart assert
+    // TODO: replace following when dpcpp has counterpart assert
     // assert(divisor >= 1 && divisor <= INT32_MAX);
 
     // TODO: gcc/clang has __builtin_clz() but it's not portable.
@@ -88,7 +88,7 @@ struct IntDivider<unsigned int> {
     uint64_t one = 1;
     uint64_t magic = ((one << 32) * ((one << shift) - divisor)) / divisor + 1;
     m1 = magic;
-    // TODO: replace following when sycl has counterpart assert
+    // TODO: replace following when dpcpp has counterpart assert
     // assert(m1 > 0 && m1 == magic);  // m1 must fit in 32 bits.
   }
 
@@ -112,4 +112,4 @@ struct IntDivider<unsigned int> {
   unsigned int shift;  // Shift amounts.
 };
 
-#endif // THSYCL_INTEGER_DIVIDER_INC
+#endif // THDPCPP_INTEGER_DIVIDER_INC

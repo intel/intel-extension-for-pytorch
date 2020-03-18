@@ -26,11 +26,11 @@
   template <typename scalar_t>                                     \
   void NAME(Tensor& self_, const Tensor& src) {                    \
     if (TensorImpl_Unwrap(self_) == TensorImpl_Unwrap(src)) {      \
-      at::sycl::SYCL_tensor_apply1<scalar_t>(            \
+      at::dpcpp::DPCPP_tensor_apply1<scalar_t>(            \
           self_, Tensor_##NAME##_##REAL##_Op<scalar_t>());         \
     } else {                                                       \
       at::AtenIpexTypeDPCPP::resize_as_(self_, src, c10::nullopt); \
-      at::sycl::SYCL_tensor_apply2<scalar_t, scalar_t>( \
+      at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>( \
           self_, src, Tensor_##NAME##_##REAL##_Op<scalar_t>());    \
     }                                                              \
   }
@@ -88,12 +88,12 @@
             COMMA_##CALLABLE_ARGS_NUM                                                                    \
             CALLABLE_INIT_ARGS_DECL_##CALLABLE_ARGS_NUM) {                                               \
     if (CHECK_SAME_TENSOR()) {                                                                           \
-      at::sycl::SYCL_tensor_apply##APPLY_NUM<REPEAT_AS_ARGLIST_##APPLY_NUM(scalar_t)>(                   \
+      at::dpcpp::DPCPP_tensor_apply##APPLY_NUM<REPEAT_AS_ARGLIST_##APPLY_NUM(scalar_t)>(                   \
           POINTWISE_OPR_ARGS_##APPLY_NUM,                                                                \
           CALLABLE<scalar_t>(CALLABLE_INIT_ARGS_##CALLABLE_ARGS_NUM));                                   \
     } else {                                                                                             \
       at::AtenIpexTypeDPCPP::resize_as_(POINTWISE_ARGS_2, c10::nullopt);                                 \
-      at::sycl::SYCL_tensor_apply##APPLY_NUM_EXT<REPEAT_AS_ARGLIST_##APPLY_NUM_EXT(scalar_t)>(           \
+      at::dpcpp::DPCPP_tensor_apply##APPLY_NUM_EXT<REPEAT_AS_ARGLIST_##APPLY_NUM_EXT(scalar_t)>(           \
           POINTWISE_ARGS_##APPLY_NUM_EXT,                                                            \
           CALLABLE<scalar_t>(CALLABLE_INIT_ARGS_##CALLABLE_ARGS_NUM));                                   \
     }                                                                                                    \
@@ -295,7 +295,7 @@ struct TensorSigmoidGradOp<at::Half> {
 };
 
 /*
- * The following function was converted to SYCL form from code that comes
+ * The following function was converted to DPCPP form from code that comes
  * with the following copyright notice. It has been released under the BSD license.
  *
  * Cephes Math Library Release 2.8:  June, 2000

@@ -8,51 +8,51 @@
 #include <functions/Loops.h>
 
 
-using namespace at::native;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-//Note: sycl compiler does not support uname type in template.
+//Note: dpcpp compiler does not support uname type in template.
 class SyclOpAdd{};
 class SyclOpMul{};
 class SyclOpDiv{};
 
-static void add_kernel_sycl(TensorIterator& iter, Scalar alpha_scalar) {
+static void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
   AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, iter.dtype(), "add", [&]() {
     auto alpha = alpha_scalar.to<scalar_t> ();
-    sycl_kernel_for_tensor_iter<SyclOpAdd>(iter,
+    dpcpp_kernel_for_tensor_iter<SyclOpAdd>(iter,
         [=](scalar_t a, scalar_t b) -> scalar_t {
           return a + alpha * b;
         });
   });
 }
 
-static void sub_kernel_sycl(TensorIterator& iter, Scalar alpha_scalar) {
-  return add_kernel_sycl(iter, -alpha_scalar);
+static void sub_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
+  return add_kernel_dpcpp(iter, -alpha_scalar);
 }
 
-static void mul_kernel_sycl(TensorIterator& iter) {
+static void mul_kernel_dpcpp(TensorIterator& iter) {
   AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, iter.dtype(), "mul", [&]() {
-    sycl_kernel_for_tensor_iter<SyclOpMul>(iter,
+    dpcpp_kernel_for_tensor_iter<SyclOpMul>(iter,
         [=](scalar_t a, scalar_t b) -> scalar_t {
           return a * b;
         });
   });
 }
 
-static void div_kernel_sycl(TensorIterator& iter) {
+static void div_kernel_dpcpp(TensorIterator& iter) {
   if (isIntegralType(iter.dtype(), false)) {
     AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "div", [&] {
-      sycl_kernel_for_tensor_iter<SyclOpDiv>(iter,
+      dpcpp_kernel_for_tensor_iter<SyclOpDiv>(iter,
         [](scalar_t a, scalar_t b)-> scalar_t {
         return a / b;
       });
     });
   } else {
     AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "div", [&]() {
-      sycl_kernel_for_tensor_iter<SyclOpDiv>(iter,
+      dpcpp_kernel_for_tensor_iter<SyclOpDiv>(iter,
         [](scalar_t a, scalar_t b)-> scalar_t {
         return a / b;
       });
@@ -91,7 +91,7 @@ Tensor& add_out(Tensor& result, const Tensor& self, const Tensor& other, Scalar 
   auto iter = TensorIterator::binary_op(result, self, other,
     /*check_mem_overlap=*/true);
   impl::alpha_check(iter, alpha);
-  impl::add_kernel_sycl(iter,alpha);
+  impl::add_kernel_dpcpp(iter,alpha);
   TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
   return result;
 }
@@ -100,7 +100,7 @@ Tensor add(const Tensor& self, const Tensor& other, Scalar alpha) {
   Tensor result;
   auto iter = TensorIterator::binary_op(result, self, other);
   impl::alpha_check(iter, alpha);
-  impl::add_kernel_sycl(iter,alpha);
+  impl::add_kernel_dpcpp(iter,alpha);
   return iter.output();
 }
 
@@ -121,7 +121,7 @@ Tensor& sub_out(Tensor& result, const Tensor& self, const Tensor& other, Scalar 
   auto iter = TensorIterator::binary_op(result, self, other,
     /*check_mem_overlap=*/true);
   impl::alpha_check(iter, alpha);
-  impl::sub_kernel_sycl(iter,alpha);
+  impl::sub_kernel_dpcpp(iter,alpha);
   TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
   return result;
 }
@@ -131,7 +131,7 @@ Tensor sub(const Tensor& self, const Tensor& other, Scalar alpha) {
   Tensor result;
   auto iter = TensorIterator::binary_op(result, self, other);
   impl::alpha_check(iter, alpha);
-  impl::sub_kernel_sycl(iter,alpha);
+  impl::sub_kernel_dpcpp(iter,alpha);
   return iter.output();
 }
 
@@ -158,14 +158,14 @@ Tensor rsub(const Tensor& self, Scalar other, Scalar alpha) {
 Tensor& mul_out(Tensor& result, const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_op(result, self, other,
     /*check_mem_overlap=*/true);
-  impl::mul_kernel_sycl(iter);
+  impl::mul_kernel_dpcpp(iter);
   return result;
 }
 
 Tensor mul(const Tensor& self, const Tensor& other) {
   Tensor result;
   auto iter = TensorIterator::binary_op(result, self, other);
-  impl::mul_kernel_sycl(iter);
+  impl::mul_kernel_dpcpp(iter);
   return iter.output();
 }
 
@@ -184,14 +184,14 @@ Tensor& mul_(Tensor& self, Scalar other) {
 Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_op(result, self, other,
     /*check_mem_overlap=*/true);
-  impl::div_kernel_sycl(iter);
+  impl::div_kernel_dpcpp(iter);
   return result;
 }
 
 Tensor div(const Tensor& self, const Tensor& other) {
   Tensor result;
   auto iter = TensorIterator::binary_op(result, self, other);
-  impl::div_kernel_sycl(iter);
+  impl::div_kernel_dpcpp(iter);
   return iter.output();
 }
 
@@ -246,7 +246,7 @@ Tensor & tanh_backward_out(
   iter.build();
 
   AT_DISPATCH_ALL_TYPES(iter.dtype(), "tanh_backward_out", [&]() {
-    sycl_kernel_for_tensor_iter<DP_K(tanh_backward)>(
+    dpcpp_kernel_for_tensor_iter<DP_K(tanh_backward)>(
         iter, [](scalar_t output, scalar_t z) -> scalar_t {
       return output * (1. - z*z);
     });

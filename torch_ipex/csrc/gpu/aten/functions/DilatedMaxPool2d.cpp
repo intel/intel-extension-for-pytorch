@@ -7,11 +7,12 @@
 #include <utils/Math.h>
 
 using namespace mkldnn;
+using namespace at::dpcpp;
+using namespace at::native;
+
 namespace at {
-namespace native {
-
-namespace {
-
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 template <typename scalar_t>
 static void max_pool2d_with_indices_out_frame(
@@ -31,9 +32,8 @@ static void max_pool2d_with_indices_out_frame(
           int padW,
           int padH,
           algorithm alg_kind,
-          prop_kind prop_kind)
-{
-  at::Device curDevice = at::Device(at::kDPCPP, c10::sycl::current_device());
+          prop_kind prop_kind) {
+  at::Device curDevice = at::Device(at::kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -55,10 +55,10 @@ static void max_pool2d_with_indices_out_frame(
   auto output_md = memory::desc({output_tz}, data_t, format_nchw);
 
   auto input_usr_memory = memory(input_md, engine);
-  at::native::sycl_set_mkldnn_buffer(input_data, input_usr_memory);
+  dpcpp_set_mkldnn_buffer(input_data, input_usr_memory);
 
   auto output_usr_memory = memory(output_md, engine);
-  at::native::sycl_set_mkldnn_buffer(output_data, output_usr_memory);
+  dpcpp_set_mkldnn_buffer(output_data, output_usr_memory);
 
   std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
   pooling_forward_desc.reset(new pooling_forward::desc(
@@ -72,7 +72,7 @@ static void max_pool2d_with_indices_out_frame(
   // auto expected_input_md = pooling_forward_pd->src_desc();
   auto input_memory = input_usr_memory;
 
-  // Currently, SYCL path doesn't support internal format.
+  // Currently, DPCPP path doesn't support internal format.
   // input has the same format with input_usr.
   // if (input_md != expected_input_md) {
   //   input_memory = memory(expected_input_md, engine);
@@ -94,7 +94,7 @@ static void max_pool2d_with_indices_out_frame(
       format_nchw}, engine});
 
   auto indices_usr = at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
-  at::native::sycl_set_mkldnn_buffer((void *)indices_usr.data_ptr<int32_t>(), indices_usr_memory);
+  dpcpp_set_mkldnn_buffer((void *)indices_usr.data_ptr<int32_t>(), indices_usr_memory);
   memory indices_memory = indices_usr_memory;
 
   std::shared_ptr<pooling_forward> pool_forward;
@@ -126,7 +126,7 @@ static void max_pool2d_with_indices_out_frame(
   // reorder(indices_memory, indices_usr_memory).
   //         execute(strm, indices_memory, indices_usr_memory);
 
-  c10::sycl::syclMemoryCopyType((int64_t *)indices_data, indices_usr.data_ptr<int32_t>(), indices_usr.numel());
+  dpcppMemoryCopyType((int64_t *)indices_data, indices_usr.data_ptr<int32_t>(), indices_usr.numel());
 }
 
 template <typename scalar_t>
@@ -149,7 +149,7 @@ static void max_pool2d_with_indices_backward_out_frame(
           algorithm alg_kind,
           prop_kind prop_kind)
 {
-  at::Device curDevice = at::Device(at::kDPCPP, c10::sycl::current_device());
+  at::Device curDevice = at::Device(at::kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -167,10 +167,10 @@ static void max_pool2d_with_indices_backward_out_frame(
   auto output_md = memory::desc({output_tz}, data_t, format_nchw);
 
   auto diff_dst_usr_memory = memory({{{output_tz}, data_t, format_nchw}, engine});
-  at::native::sycl_set_mkldnn_buffer(gradOutput_data, diff_dst_usr_memory);
+  dpcpp_set_mkldnn_buffer(gradOutput_data, diff_dst_usr_memory);
 
   auto diff_src_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  at::native::sycl_set_mkldnn_buffer(gradInput_data, diff_src_usr_memory);
+  dpcpp_set_mkldnn_buffer(gradInput_data, diff_src_usr_memory);
 
   std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
   pooling_forward_desc.reset(new pooling_forward::desc(
@@ -191,7 +191,7 @@ static void max_pool2d_with_indices_backward_out_frame(
   // auto diff_dst_md = pooling_backward_pd->diff_dst_desc();
   auto diff_dst_memory = diff_dst_usr_memory;
 
-  // Currently, SYCL path doesn't support internal format.
+  // Currently, DPCPP path doesn't support internal format.
   // diff_dst has the same format with dst.
   // if (diff_dst_usr_memory.get_desc() != diff_dst_md) {
   //   diff_dst_memory = memory(diff_dst_md, engine);
@@ -210,7 +210,7 @@ static void max_pool2d_with_indices_backward_out_frame(
   std::shared_ptr<pooling_backward> pool_backward;
 
   auto indices_usr = at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
-  c10::sycl::syclMemoryCopyType(indices_usr.data_ptr<int32_t>(), (int64_t *)indices_data, indices_usr.numel());
+  dpcppMemoryCopyType(indices_usr.data_ptr<int32_t>(), (int64_t *)indices_data, indices_usr.numel());
 
   pool_backward.reset(new pooling_backward(*pooling_backward_pd));
 
@@ -218,7 +218,7 @@ static void max_pool2d_with_indices_backward_out_frame(
   auto indices_usr_memory = memory({{{output_tz},
       (memory::data_type)indices_md.data.data_type,
       format_nchw}, engine});
-  at::native::sycl_set_mkldnn_buffer((void *)indices_usr.data_ptr<int32_t>(), indices_usr_memory);
+  dpcpp_set_mkldnn_buffer((void *)indices_usr.data_ptr<int32_t>(), indices_usr_memory);
   auto indices_memory = indices_usr_memory;
 
   // indices has the same format with indices.
@@ -240,7 +240,7 @@ static void max_pool2d_with_indices_backward_out_frame(
 
 }
 
-void max_pool2d_with_indices_out_sycl_template(
+void max_pool2d_with_indices_out_dpcpp_template(
           Tensor& output,
           Tensor& indices,
           const Tensor& input_,
@@ -275,7 +275,7 @@ void max_pool2d_with_indices_out_sycl_template(
   const int dilationW = dilation.size() == 1 ? dilationH : safe_downcast<int, int64_t>(dilation[1]);
 
   TORCH_CHECK(input_.ndimension() == 4,
-    "only support 4 dims on SYCL device now!");
+    "only support 4 dims on DPCPP device now!");
 
   /* sizes */
   const int64_t nbatch = input_.size(-4);
@@ -303,7 +303,7 @@ void max_pool2d_with_indices_out_sycl_template(
   auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(),
-      "max_pool2d_with_indices_sycl",
+      "max_pool2d_with_indices_dpcpp",
       [&] {
         scalar_t *input_data = input.data_ptr<scalar_t>();
         scalar_t *output_data = output.data_ptr<scalar_t>();
@@ -323,7 +323,7 @@ void max_pool2d_with_indices_out_sycl_template(
     );
 }
 
-Tensor& max_pool2d_with_indices_backward_out_sycl_template(
+Tensor& max_pool2d_with_indices_backward_out_dpcpp_template(
           Tensor& gradInput,
           const Tensor& gradOutput_,
           const Tensor& input,
@@ -359,7 +359,7 @@ Tensor& max_pool2d_with_indices_backward_out_sycl_template(
   const int dilationW = dilation.size() == 1 ? dilationH : safe_downcast<int, int64_t>(dilation[1]);
 
   TORCH_CHECK(input.ndimension() == 4,
-    "only support 4 dims on SYCL device now!");
+    "only support 4 dims on DPCPP device now!");
 
   /* get contiguous gradOutput */
   const Tensor gradOutput = gradOutput_.contiguous();
@@ -394,7 +394,7 @@ Tensor& max_pool2d_with_indices_backward_out_sycl_template(
     outputHeight_for_shape_check, outputWidth_for_shape_check);
 
   AT_DISPATCH_FLOATING_TYPES(input.scalar_type(),
-      "max_pool2d_with_indices_backward_sycl",
+      "max_pool2d_with_indices_backward_dpcpp",
       [&] {
         /* get raw pointers */
         scalar_t *gradInput_data = gradInput.data_ptr<scalar_t>();
@@ -417,9 +417,8 @@ Tensor& max_pool2d_with_indices_backward_out_sycl_template(
   return gradInput;
 
 }
-} // namespace
 
-std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out_sycl(
+std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out_dpcpp(
   Tensor& output,
   Tensor& indices,
   const Tensor& input,
@@ -429,7 +428,7 @@ std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out_sycl(
   IntArrayRef dilation,
   bool ceil_mode)
 {
-  max_pool2d_with_indices_out_sycl_template(
+  max_pool2d_with_indices_out_dpcpp_template(
     output,
     indices,
     input,
@@ -441,7 +440,7 @@ std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out_sycl(
   return std::tuple<Tensor&, Tensor&>(output, indices);
 }
 
-std::tuple<Tensor, Tensor> max_pool2d_with_indices_sycl(
+std::tuple<Tensor, Tensor> max_pool2d_with_indices_dpcpp(
   const Tensor& input,
   IntArrayRef kernel_size,
   IntArrayRef stride,
@@ -451,7 +450,7 @@ std::tuple<Tensor, Tensor> max_pool2d_with_indices_sycl(
 {
   Tensor output = at::empty({0}, input.options());
   Tensor indices = at::empty({0}, input.options().dtype(kLong));
-  max_pool2d_with_indices_out_sycl_template(
+  max_pool2d_with_indices_out_dpcpp_template(
     output,
     indices,
     input,
@@ -463,7 +462,7 @@ std::tuple<Tensor, Tensor> max_pool2d_with_indices_sycl(
   return std::tuple<Tensor, Tensor>(output, indices);
 }
 
-Tensor& max_pool2d_with_indices_backward_out_sycl(
+Tensor& max_pool2d_with_indices_backward_out_dpcpp(
   Tensor& gradInput,
   const Tensor& gradOutput_,
   const Tensor& input,
@@ -474,7 +473,7 @@ Tensor& max_pool2d_with_indices_backward_out_sycl(
   bool ceil_mode,
   const Tensor& indices)
 {
-  max_pool2d_with_indices_backward_out_sycl_template(
+  max_pool2d_with_indices_backward_out_dpcpp_template(
     gradInput,
     gradOutput_,
     input,
@@ -487,7 +486,7 @@ Tensor& max_pool2d_with_indices_backward_out_sycl(
   return gradInput;
 }
 
-Tensor max_pool2d_with_indices_backward_sycl(
+Tensor max_pool2d_with_indices_backward_dpcpp(
   const Tensor& gradOutput_,
   const Tensor& input,
   IntArrayRef kernel_size,
@@ -498,7 +497,7 @@ Tensor max_pool2d_with_indices_backward_sycl(
   const Tensor& indices)
 {
   auto gradInput = at::zeros_like(input);
-  max_pool2d_with_indices_backward_out_sycl_template(
+  max_pool2d_with_indices_backward_out_dpcpp_template(
     gradInput,
     gradOutput_,
     input,
@@ -511,11 +510,7 @@ Tensor max_pool2d_with_indices_backward_sycl(
   return gradInput;
 }
 
-} // at::native
-} // at
-
-namespace at {
-namespace AtenIpexTypeDPCPP {
+} // namespace impl
 
 std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
   Tensor& output,
@@ -526,7 +521,7 @@ std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
   IntArrayRef padding,
   IntArrayRef dilation,
   bool ceil_mode) {
-  return at::native::max_pool2d_with_indices_out_sycl(
+  return impl::max_pool2d_with_indices_out_dpcpp(
       output, indices, input, kernel_size, stride, padding, dilation, ceil_mode);
 }
 
@@ -537,7 +532,7 @@ std::tuple<Tensor, Tensor> max_pool2d_with_indices(
   IntArrayRef padding,
   IntArrayRef dilation,
   bool ceil_mode) {
-  return at::native::max_pool2d_with_indices_sycl(
+  return impl::max_pool2d_with_indices_dpcpp(
       input, kernel_size, stride, padding, dilation, ceil_mode);
 }
 
@@ -551,9 +546,9 @@ Tensor & max_pool2d_with_indices_backward_out(
   IntArrayRef dilation,
   bool ceil_mode,
   const Tensor & indices) {
-  return at::native::max_pool2d_with_indices_backward_out_sycl(
+  return impl::max_pool2d_with_indices_backward_out_dpcpp(
       grad_input, grad_output, self, kernel_size, stride, padding, dilation, ceil_mode, indices);
-  }
+}
 
 Tensor max_pool2d_with_indices_backward(
   const Tensor & grad_output,
@@ -564,9 +559,9 @@ Tensor max_pool2d_with_indices_backward(
   IntArrayRef dilation,
   bool ceil_mode,
   const Tensor & indices){
-  return at::native::max_pool2d_with_indices_backward_sycl(
+  return impl::max_pool2d_with_indices_backward_dpcpp(
       grad_output, self, kernel_size, stride, padding, dilation, ceil_mode, indices);
-  }
+}
 
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

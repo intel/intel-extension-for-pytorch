@@ -2,15 +2,19 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/Config.h>
 
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
 
 #include <utils/ParamUtils.h>
 
 
 using namespace mkldnn;
+using namespace at::dpcpp;
+using namespace at::native;
 
-namespace at { namespace native {
+namespace at {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 constexpr int input_batch_size_dim = 0;  // also grad_input
 constexpr int weight_output_channels_dim = 0;
@@ -31,14 +35,14 @@ static std::vector<int64_t> conv_output_size(
   return output_size;
 }
 
-at::Tensor sycl_convolution(
+at::Tensor convolution(
     const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias,
     IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups)
 {
   auto output = at::empty(conv_output_size(
     input.sizes(), weight.sizes(), padding, stride, dilation, groups), input.options());
 
-  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -96,13 +100,13 @@ at::Tensor sycl_convolution(
     *conv_forward_desc, engine));
 
   auto input_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
+  dpcpp_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
 
   auto weight_usr_memory = memory({{{weight_tz}, data_t,  format_weight}, engine});
-  sycl_set_mkldnn_buffer(weight.data_ptr(), weight_usr_memory);
+  dpcpp_set_mkldnn_buffer(weight.data_ptr(), weight_usr_memory);
 
   auto output_usr_memory = memory({{{output_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(output.data_ptr(), output_usr_memory);
+  dpcpp_set_mkldnn_buffer(output.data_ptr(), output_usr_memory);
 
   auto expected_input_md = conv_forward_pd->src_desc();
   auto input_memory = input_usr_memory;
@@ -130,7 +134,7 @@ at::Tensor sycl_convolution(
   std::shared_ptr<memory> bias_usr_memory;
   if (bias.defined()) {
     bias_usr_memory.reset(new memory({{{bias_tz}, data_t, format_x}, engine}));
-    sycl_set_mkldnn_buffer(bias.data_ptr(), *bias_usr_memory);
+    dpcpp_set_mkldnn_buffer(bias.data_ptr(), *bias_usr_memory);
   } else {
     bias_usr_memory.reset(new memory({{{}, data_t, format_x}, engine}));
   }
@@ -150,13 +154,13 @@ at::Tensor sycl_convolution(
   return output;
 }
 
-Tensor sycl_convolution_backward_input(
+Tensor dpcpp_convolution_backward_input(
     IntArrayRef input_size, const at::Tensor& grad_output, const at::Tensor& weight,
     IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool bias_defined)
 {
   auto grad_input = at::empty(input_size, grad_output.options());
 
-  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -223,13 +227,13 @@ Tensor sycl_convolution_backward_input(
     *conv_backward_data_desc, engine, *conv_forward_pd));
 
   auto grad_output_usr_memory = memory({{{output_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(grad_output.data_ptr(), grad_output_usr_memory);
+  dpcpp_set_mkldnn_buffer(grad_output.data_ptr(), grad_output_usr_memory);
 
   auto weight_usr_memory = memory({{{weight_tz}, data_t, format_weight}, engine});
-  sycl_set_mkldnn_buffer(weight.data_ptr(), weight_usr_memory);
+  dpcpp_set_mkldnn_buffer(weight.data_ptr(), weight_usr_memory);
 
   auto grad_input_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(grad_input.data_ptr(), grad_input_usr_memory);
+  dpcpp_set_mkldnn_buffer(grad_input.data_ptr(), grad_input_usr_memory);
 
   auto expected_grad_output_md = conv_backward_data_pd->diff_dst_desc();
   auto grad_output_memory = grad_output_usr_memory;
@@ -268,7 +272,7 @@ Tensor sycl_convolution_backward_input(
   return grad_input;
 }
 
-std::tuple<at::Tensor, at::Tensor> sycl_convolution_backward_weights(
+std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     IntArrayRef weight_size, const at::Tensor& grad_output, const at::Tensor& input,
     IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool bias_defined)
 {
@@ -279,7 +283,7 @@ std::tuple<at::Tensor, at::Tensor> sycl_convolution_backward_weights(
     grad_bias = at::empty({grad_output.size(1)}, grad_output.options());
   }
 
-  Device curDevice = Device(kDPCPP, c10::sycl::current_device());
+  Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -337,29 +341,29 @@ std::tuple<at::Tensor, at::Tensor> sycl_convolution_backward_weights(
   conv_forward_pd.reset(new convolution_forward::primitive_desc(
     *conv_forward_desc, engine));
 
-  std::shared_ptr<convolution_backward_weights::desc> conv_backward_weight_desc;
+  std::shared_ptr<mkldnn::convolution_backward_weights::desc> conv_backward_weight_desc;
   if (bias_defined) {
-    conv_backward_weight_desc.reset(new convolution_backward_weights::desc(
+    conv_backward_weight_desc.reset(new mkldnn::convolution_backward_weights::desc(
       algorithm::convolution_direct, input_md, weight_md, bias_md, output_md,
       _stride, _padding, _padding));
   } else {
-    conv_backward_weight_desc.reset(new convolution_backward_weights::desc(
+    conv_backward_weight_desc.reset(new mkldnn::convolution_backward_weights::desc(
       algorithm::convolution_direct, input_md, weight_md, output_md,
       _stride, _padding, _padding));
   }
 
-  std::shared_ptr<convolution_backward_weights::primitive_desc> conv_backward_weight_pd;
-  conv_backward_weight_pd.reset(new convolution_backward_weights::primitive_desc(
+  std::shared_ptr<mkldnn::convolution_backward_weights::primitive_desc> conv_backward_weight_pd;
+  conv_backward_weight_pd.reset(new mkldnn::convolution_backward_weights::primitive_desc(
     *conv_backward_weight_desc, engine, *conv_forward_pd));
 
   auto input_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
+  dpcpp_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
 
   auto grad_output_usr_memory = memory({{{output_tz}, data_t, format_nchw}, engine});
-  sycl_set_mkldnn_buffer(grad_output.data_ptr(), grad_output_usr_memory);
+  dpcpp_set_mkldnn_buffer(grad_output.data_ptr(), grad_output_usr_memory);
 
   auto grad_weight_usr_memory = memory({{{weight_tz}, data_t, format_weight}, engine});
-  sycl_set_mkldnn_buffer(grad_weight.data_ptr(), grad_weight_usr_memory);
+  dpcpp_set_mkldnn_buffer(grad_weight.data_ptr(), grad_weight_usr_memory);
 
   std::shared_ptr<memory> grad_bias_memory;
 
@@ -385,16 +389,16 @@ std::tuple<at::Tensor, at::Tensor> sycl_convolution_backward_weights(
     grad_weight_memory = memory(expected_grad_weight_md, engine);
   }
 
-  std::shared_ptr<convolution_backward_weights> conv_backward_weight;
+  std::shared_ptr<mkldnn::convolution_backward_weights> conv_backward_weight;
   if (bias_defined) {
     grad_bias_memory.reset(new memory({{{bias_tz}, data_t, format_x}, engine}));
-    sycl_set_mkldnn_buffer(grad_bias.data_ptr(), *grad_bias_memory);
+    dpcpp_set_mkldnn_buffer(grad_bias.data_ptr(), *grad_bias_memory);
   } else {
     grad_bias_memory.reset(new memory({{{}, data_t, format_x}, engine}));
   }
 
   conv_backward_weight.reset(
-      new convolution_backward_weights(*conv_backward_weight_pd));
+      new mkldnn::convolution_backward_weights(*conv_backward_weight_pd));
   conv_backward_weight->execute(strm, {
       {MKLDNN_ARG_DIFF_DST, grad_output_memory},
       {MKLDNN_ARG_SRC, input_memory},
@@ -409,7 +413,7 @@ std::tuple<at::Tensor, at::Tensor> sycl_convolution_backward_weights(
   return std::tuple<at::Tensor, at::Tensor>{grad_weight, grad_bias};
 }
 
-std::tuple<at::Tensor,at::Tensor,at::Tensor> sycl_convolution_backward(
+std::tuple<at::Tensor,at::Tensor,at::Tensor> dpcpp_convolution_backward(
     const at::Tensor& input, const at::Tensor& grad_output_t, const at::Tensor& weight,
     IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, std::array<bool,3> output_mask)
 {
@@ -417,19 +421,19 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> sycl_convolution_backward(
 
   Tensor grad_input, grad_weight, grad_bias;
   if (output_mask[0]) {
-    // grad_input = at::sycl_convolution_backward_input(
+    // grad_input = at::dpcpp_convolution_backward_input(
     //   input.sizes(), grad_output, weight, padding, stride, dilation, groups, output_mask[2]);
     // FIXME: we should route to at variable op to insert bp info, even though it is backward op
     // It exists double backward case
-    grad_input = sycl_convolution_backward_input(
+    grad_input = dpcpp_convolution_backward_input(
       input.sizes(), grad_output, weight, padding, stride, dilation, groups, output_mask[2]);
   }
   if (output_mask[1] || output_mask[2]) {
     // FIXME: we should route to at variable op to insert bp info, even though it is backward op
     // It exists double backward case
-    // std::tie(grad_weight, grad_bias) = at::sycl_convolution_backward_weights(
+    // std::tie(grad_weight, grad_bias) = at::convolution_backward_weights(
     //   weight.sizes(), grad_output, input, padding, stride, dilation, groups, output_mask[2]);
-    std::tie(grad_weight, grad_bias) = sycl_convolution_backward_weights(
+    std::tie(grad_weight, grad_bias) = convolution_backward_weights(
       weight.sizes(), grad_output, input, padding, stride, dilation, groups, output_mask[2]);
   }
 
@@ -681,13 +685,9 @@ static auto view3d(const at::Tensor& tensor) -> at::Tensor {
   return tensor.squeeze(2);
 }
 
-} // namespace native
-} // namespace at
+} // namespace impl
 
-namespace at {
-namespace AtenIpexTypeDPCPP {
-
-using namespace at::native;
+using namespace impl;
 
 Tensor convolution_overrideable(const Tensor & input_r, const Tensor & weight_r, const Tensor & bias_r, IntArrayRef stride_, IntArrayRef padding_, IntArrayRef dilation_, bool transposed_, IntArrayRef output_padding_, int64_t groups_) {
   auto input = input_r.contiguous();
@@ -726,7 +726,7 @@ Tensor convolution_overrideable(const Tensor & input_r, const Tensor & weight_r,
     output = at::thnn_conv_depthwise2d(input.contiguous(), weight,
         kernel_size, bias, stride, padding, dilation);
   } else {
-    output = sycl_convolution(input, weight, bias,
+    output = convolution(input, weight, bias,
         params.padding, params.stride, params.dilation, params.groups);
   }
 
@@ -746,11 +746,11 @@ std::tuple<Tensor,Tensor,Tensor> convolution_backward_overrideable(
 
   Tensor grad_input, grad_weight, grad_bias;
   if (output_mask[0]) {
-    grad_input = sycl_convolution_backward_input(
+    grad_input = dpcpp_convolution_backward_input(
       input.sizes(), grad_output_, weight, padding, stride, dilation, groups, output_mask[2]);
   }
   if (output_mask[1] || output_mask[2]) {
-    std::tie(grad_weight, grad_bias) = sycl_convolution_backward_weights(
+    std::tie(grad_weight, grad_bias) = convolution_backward_weights(
       weight.sizes(), grad_output_, input, padding, stride, dilation, groups, output_mask[2]);
   }
 

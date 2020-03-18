@@ -1,7 +1,7 @@
 #pragma once
 
 #include <CL/sycl.hpp>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Stream.h>
 #include <core/Memory.h>
 
@@ -9,63 +9,63 @@ DP_DEF_K1(memory_copy);
 #define SyclConvertToActualTypePtr(Scalar, buf_acc) static_cast<Scalar*>(static_cast<void*>(((buf_acc.get_pointer().get()))))
 #define SyclConvertToActualOffset(Scalar, offset) offset/sizeof(Scalar)
 
-namespace c10 {
-namespace sycl {
+namespace at {
+namespace dpcpp {
 
 using buffer_data_type_t = uint8_t;
 
-enum syclMemcpyKind {
+enum dpcppMemcpyKind {
   HostToDevice,
   DeviceToHost,
   DeviceToDevice
 };
 
-void syclMemcpy(void *dst, const void *src, size_t n_bytes, syclMemcpyKind kind);
-void syclMemcpyAsync(void *dst, const void *src, size_t n_bytes, syclMemcpyKind kind);
+void dpcppMemcpy(void *dst, const void *src, size_t n_bytes, dpcppMemcpyKind kind);
+void dpcppMemcpyAsync(void *dst, const void *src, size_t n_bytes, dpcppMemcpyKind kind);
 
-void syclMemset(void *data, int value, size_t n_bytes);
-void syclMemsetAsync(void *data, int value, size_t n_bytes );
-void* syclMalloc(size_t n_bytes);
-void syclFree(void* ptr);
-void syclFreeAll();
+void dpcppMemset(void *data, int value, size_t n_bytes);
+void dpcppMemsetAsync(void *data, int value, size_t n_bytes );
+void* dpcppMalloc(size_t n_bytes);
+void dpcppFree(void* ptr);
+void dpcppFreeAll();
 
 /*
- * When we need to write a sycl kernel, we need to create SYCLAccessor object first, then 
- * use get_pointer() to get the raw pointer in the sycl kernel code. If we need to use
+ * When we need to write a dpcpp kernel, we need to create DPCPPAccessor object first, then 
+ * use get_pointer() to get the raw pointer in the dpcpp kernel code. If we need to use
  * cgh handler like .copy(), .fill() which only accept accessor, we can use .get_access()
  * to get accessor. 
  * Example:
- *   Acc = SYCLAccessor(cgh, virtual_ptr, n_bytes);
+ *   Acc = DPCPPAccessor(cgh, virtual_ptr, n_bytes);
  *   kernel{
  *     acc_ptr =  Acc.template get_pointer<data_type>();
  *     acc_ptr[i] = ...
  *   }
 */
 
-template <cl::sycl::access::mode AccMode, typename ScalarT = uint8_t>
-class SYCLAccessor {
- static constexpr auto global_access = cl::sycl::access::target::global_buffer;
- using Accessor = cl::sycl::accessor<ScalarT, 1, AccMode, global_access>;
+template <DP::access::mode AccMode, typename ScalarT = uint8_t>
+class DPCPPAccessor {
+ static constexpr auto global_access = DP::access::target::global_buffer;
+ using Accessor = DP::accessor<ScalarT, 1, AccMode, global_access>;
  public:
-    SYCLAccessor(cl::sycl::handler &cgh, cl::sycl::buffer<ScalarT, 1> &buffer) 
+    DPCPPAccessor(DP::handler &cgh, DP::buffer<ScalarT, 1> &buffer) 
       : accessor_(buffer.template get_access<AccMode, global_access>(cgh)) {}
 
-    SYCLAccessor(cl::sycl::handler &cgh,  const void* virtual_ptr) 
-      : offset_(syclGetBufferMap().get_offset(virtual_ptr)),
-        accessor_(syclGetBufferMap().template get_buffer<ScalarT>(virtual_ptr).template get_access<AccMode, global_access>(cgh)) {}
+    DPCPPAccessor(DP::handler &cgh,  const void* virtual_ptr) 
+      : offset_(dpcppGetBufferMap().get_offset(virtual_ptr)),
+        accessor_(dpcppGetBufferMap().template get_buffer<ScalarT>(virtual_ptr).template get_access<AccMode, global_access>(cgh)) {}
 
-    SYCLAccessor(cl::sycl::handler &cgh, const void* virtual_ptr, size_t n_bytes)
-      : offset_(syclGetBufferMap().get_offset(virtual_ptr)),
-        accessor_(syclGetBufferMap().template get_buffer<ScalarT>(virtual_ptr).template get_access<AccMode, global_access>(cgh, cl::sycl::range<1>(n_bytes), cl::sycl::id<1>(offset_))) {}
+    DPCPPAccessor(DP::handler &cgh, const void* virtual_ptr, size_t n_bytes)
+      : offset_(dpcppGetBufferMap().get_offset(virtual_ptr)),
+        accessor_(dpcppGetBufferMap().template get_buffer<ScalarT>(virtual_ptr).template get_access<AccMode, global_access>(cgh, DP::range<1>(n_bytes), DP::id<1>(offset_))) {}
 
    const Accessor& get_access() const {
      return accessor_;
    }
 
-   // get_pointer should only be used in sycl kernel.
+   // get_pointer should only be used in dpcpp kernel.
    template<typename T>
-   typename cl::sycl::global_ptr<T>::pointer_t const get_pointer() const {
-     return (typename cl::sycl::global_ptr<T>::pointer_t const)(SyclConvertToActualTypePtr(T, accessor_) + SyclConvertToActualOffset(T, offset_));
+   typename DP::global_ptr<T>::pointer_t const get_pointer() const {
+     return (typename DP::global_ptr<T>::pointer_t const)(SyclConvertToActualTypePtr(T, accessor_) + SyclConvertToActualOffset(T, offset_));
    }
 
  private:
@@ -74,16 +74,16 @@ class SYCLAccessor {
 };
 
 template<typename scalar1, typename scalar2>
-void syclMemoryCopyType(scalar1 * dst, const scalar2 * src, size_t n_elements)
+void dpcppMemoryCopyType(scalar1 * dst, const scalar2 * src, size_t n_elements)
 {
   static constexpr auto write_mode = DP::access::mode::discard_write;
   static constexpr auto read_mode = DP::access::mode::read;
-  auto &sycl_queue = getCurrentSYCLStream().sycl_queue();
-  auto total_threads = sycl_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
+  auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto total_threads = dpcpp_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, src);
-    auto out_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, dst);
+    auto in_acc = DPCPPAccessor<read_mode>(cgh, src);
+    auto out_acc = DPCPPAccessor<write_mode>(cgh, dst);
     cgh.parallel_for<DP_K(memory_copy, scalar1, scalar2)>(
             DP::range<1>(total_threads),
             [=](DP::item<1> itemId) {
@@ -97,7 +97,7 @@ void syclMemoryCopyType(scalar1 * dst, const scalar2 * src, size_t n_elements)
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
-}// namespace sycl
+}// namespace dpcpp
 }// namespace c10

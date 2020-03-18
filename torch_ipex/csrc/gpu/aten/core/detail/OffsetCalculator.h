@@ -15,11 +15,11 @@ struct OffsetCalculator {
   static constexpr int MAX_DIMS = 25;
 
   // The offset for each argument (in bytes). Wrapper around fixed-size array.
-  using offset_type = at::sycl::Array<index_t, NARGS>;
+  using offset_type = at::dpcpp::Array<index_t, NARGS>;
 
   // This is a workaround for the compute cpp.
   // An issue was found that if the tailing member data is the two dim array
-  // and the column number is larger than 1, the sycl kernel may write the memory
+  // and the column number is larger than 1, the dpcpp kernel may write the memory
   // unexpectedly, memory leakage happened.
   // These test cases have been tried.
   // index_t strides_[MAX_DIMS][NARGS]; Error

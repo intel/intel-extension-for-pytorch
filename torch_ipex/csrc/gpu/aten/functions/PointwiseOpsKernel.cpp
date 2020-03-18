@@ -10,29 +10,30 @@
 DP_DEF_K1(addcmul);
 DP_DEF_K1(addcdiv);
 
-namespace at { namespace native {
+namespace at {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
-static void addcmul_sycl_kernel(TensorIterator &iter, Scalar value) {
-  AT_DISPATCH_ALL_TYPES(iter.dtype(), "addcmul_sycl", [&]() {
+static void addcmul_kernel(TensorIterator &iter, Scalar value) {
+  AT_DISPATCH_ALL_TYPES(iter.dtype(), "addcmul_dpcpp", [&]() {
     auto alpha = value.to<scalar_t>();
-    sycl_kernel_for_tensor_iter<DP_K(addcmul)>(iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
+    dpcpp_kernel_for_tensor_iter<DP_K(addcmul)>(iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
       return a + alpha * b * c;
     });
   });
 }
 
-static void addcdiv_sycl_kernel(TensorIterator& iter, Scalar value) {
-  AT_DISPATCH_ALL_TYPES(iter.dtype(), "addcdiv_sycl", [&]() {
+static void addcdiv_kernel(TensorIterator& iter, Scalar value) {
+  AT_DISPATCH_ALL_TYPES(iter.dtype(), "addcdiv_dpcpp", [&]() {
     auto alpha = value.to<scalar_t>();
-    sycl_kernel_for_tensor_iter<DP_K(addcdiv)>(iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
+    dpcpp_kernel_for_tensor_iter<DP_K(addcdiv)>(iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
       return a + alpha * (b / c);
     });
   });
 }
 
-}} // namespace at::native
+} // namespace impl
 
-namespace at { namespace AtenIpexTypeDPCPP {
 Tensor & addcmul_out(Tensor & out, const Tensor & self, const Tensor & tensor1, const Tensor & tensor2, Scalar value){
   //checkBackend("addcmul_cpu", out, self.options().backend());
   auto iter = at::TensorIterator();
@@ -42,7 +43,7 @@ Tensor & addcmul_out(Tensor & out, const Tensor & self, const Tensor & tensor1, 
   iter.add_input(tensor1);
   iter.add_input(tensor2);
   iter.build();
-  at::native::addcmul_sycl_kernel(iter, value);
+  impl::addcmul_kernel(iter, value);
   return out;
 }
 Tensor addcmul(const Tensor & self, const Tensor & tensor1, const Tensor & tensor2, Scalar value){
@@ -62,7 +63,7 @@ Tensor & addcdiv_out(Tensor & out, const Tensor & self, const Tensor & tensor1, 
   iter.add_input(tensor1);
   iter.add_input(tensor2);
   iter.build();
-  at::native::addcdiv_sycl_kernel(iter, value);
+  impl::addcdiv_kernel(iter, value);
   return out;
 }
 Tensor addcdiv(const Tensor & self, const Tensor & tensor1, const Tensor & tensor2, Scalar value){

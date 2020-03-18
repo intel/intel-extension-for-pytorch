@@ -8,43 +8,43 @@
 #include <core/Macros.h>
 #include <cstddef>
 
-namespace c10 { namespace sycl {
+namespace at { namespace dpcpp {
 
 // This code is kind of boilerplatey.  See Note [Whither the DeviceGuard boilerplate]
 
-/// A variant of DeviceGuard that is specialized for SYCL.  It accepts
-/// integer indices (interpreting them as SYCL devices) and is a little
+/// A variant of DeviceGuard that is specialized for DPCPP.  It accepts
+/// integer indices (interpreting them as DPCPP devices) and is a little
 /// more efficient than DeviceGuard however, it can only be used
-/// from code that links against SYCL directly.
-struct SYCLGuard {
+/// from code that links against DPCPP directly.
+struct DPCPPGuard {
   /// No default constructor; see Note [Omitted default constructor from RAII]
-  explicit SYCLGuard() = delete;
+  explicit DPCPPGuard() = delete;
 
-  /// Set the current SYCL device to the passed device index.
-  explicit SYCLGuard(DeviceIndex device_index) : guard_(device_index) {}
+  /// Set the current DPCPP device to the passed device index.
+  explicit DPCPPGuard(DeviceIndex device_index) : guard_(device_index) {}
 
-  /// Sets the current SYCL device to the passed device.  Errors if the passed
-  /// device is not a SYCL device.
-  explicit SYCLGuard(Device device) : guard_(device) {}
+  /// Sets the current DPCPP device to the passed device.  Errors if the passed
+  /// device is not a DPCPP device.
+  explicit DPCPPGuard(Device device) : guard_(device) {}
 
   // Copy is not allowed
-  SYCLGuard(const SYCLGuard&) = delete;
-  SYCLGuard& operator=(const SYCLGuard&) = delete;
+  DPCPPGuard(const DPCPPGuard&) = delete;
+  DPCPPGuard& operator=(const DPCPPGuard&) = delete;
 
   // Move is not allowed (there is no uninitialized state)
-  SYCLGuard(SYCLGuard&& other) = delete;
-  SYCLGuard& operator=(SYCLGuard&& other) = delete;
+  DPCPPGuard(DPCPPGuard&& other) = delete;
+  DPCPPGuard& operator=(DPCPPGuard&& other) = delete;
 
-  /// Sets the SYCL device to the given device.  Errors if the given device
-  /// is not a SYCL device.
+  /// Sets the DPCPP device to the given device.  Errors if the given device
+  /// is not a DPCPP device.
   void set_device(Device device) { guard_.set_device(device); }
 
-  /// Sets the SYCL device to the given device.  Errors if the given device
-  /// is not a SYCL device.  (This method is provided for uniformity with
+  /// Sets the DPCPP device to the given device.  Errors if the given device
+  /// is not a DPCPP device.  (This method is provided for uniformity with
   /// DeviceGuard).
   void reset_device(Device device) { guard_.reset_device(device); }
 
-  /// Sets the SYCL device to the given device index.
+  /// Sets the DPCPP device to the given device index.
   void set_index(DeviceIndex device_index) { guard_.set_index(device_index); }
 
   /// Returns the device that was set upon construction of the guard
@@ -56,42 +56,42 @@ struct SYCLGuard {
 
  private:
   /// The guard for the current device.
-  c10::impl::InlineDeviceGuard<impl::SYCLGuardImpl> guard_;
+  c10::impl::InlineDeviceGuard<impl::DPCPPGuardImpl> guard_;
 };
 
-/// A variant of OptionalDeviceGuard that is specialized for SYCL.  See
-/// SYCLGuard for when you can use this.
-struct OptionalSYCLGuard {
-  /// Create an uninitialized OptionalSYCLGuard.
-  explicit OptionalSYCLGuard() : guard_() {}
+/// A variant of OptionalDeviceGuard that is specialized for DPCPP.  See
+/// DPCPPGuard for when you can use this.
+struct OptionalDPCPPGuard {
+  /// Create an uninitialized OptionalDPCPPGuard.
+  explicit OptionalDPCPPGuard() : guard_() {}
 
-  /// Set the current SYCL device to the passed Device, if it is not nullopt.
-  explicit OptionalSYCLGuard(optional<Device> device_opt) : guard_(device_opt) {}
+  /// Set the current DPCPP device to the passed Device, if it is not nullopt.
+  explicit OptionalDPCPPGuard(optional<Device> device_opt) : guard_(device_opt) {}
 
-  /// Set the current SYCL device to the passed device index, if it is not
+  /// Set the current DPCPP device to the passed device index, if it is not
   /// nullopt
-  explicit OptionalSYCLGuard(optional<DeviceIndex> device_index_opt) : guard_(device_index_opt) {}
+  explicit OptionalDPCPPGuard(optional<DeviceIndex> device_index_opt) : guard_(device_index_opt) {}
 
   // Copy is not allowed
-  OptionalSYCLGuard(const OptionalSYCLGuard&) = delete;
-  OptionalSYCLGuard& operator=(const OptionalSYCLGuard&) = delete;
+  OptionalDPCPPGuard(const OptionalDPCPPGuard&) = delete;
+  OptionalDPCPPGuard& operator=(const OptionalDPCPPGuard&) = delete;
 
   // See Note [Move construction for RAII guards is tricky]
-  OptionalSYCLGuard(OptionalSYCLGuard&& other) = delete;
+  OptionalDPCPPGuard(OptionalDPCPPGuard&& other) = delete;
 
   // See Note [Move assignment for RAII guards is tricky]
-  OptionalSYCLGuard& operator=(OptionalSYCLGuard&& other) = delete;
+  OptionalDPCPPGuard& operator=(OptionalDPCPPGuard&& other) = delete;
 
-  /// Sets the SYCL device to the given device, initializing the guard if it
-  /// is not already initialized.  Errors if the given device is not a SYCL device.
+  /// Sets the DPCPP device to the given device, initializing the guard if it
+  /// is not already initialized.  Errors if the given device is not a DPCPP device.
   void set_device(Device device) { guard_.set_device(device); }
 
-  /// Sets the SYCL device to the given device, initializing the guard if it is
-  /// not already initialized.  Errors if the given device is not a SYCL device.
+  /// Sets the DPCPP device to the given device, initializing the guard if it is
+  /// not already initialized.  Errors if the given device is not a DPCPP device.
   /// (This method is provided for uniformity with OptionalDeviceGuard).
   void reset_device(Device device) { guard_.reset_device(device); }
 
-  /// Sets the SYCL device to the given device index, initializing the guard if
+  /// Sets the DPCPP device to the given device index, initializing the guard if
   /// it is not already initialized.
   void set_index(DeviceIndex device_index) { guard_.set_index(device_index); }
 
@@ -104,131 +104,131 @@ struct OptionalSYCLGuard {
   /// or nullopt if the guard is uninitialized.
   optional<Device> current_device() const { return guard_.current_device(); }
 
-  /// Restore the original SYCL device, resetting this guard to uninitialized state.
+  /// Restore the original DPCPP device, resetting this guard to uninitialized state.
   void reset() { guard_.reset(); }
 
 private:
-  c10::impl::InlineOptionalDeviceGuard<impl::SYCLGuardImpl> guard_;
+  c10::impl::InlineOptionalDeviceGuard<impl::DPCPPGuardImpl> guard_;
 };
 
-/// A variant of StreamGuard that is specialized for SYCL.  See SYCLGuard
+/// A variant of StreamGuard that is specialized for DPCPP.  See DPCPPGuard
 /// for when you can use this.
-struct SYCLStreamGuard {
+struct DPCPPStreamGuard {
   /// No default constructor, see Note [Omitted default constructor from RAII]
-  explicit SYCLStreamGuard() = delete;
+  explicit DPCPPStreamGuard() = delete;
 
-  /// Set the current SYCL device to the device associated with the passed stream,
-  /// and set the current SYCL stream on that device to the passed stream.
-  /// Errors if the Stream is not a SYCL stream.
-  explicit SYCLStreamGuard(Stream stream) : guard_(stream) {}
+  /// Set the current DPCPP device to the device associated with the passed stream,
+  /// and set the current DPCPP stream on that device to the passed stream.
+  /// Errors if the Stream is not a DPCPP stream.
+  explicit DPCPPStreamGuard(Stream stream) : guard_(stream) {}
 
   /// Copy is disallowed
-  SYCLStreamGuard(const SYCLStreamGuard&) = delete;
-  SYCLStreamGuard& operator=(const SYCLStreamGuard&) = delete;
+  DPCPPStreamGuard(const DPCPPStreamGuard&) = delete;
+  DPCPPStreamGuard& operator=(const DPCPPStreamGuard&) = delete;
 
-  /// Move is disallowed, as SYCLStreamGuard does not have an uninitialized state,
+  /// Move is disallowed, as DPCPPStreamGuard does not have an uninitialized state,
   /// which is required for moves on types with nontrivial destructors.
-  SYCLStreamGuard(SYCLStreamGuard&& other) = delete;
-  SYCLStreamGuard& operator=(SYCLStreamGuard&& other) = delete;
+  DPCPPStreamGuard(DPCPPStreamGuard&& other) = delete;
+  DPCPPStreamGuard& operator=(DPCPPStreamGuard&& other) = delete;
 
   /// Resets the currently set stream to the original stream and
   /// the currently set device to the original device.  Then,
   /// set the current device to the device associated with the passed stream,
   /// and set the current stream on that device to the passed stream.
-  /// Errors if the stream passed is not a SYCL stream.
+  /// Errors if the stream passed is not a DPCPP stream.
   ///
   /// NOTE: this implementation may skip some stream/device setting if
   /// it can prove that it is unnecessary.
   ///
   /// WARNING: reset_stream does NOT preserve previously set streams on
   /// different devices.  If you need to set streams on multiple devices
-  /// on SYCL, use SYCLMultiStreamGuard instead.
+  /// on DPCPP, use DPCPPMultiStreamGuard instead.
   void reset_stream(Stream stream) { guard_.reset_stream(stream); }
 
-  /// Returns the SYCL stream that was set at the time the guard was constructed.
-  SYCLStream original_stream() const {
-    return SYCLStream(SYCLStream::UNCHECKED, guard_.original_stream());
+  /// Returns the DPCPP stream that was set at the time the guard was constructed.
+  DPCPPStream original_stream() const {
+    return DPCPPStream(DPCPPStream::UNCHECKED, guard_.original_stream());
   }
 
-  /// Returns the most recent SYCL stream that was set using this device guard,
+  /// Returns the most recent DPCPP stream that was set using this device guard,
   /// either from construction, or via set_stream.
-  SYCLStream current_stream() const {
-    return SYCLStream(SYCLStream::UNCHECKED, guard_.current_stream());
+  DPCPPStream current_stream() const {
+    return DPCPPStream(DPCPPStream::UNCHECKED, guard_.current_stream());
   }
 
-  /// Returns the most recent SYCL device that was set using this device guard,
+  /// Returns the most recent DPCPP device that was set using this device guard,
   /// either from construction, or via set_device/reset_device/set_index.
   Device current_device() const { return guard_.current_device(); }
 
-  /// Returns the SYCL device that was set at the most recent reset_stream(),
+  /// Returns the DPCPP device that was set at the most recent reset_stream(),
   /// or otherwise the device at construction time.
   Device original_device() const { return guard_.original_device(); }
 
 private:
-  c10::impl::InlineStreamGuard<impl::SYCLGuardImpl> guard_;
+  c10::impl::InlineStreamGuard<impl::DPCPPGuardImpl> guard_;
 };
 
-/// A variant of OptionalStreamGuard that is specialized for SYCL.  See SYCLGuard
+/// A variant of OptionalStreamGuard that is specialized for DPCPP.  See DPCPPGuard
 /// for when you can use this.
-struct OptionalSYCLStreamGuard {
+struct OptionalDPCPPStreamGuard {
   /// Create an uninitialized guard.
-  explicit OptionalSYCLStreamGuard() : guard_() {}
+  explicit OptionalDPCPPStreamGuard() : guard_() {}
 
-  /// Set the current SYCL device to the device associated with the passed stream,
-  /// and set the current SYCL stream on that device to the passed stream.
-  /// Errors if the Stream is not a SYCL stream.
-  explicit OptionalSYCLStreamGuard(Stream stream) : guard_(stream) {}
+  /// Set the current DPCPP device to the device associated with the passed stream,
+  /// and set the current DPCPP stream on that device to the passed stream.
+  /// Errors if the Stream is not a DPCPP stream.
+  explicit OptionalDPCPPStreamGuard(Stream stream) : guard_(stream) {}
 
   /// Set the current device to the device associated with the passed stream,
   /// and set the current stream on that device to the passed stream,
   /// if the passed stream is not nullopt.
-  explicit OptionalSYCLStreamGuard(optional<Stream> stream_opt) : guard_(stream_opt) {}
+  explicit OptionalDPCPPStreamGuard(optional<Stream> stream_opt) : guard_(stream_opt) {}
 
   /// Copy is disallowed
-  OptionalSYCLStreamGuard(const OptionalSYCLStreamGuard&) = delete;
-  OptionalSYCLStreamGuard& operator=(const OptionalSYCLStreamGuard&) = delete;
+  OptionalDPCPPStreamGuard(const OptionalDPCPPStreamGuard&) = delete;
+  OptionalDPCPPStreamGuard& operator=(const OptionalDPCPPStreamGuard&) = delete;
 
   // See Note [Move construction for RAII guards is tricky]
-  OptionalSYCLStreamGuard(OptionalSYCLStreamGuard&& other) = delete;
+  OptionalDPCPPStreamGuard(OptionalDPCPPStreamGuard&& other) = delete;
 
   // See Note [Move assignment for RAII guards is tricky]
-  OptionalSYCLStreamGuard& operator=(OptionalSYCLStreamGuard&& other) = delete;
+  OptionalDPCPPStreamGuard& operator=(OptionalDPCPPStreamGuard&& other) = delete;
 
-  /// Resets the currently set SYCL stream to the original stream and
+  /// Resets the currently set DPCPP stream to the original stream and
   /// the currently set device to the original device.  Then,
   /// set the current device to the device associated with the passed stream,
   /// and set the current stream on that device to the passed stream.
   /// Initializes the guard if it was not previously initialized.
   void reset_stream(Stream stream) { guard_.reset_stream(stream); }
 
-  /// Returns the SYCL stream that was set at the time the guard was most recently
+  /// Returns the DPCPP stream that was set at the time the guard was most recently
   /// initialized, or nullopt if the guard is uninitialized.
-  optional<SYCLStream> original_stream() const {
+  optional<DPCPPStream> original_stream() const {
     auto r = guard_.original_stream();
     if (r.has_value()) {
-      return make_optional(SYCLStream(SYCLStream::UNCHECKED, r.value()));
+      return make_optional(DPCPPStream(DPCPPStream::UNCHECKED, r.value()));
     } else {
       return nullopt;
     }
   }
 
-  /// Returns the most recent SYCL stream that was set using this stream guard,
+  /// Returns the most recent DPCPP stream that was set using this stream guard,
   /// either from construction, or via reset_stream, if the guard is initialized,
   /// or nullopt if the guard is uninitialized.
-  optional<SYCLStream> current_stream() const {
+  optional<DPCPPStream> current_stream() const {
     auto r = guard_.current_stream();
     if (r.has_value()) {
-      return make_optional(SYCLStream(SYCLStream::UNCHECKED, r.value()));
+      return make_optional(DPCPPStream(DPCPPStream::UNCHECKED, r.value()));
     } else {
       return nullopt;
     }
   }
 
-  /// Restore the original SYCL device and stream, resetting this guard to uninitialized state.
+  /// Restore the original DPCPP device and stream, resetting this guard to uninitialized state.
   void reset() { guard_.reset(); }
 
 private:
-  c10::impl::InlineOptionalStreamGuard<impl::SYCLGuardImpl> guard_;
+  c10::impl::InlineOptionalStreamGuard<impl::DPCPPGuardImpl> guard_;
 };
-} // namespace sycl
-} // namespace c10
+} // namespace dpcpp
+} // namespace at

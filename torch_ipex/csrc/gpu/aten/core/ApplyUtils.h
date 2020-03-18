@@ -3,14 +3,13 @@
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <ATen/TensorUtils.h>
-#include <ATen/LegacyTHFunctionsSYCL.h>
 
 #include <core/Context.h>
 
 #include <math.h>
 
 namespace at {
-namespace sycl {
+namespace dpcpp {
 
 // We pull the kernel name from anonymous namespace to outside,
 // because otherwise dpcpp compiler will fail to recognize
@@ -42,13 +41,13 @@ template <typename Op,
           int step>
 class PointwiseApply3 {};
 
-// remove anonymous namespace to satisfy sycl kernel name's requirement:
-// Global unique and visible. 
+// remove anonymous namespace to satisfy dpcpp kernel name's requirement:
+// Global unique and visible.
 // namespace {
 
-static constexpr auto write_mode = cl::sycl::access::mode::discard_write;
-static constexpr auto read_mode = cl::sycl::access::mode::read;
-static constexpr auto read_write_mode = cl::sycl::access::mode::read_write;
+static constexpr auto write_mode = DP::access::mode::discard_write;
+static constexpr auto read_mode = DP::access::mode::read;
+static constexpr auto read_write_mode = DP::access::mode::read_write;
 
 
 // Rearrange dimensions for pointwise operations so that strides are in
@@ -142,7 +141,7 @@ struct ApplyOp1 {
 
 inline static void apply(const detail::TensorInfo<scalar, IndexType> &a,
                          const Op &op,
-                         const c10::sycl::SYCLAccessor<read_write_mode> &a_acc,
+                         const DPCPPAccessor<read_write_mode> &a_acc,
                          int n, IndexType linearIndex,
                          Offsets... aOffsets) {
   // Convert 'linearIndex' into an offset of 'a'
@@ -164,7 +163,7 @@ template <typename Op,
 struct ApplyOp1<Op, scalar, IndexType, ADims, false, 0, Offset> {
   inline static void apply(const detail::TensorInfo<scalar, IndexType> &a,
                            const Op &op,
-                           const c10::sycl::SYCLAccessor<read_write_mode> &a_acc,
+                           const DPCPPAccessor<read_write_mode> &a_acc,
                            int n, IndexType linearIndex,
                            Offset aOffset) {
     auto a_ptr = a_acc.template get_pointer<scalar>();
@@ -183,7 +182,7 @@ template <typename Op,
 struct ApplyOp1<Op, scalar, IndexType, ADims, true, 0, Offset> {
   inline static void apply(const detail::TensorInfo<scalar, IndexType> &a,
                            const Op &op,
-                           const c10::sycl::SYCLAccessor<read_write_mode> &a_acc,
+                           const DPCPPAccessor<read_write_mode> &a_acc,
                            int n, IndexType linearIndex,
                            Offset aOffset) {
     auto a_ptr = a_acc.template get_pointer<scalar>();
@@ -201,7 +200,7 @@ template <typename Op,
 struct ApplyOp1<Op, scalar, IndexType, ADims, with_offset, 0, Offsets...> {
 inline static void apply(const detail::TensorInfo<scalar, IndexType> &a,
                          const Op &op,
-                         const c10::sycl::SYCLAccessor<read_write_mode> &a_acc,
+                         const DPCPPAccessor<read_write_mode> &a_acc,
                          int n, IndexType linearIndex,
                          Offsets... aOffsets) {
   auto a_ptr = a_acc.template get_pointer<scalar>();
@@ -220,26 +219,26 @@ template <typename Op,
 void kernelPointwiseApply1(detail::TensorInfo<scalar, IndexType> a,
                            IndexType totalElements,
                            const Op op) {
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   int64_t rng, GRange, tileSize;
-  c10::sycl::parallel_for_setup(totalElements, tileSize, rng, GRange);
+  parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto a_acc = c10::sycl::SYCLAccessor<read_write_mode>(cgh, a.data);
+    auto a_acc = DPCPPAccessor<read_write_mode>(cgh, a.data);
     cgh.parallel_for<PointwiseApply1<Op, scalar, IndexType, ADims, step> >(
-            cl::sycl::nd_range<1>(cl::sycl::range<1>(tileSize), cl::sycl::range<1>(tileSize)),
-            [=](cl::sycl::nd_item<1> item) {
+            DP::nd_range<1>(DP::range<1>(tileSize), DP::range<1>(tileSize)),
+            [=](DP::nd_item<1> item) {
               for (IndexType linearIndex = item.get_global_id(0) * step;
                    linearIndex < totalElements; linearIndex += item.get_global_range()[0] * step) {
                 ApplyOp1<Op, scalar,  IndexType, ADims, with_offset, step>::apply(
-                        a, op, a_acc, cl::sycl::min(step, static_cast<int>(totalElements - linearIndex)),
+                        a, op, a_acc, DP::min(step, static_cast<int>(totalElements - linearIndex)),
                         linearIndex);
               }
             });
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 
@@ -257,8 +256,8 @@ struct ApplyOp2 {
 inline static void apply(const detail::TensorInfo<scalar1, IndexType> &a,
                          const detail::TensorInfo<scalar2, IndexType> &b,
                          const Op &op,
-                         const c10::sycl::SYCLAccessor<write_mode> &a_acc,
-                         const c10::sycl::SYCLAccessor<read_mode> &b_acc,
+                         const DPCPPAccessor<write_mode> &a_acc,
+                         const DPCPPAccessor<read_mode> &b_acc,
                          int n, IndexType linearIndex,
                          Offsets... aOffsets, Offsets... bOffsets) {
   // Convert 'linearIndex' into an offset of 'a'
@@ -285,8 +284,8 @@ struct ApplyOp2<Op, scalar1, scalar2, IndexType, ADims, BDims, false, 0, Offset>
   inline static void apply(const detail::TensorInfo<scalar1, IndexType> &a,
                            const detail::TensorInfo<scalar2, IndexType> &b,
                            const Op &op,
-                           const c10::sycl::SYCLAccessor<write_mode> &a_acc,
-                           const c10::sycl::SYCLAccessor<read_mode> &b_acc,
+                           const DPCPPAccessor<write_mode> &a_acc,
+                           const DPCPPAccessor<read_mode> &b_acc,
                            int n, IndexType linearIndex,
                            Offset aOffset, Offset bOffset) {
     auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -308,8 +307,8 @@ struct ApplyOp2<Op, scalar1, scalar2, IndexType, ADims, BDims, true, 0, Offset> 
   inline static void apply(const detail::TensorInfo<scalar1, IndexType> &a,
                            const detail::TensorInfo<scalar2, IndexType> &b,
                            const Op &op,
-                           const c10::sycl::SYCLAccessor<write_mode> &a_acc,
-                           const c10::sycl::SYCLAccessor<read_mode> &b_acc,
+                           const DPCPPAccessor<write_mode> &a_acc,
+                           const DPCPPAccessor<read_mode> &b_acc,
                            int n, IndexType linearIndex,
                            Offset aOffset, Offset bOffset) {
     auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -331,8 +330,8 @@ struct ApplyOp2<Op, scalar1, scalar2, IndexType, ADims, BDims, with_offset, 0, O
 inline static void apply(const detail::TensorInfo<scalar1, IndexType> &a,
                          const detail::TensorInfo<scalar2, IndexType> &b,
                          const Op &op,
-                         const c10::sycl::SYCLAccessor<write_mode> &a_acc,
-                         const c10::sycl::SYCLAccessor<read_mode> &b_acc,
+                         const DPCPPAccessor<write_mode> &a_acc,
+                         const DPCPPAccessor<read_mode> &b_acc,
                          int n, IndexType linearIndex,
                          Offsets... aOffsets, Offsets... bOffsets) {
   auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -353,28 +352,28 @@ void kernelPointwiseApply2(detail::TensorInfo<scalar1, IndexType> output,
                            detail::TensorInfo<scalar2, IndexType> input,
                            IndexType totalElements,
                            const Op op) {
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   int64_t rng, GRange, tileSize;
-  c10::sycl::parallel_for_setup(totalElements, tileSize, rng, GRange);
+  parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   // 1. Initialize temp buffer
   auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, input.data);
-    auto out_acc =  c10::sycl::SYCLAccessor<write_mode>(cgh, output.data);
+    auto in_acc = DPCPPAccessor<read_mode>(cgh, input.data);
+    auto out_acc =  DPCPPAccessor<write_mode>(cgh, output.data);
     cgh.parallel_for<PointwiseApply2<Op, scalar1, scalar2, IndexType, ADims, BDims, step> >(
-            cl::sycl::nd_range<1>(cl::sycl::range<1>(tileSize), cl::sycl::range<1>(tileSize)),
-            [=](cl::sycl::nd_item<1> item) {
+            DP::nd_range<1>(DP::range<1>(tileSize), DP::range<1>(tileSize)),
+            [=](DP::nd_item<1> item) {
               for (IndexType linearIndex = item.get_global_id(0) * step;
                    linearIndex < totalElements; linearIndex += item.get_global_range()[0] * step) {
                 ApplyOp2<Op, scalar1, scalar2, IndexType, ADims, BDims, with_offset, step>::apply(
-                        output, input, op, out_acc, in_acc, cl::sycl::min(step, static_cast<int>(totalElements - linearIndex)),
+                        output, input, op, out_acc, in_acc, DP::min(step, static_cast<int>(totalElements - linearIndex)),
                         linearIndex);
               }
             });
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename Op,
@@ -393,9 +392,9 @@ inline static void apply(const detail::TensorInfo<scalar1, IndexType> &a,
                          const detail::TensorInfo<scalar2, IndexType> &b,
                          const detail::TensorInfo<scalar3, IndexType> &c,
                          const Op &op,
-                         const c10::sycl::SYCLAccessor<write_mode> &a_acc,
-                         const c10::sycl::SYCLAccessor<read_mode> &b_acc,
-                         const c10::sycl::SYCLAccessor<read_mode> &c_acc,
+                         const DPCPPAccessor<write_mode> &a_acc,
+                         const DPCPPAccessor<read_mode> &b_acc,
+                         const DPCPPAccessor<read_mode> &c_acc,
                          int n, IndexType linearIndex,
                          Offsets... aOffsets, Offsets... bOffsets, Offsets... cOffsets) {
   // Convert 'linearIndex' into an offset of 'a'
@@ -431,9 +430,9 @@ struct ApplyOp3<Op, scalar1, scalar2, scalar3, IndexType, ADims, BDims, CDims, 0
                            const detail::TensorInfo<scalar2, IndexType> &b,
                const detail::TensorInfo<scalar3, IndexType> &c,
                            const Op &op,
-                           const c10::sycl::SYCLAccessor<write_mode> &a_acc,
-                           const c10::sycl::SYCLAccessor<read_mode> &b_acc,
-               const c10::sycl::SYCLAccessor<read_mode> &c_acc,
+                           const DPCPPAccessor<write_mode> &a_acc,
+                           const DPCPPAccessor<read_mode> &b_acc,
+               const DPCPPAccessor<read_mode> &c_acc,
                            int n, IndexType linearIndex,
                            Offset aOffset, Offset bOffset, Offset cOffset) {
     auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -457,9 +456,9 @@ inline static void apply(const detail::TensorInfo<scalar1, IndexType> &a,
                          const detail::TensorInfo<scalar2, IndexType> &b,
              const detail::TensorInfo<scalar3, IndexType> &c,
                          const Op &op,
-                         const c10::sycl::SYCLAccessor<write_mode> &a_acc,
-                         const c10::sycl::SYCLAccessor<read_mode> &b_acc,
-               const c10::sycl::SYCLAccessor<read_mode> &c_acc,
+                         const DPCPPAccessor<write_mode> &a_acc,
+                         const DPCPPAccessor<read_mode> &b_acc,
+               const DPCPPAccessor<read_mode> &c_acc,
                          int n, IndexType linearIndex,
                          Offsets... aOffsets, Offsets... bOffsets, Offsets... cOffsets) {
   auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -482,27 +481,27 @@ void kernelPointwiseApply3(detail::TensorInfo<scalar1, IndexType> output,
                detail::TensorInfo<scalar3, IndexType> input2,
                            IndexType totalElements,
                            const Op op) {
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   int64_t rng, GRange, tileSize;
-  c10::sycl::parallel_for_setup(totalElements, tileSize, rng, GRange);
+  parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto in1_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, input1.data);
-    auto in2_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, input2.data);
-    auto out_acc =  c10::sycl::SYCLAccessor<write_mode>(cgh, output.data);
+    auto in1_acc = DPCPPAccessor<read_mode>(cgh, input1.data);
+    auto in2_acc = DPCPPAccessor<read_mode>(cgh, input2.data);
+    auto out_acc =  DPCPPAccessor<write_mode>(cgh, output.data);
     cgh.parallel_for<PointwiseApply3<Op, scalar1, scalar2, scalar3, IndexType, ADims, BDims, CDims, step> >(
-            cl::sycl::nd_range<1>(cl::sycl::range<1>(tileSize), cl::sycl::range<1>(tileSize)),
-            [=](cl::sycl::nd_item<1> item) {
+            DP::nd_range<1>(DP::range<1>(tileSize), DP::range<1>(tileSize)),
+            [=](DP::nd_item<1> item) {
               for (IndexType linearIndex = item.get_global_id(0) * step;
                    linearIndex < totalElements; linearIndex += item.get_global_range()[0] * step) {
                 ApplyOp3<Op, scalar1, scalar2, scalar3, IndexType, ADims, BDims, CDims, step>::apply(
-                        output, input1, input2, op, out_acc, in1_acc, in2_acc, cl::sycl::min(step, static_cast<int>(totalElements - linearIndex)), linearIndex);
+                        output, input1, input2, op, out_acc, in1_acc, in2_acc, DP::min(step, static_cast<int>(totalElements - linearIndex)), linearIndex);
               }
             });
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <typename Op,
@@ -521,10 +520,10 @@ struct ApplyOp4 {
       const detail::TensorInfo<scalar3, IndexType>& c,
       const detail::TensorInfo<scalar3, IndexType>& d,
       const Op& op,
-      const c10::sycl::SYCLAccessor<write_mode>& a_acc,
-      const c10::sycl::SYCLAccessor<read_mode>& b_acc,
-      const c10::sycl::SYCLAccessor<read_mode>& c_acc,
-      const c10::sycl::SYCLAccessor<read_mode>& d_acc,
+      const DPCPPAccessor<write_mode>& a_acc,
+      const DPCPPAccessor<read_mode>& b_acc,
+      const DPCPPAccessor<read_mode>& c_acc,
+      const DPCPPAccessor<read_mode>& d_acc,
       int n, IndexType linearIndex,
       Offsets... aOffsets, Offsets... bOffsets, Offsets... cOffsets, Offsets... dOffsets) {
     // Convert 'linearIndex' into an offset of 'a'
@@ -565,10 +564,10 @@ struct ApplyOp4<Op, scalar1, scalar2, scalar3, scalar4, IndexType, ADims, BDims,
                const detail::TensorInfo<scalar3, IndexType> &c,
                            const detail::TensorInfo<scalar3, IndexType> &d,
                            const Op &op,
-                           const c10::sycl::SYCLAccessor<write_mode> &a_acc,
-                           const c10::sycl::SYCLAccessor<read_mode> &b_acc,
-               const c10::sycl::SYCLAccessor<read_mode> &c_acc,
-                           const c10::sycl::SYCLAccessor<read_mode> &d_acc,
+                           const DPCPPAccessor<write_mode> &a_acc,
+                           const DPCPPAccessor<read_mode> &b_acc,
+               const DPCPPAccessor<read_mode> &c_acc,
+                           const DPCPPAccessor<read_mode> &d_acc,
                            int n, IndexType linearIndex,
                            Offset aOffset, Offset bOffset, Offset cOffset, Offset dOffset) {
     auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -593,10 +592,10 @@ struct ApplyOp4<Op, scalar1, scalar2, scalar3, scalar4, IndexType, ADims, BDims,
                const detail::TensorInfo<scalar3, IndexType> &c,
                            const detail::TensorInfo<scalar3, IndexType> &d,
                            const Op &op,
-                           const c10::sycl::SYCLAccessor<write_mode> &a_acc,
-                           const c10::sycl::SYCLAccessor<read_mode> &b_acc,
-               const c10::sycl::SYCLAccessor<read_mode> &c_acc,
-                           const c10::sycl::SYCLAccessor<read_mode> &d_acc,
+                           const DPCPPAccessor<write_mode> &a_acc,
+                           const DPCPPAccessor<read_mode> &b_acc,
+               const DPCPPAccessor<read_mode> &c_acc,
+                           const DPCPPAccessor<read_mode> &d_acc,
                            int n, IndexType linearIndex,
                            Offsets... aOffsets, Offsets... bOffsets, Offsets... cOffsets, Offsets... dOffsets) {
     auto a_ptr = a_acc.template get_pointer<scalar1>();
@@ -632,38 +631,38 @@ void kernelPointwiseApply4(
     detail::TensorInfo<scalar4, IndexType> input3,
     IndexType totalElements,
     const Op op) {
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   int64_t rng, GRange, tileSize;
-  c10::sycl::parallel_for_setup(totalElements, tileSize, rng, GRange);
+  parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto in1_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, input1.data);
-    auto in2_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, input2.data);
-    auto in3_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, input3.data);
-    auto out_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, output.data);
+    auto in1_acc = DPCPPAccessor<read_mode>(cgh, input1.data);
+    auto in2_acc = DPCPPAccessor<read_mode>(cgh, input2.data);
+    auto in3_acc = DPCPPAccessor<read_mode>(cgh, input3.data);
+    auto out_acc = DPCPPAccessor<write_mode>(cgh, output.data);
     cgh.parallel_for<PointwiseApply4<
             Op, scalar1, scalar2, scalar3, scalar4, IndexType, ADims, BDims, CDims, DDims, step> >(
-            cl::sycl::nd_range<1>(cl::sycl::range<1>(tileSize), cl::sycl::range<1>(tileSize)),
-            [=](cl::sycl::nd_item<1> item) {
+            DP::nd_range<1>(DP::range<1>(tileSize), DP::range<1>(tileSize)),
+            [=](DP::nd_item<1> item) {
               for (IndexType linearIndex = item.get_global_id(0) * step;
                    linearIndex < totalElements; linearIndex += item.get_global_range()[0] * step) {
                 ApplyOp4<Op, scalar1, scalar2, scalar3, scalar4, IndexType, ADims, BDims, CDims, DDims, step>::apply(
                         output, input1, input2, input3, op, out_acc, in1_acc, in2_acc, in3_acc,
-                        cl::sycl::min(step, static_cast<int>(totalElements - linearIndex)), linearIndex);
+                        DP::min(step, static_cast<int>(totalElements - linearIndex)), linearIndex);
               }
             });
   };
 
   //launch kernel
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 // } // namespace
 
 template <typename scalar, int step, typename Op, bool with_offset=false>
-inline void SYCL_tensor_apply1(at::Tensor a,
+inline void DPCPP_tensor_apply1(at::Tensor a,
                                const Op &op) {
-  checkBackend("SYCL_Tensor_apply1", {a}, Backend::DPCPP);
+  checkBackend("DPCPP_Tensor_apply1", {a}, Backend::DPCPP);
   auto dim = a.dim();
 
   std::vector<int64_t> collapsed_shape;
@@ -752,24 +751,24 @@ inline void SYCL_tensor_apply1(at::Tensor a,
     //Ignore overlaps when copying back; if we use copy
     //instead, it will recursively try and invoke ourselves to make
     // old_dst contiguous
-    TORCH_CHECK(0, "not implemented THSYCLTensor_copyIgnoringOverlaps\n");
-    // at::native::legacy::sycl::_th_copy_ignoring_overlaps_(oldA, a);
+    TORCH_CHECK(0, "not implemented THDPCPPTensor_copyIgnoringOverlaps\n");
+    // at::native::legacy::dpcpp::_th_copy_ignoring_overlaps_(oldA, a);
   }
 
 }
 
-/* Provides default step = 1 to SYCL_tensor_apply1. */
+/* Provides default step = 1 to DPCPP_tensor_apply1. */
 template <typename scalar, typename Op, bool with_offset=false>
-inline void  SYCL_tensor_apply1(at::Tensor a,
+inline void  DPCPP_tensor_apply1(at::Tensor a,
                                const Op& op) {
-  SYCL_tensor_apply1<scalar, 1, Op, with_offset>(a, op);
+  DPCPP_tensor_apply1<scalar, 1, Op, with_offset>(a, op);
 }
 
 template <typename scalar1, typename scalar2, int step, typename Op, bool with_offset=false>
-inline void SYCL_tensor_apply2(at::Tensor dst,
+inline void DPCPP_tensor_apply2(at::Tensor dst,
                                at::Tensor src,
                                const Op &op) {
-  checkBackend("SYCL_Tensor_apply2", {dst, src}, Backend::DPCPP);
+  checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::DPCPP);
   int64_t totalElements = dst.numel();
 
   TORCH_CHECK(totalElements == src.numel(),
@@ -874,28 +873,28 @@ inline void SYCL_tensor_apply2(at::Tensor dst,
     //Ignore overlaps when copying back; if we use copy
     //instead, it will recursively try and invoke ourselves to make
     // old_dst contiguous
-    TORCH_CHECK(0, "not implemented THSYCLTensor_copyIgnoringOverlaps\n");
-    // at::native::legacy::sycl::_th_copy_ignoring_overlaps_(old_dst, dst);
+    TORCH_CHECK(0, "not implemented THDPCPPTensor_copyIgnoringOverlaps\n");
+    // at::native::legacy::dpcpp::_th_copy_ignoring_overlaps_(old_dst, dst);
   }
 
 }
 
-/* Provides default step = 1 to SYCL_tensor_apply2. */
+/* Provides default step = 1 to DPCPP_tensor_apply2. */
 template <typename scalar1, typename scalar2, typename Op, bool with_offset=false>
-inline void  SYCL_tensor_apply2(at::Tensor a,
+inline void  DPCPP_tensor_apply2(at::Tensor a,
                                 at::Tensor b,
                                 const Op& op) {
-  SYCL_tensor_apply2<scalar1, scalar2, 1, Op, with_offset>(a, b, op);
+  DPCPP_tensor_apply2<scalar1, scalar2, 1, Op, with_offset>(a, b, op);
 }
 
 
 
 template <typename scalar1, typename scalar2, typename scalar3, int step, typename Op>
-inline void SYCL_tensor_apply3(at::Tensor dst,
+inline void DPCPP_tensor_apply3(at::Tensor dst,
                                at::Tensor src1,
                  at::Tensor src2,
                                const Op &op) {
-  checkBackend("SYCL_Tensor_apply3", {dst, src1, src2}, Backend::DPCPP);
+  checkBackend("DPCPP_Tensor_apply3", {dst, src1, src2}, Backend::DPCPP);
   int64_t totalElements = dst.numel();
 
   TORCH_CHECK(totalElements == src1.numel() &&
@@ -1030,29 +1029,29 @@ inline void SYCL_tensor_apply3(at::Tensor dst,
     //Ignore overlaps when copying back; if we use copy
     //instead, it will recursively try and invoke ourselves to make
     // old_dst contiguous
-    TORCH_CHECK(0, "not implemented THSYCLTensor_copyIgnoringOverlaps\n");
-    // at::native::legacy::sycl::_th_copy_ignoring_overlaps_(old_dst, dst);
+    TORCH_CHECK(0, "not implemented THDPCPPTensor_copyIgnoringOverlaps\n");
+    // at::native::legacy::dpcpp::_th_copy_ignoring_overlaps_(old_dst, dst);
   }
 }
 
 /* Provides default step = 1 to CUDA_tensor_apply3. */
 template <typename scalar1, typename scalar2, typename scalar3, typename Op>
-inline void SYCL_tensor_apply3(const at::Tensor& a,
+inline void DPCPP_tensor_apply3(const at::Tensor& a,
                                const at::Tensor& b,
                                const at::Tensor& c,
                                const Op op) {
-  SYCL_tensor_apply3<scalar1, scalar2, scalar3, 1, Op>(
+  DPCPP_tensor_apply3<scalar1, scalar2, scalar3, 1, Op>(
     a, b, c, op);
 }
 
 template <typename scalar1, typename scalar2, typename scalar3, typename scalar4,
           int step, typename Op>
-inline void SYCL_tensor_apply4(at::Tensor dst,
+inline void DPCPP_tensor_apply4(at::Tensor dst,
                                at::Tensor src1,
                                at::Tensor src2,
                                at::Tensor src3,
                                const Op &op) {
-  checkBackend("SYCL_Tensor_apply4", {dst, src1, src2, src3}, Backend::DPCPP);
+  checkBackend("DPCPP_Tensor_apply4", {dst, src1, src2, src3}, Backend::DPCPP);
   int64_t totalElements = dst.numel();
 
   TORCH_CHECK(totalElements == src1.numel() &&
@@ -1210,23 +1209,23 @@ inline void SYCL_tensor_apply4(at::Tensor dst,
     // Ignore overlaps when copying back; if we use THCTensor_copy
     // instead, it will recursively try and invoke ourselves to make
     // old_dst contiguous.
-    TORCH_CHECK(0, "not implemented THSYCLTensor_copyIgnoringOverlaps\n");
-    // at::native::legacy::sycl::_th_copy_ignoring_overlaps_(old_dst, dst);
+    TORCH_CHECK(0, "not implemented THDPCPPTensor_copyIgnoringOverlaps\n");
+    // at::native::legacy::dpcpp::_th_copy_ignoring_overlaps_(old_dst, dst);
   }
 }
 
 /* Provides default step = 1 to CUDA_tensor_apply4. */
 template <typename scalar1, typename scalar2, typename scalar3, typename scalar4,
           typename Op>
-inline void SYCL_tensor_apply4(const at::Tensor& a,
+inline void DPCPP_tensor_apply4(const at::Tensor& a,
                                const at::Tensor& b,
                                const at::Tensor& c,
                                const at::Tensor& d,
                                const Op op) {
-  SYCL_tensor_apply4<scalar1, scalar2, scalar3, scalar4, 1, Op>(
+  DPCPP_tensor_apply4<scalar1, scalar2, scalar3, scalar4, 1, Op>(
     a, b, c, d, op);
 }
 
 
-} // sycl
+} // dpcpp
 } // at

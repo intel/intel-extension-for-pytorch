@@ -3,50 +3,53 @@
 
 #include <core/DPCPPTensorUtils.h>
 #include <core/Memory.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Context.h>
+
+
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 template <typename T>
-class embedding_dense_backeward_sycl_ker {};
+class embedding_dense_backeward_dpcpp_ker {};
 template <typename T>
-class embedding_dense_backeward_sycl_idx_cnt_ker {};
+class embedding_dense_backeward_dpcpp_idx_cnt_ker {};
 
 template <typename scalar_t>
-static inline void embedding_backward_sycl_kernel(
+static inline void embedding_backward_dpcpp_kernel(
     int64_t* indices_data, const scalar_t* __restrict__ grad_data,
     scalar_t* __restrict__ grad_weight_data, int num_indices, int64_t stride,
     int padding_idx, int numel_weights, bool scale_grad_by_freq) {
-  static const auto atomic_rw_mode = cl::sycl::access::mode::atomic;
-  static const auto read_mode = cl::sycl::access::mode::read;
-  static const auto write_mode = cl::sycl::access::mode::write;
-  static const auto rw_mode = cl::sycl::access::mode::discard_read_write;
-  static const auto gbuffer_target = cl::sycl::access::target::global_buffer;
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  static const auto atomic_rw_mode = DP::access::mode::atomic;
+  static const auto read_mode = DP::access::mode::read;
+  static const auto write_mode = DP::access::mode::write;
+  static const auto rw_mode = DP::access::mode::discard_read_write;
+  static const auto gbuffer_target = DP::access::target::global_buffer;
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto row_num_weights = numel_weights / stride;
-  cl::sycl::buffer<uint32_t, 1> idx_cnt(cl::sycl::range<1>{(size_t)row_num_weights});
+  DP::buffer<uint32_t, 1> idx_cnt(DP::range<1>{(size_t)row_num_weights});
 
-  sycl_queue.submit([&](cl::sycl::handler & cgh) {
+  dpcpp_queue.submit([&](DP::handler & cgh) {
     int64_t rng, GRange, tileSize;
 
     // KER1: calc indices count for each
-    auto idx_acc = c10::sycl::SYCLAccessor<read_mode>(
+    auto idx_acc = DPCPPAccessor<read_mode>(
         cgh, indices_data, num_indices * sizeof(int64_t));
 
     if (scale_grad_by_freq) {
       auto idx_cnt_acc = idx_cnt.get_access<write_mode>(cgh);
       cgh.template fill(idx_cnt_acc, static_cast<uint32_t>(0));
-      cl::sycl::accessor<uint32_t, 1, atomic_rw_mode, gbuffer_target>
-          idx_cnt_ptr(idx_cnt, cgh, cl::sycl::range<1>(row_num_weights), 0);
+      DP::accessor<uint32_t, 1, atomic_rw_mode, gbuffer_target>
+          idx_cnt_ptr(idx_cnt, cgh, DP::range<1>(row_num_weights), 0);
 
-      c10::sycl::parallel_for_setup(num_indices, tileSize, rng, GRange);
-      cgh.parallel_for<embedding_dense_backeward_sycl_idx_cnt_ker<scalar_t>> (
-          cl::sycl::nd_range<1>(cl::sycl::range<1>(GRange),
-          cl::sycl::range<1>(tileSize)),
-          [=](cl::sycl::nd_item<1> item) {
+      parallel_for_setup(num_indices, tileSize, rng, GRange);
+      cgh.parallel_for<embedding_dense_backeward_dpcpp_idx_cnt_ker<scalar_t>> (
+          DP::nd_range<1>(DP::range<1>(GRange),
+          DP::range<1>(tileSize)),
+          [=](DP::nd_item<1> item) {
         int64_t gid = item.get_global_linear_id();
         auto idx_ptr = idx_acc.template get_pointer<int64_t>();
         if (gid < num_indices)
@@ -56,16 +59,16 @@ static inline void embedding_backward_sycl_kernel(
 
     // KER2: calc gradient weight
     auto idx_cnt_acc = idx_cnt.get_access<read_mode>(cgh);
-    auto g_acc = c10::sycl::SYCLAccessor<read_mode>(
+    auto g_acc = DPCPPAccessor<read_mode>(
         cgh, grad_data, num_indices * stride * sizeof(scalar_t));
-    auto gw_acc = c10::sycl::SYCLAccessor<rw_mode, scalar_t>(
+    auto gw_acc = DPCPPAccessor<rw_mode, scalar_t>(
         cgh, grad_weight_data, numel_weights * sizeof(scalar_t));
 
-    c10::sycl::parallel_for_setup(stride, tileSize, rng, GRange);
-    cgh.parallel_for<embedding_dense_backeward_sycl_ker<scalar_t>> (
-        cl::sycl::nd_range<1>(cl::sycl::range<1>(GRange),
-        cl::sycl::range<1>(tileSize)),
-        [=](cl::sycl::nd_item<1> item) {
+    parallel_for_setup(stride, tileSize, rng, GRange);
+    cgh.parallel_for<embedding_dense_backeward_dpcpp_ker<scalar_t>> (
+        DP::nd_range<1>(DP::range<1>(GRange),
+        DP::range<1>(tileSize)),
+        [=](DP::nd_item<1> item) {
       int64_t gid = item.get_global_linear_id();
       if (gid < stride) {
         auto idx_ptr = idx_acc.template get_pointer<int64_t>();
@@ -94,7 +97,7 @@ static inline void embedding_backward_sycl_kernel(
   //     idx_cnt_host_acc[9]);
 }
 
-Tensor embedding_dense_backward_sycl(const Tensor & grad_, const Tensor & indices,
+Tensor embedding_dense_backward_dpcpp(const Tensor & grad_, const Tensor & indices,
     int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq) {
   // printf("this is %s\n", __func__);
   auto grad_arg = TensorArg(grad_, "grad", 1);
@@ -112,7 +115,7 @@ Tensor embedding_dense_backward_sycl(const Tensor & grad_, const Tensor & indice
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
       grad_.scalar_type(), "embedding_backward", [&]() {
-    embedding_backward_sycl_kernel<scalar_t>(
+    embedding_backward_dpcpp_kernel<scalar_t>(
         indices_data,
         grad.data_ptr<scalar_t>(),
         grad_weight.data_ptr<scalar_t>(),
@@ -131,7 +134,7 @@ Tensor embedding_dense_backward_sycl(const Tensor & grad_, const Tensor & indice
 
 Tensor embedding_dense_backward(const Tensor & grad_output, const Tensor & indices,
     int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq) {
-  return impl::embedding_dense_backward_sycl(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq);
+  return impl::embedding_dense_backward_dpcpp(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq);
 }
 
 } // namespace AtenIpexTypeDPCPP

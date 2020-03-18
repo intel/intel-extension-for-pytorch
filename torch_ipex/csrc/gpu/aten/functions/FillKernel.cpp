@@ -7,7 +7,8 @@
 #include <core/detail/IndexUtils.h>
 
 
-using namespace at::sycl::detail;
+using namespace at::dpcpp::detail;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -21,25 +22,25 @@ struct TensorFillOp {
   const T val;
 };
 
-void fill_kernel_sycl(TensorIterator& iter, Scalar value) {
-  AT_DISPATCH_ALL_TYPES_AND2(kHalf, kBool, iter.dtype(), "fill_sycl", [&] {
-    at::sycl::SYCL_tensor_apply1<scalar_t>(
+void fill_kernel_dpcpp(TensorIterator& iter, Scalar value) {
+  AT_DISPATCH_ALL_TYPES_AND2(kHalf, kBool, iter.dtype(), "fill_dpcpp", [&] {
+    at::dpcpp::DPCPP_tensor_apply1<scalar_t>(
         iter.tensor(0), TensorFillOp<scalar_t>(value.to<scalar_t>()));
   });
 }
 
 template <typename IndexType, int Dim>
-class fill_slice_sycl_ker {};
+class fill_slice_dpcpp_ker {};
 
 template <typename IndexType, int Dim>
 void fillSliceWithIndex(TensorInfo<int64_t, IndexType> out,
                    IndexType totalSlices,
                    IndexType sliceSize,
                    IndexType sliceStride) {
-  auto &queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto &queue = getCurrentDPCPPStream().dpcpp_queue();
   int64_t local_size = queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
   auto cgf = DP_Q_CGF(cgh) {
-    auto out_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, out.data);
+    auto out_acc = DPCPPAccessor<dp_w_mode>(cgh, out.data);
     auto kfn = DP_Q_KFN(DP::nd_item<1> item_id) {
       IndexType local_id = item_id.get_local_id(0);
       IndexType slice = item_id.get_group_linear_id();
@@ -52,7 +53,7 @@ void fillSliceWithIndex(TensorInfo<int64_t, IndexType> out,
         base[i * sliceStride] = i /* + TH_INDEX_BASE */;
       }
     };
-    cgh.parallel_for<fill_slice_sycl_ker<IndexType, Dim>>(
+    cgh.parallel_for<fill_slice_dpcpp_ker<IndexType, Dim>>(
       DP::nd_range<1>(DP::range<1>(totalSlices*local_size),
       DP::range<1>(local_size)), kfn);
   };
@@ -64,7 +65,7 @@ void fillSliceWithIndex(TensorInfo<int64_t, IndexType> out,
 
 Tensor& fill_out(Tensor& self, Scalar value) {
   auto iter = TensorIterator::nullary_op(self);
-  impl::fill_kernel_sycl(iter, value);
+  impl::fill_kernel_dpcpp(iter, value);
   return self;
 }
 
@@ -83,7 +84,7 @@ Tensor& zero_(Tensor &self) {
 
 Tensor & fill_slice_with_index(Tensor & t, int dim) {
   int64_t dims = t.dim() == 0 ? 1 : t.dim();
-  TORCH_CHECK(dims <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
+  TORCH_CHECK(dims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(t.scalar_type() == at::kLong ||
               t.scalar_type() == at::kInt, "non integer tensor");
 

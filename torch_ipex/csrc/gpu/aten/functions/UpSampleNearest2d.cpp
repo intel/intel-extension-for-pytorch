@@ -7,7 +7,7 @@
 #include <functions/UpSample.h>
 
 
-using namespace at::native;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -27,14 +27,14 @@ static void upsample_nearest2d_out_frame(
   const float height_scale = (float) input_height / (float) output_height;
   const float width_scale = (float) input_width / (float) output_width;
 
-  auto sycl_queue = c10::sycl::syclGetCurrentQueue();
+  auto dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, grng, tile_size;
-  c10::sycl::parallel_for_setup(onum, tile_size, rng, grng);
+  parallel_for_setup(onum, tile_size, rng, grng);
 
   // command group functions
   auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, idata);
-    auto out_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, odata);
+    auto in_acc = DPCPPAccessor<dp_r_mode>(cgh, idata);
+    auto out_acc = DPCPPAccessor<dp_w_mode>(cgh, odata);
     const int n = output_height * output_width;
 
     // kernel function per work-item
@@ -73,12 +73,12 @@ static void upsample_nearest2d_out_frame(
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(nearest_neighbor_4d_sycl_kernel, scalar_t)>(
+    cgh.parallel_for<DP_K(nearest_neighbor_4d_dpcpp_kernel, scalar_t)>(
       DP::nd_range<1>(DP::range<1>(grng), DP::range<1>(tile_size)), kfn);
   };
 
-  // submit to SYCL queue
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  // submit to DPCPP queue
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 /*template <typename scalar_t>
@@ -95,15 +95,15 @@ static void upsample_nearest2d_backward_out_frame(
   const float height_scale = (float) input_height / (float) output_height;
   const float width_scale = (float) input_width / (float) output_width;
 
-  auto sycl_queue = c10::sycl::syclGetCurrentQueue();
+  auto dpcpp_queue = dpcppGetCurrentQueue();
   int64_t rng, grng, tile_size;
-  c10::sycl::parallel_for_setup(onum, tile_size, rng, grng);
+  parallel_for_setup(onum, tile_size, rng, grng);
 
   // command group functions
   auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, idata); 
-    auto out_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, odata); 
-    auto in_acc_read = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, odata); 
+    auto in_acc = DPCPPAccessor<dp_w_mode>(cgh, idata); 
+    auto out_acc = DPCPPAccessor<dp_r_mode>(cgh, odata); 
+    auto in_acc_read = DPCPPAccessor<dp_r_mode>(cgh, odata); 
 
     // kernel function per work-item
     auto kfn = DP_Q_KFN(DP::nd_item<1> item) {
@@ -146,12 +146,12 @@ static void upsample_nearest2d_backward_out_frame(
     };
 
     // kick off kernel
-    cgh.parallel_for<DP_K(nearest_neighbor_4d_bwd_sycl_kernel, scalar_t)>(
+    cgh.parallel_for<DP_K(nearest_neighbor_4d_bwd_dpcpp_kernel, scalar_t)>(
       DP::nd_range<1>(DP::range<1>(grng), DP::range<1>(tile_size)), kfn);
   };
 
-  // submit to SYCL queue
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  // submit to DPCPP queue
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }*/
 
 static void upsample_nearest2d_out_template(

@@ -5,7 +5,7 @@
 #include <core/Memory.h>
 
 
-using namespace at::native;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -70,12 +70,12 @@ void SoftMaxForward(scalar_t *output, scalar_t *input, int classes, int out_size
   static const auto write_mode = DP::access::mode::discard_write;
   static const auto read_mode = DP::access::mode::read;
   using local_accessor_t = DP::accessor<scalar_t, 1, DP::access::mode::read_write, DP::access::target::local>;
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
-  int64_t local_size = sycl_queue.get_device(). template get_info<DP::info::device::max_work_group_size>();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  int64_t local_size = dpcpp_queue.get_device(). template get_info<DP::info::device::max_work_group_size>();
   int64_t global_size = out_size * local_size;
-  sycl_queue.submit([&](DP::handler &cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, input, out_size*classes * sizeof(scalar_t));
-    auto out_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, output, out_size*classes * sizeof(scalar_t));
+  dpcpp_queue.submit([&](DP::handler &cgh) {
+    auto in_acc = DPCPPAccessor<read_mode>(cgh, input, out_size*classes * sizeof(scalar_t));
+    auto out_acc = DPCPPAccessor<write_mode>(cgh, output, out_size*classes * sizeof(scalar_t));
     auto local_acc_max = local_accessor_t(local_size, cgh);
     auto local_acc_sum = local_accessor_t(local_size, cgh);
     cgh.parallel_for<SoftmaxForwardKernelName<scalar_t, Epilogue> > (
@@ -126,13 +126,13 @@ void SoftMaxBackward(scalar_t* gradInput, scalar_t *output, scalar_t *gradOutput
   static const auto write_mode = DP::access::mode::discard_write;
   static const auto read_mode = DP::access::mode::read;
   using local_accessor_t = DP::accessor<scalar_t, 1, DP::access::mode::read_write, DP::access::target::local>;
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
-  int64_t local_size = sycl_queue.get_device(). template get_info<DP::info::device::max_work_group_size>();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  int64_t local_size = dpcpp_queue.get_device(). template get_info<DP::info::device::max_work_group_size>();
   int64_t global_size = out_size * local_size;
-  sycl_queue.submit([&](DP::handler &cgh) {
-    auto gradInput_acc = c10::sycl::SYCLAccessor<write_mode>(cgh, gradInput, out_size*classes * sizeof(scalar_t));
-    auto output_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, output, out_size*classes * sizeof(scalar_t));
-    auto gradOutput_acc = c10::sycl::SYCLAccessor<read_mode>(cgh, gradOutput, out_size*classes * sizeof(scalar_t));
+  dpcpp_queue.submit([&](DP::handler &cgh) {
+    auto gradInput_acc = DPCPPAccessor<write_mode>(cgh, gradInput, out_size*classes * sizeof(scalar_t));
+    auto output_acc = DPCPPAccessor<read_mode>(cgh, output, out_size*classes * sizeof(scalar_t));
+    auto gradOutput_acc = DPCPPAccessor<read_mode>(cgh, gradOutput, out_size*classes * sizeof(scalar_t));
     auto local_acc_sum = local_accessor_t(local_size, cgh);
     cgh.parallel_for<SoftmaxBackwardKernelName<scalar_t, Epilogue> > (
         DP::nd_range<1>(DP::range<1>(global_size), DP::range<1>(local_size)),
@@ -165,14 +165,14 @@ void SoftMaxBackward(scalar_t* gradInput, scalar_t *output, scalar_t *gradOutput
 
 template <template <typename> class Epilogue>
 Tensor host_softmax(const Tensor &input_, const int64_t dim_, const bool half_to_float) {
-  AT_ASSERTM(!half_to_float, "softmax with half to float conversion is not supported on SYCL");
+  AT_ASSERTM(!half_to_float, "softmax with half to float conversion is not supported on DPCPP");
   auto input = input_.contiguous();
-  Tensor output = at::native::empty_like(input);
+  Tensor output = at::empty_like(input);
   if (input.dim() == 0) input = input.view(1);
   int64_t dim =  maybe_wrap_dim(dim_, input.dim());
   TORCH_CHECK(
       dim >= 0 && dim < input.dim(),
-      "** sycl dim must be non-negative and less than input dimensions");
+      "** dpcpp dim must be non-negative and less than input dimensions");
 
   int64_t outer_size = 1;
   int64_t dim_size = input.size(dim);
@@ -197,7 +197,7 @@ Tensor host_softmax(const Tensor &input_, const int64_t dim_, const bool half_to
 
 template <template <typename> class Epilogue>
 Tensor host_softmax_backward(const Tensor &grad_, const Tensor &output_, int64_t dim_, bool half_to_float) {
-  AT_ASSERTM(!half_to_float, "softmax with half to float conversion is not supported on SYCL");
+  AT_ASSERTM(!half_to_float, "softmax with half to float conversion is not supported on DPCPP");
   int64_t dim = maybe_wrap_dim(dim_, grad_.dim());
   auto grad = grad_.contiguous();
   Tensor gI = at::empty_like(grad);
@@ -232,7 +232,7 @@ Tensor _softmax_backward_data(const Tensor &grad,
   bool half_to_float = grad.scalar_type() != input.scalar_type();
   if (half_to_float) {
     TORCH_CHECK(!half_to_float,
-        "softmax backward with half to float conversion is not supported on SYCL");
+        "softmax backward with half to float conversion is not supported on DPCPP");
   }
   Tensor tmp = grad * output;
   return host_softmax_backward<impl::SoftMaxBackwardEpilogue>(
@@ -248,7 +248,7 @@ Tensor _log_softmax_backward_data(const Tensor &grad,
   bool half_to_float = grad.scalar_type() != input.scalar_type();
   if (half_to_float) {
     AT_ASSERTM(!half_to_float,
-        "softmax with half to float conversion is not supported on SYCL");
+        "softmax with half to float conversion is not supported on DPCPP");
   }
   return host_softmax_backward<impl::LogSoftMaxBackwardEpilogue>(
       grad, output, dim, half_to_float);

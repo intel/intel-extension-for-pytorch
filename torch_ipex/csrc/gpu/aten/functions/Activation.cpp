@@ -7,7 +7,9 @@
 #include <functions/Loops.h>
 
 
-namespace at { namespace native {
+namespace at {
+namespace AtenIpexTypeDPCPP {
+namespace impl {
 
 template <typename scalar_t>
 static inline bool is_contiguous(const int64_t* strides)
@@ -18,15 +20,15 @@ static inline bool is_contiguous(const int64_t* strides)
 }
 
 template <typename scalar_t>
-static void sycl_threshold_kernel(TensorIterator& iter) {
+static void dpcpp_threshold_kernel(TensorIterator& iter) {
   auto loop = [&](char**data, const int64_t* strides, int64_t n) {
-    sycl_eltwise_backward<mkldnn::algorithm::eltwise_relu>(
+    dpcpp_eltwise_backward<mkldnn::algorithm::eltwise_relu>(
         data[0], data[1], data[2], n, 0.0f, 0.0f); };
   iter.serial_for_each(loop, {0L, iter.numel()});
 }
 
 
-//Note: sycl compiler does not support uname type in template.
+//Note: dpcpp compiler does not support uname type in template.
 class SyclOpThreshold{};
 
 static void threshold_kernel(TensorIterator& iter, Scalar threshold_scalar, Scalar value_scalar) {
@@ -44,9 +46,9 @@ static void threshold_kernel(TensorIterator& iter, Scalar threshold_scalar, Scal
     }
     if (threshold == 0 && value == 0 && all_contiguous && !use_fp16
         /*is_contiguous<scalar_t>(iter.get_strides().data())*/) {
-      sycl_threshold_kernel<scalar_t>(iter);
+      dpcpp_threshold_kernel<scalar_t>(iter);
     } else {
-      sycl_kernel_for_tensor_iter<SyclOpThreshold>(
+      dpcpp_kernel_for_tensor_iter<SyclOpThreshold>(
         iter, [=](scalar_t x, scalar_t other) -> scalar_t {
           return x <= threshold ? value : other;
         });
@@ -54,9 +56,7 @@ static void threshold_kernel(TensorIterator& iter, Scalar threshold_scalar, Scal
   });
 }
 
-}} //namepsace at::native
-
-namespace at { namespace AtenIpexTypeDPCPP {
+} // namepsace impl
 
 Tensor relu(const Tensor & self) {
   return at::threshold(self, 0, 0);
@@ -74,7 +74,7 @@ static Tensor threshold_out(
     const Tensor& other) {
   Tensor result = opt_result.value_or(Tensor());
   auto iter = TensorIterator::binary_op(result, self, other);
-  at::native::threshold_kernel(iter, threshold, value);
+  impl::threshold_kernel(iter, threshold, value);
   return iter.output();
 }
 
@@ -91,7 +91,6 @@ Tensor threshold_out(Tensor& result, const Tensor& self, Scalar threshold, Scala
   threshold_out(make_optional(result), self, threshold, value, self);
   return result;
 }
-
 
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

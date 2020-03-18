@@ -9,50 +9,24 @@
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
 #include <utils/Numerics.h>
-#include <functions/Resize.h>
+#include <ATen/aten_ipex_type_dpcpp.h>
+
+
+using namespace at::dpcpp;
+using namespace at::native;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
+namespace impl {
 
-Tensor empty(IntArrayRef size, const TensorOptions& options, c10::optional<MemoryFormat> optional_memory_format) {
-  AT_ASSERT(options.backend() == at::Backend::DPCPP);
-  // AT_ASSERT(!options.is_variable()); // is_variable should have been "unpacked"
-
-  auto* allocator = at::sycl::getSYCLDeviceAllocator();
-  int64_t nelements = prod_intlist(size);
-  auto dtype = options.dtype();
-  auto storage_impl =  c10::make_intrusive<StorageImpl>(
-    dtype,
-    nelements,
-    allocator->allocate(nelements * dtype.itemsize()),
-    allocator,
-    /*resizeable=*/true);
-
-  auto tensor = detail::make_tensor<TensorImpl>(storage_impl, at::torch_ipex::DPCPPTensorId());
-  // Default TensorImpl has size [0]
-  if (size.size() != 1 || size[0] != 0) {
-    tensor.unsafeGetTensorImpl()->set_sizes_contiguous(size);
-  }
-
-  auto memory_format = optional_memory_format.value_or(MemoryFormat::Contiguous);
-  tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
-  return tensor;
-}
-
-} // namespace AtenIpexTypeDPCPP
-} // namespace at
-
-namespace at {
-namespace native {
-
-Tensor empty_strided_sycl(IntArrayRef size, IntArrayRef stride, const TensorOptions& options) {
+Tensor empty_strided_dpcpp(IntArrayRef size, IntArrayRef stride, const TensorOptions& options) {
   check_size_nonnegative(size);
   auto t = at::AtenIpexTypeDPCPP::empty({0}, options, c10::nullopt);
   TensorImpl_resizeImpl(t.unsafeGetTensorImpl(), size, stride);
   return t;
 }
 
-Tensor& eye_out_sycl(Tensor& result, int64_t n, int64_t m) {
+Tensor& eye_out_dpcpp(Tensor& result, int64_t n, int64_t m) {
   TORCH_CHECK(n >= 0, "n must be greater or equal to 0, got ", n);
 
   if(m < 0) {
@@ -70,13 +44,13 @@ Tensor& eye_out_sycl(Tensor& result, int64_t n, int64_t m) {
   return result;
 }
 
-Tensor& eye_out_sycl(Tensor& result, int64_t n) {
-  return at::native::eye_out_sycl(result, n, /*m=*/-1);
+Tensor& eye_out_dpcpp(Tensor& result, int64_t n) {
+  return eye_out_dpcpp(result, n, /*m=*/-1);
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ triangle ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-namespace triangle_sycl {
+namespace triangle_dpcpp {
 // To find the max integer that does not exceed the root of an int64_t variable,
 // we could use a loop to test one bit at a time, which takes up to 31
 // iterations. This would give the accurate result, but is relatively slow and
@@ -95,16 +69,16 @@ inline int64_t resolve_root_int(int64_t b, int64_t cX4, int64_t x, int32_t sign)
   // precision) to double (52 bits precision)
   double sr = DP::sqrt((double)bXb_cX4);
   //
-  // TODO: CUDA uses ::__double2ll_rd. No corresponding API in SYCL.
+  // TODO: CUDA uses ::__double2ll_rd. No corresponding API in DPCPP.
   // uses std::llround or std::ceil or std::float will cause error:
-  // terminate called after throwing an instance of 'cl::sycl::compile_program_error'.
+  // terminate called after throwing an instance of 'DP::compile_program_error'.
   //
   int64_t res = static_cast<int64_t>((-b + sign * sr)/2);
 
   // have to cast double to int64_t, otherwise it would only compare up to the
   // precision of a double variable, ignoring the precision loss
   if (bXb_cX4 != (int64_t) (sr * sr)) {
-    // TODO:CUDA uses ::__double2ll_rd && ::__double2ll_ru. No corresponding API in SYCL.
+    // TODO:CUDA uses ::__double2ll_rd && ::__double2ll_ru. No corresponding API in DPCPP.
   }
 
   return res;
@@ -137,21 +111,21 @@ DP_DEF_K1(trilIndicesSycl);
 
 template <typename scalar_t>
 void
-triu_indices_sycl_kernel(scalar_t * tensor,
+triu_indices_dpcpp_kernel(scalar_t * tensor,
                          int64_t col_offset,
                          int64_t m_first_row,
                          int64_t col,
                          int64_t rectangle_size,
                          int64_t triu_size) {
 
-  auto queue         = c10::sycl::syclGetCurrentQueue();
-  int64_t group_size = c10::sycl::syclMaxWorkGroupSize(queue);
+  auto queue         = dpcppGetCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto totalElements = triu_size;
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, tensor);
+    auto acc = DPCPPAccessor<dp_w_mode>(cgh, tensor);
 
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto tensor_ptr = acc.template get_pointer<scalar_t>();
@@ -164,7 +138,7 @@ triu_indices_sycl_kernel(scalar_t * tensor,
           c = linearIndex % col;
         } else {
           // the coordinate falls in the bottom trapezoid
-          triangle_sycl::get_coordinate_in_triu_trapezoid(
+          triangle_dpcpp::get_coordinate_in_triu_trapezoid(
             m_first_row, linearIndex - rectangle_size, r, c);
           r += rectangle_size / col;
         }
@@ -183,21 +157,21 @@ triu_indices_sycl_kernel(scalar_t * tensor,
 
 template <typename scalar_t>
 void
-tril_indices_sycl_kernel(scalar_t * tensor,
+tril_indices_dpcpp_kernel(scalar_t * tensor,
                          int64_t row_offset,
                          int64_t m_first_row,
                          int64_t col,
                          int64_t trapezoid_size,
                          int64_t tril_size) {
 
-  auto queue         = c10::sycl::syclGetCurrentQueue();
-  int64_t group_size = c10::sycl::syclMaxWorkGroupSize(queue);
+  auto queue         = dpcppGetCurrentQueue();
+  int64_t group_size = dpcppMaxWorkGroupSize(queue);
   auto totalElements = tril_size;
   auto num_groups    = CeilDiv(totalElements, group_size);
   auto total_items   = num_groups * group_size;
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, tensor);
+    auto acc = DPCPPAccessor<dp_w_mode>(cgh, tensor);
 
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto tensor_ptr = acc.template get_pointer<scalar_t>();
@@ -206,7 +180,7 @@ tril_indices_sycl_kernel(scalar_t * tensor,
            linearIndex < totalElements; linearIndex += item.get_global_range()[0]) {
         if (linearIndex < trapezoid_size) {
           // the coordinate is within the top trapezoid
-          triangle_sycl::get_coordinate_in_tril_trapezoid(m_first_row, linearIndex, r, c);
+          triangle_dpcpp::get_coordinate_in_tril_trapezoid(m_first_row, linearIndex, r, c);
         } else {
           // the coordinate falls in the bottom rectangle
           auto surplus = linearIndex - trapezoid_size;
@@ -228,7 +202,7 @@ tril_indices_sycl_kernel(scalar_t * tensor,
   DP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-Tensor triu_indices_sycl(int64_t row, int64_t col, int64_t offset, const TensorOptions& options) {
+Tensor triu_indices_dpcpp(int64_t row, int64_t col, int64_t offset, const TensorOptions& options) {
 
   check_args(row, col, options);
 
@@ -248,7 +222,7 @@ Tensor triu_indices_sycl(int64_t row, int64_t col, int64_t offset, const TensorO
     }
 
     AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, tensor.scalar_type(), "triu_indices_cuda", [&] {
-      triu_indices_sycl_kernel<scalar_t>(
+      triu_indices_dpcpp_kernel<scalar_t>(
         tensor.data_ptr<scalar_t>(),
         std::max<int64_t>(0, offset),
         m_first_row,
@@ -261,7 +235,7 @@ Tensor triu_indices_sycl(int64_t row, int64_t col, int64_t offset, const TensorO
   return tensor;
 }
 
-Tensor tril_indices_sycl(int64_t row, int64_t col, int64_t offset, const TensorOptions& options) {
+Tensor tril_indices_dpcpp(int64_t row, int64_t col, int64_t offset, const TensorOptions& options) {
   check_args(row, col, options);
 
   auto tril_size = get_tril_size(row, col, offset);
@@ -279,8 +253,8 @@ Tensor tril_indices_sycl(int64_t row, int64_t col, int64_t offset, const TensorO
       rectangle_size = (row - rectangle_row_offset) * col;
     }
 
-    AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, tensor.scalar_type(), "tril_indices_sycl", [&] {
-      tril_indices_sycl_kernel<scalar_t>(
+    AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, tensor.scalar_type(), "tril_indices_dpcpp", [&] {
+      tril_indices_dpcpp_kernel<scalar_t>(
         tensor.data_ptr<scalar_t>(),
         trapezoid_row_offset,
         m_first_row,
@@ -293,26 +267,49 @@ Tensor tril_indices_sycl(int64_t row, int64_t col, int64_t offset, const TensorO
   return tensor;
 }
 
-} // namespace native
-} // namespace at
+} // namespace impl
 
-namespace at { namespace AtenIpexTypeDPCPP {
+Tensor empty(IntArrayRef size, const TensorOptions& options, c10::optional<MemoryFormat> optional_memory_format) {
+  AT_ASSERT(options.backend() == at::Backend::DPCPP);
+  // AT_ASSERT(!options.is_variable()); // is_variable should have been "unpacked"
+
+  auto* allocator = at::dpcpp::getDPCPPDeviceAllocator();
+  int64_t nelements = prod_intlist(size);
+  auto dtype = options.dtype();
+  auto storage_impl =  c10::make_intrusive<StorageImpl>(
+    dtype,
+    nelements,
+    allocator->allocate(nelements * dtype.itemsize()),
+    allocator,
+    /*resizeable=*/true);
+
+  auto tensor = detail::make_tensor<TensorImpl>(storage_impl, at::torch_ipex::DPCPPTensorId());
+  // Default TensorImpl has size [0]
+  if (size.size() != 1 || size[0] != 0) {
+    tensor.unsafeGetTensorImpl()->set_sizes_contiguous(size);
+  }
+
+  auto memory_format = optional_memory_format.value_or(MemoryFormat::Contiguous);
+  tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
+  return tensor;
+}
+
 Tensor empty_strided(IntArrayRef size, IntArrayRef stride, const TensorOptions & options){
-  return at::native::empty_strided_sycl(size, stride, options);
+  return impl::empty_strided_dpcpp(size, stride, options);
 }
 Tensor & eye_out(Tensor & out, int64_t n){
-  at::native::eye_out_sycl(out, n);
+  impl::eye_out_dpcpp(out, n);
   return out;
 }
 Tensor & eye_out(Tensor & out, int64_t n, int64_t m){
-  at::native::eye_out_sycl(out, n, m);
+  impl::eye_out_dpcpp(out, n, m);
   return out;
 }
 Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options){
-  return at::native::tril_indices_sycl(row, col, offset, options);
+  return impl::tril_indices_dpcpp(row, col, offset, options);
 }
 Tensor triu_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options){
-  return at::native::triu_indices_sycl(row, col, offset, options);
+  return impl::triu_indices_dpcpp(row, col, offset, options);
 }
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

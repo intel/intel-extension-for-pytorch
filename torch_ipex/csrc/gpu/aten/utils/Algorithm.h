@@ -8,7 +8,7 @@
 
 // alternative for cuda thrust::tabulate
 template <typename ForwardIterator, typename UnaryOp>
-static inline void sycl_tabulate(ForwardIterator begin,
+static inline void dpcpp_tabulate(ForwardIterator begin,
     ForwardIterator end, UnaryOp unary_op) {
   for (int i = 0; (begin + i) != end; ++i) {
     *(begin + i) = unary_op(i);
@@ -18,7 +18,7 @@ static inline void sycl_tabulate(ForwardIterator begin,
 // alternative for cuda thrust::inclusive_scan
 template <typename InputIterator,
           typename OutputIterator, typename AssociativeOperator>
-static inline void sycl_inclusive_scan(InputIterator first,
+static inline void dpcpp_inclusive_scan(InputIterator first,
     InputIterator last, OutputIterator result, AssociativeOperator binary_op) {
   for (int i = 0; (first + i) != last; ++i) {
     if (i == 0) *result = *first;
@@ -31,7 +31,7 @@ static inline void sycl_inclusive_scan(InputIterator first,
 // alternative for cuda thrust::exclusive_scan
 template <typename InputIterator,
           typename OutputIterator, typename T, typename AssociativeOperator>
-static inline void sycl_exclusive_scan(InputIterator first,
+static inline void dpcpp_exclusive_scan(InputIterator first,
                          InputIterator last,
                          OutputIterator result,
                          T init,
@@ -47,7 +47,7 @@ static inline void sycl_exclusive_scan(InputIterator first,
 
 // alternative for cude thrust::identity
 template <typename T>
-DP_DEVICE struct sycl_identity {
+DP_DEVICE struct dpcpp_identity {
   T const &operator()(T const &t) const {
     return t;
   }

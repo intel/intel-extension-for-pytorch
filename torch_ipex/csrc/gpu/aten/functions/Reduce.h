@@ -21,11 +21,12 @@
 #include <utility>
 
 
+using namespace at::dpcpp;
+using at::dpcpp::Array;
+
 DP_DEF_K1(reduce_kernel);
 
-namespace at { namespace native {
-
-using at::sycl::Array;
+namespace at { namespace dpcpp {
 
 static inline int64_t div_up(int64_t a, int64_t b) {
   return (a + b - 1) / b;
@@ -372,7 +373,7 @@ struct ReduceOp {
     const dp_global_ptr_pt<out_scalar_t> &out, arg_t,
     typename std::enable_if<!can_acc>::type* = nullptr
   ) const {
-    // TODO: Replace following assert with sycl counterparts.
+    // TODO: Replace following assert with dpcpp counterparts.
     // assert(false); // can't use AT_ASSERT in Cuda.
     return arg_t {};
   }
@@ -498,35 +499,35 @@ template <typename DataType, typename R>
 static void launch_reduce_kernel(const ReduceConfig& config, const R reduction) {
   using acc_t = typename R::arg_t;
   using output_t = typename R::out_t;
-  auto queue = c10::sycl::syclGetCurrentQueue();
+  auto queue = dpcppGetCurrentQueue();
   DP::buffer<uint8_t, 1> dummy_buffer(DP::range<1>(1));
 
   // This is a work-around because dp_discard_w_mode doesn't work in some conditions
-  c10::sycl::syclMemsetAsync(reduction.dst0, 0, sizeof(output_t) * config.num_outputs); 
+  dpcppMemsetAsync(reduction.dst0, 0, sizeof(output_t) * config.num_outputs); 
   if (reduction.noutputs > 1) {
-    c10::sycl::syclMemsetAsync(reduction.dst1, 0, sizeof(output_t) * config.num_outputs);
+    dpcppMemsetAsync(reduction.dst1, 0, sizeof(output_t) * config.num_outputs);
   }
 
 
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, reduction.src);
-    auto out0_acc = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, 
+    auto in_acc = DPCPPAccessor<dp_r_mode>(cgh, reduction.src);
+    auto out0_acc = DPCPPAccessor<dp_discard_w_mode>(cgh, 
                                                                reduction.dst0, 
                                                                sizeof(output_t) * config.num_outputs);
     auto out1_acc = reduction.noutputs <= 1 ?
-        c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, dummy_buffer) :  // dummy
-        c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, 
+        DPCPPAccessor<dp_discard_w_mode>(cgh, dummy_buffer) :  // dummy
+        DPCPPAccessor<dp_discard_w_mode>(cgh, 
                                                    reduction.dst1, 
                                                    sizeof(output_t) * config.num_outputs);
     auto local_acc = dp_local_acc_t<acc_t>(config.work_group_size, cgh);
 
     auto global_reduce_acc = config.should_global_reduce()
-      ? c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, reduction.buffer)
-      : c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, dummy_buffer); // dummy
+      ? DPCPPAccessor<dp_rw_mode>(cgh, reduction.buffer)
+      : DPCPPAccessor<dp_rw_mode>(cgh, dummy_buffer); // dummy
     auto sema_acc = config.should_global_reduce()
-      ? c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, reduction.semaphores)
-      : c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, dummy_buffer); // dummy
+      ? DPCPPAccessor<dp_rw_mode>(cgh, reduction.semaphores)
+      : DPCPPAccessor<dp_rw_mode>(cgh, dummy_buffer); // dummy
 
     auto kfn = DP_Q_KFN(DP::nd_item<2> item_id) {
       auto in_ptr = in_acc.template get_pointer<char>();
@@ -546,7 +547,7 @@ static void launch_reduce_kernel(const ReduceConfig& config, const R reduction) 
 }
 
 template <typename scalar_t, typename out_scalar_t, int vt0=4, typename ops_t, typename ident_t=double>
-inline void sycl_reduce_kernel(TensorIterator& iter, const ops_t& ops, ident_t ident=0) {
+inline void dpcpp_reduce_kernel(TensorIterator& iter, const ops_t& ops, ident_t ident=0) {
   AT_ASSERT(iter.numel() > 0 && iter.ntensors() - iter.noutputs() == 1 && iter.noutputs() >= 1);
 
   using traits = binary_function_traits<decltype(&ops_t::reduce)>;
@@ -556,7 +557,7 @@ inline void sycl_reduce_kernel(TensorIterator& iter, const ops_t& ops, ident_t i
   bool can_use_32bit_indexing = iter.can_use_32bit_indexing();
   if (can_accumulate_in_output && !can_use_32bit_indexing) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
-      sycl_reduce_kernel<scalar_t, out_scalar_t, vt0>(sub_iter, ops, ident);
+      dpcpp_reduce_kernel<scalar_t, out_scalar_t, vt0>(sub_iter, ops, ident);
     }
     return;
   }
@@ -571,8 +572,8 @@ inline void sycl_reduce_kernel(TensorIterator& iter, const ops_t& ops, ident_t i
     out_data_extra = nullptr;
   }
 
-  auto queue = c10::sycl::syclGetCurrentQueue();
-  int64_t wg_size = c10::sycl::syclMaxWorkGroupSize(queue);
+  auto queue = dpcppGetCurrentQueue();
+  int64_t wg_size = dpcppMaxWorkGroupSize(queue);
   // firstly hardcoded; to be replaced with get_sub_group_max_size
   int sg_size = DP_SUB_GROUP_SIZE;
   int sgs_per_wg = wg_size / sg_size;
@@ -612,10 +613,10 @@ inline void sycl_reduce_kernel(TensorIterator& iter, const ops_t& ops, ident_t i
   at::DataPtr buffer;
   at::DataPtr semaphores;
   if (config.should_global_reduce()) {
-    auto& allocator = *sycl::getSYCLDeviceAllocator();
+    auto& allocator = *dpcpp::getDPCPPDeviceAllocator();
     buffer = allocator.allocate(config.global_memory_size());
     semaphores = allocator.allocate(config.semaphore_size());
-    c10::sycl::syclMemset(semaphores.get(), 0, config.semaphore_size());
+    dpcppMemset(semaphores.get(), 0, config.semaphore_size());
   }
 
   if (can_use_32bit_indexing) {
@@ -656,4 +657,4 @@ inline void sycl_reduce_kernel(TensorIterator& iter, const ops_t& ops, ident_t i
   }
 }
 
-}} // namespace at::native
+}} // namespace at::dpcpp

@@ -8,13 +8,13 @@ static inline void checkSameDPCPP(at::CheckedFrom c, const at::TensorArg& t1, co
   if ((t1->device().type() != at::kDPCPP) || (t2->device().type() != at::kDPCPP)) {
     std::ostringstream oss;
     if (t1->device().type() != at::kDPCPP) {
-      oss << "Tensor for " << t1 << " is not on SYCL, ";
+      oss << "Tensor for " << t1 << " is not on DPCPP, ";
     }
     if (t2->device().type() != at::kDPCPP) {
-      oss << "Tensor for " << t2 << " is not on SYCL, ";
+      oss << "Tensor for " << t2 << " is not on DPCPP, ";
     }
     oss << "but expected " << ((!(t1->device().type() == at::kDPCPP || t2->device().type() == at::kDPCPP)) ? "them" : "it")
-        << " to be on SYCL (while checking arguments for " << c << ")";
+        << " to be on DPCPP (while checking arguments for " << c << ")";
     AT_ERROR(oss.str());
   }
   AT_CHECK(

@@ -1,8 +1,11 @@
 #ifndef ATOMICS_INC
 #define ATOMICS_INC
 
-#include <core/Utils.h>
+#include <core/DPCPP.h>
+#include <core/DPCPPUtils.h>
 
+
+using namespace at::dpcpp;
 
 static inline DP_DEVICE void atomicAdd(const dp_global_ptr_pt<float> &address, float val) {
   uint32_t* address_as_ull = (uint32_t*)address;
@@ -13,7 +16,7 @@ static inline DP_DEVICE void atomicAdd(const dp_global_ptr_pt<float> &address, f
   DP::atomic<uint32_t> address_var(address_multi_ptr);
 
   do {
-    newval = c10::sycl::__float_as_int(val + c10::sycl::__int_as_float(assumed));
+    newval = __float_as_int(val + __int_as_float(assumed));
   } while (!address_var.compare_exchange_strong(assumed, newval));
 }
 

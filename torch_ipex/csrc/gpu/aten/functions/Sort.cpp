@@ -8,7 +8,8 @@
 #include "Sort.h"
 
 
-using namespace at::sycl::detail;
+using namespace at::dpcpp::detail;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -16,11 +17,11 @@ namespace AtenIpexTypeDPCPP {
 std::tuple<Tensor &, Tensor &>
 sort_out(Tensor & sorted, Tensor & indices, const Tensor & input, long dim, bool order) {
   int64_t dims = sorted.dim() == 0 ? 1 : sorted.dim();
-  TORCH_CHECK(dims <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
+  TORCH_CHECK(dims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   dims = input.dim() == 0 ? 1 : input.dim();
-  TORCH_CHECK(dims <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
+  TORCH_CHECK(dims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   dims = indices.dim() == 0 ? 1 : indices.dim();
-  TORCH_CHECK(dims <= MAX_SYCLTORCH_DIMS, SYCLTORCH_DIM_WARNING);
+  TORCH_CHECK(dims <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
 
   // Make sure sufficient output space is allocated
   sorted.resize_as_(input);

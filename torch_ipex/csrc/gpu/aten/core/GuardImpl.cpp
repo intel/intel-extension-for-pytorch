@@ -1,11 +1,11 @@
 #include <core/GuardImpl.h>
 
-namespace c10 {
-namespace sycl {
+namespace at {
+namespace dpcpp {
 namespace impl {
 
-constexpr DeviceType SYCLGuardImpl::static_type;
+constexpr DeviceType DPCPPGuardImpl::static_type;
 
-C10_REGISTER_GUARD_IMPL(DPCPP, SYCLGuardImpl);
+C10_REGISTER_GUARD_IMPL(DPCPP, DPCPPGuardImpl);
 
-}}} // namespace c10::sycl::detail
+}}} // namespace at::dpcpp::impl

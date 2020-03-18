@@ -2,9 +2,10 @@
 #include <ATen/native/Repeat.h>
 
 #include <core/Memory.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 
 
+using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
@@ -13,14 +14,14 @@ namespace impl {
 
 DP_DEF_K1(ComputeDpcppKer);
 static void repeat_interleave_dpcpp_kernel(int64_t *repeat_ptr, int64_t *cumsum_ptr, int64_t *result_ptr, int64_t size) {
-  auto queue = c10::sycl::syclGetCurrentQueue();
+  auto queue = dpcppGetCurrentQueue();
   int64_t rng, grng, tile_size;
-  c10::sycl::parallel_for_setup(size, tile_size, rng, grng);
+  parallel_for_setup(size, tile_size, rng, grng);
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto rep_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, repeat_ptr);
-    auto cum_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, cumsum_ptr);
-    auto res_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, result_ptr);
+    auto rep_acc = DPCPPAccessor<dp_rw_mode>(cgh, repeat_ptr);
+    auto cum_acc = DPCPPAccessor<dp_rw_mode>(cgh, cumsum_ptr);
+    auto res_acc = DPCPPAccessor<dp_rw_mode>(cgh, result_ptr);
 
     auto kfn = DP_Q_KFN(DP::nd_item<1>item) {
       auto rep_ptr = rep_acc.template get_pointer<int64_t>();
@@ -51,7 +52,7 @@ static void repeat_interleave_dpcpp_kernel(int64_t *repeat_ptr, int64_t *cumsum_
 } // impl
 
 Tensor repeat_interleave(const Tensor &repeat) {
-  return at::native::repeat_interleave_common<impl::repeat_interleave_dpcpp_kernel>(repeat);
+  return repeat_interleave_common<impl::repeat_interleave_dpcpp_kernel>(repeat);
 }
 
 } // namespace AtenIpexTypeDPCPP

@@ -12,6 +12,7 @@
 #include "SortingRadixSelect.h"
 
 
+using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
@@ -22,25 +23,25 @@ DP_DEF_K2(gatherKthValueKernelName, typename scalar_t, typename index_t, int Dim
 
 template <typename scalar_t, typename index_t, int Dim>
 void gatherKthValue(
-  sycl::detail::TensorInfo<scalar_t, index_t> input,
+  dpcpp::detail::TensorInfo<scalar_t, index_t> input,
   index_t inputSliceSize,
   index_t k,
 
   index_t numInputSlices,
   index_t inputWithinSliceStride,
 
-  sycl::detail::TensorInfo<scalar_t, index_t> kthValue,
-  sycl::detail::TensorInfo<int64_t, index_t> indices) {
+  dpcpp::detail::TensorInfo<scalar_t, index_t> kthValue,
+  dpcpp::detail::TensorInfo<int64_t, index_t> indices) {
   // Indices are limited to integer fp precision, so counts can fit in
   // int32, regardless of index_t
 
-  auto sycl_queue = c10::sycl::syclGetCurrentQueue();
-  int64_t local_size = sycl_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
+  auto dpcpp_queue = dpcppGetCurrentQueue();
+  int64_t local_size = dpcpp_queue.get_device(). template get_info<dp_dev_max_wgroup_size>();
 
   auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, input.data);
-    auto kth_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, kthValue.data);
-    auto indices_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, indices.data);
+    auto in_acc = DPCPPAccessor<dp_r_mode>(cgh, input.data);
+    auto kth_acc = DPCPPAccessor<dp_w_mode>(cgh, kthValue.data);
+    auto indices_acc = DPCPPAccessor<dp_w_mode>(cgh, indices.data);
 
     auto smem = dp_local_acc_t<int>(32, cgh);
     auto kfn = DP_Q_KFN(DP::nd_item<1> item) {
@@ -49,11 +50,11 @@ void gatherKthValue(
 
       // Find the start offset for our slice
       auto sliceStartIndex =
-          sycl::detail::IndexToOffset<scalar_t, index_t, Dim>::get(slice, input);
+          dpcpp::detail::IndexToOffset<scalar_t, index_t, Dim>::get(slice, input);
       auto kthValueSliceStartIndex =
-          sycl::detail::IndexToOffset<scalar_t, index_t, Dim>::get(slice, kthValue);
+          dpcpp::detail::IndexToOffset<scalar_t, index_t, Dim>::get(slice, kthValue);
       auto indicesSliceStartIndex =
-          sycl::detail::IndexToOffset<int64_t, index_t, Dim>::get(slice, indices);
+          dpcpp::detail::IndexToOffset<int64_t, index_t, Dim>::get(slice, indices);
 
       scalar_t* inputSliceStart = in_acc.template get_pointer<scalar_t>() + sliceStartIndex;
       scalar_t* kthValueSliceStart = kth_acc.template get_pointer<scalar_t>() + kthValueSliceStartIndex;
@@ -97,7 +98,7 @@ void gatherKthValue(
       DP::nd_range<1>(DP::range<1>(numInputSlices * local_size), DP::range<1>(local_size)), kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 struct KthValueLauncher {
@@ -107,11 +108,11 @@ struct KthValueLauncher {
 
   template <typename scalar_t, typename index_t, int all_dims>
   inline void launch(
-      sycl::detail::TensorInfo<scalar_t, index_t> values_info,
+      dpcpp::detail::TensorInfo<scalar_t, index_t> values_info,
       int collapse_values_dim,
-      sycl::detail::TensorInfo<int64_t, index_t> indices_info,
+      dpcpp::detail::TensorInfo<int64_t, index_t> indices_info,
       int collapse_indices_dim,
-      sycl::detail::TensorInfo<scalar_t, index_t> self_info,
+      dpcpp::detail::TensorInfo<scalar_t, index_t> self_info,
       int collapse_self_dim,
       int64_t num_slices,
       int64_t slice_size) {
@@ -147,9 +148,9 @@ Tensor median_template(const Tensor& self) {
 
   // Based on required index size, run the algorithm with the
   // appropriate index type
-  if (sycl::detail::canUse32BitIndexMath(self) &&
-      sycl::detail::canUse32BitIndexMath(values) &&
-      sycl::detail::canUse32BitIndexMath(indices)) {
+  if (dpcpp::detail::canUse32BitIndexMath(self) &&
+      dpcpp::detail::canUse32BitIndexMath(values) &&
+      dpcpp::detail::canUse32BitIndexMath(indices)) {
     run_launcher<scalar_t, uint32_t>(
         values,
         indices,
@@ -202,9 +203,9 @@ void kthvalue_template(
 
   // Based on required index size, run the algorithm with the
   // appropriate index type
-  if (sycl::detail::canUse32BitIndexMath(self) &&
-      sycl::detail::canUse32BitIndexMath(values) &&
-      sycl::detail::canUse32BitIndexMath(indices)) {
+  if (dpcpp::detail::canUse32BitIndexMath(self) &&
+      dpcpp::detail::canUse32BitIndexMath(values) &&
+      dpcpp::detail::canUse32BitIndexMath(indices)) {
     run_launcher<scalar_t, uint32_t>(
         values, indices, self, dim, KthValueLauncher(k));
   } else {

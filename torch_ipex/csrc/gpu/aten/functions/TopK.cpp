@@ -12,7 +12,8 @@
 #include "Sort.h"
 
 
-using namespace at::sycl::detail;
+using namespace at::dpcpp::detail;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -207,7 +208,7 @@ DP_DEVICE void countRadixUsingMask(int counts[RADIX_SIZE],
              IndexType sliceSize,
              IndexType withinSliceStride,
              const dp_global_ptr_pt<DataType> &data_ptr,
-             const cl::sycl::nd_item<1> &item_id) {
+             const DP::nd_item<1> &item_id) {
   // Clear out per-thread counts from a previous round
   auto local_id = item_id.get_local_id(0);
   for (int i = 0; i < RADIX_SIZE; ++i) {
@@ -222,7 +223,7 @@ DP_DEVICE void countRadixUsingMask(int counts[RADIX_SIZE],
   item_id.barrier(dp_local_fence);
 
   // scan over all the data, counts per each digit, maybe optimized
-  // with sycl subgroup in the future.
+  // with dpcpp subgroup in the future.
   for (IndexType i = local_id; i < sliceSize; i += item_id.get_local_range(0)) {
     BitDataType val = TopKTypeConfig<DataType>::convert(data_ptr[i * withinSliceStride]);
     BitDataType digitInRadix = Bitfield<BitDataType>::getBitfield(val, radixDigitPos, RADIX_BITS);
@@ -232,7 +233,7 @@ DP_DEVICE void countRadixUsingMask(int counts[RADIX_SIZE],
   }
 
   for (unsigned int i = 0; i < RADIX_SIZE; i++) {
-    cl::sycl::atomic<int, dp_local_space> smem_var(smem_acc.get_pointer() + i);
+    DP::atomic<int, dp_local_space> smem_var(smem_acc.get_pointer() + i);
     smem_var.fetch_add(counts[i]);
   }
 
@@ -254,7 +255,7 @@ DP_DEVICE DataType findPattern(const dp_local_acc_t<int> &smem_acc,
            IndexType withinSliceStride,
            BitDataType desired,
            BitDataType desiredMask,
-           const cl::sycl::nd_item<1> &item_id) {
+           const DP::nd_item<1> &item_id) {
   auto local_id = item_id.get_local_id(0);
   auto smem_ptr = SyclConvertToActualTypePtr(DataType, smem_acc);
   if (local_id < RADIX_SIZE) {
@@ -292,7 +293,7 @@ DP_DEVICE void radixSelect(const dp_global_ptr_pt<DataType> &data_ptr,
                  const IndexType withinSliceStride,
                  const dp_local_acc_t<int> &smem_acc,
                  DataType* topK,
-                 const cl::sycl::nd_item<1> &item_id) {
+                 const DP::nd_item<1> &item_id) {
   // Per-thread buckets into which we accumulate digit counts in our radix
   int counts[RADIX_SIZE];
 
@@ -387,13 +388,13 @@ void gatherTopK(TensorInfo<T, IndexType> input,
                 IndexType topKWithinSliceStride,
                 TensorInfo<int64_t, IndexType> indices,
                 IndexType indicesWithinSliceStride) {
-  auto queue = c10::sycl::syclGetCurrentQueue();
+  auto queue = dpcppGetCurrentQueue();
   int64_t local_size = queue.get_device().
       template get_info<DP::info::device::max_work_group_size>();
   auto cgf = DP_Q_CGF(cgh) {
-    auto in_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, input.data);
-    auto topk_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, topK.data);
-    auto indices_acc = c10::sycl::SYCLAccessor<dp_w_mode>(cgh, indices.data);
+    auto in_acc = DPCPPAccessor<dp_r_mode>(cgh, input.data);
+    auto topk_acc = DPCPPAccessor<dp_w_mode>(cgh, topK.data);
+    auto indices_acc = DPCPPAccessor<dp_w_mode>(cgh, indices.data);
     auto smem_acc = dp_local_acc_t<int>(32, cgh);
     auto smem_scan_acc = dp_local_acc_t<int>(local_size, cgh);
     auto kfn = DP_Q_KFN(DP::nd_item<1> item_id) {
@@ -507,11 +508,11 @@ template <typename scalar_t>
 void Topk(Tensor & topK, Tensor & indices, const Tensor & input_,
           int64_t k, int dim, int dir, int sorted) {
   TORCH_CHECK(topK.defined() && indices.defined() && input_.defined(), "invalid inputs");
-  TORCH_CHECK(topK.dim() <= MAX_SYCLTORCH_DIMS, "invalid topK dim");
+  TORCH_CHECK(topK.dim() <= MAX_DPCPPTORCH_DIMS, "invalid topK dim");
   int64_t dims = indices.dim() == 0 ? 1 : indices.dim();
-  TORCH_CHECK(dims <= MAX_SYCLTORCH_DIMS, "invalid indices dim");
+  TORCH_CHECK(dims <= MAX_DPCPPTORCH_DIMS, "invalid indices dim");
   int numDims = input_.dim() == 0 ? 1 : input_.dim();
-  TORCH_CHECK(numDims <= MAX_SYCLTORCH_DIMS, "invalid input dim");
+  TORCH_CHECK(numDims <= MAX_DPCPPTORCH_DIMS, "invalid input dim");
 
   TORCH_CHECK(dim >= 0 && dim < numDims, "dim not in range");
 
@@ -629,7 +630,7 @@ void Topk(Tensor & topK, Tensor & indices, const Tensor & input_,
       // work inplace along the slice
       SortKeyValueInplace<scalar_t>(topK, indices, dim, dir);
     } else {
-      TORCH_CHECK(false, "SYCL can not support element number to sort is larger than 2048");
+      TORCH_CHECK(false, "DPCPP can not support element number to sort is larger than 2048");
     }
   }
 }
@@ -639,7 +640,7 @@ void Topk(Tensor & topK, Tensor & indices, const Tensor & input_,
 std::tuple<at::Tensor &,at::Tensor &>
 topk_out(at::Tensor & values, at::Tensor & indices,
     const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted) {
-  auto dim_ = maybe_wrap_dim(dim, native::TensorImpl_Unwrap(self));
+  auto dim_ = maybe_wrap_dim(dim, TensorImpl_Unwrap(self));
   AT_DISPATCH_ALL_TYPES(self.scalar_type(), "Topk",
       [&]() {
         Topk<scalar_t>(values, indices, self, k, dim_, largest, sorted);

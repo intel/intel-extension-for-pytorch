@@ -3,14 +3,13 @@
 #include <ATen/Dispatch.h>
 
 #include <core/TensorImplUtils.h>
-#include <functions/Resize.h>
 #include <dnnl/InnerProduct.hpp>
 
 #define ERROR_ONLY_FP_TYPES(func) \
-  AT_ERROR(#func, "for SYCL tensors only supports floating-point types. Try converting the tensors with .float()");
+  AT_ERROR(#func, "for DPCPP tensors only supports floating-point types. Try converting the tensors with .float()");
 
 
-using namespace at::native;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -53,7 +52,7 @@ void mkldnnGemmImpl(Tensor & r_, scalar_t beta,
   else
   {
     // make r_ FORTRAN contiguous
-    AT_ERROR("THSYCL addmm r unsupported transpose");
+    AT_ERROR("THDPCPP addmm r unsupported transpose");
   }
 
   #undef LDC_COND
@@ -81,7 +80,7 @@ void mkldnnGemmImpl(Tensor & r_, scalar_t beta,
   }
   else
   {
-    AT_ERROR("THSYCL addmm m1 unsupported transpose");
+    AT_ERROR("THDPCPP addmm m1 unsupported transpose");
   }
 
   /* m2 */
@@ -100,7 +99,7 @@ void mkldnnGemmImpl(Tensor & r_, scalar_t beta,
   }
   else
   {
-    AT_ERROR("THSYCL addmm m2 unsupported transpose");
+    AT_ERROR("THDPCPP addmm m2 unsupported transpose");
   }
 
   int64_t ldm1 = (transpose_m1 == TRANSPOSE_TRUE ? m1.size(transpose_size0) :
@@ -108,20 +107,20 @@ void mkldnnGemmImpl(Tensor & r_, scalar_t beta,
   int64_t ldm2 = (transpose_m2 == TRANSPOSE_TRUE ? m2.size(transpose_size0) :
                                                     m2.size(transpose_size1));
 
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
-#if defined(THSYCL_REAL_IS_HALF)
-  auto m1_sb = c10::sycl::syclGetBufferMap().template get_buffer<cl::sycl::half>(
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+#if defined(THDPCPP_REAL_IS_HALF)
+  auto m1_sb = dpcppGetBufferMap().template get_buffer<DP::half>(
       m1.data<scalar_t>());
-  auto m2_sb = c10::sycl::syclGetBufferMap().template get_buffer<cl::sycl::half>(
+  auto m2_sb = dpcppGetBufferMap().template get_buffer<DP::half>(
       m2.data<scalar_t>());
-  auto r_sb = c10::sycl::syclGetBufferMap().template get_buffer<cl::sycl::half>(
+  auto r_sb = dpcppGetBufferMap().template get_buffer<DP::half>(
       r_.data<scalar_t>());
 #else
-  auto m1_sb = c10::sycl::syclGetBufferMap().template get_buffer<float>(
+  auto m1_sb = dpcppGetBufferMap().template get_buffer<float>(
       m1.data<scalar_t>());
-  auto m2_sb = c10::sycl::syclGetBufferMap().template get_buffer<float>(
+  auto m2_sb = dpcppGetBufferMap().template get_buffer<float>(
       m2.data<scalar_t>());
-  auto r_sb = c10::sycl::syclGetBufferMap().template get_buffer<float>(
+  auto r_sb = dpcppGetBufferMap().template get_buffer<float>(
       r_.data<scalar_t>());
 #endif
   // assume dnnl_notrans = 0 & dnnl_trans = 1
@@ -135,9 +134,9 @@ void mkldnnGemmImpl(Tensor & r_, scalar_t beta,
 
   // This is a work-around synchronization because we suspect that mkldnn gemm didn't
   // handle Dependency very well.
-  sycl_queue.wait();
+  dpcpp_queue.wait();
 
-  mkldnn::gemm(sycl_queue, transpose_m1_,transpose_m2_, m, n, k, alpha,
+  mkldnn::gemm(dpcpp_queue, transpose_m1_,transpose_m2_, m, n, k, alpha,
                m1_sb, 0, ldm1, m2_sb, 0, ldm2, beta, r_sb, 0, ldr);
   #undef TRANSPOSE_TRUE
   #undef TRANSPOSE_FALSE
@@ -154,20 +153,20 @@ void addmm(Tensor & r_, scalar_t beta,
     AT_ERROR("2D tensor expected, got ", t.dim(), "D tensor for t");
 
   if (m1.size(1) != m2.size(0)) {
-    SYCLDescBuff bm1 = TensorImpl_sizeDesc(m1.unsafeGetTensorImpl());
-    SYCLDescBuff bm2 = TensorImpl_sizeDesc(m2.unsafeGetTensorImpl());
+    DPCPPDescBuff bm1 = TensorImpl_sizeDesc(m1.unsafeGetTensorImpl());
+    DPCPPDescBuff bm2 = TensorImpl_sizeDesc(m2.unsafeGetTensorImpl());
     AT_ERROR("size mismatch, m1: ", bm1.str, " m2: ", bm2.str);
   }
 
   if( (t.size(0) != m1.size(0)) || (t.size(1) != m2.size(1)) ) {
-    SYCLDescBuff bt  = TensorImpl_sizeDesc(t.unsafeGetTensorImpl());
-    SYCLDescBuff bm1 = TensorImpl_sizeDesc(m1.unsafeGetTensorImpl());
-    SYCLDescBuff bm2 = TensorImpl_sizeDesc(m2.unsafeGetTensorImpl());
+    DPCPPDescBuff bt  = TensorImpl_sizeDesc(t.unsafeGetTensorImpl());
+    DPCPPDescBuff bm1 = TensorImpl_sizeDesc(m1.unsafeGetTensorImpl());
+    DPCPPDescBuff bm2 = TensorImpl_sizeDesc(m2.unsafeGetTensorImpl());
     AT_ERROR("size mismatch, t:", bt.str, " m1: ", bm1.str, " m2: ", bm2.str);
   }
 
   if (TensorImpl_Unwrap(t) != TensorImpl_Unwrap(r_)) {
-    at::native::resize_as_sycl_(r_, t);
+    r_.resize_as_(t);
     if (beta != 0.0) {
       r_.copy_(t);
     }
@@ -183,7 +182,7 @@ initTensorArray(const std::vector<at::Tensor> &tensors) {
 
   for (int i = 0; i < numt; i++) {
     Tensor tmp = at::empty({0}, tensors[i].options());
-    at::native::resize_as_sycl_(tmp, tensors[i]);
+    tmp.resize_as_(tensors[i]);
     tmp.copy_(tensors[i]);
     _tensors.push_back(tmp);
   }
@@ -221,7 +220,7 @@ void baddbmm(Tensor & result, scalar_t beta, const Tensor & t,
   TORCH_CHECK(batch1.size(2) == batch2.size(1), "wrong matrix size");
 
   if (TensorImpl_Unwrap(t) != TensorImpl_Unwrap(result)) {
-    at::native::resize_as_sycl_(result, t);
+    result.resize_as_(t);
     if (beta != 0.0) {
       result.copy_(t);
     }
