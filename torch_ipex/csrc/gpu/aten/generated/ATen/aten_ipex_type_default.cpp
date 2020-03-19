@@ -259,6 +259,14 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexTypeDefault::kthvalue_out(at::Tens
   return AtenIpexTypeDPCPP::kthvalue_out(values, indices, self, k, dim, keepdim);
 }
 
+std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexTypeDefault::native_layer_norm(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, int64_t M, int64_t N, double eps) {
+  return AtenIpexTypeDPCPP::native_layer_norm(input, weight, bias, M, N, eps);
+}
+
+std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexTypeDefault::native_layer_norm_backward(const at::Tensor & grad_out, const at::Tensor & input, const at::Tensor & mean, const at::Tensor & rstd, const at::Tensor & weight, int64_t M, int64_t N, std::array<bool,3> output_mask) {
+  return AtenIpexTypeDPCPP::native_layer_norm_backward(grad_out, input, mean, rstd, weight, M, N, output_mask);
+}
+
 at::Tensor & AtenIpexTypeDefault::linspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps) {
   return AtenIpexTypeDPCPP::linspace_out(out, start, end, steps);
 }
@@ -1403,6 +1411,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::kthvalue.values(Tensor self, int k, int dim=-1, bool keepdim=False, *, Tensor(a!) values, Tensor(b!) indices) -> (Tensor(a!) values, Tensor(b!) indices)")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor &,at::Tensor &>(at::Tensor &, at::Tensor &, const at::Tensor &, int64_t, int64_t, bool), &AtenIpexTypeDefault::kthvalue_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::native_layer_norm(Tensor input, Tensor? weight, Tensor? bias, int M, int N, float eps) -> (Tensor, Tensor, Tensor)")
+      .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor,at::Tensor>(const at::Tensor &, const at::Tensor &, const at::Tensor &, int64_t, int64_t, double), &AtenIpexTypeDefault::native_layer_norm>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)")
+      .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor,at::Tensor>(const at::Tensor &, const at::Tensor &, const at::Tensor &, const at::Tensor &, const at::Tensor &, int64_t, int64_t, std::array<bool,3>), &AtenIpexTypeDefault::native_layer_norm_backward>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::linspace.out(Scalar start, Scalar end, int steps=100, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar, at::Scalar, int64_t), &AtenIpexTypeDefault::linspace_out>(at::TensorTypeId::DPCPPTensorId)

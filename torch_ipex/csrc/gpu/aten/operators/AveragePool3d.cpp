@@ -5,7 +5,7 @@
 #include <core/Runtime.h>
 #include <vector>
 
-using namespace mkldnn;
+using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
 
@@ -74,7 +74,7 @@ static void avg_pool3d_out_dpcpp_frame(
 
   auto data_t = scalar_t_to_dnnl::to<scalar_t>();
   if (data_t == memory::data_type::f16) {
-    prop_kind = prop_kind::forward_inference;
+    prop_kind = dnnl::prop_kind::forward_inference;
   }
   auto format = memory::format_tag::ncdhw;
 
@@ -349,7 +349,7 @@ void avg_pool3d_out_dpcpp_template(
 
   auto alg_kind = count_include_pad ? algorithm::pooling_avg_include_padding
                                     : algorithm::pooling_avg_exclude_padding;
-  auto prop_kind = prop_kind::forward_training;
+  auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
       input.scalar_type(), "avg_pool3d_out_dpcpp_frame", [&] {
@@ -496,7 +496,7 @@ Tensor& avg_pool3d_backward_out_dpcpp_template(
 
   auto alg_kind = count_include_pad ? algorithm::pooling_avg_include_padding
                                     : algorithm::pooling_avg_exclude_padding;
-  auto prop_kind = prop_kind::forward_training;
+  auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES(
       input.scalar_type(), "avg_pool3d_backward_out_dpcpp_frame", [&] {

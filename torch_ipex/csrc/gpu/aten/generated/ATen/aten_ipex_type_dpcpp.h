@@ -69,6 +69,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & fill_(at::Tensor & self, const at::Tensor & value);
   at::Tensor & floor_out(at::Tensor & out, const at::Tensor & self);
   std::tuple<at::Tensor &,at::Tensor &> kthvalue_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool keepdim);
+  std::tuple<at::Tensor,at::Tensor,at::Tensor> native_layer_norm(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, int64_t M, int64_t N, double eps);
+  std::tuple<at::Tensor,at::Tensor,at::Tensor> native_layer_norm_backward(const at::Tensor & grad_out, const at::Tensor & input, const at::Tensor & mean, const at::Tensor & rstd, const at::Tensor & weight, int64_t M, int64_t N, std::array<bool,3> output_mask);
   at::Tensor & linspace_out(at::Tensor & out, at::Scalar start, at::Scalar end, int64_t steps);
   at::Tensor & log_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & log10_out(at::Tensor & out, const at::Tensor & self);

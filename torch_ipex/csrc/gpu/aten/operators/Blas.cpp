@@ -1,6 +1,6 @@
+#include <ATen/ATen.h>
 #include <ATen/Dispatch.h>
 #include <ATen/ExpandUtils.h>
-#include <ATen/Functions.h>
 
 #include <core/TensorImplUtils.h>
 #include <dnnl/InnerProduct.hpp>
@@ -11,6 +11,7 @@
       "for DPCPP tensors only supports floating-point types. Try " \
       "converting the tensors with .float()");
 
+using namespace dnnl;
 using namespace at::dpcpp;
 
 namespace at {
@@ -105,22 +106,6 @@ void mkldnnGemmImpl(
       (transpose_m2 == TRANSPOSE_TRUE ? m2.size(transpose_size0)
                                       : m2.size(transpose_size1));
 
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-#if defined(THDPCPP_REAL_IS_HALF)
-  auto m1_sb =
-      dpcppGetBufferMap().template get_buffer<DPCPP::half>(m1.data<scalar_t>());
-  auto m2_sb =
-      dpcppGetBufferMap().template get_buffer<DPCPP::half>(m2.data<scalar_t>());
-  auto r_sb =
-      dpcppGetBufferMap().template get_buffer<DPCPP::half>(r_.data<scalar_t>());
-#else
-  auto m1_sb =
-      dpcppGetBufferMap().template get_buffer<float>(m1.data<scalar_t>());
-  auto m2_sb =
-      dpcppGetBufferMap().template get_buffer<float>(m2.data<scalar_t>());
-  auto r_sb =
-      dpcppGetBufferMap().template get_buffer<float>(r_.data<scalar_t>());
-#endif
   // assume dnnl_notrans = 0 & dnnl_trans = 1
   auto transpose_m1_ = transpose_m1 == TRANSPOSE_FALSE ? 'N' : 'T';
   auto transpose_m2_ = transpose_m2 == TRANSPOSE_FALSE ? 'N' : 'T';
@@ -130,32 +115,56 @@ void mkldnnGemmImpl(
   if (n == 1)
     ldr = m;
 
-  // This is a work-around synchronization because we suspect that mkldnn gemm
-  // didn't
-  // handle Dependency very well.
-  dpcpp_queue.wait();
+  at::Device curDevice = at::Device(at::kDPCPP, current_device());
+  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
+  auto strm = GpuStreamManager::Instance().get_stream();
 
-  mkldnn::gemm(
-      dpcpp_queue,
-      transpose_m1_,
-      transpose_m2_,
-      m,
-      n,
-      k,
-      alpha,
-      m1_sb,
-      0,
-      ldm1,
-      m2_sb,
-      0,
-      ldm2,
-      beta,
-      r_sb,
-      0,
-      ldr);
-#undef TRANSPOSE_TRUE
-#undef TRANSPOSE_FALSE
-#undef Max
+  memory::dims m1_strides = transpose_m1_ == 'N' ? memory::dims {ldm1, 1} : memory::dims {1, ldm1};
+  memory::dims m2_strides = transpose_m2_ == 'N' ? memory::dims {ldm2, 1} : memory::dims {1, ldm2};
+
+  memory::data_type data_t;
+  if (std::is_same<scalar_t, at::Half>::value) {
+    data_t = memory::data_type::f16;
+  } else if (std::is_same<scalar_t, at::BFloat16>::value) {
+    data_t = memory::data_type::bf16;
+  } else {
+    data_t = memory::data_type::f32;
+  }
+  memory::desc m1_md({m, k}, data_t, m1_strides);
+  memory::desc m2_md({k, n}, data_t, m2_strides);
+  memory::desc r_md({m, n}, data_t, {ldr, 1});
+
+  primitive_attr attr;
+  if (alpha != 1.f) attr.set_output_scales(/* mask */ 0, {(float)alpha});
+  if (beta != 0.f) {
+    post_ops po;
+    po.append_sum(beta);
+    attr.set_post_ops(po);
+  }
+
+  std::shared_ptr<dnnl::matmul::desc> matmul_desc;
+  matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
+  std::shared_ptr<dnnl::matmul::primitive_desc> matmul_pd;
+  matmul_pd.reset(new dnnl::matmul::primitive_desc(*matmul_desc, attr, engine));
+  std::shared_ptr<dnnl::matmul> matmul_p;
+  matmul_p.reset(new dnnl::matmul(*matmul_pd));
+
+  auto m1_memory = memory({m1_md, engine});
+  dpcpp_set_mkldnn_buffer(m1.data_ptr(), m1_memory);
+
+  auto m2_memory = memory({m2_md, engine});
+  dpcpp_set_mkldnn_buffer(m2.data_ptr(), m2_memory);
+
+  auto r_memory = memory({r_md, engine});
+  dpcpp_set_mkldnn_buffer(r_.data_ptr(), r_memory);
+
+  matmul_p->execute(strm,
+        {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
+                {DNNL_ARG_DST, r_memory}});
+  strm.wait();
+
+  #undef TRANSPOSE_TRUE
+  #undef TRANSPOSE_FALSE
 }
 
 template <typename scalar_t>
