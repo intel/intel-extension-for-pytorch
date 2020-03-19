@@ -99,6 +99,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & round_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor relu(const at::Tensor & self);
   at::Tensor & relu_(at::Tensor & self);
+  at::Tensor hardshrink(const at::Tensor & self, at::Scalar lambd);
+  at::Tensor hardshrink_backward(const at::Tensor & grad_out, const at::Tensor & self, at::Scalar lambd);
   at::Tensor & rsqrt_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor sigmoid(const at::Tensor & self);
   at::Tensor & sigmoid_(at::Tensor & self);

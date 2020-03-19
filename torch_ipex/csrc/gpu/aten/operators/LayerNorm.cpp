@@ -1,11 +1,10 @@
 #include <ATen/ATen.h>
-#include <ATen/NativeFunctions.h>
 #include <ATen/Config.h>
+#include <ATen/NativeFunctions.h>
 
-#include <core/Runtime.h>
 #include <core/Memory.h>
+#include <core/Runtime.h>
 #include <utils/Math.h>
-
 
 using namespace dnnl;
 using namespace at::dpcpp;
@@ -27,8 +26,8 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   // FP16 Data Type only support forward_inference
   bool training = input.type().scalarType() == ScalarType::Half ? false : true;
-  auto propagation =
-      training ? dnnl::prop_kind::forward_training : dnnl::prop_kind::forward_inference;
+  auto propagation = training ? dnnl::prop_kind::forward_training
+                              : dnnl::prop_kind::forward_inference;
 
   int32_t n, ic, ih;
   n = input.size(0);
@@ -56,12 +55,11 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
       layer_norm_forward_desc, engine);
 
   std::unordered_map<int, memory> args = {
-      {MKLDNN_ARG_SRC, input_usr_memory},
-      {MKLDNN_ARG_DST, output_usr_memory},
+      {MKLDNN_ARG_SRC, input_usr_memory}, {MKLDNN_ARG_DST, output_usr_memory},
   };
 
-  Tensor mean = at::empty({n*ih*ic}, input.options());
-  Tensor rstd = at::empty({n*ih*ic}, input.options());
+  Tensor mean = at::empty({n * ih * ic}, input.options());
+  Tensor rstd = at::empty({n * ih * ic}, input.options());
   if (training) {
     auto mean_memory = memory(lnorm_fwd_pd.mean_desc(), engine);
     auto var_memory = memory(lnorm_fwd_pd.variance_desc(), engine);
@@ -75,10 +73,15 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
     auto weight_bias_memory = memory(lnorm_fwd_pd.weights_desc(), engine);
     auto weight_bias = at::empty(2 * ih, weight.options());
     dpcppMemcpyAsync(
-        weight_bias.data_ptr(), weight.data_ptr(), ih * sizeof(float), DeviceToDevice);
+        weight_bias.data_ptr(),
+        weight.data_ptr(),
+        ih * sizeof(float),
+        DeviceToDevice);
     dpcppMemcpyAsync(
         static_cast<uint8_t*>(weight_bias.data_ptr()) + ih * sizeof(float),
-        bias.data_ptr(), ih * sizeof(float), DeviceToDevice);
+        bias.data_ptr(),
+        ih * sizeof(float),
+        DeviceToDevice);
     dpcpp_set_mkldnn_buffer(weight_bias.data_ptr(), weight_bias_memory);
     args.insert({DNNL_ARG_SCALE_SHIFT, weight_bias_memory});
   }
@@ -98,7 +101,6 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
     int64_t M,
     int64_t N,
     std::array<bool, 3> grad_input_mask) {
-
   auto input = X.contiguous().view({1, M, N});
   Tensor grad_input;
   Tensor grad_weight;
@@ -145,9 +147,9 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
   dnnl::prop_kind p_kind = dnnl::prop_kind::backward;
 
   auto lnorm_bwd_d = layer_normalization_backward::desc(
-          p_kind, grad_output_md, input_md, epsilon, flags);
+      p_kind, grad_output_md, input_md, epsilon, flags);
   auto lnorm_bwd_pd = layer_normalization_backward::primitive_desc(
-          lnorm_bwd_d, engine, lnorm_fwd_pd);
+      lnorm_bwd_d, engine, lnorm_fwd_pd);
 
   auto input_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
   dpcpp_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
@@ -176,15 +178,21 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
     auto weight_bias_memory = memory(lnorm_bwd_pd.weights_desc(), engine);
     auto weight_bias = at::empty(2 * ih, weight.options());
     dpcppMemcpyAsync(
-        weight_bias.data_ptr(), weight.data_ptr(), ih * sizeof(float), DeviceToDevice);
+        weight_bias.data_ptr(),
+        weight.data_ptr(),
+        ih * sizeof(float),
+        DeviceToDevice);
     dpcppMemsetAsync(
         static_cast<uint8_t*>(weight_bias.data_ptr()) + ih * sizeof(float),
-        0, ih * sizeof(float));
+        0,
+        ih * sizeof(float));
     dpcpp_set_mkldnn_buffer(weight_bias.data_ptr(), weight_bias_memory);
 
-    auto grad_weight_bias_memory = memory(lnorm_bwd_pd.diff_weights_desc(), engine);
+    auto grad_weight_bias_memory =
+        memory(lnorm_bwd_pd.diff_weights_desc(), engine);
     grad_weight_bias = at::empty(2 * ih, weight.options());
-    dpcpp_set_mkldnn_buffer(grad_weight_bias.data_ptr(), grad_weight_bias_memory);
+    dpcpp_set_mkldnn_buffer(
+        grad_weight_bias.data_ptr(), grad_weight_bias_memory);
 
     args.insert({DNNL_ARG_SCALE_SHIFT, weight_bias_memory});
     args.insert({DNNL_ARG_DIFF_SCALE_SHIFT, grad_weight_bias_memory});
@@ -208,5 +216,5 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
 
   return std::make_tuple(grad_input.view(X.sizes()), grad_weight, grad_bias);
 }
-
-}} // at::AtenIpexTypeDPCPP
+}
+} // at::AtenIpexTypeDPCPP

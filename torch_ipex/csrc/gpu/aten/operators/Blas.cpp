@@ -119,8 +119,10 @@ void mkldnnGemmImpl(
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  memory::dims m1_strides = transpose_m1_ == 'N' ? memory::dims {ldm1, 1} : memory::dims {1, ldm1};
-  memory::dims m2_strides = transpose_m2_ == 'N' ? memory::dims {ldm2, 1} : memory::dims {1, ldm2};
+  memory::dims m1_strides =
+      transpose_m1_ == 'N' ? memory::dims{ldm1, 1} : memory::dims{1, ldm1};
+  memory::dims m2_strides =
+      transpose_m2_ == 'N' ? memory::dims{ldm2, 1} : memory::dims{1, ldm2};
 
   memory::data_type data_t;
   if (std::is_same<scalar_t, at::Half>::value) {
@@ -135,7 +137,8 @@ void mkldnnGemmImpl(
   memory::desc r_md({m, n}, data_t, {ldr, 1});
 
   primitive_attr attr;
-  if (alpha != 1.f) attr.set_output_scales(/* mask */ 0, {(float)alpha});
+  if (alpha != 1.f)
+    attr.set_output_scales(/* mask */ 0, {(float)alpha});
   if (beta != 0.f) {
     post_ops po;
     po.append_sum(beta);
@@ -158,13 +161,15 @@ void mkldnnGemmImpl(
   auto r_memory = memory({r_md, engine});
   dpcpp_set_mkldnn_buffer(r_.data_ptr(), r_memory);
 
-  matmul_p->execute(strm,
-        {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
-                {DNNL_ARG_DST, r_memory}});
+  matmul_p->execute(
+      strm,
+      {{DNNL_ARG_SRC, m1_memory},
+       {DNNL_ARG_WEIGHTS, m2_memory},
+       {DNNL_ARG_DST, r_memory}});
   strm.wait();
 
-  #undef TRANSPOSE_TRUE
-  #undef TRANSPOSE_FALSE
+#undef TRANSPOSE_TRUE
+#undef TRANSPOSE_FALSE
 }
 
 template <typename scalar_t>

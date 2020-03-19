@@ -379,6 +379,14 @@ at::Tensor & AtenIpexTypeDefault::relu_(at::Tensor & self) {
   return AtenIpexTypeDPCPP::relu_(self);
 }
 
+at::Tensor AtenIpexTypeDefault::hardshrink(const at::Tensor & self, at::Scalar lambd) {
+  return AtenIpexTypeDPCPP::hardshrink(self, lambd);
+}
+
+at::Tensor AtenIpexTypeDefault::hardshrink_backward(const at::Tensor & grad_out, const at::Tensor & self, at::Scalar lambd) {
+  return AtenIpexTypeDPCPP::hardshrink_backward(grad_out, self, lambd);
+}
+
 at::Tensor & AtenIpexTypeDefault::rsqrt_out(at::Tensor & out, const at::Tensor & self) {
   return AtenIpexTypeDPCPP::rsqrt_out(out, self);
 }
@@ -1501,6 +1509,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::relu_(Tensor(a!) self) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::relu_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::hardshrink(Tensor self, Scalar lambd=0.5) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::hardshrink>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::hardshrink_backward(Tensor grad_out, Tensor self, Scalar lambd) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::hardshrink_backward>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::rsqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::rsqrt_out>(at::TensorTypeId::DPCPPTensorId)

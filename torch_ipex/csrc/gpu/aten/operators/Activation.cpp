@@ -1,7 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/Functions.h>
-
 #include <ATen/native/Activation.h>
+
+#include <core/DPCPP.h>
 
 #include "Eltwise.hpp"
 #include "Loops.h"
@@ -95,6 +96,49 @@ Tensor threshold_out(
     Scalar value) {
   threshold_out(make_optional(result), self, threshold, value, self);
   return result;
+}
+
+DPCPP_DEF_K1(DPCPPOpHardShrink);
+Tensor hardshrink(const Tensor& self, Scalar lambd_) {
+  auto out_tensor = at::empty_like(self);
+
+  auto iter = TensorIterator();
+  iter.add_output(out_tensor);
+  iter.add_input(self);
+  iter.build();
+
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "hardshrink", [&] {
+    auto lambd = lambd_.to<scalar_t>();
+    dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardShrink)>(
+        iter, [=](scalar_t x) -> scalar_t {
+          return (x >= -lambd && x <= lambd) ? scalar_t(0) : x;
+        });
+  });
+  return out_tensor;
+}
+
+DPCPP_DEF_K1(DPCPPOpHardShrinkBackward);
+Tensor hardshrink_backward(
+    const Tensor& grad,
+    const Tensor& self,
+    Scalar lambd_) {
+  auto out_tensor = at::empty_like(grad);
+
+  auto iter = TensorIterator();
+  iter.add_output(out_tensor);
+  iter.add_input(grad);
+  iter.add_input(self);
+  iter.build();
+
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+      self.scalar_type(), "hardshrink_backward", [&] {
+        auto lambd = lambd_.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardShrinkBackward)>(
+            iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {
+              return (x >= -lambd && x <= lambd) ? scalar_t(0) : grad_output;
+            });
+      });
+  return out_tensor;
 }
 
 } // namespace AtenIpexTypeDPCPP
