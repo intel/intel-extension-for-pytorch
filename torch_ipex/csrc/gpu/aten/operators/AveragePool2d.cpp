@@ -408,103 +408,6 @@ Tensor& avg_pool2d_backward_out_dpcpp_template(
   return gradInput;
 }
 
-Tensor& avg_pool2d_out_dpcpp(
-    Tensor& output,
-    const Tensor& input,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    bool ceil_mode,
-    bool count_include_pad,
-    c10::optional<int64_t> divisor_override) {
-  TORCH_CHECK(
-      !divisor_override.has_value(),
-      "dpcpp_avg_pool2d operator does not support divisor");
-  avg_pool2d_out_dpcpp_template(
-      output,
-      input,
-      kernel_size,
-      stride,
-      padding,
-      ceil_mode,
-      count_include_pad);
-  return output;
-}
-
-Tensor avg_pool2d_dpcpp(
-    const Tensor& input,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    bool ceil_mode,
-    bool count_include_pad,
-    c10::optional<int64_t> divisor_override) {
-  TORCH_CHECK(
-      !divisor_override.has_value(),
-      "dpcpp_avg_pool2d operator does not support divisor");
-  Tensor output = at::empty({0}, input.options());
-  avg_pool2d_out_dpcpp_template(
-      output,
-      input,
-      kernel_size,
-      stride,
-      padding,
-      ceil_mode,
-      count_include_pad);
-  return output;
-}
-
-Tensor& avg_pool2d_backward_out_dpcpp(
-    Tensor& gradInput,
-    const Tensor& gradOutput_,
-    const Tensor& input,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    bool ceil_mode,
-    bool count_include_pad,
-    c10::optional<int64_t> divisor_override) {
-  TORCH_CHECK(
-      !divisor_override.has_value(),
-      "dpcpp_avg_pool2d operator does not support divisor");
-  avg_pool2d_backward_out_dpcpp_template(
-      gradInput,
-      gradOutput_,
-      input,
-      kernel_size,
-      stride,
-      padding,
-      ceil_mode,
-      count_include_pad);
-  return gradInput;
-}
-
-Tensor avg_pool2d_backward_dpcpp(
-    const Tensor& gradOutput_,
-    const Tensor& input,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    bool ceil_mode,
-    bool count_include_pad,
-    c10::optional<int64_t> divisor_override) {
-  TORCH_CHECK(
-      !divisor_override.has_value(),
-      "dpcpp_avg_pool2d operator does not support divisor");
-  auto gradInput = at::zeros_like(input);
-
-  avg_pool2d_backward_out_dpcpp_template(
-      gradInput,
-      gradOutput_,
-      input,
-      kernel_size,
-      stride,
-      padding,
-      ceil_mode,
-      count_include_pad);
-  return gradInput;
-}
-
 } // namespace impl
 
 Tensor& avg_pool2d_out(
@@ -516,15 +419,18 @@ Tensor& avg_pool2d_out(
     bool ceil_mode,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
-  return impl::avg_pool2d_out_dpcpp(
+  TORCH_CHECK(
+      !divisor_override.has_value(),
+      "dpcpp_avg_pool2d operator does not support divisor");
+  impl::avg_pool2d_out_dpcpp_template(
       output,
       input,
       kernel_size,
       stride,
       padding,
       ceil_mode,
-      count_include_pad,
-      divisor_override);
+      count_include_pad);
+  return output;
 }
 
 Tensor avg_pool2d(
@@ -535,7 +441,9 @@ Tensor avg_pool2d(
     bool ceil_mode,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
-  return impl::avg_pool2d_dpcpp(
+  Tensor output = at::empty({0}, input.options());
+  return at::AtenIpexTypeDPCPP::avg_pool2d_out(
+      output,
       input,
       kernel_size,
       stride,
@@ -555,7 +463,10 @@ Tensor& avg_pool2d_backward_out(
     bool ceil_mode,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
-  return impl::avg_pool2d_backward_out_dpcpp(
+  TORCH_CHECK(
+      !divisor_override.has_value(),
+      "dpcpp_avg_pool2d operator does not support divisor");
+  impl::avg_pool2d_backward_out_dpcpp_template(
       grad_input,
       grad_output,
       input,
@@ -563,8 +474,8 @@ Tensor& avg_pool2d_backward_out(
       stride,
       padding,
       ceil_mode,
-      count_include_pad,
-      divisor_override);
+      count_include_pad);
+  return grad_input;
 }
 
 Tensor avg_pool2d_backward(
@@ -576,7 +487,9 @@ Tensor avg_pool2d_backward(
     bool ceil_mode,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
-  return impl::avg_pool2d_backward_dpcpp(
+  Tensor grad_input = at::zeros_like(input);
+  return at::AtenIpexTypeDPCPP::avg_pool2d_backward_out(
+      grad_input,
       grad_output,
       input,
       kernel_size,
