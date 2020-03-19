@@ -283,6 +283,11 @@ namespace AtenIpexTypeDPCPP {
   std::tuple<at::Tensor,at::Tensor> nll_loss_forward(const at::Tensor & self, const at::Tensor & target, const at::Tensor & weight, int64_t reduction, int64_t ignore_index);
   at::Tensor & nll_loss_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & target, const at::Tensor & weight, int64_t reduction, int64_t ignore_index, const at::Tensor & total_weight);
   at::Tensor nll_loss_backward(const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & target, const at::Tensor & weight, int64_t reduction, int64_t ignore_index, const at::Tensor & total_weight);
+  at::Tensor & hardtanh_out(at::Tensor & out, const at::Tensor & self, at::Scalar min_val, at::Scalar max_val);
+  at::Tensor hardtanh(const at::Tensor & self, at::Scalar min_val, at::Scalar max_val);
+  at::Tensor & hardtanh_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, at::Scalar min_val, at::Scalar max_val);
+  at::Tensor hardtanh_backward(const at::Tensor & grad_output, const at::Tensor & self, at::Scalar min_val, at::Scalar max_val);
+  at::Tensor & hardtanh_(at::Tensor & self, at::Scalar min_val, at::Scalar max_val);
   at::Tensor & softplus_out(at::Tensor & out, const at::Tensor & self, at::Scalar beta, at::Scalar threshold);
   at::Tensor softplus(const at::Tensor & self, at::Scalar beta, at::Scalar threshold);
   at::Tensor & softplus_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, at::Scalar beta, at::Scalar threshold, const at::Tensor & output);
