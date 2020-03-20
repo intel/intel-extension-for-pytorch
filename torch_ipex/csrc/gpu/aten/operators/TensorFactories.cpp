@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/InitialTensorOptions.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/native/ReduceOpsUtils.h>
 #include <ATen/native/TensorFactories.h>
 #include <c10/util/Exception.h>
 
@@ -335,14 +336,17 @@ Tensor empty_strided(
     const TensorOptions& options) {
   return impl::empty_strided_dpcpp(size, stride, options);
 }
+
 Tensor& eye_out(Tensor& out, int64_t n) {
   impl::eye_out_dpcpp(out, n);
   return out;
 }
+
 Tensor& eye_out(Tensor& out, int64_t n, int64_t m) {
   impl::eye_out_dpcpp(out, n, m);
   return out;
 }
+
 Tensor tril_indices(
     int64_t row,
     int64_t col,
@@ -350,6 +354,7 @@ Tensor tril_indices(
     const TensorOptions& options) {
   return impl::tril_indices_dpcpp(row, col, offset, options);
 }
+
 Tensor triu_indices(
     int64_t row,
     int64_t col,
@@ -357,5 +362,25 @@ Tensor triu_indices(
     const TensorOptions& options) {
   return impl::triu_indices_dpcpp(row, col, offset, options);
 }
+
+Tensor var(const Tensor& self, IntArrayRef dim, bool unbiased, bool keepdim) {
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::std_var_out(
+      result, self, dim, unbiased, keepdim, false);
+}
+
+Tensor var(const Tensor& self, bool unbiased) {
+  auto trivial_return =
+      _allreduce_return_trivial(self, std::numeric_limits<double>::quiet_NaN());
+  return trivial_return.has_value() ? trivial_return.value()
+                                    : at::_var(self, unbiased);
+}
+
+Tensor _var(const Tensor& self, bool unbiased) {
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::std_var_out(
+      result, self, IntArrayRef{}, unbiased, false, false);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

@@ -471,6 +471,14 @@ at::Tensor & AtenIpexTypeDefault::trunc_out(at::Tensor & out, const at::Tensor &
   return AtenIpexTypeDPCPP::trunc_out(out, self);
 }
 
+at::Tensor AtenIpexTypeDefault::var(const at::Tensor & self, bool unbiased) {
+  return AtenIpexTypeDPCPP::var(self, unbiased);
+}
+
+at::Tensor AtenIpexTypeDefault::var(const at::Tensor & self, at::IntArrayRef dim, bool unbiased, bool keepdim) {
+  return AtenIpexTypeDPCPP::var(self, dim, unbiased, keepdim);
+}
+
 at::Tensor AtenIpexTypeDefault::_s_where(const at::Tensor & condition, const at::Tensor & self, const at::Tensor & other) {
   return AtenIpexTypeDPCPP::_s_where(condition, self, other);
 }
@@ -1049,6 +1057,10 @@ at::Tensor AtenIpexTypeDefault::_cumprod(const at::Tensor & self, int64_t dim) {
 
 at::Tensor & AtenIpexTypeDefault::_cumprod_out(at::Tensor & out, const at::Tensor & self, int64_t dim) {
   return AtenIpexTypeDPCPP::_cumprod_out(out, self, dim);
+}
+
+at::Tensor AtenIpexTypeDefault::_var(const at::Tensor & self, bool unbiased) {
+  return AtenIpexTypeDPCPP::_var(self, unbiased);
 }
 
 at::Tensor AtenIpexTypeDefault::_cat(at::TensorList tensors, int64_t dim) {
@@ -1655,6 +1667,12 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::trunc.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::trunc_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::var(Tensor self, bool unbiased=True) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, bool), &AtenIpexTypeDefault::var>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::var.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, bool, bool), &AtenIpexTypeDefault::var>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_s_where(Tensor condition, Tensor self, Tensor other) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::_s_where>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -2089,6 +2107,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_cumprod.out(Tensor self, int dim, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, int64_t), &AtenIpexTypeDefault::_cumprod_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::_var(Tensor self, bool unbiased=True) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, bool), &AtenIpexTypeDefault::_var>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_cat(Tensor[] tensors, int dim=0) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(at::TensorList, int64_t), &AtenIpexTypeDefault::_cat>(at::TensorTypeId::DPCPPTensorId)

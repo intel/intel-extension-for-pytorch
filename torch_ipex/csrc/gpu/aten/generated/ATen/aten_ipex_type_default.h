@@ -122,6 +122,8 @@ class AtenIpexTypeDefault {
   static at::Tensor & threshold_out(at::Tensor & out, const at::Tensor & self, at::Scalar threshold, at::Scalar value);
   static at::Tensor roll(const at::Tensor & self, at::IntArrayRef shifts, at::IntArrayRef dims);
   static at::Tensor & trunc_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor var(const at::Tensor & self, bool unbiased);
+  static at::Tensor var(const at::Tensor & self, at::IntArrayRef dim, bool unbiased, bool keepdim);
   static at::Tensor _s_where(const at::Tensor & condition, const at::Tensor & self, const at::Tensor & other);
   static at::Tensor norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::ScalarType dtype);
   static at::Tensor norm(const at::Tensor & self, at::Scalar p);
@@ -267,6 +269,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & _cumsum_out(at::Tensor & out, const at::Tensor & self, int64_t dim);
   static at::Tensor _cumprod(const at::Tensor & self, int64_t dim);
   static at::Tensor & _cumprod_out(at::Tensor & out, const at::Tensor & self, int64_t dim);
+  static at::Tensor _var(const at::Tensor & self, bool unbiased);
   static at::Tensor _cat(at::TensorList tensors, int64_t dim);
   static at::Tensor & _cat_out(at::Tensor & out, at::TensorList tensors, int64_t dim);
   static std::tuple<at::Tensor,at::Tensor> _max(const at::Tensor & self, int64_t dim, bool keepdim);

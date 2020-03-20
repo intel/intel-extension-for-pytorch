@@ -262,47 +262,47 @@ struct WelfordOps {
 };
 
 template <typename acc_t>
-struct add_kernel {
-  add_kernel() {}
+struct ReduceAddOps {
+  ReduceAddOps() {}
   acc_t operator()(acc_t a, acc_t b) const {
     return a + b;
   }
 };
 
 template <typename acc_t>
-struct min_kernel {
-  min_kernel() {}
+struct ReduceMinOps {
+  ReduceMinOps() {}
   acc_t operator()(acc_t a, acc_t b) const {
     return (Numerics<acc_t>::lt(a, b) || Numerics<acc_t>::isnan(a)) ? a : b;
   }
 };
 
 template <typename acc_t>
-struct max_kernel {
-  max_kernel() {}
+struct ReduceMaxOps {
+  ReduceMaxOps() {}
   acc_t operator()(acc_t a, acc_t b) const {
     return (Numerics<acc_t>::gt(a, b) || Numerics<acc_t>::isnan(a)) ? a : b;
   }
 };
 
 template <typename acc_t>
-struct and_kernel {
-  and_kernel() {}
+struct ReduceAndOps {
+  ReduceAndOps() {}
   acc_t operator()(acc_t a, acc_t b) const {
     return a && b;
   }
 };
 
 template <typename acc_t>
-struct or_kernel {
-  or_kernel() {}
+struct ReduceOrOps {
+  ReduceOrOps() {}
   acc_t operator()(acc_t a, acc_t b) const {
     return a || b;
   }
 };
 
 template <typename acc_t, typename factor_t>
-struct MeanOps {
+struct ReduceMeanOps {
   factor_t factor;
 
   inline acc_t reduce(acc_t a, acc_t b) const {
@@ -322,7 +322,7 @@ struct MeanOps {
     return arg;
   }
 
-  MeanOps(factor_t factor) : factor(factor) {}
+  ReduceMeanOps(factor_t factor) : factor(factor) {}
 };
 
 template <typename acc_t>
@@ -465,7 +465,7 @@ template <typename scalar_t,
           typename out_t = scalar_t>
 void sum_kernel_impl(TensorIterator& iter) {
   dpcpp_reduce_kernel<scalar_t, out_t>(
-      iter, func_wrapper<out_t>(add_kernel<acc_t>()));
+      iter, func_wrapper<out_t>(ReduceAddOps<acc_t>()));
 }
 
 template <typename scalar_t,
@@ -473,7 +473,8 @@ template <typename scalar_t,
           typename out_t = scalar_t>
 void mean_kernel_impl(TensorIterator& iter) {
   float factor = float(iter.num_output_elements()) / iter.numel();
-  dpcpp_reduce_kernel<scalar_t, out_t>(iter, MeanOps<acc_t, float>{factor});
+  dpcpp_reduce_kernel<scalar_t, out_t>(
+      iter, ReduceMeanOps<acc_t, float>{factor});
 }
 
 template <typename scalar_t,
@@ -482,7 +483,7 @@ template <typename scalar_t,
 void min_kernel_impl(TensorIterator& iter) {
   dpcpp_reduce_kernel<scalar_t, out_t>(
       iter,
-      func_wrapper<scalar_t>(min_kernel<scalar_t>()),
+      func_wrapper<scalar_t>(ReduceMinOps<scalar_t>()),
       Numerics<scalar_t>::upper_bound());
 }
 
@@ -492,7 +493,7 @@ template <typename scalar_t,
 void max_kernel_impl(TensorIterator& iter) {
   dpcpp_reduce_kernel<scalar_t, out_t>(
       iter,
-      func_wrapper<scalar_t>(max_kernel<scalar_t>()),
+      func_wrapper<scalar_t>(ReduceMaxOps<scalar_t>()),
       Numerics<scalar_t>::lower_bound());
 }
 
@@ -524,7 +525,7 @@ static void norm_kernel_impl(TensorIterator& iter, Scalar val) {
   }
 }
 
-static void std_var_kernel_dpcpp(
+static void std_var_kernel(
     TensorIterator& iter,
     bool unbiased,
     bool take_sqrt) {
@@ -533,31 +534,31 @@ static void std_var_kernel_dpcpp(
   });
 }
 
-static void sum_kernel_dpcpp(TensorIterator& iter) {
+static void sum_kernel(TensorIterator& iter) {
   AT_DISPATCH_ALL_TYPES(
       iter.dtype(), "sum", [&]() { sum_kernel_impl<scalar_t>(iter); });
 }
 
-static void prod_kernel_dpcpp(TensorIterator& iter) {
-  AT_ERROR("prod_kernel_dpcpp not implemented yet!");
+static void prod_kernel(TensorIterator& iter) {
+  AT_ERROR("prod_kernel not implemented yet!");
 }
 
-static void mean_kernel_dpcpp(TensorIterator& iter) {
+static void mean_kernel(TensorIterator& iter) {
   AT_DISPATCH_ALL_TYPES(
       iter.dtype(), "mean", [&]() { mean_kernel_impl<scalar_t>(iter); });
 }
 
-static void min_kernel_dpcpp(TensorIterator& iter) {
+static void min_kernel(TensorIterator& iter) {
   AT_DISPATCH_ALL_TYPES(
       iter.dtype(), "min", [&]() { min_kernel_impl<scalar_t>(iter); });
 }
 
-static void max_kernel_dpcpp(TensorIterator& iter) {
+static void max_kernel(TensorIterator& iter) {
   AT_DISPATCH_ALL_TYPES(
       iter.dtype(), "max", [&]() { max_kernel_impl<scalar_t>(iter); });
 }
 
-static void norm_kernel_dpcpp(TensorIterator& iter, Scalar p) {
+static void norm_kernel(TensorIterator& iter, Scalar p) {
   if (iter.dtype() == kHalf) {
     return norm_kernel_impl<at::Half, float>(iter, p);
   } else if (iter.dtype(1) == kHalf && iter.dtype() == kFloat) {
@@ -568,17 +569,18 @@ static void norm_kernel_dpcpp(TensorIterator& iter, Scalar p) {
       iter.dtype(), "norm", [&]() { norm_kernel_impl<scalar_t>(iter, p); });
 }
 
-void and_kernel_dpcpp(TensorIterator& iter) {
+void and_kernel(TensorIterator& iter) {
   dpcpp_reduce_kernel<uint8_t, uint8_t>(
-      iter, func_wrapper<uint8_t>(and_kernel<uint8_t>()), true);
+      iter, func_wrapper<uint8_t>(ReduceAndOps<uint8_t>()), true);
 }
 
-void or_kernel_dpcpp(TensorIterator& iter) {
+void or_kernel(TensorIterator& iter) {
   dpcpp_reduce_kernel<uint8_t, uint8_t>(
-      iter, func_wrapper<uint8_t>(or_kernel<uint8_t>()), false);
+      iter, func_wrapper<uint8_t>(ReduceOrOps<uint8_t>()), false);
 }
 
 } // namespace impl
+using namespace impl;
 
 Tensor& sum_out(
     Tensor& result,
@@ -591,7 +593,7 @@ Tensor& sum_out(
   if (iter.numel() == 0) {
     result.zero_();
   } else {
-    impl::sum_kernel_dpcpp(iter);
+    impl::sum_kernel(iter);
   }
   return result;
 }
@@ -619,7 +621,7 @@ Tensor min_out(
   if (iter.numel() == 0) {
     result.zero_();
   } else {
-    impl::min_kernel_dpcpp(iter);
+    impl::min_kernel(iter);
   }
   return result;
 }
@@ -640,7 +642,7 @@ Tensor max_out(
   if (iter.numel() == 0) {
     result.zero_();
   } else {
-    impl::max_kernel_dpcpp(iter);
+    impl::max_kernel(iter);
   }
   return result;
 }
@@ -672,7 +674,7 @@ static Tensor& norm_out(
   if (iter.numel() == 0) {
     result.zero_();
   } else {
-    impl::norm_kernel_dpcpp(iter, p);
+    impl::norm_kernel(iter, p);
   }
   return result;
 }
@@ -754,7 +756,7 @@ inline Tensor& _all(Tensor& result, TensorIterator& iter) {
   if (iter.numel() == 0) {
     result.fill_(1);
   } else {
-    impl::and_kernel_dpcpp(iter);
+    impl::and_kernel(iter);
   }
 
   return result;
@@ -853,6 +855,51 @@ Tensor renorm(const Tensor& self, Scalar p, int64_t dim, Scalar maxnorm) {
 
 Tensor& renorm_(Tensor& self, Scalar p, int64_t dim, Scalar maxnorm) {
   return at::AtenIpexTypeDPCPP::renorm_out(self, self, p, dim, maxnorm);
+}
+
+Tensor& std_var_out(
+    Tensor& result,
+    const Tensor& self,
+    IntArrayRef dim,
+    bool unbiased,
+    bool keepdim,
+    bool take_sqrt) {
+  TORCH_CHECK(
+      at::isFloatingType(self.scalar_type()) ||
+          at::isComplexType(self.scalar_type()),
+      "std and var only support floating-point dtypes");
+
+  if (at::isComplexType(self.scalar_type())) {
+    ScalarType dtype = c10::toValueType(get_dtype(result, self, {}, true));
+    Tensor real_in = self.real().to(dtype);
+    Tensor real_out = at::empty({0}, self.options().dtype(dtype));
+    auto iter =
+        make_reduction("std or var", real_out, real_in, dim, keepdim, dtype);
+    if (iter.numel() == 0) {
+      real_out.fill_(NAN);
+    } else {
+      std_var_kernel(iter, unbiased, false);
+    }
+    Tensor imag_in = self.imag().to(dtype);
+    Tensor imag_out = at::empty({0}, self.options().dtype(dtype));
+    iter = make_reduction("std or var", imag_out, imag_in, dim, keepdim, dtype);
+    if (iter.numel() == 0) {
+      imag_out.fill_(NAN);
+    } else {
+      std_var_kernel(iter, unbiased, false);
+    }
+    at::add_out(result, real_out, imag_out);
+    take_sqrt ? at::sqrt_out(result, result) : result;
+  } else {
+    ScalarType dtype = get_dtype(result, self, {}, true);
+    auto iter = make_reduction("std or var", result, self, dim, keepdim, dtype);
+    if (iter.numel() == 0) {
+      result.fill_(NAN);
+    } else {
+      std_var_kernel(iter, unbiased, take_sqrt);
+    }
+  }
+  return result;
 }
 
 } // namespace AtenIpexTypeDPCPP
