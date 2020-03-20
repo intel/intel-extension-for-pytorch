@@ -1,7 +1,5 @@
-import numpy
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 import torch_ipex
 
@@ -10,26 +8,29 @@ sycl_device = torch.device("dpcpp")
 
 print('none')
 loss = nn.MSELoss(reduction="none")
-input = torch.randn(3, 5, requires_grad=True)
+input = torch.randn(3, 5)
+input_sycl = input.to("dpcpp")
 target = torch.randn(3, 5)
 
 print("cpu")
 input_cpu = input
 target_cpu = target
+input_cpu.requires_grad = True
 output_cpu = loss(input_cpu, target_cpu)
 print(output_cpu)
-# output_cpu.backward(torch.ones_like(target_cpu, dtype=torch.float))
-# print(input_cpu.grad)
-# input_cpu.grad.zero_()
+output_cpu.backward(torch.ones_like(target_cpu, dtype=torch.float))
+print(input_cpu.grad)
+input_cpu.grad.zero_()
 
 print("sycl")
-input_sycl = input.to("dpcpp")
+
 target_sycl = target.to("dpcpp")
+input_sycl.requires_grad = True
 output_sycl = loss(input_sycl, target_sycl)
-print(output_sycl.to("cpu"))
-# output_sycl.backward(torch.ones_like(target_sycl, dtype=torch.float, device=sycl_device))
-# print(input_sycl.grad.cpu())
-# input_sycl.grad.zero_()
+print(output_sycl.cpu())
+output_sycl.backward(torch.ones_like(target, dtype=torch.float, device=sycl_device))
+print(input_sycl.grad.cpu())
+input_sycl.grad.zero_()
 
 print("sum")
 loss = nn.MSELoss(reduction="sum")
@@ -39,18 +40,18 @@ input_cpu = input
 target_cpu = target
 output_cpu = loss(input_cpu, target_cpu)
 print(output_cpu)
-# output_cpu.backward(torch.ones_like(target_cpu, dtype=torch.float))
-# print(input_cpu.grad)
-# input_cpu.grad.zero_()
+output_cpu.backward(torch.tensor((2.0), dtype=torch.float))
+print(input_cpu.grad)
+input_cpu.grad.zero_()
 
 print("sycl")
-input_sycl = input.to("dpcpp")
 target_sycl = target.to("dpcpp")
+input_sycl.requires_grad = True
 output_sycl = loss(input_sycl, target_sycl)
-print(output_sycl.to("cpu"))
-# output_sycl.backward(torch.ones_like(target_sycl, dtype=torch.float, device=sycl_device))
-# print(input_sycl.grad.cpu())
-# input_sycl.grad.zero_()
+print(output_sycl.cpu())
+output_sycl.backward(torch.tensor((2.0), dtype=torch.float, device=sycl_device))
+print(input_sycl.grad.cpu())
+input_sycl.grad.zero_()
 
 print("mean")
 loss = nn.MSELoss(reduction="mean")
@@ -60,15 +61,15 @@ input_cpu = input
 target_cpu = target
 output_cpu = loss(input_cpu, target_cpu)
 print(output_cpu)
-# output_cpu.backward(torch.ones_like(target_cpu, dtype=torch.float))
-# print(input_cpu.grad)
-# input_cpu.grad.zero_()
+output_cpu.backward(torch.tensor((2.0), dtype=torch.float))
+print(input_cpu.grad)
+input_cpu.grad.zero_()
 
 print("sycl")
-input_sycl = input.to("dpcpp")
 target_sycl = target.to("dpcpp")
+input_sycl.requires_grad = True
 output_sycl = loss(input_sycl, target_sycl)
-print(output_sycl.to("cpu"))
-# output_sycl.backward(torch.ones_like(target_sycl, dtype=torch.float, device=sycl_device))
-# print(input_sycl.grad.cpu())
-# input_sycl.grad.zero_()
+print(output_sycl.cpu())
+output_sycl.backward(torch.tensor((2.0), dtype=torch.float, device=sycl_device))
+print(input_sycl.grad.cpu())
+input_sycl.grad.zero_()

@@ -46,7 +46,7 @@ class scalar_t_to_dnnl {
 };
 
 template <typename scalar_t>
-static void avg_pool3d_out_dpcpp_frame(
+static void avg_pool3d_out_frame(
     scalar_t* input_data,
     scalar_t* output_data,
     int64_t nbatch,
@@ -142,7 +142,7 @@ static void avg_pool3d_out_dpcpp_frame(
 }
 
 template <typename scalar_t>
-static void avg_pool3d_backward_out_dpcpp_frame(
+static void avg_pool3d_backward_out_frame(
     scalar_t* gradInput_data,
     scalar_t* gradOutput_data,
     int64_t nbatch,
@@ -248,7 +248,7 @@ static void avg_pool3d_backward_out_dpcpp_frame(
   // }
 }
 
-void avg_pool3d_out_dpcpp_template(
+void avg_pool3d_out_template(
     Tensor& output,
     const Tensor& input,
     IntArrayRef kernel_size,
@@ -352,11 +352,11 @@ void avg_pool3d_out_dpcpp_template(
   auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "avg_pool3d_out_dpcpp_frame", [&] {
+      input.scalar_type(), "avg_pool3d_frame", [&] {
         scalar_t* input_data = input.data_ptr<scalar_t>();
         scalar_t* output_data = output.data_ptr<scalar_t>();
 
-        avg_pool3d_out_dpcpp_frame(
+        avg_pool3d_out_frame(
             input_data,
             output_data,
             nbatch,
@@ -381,7 +381,7 @@ void avg_pool3d_out_dpcpp_template(
       });
 }
 
-Tensor& avg_pool3d_backward_out_dpcpp_template(
+Tensor& avg_pool3d_backward_out_template(
     Tensor& gradInput,
     const Tensor& gradOutput,
     const Tensor& input,
@@ -499,11 +499,11 @@ Tensor& avg_pool3d_backward_out_dpcpp_template(
   auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES(
-      input.scalar_type(), "avg_pool3d_backward_out_dpcpp_frame", [&] {
+      input.scalar_type(), "avg_pool3d_backward_out_frame", [&] {
         scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();
         scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();
 
-        avg_pool3d_backward_out_dpcpp_frame(
+        avg_pool3d_backward_out_frame(
             gradInput_data,
             gradOutput_data,
             nbatch,
@@ -543,7 +543,7 @@ Tensor& avg_pool3d_out(
   TORCH_CHECK(
       !divisor_override.has_value(),
       "dpcpp_avg_pool3d operator does not support divisor");
-  impl::avg_pool3d_out_dpcpp_template(
+  impl::avg_pool3d_out_template(
       out, self, kernel_size, stride, padding, ceil_mode, count_include_pad);
   return out;
 }
@@ -581,7 +581,7 @@ Tensor& avg_pool3d_backward_out(
   TORCH_CHECK(
       !divisor_override.has_value(),
       "dpcpp_avg_pool3d operator does not support divisor");
-  impl::avg_pool3d_backward_out_dpcpp_template(
+  impl::avg_pool3d_backward_out_template(
       grad_input,
       grad_output,
       self,
