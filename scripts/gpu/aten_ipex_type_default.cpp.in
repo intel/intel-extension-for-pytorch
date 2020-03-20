@@ -599,6 +599,10 @@ at::Tensor AtenIpexTypeDefault::view(const at::Tensor & self, at::IntArrayRef si
   return AtenIpexTypeDPCPP::view(self, size);
 }
 
+at::Tensor & AtenIpexTypeDefault::put_(at::Tensor & self, const at::Tensor & index, const at::Tensor & source, bool accumulate) {
+  return AtenIpexTypeDPCPP::put_(self, index, source, accumulate);
+}
+
 at::Tensor & AtenIpexTypeDefault::index_add_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & source) {
   return AtenIpexTypeDPCPP::index_add_(self, dim, index, source);
 }
@@ -1762,6 +1766,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::view(Tensor(a) self, int[] size) -> Tensor(a)")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::view>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::put_(Tensor(a!) self, Tensor index, Tensor source, bool accumulate=False) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, bool), &AtenIpexTypeDefault::put_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::index_add_(Tensor(a!) self, int dim, Tensor index, Tensor source) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, int64_t, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::index_add_>(at::TensorTypeId::DPCPPTensorId)

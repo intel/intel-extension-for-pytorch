@@ -154,6 +154,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & masked_fill_(at::Tensor & self, const at::Tensor & mask, const at::Tensor & value);
   at::Tensor & masked_scatter_(at::Tensor & self, const at::Tensor & mask, const at::Tensor & source);
   at::Tensor view(const at::Tensor & self, at::IntArrayRef size);
+  at::Tensor & put_(at::Tensor & self, const at::Tensor & index, const at::Tensor & source, bool accumulate);
   at::Tensor & index_add_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & source);
   at::Tensor & index_fill_(at::Tensor & self, int64_t dim, const at::Tensor & index, at::Scalar value);
   at::Tensor & index_fill_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & value);

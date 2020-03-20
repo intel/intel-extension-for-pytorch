@@ -7,13 +7,13 @@
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
+#include <utils/Atomics.h>
 #include <utils/MathReduce.h>
 #include <utils/Numerics.h>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
 #include "ParttenScan.h"
 
-using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
 
 namespace at {
@@ -820,6 +820,70 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
   }
 }
 
+template <int N>
+struct alignas(N) OpaqueType {
+  char data[N];
+};
+
+DPCPP_DEF_K1(dpcpp_put_kernel);
+template <typename scalar_t, typename kernel_name, typename Func>
+void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
+  auto numel = index.numel();
+  auto out_numel = self.numel();
+  size_t scalar_bytes = sizeof(scalar_t);
+
+  TensorInfo<scalar_t, uint64_t> out_info =
+      getTensorInfo<scalar_t, uint64_t>(self);
+  out_info.collapseDims();
+
+  TensorInfo<long, uint64_t> indices_info =
+      getTensorInfo<long, uint64_t>(index);
+  indices_info.collapseDims();
+
+  TensorInfo<scalar_t, uint64_t> source_info =
+      getTensorInfo<scalar_t, uint64_t>(source);
+  source_info.collapseDims();
+
+  using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
+  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
+
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+
+  auto cgf = DPCPP_Q_CGF(__cgh) {
+    out_accessor_t out_acc = out_accessor_t(__cgh, self.data_ptr());
+    in_accessor_t indices_acc = in_accessor_t(__cgh, index.data_ptr());
+    in_accessor_t source_acc = in_accessor_t(__cgh, source.data_ptr());
+
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      auto out_ptr = out_acc.template get_pointer<char>();
+      auto indices_ptr = indices_acc.template get_pointer<long>();
+      auto source_ptr = source_acc.template get_pointer<char>();
+
+      auto linear_idx = item_id.get_id(0);
+      auto idx_offset =
+          IndexToOffset<long, uint64_t>::get(linear_idx, indices_info);
+
+      auto index = indices_ptr[idx_offset];
+      if (index > out_numel) {
+        /*error handle*/
+        return;
+      }
+
+      auto src_offset =
+          IndexToOffset<scalar_t, uint64_t>::get(linear_idx, source_info);
+      src_offset *= scalar_bytes;
+      auto out_offset = IndexToOffset<scalar_t, uint64_t>::get(index, out_info);
+      out_offset *= scalar_bytes;
+
+      f(out_ptr, source_ptr + src_offset, out_offset);
+    };
+
+    __cgh.parallel_for<DPCPP_K(dpcpp_put_kernel, kernel_name)>(
+        DPCPP::range</*dim=*/1>(numel), kfn);
+  };
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+}
+
 } // namespace impl
 
 Tensor& index_select_out(
@@ -949,5 +1013,85 @@ Tensor masked_select(const Tensor& self, const Tensor& mask) {
   return at::AtenIpexTypeDPCPP::masked_select_out(out, self, mask);
 }
 
+#define AT_DISPATCH_ALL_ATOMIC_TYPES(TYPE, NAME, ...)                        \
+  [&] {                                                                      \
+    const auto& the_type = TYPE;                                             \
+    /* don't use TYPE again in case it is an expensive or side-effect op  */ \
+    at::ScalarType _st = ::detail::scalar_type(the_type);                    \
+    switch (_st) {                                                           \
+      AT_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)        \
+      AT_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)        \
+      default:                                                               \
+        AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
+    }                                                                        \
+  }()
+
+DPCPP_DEF_K1(dpcpp_put_kernel);
+Tensor& put_(
+    Tensor& self,
+    const Tensor& index_,
+    const Tensor& source_,
+    bool accumulate) {
+  TORCH_CHECK(
+      index_.numel() == source_.numel(),
+      "indices number must be same as the source number");
+  TORCH_CHECK(
+      index_.dtype() == kLong,
+      "indices number must be same as the source number");
+  TORCH_CHECK(
+      self.dtype() == source_.dtype(),
+      "out and source must be the same tpye. got:",
+      self.dtype(),
+      " and ",
+      source_.dtype());
+  Tensor index;
+  Tensor source;
+  // Ensure index is on the same device as self
+  if (index_.device() != self.device()) {
+    index = index_.to(self.device());
+  } else {
+    index = index_;
+  }
+
+  // Ensure source is on the same device as self
+  if (source_.device() != self.device()) {
+    source = source_.to(self.device());
+  } else {
+    source = source_;
+  }
+
+  if (accumulate) {
+    AT_DISPATCH_ALL_ATOMIC_TYPES(self.scalar_type(), "put_", [&] {
+      impl::put<scalar_t,
+                DPCPP_K(dpcpp_put_kernel, scalar_t, /*accumulate=*/bool)>(
+          self,
+          index,
+          source,
+          [](dpcpp_global_ptr_pt<char> out_data,
+             dpcpp_global_ptr_pt<char> in_data,
+             uint64_t offset) {
+            dpcpp_global_ptr_pt<scalar_t> out_ptr =
+                (dpcpp_global_ptr_pt<scalar_t>)(out_data + offset);
+            auto in = *(scalar_t*)in_data;
+            atomicAdd(out_ptr, in);
+          });
+    });
+  } else {
+    AT_DISPATCH_ALL_TYPES(self.scalar_type(), "put_", [&] {
+      using dtype = impl::OpaqueType<sizeof(scalar_t)>;
+      impl::put<scalar_t, DPCPP_K(dpcpp_put_kernel, scalar_t)>(
+          self,
+          index,
+          source,
+          [](dpcpp_global_ptr_pt<char> out_data,
+             dpcpp_global_ptr_pt<char> in_data,
+             uint64_t offset) {
+            *(dtype*)(out_data + offset) = *(dtype*)in_data;
+          });
+    });
+  }
+
+  return self;
+}
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
