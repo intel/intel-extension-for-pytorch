@@ -1151,6 +1151,22 @@ at::Tensor AtenIpexTypeDefault::softplus_backward(const at::Tensor & grad_output
   return AtenIpexTypeDPCPP::softplus_backward(grad_output, self, beta, threshold, output);
 }
 
+at::Tensor & AtenIpexTypeDefault::softshrink_out(at::Tensor & out, const at::Tensor & self, at::Scalar lambd) {
+  return AtenIpexTypeDPCPP::softshrink_out(out, self, lambd);
+}
+
+at::Tensor AtenIpexTypeDefault::softshrink(const at::Tensor & self, at::Scalar lambd) {
+  return AtenIpexTypeDPCPP::softshrink(self, lambd);
+}
+
+at::Tensor & AtenIpexTypeDefault::softshrink_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, at::Scalar lambd) {
+  return AtenIpexTypeDPCPP::softshrink_backward_out(grad_input, grad_output, self, lambd);
+}
+
+at::Tensor AtenIpexTypeDefault::softshrink_backward(const at::Tensor & grad_output, const at::Tensor & self, at::Scalar lambd) {
+  return AtenIpexTypeDPCPP::softshrink_backward(grad_output, self, lambd);
+}
+
 at::Tensor & AtenIpexTypeDefault::adaptive_avg_pool2d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef output_size) {
   return AtenIpexTypeDPCPP::adaptive_avg_pool2d_out(out, self, output_size);
 }
@@ -2124,6 +2140,18 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::softplus_backward(Tensor grad_output, Tensor self, Scalar beta, Scalar threshold, Tensor output) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar, const at::Tensor &), &AtenIpexTypeDefault::softplus_backward>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::softshrink.out(Tensor self, Scalar lambd=0.5, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::softshrink_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::softshrink(Tensor self, Scalar lambd=0.5) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::softshrink>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::softshrink_backward.grad_input(Tensor grad_output, Tensor self, Scalar lambd, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::softshrink_backward_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::softshrink_backward(Tensor grad_output, Tensor self, Scalar lambd) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::softshrink_backward>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::adaptive_avg_pool2d.out(Tensor self, int[2] output_size, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::adaptive_avg_pool2d_out>(at::TensorTypeId::DPCPPTensorId)

@@ -292,6 +292,10 @@ class AtenIpexTypeDefault {
   static at::Tensor softplus(const at::Tensor & self, at::Scalar beta, at::Scalar threshold);
   static at::Tensor & softplus_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, at::Scalar beta, at::Scalar threshold, const at::Tensor & output);
   static at::Tensor softplus_backward(const at::Tensor & grad_output, const at::Tensor & self, at::Scalar beta, at::Scalar threshold, const at::Tensor & output);
+  static at::Tensor & softshrink_out(at::Tensor & out, const at::Tensor & self, at::Scalar lambd);
+  static at::Tensor softshrink(const at::Tensor & self, at::Scalar lambd);
+  static at::Tensor & softshrink_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, at::Scalar lambd);
+  static at::Tensor softshrink_backward(const at::Tensor & grad_output, const at::Tensor & self, at::Scalar lambd);
   static at::Tensor & adaptive_avg_pool2d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef output_size);
   static at::Tensor adaptive_avg_pool2d(const at::Tensor & self, at::IntArrayRef output_size);
   static at::Tensor _adaptive_avg_pool2d(const at::Tensor & self, at::IntArrayRef output_size);
