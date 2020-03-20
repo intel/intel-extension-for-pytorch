@@ -502,94 +502,6 @@ Tensor& max_pool2d_with_indices_backward_out_dpcpp_template(
   return gradInput;
 }
 
-std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out_dpcpp(
-    Tensor& output,
-    Tensor& indices,
-    const Tensor& input,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    IntArrayRef dilation,
-    bool ceil_mode) {
-  max_pool2d_with_indices_out_dpcpp_template(
-      output,
-      indices,
-      input,
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode);
-  return std::tuple<Tensor&, Tensor&>(output, indices);
-}
-
-std::tuple<Tensor, Tensor> max_pool2d_with_indices_dpcpp(
-    const Tensor& input,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    IntArrayRef dilation,
-    bool ceil_mode) {
-  Tensor output = at::empty({0}, input.options());
-  Tensor indices = at::empty({0}, input.options().dtype(kLong));
-  max_pool2d_with_indices_out_dpcpp_template(
-      output,
-      indices,
-      input,
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode);
-  return std::tuple<Tensor, Tensor>(output, indices);
-}
-
-Tensor& max_pool2d_with_indices_backward_out_dpcpp(
-    Tensor& gradInput,
-    const Tensor& gradOutput_,
-    const Tensor& input,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    IntArrayRef dilation,
-    bool ceil_mode,
-    const Tensor& indices) {
-  max_pool2d_with_indices_backward_out_dpcpp_template(
-      gradInput,
-      gradOutput_,
-      input,
-      indices,
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode);
-  return gradInput;
-}
-
-Tensor max_pool2d_with_indices_backward_dpcpp(
-    const Tensor& gradOutput_,
-    const Tensor& input,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    IntArrayRef dilation,
-    bool ceil_mode,
-    const Tensor& indices) {
-  auto gradInput = at::zeros_like(input);
-  max_pool2d_with_indices_backward_out_dpcpp_template(
-      gradInput,
-      gradOutput_,
-      input,
-      indices,
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode);
-  return gradInput;
-}
-
 } // namespace impl
 
 std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
@@ -601,7 +513,7 @@ std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  return impl::max_pool2d_with_indices_out_dpcpp(
+  impl::max_pool2d_with_indices_out_dpcpp_template(
       output,
       indices,
       input,
@@ -610,6 +522,7 @@ std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
       padding,
       dilation,
       ceil_mode);
+  return std::tuple<Tensor&, Tensor&>(output, indices);
 }
 
 std::tuple<Tensor, Tensor> max_pool2d_with_indices(
@@ -619,8 +532,17 @@ std::tuple<Tensor, Tensor> max_pool2d_with_indices(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  return impl::max_pool2d_with_indices_dpcpp(
-      input, kernel_size, stride, padding, dilation, ceil_mode);
+  Tensor output = at::empty({0}, input.options());
+  Tensor indices = at::empty({0}, input.options().dtype(kLong));
+  return at::AtenIpexTypeDPCPP::max_pool2d_with_indices_out(
+      output,
+      indices,
+      input,
+      kernel_size,
+      stride,
+      padding,
+      dilation,
+      ceil_mode);
 }
 
 Tensor& max_pool2d_with_indices_backward_out(
@@ -633,16 +555,17 @@ Tensor& max_pool2d_with_indices_backward_out(
     IntArrayRef dilation,
     bool ceil_mode,
     const Tensor& indices) {
-  return impl::max_pool2d_with_indices_backward_out_dpcpp(
+  impl::max_pool2d_with_indices_backward_out_dpcpp_template(
       grad_input,
       grad_output,
       self,
+      indices,
       kernel_size,
       stride,
       padding,
       dilation,
-      ceil_mode,
-      indices);
+      ceil_mode);
+  return grad_input;
 }
 
 Tensor max_pool2d_with_indices_backward(
@@ -654,7 +577,9 @@ Tensor max_pool2d_with_indices_backward(
     IntArrayRef dilation,
     bool ceil_mode,
     const Tensor& indices) {
-  return impl::max_pool2d_with_indices_backward_dpcpp(
+  auto grad_input = at::zeros_like(self);
+  return at::AtenIpexTypeDPCPP::max_pool2d_with_indices_backward_out(
+      grad_input,
       grad_output,
       self,
       kernel_size,

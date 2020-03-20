@@ -331,20 +331,26 @@ void adaptive_avg_pool2d_backward_out_dpcpp_template(
       });
 }
 
-Tensor& adaptive_avg_pool2d_out_dpcpp(
-    Tensor& output,
-    const Tensor& input,
+} // namespace impl
+
+Tensor& adaptive_avg_pool2d_out(
+    Tensor& out,
+    const Tensor& self,
     IntArrayRef output_size) {
-  adaptive_avg_pool2d_out_dpcpp_template(output, input, output_size);
-  return output;
+  impl::adaptive_avg_pool2d_out_dpcpp_template(out, self, output_size);
+  return out;
 }
 
-Tensor adaptive_avg_pool2d_dpcpp(
-    at::Tensor const& input,
-    IntArrayRef output_size) {
-  auto output = at::empty({0}, input.options());
-  adaptive_avg_pool2d_out_dpcpp_template(output, input, output_size);
-  return output;
+Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
+  auto output = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::adaptive_avg_pool2d_out(
+      output, self, output_size);
+}
+
+Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
+  auto output = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::adaptive_avg_pool2d_out(
+      output, self, output_size);
 }
 
 Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
@@ -352,40 +358,18 @@ Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
     const Tensor& gradOutput,
     const Tensor& input) {
   gradInput.resize_as_(input);
-  adaptive_avg_pool2d_backward_out_dpcpp_template(gradInput, gradOutput, input);
+  impl::adaptive_avg_pool2d_backward_out_dpcpp_template(
+      gradInput, gradOutput, input);
   return gradInput;
-}
-
-Tensor adaptive_avg_pool2d_backward_dpcpp(
-    const Tensor& gradOutput,
-    const Tensor& input) {
-  auto gradInput = at::zeros_like(input);
-  adaptive_avg_pool2d_backward_out_dpcpp_template(gradInput, gradOutput, input);
-  return gradInput;
-}
-
-} // namespace impl
-
-Tensor& adaptive_avg_pool2d_out(
-    Tensor& out,
-    const Tensor& self,
-    IntArrayRef output_size) {
-  impl::adaptive_avg_pool2d_out_dpcpp(out, self, output_size);
-  return out;
-}
-
-Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
-  return impl::adaptive_avg_pool2d_dpcpp(self, output_size);
-}
-
-Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
-  return impl::adaptive_avg_pool2d_dpcpp(self, output_size);
 }
 
 Tensor _adaptive_avg_pool2d_backward(
     const Tensor& grad_output,
     const Tensor& self) {
-  return impl::adaptive_avg_pool2d_backward_dpcpp(grad_output, self);
+  auto grad_input = at::zeros_like(self);
+  impl::adaptive_avg_pool2d_backward_out_dpcpp_template(
+      grad_input, grad_output, self);
+  return grad_input;
 }
 
 } // namespace AtenIpexTypeDPCPP
