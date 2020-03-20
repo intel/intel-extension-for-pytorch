@@ -288,6 +288,10 @@ class AtenIpexTypeDefault {
   static at::Tensor & hardtanh_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, at::Scalar min_val, at::Scalar max_val);
   static at::Tensor hardtanh_backward(const at::Tensor & grad_output, const at::Tensor & self, at::Scalar min_val, at::Scalar max_val);
   static at::Tensor & hardtanh_(at::Tensor & self, at::Scalar min_val, at::Scalar max_val);
+  static std::tuple<at::Tensor &,at::Tensor &> log_sigmoid_forward_out(at::Tensor & output, at::Tensor & buffer, const at::Tensor & self);
+  static std::tuple<at::Tensor,at::Tensor> log_sigmoid_forward(const at::Tensor & self);
+  static at::Tensor & log_sigmoid_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & buffer);
+  static at::Tensor log_sigmoid_backward(const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & buffer);
   static at::Tensor & softplus_out(at::Tensor & out, const at::Tensor & self, at::Scalar beta, at::Scalar threshold);
   static at::Tensor softplus(const at::Tensor & self, at::Scalar beta, at::Scalar threshold);
   static at::Tensor & softplus_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, at::Scalar beta, at::Scalar threshold, const at::Tensor & output);

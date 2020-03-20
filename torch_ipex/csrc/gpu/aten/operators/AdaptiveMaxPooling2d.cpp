@@ -5,8 +5,10 @@
 #include <core/Runtime.h>
 #include <vector>
 
-using namespace mkldnn;
+
+using namespace dnnl;
 using namespace at::dpcpp;
+
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
@@ -37,7 +39,7 @@ static void adaptive_max_pool2d_out_frame(
   auto data_t = memory::data_type::f32;
   if (std::is_same<scalar_t, Half>::value == true) {
     data_t = memory::data_type::f16;
-    prop_kind = prop_kind::forward_inference;
+    prop_kind = dnnl::prop_kind::forward_inference;
   }
   auto format_nchw = memory::format_tag::nchw;
 
@@ -190,7 +192,7 @@ void adaptive_max_pool2d_out_dpcpp_template(
   int padH = 0;
 
   auto alg_kind = algorithm::pooling_max;
-  auto prop_kind = prop_kind::forward_training;
+  auto prop_kind = dnnl::prop_kind::forward_training;
 
   output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
   indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
@@ -393,7 +395,7 @@ Tensor& adaptive_max_pool2d_backward_out_dpcpp_template(
   gradInput.zero_();
 
   auto alg_kind = algorithm::pooling_max;
-  auto prop_kind = prop_kind::forward_training;
+  auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES(
       input.scalar_type(), "adaptive_max_pool2d_backward", [&] {

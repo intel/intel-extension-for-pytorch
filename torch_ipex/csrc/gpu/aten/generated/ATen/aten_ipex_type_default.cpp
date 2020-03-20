@@ -1135,6 +1135,22 @@ at::Tensor & AtenIpexTypeDefault::hardtanh_(at::Tensor & self, at::Scalar min_va
   return AtenIpexTypeDPCPP::hardtanh_(self, min_val, max_val);
 }
 
+std::tuple<at::Tensor &,at::Tensor &> AtenIpexTypeDefault::log_sigmoid_forward_out(at::Tensor & output, at::Tensor & buffer, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::log_sigmoid_forward_out(output, buffer, self);
+}
+
+std::tuple<at::Tensor,at::Tensor> AtenIpexTypeDefault::log_sigmoid_forward(const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::log_sigmoid_forward(self);
+}
+
+at::Tensor & AtenIpexTypeDefault::log_sigmoid_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & buffer) {
+  return AtenIpexTypeDPCPP::log_sigmoid_backward_out(grad_input, grad_output, self, buffer);
+}
+
+at::Tensor AtenIpexTypeDefault::log_sigmoid_backward(const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & buffer) {
+  return AtenIpexTypeDPCPP::log_sigmoid_backward(grad_output, self, buffer);
+}
+
 at::Tensor & AtenIpexTypeDefault::softplus_out(at::Tensor & out, const at::Tensor & self, at::Scalar beta, at::Scalar threshold) {
   return AtenIpexTypeDPCPP::softplus_out(out, self, beta, threshold);
 }
@@ -2128,6 +2144,18 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::hardtanh_(Tensor(a!) self, Scalar min_val=-1, Scalar max_val=1) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::hardtanh_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::log_sigmoid_forward.output(Tensor self, *, Tensor(a!) output, Tensor(b!) buffer) -> (Tensor(a!), Tensor(b!))")
+      .impl_unboxedOnlyKernel<std::tuple<at::Tensor &,at::Tensor &>(at::Tensor &, at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::log_sigmoid_forward_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::log_sigmoid_forward(Tensor self) -> (Tensor output, Tensor buffer)")
+      .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor>(const at::Tensor &), &AtenIpexTypeDefault::log_sigmoid_forward>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::log_sigmoid_backward.grad_input(Tensor grad_output, Tensor self, Tensor buffer, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::log_sigmoid_backward_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::log_sigmoid_backward(Tensor grad_output, Tensor self, Tensor buffer) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::log_sigmoid_backward>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::softplus.out(Tensor self, Scalar beta=1, Scalar threshold=20, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::softplus_out>(at::TensorTypeId::DPCPPTensorId)

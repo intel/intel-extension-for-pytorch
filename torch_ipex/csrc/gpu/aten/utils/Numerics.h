@@ -620,10 +620,12 @@ struct Numerics<float> {
   static inline float atan2(float a, float b) {
     return DPCPP::atan2(a, b);
   }
+  static inline float max(float a, float b) {
+    return cl::sycl::fmax(a, b);
+  }
   static inline float abs(float a) {
     return DPCPP::fabs(a);
   }
-
   static inline bool isnan(float a) {
     return DPCPP::isnan(a);
   }
@@ -758,11 +760,12 @@ struct Numerics<double> {
   static inline double atan2(double a, double b) {
     return DPCPP::atan2(a, b);
   }
-
+  static inline double max(double a, double b) {
+    return cl::sycl::fmax(a, b);
+  }
   static inline double abs(double a) {
     return DPCPP::fabs(a);
   }
-
   static inline bool isnan(double a) {
     return DPCPP::isnan(a);
   }
