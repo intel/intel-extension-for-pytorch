@@ -22,6 +22,74 @@ namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 template <typename T>
+struct TensorAbsOp {
+  void operator()(T& out, T& in1, T& in2) const {
+    T z = in1 - in2;
+    out = z >= 0 ? z : -z;
+  }
+};
+
+template <typename T>
+struct TensorAbsGradOp {
+  void operator()(T& out, T& in1, T& in2) const {
+    out = ScalarConvert<int, T>::to(in1 >= in2 ? 1 : -1);
+  }
+};
+
+template <typename T>
+struct TensorAbsNormOp {
+  TensorAbsNormOp(T norm) : norm(norm) {}
+  void operator()(T& out, T& in1, T& in2) const {
+    out = (in1 >= in2 ? norm : ScalarConvert<float, T>::to(-1.) * norm);
+  }
+
+  const T norm;
+};
+
+template <typename T>
+struct TensorSmoothL1Op {
+  void operator()(T& out, T& in1, T& in2) const {
+    T z = Numerics<T>::abs(in1 - in2);
+    T one = ScalarConvert<float, T>::to(1.);
+    T oneHalf = ScalarConvert<float, T>::to(0.5);
+    out = z < one ? oneHalf * z * z : z - oneHalf;
+  }
+};
+
+template <typename T>
+struct TensorSmoothL1GradOp {
+  void operator()(T& out, T& in1, T& in2) const {
+    T x = in1 - in2;
+    T one = ScalarConvert<float, T>::to(1.);
+    if (x < -one) {
+      out = -one;
+    } else if (x > one) {
+      out = one;
+    } else {
+      out = x;
+    }
+  }
+};
+
+template <typename T>
+struct TensorSmoothL1NormOp {
+  TensorSmoothL1NormOp(T norm) : norm(norm) {}
+
+  void operator()(T& out, T& in1, T& in2) const {
+    T x = in1 - in2;
+    T one = ScalarConvert<float, T>::to(1.);
+    if (x < -one)
+      out = -one * norm;
+    else if (x > one)
+      out = norm;
+    else
+      out = norm * x;
+  }
+
+  const T norm;
+};
+
+template <typename T>
 struct TensorMSEOp {
   void operator()(T& out, T& in1, T& in2) const {
     out = (in1 - in2) * (in1 - in2);
@@ -349,7 +417,7 @@ void MSECriterion_updateGradInput(
     const Tensor& grad_output,
     const Tensor& input,
     const Tensor& target,
-    long reduction) {
+    int64_t reduction) {
   TORCH_CHECK(
       input.numel() == target.numel(),
       "input and target have different number of elements");
@@ -367,6 +435,124 @@ void MSECriterion_updateGradInput(
       gradOutput0d;
   at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
       grad_input, input, target, TensorMSENormOp<scalar_t>(norm));
+}
+
+template <typename scalar_t>
+void AbsCriterion_updateOutput(
+    Tensor& output,
+    const Tensor& input,
+    const Tensor& target,
+    int64_t reduction) {
+  TORCH_CHECK(check_size(input, target), "input and target shape do not match");
+
+  if (reduction == Reduction::None) {
+    output.resize_as_(input);
+    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+        output, input, target, TensorAbsOp<scalar_t>());
+    return;
+  }
+
+  int64_t size0 = input.numel();
+  output.resize_({});
+  Tensor t1 = at::empty_like(input);
+  Tensor t2 = at::empty_like(input);
+  t1.fill_(ScalarConvert<int, scalar_t>::to(1));
+  at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+      t2, input, target, TensorAbsOp<scalar_t>());
+
+  scalar_t* t1_data = t1.data_ptr<scalar_t>();
+  scalar_t* t2_data = t2.data_ptr<scalar_t>();
+  scalar_t* output_data = output.data_ptr<scalar_t>();
+  dnnl_inner_product_forward_frame<scalar_t>(
+      (int)size0, t1_data, t2_data, output_data);
+
+  if (reduction == Reduction::Mean)
+    output.div_(size0);
+}
+
+template <typename scalar_t>
+void AbsCriterion_updateGradInput(
+    Tensor& grad_input,
+    const Tensor& grad_output,
+    const Tensor& input,
+    const Tensor& target,
+    int64_t reduction) {
+  TORCH_CHECK(check_size(input, target), "input and target shape do not match");
+  grad_input.resize_as_(input);
+
+  if (reduction == Reduction::None) {
+    TORCH_CHECK(
+        check_size(grad_output, input),
+        "input and gradOutput shape do not match");
+    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+        grad_input, input, target, TensorAbsGradOp<scalar_t>());
+    at::mul_out(grad_input, grad_input, grad_output);
+    return;
+  }
+
+  scalar_t gradOutput0d = grad_output.item().to<scalar_t>();
+  scalar_t norm =
+      (reduction == Reduction::Mean ? 1. / (scalar_t)input.numel() : 1.) *
+      gradOutput0d;
+  at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+      grad_input, input, target, TensorAbsNormOp<scalar_t>(norm));
+}
+
+template <typename scalar_t>
+void SmoothL1Criterion_updateOutput(
+    Tensor& output,
+    const Tensor& input,
+    const Tensor& target,
+    int64_t reduction) {
+  TORCH_CHECK(check_size(input, target), "input and target shape do not match");
+
+  if (reduction == Reduction::None) {
+    output.resize_as_(input);
+    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+        output, input, target, TensorSmoothL1Op<scalar_t>());
+    return;
+  }
+
+  output.resize_({});
+  Tensor t1 = at::empty_like(input);
+  Tensor t2 = at::empty_like(input);
+  t1.fill_(ScalarConvert<int, scalar_t>::to(1));
+  at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+      t2, input, target, TensorSmoothL1Op<scalar_t>());
+
+  int64_t size0 = input.numel();
+  scalar_t* t1_data = t1.data_ptr<scalar_t>();
+  scalar_t* t2_data = t2.data_ptr<scalar_t>();
+  scalar_t* output_data = output.data_ptr<scalar_t>();
+  dnnl_inner_product_forward_frame<scalar_t>(
+      (int)size0, t1_data, t2_data, output_data);
+
+  if (reduction == Reduction::Mean)
+    output.div_(size0);
+}
+
+template <typename scalar_t>
+void SmoothL1Criterion_updateGradInput(
+    Tensor& grad_input,
+    const Tensor& grad_output,
+    const Tensor& input,
+    const Tensor& target,
+    int64_t reduction) {
+  TORCH_CHECK(check_size(input, target), "input and target shape do not match");
+  grad_input.resize_as_(input);
+
+  if (reduction == Reduction::None) {
+    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+        grad_input, input, target, TensorSmoothL1GradOp<scalar_t>());
+    at::mul_out(grad_input, grad_input, grad_output);
+    return;
+  }
+  scalar_t gradOutput0d = grad_output.item().to<scalar_t>();
+  scalar_t norm =
+      (reduction == Reduction::Mean ? 1. / (scalar_t)input.numel() : 1.) *
+      gradOutput0d;
+  at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+      grad_input, input, target, TensorSmoothL1NormOp<scalar_t>(norm));
 }
 
 } // namespace impl
@@ -457,6 +643,92 @@ Tensor mse_loss_backward(
     int64_t reduction) {
   Tensor grad_input = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::mse_loss_backward_out(
+      grad_input, grad_output, self, target, reduction);
+}
+
+Tensor& l1_loss_out(
+    Tensor& out,
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction) {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "l1_loss_out", [&] {
+    impl::AbsCriterion_updateOutput<scalar_t>(out, self, target, reduction);
+  });
+  return out;
+}
+
+Tensor l1_loss(const Tensor& self, const Tensor& target, int64_t reduction) {
+  Tensor out = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::l1_loss_out(out, self, target, reduction);
+}
+
+Tensor& l1_loss_backward_out(
+    Tensor& grad_input,
+    const Tensor& grad_output,
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction) {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+      self.scalar_type(), "l1_loss_backward_out", [&] {
+        impl::AbsCriterion_updateGradInput<scalar_t>(
+            grad_input, grad_output, self, target, reduction);
+      });
+  return grad_input;
+}
+
+Tensor l1_loss_backward(
+    const Tensor& grad_output,
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction) {
+  Tensor grad_input = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::l1_loss_backward_out(
+      grad_input, grad_output, self, target, reduction);
+}
+
+Tensor& smooth_l1_loss_out(
+    Tensor& out,
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction) {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+      self.scalar_type(), "smooth_l1_loss_out", [&] {
+        impl::SmoothL1Criterion_updateOutput<scalar_t>(
+            out, self, target, reduction);
+      });
+  return out;
+}
+
+Tensor smooth_l1_loss(
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction) {
+  Tensor out = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::smooth_l1_loss_out(
+      out, self, target, reduction);
+}
+
+Tensor& smooth_l1_loss_backward_out(
+    Tensor& grad_input,
+    const Tensor& grad_output,
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction) {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+      self.scalar_type(), "smooth_l1_loss_backward_out", [&] {
+        impl::SmoothL1Criterion_updateGradInput<scalar_t>(
+            grad_input, grad_output, self, target, reduction);
+      });
+  return grad_input;
+}
+
+Tensor smooth_l1_loss_backward(
+    const Tensor& grad_output,
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction) {
+  Tensor grad_input = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::smooth_l1_loss_backward_out(
       grad_input, grad_output, self, target, reduction);
 }
 
