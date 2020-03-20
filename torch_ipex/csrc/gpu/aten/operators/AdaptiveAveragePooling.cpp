@@ -12,7 +12,7 @@ namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 template <typename scalar_t>
-static void adaptive_avg_pool2d_out_dpcpp_frame(
+static void adaptive_avg_pool2d_out_frame(
     scalar_t* input_data,
     scalar_t* output_data,
     int64_t nbatch,
@@ -104,7 +104,7 @@ static void adaptive_avg_pool2d_out_dpcpp_frame(
 }
 
 template <typename scalar_t>
-static void adaptive_avg_pool2d_backward_out_dpcpp_frame(
+static void adaptive_avg_pool2d_backward_out_frame(
     scalar_t* gradInput_data,
     scalar_t* gradOutput_data,
     int64_t nbatch,
@@ -203,7 +203,7 @@ static void adaptive_avg_pool2d_backward_out_dpcpp_frame(
   // }
 }
 
-void adaptive_avg_pool2d_out_dpcpp_template(
+void adaptive_avg_pool2d_out_template(
     Tensor& output,
     const Tensor& input,
     IntArrayRef output_size) {
@@ -245,10 +245,10 @@ void adaptive_avg_pool2d_out_dpcpp_template(
   output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols});
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "adaptive_avg_pool2d_dpcpp", [&] {
+      input.scalar_type(), "adaptive_avg_pool2d", [&] {
         auto input_data = input.data_ptr<scalar_t>();
         auto output_data = output.data_ptr<scalar_t>();
-        adaptive_avg_pool2d_out_dpcpp_frame<scalar_t>(
+        adaptive_avg_pool2d_out_frame<scalar_t>(
             input_data,
             output_data,
             batchSize,
@@ -268,7 +268,7 @@ void adaptive_avg_pool2d_out_dpcpp_template(
       });
 }
 
-void adaptive_avg_pool2d_backward_out_dpcpp_template(
+void adaptive_avg_pool2d_backward_out_template(
     Tensor& gradInput,
     const Tensor& gradOutput,
     const Tensor& input) {
@@ -308,10 +308,10 @@ void adaptive_avg_pool2d_backward_out_dpcpp_template(
   auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "adaptive_avg_pool2d_backward_dpcpp", [&] {
+      input.scalar_type(), "adaptive_avg_pool2d_backward", [&] {
         auto gradOutput_data = gradOutput.data_ptr<scalar_t>();
         auto gradInput_data = gradInput.data_ptr<scalar_t>();
-        adaptive_avg_pool2d_backward_out_dpcpp_frame<scalar_t>(
+        adaptive_avg_pool2d_backward_out_frame<scalar_t>(
             gradInput_data,
             gradOutput_data,
             batchSize,
@@ -337,7 +337,7 @@ Tensor& adaptive_avg_pool2d_out(
     Tensor& out,
     const Tensor& self,
     IntArrayRef output_size) {
-  impl::adaptive_avg_pool2d_out_dpcpp_template(out, self, output_size);
+  impl::adaptive_avg_pool2d_out_template(out, self, output_size);
   return out;
 }
 
@@ -358,8 +358,7 @@ Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
     const Tensor& gradOutput,
     const Tensor& input) {
   gradInput.resize_as_(input);
-  impl::adaptive_avg_pool2d_backward_out_dpcpp_template(
-      gradInput, gradOutput, input);
+  impl::adaptive_avg_pool2d_backward_out_template(gradInput, gradOutput, input);
   return gradInput;
 }
 
@@ -367,7 +366,7 @@ Tensor _adaptive_avg_pool2d_backward(
     const Tensor& grad_output,
     const Tensor& self) {
   auto grad_input = at::zeros_like(self);
-  impl::adaptive_avg_pool2d_backward_out_dpcpp_template(
+  impl::adaptive_avg_pool2d_backward_out_template(
       grad_input, grad_output, self);
   return grad_input;
 }

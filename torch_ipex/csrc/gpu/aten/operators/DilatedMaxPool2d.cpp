@@ -266,7 +266,7 @@ static void max_pool2d_with_indices_backward_out_frame(
   // }
 }
 
-void max_pool2d_with_indices_out_dpcpp_template(
+void max_pool2d_with_indices_out_template(
     Tensor& output,
     Tensor& indices,
     const Tensor& input_,
@@ -353,7 +353,7 @@ void max_pool2d_with_indices_out_dpcpp_template(
   auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "max_pool2d_with_indices_dpcpp", [&] {
+      input.scalar_type(), "max_pool2d_with_indices", [&] {
         scalar_t* input_data = input.data_ptr<scalar_t>();
         scalar_t* output_data = output.data_ptr<scalar_t>();
         int64_t* indices_data = indices.data_ptr<int64_t>();
@@ -379,7 +379,7 @@ void max_pool2d_with_indices_out_dpcpp_template(
       });
 }
 
-Tensor& max_pool2d_with_indices_backward_out_dpcpp_template(
+Tensor& max_pool2d_with_indices_backward_out_template(
     Tensor& gradInput,
     const Tensor& gradOutput_,
     const Tensor& input,
@@ -474,7 +474,7 @@ Tensor& max_pool2d_with_indices_backward_out_dpcpp_template(
       outputWidth_for_shape_check);
 
   AT_DISPATCH_FLOATING_TYPES(
-      input.scalar_type(), "max_pool2d_with_indices_backward_dpcpp", [&] {
+      input.scalar_type(), "max_pool2d_with_indices_backward", [&] {
         /* get raw pointers */
         scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();
         scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();
@@ -513,7 +513,7 @@ std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  impl::max_pool2d_with_indices_out_dpcpp_template(
+  impl::max_pool2d_with_indices_out_template(
       output,
       indices,
       input,
@@ -555,7 +555,7 @@ Tensor& max_pool2d_with_indices_backward_out(
     IntArrayRef dilation,
     bool ceil_mode,
     const Tensor& indices) {
-  impl::max_pool2d_with_indices_backward_out_dpcpp_template(
+  impl::max_pool2d_with_indices_backward_out_template(
       grad_input,
       grad_output,
       self,

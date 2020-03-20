@@ -5,7 +5,6 @@
 #include <core/Runtime.h>
 #include <vector>
 
-
 using namespace dnnl;
 using namespace at::dpcpp;
 
@@ -140,7 +139,7 @@ static void adaptive_max_pool2d_out_frame(
       indices_usr.numel());
 }
 
-void adaptive_max_pool2d_out_dpcpp_template(
+void adaptive_max_pool2d_out_template(
     Tensor& output,
     Tensor& indices,
     const Tensor& input,
@@ -358,7 +357,7 @@ static void adaptive_max_pool2d_backward_out_frame(
   // }
 }
 
-Tensor& adaptive_max_pool2d_backward_out_dpcpp_template(
+Tensor& adaptive_max_pool2d_backward_out_template(
     Tensor& gradInput,
     const Tensor& gradOutput_,
     const Tensor& input,
@@ -433,7 +432,7 @@ std::tuple<Tensor&, Tensor&> adaptive_max_pool2d_out(
     Tensor& indices,
     const Tensor& self,
     IntArrayRef output_size) {
-  impl::adaptive_max_pool2d_out_dpcpp_template(out, indices, self, output_size);
+  impl::adaptive_max_pool2d_out_template(out, indices, self, output_size);
   return std::tuple<Tensor&, Tensor&>(out, indices);
 }
 
@@ -452,7 +451,7 @@ Tensor& adaptive_max_pool2d_backward_out(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& indices) {
-  impl::adaptive_max_pool2d_backward_out_dpcpp_template(
+  impl::adaptive_max_pool2d_backward_out_template(
       grad_input, grad_output, self, indices);
   return grad_input;
 }
