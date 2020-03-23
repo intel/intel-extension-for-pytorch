@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/native/TensorIterator.h>
 
 #include <core/ApplyUtils.h>
 #include <core/DPCPP.h>
@@ -12,7 +13,22 @@
 #include <utils/Numerics.h>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
+#include "IndexingUtils.h"
+#include "Loops.h"
 #include "ParttenScan.h"
+
+#define AT_DISPATCH_ALL_ATOMIC_TYPES(TYPE, NAME, ...)                        \
+  [&] {                                                                      \
+    const auto& the_type = TYPE;                                             \
+    /* don't use TYPE again in case it is an expensive or side-effect op  */ \
+    at::ScalarType _st = ::detail::scalar_type(the_type);                    \
+    switch (_st) {                                                           \
+      AT_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)        \
+      AT_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)        \
+      default:                                                               \
+        AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
+    }                                                                        \
+  }()
 
 using namespace at::dpcpp;
 
@@ -884,6 +900,68 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
+DPCPP_DEF_K1(index_kernel);
+void index(
+    TensorIterator& iter,
+    IntArrayRef index_size,
+    IntArrayRef index_stride) {
+  AT_DISPATCH_ALL_TYPES(iter.dtype(), "index", [&] {
+    using dtype = OpaqueType<sizeof(scalar_t)>;
+    dpcpp_index_kernel<DPCPP_K(index_kernel, scalar_t)>(
+        iter,
+        index_size,
+        index_stride,
+        // This lambda function only works in dpcpp kernel.
+        [](dpcpp_global_ptr_pt<char> out_data,
+           dpcpp_global_ptr_pt<char> in_data,
+           int64_t offset) {
+          *(dtype*)out_data = *(dtype*)(in_data + offset);
+        });
+  });
+}
+
+DPCPP_DEF_K1(index_put_kernel);
+void index_put(
+    TensorIterator& iter,
+    IntArrayRef index_size,
+    IntArrayRef index_stride,
+    bool accumulate) {
+  if (accumulate) {
+    AT_DISPATCH_ALL_ATOMIC_TYPES(iter.dtype(), "index_put", [&] {
+      dpcpp_index_kernel<DPCPP_K(
+          index_put_kernel,
+          scalar_t,
+          /*accumulate=*/bool)>(
+          iter,
+          index_size,
+          index_stride,
+          // This lambda function only works in dpcpp kernel.
+          [](dpcpp_global_ptr_pt<char> out_data,
+             dpcpp_global_ptr_pt<char> in_data,
+             int64_t offset) {
+            dpcpp_global_ptr_pt<scalar_t> out_ptr =
+                (dpcpp_global_ptr_pt<scalar_t>)(out_data + offset);
+            auto in = *(scalar_t*)in_data;
+            atomicAdd(out_ptr, in);
+          });
+    });
+  } else {
+    AT_DISPATCH_ALL_TYPES(iter.dtype(), "index_put", [&] {
+      using dtype = OpaqueType<sizeof(scalar_t)>;
+      dpcpp_index_kernel<DPCPP_K(index_put_kernel, scalar_t)>(
+          iter,
+          index_size,
+          index_stride,
+          // This lambda function only works in dpcpp kernel.
+          [](dpcpp_global_ptr_pt<char> out_data,
+             dpcpp_global_ptr_pt<char> in_data,
+             int64_t offset) {
+            *(dtype*)(out_data + offset) = *(dtype*)in_data;
+          });
+    });
+  }
+}
+
 } // namespace impl
 
 Tensor& index_select_out(
@@ -1013,19 +1091,6 @@ Tensor masked_select(const Tensor& self, const Tensor& mask) {
   return at::AtenIpexTypeDPCPP::masked_select_out(out, self, mask);
 }
 
-#define AT_DISPATCH_ALL_ATOMIC_TYPES(TYPE, NAME, ...)                        \
-  [&] {                                                                      \
-    const auto& the_type = TYPE;                                             \
-    /* don't use TYPE again in case it is an expensive or side-effect op  */ \
-    at::ScalarType _st = ::detail::scalar_type(the_type);                    \
-    switch (_st) {                                                           \
-      AT_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)        \
-      AT_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)        \
-      default:                                                               \
-        AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
-    }                                                                        \
-  }()
-
 DPCPP_DEF_K1(dpcpp_put_kernel);
 Tensor& put_(
     Tensor& self,
@@ -1093,5 +1158,41 @@ Tensor& put_(
 
   return self;
 }
+
+Tensor index(const Tensor& self, TensorList indices) {
+  TORCH_CHECK(
+      indices.size() <= (size_t)self.dim(),
+      "too many indices for tensor of dimension ",
+      self.dim(),
+      " (got ",
+      indices.size(),
+      ")");
+
+  auto info = make_info(self, indices);
+  auto iter = make_index_iterator(info);
+  impl::index(iter, info.indexed_sizes, info.indexed_strides);
+  return iter.output();
+}
+
+Tensor& _index_put_impl_(
+    Tensor& self,
+    TensorList indices,
+    const Tensor& value,
+    const bool accumulate,
+    const bool unsafe) {
+  TORCH_CHECK(
+      indices.size() <= (size_t)self.dim(),
+      "too many indices for tensor of dimension ",
+      self.dim(),
+      " (got ",
+      indices.size(),
+      ")");
+
+  auto info = make_info(self, indices);
+  auto iter = make_index_put_iterator(info, value);
+  impl::index_put(iter, info.indexed_sizes, info.indexed_strides, accumulate);
+  return self;
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
