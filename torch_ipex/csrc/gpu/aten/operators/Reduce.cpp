@@ -628,7 +628,12 @@ Tensor sum(const Tensor& self, c10::optional<ScalarType> dtype) {
   return at::AtenIpexTypeDPCPP::sum(self, std::vector<int64_t>{}, false, dtype);
 }
 
-Tensor& prod_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim, c10::optional<ScalarType> opt_dtype) {
+Tensor& prod_out(
+    Tensor& result,
+    const Tensor& self,
+    int64_t dim,
+    bool keepdim,
+    c10::optional<ScalarType> opt_dtype) {
   ScalarType dtype = get_dtype(result, self, opt_dtype, true);
   auto iter = make_reduction("prod", result, self, dim, keepdim, dtype);
   if (iter.numel() == 0) {
@@ -639,19 +644,28 @@ Tensor& prod_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim, 
   return result;
 }
 
-Tensor prod(const Tensor& self, int64_t dim, bool keepdim, c10::optional<ScalarType> dtype) {
+Tensor prod(
+    const Tensor& self,
+    int64_t dim,
+    bool keepdim,
+    c10::optional<ScalarType> dtype) {
   Tensor result;
   return at::AtenIpexTypeDPCPP::prod_out(result, self, dim, keepdim, dtype);
 }
 
-Tensor prod(const Tensor &self, c10::optional<ScalarType> dtype) {
+Tensor prod(const Tensor& self, c10::optional<ScalarType> dtype) {
   Tensor result;
   return at::AtenIpexTypeDPCPP::prod_out(result, self, {}, false, dtype);
 }
 
-Tensor &mean_out(Tensor &result, const Tensor &self, IntArrayRef dim,
-                 bool keepdim, c10::optional<ScalarType> opt_dtype) {
-  ScalarType scalarType = opt_dtype.has_value() ? opt_dtype.value() : self.scalar_type();
+Tensor& mean_out(
+    Tensor& result,
+    const Tensor& self,
+    IntArrayRef dim,
+    bool keepdim,
+    c10::optional<ScalarType> opt_dtype) {
+  ScalarType scalarType =
+      opt_dtype.has_value() ? opt_dtype.value() : self.scalar_type();
   TORCH_CHECK(
       at::isFloatingType(scalarType) || at::isComplexType(scalarType),
       "Can only calculate the mean of floating types. Got ",
@@ -668,11 +682,15 @@ Tensor &mean_out(Tensor &result, const Tensor &self, IntArrayRef dim,
   return result;
 }
 
-Tensor mean(const Tensor &self, optional<ScalarType> dtype) {
+Tensor mean(const Tensor& self, optional<ScalarType> dtype) {
   return at::AtenIpexTypeDPCPP::mean(self, IntArrayRef{}, false, dtype);
 }
 
-Tensor mean(const Tensor& self, IntArrayRef dim, bool keepdim, optional<ScalarType> dtype) {
+Tensor mean(
+    const Tensor& self,
+    IntArrayRef dim,
+    bool keepdim,
+    optional<ScalarType> dtype) {
   Tensor result;
   return at::AtenIpexTypeDPCPP::mean_out(result, self, dim, keepdim, dtype);
 }
