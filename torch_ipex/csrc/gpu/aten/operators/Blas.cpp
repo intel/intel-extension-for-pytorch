@@ -35,13 +35,6 @@ void mkldnnGemmImpl(
 
   Tensor m1 = _m1, m2 = _m2;
 
-  printf(
-      "[1] result stride(0) %d stirde(1) %d shape(0) %d shape (1) %d\n",
-      r_.stride(0),
-      r_.stride(1),
-      r_.size(0),
-      r_.size(0));
-
   /* r_ */
   if (r_.stride(0) == 1 && LDC_COND(r_.size(0), r_.size(1), r_.stride(1))) {
     // if column major, no swap, no transpose
