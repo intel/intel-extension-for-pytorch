@@ -902,5 +902,33 @@ Tensor& std_var_out(
   return result;
 }
 
+Tensor &mean_out(Tensor &result, const Tensor &self, IntArrayRef dim,
+                 bool keepdim, c10::optional<ScalarType> opt_dtype) {
+  ScalarType scalarType = opt_dtype.has_value() ? opt_dtype.value() : self.scalar_type();
+  TORCH_CHECK(
+      at::isFloatingType(scalarType) || at::isComplexType(scalarType),
+      "Can only calculate the mean of floating types. Got ",
+      toString(scalarType),
+      " instead.");
+
+  ScalarType dtype = get_dtype(result, self, opt_dtype, true);
+  auto iter = make_reduction("mean", result, self, dim, keepdim, dtype);
+  if (iter.numel() == 0) {
+    result.fill_(std::numeric_limits<double>::quiet_NaN());
+  } else {
+    impl::mean_kernel(iter);
+  }
+  return result;
+}
+
+Tensor mean(const Tensor &self, optional<ScalarType> dtype) {
+  return at::AtenIpexTypeDPCPP::mean(self, IntArrayRef{}, false, dtype);
+}
+
+Tensor mean(const Tensor& self, IntArrayRef dim, bool keepdim, optional<ScalarType> dtype) {
+  Tensor result;
+  return at::AtenIpexTypeDPCPP::mean_out(result, self, dim, keepdim, dtype);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

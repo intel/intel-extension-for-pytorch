@@ -83,6 +83,9 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor _log_softmax_backward_data(const at::Tensor & grad_output, const at::Tensor & output, int64_t dim, const at::Tensor & self);
   std::tuple<at::Tensor,at::Tensor> max(const at::Tensor & self, int64_t dim, bool keepdim);
   std::tuple<at::Tensor &,at::Tensor &> max_out(at::Tensor & max, at::Tensor & max_values, const at::Tensor & self, int64_t dim, bool keepdim);
+  at::Tensor mean(const at::Tensor & self, c10::optional<at::ScalarType> dtype);
+  at::Tensor mean(const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
+  at::Tensor & mean_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   std::tuple<at::Tensor,at::Tensor> min(const at::Tensor & self, int64_t dim, bool keepdim);
   std::tuple<at::Tensor &,at::Tensor &> min_out(at::Tensor & min, at::Tensor & min_indices, const at::Tensor & self, int64_t dim, bool keepdim);
   at::Tensor mm(const at::Tensor & self, const at::Tensor & mat2);

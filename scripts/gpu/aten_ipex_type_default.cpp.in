@@ -315,6 +315,18 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexTypeDefault::max_out(at::Tensor & 
   return AtenIpexTypeDPCPP::max_out(max, max_values, self, dim, keepdim);
 }
 
+at::Tensor AtenIpexTypeDefault::mean(const at::Tensor & self, c10::optional<at::ScalarType> dtype) {
+  return AtenIpexTypeDPCPP::mean(self, dtype);
+}
+
+at::Tensor AtenIpexTypeDefault::mean(const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype) {
+  return AtenIpexTypeDPCPP::mean(self, dim, keepdim, dtype);
+}
+
+at::Tensor & AtenIpexTypeDefault::mean_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype) {
+  return AtenIpexTypeDPCPP::mean_out(out, self, dim, keepdim, dtype);
+}
+
 std::tuple<at::Tensor,at::Tensor> AtenIpexTypeDefault::min(const at::Tensor & self, int64_t dim, bool keepdim) {
   return AtenIpexTypeDPCPP::min(self, dim, keepdim);
 }
@@ -1593,6 +1605,15 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::max.dim_max(Tensor self, int dim, bool keepdim=False, *, Tensor(a!) max, Tensor(b!) max_values) -> (Tensor(a!) values, Tensor(b!) indices)")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor &,at::Tensor &>(at::Tensor &, at::Tensor &, const at::Tensor &, int64_t, bool), &AtenIpexTypeDefault::max_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::mean(Tensor self, *, ScalarType? dtype=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::ScalarType>), &AtenIpexTypeDefault::mean>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::mean.dim(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, bool, c10::optional<at::ScalarType>), &AtenIpexTypeDefault::mean>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::mean.out(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, bool, c10::optional<at::ScalarType>), &AtenIpexTypeDefault::mean_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::min.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor>(const at::Tensor &, int64_t, bool), &AtenIpexTypeDefault::min>(at::TensorTypeId::DPCPPTensorId)

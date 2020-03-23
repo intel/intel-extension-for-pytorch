@@ -80,3 +80,8 @@ static Tensor & lt_out(Tensor & out, const Tensor & self, const Tensor & other);
 static Tensor digamma(const Tensor & self); // aten::digamma(Tensor self) -> Tensor
 static Tensor & digamma_out(Tensor & out, const Tensor & self); // aten::digamma.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor & digamma_(Tensor & self); // aten::digamma_(Tensor(a!) self) -> Tensor(a!)
+static Tensor & _index_put_impl_(Tensor & self, TensorList indices, const Tensor & values, bool accumulate, bool unsafe); // aten::_index_put_impl_(Tensor(a!) self, Tensor?[] indices, Tensor values, bool accumulate=False, bool unsafe=False) -> Tensor(a!)
+static Tensor index(const Tensor & self, TensorList indices); // aten::index.Tensor(Tensor self, Tensor?[] indices) -> Tensor
+static Tensor mean(const Tensor & self, c10::optional<ScalarType> dtype); // aten::mean(Tensor self, *, ScalarType? dtype=None) -> Tensor
+static Tensor mean(const Tensor & self, IntArrayRef dim, bool keepdim, c10::optional<ScalarType> dtype); // aten::mean.dim(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor
+static Tensor & mean_out(Tensor & out, const Tensor & self, IntArrayRef dim, bool keepdim, c10::optional<ScalarType> dtype); // aten::mean.out(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
