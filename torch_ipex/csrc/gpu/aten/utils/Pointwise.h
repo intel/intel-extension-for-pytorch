@@ -587,6 +587,31 @@ struct TensorClampOp {
 };
 
 template <typename T>
+struct TensorCrossOp {
+  TensorCrossOp(int64_t sx, int64_t sy, int64_t so) : sx(sx), sy(sy), so(so) {}
+
+  void operator()(T& out, T& x, T& y) const {
+    T val0 = Numerics<T>::sub(
+        Numerics<T>::mul((&x)[1 * sx], (&y)[2 * sy]),
+        Numerics<T>::mul((&x)[2 * sx], (&y)[1 * sy]));
+
+    T val1 = Numerics<T>::sub(
+        Numerics<T>::mul((&x)[2 * sx], (&y)[0 * sy]),
+        Numerics<T>::mul((&x)[0 * sx], (&y)[2 * sy]));
+
+    T val2 = Numerics<T>::sub(
+        Numerics<T>::mul((&x)[0 * sx], (&y)[1 * sy]),
+        Numerics<T>::mul((&x)[1 * sx], (&y)[0 * sy]));
+
+    (&out)[0 * so] = val0;
+    (&out)[1 * so] = val1;
+    (&out)[2 * so] = val2;
+  }
+
+  const int64_t sx, sy, so;
+};
+
+template <typename T>
 struct TensorLerpOp {
   TensorLerpOp(T w) : w(w) {}
 

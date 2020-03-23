@@ -195,6 +195,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & normal_(at::Tensor & self, double mean, double std, at::Generator * generator);
   at::Tensor & diag_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
   at::Tensor diag(const at::Tensor & self, int64_t diagonal);
+  at::Tensor & cross_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other, c10::optional<int64_t> dim);
+  at::Tensor cross(const at::Tensor & self, const at::Tensor & other, c10::optional<int64_t> dim);
   at::Tensor & triu_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
   at::Tensor & tril_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal);
   at::Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const at::TensorOptions & options);

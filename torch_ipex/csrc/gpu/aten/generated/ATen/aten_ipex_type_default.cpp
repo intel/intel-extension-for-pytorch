@@ -763,6 +763,14 @@ at::Tensor AtenIpexTypeDefault::diag(const at::Tensor & self, int64_t diagonal) 
   return AtenIpexTypeDPCPP::diag(self, diagonal);
 }
 
+at::Tensor & AtenIpexTypeDefault::cross_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other, c10::optional<int64_t> dim) {
+  return AtenIpexTypeDPCPP::cross_out(out, self, other, dim);
+}
+
+at::Tensor AtenIpexTypeDefault::cross(const at::Tensor & self, const at::Tensor & other, c10::optional<int64_t> dim) {
+  return AtenIpexTypeDPCPP::cross(self, other, dim);
+}
+
 at::Tensor & AtenIpexTypeDefault::triu_out(at::Tensor & out, const at::Tensor & self, int64_t diagonal) {
   return AtenIpexTypeDPCPP::triu_out(out, self, diagonal);
 }
@@ -1961,6 +1969,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::diag(Tensor self, int diagonal=0) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, int64_t), &AtenIpexTypeDefault::diag>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::cross.out(Tensor self, Tensor other, int? dim=None, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, c10::optional<int64_t>), &AtenIpexTypeDefault::cross_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::cross(Tensor self, Tensor other, int? dim=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, c10::optional<int64_t>), &AtenIpexTypeDefault::cross>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::triu.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, int64_t), &AtenIpexTypeDefault::triu_out>(at::TensorTypeId::DPCPPTensorId)
