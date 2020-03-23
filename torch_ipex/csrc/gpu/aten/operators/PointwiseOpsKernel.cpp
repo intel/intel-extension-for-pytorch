@@ -53,6 +53,7 @@ Tensor& addcmul_out(
   impl::addcmul_kernel(iter, value);
   return out;
 }
+
 Tensor addcmul(
     const Tensor& self,
     const Tensor& tensor1,
@@ -62,6 +63,7 @@ Tensor addcmul(
   return at::AtenIpexTypeDPCPP::addcmul_out(
       result, self, tensor1, tensor2, value);
 }
+
 Tensor& addcmul_(
     Tensor& self,
     const Tensor& tensor1,
@@ -88,6 +90,7 @@ Tensor& addcdiv_out(
   impl::addcdiv_kernel(iter, value);
   return out;
 }
+
 Tensor addcdiv(
     const Tensor& self,
     const Tensor& tensor1,
@@ -97,6 +100,7 @@ Tensor addcdiv(
   return at::AtenIpexTypeDPCPP::addcdiv_out(
       result, self, tensor1, tensor2, value);
 }
+
 Tensor& addcdiv_(
     Tensor& self,
     const Tensor& tensor1,
@@ -105,5 +109,6 @@ Tensor& addcdiv_(
   return at::AtenIpexTypeDPCPP::addcdiv_out(
       self, self, tensor1, tensor2, value);
 }
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
