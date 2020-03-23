@@ -118,6 +118,9 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor sum(const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   at::Tensor & sum_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   at::Tensor & sqrt_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor prod(const at::Tensor & self, c10::optional<at::ScalarType> dtype);
+  at::Tensor prod(const at::Tensor & self, int64_t dim, bool keepdim, c10::optional<at::ScalarType> dtype);
+  at::Tensor & prod_out(at::Tensor & out, const at::Tensor & self, int64_t dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   at::Tensor & tan_(at::Tensor & self);
   at::Tensor & tan_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & tanh_(at::Tensor & self);
