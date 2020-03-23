@@ -51,6 +51,7 @@ SET(MKL_cmake_included TRUE)
 IF (USE_SYCL)
   SET(DNNL_CPU_RUNTIME "SYCL" CACHE STRING "mkldnn cpu backend" FORCE)
   SET(DNNL_GPU_RUNTIME "SYCL" CACHE STRING "mkldnn gpu backend" FORCE)
+  SET(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "mkldnn sycl primitive cache" FORCE)
 ENDIF()
 
 IF(MKLDNN_USE_NATIVE_ARCH)  # Disable HostOpts in MKLDNN unless MKLDNN_USE_NATIVE_ARCH is set.
