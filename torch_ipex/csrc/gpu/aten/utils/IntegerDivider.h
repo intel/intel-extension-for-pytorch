@@ -1,5 +1,5 @@
-#ifndef THSYCL_INTEGER_DIVIDER_INC
-#define THSYCL_INTEGER_DIVIDER_INC
+#ifndef THDPCPP_INTEGER_DIVIDER_INC
+#define THDPCPP_INTEGER_DIVIDER_INC
 
 #include <assert.h>
 
@@ -52,18 +52,22 @@ template <typename Value>
 struct DivMod {
   Value div, mod;
 
-  DivMod(Value div, Value mod) : div(div), mod(mod) { }
+  DivMod(Value div, Value mod) : div(div), mod(mod) {}
 };
 
 // Base case: we only have an implementation for uint32_t for now.  For
 // everything else, we use plain division.
 template <typename Value>
 struct IntDivider {
-  IntDivider() { }  // Dummy constructor for arrays.
-  IntDivider(Value d) : divisor(d) { }
+  IntDivider() {} // Dummy constructor for arrays.
+  IntDivider(Value d) : divisor(d) {}
 
-  inline Value div(Value n) const { return n / divisor; }
-  inline Value mod(Value n) const { return n % divisor; }
+  inline Value div(Value n) const {
+    return n / divisor;
+  }
+  inline Value mod(Value n) const {
+    return n % divisor;
+  }
   inline DivMod<Value> divmod(Value n) const {
     return DivMod<Value>(n / divisor, n % divisor);
   }
@@ -76,25 +80,27 @@ template <>
 struct IntDivider<unsigned int> {
   static_assert(sizeof(unsigned int) == 4, "Assumes 32-bit unsigned int.");
 
-  IntDivider() { }  // Dummy constructor for arrays.
+  IntDivider() {} // Dummy constructor for arrays.
 
   IntDivider(unsigned int d) : divisor(d) {
-    // TODO: replace following when sycl has counterpart assert
+    // TODO: replace following when dpcpp has counterpart assert
     // assert(divisor >= 1 && divisor <= INT32_MAX);
 
     // TODO: gcc/clang has __builtin_clz() but it's not portable.
-    for (shift = 0; shift < 32; shift++) if ((1U << shift) >= divisor) break;
+    for (shift = 0; shift < 32; shift++)
+      if ((1U << shift) >= divisor)
+        break;
 
     uint64_t one = 1;
     uint64_t magic = ((one << 32) * ((one << shift) - divisor)) / divisor + 1;
     m1 = magic;
-    // TODO: replace following when sycl has counterpart assert
+    // TODO: replace following when dpcpp has counterpart assert
     // assert(m1 > 0 && m1 == magic);  // m1 must fit in 32 bits.
   }
 
   inline unsigned int div(unsigned int n) const {
     // Using uint64_t so that the addition does not overflow.
-    uint64_t t = ((uint64_t) n * m1) >> 32;
+    uint64_t t = ((uint64_t)n * m1) >> 32;
     return (t + n) >> shift;
   }
 
@@ -107,9 +113,9 @@ struct IntDivider<unsigned int> {
     return DivMod<unsigned int>(q, n - q * divisor);
   }
 
-  unsigned int divisor;  // d above.
-  unsigned int m1;  // Magic number: m' above.
-  unsigned int shift;  // Shift amounts.
+  unsigned int divisor; // d above.
+  unsigned int m1; // Magic number: m' above.
+  unsigned int shift; // Shift amounts.
 };
 
-#endif // THSYCL_INTEGER_DIVIDER_INC
+#endif // THDPCPP_INTEGER_DIVIDER_INC

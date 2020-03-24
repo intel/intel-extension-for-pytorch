@@ -3,13 +3,12 @@
 
 #include <ATen/ATen.h>
 
-#include <core/SYCL.h>
-
+#include <core/ApplyUtils.h>
+#include <core/DPCPP.h>
 #include <core/TensorImplUtils.h>
-#include <core/SYCLApplyUtils.h>
-#include <ATen/aten_ipex_type_dpcpp.h>
 #include <utils/Numerics.h>
 
+#include <ATen/aten_ipex_type_dpcpp.h>
 
 #define IMPLEMENT_POINTWISE_FUNC_(NAME, CFUNC, REAL)               \
   template <typename scalar_t>                                     \
@@ -26,18 +25,17 @@
   template <typename scalar_t>                                     \
   void NAME(Tensor& self_, const Tensor& src) {                    \
     if (TensorImpl_Unwrap(self_) == TensorImpl_Unwrap(src)) {      \
-      at::sycl::SYCL_tensor_apply1<scalar_t>(            \
+      at::dpcpp::DPCPP_tensor_apply1<scalar_t>(                    \
           self_, Tensor_##NAME##_##REAL##_Op<scalar_t>());         \
     } else {                                                       \
       at::AtenIpexTypeDPCPP::resize_as_(self_, src, c10::nullopt); \
-      at::sycl::SYCL_tensor_apply2<scalar_t, scalar_t>( \
+      at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(          \
           self_, src, Tensor_##NAME##_##REAL##_Op<scalar_t>());    \
     }                                                              \
   }
 
-#define IMPLEMENT_POINTWISE_1_FUNC(NAME, CFUNC, REAL)              \
+#define IMPLEMENT_POINTWISE_1_FUNC(NAME, CFUNC, REAL) \
   IMPLEMENT_POINTWISE_FUNC_(NAME, CFUNC, REAL)
-
 
 // Customized Callable Ops
 #define POINTWISE_ARGS_1 arg1 // out
@@ -50,9 +48,9 @@
 #define POINTWISE_OPR_ARGS_2 POINTWISE_ARGS_1, arg3
 #define POINTWISE_OPR_ARGS_3 POINTWISE_ARGS_1, arg3, arg4
 
-#define POINTWISE_ARGS_DECL_1 Tensor & arg1 // out
-#define POINTWISE_ARGS_DECL_2 POINTWISE_ARGS_DECL_1, const Tensor & arg2
-#define POINTWISE_ARGS_DECL_3 POINTWISE_ARGS_DECL_2, const Tensor & arg3
+#define POINTWISE_ARGS_DECL_1 Tensor& arg1 // out
+#define POINTWISE_ARGS_DECL_2 POINTWISE_ARGS_DECL_1, const Tensor& arg2
+#define POINTWISE_ARGS_DECL_3 POINTWISE_ARGS_DECL_2, const Tensor& arg3
 #define POINTWISE_ARGS_DECL_11 POINTWISE_ARGS_DECL_1
 
 #define POINTWISE_ARG_FOR_TYPE_1 arg1
@@ -81,77 +79,74 @@
 #define REPEAT_AS_ARGLIST_2(r) REPEAT_AS_ARGLIST_1(r), r
 #define REPEAT_AS_ARGLIST_3(r) REPEAT_AS_ARGLIST_2(r), r
 
-
-#define IMPLEMENT_POINTWISE_CALLABLE_(NAME, APPLY_NUM, APPLY_NUM_EXT, CALLABLE, CALLABLE_ARGS_NUM)       \
-  template <typename scalar_t>                                                                           \
-  void NAME(POINTWISE_ARGS_DECL_##APPLY_NUM_EXT                                                          \
-            COMMA_##CALLABLE_ARGS_NUM                                                                    \
-            CALLABLE_INIT_ARGS_DECL_##CALLABLE_ARGS_NUM) {                                               \
-    if (CHECK_SAME_TENSOR()) {                                                                           \
-      at::sycl::SYCL_tensor_apply##APPLY_NUM<REPEAT_AS_ARGLIST_##APPLY_NUM(scalar_t)>(                   \
-          POINTWISE_OPR_ARGS_##APPLY_NUM,                                                                \
-          CALLABLE<scalar_t>(CALLABLE_INIT_ARGS_##CALLABLE_ARGS_NUM));                                   \
-    } else {                                                                                             \
-      at::AtenIpexTypeDPCPP::resize_as_(POINTWISE_ARGS_2, c10::nullopt);                                 \
-      at::sycl::SYCL_tensor_apply##APPLY_NUM_EXT<REPEAT_AS_ARGLIST_##APPLY_NUM_EXT(scalar_t)>(           \
-          POINTWISE_ARGS_##APPLY_NUM_EXT,                                                            \
-          CALLABLE<scalar_t>(CALLABLE_INIT_ARGS_##CALLABLE_ARGS_NUM));                                   \
-    }                                                                                                    \
+#define IMPLEMENT_POINTWISE_CALLABLE_(                                        \
+    NAME, APPLY_NUM, APPLY_NUM_EXT, CALLABLE, CALLABLE_ARGS_NUM)              \
+  template <typename scalar_t>                                                \
+  void NAME(                                                                  \
+      POINTWISE_ARGS_DECL_##APPLY_NUM_EXT COMMA_##CALLABLE_ARGS_NUM           \
+          CALLABLE_INIT_ARGS_DECL_##CALLABLE_ARGS_NUM) {                      \
+    if (CHECK_SAME_TENSOR()) {                                                \
+      at::dpcpp::DPCPP_tensor_apply##APPLY_NUM<REPEAT_AS_ARGLIST_##APPLY_NUM( \
+          scalar_t)>(                                                         \
+          POINTWISE_OPR_ARGS_##APPLY_NUM,                                     \
+          CALLABLE<scalar_t>(CALLABLE_INIT_ARGS_##CALLABLE_ARGS_NUM));        \
+    } else {                                                                  \
+      at::AtenIpexTypeDPCPP::resize_as_(POINTWISE_ARGS_2, c10::nullopt);      \
+      at::dpcpp::DPCPP_tensor_apply##APPLY_NUM_EXT<                           \
+          REPEAT_AS_ARGLIST_##APPLY_NUM_EXT(scalar_t)>(                       \
+          POINTWISE_ARGS_##APPLY_NUM_EXT,                                     \
+          CALLABLE<scalar_t>(CALLABLE_INIT_ARGS_##CALLABLE_ARGS_NUM));        \
+    }                                                                         \
   }
 
-#define IMPLEMENT_POINTWISE_1_CALLABLE_0(NAME, CALLABLE)           \
+#define IMPLEMENT_POINTWISE_1_CALLABLE_0(NAME, CALLABLE) \
   IMPLEMENT_POINTWISE_CALLABLE_(NAME, 1, 2, CALLABLE, 0)
 
-#define IMPLEMENT_POINTWISE_2_CALLABLE_0(NAME, CALLABLE)           \
+#define IMPLEMENT_POINTWISE_2_CALLABLE_0(NAME, CALLABLE) \
   IMPLEMENT_POINTWISE_CALLABLE_(NAME, 2, 3, CALLABLE, 0)
 
-#define IMPLEMENT_POINTWISE_1_CALLABLE_1(NAME, CALLABLE)           \
+#define IMPLEMENT_POINTWISE_1_CALLABLE_1(NAME, CALLABLE) \
   IMPLEMENT_POINTWISE_CALLABLE_(NAME, 1, 2, CALLABLE, 1)
 
-#define IMPLEMENT_POINTWISE_2_CALLABLE_1(NAME, CALLABLE)           \
+#define IMPLEMENT_POINTWISE_2_CALLABLE_1(NAME, CALLABLE) \
   IMPLEMENT_POINTWISE_CALLABLE_(NAME, 2, 3, CALLABLE, 1)
 
-#define IMPLEMENT_POINTWISE_1_CALLABLE_2(NAME, CALLABLE)           \
+#define IMPLEMENT_POINTWISE_1_CALLABLE_2(NAME, CALLABLE) \
   IMPLEMENT_POINTWISE_CALLABLE_(NAME, 1, 2, CALLABLE, 2)
 
-#define IMPLEMENT_POINTWISE_2_CALLABLE_2(NAME, CALLABLE)           \
+#define IMPLEMENT_POINTWISE_2_CALLABLE_2(NAME, CALLABLE) \
   IMPLEMENT_POINTWISE_CALLABLE_(NAME, 2, 3, CALLABLE, 2)
 
-
 // AT Dispatch
-#define IPEX_FUNC_OPS(op, func, real, types)                             \
-  namespace impl {                                                            \
-    IMPLEMENT_POINTWISE_1_FUNC(op, func, real)                                \
-  }                                                                           \
-                                                                              \
-  Tensor & op(Tensor & out, const Tensor & self) {                            \
-    AT_DISPATCH_##types(self.scalar_type(), #op,                      \
-        [&]() {                                                               \
-          impl::op<scalar_t>(out, self);                                      \
-        }                                                                     \
-    );                                                                        \
-    return out;                                                               \
+#define IPEX_FUNC_OPS(op, func, real, types)                                \
+  namespace impl {                                                          \
+  IMPLEMENT_POINTWISE_1_FUNC(op, func, real)                                \
+  }                                                                         \
+                                                                            \
+  Tensor& op(Tensor& out, const Tensor& self) {                             \
+    AT_DISPATCH_##types(                                                    \
+        self.scalar_type(), #op, [&]() { impl::op<scalar_t>(out, self); }); \
+    return out;                                                             \
   }
 
-#define IPEX_OUT_INPLACE_UNARY_FUNC_OPS(op, func, real, types)                \
-  IPEX_FUNC_OPS(op##_out, func, real, types)                                  \
-                                                                              \
-  Tensor & op##_(Tensor & self) {                                             \
-    return at::op##_out(self, self);                                          \
+#define IPEX_OUT_INPLACE_UNARY_FUNC_OPS(op, func, real, types) \
+  IPEX_FUNC_OPS(op##_out, func, real, types)                   \
+                                                               \
+  Tensor& op##_(Tensor& self) {                                \
+    return at::op##_out(self, self);                           \
   }
 
-#define IPEX_OUT_ALL_UNARY_FUNC_OPS(op, func, real)                           \
-    IPEX_FUNC_OPS(op, func, real, ALL_TYPES)
+#define IPEX_OUT_ALL_UNARY_FUNC_OPS(op, func, real) \
+  IPEX_FUNC_OPS(op, func, real, ALL_TYPES)
 
-#define IPEX_OUT_FLOAT_UNARY_FUNC_OPS(op, func, real)                         \
-    IPEX_FUNC_OPS(op, func, real, FLOATING_TYPES)
+#define IPEX_OUT_FLOAT_UNARY_FUNC_OPS(op, func, real) \
+  IPEX_FUNC_OPS(op, func, real, FLOATING_TYPES)
 
-#define IPEX_OUT_INPLACE_ALL_UNARY_FUNC_OPS(op, func, real)                   \
-    IPEX_OUT_INPLACE_UNARY_FUNC_OPS(op, func, real, ALL_TYPES)
+#define IPEX_OUT_INPLACE_ALL_UNARY_FUNC_OPS(op, func, real) \
+  IPEX_OUT_INPLACE_UNARY_FUNC_OPS(op, func, real, ALL_TYPES)
 
-#define IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(op, func, real)                 \
-    IPEX_OUT_INPLACE_UNARY_FUNC_OPS(op, func, real, FLOATING_TYPES)
-
+#define IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(op, func, real) \
+  IPEX_OUT_INPLACE_UNARY_FUNC_OPS(op, func, real, FLOATING_TYPES)
 
 // Customized Callable Ops
 #define SCALAR_ARGS_0
@@ -164,99 +159,99 @@
 #define SCALAR_ARGS_DECL_2 SCALAR_ARGS_DECL_1, Scalar val2
 #define SCALAR_ARGS_DECL_3 SCALAR_ARGS_DECL_2, Scalar val3
 
-#define IPEX_CALLABLE_OPS(op, callable, types, oprand_num, arg_num, callable_args_num) \
-  namespace impl {                                                            \
-    IMPLEMENT_POINTWISE_##oprand_num##_CALLABLE_##callable_args_num(op, callable) \
-  }                                                                           \
-                                                                              \
-  Tensor & op(POINTWISE_ARGS_DECL_##arg_num                                   \
-              COMMA_##callable_args_num                                       \
-              SCALAR_ARGS_DECL_##callable_args_num) {                         \
-    AT_DISPATCH_##types(POINTWISE_ARG_FOR_TYPE_##arg_num.scalar_type(), #op, \
-        [&]() {                                                               \
-          impl::op<scalar_t>(POINTWISE_ARGS_##arg_num                         \
-                             COMMA_##callable_args_num                        \
-                             SCALAR_ARGS_##callable_args_num);                \
-        }                                                                     \
-    );                                                                        \
-    return arg1;                                                              \
+#define IPEX_CALLABLE_OPS(                                           \
+    op, callable, types, oprand_num, arg_num, callable_args_num)     \
+  namespace impl {                                                   \
+  IMPLEMENT_POINTWISE_##oprand_num##_CALLABLE_##callable_args_num(   \
+      op,                                                            \
+      callable)                                                      \
+  }                                                                  \
+                                                                     \
+  Tensor& op(                                                        \
+      POINTWISE_ARGS_DECL_##arg_num COMMA_##callable_args_num        \
+          SCALAR_ARGS_DECL_##callable_args_num) {                    \
+    AT_DISPATCH_##types(                                             \
+        POINTWISE_ARG_FOR_TYPE_##arg_num.scalar_type(), #op, [&]() { \
+          impl::op<scalar_t>(                                        \
+              POINTWISE_ARGS_##arg_num COMMA_##callable_args_num     \
+                  SCALAR_ARGS_##callable_args_num);                  \
+        });                                                          \
+    return arg1;                                                     \
   }
 
 // Unary
-#define IPEX_OUT_ALL_CALLABLE_0_UNARY_OPS(op, callable)                       \
-    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 2, 0)
+#define IPEX_OUT_ALL_CALLABLE_0_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 2, 0)
 
-#define IPEX_OUT_FLOAT_CALLABLE_0_UNARY_OPS(op, callable)                     \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 2, 0)
+#define IPEX_OUT_FLOAT_CALLABLE_0_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 2, 0)
 
-#define IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(op, callable)            \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND_HALF, 1, 2, 0)
+#define IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND_HALF, 1, 2, 0)
 
+#define IPEX_ALL_CALLABLE_1_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 11 /* inplace */, 1)
 
-#define IPEX_ALL_CALLABLE_1_UNARY_OPS(op, callable)                           \
-    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 11 /* inplace */, 1)
+#define IPEX_FLOAT_CALLABLE_1_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 11 /* inplace */, 1)
 
-#define IPEX_FLOAT_CALLABLE_1_UNARY_OPS(op, callable)                         \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 11 /* inplace */, 1)
+#define IPEX_INT_CALLABLE_1_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 11 /* inplace */, 1)
 
-#define IPEX_INT_CALLABLE_1_UNARY_OPS(op, callable)                           \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 11 /* inplace */, 1)
+#define IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 2, 1)
 
-#define IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(op, callable)                       \
-    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 2, 1)
+#define IPEX_OUT_FLOAT_CALLABLE_1_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 2, 1)
 
-#define IPEX_OUT_FLOAT_CALLABLE_1_UNARY_OPS(op, callable)                     \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 2, 1)
+#define IPEX_OUT_INT_CALLABLE_1_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 2, 1)
 
-#define IPEX_OUT_INT_CALLABLE_1_UNARY_OPS(op, callable)                       \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 2, 1)
+#define IPEX_ALL_CALLABLE_2_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 11 /* inplace */, 2)
 
-#define IPEX_ALL_CALLABLE_2_UNARY_OPS(op, callable)                           \
-    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 11 /* inplace */, 2)
+#define IPEX_FLOAT_CALLABLE_2_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 11 /* inplace */, 2)
 
-#define IPEX_FLOAT_CALLABLE_2_UNARY_OPS(op, callable)                         \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 11 /* inplace */, 2)
+#define IPEX_INT_CALLABLE_2_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 11 /* inplace */, 2)
 
-#define IPEX_INT_CALLABLE_2_UNARY_OPS(op, callable)                           \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 11 /* inplace */, 2)
+#define IPEX_OUT_ALL_CALLABLE_2_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 2, 2)
 
-#define IPEX_OUT_ALL_CALLABLE_2_UNARY_OPS(op, callable)                       \
-    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 1, 2, 2)
+#define IPEX_OUT_FLOAT_CALLABLE_2_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 2, 2)
 
-#define IPEX_OUT_FLOAT_CALLABLE_2_UNARY_OPS(op, callable)                     \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 1, 2, 2)
-
-#define IPEX_OUT_INT_CALLABLE_2_UNARY_OPS(op, callable)                       \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 2, 2)
+#define IPEX_OUT_INT_CALLABLE_2_UNARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 2, 2)
 
 // Binary
-#define IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(op, callable)                      \
-    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 2, 3, 0)
+#define IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 2, 3, 0)
 
-#define IPEX_OUT_FLOAT_CALLABLE_0_BINARY_OPS(op, callable)                    \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 2, 3, 0)
+#define IPEX_OUT_FLOAT_CALLABLE_0_BINARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 2, 3, 0)
 
-#define IPEX_OUT_INT_CALLABLE_0_BINARY_OPS(op, callable)                      \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 0)
+#define IPEX_OUT_INT_CALLABLE_0_BINARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 0)
 
-#define IPEX_OUT_ALL_CALLABLE_1_BINARY_OPS(op, callable)                      \
-    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 2, 3, 1)
+#define IPEX_OUT_ALL_CALLABLE_1_BINARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 2, 3, 1)
 
-#define IPEX_OUT_FLOAT_CALLABLE_1_BINARY_OPS(op, callable)                    \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 2, 3, 1)
+#define IPEX_OUT_FLOAT_CALLABLE_1_BINARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 2, 3, 1)
 
-#define IPEX_OUT_INT_CALLABLE_1_BINARY_OPS(op, callable)                      \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 1)
+#define IPEX_OUT_INT_CALLABLE_1_BINARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 1)
 
-#define IPEX_OUT_ALL_CALLABLE_2_BINARY_OPS(op, callable)                      \
-    IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 2, 3, 2)
+#define IPEX_OUT_ALL_CALLABLE_2_BINARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, ALL_TYPES, 2, 3, 2)
 
-#define IPEX_OUT_FLOAT_CALLABLE_2_BINARY_OPS(op, callable)                    \
-    IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 2, 3, 2)
+#define IPEX_OUT_FLOAT_CALLABLE_2_BINARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES, 2, 3, 2)
 
-#define IPEX_OUT_INT_CALLABLE_2_BINARY_OPS(op, callable)                      \
-    IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 2)
-
+#define IPEX_OUT_INT_CALLABLE_2_BINARY_OPS(op, callable) \
+  IPEX_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 2)
 
 template <typename T>
 struct TensorATan2Op {
@@ -268,12 +263,12 @@ struct TensorATan2Op {
 template <typename T>
 struct TensorSigmoidOp {
   void operator()(T& out, T& in) const {
-    T one = (T) 1.0;
+    T one = (T)1.0;
     out = one / (one + Numerics<T>::exp(-static_cast<T>(in)));
   }
 
   void operator()(T& v) const {
-    T one = (T) 1.0;
+    T one = (T)1.0;
     v = one / (one + Numerics<T>::exp(-static_cast<T>(v)));
   }
 };
@@ -287,7 +282,8 @@ struct TensorSigmoidGradOp {
 
 template <>
 struct TensorSigmoidGradOp<at::Half> {
-  void operator()(at::Half& gradInput, at::Half& output, at::Half& gradOutput) const {
+  void operator()(at::Half& gradInput, at::Half& output, at::Half& gradOutput)
+      const {
     float out = (float)output;
     float go = (float)gradOutput;
     gradInput = (at::Half)(go * (1.f - out) * out);
@@ -295,8 +291,9 @@ struct TensorSigmoidGradOp<at::Half> {
 };
 
 /*
- * The following function was converted to SYCL form from code that comes
- * with the following copyright notice. It has been released under the BSD license.
+ * The following function was converted to DPCPP form from code that comes
+ * with the following copyright notice. It has been released under the BSD
+ * license.
  *
  * Cephes Math Library Release 2.8:  June, 2000
  * Copyright 1984, 1987, 1992, 2000 by Stephen L. Moshier
@@ -304,18 +301,20 @@ struct TensorSigmoidGradOp<at::Half> {
 template <typename T>
 struct TensorDigammaOp {
   void operator()(T& out, T& in) const {
-
-    using compute_type = typename std::conditional<std::is_same<T, at::Half>::value, float, T>::type;
+    using compute_type =
+        typename std::conditional<std::is_same<T, at::Half>::value,
+                                  float,
+                                  T>::type;
     static const double PI_f64 = 3.14159265358979323846;
     static const compute_type PSI_10 = 2.25175258906672110764;
     static const compute_type A[] = {
-       8.33333333333333333333E-2,
-      -2.10927960927960927961E-2,
-       7.57575757575757575758E-3,
-      -4.16666666666666666667E-3,
-       3.96825396825396825397E-3,
-      -8.33333333333333333333E-3,
-       8.33333333333333333333E-2,
+        8.33333333333333333333E-2,
+        -2.10927960927960927961E-2,
+        7.57575757575757575758E-3,
+        -4.16666666666666666667E-3,
+        3.96825396825396825397E-3,
+        -8.33333333333333333333E-3,
+        8.33333333333333333333E-2,
     };
 
     auto x = scalar_cast<compute_type>(in);
@@ -324,7 +323,7 @@ struct TensorDigammaOp {
       return;
     }
 
-    bool x_is_integer = (x == DP::floor(x));
+    bool x_is_integer = (x == DPCPP::floor(x));
     compute_type result = 0;
 
     if (x < 0) {
@@ -336,7 +335,7 @@ struct TensorDigammaOp {
       // Rounding errors in tan's input can really affect the output
       // for extreme values, so we always perform this computation in double.
       result = scalar_cast<compute_type>(
-          - PI_f64 / DP::tan(PI_f64 * scalar_cast<double>(x)));
+          -PI_f64 / DPCPP::tan(PI_f64 * scalar_cast<double>(x)));
       x = 1 - x;
     }
 
@@ -360,23 +359,25 @@ struct TensorDigammaOp {
       y = z * polevl_result;
     }
 
-    out = scalar_cast<T>(DP::log(x) - (0.5 / x) - y + result);
+    out = scalar_cast<T>(DPCPP::log(x) - (0.5 / x) - y + result);
     return;
   }
 
   void operator()(T& v) const {
-
-    using compute_type = typename std::conditional<std::is_same<T, at::Half>::value, float, T>::type;
+    using compute_type =
+        typename std::conditional<std::is_same<T, at::Half>::value,
+                                  float,
+                                  T>::type;
     static const double PI_f64 = 3.14159265358979323846;
     static const compute_type PSI_10 = 2.25175258906672110764;
     static const compute_type A[] = {
-       8.33333333333333333333E-2,
-      -2.10927960927960927961E-2,
-       7.57575757575757575758E-3,
-      -4.16666666666666666667E-3,
-       3.96825396825396825397E-3,
-      -8.33333333333333333333E-3,
-       8.33333333333333333333E-2,
+        8.33333333333333333333E-2,
+        -2.10927960927960927961E-2,
+        7.57575757575757575758E-3,
+        -4.16666666666666666667E-3,
+        3.96825396825396825397E-3,
+        -8.33333333333333333333E-3,
+        8.33333333333333333333E-2,
     };
 
     auto x = scalar_cast<compute_type>(v);
@@ -385,7 +386,7 @@ struct TensorDigammaOp {
       return;
     }
 
-    bool x_is_integer = (x == DP::floor(x));
+    bool x_is_integer = (x == DPCPP::floor(x));
     compute_type result = 0;
 
     if (x < 0) {
@@ -397,7 +398,7 @@ struct TensorDigammaOp {
       // Rounding errors in tan's input can really affect the output
       // for extreme values, so we always perform this computation in double.
       result = scalar_cast<compute_type>(
-          - PI_f64 / DP::tan(PI_f64 * scalar_cast<double>(x)));
+          -PI_f64 / DPCPP::tan(PI_f64 * scalar_cast<double>(x)));
       x = 1 - x;
     }
 
@@ -421,84 +422,114 @@ struct TensorDigammaOp {
       y = z * polevl_result;
     }
 
-    v = scalar_cast<T>(DP::log(x) - (0.5 / x) - y + result);
+    v = scalar_cast<T>(DPCPP::log(x) - (0.5 / x) - y + result);
     return;
   }
-
-
 };
 
 template <typename T>
 struct TensorErfinvOp {
   void operator()(T& out, T& in) const {
-
-    using compute_type = typename std::conditional<std::is_same<T, at::Half>::value, float, T>::type;
+    using compute_type =
+        typename std::conditional<std::is_same<T, at::Half>::value,
+                                  float,
+                                  T>::type;
     compute_type z, num, dem;
     static const double PI_f64 = 3.14159265358979323846;
-    static const compute_type a[4]={ 0.886226899, -1.645349621,  0.914624893, -0.140543331};
-    static const compute_type b[4]={-2.118377725,  1.442710462, -0.329097515,  0.012229801};
-    static const compute_type c[4]={-1.970840454, -1.624906493,  3.429567803,  1.641345311};
-    static const compute_type d[2]={ 3.543889200,  1.637067800};
+    static const compute_type a[4] = {
+        0.886226899, -1.645349621, 0.914624893, -0.140543331};
+    static const compute_type b[4] = {
+        -2.118377725, 1.442710462, -0.329097515, 0.012229801};
+    static const compute_type c[4] = {
+        -1.970840454, -1.624906493, 3.429567803, 1.641345311};
+    static const compute_type d[2] = {3.543889200, 1.637067800};
 
     auto x = scalar_cast<compute_type>(in);
-    if(DP::fabs(x) > 1.0) {
+    if (DPCPP::fabs(x) > 1.0) {
       out = scalar_cast<T>(NAN);
       return;
     }
-    if(DP::fabs(x) == 1.0) {
-      out = scalar_cast<T>((DP::copysign(1.0, scalar_cast<double>(x))) * (scalar_cast<double>(INFINITY)));
+    if (DPCPP::fabs(x) == 1.0) {
+      out = scalar_cast<T>(
+          (DPCPP::copysign(1.0, scalar_cast<double>(x))) *
+          (scalar_cast<double>(INFINITY)));
       return;
     }
-    if(DP::fabs(x) <= 0.7){
+    if (DPCPP::fabs(x) <= 0.7) {
       z = x * x;
-      num = (((a[3]*z + a[2])*z + a[1])*z + a[0]);
-      dem = ((((b[3]*z + b[2])*z + b[1])*z +b[0])*z + scalar_cast<compute_type>(1.0));
+      num = (((a[3] * z + a[2]) * z + a[1]) * z + a[0]);
+      dem =
+          ((((b[3] * z + b[2]) * z + b[1]) * z + b[0]) * z +
+           scalar_cast<compute_type>(1.0));
       out = x * num / dem;
+    } else {
+      z = scalar_cast<compute_type>(
+          DPCPP::sqrt(-DPCPP::log((1.0 - DPCPP::fabs(x)) / 2.0)));
+      num = ((c[3] * z + c[2]) * z + c[1]) * z + c[0];
+      dem = (d[1] * z + d[0]) * z + scalar_cast<compute_type>(1.0);
+      out = scalar_cast<T>(
+          scalar_cast<compute_type>(
+              DPCPP::copysign(1.0, scalar_cast<double>(x))) *
+          num / dem);
     }
-    else {
-      z = scalar_cast<compute_type>(DP::sqrt(-DP::log((1.0-DP::fabs(x))/2.0)));
-      num = ((c[3]*z + c[2])*z + c[1])*z + c[0];
-      dem = (d[1]*z + d[0])*z + scalar_cast<compute_type>(1.0);
-      out = scalar_cast<T>(scalar_cast<compute_type>(DP::copysign(1.0,scalar_cast<double>(x)))*num/dem);
-    }
-    out = out - scalar_cast<T>((DP::erf(scalar_cast<double>(out)) - x)/((2.0/DP::sqrt(PI_f64))*DP::exp(-x*x)));
-    out = out - scalar_cast<T>((DP::erf(scalar_cast<double>(out)) - x)/((2.0/DP::sqrt(PI_f64))*DP::exp(-x*x)));
+    out = out - scalar_cast<T>(
+                    (DPCPP::erf(scalar_cast<double>(out)) - x) /
+                    ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
+    out = out - scalar_cast<T>(
+                    (DPCPP::erf(scalar_cast<double>(out)) - x) /
+                    ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
     return;
   }
 
   void operator()(T& v) const {
-
-    using compute_type = typename std::conditional<std::is_same<T, at::Half>::value, float, T>::type;
+    using compute_type =
+        typename std::conditional<std::is_same<T, at::Half>::value,
+                                  float,
+                                  T>::type;
     compute_type z, num, dem;
     static const double PI_f64 = 3.14159265358979323846;
-    static const compute_type a[4]={ 0.886226899, -1.645349621,  0.914624893, -0.140543331};
-    static const compute_type b[4]={-2.118377725,  1.442710462, -0.329097515,  0.012229801};
-    static const compute_type c[4]={-1.970840454, -1.624906493,  3.429567803,  1.641345311};
-    static const compute_type d[2]={ 3.543889200,  1.637067800};
+    static const compute_type a[4] = {
+        0.886226899, -1.645349621, 0.914624893, -0.140543331};
+    static const compute_type b[4] = {
+        -2.118377725, 1.442710462, -0.329097515, 0.012229801};
+    static const compute_type c[4] = {
+        -1.970840454, -1.624906493, 3.429567803, 1.641345311};
+    static const compute_type d[2] = {3.543889200, 1.637067800};
 
     auto x = scalar_cast<compute_type>(v);
-    if(DP::fabs(x) > 1.0) {
+    if (DPCPP::fabs(x) > 1.0) {
       v = scalar_cast<T>(NAN);
       return;
     }
-    if(DP::fabs(x) == 1.0){
-      v = scalar_cast<T>((DP::copysign(1.0, scalar_cast<double>(x))) * (scalar_cast<double>(INFINITY)));
+    if (DPCPP::fabs(x) == 1.0) {
+      v = scalar_cast<T>(
+          (DPCPP::copysign(1.0, scalar_cast<double>(x))) *
+          (scalar_cast<double>(INFINITY)));
       return;
     }
-    if(DP::fabs(x) <= 0.7){
+    if (DPCPP::fabs(x) <= 0.7) {
       z = x * x;
-      num = (((a[3]*z + a[2])*z + a[1])*z + a[0]);
-      dem = ((((b[3]*z + b[2])*z + b[1])*z +b[0])*z + scalar_cast<compute_type>(1.0));
+      num = (((a[3] * z + a[2]) * z + a[1]) * z + a[0]);
+      dem =
+          ((((b[3] * z + b[2]) * z + b[1]) * z + b[0]) * z +
+           scalar_cast<compute_type>(1.0));
       v = x * num / dem;
+    } else {
+      z = scalar_cast<compute_type>(
+          DPCPP::sqrt(-DPCPP::log((1.0 - DPCPP::fabs(x)) / 2.0)));
+      num = ((c[3] * z + c[2]) * z + c[1]) * z + c[0];
+      dem = (d[1] * z + d[0]) * z + scalar_cast<compute_type>(1.0);
+      v = scalar_cast<T>(
+          scalar_cast<compute_type>(
+              DPCPP::copysign(1.0, scalar_cast<double>(x))) *
+          num / dem);
     }
-    else {
-      z = scalar_cast<compute_type>(DP::sqrt(-DP::log((1.0-DP::fabs(x))/2.0)));
-      num = ((c[3]*z + c[2])*z + c[1])*z + c[0];
-      dem = (d[1]*z + d[0])*z + scalar_cast<compute_type>(1.0);
-      v = scalar_cast<T>(scalar_cast<compute_type>(DP::copysign(1.0,scalar_cast<double>(x)))*num/dem);
-    }
-    v = v - scalar_cast<T>((DP::erf(scalar_cast<double>(v)) - x)/((2.0/DP::sqrt(PI_f64))*DP::exp(-x*x)));
-    v = v - scalar_cast<T>((DP::erf(scalar_cast<double>(v)) - x)/((2.0/DP::sqrt(PI_f64))*DP::exp(-x*x)));
+    v = v - scalar_cast<T>(
+                (DPCPP::erf(scalar_cast<double>(v)) - x) /
+                ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
+    v = v - scalar_cast<T>(
+                (DPCPP::erf(scalar_cast<double>(v)) - x) /
+                ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
     return;
   }
 };
@@ -535,7 +566,7 @@ struct TensorSignOp<bool> {
     out = in;
   }
 
-  void operator()(bool& v) const { }
+  void operator()(bool& v) const {}
 };
 
 template <typename T>
@@ -556,22 +587,40 @@ struct TensorClampOp {
 };
 
 template <typename T>
+struct TensorCrossOp {
+  TensorCrossOp(int64_t sx, int64_t sy, int64_t so) : sx(sx), sy(sy), so(so) {}
+
+  void operator()(T& out, T& x, T& y) const {
+    T val0 = Numerics<T>::sub(
+        Numerics<T>::mul((&x)[1 * sx], (&y)[2 * sy]),
+        Numerics<T>::mul((&x)[2 * sx], (&y)[1 * sy]));
+
+    T val1 = Numerics<T>::sub(
+        Numerics<T>::mul((&x)[2 * sx], (&y)[0 * sy]),
+        Numerics<T>::mul((&x)[0 * sx], (&y)[2 * sy]));
+
+    T val2 = Numerics<T>::sub(
+        Numerics<T>::mul((&x)[0 * sx], (&y)[1 * sy]),
+        Numerics<T>::mul((&x)[1 * sx], (&y)[0 * sy]));
+
+    (&out)[0 * so] = val0;
+    (&out)[1 * so] = val1;
+    (&out)[2 * so] = val2;
+  }
+
+  const int64_t sx, sy, so;
+};
+
+template <typename T>
 struct TensorLerpOp {
   TensorLerpOp(T w) : w(w) {}
 
-  void operator()(T &out, T &a, T &b) const {
-    out = Numerics<T>::add(
-      a,
-      Numerics<T>::mul(
-          w,
-          Numerics<T>::sub(b, a)
-        )
-    );
+  void operator()(T& out, T& a, T& b) const {
+    out = Numerics<T>::add(a, Numerics<T>::mul(w, Numerics<T>::sub(b, a)));
   }
 
   const T w;
 };
-
 
 template <typename T>
 struct TensorMaxOp {
@@ -595,17 +644,16 @@ struct TensorMinOp {
   }
 };
 
-
 template <typename T>
 struct TensorMaxValueOp {
   TensorMaxValueOp(T v) : val(v) {}
 
   inline void operator()(T& out) const {
-    out = Numerics<T>::lt(out, val) ? val : out;  // this order propagates NaN
+    out = Numerics<T>::lt(out, val) ? val : out; // this order propagates NaN
   }
 
   inline void operator()(T& out, T& in) const {
-    out = Numerics<T>::lt(in, val) ? val : in;  // this order propagates NaN
+    out = Numerics<T>::lt(in, val) ? val : in; // this order propagates NaN
   }
 
   T val;
@@ -616,11 +664,11 @@ struct TensorMinValueOp {
   TensorMinValueOp(T v) : val(v) {}
 
   void operator()(T& out) const {
-    out = Numerics<T>::gt(out, val) ? val : out;  // this order propagates NaN
+    out = Numerics<T>::gt(out, val) ? val : out; // this order propagates NaN
   }
 
   void operator()(T& out, T& in) const {
-    out = Numerics<T>::gt(in, val) ? val : in;  // this order propagates NaN
+    out = Numerics<T>::gt(in, val) ? val : in; // this order propagates NaN
   }
 
   T val;
@@ -632,12 +680,7 @@ struct TensorAddCMulOp {
 
   void operator()(T& out, T& in1, T& in2) const {
     out = Numerics<T>::add(
-      out,
-      Numerics<T>::mul(
-        val,
-        Numerics<T>::mul(in1, in2)
-      )
-    );
+        out, Numerics<T>::mul(val, Numerics<T>::mul(in1, in2)));
   }
 
   T val;
@@ -649,17 +692,11 @@ struct TensorAddCDivOp {
 
   void operator()(T& out, T& in1, T& in2) const {
     out = Numerics<T>::add(
-      out,
-      Numerics<T>::mul(
-        val,
-        Numerics<T>::div(in1, in2)
-      )
-    );
+        out, Numerics<T>::mul(val, Numerics<T>::div(in1, in2)));
   }
 
   T val;
 };
-
 
 template <typename T>
 struct TensorBitAndOp {
@@ -694,29 +731,31 @@ struct TensorBitXorOp {
   }
 };
 
-
-template<typename T>
-static typename std::enable_if<std::is_signed<T>::value, bool>::type
-modulo_wrap(T a, T b) {
-    return (a != 0) && (a < 0) != (b < 0);
+template <typename T>
+static typename std::enable_if<std::is_signed<T>::value, bool>::type modulo_wrap(
+    T a,
+    T b) {
+  return (a != 0) && (a < 0) != (b < 0);
 }
 
-template<typename T> typename std::enable_if<std::is_unsigned<T>::value, bool>::type
-modulo_wrap(T a, T b) {
-    return false;
+template <typename T>
+typename std::enable_if<std::is_unsigned<T>::value, bool>::type modulo_wrap(
+    T a,
+    T b) {
+  return false;
 }
 
 template <typename T>
 struct TensorCRemainderOp {
   void operator()(T& out, T& in) const {
-    T val =  out % in;
+    T val = out % in;
     if (modulo_wrap(val, in)) {
       val += in;
     }
     out = val;
   }
 
-  void operator()(T& out, T& in1, T& in2)const {
+  void operator()(T& out, T& in1, T& in2) const {
     T val = in1 % in2;
     if (modulo_wrap(val, in2)) {
       val += in2;
@@ -728,40 +767,39 @@ struct TensorCRemainderOp {
 template <>
 struct TensorCRemainderOp<float> {
   void operator()(float& out, float& in) const {
-    out = in != 0.f ? out - in * DP::floor(out / in) : NAN;
+    out = in != 0.f ? out - in * DPCPP::floor(out / in) : NAN;
   }
 
   void operator()(float& out, float& in1, float& in2) const {
-    out = in2 != 0.f ? in1 - in2 * DP::floor(in1 / in2) : NAN;
+    out = in2 != 0.f ? in1 - in2 * DPCPP::floor(in1 / in2) : NAN;
   }
 };
 
 template <>
 struct TensorCRemainderOp<double> {
   void operator()(double& out, double& in) const {
-    out = in != 0. ? out - in * DP::floor(out / in) : NAN;
+    out = in != 0. ? out - in * DPCPP::floor(out / in) : NAN;
   }
 
   void operator()(double& out, double& in1, double& in2) const {
-    out = in2 != 0. ? in1 - in2 * DP::floor(in1 / in2) : NAN;
+    out = in2 != 0. ? in1 - in2 * DPCPP::floor(in1 / in2) : NAN;
   }
 };
 
 template <>
 struct TensorCRemainderOp<at::Half> {
   void operator()(at::Half& out, at::Half& in) const {
-    out = in != 0.f ? out - in * DP::floor(float(out / in)) : NAN;
+    out = in != 0.f ? out - in * DPCPP::floor(float(out / in)) : NAN;
   }
 
   void operator()(at::Half& out, at::Half& in1, at::Half& in2) const {
-    out = in2 != 0.f ? in1 - in2 * DP::floor(float(in1 / in2)) : NAN;
+    out = in2 != 0.f ? in1 - in2 * DPCPP::floor(float(in1 / in2)) : NAN;
   }
 };
 
-
 template <typename T>
 struct TensorCFmodOp {
-  void operator()(T &out, T &in) const {
+  void operator()(T& out, T& in) const {
     out = out % in;
   }
 
@@ -773,74 +811,73 @@ struct TensorCFmodOp {
 template <>
 struct TensorCFmodOp<float> {
   void operator()(float& out, float& in) const {
-    out = DP::fmod(out, in);
+    out = DPCPP::fmod(out, in);
   }
 
   void operator()(float& out, float& in1, float& in2) const {
-    out = DP::fmod(in1, in2);
+    out = DPCPP::fmod(in1, in2);
   }
 };
 
 template <>
 struct TensorCFmodOp<double> {
   void operator()(double& out, double& in) const {
-    out = DP::fmod(out, in);
+    out = DPCPP::fmod(out, in);
   }
 
   void operator()(double& out, double& in1, double& in2) const {
-    out = DP::fmod(in1, in2);
+    out = DPCPP::fmod(in1, in2);
   }
 };
-
 
 template <>
 struct TensorCFmodOp<at::Half> {
   void operator()(at::Half& out, at::Half& in) const {
-    out = DP::fmod(float(out), float(in));
+    out = DPCPP::fmod(float(out), float(in));
   }
 
   void operator()(at::Half& out, at::Half& in1, at::Half& in2) const {
-    out = DP::fmod(float(in1), float(in2));
+    out = DPCPP::fmod(float(in1), float(in2));
   }
 };
 
 template <typename T>
 struct TensorCPowOp {
-  void operator()(T &out, T &in) const{
+  void operator()(T& out, T& in) const {
     out = Numerics<T>::pow(out, in);
   }
 
-  void operator()(T& out, T& in1, T& in2) const{
+  void operator()(T& out, T& in1, T& in2) const {
     out = Numerics<T>::pow(in1, in2);
   }
 };
 
 template <>
 struct TensorCPowOp<float> {
-  void operator()(float &out, float &in) const{
-    out = DP::pow(out, in);
+  void operator()(float& out, float& in) const {
+    out = DPCPP::pow(out, in);
   }
 
-  void operator()(float &out, float &in1, float &in2) const{
-    out = DP::pow(in1, in2);
+  void operator()(float& out, float& in1, float& in2) const {
+    out = DPCPP::pow(in1, in2);
   }
 };
 
 template <>
 struct TensorCPowOp<double> {
-  void operator()(double &out, double &in) const{
-    out = DP::pow(out, in);
+  void operator()(double& out, double& in) const {
+    out = DPCPP::pow(out, in);
   }
 
-  void operator()(double &out, double &in1, double &in2) const{
-    out = DP::pow(in1, in2);
+  void operator()(double& out, double& in1, double& in2) const {
+    out = DPCPP::pow(in1, in2);
   }
 };
 
-template<typename T, int StaticExp>
+template <typename T, int StaticExp>
 struct TensorPowOp {
   TensorPowOp(T v) : val(v) {}
-  void operator()(T &out, T &in) const{
+  void operator()(T& out, T& in) const {
     if (StaticExp == 1) {
       out = in;
     } else if (StaticExp == 2) {
@@ -853,7 +890,7 @@ struct TensorPowOp {
     }
   }
 
-  void operator()(T &v) const{
+  void operator()(T& v) const {
     if (StaticExp == 1) {
       v = v;
     } else if (StaticExp == 2) {
@@ -868,29 +905,29 @@ struct TensorPowOp {
   const T val;
 };
 
-template<typename T>
+template <typename T>
 struct TensorPowOp<T, -1> {
   TensorPowOp(T v) : val(v) {}
-  void operator()(T &out, T &in) const{
+  void operator()(T& out, T& in) const {
     out = Numerics<T>::cinv(in);
   }
 
-  void operator()(T &v) const{
+  void operator()(T& v) const {
     v = Numerics<T>::cinv(v);
   }
 
   const T val;
 };
 
-template<typename T>
+template <typename T>
 struct TensorPowOp<T, -2> {
   TensorPowOp(T v) : val(v) {}
-  void operator()(T &out, T &in) const{
+  void operator()(T& out, T& in) const {
     T square = Numerics<T>::mul(in, in);
     out = Numerics<T>::cinv(square);
   }
 
-  void operator()(T &v) const{
+  void operator()(T& v) const {
     T square = Numerics<T>::mul(v, v);
     v = Numerics<T>::cinv(square);
   }
@@ -898,15 +935,15 @@ struct TensorPowOp<T, -2> {
   const T val;
 };
 
-template<typename T>
+template <typename T>
 struct TensorTPowOp {
   TensorTPowOp(T v) : val(v) {}
 
-  void operator()(T &out, T &in) const{
+  void operator()(T& out, T& in) const {
     out = Numerics<T>::pow(val, in);
   }
 
-  void operator()(T &v) const{
+  void operator()(T& v) const {
     v = Numerics<T>::pow(val, v);
   }
 

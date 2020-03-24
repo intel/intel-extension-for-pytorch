@@ -2,9 +2,8 @@
 #define PAIRWISE_INC
 
 #include <ATen/ATen.h>
-#include <core/SYCL.h>
+#include <core/DPCPP.h>
 #include <utils/Pointwise.h>
-
 
 template <typename T>
 struct TensorBitAndConstantOp {
@@ -58,11 +57,11 @@ template <>
 struct TensorRemainderOp<float> {
   TensorRemainderOp(float v) : val(v) {}
   void operator()(float& out, float& in) const {
-    out = in - val * DP::floor(in / val);
+    out = in - val * DPCPP::floor(in / val);
   }
 
   void operator()(float& v) const {
-    v = v - val * DP::floor(v / val);
+    v = v - val * DPCPP::floor(v / val);
   }
 
   const float val;
@@ -72,11 +71,11 @@ template <>
 struct TensorRemainderOp<double> {
   TensorRemainderOp(double v) : val(v) {}
   void operator()(double& out, double& in) const {
-    out = in - val * DP::floor(in / val);
+    out = in - val * DPCPP::floor(in / val);
   }
 
   void operator()(double& v) const {
-    v = v - val * DP::floor(v / val);
+    v = v - val * DPCPP::floor(v / val);
   }
 
   const double val;
@@ -84,14 +83,14 @@ struct TensorRemainderOp<double> {
 
 template <>
 struct TensorRemainderOp<at::Half> {
-  TensorRemainderOp(at::Half v): val(v) {}
+  TensorRemainderOp(at::Half v) : val(v) {}
 
   void operator()(at::Half& out, at::Half& in) const {
-    out = in - val * DP::floor(float(in / val));
+    out = in - val * DPCPP::floor(float(in / val));
   }
 
   void operator()(at::Half& v) const {
-    v = v - val * DP::floor(float(v / val));
+    v = v - val * DPCPP::floor(float(v / val));
   }
 
   const at::Half val;
@@ -101,11 +100,11 @@ template <typename T>
 struct TensorFmodOp {
   TensorFmodOp(T v) : val((float)v) {}
   void operator()(T& out, T& in) const {
-    out = (T) DP::fmod((float) in, val);
+    out = (T)DPCPP::fmod((float)in, val);
   }
 
   void operator()(T& v) const {
-    v = (T) DP::fmod((float) v, val);
+    v = (T)DPCPP::fmod((float)v, val);
   }
 
   const float val;
@@ -115,11 +114,11 @@ template <>
 struct TensorFmodOp<double> {
   TensorFmodOp(double v) : val(v) {}
   void operator()(double& out, double& in) const {
-    out = DP::fmod(in, val);
+    out = DPCPP::fmod(in, val);
   }
 
   void operator()(double v) const {
-    v = DP::fmod(v, val);
+    v = DPCPP::fmod(v, val);
   }
 
   const double val;
@@ -128,31 +127,27 @@ struct TensorFmodOp<double> {
 template <typename T, int Upper>
 struct TensorTriOp {
   TensorTriOp(int64_t stride0_, int64_t stride1_, int64_t k_)
-    : stride0(stride0_), stride1(stride1_), k(k_) {}
+      : stride0(stride0_), stride1(stride1_), k(k_) {}
 
-  int mask(T &out, int64_t offset) const {
-
+  int mask(T& out, int64_t offset) const {
 #if defined(USE_COMPUTECPP)
     if (offset < 1) {
-      printf ("offset is %ld, mask is not supported!\n", offset);
+      printf("offset is %ld, mask is not supported!\n", offset);
     }
 #elif defined(USE_DPCPP)
-    // TODO: Use DP::stream
+// TODO: Use DPCPP::stream
 
 #endif
 
     ptrdiff_t n = offset - 1;
     int64_t row, col;
 
-    if (stride0 > stride1)
-    {
-      row = (int64_t) (n / stride0);
-      col = (int64_t) ((n % stride0) / stride1);
-    }
-    else
-    {
-      row = (int64_t) ((n % stride1) / stride0);
-      col = (int64_t) (n / stride1);
+    if (stride0 > stride1) {
+      row = (int64_t)(n / stride0);
+      col = (int64_t)((n % stride0) / stride1);
+    } else {
+      row = (int64_t)((n % stride1) / stride0);
+      col = (int64_t)(n / stride1);
     }
 
     return Upper ? (col - row >= k) : (col - row <= k);

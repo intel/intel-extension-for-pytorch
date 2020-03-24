@@ -1,10 +1,11 @@
 #pragma once
 
-// A fixed-size array type usable from SYCL kernels.
+// A fixed-size array type usable from DPCPP kernels.
 
 #include <c10/macros/Macros.h>
 
-namespace at { namespace sycl {
+namespace at {
+namespace dpcpp {
 
 template <typename T, int size>
 struct alignas(16) Array {
@@ -28,5 +29,5 @@ struct alignas(16) Array {
     }
   }
 };
-
-}}
+}
+}

@@ -4,17 +4,17 @@
 #include <ATen/CPUApplyUtils.h>
 
 namespace at {
-namespace sycl {
+namespace dpcpp {
 namespace detail {
 
 #define MAX_TENSORINFO_DIMS 25
-#define MAX_SYCLTORCH_DIMS MAX_TENSORINFO_DIMS
+#define MAX_DPCPPTORCH_DIMS MAX_TENSORINFO_DIMS
 
-#define SYCLTORCH_STR(X) #X
-#define SYCLTORCH_DIM_WARNING "tensor too large or too many (>" \
-                              SYCLTORCH_STR(MAX_SYCLTORCH_DIMS) ") dimensions"
+#define DPCPPTORCH_STR(X) #X
+#define DPCPPTORCH_DIM_WARNING "tensor too large or too many (>" \
+                              DPCPPTORCH_STR(MAX_DPCPPTORCH_DIMS) ") dimensions"
 
-// SYCL kernel argument taht defines tensor layout
+// DPCPP kernel argument taht defines tensor layout
 template <typename T, typename IndexType>
 struct TensorInfo {
   TensorInfo();
@@ -206,6 +206,6 @@ getTensorInfo(const at::Tensor& t) {
 }
 
 } // detail
-} // sycl
+} // dpcpp
 } // at
 
