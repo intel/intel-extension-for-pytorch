@@ -48,7 +48,7 @@ static void softshrink_backward(TensorIterator& iter, Scalar lambd) {
 } // namespace impl
 
 Tensor& softshrink_out(Tensor& out, const Tensor& self, Scalar lambd) {
-  checkBackend("softshrink_forward", {out}, self.type().backend());
+  checkBackend("softshrink_forward", {out}, self.options().backend());
   auto iter = at::TensorIterator();
   iter.set_check_mem_overlap(true);
   iter.add_output(out);
@@ -69,7 +69,9 @@ Tensor& softshrink_backward_out(
     const Tensor& self,
     Scalar lambd) {
   checkBackend(
-      "softshrink_backward", {grad_input, grad_output}, self.type().backend());
+      "softshrink_backward",
+      {grad_input, grad_output},
+      self.options().backend());
   auto iter = at::TensorIterator();
   iter.set_check_mem_overlap(true);
   iter.add_output(grad_input);

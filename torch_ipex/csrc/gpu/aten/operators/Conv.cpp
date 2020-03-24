@@ -74,7 +74,7 @@ at::Tensor convolution(
   int32_t ph = padding[0];
   int32_t pw = padding[1];
 
-  auto data_t = dt_to_dnnl(input.type().scalarType());
+  auto data_t = dt_to_dnnl(input.scalar_type());
   auto format_any = memory::format_tag::any;
   auto format_nchw = memory::format_tag::nchw;
   auto format_weight =

@@ -74,7 +74,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
     AT_ERROR(ss.str());
   }
 
-  auto data_t = dt_to_dnnl(input.type().scalarType());
+  auto data_t = dt_to_dnnl(input.scalar_type());
   auto format_nchw = memory::format_tag::nchw;
 
   memory::dims input_tz = {n, ic, ih, iw};
