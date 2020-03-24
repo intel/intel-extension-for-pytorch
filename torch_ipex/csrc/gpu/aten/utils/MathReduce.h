@@ -78,11 +78,11 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
   auto num_groups = CeilDiv(totalElements, group_size);
   auto total_items = num_groups * group_size;
 
-  auto tgt1_data = tgt1.data<K>();
-  auto tgt2_data = tgt2.data<Index>();
+  auto tgt1_data = tgt1.data_ptr<K>();
+  auto tgt2_data = tgt2.data_ptr<Index>();
   auto tgt1_size = (tgt1.numel()) * (tgt1.itemsize());
   auto tgt2_size = (tgt2.numel()) * (tgt2.itemsize());
-  auto src_data = src.data<K>();
+  auto src_data = src.data_ptr<K>();
   auto src_size = totalElements * (src.itemsize());
   auto dim = tgt1.dim() - 1;
 
@@ -150,11 +150,11 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
   auto num_groups = CeilDiv(totalElements, group_size);
   auto total_items = num_groups * group_size;
 
-  auto tgt1_data = tgt1.data<K>();
-  auto tgt2_data = tgt2.data<Index>();
+  auto tgt1_data = tgt1.data_ptr<K>();
+  auto tgt2_data = tgt2.data_ptr<Index>();
   auto tgt1_size = (tgt1.numel()) * (tgt1.itemsize());
   auto tgt2_size = (tgt2.numel()) * (tgt2.itemsize());
-  auto src_data = src.data<K>();
+  auto src_data = src.data_ptr<K>();
   auto src_size = totalElements * (src.itemsize());
 
   int64_t n = src.size(rdim);

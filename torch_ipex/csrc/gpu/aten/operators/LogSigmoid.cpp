@@ -14,7 +14,7 @@ std::tuple<Tensor&, Tensor&> log_sigmoid_forward_out(
     Tensor& output,
     Tensor& buffer,
     const Tensor& self) {
-  checkBackend("log_sigmoid_forward", output, self.type().backend());
+  checkBackend("log_sigmoid_forward", output, self.options().backend());
   // Compare the norm and maxnorm value.
   auto iter = TensorIterator();
   iter.set_check_mem_overlap(true);
@@ -51,7 +51,9 @@ Tensor& log_sigmoid_backward_out(
     const Tensor& self,
     const Tensor& buffer) {
   checkBackend(
-      "log_sigmoid_backward", {grad_input, grad_output}, self.type().backend());
+      "log_sigmoid_backward",
+      {grad_input, grad_output},
+      self.options().backend());
   // Compare the norm and maxnorm value.
   auto iter = TensorIterator();
   iter.set_check_mem_overlap(true);

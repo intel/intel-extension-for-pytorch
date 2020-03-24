@@ -723,7 +723,6 @@ void EmbeddingBag_accGradParametersKernel_max(
     scalar_t* gradWeight,
     int64_t stride,
     int64_t numBags) {
-  using accscalar_t = acc_type<scalar_t, true>;
   auto queue = dpcppGetCurrentQueue();
   int64_t chunksPerBag = CeilDiv(stride, (int64_t)64);
   int64_t numChunks = numBags * chunksPerBag;

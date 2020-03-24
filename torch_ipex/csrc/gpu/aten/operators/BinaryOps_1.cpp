@@ -32,10 +32,10 @@ static void sub_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
 
 // alpha_check
 static inline void alpha_check(const TensorIterator& iter, Scalar alpha) {
-  AT_CHECK(
+  TORCH_CHECK(
       !alpha.isBoolean() || iter.dtype() == ScalarType::Bool,
       "Boolean alpha only supported for Boolean results.");
-  AT_CHECK(
+  TORCH_CHECK(
       isFloatingType(iter.dtype()) || alpha.isIntegral(true),
       "For integral input tensors, argument alpha must not be a floating "
       "point number.");
@@ -50,11 +50,11 @@ static Tensor wrapped_scalar_tensor(Scalar scalar) {
 
 // Basic checking for all sub functions.
 static inline void sub_check(const Tensor& self, const Tensor& other) {
-  AT_CHECK(
+  TORCH_CHECK(
       self.scalar_type() != kBool || other.scalar_type() != kBool,
       "Subtraction, the `-` operator, with two bool tensors is not supported. "
       "Use the `^` or `logical_xor()` operator instead.");
-  AT_CHECK(
+  TORCH_CHECK(
       self.scalar_type() != kBool && other.scalar_type() != kBool,
       "Subtraction, the `-` operator, with a bool tensor is not supported. "
       "If you are trying to invert a mask, use the `~` or `logical_not()` "

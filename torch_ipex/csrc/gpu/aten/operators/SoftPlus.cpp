@@ -20,7 +20,7 @@ Tensor& softplus_out(
     const Tensor& self,
     Scalar beta,
     Scalar threshold) {
-  checkBackend("softplus_forward", {out}, self.type().backend());
+  checkBackend("softplus_forward", {out}, self.options().backend());
   auto iter = at::TensorIterator();
   iter.set_check_mem_overlap(true);
   iter.add_output(out);
@@ -57,7 +57,7 @@ Tensor& softplus_backward_out(
   checkBackend(
       "softplus_backward",
       {grad_input, grad_output, output},
-      self.type().backend());
+      self.options().backend());
   auto iter = at::TensorIterator();
   iter.set_check_mem_overlap(true);
   iter.add_output(grad_input);
