@@ -1,7 +1,4 @@
-# This file solely exists to let Caffe2 Android build get at the list
-# of core files without having to trundle through all of ATen's CMakeLists.txt
-# Add files needed from jit folders
-FILE(GLOB _CPU_SRCS *.cpp)
+FILE(GLOB _CPU_SRCS *.cpp dbl/*.cpp)
 LIST(APPEND DPCPP_CPU_SRCS ${_CPU_SRCS})
 
 # Pass to parent

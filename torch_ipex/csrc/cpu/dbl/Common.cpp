@@ -1,11 +1,13 @@
 #include "Common.h"
 
+#include <ATen/ATen.h>
 #include <ATen/Tensor.h>
 #include <c10/util/Exception.h>
 
-#include "cpu/dil/dil.hpp"
+#include "cpu/dil/dil_pin_singletons.hpp"
 #include "cpu/ShadeDataContext.h"
 #include "torch_ipex/csrc/ipex_tensor_impl.h"
+#include "torch_ipex/csrc/utils.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -27,14 +29,15 @@ dil::tensor dil_tensor_from_dense(const at::Tensor& tensor) {
           tensor.data_ptr()};
 }
 
-at::Tensor dil_tensor_to_dense(const dil::tensor& dil_tensor) {
+at::Tensor dil_tensor_to_dense(const at::Tensor& tensor) {
+  TORCH_INTERNAL_ASSERT(cpu::ShadeDataContext::isDilTensor(tensor));
+  TORCH_INTERNAL_ASSERT(tensor.unsafeGetTensorImpl()->version_counter().current_version() == 1);
+  auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
   auto dims = dil_tensor.get_dims();
   // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
   at::Tensor cpu_tensor = at::empty(
     std::vector<int64_t>(dims.begin(), dims.end()),
-    ipexTensor.options().device(c10::kCPU).layout(c10::kStrided));
-  // make sure that it is not a in-place tensor
-  TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->version_counter().current_version() == 1);
+    tensor.options().device(c10::kCPU).layout(c10::kStrided));
   dil_tensor.to_public(cpu_tensor.data_ptr(), dil_tensor.get_data_type());
   return cpu_tensor;
 }
@@ -44,7 +47,7 @@ dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
     return cpu::ShadeDataContext::getDilTensor(input);
   } else {
     TORCH_INTERNAL_ASSERT(input.is_contiguous());
-    return dnnl::comm::dil_tensor_from_dense(input);
+    return dil_tensor_from_dense(input);
   }
 }
 
@@ -59,7 +62,7 @@ at::Tensor gen_aten_tensor_by(const dil::tensor& dil_tensor) {
     cpu::ShadeDataContext::freeShadeDataContext,
     at::DeviceType::DPCPP);
   auto dims = dil_tensor.get_dims();
-  std::vector<int64_t> _tensor_sizes(dims.begin(), dims.end())
+  std::vector<int64_t> _tensor_sizes(dims.begin(), dims.end());
   auto at_data_type = get_at_data_type(dil_tensor.get_data_type());
   auto storage_impl = c10::make_intrusive<at::StorageImpl>(
     at::scalarTypeToTypeMeta(at_data_type),
