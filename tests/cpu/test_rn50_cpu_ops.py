@@ -1,4 +1,4 @@
-"""Tests for xla_dist."""
+"""Tests for rn50."""
 from __future__ import division
 from __future__ import print_function
 
@@ -8,7 +8,9 @@ import unittest
 from functools import reduce
 
 import torch
-import intel_pytorch_extension as ipex
+import _torch_ipex as ipex
+ipex._initialize_aten_bindings()
+
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from torch.nn import Parameter
