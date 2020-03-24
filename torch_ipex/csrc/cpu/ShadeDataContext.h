@@ -27,7 +27,6 @@ struct ShadeDataContext {
       TORCH_INTERNAL_ASSERT(shade_data_ctx->cpu_raw_data == nullptr);
       TORCH_INTERNAL_ASSERT(shade_data_ctx->cpu_del_run == nullptr);
     } else { // CPU Tensor here
-      TORCH_INTERNAL_ASSERT(shade_data_ctx->cpu_raw_data != nullptr);
       TORCH_INTERNAL_ASSERT(shade_data_ctx->cpu_del_run != nullptr);
       shade_data_ctx->cpu_del_run(shade_data_ctx->cpu_raw_data);
       shade_data_ctx->cpu_raw_data = nullptr;
@@ -54,12 +53,9 @@ struct ShadeDataContext {
   static inline bool isDilTensor(const at::Tensor &tensor) {
     TORCH_INTERNAL_ASSERT(tensor.has_storage());
     // Make sure simple case
-    TORCH_INTERNAL_ASSERT(tensor.unsafeGetTensorImpl()->unique_version());
+    //TORCH_INTERNAL_ASSERT(tensor.unsafeGetTensorImpl()->version_counter().current_version() <= 1);
     void *storage_context = tensor.storage().data_ptr().get_context();
-    ShadeDataContext *shade_data_context = (ShadeDataContext*)shade_data_context;
-    auto data_type = shade_data_context->data_type;
-    TORCH_INTERNAL_ASSERT((data_type == SHADE_DATA_TYPE::CPU_RAW) || (data_type == SHADE_DATA_TYPE::DIL));
-    return data_type == SHADE_DATA_TYPE::DIL;
+    return isDilTensor(storage_context);
   }
 
   static inline bool isCpuTensor(const at::Tensor &tensor) {

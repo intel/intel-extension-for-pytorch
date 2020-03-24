@@ -45,6 +45,33 @@ namespace bridge {
   CHECK_TENSOR(a._indices(), b._indices()); \
   CHECK_TENSOR(a._values(), b._values())
 
+
+void attachShadeDataConext(const at::Tensor& tensor) {
+  auto tensor_storage_impl = tensor.storage().unsafeGetStorageImpl();
+  auto& data_ptr = tensor_storage_impl->data_ptr();
+  // [NOTE]: We assume the real data of storage should be as same as its context.
+  //         Then we use the assumption to check if current tensor has contained
+  //         shade data context.
+  if (data_ptr.get() != data_ptr.get_context()) {
+    return;
+  }
+  auto cur_del_fn = data_ptr.get_deleter();
+  bool res = data_ptr.compare_exchange_deleter(cur_del_fn, &(c10::detail::deleteNothing));
+  TORCH_INTERNAL_ASSERT(res);
+  // Make sure that does not triger free resource for set_ptr
+  cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
+  shade_data_context->cpu_raw_data = data_ptr.get();
+  shade_data_context->cpu_del_run = cur_del_fn;
+  shade_data_context->data_type = cpu::SHADE_DATA_TYPE::CPU_RAW;
+  c10::DataPtr shade_data_ptr(
+    data_ptr.get(),
+    shade_data_context,
+    cpu::ShadeDataContext::freeShadeDataContext,
+    tensor.device().type());
+  tensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(shade_data_ptr));
+}
+
+
 // Fallback DPCPP tensor to CPU Tensor.
 // It will allocate new memory buffer and then duplicate the DPCPP tensor buffer to create new CPU Tensor
 at::Tensor fallbackToCPUTensor(const at::Tensor& ipexTensor) {
@@ -254,6 +281,7 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     CHECK_TENSOR_CRITICAL(_tensor, cpuTensor);
     //TODO: Cannot set reserved_ 
     //      dest_impl->reserved_ = src_impl->reserved_;
+    attachShadeDataConext(_tensor);
     return _tensor;
   }
 }
@@ -274,6 +302,8 @@ at::Tensor shallowUpgradeToDPCPPTensorA(const at::Tensor& ipexTensor, const at::
   IPEXTensorImpl* ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
   ipex_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
   CHECK_TENSOR_CRITICAL(_tensor, cpuTensor);
+
+  attachShadeDataConext(_tensor);
   return _tensor;
 }
 
@@ -314,6 +344,7 @@ at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cp
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
   ipex_tensor_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
   CHECK_TENSOR_CRITICAL(ipexTensor, cpuTensor);
+  attachShadeDataConext(ipexTensor);
   return ipexTensor;
 }
 
