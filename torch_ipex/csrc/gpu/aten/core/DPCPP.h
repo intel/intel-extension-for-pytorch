@@ -24,26 +24,24 @@ namespace DPCPP = cl::sycl;
 #define DPCPP_Q_SUBMIT(q, cgf, ...) q.submit(cgf, ##__VA_ARGS__)
 
 #ifndef DPCPP_PROFILING
-#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)    \
-  {                                         \
-    auto e = q.submit(cgf, ##__VA_ARGS__);  \
-    e.wait();                               \
+#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)   \
+  {                                        \
+    auto e = q.submit(cgf, ##__VA_ARGS__); \
+    e.wait();                              \
   }
-#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)   \
-  {                                         \
-    auto e = q.submit(cgf, ##__VA_ARGS__);  \
-  }
+#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...) \
+  { auto e = q.submit(cgf, ##__VA_ARGS__); }
 #else
-#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)    \
-  {                                         \
-    auto e = q.submit(cgf, ##__VA_ARGS__);  \
-    e.wait();                               \
-    dpcpp_log("sycl_kernel", e);            \
+#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)   \
+  {                                        \
+    auto e = q.submit(cgf, ##__VA_ARGS__); \
+    e.wait();                              \
+    dpcpp_log("sycl_kernel", e);           \
   }
-#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)   \
-  {                                         \
-    auto e = q.submit(cgf, ##__VA_ARGS__);  \
-    dpcpp_log("sycl_kernel", e);            \
+#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)  \
+  {                                        \
+    auto e = q.submit(cgf, ##__VA_ARGS__); \
+    dpcpp_log("sycl_kernel", e);           \
   }
 #endif
 

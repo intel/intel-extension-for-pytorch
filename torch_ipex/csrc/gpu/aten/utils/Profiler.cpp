@@ -5,7 +5,6 @@
 #include <CL/sycl.hpp>
 #include <sstream>
 
-
 float DPCPPEventStubImpl::elapsed() {
   printf("DPCPPEventStubImpl elapsed ++\n");
   float us;

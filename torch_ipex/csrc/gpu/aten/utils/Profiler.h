@@ -5,7 +5,6 @@
 #include <CL/sycl.hpp>
 #include <sstream>
 
-
 using namespace torch::autograd::profiler;
 
 struct DPCPPEventStubImpl : public DPCPPEventStubBase {
@@ -14,6 +13,7 @@ struct DPCPPEventStubImpl : public DPCPPEventStubBase {
   DPCPPEventStubImpl(cl::sycl::event event) : event_(event){};
   virtual float elapsed() override;
   virtual ~DPCPPEventStubImpl() = default;
+
  private:
   cl::sycl::event event_;
 };

@@ -33,12 +33,21 @@ class DPCPPStreamImpl {
       DeviceIndex di,
       DPCPP::async_handler asyncHandler = dpcppAsyncHandler)
       : /* queue_(dpcppGetRawDevice(di), asyncHandler),*/
+#ifndef DPCPP_PROFILING
         queue_(
             at::dpcpp::getGlobalContext(),
             dpcppGetDeviceSelector(di),
             asyncHandler),
-        device_index_(di),
-        properties_({DPCPP::property::queue::enable_profiling()}) {}
+#else
+        properties_({DPCPP::property::queue::enable_profiling()}),
+        queue_(
+            at::dpcpp::getGlobalContext(),
+            dpcppGetDeviceSelector(di),
+            asyncHandler,
+            properties_),
+#endif
+        device_index_(di) {
+  }
 
   DeviceIndex getDeviceIndex() const {
     return device_index_;
@@ -51,9 +60,11 @@ class DPCPPStreamImpl {
   C10_DISABLE_COPY_AND_ASSIGN(DPCPPStreamImpl);
 
  private:
+#ifdef DPCPP_PROFILING
+  DPCPP::property_list properties_;
+#endif
   DPCPP::queue queue_;
   DeviceIndex device_index_;
-  DPCPP::property_list properties_;
 };
 
 static int dpcpp_num_devices;
