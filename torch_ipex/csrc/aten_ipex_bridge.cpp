@@ -12,6 +12,7 @@
 #include "ipex_tensor_impl.h"
 #include "ipex_sparse_tensor_impl.h"
 #include "cpu/ShadeDataContext.h"
+#include "utils.h"
 
 namespace torch_ipex {
 namespace bridge {
@@ -44,7 +45,6 @@ namespace bridge {
   TORCH_INTERNAL_ASSERT(a.is_coalesced() == b.is_coalesced()); \
   CHECK_TENSOR(a._indices(), b._indices()); \
   CHECK_TENSOR(a._values(), b._values())
-
 
 void attachShadeDataConext(const at::Tensor& tensor) {
   auto tensor_storage_impl = tensor.storage().unsafeGetStorageImpl();
@@ -116,36 +116,38 @@ at::Tensor shallowFallbackToCPUShadeTensor(const at::Tensor& ipexTensor) {
     return ipexTensor;
   }
 
-  TORCH_INTERNAL_ASSERT(!ipexTensor.is_sparse());
+  // NOT support sparse tensor.
+  TORCH_INTERNAL_ASSERT(!(ipexTensor.is_sparse()));
   TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
   if (ipexTensor.device().is_cpu())
     return ipexTensor;
 
-  auto* allocator = c10::GetAllocator(c10::DeviceType::CPU);
-  void* tensor_raw_data = nullptr;
   void* data_context = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
+  TORCH_INTERNAL_ASSERT(data_context != ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get());
   TORCH_INTERNAL_ASSERT(data_context != nullptr);
 
   // Unpack CPU raw data from shade data
   cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_context;
   if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
-    //TODO: Call reorder here
-    TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->unique_version());
     dil::tensor &dil_tensor = shade_data_context->dil_tensor;
-    auto dims = dil_tensor.get_dims();
-    // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
-    at::Tensor cpu_tensor = at::empty(
-      std::vector<int64_t>(dims.begin(), dims.end()),
-      ipexTensor.options().device(c10::kCPU).layout(c10::kStrided));
-    // make sure that it is not a in-place tensor
-    TORCH_INTERNAL_ASSERT(ipexTensor.unsafeGetTensorImpl()->version_counter().current_version() == 1);
-    dil_tensor.to_public(cpu_tensor.data_ptr(), dil_tensor.get_data_type());
-    CHECK_TENSOR_CRITICAL(cpu_tensor, ipexTensor);
-    return cpu_tensor;
-  } else {
-    TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data == ipexTensor.data_ptr());
-    return shallowFallbackToCPUTensor(ipexTensor);
+    if (dil_tensor.is_public_format()) {
+      shade_data_context->data_type = cpu::SHADE_DATA_TYPE::CPU_RAW;
+    } else {
+      auto dims = dil_tensor.get_dims();
+      // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
+      at::Tensor cpu_tensor = at::empty(
+        std::vector<int64_t>(dims.begin(), dims.end()),
+        ipexTensor.options().device(c10::kCPU).layout(c10::kStrided));
+      TORCH_INTERNAL_ASSERT(cpu_tensor.scalar_type() == get_at_data_type(dil_tensor.get_data_type()));
+      dil_tensor.to_public(cpu_tensor.data_ptr(), dil_tensor.get_data_type());
+      CHECK_TENSOR_CRITICAL(cpu_tensor, ipexTensor);
+      at::DataPtr& cpu_tensor_data_ptr = cpu_tensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr();
+      ipexTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(cpu_tensor_data_ptr));
+      attachShadeDataConext(ipexTensor);
+    }
   }
+
+  return shallowFallbackToCPUTensor(ipexTensor);
 }
 
 
@@ -161,20 +163,16 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   if (ipexTensor.device().is_cpu())
     return ipexTensor;
 
-  auto* allocator = c10::GetAllocator(c10::DeviceType::CPU);
-  void* tensor_raw_data = ipexTensor.unsafeGetTensorImpl()->storage().data();
-  c10::DataPtr cpu_data_ptr(tensor_raw_data, at::DeviceType::CPU);
-  auto storage_impl = c10::make_intrusive<at::StorageImpl>(
-    ipexTensor.unsafeGetTensorImpl()->storage().dtype(),
-    ipexTensor.unsafeGetTensorImpl()->storage().numel(),
-    std::move(cpu_data_ptr),
-    allocator,
-    ipexTensor.unsafeGetTensorImpl()->storage().resizable()
-  );
+  auto *ipex_tensor_impl = ipexTensor.unsafeGetTensorImpl();
+  TORCH_INTERNAL_ASSERT(ipex_tensor_impl != nullptr);
+  TORCH_INTERNAL_ASSERT(ipex_tensor_impl->has_storage());
+  TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
 
-  auto _tensor =  at::detail::make_tensor<IPEXTensorImpl>(storage_impl, at::TensorTypeId::CPUTensorId);
-  IPEXTensorImpl* impex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
-  impex_impl->copy_meta_info(ipexTensor.unsafeGetTensorImpl());
+  auto ipex_tensor_storage = ipex_tensor_impl->storage().unsafeGetStorageImpl();
+  ipex_tensor_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::CPU));
+  auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(ipexTensor.storage(), at::TensorTypeId::CPUTensorId);
+  IPEXTensorImpl* cur_ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
+  cur_ipex_impl->copy_meta_info(ipexTensor.unsafeGetTensorImpl());
   CHECK_TENSOR_CRITICAL(_tensor, ipexTensor);
   // TODO: Cannot reserved_
   //       dest_impl->reserved_ = src_impl->reserved_;
@@ -295,8 +293,16 @@ at::Tensor shallowUpgradeToDPCPPTensorA(const at::Tensor& ipexTensor, const at::
   TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(cpuTensor.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(ipexTensor.device().type() == at::DeviceType::DPCPP);
+
+  ipexTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
+
+  TORCH_INTERNAL_ASSERT(ipexTensor.storage().device_type() == at::DeviceType::DPCPP);
   TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
+
+  // The ipexTensor and cpuTensor shares same storage.
+  TORCH_INTERNAL_ASSERT(cpuTensor.storage().device_type() == at::DeviceType::DPCPP);
   TORCH_INTERNAL_ASSERT(ipexTensor.storage().data() == cpuTensor.storage().data());
+
   auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(at::Storage(ipexTensor.storage()), at::TensorTypeId::DPCPPTensorId);
   TORCH_INTERNAL_ASSERT(_tensor.device().type() == at::DeviceType::DPCPP);
   IPEXTensorImpl* ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
@@ -328,6 +334,7 @@ at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cp
     return ipexTensor;
   }
 
+  ipexTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
   TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
   TORCH_INTERNAL_ASSERT(ipexTensor.device().type() == at::DeviceType::DPCPP);
 
