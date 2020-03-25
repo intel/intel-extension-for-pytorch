@@ -57,18 +57,13 @@ at::Tensor & AtenIpexCPUSparse::_coalesced_(at::Tensor & self, bool coalesced) {
 
 // Align with at::clone_sparse
 at::Tensor AtenIpexCPUSparse::clone(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format) {
-  DEBUG("AtenIpexCPUSparse::clone\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kSparse);
   TORCH_INTERNAL_ASSERT(!memory_format.has_value());
   TORCH_INTERNAL_ASSERT(at::impl::variable_is_excluded());
 
-  // Create and resize sparse tensor
-  auto _tensor = at::detail::make_tensor<IPEXSparseTensorImpl>(
-      at::TensorTypeSet(at::TensorTypeId::SparseDPCPPTensorId), self.dtype());
-  IPEXSparseTensorImpl::get_ipex_sparse_impl(_tensor)->resize_and_clear_(self.sparse_dim(), self.dense_dim(), self.sizes());
-  // Copy indices and values
-  at::sparse::copy_into_sparse(_tensor, self._indices(), self._values(), true);
-  return _tensor._coalesced_(self.is_coalesced());
+  auto&& cpu_self = bridge::shallowFallbackToCPUTensor(self);
+  auto&& cpu_result = at::clone(cpu_self, memory_format);
+  return bridge::shallowUpgradeToDPCPPTensor(cpu_result);
 }
 
 // Align with at::new_with_dims_and_tensor_sparse
@@ -77,21 +72,15 @@ at::Tensor AtenIpexCPUSparse::_sparse_coo_tensor_with_dims_and_tensors(int64_t s
   TORCH_INTERNAL_ASSERT(indices.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(values.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
-  //TODO
-  auto _tensor = at::detail::make_tensor<IPEXSparseTensorImpl>(
-      at::TensorTypeSet(at::TensorTypeId::SparseDPCPPTensorId), options.dtype());
-  IPEXSparseTensorImpl::get_ipex_sparse_impl(_tensor)->resize_(sparse_dim, dense_dim, size);
-  // NOTE: There is no guarantee that `indices` and `values` don't contain AutogradMeta. However,
-  // we want to maintain the invariant that `indices_` and `values_` of a sparse tensor don't
-  // contain AutogradMeta, and to achieve that we shallow-copy `indices` and `values` here.
-  auto indices_shallow_copy = at::sparse::LongTensor(indices.unsafeGetTensorImpl()->shallow_copy_and_detach(
-    /*version_counter=*/indices.unsafeGetTensorImpl()->version_counter(),
-    /*allow_tensor_metadata_change=*/true));
-  auto values_shallow_copy = at::Tensor(values.unsafeGetTensorImpl()->shallow_copy_and_detach(
-    /*version_counter=*/values.unsafeGetTensorImpl()->version_counter(),
-    /*allow_tensor_metadata_change=*/true));
-  at::sparse::alias_into_sparse(_tensor, indices_shallow_copy, values_shallow_copy);
-  return _tensor;
+
+  // TODO: Keep this until shallowFallbackToCPUTensor ready.
+  auto&& cpu_indices = bridge::fallbackToCPUTensor(indices);
+  auto&& cpu_values = bridge::fallbackToCPUTensor(values);
+  // auto&& cpu_indices = bridge::shallowFallbackToCPUTensor(indices);
+  // auto&& cpu_values = bridge::shallowFallbackToCPUTensor(values);
+  at::TensorOptions cpu_options = options.device(at::DeviceType::CPU);
+  auto&& cpu_result = at::_sparse_coo_tensor_with_dims_and_tensors(sparse_dim, dense_dim, size, cpu_indices, cpu_values, cpu_options);
+  return bridge::shallowUpgradeToDPCPPTensor(cpu_result);
 }
 
 }  // namespace cpu

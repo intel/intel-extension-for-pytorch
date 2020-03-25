@@ -8,7 +8,7 @@ IPEXSparseTensorImpl::IPEXSparseTensorImpl(at::TensorTypeSet type_set, const caf
 
 IPEXSparseTensorImpl * IPEXSparseTensorImpl::get_ipex_sparse_impl(const at::Tensor& ipex_tensor) {
   TORCH_INTERNAL_ASSERT(ipex_tensor.layout() == c10::kSparse);
-  TORCH_INTERNAL_ASSERT(ipex_tensor.device().type() == at::DeviceType::DPCPP);
+  // TORCH_INTERNAL_ASSERT(ipex_tensor.device().type() == at::DeviceType::DPCPP);
   return static_cast<IPEXSparseTensorImpl*>(ipex_tensor.unsafeGetTensorImpl());
 }
 
@@ -47,6 +47,11 @@ void IPEXSparseTensorImpl::copy_meta_info(const at::SparseTensorImpl *src_impl) 
   this->sparse_dim_ = src_impl->sparse_dim();
   this->dense_dim_ = src_impl->dense_dim();
   this->coalesced_ = src_impl->coalesced();
+}
+
+void IPEXSparseTensorImpl::copy_indices_and_values(const at::Tensor& indices, const at::Tensor& values) {
+  this->indices_ = indices;
+  this->values_ = values;
 }
 
 } // namespace torch_ipex
