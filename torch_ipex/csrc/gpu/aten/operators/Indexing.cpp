@@ -26,7 +26,7 @@
       AT_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)        \
       AT_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)        \
       default:                                                               \
-        AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
+        TORCH_CHECK(0, #NAME, " not implemented for '", toString(_st), "'"); \
     }                                                                        \
   }()
 

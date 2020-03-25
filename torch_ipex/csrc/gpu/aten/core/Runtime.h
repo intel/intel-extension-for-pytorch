@@ -34,8 +34,8 @@ static inline void dpcpp_set_mkldnn_buffer(void* vptr, mkldnn::memory& memory) {
     // encounter non-zero
     // offset, we currently throw a error. This will not be an issue when usm is
     // available.
-    AT_ERROR(
-        "the offset of dpcpp buffer is not 0. We don't support this case.");
+    TORCH_CHECK(
+        0, "the offset of dpcpp buffer is not 0. We don't support this case.");
 #if 0
     // If offset is not 0, we need to copy a new dpcpp buffer with correct base addr, then pass to MKL-DNN
     size_t mkldnn_size = memory.get_desc().get_size();
@@ -72,8 +72,8 @@ struct GpuEngineManager {
   }
 
   engine& get_engine(const Device& device) {
-    AT_ASSERT(device.type() == kDPCPP);
-    AT_ASSERT(device.index() < at::dpcpp::device_count());
+    TORCH_INTERNAL_ASSERT(device.type() == kDPCPP);
+    TORCH_INTERNAL_ASSERT(device.index() < at::dpcpp::device_count());
     return _gpu_engines[device.index()];
   }
 
@@ -83,7 +83,7 @@ struct GpuEngineManager {
  protected:
   GpuEngineManager() {
     int device_count = (int)at::dpcpp::device_count();
-    AT_ASSERT(device_count > 0);
+    TORCH_INTERNAL_ASSERT(device_count > 0);
     for (int i = 0; i < device_count; i++) {
       _gpu_engines.push_back(
           {engine::kind::gpu,
@@ -105,7 +105,7 @@ struct GpuStreamManager {
   };
   stream get_stream(int device_index = 0) {
     int device_count = (int)at::dpcpp::device_count();
-    AT_ASSERT(device_count > 0 && device_index < device_count);
+    TORCH_INTERNAL_ASSERT(device_count > 0 && device_index < device_count);
     return mkldnn::stream(
         GpuEngineManager::Instance().get_engine({kDPCPP, current_device()}),
         getDefaultDPCPPStream(device_index).dpcpp_queue());

@@ -127,7 +127,7 @@ TensorImpl* TensorImpl_resizeImpl(
   // maybe resize storage
   if (storage_size + self->storage_offset() > 0) {
     if (!TensorImpl_getStoragePtr(self)) {
-      AT_ERROR("Tensor: invalid null storage");
+      TORCH_CHECK(0, "Tensor: invalid null storage");
     }
     if (storage_size + self->storage_offset() > self->storage().numel()) {
       StorageImpl_resize(
@@ -206,9 +206,9 @@ void TensorImpl_stealAndSetStoragePtr(
     at::StorageImpl* storage) {
   // Caffe2 might have tensors whose storages are null, but we
   // don't allow it in PyTorch.
-  AT_ASSERT(storage);
+  TORCH_INTERNAL_ASSERT(storage);
   // Caffe2 also has uninitialized dtype states, which we disallow here
-  AT_ASSERT(tensor->storage().dtype() == storage->dtype());
+  TORCH_INTERNAL_ASSERT(tensor->storage().dtype() == storage->dtype());
 
   // We used to allow this, but this breaks device caching.
   // Let's put an actual error message for this one.

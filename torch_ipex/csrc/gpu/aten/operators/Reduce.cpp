@@ -523,7 +523,7 @@ static void norm_kernel_impl(TensorIterator& iter, Scalar val) {
   } else if (val.isFloatingPoint()) {
     p = val.to<acc_t>();
   } else {
-    AT_ERROR("norm_kernel_impl expects norm to be integer or float");
+    TORCH_CHECK(0, "norm_kernel_impl expects norm to be integer or float");
   }
 
   if (p == static_cast<float>(0)) {

@@ -115,7 +115,7 @@ static StreamId DPCPPStream_getStreamId(const DPCPPStreamImpl* ptr) {
     }
   }
 
-  AT_ASSERTM(
+  TORCH_INTERNAL_ASSERT(
       0,
       "Could not compute stream ID for ",
       ptr,
@@ -179,7 +179,7 @@ static void initDPCPPStreamsOnce() {
 }
 
 static inline void check_num_devices(DeviceIndex device_index) {
-  AT_ASSERT(device_index >= 0 && device_index < dpcpp_num_devices);
+  TORCH_INTERNAL_ASSERT(device_index >= 0 && device_index < dpcpp_num_devices);
 }
 
 static uint32_t get_stream_index(std::atomic<uint32_t>& counter) {
@@ -193,7 +193,7 @@ DPCPPStreamImpl* DPCPPStreamToDPCPPStreamImpl(DPCPPStream stream) {
   size_t si = streamIdIndex(stream.unwrap().id());
   switch (st) {
     case StreamType::DEFAULT:
-      AT_ASSERTM(
+      TORCH_INTERNAL_ASSERT(
           si == 0,
           "Unrecognized stream ",
           stream.unwrap(),
@@ -205,7 +205,7 @@ DPCPPStreamImpl* DPCPPStreamToDPCPPStreamImpl(DPCPPStream stream) {
     case StreamType::RESERVE:
       return reserve_streams[di][si].get();
     default:
-      AT_ASSERTM(
+      TORCH_INTERNAL_ASSERT(
           0,
           "Unrecognized stream ",
           stream.unwrap(),
@@ -264,7 +264,7 @@ DPCPPStream getCurrentDPCPPStream(DeviceIndex device_index) {
 void setCurrentDPCPPStream(DPCPPStream stream) {
   initDPCPPStreamsOnce();
   auto ptr = DPCPPStreamToDPCPPStreamImpl(stream);
-  AT_ASSERT(ptr);
+  TORCH_INTERNAL_ASSERT(ptr);
   current_streams[ptr->getDeviceIndex()] = ptr;
 }
 
@@ -275,7 +275,7 @@ DPCPPStream getDPCPPStreamOnDevice(DeviceIndex device_index, int stream_index) {
   check_num_devices(device_index);
   if (stream_index == 0)
     return getDefaultDPCPPStream(device_index);
-  AT_ASSERT(stream_index <= dpcppStreamsPerPool);
+  TORCH_INTERNAL_ASSERT(stream_index <= dpcppStreamsPerPool);
   return DPCPPStreamImplToDPCPPStream(
       reserve_streams[device_index][stream_index - 1].get());
 }

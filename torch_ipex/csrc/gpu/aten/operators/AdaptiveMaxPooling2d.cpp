@@ -441,7 +441,7 @@ std::tuple<Tensor, Tensor> adaptive_max_pool2d(
     IntArrayRef output_size) {
   Tensor output = at::empty({0}, self.options());
   Tensor indices = at::empty({0}, self.options().dtype(kLong));
-  AT_ASSERT(output_size.size() == 2);
+  TORCH_INTERNAL_ASSERT(output_size.size() == 2);
   return at::AtenIpexTypeDPCPP::adaptive_max_pool2d_out(
       output, indices, self, output_size);
 }

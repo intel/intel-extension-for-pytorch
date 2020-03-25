@@ -157,19 +157,19 @@ Tensor bincount_template(
     const Tensor& weights,
     int64_t minlength) {
   if (minlength < 0) {
-    AT_ERROR("minlength should be >= 0");
+    TORCH_CHECK(0, "minlength should be >= 0");
   }
   if (self.dim() == 1 && self.numel() == 0) {
     return native::zeros({minlength}, device(kDPCPP).dtype(kLong));
   }
   if (self.dim() != 1 || (!std::is_same<input_t, uint8_t>::value &&
                           *self.min().cpu().data_ptr<input_t>() < 0)) {
-    AT_ERROR("bincount only supports 1-d non-negative integral inputs.");
+    TORCH_CHECK(0, "bincount only supports 1-d non-negative integral inputs.");
   }
 
   bool has_weights = weights.defined();
   if (has_weights && weights.size(0) != self.size(0)) {
-    AT_ERROR("input and weights should have the same length");
+    TORCH_CHECK(0, "input and weights should have the same length");
   }
 
   const int64_t nbins =

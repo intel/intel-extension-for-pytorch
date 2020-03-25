@@ -866,7 +866,7 @@ Tensor _embedding_bag_dense_backward_dpcpp(
     case MODE_SUM:
     case MODE_MEAN:
       if (mode == MODE_MEAN)
-        AT_ASSERT(!per_sample_weights.defined());
+        TORCH_INTERNAL_ASSERT(!per_sample_weights.defined());
       return embedding_bag_backward_dpcpp_sum_avg(
           grad,
           indices,
@@ -879,11 +879,11 @@ Tensor _embedding_bag_dense_backward_dpcpp(
           per_sample_weights);
 
     case MODE_MAX:
-      AT_ASSERT(!per_sample_weights.defined());
+      TORCH_INTERNAL_ASSERT(!per_sample_weights.defined());
       return embedding_bag_backward_dpcpp_max(grad, max_indices, num_weights);
 
     default:
-      AT_ERROR("Unknown mode for embedding_bag_backward_dpcpp ", mode);
+      TORCH_CHECK(0, "Unknown mode for embedding_bag_backward_dpcpp ", mode);
   }
 }
 

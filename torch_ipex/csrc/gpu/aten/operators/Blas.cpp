@@ -6,7 +6,8 @@
 #include <dnnl/InnerProduct.hpp>
 
 #define ERROR_ONLY_FP_TYPES(func)                                  \
-  AT_ERROR(                                                        \
+  TORCH_CHECK(                                                     \
+      0,                                                           \
       #func,                                                       \
       "for DPCPP tensors only supports floating-point types. Try " \
       "converting the tensors with .float()");
@@ -50,7 +51,7 @@ void mkldnnGemmImpl(
     transpose_r = TRANSPOSE_FALSE;
   } else {
     // make r_ FORTRAN contiguous
-    AT_ERROR("THDPCPP addmm r unsupported transpose");
+    TORCH_CHECK(0, "THDPCPP addmm r unsupported transpose");
   }
 
 #undef LDC_COND
@@ -74,7 +75,7 @@ void mkldnnGemmImpl(
     // row major
     transpose_m1 = TRANSPOSE_FALSE;
   } else {
-    AT_ERROR("THDPCPP addmm m1 unsupported transpose");
+    TORCH_CHECK(0, "THDPCPP addmm m1 unsupported transpose");
   }
 
   /* m2 */
@@ -89,7 +90,7 @@ void mkldnnGemmImpl(
     // row major
     transpose_m2 = TRANSPOSE_FALSE;
   } else {
-    AT_ERROR("THDPCPP addmm m2 unsupported transpose");
+    TORCH_CHECK(0, "THDPCPP addmm m2 unsupported transpose");
   }
 
   int64_t ldm1 =
@@ -174,23 +175,24 @@ void addmm(
     const Tensor& m1,
     const Tensor& m2) {
   if ((m1.dim() != 2) || (m2.dim() != 2))
-    AT_ERROR(
-        "2D tensors expected, got ", m1.dim(), "D, ", m2.dim(), "D tensors");
+    TORCH_CHECK(
+        0, "2D tensors expected, got ", m1.dim(), "D, ", m2.dim(), "D tensors");
 
   if (t.dim() != 2)
-    AT_ERROR("2D tensor expected, got ", t.dim(), "D tensor for t");
+    TORCH_CHECK(0, "2D tensor expected, got ", t.dim(), "D tensor for t");
 
   if (m1.size(1) != m2.size(0)) {
     DPCPPDescBuff bm1 = TensorImpl_sizeDesc(m1.unsafeGetTensorImpl());
     DPCPPDescBuff bm2 = TensorImpl_sizeDesc(m2.unsafeGetTensorImpl());
-    AT_ERROR("size mismatch, m1: ", bm1.str, " m2: ", bm2.str);
+    TORCH_CHECK(0, "size mismatch, m1: ", bm1.str, " m2: ", bm2.str);
   }
 
   if ((t.size(0) != m1.size(0)) || (t.size(1) != m2.size(1))) {
     DPCPPDescBuff bt = TensorImpl_sizeDesc(t.unsafeGetTensorImpl());
     DPCPPDescBuff bm1 = TensorImpl_sizeDesc(m1.unsafeGetTensorImpl());
     DPCPPDescBuff bm2 = TensorImpl_sizeDesc(m2.unsafeGetTensorImpl());
-    AT_ERROR("size mismatch, t:", bt.str, " m1: ", bm1.str, " m2: ", bm2.str);
+    TORCH_CHECK(
+        0, "size mismatch, t:", bt.str, " m1: ", bm1.str, " m2: ", bm2.str);
   }
 
   if (TensorImpl_Unwrap(t) != TensorImpl_Unwrap(r_)) {

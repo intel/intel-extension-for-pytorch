@@ -818,7 +818,8 @@ static void check_shape_forward(
         separator = " x ";
       }
 
-      AT_ERROR(
+      TORCH_CHECK(
+          0,
           "Calculated padded input size per channel: (",
           input_ss.str(),
           "). "

@@ -430,8 +430,7 @@ void pdist_backward(
 Tensor _pdist_forward(const Tensor& self, const double p) {
   TORCH_CHECK(self.is_contiguous(), "_pdist_forward requires contiguous input");
   auto device = self.device().type();
-  Tensor result =
-      at::empty({0}, self.options(), LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  Tensor result = at::empty({0}, self.options());
   if (self.size(0) <= 1) {
     result.resize_({0});
   } else {
@@ -457,7 +456,7 @@ Tensor _pdist_backward(
   TORCH_CHECK(
       pdist.is_contiguous(), "_pdist_backward requires pdist to be contiguous");
   auto device = self.device().type();
-  Tensor result = at::empty_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  Tensor result = at::empty_like(self);
   impl::pdist_backward(result, grad, self, p, pdist);
   return result;
 }

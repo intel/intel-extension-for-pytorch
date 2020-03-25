@@ -30,7 +30,7 @@ Tensor cross(
     const Tensor& input,
     const Tensor& other,
     const c10::optional<int64_t> dimension) {
-  Tensor out = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  Tensor out = at::empty_like(input);
   at::AtenIpexTypeDPCPP::cross_out(out, input, other, dimension);
   return out;
 }

@@ -424,7 +424,7 @@ struct ReduceOp {
       arg_t,
       typename std::enable_if<!can_acc>::type* = nullptr) const {
     // TODO: Replace following assert with dpcpp counterparts.
-    // assert(false); // can't use AT_ASSERT in Cuda.
+    // assert(false); // can't use TORCH_INTERNAL_ASSERT in Cuda.
     return arg_t{};
   }
 
@@ -633,7 +633,7 @@ inline void dpcpp_reduce_kernel(
     TensorIterator& iter,
     const ops_t& ops,
     ident_t ident = 0) {
-  AT_ASSERT(
+  TORCH_INTERNAL_ASSERT(
       iter.numel() > 0 && iter.ntensors() - iter.noutputs() == 1 &&
       iter.noutputs() >= 1);
 
@@ -742,7 +742,7 @@ inline void dpcpp_reduce_kernel(
         (int*)semaphores.get(),
         ident,
         noutputs);
-    AT_ASSERT(!iter.should_accumulate());
+    TORCH_INTERNAL_ASSERT(!iter.should_accumulate());
     reduce.accumulate = false;
     launch_reduce_kernel<scalar_t>(config, reduce);
   }

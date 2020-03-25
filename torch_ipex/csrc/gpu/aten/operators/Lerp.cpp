@@ -29,8 +29,7 @@ template <typename T>
 struct TensorLerpOp {
   void operator()(T& out, T& a, T& b, T& weight) const {
     out = (weight < 0.5)
-        ? out = Numerics<T>::add(
-              a, Numerics<T>::mul(weight, Numerics<T>::sub(b, a)))
+        ? Numerics<T>::add(a, Numerics<T>::mul(weight, Numerics<T>::sub(b, a)))
         : Numerics<T>::sub(
               b,
               Numerics<T>::mul(

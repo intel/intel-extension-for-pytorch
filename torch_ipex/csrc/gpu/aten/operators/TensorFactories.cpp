@@ -303,8 +303,9 @@ Tensor empty(
     IntArrayRef size,
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
-  AT_ASSERT(options.backend() == at::Backend::DPCPP);
-  // AT_ASSERT(!options.is_variable()); // is_variable should have been
+  TORCH_INTERNAL_ASSERT(options.backend() == at::Backend::DPCPP);
+  // TORCH_INTERNAL_ASSERT(!options.is_variable()); // is_variable should have
+  // been
   // "unpacked"
 
   auto* allocator = at::dpcpp::getDPCPPDeviceAllocator();

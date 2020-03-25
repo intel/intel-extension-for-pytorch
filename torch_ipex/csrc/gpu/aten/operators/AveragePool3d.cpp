@@ -41,7 +41,7 @@ class scalar_t_to_dnnl {
       typename scalar_t,
       c10::guts::enable_if_t<std::is_same<scalar_t, double>::value, int> = 0>
   static memory::data_type to() {
-    AT_ERROR(" mkldnn not support for double");
+    TORCH_CHECK(0, " mkldnn not support for double");
   };
 };
 
