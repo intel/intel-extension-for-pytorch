@@ -5,6 +5,7 @@ import torch
 import intel_pytorch_extension as ipex
 import torch.nn as nn
 from common_utils import TestCase
+from numbers import Number
 
 from hypothesis import given
 from hypothesis import strategies as st
@@ -40,6 +41,58 @@ class TestEMB(TestCase):
             self.assertEqual(cpu_emb.weight.grad.data._values(), dpcpp_emb.weight.grad.data._values().to('cpu'))
         else:
             self.assertEqual(cpu_emb.weight.grad.data, dpcpp_emb.weight.grad.data.to('cpu'))
+
+class TestSparse(TestCase):
+    def genSparseTensor(self, size, sparse_dim, nnz, device='cpu'):
+        assert all(size[d] > 0 for d in range(sparse_dim)) or nnz == 0, 'invalid arguments'
+
+        v_size = [nnz] + list(size[sparse_dim:])
+        v = torch.randn(*v_size, device=device)
+        i = torch.rand(sparse_dim, nnz, device=device)
+        i.mul_(torch.tensor(size[:sparse_dim]).unsqueeze(1).to(i))
+        i = i.to(torch.long)
+
+        x = torch.sparse_coo_tensor(i, v, torch.Size(size))
+
+        x = x.detach().clone()
+        return x, x._indices().clone(), x._values().clone()
+
+    def _gen_sparse(self, sparse_dim, nnz, with_size):
+        if isinstance(with_size, Number):
+            with_size = [with_size] * sparse_dim
+
+        return self.genSparseTensor(with_size, sparse_dim, nnz)
+
+    def _test_basic_ops_shape(self, nnz_x1, nnz_x2, shape):
+        x1, _, _ = self._gen_sparse(len(shape), nnz_x1, shape)
+        x2, _, _ = self._gen_sparse(len(shape), nnz_x2, shape)
+
+        y1 = x1.clone()
+        y1.add_(x2)
+
+        y2 = x1.clone().to('dpcpp:0')
+        y2.add_(x2.to('dpcpp:0'))
+
+        y3 = x1.clone().to_dense().to('dpcpp:0')
+        y3.add_(x2.to('dpcpp:0'))
+
+        expected = x1.to_dense() + x2.to_dense()
+        self.assertEqual(y1.to_dense(), expected)
+        # self.assertEqual(y2.to_dense().to('cpu'), expected)
+        print(y3)
+        print(expected)
+        self.assertEqual(y3.to('cpu'), expected)
+        
+    def test_basic_ops(self):
+        self._test_basic_ops_shape(9, 12, [5, 6])
+        self._test_basic_ops_shape(9, 12, [10, 10, 10])
+        self._test_basic_ops_shape(9, 12, [50, 30, 20])
+        self._test_basic_ops_shape(9, 12, [5, 5, 5, 5, 5, 5])
+        self._test_basic_ops_shape(0, 12, [10, 10, 10])
+        self._test_basic_ops_shape(9, 0, [10, 10, 10])
+        self._test_basic_ops_shape(0, 0, [10, 10, 10])
+        self._test_basic_ops_shape(0, 0, [10, 10, 0])
+
 
 if __name__ == '__main__':
     test = unittest.main()

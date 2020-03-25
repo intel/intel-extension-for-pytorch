@@ -167,8 +167,8 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
     TORCH_INTERNAL_ASSERT(ipexTensor._indices().layout() == c10::kStrided);
     TORCH_INTERNAL_ASSERT(ipexTensor._values().layout() == c10::kStrided);
 
-    auto cpu_indices = shallowFallbackToCPUTensor(ipexTensor._indices());
-    auto cpu_values = shallowFallbackToCPUTensor(ipexTensor._values());
+    auto&& cpu_indices = shallowFallbackToCPUTensor(ipexTensor._indices());
+    auto&& cpu_values = shallowFallbackToCPUTensor(ipexTensor._values());
     // Create cpu sparse tensor and copy meta data from ipex cpu sparse tensor
     auto _tensor = at::detail::make_tensor<IPEXSparseTensorImpl>(
       at::TensorTypeSet(at::TensorTypeId::SparseCPUTensorId), ipexTensor.dtype());
@@ -270,8 +270,8 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     // [NOTE]: Use _indices and _values interfaces to bypass non-coalesced check
     TORCH_INTERNAL_ASSERT(cpuTensor._indices().layout() == c10::kStrided);
     TORCH_INTERNAL_ASSERT(cpuTensor._values().layout() == c10::kStrided);
-    auto ipex_indices = shallowUpgradeToDPCPPTensor(cpuTensor._indices());
-    auto ipex_values = shallowUpgradeToDPCPPTensor(cpuTensor._values());
+    auto&& ipex_indices = shallowUpgradeToDPCPPTensor(cpuTensor._indices());
+    auto&& ipex_values = shallowUpgradeToDPCPPTensor(cpuTensor._values());
     // Create ipex sparse tensor and copy meta data from cpu sparse tensor
     auto _tensor = at::detail::make_tensor<IPEXSparseTensorImpl>(
         at::TensorTypeSet(at::TensorTypeId::SparseDPCPPTensorId), cpuTensor.dtype());
@@ -339,11 +339,6 @@ at::Tensor shallowUpgradeToDPCPPTensorA(const at::Tensor& ipexTensor, const at::
 at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cpuTensor) {
   TORCH_INTERNAL_ASSERT(ipexTensor.defined());
   TORCH_INTERNAL_ASSERT(cpuTensor.defined());
-  TORCH_INTERNAL_ASSERT(!ipexTensor.is_sparse());
-  TORCH_INTERNAL_ASSERT(!cpuTensor.is_sparse());
-  TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(cpuTensor.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(ipexTensor.data_ptr() == cpuTensor.data_ptr());
 
   // The dispatch priority of DPCPPTensorId is higher than other CPU tensor ids. So if a tensor is CPU and
   // another tensor is DPCPP, it still will be disptached to DPCPP OPs.
@@ -354,25 +349,59 @@ at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cp
     return ipexTensor;
   }
 
-  ipexTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
   TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
   TORCH_INTERNAL_ASSERT(ipexTensor.device().type() == at::DeviceType::DPCPP);
 
-  // NOTE: Cannot set storage data_ptr by set_data_ptr.
-  //       set_data_ptr will release caller tensor's original data_ptr. It is wrong here because
-  //       the ipexTensor and cpuTensor share same buffer here.
-  //
-  // [Wrong code]:
-  //   void* tensor_raw_data = cpuTensor.unsafeGetTensorImpl()->storage().data();
-  //   c10::DataPtr dpcpp_data_ptr(tensor_raw_data, at::DeviceType::DPCPP);
-  //   ipexTensor.storage().set_data_ptr(std::move(dpcpp_data_ptr));
-  //
+  if (ipexTensor.is_sparse()) {
+    TORCH_INTERNAL_ASSERT(cpuTensor.is_sparse());
+    TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kSparse);
+    TORCH_INTERNAL_ASSERT(cpuTensor.layout() == c10::kSparse);
 
-  IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
-  ipex_tensor_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
-  CHECK_TENSOR_CRITICAL(ipexTensor, cpuTensor);
-  attachShadeDataConext(ipexTensor);
-  return ipexTensor;
+    auto&& ipex_indices = ipexTensor._indices();
+    auto&& ipex_values = ipexTensor._values();
+    auto&& cpu_indices = cpuTensor._indices();
+    auto&& cpu_values = cpuTensor._values();
+    if (ipex_indices.data_ptr() == NULL) {
+      ipex_indices = shallowUpgradeToDPCPPTensor(cpu_indices);
+      ipex_values = shallowUpgradeToDPCPPTensor(cpu_values);
+    } else {
+      ipex_indices = shallowUpgradeToDPCPPTensorAW(ipex_indices, cpu_indices);
+      ipex_values = shallowUpgradeToDPCPPTensorAW(ipex_values, cpu_values);
+    }
+    auto ipex_sparse_impl = IPEXSparseTensorImpl::get_ipex_sparse_impl(ipexTensor);
+    auto cpu_sparse_impl = at::sparse::get_sparse_impl(cpuTensor);
+    ipex_sparse_impl->copy_meta_info(cpu_sparse_impl);
+    ipex_sparse_impl->copy_indices_and_values(ipex_indices, ipex_values);
+    // [Hongzhen] TODO: Fix this issue for Sparse data_ptr comparison
+    // CHECK_SPARSE_TENSOR_CRITICAL(ipexTensor, cpuTensor);
+    return ipexTensor;
+  } else {
+    TORCH_INTERNAL_ASSERT(!ipexTensor.is_sparse());
+    TORCH_INTERNAL_ASSERT(!cpuTensor.is_sparse());
+    TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
+    TORCH_INTERNAL_ASSERT(cpuTensor.layout() == c10::kStrided);
+    // [Hongzhen] TODO: Fix this issue for Sparse data_ptr comparison
+    // TORCH_INTERNAL_ASSERT(ipexTensor.data_ptr() == cpuTensor.data_ptr());
+
+    // NOTE: Cannot set storage data_ptr by set_data_ptr.
+    //       set_data_ptr will release caller tensor's original data_ptr. It is wrong here because
+    //       the ipexTensor and cpuTensor share same buffer here.
+    //
+    // [Wrong code]:
+    //   void* tensor_raw_data = cpuTensor.unsafeGetTensorImpl()->storage().data();
+    //   c10::DataPtr dpcpp_data_ptr(tensor_raw_data, at::DeviceType::DPCPP);
+    //   ipexTensor.storage().set_data_ptr(std::move(dpcpp_data_ptr));
+    //
+
+    ipexTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
+
+    IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
+    ipex_tensor_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
+    // [Hongzhen] TODO: Fix this issue for Sparse data_ptr comparison
+    // CHECK_TENSOR_CRITICAL(ipexTensor, cpuTensor);
+    attachShadeDataConext(ipexTensor);
+    return ipexTensor;
+  }
 }
 
 
