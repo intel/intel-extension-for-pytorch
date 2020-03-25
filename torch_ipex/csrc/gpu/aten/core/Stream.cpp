@@ -37,7 +37,9 @@ class DPCPPStreamImpl {
             at::dpcpp::getGlobalContext(),
             dpcppGetDeviceSelector(di),
             asyncHandler),
-        device_index_(di){};
+        device_index_(di),
+        properties_({DPCPP::property::queue::enable_profiling()}) {}
+
   DeviceIndex getDeviceIndex() const {
     return device_index_;
   };
@@ -51,6 +53,7 @@ class DPCPPStreamImpl {
  private:
   DPCPP::queue queue_;
   DeviceIndex device_index_;
+  DPCPP::property_list properties_;
 };
 
 static int dpcpp_num_devices;

@@ -179,6 +179,9 @@ class DPCPPBuild(build_ext, object):
     if _check_env_flag("USE_SYCL"):
       cmake_args += ['-DUSE_SYCL=1']
 
+    if _check_env_flag("DPCPP_ENABLE_PROFILING"):
+      cmake_args += ['-DDPCPP_ENABLE_PROFILING=1']
+
     build_args = ['-j', str(multiprocessing.cpu_count())]
 
     env = os.environ.copy()

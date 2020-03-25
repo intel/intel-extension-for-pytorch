@@ -82,6 +82,10 @@ set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -fno-omit-fram
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-math-errno")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
+if (DPCPP_ENABLE_PROFILING)
+  add_definitions(-DDPCPP_PROFILING)
+endif()
+
 
 # ---[ Main build
 
@@ -161,6 +165,18 @@ add_custom_target(
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/scripts/gpu
 )
 
+# includes installation
+add_custom_target(
+  install_dpcpp_gpu_includes
+  COMMAND rm -rf "${CMAKE_BINARY_DIR}/include"
+  COMMAND mkdir "${CMAKE_BINARY_DIR}/include"
+  COMMAND mkdir "${CMAKE_BINARY_DIR}/include/torch"
+  COMMAND mkdir "${CMAKE_BINARY_DIR}/include/torch/extension"
+  COMMAND mkdir "${CMAKE_BINARY_DIR}/include/torch/extension/dpcpp"
+  COMMAND cp "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/gpu/includes/*.h" "${CMAKE_BINARY_DIR}/include/torch/extension/dpcpp"
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
 # dependencies
 # set(DPCPP_DEP)
 # include(cmake/Dependencies.cmake)
@@ -190,6 +206,7 @@ target_link_libraries(torch_ipex PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME "_torch_ipex")
 add_dependencies(torch_ipex gen_dpcpp_gpu_c10_dispatch_registration)
+add_dependencies(torch_ipex install_dpcpp_gpu_includes)
 # add_dependencies(torch_ipex ${DPCPP_DEP})
 # target_link_libraries(torch PUBLIC c10_sycl)
 # target_include_directories(torch INTERFACE $<INSTALL_INTERFACE:include>)
