@@ -25,7 +25,7 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   // FP16 Data Type only support forward_inference
-  bool training = input.type().scalarType() == ScalarType::Half ? false : true;
+  bool training = input.scalar_type() == ScalarType::Half ? false : true;
   auto propagation = training ? dnnl::prop_kind::forward_training
                               : dnnl::prop_kind::forward_inference;
 
@@ -34,7 +34,7 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   ic = input.size(1);
   ih = input.size(2);
 
-  auto data_t = dt_to_dnnl(input.type().scalarType());
+  auto data_t = dt_to_dnnl(input.scalar_type());
   auto format_nch = memory::format_tag::abc;
 
   memory::dims input_tz = {n, ic, ih};

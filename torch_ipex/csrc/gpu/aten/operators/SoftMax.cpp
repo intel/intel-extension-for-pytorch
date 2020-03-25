@@ -201,7 +201,7 @@ Tensor host_softmax(
     const Tensor& input_,
     const int64_t dim_,
     const bool half_to_float) {
-  AT_ASSERTM(
+  TORCH_INTERNAL_ASSERT(
       !half_to_float,
       "softmax with half to float conversion is not supported on DPCPP");
   auto input = input_.contiguous();
@@ -243,7 +243,7 @@ Tensor host_softmax_backward(
     const Tensor& output_,
     int64_t dim_,
     bool half_to_float) {
-  AT_ASSERTM(
+  TORCH_INTERNAL_ASSERT(
       !half_to_float,
       "softmax with half to float conversion is not supported on DPCPP");
   int64_t dim = maybe_wrap_dim(dim_, grad_.dim());
@@ -314,7 +314,7 @@ Tensor _log_softmax_backward_data(
     const Tensor& input) {
   bool half_to_float = grad.scalar_type() != input.scalar_type();
   if (half_to_float) {
-    AT_ASSERTM(
+    TORCH_INTERNAL_ASSERT(
         !half_to_float,
         "softmax with half to float conversion is not supported on DPCPP");
   }

@@ -56,7 +56,7 @@ struct CAFFE2_API DPCPPHooksInterface {
   }
 
   virtual Allocator* getPinnedMemoryAllocator() const {
-    AT_ERROR("DPCPP currently not support Pinned Memory");
+    TORCH_CHECK(0, "DPCPP currently not support Pinned Memory");
   }
 
   virtual int getNumGPUs() const {

@@ -199,7 +199,7 @@ static void upsample_nearest2d_out_template(
   output.resize_({nbatch, channels, output_height, output_width});
   output.zero_();
 
-  AT_ASSERT(input_width > 0 && output_width > 0);
+  TORCH_INTERNAL_ASSERT(input_width > 0 && output_width > 0);
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
       input.scalar_type(), "upsample_nearest2d", [&] {

@@ -71,10 +71,10 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
     ss << "DPCPP batch_norm backend got shape=" << input_sizes
        << ", expected input with rank 3 [n, c, h*w] or rank 4 [n, c, h, "
           "w]shape ";
-    AT_ERROR(ss.str());
+    TORCH_CHECK(0, ss.str());
   }
 
-  auto data_t = dt_to_dnnl(input.type().scalarType());
+  auto data_t = dt_to_dnnl(input.scalar_type());
   auto format_nchw = memory::format_tag::nchw;
 
   memory::dims input_tz = {n, ic, ih, iw};
@@ -183,7 +183,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm(
     std::stringstream ss;
     ss << "DPCPP batch_norm backend got unsupported type="
        << input.scalar_type();
-    AT_ERROR(ss.str());
+    TORCH_CHECK(0, ss.str());
   } else
     return AT_DISPATCH_FLOATING_TYPES_AND_HALF(
         input.scalar_type(), "batch_norm", [&] {
@@ -263,7 +263,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     ss << "DPCPP batch_norm backend got shape=" << input_sizes
        << ", expected input with rank 3 [n, c, h*w] or rank 4 [n, c, h, "
           "w]shape ";
-    AT_ERROR(ss.str());
+    TORCH_CHECK(0, ss.str());
   }
 
   auto data_t = memory::data_type::f32;

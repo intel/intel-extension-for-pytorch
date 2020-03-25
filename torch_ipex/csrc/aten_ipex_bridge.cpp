@@ -158,25 +158,41 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
     return ipexTensor;
   }
 
-  TORCH_INTERNAL_ASSERT(!ipexTensor.is_sparse());
-  TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
   if (ipexTensor.device().is_cpu())
     return ipexTensor;
 
-  auto *ipex_tensor_impl = ipexTensor.unsafeGetTensorImpl();
-  TORCH_INTERNAL_ASSERT(ipex_tensor_impl != nullptr);
-  TORCH_INTERNAL_ASSERT(ipex_tensor_impl->has_storage());
-  TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
+  if (ipexTensor.is_sparse()) {
+    TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kSparse);
+    // [NOTE]: Use _indices and _values interfaces to bypass non-coalesced check
+    TORCH_INTERNAL_ASSERT(ipexTensor._indices().layout() == c10::kStrided);
+    TORCH_INTERNAL_ASSERT(ipexTensor._values().layout() == c10::kStrided);
 
-  auto ipex_tensor_storage = ipex_tensor_impl->storage().unsafeGetStorageImpl();
-  ipex_tensor_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::CPU));
-  auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(ipexTensor.storage(), at::TensorTypeId::CPUTensorId);
-  IPEXTensorImpl* cur_ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
-  cur_ipex_impl->copy_meta_info(ipexTensor.unsafeGetTensorImpl());
-  CHECK_TENSOR_CRITICAL(_tensor, ipexTensor);
-  // TODO: Cannot reserved_
-  //       dest_impl->reserved_ = src_impl->reserved_;
-  return _tensor;
+    auto cpu_indices = shallowFallbackToCPUTensor(ipexTensor._indices());
+    auto cpu_values = shallowFallbackToCPUTensor(ipexTensor._values());
+    // Create cpu sparse tensor and copy meta data from ipex cpu sparse tensor
+    auto _tensor = at::detail::make_tensor<IPEXSparseTensorImpl>(
+      at::TensorTypeSet(at::TensorTypeId::SparseCPUTensorId), ipexTensor.dtype());
+    auto cpu_sparse_impl = IPEXSparseTensorImpl::get_ipex_sparse_impl(_tensor);
+    auto ipex_sparse_impl = IPEXSparseTensorImpl::get_ipex_sparse_impl(ipexTensor);
+    cpu_sparse_impl->copy_meta_info(ipex_sparse_impl);
+    // Copy indices and values
+    cpu_sparse_impl->copy_indices_and_values(cpu_indices, cpu_values);
+    CHECK_SPARSE_TENSOR_CRITICAL(_tensor, ipexTensor);
+    return _tensor;
+  } else {
+    TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
+
+
+    auto ipex_tensor_storage = ipex_tensor_impl->storage().unsafeGetStorageImpl();
+    ipex_tensor_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::CPU));
+    auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(ipexTensor.storage(), at::TensorTypeId::CPUTensorId);
+    IPEXTensorImpl* cur_ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
+    cur_ipex_impl->copy_meta_info(ipexTensor.unsafeGetTensorImpl());
+    CHECK_TENSOR_CRITICAL(_tensor, ipexTensor);
+    // TODO: Cannot reserved_
+    //       dest_impl->reserved_ = src_impl->reserved_;
+    return _tensor;
+  }
 }
 
 
@@ -255,11 +271,14 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     TORCH_INTERNAL_ASSERT(cpuTensor._values().layout() == c10::kStrided);
     auto ipex_indices = shallowUpgradeToDPCPPTensor(cpuTensor._indices());
     auto ipex_values = shallowUpgradeToDPCPPTensor(cpuTensor._values());
+    // Create ipex sparse tensor and copy meta data from cpu sparse tensor
     auto _tensor = at::detail::make_tensor<IPEXSparseTensorImpl>(
         at::TensorTypeSet(at::TensorTypeId::SparseDPCPPTensorId), cpuTensor.dtype());
     auto ipex_sparse_impl = IPEXSparseTensorImpl::get_ipex_sparse_impl(_tensor);
-    ipex_sparse_impl->copy_meta_info(at::sparse::get_sparse_impl(cpuTensor));
-    at::sparse::alias_into_sparse(_tensor, ipex_indices, ipex_values);
+    auto cpu_sparse_impl = at::sparse::get_sparse_impl(cpuTensor);
+    ipex_sparse_impl->copy_meta_info(cpu_sparse_impl);
+    // Copy indices and values
+    ipex_sparse_impl->copy_indices_and_values(ipex_indices, ipex_values);
     CHECK_SPARSE_TENSOR_CRITICAL(_tensor, cpuTensor);
     return _tensor;
   } else {
@@ -274,8 +293,8 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     cpu_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
     auto _tensor =  at::detail::make_tensor<IPEXTensorImpl>(cpuTensor.storage(), at::TensorTypeId::DPCPPTensorId);
     TORCH_INTERNAL_ASSERT(_tensor.device().type() == at::DeviceType::DPCPP);
-    IPEXTensorImpl* impex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
-    impex_impl->copy_meta_info(cpu_tensor_impl);
+    IPEXTensorImpl* ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
+    ipex_impl->copy_meta_info(cpu_tensor_impl);
     CHECK_TENSOR_CRITICAL(_tensor, cpuTensor);
     //TODO: Cannot set reserved_ 
     //      dest_impl->reserved_ = src_impl->reserved_;

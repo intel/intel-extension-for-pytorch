@@ -1,6 +1,10 @@
 #pragma once
 
 #include <CL/sycl.hpp>
+#include <utils/Profiler.h>
+
+#include <SYCL/event.h>
+#include <chrono>
 
 // alias for dpcpp namespace
 namespace DPCPP = cl::sycl;
@@ -18,13 +22,28 @@ namespace DPCPP = cl::sycl;
 #define DPCPP_Q_KFN(...) [=](__VA_ARGS__)
 #define DPCPP_Q_CGF(h) [&](DPCPP::handler & h)
 #define DPCPP_Q_SUBMIT(q, cgf, ...) q.submit(cgf, ##__VA_ARGS__)
-#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)            \
-  {                                                 \
-    auto e = DPCPP_Q_SUBMIT(q, cgf, ##__VA_ARGS__); \
-    e.wait();                                       \
+
+#ifndef DPCPP_PROFILING
+#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)   \
+  {                                        \
+    auto e = q.submit(cgf, ##__VA_ARGS__); \
+    e.wait();                              \
   }
 #define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...) \
-  { DPCPP_Q_SUBMIT(q, cgf, ##__VA_ARGS__); }
+  { auto e = q.submit(cgf, ##__VA_ARGS__); }
+#else
+#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)   \
+  {                                        \
+    auto e = q.submit(cgf, ##__VA_ARGS__); \
+    e.wait();                              \
+    dpcpp_log("sycl_kernel", e);           \
+  }
+#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)  \
+  {                                        \
+    auto e = q.submit(cgf, ##__VA_ARGS__); \
+    dpcpp_log("sycl_kernel", e);           \
+  }
+#endif
 
 // the descriptor as entity attribute
 #define DPCPP_HOST // for host only

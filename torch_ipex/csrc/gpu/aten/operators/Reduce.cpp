@@ -518,12 +518,12 @@ template <typename scalar_t,
           typename out_t = scalar_t>
 static void norm_kernel_impl(TensorIterator& iter, Scalar val) {
   float p;
-  if (val.isIntegral()) {
+  if (val.isIntegral(false)) {
     p = val.to<int64_t>();
   } else if (val.isFloatingPoint()) {
     p = val.to<acc_t>();
   } else {
-    AT_ERROR("norm_kernel_impl expects norm to be integer or float");
+    TORCH_CHECK(0, "norm_kernel_impl expects norm to be integer or float");
   }
 
   if (p == static_cast<float>(0)) {

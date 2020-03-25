@@ -19,16 +19,16 @@ class TestEMB(TestCase):
         cpu_output = cpu_emb(cpu_input, cpu_offsets)
 
         dpcpp_emb = copy.deepcopy(cpu_emb).to('dpcpp:0')
-        dpcpp_input = cpu_input.clone().to('dpcpp:0')
-        dpcpp_offsets = cpu_offsets.clone().to('dpcpp:0')
+        dpcpp_input = cpu_input.clone().detach().to('dpcpp:0')
+        dpcpp_offsets = cpu_offsets.clone().detach().to('dpcpp:0')
         dpcpp_output = dpcpp_emb(dpcpp_input, dpcpp_offsets)
 
         self.assertEqual(cpu_output, dpcpp_output.to('cpu'))
 
         # Backward testing
         cpu_gy = torch.rand(2, 3, device='cpu')
+        dpcpp_gy = cpu_gy.clone().detach().to('dpcpp:0')
         cpu_output.backward(cpu_gy)
-        dpcpp_gy = cpu_gy.clone().to('dpcpp:0')
         dpcpp_output.backward(dpcpp_gy)
 
         if sparse:

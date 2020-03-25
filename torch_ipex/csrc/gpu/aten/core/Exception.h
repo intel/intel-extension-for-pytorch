@@ -8,7 +8,7 @@
 #define AT_DPCPP_CATCH_RETHROW(filename, lineno) \
   }                                              \
   catch (DPCPP::exception & e) {                 \
-    AT_WARN(                                     \
+    TORCH_WARN(                                  \
         "DPCPP Exception: ",                     \
         e.what(),                                \
         "file = ",                               \
@@ -21,7 +21,7 @@
 #define AT_DPCPP_CATCH_NOTHROW(filename, lineno) \
   }                                              \
   catch (DPCPP::exception & e) {                 \
-    AT_WARN(                                     \
+    TORCH_WARN(                                  \
         "DPCPP Exception: ",                     \
         e.what(),                                \
         "file = ",                               \
@@ -37,7 +37,7 @@
     __err = EXPR;                                \
     AT_DPCPP_CATCH_RETHROW(filename, lineno)     \
     if (__err != DPCPP_SUCCESS) {                \
-      AT_ERROR("DPCPP error: %d", __err);        \
+      TORCH_CHECK(0, "DPCPP error: %d", __err);  \
     }                                            \
   } while (0)
 
@@ -65,9 +65,9 @@
   } catch (...) {             \
   }
 
-#define AT_DPCPP_ASSERT(cond)               \
-  do {                                      \
-    if (!(cond)) {                          \
-      AT_ERROR("assert(%s) failed", #cond); \
-    }                                       \
+#define AT_DPCPP_ASSERT(cond)                     \
+  do {                                            \
+    if (!(cond)) {                                \
+      TORCH_CHECK(0, "assert(%s) failed", #cond); \
+    }                                             \
   } while (0)

@@ -15,7 +15,7 @@ Tensor& hardtanh_out(
     const Tensor& self,
     Scalar min_val,
     Scalar max_val) {
-  checkBackend("hardtanh", out, self.type().backend());
+  checkBackend("hardtanh", out, self.options().backend());
   // Compare the norm and maxnorm value.
   auto iter = TensorIterator();
   iter.set_check_mem_overlap(true);
@@ -59,7 +59,7 @@ Tensor& hardtanh_backward_out(
     Scalar min_val,
     Scalar max_val) {
   checkBackend(
-      "hardtanh_backward", {grad_input, grad_output}, self.type().backend());
+      "hardtanh_backward", {grad_input, grad_output}, self.options().backend());
   // Compare the norm and maxnorm value.
   auto iter = TensorIterator();
   iter.set_check_mem_overlap(true);

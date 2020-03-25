@@ -56,7 +56,7 @@ TensorInfo<T, IndexType>::TensorInfo(T* p,
                                      IndexType st[MAX_TENSORINFO_DIMS]) {
    data = p;
    dims = dim;
-   AT_ASSERT(dims < MAX_TENSORINFO_DIMS);
+   TORCH_INTERNAL_ASSERT(dims < MAX_TENSORINFO_DIMS);
 
    for (int i = 0; i < dim; i++) {
      sizes[i] = sz[i];

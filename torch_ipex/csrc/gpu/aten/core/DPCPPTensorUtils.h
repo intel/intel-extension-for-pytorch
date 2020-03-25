@@ -21,9 +21,9 @@ static inline void checkSameDPCPP(
                                    ? "them"
                                    : "it")
         << " to be on DPCPP (while checking arguments for " << c << ")";
-    AT_ERROR(oss.str());
+    TORCH_CHECK(0, oss.str());
   }
-  AT_CHECK(
+  TORCH_CHECK(
       t1->get_device() == t2->get_device(),
       "Expected tensor for ",
       t1,

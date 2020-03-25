@@ -18,13 +18,13 @@ struct DPCPPGuardImpl final : public c10::impl::DeviceGuardImplInterface {
   static constexpr DeviceType static_type = DeviceType::DPCPP;
   DPCPPGuardImpl() {}
   DPCPPGuardImpl(DeviceType t) {
-    AT_ASSERT(t == DeviceType::DPCPP);
+    TORCH_INTERNAL_ASSERT(t == DeviceType::DPCPP);
   }
   DeviceType type() const override {
     return DeviceType::DPCPP;
   }
   Device exchangeDevice(Device d) const override {
-    AT_ASSERT(d.type() == DeviceType::DPCPP);
+    TORCH_INTERNAL_ASSERT(d.type() == DeviceType::DPCPP);
     Device old_device = getDevice();
     if (old_device.index() != d.index()) {
       AT_DPCPP_CHECK(dpcppSetDevice(d.index()));
@@ -37,13 +37,13 @@ struct DPCPPGuardImpl final : public c10::impl::DeviceGuardImplInterface {
     return Device(DeviceType::DPCPP, device);
   }
   void setDevice(Device d) const override {
-    AT_ASSERT(d.type() == DeviceType::DPCPP);
+    TORCH_INTERNAL_ASSERT(d.type() == DeviceType::DPCPP);
     AT_DPCPP_CHECK(dpcppSetDevice(d.index()));
   }
   void uncheckedSetDevice(Device d) const noexcept override {
     int __err = dpcppSetDevice(d.index());
     if (__err != DPCPP_SUCCESS) {
-      AT_WARN("DPCPP error: uncheckedSetDevice failed");
+      TORCH_WARN("DPCPP error: uncheckedSetDevice failed");
     }
   }
   Stream getStream(Device d) const noexcept override {

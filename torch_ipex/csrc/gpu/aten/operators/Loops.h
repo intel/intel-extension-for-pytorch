@@ -61,7 +61,7 @@ static SyclOffsetCal<IndexType> make_offset_calculator(
 
 template <int N>
 static OffsetCalculator<N> make_offset_calculator(const TensorIterator& iter) {
-  AT_ASSERT(N <= iter.ntensors());
+  TORCH_INTERNAL_ASSERT(N <= iter.ntensors());
   std::array<const int64_t*, N> strides;
   for (int i = 0; i < N; i++) {
     strides[i] = iter.strides(i).data();
@@ -167,7 +167,7 @@ void dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
   using traits = function_traits<func_t>;
   TORCH_INTERNAL_ASSERT(iter.can_use_32bit_indexing());
   TORCH_INTERNAL_ASSERT(iter.ntensors() == traits::arity + 1);
-  AT_ASSERTM(
+  TORCH_INTERNAL_ASSERT(
       traits::arity <= MAX_INPUT_TENSOR_NUM,
       "loops kernel for",
       traits::arity,
@@ -381,9 +381,10 @@ void dpcpp_index_kernel(
   }
 
   size_t num_indices = index_size.size();
-  AT_ASSERT(num_indices == index_stride.size());
-  AT_ASSERT(num_indices == static_cast<size_t>(iter.ntensors()) - 2);
-  AT_ASSERT(num_indices <= MAX_TENSORINFO_DIMS);
+  TORCH_INTERNAL_ASSERT(num_indices == index_stride.size());
+  TORCH_INTERNAL_ASSERT(
+      num_indices == static_cast<size_t>(iter.ntensors()) - 2);
+  TORCH_INTERNAL_ASSERT(num_indices <= MAX_TENSORINFO_DIMS);
 
   void* out_data = (void*)iter.data_ptr(0);
   void* in_data = (void*)iter.data_ptr(1);

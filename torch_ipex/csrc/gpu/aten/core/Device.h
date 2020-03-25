@@ -17,7 +17,8 @@ class DPCPPDeviceSelector : public DPCPP::device_selector {
   DPCPPDeviceSelector(const DPCPP::device& dev) : m_target_device(dev.get()) {}
 
   DPCPPDeviceSelector(const DPCPPDeviceSelector& other)
-      : m_target_device(other.get_target_device()) {}
+      : DPCPP::device_selector(other),
+        m_target_device(other.get_target_device()) {}
 
   int operator()(const DPCPP::device& candidate) const override {
     if (candidate.is_gpu() && candidate.get() == m_target_device)
