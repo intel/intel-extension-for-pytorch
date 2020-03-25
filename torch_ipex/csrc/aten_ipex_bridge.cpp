@@ -180,9 +180,10 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
     CHECK_SPARSE_TENSOR_CRITICAL(_tensor, ipexTensor);
     return _tensor;
   } else {
+    auto *ipex_tensor_impl = ipexTensor.unsafeGetTensorImpl();
+    TORCH_INTERNAL_ASSERT(ipex_tensor_impl != nullptr);
+    TORCH_INTERNAL_ASSERT(ipex_tensor_impl->has_storage());
     TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
-
-
     auto ipex_tensor_storage = ipex_tensor_impl->storage().unsafeGetStorageImpl();
     ipex_tensor_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::CPU));
     auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(ipexTensor.storage(), at::TensorTypeId::CPUTensorId);
