@@ -47,6 +47,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
   at::Tensor & cos_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & cosh_out(at::Tensor & out, const at::Tensor & self);
+  std::tuple<at::Tensor,at::Tensor> _ctc_loss(const at::Tensor & log_probs, const at::Tensor & targets, at::IntArrayRef input_lengths, at::IntArrayRef target_lengths, int64_t blank, bool zero_infinity);
+  at::Tensor _ctc_loss_backward(const at::Tensor & grad, const at::Tensor & log_probs, const at::Tensor & targets, at::IntArrayRef input_lengths, at::IntArrayRef target_lengths, const at::Tensor & neg_log_likelihood, const at::Tensor & log_alpha, int64_t blank, bool zero_infinity);
   at::Tensor div(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & div_(at::Tensor & self, const at::Tensor & other);
   at::Tensor & div_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
