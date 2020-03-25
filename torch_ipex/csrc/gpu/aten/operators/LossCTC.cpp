@@ -4,7 +4,7 @@
 #include <core/DPCPPTensorUtils.h>
 #include <core/DPCPP.h>
 #include <core/Memory.h>
-#include <core/Utils.h>
+#include <core/DPCPPUtils.h>
 #include <core/Context.h>
 #include <utils/Numerics.h>
 #include <utils/Atomics.h>
@@ -16,7 +16,7 @@ template <typename...> class ctc_loss_beta_kernel {};
 template <typename...> class ctc_loss_collect_nonblank_kernel {};
 template <typename...> class ctc_loss_collect_kernel {};
 template <typename...> class ctc_loss_zero_padded_kernel {};
-using namespace at::native;
+using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -41,8 +41,8 @@ static inline int64_t get_target_prime(
   }
 }
 
-std::tuple<DP::range<2>, DP::range<2>> get_work_range(DP::queue& sycl_queue, int64_t work_in_batch_size, int64_t batch_size) {
-  size_t work_group_size = c10::sycl::syclMaxWorkGroupSize(sycl_queue);
+std::tuple<DPCPP::range<2>, DPCPP::range<2>> get_work_range(DPCPP::queue& sycl_queue, int64_t work_in_batch_size, int64_t batch_size) {
+  size_t work_group_size = dpcppMaxWorkGroupSize(sycl_queue);
   int intra_batch_size = work_group_size;
   while (intra_batch_size / 2 >= work_in_batch_size && intra_batch_size > 1) {
     intra_batch_size /= 2;
@@ -50,10 +50,10 @@ std::tuple<DP::range<2>, DP::range<2>> get_work_range(DP::queue& sycl_queue, int
 
   int inter_batch_size = std::min((int)(work_group_size / intra_batch_size), (int) batch_size);
 
-  DP::range<2> global_range( std::max<int>((work_in_batch_size + intra_batch_size - 1)/intra_batch_size, 1) * intra_batch_size, // round up to intra_batch_size
+  DPCPP::range<2> global_range( std::max<int>((work_in_batch_size + intra_batch_size - 1)/intra_batch_size, 1) * intra_batch_size, // round up to intra_batch_size
                              ((batch_size + inter_batch_size - 1)/inter_batch_size) * inter_batch_size // round up to inter_batch_size
   );
-  DP::range<2> local_range(intra_batch_size, inter_batch_size);
+  DPCPP::range<2> local_range(intra_batch_size, inter_batch_size);
 
   return std::make_tuple(global_range, local_range);
 }
@@ -85,20 +85,20 @@ ctc_loss_log_alpha_kernel(Tensor& log_alpha,
   int64_t __la_input_stride = log_alpha.stride(1);
   int64_t __la_target_stride = log_alpha.stride(2);
 
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
-  DP::range<2> global_range, local_range;
+  auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
+  DPCPP::range<2> global_range, local_range;
   std::tie(global_range, local_range) = get_work_range(sycl_queue,
                                                        2*__max_input_length+1, __batch_size);
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto log_alpha_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, log_alpha.data_ptr());
-    auto log_probs_acc = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, log_probs.data_ptr());
-    auto input_lengths_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, input_lengths.data_ptr());
-    auto targets_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, targets.data_ptr());
-    auto target_lengths_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, target_lengths.data_ptr());
-    auto neg_log_likelihood_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, neg_log_likelihood.data_ptr());
-    auto tg_batch_offsets_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, tg_batch_offsets.data_ptr());
-    auto kfn = DP_Q_KFN(DP::nd_item<2> item_id)  {
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto log_alpha_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, log_alpha.data_ptr());
+    auto log_probs_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, log_probs.data_ptr());
+    auto input_lengths_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input_lengths.data_ptr());
+    auto targets_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, targets.data_ptr());
+    auto target_lengths_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target_lengths.data_ptr());
+    auto neg_log_likelihood_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, neg_log_likelihood.data_ptr());
+    auto tg_batch_offsets_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, tg_batch_offsets.data_ptr());
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id)  {
       size_t intra_batch_id = item_id.get_local_id(0);
       size_t intra_batch_size = item_id.get_local_range(0);
       scalar_t* log_alpha_data = log_alpha_acc.template get_pointer<scalar_t>();
@@ -183,7 +183,7 @@ ctc_loss_log_alpha_kernel(Tensor& log_alpha,
         }
 
         for (int64_t t=1; t < max_input_length; t++) {
-          item_id.barrier(DP::access::fence_space::global_space);
+          item_id.barrier(DPCPP::access::fence_space::global_space);
           if ((b < batch_size) && (t < input_length) && (s < 2 * target_length + 1)) {
             // only for valid t, s. This is equation (6) and (7), la1, la2, la3 are the three summands,
             // lamax is the maximum for the logsumexp trick.
@@ -224,7 +224,7 @@ ctc_loss_log_alpha_kernel(Tensor& log_alpha,
 
         }
       }
-      item_id.barrier(DP::access::fence_space::global_space);
+      item_id.barrier(DPCPP::access::fence_space::global_space);
 
       if (b >= batch_size)
         return ;
@@ -254,11 +254,11 @@ ctc_loss_log_alpha_kernel(Tensor& log_alpha,
     };
 
     cgh.parallel_for<ctc_loss_alpha_kernel<scalar_t, target_t>>(
-      DP::nd_range<2>(global_range, local_range),
+      DPCPP::nd_range<2>(global_range, local_range),
         kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
 
 }
 
@@ -280,19 +280,19 @@ ctc_loss_backward_log_beta_kernel(Tensor& log_beta,
   int64_t __lb_input_stride = log_beta.stride(1);
   int64_t __lb_target_stride = log_beta.stride(2);
 
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
-  DP::range<2> global_range, local_range;
+  auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
+  DPCPP::range<2> global_range, local_range;
   std::tie(global_range, local_range) = get_work_range(sycl_queue,
                                                        2*__max_input_length+1, __batch_size);
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto log_beta_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, log_beta.data_ptr());
-    auto log_probs_acc = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, log_probs.data_ptr());
-    auto input_lengths_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, input_lengths.data_ptr());
-    auto targets_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, targets.data_ptr());
-    auto target_lengths_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, target_lengths.data_ptr());
-    auto tg_batch_offsets_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, tg_batch_offsets.data_ptr());
-    auto kfn = DP_Q_KFN(DP::nd_item<2> item_id)  {
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto log_beta_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, log_beta.data_ptr());
+    auto log_probs_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, log_probs.data_ptr());
+    auto input_lengths_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input_lengths.data_ptr());
+    auto targets_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, targets.data_ptr());
+    auto target_lengths_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target_lengths.data_ptr());
+    auto tg_batch_offsets_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, tg_batch_offsets.data_ptr());
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id)  {
       size_t intra_batch_id = item_id.get_local_id(0);
       size_t intra_batch_size = item_id.get_local_range(0);
       scalar_t* log_beta_data = log_beta_acc.template get_pointer<scalar_t>();
@@ -373,7 +373,7 @@ ctc_loss_backward_log_beta_kernel(Tensor& log_beta,
         }
         // now go backward in t. Note that we need to skip the last timestep that we did above.
         for (int64_t t=max_input_length-2; t>=0; t--) {
-          item_id.barrier(DP::access::fence_space::global_space);
+          item_id.barrier(DPCPP::access::fence_space::global_space);
           if ((b < batch_size) && (t < input_length - 1) && (s < 2 * target_length + 1)) {
             scalar_t lb1 = log_beta_data[lb_batch_offset + lb_input_stride * (t+1) + lb_target_stride * s];
             scalar_t lbmax = lb1;
@@ -414,11 +414,11 @@ ctc_loss_backward_log_beta_kernel(Tensor& log_beta,
     };
 
     cgh.parallel_for<ctc_loss_beta_kernel<scalar_t, target_t>>(
-      DP::nd_range<2>(global_range, local_range),
+      DPCPP::nd_range<2>(global_range, local_range),
       kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
 }
 
 // This implements the subtrahend of equation (16) for all *nonblank* characters.
@@ -460,23 +460,23 @@ ctc_loss_backward_collect_nonblank_kernel(Tensor& gradient,
   int64_t lb_input_stride = log_beta.stride(1);
   int64_t lb_target_stride = log_beta.stride(2);
 
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
-  DP::range<2> global_range, local_range;
+  auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
+  DPCPP::range<2> global_range, local_range;
   std::tie(global_range, local_range) = get_work_range(sycl_queue,
                                                        max_target_length, batch_size);
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto gradient_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, gradient.data_ptr());
-    auto grad_out_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, grad_out.data_ptr());
-    auto log_alpha_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, log_alpha.data_ptr());
-    auto log_beta_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, log_beta.data_ptr());
-    auto log_probs_acc = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, log_probs.data_ptr());
-    auto input_lengths_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, input_lengths.data_ptr());
-    auto targets_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, targets.data_ptr());
-    auto target_lengths_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, target_lengths.data_ptr());
-    auto neg_log_likelihood_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, neg_log_likelihood.data_ptr());
-    auto tg_batch_offsets_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, tg_batch_offsets.data_ptr());
-    auto kfn = DP_Q_KFN(DP::nd_item<2> item_id)  {
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto gradient_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, gradient.data_ptr());
+    auto grad_out_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, grad_out.data_ptr());
+    auto log_alpha_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, log_alpha.data_ptr());
+    auto log_beta_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, log_beta.data_ptr());
+    auto log_probs_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, log_probs.data_ptr());
+    auto input_lengths_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input_lengths.data_ptr());
+    auto targets_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, targets.data_ptr());
+    auto target_lengths_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target_lengths.data_ptr());
+    auto neg_log_likelihood_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, neg_log_likelihood.data_ptr());
+    auto tg_batch_offsets_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, tg_batch_offsets.data_ptr());
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id)  {
       scalar_t* gradient_data = gradient_acc.template get_pointer<scalar_t>();
       scalar_t* grad_out_data = grad_out_acc.template get_pointer<scalar_t>();
       scalar_t* log_alpha_data = log_alpha_acc.template get_pointer<scalar_t>();
@@ -523,11 +523,11 @@ ctc_loss_backward_collect_nonblank_kernel(Tensor& gradient,
     };
 
     cgh.parallel_for<ctc_loss_collect_nonblank_kernel<scalar_t, target_t>>(
-      DP::nd_range<2>(global_range, local_range),
+      DPCPP::nd_range<2>(global_range, local_range),
       kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
 }
 
 // This is the naive implementation of equation (16). It is parallelised in batch and input timestep.
@@ -557,22 +557,22 @@ ctc_loss_backward_collect_kernel(Tensor& gradient,
   int64_t lb_input_stride = log_beta.stride(1);
   int64_t lb_target_stride = log_beta.stride(2);
 
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
-  DP::range<2> global_range, local_range;
+  auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
+  DPCPP::range<2> global_range, local_range;
   std::tie(global_range, local_range) = get_work_range(sycl_queue,
                                                        log_probs.size(0), batch_size);
-  auto cgf = DP_Q_CGF(cgh) {
-    auto gradient_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, gradient.data_ptr());
-    auto grad_out_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, grad_out.data_ptr());
-    auto log_alpha_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, log_alpha.data_ptr());
-    auto log_beta_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, log_beta.data_ptr());
-    auto log_probs_acc = c10::sycl::SYCLAccessor<dp_discard_w_mode>(cgh, log_probs.data_ptr());
-    auto input_lengths_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, input_lengths.data_ptr());
-    auto targets_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, targets.data_ptr());
-    auto target_lengths_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, target_lengths.data_ptr());
-    auto neg_log_likelihood_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, neg_log_likelihood.data_ptr());
-    auto tg_batch_offsets_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, tg_batch_offsets.data_ptr());
-    auto kfn = DP_Q_KFN(DP::nd_item<2> item_id)  {
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto gradient_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, gradient.data_ptr());
+    auto grad_out_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, grad_out.data_ptr());
+    auto log_alpha_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, log_alpha.data_ptr());
+    auto log_beta_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, log_beta.data_ptr());
+    auto log_probs_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, log_probs.data_ptr());
+    auto input_lengths_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input_lengths.data_ptr());
+    auto targets_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, targets.data_ptr());
+    auto target_lengths_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target_lengths.data_ptr());
+    auto neg_log_likelihood_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, neg_log_likelihood.data_ptr());
+    auto tg_batch_offsets_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, tg_batch_offsets.data_ptr());
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id)  {
       scalar_t* gradient_data = gradient_acc.template get_pointer<scalar_t>();
       scalar_t* grad_out_data = grad_out_acc.template get_pointer<scalar_t>();
       scalar_t* log_alpha_data = log_alpha_acc.template get_pointer<scalar_t>();
@@ -635,11 +635,11 @@ ctc_loss_backward_collect_kernel(Tensor& gradient,
     };
 
     cgh.parallel_for<ctc_loss_collect_kernel<scalar_t, target_t>>(
-      DP::nd_range<2>(global_range, local_range),
+      DPCPP::nd_range<2>(global_range, local_range),
       kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
 }
 
 // This is to zero gradients which corresponding to the out-of-sequence position
@@ -657,16 +657,16 @@ ctc_loss_zero_padded_gradients(
   int64_t batch_size, /* B */
   int64_t num_labels  /* D */ ) {
 
-  auto& sycl_queue = c10::sycl::getCurrentSYCLStream().sycl_queue();
+  auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  DP::range<2> global_range, local_range;
+  DPCPP::range<2> global_range, local_range;
   std::tie(global_range, local_range) = get_work_range(sycl_queue,
                                                        max_input_length, batch_size);
 
-  auto cgf = DP_Q_CGF(cgh) {
-    auto gradient_acc = c10::sycl::SYCLAccessor<dp_rw_mode>(cgh, gradient.data_ptr());
-    auto input_lengths_acc = c10::sycl::SYCLAccessor<dp_r_mode>(cgh, input_lengths.data_ptr());
-    auto kfn = DP_Q_KFN(DP::nd_item<2> item_id)  {
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto gradient_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, gradient.data_ptr());
+    auto input_lengths_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input_lengths.data_ptr());
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id)  {
       scalar_t* gradient_data = gradient_acc.template get_pointer<scalar_t>();
       int64_t* input_lengths_data = input_lengths_acc.template get_pointer<int64_t>();
 
@@ -688,11 +688,11 @@ ctc_loss_zero_padded_gradients(
     };
 
     cgh.parallel_for<ctc_loss_zero_padded_kernel<scalar_t>>(
-      DP::nd_range<2>(global_range, local_range),
+      DPCPP::nd_range<2>(global_range, local_range),
       kfn);
   };
 
-  DP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
 }
 
 // The forward computation. Lot's of admin and a call to the alpha kernel.
@@ -896,42 +896,33 @@ Tensor ctc_loss_backward_template(const Tensor& grad_out, const Tensor& log_prob
 
   return grad;
 }
-
-std::tuple<Tensor, Tensor> _ctc_loss(const Tensor& log_probs, const Tensor& targets, IntArrayRef input_lengths, IntArrayRef target_lengths, int64_t BLANK, bool zero_infinity) {
-  (void)zero_infinity; // only used for backward
-  return AT_DISPATCH_FLOATING_TYPES(log_probs.scalar_type(), "ctc_loss", [&] {
-    if (targets.scalar_type() == kLong) {
-      return ctc_loss_template<scalar_t, kLong>(log_probs, targets, input_lengths, target_lengths, BLANK);
-    } else {
-      return ctc_loss_template<scalar_t, kInt>(log_probs, targets, input_lengths, target_lengths, BLANK);
-    }
-  });
-}
-
-Tensor _ctc_loss_backward(const Tensor& grad, const Tensor& log_probs, const Tensor& targets, IntArrayRef input_lengths, IntArrayRef target_lengths,
-                              const Tensor& neg_log_likelihood, const Tensor& log_alpha, int64_t BLANK, bool zero_infinity) {
-  return AT_DISPATCH_ALL_ATOMIC_TYPES(log_probs.scalar_type(), "ctc_loss_backward", [&] {
-    if (targets.scalar_type() == kLong) {
-      return ctc_loss_backward_template<scalar_t, kLong>(grad, log_probs, targets, input_lengths, target_lengths, neg_log_likelihood, log_alpha, BLANK, zero_infinity);
-    } else {
-      return ctc_loss_backward_template<scalar_t, kInt>(grad, log_probs, targets, input_lengths, target_lengths, neg_log_likelihood, log_alpha, BLANK, zero_infinity);
-    }
-  });
-}
-
 } // namespace impl
 
 std::tuple<Tensor,Tensor> _ctc_loss(const Tensor & log_probs, 
-    const Tensor & targets, IntArrayRef input_lengths, IntArrayRef target_lengths,
-    int64_t blank, bool zero_infinity){
-        return impl::_ctc_loss(log_probs, targets, input_lengths, target_lengths, blank, zero_infinity);
-    }
-Tensor _ctc_loss_backward(const Tensor & grad, 
-    const Tensor & log_probs, const Tensor & targets, IntArrayRef input_lengths, 
-    IntArrayRef target_lengths, const Tensor & neg_log_likelihood, const Tensor & log_alpha, 
-    int64_t blank, bool zero_infinity){
-        return impl::_ctc_loss_backward(grad, log_probs, targets, input_lengths, target_lengths, neg_log_likelihood, log_alpha, blank, zero_infinity);
-    }
+  const Tensor & targets, IntArrayRef input_lengths, IntArrayRef target_lengths,
+  int64_t blank, bool zero_infinity){
+    (void)zero_infinity; // only used for backward
+    return AT_DISPATCH_FLOATING_TYPES(log_probs.scalar_type(), "ctc_loss", [&] {
+      if (targets.scalar_type() == kLong) {
+        return impl::ctc_loss_template<scalar_t, kLong>(log_probs, targets, input_lengths, target_lengths, blank);
+      } else {
+        return impl::ctc_loss_template<scalar_t, kInt>(log_probs, targets, input_lengths, target_lengths, blank);
+      }
+    });
+  }
 
+Tensor _ctc_loss_backward(const Tensor & grad, 
+  const Tensor & log_probs, const Tensor & targets, IntArrayRef input_lengths, 
+  IntArrayRef target_lengths, const Tensor & neg_log_likelihood, const Tensor & log_alpha, 
+  int64_t blank, bool zero_infinity){
+    return AT_DISPATCH_ALL_ATOMIC_TYPES(log_probs.scalar_type(), "ctc_loss_backward", [&] {
+      if (targets.scalar_type() == kLong) {
+        return impl::ctc_loss_backward_template<scalar_t, kLong>(grad, log_probs, targets, input_lengths, target_lengths, neg_log_likelihood, log_alpha, blank, zero_infinity);
+      } else {
+        return impl::ctc_loss_backward_template<scalar_t, kInt>(grad, log_probs, targets, input_lengths, target_lengths, neg_log_likelihood, log_alpha, blank, zero_infinity);
+      }
+    });
+  }
+  
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
