@@ -188,14 +188,6 @@ set(DPCPP_ATEN_SRCS)
 add_subdirectory(torch_ipex/csrc/gpu/aten)
 list(APPEND DPCPP_SRCS ${DPCPP_ATEN_SRCS})
 
-set(DPCPP_LEGACY_SRCS)
-add_subdirectory(torch_ipex/csrc/gpu/legacy)
-list(APPEND DPCPP_SRCS ${DPCPP_LEGACY_SRCS})
-
-set(DPCPP_LEGACY_NN_SRCS)
-add_subdirectory(torch_ipex/csrc/gpu/legacy_nn)
-list(APPEND DPCPP_SRCS ${DPCPP_LEGACY_NN_SRCS})
-
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 
 add_library(torch_ipex SHARED ${DPCPP_SRCS})

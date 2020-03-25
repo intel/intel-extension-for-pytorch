@@ -6,10 +6,11 @@
 #include <core/DPCPPTensorUtils.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
+#include <utils/ATDispatch.h>
 #include <utils/Atomics.h>
 #include <utils/Numerics.h>
 
-#include <utils/AtDispatch.h>
+using namespace at::dpcpp;
 
 template <typename...>
 class ctc_loss_alpha_kernel {};
@@ -21,7 +22,6 @@ template <typename...>
 class ctc_loss_collect_kernel {};
 template <typename...>
 class ctc_loss_zero_padded_kernel {};
-using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {

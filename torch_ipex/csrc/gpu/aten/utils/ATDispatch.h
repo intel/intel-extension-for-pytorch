@@ -1,3 +1,5 @@
+#pragma once
+
 // temp, the atomic operation only support for the float now
 #define AT_DISPATCH_ALL_ATOMIC_TYPES(TYPE, NAME, ...)                        \
   [&] {                                                                      \

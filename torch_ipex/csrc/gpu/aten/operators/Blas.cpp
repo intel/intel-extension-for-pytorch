@@ -3,7 +3,8 @@
 #include <ATen/ExpandUtils.h>
 
 #include <core/TensorImplUtils.h>
-#include <dnnl/InnerProduct.hpp>
+
+#include "InnerProduct.hpp"
 
 #define ERROR_ONLY_FP_TYPES(func)                                  \
   TORCH_CHECK(                                                     \
