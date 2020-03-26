@@ -609,11 +609,12 @@ void MaskedFill(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
 DPCPP_DEF_K1(maskedScatter_scan_dpcpp_ker);
 DPCPP_DEF_K1(TensorMaskedScatterOp);
 template <typename scalar_t>
-void MaskedScatter(Tensor& tensor, const Tensor& mask, const Tensor& src) {
+void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
+  Tensor mask;
+  std::tie(mask) = expand_inplace(tensor, mask_, "masked_scatter_");
   auto maskSize = mask.numel();
   auto tensorSize = tensor.numel();
   auto srcSize = src.numel();
-  TORCH_CHECK(mask.numel() == src.numel(), "sizes do not match");
 
   // `mask` and `tensor` must have the same number of elements
   TORCH_CHECK(

@@ -45,6 +45,12 @@ bool check_device_by_options(const at::TensorOptions& tensor_options, DPCPPSubDe
   return false;
 }
 
+bool check_layout_by_options(const at::TensorOptions& tensor_options, c10::Layout layout) {
+  TORCH_CHECK(tensor_options.has_layout());
+  TORCH_CHECK(((layout == c10::kStrided) || (layout == c10::kSparse)));
+  return tensor_options.layout() == layout;
+}
+
 bool check_device_by_device(const at::Device& device, DPCPPSubDev sub_dev) {
   int64_t dev_idx = 0;
   if (device.has_index())

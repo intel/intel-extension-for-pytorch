@@ -417,7 +417,11 @@ at::Tensor AtenIpexTypeDefault::add(const at::Tensor & self, const at::Tensor & 
 
 at::Tensor & AtenIpexTypeDefault::add_(at::Tensor & self, const at::Tensor & other, at::Scalar alpha) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::add_(self, other, alpha);
+    if (self.is_sparse() || other.is_sparse()) {
+      return cpu::AtenIpexCPUSparse::add_(self, other, alpha);
+    } else {
+      return cpu::AtenIpexCPUDefault::add_(self, other, alpha);
+    }
   } else {
     AT_ASSERT(false);
   }
@@ -1521,7 +1525,11 @@ at::Tensor AtenIpexTypeDefault::_embedding_bag_per_sample_weights_backward(const
 
 at::Tensor AtenIpexTypeDefault::empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
   if (check_device_by_options(options, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::empty(size, options, memory_format);
+    if (check_layout_by_options(options, c10::kSparse)) {
+      return cpu::AtenIpexCPUSparse::empty(size, options, memory_format);
+    } else {
+      return cpu::AtenIpexCPUDefault::empty(size, options, memory_format);
+    }
   } else {
     AT_ASSERT(false);
   }
@@ -5009,7 +5017,7 @@ at::Tensor AtenIpexTypeDefault::hspmm(const at::Tensor & mat1, const at::Tensor 
 
 at::Tensor & AtenIpexTypeDefault::copy_sparse_to_sparse_(at::Tensor & self, const at::Tensor & src, bool non_blocking) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::copy_sparse_to_sparse_(self, src, non_blocking);
+    return cpu::AtenIpexCPUSparse::copy_sparse_to_sparse_(self, src, non_blocking);
   } else {
     AT_ASSERT(false);
   }
@@ -9444,6 +9452,9 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::add_.Tensor(Tensor(a!) self, Tensor other, *, Scalar alpha=1) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::add_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::add_.Tensor(Tensor(a!) self, Tensor other, *, Scalar alpha=1) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::add_>(at::TensorTypeId::SparseDPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::add.out(Tensor self, Tensor other, *, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::add_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -9857,6 +9868,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::empty.memory_format(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(at::IntArrayRef, const at::TensorOptions &, c10::optional<at::MemoryFormat>), &AtenIpexTypeDefault::empty>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::empty.memory_format(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(at::IntArrayRef, const at::TensorOptions &, c10::optional<at::MemoryFormat>), &AtenIpexTypeDefault::empty>(at::TensorTypeId::SparseDPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::new_empty(Tensor self, int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, const at::TensorOptions &), &AtenIpexTypeDefault::new_empty>(at::TensorTypeId::DPCPPTensorId)
@@ -11167,7 +11181,7 @@ void RegisterAtenTypeFunctions() {
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::hspmm>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::copy_sparse_to_sparse_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)")
-      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, bool), &AtenIpexTypeDefault::copy_sparse_to_sparse_>(at::TensorTypeId::DPCPPTensorId)
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, bool), &AtenIpexTypeDefault::copy_sparse_to_sparse_>(at::TensorTypeId::SparseDPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::unbind.int(Tensor(a) self, int dim=0) -> Tensor(a)[]")
       .impl_unboxedOnlyKernel<std::vector<at::Tensor>(const at::Tensor &, int64_t), &AtenIpexTypeDefault::unbind>(at::TensorTypeId::DPCPPTensorId)
