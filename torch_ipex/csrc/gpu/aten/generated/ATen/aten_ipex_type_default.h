@@ -15,6 +15,8 @@ class AtenIpexTypeDefault {
   static at::Tensor & add_(at::Tensor & self, at::Scalar other, at::Scalar alpha);
   static at::Tensor all(const at::Tensor & self, int64_t dim, bool keepdim);
   static at::Tensor & all_out(at::Tensor & out, const at::Tensor & self, int64_t dim, bool keepdim);
+  static at::Tensor any(const at::Tensor & self, int64_t dim, bool keepdim);
+  static at::Tensor & any_out(at::Tensor & out, const at::Tensor & self, int64_t dim, bool keepdim);
   static at::Tensor & arange_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
   static at::Tensor as_strided(const at::Tensor & self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset);
   static at::Tensor & asin_out(at::Tensor & out, const at::Tensor & self);
@@ -273,6 +275,7 @@ class AtenIpexTypeDefault {
   static std::tuple<at::Tensor &,at::Tensor &> topk_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
   static std::tuple<at::Tensor,at::Tensor> topk(const at::Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted);
   static at::Tensor all(const at::Tensor & self);
+  static at::Tensor any(const at::Tensor & self);
   static at::Tensor & renorm_out(at::Tensor & out, const at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm);
   static at::Tensor renorm(const at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm);
   static at::Tensor unfold(const at::Tensor & self, int64_t dimension, int64_t size, int64_t step);

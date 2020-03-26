@@ -19,6 +19,10 @@ Tensor all(const Tensor & self, int64_t dim, bool keepdim); // aten::all.dim(Ten
 
 Tensor & all_out(Tensor & out, const Tensor & self, int64_t dim, bool keepdim); // aten::all.out(Tensor self, int dim, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
 
+Tensor any(const Tensor & self, int64_t dim, bool keepdim); // aten::any.dim(Tensor self, int dim, bool keepdim=False) -> Tensor
+
+Tensor & any_out(Tensor & out, const Tensor & self, int64_t dim, bool keepdim); // aten::any.out(Tensor self, int dim, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
+
 Tensor & arange_out(Tensor & out, Scalar start, Scalar end, Scalar step); // aten::arange.start_out(Scalar start, Scalar end, Scalar step=1, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor as_strided(const Tensor & self, IntArrayRef size, IntArrayRef stride, c10::optional<int64_t> storage_offset); // aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> Tensor(a)
@@ -534,6 +538,8 @@ std::tuple<Tensor &,Tensor &> topk_out(Tensor & values, Tensor & indices, const 
 std::tuple<Tensor,Tensor> topk(const Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted); // aten::topk(Tensor self, int k, int dim=-1, bool largest=True, bool sorted=True) -> (Tensor values, Tensor indices)
 
 Tensor all(const Tensor & self); // aten::all(Tensor self) -> Tensor
+
+Tensor any(const Tensor & self); // aten::any(Tensor self) -> Tensor
 
 Tensor & renorm_out(Tensor & out, const Tensor & self, Scalar p, int64_t dim, Scalar maxnorm); // aten::renorm.out(Tensor self, Scalar p, int dim, Scalar maxnorm, *, Tensor(a!) out) -> Tensor(a!)
 
