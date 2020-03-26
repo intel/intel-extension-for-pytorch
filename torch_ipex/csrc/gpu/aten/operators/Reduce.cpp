@@ -879,6 +879,49 @@ Tensor all(const Tensor& self, int64_t dim, bool keepdim) {
   return at::AtenIpexTypeDPCPP::all_out(result, self, dim, keepdim);
 }
 
+inline Tensor& _any(Tensor& result, TensorIterator& iter) {
+  if (iter.numel() == 0) {
+    result.fill_(0);
+  } else {
+    impl::or_kernel(iter);
+  }
+
+  return result;
+}
+
+Tensor any(const at::Tensor& self) {
+  TORCH_CHECK(
+      self.scalar_type() == at::ScalarType::Byte ||
+          self.scalar_type() == at::ScalarType::Bool,
+      "any only supports torch.uint8 and torch.bool dtypes");
+
+  Tensor result = at::empty({0}, self.options());
+  auto iter =
+      impl::make_reduction("any", result, self, {}, false, self.scalar_type());
+
+  return at::AtenIpexTypeDPCPP::_any(result, iter);
+}
+
+Tensor& any_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
+  TORCH_CHECK(
+      self.scalar_type() == at::ScalarType::Byte ||
+          self.scalar_type() == at::ScalarType::Bool,
+      "any only supports torch.uint8 and torch.bool dtypes");
+  dim = maybe_wrap_dim(dim, self.dim());
+  if (_dimreduce_return_trivial(result, self, 0, dim, keepdim)) {
+    return result;
+  } else {
+    auto iter = impl::make_reduction(
+        "any", result, self, dim, keepdim, self.scalar_type());
+    return at::AtenIpexTypeDPCPP::_any(result, iter);
+  }
+}
+
+Tensor any(const Tensor& self, int64_t dim, bool keepdim) {
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::any_out(result, self, dim, keepdim);
+}
+
 class OpRenorm {};
 
 Tensor& renorm_out(
