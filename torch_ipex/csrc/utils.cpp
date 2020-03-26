@@ -119,4 +119,15 @@ at::ScalarType get_at_data_type(dil::data_type dil_dt) {
   }
 }
 
+bool check_force_dnnl_env() {
+  auto envar = std::getenv("FORCE_DNNL");
+  if (envar) {
+    if (strcmp(envar, "1") == 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 } // namespace torch_ipex

@@ -18,5 +18,6 @@ bool check_layout_by_options(const at::TensorOptions& tensor_options, c10::Layou
 bool get_device_count(c10::Device dev_type, c10::DeviceIndex *count);
 dil::data_type get_dil_data_type(at::ScalarType);
 at::ScalarType get_at_data_type(dil::data_type);
+bool check_force_dnnl_env();
 
 } // namespace torch_ipex

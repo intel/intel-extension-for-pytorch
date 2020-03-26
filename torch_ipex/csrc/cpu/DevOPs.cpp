@@ -34,26 +34,18 @@ at::Tensor dil_convolution(const at::Tensor & input, const at::Tensor & weight, 
 
   TORCH_INTERNAL_ASSERT(input.defined());
   TORCH_INTERNAL_ASSERT(input.device().type() == at::DeviceType::DPCPP);
-  if (! (input.is_contiguous())) {
-    TORCH_INTERNAL_ASSERT(! (cpu::ShadeDataContext::isDilTensor(input)));
-  }
+  TORCH_INTERNAL_ASSERT(input.is_contiguous());
 
   TORCH_INTERNAL_ASSERT(weight.defined());
   TORCH_INTERNAL_ASSERT(weight.device().type() == at::DeviceType::DPCPP);
-  if (! (weight.is_contiguous())) {
-    TORCH_INTERNAL_ASSERT(! (cpu::ShadeDataContext::isDilTensor(weight)));
-  }
+  TORCH_INTERNAL_ASSERT(weight.is_contiguous());
 
-  dil_input = dbl::comm::try_gen_dil_tensor(input.is_contiguous() ? input : input.contiguous());
-  dil_weight = dbl::comm::try_gen_dil_tensor(weight.is_contiguous() ? weight : weight.contiguous());
+  dil_input = dbl::comm::try_gen_dil_tensor(input);
+  dil_weight = dbl::comm::try_gen_dil_tensor(weight);
   if (bias.defined()) {
     TORCH_INTERNAL_ASSERT(bias.is_contiguous());
     TORCH_INTERNAL_ASSERT(bias.device().type() == at::DeviceType::DPCPP);
-    if (! (bias.is_contiguous())) {
-      TORCH_INTERNAL_ASSERT(! (cpu::ShadeDataContext::isDilTensor(bias)));
-    }
-
-    dil_bias = dbl::comm::try_gen_dil_tensor(bias.is_contiguous() ? bias : bias.contiguous());
+    dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
 
   dil::tensor dil_output = dbl::conv::conv2d_impl(
@@ -70,7 +62,19 @@ at::Tensor dil_convolution(const at::Tensor & input, const at::Tensor & weight, 
 
 at::Tensor AtenIpexCPUDev::convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
   DEBUG("AtenIpexCPUDev::convolution_overrideable\n");
-  return mkldnn_convolution(input, weight, bias, padding, stride, dilation, groups);
+  // NOTE: DO NOT always call contiguous. It may break lazy-reorder. Because contiguous will call reorder instantly.
+  if (check_force_dnnl_env()) {
+    return dil_convolution(
+      input.is_contiguous() ? input : input.contiguous(),
+      weight.is_contiguous() ? weight : weight.contiguous(),
+      bias.defined() ? (bias.is_contiguous() ? bias :bias.contiguous()) : bias,
+      stride,
+      padding,
+      dilation,
+      groups);
+  } else {
+    return mkldnn_convolution(input, weight, bias, padding, stride, dilation, groups);
+  }
 }
 
 at::Tensor AtenIpexCPUDev::mkldnn_convolution(const at::Tensor & self, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups) {
