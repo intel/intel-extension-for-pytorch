@@ -1056,7 +1056,9 @@ Tensor trace(const Tensor& self) {
   return out;
 }
 
-Tensor& masked_fill_(Tensor& self, const Tensor& mask, Scalar value) {
+Tensor& masked_fill_(Tensor& self, const Tensor& mask_, Scalar value) {
+  Tensor mask;
+  std::tie(mask) = expand_inplace(self, mask_, "masked_fill_");
   AT_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, self.scalar_type(), "MaskedFill", [&]() {
         impl::MaskedFill<scalar_t>(self, mask, value);
