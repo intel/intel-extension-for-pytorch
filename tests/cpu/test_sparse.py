@@ -79,8 +79,6 @@ class TestSparse(TestCase):
         expected = x1.to_dense() + x2.to_dense()
         self.assertEqual(y1.to_dense(), expected)
         # self.assertEqual(y2.to_dense().to('cpu'), expected)
-        print(y3)
-        print(expected)
         self.assertEqual(y3.to('cpu'), expected)
         
     def test_basic_ops(self):

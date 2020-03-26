@@ -7,9 +7,7 @@ namespace cpu {
 
 class AtenIpexCPUSparse {
  public:
-  // aten::_indices(Tensor(a) self) -> Tensor(a)
   static at::Tensor _indices(const at::Tensor & self);
-  // aten::_values(Tensor(a) self) -> Tensor(a)
   static at::Tensor _values(const at::Tensor & self);
   static int64_t sparse_dim(const at::Tensor & self);
   static int64_t dense_dim(const at::Tensor & self);

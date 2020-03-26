@@ -30,15 +30,15 @@ namespace bridge {
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->version_counter().current_version() == b.unsafeGetTensorImpl()->version_counter().current_version()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->allow_tensor_metadata_change() == b.unsafeGetTensorImpl()->allow_tensor_metadata_change())
 
-#define CHECK_TENSOR_CRITICAL(a, b) \
-  TORCH_INTERNAL_ASSERT(a.data_ptr() == b.data_ptr()); \
+#define CHECK_TENSOR_CRITICAL(a, b, check_data_ptr) \
+  TORCH_INTERNAL_ASSERT(!check_data_ptr || a.data_ptr() == b.data_ptr()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->strides() == b.unsafeGetTensorImpl()->strides()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->storage_offset() == b.unsafeGetTensorImpl()->storage_offset()); \
   CHECK_TENSOR(a, b)
 
-#define CHECK_SPARSE_TENSOR_CRITICAL(a, b) \
-  TORCH_INTERNAL_ASSERT(a._indices().data_ptr() == b._indices().data_ptr()); \
-  TORCH_INTERNAL_ASSERT(a._values().data_ptr() == b._values().data_ptr()); \
+#define CHECK_SPARSE_TENSOR_CRITICAL(a, b, check_data_ptr) \
+  TORCH_INTERNAL_ASSERT(!check_data_ptr || a._indices().data_ptr() == b._indices().data_ptr()); \
+  TORCH_INTERNAL_ASSERT(!check_data_ptr || a._values().data_ptr() == b._values().data_ptr()); \
   TORCH_INTERNAL_ASSERT(a.sparse_dim() == b.sparse_dim()); \
   TORCH_INTERNAL_ASSERT(a.dense_dim() == b.dense_dim()); \
   TORCH_INTERNAL_ASSERT(a._nnz() == b._nnz()); \
@@ -121,8 +121,6 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
     return ipexTensor;
   }
 
-  // NOT support sparse tensor.
-  TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
   if (ipexTensor.device().is_cpu())
     return ipexTensor;
 
@@ -132,11 +130,19 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   }
 
   // Branch 2: Dense Tensor
-  void* data_context = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
-  TORCH_INTERNAL_ASSERT(data_context != ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get());
-  TORCH_INTERNAL_ASSERT(data_context != nullptr);
+  
+  // Branch 2.0: Dense + CPU Tensor + w/o context.
+  // Supposing only Aten inplace op w/ Resize internally will run into this branch,
+  // since new DataPtr has replaced orignal one, then DPCPP tensor loses context info.
+  // e.g. Sparse add_()
+  void *data_ptr = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get();
+  void *data_ctx = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
+  if (data_ptr == data_ctx) {
+    return shallowFallbackToCPUTensorImpl(ipexTensor);
+  }
 
-  cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_context;
+  TORCH_INTERNAL_ASSERT(data_ctx != nullptr);
+  cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
   // Branch 2.1: Dense + Dil Tensor
   if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
     // All aten::tensor with dnnl::tensor should be contiguous
@@ -196,7 +202,7 @@ at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor) {
     cpu_sparse_impl->copy_meta_info(ipex_sparse_impl);
     // Copy indices and values
     cpu_sparse_impl->copy_indices_and_values(cpu_indices, cpu_values);
-    CHECK_SPARSE_TENSOR_CRITICAL(_tensor, ipexTensor);
+    CHECK_SPARSE_TENSOR_CRITICAL(_tensor, ipexTensor, true);
     return _tensor;
   } else {
     auto *ipex_tensor_impl = ipexTensor.unsafeGetTensorImpl();
@@ -208,7 +214,7 @@ at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor) {
     auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(ipexTensor.storage(), at::TensorTypeId::CPUTensorId);
     IPEXTensorImpl* cur_ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
     cur_ipex_impl->copy_meta_info(ipexTensor.unsafeGetTensorImpl());
-    CHECK_TENSOR_CRITICAL(_tensor, ipexTensor);
+    CHECK_TENSOR_CRITICAL(_tensor, ipexTensor, true);
     // TODO: Cannot reserved_
     //       dest_impl->reserved_ = src_impl->reserved_;
     return _tensor;
@@ -299,7 +305,7 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     ipex_sparse_impl->copy_meta_info(cpu_sparse_impl);
     // Copy indices and values
     ipex_sparse_impl->copy_indices_and_values(ipex_indices, ipex_values);
-    CHECK_SPARSE_TENSOR_CRITICAL(_tensor, cpuTensor);
+    CHECK_SPARSE_TENSOR_CRITICAL(_tensor, cpuTensor, true);
     return _tensor;
   } else {
     auto *cpu_tensor_impl = cpuTensor.unsafeGetTensorImpl();
@@ -315,7 +321,7 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     TORCH_INTERNAL_ASSERT(_tensor.device().type() == at::DeviceType::DPCPP);
     IPEXTensorImpl* ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
     ipex_impl->copy_meta_info(cpu_tensor_impl);
-    CHECK_TENSOR_CRITICAL(_tensor, cpuTensor);
+    CHECK_TENSOR_CRITICAL(_tensor, cpuTensor, true);
     //TODO: Cannot set reserved_ 
     //      dest_impl->reserved_ = src_impl->reserved_;
     attachShadeDataConext(_tensor);
@@ -346,7 +352,7 @@ at::Tensor shallowUpgradeToDPCPPTensorA(const at::Tensor& ipexTensor, const at::
   TORCH_INTERNAL_ASSERT(_tensor.device().type() == at::DeviceType::DPCPP);
   IPEXTensorImpl* ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
   ipex_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
-  CHECK_TENSOR_CRITICAL(_tensor, cpuTensor);
+  CHECK_TENSOR_CRITICAL(_tensor, cpuTensor, true);
 
   attachShadeDataConext(_tensor);
   return _tensor;
@@ -375,6 +381,9 @@ at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cp
     TORCH_INTERNAL_ASSERT(cpuTensor.is_sparse());
     TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kSparse);
     TORCH_INTERNAL_ASSERT(cpuTensor.layout() == c10::kSparse);
+    // NOTICE:
+    // Sometimes, Sparse ops break alias semantics, so the data_ptr will be different in these two Tensors.
+    auto check_data_ptr = ipexTensor._nnz() == cpuTensor._nnz();
 
     auto&& ipex_indices = ipexTensor._indices();
     auto&& ipex_values = ipexTensor._values();
@@ -391,16 +400,15 @@ at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cp
     auto cpu_sparse_impl = at::sparse::get_sparse_impl(cpuTensor);
     ipex_sparse_impl->copy_meta_info(cpu_sparse_impl);
     ipex_sparse_impl->copy_indices_and_values(ipex_indices, ipex_values);
-    // [Hongzhen] TODO: Fix this issue for Sparse data_ptr comparison
-    // CHECK_SPARSE_TENSOR_CRITICAL(ipexTensor, cpuTensor);
+    CHECK_SPARSE_TENSOR_CRITICAL(ipexTensor, cpuTensor, check_data_ptr);
     return ipexTensor;
   } else {
     TORCH_INTERNAL_ASSERT(!ipexTensor.is_sparse());
     TORCH_INTERNAL_ASSERT(!cpuTensor.is_sparse());
     TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
     TORCH_INTERNAL_ASSERT(cpuTensor.layout() == c10::kStrided);
-    // [Hongzhen] TODO: Fix this issue for Sparse data_ptr comparison
-    // TORCH_INTERNAL_ASSERT(ipexTensor.data_ptr() == cpuTensor.data_ptr());
+    auto check_data_ptr = ipexTensor.numel() == cpuTensor.numel();
+    TORCH_INTERNAL_ASSERT(!check_data_ptr || ipexTensor.data_ptr() == cpuTensor.data_ptr());
 
     // NOTE: Cannot set storage data_ptr by set_data_ptr.
     //       set_data_ptr will release caller tensor's original data_ptr. It is wrong here because
@@ -416,8 +424,7 @@ at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cp
 
     IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
     ipex_tensor_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
-    // [Hongzhen] TODO: Fix this issue for Sparse data_ptr comparison
-    // CHECK_TENSOR_CRITICAL(ipexTensor, cpuTensor);
+    CHECK_TENSOR_CRITICAL(ipexTensor, cpuTensor, check_data_ptr);
     attachShadeDataConext(ipexTensor);
     return ipexTensor;
   }

@@ -5,51 +5,37 @@
 namespace torch_ipex {
 namespace cpu {
 
-//#define DBG
-#if defined(DBG)
-#define DEBUG(fmt) printf(fmt);
-#else
-#define DEBUG(fmt)
-#endif
-
 at::Tensor AtenIpexCPUSparse::_indices(const at::Tensor & self) {
-  DEBUG("AtenIpexCPUSparse::_indices\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kSparse);
   return IPEXSparseTensorImpl::get_ipex_sparse_impl(self)->indices();
 }
 
 at::Tensor AtenIpexCPUSparse::_values(const at::Tensor & self) {
-  DEBUG("AtenIpexCPUSparse::_values\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kSparse);
   return IPEXSparseTensorImpl::get_ipex_sparse_impl(self)->values();
 }
 
 int64_t AtenIpexCPUSparse::sparse_dim(const at::Tensor & self) {
-  DEBUG("AtenIpexCPUSparse::sparse_dim\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kSparse);
   return IPEXSparseTensorImpl::get_ipex_sparse_impl(self)->sparse_dim();
 }
 
 int64_t AtenIpexCPUSparse::dense_dim(const at::Tensor & self) {
-  DEBUG("AtenIpexCPUSparse::dense_dim\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kSparse);
   return IPEXSparseTensorImpl::get_ipex_sparse_impl(self)->dense_dim();
 }
 
 int64_t AtenIpexCPUSparse::_nnz(const at::Tensor & self) {
-  DEBUG("AtenIpexCPUSparse::_nnz\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kSparse);
   return IPEXSparseTensorImpl::get_ipex_sparse_impl(self)->nnz();
 }
 
 bool AtenIpexCPUSparse::is_coalesced(const at::Tensor & self) {
-  DEBUG("AtenIpexCPUSparse::is_coalesced\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kSparse);
   return IPEXSparseTensorImpl::get_ipex_sparse_impl(self)->coalesced();
 }
 
 at::Tensor & AtenIpexCPUSparse::_coalesced_(at::Tensor & self, bool coalesced) {
-  DEBUG("AtenIpexCPUSparse::_coalesced_\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kSparse);
   IPEXSparseTensorImpl::get_ipex_sparse_impl(self)->set_coalesced(coalesced);
   return self;
