@@ -26,18 +26,34 @@ namespace cpu {
 #define DEBUG(fmt)
 #endif
 
-at::Tensor dil_convolution(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
-  DEBUG("AtenIpexCPUOptimized::dil_convolution\n");
+at::Tensor dil_convolution(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups) {
+  DEBUG("AtenIpexCPUDev::dil_convolution\n");
   dil::tensor dil_input;
   dil::tensor dil_weight;
   c10::optional<dil::tensor> dil_bias{c10::nullopt};
 
   TORCH_INTERNAL_ASSERT(input.defined());
+  TORCH_INTERNAL_ASSERT(input.device().type() == at::DeviceType::DPCPP);
+  if (! (input.is_contiguous())) {
+    TORCH_INTERNAL_ASSERT(! (cpu::ShadeDataContext::isDilTensor(input)));
+  }
+
   TORCH_INTERNAL_ASSERT(weight.defined());
-  dil_input = dbl::comm::try_gen_dil_tensor(input);
-  dil_weight = dbl::comm::try_gen_dil_tensor(weight);
+  TORCH_INTERNAL_ASSERT(weight.device().type() == at::DeviceType::DPCPP);
+  if (! (weight.is_contiguous())) {
+    TORCH_INTERNAL_ASSERT(! (cpu::ShadeDataContext::isDilTensor(weight)));
+  }
+
+  dil_input = dbl::comm::try_gen_dil_tensor(input.is_contiguous() ? input : input.contiguous());
+  dil_weight = dbl::comm::try_gen_dil_tensor(weight.is_contiguous() ? weight : weight.contiguous());
   if (bias.defined()) {
-    dil_bias = dbl::comm::try_gen_dil_tensor(bias);
+    TORCH_INTERNAL_ASSERT(bias.is_contiguous());
+    TORCH_INTERNAL_ASSERT(bias.device().type() == at::DeviceType::DPCPP);
+    if (! (bias.is_contiguous())) {
+      TORCH_INTERNAL_ASSERT(! (cpu::ShadeDataContext::isDilTensor(bias)));
+    }
+
+    dil_bias = dbl::comm::try_gen_dil_tensor(bias.is_contiguous() ? bias : bias.contiguous());
   }
 
   dil::tensor dil_output = dbl::conv::conv2d_impl(
@@ -53,12 +69,12 @@ at::Tensor dil_convolution(const at::Tensor & input, const at::Tensor & weight, 
 }
 
 at::Tensor AtenIpexCPUDev::convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
-  DEBUG("AtenIpexCPUOptimized::convolution_overrideable\n");
+  DEBUG("AtenIpexCPUDev::convolution_overrideable\n");
   return mkldnn_convolution(input, weight, bias, padding, stride, dilation, groups);
 }
 
 at::Tensor AtenIpexCPUDev::mkldnn_convolution(const at::Tensor & self, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups) {
-  DEBUG("AtenIpexCPUOptimized::mkldnn_convolution\n");
+  DEBUG("AtenIpexCPUDev::mkldnn_convolution\n");
   TORCH_INTERNAL_ASSERT(self.defined());
   TORCH_INTERNAL_ASSERT(weight.defined());
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
@@ -75,12 +91,12 @@ at::Tensor AtenIpexCPUDev::mkldnn_convolution(const at::Tensor & self, const at:
 }
 
 std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::convolution_backward_overrideable(const at::Tensor & grad_output, const at::Tensor & input, const at::Tensor & weight, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups, std::array<bool,3> output_mask) {
-  DEBUG("AtenIpexCPUOptimized::convolution_backward_overrideable\n");
+  DEBUG("AtenIpexCPUDev::convolution_backward_overrideable\n");
   return mkldnn_convolution_backward(input, grad_output, weight, padding, stride, dilation, groups, output_mask);
 }
 
 std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::mkldnn_convolution_backward(const at::Tensor & self, const at::Tensor & grad_output, const at::Tensor & weight, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups, std::array<bool,3> output_mask) {
-  DEBUG("AtenIpexCPUOptimized::mkldnn_convolution_backward\n");
+  DEBUG("AtenIpexCPUDev::mkldnn_convolution_backward\n");
   TORCH_INTERNAL_ASSERT(self.defined());
   TORCH_INTERNAL_ASSERT(grad_output.defined());
   TORCH_INTERNAL_ASSERT(weight.defined());

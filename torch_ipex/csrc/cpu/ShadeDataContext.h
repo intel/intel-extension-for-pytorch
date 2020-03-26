@@ -17,28 +17,43 @@ struct ShadeDataContext {
 
   SHADE_DATA_TYPE    data_type;
 
+  ShadeDataContext() : dil_tensor(),
+                       cpu_raw_data(nullptr),
+                       cpu_del_run(nullptr),
+                       data_type(SHADE_DATA_TYPE::CPU_RAW) {}
+
+  ~ShadeDataContext() {
+    if (this->data_type == SHADE_DATA_TYPE::DIL) { // DIL Tensor
+      if (this->dil_tensor.is_public_format()) {
+        // If the dis tensor is plain format, then it means that its buffer is cpu buffer and should
+        // be as same as cpu_raw_data
+        TORCH_INTERNAL_ASSERT(this->dil_tensor.get() == cpu_raw_data);
+        TORCH_INTERNAL_ASSERT(this->cpu_raw_data != nullptr);
+        TORCH_INTERNAL_ASSERT(this->cpu_del_run != nullptr);
+        this->cpu_del_run(this->cpu_raw_data);
+        this->cpu_raw_data = nullptr;
+      } else {
+        // If dil tensor is block format, the cpu raw data means nothing here.
+        TORCH_INTERNAL_ASSERT(this->cpu_raw_data == nullptr);
+        TORCH_INTERNAL_ASSERT(this->cpu_del_run == nullptr);
+      }
+    } else { // CPU Tensor here
+      TORCH_INTERNAL_ASSERT(this->cpu_del_run != nullptr);
+      this->cpu_del_run(this->cpu_raw_data);
+      this->cpu_raw_data = nullptr;
+    }
+  }
+
   static void freeShadeDataContext(void *raw_data) {
     TORCH_INTERNAL_ASSERT(raw_data != nullptr);
     ShadeDataContext *shade_data_ctx = (ShadeDataContext*)raw_data;
-
     auto data_type = shade_data_ctx->data_type;
     TORCH_INTERNAL_ASSERT((data_type == SHADE_DATA_TYPE::CPU_RAW) || (data_type == SHADE_DATA_TYPE::DIL));
-    if (isDilTensor(raw_data)) { // DIL Tensor
-      TORCH_INTERNAL_ASSERT(shade_data_ctx->cpu_raw_data == nullptr);
-      TORCH_INTERNAL_ASSERT(shade_data_ctx->cpu_del_run == nullptr);
-    } else { // CPU Tensor here
-      TORCH_INTERNAL_ASSERT(shade_data_ctx->cpu_del_run != nullptr);
-      shade_data_ctx->cpu_del_run(shade_data_ctx->cpu_raw_data);
-      shade_data_ctx->cpu_raw_data = nullptr;
-    }
-    free(shade_data_ctx);
+    delete shade_data_ctx;
   }
 
   static ShadeDataContext *allocShadeDataContext() {
-    ShadeDataContext *shade_data_context = (ShadeDataContext*)malloc(sizeof(ShadeDataContext));
-    shade_data_context->cpu_raw_data = nullptr;
-    shade_data_context->cpu_del_run = nullptr;
-    shade_data_context->data_type = SHADE_DATA_TYPE::CPU_RAW;
+    ShadeDataContext *shade_data_context = new ShadeDataContext();
     return shade_data_context;
   }
 

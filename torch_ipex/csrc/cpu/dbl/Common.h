@@ -14,7 +14,9 @@ namespace comm {
 dil::tensor dil_tensor_from_dense(const at::Tensor& tensor);
 at::Tensor dil_tensor_to_dense(const dil::tensor& dil_tensor);
 dil::tensor try_gen_dil_tensor(const at::Tensor &input);
-at::Tensor gen_aten_tensor_by(const dil::tensor& tensor);
+at::Tensor gen_aten_tensor_by(dil::tensor tensor);
+
+bool meet_dnnl_route_pre_cond(at::Tensor tensor);
 
 }  // namespace comm
 }  // namespace dbl

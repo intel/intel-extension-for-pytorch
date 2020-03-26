@@ -51,7 +51,7 @@ dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
   }
 }
 
-at::Tensor gen_aten_tensor_by(const dil::tensor& dil_tensor) {
+at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
   // Generate new CPU Tensor and store dil tensor at its storage
   cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
   shade_data_context->dil_tensor = dil_tensor;
@@ -75,6 +75,16 @@ at::Tensor gen_aten_tensor_by(const dil::tensor& dil_tensor) {
     _tensor.unsafeGetTensorImpl()->set_sizes_contiguous(_tensor_sizes);
   }
   return _tensor;
+}
+
+bool meet_dnnl_route_pre_cond(const at::Tensor& tensor) {
+  if (tensor.is_contiguous()) {
+    if (tensor.layout() == at::Layout::Strided) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 }  // namespace comm

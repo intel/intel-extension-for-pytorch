@@ -46,6 +46,10 @@ namespace bridge {
   CHECK_TENSOR(a._indices(), b._indices()); \
   CHECK_TENSOR(a._values(), b._values())
 
+
+at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor);
+
+
 void attachShadeDataConext(const at::Tensor& tensor) {
   auto tensor_storage_impl = tensor.storage().unsafeGetStorageImpl();
   auto& data_ptr = tensor_storage_impl->data_ptr();
@@ -111,27 +115,39 @@ at::Tensor fallbackToCPUTensor(const at::Tensor& ipexTensor) {
 
 
 // Unpack CPU tensor from ipex tensor and return to caller directly
-at::Tensor shallowFallbackToCPUShadeTensor(const at::Tensor& ipexTensor) {
+//at::Tensor shallowFallbackToCPUShadeTensor(const at::Tensor& ipexTensor) {
+at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   if (!(ipexTensor.defined())) {
     return ipexTensor;
   }
 
   // NOT support sparse tensor.
-  TORCH_INTERNAL_ASSERT(!(ipexTensor.is_sparse()));
   TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
   if (ipexTensor.device().is_cpu())
     return ipexTensor;
 
+  // Brnach 1: Sparse Tensor
+  if (ipexTensor.is_sparse()) {
+    return shallowFallbackToCPUTensorImpl(ipexTensor);
+  }
+
+  // Branch 2: Dense Tensor
   void* data_context = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
   TORCH_INTERNAL_ASSERT(data_context != ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get());
   TORCH_INTERNAL_ASSERT(data_context != nullptr);
 
-  // Unpack CPU raw data from shade data
   cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_context;
+  // Branch 2.1: Dense + Dil Tensor
   if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
+    // All aten::tensor with dnnl::tensor should be contiguous
+    TORCH_INTERNAL_ASSERT(ipexTensor.is_contiguous());
+    TORCH_INTERNAL_ASSERT(! (shade_data_context->dil_tensor.is_empty()));
     dil::tensor &dil_tensor = shade_data_context->dil_tensor;
     if (dil_tensor.is_public_format()) {
       shade_data_context->data_type = cpu::SHADE_DATA_TYPE::CPU_RAW;
+      TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor.get());
+      TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data != nullptr);
+      TORCH_INTERNAL_ASSERT(shade_data_context->cpu_del_run != nullptr);
     } else {
       auto dims = dil_tensor.get_dims();
       // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
@@ -139,21 +155,24 @@ at::Tensor shallowFallbackToCPUShadeTensor(const at::Tensor& ipexTensor) {
         std::vector<int64_t>(dims.begin(), dims.end()),
         ipexTensor.options().device(c10::kCPU).layout(c10::kStrided));
       TORCH_INTERNAL_ASSERT(cpu_tensor.scalar_type() == get_at_data_type(dil_tensor.get_data_type()));
-      dil_tensor.to_public(cpu_tensor.data_ptr(), dil_tensor.get_data_type());
-      CHECK_TENSOR_CRITICAL(cpu_tensor, ipexTensor);
+      auto pub_tensor = dil_tensor.to_public(cpu_tensor.data_ptr(), dil_tensor.get_data_type());
       at::DataPtr& cpu_tensor_data_ptr = cpu_tensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr();
       ipexTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(cpu_tensor_data_ptr));
+      // The tensor has been reset to new DataPtr, then we need to attach new shade data context.
       attachShadeDataConext(ipexTensor);
+      ipexTensor.as_strided_(dims, pub_tensor.get_strides());
+      TORCH_INTERNAL_ASSERT(ipexTensor.is_contiguous());
     }
   }
 
-  return shallowFallbackToCPUTensor(ipexTensor);
+  // Branch 2.2: Dense + CPU Tensor
+  return shallowFallbackToCPUTensorImpl(ipexTensor);
 }
 
 
 // Fallback CPU tensor to DPCPP Tensor with shallow copy
 // It will create an new CPU tensor but shares DPCPP tensor buffer
-at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
+at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor) {
   if (!(ipexTensor.defined())) {
     return ipexTensor;
   }
@@ -167,8 +186,8 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
     TORCH_INTERNAL_ASSERT(ipexTensor._indices().layout() == c10::kStrided);
     TORCH_INTERNAL_ASSERT(ipexTensor._values().layout() == c10::kStrided);
 
-    auto cpu_indices = shallowFallbackToCPUTensor(ipexTensor._indices());
-    auto cpu_values = shallowFallbackToCPUTensor(ipexTensor._values());
+    auto cpu_indices = shallowFallbackToCPUTensorImpl(ipexTensor._indices());
+    auto cpu_values = shallowFallbackToCPUTensorImpl(ipexTensor._values());
     // Create cpu sparse tensor and copy meta data from ipex cpu sparse tensor
     auto _tensor = at::detail::make_tensor<IPEXSparseTensorImpl>(
       at::TensorTypeSet(at::TensorTypeId::SparseCPUTensorId), ipexTensor.dtype());
@@ -394,7 +413,7 @@ std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& ten
   for (size_t i = 0; i < tensor_list.size(); ++i) {
     const at::Tensor& tensor = tensor_list[i];
     if (tensor.defined()) {
-      dpcpp_tensor_vec[i] = shallowFallbackToCPUTensor(tensor);
+      dpcpp_tensor_vec[i] = shallowFallbackToCPUTensorImpl(tensor);
     }
   }
   return dpcpp_tensor_vec;
