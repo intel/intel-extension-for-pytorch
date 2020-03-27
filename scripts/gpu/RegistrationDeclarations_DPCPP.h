@@ -257,6 +257,8 @@ Tensor & threshold_(Tensor & self, Scalar threshold, Scalar value); // aten::thr
 
 Tensor & threshold_out(Tensor & out, const Tensor & self, Scalar threshold, Scalar value); // aten::threshold.out(Tensor self, Scalar threshold, Scalar value, *, Tensor(a!) out) -> Tensor(a!)
 
+Tensor threshold_backward(const Tensor & grad_output, const Tensor & self, Scalar threshold); // aten::threshold_backward(Tensor grad_output, Tensor self, Scalar threshold) -> Tensor
+
 Tensor roll(const Tensor & self, IntArrayRef shifts, IntArrayRef dims); // aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> Tensor
 
 Tensor & trunc_out(Tensor & out, const Tensor & self); // aten::trunc.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)

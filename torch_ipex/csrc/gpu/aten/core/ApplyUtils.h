@@ -20,31 +20,34 @@ namespace dpcpp {
 template <typename Op, typename scalar, typename IndexType, int ADims, int step>
 class PointwiseApply1 {};
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          int step>
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int step>
 class PointwiseApply2 {};
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          int CDims,
-          int step>
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int CDims,
+    int step>
 class PointwiseApply3 {};
 
-template <typename T1,
-          typename IndexType,
-          typename T2 = void,
-          typename T3 = void,
-          typename T4 = void>
+template <
+    typename T1,
+    typename IndexType,
+    typename T2 = void,
+    typename T3 = void,
+    typename T4 = void>
 inline void rearrangeDims(
     detail::TensorInfo<T1, IndexType>* aInfo,
     detail::TensorInfo<T2, IndexType>* bInfo = nullptr,
@@ -130,13 +133,14 @@ inline void rearrangeDims(
   }
 }
 
-template <typename Op,
-          typename scalar,
-          typename IndexType,
-          int ADims,
-          bool with_offset,
-          int remaining_steps,
-          typename... Offsets>
+template <
+    typename Op,
+    typename scalar,
+    typename IndexType,
+    int ADims,
+    bool with_offset,
+    int remaining_steps,
+    typename... Offsets>
 struct ApplyOp1 {
   inline static void apply(
       const detail::TensorInfo<scalar, IndexType>& a,
@@ -150,25 +154,27 @@ struct ApplyOp1 {
         ? detail::IndexToOffset<scalar, IndexType, ADims>::get(linearIndex, a)
         : 0;
     // Convert 'linearIndex' into an offset of input 'b'
-    ApplyOp1<Op,
-             scalar,
-             IndexType,
-             ADims,
-             with_offset,
-             remaining_steps - 1,
-             const IndexType,
-             Offsets...>::
+    ApplyOp1<
+        Op,
+        scalar,
+        IndexType,
+        ADims,
+        with_offset,
+        remaining_steps - 1,
+        const IndexType,
+        Offsets...>::
         apply(a, op, a_acc, n, linearIndex + 1, aOffsets..., aOffset);
   }
 };
 
 // Specialize 'step=1' case (i.e., 'remaining_steps = 0' and 'len(Offsets)=1').
 // We don't need to pass in how many elements need to processed in this case.
-template <typename Op,
-          typename scalar,
-          typename IndexType,
-          int ADims,
-          typename Offset>
+template <
+    typename Op,
+    typename scalar,
+    typename IndexType,
+    int ADims,
+    typename Offset>
 struct ApplyOp1<Op, scalar, IndexType, ADims, false, 0, Offset> {
   inline static void apply(
       const detail::TensorInfo<scalar, IndexType>& a,
@@ -184,11 +190,12 @@ struct ApplyOp1<Op, scalar, IndexType, ADims, false, 0, Offset> {
 
 // Specialize 'step=1' case (i.e., 'remaining_steps = 0' and 'len(Offsets)=1').
 // We don't need to pass in how many elements need to processed in this case.
-template <typename Op,
-          typename scalar,
-          typename IndexType,
-          int ADims,
-          typename Offset>
+template <
+    typename Op,
+    typename scalar,
+    typename IndexType,
+    int ADims,
+    typename Offset>
 struct ApplyOp1<Op, scalar, IndexType, ADims, true, 0, Offset> {
   inline static void apply(
       const detail::TensorInfo<scalar, IndexType>& a,
@@ -202,12 +209,13 @@ struct ApplyOp1<Op, scalar, IndexType, ADims, true, 0, Offset> {
   }
 };
 
-template <typename Op,
-          typename scalar,
-          typename IndexType,
-          int ADims,
-          bool with_offset,
-          typename... Offsets>
+template <
+    typename Op,
+    typename scalar,
+    typename IndexType,
+    int ADims,
+    bool with_offset,
+    typename... Offsets>
 struct ApplyOp1<Op, scalar, IndexType, ADims, with_offset, 0, Offsets...> {
   inline static void apply(
       const detail::TensorInfo<scalar, IndexType>& a,
@@ -221,12 +229,13 @@ struct ApplyOp1<Op, scalar, IndexType, ADims, with_offset, 0, Offsets...> {
   }
 };
 
-template <typename Op,
-          typename scalar,
-          typename IndexType,
-          int ADims,
-          int step,
-          bool with_offset>
+template <
+    typename Op,
+    typename scalar,
+    typename IndexType,
+    int ADims,
+    int step,
+    bool with_offset>
 void kernelPointwiseApply1(
     detail::TensorInfo<scalar, IndexType> a,
     IndexType totalElements,
@@ -258,15 +267,16 @@ void kernelPointwiseApply1(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          bool with_offset,
-          int remaining_steps,
-          typename... Offsets>
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    bool with_offset,
+    int remaining_steps,
+    typename... Offsets>
 struct ApplyOp2 {
   inline static void apply(
       const detail::TensorInfo<scalar1, IndexType>& a,
@@ -286,16 +296,17 @@ struct ApplyOp2 {
     const IndexType bOffset = static_cast<int>(sizeof...(Offsets)) < n
         ? detail::IndexToOffset<scalar2, IndexType, BDims>::get(linearIndex, b)
         : 0;
-    ApplyOp2<Op,
-             scalar1,
-             scalar2,
-             IndexType,
-             ADims,
-             BDims,
-             with_offset,
-             remaining_steps - 1,
-             const IndexType,
-             Offsets...>::
+    ApplyOp2<
+        Op,
+        scalar1,
+        scalar2,
+        IndexType,
+        ADims,
+        BDims,
+        with_offset,
+        remaining_steps - 1,
+        const IndexType,
+        Offsets...>::
         apply(
             a,
             b,
@@ -313,22 +324,24 @@ struct ApplyOp2 {
 
 // Specialize 'step=1' case (i.e., 'remaining_steps = 0' and 'len(Offsets)=1').
 // We don't need to pass in how many elements need to processed in this case.
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          typename Offset>
-struct ApplyOp2<Op,
-                scalar1,
-                scalar2,
-                IndexType,
-                ADims,
-                BDims,
-                false,
-                0,
-                Offset> {
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    typename Offset>
+struct ApplyOp2<
+    Op,
+    scalar1,
+    scalar2,
+    IndexType,
+    ADims,
+    BDims,
+    false,
+    0,
+    Offset> {
   inline static void apply(
       const detail::TensorInfo<scalar1, IndexType>& a,
       const detail::TensorInfo<scalar2, IndexType>& b,
@@ -347,22 +360,24 @@ struct ApplyOp2<Op,
 
 // Specialize 'step=1' case (i.e., 'remaining_steps = 0' and 'len(Offsets)=1').
 // We don't need to pass in how many elements need to processed in this case.
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          typename Offset>
-struct ApplyOp2<Op,
-                scalar1,
-                scalar2,
-                IndexType,
-                ADims,
-                BDims,
-                true,
-                0,
-                Offset> {
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    typename Offset>
+struct ApplyOp2<
+    Op,
+    scalar1,
+    scalar2,
+    IndexType,
+    ADims,
+    BDims,
+    true,
+    0,
+    Offset> {
   inline static void apply(
       const detail::TensorInfo<scalar1, IndexType>& a,
       const detail::TensorInfo<scalar2, IndexType>& b,
@@ -379,23 +394,25 @@ struct ApplyOp2<Op,
   }
 };
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          bool with_offset,
-          typename... Offsets>
-struct ApplyOp2<Op,
-                scalar1,
-                scalar2,
-                IndexType,
-                ADims,
-                BDims,
-                with_offset,
-                0,
-                Offsets...> {
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    bool with_offset,
+    typename... Offsets>
+struct ApplyOp2<
+    Op,
+    scalar1,
+    scalar2,
+    IndexType,
+    ADims,
+    BDims,
+    with_offset,
+    0,
+    Offsets...> {
   inline static void apply(
       const detail::TensorInfo<scalar1, IndexType>& a,
       const detail::TensorInfo<scalar2, IndexType>& b,
@@ -412,14 +429,15 @@ struct ApplyOp2<Op,
   }
 };
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          int step,
-          bool with_offset>
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int step,
+    bool with_offset>
 void kernelPointwiseApply2(
     detail::TensorInfo<scalar1, IndexType> output,
     detail::TensorInfo<scalar2, IndexType> input,
@@ -441,14 +459,15 @@ void kernelPointwiseApply2(
           for (IndexType linearIndex = item.get_global_id(0) * step;
                linearIndex < totalElements;
                linearIndex += item.get_global_range()[0] * step) {
-            ApplyOp2<Op,
-                     scalar1,
-                     scalar2,
-                     IndexType,
-                     ADims,
-                     BDims,
-                     with_offset,
-                     step>::
+            ApplyOp2<
+                Op,
+                scalar1,
+                scalar2,
+                IndexType,
+                ADims,
+                BDims,
+                with_offset,
+                step>::
                 apply(
                     output,
                     input,
@@ -466,16 +485,17 @@ void kernelPointwiseApply2(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          int CDims,
-          int remaining_steps,
-          typename... Offsets>
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int CDims,
+    int remaining_steps,
+    typename... Offsets>
 struct ApplyOp3 {
   inline static void apply(
       const detail::TensorInfo<scalar1, IndexType>& a,
@@ -503,17 +523,18 @@ struct ApplyOp3 {
         ? detail::IndexToOffset<scalar3, IndexType, CDims>::get(linearIndex, c)
         : 0;
 
-    ApplyOp3<Op,
-             scalar1,
-             scalar2,
-             scalar3,
-             IndexType,
-             ADims,
-             BDims,
-             CDims,
-             remaining_steps - 1,
-             const IndexType,
-             Offsets...>::
+    ApplyOp3<
+        Op,
+        scalar1,
+        scalar2,
+        scalar3,
+        IndexType,
+        ADims,
+        BDims,
+        CDims,
+        remaining_steps - 1,
+        const IndexType,
+        Offsets...>::
         apply(
             a,
             b,
@@ -537,25 +558,27 @@ struct ApplyOp3 {
 
 // Specialize 'step=1' case (i.e., 'remaining_steps = 0' and 'len(Offsets)=1').
 // We don't need to pass in how many elements need to processed in this case.
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          int CDims,
-          typename Offset>
-struct ApplyOp3<Op,
-                scalar1,
-                scalar2,
-                scalar3,
-                IndexType,
-                ADims,
-                BDims,
-                CDims,
-                0,
-                Offset> {
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int CDims,
+    typename Offset>
+struct ApplyOp3<
+    Op,
+    scalar1,
+    scalar2,
+    scalar3,
+    IndexType,
+    ADims,
+    BDims,
+    CDims,
+    0,
+    Offset> {
   inline static void apply(
       const detail::TensorInfo<scalar1, IndexType>& a,
       const detail::TensorInfo<scalar2, IndexType>& b,
@@ -576,25 +599,27 @@ struct ApplyOp3<Op,
   }
 };
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          int CDims,
-          typename... Offsets>
-struct ApplyOp3<Op,
-                scalar1,
-                scalar2,
-                scalar3,
-                IndexType,
-                ADims,
-                BDims,
-                CDims,
-                0,
-                Offsets...> {
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int CDims,
+    typename... Offsets>
+struct ApplyOp3<
+    Op,
+    scalar1,
+    scalar2,
+    scalar3,
+    IndexType,
+    ADims,
+    BDims,
+    CDims,
+    0,
+    Offsets...> {
   inline static void apply(
       const detail::TensorInfo<scalar1, IndexType>& a,
       const detail::TensorInfo<scalar2, IndexType>& b,
@@ -615,15 +640,16 @@ struct ApplyOp3<Op,
   }
 };
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          int CDims,
-          int step>
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int CDims,
+    int step>
 void kernelPointwiseApply3(
     detail::TensorInfo<scalar1, IndexType> output,
     detail::TensorInfo<scalar2, IndexType> input1,
@@ -638,30 +664,32 @@ void kernelPointwiseApply3(
     auto in1_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input1.data);
     auto in2_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input2.data);
     auto out_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output.data);
-    cgh.parallel_for<PointwiseApply3<Op,
-                                     scalar1,
-                                     scalar2,
-                                     scalar3,
-                                     IndexType,
-                                     ADims,
-                                     BDims,
-                                     CDims,
-                                     step>>(
+    cgh.parallel_for<PointwiseApply3<
+        Op,
+        scalar1,
+        scalar2,
+        scalar3,
+        IndexType,
+        ADims,
+        BDims,
+        CDims,
+        step>>(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
         [=](DPCPP::nd_item<1> item) {
           for (IndexType linearIndex = item.get_global_id(0) * step;
                linearIndex < totalElements;
                linearIndex += item.get_global_range()[0] * step) {
-            ApplyOp3<Op,
-                     scalar1,
-                     scalar2,
-                     scalar3,
-                     IndexType,
-                     ADims,
-                     BDims,
-                     CDims,
-                     step>::
+            ApplyOp3<
+                Op,
+                scalar1,
+                scalar2,
+                scalar3,
+                IndexType,
+                ADims,
+                BDims,
+                CDims,
+                step>::
                 apply(
                     output,
                     input1,
@@ -681,18 +709,19 @@ void kernelPointwiseApply3(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          typename scalar4,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          int CDims,
-          int DDims,
-          int remaining_steps,
-          typename... Offsets>
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename scalar4,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int CDims,
+    int DDims,
+    int remaining_steps,
+    typename... Offsets>
 struct ApplyOp4 {
   inline static void apply(
       const detail::TensorInfo<scalar1, IndexType>& a,
@@ -727,19 +756,20 @@ struct ApplyOp4 {
         ? detail::IndexToOffset<scalar4, IndexType, DDims>::get(linearIndex, d)
         : 0;
 
-    ApplyOp4<Op,
-             scalar1,
-             scalar2,
-             scalar3,
-             scalar4,
-             IndexType,
-             ADims,
-             BDims,
-             CDims,
-             DDims,
-             remaining_steps - 1,
-             const IndexType,
-             Offsets...>::
+    ApplyOp4<
+        Op,
+        scalar1,
+        scalar2,
+        scalar3,
+        scalar4,
+        IndexType,
+        ADims,
+        BDims,
+        CDims,
+        DDims,
+        remaining_steps - 1,
+        const IndexType,
+        Offsets...>::
         apply(
             a,
             b,
@@ -763,29 +793,31 @@ struct ApplyOp4 {
   }
 };
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          typename scalar4,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          int CDims,
-          int DDims,
-          typename Offset>
-struct ApplyOp4<Op,
-                scalar1,
-                scalar2,
-                scalar3,
-                scalar4,
-                IndexType,
-                ADims,
-                BDims,
-                CDims,
-                DDims,
-                0,
-                Offset> {
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename scalar4,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int CDims,
+    int DDims,
+    typename Offset>
+struct ApplyOp4<
+    Op,
+    scalar1,
+    scalar2,
+    scalar3,
+    scalar4,
+    IndexType,
+    ADims,
+    BDims,
+    CDims,
+    DDims,
+    0,
+    Offset> {
   inline static void apply(
       const detail::TensorInfo<scalar1, IndexType>& a,
       const detail::TensorInfo<scalar2, IndexType>& b,
@@ -810,29 +842,31 @@ struct ApplyOp4<Op,
   }
 };
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          typename scalar4,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          int CDims,
-          int DDims,
-          typename... Offsets>
-struct ApplyOp4<Op,
-                scalar1,
-                scalar2,
-                scalar3,
-                scalar4,
-                IndexType,
-                ADims,
-                BDims,
-                CDims,
-                DDims,
-                0,
-                Offsets...> {
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename scalar4,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int CDims,
+    int DDims,
+    typename... Offsets>
+struct ApplyOp4<
+    Op,
+    scalar1,
+    scalar2,
+    scalar3,
+    scalar4,
+    IndexType,
+    ADims,
+    BDims,
+    CDims,
+    DDims,
+    0,
+    Offsets...> {
   inline static void apply(
       const detail::TensorInfo<scalar1, IndexType>& a,
       const detail::TensorInfo<scalar2, IndexType>& b,
@@ -861,30 +895,32 @@ struct ApplyOp4<Op,
   }
 };
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          typename scalar4,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          int CDims,
-          int DDims,
-          int step>
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename scalar4,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int CDims,
+    int DDims,
+    int step>
 class PointwiseApply4 {};
 
-template <typename Op,
-          typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          typename scalar4,
-          typename IndexType,
-          int ADims,
-          int BDims,
-          int CDims,
-          int DDims,
-          int step>
+template <
+    typename Op,
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename scalar4,
+    typename IndexType,
+    int ADims,
+    int BDims,
+    int CDims,
+    int DDims,
+    int step>
 void kernelPointwiseApply4(
     detail::TensorInfo<scalar1, IndexType> output,
     detail::TensorInfo<scalar2, IndexType> input1,
@@ -901,34 +937,36 @@ void kernelPointwiseApply4(
     auto in2_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input2.data);
     auto in3_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input3.data);
     auto out_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output.data);
-    cgh.parallel_for<PointwiseApply4<Op,
-                                     scalar1,
-                                     scalar2,
-                                     scalar3,
-                                     scalar4,
-                                     IndexType,
-                                     ADims,
-                                     BDims,
-                                     CDims,
-                                     DDims,
-                                     step>>(
+    cgh.parallel_for<PointwiseApply4<
+        Op,
+        scalar1,
+        scalar2,
+        scalar3,
+        scalar4,
+        IndexType,
+        ADims,
+        BDims,
+        CDims,
+        DDims,
+        step>>(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
         [=](DPCPP::nd_item<1> item) {
           for (IndexType linearIndex = item.get_global_id(0) * step;
                linearIndex < totalElements;
                linearIndex += item.get_global_range()[0] * step) {
-            ApplyOp4<Op,
-                     scalar1,
-                     scalar2,
-                     scalar3,
-                     scalar4,
-                     IndexType,
-                     ADims,
-                     BDims,
-                     CDims,
-                     DDims,
-                     step>::
+            ApplyOp4<
+                Op,
+                scalar1,
+                scalar2,
+                scalar3,
+                scalar4,
+                IndexType,
+                ADims,
+                BDims,
+                CDims,
+                DDims,
+                step>::
                 apply(
                     output,
                     input1,
@@ -1050,11 +1088,12 @@ inline void DPCPP_tensor_apply1(at::Tensor a, const Op& op) {
   DPCPP_tensor_apply1<scalar, 1, Op, with_offset>(a, op);
 }
 
-template <typename scalar1,
-          typename scalar2,
-          int step,
-          typename Op,
-          bool with_offset = false>
+template <
+    typename scalar1,
+    typename scalar2,
+    int step,
+    typename Op,
+    bool with_offset = false>
 inline void DPCPP_tensor_apply2(at::Tensor dst, at::Tensor src, const Op& op) {
   checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::DPCPP);
   int64_t totalElements = dst.numel();
@@ -1077,14 +1116,14 @@ inline void DPCPP_tensor_apply2(at::Tensor dst, at::Tensor src, const Op& op) {
     dst = dst.contiguous();
   }
 
-// It is possible that the tensor dimensions are able to be collapsed,
-// and thus we can reduce the actual code complexity of the copy by
-// exploiting this knowledge statically, since the div/mod is the
-// most expensive part of the operation, more so than memory accesses.
-// For instance, when copying a non-contiguous to a contiguous tensor
-// (or vice versa), the contiguous tensor can be collapsed to one
-// dimension, and the loop to translate the linear index to the array
-// index can be similarly collapsed. That is what this unrolling is for.
+  // It is possible that the tensor dimensions are able to be collapsed,
+  // and thus we can reduce the actual code complexity of the copy by
+  // exploiting this knowledge statically, since the div/mod is the
+  // most expensive part of the operation, more so than memory accesses.
+  // For instance, when copying a non-contiguous to a contiguous tensor
+  // (or vice versa), the contiguous tensor can be collapsed to one
+  // dimension, and the loop to translate the linear index to the array
+  // index can be similarly collapsed. That is what this unrolling is for.
 
 #define HANDLE_CASE(TYPE, A, B)                                               \
   kernelPointwiseApply2<Op, scalar1, scalar2, TYPE, A, B, step, with_offset>( \
@@ -1164,19 +1203,21 @@ inline void DPCPP_tensor_apply2(at::Tensor dst, at::Tensor src, const Op& op) {
 }
 
 /* Provides default step = 1 to DPCPP_tensor_apply2. */
-template <typename scalar1,
-          typename scalar2,
-          typename Op,
-          bool with_offset = false>
+template <
+    typename scalar1,
+    typename scalar2,
+    typename Op,
+    bool with_offset = false>
 inline void DPCPP_tensor_apply2(at::Tensor a, at::Tensor b, const Op& op) {
   DPCPP_tensor_apply2<scalar1, scalar2, 1, Op, with_offset>(a, b, op);
 }
 
-template <typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          int step,
-          typename Op>
+template <
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    int step,
+    typename Op>
 inline void DPCPP_tensor_apply3(
     at::Tensor dst,
     at::Tensor src1,
@@ -1205,14 +1246,14 @@ inline void DPCPP_tensor_apply3(
     dst = dst.contiguous();
   }
 
-// It is possible that the tensor dimensions are able to be collapsed,
-// and thus we can reduce the actual code complexity of the copy by
-// exploiting this knowledge statically, since the div/mod is the
-// most expensive part of the operation, more so than memory accesses.
-// For instance, when copying a non-contiguous to a contiguous tensor
-// (or vice versa), the contiguous tensor can be collapsed to one
-// dimension, and the loop to translate the linear index to the array
-// index can be similarly collapsed. That is what this unrolling is for.
+  // It is possible that the tensor dimensions are able to be collapsed,
+  // and thus we can reduce the actual code complexity of the copy by
+  // exploiting this knowledge statically, since the div/mod is the
+  // most expensive part of the operation, more so than memory accesses.
+  // For instance, when copying a non-contiguous to a contiguous tensor
+  // (or vice versa), the contiguous tensor can be collapsed to one
+  // dimension, and the loop to translate the linear index to the array
+  // index can be similarly collapsed. That is what this unrolling is for.
 
 #define HANDLE_CASE(TYPE, A, B, C)                                           \
   kernelPointwiseApply3<Op, scalar1, scalar2, scalar3, TYPE, A, B, C, step>( \
@@ -1329,12 +1370,13 @@ inline void DPCPP_tensor_apply3(
   DPCPP_tensor_apply3<scalar1, scalar2, scalar3, 1, Op>(a, b, c, op);
 }
 
-template <typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          typename scalar4,
-          int step,
-          typename Op>
+template <
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename scalar4,
+    int step,
+    typename Op>
 inline void DPCPP_tensor_apply4(
     at::Tensor dst,
     at::Tensor src1,
@@ -1367,17 +1409,18 @@ inline void DPCPP_tensor_apply4(
   }
 
 #define HANDLE_CASE(TYPE, A, B, C, D)   \
-  kernelPointwiseApply4<Op,             \
-                        scalar1,        \
-                        scalar2,        \
-                        scalar3,        \
-                        scalar4,        \
-                        TYPE,           \
-                        A,              \
-                        B,              \
-                        C,              \
-                        D,              \
-                        step>(          \
+  kernelPointwiseApply4<                \
+      Op,                               \
+      scalar1,                          \
+      scalar2,                          \
+      scalar3,                          \
+      scalar4,                          \
+      TYPE,                             \
+      A,                                \
+      B,                                \
+      C,                                \
+      D,                                \
+      step>(                            \
       dstInfo,                          \
       src1Info,                         \
       src2Info,                         \
@@ -1521,11 +1564,12 @@ inline void DPCPP_tensor_apply4(
 }
 
 /* Provides default step = 1 to CUDA_tensor_apply4. */
-template <typename scalar1,
-          typename scalar2,
-          typename scalar3,
-          typename scalar4,
-          typename Op>
+template <
+    typename scalar1,
+    typename scalar2,
+    typename scalar3,
+    typename scalar4,
+    typename Op>
 inline void DPCPP_tensor_apply4(
     const at::Tensor& a,
     const at::Tensor& b,
@@ -1536,5 +1580,5 @@ inline void DPCPP_tensor_apply4(
       a, b, c, d, op);
 }
 
-} // dpcpp
-} // at
+} // namespace dpcpp
+} // namespace at

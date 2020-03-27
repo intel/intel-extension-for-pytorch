@@ -88,7 +88,6 @@ Tensor& linspace_dpcpp_out(
 
       // submit to DPCPP queue
       DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
-
     });
   }
 
@@ -140,7 +139,6 @@ Tensor& logspace_dpcpp_out(
 
       // submit to DPCPP queue
       DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
-
     });
   }
 
@@ -283,7 +281,6 @@ Tensor& arange_dpcpp_out(
 
         // submit to DPCPP queue
         DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
-
       });
   return result;
 }

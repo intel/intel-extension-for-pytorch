@@ -134,6 +134,7 @@ class AtenIpexTypeDefault {
   static at::Tensor threshold(const at::Tensor & self, at::Scalar threshold, at::Scalar value);
   static at::Tensor & threshold_(at::Tensor & self, at::Scalar threshold, at::Scalar value);
   static at::Tensor & threshold_out(at::Tensor & out, const at::Tensor & self, at::Scalar threshold, at::Scalar value);
+  static at::Tensor threshold_backward(const at::Tensor & grad_output, const at::Tensor & self, at::Scalar threshold);
   static at::Tensor roll(const at::Tensor & self, at::IntArrayRef shifts, at::IntArrayRef dims);
   static at::Tensor & trunc_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor var(const at::Tensor & self, bool unbiased);

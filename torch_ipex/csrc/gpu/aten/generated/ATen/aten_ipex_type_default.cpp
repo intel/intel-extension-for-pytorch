@@ -519,6 +519,10 @@ at::Tensor & AtenIpexTypeDefault::threshold_out(at::Tensor & out, const at::Tens
   return AtenIpexTypeDPCPP::threshold_out(out, self, threshold, value);
 }
 
+at::Tensor AtenIpexTypeDefault::threshold_backward(const at::Tensor & grad_output, const at::Tensor & self, at::Scalar threshold) {
+  return AtenIpexTypeDPCPP::threshold_backward(grad_output, self, threshold);
+}
+
 at::Tensor AtenIpexTypeDefault::roll(const at::Tensor & self, at::IntArrayRef shifts, at::IntArrayRef dims) {
   return AtenIpexTypeDPCPP::roll(self, shifts, dims);
 }
@@ -1806,6 +1810,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::threshold.out(Tensor self, Scalar threshold, Scalar value, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::threshold_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::threshold_backward(Tensor grad_output, Tensor self, Scalar threshold) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::threshold_backward>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, at::IntArrayRef), &AtenIpexTypeDefault::roll>(at::TensorTypeId::DPCPPTensorId)

@@ -118,7 +118,7 @@ inline void get_coordinate_in_tril_trapezoid(
   col = x - ((f + row - 1) * row >> 1);
 }
 
-} // end of namespace
+} // namespace triangle_dpcpp
 
 DPCPP_DEF_K1(triuIndicesSycl);
 DPCPP_DEF_K1(trilIndicesSycl);

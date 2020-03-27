@@ -102,5 +102,5 @@ void dpcpp_eltwise_backward(
        {MKLDNN_ARG_DIFF_DST, diff_dst_memory},
        {MKLDNN_ARG_DIFF_SRC, diff_src_memory}});
 }
-}
-} // at::dpcpp
+} // namespace dpcpp
+} // namespace at

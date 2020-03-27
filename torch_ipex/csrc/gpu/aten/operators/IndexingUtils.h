@@ -320,5 +320,5 @@ static TensorIterator make_index_iterator(const AdvancedIndex& info) {
   iter.build();
   return iter;
 }
-}
-}
+} // namespace dpcpp
+} // namespace at

@@ -82,5 +82,5 @@ Tensor& cross_out(
 
   return out;
 }
-}
-} // namespace at::AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

@@ -134,6 +134,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor threshold(const at::Tensor & self, at::Scalar threshold, at::Scalar value);
   at::Tensor & threshold_(at::Tensor & self, at::Scalar threshold, at::Scalar value);
   at::Tensor & threshold_out(at::Tensor & out, const at::Tensor & self, at::Scalar threshold, at::Scalar value);
+  at::Tensor threshold_backward(const at::Tensor & grad_output, const at::Tensor & self, at::Scalar threshold);
   at::Tensor roll(const at::Tensor & self, at::IntArrayRef shifts, at::IntArrayRef dims);
   at::Tensor & trunc_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor var(const at::Tensor & self, bool unbiased);

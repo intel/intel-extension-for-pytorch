@@ -10,46 +10,46 @@
 #include <core/Macros.h>
 
 /*
-* Stream pool note.
-*
-* A DPCPPStream is an abstraction of an actual cuStream on the GPU. DPCPPStreams
-* are backed by cuStreams, but they use several pools to minimize the costs
-* associated with creating, retaining, and destroying cuStreams.
-*
-* There are three pools per device, and a device's pools are lazily created.
-*
-* The first pool contains only the default stream. When the default stream
-* is requested it's returned.
-*
-* The second pool is the "low priority" or "default priority" streams. In
-* HIP builds there is no distinction between streams in this pool and streams
-* in the third pool (below). There are 32 of these streams per device, and
-* when a stream is requested one of these streams is returned round-robin.
-* That is, the first stream requested is at index 0, the second at index 1...
-* to index 31, then index 0 again.
-*
-* This means that if 33 low priority streams are requested, the first and
-* last streams requested are actually the same stream (under the covers)
-* and kernels enqueued on them cannot run concurrently.
-*
-* The third pool is the "high priority" streams. The third pool acts like
-* the second pool except the streams are created with a higher priority.
-*
-* These pools suggest that stream users should prefer many short-lived streams,
-* as the cost of acquiring and releasing streams is effectively zero. If
-* many longer-lived streams are required in performance critical scenarios
-* then the functionality here may need to be extended to allow, for example,
-* "reserving" a subset of the pool so that other streams do not accidentally
-* overlap the performance critical streams.
-*
-* Note: although the notion of "current stream for device" is thread local
-* (every OS thread has a separate current stream, as one might expect),
-* the stream pool is global across all threads; stream 0 is always stream 0
-* no matter which thread you use it on.  Multiple threads can synchronize
-* on the same stream.  Although the DPCPP documentation is not very clear
-* on the matter, streams are thread safe; e.g., it is safe to enqueue
-* a kernel on the same stream from two different threads.
-*/
+ * Stream pool note.
+ *
+ * A DPCPPStream is an abstraction of an actual cuStream on the GPU.
+ * DPCPPStreams are backed by cuStreams, but they use several pools to minimize
+ * the costs associated with creating, retaining, and destroying cuStreams.
+ *
+ * There are three pools per device, and a device's pools are lazily created.
+ *
+ * The first pool contains only the default stream. When the default stream
+ * is requested it's returned.
+ *
+ * The second pool is the "low priority" or "default priority" streams. In
+ * HIP builds there is no distinction between streams in this pool and streams
+ * in the third pool (below). There are 32 of these streams per device, and
+ * when a stream is requested one of these streams is returned round-robin.
+ * That is, the first stream requested is at index 0, the second at index 1...
+ * to index 31, then index 0 again.
+ *
+ * This means that if 33 low priority streams are requested, the first and
+ * last streams requested are actually the same stream (under the covers)
+ * and kernels enqueued on them cannot run concurrently.
+ *
+ * The third pool is the "high priority" streams. The third pool acts like
+ * the second pool except the streams are created with a higher priority.
+ *
+ * These pools suggest that stream users should prefer many short-lived streams,
+ * as the cost of acquiring and releasing streams is effectively zero. If
+ * many longer-lived streams are required in performance critical scenarios
+ * then the functionality here may need to be extended to allow, for example,
+ * "reserving" a subset of the pool so that other streams do not accidentally
+ * overlap the performance critical streams.
+ *
+ * Note: although the notion of "current stream for device" is thread local
+ * (every OS thread has a separate current stream, as one might expect),
+ * the stream pool is global across all threads; stream 0 is always stream 0
+ * no matter which thread you use it on.  Multiple threads can synchronize
+ * on the same stream.  Although the DPCPP documentation is not very clear
+ * on the matter, streams are thread safe; e.g., it is safe to enqueue
+ * a kernel on the same stream from two different threads.
+ */
 
 namespace at {
 namespace dpcpp {
@@ -136,7 +136,7 @@ class AT_DPCPP_API DPCPPStream {
 
   // Explicit conversion to dpcppStream_t
   dpcppStream_t stream() const {
-    return (dpcppStream_t) this->dpcpp_queue().get();
+    return (dpcppStream_t)this->dpcpp_queue().get();
   }
 
   // Deleted for now; use DPCPPEvent::block instead

@@ -82,9 +82,8 @@
 #define IMPLEMENT_POINTWISE_CALLABLE_(                                        \
     NAME, APPLY_NUM, APPLY_NUM_EXT, CALLABLE, CALLABLE_ARGS_NUM)              \
   template <typename scalar_t>                                                \
-  void NAME(                                                                  \
-      POINTWISE_ARGS_DECL_##APPLY_NUM_EXT COMMA_##CALLABLE_ARGS_NUM           \
-          CALLABLE_INIT_ARGS_DECL_##CALLABLE_ARGS_NUM) {                      \
+  void NAME(POINTWISE_ARGS_DECL_##APPLY_NUM_EXT COMMA_##CALLABLE_ARGS_NUM     \
+                CALLABLE_INIT_ARGS_DECL_##CALLABLE_ARGS_NUM) {                \
     if (CHECK_SAME_TENSOR()) {                                                \
       at::dpcpp::DPCPP_tensor_apply##APPLY_NUM<REPEAT_AS_ARGLIST_##APPLY_NUM( \
           scalar_t)>(                                                         \
@@ -167,9 +166,8 @@
       callable)                                                      \
   }                                                                  \
                                                                      \
-  Tensor& op(                                                        \
-      POINTWISE_ARGS_DECL_##arg_num COMMA_##callable_args_num        \
-          SCALAR_ARGS_DECL_##callable_args_num) {                    \
+  Tensor& op(POINTWISE_ARGS_DECL_##arg_num COMMA_##callable_args_num \
+                 SCALAR_ARGS_DECL_##callable_args_num) {             \
     AT_DISPATCH_##types(                                             \
         POINTWISE_ARG_FOR_TYPE_##arg_num.scalar_type(), #op, [&]() { \
           impl::op<scalar_t>(                                        \
@@ -301,10 +299,8 @@ struct TensorSigmoidGradOp<at::Half> {
 template <typename T>
 struct TensorDigammaOp {
   void operator()(T& out, T& in) const {
-    using compute_type =
-        typename std::conditional<std::is_same<T, at::Half>::value,
-                                  float,
-                                  T>::type;
+    using compute_type = typename std::
+        conditional<std::is_same<T, at::Half>::value, float, T>::type;
     static const double PI_f64 = 3.14159265358979323846;
     static const compute_type PSI_10 = 2.25175258906672110764;
     static const compute_type A[] = {
@@ -364,10 +360,8 @@ struct TensorDigammaOp {
   }
 
   void operator()(T& v) const {
-    using compute_type =
-        typename std::conditional<std::is_same<T, at::Half>::value,
-                                  float,
-                                  T>::type;
+    using compute_type = typename std::
+        conditional<std::is_same<T, at::Half>::value, float, T>::type;
     static const double PI_f64 = 3.14159265358979323846;
     static const compute_type PSI_10 = 2.25175258906672110764;
     static const compute_type A[] = {
@@ -430,10 +424,8 @@ struct TensorDigammaOp {
 template <typename T>
 struct TensorErfinvOp {
   void operator()(T& out, T& in) const {
-    using compute_type =
-        typename std::conditional<std::is_same<T, at::Half>::value,
-                                  float,
-                                  T>::type;
+    using compute_type = typename std::
+        conditional<std::is_same<T, at::Half>::value, float, T>::type;
     compute_type z, num, dem;
     static const double PI_f64 = 3.14159265358979323846;
     static const compute_type a[4] = {
@@ -472,20 +464,20 @@ struct TensorErfinvOp {
               DPCPP::copysign(1.0, scalar_cast<double>(x))) *
           num / dem);
     }
-    out = out - scalar_cast<T>(
-                    (DPCPP::erf(scalar_cast<double>(out)) - x) /
-                    ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
-    out = out - scalar_cast<T>(
-                    (DPCPP::erf(scalar_cast<double>(out)) - x) /
-                    ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
+    out = out -
+        scalar_cast<T>(
+              (DPCPP::erf(scalar_cast<double>(out)) - x) /
+              ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
+    out = out -
+        scalar_cast<T>(
+              (DPCPP::erf(scalar_cast<double>(out)) - x) /
+              ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
     return;
   }
 
   void operator()(T& v) const {
-    using compute_type =
-        typename std::conditional<std::is_same<T, at::Half>::value,
-                                  float,
-                                  T>::type;
+    using compute_type = typename std::
+        conditional<std::is_same<T, at::Half>::value, float, T>::type;
     compute_type z, num, dem;
     static const double PI_f64 = 3.14159265358979323846;
     static const compute_type a[4] = {
@@ -524,12 +516,14 @@ struct TensorErfinvOp {
               DPCPP::copysign(1.0, scalar_cast<double>(x))) *
           num / dem);
     }
-    v = v - scalar_cast<T>(
-                (DPCPP::erf(scalar_cast<double>(v)) - x) /
-                ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
-    v = v - scalar_cast<T>(
-                (DPCPP::erf(scalar_cast<double>(v)) - x) /
-                ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
+    v = v -
+        scalar_cast<T>(
+            (DPCPP::erf(scalar_cast<double>(v)) - x) /
+            ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
+    v = v -
+        scalar_cast<T>(
+            (DPCPP::erf(scalar_cast<double>(v)) - x) /
+            ((2.0 / DPCPP::sqrt(PI_f64)) * DPCPP::exp(-x * x)));
     return;
   }
 };

@@ -476,7 +476,6 @@ Tensor embedding_bag_backward_dpcpp_kernel(
             grad_weight_per_segment.data_ptr<partial_weight_t>(),
             partials_per_segment_offset.data_ptr<int64_t>(),
             num_of_partial_segments);
-
       });
 
   return grad_weight;
@@ -887,7 +886,7 @@ Tensor _embedding_bag_dense_backward_dpcpp(
   }
 }
 
-} // impl
+} // namespace impl
 
 std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag(
     const Tensor& weight,

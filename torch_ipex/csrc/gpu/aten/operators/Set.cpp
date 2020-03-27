@@ -44,5 +44,5 @@ bool is_set_to(const Tensor& self, const Tensor& tensor) {
   return TensorImpl_isSetTo(TensorImpl_Unwrap(self), TensorImpl_Unwrap(tensor));
 }
 
-} // namepsace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeDPCPP
 } // namespace at

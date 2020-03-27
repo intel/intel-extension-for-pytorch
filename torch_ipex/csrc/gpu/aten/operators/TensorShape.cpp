@@ -31,5 +31,5 @@ Tensor unfold(
   return at::native::unfold(self, dimension, size, step);
 }
 
-} // AtenIpexTypeDPCPP
-} // at
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

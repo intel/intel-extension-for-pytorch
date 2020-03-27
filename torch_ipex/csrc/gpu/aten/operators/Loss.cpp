@@ -212,9 +212,8 @@ void dnnl_inner_product_forward_frame(
   auto output_md = memory::desc({output_tz}, data_t, format_any);
 
   std::shared_ptr<inner_product_forward::desc> ipFwd_desc;
-  ipFwd_desc.reset(
-      new inner_product_forward::desc(
-          prop_kind::forward, input_md, weight_md, output_md));
+  ipFwd_desc.reset(new inner_product_forward::desc(
+      prop_kind::forward, input_md, weight_md, output_md));
   auto ip_forward_pd =
       inner_product_forward::primitive_desc(*ipFwd_desc, engine);
 

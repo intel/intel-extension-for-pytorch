@@ -8,7 +8,9 @@ namespace dpcpp {
 
 #define DPCPP_DESC_BUFF_LEN 64
 
-typedef struct DPCPPDescBuff { char str[DPCPP_DESC_BUFF_LEN]; } DPCPPDescBuff;
+typedef struct DPCPPDescBuff {
+  char str[DPCPP_DESC_BUFF_LEN];
+} DPCPPDescBuff;
 
 TensorImpl* TensorImpl_new();
 at::Tensor TensorImpl_wrap(TensorImpl* tensor);
@@ -87,5 +89,5 @@ bool TensorImpl_maybeOverlappingIndices(const at::TensorImpl* t);
 
 DPCPPDescBuff TensorImpl_sizeDesc(const at::TensorImpl* tensor);
 
-} // dpcpp::
-} // at::
+} // namespace dpcpp
+} // namespace at

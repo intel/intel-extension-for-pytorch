@@ -33,8 +33,9 @@ Tensor& softplus_out(
     dpcpp_kernel_for_tensor_iter<DPCPP_K(softplus_forward)>(
         iter, [=](scalar_t a) -> scalar_t {
           return (
-              a * b > t ? a : Numerics<scalar_t>::log1p(
-                                  Numerics<scalar_t>::exp(a * b)) /
+              a * b > t
+                  ? a
+                  : Numerics<scalar_t>::log1p(Numerics<scalar_t>::exp(a * b)) /
                       b);
         });
   });

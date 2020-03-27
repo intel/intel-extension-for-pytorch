@@ -51,12 +51,13 @@ static void upsample_nearest2d_out_frame(
           const int w1 = w2;
           for (int n = 0; n < nbatch; n++) {
             for (int c = 0; c < channels; ++c) {
-              auto val = in_ptr[n * input_height * input_width * channels +
-                                c * input_height * input_width +
-                                h1 * input_width + w1];
-              out_ptr[n * output_height * output_width * channels +
-                      c * output_height * output_width + h2 * output_width +
-                      w2] = val;
+              auto val = in_ptr
+                  [n * input_height * input_width * channels +
+                   c * input_height * input_width + h1 * input_width + w1];
+              out_ptr
+                  [n * output_height * output_width * channels +
+                   c * output_height * output_width + h2 * output_width + w2] =
+                      val;
             }
           }
           return;
@@ -67,12 +68,13 @@ static void upsample_nearest2d_out_frame(
             nearest_neighbor_compute_source_index(width_scale, w2, input_width);
         for (int n = 0; n < nbatch; n++) {
           for (int c = 0; c < channels; ++c) {
-            const scalar_t val =
-                in_ptr[n * input_height * input_width * channels +
-                       c * input_height * input_width + h1 * input_width + w1];
-            out_ptr[n * output_height * output_width * channels +
-                    c * output_height * output_width + h2 * output_width + w2] =
-                val;
+            const scalar_t val = in_ptr
+                [n * input_height * input_width * channels +
+                 c * input_height * input_width + h1 * input_width + w1];
+            out_ptr
+                [n * output_height * output_width * channels +
+                 c * output_height * output_width + h2 * output_width + w2] =
+                    val;
           }
         }
       }
@@ -278,7 +280,6 @@ static void upsample_nearest2d_backward_out_template(
         printf(
             "Backward is depending on the atomic float op implementation, "
             "will enable it later!!!\n");
-
       });
 }
 

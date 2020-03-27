@@ -142,20 +142,19 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
           memory::desc({dst_iter_c_dims}, data_t, memory::format_tag::any);
 
       std::shared_ptr<lstm_forward::desc> lstm_forward_desc;
-      lstm_forward_desc.reset(
-          new lstm_forward::desc(
-              prop_kind::forward_inference,
-              dir,
-              src_layer_md,
-              src_iter_md,
-              src_iter_c_md,
-              weights_layer_md,
-              weights_iter_md,
-              bias_md,
-              dst_layer_md,
-              dst_iter_md,
-              dst_iter_c_md,
-              rnn_flags::undef));
+      lstm_forward_desc.reset(new lstm_forward::desc(
+          prop_kind::forward_inference,
+          dir,
+          src_layer_md,
+          src_iter_md,
+          src_iter_c_md,
+          weights_layer_md,
+          weights_iter_md,
+          bias_md,
+          dst_layer_md,
+          dst_iter_md,
+          dst_iter_c_md,
+          rnn_flags::undef));
 
       std::shared_ptr<lstm_forward::primitive_desc> lstm_forward_pd;
       lstm_forward_pd.reset(
@@ -344,5 +343,5 @@ void lstm_dpcpp(
       batch_first);
   std::tie(output, hy, cy) = result;
 }
-}
-} // namespace at::AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

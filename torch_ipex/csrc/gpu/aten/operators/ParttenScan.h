@@ -17,10 +17,11 @@ struct TensorFillOp {
 };
 
 // calculate shift where we should start processing on current item
-template <typename _NDItemId,
-          typename _GlobalIdx,
-          typename _SizeNIter,
-          typename _SizeN>
+template <
+    typename _NDItemId,
+    typename _GlobalIdx,
+    typename _SizeNIter,
+    typename _SizeN>
 _SizeN calc_shift(
     const _NDItemId __item_id,
     const _GlobalIdx __global_idx,
@@ -39,17 +40,18 @@ _SizeN calc_shift(
 }
 
 // write data from local memory to global
-template <typename _Inclusive,
-          typename _NDItemId,
-          typename _GlobalIdx,
-          typename _Size,
-          typename _AccLocal,
-          typename _InAcc,
-          typename _OutAcc,
-          typename _Tp,
-          typename _Fp,
-          typename _BinaryOp,
-          typename _UnaryOp>
+template <
+    typename _Inclusive,
+    typename _NDItemId,
+    typename _GlobalIdx,
+    typename _Size,
+    typename _AccLocal,
+    typename _InAcc,
+    typename _OutAcc,
+    typename _Tp,
+    typename _Fp,
+    typename _BinaryOp,
+    typename _UnaryOp>
 void write_to_global(
     const _NDItemId __item_id,
     const _GlobalIdx __global_idx,
@@ -103,22 +105,24 @@ void write_to_global(
 }
 
 // Scan on local memory
-template <typename _Inclusive,
-          typename _BinaryOperation,
-          typename _UnaryOp,
-          typename _Assigner,
-          typename _Tp>
+template <
+    typename _Inclusive,
+    typename _BinaryOperation,
+    typename _UnaryOp,
+    typename _Assigner,
+    typename _Tp>
 struct scan {
   _BinaryOperation __bin_op;
   _UnaryOp __unary_op;
   _Assigner __f;
 
-  template <typename _NDItemId,
-            typename _GlobalIdx,
-            typename _Size,
-            typename _AccLocal,
-            typename _InAcc,
-            typename _OutAcc>
+  template <
+      typename _NDItemId,
+      typename _GlobalIdx,
+      typename _Size,
+      typename _AccLocal,
+      typename _InAcc,
+      typename _OutAcc>
   void operator()(
       const _NDItemId __item_id,
       const _GlobalIdx __global_idx,
@@ -182,10 +186,11 @@ template <typename _BinaryOperation1, typename _Tp>
 struct reduce {
   _BinaryOperation1 __bin_op1;
 
-  template <typename _NDItemId,
-            typename _GlobalIdx,
-            typename _Size,
-            typename _AccLocal>
+  template <
+      typename _NDItemId,
+      typename _GlobalIdx,
+      typename _Size,
+      typename _AccLocal>
   _Tp operator()(
       const _NDItemId __item_id,
       const _GlobalIdx __global_idx,
@@ -213,11 +218,12 @@ struct transform_init {
   _Operation1 __binary_op;
   _Operation2 __unary_op;
 
-  template <typename _NDItemId,
-            typename _Acc,
-            typename _GlobalIdx,
-            typename _Size,
-            typename _AccLocal>
+  template <
+      typename _NDItemId,
+      typename _Acc,
+      typename _GlobalIdx,
+      typename _Size,
+      typename _AccLocal>
   void operator()(
       const _NDItemId __item_id,
       const _GlobalIdx __global_idx,
@@ -258,13 +264,14 @@ class __init_kernel_name_1 {};
 template <typename... T>
 class __init_kernel_name_2 {};
 // returns the last partial sum
-template <typename InputType,
-          typename OutputType,
-          typename IndexType,
-          typename _BinaryOperation,
-          typename _Transform,
-          typename _Reduce,
-          typename _Scan>
+template <
+    typename InputType,
+    typename OutputType,
+    typename IndexType,
+    typename _BinaryOperation,
+    typename _Transform,
+    typename _Reduce,
+    typename _Scan>
 IndexType parallel_transform_scan(
     DPCPP::queue& queue,
     TensorInfo<InputType, IndexType>& input,
@@ -429,11 +436,12 @@ IndexType parallel_transform_scan(
   return __last_reduced_value;
 }
 
-template <typename InputType,
-          typename OutputType,
-          typename IndexType,
-          typename _CreateMaskOp,
-          typename _CopyByMaskOp>
+template <
+    typename InputType,
+    typename OutputType,
+    typename IndexType,
+    typename _CreateMaskOp,
+    typename _CopyByMaskOp>
 IndexType pattern_scan_copy(
     DPCPP::queue& queue,
     TensorInfo<InputType, IndexType>& input,
@@ -456,11 +464,12 @@ IndexType pattern_scan_copy(
       IndexType{0},
       transform_init<_ReduceOp, _CreateMaskOp>{__reduce_op, __create_mask_op},
       reduce<_ReduceOp, IndexType>{__reduce_op},
-      scan</*inclusive*/ std::true_type,
-           _ReduceOp,
-           _GetMaskOp,
-           _CopyByMaskOp,
-           IndexType>{__reduce_op, __get_mask_op, __copy_by_mask_op});
+      scan<
+          /*inclusive*/ std::true_type,
+          _ReduceOp,
+          _GetMaskOp,
+          _CopyByMaskOp,
+          IndexType>{__reduce_op, __get_mask_op, __copy_by_mask_op});
 }
 
 // create mask
@@ -517,11 +526,12 @@ struct idx_functor {
       : dims(t_info.dims), sz{t_info.sizes[I]...}, st{t_info.strides[I]...} {}
 };
 
-template <typename InputType,
-          typename OutputType,
-          typename IndexType,
-          typename Predicate,
-          typename CopyMaskOp>
+template <
+    typename InputType,
+    typename OutputType,
+    typename IndexType,
+    typename Predicate,
+    typename CopyMaskOp>
 IndexType pattern_scan(
     DPCPP::queue& queue,
     TensorInfo<InputType, IndexType>& input,

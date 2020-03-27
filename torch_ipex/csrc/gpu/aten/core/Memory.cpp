@@ -157,5 +157,5 @@ void dpcppFreeAll() {
   DPCPPfreeAll(dpcppGetBufferMap());
 }
 
-} // namespace of dpcpp
-} // namespace of c10
+} // namespace dpcpp
+} // namespace at

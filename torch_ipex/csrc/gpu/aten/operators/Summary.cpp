@@ -35,12 +35,13 @@ static IndexType getBin(
 /*
   Kernel for computing the histogram of the input.
  */
-template <typename output_t,
-          typename input_t,
-          typename IndexType,
-          int ADims,
-          bool has_weight,
-          typename Op>
+template <
+    typename output_t,
+    typename input_t,
+    typename IndexType,
+    int ADims,
+    bool has_weight,
+    typename Op>
 void kernelHistogram1D(
     dpcpp::detail::TensorInfo<output_t, IndexType> a, /* output */
     dpcpp::detail::TensorInfo<input_t, IndexType> b, /* input */
@@ -128,20 +129,20 @@ bool dpcpp_tensor_histogram(
   auto bInfo = dpcpp::detail::getTensorInfo<input_t, IndexType>(b);
   if (HasWeights) {
     auto cInfo = dpcpp::detail::getTensorInfo<output_t, IndexType>(c);
-    const auto getWeightsOp = [cInfo](
-        dpcpp_global_ptr_pt<output_t> cPtr, IndexType cIndex) {
-      const IndexType cOffset =
-          dpcpp::detail::IndexToOffset<output_t, IndexType, 1>::get(
-              cIndex, cInfo);
-      return cPtr[cOffset];
-    };
+    const auto getWeightsOp =
+        [cInfo](dpcpp_global_ptr_pt<output_t> cPtr, IndexType cIndex) {
+          const IndexType cOffset =
+              dpcpp::detail::IndexToOffset<output_t, IndexType, 1>::get(
+                  cIndex, cInfo);
+          return cPtr[cOffset];
+        };
     HANDLE_CASE(getWeightsOp, true);
   } else {
     dpcpp::detail::TensorInfo<output_t, IndexType> cInfo;
     // set the dummy cinfo with the ptr to the output
     cInfo.data = aInfo.data;
-    static const auto getDummyOp = [](
-        dpcpp_global_ptr_pt<output_t>, IndexType) {
+    static const auto getDummyOp = [](dpcpp_global_ptr_pt<output_t>,
+                                      IndexType) {
       return static_cast<output_t>(1);
     };
     HANDLE_CASE(getDummyOp, false);
@@ -162,8 +163,9 @@ Tensor bincount_template(
   if (self.dim() == 1 && self.numel() == 0) {
     return native::zeros({minlength}, device(kDPCPP).dtype(kLong));
   }
-  if (self.dim() != 1 || (!std::is_same<input_t, uint8_t>::value &&
-                          *self.min().cpu().data_ptr<input_t>() < 0)) {
+  if (self.dim() != 1 ||
+      (!std::is_same<input_t, uint8_t>::value &&
+       *self.min().cpu().data_ptr<input_t>() < 0)) {
     TORCH_CHECK(0, "bincount only supports 1-d non-negative integral inputs.");
   }
 

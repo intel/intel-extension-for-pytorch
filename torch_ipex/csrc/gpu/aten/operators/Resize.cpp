@@ -37,5 +37,5 @@ Tensor& resize_as_(
   return at::AtenIpexTypeDPCPP::resize_(
       self, the_template.sizes(), memory_format);
 }
-}
-} // namespace at::AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

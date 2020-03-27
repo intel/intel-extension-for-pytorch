@@ -186,12 +186,13 @@ struct Bitfield<uint64_t> {
 // those that pass the filter `((v & desiredMask) == desired)`.
 // This produces and broadcasts the seen counts for a single block only.
 // `smem` must have at least `RadixSize` elements.
-template <typename scalar_t,
-          typename bitwise_t,
-          typename index_t,
-          typename CountType,
-          int RadixSize,
-          int RadixBits>
+template <
+    typename scalar_t,
+    typename bitwise_t,
+    typename index_t,
+    typename CountType,
+    int RadixSize,
+    int RadixBits>
 void countRadixUsingMask(
     CountType counts[RadixSize],
     const dpcpp_local_acc_t<int>& smem,
@@ -335,12 +336,13 @@ void radixSelect(
        digitPos -= RADIX_BITS) {
     // Count radix distribution for the current position and reduce
     // across all threads
-    countRadixUsingMask<scalar_t,
-                        bitwise_t,
-                        index_t,
-                        int,
-                        RADIX_SIZE,
-                        RADIX_BITS>(
+    countRadixUsingMask<
+        scalar_t,
+        bitwise_t,
+        index_t,
+        int,
+        RADIX_SIZE,
+        RADIX_BITS>(
         counts,
         smem,
         desired,

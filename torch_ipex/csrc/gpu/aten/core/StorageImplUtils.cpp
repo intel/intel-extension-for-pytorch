@@ -52,5 +52,5 @@ at::StorageImpl* StorageImpl_new(caffe2::TypeMeta data_type) {
   return storage;
 }
 
-} // dpcpp::
-} // at::
+} // namespace dpcpp
+} // namespace at

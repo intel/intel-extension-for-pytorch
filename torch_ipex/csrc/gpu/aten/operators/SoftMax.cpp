@@ -69,10 +69,11 @@ void SoftMaxForward(
     int out_size) {
   static const auto write_mode = DPCPP::access::mode::discard_write;
   static const auto read_mode = DPCPP::access::mode::read;
-  using local_accessor_t = DPCPP::accessor<scalar_t,
-                                           1,
-                                           DPCPP::access::mode::read_write,
-                                           DPCPP::access::target::local>;
+  using local_accessor_t = DPCPP::accessor<
+      scalar_t,
+      1,
+      DPCPP::access::mode::read_write,
+      DPCPP::access::target::local>;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   int64_t local_size =
       dpcpp_queue.get_device()
@@ -145,10 +146,11 @@ void SoftMaxBackward(
     int out_size) {
   static const auto write_mode = DPCPP::access::mode::discard_write;
   static const auto read_mode = DPCPP::access::mode::read;
-  using local_accessor_t = DPCPP::accessor<scalar_t,
-                                           1,
-                                           DPCPP::access::mode::read_write,
-                                           DPCPP::access::target::local>;
+  using local_accessor_t = DPCPP::accessor<
+      scalar_t,
+      1,
+      DPCPP::access::mode::read_write,
+      DPCPP::access::target::local>;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   int64_t local_size =
       dpcpp_queue.get_device()

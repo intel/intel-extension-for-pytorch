@@ -55,11 +55,12 @@ inline void bitonicSwap(
   }
 };
 
-template <typename Comparator,
-          typename K,
-          typename V,
-          typename IndexType,
-          int Power2SortSize>
+template <
+    typename Comparator,
+    typename K,
+    typename V,
+    typename IndexType,
+    int Power2SortSize>
 inline void bitonicSort(
     const dpcpp_local_acc_t<K>& keys_smem,
     const dpcpp_local_acc_t<V>& values_smem,
@@ -102,22 +103,24 @@ inline void bitonicSort(
   item_id.barrier(dpcpp_local_fence);
 }
 
-template <typename K,
-          typename V,
-          int KeyDims,
-          int ValueDims,
-          typename Comparator,
-          typename IndexType,
-          int Power2SortSize>
+template <
+    typename K,
+    typename V,
+    int KeyDims,
+    int ValueDims,
+    typename Comparator,
+    typename IndexType,
+    int Power2SortSize>
 class binarySortKVInplaceKernelName {};
 
-template <typename K,
-          typename V,
-          int KeyDims,
-          int ValueDims,
-          typename Comparator,
-          typename IndexType,
-          int Power2SortSize>
+template <
+    typename K,
+    typename V,
+    int KeyDims,
+    int ValueDims,
+    typename Comparator,
+    typename IndexType,
+    int Power2SortSize>
 inline void bitonicSortKVInPlace(
     TensorInfo<K, IndexType> keys,
     IndexType keySlices,
@@ -186,13 +189,14 @@ inline void bitonicSortKVInPlace(
       }
     };
 
-    cgh.parallel_for<binarySortKVInplaceKernelName<K,
-                                                   V,
-                                                   KeyDims,
-                                                   ValueDims,
-                                                   Comparator,
-                                                   IndexType,
-                                                   Power2SortSize>>(
+    cgh.parallel_for<binarySortKVInplaceKernelName<
+        K,
+        V,
+        KeyDims,
+        ValueDims,
+        Comparator,
+        IndexType,
+        Power2SortSize>>(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)),
         kfn);
@@ -259,13 +263,14 @@ inline void SortKeyValueInplace(Tensor& key, Tensor& value, int dim, bool dir) {
     }                                                \
                                                      \
     if (dir) {                                       \
-      bitonicSortKVInPlace<scalar_t,                 \
-                           int64_t,                  \
-                           A,                        \
-                           -1,                       \
-                           GTComp<scalar_t>,         \
-                           TYPE,                     \
-                           SIZE>(                    \
+      bitonicSortKVInPlace<                          \
+          scalar_t,                                  \
+          int64_t,                                   \
+          A,                                         \
+          -1,                                        \
+          GTComp<scalar_t>,                          \
+          TYPE,                                      \
+          SIZE>(                                     \
           keyInfo,                                   \
           keySlices,                                 \
           (TYPE)keySliceSize,                        \
@@ -274,13 +279,14 @@ inline void SortKeyValueInplace(Tensor& key, Tensor& value, int dim, bool dir) {
           (TYPE)valueInfo.strides[collapseValueDim], \
           GTComp<scalar_t>());                       \
     } else {                                         \
-      bitonicSortKVInPlace<scalar_t,                 \
-                           int64_t,                  \
-                           A,                        \
-                           -1,                       \
-                           LTComp<scalar_t>,         \
-                           TYPE,                     \
-                           SIZE>(                    \
+      bitonicSortKVInPlace<                          \
+          scalar_t,                                  \
+          int64_t,                                   \
+          A,                                         \
+          -1,                                        \
+          LTComp<scalar_t>,                          \
+          TYPE,                                      \
+          SIZE>(                                     \
           keyInfo,                                   \
           keySlices,                                 \
           (TYPE)keySliceSize,                        \

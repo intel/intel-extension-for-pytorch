@@ -55,7 +55,8 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
       layer_norm_forward_desc, engine);
 
   std::unordered_map<int, memory> args = {
-      {MKLDNN_ARG_SRC, input_usr_memory}, {MKLDNN_ARG_DST, output_usr_memory},
+      {MKLDNN_ARG_SRC, input_usr_memory},
+      {MKLDNN_ARG_DST, output_usr_memory},
   };
 
   Tensor mean = at::empty({n * ih * ic}, input.options());
@@ -216,5 +217,5 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
 
   return std::make_tuple(grad_input.view(X.sizes()), grad_weight, grad_bias);
 }
-}
-} // at::AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

@@ -48,7 +48,7 @@ void dpcppFreeAll();
  *     acc_ptr =  Acc.template get_pointer<data_type>();
  *     acc_ptr[i] = ...
  *   }
-*/
+ */
 
 template <DPCPP::access::mode AccMode, typename ScalarT = uint8_t>
 class DPCPPAccessor {
@@ -61,20 +61,18 @@ class DPCPPAccessor {
 
   DPCPPAccessor(DPCPP::handler& cgh, const void* virtual_ptr)
       : offset_(dpcppGetBufferMap().get_offset(virtual_ptr)),
-        accessor_(
-            dpcppGetBufferMap()
-                .template get_buffer<ScalarT>(virtual_ptr)
-                .template get_access<AccMode, global_access>(cgh)) {}
+        accessor_(dpcppGetBufferMap()
+                      .template get_buffer<ScalarT>(virtual_ptr)
+                      .template get_access<AccMode, global_access>(cgh)) {}
 
   DPCPPAccessor(DPCPP::handler& cgh, const void* virtual_ptr, size_t n_bytes)
       : offset_(dpcppGetBufferMap().get_offset(virtual_ptr)),
-        accessor_(
-            dpcppGetBufferMap()
-                .template get_buffer<ScalarT>(virtual_ptr)
-                .template get_access<AccMode, global_access>(
-                    cgh,
-                    DPCPP::range<1>(n_bytes),
-                    DPCPP::id<1>(offset_))) {}
+        accessor_(dpcppGetBufferMap()
+                      .template get_buffer<ScalarT>(virtual_ptr)
+                      .template get_access<AccMode, global_access>(
+                          cgh,
+                          DPCPP::range<1>(n_bytes),
+                          DPCPP::id<1>(offset_))) {}
 
   const Accessor& get_access() const {
     return accessor_;
@@ -109,7 +107,6 @@ void dpcppMemoryCopyType(scalar1* dst, const scalar2* src, size_t n_elements) {
           auto id = itemId.get_id(0);
           for (auto i = id; i < n_elements; i += itemId.get_range()[0])
             out_ptr[i] = (scalar1)in_ptr[i];
-
         });
   };
 
@@ -117,4 +114,4 @@ void dpcppMemoryCopyType(scalar1* dst, const scalar2* src, size_t n_elements) {
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 } // namespace dpcpp
-} // namespace c10
+} // namespace at

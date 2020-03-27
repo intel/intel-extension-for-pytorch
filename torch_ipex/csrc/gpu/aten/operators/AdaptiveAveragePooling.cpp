@@ -57,16 +57,15 @@ static void adaptive_avg_pool2d_out_frame(
   dpcpp_set_mkldnn_buffer(output_data, output_usr_memory);
 
   std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
-  pooling_forward_desc.reset(
-      new pooling_forward::desc(
-          prop_kind,
-          alg_kind,
-          input_md,
-          output_md,
-          stride,
-          kernel,
-          padding,
-          padding));
+  pooling_forward_desc.reset(new pooling_forward::desc(
+      prop_kind,
+      alg_kind,
+      input_md,
+      output_md,
+      stride,
+      kernel,
+      padding,
+      padding));
 
   std::shared_ptr<pooling_forward::primitive_desc> pooling_forward_pd;
   pooling_forward_pd.reset(
@@ -146,28 +145,25 @@ static void adaptive_avg_pool2d_backward_out_frame(
   dpcpp_set_mkldnn_buffer(gradInput_data, diff_src_usr_memory);
 
   std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
-  pooling_forward_desc.reset(
-      new pooling_forward::desc(
-          prop_kind,
-          alg_kind,
-          input_md,
-          output_md,
-          stride,
-          kernel,
-          padding,
-          padding));
+  pooling_forward_desc.reset(new pooling_forward::desc(
+      prop_kind,
+      alg_kind,
+      input_md,
+      output_md,
+      stride,
+      kernel,
+      padding,
+      padding));
   std::shared_ptr<pooling_forward::primitive_desc> pooling_forward_pd;
   pooling_forward_pd.reset(
       new pooling_forward::primitive_desc(*pooling_forward_desc, engine));
 
   std::shared_ptr<pooling_backward::desc> pooling_backward_desc;
-  pooling_backward_desc.reset(
-      new pooling_backward::desc(
-          alg_kind, input_md, output_md, stride, kernel, padding, padding));
+  pooling_backward_desc.reset(new pooling_backward::desc(
+      alg_kind, input_md, output_md, stride, kernel, padding, padding));
   std::shared_ptr<pooling_backward::primitive_desc> pooling_backward_pd;
-  pooling_backward_pd.reset(
-      new pooling_backward::primitive_desc(
-          *pooling_backward_desc, engine, *pooling_forward_pd));
+  pooling_backward_pd.reset(new pooling_backward::primitive_desc(
+      *pooling_backward_desc, engine, *pooling_forward_pd));
 
   // auto diff_dst_md = pooling_backward_pd->diff_dst_desc();
   auto diff_dst_memory = diff_dst_usr_memory;

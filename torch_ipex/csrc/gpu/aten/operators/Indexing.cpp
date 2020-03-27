@@ -141,7 +141,6 @@ void indexSelect(
               dst_ptr + dst_slice_id * dst_info.strides[dst_select_dim];
 
           group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
-
             auto ii_ = item_id.get_logical_local_id()[0];
             auto src_offset_ =
                 IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
@@ -382,7 +381,6 @@ void indexAdd(
               src_ptr + dst_slice_id * src_info.strides[src_add_dim];
 
           group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
-
             auto ii_ = item_id.get_logical_local_id()[0];
             auto dst_offset_ =
                 IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
@@ -489,7 +487,6 @@ void indexFill(
               g_idx_ptr[dst_slice_id] * dst_info.strides[dst_fill_dim];
 
           group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
-
             auto ii_ = item_id.get_logical_local_id()[0];
             auto dst_offset_ =
                 IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
@@ -1130,8 +1127,9 @@ Tensor& put_(
 
   if (accumulate) {
     AT_DISPATCH_ALL_ATOMIC_TYPES(self.scalar_type(), "put_", [&] {
-      impl::put<scalar_t,
-                DPCPP_K(dpcpp_put_kernel, scalar_t, /*accumulate=*/bool)>(
+      impl::put<
+          scalar_t,
+          DPCPP_K(dpcpp_put_kernel, scalar_t, /*accumulate=*/bool)>(
           self,
           index,
           source,

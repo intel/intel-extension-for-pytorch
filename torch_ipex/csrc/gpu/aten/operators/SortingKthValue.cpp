@@ -71,10 +71,11 @@ void gatherKthValue(
 
       // Find the k-th highest element in our input
       scalar_t kValue = ScalarConvert<int, scalar_t>::to(0);
-      radixSelect<scalar_t,
-                  typename TopKTypeConfig<scalar_t>::RadixType,
-                  index_t,
-                  false>(
+      radixSelect<
+          scalar_t,
+          typename TopKTypeConfig<scalar_t>::RadixType,
+          index_t,
+          false>(
           (dpcpp_global_ptr_pt<scalar_t>)inputSliceStart,
           k,
           inputSliceSize,
