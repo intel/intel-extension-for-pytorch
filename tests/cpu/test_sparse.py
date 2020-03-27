@@ -80,6 +80,12 @@ class TestSparse(TestCase):
         self.assertEqual(y1.to_dense(), expected)
         # self.assertEqual(y2.to_dense().to('cpu'), expected)
         self.assertEqual(y3.to('cpu'), expected)
+
+        z1 = x1 + x2
+        z1 = z1.zero_()
+        z2 = y2.zero_()
+        self.assertEqual(z2.to('cpu'), z1)
+
         
     def test_basic_ops(self):
         self._test_basic_ops_shape(9, 12, [5, 6])
