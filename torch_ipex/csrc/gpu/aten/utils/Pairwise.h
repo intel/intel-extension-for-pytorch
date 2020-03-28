@@ -135,7 +135,7 @@ struct TensorTriOp {
       printf("offset is %ld, mask is not supported!\n", offset);
     }
 #elif defined(USE_DPCPP)
-// TODO: Use DPCPP::stream
+    // TODO: Use DPCPP::stream
 
 #endif
 

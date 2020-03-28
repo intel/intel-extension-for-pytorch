@@ -85,10 +85,9 @@ struct GpuEngineManager {
     int device_count = (int)at::dpcpp::device_count();
     TORCH_INTERNAL_ASSERT(device_count > 0);
     for (int i = 0; i < device_count; i++) {
-      _gpu_engines.push_back(
-          {engine::kind::gpu,
-           dpcppGetRawDevice(i),
-           at::dpcpp::getGlobalContext()});
+      _gpu_engines.push_back({engine::kind::gpu,
+                              dpcppGetRawDevice(i),
+                              at::dpcpp::getGlobalContext()});
     }
   }
   ~GpuEngineManager() {}
@@ -117,5 +116,5 @@ struct GpuStreamManager {
   GpuStreamManager(){};
   ~GpuStreamManager(){};
 };
-}
-} // namespace at::dpcpp
+} // namespace dpcpp
+} // namespace at

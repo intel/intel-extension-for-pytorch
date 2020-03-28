@@ -18,5 +18,5 @@ void dpcppMemoryScale2(
     size_t n_elements,
     const float alpha,
     const double eps);
-}
-} // at::dpcpp
+} // namespace dpcpp
+} // namespace at

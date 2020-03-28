@@ -58,7 +58,7 @@ static void threshold_kernel(
       });
 }
 
-} // namepsace impl
+} // namespace impl
 
 Tensor relu(const Tensor& self) {
   return at::threshold(self, 0, 0);
@@ -96,6 +96,13 @@ Tensor threshold_out(
     Scalar value) {
   threshold_out(make_optional(result), self, threshold, value, self);
   return result;
+}
+
+Tensor threshold_backward(
+    const Tensor& grad,
+    const Tensor& self,
+    Scalar threshold) {
+  return threshold_out(nullopt, self, threshold, 0, grad);
 }
 
 DPCPP_DEF_K1(DPCPPOpHardShrink);

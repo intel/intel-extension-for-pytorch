@@ -96,28 +96,26 @@ at::Tensor convolution(
 
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
   if (bias.defined()) {
-    conv_forward_desc.reset(
-        new convolution_forward::desc(
-            prop_kind::forward,
-            algorithm::convolution_direct,
-            input_md,
-            weight_md,
-            bias_md,
-            output_md,
-            _stride,
-            _padding,
-            _padding));
+    conv_forward_desc.reset(new convolution_forward::desc(
+        prop_kind::forward,
+        algorithm::convolution_direct,
+        input_md,
+        weight_md,
+        bias_md,
+        output_md,
+        _stride,
+        _padding,
+        _padding));
   } else {
-    conv_forward_desc.reset(
-        new convolution_forward::desc(
-            prop_kind::forward,
-            algorithm::convolution_direct,
-            input_md,
-            weight_md,
-            output_md,
-            _stride,
-            _padding,
-            _padding));
+    conv_forward_desc.reset(new convolution_forward::desc(
+        prop_kind::forward,
+        algorithm::convolution_direct,
+        input_md,
+        weight_md,
+        output_md,
+        _stride,
+        _padding,
+        _padding));
   }
 
   std::shared_ptr<convolution_forward::primitive_desc> conv_forward_pd;
@@ -238,28 +236,26 @@ Tensor dpcpp_convolution_backward_input(
   // need to re-create conv_forward_pd to feed conv_backward_data_pd
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
   if (bias_defined) {
-    conv_forward_desc.reset(
-        new convolution_forward::desc(
-            prop_kind::forward,
-            algorithm::convolution_direct,
-            input_md,
-            weight_md,
-            bias_md,
-            output_md,
-            _stride,
-            _padding,
-            _padding));
+    conv_forward_desc.reset(new convolution_forward::desc(
+        prop_kind::forward,
+        algorithm::convolution_direct,
+        input_md,
+        weight_md,
+        bias_md,
+        output_md,
+        _stride,
+        _padding,
+        _padding));
   } else {
-    conv_forward_desc.reset(
-        new convolution_forward::desc(
-            prop_kind::forward,
-            algorithm::convolution_direct,
-            input_md,
-            weight_md,
-            output_md,
-            _stride,
-            _padding,
-            _padding));
+    conv_forward_desc.reset(new convolution_forward::desc(
+        prop_kind::forward,
+        algorithm::convolution_direct,
+        input_md,
+        weight_md,
+        output_md,
+        _stride,
+        _padding,
+        _padding));
   }
 
   std::shared_ptr<convolution_forward::primitive_desc> conv_forward_pd;
@@ -267,21 +263,19 @@ Tensor dpcpp_convolution_backward_input(
       new convolution_forward::primitive_desc(*conv_forward_desc, engine));
 
   std::shared_ptr<convolution_backward_data::desc> conv_backward_data_desc;
-  conv_backward_data_desc.reset(
-      new convolution_backward_data::desc(
-          algorithm::convolution_direct,
-          input_md,
-          weight_md,
-          output_md,
-          _stride,
-          _padding,
-          _padding));
+  conv_backward_data_desc.reset(new convolution_backward_data::desc(
+      algorithm::convolution_direct,
+      input_md,
+      weight_md,
+      output_md,
+      _stride,
+      _padding,
+      _padding));
 
   std::shared_ptr<convolution_backward_data::primitive_desc>
       conv_backward_data_pd;
-  conv_backward_data_pd.reset(
-      new convolution_backward_data::primitive_desc(
-          *conv_backward_data_desc, engine, *conv_forward_pd));
+  conv_backward_data_pd.reset(new convolution_backward_data::primitive_desc(
+      *conv_backward_data_desc, engine, *conv_forward_pd));
 
   auto grad_output_usr_memory =
       memory({{{output_tz}, data_t, format_nchw}, engine});
@@ -397,28 +391,26 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   // need to re-create conv_forward_pd to feed conv_backward_weight_pd
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
   if (bias_defined) {
-    conv_forward_desc.reset(
-        new convolution_forward::desc(
-            prop_kind::forward,
-            algorithm::convolution_direct,
-            input_md,
-            weight_md,
-            bias_md,
-            output_md,
-            _stride,
-            _padding,
-            _padding));
+    conv_forward_desc.reset(new convolution_forward::desc(
+        prop_kind::forward,
+        algorithm::convolution_direct,
+        input_md,
+        weight_md,
+        bias_md,
+        output_md,
+        _stride,
+        _padding,
+        _padding));
   } else {
-    conv_forward_desc.reset(
-        new convolution_forward::desc(
-            prop_kind::forward,
-            algorithm::convolution_direct,
-            input_md,
-            weight_md,
-            output_md,
-            _stride,
-            _padding,
-            _padding));
+    conv_forward_desc.reset(new convolution_forward::desc(
+        prop_kind::forward,
+        algorithm::convolution_direct,
+        input_md,
+        weight_md,
+        output_md,
+        _stride,
+        _padding,
+        _padding));
   }
 
   std::shared_ptr<convolution_forward::primitive_desc> conv_forward_pd;
@@ -842,8 +834,9 @@ static void check_shape_forward(
         input.size(1),
         " channels instead");
     TORCH_CHECK(
-        !bias.defined() || (bias.ndimension() == 1 &&
-                            bias.size(0) == weight_sizes[1] * groups),
+        !bias.defined() ||
+            (bias.ndimension() == 1 &&
+             bias.size(0) == weight_sizes[1] * groups),
         "Given transposed=",
         transposed,
         ", weight of size ",

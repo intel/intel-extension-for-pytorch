@@ -30,9 +30,9 @@ __and___out(Tensor& result, const Tensor& self, const Tensor& other) {
 }
 
 template <typename scalar_t>
-typename std::enable_if<!(IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t)),
-                        void>::type
-__and___out(Tensor& result, const Tensor& self, const Tensor& other) {}
+typename std::enable_if<!(IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t)), void>::
+    type
+    __and___out(Tensor& result, const Tensor& self, const Tensor& other) {}
 
 template <typename scalar_t>
 typename std::enable_if<IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t), void>::type
@@ -49,9 +49,9 @@ __or___out(Tensor& result, const Tensor& self, const Tensor& other) {
 }
 
 template <typename scalar_t>
-typename std::enable_if<!(IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t)),
-                        void>::type
-__or___out(Tensor& result, const Tensor& self, const Tensor& other) {}
+typename std::enable_if<!(IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t)), void>::
+    type
+    __or___out(Tensor& result, const Tensor& self, const Tensor& other) {}
 
 } // namespace impl
 

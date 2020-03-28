@@ -69,7 +69,7 @@ class PointerMapper {
    */
   struct virtual_pointer_t {
     /* Type for the pointers
-    */
+     */
     base_ptr_t m_contents;
 
     /** Conversions from virtual_pointer_t to
@@ -257,9 +257,10 @@ class PointerMapper {
    * @param accessTarget
    * @param ptr The virtual pointer
    */
-  template <dpcpp_acc_mode access_mode = default_acc_mode,
-            dpcpp_acc_target access_target = default_acc_target,
-            typename buffer_data_type = buffer_data_type_t>
+  template <
+      dpcpp_acc_mode access_mode = default_acc_mode,
+      dpcpp_acc_target access_target = default_acc_target,
+      typename buffer_data_type = buffer_data_type_t>
   DPCPP::accessor<buffer_data_type, 1, access_mode, access_target> get_access(
       const virtual_pointer_t ptr) {
     auto buf = get_buffer<buffer_data_type>(ptr);
@@ -274,9 +275,10 @@ class PointerMapper {
    * @param ptr The virtual pointer
    * @param cgh Reference to the command group scope
    */
-  template <dpcpp_acc_mode access_mode = default_acc_mode,
-            dpcpp_acc_target access_target = default_acc_target,
-            typename buffer_data_type = buffer_data_type_t>
+  template <
+      dpcpp_acc_mode access_mode = default_acc_mode,
+      dpcpp_acc_target access_target = default_acc_target,
+      typename buffer_data_type = buffer_data_type_t>
   DPCPP::accessor<buffer_data_type, 1, access_mode, access_target> get_access(
       const virtual_pointer_t ptr,
       DPCPP::handler& cgh) {
@@ -318,8 +320,8 @@ class PointerMapper {
   PointerMapper(const PointerMapper&) = delete;
 
   /**
-  * Empty the pointer list
-  */
+   * Empty the pointer list
+   */
   inline void clear() {
     m_freeList.clear();
     m_pointerMap.clear();
@@ -483,7 +485,7 @@ class PointerMapper {
   };
 
   /* Maps the pointer addresses to buffer and size pairs.
-    */
+   */
   pointerMap_t m_pointerMap;
 
   /* List of free nodes available for re-using
@@ -549,6 +551,6 @@ inline void DPCPPfreeAll(PointerMapper& pMap) {
   pMap.clear();
 }
 
-} // codeplay
-} // dpcpp
-} // cl
+} // namespace codeplay
+} // namespace sycl
+} // namespace cl

@@ -200,11 +200,12 @@ struct WelfordData {
       : mean(mean), m2(m2), n(n), nf(nf) {}
 };
 
-template <typename scalar_t,
-          typename acc_scalar_t,
-          typename index_t,
-          typename combine_t,
-          typename res_t>
+template <
+    typename scalar_t,
+    typename acc_scalar_t,
+    typename index_t,
+    typename combine_t,
+    typename res_t>
 struct WelfordOps {
   bool unbiased;
   bool take_sqrt;
@@ -443,11 +444,12 @@ void std_var_kernel_impl(TensorIterator& iter, bool unbiased, bool take_sqrt) {
   // This is necessary to lower register usage that leads to register spills.
   dpcpp_reduce_kernel<scalar_t, scalar_t, 2>(
       iter,
-      WelfordOps<scalar_t,
-                 scalar_t,
-                 int32_t,
-                 float,
-                 std::pair<scalar_t, scalar_t>>{unbiased, take_sqrt},
+      WelfordOps<
+          scalar_t,
+          scalar_t,
+          int32_t,
+          float,
+          std::pair<scalar_t, scalar_t>>{unbiased, take_sqrt},
       WelfordData<scalar_t, int32_t, float>{});
 }
 
@@ -460,42 +462,47 @@ void std_var_kernel_impl<at::Half>(
   // This is necessary to lower register usage that leads to register spills.
   dpcpp_reduce_kernel<at::Half, at::Half, 2>(
       iter,
-      WelfordOps<at::Half,
-                 float,
-                 int32_t,
-                 float,
-                 std::pair<at::Half, at::Half>>{unbiased, take_sqrt},
+      WelfordOps<
+          at::Half,
+          float,
+          int32_t,
+          float,
+          std::pair<at::Half, at::Half>>{unbiased, take_sqrt},
       WelfordData<float, int32_t, float>{});
 }
 
-template <typename scalar_t,
-          typename acc_t = scalar_t,
-          typename out_t = scalar_t>
+template <
+    typename scalar_t,
+    typename acc_t = scalar_t,
+    typename out_t = scalar_t>
 void sum_kernel_impl(TensorIterator& iter) {
   dpcpp_reduce_kernel<scalar_t, out_t>(
       iter, func_wrapper<out_t>(ReduceAddOps<acc_t>()));
 }
 
-template <typename scalar_t,
-          typename acc_t = scalar_t,
-          typename out_t = scalar_t>
+template <
+    typename scalar_t,
+    typename acc_t = scalar_t,
+    typename out_t = scalar_t>
 void prod_kernel_impl(TensorIterator& iter) {
   dpcpp_reduce_kernel<scalar_t, out_t>(
       iter, func_wrapper<out_t>(ReduceProdOps<acc_t>()), 1);
 }
 
-template <typename scalar_t,
-          typename acc_t = scalar_t,
-          typename out_t = scalar_t>
+template <
+    typename scalar_t,
+    typename acc_t = scalar_t,
+    typename out_t = scalar_t>
 void mean_kernel_impl(TensorIterator& iter) {
   float factor = float(iter.num_output_elements()) / iter.numel();
   dpcpp_reduce_kernel<scalar_t, out_t>(
       iter, ReduceMeanOps<acc_t, float>{factor});
 }
 
-template <typename scalar_t,
-          typename acc_t = scalar_t,
-          typename out_t = scalar_t>
+template <
+    typename scalar_t,
+    typename acc_t = scalar_t,
+    typename out_t = scalar_t>
 void min_kernel_impl(TensorIterator& iter) {
   dpcpp_reduce_kernel<scalar_t, out_t>(
       iter,
@@ -503,9 +510,10 @@ void min_kernel_impl(TensorIterator& iter) {
       Numerics<scalar_t>::upper_bound());
 }
 
-template <typename scalar_t,
-          typename acc_t = scalar_t,
-          typename out_t = scalar_t>
+template <
+    typename scalar_t,
+    typename acc_t = scalar_t,
+    typename out_t = scalar_t>
 void max_kernel_impl(TensorIterator& iter) {
   dpcpp_reduce_kernel<scalar_t, out_t>(
       iter,
@@ -513,9 +521,10 @@ void max_kernel_impl(TensorIterator& iter) {
       Numerics<scalar_t>::lower_bound());
 }
 
-template <typename scalar_t,
-          typename acc_t = scalar_t,
-          typename out_t = scalar_t>
+template <
+    typename scalar_t,
+    typename acc_t = scalar_t,
+    typename out_t = scalar_t>
 static void norm_kernel_impl(TensorIterator& iter, Scalar val) {
   float p;
   if (val.isIntegral(false)) {

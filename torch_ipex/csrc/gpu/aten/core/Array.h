@@ -29,5 +29,5 @@ struct alignas(16) Array {
     }
   }
 };
-}
-}
+} // namespace dpcpp
+} // namespace at

@@ -16,10 +16,11 @@ static inline void checkSameDPCPP(
     if (t2->device().type() != at::kDPCPP) {
       oss << "Tensor for " << t2 << " is not on DPCPP, ";
     }
-    oss << "but expected " << ((!(t1->device().type() == at::kDPCPP ||
-                                  t2->device().type() == at::kDPCPP))
-                                   ? "them"
-                                   : "it")
+    oss << "but expected "
+        << ((!(t1->device().type() == at::kDPCPP ||
+               t2->device().type() == at::kDPCPP))
+                ? "them"
+                : "it")
         << " to be on DPCPP (while checking arguments for " << c << ")";
     TORCH_CHECK(0, oss.str());
   }

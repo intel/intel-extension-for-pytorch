@@ -68,7 +68,7 @@ void fillSliceWithIndex(
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-} // impl
+} // namespace impl
 
 Tensor& fill_out(Tensor& self, Scalar value) {
   auto iter = TensorIterator::nullary_op(self);

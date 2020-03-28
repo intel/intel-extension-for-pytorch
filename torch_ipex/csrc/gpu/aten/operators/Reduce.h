@@ -260,11 +260,12 @@ func_wrapper_t<scalar_t, func_t> func_wrapper(const func_t& op) {
   return func_wrapper_t<scalar_t, func_t>{op};
 }
 
-template <typename scalar_t,
-          typename ops_t,
-          typename index_t,
-          typename out_scalar_t = scalar_t,
-          int vt0 = 4>
+template <
+    typename scalar_t,
+    typename ops_t,
+    typename index_t,
+    typename out_scalar_t = scalar_t,
+    int vt0 = 4>
 struct ReduceOp {
   using traits = binary_function_traits<decltype(&ops_t::reduce)>;
   using arg_t = typename std::remove_const<
@@ -624,11 +625,12 @@ static void launch_reduce_kernel(
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 }
 
-template <typename scalar_t,
-          typename out_scalar_t,
-          int vt0 = 4,
-          typename ops_t,
-          typename ident_t = double>
+template <
+    typename scalar_t,
+    typename out_scalar_t,
+    int vt0 = 4,
+    typename ops_t,
+    typename ident_t = double>
 inline void dpcpp_reduce_kernel(
     TensorIterator& iter,
     const ops_t& ops,
@@ -747,5 +749,5 @@ inline void dpcpp_reduce_kernel(
     launch_reduce_kernel<scalar_t>(config, reduce);
   }
 }
-}
-} // namespace at::dpcpp
+} // namespace dpcpp
+} // namespace at

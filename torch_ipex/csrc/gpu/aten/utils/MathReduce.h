@@ -207,9 +207,10 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
 };
 
-template <typename ScalarTypeK,
-          typename ScalarTypeIndex,
-          typename BinaryFunction>
+template <
+    typename ScalarTypeK,
+    typename ScalarTypeIndex,
+    typename BinaryFunction>
 DPCPP_HOST void transformReduceOuterDimIndex(
     at::Tensor& tgt1,
     at::Tensor& tgt2,
@@ -220,9 +221,10 @@ DPCPP_HOST void transformReduceOuterDimIndex(
   kernelTransformReduceOuterDimIndex(tgt1, tgt2, src, rdim, init, binary_op);
 }
 
-template <typename ScalarTypeK,
-          typename ScalarTypeIndex,
-          typename BinaryFunction>
+template <
+    typename ScalarTypeK,
+    typename ScalarTypeIndex,
+    typename BinaryFunction>
 DPCPP_HOST void transformReduceInnermostDimIndex(
     at::Tensor& tgt1,
     at::Tensor& tgt2,
@@ -232,9 +234,10 @@ DPCPP_HOST void transformReduceInnermostDimIndex(
   kernelTransformReduceInnermostDimIndex(tgt1, tgt2, src, init, binary_op);
 }
 
-template <typename ScalarTypeK,
-          typename ScalarTypeIndex,
-          typename BinaryFunction>
+template <
+    typename ScalarTypeK,
+    typename ScalarTypeIndex,
+    typename BinaryFunction>
 DPCPP_HOST void reduceDimIndex(
     at::Tensor& tgt1_,
     at::Tensor& tgt2_,

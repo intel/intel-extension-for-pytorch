@@ -89,5 +89,5 @@ Tensor softshrink_backward(
   Tensor grad_input = at::empty({0}, grad_output.options());
   return at::softshrink_backward_out(grad_input, grad_output, self, lambd);
 }
-}
-} // namespace at::AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

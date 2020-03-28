@@ -271,7 +271,7 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
       [&]() { _copy__dpcpp<scalar_t>(iter, non_blocking); });
 }
 
-} // impl
+} // namespace impl
 
 Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   // TODO: valid check

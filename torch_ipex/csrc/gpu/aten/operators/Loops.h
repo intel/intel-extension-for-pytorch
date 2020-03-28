@@ -304,7 +304,6 @@ static inline void dpcpp_binary_loop(
   int64_t rng, GRange, tileSize;
   parallel_for_setup(n, tileSize, rng, GRange);
   dpcpp_queue.submit([&](DPCPP::handler& cgh) {
-
     auto in1_Acc = DPCPPAccessor<read_mode>(cgh, in1_ptr, n * s1);
     auto in2_Acc = DPCPPAccessor<read_mode>(cgh, in2_ptr, n * s2);
     auto out_Acc = DPCPPAccessor<write_mode>(cgh, out_ptr, n * s0);
@@ -328,12 +327,12 @@ template <class op_type, typename func_t>
 void dpcpp_binary_kernel(TensorIterator& iter, const func_t& op) {
   using traits = binary_function_traits<func_t>;
   static_assert(
-      std::is_same<typename traits::result_type,
-                   typename traits::arg1_t>::value,
+      std::is_same<typename traits::result_type, typename traits::arg1_t>::
+          value,
       "all types must match");
   static_assert(
-      std::is_same<typename traits::result_type,
-                   typename traits::arg2_t>::value,
+      std::is_same<typename traits::result_type, typename traits::arg2_t>::
+          value,
       "all types must match");
 
   // int64_t n = iter.numel();
@@ -453,5 +452,5 @@ void dpcpp_index_kernel(
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
-}
-} // namespace at::dpcpp
+} // namespace dpcpp
+} // namespace at

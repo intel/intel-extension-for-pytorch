@@ -64,7 +64,8 @@ class dists {
         const scalar_t grad,
         const scalar_t dist,
         const scalar_t p) {
-      return dist == 0.0 ? 0 : sign(diff) *
+      return dist == 0.0 ? 0
+                         : sign(diff) *
               Numerics<scalar_t>::pow(Numerics<scalar_t>::abs(diff), p - 1) *
               grad / Numerics<scalar_t>::pow(dist, p - 1);
     }
@@ -106,7 +107,8 @@ class dists {
         const scalar_t grad,
         const scalar_t dist,
         const scalar_t p) {
-      return dist == 0.0 ? 0 : diff *
+      return dist == 0.0 ? 0
+                         : diff *
               Numerics<scalar_t>::pow(Numerics<scalar_t>::abs(diff), p - 2) *
               grad / Numerics<scalar_t>::pow(dist, p - 1);
     }
@@ -137,10 +139,11 @@ class dists {
   };
 };
 
-template <typename scalar_t,
-          typename F,
-          typename nd_item_id,
-          typename local_shared>
+template <
+    typename scalar_t,
+    typename F,
+    typename nd_item_id,
+    typename local_shared>
 static inline scalar_t reduce_agg(
     scalar_t agg,
     nd_item_id item_id,
@@ -460,5 +463,5 @@ Tensor _pdist_backward(
   impl::pdist_backward(result, grad, self, p, pdist);
   return result;
 }
-}
-} // at::AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

@@ -17,9 +17,10 @@ static inline void dpcpp_tabulate(
 }
 
 // alternative for cuda thrust::inclusive_scan
-template <typename InputIterator,
-          typename OutputIterator,
-          typename AssociativeOperator>
+template <
+    typename InputIterator,
+    typename OutputIterator,
+    typename AssociativeOperator>
 static inline void dpcpp_inclusive_scan(
     InputIterator first,
     InputIterator last,
@@ -35,10 +36,11 @@ static inline void dpcpp_inclusive_scan(
 }
 
 // alternative for cuda thrust::exclusive_scan
-template <typename InputIterator,
-          typename OutputIterator,
-          typename T,
-          typename AssociativeOperator>
+template <
+    typename InputIterator,
+    typename OutputIterator,
+    typename T,
+    typename AssociativeOperator>
 static inline void dpcpp_exclusive_scan(
     InputIterator first,
     InputIterator last,

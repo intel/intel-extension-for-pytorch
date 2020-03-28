@@ -96,7 +96,8 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
 
   bn_fwd.reset(new batch_normalization_forward(batch_norm_forward_pd));
   std::unordered_map<int, memory> args = {
-      {MKLDNN_ARG_SRC, input_usr_memory}, {MKLDNN_ARG_DST, output_usr_memory},
+      {MKLDNN_ARG_SRC, input_usr_memory},
+      {MKLDNN_ARG_DST, output_usr_memory},
   };
 
   if ((bool)(flag & normalization_flags::use_scale_shift)) {
@@ -161,7 +162,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
 
   return std::tuple<Tensor, Tensor, Tensor>{output, save_mean, save_var};
 }
-}
+} // namespace impl
 
 std::tuple<Tensor, Tensor, Tensor> native_batch_norm(
     const Tensor& input,

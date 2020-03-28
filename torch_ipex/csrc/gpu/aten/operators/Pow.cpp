@@ -19,12 +19,12 @@ typename std::enable_if<!IS_FLOAT(scalar_t), void>::type pow(
     if (Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(1))) {
       dpcpp::DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, 1>(value));
-    } else if (
-        Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(2))) {
+    } else if (Numerics<scalar_t>::eq(
+                   value, ScalarConvert<int, scalar_t>::to(2))) {
       dpcpp::DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, 2>(value));
-    } else if (
-        Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(3))) {
+    } else if (Numerics<scalar_t>::eq(
+                   value, ScalarConvert<int, scalar_t>::to(3))) {
       dpcpp::DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, 3>(value));
     } else {
@@ -36,12 +36,12 @@ typename std::enable_if<!IS_FLOAT(scalar_t), void>::type pow(
     if (Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(1))) {
       dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, 1>(value));
-    } else if (
-        Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(2))) {
+    } else if (Numerics<scalar_t>::eq(
+                   value, ScalarConvert<int, scalar_t>::to(2))) {
       dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, 2>(value));
-    } else if (
-        Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(3))) {
+    } else if (Numerics<scalar_t>::eq(
+                   value, ScalarConvert<int, scalar_t>::to(3))) {
       dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, 3>(value));
     } else {
@@ -60,20 +60,20 @@ typename std::enable_if<IS_FLOAT(scalar_t), void>::type pow(
     if (Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(1))) {
       dpcpp::DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, 1>(value));
-    } else if (
-        Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(2))) {
+    } else if (Numerics<scalar_t>::eq(
+                   value, ScalarConvert<int, scalar_t>::to(2))) {
       dpcpp::DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, 2>(value));
-    } else if (
-        Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(3))) {
+    } else if (Numerics<scalar_t>::eq(
+                   value, ScalarConvert<int, scalar_t>::to(3))) {
       dpcpp::DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, 3>(value));
-    } else if (
-        Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(-1))) {
+    } else if (Numerics<scalar_t>::eq(
+                   value, ScalarConvert<int, scalar_t>::to(-1))) {
       dpcpp::DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, -1>(value));
-    } else if (
-        Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(-2))) {
+    } else if (Numerics<scalar_t>::eq(
+                   value, ScalarConvert<int, scalar_t>::to(-2))) {
       dpcpp::DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, -2>(value));
     } else {
@@ -85,20 +85,20 @@ typename std::enable_if<IS_FLOAT(scalar_t), void>::type pow(
     if (Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(1))) {
       dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, 1>(value));
-    } else if (
-        Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(2))) {
+    } else if (Numerics<scalar_t>::eq(
+                   value, ScalarConvert<int, scalar_t>::to(2))) {
       dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, 2>(value));
-    } else if (
-        Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(3))) {
+    } else if (Numerics<scalar_t>::eq(
+                   value, ScalarConvert<int, scalar_t>::to(3))) {
       dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, 3>(value));
-    } else if (
-        Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(-1))) {
+    } else if (Numerics<scalar_t>::eq(
+                   value, ScalarConvert<int, scalar_t>::to(-1))) {
       dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, -1>(value));
-    } else if (
-        Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(-2))) {
+    } else if (Numerics<scalar_t>::eq(
+                   value, ScalarConvert<int, scalar_t>::to(-2))) {
       dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, -2>(value));
     } else {

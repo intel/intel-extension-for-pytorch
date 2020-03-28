@@ -55,7 +55,7 @@ static void repeat_interleave_dpcpp_kernel(
 //   repeat_interleave_dpcpp_kernel(repeat_ptr, cumsum_ptr, result_ptr, size);
 // }
 
-} // impl
+} // namespace impl
 
 Tensor repeat_interleave(const Tensor& repeat) {
   return repeat_interleave_common<impl::repeat_interleave_dpcpp_kernel>(repeat);

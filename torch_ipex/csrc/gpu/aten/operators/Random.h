@@ -3,14 +3,16 @@
 
 using namespace DPCPP;
 using namespace at::dpcpp;
-using ACC_1D_RW_G = accessor<buffer_data_type_t,
-                             1,
-                             access::mode::read_write,
-                             DPCPP::access::target::global_buffer>;
-using ACC_1D_W_G = accessor<buffer_data_type_t,
-                            1,
-                            access::mode::write,
-                            DPCPP::access::target::global_buffer>;
+using ACC_1D_RW_G = accessor<
+    buffer_data_type_t,
+    1,
+    access::mode::read_write,
+    DPCPP::access::target::global_buffer>;
+using ACC_1D_W_G = accessor<
+    buffer_data_type_t,
+    1,
+    access::mode::write,
+    DPCPP::access::target::global_buffer>;
 
 #define RANDOM_NUM (200000)
 #define NUM_PER_RND (624)

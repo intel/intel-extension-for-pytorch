@@ -11,7 +11,7 @@
 namespace {
 // warning, use std::numeric_limits if possible.
 constexpr double inf = INFINITY;
-}
+} // namespace
 
 namespace at {
 template <typename T>
@@ -106,4 +106,4 @@ struct numeric_limits<bool> {
     return true;
   }
 };
-}
+} // namespace at

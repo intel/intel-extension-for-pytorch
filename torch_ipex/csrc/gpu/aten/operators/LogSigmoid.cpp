@@ -89,5 +89,5 @@ Tensor log_sigmoid_backward(
   return at::AtenIpexTypeDPCPP::log_sigmoid_backward_out(
       grad_input, grad_output, self, buffer);
 }
-}
-} // namespace at::AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

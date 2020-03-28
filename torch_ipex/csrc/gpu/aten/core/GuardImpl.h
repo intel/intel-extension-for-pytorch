@@ -60,6 +60,6 @@ struct DPCPPGuardImpl final : public c10::impl::DeviceGuardImplInterface {
     return device_count();
   }
 };
-}
-}
-} // namespace at::dpcpp::impl
+} // namespace impl
+} // namespace dpcpp
+} // namespace at

@@ -469,7 +469,7 @@ int compareSizeAndStride(const void* a, const void* b) {
     return 0;
   return 1;
 }
-}
+} // namespace
 
 /* Returns false if there is no possibility that the tensor    */
 /* has "overlapping" indices and true otherwise.               */
@@ -545,5 +545,5 @@ at::TensorImpl* TensorImpl_Unwrap(const at::Tensor& tensor) {
   return tensor.unsafeGetTensorImpl();
 }
 
-} // dpcpp::
-} // at::
+} // namespace dpcpp
+} // namespace at

@@ -208,15 +208,17 @@ DPCPP_DEVICE using dpcpp_multi_ptr_crt =
     typename dpcpp_multi_ptr<T, Space>::const_reference_t;
 
 // dpcpp accessor type
-template <typename ScalarType,
-          DPCPP::access::mode Mode = dpcpp_rw_mode,
-          int Dims = 1>
+template <
+    typename ScalarType,
+    DPCPP::access::mode Mode = dpcpp_rw_mode,
+    int Dims = 1>
 DPCPP_DEVICE using dpcpp_local_acc_t =
     DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_local_buf>;
 
-template <typename ScalarType,
-          DPCPP::access::mode Mode = dpcpp_rw_mode,
-          int Dims = 1>
+template <
+    typename ScalarType,
+    DPCPP::access::mode Mode = dpcpp_rw_mode,
+    int Dims = 1>
 DPCPP_DEVICE using dpcpp_global_acc_t =
     DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_global_buf>;
 
@@ -224,8 +226,9 @@ template <typename ScalarType, int Dims = 1>
 DPCPP_DEVICE using dpcpp_const_acc_t =
     DPCPP::accessor<ScalarType, Dims, dpcpp_r_mode, dpcpp_const_buf>;
 
-template <typename ScalarType,
-          DPCPP::access::mode Mode = dpcpp_rw_mode,
-          int Dims = 1>
+template <
+    typename ScalarType,
+    DPCPP::access::mode Mode = dpcpp_rw_mode,
+    int Dims = 1>
 DPCPP_HOST using dpcpp_host_acc_t =
     DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_host_buf>;

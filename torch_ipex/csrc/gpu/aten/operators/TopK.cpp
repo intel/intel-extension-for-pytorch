@@ -301,10 +301,11 @@ DPCPP_DEVICE DataType findPattern(
   return ScalarConvert<int, DataType>::to(0);
 }
 
-template <typename DataType,
-          typename BitDataType,
-          typename IndexType,
-          bool Order>
+template <
+    typename DataType,
+    typename BitDataType,
+    typename IndexType,
+    bool Order>
 DPCPP_DEVICE void radixSelect(
     const dpcpp_global_ptr_pt<DataType>& data_ptr,
     const IndexType k,

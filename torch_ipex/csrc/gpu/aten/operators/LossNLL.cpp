@@ -322,9 +322,9 @@ void ClassNLLCriterion_updateGradInput(
           }
           scalar_t cur_weight = has_weights ? weights_ptr[cur_target]
                                             : static_cast<scalar_t>(1.0f);
-          gradInput_ptr[i * gradInput_stride_0 +
-                        cur_target * gradInput_stride_1] =
-              -cur_weight * gradOutput_ptr[i * gradOutput_stride_0];
+          gradInput_ptr
+              [i * gradInput_stride_0 + cur_target * gradInput_stride_1] =
+                  -cur_weight * gradOutput_ptr[i * gradOutput_stride_0];
         }
       };
 

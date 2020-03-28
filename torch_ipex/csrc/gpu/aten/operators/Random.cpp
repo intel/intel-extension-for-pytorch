@@ -94,10 +94,10 @@ void normal(Tensor& self, double mean, double stdv, Generator* _generator) {
 
 Tensor& normal_(Tensor& self, double mean, double std, Generator* generator) {
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "normal_", [&]() {
-    using accreal =
-        typename std::conditional<std::is_same<scalar_t, at::Half>::value,
-                                  float,
-                                  scalar_t>::type;
+    using accreal = typename std::conditional<
+        std::is_same<scalar_t, at::Half>::value,
+        float,
+        scalar_t>::type;
     impl::normal<scalar_t, accreal>(self, mean, std, generator);
   });
   return self;

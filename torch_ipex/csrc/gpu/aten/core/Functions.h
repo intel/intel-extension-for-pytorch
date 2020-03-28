@@ -39,5 +39,5 @@ inline DeviceIndex current_device() {
 inline void set_device(DeviceIndex device) {
   AT_DPCPP_CHECK(dpcppSetDevice(static_cast<int>(device)));
 }
-}
-} // namespace at::dpcpp
+} // namespace dpcpp
+} // namespace at

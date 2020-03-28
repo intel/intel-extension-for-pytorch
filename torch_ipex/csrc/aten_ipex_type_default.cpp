@@ -4717,7 +4717,11 @@ at::Tensor AtenIpexTypeDefault::pow(const at::Tensor & self, at::Scalar exponent
 
 at::Tensor & AtenIpexTypeDefault::zero_(at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::zero_(self);
+    if (self.is_sparse()) {
+      return cpu::AtenIpexCPUSparse::zero_(self);
+    } else {
+      return cpu::AtenIpexCPUDefault::zero_(self);
+    }
   } else {
     AT_ASSERT(false);
   }
@@ -11068,6 +11072,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::zero_(Tensor(a!) self) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::zero_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::zero_(Tensor(a!) self) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::zero_>(at::TensorTypeId::SparseDPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::sub.out(Tensor self, Tensor other, *, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::sub_out>(at::TensorTypeId::DPCPPTensorId)

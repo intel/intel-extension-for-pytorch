@@ -17,7 +17,7 @@ template <typename ScalarType>
 void TensorImpl_freeCopyTo(TensorImpl* self, TensorImpl* dst);
 template <typename ScalarType>
 void TensorImpl_copyIgnoringOverlaps(TensorImpl* dst, TensorImpl* src);
-}
-}
+} // namespace native
+} // namespace at
 
 #endif

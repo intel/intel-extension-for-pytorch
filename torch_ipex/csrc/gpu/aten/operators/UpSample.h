@@ -59,5 +59,5 @@ DPCPP_DEVICE static int nearest_neighbor_compute_source_index(
   return src_index;
 }
 
-} // namespace native
+} // namespace dpcpp
 } // namespace at

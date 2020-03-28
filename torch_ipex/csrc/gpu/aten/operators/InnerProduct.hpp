@@ -46,13 +46,11 @@ void mkldnn_inner_product(
   std::shared_ptr<inner_product_forward::desc> ipFwd_desc;
 
   if (use_bias) {
-    ipFwd_desc.reset(
-        new inner_product_forward::desc(
-            prop_kind::forward, input_md, weight_md, bias_md, output_md));
+    ipFwd_desc.reset(new inner_product_forward::desc(
+        prop_kind::forward, input_md, weight_md, bias_md, output_md));
   } else {
-    ipFwd_desc.reset(
-        new inner_product_forward::desc(
-            prop_kind::forward, input_md, weight_md, output_md));
+    ipFwd_desc.reset(new inner_product_forward::desc(
+        prop_kind::forward, input_md, weight_md, output_md));
   }
   auto ip_forward_pd =
       inner_product_forward::primitive_desc(*ipFwd_desc, engine);
@@ -94,5 +92,5 @@ void mkldnn_inner_product(
        {MKLDNN_ARG_BIAS, *bias_usr_memory},
        {MKLDNN_ARG_DST, output_usr_memory}});
 }
-}
-} // namespace at::native
+} // namespace dpcpp
+} // namespace at

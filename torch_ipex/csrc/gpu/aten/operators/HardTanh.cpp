@@ -92,5 +92,5 @@ Tensor hardtanh_backward(
   return at::AtenIpexTypeDPCPP::hardtanh_backward_out(
       grad_input, grad_output, self, min_val, max_val);
 }
-}
-} // namespace at::AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeDPCPP
+} // namespace at

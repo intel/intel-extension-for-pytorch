@@ -101,5 +101,13 @@ at::Tensor & AtenIpexCPUSparse::copy_sparse_to_sparse_(at::Tensor & self, const 
   return self;
 }
 
+at::Tensor & AtenIpexCPUSparse::zero_(at::Tensor & self) {
+  TORCH_INTERNAL_ASSERT(self.layout() == c10::kSparse);
+  auto&& cpu_self = bridge::shallowFallbackToCPUTensor(self);
+  auto&& cpu_result = at::zero_(cpu_self);
+  bridge::shallowUpgradeToDPCPPTensorAW(self, cpu_self);
+  return self;
+}
+
 }  // namespace cpu
 }  // namespace torch_ipex
