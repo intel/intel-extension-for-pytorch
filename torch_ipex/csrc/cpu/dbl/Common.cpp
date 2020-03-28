@@ -74,13 +74,17 @@ at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
   if (_tensor_sizes.size() != 1 || _tensor_sizes[0] != 0) {
     _tensor.unsafeGetTensorImpl()->set_sizes_contiguous(_tensor_sizes);
   }
+  TORCH_INTERNAL_ASSERT(_tensor.is_contiguous());
+  TORCH_INTERNAL_ASSERT(_tensor.layout() == c10::kStrided);
   return _tensor;
 }
 
 bool meet_dnnl_route_pre_cond(const at::Tensor& tensor) {
   if (tensor.is_contiguous()) {
     if (tensor.layout() == at::Layout::Strided) {
-      return true;
+      if (tensor.device().type() == at::DeviceType::DPCPP) {
+        return true;
+      }
     }
   }
 

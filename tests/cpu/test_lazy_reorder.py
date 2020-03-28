@@ -2,6 +2,7 @@
 from __future__ import division
 from __future__ import print_function
 
+import os
 import math
 import random
 import unittest
@@ -62,6 +63,52 @@ class TestConv(TestCase):
         res_cpu = self._seq_conf(device='cpu')
         res_dpcpp = self._seq_conf(device=device)
         self.assertEqual(res_cpu, res_dpcpp.to('cpu'))
+
+class TestBinaryOp(TestCase):
+    def _test_dil_add(self, device):
+        torch.manual_seed(10)
+        a = torch.rand((8, 8)).to(device=device)
+        a1 = a[0:2, :]
+        a2 = a[4:6, :]
+        self.assertEqual(a1.is_contiguous(), True)
+        self.assertEqual(a2.is_contiguous(), True)
+        a1 += a2
+        return a1
+
+    def test_dil_add_(self):
+        os.environ["FORCE_DNNL"] = "1"
+        res_dcpp_dnnl = self._test_dil_add("dpcpp:0")
+        os.environ["FORCE_DNNL"] = "0"
+        res_dcpp_cpu = self._test_dil_add("dpcpp:0")
+        res_cpu = self._test_dil_add("cpu")
+        self.assertEqual(res_cpu, res_dcpp_cpu.to('cpu'))
+        self.assertEqual(res_cpu, res_dcpp_dnnl.to('cpu'))
+
+    def test_dil_add_scalar(self):
+        os.environ["FORCE_DNNL"] = "1"
+        a = torch.rand((8, 8)).to(device=device)
+        a += 2
+
+class TestMixOp(TestCase):
+    def _test_conv_add_(self, device):
+        torch.manual_seed(1)
+        conv_op = torch.nn.Conv2d(1, 1, (7, 7)).to(device=device)
+        conv_op_input = torch.rand((1, 1, 10, 10)).to(device=device)
+        conv_op_putput = conv_op(conv_op_input)
+        print(conv_op_putput.size())
+        add_src = torch.rand((1, 1, 4, 4)).to(device=device)
+        conv_op_putput += add_src
+        return conv_op_putput
+
+    def test_conv_add_(self):
+        os.environ["FORCE_DNNL"] = "1"
+        res_dcpp_dnnl = self._test_conv_add_("dpcpp:0")
+        os.environ["FORCE_DNNL"] = "0"
+        res_dcpp_cpu = self._test_conv_add_("dpcpp:0")
+        res_cpu = self._test_conv_add_("cpu")
+        self.assertEqual(res_cpu, res_dcpp_cpu.to('cpu'))
+        self.assertEqual(res_cpu, res_dcpp_dnnl.to('cpu'))
+
 
 
 if __name__ == '__main__':
