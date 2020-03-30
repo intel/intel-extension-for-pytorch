@@ -4889,7 +4889,11 @@ at::Tensor AtenIpexTypeDefault::sparse_mask(const at::Tensor & self, const at::T
 
 at::Tensor AtenIpexTypeDefault::to_dense(const at::Tensor & self) {
   if (check_device_by_tensor(self, DPCPPSubDev::CPU)) {
-    return cpu::AtenIpexCPUDefault::to_dense(self);
+    if (self.is_sparse()) {
+      return cpu::AtenIpexCPUSparse::to_dense(self);
+    } else {
+      return cpu::AtenIpexCPUDefault::to_dense(self);
+    }
   } else {
     AT_ASSERT(false);
   }
@@ -11138,6 +11142,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::to_dense(Tensor self) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::to_dense>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::to_dense(Tensor self) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::to_dense>(at::TensorTypeId::SparseDPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::to_dense_backward(Tensor grad, Tensor input) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::to_dense_backward>(at::TensorTypeId::DPCPPTensorId)

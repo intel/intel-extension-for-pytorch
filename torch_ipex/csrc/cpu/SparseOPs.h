@@ -21,6 +21,7 @@ class AtenIpexCPUSparse {
   static at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format);
   static at::Tensor & copy_sparse_to_sparse_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
   static at::Tensor & zero_(at::Tensor & self);
+  static at::Tensor to_dense(const at::Tensor & self);
 };
 
 }  // namespace cpu

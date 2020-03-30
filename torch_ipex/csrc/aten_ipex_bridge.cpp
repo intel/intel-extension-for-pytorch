@@ -30,15 +30,15 @@ namespace bridge {
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->version_counter().current_version() == b.unsafeGetTensorImpl()->version_counter().current_version()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->allow_tensor_metadata_change() == b.unsafeGetTensorImpl()->allow_tensor_metadata_change())
 
-#define CHECK_TENSOR_CRITICAL(a, b, check_data_ptr) \
-  TORCH_INTERNAL_ASSERT(!check_data_ptr || a.data_ptr() == b.data_ptr()); \
+#define CHECK_TENSOR_CRITICAL(a, b, may_alias) \
+  TORCH_INTERNAL_ASSERT(!may_alias || a.data_ptr() == b.data_ptr()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->strides() == b.unsafeGetTensorImpl()->strides()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->storage_offset() == b.unsafeGetTensorImpl()->storage_offset()); \
   CHECK_TENSOR(a, b)
 
-#define CHECK_SPARSE_TENSOR_CRITICAL(a, b, check_data_ptr) \
-  TORCH_INTERNAL_ASSERT(!check_data_ptr || a._indices().data_ptr() == b._indices().data_ptr()); \
-  TORCH_INTERNAL_ASSERT(!check_data_ptr || a._values().data_ptr() == b._values().data_ptr()); \
+#define CHECK_SPARSE_TENSOR_CRITICAL(a, b, may_alias) \
+  TORCH_INTERNAL_ASSERT(!may_alias || a._indices().data_ptr() == b._indices().data_ptr()); \
+  TORCH_INTERNAL_ASSERT(!may_alias || a._values().data_ptr() == b._values().data_ptr()); \
   TORCH_INTERNAL_ASSERT(a.sparse_dim() == b.sparse_dim()); \
   TORCH_INTERNAL_ASSERT(a.dense_dim() == b.dense_dim()); \
   TORCH_INTERNAL_ASSERT(a._nnz() == b._nnz()); \
@@ -382,14 +382,17 @@ at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cp
     TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kSparse);
     TORCH_INTERNAL_ASSERT(cpuTensor.layout() == c10::kSparse);
     // NOTICE:
-    // Sometimes, Sparse ops break alias semantics, so the data_ptr will be different in these two Tensors.
-    auto check_data_ptr = ipexTensor._nnz() == cpuTensor._nnz();
+    // In PyTorch, alias semantics is `may alias`, not `must alias`.
+    // e.g. some sparse 'alias marked' ops are not alias actually,
+    // so following data_ptr will be different for those cases.
+    // TODO: whether nnz checking is enough or exact.
+    auto may_alias = ipexTensor._nnz() == cpuTensor._nnz();
 
     auto&& ipex_indices = ipexTensor._indices();
     auto&& ipex_values = ipexTensor._values();
     auto&& cpu_indices = cpuTensor._indices();
     auto&& cpu_values = cpuTensor._values();
-    if (ipex_indices.data_ptr() == NULL) {
+    if (!may_alias) {
       ipex_indices = shallowUpgradeToDPCPPTensor(cpu_indices);
       ipex_values = shallowUpgradeToDPCPPTensor(cpu_values);
     } else {
@@ -400,15 +403,14 @@ at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cp
     auto cpu_sparse_impl = at::sparse::get_sparse_impl(cpuTensor);
     ipex_sparse_impl->copy_meta_info(cpu_sparse_impl);
     ipex_sparse_impl->copy_indices_and_values(ipex_indices, ipex_values);
-    CHECK_SPARSE_TENSOR_CRITICAL(ipexTensor, cpuTensor, check_data_ptr);
+    CHECK_SPARSE_TENSOR_CRITICAL(ipexTensor, cpuTensor, may_alias);
     return ipexTensor;
   } else {
     TORCH_INTERNAL_ASSERT(!ipexTensor.is_sparse());
     TORCH_INTERNAL_ASSERT(!cpuTensor.is_sparse());
     TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
     TORCH_INTERNAL_ASSERT(cpuTensor.layout() == c10::kStrided);
-    auto check_data_ptr = ipexTensor.numel() == cpuTensor.numel();
-    TORCH_INTERNAL_ASSERT(!check_data_ptr || ipexTensor.data_ptr() == cpuTensor.data_ptr());
+    TORCH_INTERNAL_ASSERT(ipexTensor.data_ptr() == cpuTensor.data_ptr());
 
     // NOTE: Cannot set storage data_ptr by set_data_ptr.
     //       set_data_ptr will release caller tensor's original data_ptr. It is wrong here because
@@ -424,7 +426,7 @@ at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cp
 
     IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
     ipex_tensor_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
-    CHECK_TENSOR_CRITICAL(ipexTensor, cpuTensor, check_data_ptr);
+    CHECK_TENSOR_CRITICAL(ipexTensor, cpuTensor, true);
     attachShadeDataConext(ipexTensor);
     return ipexTensor;
   }

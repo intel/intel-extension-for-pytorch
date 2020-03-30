@@ -70,17 +70,20 @@ class TestSparse(TestCase):
         y1 = x1.clone()
         y1.add_(x2)
 
+        # test sparse + sparse
         y2 = x1.clone().to('dpcpp:0')
         y2.add_(x2.to('dpcpp:0'))
 
+        # test dense + sparse
         y3 = x1.clone().to_dense().to('dpcpp:0')
         y3.add_(x2.to('dpcpp:0'))
 
         expected = x1.to_dense() + x2.to_dense()
         self.assertEqual(y1.to_dense(), expected)
-        # self.assertEqual(y2.to_dense().to('cpu'), expected)
+        self.assertEqual(y2.to_dense().to('cpu'), expected)
         self.assertEqual(y3.to('cpu'), expected)
 
+        # test zero
         z1 = x1 + x2
         z1 = z1.zero_()
         z2 = y2.zero_()
