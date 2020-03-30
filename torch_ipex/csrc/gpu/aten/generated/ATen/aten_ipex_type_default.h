@@ -234,6 +234,8 @@ class AtenIpexTypeDefault {
   static at::Tensor lt(const at::Tensor & self, at::Scalar other);
   static at::Tensor & lt_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
   static at::Tensor lt(const at::Tensor & self, const at::Tensor & other);
+  static at::Tensor & take_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & index);
+  static at::Tensor take(const at::Tensor & self, const at::Tensor & index);
   static at::Tensor & index_select_out(at::Tensor & out, const at::Tensor & self, int64_t dim, const at::Tensor & index);
   static at::Tensor index_select(const at::Tensor & self, int64_t dim, const at::Tensor & index);
   static at::Tensor & masked_select_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & mask);
