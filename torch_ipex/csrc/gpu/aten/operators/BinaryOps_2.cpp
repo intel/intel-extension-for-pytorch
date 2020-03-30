@@ -23,7 +23,7 @@ static void mul_kernel_dpcpp(TensorIterator& iter) {
       at::ScalarType::Half, at::ScalarType::Bool, iter.dtype(), "mul", [&]() {
         dpcpp_kernel_for_tensor_iter<SyclOpMul>(
             iter, [=](scalar_t a, scalar_t b) -> scalar_t { return a * b; });
-  });
+      });
 }
 
 static void div_kernel_dpcpp(TensorIterator& iter) {

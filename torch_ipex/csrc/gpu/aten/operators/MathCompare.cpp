@@ -406,6 +406,15 @@ Tensor eq(const Tensor& self, const Tensor& other) {
   return at::eq_out(result, self, other);
 }
 
+bool equal(const Tensor& self, const Tensor& other) {
+  Tensor result = at::empty_like(self, self.options().dtype(kBool));
+
+  at::AtenIpexTypeDPCPP::eq_out(result, self, other);
+  Tensor min = at::AtenIpexTypeDPCPP::min(result);
+  Scalar min_ = at::AtenIpexTypeDPCPP::_local_scalar_dense(min);
+  return min_.to<bool>() != 0;
+}
+
 Tensor& ne_out(Tensor& out, const Tensor& self, Scalar other_) {
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
