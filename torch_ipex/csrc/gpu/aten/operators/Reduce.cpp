@@ -575,8 +575,9 @@ static void mean_kernel(TensorIterator& iter) {
 }
 
 static void min_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES(
-      iter.dtype(), "min", [&]() { min_kernel_impl<scalar_t>(iter); });
+  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Bool, iter.dtype(), "min", [&]() {
+    min_kernel_impl<scalar_t>(iter);
+  });
 }
 
 static void max_kernel(TensorIterator& iter) {

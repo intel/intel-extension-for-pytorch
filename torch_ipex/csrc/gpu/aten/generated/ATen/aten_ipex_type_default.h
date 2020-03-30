@@ -285,6 +285,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & renorm_out(at::Tensor & out, const at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm);
   static at::Tensor renorm(const at::Tensor & self, at::Scalar p, int64_t dim, at::Scalar maxnorm);
   static at::Tensor unfold(const at::Tensor & self, int64_t dimension, int64_t size, int64_t step);
+  static bool equal(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & pow_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & exponent);
   static at::Tensor pow(const at::Tensor & self, const at::Tensor & exponent);
   static at::Tensor & pow_out(at::Tensor & out, at::Scalar self, const at::Tensor & exponent);

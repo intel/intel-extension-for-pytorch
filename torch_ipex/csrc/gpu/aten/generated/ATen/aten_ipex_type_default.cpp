@@ -1123,6 +1123,10 @@ at::Tensor AtenIpexTypeDefault::unfold(const at::Tensor & self, int64_t dimensio
   return AtenIpexTypeDPCPP::unfold(self, dimension, size, step);
 }
 
+bool AtenIpexTypeDefault::equal(const at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::equal(self, other);
+}
+
 at::Tensor & AtenIpexTypeDefault::pow_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & exponent) {
   return AtenIpexTypeDPCPP::pow_out(out, self, exponent);
 }
@@ -2283,6 +2287,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::unfold(Tensor(a) self, int dimension, int size, int step) -> Tensor(a)")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, int64_t, int64_t, int64_t), &AtenIpexTypeDefault::unfold>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::equal(Tensor self, Tensor other) -> bool")
+      .impl_unboxedOnlyKernel<bool(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::equal>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::pow.Tensor_Tensor_out(Tensor self, Tensor exponent, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::pow_out>(at::TensorTypeId::DPCPPTensorId)
