@@ -17,7 +17,6 @@ namespace AtenIpexTypeDPCPP {
 IPEX_OUT_ALL_UNARY_FUNC_OPS(abs_out, Numerics<scalar_t>::abs, Real);
 IPEX_OUT_ALL_UNARY_FUNC_OPS(neg_out, Numerics<scalar_t>::neg, Real);
 
-IPEX_OUT_FLOAT_UNARY_FUNC_OPS(cos_out, Numerics<scalar_t>::cos, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(sin_out, Numerics<scalar_t>::sin, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(cosh_out, Numerics<scalar_t>::cosh, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(sinh_out, Numerics<scalar_t>::sinh, Real);
@@ -35,6 +34,7 @@ IPEX_OUT_FLOAT_UNARY_FUNC_OPS(log2_out, Numerics<scalar_t>::log2, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(rsqrt_out, Numerics<scalar_t>::rsqrt, Real);
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(sqrt_out, Numerics<scalar_t>::sqrt, Real);
 
+IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(cos, Numerics<scalar_t>::cos, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(tan, Numerics<scalar_t>::tan, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(tanh, Numerics<scalar_t>::tanh, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(atan, Numerics<scalar_t>::atan, Real);

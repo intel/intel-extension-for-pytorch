@@ -171,6 +171,10 @@ at::Tensor & AtenIpexTypeDefault::copy_(at::Tensor & self, const at::Tensor & sr
   return AtenIpexTypeDPCPP::copy_(self, src, non_blocking);
 }
 
+at::Tensor & AtenIpexTypeDefault::cos_(at::Tensor & self) {
+  return AtenIpexTypeDPCPP::cos_(self);
+}
+
 at::Tensor & AtenIpexTypeDefault::cos_out(at::Tensor & out, const at::Tensor & self) {
   return AtenIpexTypeDPCPP::cos_out(out, self);
 }
@@ -1561,6 +1565,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, bool), &AtenIpexTypeDefault::copy_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::cos_(Tensor(a!) self) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &), &AtenIpexTypeDefault::cos_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::cos.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::cos_out>(at::TensorTypeId::DPCPPTensorId)

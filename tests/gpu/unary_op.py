@@ -20,6 +20,9 @@ print("bitwise_not dpcpp", torch.bitwise_not(y_dpcpp_int8).cpu())
 print("logical_not cpu", torch.logical_not(y_cpu_int8))
 print("logical_not dpcpp", torch.logical_not(y_dpcpp_int8).cpu())
 
+print("cos_ cpu", y_cpu_float.cos())
+print("cos_ dpcpp", y_dpcpp_float.cos().cpu())
+
 print("cos cpu", torch.cos(y_cpu_float))
 print("cos dpcpp", torch.cos(y_dpcpp_float).cpu())
 

@@ -83,6 +83,8 @@ std::tuple<Tensor,Tensor,Tensor> convolution_backward_overrideable(const Tensor 
 
 Tensor & copy_(Tensor & self, const Tensor & src, bool non_blocking); // aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 
+Tensor & cos_(Tensor & self); // aten::cos_(Tensor(a!) self) -> Tensor(a!)
+
 Tensor & cos_out(Tensor & out, const Tensor & self); // aten::cos.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor & cosh_out(Tensor & out, const Tensor & self); // aten::cosh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
