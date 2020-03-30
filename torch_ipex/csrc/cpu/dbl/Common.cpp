@@ -8,6 +8,7 @@
 #include "cpu/ShadeDataContext.h"
 #include "torch_ipex/csrc/ipex_tensor_impl.h"
 #include "torch_ipex/csrc/utils.h"
+#include "torch_ipex/csrc/auto_opt_config.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -88,6 +89,18 @@ bool meet_dnnl_route_pre_cond(const at::Tensor& tensor) {
     }
   }
 
+  return false;
+}
+
+bool possible_to_route_to_dnnl(const std::vector<at::Tensor> &tensor_vec) {
+  if (AutoOptConfig::singleton().get_auto_dnnl()) {
+    for (auto it = tensor_vec.begin(); it != tensor_vec.end(); ++it) {
+      if (! (meet_dnnl_route_pre_cond(*it))) {
+        return false;
+      }
+    }
+    return true;
+  }
   return false;
 }
 

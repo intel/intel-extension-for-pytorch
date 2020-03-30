@@ -121,7 +121,7 @@ at::ScalarType get_at_data_type(dil::data_type dil_dt) {
   }
 }
 
-bool check_force_dnnl_env() {
+bool check_auto_dnnl() {
   return AutoOptConfig::singleton().get_auto_dnnl();
 }
 

@@ -19,7 +19,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-//#define DBG
+#define DBG
 #if defined(DBG)
 #define DEBUG(fmt) printf(fmt);
 #else
@@ -66,7 +66,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   return dbl::comm::gen_aten_tensor_by(dil_output);
 }
 
-at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor & self, const at::Tensor & other, at::Scalar alpha) {
+at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other, at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_add_\n");
   CHECK_DNNL_OP_PRE_COND(self);
 
@@ -79,10 +79,43 @@ at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor & self, const at::Tensor & othe
   return self;
 }
 
+at::Tensor& AtenIpexCPUDev::dil_mul_out(at::Tensor& result, const at::Tensor& self, const at::Tensor& other) {
+  CHECK_DNNL_OP_PRE_COND(result);
+  CHECK_DNNL_OP_PRE_COND(self);
+  CHECK_DNNL_OP_PRE_COND(other);
+
+  auto dil_result = dbl::comm::try_gen_dil_tensor(result);
+  auto dil_self = dbl::comm::try_gen_dil_tensor(self);
+  auto dil_other = dbl::comm::try_gen_dil_tensor(other);
+
+  dil::binary::compute(dil_self, dil_other, dil_result, dil::algorithm::binary_mul);
+
+  return result;
+}
+
+at::Tensor& AtenIpexCPUDev::dil_mul_(at::Tensor& self, const at::Tensor& other) {
+  DEBUG("AtenIpexCPUDev::dil_mul_\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+  CHECK_DNNL_OP_PRE_COND(other);
+  return dil_mul_out(self, self, other);
+}
+
+at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
+  DEBUG("AtenIpexCPUDev::dil_relu_\n");
+  auto dil_self = dbl::comm::try_gen_dil_tensor(input);
+  dil::eltwise_forward::compute(
+    dil_self,
+    dil_self,
+    dil::algorithm::eltwise_relu,
+    dil::prop_kind::forward_training,
+    /*alpha*/ 0.0);
+  return input;
+}
+
 at::Tensor AtenIpexCPUDev::convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
   DEBUG("AtenIpexCPUDev::convolution_overrideable\n");
   // NOTE: DO NOT always call contiguous. It may break lazy-reorder. Because contiguous will call reorder instantly.
-  if (check_force_dnnl_env()) {
+  if (check_auto_dnnl()) {
     return dil_convolution(
       input.is_contiguous() ? input : input.contiguous(),
       weight.is_contiguous() ? weight : weight.contiguous(),

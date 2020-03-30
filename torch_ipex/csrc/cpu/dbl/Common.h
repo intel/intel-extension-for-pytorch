@@ -30,6 +30,8 @@ at::Tensor gen_aten_tensor_by(dil::tensor tensor);
  */
 bool meet_dnnl_route_pre_cond(const at::Tensor& tensor);
 
+bool possible_to_route_to_dnnl(const std::vector<at::Tensor> &tensor_vec);
+
 }  // namespace comm
 }  // namespace dbl
 }  // namespace cpu

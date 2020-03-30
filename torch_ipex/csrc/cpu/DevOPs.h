@@ -16,6 +16,9 @@ class AtenIpexCPUDev {
   // For DNNL OPs
   static at::Tensor dil_convolution(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups);
   static at::Tensor & dil_add_(at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
+  static at::Tensor& dil_mul_out(at::Tensor& result, const at::Tensor& self, const at::Tensor& other);
+  static at::Tensor & dil_mul_(at::Tensor & self, const at::Tensor & other);
+  static at::Tensor& dil_relu_(at::Tensor& input);
 };
 
 }  // namespace cpu
