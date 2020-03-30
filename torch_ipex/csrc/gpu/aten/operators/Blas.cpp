@@ -295,14 +295,30 @@ void baddbmm(
 
 Tensor addmm(
     const Tensor& self,
-    const Tensor& mat1,
-    const Tensor& mat2,
+    const Tensor& mat1_,
+    const Tensor& mat2_,
     Scalar beta,
     Scalar alpha) {
-  Tensor b_self;
-  std::tie(b_self) =
-      expand_size(self, {mat1.size(0), mat2.size(1)}, "addmm_out");
+  Tensor b_self_;
+  std::tie(b_self_) =
+      expand_size(self, {mat1_.size(0), mat2_.size(1)}, "addmm_out");
   Tensor r = at::empty({0}, self.options());
+
+  Tensor b_self, mat1, mat2;
+  if (dpcppGetBufferMap().get_offset(b_self_.data_ptr()) != 0 ||
+      dpcppGetBufferMap().get_offset(mat1_.data_ptr()) != 0 ||
+      dpcppGetBufferMap().get_offset(mat2_.data_ptr()) != 0) {
+    b_self = at::empty_like(b_self_);
+    b_self.copy_(b_self_);
+    mat1 = at::empty_like(mat1_);
+    mat1.copy_(mat1_);
+    mat2 = at::empty_like(mat2_);
+    mat2.copy_(mat2_);
+  } else {
+    b_self = b_self_;
+    mat1 = mat1_;
+    mat2 = mat2_;
+  }
 
   AT_DISPATCH_ALL_TYPES(self.scalar_type(), "addmm_out", [&]() {
     impl::addmm<scalar_t>(
@@ -312,7 +328,19 @@ Tensor addmm(
   return r;
 }
 
-Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
+Tensor& mm_out(Tensor& result, const Tensor& self_, const Tensor& mat2_) {
+  Tensor self, mat2;
+  if (dpcppGetBufferMap().get_offset(self_.data_ptr()) != 0 ||
+      dpcppGetBufferMap().get_offset(mat2_.data_ptr()) != 0) {
+    self = at::empty_like(self_);
+    self.copy_(self_);
+    mat2 = at::empty_like(mat2_);
+    mat2.copy_(mat2_);
+  } else {
+    self = self_;
+    mat2 = mat2_;
+  }
+
   AT_DISPATCH_ALL_TYPES(self.scalar_type(), "mm_out", [&]() {
     impl::addmm<scalar_t>(result, scalar_t(0), result, scalar_t(1), self, mat2);
   });
