@@ -919,6 +919,14 @@ at::Tensor AtenIpexTypeDefault::lt(const at::Tensor & self, const at::Tensor & o
   return AtenIpexTypeDPCPP::lt(self, other);
 }
 
+at::Tensor & AtenIpexTypeDefault::take_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & index) {
+  return AtenIpexTypeDPCPP::take_out(out, self, index);
+}
+
+at::Tensor AtenIpexTypeDefault::take(const at::Tensor & self, const at::Tensor & index) {
+  return AtenIpexTypeDPCPP::take(self, index);
+}
+
 at::Tensor & AtenIpexTypeDefault::index_select_out(at::Tensor & out, const at::Tensor & self, int64_t dim, const at::Tensor & index) {
   return AtenIpexTypeDPCPP::index_select_out(out, self, dim, index);
 }
@@ -2142,6 +2150,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::lt.Tensor(Tensor self, Tensor other) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::lt>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::take.out(Tensor self, Tensor index, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::take_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::take(Tensor self, Tensor index) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::take>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::index_select.out(Tensor self, int dim, Tensor index, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, int64_t, const at::Tensor &), &AtenIpexTypeDefault::index_select_out>(at::TensorTypeId::DPCPPTensorId)

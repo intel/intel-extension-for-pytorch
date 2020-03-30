@@ -234,6 +234,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor lt(const at::Tensor & self, at::Scalar other);
   at::Tensor & lt_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
   at::Tensor lt(const at::Tensor & self, const at::Tensor & other);
+  at::Tensor & take_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & index);
+  at::Tensor take(const at::Tensor & self, const at::Tensor & index);
   at::Tensor & index_select_out(at::Tensor & out, const at::Tensor & self, int64_t dim, const at::Tensor & index);
   at::Tensor index_select(const at::Tensor & self, int64_t dim, const at::Tensor & index);
   at::Tensor & masked_select_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & mask);
