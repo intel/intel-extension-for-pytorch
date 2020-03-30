@@ -184,6 +184,7 @@ class AtenIpexTypeDefault {
   static at::Tensor __or__(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & __ior__(at::Tensor & self, at::Scalar other);
   static at::Tensor & __ior__(at::Tensor & self, const at::Tensor & other);
+  static at::Tensor & atan2_(at::Tensor & self, const at::Tensor & other);
   static at::Tensor & tril_(at::Tensor & self, int64_t diagonal);
   static at::Tensor & triu_(at::Tensor & self, int64_t diagonal);
   static at::Tensor & digamma_(at::Tensor & self);
@@ -252,6 +253,8 @@ class AtenIpexTypeDefault {
   static at::Tensor sign(const at::Tensor & self);
   static at::Tensor & sign_(at::Tensor & self);
   static at::Tensor & sign_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & atan2_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
+  static at::Tensor atan2(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & lerp_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & end, at::Scalar weight);
   static at::Tensor & lerp_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & end, const at::Tensor & weight);
   static at::Tensor lerp(const at::Tensor & self, const at::Tensor & end, at::Scalar weight);

@@ -184,6 +184,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor __or__(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & __ior__(at::Tensor & self, at::Scalar other);
   at::Tensor & __ior__(at::Tensor & self, const at::Tensor & other);
+  at::Tensor & atan2_(at::Tensor & self, const at::Tensor & other);
   at::Tensor & tril_(at::Tensor & self, int64_t diagonal);
   at::Tensor & triu_(at::Tensor & self, int64_t diagonal);
   at::Tensor & digamma_(at::Tensor & self);
@@ -252,6 +253,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor sign(const at::Tensor & self);
   at::Tensor & sign_(at::Tensor & self);
   at::Tensor & sign_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & atan2_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
+  at::Tensor atan2(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & lerp_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & end, at::Scalar weight);
   at::Tensor & lerp_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & end, const at::Tensor & weight);
   at::Tensor lerp(const at::Tensor & self, const at::Tensor & end, at::Scalar weight);

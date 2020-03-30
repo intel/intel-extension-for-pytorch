@@ -393,9 +393,10 @@ Tensor eq(const Tensor& self, Scalar other_) {
 }
 
 Tensor& eq_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "eqTensor", [&]() {
-    impl::eqTensor<scalar_t>(out, self, other);
-  });
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::Bool, self.scalar_type(), "eqTensor", [&]() {
+        impl::eqTensor<scalar_t>(out, self, other);
+      });
 
   return out;
 }
