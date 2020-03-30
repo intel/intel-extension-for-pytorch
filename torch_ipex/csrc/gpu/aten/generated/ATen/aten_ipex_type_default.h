@@ -75,6 +75,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & floor_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor index(const at::Tensor & self, at::TensorList indices);
   static at::Tensor & _index_put_impl_(at::Tensor & self, at::TensorList indices, const at::Tensor & values, bool accumulate, bool unsafe);
+  static at::Tensor isnan(const at::Tensor & self);
   static std::tuple<at::Tensor &,at::Tensor &> kthvalue_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool keepdim);
   static std::tuple<at::Tensor,at::Tensor,at::Tensor> native_layer_norm(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, int64_t M, int64_t N, double eps);
   static std::tuple<at::Tensor,at::Tensor,at::Tensor> native_layer_norm_backward(const at::Tensor & grad_out, const at::Tensor & input, const at::Tensor & mean, const at::Tensor & rstd, const at::Tensor & weight, int64_t M, int64_t N, std::array<bool,3> output_mask);

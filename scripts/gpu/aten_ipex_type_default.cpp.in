@@ -283,6 +283,10 @@ at::Tensor & AtenIpexTypeDefault::_index_put_impl_(at::Tensor & self, at::Tensor
   return AtenIpexTypeDPCPP::_index_put_impl_(self, indices, values, accumulate, unsafe);
 }
 
+at::Tensor AtenIpexTypeDefault::isnan(const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::isnan(self);
+}
+
 std::tuple<at::Tensor &,at::Tensor &> AtenIpexTypeDefault::kthvalue_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, int64_t dim, bool keepdim) {
   return AtenIpexTypeDPCPP::kthvalue_out(values, indices, self, k, dim, keepdim);
 }
@@ -1649,6 +1653,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_index_put_impl_(Tensor(a!) self, Tensor?[] indices, Tensor values, bool accumulate=False, bool unsafe=False) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::TensorList, const at::Tensor &, bool, bool), &AtenIpexTypeDefault::_index_put_impl_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::isnan(Tensor self) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::isnan>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::kthvalue.values(Tensor self, int k, int dim=-1, bool keepdim=False, *, Tensor(a!) values, Tensor(b!) indices) -> (Tensor(a!) values, Tensor(b!) indices)")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor &,at::Tensor &>(at::Tensor &, at::Tensor &, const at::Tensor &, int64_t, int64_t, bool), &AtenIpexTypeDefault::kthvalue_out>(at::TensorTypeId::DPCPPTensorId)

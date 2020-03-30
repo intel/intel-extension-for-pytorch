@@ -291,5 +291,6 @@ struct TORCH_API SYCLType final {
   static Tensor & tanh_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & output); // aten::tanh_backward.grad_input(Tensor grad_output, Tensor output, *, Tensor(a!) grad_input) -> Tensor(a!)
   static Tensor tanh_backward(const Tensor & grad_output, const Tensor & output); // aten::tanh_backward(Tensor grad_output, Tensor output) -> Tensor
 };
+  static Tensor isnan(const Tensor & self); // aten::isnan(Tensor self) -> Tensor
 
 } // namespace at

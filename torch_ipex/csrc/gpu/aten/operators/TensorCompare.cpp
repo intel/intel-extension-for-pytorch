@@ -56,5 +56,9 @@ Tensor _s_where(
   return ret;
 }
 
+Tensor isnan(const Tensor& self) {
+  return self != self;
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
