@@ -247,6 +247,8 @@ class AtenIpexTypeDefault {
   static at::Tensor & addcmul_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   static at::Tensor & addcdiv_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   static at::Tensor addcdiv(const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
+  static at::Tensor & multinomial_out(at::Tensor & out, const at::Tensor & self, int64_t num_samples, bool replacement, at::Generator * generator);
+  static at::Tensor multinomial(const at::Tensor & self, int64_t num_samples, bool replacement, at::Generator * generator);
   static at::Tensor & digamma_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor digamma(const at::Tensor & self);
   static at::Tensor erfinv(const at::Tensor & self);

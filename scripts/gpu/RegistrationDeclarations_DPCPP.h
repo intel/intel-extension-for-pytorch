@@ -483,6 +483,10 @@ Tensor & addcdiv_out(Tensor & out, const Tensor & self, const Tensor & tensor1, 
 
 Tensor addcdiv(const Tensor & self, const Tensor & tensor1, const Tensor & tensor2, Scalar value); // aten::addcdiv(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1) -> Tensor
 
+Tensor & multinomial_out(Tensor & out, const Tensor & self, int64_t num_samples, bool replacement, Generator * generator); // aten::multinomial.out(Tensor self, int num_samples, bool replacement=False, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
+
+Tensor multinomial(const Tensor & self, int64_t num_samples, bool replacement, Generator * generator); // aten::multinomial(Tensor self, int num_samples, bool replacement=False, *, Generator? generator=None) -> Tensor
+
 Tensor & digamma_out(Tensor & out, const Tensor & self); // aten::digamma.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor digamma(const Tensor & self); // aten::digamma(Tensor self) -> Tensor

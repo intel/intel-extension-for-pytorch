@@ -971,6 +971,14 @@ at::Tensor AtenIpexTypeDefault::addcdiv(const at::Tensor & self, const at::Tenso
   return AtenIpexTypeDPCPP::addcdiv(self, tensor1, tensor2, value);
 }
 
+at::Tensor & AtenIpexTypeDefault::multinomial_out(at::Tensor & out, const at::Tensor & self, int64_t num_samples, bool replacement, at::Generator * generator) {
+  return AtenIpexTypeDPCPP::multinomial_out(out, self, num_samples, replacement, generator);
+}
+
+at::Tensor AtenIpexTypeDefault::multinomial(const at::Tensor & self, int64_t num_samples, bool replacement, at::Generator * generator) {
+  return AtenIpexTypeDPCPP::multinomial(self, num_samples, replacement, generator);
+}
+
 at::Tensor & AtenIpexTypeDefault::digamma_out(at::Tensor & out, const at::Tensor & self) {
   return AtenIpexTypeDPCPP::digamma_out(out, self);
 }
@@ -2173,6 +2181,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::addcdiv(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::addcdiv>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::multinomial.out(Tensor self, int num_samples, bool replacement=False, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, int64_t, bool, at::Generator *), &AtenIpexTypeDefault::multinomial_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::multinomial(Tensor self, int num_samples, bool replacement=False, *, Generator? generator=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, int64_t, bool, at::Generator *), &AtenIpexTypeDefault::multinomial>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::digamma.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::digamma_out>(at::TensorTypeId::DPCPPTensorId)
