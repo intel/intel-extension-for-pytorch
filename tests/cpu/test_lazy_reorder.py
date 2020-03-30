@@ -39,7 +39,10 @@ class TestConv(TestCase):
         input_cpu = torch.rand((1, 1, 7, 7))
         input_dpcpp = input_cpu.to(device=device)
 
+        ipex.enable_auto_dnnl()
         out_dpcpp = conv_dpcpp(input_dpcpp)
+
+        ipex.disable_auto_dnnl()
         out_dpcpp_cpu = out_dpcpp.to('cpu')
         out_cpu = conv_cpu(input_cpu)
         self.assertEqual(out_dpcpp.size(), out_cpu.size())
@@ -60,7 +63,10 @@ class TestConv(TestCase):
 
 
     def test_seq_conv(self):
+        ipex.disable_auto_dnnl()
         res_cpu = self._seq_conf(device='cpu')
+
+        ipex.enable_auto_dnnl()
         res_dpcpp = self._seq_conf(device=device)
         self.assertEqual(res_cpu, res_dpcpp.to('cpu'))
 
@@ -76,16 +82,18 @@ class TestBinaryOp(TestCase):
         return a1
 
     def test_dil_add_(self):
-        os.environ["FORCE_DNNL"] = "1"
+        ipex.enable_auto_dnnl()
         res_dcpp_dnnl = self._test_dil_add("dpcpp:0")
-        os.environ["FORCE_DNNL"] = "0"
+
+        ipex.disable_auto_dnnl()
         res_dcpp_cpu = self._test_dil_add("dpcpp:0")
+
         res_cpu = self._test_dil_add("cpu")
         self.assertEqual(res_cpu, res_dcpp_cpu.to('cpu'))
         self.assertEqual(res_cpu, res_dcpp_dnnl.to('cpu'))
 
     def test_dil_add_scalar(self):
-        os.environ["FORCE_DNNL"] = "1"
+        ipex.enable_auto_dnnl()
         a = torch.rand((8, 8)).to(device=device)
         a += 2
 
@@ -101,14 +109,15 @@ class TestMixOp(TestCase):
         return conv_op_putput
 
     def test_conv_add_(self):
-        os.environ["FORCE_DNNL"] = "1"
+        ipex.enable_auto_dnnl()
         res_dcpp_dnnl = self._test_conv_add_("dpcpp:0")
-        os.environ["FORCE_DNNL"] = "0"
+
+        ipex.disable_auto_dnnl()
         res_dcpp_cpu = self._test_conv_add_("dpcpp:0")
+
         res_cpu = self._test_conv_add_("cpu")
         self.assertEqual(res_cpu, res_dcpp_cpu.to('cpu'))
         self.assertEqual(res_cpu, res_dcpp_dnnl.to('cpu'))
-
 
 
 if __name__ == '__main__':

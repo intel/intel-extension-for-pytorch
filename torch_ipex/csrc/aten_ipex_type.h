@@ -10,4 +10,4 @@ class AtenIpexType {
   static void InitializeAtenBindings();
 };
 
-} // namespace torch_ipe
+} // namespace torch_ipex
