@@ -3,6 +3,8 @@
 #include <ATen/Tensor.h>
 #include <c10/util/Exception.h>
 
+#include "auto_opt_config.h"
+
 namespace torch_ipex {
 
 bool check_device_by_tensor(const at::Tensor& tensor, DPCPPSubDev sub_dev) {
@@ -120,14 +122,7 @@ at::ScalarType get_at_data_type(dil::data_type dil_dt) {
 }
 
 bool check_force_dnnl_env() {
-  auto envar = std::getenv("FORCE_DNNL");
-  if (envar) {
-    if (strcmp(envar, "1") == 0) {
-      return true;
-    }
-  }
-
-  return false;
+  return AutoOptConfig::singleton().get_auto_dnnl();
 }
 
 } // namespace torch_ipex

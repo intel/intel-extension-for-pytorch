@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "aten_ipex_type.h"
+#include "auto_opt_config.h"
 
 namespace torch_ipex {
 namespace {
@@ -21,10 +22,16 @@ py::object GetRevisions() {
   return py_dict;
 }
 
+void setAutoDNNL(bool val) {
+  AutoOptConfig::singleton().set_auto_dnnl(val);
+}
+
 void InitIpeModuleBindings(py::module m) {
   m.def("_initialize_aten_bindings",
         []() { AtenIpexType::InitializeAtenBindings(); });
   m.def("_get_git_revs", []() { return GetRevisions(); });
+  m.def("enable_auto_dnnl", []() { setAutoDNNL(true); });
+  m.def("disable_auto_dnnl", []() { setAutoDNNL(false); });
 }
 
 }  // namespace
