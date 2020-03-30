@@ -1,3 +1,5 @@
+#include <ATen/core/PhiloxRNGEngine.h>
+
 #include <core/DPCPP.h>
 #include <core/Memory.h>
 
@@ -209,4 +211,33 @@ class NormalRandomFiller {
   double m_stdv;
   double m_mean;
   int64_t m_compute_num;
+};
+
+using Philox4_32_10 = at::Philox4_32_10;
+
+template <typename scalar_t, typename engine_t = Philox4_32_10>
+class RandomState final {
+ public:
+  template <
+      typename = std::enable_if<std::is_same<Philox4_32_10, engine_t>::value>>
+  RandomState(
+      uint64_t seed = 67280421310721,
+      uint64_t subsequence = 0,
+      uint64_t offset = 0)
+      : engine(seed, subsequence, offset){};
+
+  RandomState() = delete;
+  RandomState(const RandomState&) = delete;
+  RandomState& operator=(const RandomState&) = delete;
+  RandomState(RandomState&&) = default;
+  RandomState& operator=(RandomState&&) = default;
+
+  float uniform() {
+    uint32_t y = engine();
+
+    return ((float)y + 1.0f) / FLOAT_DIVISOR;
+  }
+
+ private:
+  engine_t engine;
 };

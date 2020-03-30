@@ -234,6 +234,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor lt(const at::Tensor & self, at::Scalar other);
   at::Tensor & lt_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
   at::Tensor lt(const at::Tensor & self, const at::Tensor & other);
+  at::Tensor & take_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & index);
+  at::Tensor take(const at::Tensor & self, const at::Tensor & index);
   at::Tensor & index_select_out(at::Tensor & out, const at::Tensor & self, int64_t dim, const at::Tensor & index);
   at::Tensor index_select(const at::Tensor & self, int64_t dim, const at::Tensor & index);
   at::Tensor & masked_select_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & mask);
@@ -247,6 +249,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & addcmul_(at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   at::Tensor & addcdiv_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
   at::Tensor addcdiv(const at::Tensor & self, const at::Tensor & tensor1, const at::Tensor & tensor2, at::Scalar value);
+  at::Tensor & multinomial_out(at::Tensor & out, const at::Tensor & self, int64_t num_samples, bool replacement, at::Generator * generator);
+  at::Tensor multinomial(const at::Tensor & self, int64_t num_samples, bool replacement, at::Generator * generator);
   at::Tensor & digamma_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor digamma(const at::Tensor & self);
   at::Tensor erfinv(const at::Tensor & self);
