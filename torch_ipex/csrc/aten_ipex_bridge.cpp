@@ -478,7 +478,6 @@ std::vector<at::Tensor> shallowUpgradeToDPCPPTensorVec(const std::vector<at::Ten
     auto&& cur_tensor = tensor_vec[i];
     TORCH_INTERNAL_ASSERT(cur_tensor.defined());
     TORCH_INTERNAL_ASSERT(cur_tensor.layout() == c10::kStrided);
-    TORCH_INTERNAL_ASSERT(cur_tensor.is_contiguous());
     auto&& cur_dpcpp_tensor = shallowUpgradeToDPCPPTensor(cur_tensor);
     ret_dpcpp_tensor_vec.push_back(cur_dpcpp_tensor);
   }

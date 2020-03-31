@@ -162,6 +162,7 @@ class TestMixOp(TestCase):
         self.assertEqual(res_cpu, res_dcpp_cpu.to('cpu'))
         self.assertEqual(res_cpu, res_dcpp_dnnl.to('cpu'))
 
+        ipex.enable_auto_dnnl()
         res_dcpp_dnnl.sum().backward()
         res_dcpp_cpu.sum().backward()
         res_cpu.sum().backward()
