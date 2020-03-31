@@ -104,6 +104,18 @@ bool possible_to_route_to_dnnl(const std::vector<at::Tensor> &tensor_vec) {
   return false;
 }
 
+at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& options) {
+  /*TORCH_CHECK(
+     !optional_memory_format.has_value(),
+     "'memory_format' argument is incompatible with mkldnn tensor");*/
+  // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
+  // TODO: support int64_t dims in ideep::tensor to avoid extra conversion
+  dil::tensor::dims dst_dims (sizes.begin(), sizes.end());
+  auto data_type = get_dil_data_type(at::typeMetaToScalarType(options.dtype()));
+  dil::tensor it {dst_dims, data_type};
+  return gen_aten_tensor_by(it);
+}
+
 }  // namespace comm
 }  // namespace dbl
 }  // namespace cpu
