@@ -178,6 +178,18 @@ class AtenIpexTypeDefault {
   static at::Tensor & scatter_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & src);
   static at::Tensor & scatter_(at::Tensor & self, int64_t dim, const at::Tensor & index, at::Scalar value);
   static at::Tensor & scatter_add_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & src);
+  static at::Tensor & lt_(at::Tensor & self, at::Scalar other);
+  static at::Tensor & lt_(at::Tensor & self, const at::Tensor & other);
+  static at::Tensor & gt_(at::Tensor & self, at::Scalar other);
+  static at::Tensor & gt_(at::Tensor & self, const at::Tensor & other);
+  static at::Tensor & le_(at::Tensor & self, at::Scalar other);
+  static at::Tensor & le_(at::Tensor & self, const at::Tensor & other);
+  static at::Tensor & ge_(at::Tensor & self, at::Scalar other);
+  static at::Tensor & ge_(at::Tensor & self, const at::Tensor & other);
+  static at::Tensor & eq_(at::Tensor & self, at::Scalar other);
+  static at::Tensor & eq_(at::Tensor & self, const at::Tensor & other);
+  static at::Tensor & ne_(at::Tensor & self, at::Scalar other);
+  static at::Tensor & ne_(at::Tensor & self, const at::Tensor & other);
   static at::Tensor __and__(const at::Tensor & self, at::Scalar other);
   static at::Tensor __and__(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & __iand__(at::Tensor & self, at::Scalar other);

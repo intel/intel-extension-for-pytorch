@@ -178,6 +178,18 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & scatter_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & src);
   at::Tensor & scatter_(at::Tensor & self, int64_t dim, const at::Tensor & index, at::Scalar value);
   at::Tensor & scatter_add_(at::Tensor & self, int64_t dim, const at::Tensor & index, const at::Tensor & src);
+  at::Tensor & lt_(at::Tensor & self, at::Scalar other);
+  at::Tensor & lt_(at::Tensor & self, const at::Tensor & other);
+  at::Tensor & gt_(at::Tensor & self, at::Scalar other);
+  at::Tensor & gt_(at::Tensor & self, const at::Tensor & other);
+  at::Tensor & le_(at::Tensor & self, at::Scalar other);
+  at::Tensor & le_(at::Tensor & self, const at::Tensor & other);
+  at::Tensor & ge_(at::Tensor & self, at::Scalar other);
+  at::Tensor & ge_(at::Tensor & self, const at::Tensor & other);
+  at::Tensor & eq_(at::Tensor & self, at::Scalar other);
+  at::Tensor & eq_(at::Tensor & self, const at::Tensor & other);
+  at::Tensor & ne_(at::Tensor & self, at::Scalar other);
+  at::Tensor & ne_(at::Tensor & self, const at::Tensor & other);
   at::Tensor __and__(const at::Tensor & self, at::Scalar other);
   at::Tensor __and__(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & __iand__(at::Tensor & self, at::Scalar other);
