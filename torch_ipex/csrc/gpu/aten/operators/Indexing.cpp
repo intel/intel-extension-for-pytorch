@@ -1241,17 +1241,11 @@ Tensor & take_out(Tensor & out, const Tensor & self, const Tensor & index) {
     impl::Take<scalar_t>(out, self, index);
   });
 
-  auto dst_data = out.data_ptr();
-  auto dst_dbg_sycl_buff = dpcppGetBufferMap().template get_buffer<float>(dst_data);
-  auto dst_dbg = dst_dbg_sycl_buff.template get_access<dpcpp_r_mode>();
-
-  printf("dst2: %f %f %f --\n", dst_dbg[0], dst_dbg[1], dst_dbg[2]);
-
   return out;
 }
 
 Tensor take(const Tensor & self, const Tensor & index) {
-  Tensor out = at::empty({0}, self.options().dtype());
+  Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::take_out(out, self, index);
 }
 
