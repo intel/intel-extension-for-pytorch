@@ -695,6 +695,54 @@ at::Tensor & AtenIpexTypeDefault::scatter_add_(at::Tensor & self, int64_t dim, c
   return AtenIpexTypeDPCPP::scatter_add_(self, dim, index, src);
 }
 
+at::Tensor & AtenIpexTypeDefault::lt_(at::Tensor & self, at::Scalar other) {
+  return AtenIpexTypeDPCPP::lt_(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::lt_(at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::lt_(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::gt_(at::Tensor & self, at::Scalar other) {
+  return AtenIpexTypeDPCPP::gt_(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::gt_(at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::gt_(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::le_(at::Tensor & self, at::Scalar other) {
+  return AtenIpexTypeDPCPP::le_(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::le_(at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::le_(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::ge_(at::Tensor & self, at::Scalar other) {
+  return AtenIpexTypeDPCPP::ge_(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::ge_(at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::ge_(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::eq_(at::Tensor & self, at::Scalar other) {
+  return AtenIpexTypeDPCPP::eq_(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::eq_(at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::eq_(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::ne_(at::Tensor & self, at::Scalar other) {
+  return AtenIpexTypeDPCPP::ne_(self, other);
+}
+
+at::Tensor & AtenIpexTypeDefault::ne_(at::Tensor & self, const at::Tensor & other) {
+  return AtenIpexTypeDPCPP::ne_(self, other);
+}
+
 at::Tensor AtenIpexTypeDefault::__and__(const at::Tensor & self, at::Scalar other) {
   return AtenIpexTypeDPCPP::__and__(self, other);
 }
@@ -1982,6 +2030,42 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::scatter_add_(Tensor(a!) self, int dim, Tensor index, Tensor src) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, int64_t, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::scatter_add_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::lt_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::lt_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::lt_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::lt_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::gt_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::gt_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::gt_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::gt_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::le_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::le_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::le_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::le_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::ge_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::ge_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::ge_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::ge_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::eq_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::eq_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::eq_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::eq_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::ne_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::ne_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::ne_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::ne_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::__and__.Scalar(Tensor self, Scalar other) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::__and__>(at::TensorTypeId::DPCPPTensorId)

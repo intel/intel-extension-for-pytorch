@@ -1,8 +1,10 @@
+#include <ATen/ExpandUtils.h>
 #include <ATen/Functions.h>
 #include <ATen/ScalarOps.h>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
 #include <core/ApplyUtils.h>
+#include <core/TensorImplUtils.h>
 #include <utils/Numerics.h>
 
 using namespace at::dpcpp;
@@ -15,6 +17,10 @@ namespace {
 
 template <typename T, typename TOut>
 struct TensorLTOp {
+  inline void operator()(T& out, T& in) const {
+    out = Numerics<T>::lt(out, in);
+  }
+
   inline void operator()(TOut& out, T& a, T& b) const {
     out = ScalarConvert<bool, TOut>::to(Numerics<T>::lt(a, b));
   }
@@ -22,6 +28,10 @@ struct TensorLTOp {
 
 template <typename T, typename TOut>
 struct TensorGTOp {
+  inline void operator()(T& out, T& in) const {
+    out = Numerics<T>::gt(out, in);
+  }
+
   inline void operator()(TOut& out, T& a, T& b) const {
     out = ScalarConvert<bool, TOut>::to(Numerics<T>::gt(a, b));
   }
@@ -29,6 +39,10 @@ struct TensorGTOp {
 
 template <typename T, typename TOut>
 struct TensorLEOp {
+  inline void operator()(T& out, T& in) const {
+    out = Numerics<T>::le(out, in);
+  }
+
   inline void operator()(TOut& out, T& a, T& b) const {
     out = ScalarConvert<bool, TOut>::to(Numerics<T>::le(a, b));
   }
@@ -36,6 +50,10 @@ struct TensorLEOp {
 
 template <typename T, typename TOut>
 struct TensorGEOp {
+  inline void operator()(T& out, T& in) const {
+    out = Numerics<T>::ge(out, in);
+  }
+
   inline void operator()(TOut& out, T& a, T& b) const {
     out = ScalarConvert<bool, TOut>::to(Numerics<T>::ge(a, b));
   }
@@ -43,6 +61,10 @@ struct TensorGEOp {
 
 template <typename T, typename TOut>
 struct TensorEQOp {
+  inline void operator()(T& out, T& in) const {
+    out = Numerics<T>::eq(out, in);
+  }
+
   void operator()(TOut& out, T& a, T& b) const {
     out = ScalarConvert<bool, TOut>::to(Numerics<T>::eq(a, b));
   }
@@ -50,6 +72,10 @@ struct TensorEQOp {
 
 template <typename T, typename TOut>
 struct TensorNEOp {
+  inline void operator()(T& out, T& in) const {
+    out = Numerics<T>::ne(out, in);
+  }
+
   inline void operator()(TOut& out, T& a, T& b) const {
     out = ScalarConvert<bool, TOut>::to(Numerics<T>::ne(a, b));
   }
@@ -61,11 +87,16 @@ void logicalTensor(
     const Tensor& src1,
     const Tensor& src2,
     Op op) {
-  at::AtenIpexTypeDPCPP::resize_as_(self_, src1, c10::nullopt);
+  if (at::dpcpp::TensorImpl_Unwrap(self_) ==
+      at::dpcpp::TensorImpl_Unwrap(src1)) {
+    at::dpcpp::DPCPP_tensor_apply2<ScalarType, ScalarType>(self_, src2, op);
+  } else {
+    at::AtenIpexTypeDPCPP::resize_as_(self_, src1, c10::nullopt);
 
-  TORCH_CHECK(src1.numel() == src2.numel(), "sizes do not match");
-  at::dpcpp::DPCPP_tensor_apply3<ScalarTypeOut, ScalarType, ScalarType>(
-      self_, src1, src2, op);
+    TORCH_CHECK(src1.numel() == src2.numel(), "sizes do not match");
+    at::dpcpp::DPCPP_tensor_apply3<ScalarTypeOut, ScalarType, ScalarType>(
+        self_, src1, src2, op);
+  }
 }
 
 } // namespace
@@ -273,6 +304,14 @@ Tensor lt(const Tensor& self, const Tensor& other) {
   return at::lt_out(result, self, other);
 }
 
+Tensor& lt_(Tensor& self, Scalar other) {
+  return at::lt_out(self, self, other);
+}
+
+Tensor& lt_(Tensor& self, const Tensor& other) {
+  return at::lt_out(self, self, other);
+}
+
 Tensor& gt_out(Tensor& out, const Tensor& self, Scalar other_) {
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
@@ -305,6 +344,14 @@ Tensor& gt_out(Tensor& out, const Tensor& self, const Tensor& other) {
 Tensor gt(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
   return at::gt_out(result, self, other);
+}
+
+Tensor& gt_(Tensor& self, Scalar other) {
+  return at::gt_out(self, self, other);
+}
+
+Tensor& gt_(Tensor& self, const Tensor& other) {
+  return at::gt_out(self, self, other);
 }
 
 Tensor& ge_out(Tensor& out, const Tensor& self, Scalar other_) {
@@ -340,6 +387,14 @@ Tensor ge(const Tensor& self, const Tensor& other) {
   return at::ge_out(result, self, other);
 }
 
+Tensor& ge_(Tensor& self, Scalar other) {
+  return at::ge_out(self, self, other);
+}
+
+Tensor& ge_(Tensor& self, const Tensor& other) {
+  return at::ge_out(self, self, other);
+}
+
 Tensor& le_out(Tensor& out, const Tensor& self, Scalar other_) {
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
@@ -373,6 +428,14 @@ Tensor le(const Tensor& self, const Tensor& other) {
   return at::le_out(result, self, other);
 }
 
+Tensor& le_(Tensor& self, Scalar other) {
+  return at::le_out(self, self, other);
+}
+
+Tensor& le_(Tensor& self, const Tensor& other) {
+  return at::le_out(self, self, other);
+}
+
 Tensor& eq_out(Tensor& out, const Tensor& self, Scalar other_) {
   auto other = c10::scalar_to_tensor(other_, kDPCPP);
   other.unsafeGetTensorImpl()->set_wrapped_number(true);
@@ -404,6 +467,14 @@ Tensor& eq_out(Tensor& out, const Tensor& self, const Tensor& other) {
 Tensor eq(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
   return at::eq_out(result, self, other);
+}
+
+Tensor& eq_(Tensor& self, Scalar other) {
+  return at::eq_out(self, self, other);
+}
+
+Tensor& eq_(Tensor& self, const Tensor& other) {
+  return at::eq_out(self, self, other);
 }
 
 bool equal(const Tensor& self, const Tensor& other) {
@@ -446,6 +517,14 @@ Tensor& ne_out(Tensor& out, const Tensor& self, const Tensor& other) {
 Tensor ne(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
   return at::ne_out(result, self, other);
+}
+
+Tensor& ne_(Tensor& self, Scalar other) {
+  return at::ne_out(self, self, other);
+}
+
+Tensor& ne_(Tensor& self, const Tensor& other) {
+  return at::ne_out(self, self, other);
 }
 
 } // namespace AtenIpexTypeDPCPP

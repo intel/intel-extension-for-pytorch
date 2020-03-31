@@ -12,21 +12,22 @@ std::tuple<Tensor&, Tensor&> _min_out(
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
-  AT_DISPATCH_ALL_TYPES(min.scalar_type(), "_min_out", [&] {
-    std::pair<scalar_t, int64_t> init =
-        std::make_pair<scalar_t, int64_t>(Numerics<scalar_t>::upper_bound(), 0);
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::Bool, min.scalar_type(), "_min_out", [&] {
+        std::pair<scalar_t, int64_t> init = std::make_pair<scalar_t, int64_t>(
+            Numerics<scalar_t>::upper_bound(), 0);
 
-    dim = maybe_wrap_dim(dim, TensorImpl_Unwrap(self));
+        dim = maybe_wrap_dim(dim, TensorImpl_Unwrap(self));
 
-    reduceDimIndex<scalar_t, int64_t>(
-        min,
-        min_indices,
-        self,
-        dim,
-        keepdim,
-        init,
-        MinValuePair<scalar_t, int64_t>());
-  });
+        reduceDimIndex<scalar_t, int64_t>(
+            min,
+            min_indices,
+            self,
+            dim,
+            keepdim,
+            init,
+            MinValuePair<scalar_t, int64_t>());
+      });
 
   return std::tuple<Tensor&, Tensor&>(min, min_indices);
 }
@@ -57,21 +58,22 @@ std::tuple<Tensor&, Tensor&> _max_out(
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
-  AT_DISPATCH_ALL_TYPES(max.scalar_type(), "_max_out", [&] {
-    std::pair<scalar_t, int64_t> init =
-        std::make_pair<scalar_t, int64_t>(Numerics<scalar_t>::lower_bound(), 0);
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::Bool, max.scalar_type(), "_max_out", [&] {
+        std::pair<scalar_t, int64_t> init = std::make_pair<scalar_t, int64_t>(
+            Numerics<scalar_t>::lower_bound(), 0);
 
-    dim = maybe_wrap_dim(dim, TensorImpl_Unwrap(self));
+        dim = maybe_wrap_dim(dim, TensorImpl_Unwrap(self));
 
-    reduceDimIndex<scalar_t, int64_t>(
-        max,
-        max_indices,
-        self,
-        dim,
-        keepdim,
-        init,
-        MaxValuePair<scalar_t, int64_t>());
-  });
+        reduceDimIndex<scalar_t, int64_t>(
+            max,
+            max_indices,
+            self,
+            dim,
+            keepdim,
+            init,
+            MaxValuePair<scalar_t, int64_t>());
+      });
 
   return std::tuple<Tensor&, Tensor&>(max, max_indices);
 }
