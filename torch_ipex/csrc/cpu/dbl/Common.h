@@ -12,9 +12,10 @@ namespace dbl {
 namespace comm {
 
 dil::tensor dil_tensor_from_dense(const at::Tensor& tensor);
-at::Tensor dil_tensor_to_dense(const dil::tensor& dil_tensor);
+at::Tensor dil_tensor_to_dense(const at::Tensor& tensor);
 dil::tensor try_gen_dil_tensor(const at::Tensor &input);
 at::Tensor gen_aten_tensor_by(dil::tensor tensor);
+at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& options);
 
 /**
  * Check if current tensor can be routed to DNNL OP or not.
