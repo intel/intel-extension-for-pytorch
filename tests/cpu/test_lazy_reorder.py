@@ -79,6 +79,32 @@ class TestConv(TestCase):
         self.assertEqual(res_cpu, res_dpcpp.to('cpu'))
 
 class TestBinaryOp(TestCase):
+    def test_dil_add(self):
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 100, (1,)).item()
+        alpha = torch.randn(1, dtype=torch.float32).item()
+
+        x_cpu = torch.randn(N, C, 35, 45, dtype=torch.float32) * 10
+        y_cpu = torch.randn(N, C, 35, 45, dtype=torch.float32) * 10
+        x_dpcpp = x_cpu.to(device=device)
+        y_dpcpp = y_cpu.to(device=device)
+
+        # add
+        self.assertEqual(
+            x_cpu + y_cpu,
+            x_dpcpp + y_dpcpp)
+
+        self.assertEqual(
+            torch.add(x_cpu, y_cpu, alpha=alpha),
+            torch.add(x_dpcpp, y_dpcpp, alpha=alpha))
+
+        # add_out
+        out_cpu = x_cpu.clone()
+        out_dpcpp = out_cpu.to(device=device)
+        torch.add(x_cpu, y_cpu, alpha=alpha, out=out_cpu)
+        torch.add(x_dpcpp, y_dpcpp, alpha=alpha, out=out_dpcpp)
+        self.assertEqual(out_cpu, out_dpcpp)
+
     def _test_dil_add(self, device, rand_seed):
         torch.manual_seed(rand_seed)
         a = torch.rand((8, 8)).to(device=device)
@@ -169,6 +195,125 @@ class TestMixOp(TestCase):
 
         self.assertEqual(input_dpcpp_dnnl.grad.to('cpu'), input_cpu.grad, prec=0.0)
         self.assertEqual(input_dpcpp_cpu.grad.to('cpu'), input_cpu.grad, prec=0.0)
+
+class TestLinearAlgebraOps(TestCase):
+    def test_mm(self):
+        M, N, O = 23, 8, 12
+        b1_cpu = torch.randn(M, N, dtype=torch.float32)
+        b2_cpu = torch.randn(N, O, dtype=torch.float32)
+        b1_dpcpp = b1_cpu.to(device=device)
+        b2_dpcpp = b2_cpu.to(device=device)
+
+        # mm
+        mm_cpu = torch.mm(b1_cpu, b2_cpu)
+        mm_dpcpp = torch.mm(b1_dpcpp, b2_dpcpp)
+        self.assertEqual(mm_cpu, mm_dpcpp)
+
+        # mm_out
+        y_cpu = torch.randn(M, O, dtype=torch.float32)
+        y_dpcpp = y_cpu.to(device=device)
+        torch.mm(b1_cpu, b2_cpu, out=y_cpu)
+        torch.mm(b1_dpcpp, b2_dpcpp, out=y_dpcpp)
+        self.assertEqual(y_cpu, y_dpcpp)
+
+    def test_bmm(self):
+        num_batches = 10
+        M, N, O = 23, 8, 12
+        b1_cpu = torch.randn(num_batches, M, N, dtype=torch.float32)
+        b2_cpu = torch.randn(num_batches, N, O, dtype=torch.float32)
+        b1_dpcpp = b1_cpu.to(device=device)
+        b2_dpcpp = b2_cpu.to(device=device)
+
+        # bmm
+        bmm_cpu = torch.bmm(b1_cpu, b2_cpu)
+        bmm_dpcpp = torch.bmm(b1_dpcpp, b2_dpcpp)
+        self.assertEqual(bmm_cpu, bmm_dpcpp)
+
+        # bmm_out
+        y_cpu = torch.randn(num_batches, M, O, dtype=torch.float32)
+        y_dpcpp = y_cpu.to(device=device)
+        torch.bmm(b1_cpu, b2_cpu, out=y_cpu)
+        torch.bmm(b1_dpcpp, b2_dpcpp, out=y_dpcpp)
+        self.assertEqual(y_cpu, y_dpcpp)
+
+    def test_addmm(self):
+        for i in range(8, 14, 2):
+            for j in range(8, 14, 2):
+                alpha = i / 10
+                beta = j / 10
+                M, N, O = 23, 8, 12
+                b1_cpu = torch.randn(M, N, dtype=torch.float32)
+                b2_cpu = torch.randn(N, O, dtype=torch.float32)
+                res_cpu = torch.randn(M, O, dtype=torch.float32)
+                b1_dpcpp = b1_cpu.to(device=device)
+                b2_dpcpp = b2_cpu.to(device=device)
+                res_dpcpp = res_cpu.to(device=device)
+
+                addmm_cpu = torch.addmm(input=res_cpu, mat1=b1_cpu, mat2=b2_cpu, alpha=alpha, beta=beta)
+                addmm_dpcpp = torch.addmm(input=res_dpcpp, mat1=b1_dpcpp, mat2=b2_dpcpp, alpha=alpha, beta=beta)
+                self.assertEqual(addmm_cpu, addmm_dpcpp)
+
+                y_cpu = torch.randn(M, O, dtype=torch.float32)
+                y_dpcpp = y_cpu.to(device=device)
+                torch.addmm(input=res_cpu, mat1=b1_cpu, mat2=b2_cpu, alpha=alpha, beta=beta, out=y_cpu)
+                torch.addmm(input=res_dpcpp, mat1=b1_dpcpp, mat2=b2_dpcpp, alpha=alpha, beta=beta, out=y_dpcpp)
+                self.assertEqual(y_cpu, y_dpcpp)
+
+    def test_addbmm(self):
+        for i in range(8, 14, 2):
+            for j in range(8, 14, 2):
+                alpha = i / 10
+                beta = j / 10
+                num_batches = 10
+                M, N, O = 23, 8, 12
+                b1_cpu = torch.randn(num_batches, M, N, dtype=torch.float32)
+                b2_cpu = torch.randn(num_batches, N, O, dtype=torch.float32)
+                res_cpu = torch.randn(M, O, dtype=torch.float32)
+                b1_dpcpp = b1_cpu.to(device=device)
+                b2_dpcpp = b2_cpu.to(device=device)
+                res_dpcpp = res_cpu.to(device=device)
+
+                addbmm_cpu = torch.addbmm(res_cpu, b1_cpu, b2_cpu, beta=beta, alpha=alpha)
+                addbmm_dpcpp = torch.addbmm(res_dpcpp, b1_dpcpp, b2_dpcpp, beta=beta, alpha=alpha)
+                self.assertEqual(addbmm_cpu, addbmm_dpcpp)
+                y_cpu = torch.randn(M, O, dtype=torch.float32)
+                y_dpcpp = y_cpu.to(device=device)
+                torch.addbmm(res_cpu, b1_cpu, b2_cpu, beta=beta, alpha=alpha, out=y_cpu)
+                torch.addbmm(res_dpcpp, b1_dpcpp, b2_dpcpp, beta=beta, alpha=alpha, out=y_dpcpp)
+                self.assertEqual(y_cpu, y_dpcpp)
+
+    def test_baddbmm(self):
+        for i in range(8, 14, 2):
+            for j in range(8, 14, 2):
+                alpha = i / 10
+                beta = j / 10
+                num_batches = 10
+                M, N, O = 23, 8, 12
+                b1_cpu = torch.randn(num_batches, M, N, dtype=torch.float32)
+                b2_cpu = torch.randn(num_batches, N, O, dtype=torch.float32)
+                res_cpu = torch.randn(num_batches, M, O, dtype=torch.float32)
+                b1_dpcpp = b1_cpu.to(device=device)
+                b2_dpcpp = b2_cpu.to(device=device)
+                res_dpcpp = res_cpu.to(device=device)
+
+                baddbmm_cpu = torch.baddbmm(res_cpu, b1_cpu, b2_cpu, alpha=alpha, beta=beta)
+                baddbmm_dpcpp = torch.baddbmm(res_dpcpp, b1_dpcpp, b2_dpcpp, alpha=alpha, beta=beta)
+                self.assertEqual(baddbmm_cpu, baddbmm_dpcpp)
+                y_cpu = torch.randn(num_batches, M, O, dtype=torch.float32)
+                y_dpcpp = y_cpu.to(device=device)
+                torch.baddbmm(res_cpu, b1_cpu, b2_cpu, alpha=alpha, beta=beta, out=y_cpu),
+                torch.baddbmm(res_dpcpp, b1_dpcpp, b2_dpcpp, alpha=alpha, beta=beta, out=y_dpcpp),
+                self.assertEqual(y_cpu, y_dpcpp)
+
+class TestLinear(TestCase):
+    def test_linear(self):
+        in_features = torch.randint(3, 10, (1,)).item()
+        out_features = torch.randint(3, 100, (1,)).item()
+        x_cpu = torch.randn(3, in_features, dtype=torch.float32) * 10
+        x_dpcpp = x_cpu.to(device=device)
+        for bias in [True, False]:
+            linear = torch.nn.Linear(in_features, out_features, bias=bias).float()
+            self.assertEqual(linear(x_cpu), linear(x_dpcpp))
 
 if __name__ == '__main__':
     test = unittest.main()
