@@ -138,28 +138,36 @@ class TestBinaryOp(TestCase):
 
 
 class TestMixOp(TestCase):
-    def _test_conv_add_(self, device, rand_seed):
+    def _test_conv_add_relu_(self, device, rand_seed):
         torch.manual_seed(rand_seed)
         conv_op = torch.nn.Conv2d(1, 1, (7, 7)).to(device=device)
-        conv_op_input = torch.rand((1, 1, 10, 10)).to(device=device)
-        conv_op_putput = conv_op(conv_op_input)
-        add_src = torch.rand((1, 1, 4, 4)).to(device=device)
-        conv_op_putput += add_src
-        return conv_op_putput
+        conv_op_input = torch.rand((1, 1, 10, 10)).to(device=device).requires_grad_(True)
+        conv_op_output = conv_op(conv_op_input)
+        add_src = torch.rand((1, 1, 4, 4)).to(device=device).requires_grad_(True)
+        conv_op_output += add_src
+        conv_op_output.relu_()
 
-    def test_conv_add_(self):
+        return conv_op_output, conv_op_input, add_src
+
+    def test_conv_add_relu_(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("test_dil_add_ rand sed: {}".format(rand_seed))
-        res_dcpp_dnnl = self._test_conv_add_("dpcpp:0", rand_seed)
+        res_dcpp_dnnl, input_dpcpp_dnnl, _ = self._test_conv_add_relu_("dpcpp:0", rand_seed)
 
         ipex.disable_auto_dnnl()
-        res_dcpp_cpu = self._test_conv_add_("dpcpp:0", rand_seed)
+        res_dcpp_cpu, input_dpcpp_cpu, _ = self._test_conv_add_relu_("dpcpp:0", rand_seed)
 
-        res_cpu = self._test_conv_add_("cpu", rand_seed)
+        res_cpu, input_cpu, _ = self._test_conv_add_relu_("cpu", rand_seed)
         self.assertEqual(res_cpu, res_dcpp_cpu.to('cpu'))
         self.assertEqual(res_cpu, res_dcpp_dnnl.to('cpu'))
 
+        res_dcpp_dnnl.sum().backward()
+        res_dcpp_cpu.sum().backward()
+        res_cpu.sum().backward()
+
+        self.assertEqual(input_dpcpp_dnnl.grad.to('cpu'), input_cpu.grad, prec=0.0)
+        self.assertEqual(input_dpcpp_cpu.grad.to('cpu'), input_cpu.grad, prec=0.0)
 
 if __name__ == '__main__':
     test = unittest.main()
