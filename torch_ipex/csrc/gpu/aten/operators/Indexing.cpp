@@ -963,104 +963,41 @@ void index_put(
 DPCPP_DEF_K1(take_ker);
 template <typename scalar_t>
 void Take(Tensor & dst, const Tensor & src, const Tensor & index) {
-
   TORCH_CHECK(src.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(index.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(!(src.numel() == 0 && index.numel() != 0), "tried to take from an empty tensor");
-  
-  TensorImpl_resizeNd(TensorImpl_Unwrap(dst), index.dim(), index.sizes().data(), nullptr);
+
+  dst = dst.resize_as_(index);
 
   ptrdiff_t dst_num_elem = dst.numel();
   if (dst_num_elem == 0) {
     return;
   }
 
-  uint64_t num_slices = index.numel();
-
-  auto slice_size = dst_num_elem / num_slices;
-
-  TensorInfo<int64_t, unsigned int> indices_info =
-    getTensorInfo<int64_t, unsigned int>(index);
-  indices_info.collapseDims();
-
-  TensorInfo<scalar_t, unsigned int> dst_info =
-    getTensorInfo<scalar_t, unsigned int>(dst);
-  int dst_take_dim = dst_info.collapseDims(0);
-  dst_info.reduceDim(dst_take_dim);
-
-  TensorInfo<scalar_t, unsigned int> src_info =
-    getTensorInfo<scalar_t, unsigned int>(src);
-  int src_take_dim = src_info.collapseDims(0);
-  src_info.reduceDim(src_take_dim);
+  auto src_data = src.data_ptr<scalar_t>();
+  auto dst_data = dst.data_ptr<scalar_t>();
+  auto idx_data = index.data_ptr<int64_t>();
 
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data);
+    auto dst_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dst_data);
+    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, idx_data);
 
-  auto wgroup_size = dpcpp_queue.get_device().template \
-          get_info<dpcpp_dev_max_wgroup_size>();
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {
+      auto src_ptr = src_acc.template get_pointer<scalar_t>();
+      auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
+      auto idx_ptr = idx_acc.template get_pointer<int64_t>();
 
-  wgroup_size = std::min(decltype(wgroup_size)(slice_size), wgroup_size);
-  
-  auto n_work_item_iter = (slice_size + wgroup_size - 1) / wgroup_size;
+      auto idx = item.get_linear_id();
+      auto offset = idx_ptr[idx];
+      dst_ptr[idx] = src_ptr[offset];
+    };
 
-  auto src_data = src.data_ptr();
-  auto dst_data = dst.data_ptr();
-  auto idx_data = index.data_ptr();
-  auto src_size = src.storage().numel() * \
-          (src.dtype().itemsize());
-  auto dst_size = dst.storage().numel() * \
-          (dst.dtype().itemsize());
-  auto idx_size = index.storage().numel() * \
-          (index.dtype().itemsize());
-
-  dst_size = dst.nbytes();
-
-  auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, src_data, src_size);
-    auto dst_acc = DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data/*, dst_size */); // runtime error
-    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data, idx_size);
-
-    __cgh.parallel_for_work_group<DPCPP_K(take_ker, scalar_t)>(
-      DPCPP::range</*dim=*/1>(num_slices),
-      DPCPP::range</*dim=*/1>(wgroup_size),
-      [=](DPCPP::group<1> group_id) {
-        auto src_ptr = src_acc.template get_pointer<scalar_t>();
-        auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
-        auto idx_ptr = idx_acc.template get_pointer<long>();
-
-        auto dst_slice_id = group_id.get_id()[0];
-
-        auto slice_off = IndexToOffset<int64_t, unsigned int>::get(dst_slice_id, indices_info);
-        auto src_slice_id = idx_ptr[slice_off]/* - TH_INDEX_BASE*/;
-
-        auto g_src_ptr = src_ptr + src_slice_id;
-        auto g_dst_ptr = dst_ptr + dst_slice_id * dst_info.strides[dst_take_dim];
-
-        group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
-
-          auto ii_ = item_id.get_logical_local_id()[0];
-          auto src_offset_ =
-                  IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
-          auto dst_offset_ =
-                  IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
-
-          g_dst_ptr[ dst_offset_ ] = g_src_ptr[ src_offset_ ];
-
-          for (int iter = 1; iter < n_work_item_iter;iter++)
-          {
-            auto __inner_idx = iter * wgroup_size + ii_;
-            if (__inner_idx < slice_size)
-            {
-              src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, src_info);
-              dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(__inner_idx, dst_info);
-
-              g_dst_ptr[ dst_offset_ ] = g_src_ptr[ src_offset_ ];
-            }
-          }
-        });
-      }
-    );
+    cgh.parallel_for<DPCPP_K(take_ker, scalar_t)>(DPCPP::range<1>(dst_num_elem), kfn);
   };
+
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
@@ -1303,6 +1240,13 @@ Tensor & take_out(Tensor & out, const Tensor & self, const Tensor & index) {
   AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, self.scalar_type(), "Take", [&]() {
     impl::Take<scalar_t>(out, self, index);
   });
+
+  auto dst_data = out.data_ptr();
+  auto dst_dbg_sycl_buff = dpcppGetBufferMap().template get_buffer<float>(dst_data);
+  auto dst_dbg = dst_dbg_sycl_buff.template get_access<dpcpp_r_mode>();
+
+  printf("dst2: %f %f %f --\n", dst_dbg[0], dst_dbg[1], dst_dbg[2]);
+
   return out;
 }
 
