@@ -162,26 +162,6 @@ at::Tensor AtenIpexCPUAlias::unsqueeze(const at::Tensor & self, int64_t dim) {
   return bridge::shallowUpgradeToDPCPPTensorA(self, _ipex_result);
 }
 
-at::Tensor AtenIpexCPUAlias::indices(const at::Tensor & self) {
-  TORCH_INTERNAL_ASSERT(false);
-  DEBUG("AtenIpexCPUAlias::indices\n");
-  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
-  auto&& _ipex_result = _ipex_self.indices();
-  static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  return bridge::upgradeToDPCPPTensor(_ipex_result);
-}
-
-at::Tensor AtenIpexCPUAlias::values(const at::Tensor & self) {
-  DEBUG("AtenIpexCPUAlias::values\n");
-  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
-  auto&& _ipex_result = _ipex_self.values();
-  static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  return bridge::shallowUpgradeToDPCPPTensorA(self, _ipex_result);
-}
-
 std::vector<at::Tensor> AtenIpexCPUAlias::unbind(const at::Tensor & self, int64_t dim) {
   DEBUG("AtenIpexCPUAlias::unbind\n");
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);

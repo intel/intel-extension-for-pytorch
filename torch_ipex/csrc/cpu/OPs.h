@@ -602,14 +602,7 @@ class AtenIpexCPUDefault {
   static at::Tensor sparse_mask(const at::Tensor & self, const at::Tensor & mask);
   static at::Tensor to_dense(const at::Tensor & self);
   static at::Tensor to_dense_backward(const at::Tensor & grad, const at::Tensor & input);
-  static int64_t sparse_dim(const at::Tensor & self);
-  static int64_t _dimI(const at::Tensor & self);
-  static int64_t dense_dim(const at::Tensor & self);
-  static int64_t _dimV(const at::Tensor & self);
-  static int64_t _nnz(const at::Tensor & self);
   static at::Tensor coalesce(const at::Tensor & self);
-  static bool is_coalesced(const at::Tensor & self);
-  static at::Tensor & _coalesced_(at::Tensor & self, bool coalesced);
   static at::Tensor & hspmm_out(at::Tensor & out, const at::Tensor & mat1, const at::Tensor & mat2);
   static at::Tensor hspmm(const at::Tensor & mat1, const at::Tensor & mat2);
   static at::Tensor & copy_sparse_to_sparse_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
