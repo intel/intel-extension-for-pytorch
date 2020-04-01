@@ -89,6 +89,20 @@ class TestSparse(TestCase):
         z2 = y2.zero_()
         self.assertEqual(z2.to('cpu'), z1)
 
+        # test _dimI, _dimV]
+        self.assertEqual(x1._dimI(), x1.to('dpcpp:0')._dimI())
+        self.assertEqual(x1._dimV(), x1.to('dpcpp:0')._dimV())
+
+        # test coalesce
+        c1 = x1.coalesce()
+        c2 = x1.to('dpcpp:0').coalesce().to('cpu')
+        self.assertEqual(c1._indices(), c2._indices())
+        self.assertEqual(c1._values(), c2._values())
+
+        # test indices and values
+        x1 = x1.coalesce()
+        self.assertEqual(x1.indices(), x1.to('dpcpp:0').indices())
+        self.assertEqual(x1.values(), x1.to('dpcpp:0').values())
         
     def test_basic_ops(self):
         self._test_basic_ops_shape(9, 12, [5, 6])
