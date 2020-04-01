@@ -121,8 +121,16 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
     return ipexTensor;
   }
 
-  if (ipexTensor.device().is_cpu())
+  if (ipexTensor.device().is_cpu()) {
+    TORCH_INTERNAL_ASSERT(! (ipexTensor.type_set().has(at::TensorTypeId::DPCPPTensorId)));
+    TORCH_INTERNAL_ASSERT(! (ipexTensor.type_set().has(at::TensorTypeId::SparseDPCPPTensorId)));
     return ipexTensor;
+  }
+
+  TORCH_INTERNAL_ASSERT(ipexTensor.device().is_dpcpp());
+  TORCH_INTERNAL_ASSERT(
+    ipexTensor.type_set().has(at::TensorTypeId::DPCPPTensorId) ||
+    ipexTensor.type_set().has(at::TensorTypeId::SparseDPCPPTensorId));
 
   // Brnach 1: Sparse Tensor
   if (ipexTensor.is_sparse()) {
@@ -183,8 +191,11 @@ at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor) {
     return ipexTensor;
   }
 
-  if (ipexTensor.device().is_cpu())
+  if (ipexTensor.device().is_cpu()) {
+    TORCH_INTERNAL_ASSERT(! (ipexTensor.type_set().has(at::TensorTypeId::DPCPPTensorId)));
+    TORCH_INTERNAL_ASSERT(! (ipexTensor.type_set().has(at::TensorTypeId::SparseDPCPPTensorId)));
     return ipexTensor;
+  }
 
   if (ipexTensor.is_sparse()) {
     TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kSparse);
@@ -410,6 +421,17 @@ at::Tensor& shallowUpgradeToDPCPPTensorAW(at::Tensor& ipexTensor, at::Tensor& cp
     TORCH_INTERNAL_ASSERT(!cpuTensor.is_sparse());
     TORCH_INTERNAL_ASSERT(ipexTensor.layout() == c10::kStrided);
     TORCH_INTERNAL_ASSERT(cpuTensor.layout() == c10::kStrided);
+
+    auto ipex_tensor_storage_impl = ipexTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
+    auto cpu_tensor_storage_impl = cpuTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
+
+    // Some inplace OPs replace its storage but not modify its raw data. (ex. set_)
+    if (ipex_tensor_storage_impl != cpu_tensor_storage_impl) {
+      TORCH_WARN("An in-place OP implements its semantic by replace storage!");
+      cpuTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
+      ipexTensor.unsafeGetTensorImpl()->set_storage(cpuTensor.storage());
+    }
+
     TORCH_INTERNAL_ASSERT(ipexTensor.data_ptr() == cpuTensor.data_ptr());
 
     // NOTE: Cannot set storage data_ptr by set_data_ptr.
