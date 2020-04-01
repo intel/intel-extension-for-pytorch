@@ -844,7 +844,7 @@ def generate_aten_to_ipex(ctx, tree, mapsig, rwxtree, fname, sig, rwsig, params,
                 check_cond = '{}.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous'.format(pname)
             else:
                 check_cond = '{} == c10::MemoryFormat::Contiguous'.format(pname)
-            code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond)
+            code += '  TORCH_WARN({});\n'.format(check_cond)
             param_vars.append(pname)
             dnnl_op_input_vars.append(pname)
         elif cptype != 'Tensor':
