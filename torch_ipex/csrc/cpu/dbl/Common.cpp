@@ -26,8 +26,7 @@ dil::tensor dil_tensor_from_dense(const at::Tensor& tensor) {
     !tensor.is_variable(),
     "dil_tensor_view_from_dense: should not be a variable");
   at::ScalarType cur_type = tensor.scalar_type();
-  return {{{tensor.sizes().cbegin(), tensor.sizes().cend()}, get_dil_data_type(cur_type)},
-          tensor.data_ptr()};
+  return {{tensor.sizes().cbegin(), tensor.sizes().cend()}, get_dil_data_type(cur_type), tensor.data_ptr()};
 }
 
 at::Tensor dil_tensor_to_dense(const at::Tensor& tensor) {

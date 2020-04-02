@@ -29,7 +29,7 @@ struct ShadeDataContext {
       if (this->dil_tensor.is_public_format()) {
         // If the dis tensor is plain format, then it means that its buffer is cpu buffer and should
         // be as same as cpu_raw_data
-        TORCH_INTERNAL_ASSERT(this->dil_tensor.get() == cpu_raw_data);
+        TORCH_INTERNAL_ASSERT(this->dil_tensor.get_data_handle() == cpu_raw_data);
         TORCH_INTERNAL_ASSERT(this->cpu_raw_data != nullptr);
         TORCH_INTERNAL_ASSERT(this->cpu_del_run != nullptr);
         this->cpu_del_run(this->cpu_raw_data);
@@ -108,7 +108,7 @@ struct ShadeDataContext {
         //   C = A[4:7, :]
         // All these tensors share same buffer of Tensor A with different storge offsets and elements.
         // So the context modification will impact all these tensors.
-        if (shade_data_context->dil_tensor.get() == raw_cpu_data) {
+        if (shade_data_context->dil_tensor.get_data_handle() == raw_cpu_data) {
           if (shade_data_context->dil_tensor.get_nelems() == tensor.storage().numel()) {
             if (shade_data_context->dil_tensor.get_data_type() == get_dil_data_type(tensor.scalar_type())) {
               TORCH_INTERNAL_ASSERT(shade_data_context->dil_tensor.get_size() == tensor.storage().capacity());

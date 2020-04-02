@@ -477,6 +477,12 @@ at::Tensor & AtenIpexCPUDefault::add_out(at::Tensor & out, const at::Tensor & se
   TORCH_INTERNAL_ASSERT(out.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(other.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    TORCH_INTERNAL_ASSERT(out.is_contiguous());
+    return AtenIpexCPUDev::dil_add_out(out, self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous(), alpha);
+  }
+
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
@@ -1284,7 +1290,8 @@ at::Tensor AtenIpexCPUDefault::constant_pad_nd(const at::Tensor & self, at::IntA
 
 at::Tensor AtenIpexCPUDefault::contiguous(const at::Tensor & self, at::MemoryFormat memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_WARN(memory_format == c10::MemoryFormat::Contiguous);
+  if (memory_format != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.contiguous(memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -1914,7 +1921,8 @@ at::Tensor AtenIpexCPUDefault::_embedding_bag_per_sample_weights_backward(const 
 at::Tensor AtenIpexCPUDefault::empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_result = at::empty(size, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
@@ -1953,7 +1961,8 @@ at::Tensor AtenIpexCPUDefault::new_zeros(const at::Tensor & self, at::IntArrayRe
 at::Tensor AtenIpexCPUDefault::_empty_affine_quantized(at::IntArrayRef size, const at::TensorOptions & options, double scale, int64_t zero_point, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_result = at::_empty_affine_quantized(size, _ipex_options, scale, zero_point, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
@@ -1964,7 +1973,8 @@ at::Tensor AtenIpexCPUDefault::_empty_per_channel_affine_quantized(at::IntArrayR
   TORCH_INTERNAL_ASSERT(zero_points.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_scales = bridge::shallowFallbackToCPUTensor(scales);
   auto&& _ipex_zero_points = bridge::shallowFallbackToCPUTensor(zero_points);
   auto&& _ipex_result = at::_empty_per_channel_affine_quantized(size, _ipex_scales, _ipex_zero_points, axis, _ipex_options, memory_format);
@@ -1983,7 +1993,8 @@ at::Tensor & AtenIpexCPUDefault::resize_(at::Tensor & self, at::IntArrayRef size
 
 at::Tensor & AtenIpexCPUDefault::empty_out(at::Tensor & out, at::IntArrayRef size, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(out.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::empty_out(_ipex_out, size, memory_format);
   bridge::shallowUpgradeToDPCPPTensorAW(out, _ipex_out);
@@ -1993,7 +2004,8 @@ at::Tensor & AtenIpexCPUDefault::empty_out(at::Tensor & out, at::IntArrayRef siz
 
 at::Tensor AtenIpexCPUDefault::empty_like(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::empty_like(_ipex_self, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -2004,7 +2016,8 @@ at::Tensor AtenIpexCPUDefault::empty_like(const at::Tensor & self, const at::Ten
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::empty_like(_ipex_self, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -2278,7 +2291,8 @@ at::Tensor & AtenIpexCPUDefault::full_out(at::Tensor & out, at::IntArrayRef size
 
 at::Tensor AtenIpexCPUDefault::full_like(const at::Tensor & self, at::Scalar fill_value, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::full_like(_ipex_self, fill_value, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -2289,7 +2303,8 @@ at::Tensor AtenIpexCPUDefault::full_like(const at::Tensor & self, at::Scalar fil
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::full_like(_ipex_self, fill_value, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -3570,6 +3585,12 @@ at::Tensor & AtenIpexCPUDefault::mul_out(at::Tensor & out, const at::Tensor & se
   TORCH_INTERNAL_ASSERT(out.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(other.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    TORCH_INTERNAL_ASSERT(out.is_contiguous());
+    return AtenIpexCPUDev::dil_mul_out(out, self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous());
+  }
+
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
@@ -3868,7 +3889,8 @@ at::Tensor & AtenIpexCPUDefault::ones_out(at::Tensor & out, at::IntArrayRef size
 
 at::Tensor AtenIpexCPUDefault::ones_like(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::ones_like(_ipex_self, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -3879,7 +3901,8 @@ at::Tensor AtenIpexCPUDefault::ones_like(const at::Tensor & self, const at::Tens
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::ones_like(_ipex_self, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -4044,7 +4067,8 @@ at::Tensor & AtenIpexCPUDefault::rand_out(at::Tensor & out, at::IntArrayRef size
 
 at::Tensor AtenIpexCPUDefault::rand_like(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::rand_like(_ipex_self, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -4055,7 +4079,8 @@ at::Tensor AtenIpexCPUDefault::rand_like(const at::Tensor & self, const at::Tens
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::rand_like(_ipex_self, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -4132,7 +4157,8 @@ at::Tensor & AtenIpexCPUDefault::randint_out(at::Tensor & out, int64_t low, int6
 
 at::Tensor AtenIpexCPUDefault::randint_like(const at::Tensor & self, int64_t high, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::randint_like(_ipex_self, high, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -4141,7 +4167,8 @@ at::Tensor AtenIpexCPUDefault::randint_like(const at::Tensor & self, int64_t hig
 
 at::Tensor AtenIpexCPUDefault::randint_like(const at::Tensor & self, int64_t low, int64_t high, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::randint_like(_ipex_self, low, high, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -4152,7 +4179,8 @@ at::Tensor AtenIpexCPUDefault::randint_like(const at::Tensor & self, int64_t hig
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::randint_like(_ipex_self, high, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -4163,7 +4191,8 @@ at::Tensor AtenIpexCPUDefault::randint_like(const at::Tensor & self, int64_t low
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::randint_like(_ipex_self, low, high, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -4206,7 +4235,8 @@ at::Tensor & AtenIpexCPUDefault::randn_out(at::Tensor & out, at::IntArrayRef siz
 
 at::Tensor AtenIpexCPUDefault::randn_like(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::randn_like(_ipex_self, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -4217,7 +4247,8 @@ at::Tensor AtenIpexCPUDefault::randn_like(const at::Tensor & self, const at::Ten
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::randn_like(_ipex_self, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -5417,7 +5448,8 @@ at::Tensor & AtenIpexCPUDefault::zeros_out(at::Tensor & out, at::IntArrayRef siz
 
 at::Tensor AtenIpexCPUDefault::zeros_like(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::zeros_like(_ipex_self, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -5428,7 +5460,8 @@ at::Tensor AtenIpexCPUDefault::zeros_like(const at::Tensor & self, const at::Ten
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::zeros_like(_ipex_self, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -5652,7 +5685,8 @@ at::Tensor & AtenIpexCPUDefault::nuclear_norm_out(at::Tensor & out, const at::Te
 
 at::Tensor AtenIpexCPUDefault::clone(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::clone(_ipex_self, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -6139,7 +6173,8 @@ at::Tensor AtenIpexCPUDefault::to(const at::Tensor & self, const at::TensorOptio
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.to(_ipex_options, non_blocking, copy, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -6148,7 +6183,8 @@ at::Tensor AtenIpexCPUDefault::to(const at::Tensor & self, const at::TensorOptio
 
 at::Tensor AtenIpexCPUDefault::to(const at::Tensor & self, c10::Device device, at::ScalarType dtype, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.to(device, dtype, non_blocking, copy, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -6157,7 +6193,8 @@ at::Tensor AtenIpexCPUDefault::to(const at::Tensor & self, c10::Device device, a
 
 at::Tensor AtenIpexCPUDefault::to(const at::Tensor & self, at::ScalarType dtype, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.to(dtype, non_blocking, copy, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -6167,7 +6204,8 @@ at::Tensor AtenIpexCPUDefault::to(const at::Tensor & self, at::ScalarType dtype,
 at::Tensor AtenIpexCPUDefault::to(const at::Tensor & self, const at::Tensor & other, bool non_blocking, bool copy, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(other.layout() == c10::kStrided);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.to(_ipex_other, non_blocking, copy, memory_format);

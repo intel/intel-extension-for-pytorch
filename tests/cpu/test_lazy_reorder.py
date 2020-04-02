@@ -80,6 +80,7 @@ class TestConv(TestCase):
 
 class TestBinaryOp(TestCase):
     def test_dil_add(self):
+        ipex.enable_auto_dnnl()
         N = torch.randint(3, 10, (1,)).item()
         C = torch.randint(3, 100, (1,)).item()
         alpha = torch.randn(1, dtype=torch.float32).item()
@@ -132,6 +133,13 @@ class TestBinaryOp(TestCase):
         ipex.enable_auto_dnnl()
         a = torch.rand((8, 8)).to(device=device)
         a += 2
+
+    def test_add_out(self):
+        ipex.enable_auto_dnnl()
+        a = torch.rand((8, 8)).to(device=device)
+        b = torch.rand((8, 8)).to(device=device)
+        c = torch.rand((8, 8)).to(device=device)
+        c = a + b
 
     def _test_mul_(self, device, rand_seed):
         torch.manual_seed(rand_seed)

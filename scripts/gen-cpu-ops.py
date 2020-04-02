@@ -91,7 +91,9 @@ _FN_BLACKLIST_REGEX = [
 
 _FN_DNNL_FUNCS = [
     'add_(Tensor, Tensor, Scalar) -> Tensor',
+    'add_out(Tensor, Tensor, Tensor, Scalar) -> Tensor',
     'mul_(Tensor, Tensor) -> Tensor',
+    'mul_out(Tensor, Tensor, Tensor) -> Tensor',
     'relu_(Tensor) -> Tensor'
 ]
 
@@ -746,10 +748,14 @@ def get_handling_function(dense_ctx, fname, ipex_ref_param, param_vars):
     return code
 
 
-def get_dnnl_dispatch_function(fname, param_vars, dnnl_tensor_param_vars):
+def get_dnnl_dispatch_function(fname, is_inplace, param_vars, dnnl_tensor_param_vars):
     code = ''
 
-    if len(dnnl_tensor_param_vars) > 0:
+    def is_out_func(fname):
+        return fname.endswith("_out")
+
+    if is_inplace:
+        assert len(dnnl_tensor_param_vars) > 0
         code += '\n  if (check_auto_dnnl()) {\n'
         code += '    std::vector<at::Tensor> dnnl_input_tensors;\n'
         for dnnl_tensor_param_var in dnnl_tensor_param_vars:
@@ -757,6 +763,21 @@ def get_dnnl_dispatch_function(fname, param_vars, dnnl_tensor_param_vars):
         code += '    if (dbl::comm::possible_to_route_to_dnnl(dnnl_input_tensors))\n'
         code += '      return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(list(param_vars)))
         code += '  }\n'
+    else:
+        code += '\n  if (check_auto_dnnl()) {\n'
+        param_seq_str_vec = []
+        for param_var in param_vars:
+            if param_var in dnnl_tensor_param_vars:
+                if is_out_func(fname):
+                    if param_var != 'out':
+                        param_seq_str_vec.append('{}.is_contiguous() ? {} : {}.contiguous()'.format(param_var, param_var, param_var))
+                        continue
+                    else:
+                        code += '    TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(param_var)
+            param_seq_str_vec.append(param_var)
+        code += '    return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))
+        code += '  }\n\n'
+
     return code
 
 
@@ -888,10 +909,11 @@ def generate_aten_to_ipex(dense_ctx, tree, mapsig, rwxtree, fname, sig, rwsig, p
             dnnl_op_input_vars.append(pname)
         elif cptype == 'MemoryFormat':
             if type_is_optional(ptype):
-                check_cond = '{}.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous'.format(pname)
+                check_cond = '{}.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous'.format(pname)
             else:
-                check_cond = '{} == c10::MemoryFormat::Contiguous'.format(pname)
-            code += '  TORCH_WARN({});\n'.format(check_cond)
+                check_cond = '{} != c10::MemoryFormat::Contiguous'.format(pname)
+            code += '  if ({})\n'.format(check_cond)
+            code += '      TORCH_WARN({});\n'.format(check_cond)
             param_vars.append(pname)
             dnnl_op_input_vars.append(pname)
         elif cptype != 'Tensor':
@@ -904,7 +926,6 @@ def generate_aten_to_ipex(dense_ctx, tree, mapsig, rwxtree, fname, sig, rwsig, p
             if optype is OpType.DENSE_ONLY:
                 check_cond = '{}.layout() == c10::kStrided'.format(pname)
                 code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond)
-            defval = None
             if type_is_const(ptype):
                 defval = is_write_param(fnopts, pname, False)
             else:
@@ -915,7 +936,7 @@ def generate_aten_to_ipex(dense_ctx, tree, mapsig, rwxtree, fname, sig, rwsig, p
 
             # If current OP can be routed to DNNL and it is with in-place semantic.
             # We need to check if input tensors match DNNL requirements.
-            if is_dnnl and is_inplace:
+            if is_dnnl:
                 dnnl_op_input_tensor_vars.append(pname)
 
         if p == ref_param and not get_optional(fnopts, 'ref_param'):
@@ -923,7 +944,8 @@ def generate_aten_to_ipex(dense_ctx, tree, mapsig, rwxtree, fname, sig, rwsig, p
 
     # currently, oneDNN doesn't support dense op
     if optype is OpType.DENSE_ONLY:
-        code +=  get_dnnl_dispatch_function(fname, dnnl_op_input_vars, dnnl_op_input_tensor_vars)
+        if is_dnnl:
+            code +=  get_dnnl_dispatch_function(fname, is_inplace, dnnl_op_input_vars, dnnl_op_input_tensor_vars)
 
     code += tfetcher.generate_fetches()
     result_assign = generate_result_assignment(tree, _RESULT_NAME)
