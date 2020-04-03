@@ -596,11 +596,19 @@ struct TensorMaskedFillOp {
 };
 
 template <typename scalar_t>
-void MaskedFill(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
+void MaskedFillBool(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
   auto value = value_scalar.to<scalar_t>();
   TORCH_CHECK(tensor.numel() == mask.numel(), "sizes do not match");
   at::dpcpp::DPCPP_tensor_apply2<scalar_t, bool>(
       tensor, mask, TensorMaskedFillOp<scalar_t, bool>(value));
+}
+
+template <typename scalar_t>
+void MaskedFill(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
+  auto value = value_scalar.to<scalar_t>();
+  TORCH_CHECK(tensor.numel() == mask.numel(), "sizes do not match");
+  at::dpcpp::DPCPP_tensor_apply2<scalar_t, uint8_t>(
+      tensor, mask, TensorMaskedFillOp<scalar_t, unsigned char>(value));
 }
 
 DPCPP_DEF_K1(maskedScatter_scan_dpcpp_ker);
@@ -962,11 +970,13 @@ void index_put(
 
 DPCPP_DEF_K1(take_ker);
 template <typename scalar_t>
-void Take(Tensor & dst, const Tensor & src, const Tensor & index) {
+void Take(Tensor& dst, const Tensor& src, const Tensor& index) {
   TORCH_CHECK(src.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
   TORCH_CHECK(index.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-  TORCH_CHECK(!(src.numel() == 0 && index.numel() != 0), "tried to take from an empty tensor");
+  TORCH_CHECK(
+      !(src.numel() == 0 && index.numel() != 0),
+      "tried to take from an empty tensor");
 
   dst = dst.resize_as_(index);
 
@@ -995,7 +1005,8 @@ void Take(Tensor & dst, const Tensor & src, const Tensor & index) {
       dst_ptr[idx] = src_ptr[offset];
     };
 
-    cgh.parallel_for<DPCPP_K(take_ker, scalar_t)>(DPCPP::range<1>(dst_num_elem), kfn);
+    cgh.parallel_for<DPCPP_K(take_ker, scalar_t)>(
+        DPCPP::range<1>(dst_num_elem), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -1099,7 +1110,11 @@ Tensor& masked_fill_(Tensor& self, const Tensor& mask_, Scalar value) {
   std::tie(mask) = expand_inplace(self, mask_, "masked_fill_");
   AT_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, self.scalar_type(), "MaskedFill", [&]() {
-        impl::MaskedFill<scalar_t>(self, mask, value);
+        if (mask.dtype() == at::ScalarType::Byte) {
+          impl::MaskedFill<scalar_t>(self, mask, value);
+        } else {
+          impl::MaskedFillBool<scalar_t>(self, mask, value);
+        }
       });
   return self;
 }
@@ -1120,9 +1135,11 @@ Tensor& masked_scatter_(
 }
 
 Tensor& masked_select_out(Tensor& out, const Tensor& self, const Tensor& mask) {
+  Tensor b_self, b_mask;
+  std::tie(b_self, b_mask) = expand_outplace(self, mask, "masked_select_out");
   AT_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, self.scalar_type(), "MaskedSelect", [&]() {
-        impl::MaskedSelect<scalar_t>(out, self, mask);
+        impl::MaskedSelect<scalar_t>(out, b_self, b_mask);
       });
   return out;
 }
@@ -1236,15 +1253,16 @@ Tensor& _index_put_impl_(
   return self;
 }
 
-Tensor & take_out(Tensor & out, const Tensor & self, const Tensor & index) {
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, self.scalar_type(), "Take", [&]() {
-    impl::Take<scalar_t>(out, self, index);
-  });
+Tensor& take_out(Tensor& out, const Tensor& self, const Tensor& index) {
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::Half, self.scalar_type(), "Take", [&]() {
+        impl::Take<scalar_t>(out, self, index);
+      });
 
   return out;
 }
 
-Tensor take(const Tensor & self, const Tensor & index) {
+Tensor take(const Tensor& self, const Tensor& index) {
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::take_out(out, self, index);
 }
