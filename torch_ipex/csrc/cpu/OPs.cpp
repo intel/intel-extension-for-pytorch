@@ -449,7 +449,12 @@ at::Tensor AtenIpexCPUDefault::add(const at::Tensor & self, const at::Tensor & o
   TORCH_INTERNAL_ASSERT(other.layout() == c10::kStrided);
 
   if (check_auto_dnnl()) {
-    return AtenIpexCPUDev::dil_add(self, other, alpha);
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(other);
+    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
+      return AtenIpexCPUDev::dil_add(self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous(), alpha);
+    }
   }
 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
@@ -467,9 +472,12 @@ at::Tensor & AtenIpexCPUDefault::add_(at::Tensor & self, const at::Tensor & othe
     std::vector<at::Tensor> dnnl_input_tensors;
     dnnl_input_tensors.push_back(self);
     dnnl_input_tensors.push_back(other);
-    if (dbl::comm::possible_to_route_to_dnnl(dnnl_input_tensors))
-      return AtenIpexCPUDev::dil_add_(self, other, alpha);
+    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
+      if (dbl::comm::possible_to_route_to_dnnl(dnnl_input_tensors))
+        return AtenIpexCPUDev::dil_add_(self, other, alpha);
+    }
   }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.add_(_ipex_other, alpha);
@@ -484,8 +492,14 @@ at::Tensor & AtenIpexCPUDefault::add_out(at::Tensor & out, const at::Tensor & se
   TORCH_INTERNAL_ASSERT(other.layout() == c10::kStrided);
 
   if (check_auto_dnnl()) {
-    TORCH_INTERNAL_ASSERT(out.is_contiguous());
-    return AtenIpexCPUDev::dil_add_out(out, self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous(), alpha);
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(out);
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(other);
+    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
+      TORCH_INTERNAL_ASSERT(out.is_contiguous());
+      return AtenIpexCPUDev::dil_add_out(out, self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous(), alpha);
+    }
   }
 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
@@ -3562,7 +3576,12 @@ at::Tensor AtenIpexCPUDefault::mul(const at::Tensor & self, const at::Tensor & o
   TORCH_INTERNAL_ASSERT(other.layout() == c10::kStrided);
 
   if (check_auto_dnnl()) {
-    return AtenIpexCPUDev::dil_mul(self, other);
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(other);
+    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
+      return AtenIpexCPUDev::dil_mul(self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous());
+    }
   }
 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
@@ -3580,9 +3599,12 @@ at::Tensor & AtenIpexCPUDefault::mul_(at::Tensor & self, const at::Tensor & othe
     std::vector<at::Tensor> dnnl_input_tensors;
     dnnl_input_tensors.push_back(self);
     dnnl_input_tensors.push_back(other);
-    if (dbl::comm::possible_to_route_to_dnnl(dnnl_input_tensors))
-      return AtenIpexCPUDev::dil_mul_(self, other);
+    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
+      if (dbl::comm::possible_to_route_to_dnnl(dnnl_input_tensors))
+        return AtenIpexCPUDev::dil_mul_(self, other);
+    }
   }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = _ipex_self.mul_(_ipex_other);
@@ -3597,8 +3619,14 @@ at::Tensor & AtenIpexCPUDefault::mul_out(at::Tensor & out, const at::Tensor & se
   TORCH_INTERNAL_ASSERT(other.layout() == c10::kStrided);
 
   if (check_auto_dnnl()) {
-    TORCH_INTERNAL_ASSERT(out.is_contiguous());
-    return AtenIpexCPUDev::dil_mul_out(out, self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous());
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(out);
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(other);
+    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
+      TORCH_INTERNAL_ASSERT(out.is_contiguous());
+      return AtenIpexCPUDev::dil_mul_out(out, self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous());
+    }
   }
 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
@@ -4491,9 +4519,12 @@ at::Tensor & AtenIpexCPUDefault::relu_(at::Tensor & self) {
   if (check_auto_dnnl()) {
     std::vector<at::Tensor> dnnl_input_tensors;
     dnnl_input_tensors.push_back(self);
-    if (dbl::comm::possible_to_route_to_dnnl(dnnl_input_tensors))
-      return AtenIpexCPUDev::dil_relu_(self);
+    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
+      if (dbl::comm::possible_to_route_to_dnnl(dnnl_input_tensors))
+        return AtenIpexCPUDev::dil_relu_(self);
+    }
   }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::relu_(_ipex_self);
   bridge::shallowUpgradeToDPCPPTensorAW(self, _ipex_self);

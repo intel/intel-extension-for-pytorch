@@ -17,9 +17,6 @@ namespace comm {
 
 dil::tensor dil_tensor_from_dense(const at::Tensor& tensor) {
   AT_ASSERTM(
-    tensor.device().type() == at::DeviceType::DPCPP,
-    "dil_tensor_view_from_dense expects CPU tensor input");
-  AT_ASSERTM(
     tensor.layout() == at::Layout::Strided,
     "dil_tensor_view_from_dense expects dense tensor input");
   AT_ASSERTM(
@@ -86,7 +83,7 @@ at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
 bool meet_dnnl_route_pre_cond(const at::Tensor& tensor) {
   return tensor.is_contiguous() &&
          tensor.layout() == at::Layout::Strided &&
-         tensor.device().type() == at::DeviceType::DPCPP;
+         torch_ipex::get_dil_data_type(tensor.scalar_type()) !=  dil::data_type::undef;
 }
 
 bool possible_to_route_to_dnnl(const std::vector<at::Tensor> &tensor_vec) {
@@ -99,6 +96,16 @@ bool possible_to_route_to_dnnl(const std::vector<at::Tensor> &tensor_vec) {
     return true;
   }
   return false;
+}
+
+bool dnnl_support_the_data_type_of(const std::vector<at::Tensor> &tensor_vec) {
+  for (auto it = tensor_vec.begin(); it != tensor_vec.end(); ++it) {
+    if (torch_ipex::get_dil_data_type(it->scalar_type()) ==  dil::data_type::undef) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& options) {

@@ -28,7 +28,6 @@ namespace cpu {
 
 #define CHECK_DNNL_OP_PRE_COND(tensor)                                    \
   TORCH_INTERNAL_ASSERT(tensor.defined());                                \
-  TORCH_INTERNAL_ASSERT(tensor.device().type() == at::DeviceType::DPCPP); \
   TORCH_INTERNAL_ASSERT(tensor.is_contiguous());                          \
   TORCH_INTERNAL_ASSERT(tensor.layout() == c10::kStrided)
 

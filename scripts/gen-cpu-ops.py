@@ -757,29 +757,31 @@ def get_dnnl_dispatch_function(fname, is_inplace, param_vars, dnnl_tensor_param_
     def is_out_func(fname):
         return fname.endswith("_out")
 
-    if is_inplace:
-        assert len(dnnl_tensor_param_vars) > 0
-        code += '\n  if (check_auto_dnnl()) {\n'
-        code += '    std::vector<at::Tensor> dnnl_input_tensors;\n'
+    code += '\n  if (check_auto_dnnl()) {\n'
+    code += '    std::vector<at::Tensor> dnnl_input_tensors;\n'
+    if len(dnnl_tensor_param_vars) > 0:
         for dnnl_tensor_param_var in dnnl_tensor_param_vars:
             code += '    dnnl_input_tensors.push_back({});\n'.format(dnnl_tensor_param_var)
-        code += '    if (dbl::comm::possible_to_route_to_dnnl(dnnl_input_tensors))\n'
-        code += '      return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(list(param_vars)))
-        code += '  }\n'
+        code += '    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {\n'
+
+    if is_inplace:
+        assert len(dnnl_tensor_param_vars) > 0
+        code += '      if (dbl::comm::possible_to_route_to_dnnl(dnnl_input_tensors))\n'
+        code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(list(param_vars)))
     else:
-        code += '\n  if (check_auto_dnnl()) {\n'
         param_seq_str_vec = []
         for param_var in param_vars:
+            param_seq_str = param_var
             if param_var in dnnl_tensor_param_vars:
-                if is_out_func(fname):
-                    if param_var != 'out':
-                        param_seq_str_vec.append('{}.is_contiguous() ? {} : {}.contiguous()'.format(param_var, param_var, param_var))
-                        continue
-                    else:
-                        code += '    TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(param_var)
-            param_seq_str_vec.append(param_var)
-        code += '    return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))
-        code += '  }\n\n'
+                if param_var == 'out' and is_out_func(fname):
+                    code += '      TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(param_var)
+                else:
+                    param_seq_str = '{}.is_contiguous() ? {} : {}.contiguous()'.format(param_var, param_var, param_var)
+            param_seq_str_vec.append(param_seq_str)
+        code += '      return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))
+
+    code += '    }\n'
+    code += '  }\n\n'
 
     return code
 

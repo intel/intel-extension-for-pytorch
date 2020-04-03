@@ -31,7 +31,22 @@ at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& opti
  */
 bool meet_dnnl_route_pre_cond(const at::Tensor& tensor);
 
+/**
+ * Check if the input tenosrs can be routed to DNNL OP. The input tensor should
+ * meet the conditions defined by @ref meet_dnnl_route_pre_cond
+ *
+ * @param tensor_vec input tensors to be checked if it can be routed to DNNL
+ *
+ */
 bool possible_to_route_to_dnnl(const std::vector<at::Tensor> &tensor_vec);
+
+/**
+ * Check if the data type of the input tenosrs can be supported by DNNL
+ *
+ * @param tensor_vec input tensors
+ *
+ */
+bool dnnl_support_the_data_type_of(const std::vector<at::Tensor> &tensor_vec);
 
 }  // namespace comm
 }  // namespace dbl

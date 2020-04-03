@@ -75,8 +75,13 @@ struct ShadeDataContext {
    */
   static inline bool isDilTensor(const at::Tensor &tensor) {
     TORCH_INTERNAL_ASSERT(tensor.has_storage());
-    TORCH_INTERNAL_ASSERT(tensor.device().type() == c10::DeviceType::DPCPP);
     TORCH_INTERNAL_ASSERT(tensor.layout() == c10::Layout::Strided);
+
+    if (tensor.device().type() != c10::DeviceType::DPCPP) {
+      TORCH_INTERNAL_ASSERT(tensor.device().type() == c10::DeviceType::CPU);
+      return false;
+    }
+
     // Make sure simple case
     //TORCH_INTERNAL_ASSERT(tensor.unsafeGetTensorImpl()->version_counter().current_version() <= 1);
     void *storage_context = tensor.storage().data_ptr().get_context();

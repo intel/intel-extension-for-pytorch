@@ -97,7 +97,7 @@ dil::data_type get_dil_data_type(at::ScalarType at_dt) {
   }  else if (at_dt == at::ScalarType::QUInt8) {
     return dil::data_type::u8;
   } else {
-    AT_ASSERT(false);
+    TORCH_WARN("DNNL does not support current data type.");
     return dil::data_type::undef;
   }
 }
