@@ -90,9 +90,10 @@ _FN_BLACKLIST_REGEX = [
 ]
 
 _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
-    'add(Tensor,Tensor,Scalar)->Tensor',
+    'add(Tensor, Tensor, Scalar) -> Tensor',
     'add_(Tensor,Tensor,Scalar)->Tensor',
     'add_out(Tensor,Tensor,Tensor,Scalar)->Tensor',
+    'mul(Tensor, Tensor) -> Tensor',
     'mul_(Tensor,Tensor)->Tensor',
     'mul_out(Tensor,Tensor,Tensor)->Tensor',
     'relu_(Tensor)->Tensor'
