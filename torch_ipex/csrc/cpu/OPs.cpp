@@ -9,7 +9,7 @@
 #include "aten_ipex_bridge.h"
 #include "utils.h"
 #include "DevOPs.h"
-#include "dbl/Common.h"
+#include "dbl/DNNLChecker.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -452,9 +452,8 @@ at::Tensor AtenIpexCPUDefault::add(const at::Tensor & self, const at::Tensor & o
     std::vector<at::Tensor> dnnl_input_tensors;
     dnnl_input_tensors.push_back(self);
     dnnl_input_tensors.push_back(other);
-    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
       return AtenIpexCPUDev::dil_add(self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous(), alpha);
-    }
   }
 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
@@ -472,10 +471,8 @@ at::Tensor & AtenIpexCPUDefault::add_(at::Tensor & self, const at::Tensor & othe
     std::vector<at::Tensor> dnnl_input_tensors;
     dnnl_input_tensors.push_back(self);
     dnnl_input_tensors.push_back(other);
-    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
-      if (dbl::comm::possible_to_route_to_dnnl(dnnl_input_tensors))
-        return AtenIpexCPUDev::dil_add_(self, other, alpha);
-    }
+    if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_add_(self, other, alpha);
   }
 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
@@ -496,10 +493,9 @@ at::Tensor & AtenIpexCPUDefault::add_out(at::Tensor & out, const at::Tensor & se
     dnnl_input_tensors.push_back(out);
     dnnl_input_tensors.push_back(self);
     dnnl_input_tensors.push_back(other);
-    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
-      TORCH_INTERNAL_ASSERT(out.is_contiguous());
+    TORCH_INTERNAL_ASSERT(out.is_contiguous());
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
       return AtenIpexCPUDev::dil_add_out(out, self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous(), alpha);
-    }
   }
 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
@@ -3579,9 +3575,8 @@ at::Tensor AtenIpexCPUDefault::mul(const at::Tensor & self, const at::Tensor & o
     std::vector<at::Tensor> dnnl_input_tensors;
     dnnl_input_tensors.push_back(self);
     dnnl_input_tensors.push_back(other);
-    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
       return AtenIpexCPUDev::dil_mul(self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous());
-    }
   }
 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
@@ -3599,10 +3594,8 @@ at::Tensor & AtenIpexCPUDefault::mul_(at::Tensor & self, const at::Tensor & othe
     std::vector<at::Tensor> dnnl_input_tensors;
     dnnl_input_tensors.push_back(self);
     dnnl_input_tensors.push_back(other);
-    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
-      if (dbl::comm::possible_to_route_to_dnnl(dnnl_input_tensors))
-        return AtenIpexCPUDev::dil_mul_(self, other);
-    }
+    if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_mul_(self, other);
   }
 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
@@ -3623,10 +3616,9 @@ at::Tensor & AtenIpexCPUDefault::mul_out(at::Tensor & out, const at::Tensor & se
     dnnl_input_tensors.push_back(out);
     dnnl_input_tensors.push_back(self);
     dnnl_input_tensors.push_back(other);
-    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
-      TORCH_INTERNAL_ASSERT(out.is_contiguous());
+    TORCH_INTERNAL_ASSERT(out.is_contiguous());
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
       return AtenIpexCPUDev::dil_mul_out(out, self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous());
-    }
   }
 
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
@@ -4519,10 +4511,8 @@ at::Tensor & AtenIpexCPUDefault::relu_(at::Tensor & self) {
   if (check_auto_dnnl()) {
     std::vector<at::Tensor> dnnl_input_tensors;
     dnnl_input_tensors.push_back(self);
-    if (dbl::comm::dnnl_support_the_data_type_of(dnnl_input_tensors)) {
-      if (dbl::comm::possible_to_route_to_dnnl(dnnl_input_tensors))
-        return AtenIpexCPUDev::dil_relu_(self);
-    }
+    if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_relu_(self);
   }
 
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);

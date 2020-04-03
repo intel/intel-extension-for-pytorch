@@ -80,34 +80,6 @@ at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
   return _tensor;
 }
 
-bool meet_dnnl_route_pre_cond(const at::Tensor& tensor) {
-  return tensor.is_contiguous() &&
-         tensor.layout() == at::Layout::Strided &&
-         torch_ipex::get_dil_data_type(tensor.scalar_type()) !=  dil::data_type::undef;
-}
-
-bool possible_to_route_to_dnnl(const std::vector<at::Tensor> &tensor_vec) {
-  if (AutoOptConfig::singleton().get_auto_dnnl()) {
-    for (auto it = tensor_vec.begin(); it != tensor_vec.end(); ++it) {
-      if (! (meet_dnnl_route_pre_cond(*it))) {
-        return false;
-      }
-    }
-    return true;
-  }
-  return false;
-}
-
-bool dnnl_support_the_data_type_of(const std::vector<at::Tensor> &tensor_vec) {
-  for (auto it = tensor_vec.begin(); it != tensor_vec.end(); ++it) {
-    if (torch_ipex::get_dil_data_type(it->scalar_type()) ==  dil::data_type::undef) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& options) {
   /*TORCH_CHECK(
      !optional_memory_format.has_value(),
