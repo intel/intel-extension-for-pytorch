@@ -3560,6 +3560,11 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexCPUDefault::mode_out(at::Tensor & 
 at::Tensor AtenIpexCPUDefault::mul(const at::Tensor & self, const at::Tensor & other) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(other.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    return AtenIpexCPUDev::dil_mul(self, other);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::mul(_ipex_self, _ipex_other);

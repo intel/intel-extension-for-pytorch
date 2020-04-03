@@ -93,6 +93,7 @@ _FN_DNNL_FUNCS = [
     'add(Tensor, Tensor, Scalar) -> Tensor',
     'add_(Tensor, Tensor, Scalar) -> Tensor',
     'add_out(Tensor, Tensor, Tensor, Scalar) -> Tensor',
+    'mul(Tensor, Tensor) -> Tensor',
     'mul_(Tensor, Tensor) -> Tensor',
     'mul_out(Tensor, Tensor, Tensor) -> Tensor',
     'relu_(Tensor) -> Tensor'

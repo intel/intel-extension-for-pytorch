@@ -186,7 +186,7 @@ at::Tensor& AtenIpexCPUDev::dil_mul_out(at::Tensor& result, const at::Tensor& se
 
 at::Tensor AtenIpexCPUDev::dil_mul(const at::Tensor& self, const at::Tensor& other) {
   DEBUG("AtenIpexCPUDev::dil_mul\n");
-  at::Tensor result = dbl::comm::empty_dil_tensor(self.sizes(), self.options());
+  auto result = empty_like(self);
   return dil_mul_out(result, self, other);
 }
 
