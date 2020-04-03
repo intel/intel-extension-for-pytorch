@@ -5,6 +5,7 @@
 #include <mutex>
 
 #include "aten_ipex_type_default.h"
+#include "aten_ipex_sparse_type_default.h"
 #include "version.h"
 
 namespace torch_ipex {
@@ -13,6 +14,7 @@ namespace {
 
 void AtenInitialize() {
   RegisterAtenTypeFunctions();
+  RegisterAtenTypeSparseFunctions();
 }
 
 }  // namespace

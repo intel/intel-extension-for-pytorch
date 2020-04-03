@@ -4,6 +4,7 @@
 LIST(APPEND DPCPP_COMMON_SRCS
     ${DPCPP_ROOT}/aten_ipex_bridge.cpp
     ${DPCPP_ROOT}/aten_ipex_type_default.cpp
+    ${DPCPP_ROOT}/aten_ipex_sparse_type_default.cpp
     ${DPCPP_ROOT}/aten_ipex_type.cpp
     ${DPCPP_ROOT}/dpcpp_allocator.cpp
     ${DPCPP_ROOT}/init_python_bindings.cpp
