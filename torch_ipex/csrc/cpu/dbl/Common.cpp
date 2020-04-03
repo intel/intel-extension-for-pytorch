@@ -26,17 +26,15 @@ dil::tensor dil_tensor_from_dense(const at::Tensor& tensor) {
     !tensor.is_variable(),
     "dil_tensor_view_from_dense: should not be a variable");
   at::ScalarType cur_type = tensor.scalar_type();
-  return {{tensor.sizes().cbegin(), tensor.sizes().cend()}, get_dil_data_type(cur_type), tensor.data_ptr()};
+  return {tensor.sizes().vec(), get_dil_data_type(cur_type), tensor.data_ptr()};
 }
 
 at::Tensor dil_tensor_to_dense(const at::Tensor& tensor) {
   TORCH_INTERNAL_ASSERT(cpu::ShadeDataContext::isDilTensor(tensor));
   TORCH_INTERNAL_ASSERT(tensor.unsafeGetTensorImpl()->version_counter().current_version() == 1);
   auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
-  auto dims = dil_tensor.get_dims();
-  // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
   at::Tensor cpu_tensor = at::empty(
-    std::vector<int64_t>(dims.begin(), dims.end()),
+    dil_tensor.get_dims(),
     tensor.options().device(c10::kCPU).layout(c10::kStrided));
   dil_tensor.to_public(cpu_tensor.data_ptr(), dil_tensor.get_data_type());
   return cpu_tensor;
@@ -61,8 +59,7 @@ at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
     shade_data_context,
     cpu::ShadeDataContext::freeShadeDataContext,
     at::DeviceType::DPCPP);
-  auto dims = dil_tensor.get_dims();
-  std::vector<int64_t> _tensor_sizes(dims.begin(), dims.end());
+  auto tensor_sizes = dil_tensor.get_dims();
   auto at_data_type = get_at_data_type(dil_tensor.get_data_type());
   auto storage_impl = c10::make_intrusive<at::StorageImpl>(
     at::scalarTypeToTypeMeta(at_data_type),
@@ -71,8 +68,8 @@ at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
     nullptr,
     /*resizeable=*/false);
   auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::TensorTypeId::DPCPPTensorId);
-  if (_tensor_sizes.size() != 1 || _tensor_sizes[0] != 0) {
-    _tensor.unsafeGetTensorImpl()->set_sizes_contiguous(_tensor_sizes);
+  if (tensor_sizes.size() != 1 || tensor_sizes[0] != 0) {
+    _tensor.unsafeGetTensorImpl()->set_sizes_contiguous(tensor_sizes);
   }
   TORCH_INTERNAL_ASSERT(_tensor.is_contiguous());
   TORCH_INTERNAL_ASSERT(_tensor.layout() == c10::kStrided);
@@ -80,15 +77,9 @@ at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
 }
 
 bool meet_dnnl_route_pre_cond(const at::Tensor& tensor) {
-  if (tensor.is_contiguous()) {
-    if (tensor.layout() == at::Layout::Strided) {
-      if (tensor.device().type() == at::DeviceType::DPCPP) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+  return tensor.is_contiguous() &&
+         tensor.layout() == at::Layout::Strided &&
+         tensor.device().type() == at::DeviceType::DPCPP;
 }
 
 bool possible_to_route_to_dnnl(const std::vector<at::Tensor> &tensor_vec) {
@@ -107,11 +98,8 @@ at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& opti
   /*TORCH_CHECK(
      !optional_memory_format.has_value(),
      "'memory_format' argument is incompatible with mkldnn tensor");*/
-  // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
-  // TODO: support int64_t dims in ideep::tensor to avoid extra conversion
-  dil::tensor::dims dst_dims (sizes.begin(), sizes.end());
   auto data_type = get_dil_data_type(at::typeMetaToScalarType(options.dtype()));
-  dil::tensor it {dst_dims, data_type};
+  dil::tensor it {sizes.vec(), data_type};
   return gen_aten_tensor_by(it);
 }
 
