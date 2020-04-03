@@ -63,7 +63,8 @@ at::Tensor & AtenIpexCPUSparse::div_out(at::Tensor & out, const at::Tensor & sel
 at::Tensor AtenIpexCPUSparse::empty(at::IntArrayRef size, const at::TensorOptions & options, c10::optional<at::MemoryFormat> memory_format) {
   TORCH_INTERNAL_ASSERT(options.device().type() == at::DeviceType::DPCPP);
   at::TensorOptions _ipex_options = options.device(at::DeviceType::CPU);
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_result = at::empty(size, _ipex_options, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
@@ -165,7 +166,8 @@ at::Tensor AtenIpexCPUSparse::_sparse_sum_backward(const at::Tensor & grad, cons
 }
 
 at::Tensor AtenIpexCPUSparse::clone(const at::Tensor & self, c10::optional<at::MemoryFormat> memory_format) {
-  TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) == c10::MemoryFormat::Contiguous);
+  if (memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous)
+      TORCH_WARN(memory_format.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::clone(_ipex_self, memory_format);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used

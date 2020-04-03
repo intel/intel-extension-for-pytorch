@@ -14,34 +14,31 @@ enum SHADE_DATA_TYPE {CPU_RAW, DIL};
 
 struct ShadeDataContext {
   void              *cpu_raw_data; ///< The raw memory buffer of storage
-  c10::DeleterFnPtr  cpu_del_run;  ///< Delete function to release cpu_raw_data
+  c10::DeleterFnPtr  cpu_del_fun;  ///< Delete function to release cpu_raw_data
   dil::tensor        dil_tensor;   ///< DNNL memory buffer for lazy reorder
 
   SHADE_DATA_TYPE    data_type;    ///< Memory buffer type
 
   ShadeDataContext() : dil_tensor(),
                        cpu_raw_data(nullptr),
-                       cpu_del_run(nullptr),
+                       cpu_del_fun(nullptr),
                        data_type(SHADE_DATA_TYPE::CPU_RAW) {}
 
   ~ShadeDataContext() {
     if (this->data_type == SHADE_DATA_TYPE::DIL) { // DIL Tensor
       if (this->dil_tensor.is_public_format()) {
-        // If the dis tensor is plain format, then it means that its buffer is cpu buffer and should
-        // be as same as cpu_raw_data
-        TORCH_INTERNAL_ASSERT(this->dil_tensor.get_data_handle() == cpu_raw_data);
         TORCH_INTERNAL_ASSERT(this->cpu_raw_data != nullptr);
-        TORCH_INTERNAL_ASSERT(this->cpu_del_run != nullptr);
-        this->cpu_del_run(this->cpu_raw_data);
-        this->cpu_raw_data = nullptr;
+        TORCH_INTERNAL_ASSERT(this->dil_tensor.get_data_handle() == this->cpu_raw_data);
+        TORCH_INTERNAL_ASSERT(this->cpu_del_fun == &(c10::detail::deleteNothing));
       } else {
         // If dil tensor is block format, the cpu raw data means nothing here.
         TORCH_INTERNAL_ASSERT(this->cpu_raw_data == nullptr);
-        TORCH_INTERNAL_ASSERT(this->cpu_del_run == nullptr);
+        TORCH_INTERNAL_ASSERT(this->cpu_del_fun == nullptr);
       }
     } else { // CPU Tensor here
-      TORCH_INTERNAL_ASSERT(this->cpu_del_run != nullptr);
-      this->cpu_del_run(this->cpu_raw_data);
+      TORCH_INTERNAL_ASSERT(this->cpu_del_fun != nullptr);
+      TORCH_INTERNAL_ASSERT(this->cpu_del_fun != &(c10::detail::deleteNothing));
+      this->cpu_del_fun(this->cpu_raw_data);
       this->cpu_raw_data = nullptr;
     }
   }

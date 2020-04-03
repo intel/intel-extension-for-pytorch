@@ -56,8 +56,15 @@ at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
   cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
   shade_data_context->dil_tensor = dil_tensor;
   shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
+  void *tensor_data = nullptr;
+  if (dil_tensor.is_public_format()) {
+    // The buffer of a tensor with public format is shared between CPU and DNNL
+    tensor_data = dil_tensor.get_data_handle();
+    shade_data_context->cpu_raw_data = dil_tensor.get_data_handle();
+    shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
+  }
   c10::DataPtr shade_data_ptr(
-    nullptr,
+    tensor_data,
     shade_data_context,
     cpu::ShadeDataContext::freeShadeDataContext,
     at::DeviceType::DPCPP);

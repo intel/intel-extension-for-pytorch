@@ -89,12 +89,13 @@ _FN_BLACKLIST_REGEX = [
     r'[^(]*mkldnn',
 ]
 
-_FN_DNNL_FUNCS = [
-    'add_(Tensor, Tensor, Scalar) -> Tensor',
-    'add_out(Tensor, Tensor, Tensor, Scalar) -> Tensor',
-    'mul_(Tensor, Tensor) -> Tensor',
-    'mul_out(Tensor, Tensor, Tensor) -> Tensor',
-    'relu_(Tensor) -> Tensor'
+_FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
+    'add(Tensor,Tensor,Scalar)->Tensor',
+    'add_(Tensor,Tensor,Scalar)->Tensor',
+    'add_out(Tensor,Tensor,Tensor,Scalar)->Tensor',
+    'mul_(Tensor,Tensor)->Tensor',
+    'mul_out(Tensor,Tensor,Tensor)->Tensor',
+    'relu_(Tensor)->Tensor'
 ]
 
 _SPARSE_ONLY_FUNCS = [
@@ -516,11 +517,12 @@ def fn_is_inplace(fname):
         return False
 
 
-def fn_is_dnnl(fname):
-    if fname in _FN_DNNL_FUNCS:
-        return True
-    else:
-        return False
+def fn_is_dnnl(simple_aten_sig):
+    stripped_str = simple_aten_sig.replace(' ', '')
+    for item in _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG:
+        if stripped_str == item.replace(' ', ''):
+            return True
+    return False
 
 
 def fn_is_alias(fname):

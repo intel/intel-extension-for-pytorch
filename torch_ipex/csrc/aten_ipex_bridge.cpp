@@ -65,7 +65,7 @@ void attachShadeDataConext(const at::Tensor& tensor) {
   // Make sure that does not triger free resource for set_ptr
   cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
   shade_data_context->cpu_raw_data = data_ptr.get();
-  shade_data_context->cpu_del_run = cur_del_fn;
+  shade_data_context->cpu_del_fun = cur_del_fn;
   shade_data_context->data_type = cpu::SHADE_DATA_TYPE::CPU_RAW;
   c10::DataPtr shade_data_ptr(
     data_ptr.get(),
@@ -158,10 +158,9 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
     TORCH_INTERNAL_ASSERT(! (shade_data_context->dil_tensor.is_empty()));
     dil::tensor &dil_tensor = shade_data_context->dil_tensor;
     if (dil_tensor.is_public_format()) {
-      shade_data_context->data_type = cpu::SHADE_DATA_TYPE::CPU_RAW;
-      TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor.get());
+      TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor.get_data_handle());
       TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data != nullptr);
-      TORCH_INTERNAL_ASSERT(shade_data_context->cpu_del_run != nullptr);
+      TORCH_INTERNAL_ASSERT(shade_data_context->cpu_del_fun != nullptr);
     } else {
       auto dims = dil_tensor.get_dims();
       // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
@@ -281,7 +280,7 @@ at::Tensor shallowUpgradeToDPCPPShadeTensor(const at::Tensor& cpuTensor) {
   // Make sure that does not triger free resource for set_ptr
   cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
   shade_data_context->cpu_raw_data = data_ptr.get();
-  shade_data_context->cpu_del_run = cur_del_fn;
+  shade_data_context->cpu_del_fun = cur_del_fn;
   shade_data_context->data_type = cpu::SHADE_DATA_TYPE::CPU_RAW;
   c10::DataPtr shade_data_ptr(
     data_ptr.get(),
