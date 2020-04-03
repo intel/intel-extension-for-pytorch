@@ -1,9 +1,10 @@
 #!/bin/bash
 
 cpu_op_path=$1
-
-python "./gen-cpu-sparse-dispatch.py"                 \
+python "./gen-cpu-sparse-ops.py"                      \
   --output_folder="$cpu_op_path"                      \
   "./pytorch_headers/RegistrationDeclarations.h"      \
+  "./pytorch_headers/Functions.h"                     \
   "./pytorch_headers/SparseCPUType.h"                 \
-  "./gen_check/aten_ipex_sparse_type_default.h"
+  "./sparse_spec/SparseAttrs.h"                       \
+  "gen_check/SparseOPs.h"

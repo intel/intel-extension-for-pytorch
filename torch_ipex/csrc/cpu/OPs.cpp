@@ -5973,12 +5973,69 @@ at::Tensor AtenIpexCPUDefault::to_dense_backward(const at::Tensor & grad, const 
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
 }
 
+int64_t AtenIpexCPUDefault::sparse_dim(const at::Tensor & self) {
+  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
+  auto&& _ipex_result = _ipex_self.sparse_dim();
+  static_cast<void>(_ipex_result); // Avoid warnings in case not used
+  return _ipex_result;
+}
+
+int64_t AtenIpexCPUDefault::_dimI(const at::Tensor & self) {
+  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
+  auto&& _ipex_result = _ipex_self._dimI();
+  static_cast<void>(_ipex_result); // Avoid warnings in case not used
+  return _ipex_result;
+}
+
+int64_t AtenIpexCPUDefault::dense_dim(const at::Tensor & self) {
+  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
+  auto&& _ipex_result = _ipex_self.dense_dim();
+  static_cast<void>(_ipex_result); // Avoid warnings in case not used
+  return _ipex_result;
+}
+
+int64_t AtenIpexCPUDefault::_dimV(const at::Tensor & self) {
+  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
+  auto&& _ipex_result = _ipex_self._dimV();
+  static_cast<void>(_ipex_result); // Avoid warnings in case not used
+  return _ipex_result;
+}
+
+int64_t AtenIpexCPUDefault::_nnz(const at::Tensor & self) {
+  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
+  auto&& _ipex_result = _ipex_self._nnz();
+  static_cast<void>(_ipex_result); // Avoid warnings in case not used
+  return _ipex_result;
+}
+
 at::Tensor AtenIpexCPUDefault::coalesce(const at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = _ipex_self.coalesce();
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+}
+
+bool AtenIpexCPUDefault::is_coalesced(const at::Tensor & self) {
+  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
+  auto&& _ipex_result = _ipex_self.is_coalesced();
+  static_cast<void>(_ipex_result); // Avoid warnings in case not used
+  return _ipex_result;
+}
+
+at::Tensor & AtenIpexCPUDefault::_coalesced_(at::Tensor & self, bool coalesced) {
+  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
+  auto&& _ipex_result = _ipex_self._coalesced_(coalesced);
+  bridge::shallowUpgradeToDPCPPTensorAW(self, _ipex_self);
+  static_cast<void>(_ipex_result); // Avoid warnings in case not used
+  return self;
 }
 
 at::Tensor & AtenIpexCPUDefault::hspmm_out(at::Tensor & out, const at::Tensor & mat1, const at::Tensor & mat2) {
