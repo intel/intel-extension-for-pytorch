@@ -20,20 +20,11 @@ def namedtuple_with_defaults(typename, field_names, default_values=()):
     return ntuple
 
 
-class ArgTemplate(string.Template):
-    idpattern = r'[a-z0-9_]+'
-
-
 FuncDecl = namedtuple_with_defaults('FuncDecl', 'cpp_sig, aten_sig')
 
 FuncGen = namedtuple_with_defaults(
     'FuncGen',
     'tree, xtree, rwxtree, func, xfunc, code, sig, rwsig, cppsig, funsig, mapsig, aten_sig'
-)
-
-FuncOpts = namedtuple_with_defaults(
-    'FuncOpts',
-    'ref_param, device_param, wparams, outfn_template, outfn_name, shape_check_indices'
 )
 
 _GRAMMAR = r"""
@@ -145,10 +136,6 @@ namespace torch_ipex {{
 }}  // namespace torch_ipex
 """
 
-_FUNCTION_OPTIONS = {}
-
-_FN_WITH_ALIAS_FEATURE = "Tensor(a)"
-
 
 class Context(object):
 
@@ -211,13 +198,6 @@ def is_blacklisted_fn(fname, mapsig):
         if re.match(frx, fname) or re.match(frx, mapsig):
             return True
     return False
-
-
-def is_write_param(fnopts, pname, defval):
-    if fnopts and fnopts.wparams:
-        if pname in fnopts.wparams:
-            return True
-    return defval
 
 
 def first_match(t):
@@ -411,7 +391,6 @@ def get_ipex_wrapper(fndecl):
     rwsig = rewrite_signature(fndecl.cpp_sig, _TYPE_NSMAP)
     rwxtree = _XPARSER.parse(rwsig)
     params = get_parameters(tree)
-    fnopts = _FUNCTION_OPTIONS.get(mapsig, None)
 
     def gen_fnname(x):
         return 'AtenIpexSparseTypeDefault::{}'.format(x)
@@ -611,7 +590,7 @@ if __name__ == '__main__':
     arg_parser.add_argument(
         'sparse_header',
         type=str,
-        metavar='SPARSE_FUNCTIONS_HEADER',
+        metavar='SPARSE_FUNCTIONS_FROM_PYTORCH',
         help='The path to PyTorch SparseCPUType.h')
     arg_parser.add_argument(
         'sparse_typedef',
