@@ -103,6 +103,10 @@ at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& opti
   return gen_aten_tensor_by(it);
 }
 
+at::Tensor empty_like(const at::Tensor& input) {
+  return at::empty_like(input);
+}
+
 }  // namespace comm
 }  // namespace dbl
 }  // namespace cpu

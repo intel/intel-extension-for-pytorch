@@ -153,16 +153,8 @@ at::Tensor& AtenIpexCPUDev::dil_add_out(
 
 at::Tensor AtenIpexCPUDev::dil_add(const at::Tensor& self, const at::Tensor& other, at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_add\n");
-  CHECK_DNNL_OP_PRE_COND(self);
-  CHECK_DNNL_OP_PRE_COND(other);
-  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
-  dil::tensor y = dbl::comm::try_gen_dil_tensor(other);
-
-  dil::tensor z;
-  const std::vector<float> scales{1.0, alpha.to<float>()};
-  dil::sum::compute(scales, {x, y}, z);
-
-  return dbl::comm::gen_aten_tensor_by(z);
+  auto result = empty_like(self);
+  return dil_add_out(result, self, other, alpha);
 }
 
 at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other, at::Scalar alpha) {

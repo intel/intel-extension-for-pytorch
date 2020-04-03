@@ -447,6 +447,11 @@ std::tuple<at::Tensor,at::Tensor> AtenIpexCPUDefault::adaptive_max_pool1d(const 
 at::Tensor AtenIpexCPUDefault::add(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(other.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    return AtenIpexCPUDev::dil_add(self, other, alpha);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::add(_ipex_self, _ipex_other, alpha);
