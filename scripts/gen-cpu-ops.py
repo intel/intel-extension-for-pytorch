@@ -19,21 +19,11 @@ def namedtuple_with_defaults(typename, field_names, default_values=()):
     ntuple.__new__.__defaults__ = tuple(prototype)
     return ntuple
 
-
-class ArgTemplate(string.Template):
-    idpattern = r'[a-z0-9_]+'
-
-
 FuncDef = namedtuple_with_defaults('FuncDef', 'cpp_sig, aten_sig')
 
 FuncGen = namedtuple_with_defaults(
     'FuncGen',
     'tree, xtree, rwxtree, func, xfunc, code, sig, rwsig, cppsig, funsig, mapsig, aten_sig'
-)
-
-FuncOpts = namedtuple_with_defaults(
-    'FuncOpts',
-    'ref_param, device_param, wparams, outfn_template, outfn_name, shape_check_indices'
 )
 
 _GRAMMAR = r"""
@@ -98,35 +88,6 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'relu_(Tensor)->Tensor'
 ]
 
-#
-# _FN_DNNL_FUNCS = [
-#     'add',
-#     'add_',
-#     'add_out',
-#     'empty',
-#     'linear',
-#     'max_pool2d',
-#     'mul',
-#     'mul_',
-#     'mul_out',
-#     'batch_norm',
-#     'reshape',
-#     'relu',
-#     'relu_',
-#     'sigmoid',
-#     'sigmoid_',
-#     '_softmax',
-#     'transpose',
-#     'transpose_',
-#     'clone',
-#     'zero_',
-#     'view',
-#     'adaptive_avg_pool2d_out',
-#     'adaptive_avg_pool2d',
-#     'avg_pool2d',
-#     'avg_pool2d_out'
-# ]
-
 _FN_WITH_ALIAS_FEATURE = 'Tensor(a)'
 
 _FALLBACK_TO_CPU_TENSOR_LIST = 'fallbackToCPUTensorList'
@@ -139,14 +100,6 @@ _SHALLOW_UPGRADE_TO_DPCPP_TENSOR = 'shallowUpgradeToDPCPPTensor'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_VEC = 'shallowUpgradeToDPCPPTensorVec'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_A = 'shallowUpgradeToDPCPPTensorA'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_AW = 'shallowUpgradeToDPCPPTensorAW'
-
-# List of tuples with the regex match first, and the corresponding FuncOpts()
-# second.
-# _FN_OUT_REGEX = {
-#     # ATEN functions with tensor out
-#     r'[^(]*_out\(' : FuncOpts(),
-# }
-_FN_OUT_REGEX ={}
 
 _TYPE_NSMAP = {
     'Tensor': 'at::Tensor',
@@ -207,20 +160,6 @@ namespace cpu {{
 }}  // namespace torch_ipex
 """
 
-_CTOR_FUNCTIONS = {
-    'empty': '.device(at::DeviceType::DPCPP)',
-    'linspace': '.device(at::DeviceType::DPCPP)',
-    'logspace': '.device(at::DeviceType::DPCPP)',
-    'rand': '.device(at::DeviceType::DPCPP)',
-    'rand_like': '.device(at::DeviceType::DPCPP)',
-    'randn': '.device(at::DeviceType::DPCPP)',
-    'randn_like': '.device(at::DeviceType::DPCPP)',
-    'randint': '.device(at::DeviceType::DPCPP)',
-    'randint_like': '.device(at::DeviceType::DPCPP)',
-    'randperm': '.device(at::DeviceType::DPCPP)',
-    'scalar_tensor': '.device(at::DeviceType::DPCPP)',
-}
-
 _FUNCTION_OPTIONS = {}
 
 _RESULT_NAME = '_ipex_result'
@@ -266,9 +205,7 @@ class StringEmit(object):
 
 class TensorFetcher(object):
 
-    def __init__(self, var_name):
-        self.var_name = var_name
-        self.tvar_name = '{}_tensors'.format(self.var_name)
+    def __init__(self):
         self.tensors = []
         self.writeable_tensors = []
 
@@ -308,24 +245,11 @@ def is_blacklisted_fn(fname, mapsig):
     return False
 
 
-def get_outfn_options(fname, mapsig):
-    for frx, fnopts in _FN_OUT_REGEX.items():
-        if re.match(frx, fname) or re.match(frx, mapsig):
-            return fnopts
-
-
 def is_write_param(fnopts, pname, defval):
     if fnopts and fnopts.wparams:
         if pname in fnopts.wparams:
             return True
     return defval
-
-
-def first_match(t):
-    if isinstance(t, lark.lexer.Token):
-        return t.column - 1
-    assert isinstance(t, lark.tree.Tree)
-    return first_match(t.children[0])
 
 
 def last_match(t):
@@ -747,100 +671,13 @@ def rewrite_tensor_options(fname, pname):
     return code, xname
 
 
-def get_param_names(params):
-    param_vars = []
-    for p in params:
-        pname = param_name(p)
-        param_vars.append(pname)
-    return param_vars
-
-
-def expand_fn_template(tmpl, param_vars):
-    mdict = {}
-    for i, pname in enumerate(param_vars):
-        mdict[str(i)] = pname
-    return tmpl.substitute(mdict)
-
-
-def create_call(fname, param_vars):
-    return '{}({})'.format(fname, ', '.join(param_vars))
-
-
-def generate_shape_checks(param_vars, shape_check_indices, fname):
-    code = ''
-    for i, j in shape_check_indices:
-        code += ('  XLA_CHECK({}.sizes() == {}.sizes()) << "Operand shapes must be '
-                 'identical for {}, mismatch for arguments {} and {}";\n').format(
-            param_vars[i], param_vars[j], fname, i + 1, j + 1)
-    return code
-
-
-def generate_aten_remap(ctx, fname, sig, params, fnopts):
-    code = '{} {{\n'.format(sig)
-
-    param_vars = get_param_names(params)
-    if fnopts.outfn_template is not None:
-        fcall = expand_fn_template(fnopts.outfn_template, param_vars)
-    else:
-        assert fnopts.outfn_name
-        fcall = create_call(fnopts.outfn_name, param_vars)
-
-    if fnopts.shape_check_indices is not None:
-        code += generate_shape_checks(param_vars, fnopts.shape_check_indices, fname)
-    code += '  return {};\n'.format(fcall)
-    code += '}'
-    return code
-
-
-def generate_outfn_result_copy(dest, src):
-    return '  {}.unsafeGetTensorImpl()->shallow_copy_from({}.getIntrusivePtr());\n'.format(
-        dest, src)
-
-
-def generate_aten_out(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
-    rtype = tree.children[0]
-    num_outputs = None
-    if type_core(rtype) == 'std::tuple':
-        num_outputs = len(tuple_type_list(rtype))
-
-    code = '{} {{\n'.format(sig)
-
-    param_vars = get_param_names(params)
-    if fnopts.outfn_template is not None:
-        fcall = expand_fn_template(fnopts.outfn_template, param_vars)
-    else:
-        m = re.match(r'(.*)_out$', fname)
-        assert m is not None, fname
-        out_count = num_outputs if num_outputs is not None else 1
-        fcall = create_call('AtenXlaType::{}'.format(m.group(1)),
-                            param_vars[out_count:])
-
-    tmp_result = '{}_tmp'.format(fname)
-    code += '  auto {} = {};\n'.format(tmp_result, fcall)
-    if num_outputs is None:
-        code += generate_outfn_result_copy(param_vars[0], tmp_result)
-        code += '  return {};\n'.format(param_vars[0])
-    else:
-        for i in range(0, num_outputs):
-            code += generate_outfn_result_copy(
-                param_vars[i], 'std::get<{}>({})'.format(i, tmp_result))
-        code += '  return {}('.format(get_return_type_str(rwxtree, rwsig))
-        for i in range(0, num_outputs):
-            if i > 0:
-                code += ', '
-            code += param_vars[i]
-        code += ');\n'
-    code += '}'
-    return code
-
-
 def generate_aten_to_ipex(ctx, tree, mapsig, rwxtree, fname, sig, rwsig, params, fnopts):
     ref_param = get_reference_param(params, fnopts=fnopts)
 
     code = '{} {{\n'.format(sig)
     #code += '  printf("AtenIpexCPUDefault::{}\\n");\n'.format(fname)
     ipex_ref_param = param_name(ref_param) if ref_param else None
-    tfetcher = TensorFetcher('xlatens')
+    tfetcher = TensorFetcher()
     param_vars = []
     dnnl_op_input_tensor_vars = []
     dnnl_op_input_vars = []
@@ -937,11 +774,7 @@ def get_ipex_wrapper(fndef, ctx):
 
     sig, fname, xfname = get_function_signature(rwxtree, rwsig, gen_fnname)
     if not is_blacklisted_fn(fname, mapsig):
-        ofnopts = get_outfn_options(fname, mapsig)
-        if ofnopts is not None:
-            code = generate_aten_out(ctx, tree, rwxtree, fname, sig, rwsig, params, ofnopts)
-        else:
-            code = generate_aten_to_ipex(ctx, tree, mapsig, rwxtree, fname, sig, rwsig, params, fnopts)
+        code = generate_aten_to_ipex(ctx, tree, mapsig, rwxtree, fname, sig, rwsig, params, fnopts)
     else:
         code = None
     return FuncGen(
@@ -1013,7 +846,7 @@ def parse_local_overrides(path):
 
     overrides = {}
     for fndef in functions:
-        # Discard static XLA type functions which are not ATEN.
+        # Discard static IPEX type functions which are not ATEN.
         is_tensor, fndef = is_tensor_api(fndef)
         if is_tensor:
             xtree = _XPARSER.parse(fndef)
@@ -1067,10 +900,7 @@ def check_overrides(overrides, overridden):
         mapsig_key = get_mapsig_key(mapsig)
         if not mapsig_key in overridden:
             misses += 1
-            print(
-                'AtenXlaType function missed override: {}; // {}'.format(
-                    cpp_sig, mapsig),
-                file=sys.stderr)
+            print('IPEX function missed override: {}; // {}'.format(cpp_sig, mapsig), file=sys.stderr)
     return misses == 0
 
 
