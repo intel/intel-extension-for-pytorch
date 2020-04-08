@@ -102,8 +102,20 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'reshape(Tensor, IntArrayRef) -> Tensor',
     'cat_out(Tensor, TensorList, int64_t) -> Tensor',
     'cat(TensorList, int64_t) -> Tensor',
-    'split_with_sizes(Tensor, IntArrayRef, int64_t) -> std::vector<Tensor>'
-
+    'split_with_sizes(Tensor, IntArrayRef, int64_t) -> std::vector<Tensor>',
+    'bmm(Tensor, Tensor) -> Tensor',
+    'bmm_out(Tensor, Tensor, Tensor) -> Tensor',
+    'mm(Tensor, Tensor) -> Tensor',
+    'mm_out(Tensor, Tensor, Tensor) -> Tensor',
+    'baddbmm(Tensor, Tensor, Tensor, Scalar, Scalar) -> Tensor',
+    'baddbmm_(Tensor, Tensor, Tensor, Scalar, Scalar) -> Tensor',
+    'baddbmm_out(Tensor, Tensor, Tensor, Tensor, Scalar, Scalar) -> Tensor',
+    'addmm(Tensor, Tensor, Tensor, Scalar, Scalar) -> Tensor',
+    'addmm_(Tensor, Tensor, Tensor, Scalar, Scalar) -> Tensor',
+    'addmm_out(Tensor, Tensor, Tensor, Tensor, Scalar, Scalar) -> Tensor',
+    'addbmm(Tensor, Tensor, Tensor, Scalar, Scalar) -> Tensor',
+    'addbmm_(Tensor, Tensor, Tensor, Scalar, Scalar) -> Tensor',
+    'addbmm_out(Tensor, Tensor, Tensor, Tensor, Scalar, Scalar) -> Tensor',
 ]
 
 _FN_WITH_ALIAS_FEATURE = 'Tensor(a)'

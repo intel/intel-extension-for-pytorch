@@ -196,6 +196,262 @@ at::Tensor& AtenIpexCPUDev::dil_mul_(at::Tensor& self, const at::Tensor& other) 
   return dil_mul_out(self, self, other);
 }
 
+void matmul_common(
+    const dil::tensor &x,
+    const dil::tensor &w,
+    const dil::tensor &bias, 
+    dil::tensor &y,
+    at::Scalar beta=1,
+    at::Scalar alpha=1, 
+    const dil::attr_t& attr = dil::attr_t()) {
+  float dst_coeff = alpha.to<float>();
+  float sum_coeff = beta.to<float>();
+  if (!bias.is_empty()) { 
+    // DNNL only supports bias in 1xN dims
+    // use bias for sum can save tensor memory copy 
+    if (dst_coeff == 1.0f  && sum_coeff == 1.0f && bias.get_dim(0) == 1) {
+      dil::matmul_forward::compute(x, w, bias, y);
+      return;
+    }
+    dil::direct_copy::compute(bias, y);
+  }
+
+  dil::matmul_forward::compute(x, w, y, dst_coeff, sum_coeff,
+      dil::scale_t(), dil::scale_t(), dil::scale_t(), attr);
+}
+
+at::Tensor AtenIpexCPUDev::dil_bmm(
+    const at::Tensor& self, 
+    const at::Tensor& mat2) {
+  DEBUG("AtenIpexCPUDev::dil_bmm\n");
+  auto self_size = self.sizes();
+  std::vector<int64_t> result_size(self_size.begin(), self_size.end()-1);
+  result_size.push_back(mat2.size(-1));
+  at::Tensor result = dbl::comm::empty_dil_tensor(result_size, self.options());
+  return dil_bmm_out(result, self, mat2);
+}
+
+at::Tensor& AtenIpexCPUDev::dil_bmm_out(
+    at::Tensor &result, 
+    const at::Tensor& batch1, 
+    const at::Tensor& batch2) {
+  DEBUG("AtenIpexCPUDev::dil_bmm_out\n");
+  const dil::tensor x = dbl::comm::try_gen_dil_tensor(batch1);
+  const dil::tensor w = dbl::comm::try_gen_dil_tensor(batch2);
+  dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
+  matmul_common(x, w, dil::tensor(), y);
+  return result;
+}
+
+at::Tensor AtenIpexCPUDev::dil_mm(
+    const at::Tensor& self,
+    const at::Tensor& mat2) {
+  DEBUG("AtenIpexCPUDev::dil_mm\n");
+  return dil_bmm(self, mat2);
+}
+
+at::Tensor& AtenIpexCPUDev::dil_mm_out(
+    at::Tensor& result,
+    const at::Tensor& self,
+    const at::Tensor& mat2) {
+  DEBUG("AtenIpexCPUDev::dil_mm_out\n");
+  return dil_bmm_out(result, self, mat2);
+}
+
+at::Tensor& AtenIpexCPUDev::dil_baddbmm_out(
+    at::Tensor &result, 
+    const at::Tensor& self, 
+    const at::Tensor& batch1, 
+    const at::Tensor& batch2, 
+    at::Scalar beta, 
+    at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_baddbmm_out\n");
+  const dil::tensor x = dbl::comm::try_gen_dil_tensor(batch1);
+  const dil::tensor w = dbl::comm::try_gen_dil_tensor(batch2);
+  dil::tensor bias;
+  if (self.numel() != 0) {
+    bias = dbl::comm::try_gen_dil_tensor(self);
+    if (bias.ndims() < x.ndims()) {
+      auto bias_dims = bias.get_dims();
+      bias_dims.insert(bias_dims.begin(), 1);
+      bias.reshape(bias_dims);
+    }
+  }
+  dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
+  auto attr_ = dil::attr_t::fuse_sum();
+  matmul_common(x, w, bias, y, beta, alpha, attr_);
+  return result;
+}
+
+at::Tensor AtenIpexCPUDev::dil_baddbmm(
+    const at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor & batch2,
+    at::Scalar beta,
+    at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_baddbmm\n");
+  at::Tensor result = dbl::comm::empty_dil_tensor(self.sizes(), self.options());
+  return dil_baddbmm_out(result, self, batch1, batch2, beta, alpha);
+}
+
+at::Tensor& AtenIpexCPUDev::dil_baddbmm_(
+    at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    at::Scalar beta,
+    at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_baddbmm_\n");
+  at::Tensor result = at::empty({0}, self.options());
+  return dil_baddbmm_out(self, result, batch1, batch2, beta, alpha);
+}
+
+at::Tensor& AtenIpexCPUDev::dil_addmm_out(
+    at::Tensor& result,
+    const at::Tensor& self,
+    const at::Tensor& mat1,
+    const at::Tensor& mat2,
+    at::Scalar beta,
+    at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_addmm_out\n");   
+  return dil_baddbmm_out(result, self, mat1, mat2, beta, alpha);
+}
+
+at::Tensor AtenIpexCPUDev::dil_addmm(
+    const at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor & batch2,
+    at::Scalar beta,
+    at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_addmm\n");
+  return dil_baddbmm(self, batch1, batch2, beta, alpha);
+}
+
+at::Tensor& AtenIpexCPUDev::dil_addmm_(
+    at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor & batch2,
+    at::Scalar beta,
+    at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_addmm_\n");
+  return dil_baddbmm_(self, batch1, batch2, beta, alpha);
+}
+
+at::Tensor& AtenIpexCPUDev::dil_addbmm_out(
+    at::Tensor& result,
+    const at::Tensor &self,
+    const at::Tensor &batch1,
+    const at::Tensor &batch2,
+    at::Scalar beta,
+    at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_addbmm_out\n");
+  // addbmm(batch1*batch2) [b,n,m] * [b,m,p] = [n,p] can be treated as:
+  // [n, b*m] * [b*m, p] = [n, p]
+  // For batch1: reorder from [b, n, m] to [n, b, m], reshape to [n, b*m]
+  // For batch2: reshape from [b, m, p] to [b*m, p]
+  const dil::tensor x = dbl::comm::try_gen_dil_tensor(batch1);
+  dil::tensor w = dbl::comm::try_gen_dil_tensor(batch2);
+
+  auto x_ = x;
+  if (x.get_dim(0) > 1) {
+    x_ = x.transpose(0, 1);
+  }
+  dil::dims x_dims = {x.get_dim(1), x.get_dim(0) * x.get_dim(2)};
+  x_ = x_.reshape(x_dims);
+  dil::dims w_dims = {w.get_dim(0) * w.get_dim(1), w.get_dim(2)};
+  auto w_ = w.reshape(w_dims);
+  dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
+  auto attr_ = dil::attr_t::fuse_sum();
+ 
+  dil::tensor bias; 
+  if (self.numel() != 0) {
+    bias = dbl::comm::try_gen_dil_tensor(self);
+    if (bias.ndims() < x_.ndims()) {
+      auto bias_dims = bias.get_dims();
+      bias_dims.insert(bias_dims.begin(), 1);
+      bias.reshape(bias_dims);
+    }
+  }
+  matmul_common(x_, w_, bias, y, beta, alpha, attr_);
+  return result;
+}
+
+at::Tensor AtenIpexCPUDev::dil_addbmm(
+    const at::Tensor &self,
+    const at::Tensor &batch1,
+    const at::Tensor &batch2,
+    at::Scalar beta,
+    at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_addbmm\n");
+  at::Tensor result = dbl::comm::empty_dil_tensor(self.sizes(), self.options());
+  return dil_addbmm_out(result, self, batch1, batch2, beta, alpha);
+}
+
+at::Tensor& AtenIpexCPUDev::dil_addbmm_(
+    at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    at::Scalar beta,
+    at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_addbmm_\n");
+  at::Tensor result = at::empty({0}, self.options());
+  return dil_addbmm_out(self, result, batch1, batch2, beta, alpha);
+}
+
+at::Tensor dil_maybe_multiply(const at::Tensor& grad_output, at::Scalar alpha=1) {
+  if (alpha.toFloat() == 1) {
+    return grad_output;
+  }
+  const dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output);
+  dil::tensor gradx;
+  dil::eltwise_forward::compute(grady, gradx, 
+      dil::algorithm::eltwise_linear, 
+      dil::prop_kind::forward_inference, alpha.toFloat());
+  return dbl::comm::gen_aten_tensor_by(gradx);
+}
+
+std::tuple<at::Tensor, at::Tensor> AtenIpexCPUDev::dil_matmul_backward(const at::Tensor& grad_output, const at::Tensor& mat1,  const at::Tensor& mat2, at::Scalar alpha=1) {
+  auto grady = dbl::comm::try_gen_dil_tensor(grad_output);
+  auto ndim = mat1.dim();
+  auto m1 = dbl::comm::try_gen_dil_tensor(mat1).transpose_(ndim-2, ndim-1);
+  auto m2 = dbl::comm::try_gen_dil_tensor(mat2).transpose_(ndim-2, ndim-1);
+  dil::tensor gradx, gradw;
+  dil::matmul_forward::compute(grady, m2, gradx, alpha.toFloat());
+  dil::matmul_forward::compute(m1, grady, gradw, alpha.toFloat());
+  return std::tuple<at::Tensor, at::Tensor>{
+      dbl::comm::gen_aten_tensor_by(gradx), 
+      dbl::comm::gen_aten_tensor_by(gradw)};
+}
+
+std::tuple<at::Tensor, at::Tensor> AtenIpexCPUDev::dil_mm_backward(const at::Tensor& grad_output, const at::Tensor& self, const at::Tensor& mat2) {
+  return dil_matmul_backward(grad_output, self, mat2);
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_addmm_backward(const at::Tensor& grad_output, const at::Tensor& mat1, const at::Tensor& mat2, at::Scalar beta, at::Scalar alpha) {
+  at::Tensor grad1 = dil_maybe_multiply(grad_output, beta);
+  at::Tensor grad2, grad3;
+  std::tie(grad2, grad3) = dil_matmul_backward(grad_output, mat1, mat2, alpha);
+  return std::tuple<at::Tensor, at::Tensor, at::Tensor>{grad1, grad2, grad3}; 
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_addbmm_backward(const at::Tensor& grad_output, const at::Tensor& batch1, const at::Tensor& batch2, at::Scalar beta, at::Scalar alpha) {
+  at::Tensor grad1 = dil_maybe_multiply(grad_output, beta);
+  
+  // Workaround: dilTensor not support unsqueeze and expand operations now
+  auto grad_dense = dbl::comm::dil_tensor_to_dense(grad_output);
+  grad_dense = grad_dense.unsqueeze(0).expand({batch1.size(0), batch1.size(1), batch2.size(2)});
+  auto grad_expand = dbl::comm::dil_tensor_from_dense(grad_dense);
+  at::Tensor grad2, grad3;
+  std::tie(grad2, grad3) = dil_matmul_backward(grad_dense, batch1, batch2, alpha);//jiayi
+  return std::tuple<at::Tensor, at::Tensor, at::Tensor>{grad1, grad2, grad3}; 
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_baddbmm_backward(const at::Tensor& grad_output, const at::Tensor& batch1, const at::Tensor& batch2, at::Scalar beta, at::Scalar alpha) {
+  at::Tensor grad1 = dil_maybe_multiply(grad_output, beta);
+  at::Tensor grad2, grad3;
+  std::tie(grad2, grad3) = dil_matmul_backward(grad_output, batch1, batch2, alpha);
+  return std::tuple<at::Tensor, at::Tensor, at::Tensor>{grad1, grad2, grad3}; 
+}
+
 at::Tensor AtenIpexCPUDev::dil_linear(
     const at::Tensor& self,
     const at::Tensor& weight,
@@ -203,8 +459,6 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   DEBUG("AtenIpexCPUDev::dil_linear\n");
   TORCH_CHECK(self.dim() >= 2,
       "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
-  TORCH_CHECK(self.is_mkldnn(),
-      "dil_linear: input needs to be dil layout");
 
   // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
   auto self_reshaped = self.dim() > 2 ? self.reshape({-1, self.size(self.dim() - 1)}) : self;
@@ -270,15 +524,9 @@ std::tuple<at::Tensor, at::Tensor> dil_linear_backward_weights(
   // Extract device info from weight and data type info from input.
   // since for current BF16 design, input is BF16 tensor while weight is FP32 tensor.  
   auto options = weight.options().dtype(input.scalar_type());
-  if (weight.is_mkldnn()) {
-    return std::tuple<at::Tensor, at::Tensor>{
-      dbl::comm::gen_aten_tensor_by(gradw),
-      dbl::comm::gen_aten_tensor_by(gradb)};
-  } else {
-    return std::tuple<at::Tensor, at::Tensor>{
-      dbl::comm::dil_tensor_to_dense(dbl::comm::gen_aten_tensor_by(gradw)),
-      dbl::comm::dil_tensor_to_dense(dbl::comm::gen_aten_tensor_by(gradb))};
-  }
+  return std::tuple<at::Tensor, at::Tensor>{
+    dbl::comm::gen_aten_tensor_by(gradw),
+    dbl::comm::gen_aten_tensor_by(gradb)};
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_linear_backward(
@@ -409,17 +657,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
   dil::batch_normalization_backward::compute(
       x, m, v, grady, w, gradx, gradw, gradb, eps);
 
-  if (weight.is_mkldnn()) {
-    return std::make_tuple(
-        dbl::comm::gen_aten_tensor_by(gradx),
-        dbl::comm::gen_aten_tensor_by(gradw),
-        dbl::comm::gen_aten_tensor_by(gradb));
-  } else {
-    return std::make_tuple(
-        dbl::comm::gen_aten_tensor_by(gradx),
-        dbl::comm::dil_tensor_to_dense(dbl::comm::gen_aten_tensor_by(gradw)),
-        dbl::comm::dil_tensor_to_dense(dbl::comm::gen_aten_tensor_by(gradb)));
-  }
+  return std::make_tuple(
+      dbl::comm::gen_aten_tensor_by(gradx),
+      dbl::comm::gen_aten_tensor_by(gradw),
+      dbl::comm::gen_aten_tensor_by(gradb));
 }
 
 at::Tensor AtenIpexCPUDev::dil_max_pooling(
@@ -690,7 +931,7 @@ at::Tensor AtenIpexCPUDev::dil_sigmoid(const at::Tensor& self) {
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::tensor y;
   dil::eltwise_forward::compute(
-      x, y, dil::algorithm::eltwise_logistic, dil::prop_kind::forward);
+      x, y, dil::algorithm::eltwise_logistic_use_dst_for_bwd, dil::prop_kind::forward);
   return dbl::comm::gen_aten_tensor_by(y);
 }
 
@@ -698,7 +939,7 @@ at::Tensor& AtenIpexCPUDev::dil_sigmoid_(at::Tensor& self) {
   DEBUG("AtenIpexCPUDev::dil_sigmoid_\n");
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::eltwise_forward::compute(
-      x, x, dil::algorithm::eltwise_logistic, dil::prop_kind::forward);
+      x, x, dil::algorithm::eltwise_logistic_use_dst_for_bwd, dil::prop_kind::forward);
   return self;
 }
 
@@ -710,7 +951,7 @@ at::Tensor AtenIpexCPUDev::dil_sigmoid_backward(
   dil::tensor gy = dbl::comm::try_gen_dil_tensor(grad_output.is_contiguous() ? grad_output : grad_output.contiguous());
   dil::tensor gx;
   dil::eltwise_backward::compute(y, gy, gx,
-      dil::algorithm::eltwise_logistic);
+      dil::algorithm::eltwise_logistic_use_dst_for_bwd);
   return dbl::comm::gen_aten_tensor_by(gx);
 }
 

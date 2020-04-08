@@ -254,6 +254,10 @@ class TestMixOp(TestCase):
 
 class TestLinearAlgebraOps(TestCase):
     def test_mm(self):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        torch.manual_seed(rand_seed)
         M, N, O = 23, 8, 12
         b1_cpu = torch.randn(M, N, dtype=torch.float32)
         b2_cpu = torch.randn(N, O, dtype=torch.float32)
@@ -273,6 +277,10 @@ class TestLinearAlgebraOps(TestCase):
         self.assertEqual(y_cpu, y_dpcpp)
 
     def test_bmm(self):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        torch.manual_seed(rand_seed)
         num_batches = 10
         M, N, O = 23, 8, 12
         b1_cpu = torch.randn(num_batches, M, N, dtype=torch.float32)
@@ -293,8 +301,12 @@ class TestLinearAlgebraOps(TestCase):
         self.assertEqual(y_cpu, y_dpcpp)
 
     def test_addmm(self):
-        for i in range(8, 14, 2):
-            for j in range(8, 14, 2):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        torch.manual_seed(rand_seed)
+        for i in range(8, 12, 2):
+            for j in range(8, 12, 2):
                 alpha = i / 10
                 beta = j / 10
                 M, N, O = 23, 8, 12
@@ -316,8 +328,12 @@ class TestLinearAlgebraOps(TestCase):
                 self.assertEqual(y_cpu, y_dpcpp)
 
     def test_addbmm(self):
-        for i in range(8, 14, 2):
-            for j in range(8, 14, 2):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        torch.manual_seed(rand_seed)
+        for i in range(8, 12, 2):
+            for j in range(8, 12, 2):
                 alpha = i / 10
                 beta = j / 10
                 num_batches = 10
@@ -339,8 +355,12 @@ class TestLinearAlgebraOps(TestCase):
                 self.assertEqual(y_cpu, y_dpcpp)
 
     def test_baddbmm(self):
-        for i in range(8, 14, 2):
-            for j in range(8, 14, 2):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        torch.manual_seed(rand_seed)
+        for i in range(8, 12, 2):
+            for j in range(8, 12, 2):
                 alpha = i / 10
                 beta = j / 10
                 num_batches = 10
@@ -360,20 +380,6 @@ class TestLinearAlgebraOps(TestCase):
                 torch.baddbmm(res_cpu, b1_cpu, b2_cpu, alpha=alpha, beta=beta, out=y_cpu),
                 torch.baddbmm(res_dpcpp, b1_dpcpp, b2_dpcpp, alpha=alpha, beta=beta, out=y_dpcpp),
                 self.assertEqual(y_cpu, y_dpcpp)
-
-class TestLinear(TestCase):
-    def test_linear(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
-        torch.manual_seed(rand_seed)
-        in_features = torch.randint(3, 10, (1,)).item()
-        out_features = torch.randint(3, 100, (1,)).item()
-        x_cpu = torch.randn(3, in_features, dtype=torch.float32) * 10
-        x_dpcpp = x_cpu.to(device=device)
-        for bias in [True, False]:
-            linear = torch.nn.Linear(in_features, out_features, bias=bias).float()
-            self.assertEqual(linear(x_cpu), linear(x_dpcpp))
 
 class TestPool(TestCase):
     def test_avg_pool2d(self):
@@ -469,7 +475,7 @@ class TestBatchNorm(TestCase):
 
         bn = torch.nn.BatchNorm2d(3)
         bn_dpcpp = torch.nn.BatchNorm2d(3).to(device=device)
-        bn_dpcpp(x_dpcpp)
+        self.assertEqual(bn(x_cpu), bn_dpcpp(x_dpcpp))
 
     def test_batch_norm3d(self):
         ipex.enable_auto_dnnl()
@@ -481,10 +487,10 @@ class TestBatchNorm(TestCase):
 
         bn = torch.nn.BatchNorm3d(3)
         bn_dpcpp = torch.nn.BatchNorm3d(3).to(device=device)
-        bn_dpcpp(x_dpcpp)
+        self.assertEqual(bn(x_cpu), bn_dpcpp(x_dpcpp))
 
     def test_batch_norm2d_backward(self):
-        ipex.disable_auto_dnnl()
+        ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
         torch.manual_seed(rand_seed)
@@ -494,10 +500,6 @@ class TestBatchNorm(TestCase):
 
         bn = torch.nn.BatchNorm2d(3)
         bn_dpcpp = torch.nn.BatchNorm2d(3).to(device=device)
-        bn_dpcpp.weight.data = bn.weight.data.to(device=device)
-        bn_dpcpp.bias.data = bn.bias.data.to(device=device)
-        bn_dpcpp.running_mean.data = bn.running_mean.data.to(device=device)
-        bn_dpcpp.running_var.data = bn.running_var.data.to(device=device)
 
         y_cpu = bn(x_cpu).sum()
         y_dpcpp = bn_dpcpp(x_dpcpp).sum()
@@ -563,7 +565,7 @@ class TestSoftMax(TestCase):
             self.assertEqual(softmax(x_cpu), softmax(x_dpcpp))
 
     def test_softmax_backward(self):
-        ipex.disable_auto_dnnl()
+        ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
         torch.manual_seed(rand_seed)
@@ -593,7 +595,7 @@ class TestSigmoid(TestCase):
         self.assertEqual(x_cpu, x_dpcpp)
 
     def test_sigmoid_backward(self):
-        ipex.disable_auto_dnnl()
+        ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
         torch.manual_seed(rand_seed)

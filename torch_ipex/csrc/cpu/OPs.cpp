@@ -802,6 +802,16 @@ at::Tensor AtenIpexCPUDefault::baddbmm(const at::Tensor & self, const at::Tensor
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(batch1.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(batch2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(batch1);
+    dnnl_input_tensors.push_back(batch2);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_baddbmm(self.is_contiguous() ? self : self.contiguous(), batch1.is_contiguous() ? batch1 : batch1.contiguous(), batch2.is_contiguous() ? batch2 : batch2.contiguous(), beta, alpha);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_batch1 = bridge::shallowFallbackToCPUTensor(batch1);
   auto&& _ipex_batch2 = bridge::shallowFallbackToCPUTensor(batch2);
@@ -814,6 +824,16 @@ at::Tensor & AtenIpexCPUDefault::baddbmm_(at::Tensor & self, const at::Tensor & 
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(batch1.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(batch2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(batch1);
+    dnnl_input_tensors.push_back(batch2);
+    if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_baddbmm_(self, batch1, batch2, beta, alpha);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_batch1 = bridge::shallowFallbackToCPUTensor(batch1);
   auto&& _ipex_batch2 = bridge::shallowFallbackToCPUTensor(batch2);
@@ -841,6 +861,18 @@ at::Tensor & AtenIpexCPUDefault::baddbmm_out(at::Tensor & out, const at::Tensor 
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(batch1.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(batch2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(out);
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(batch1);
+    dnnl_input_tensors.push_back(batch2);
+    TORCH_INTERNAL_ASSERT(out.is_contiguous());
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_baddbmm_out(out, self.is_contiguous() ? self : self.contiguous(), batch1.is_contiguous() ? batch1 : batch1.contiguous(), batch2.is_contiguous() ? batch2 : batch2.contiguous(), beta, alpha);
+  }
+
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_batch1 = bridge::shallowFallbackToCPUTensor(batch1);
@@ -1131,6 +1163,15 @@ at::Tensor AtenIpexCPUDefault::blackman_window(int64_t window_length, bool perio
 at::Tensor AtenIpexCPUDefault::bmm(const at::Tensor & self, const at::Tensor & mat2) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(mat2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(mat2);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_bmm(self.is_contiguous() ? self : self.contiguous(), mat2.is_contiguous() ? mat2 : mat2.contiguous());
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_mat2 = bridge::shallowFallbackToCPUTensor(mat2);
   auto&& _ipex_result = at::bmm(_ipex_self, _ipex_mat2);
@@ -1142,6 +1183,17 @@ at::Tensor & AtenIpexCPUDefault::bmm_out(at::Tensor & out, const at::Tensor & se
   TORCH_INTERNAL_ASSERT(out.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(mat2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(out);
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(mat2);
+    TORCH_INTERNAL_ASSERT(out.is_contiguous());
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_bmm_out(out, self.is_contiguous() ? self : self.contiguous(), mat2.is_contiguous() ? mat2 : mat2.contiguous());
+  }
+
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_mat2 = bridge::shallowFallbackToCPUTensor(mat2);
@@ -3540,6 +3592,15 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor,std::vector<at::Tensor>> AtenIpexCPU
 at::Tensor AtenIpexCPUDefault::mm(const at::Tensor & self, const at::Tensor & mat2) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(mat2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(mat2);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_mm(self.is_contiguous() ? self : self.contiguous(), mat2.is_contiguous() ? mat2 : mat2.contiguous());
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_mat2 = bridge::shallowFallbackToCPUTensor(mat2);
   auto&& _ipex_result = at::mm(_ipex_self, _ipex_mat2);
@@ -3551,6 +3612,17 @@ at::Tensor & AtenIpexCPUDefault::mm_out(at::Tensor & out, const at::Tensor & sel
   TORCH_INTERNAL_ASSERT(out.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(mat2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(out);
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(mat2);
+    TORCH_INTERNAL_ASSERT(out.is_contiguous());
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_mm_out(out, self.is_contiguous() ? self : self.contiguous(), mat2.is_contiguous() ? mat2 : mat2.contiguous());
+  }
+
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_mat2 = bridge::shallowFallbackToCPUTensor(mat2);
@@ -5958,6 +6030,18 @@ at::Tensor & AtenIpexCPUDefault::addmm_out(at::Tensor & out, const at::Tensor & 
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(mat1.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(mat2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(out);
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(mat1);
+    dnnl_input_tensors.push_back(mat2);
+    TORCH_INTERNAL_ASSERT(out.is_contiguous());
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_addmm_out(out, self.is_contiguous() ? self : self.contiguous(), mat1.is_contiguous() ? mat1 : mat1.contiguous(), mat2.is_contiguous() ? mat2 : mat2.contiguous(), beta, alpha);
+  }
+
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_mat1 = bridge::shallowFallbackToCPUTensor(mat1);
@@ -5972,6 +6056,16 @@ at::Tensor AtenIpexCPUDefault::addmm(const at::Tensor & self, const at::Tensor &
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(mat1.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(mat2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(mat1);
+    dnnl_input_tensors.push_back(mat2);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_addmm(self.is_contiguous() ? self : self.contiguous(), mat1.is_contiguous() ? mat1 : mat1.contiguous(), mat2.is_contiguous() ? mat2 : mat2.contiguous(), beta, alpha);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_mat1 = bridge::shallowFallbackToCPUTensor(mat1);
   auto&& _ipex_mat2 = bridge::shallowFallbackToCPUTensor(mat2);
@@ -5984,6 +6078,16 @@ at::Tensor & AtenIpexCPUDefault::addmm_(at::Tensor & self, const at::Tensor & ma
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(mat1.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(mat2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(mat1);
+    dnnl_input_tensors.push_back(mat2);
+    if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_addmm_(self, mat1, mat2, beta, alpha);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_mat1 = bridge::shallowFallbackToCPUTensor(mat1);
   auto&& _ipex_mat2 = bridge::shallowFallbackToCPUTensor(mat2);
@@ -7670,6 +7774,16 @@ at::Tensor & AtenIpexCPUDefault::addbmm_(at::Tensor & self, const at::Tensor & b
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(batch1.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(batch2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(batch1);
+    dnnl_input_tensors.push_back(batch2);
+    if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_addbmm_(self, batch1, batch2, beta, alpha);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_batch1 = bridge::shallowFallbackToCPUTensor(batch1);
   auto&& _ipex_batch2 = bridge::shallowFallbackToCPUTensor(batch2);
@@ -7684,6 +7798,18 @@ at::Tensor & AtenIpexCPUDefault::addbmm_out(at::Tensor & out, const at::Tensor &
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(batch1.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(batch2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(out);
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(batch1);
+    dnnl_input_tensors.push_back(batch2);
+    TORCH_INTERNAL_ASSERT(out.is_contiguous());
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_addbmm_out(out, self.is_contiguous() ? self : self.contiguous(), batch1.is_contiguous() ? batch1 : batch1.contiguous(), batch2.is_contiguous() ? batch2 : batch2.contiguous(), beta, alpha);
+  }
+
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_batch1 = bridge::shallowFallbackToCPUTensor(batch1);
@@ -7698,6 +7824,16 @@ at::Tensor AtenIpexCPUDefault::addbmm(const at::Tensor & self, const at::Tensor 
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(batch1.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(batch2.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    dnnl_input_tensors.push_back(batch1);
+    dnnl_input_tensors.push_back(batch2);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_addbmm(self.is_contiguous() ? self : self.contiguous(), batch1.is_contiguous() ? batch1 : batch1.contiguous(), batch2.is_contiguous() ? batch2 : batch2.contiguous(), beta, alpha);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_batch1 = bridge::shallowFallbackToCPUTensor(batch1);
   auto&& _ipex_batch2 = bridge::shallowFallbackToCPUTensor(batch2);
