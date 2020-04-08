@@ -222,6 +222,14 @@ at::Tensor AtenIpexCPUDefault::_shape_as_tensor(const at::Tensor & self) {
 
 at::Tensor AtenIpexCPUDefault::dropout(const at::Tensor & input, double p, bool train) {
   TORCH_INTERNAL_ASSERT(input.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(input);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_dropout(input.is_contiguous() ? input : input.contiguous(), p, train);
+  }
+
   auto&& _ipex_input = bridge::shallowFallbackToCPUTensor(input);
   auto&& _ipex_result = at::dropout(_ipex_input, p, train);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -447,15 +455,6 @@ std::tuple<at::Tensor,at::Tensor> AtenIpexCPUDefault::adaptive_max_pool1d(const 
 at::Tensor AtenIpexCPUDefault::add(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(other.layout() == c10::kStrided);
-
-  if (check_auto_dnnl()) {
-    std::vector<at::Tensor> dnnl_input_tensors;
-    dnnl_input_tensors.push_back(self);
-    dnnl_input_tensors.push_back(other);
-    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
-      return AtenIpexCPUDev::dil_add(self.is_contiguous() ? self : self.contiguous(), other.is_contiguous() ? other : other.contiguous(), alpha);
-  }
-
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_other = bridge::shallowFallbackToCPUTensor(other);
   auto&& _ipex_result = at::add(_ipex_self, _ipex_other, alpha);
@@ -1161,6 +1160,13 @@ std::vector<at::Tensor> AtenIpexCPUDefault::broadcast_tensors(at::TensorList ten
 
 at::Tensor AtenIpexCPUDefault::cat(at::TensorList tensors, int64_t dim) {
   auto&& _ipex_tensors = bridge::shallowFallbackToCPUTensorList(tensors);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_cat(tensors, dim);
+  }
+
   auto&& _ipex_result = at::cat(_ipex_tensors, dim);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
@@ -1169,6 +1175,15 @@ at::Tensor AtenIpexCPUDefault::cat(at::TensorList tensors, int64_t dim) {
 at::Tensor & AtenIpexCPUDefault::cat_out(at::Tensor & out, at::TensorList tensors, int64_t dim) {
   TORCH_INTERNAL_ASSERT(out.layout() == c10::kStrided);
   auto&& _ipex_tensors = bridge::shallowFallbackToCPUTensorList(tensors);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(out);
+    TORCH_INTERNAL_ASSERT(out.is_contiguous());
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_cat_out(out, tensors, dim);
+  }
+
   auto&& _ipex_out = bridge::shallowFallbackToCPUTensor(out);
   auto&& _ipex_result = at::cat_out(_ipex_out, _ipex_tensors, dim);
   bridge::shallowUpgradeToDPCPPTensorAW(out, _ipex_out);
@@ -2789,6 +2804,16 @@ at::Tensor AtenIpexCPUDefault::linear(const at::Tensor & input, const at::Tensor
   TORCH_INTERNAL_ASSERT(input.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(weight.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(bias.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(input);
+    dnnl_input_tensors.push_back(weight);
+    dnnl_input_tensors.push_back(bias);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_linear(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.is_contiguous() ? bias : bias.contiguous());
+  }
+
   auto&& _ipex_input = bridge::shallowFallbackToCPUTensor(input);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
@@ -3701,6 +3726,18 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDefault::native_batch_no
   TORCH_INTERNAL_ASSERT(bias.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(running_mean.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(running_var.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(input);
+    dnnl_input_tensors.push_back(weight);
+    dnnl_input_tensors.push_back(bias);
+    dnnl_input_tensors.push_back(running_mean);
+    dnnl_input_tensors.push_back(running_var);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_native_batch_norm(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.is_contiguous() ? bias : bias.contiguous(), running_mean.is_contiguous() ? running_mean : running_mean.contiguous(), running_var.is_contiguous() ? running_var : running_var.contiguous(), training, momentum, eps);
+  }
+
   auto&& _ipex_input = bridge::shallowFallbackToCPUTensor(input);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
@@ -3794,6 +3831,20 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDefault::native_batch_no
   TORCH_INTERNAL_ASSERT(running_var.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(save_mean.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(save_invstd.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(grad_out);
+    dnnl_input_tensors.push_back(input);
+    dnnl_input_tensors.push_back(weight);
+    dnnl_input_tensors.push_back(running_mean);
+    dnnl_input_tensors.push_back(running_var);
+    dnnl_input_tensors.push_back(save_mean);
+    dnnl_input_tensors.push_back(save_invstd);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_native_batch_norm_backward(grad_out.is_contiguous() ? grad_out : grad_out.contiguous(), input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), running_mean.is_contiguous() ? running_mean : running_mean.contiguous(), running_var.is_contiguous() ? running_var : running_var.contiguous(), save_mean.is_contiguous() ? save_mean : save_mean.contiguous(), save_invstd.is_contiguous() ? save_invstd : save_invstd.contiguous(), train, eps, output_mask);
+  }
+
   auto&& _ipex_grad_out = bridge::shallowFallbackToCPUTensor(grad_out);
   auto&& _ipex_input = bridge::shallowFallbackToCPUTensor(input);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
@@ -4436,6 +4487,14 @@ at::Tensor AtenIpexCPUDefault::repeat_interleave(const at::Tensor & self, int64_
 
 at::Tensor AtenIpexCPUDefault::reshape(const at::Tensor & self, at::IntArrayRef shape) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_reshape(self.is_contiguous() ? self : self.contiguous(), shape);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::reshape(_ipex_self, shape);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -4499,6 +4558,14 @@ at::Tensor & AtenIpexCPUDefault::rrelu_(at::Tensor & self, at::Scalar lower, at:
 
 at::Tensor AtenIpexCPUDefault::relu(const at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_relu(self.is_contiguous() ? self : self.contiguous());
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::relu(_ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -4644,6 +4711,14 @@ at::Tensor & AtenIpexCPUDefault::celu_(at::Tensor & self, at::Scalar alpha) {
 
 at::Tensor AtenIpexCPUDefault::sigmoid(const at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_sigmoid(self.is_contiguous() ? self : self.contiguous());
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sigmoid(_ipex_self);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -4652,6 +4727,14 @@ at::Tensor AtenIpexCPUDefault::sigmoid(const at::Tensor & self) {
 
 at::Tensor & AtenIpexCPUDefault::sigmoid_(at::Tensor & self) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_sigmoid_(self);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::sigmoid_(_ipex_self);
   bridge::shallowUpgradeToDPCPPTensorAW(self, _ipex_self);
@@ -4779,6 +4862,14 @@ at::Tensor AtenIpexCPUDefault::softmax(const at::Tensor & self, int64_t dim, c10
 
 at::Tensor AtenIpexCPUDefault::_softmax(const at::Tensor & self, int64_t dim, bool half_to_float) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil__softmax(self.is_contiguous() ? self : self.contiguous(), dim, half_to_float);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::_softmax(_ipex_self, dim, half_to_float);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -4789,6 +4880,16 @@ at::Tensor AtenIpexCPUDefault::_softmax_backward_data(const at::Tensor & grad_ou
   TORCH_INTERNAL_ASSERT(grad_output.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(output.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(grad_output);
+    dnnl_input_tensors.push_back(output);
+    dnnl_input_tensors.push_back(self);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil__softmax_backward_data(grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), output.is_contiguous() ? output : output.contiguous(), dim, self.is_contiguous() ? self : self.contiguous());
+  }
+
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_output = bridge::shallowFallbackToCPUTensor(output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
@@ -4799,6 +4900,14 @@ at::Tensor AtenIpexCPUDefault::_softmax_backward_data(const at::Tensor & grad_ou
 
 std::vector<at::Tensor> AtenIpexCPUDefault::split_with_sizes(const at::Tensor & self, at::IntArrayRef split_sizes, int64_t dim) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_split_with_sizes(self.is_contiguous() ? self : self.contiguous(), split_sizes, dim);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::split_with_sizes(_ipex_self, split_sizes, dim);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -10651,6 +10760,14 @@ at::Tensor & AtenIpexCPUDefault::avg_pool2d_out(at::Tensor & out, const at::Tens
 
 at::Tensor AtenIpexCPUDefault::avg_pool2d(const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_avg_pool2d(self.is_contiguous() ? self : self.contiguous(), kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::avg_pool2d(_ipex_self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -10673,6 +10790,15 @@ at::Tensor & AtenIpexCPUDefault::avg_pool2d_backward_out(at::Tensor & grad_input
 at::Tensor AtenIpexCPUDefault::avg_pool2d_backward(const at::Tensor & grad_output, const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
   TORCH_INTERNAL_ASSERT(grad_output.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(grad_output);
+    dnnl_input_tensors.push_back(self);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_avg_pool2d_backward(grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), self.is_contiguous() ? self : self.contiguous(), kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
+  }
+
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::avg_pool2d_backward(_ipex_grad_output, _ipex_self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
@@ -10693,6 +10819,14 @@ at::Tensor & AtenIpexCPUDefault::avg_pool3d_out(at::Tensor & out, const at::Tens
 
 at::Tensor AtenIpexCPUDefault::avg_pool3d(const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(self);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_avg_pool3d(self.is_contiguous() ? self : self.contiguous(), kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
+  }
+
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::avg_pool3d(_ipex_self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
@@ -10715,6 +10849,15 @@ at::Tensor & AtenIpexCPUDefault::avg_pool3d_backward_out(at::Tensor & grad_input
 at::Tensor AtenIpexCPUDefault::avg_pool3d_backward(const at::Tensor & grad_output, const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
   TORCH_INTERNAL_ASSERT(grad_output.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(grad_output);
+    dnnl_input_tensors.push_back(self);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_avg_pool3d_backward(grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), self.is_contiguous() ? self : self.contiguous(), kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
+  }
+
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_result = at::avg_pool3d_backward(_ipex_grad_output, _ipex_self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
@@ -11518,6 +11661,15 @@ at::Tensor & AtenIpexCPUDefault::sigmoid_backward_out(at::Tensor & grad_input, c
 at::Tensor AtenIpexCPUDefault::sigmoid_backward(const at::Tensor & grad_output, const at::Tensor & output) {
   TORCH_INTERNAL_ASSERT(grad_output.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT(output.layout() == c10::kStrided);
+
+  if (check_auto_dnnl()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(grad_output);
+    dnnl_input_tensors.push_back(output);
+    if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      return AtenIpexCPUDev::dil_sigmoid_backward(grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), output.is_contiguous() ? output : output.contiguous());
+  }
+
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_output = bridge::shallowFallbackToCPUTensor(output);
   auto&& _ipex_result = at::sigmoid_backward(_ipex_grad_output, _ipex_output);

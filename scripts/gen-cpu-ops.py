@@ -79,13 +79,31 @@ _FN_BLACKLIST_REGEX = [
 ]
 
 _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
-    'add(Tensor, Tensor, Scalar) -> Tensor',
     'add_(Tensor,Tensor,Scalar)->Tensor',
     'add_out(Tensor,Tensor,Tensor,Scalar)->Tensor',
     'mul(Tensor, Tensor) -> Tensor',
     'mul_(Tensor,Tensor)->Tensor',
     'mul_out(Tensor,Tensor,Tensor)->Tensor',
-    'relu_(Tensor)->Tensor'
+    'linear(Tensor, Tensor, Tensor) -> Tensor',
+    'dropout(Tensor, double, bool) -> Tensor',
+    'native_batch_norm(Tensor, Tensor, Tensor, Tensor, Tensor, bool, double, double) -> std::tuple<Tensor,Tensor,Tensor>',
+    'native_batch_norm_backward(Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, bool, double, std::array<bool,3>) -> std::tuple<Tensor,Tensor,Tensor>',
+    'avg_pool2d(Tensor, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>) -> Tensor',
+    'avg_pool2d_backward(Tensor, Tensor, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>) -> Tensor',
+    'avg_pool3d(Tensor, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>) -> Tensor',
+    'avg_pool3d_backward(Tensor, Tensor, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>) -> Tensor',
+    'relu(Tensor)->Tensor',
+    'relu_(Tensor)->Tensor',
+    '_softmax(Tensor, int64_t, bool) -> Tensor',
+    '_softmax_backward_data(Tensor, Tensor, int64_t, Tensor) -> Tensor',
+    'sigmoid(Tensor) -> Tensor',
+    'sigmoid_(Tensor) -> Tensor',
+    'sigmoid_backward(Tensor, Tensor) -> Tensor',
+    'reshape(Tensor, IntArrayRef) -> Tensor',
+    'cat_out(Tensor, TensorList, int64_t) -> Tensor',
+    'cat(TensorList, int64_t) -> Tensor',
+    'split_with_sizes(Tensor, IntArrayRef, int64_t) -> std::vector<Tensor>'
+
 ]
 
 _FN_WITH_ALIAS_FEATURE = 'Tensor(a)'
@@ -691,7 +709,7 @@ def generate_aten_to_ipex(ctx, tree, mapsig, rwxtree, fname, sig, rwsig, params,
             xname = '_ipex_{}'.format(pname)
             code += ('  auto&& {} = bridge::{}({});\n').format(xname, _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST, pname)
             param_vars.append(xname)
-            assert not is_dnnl
+            dnnl_op_input_vars.append(pname)
         elif cptype == 'TensorOptions':
             gcode, xname = rewrite_tensor_options(fname, pname)
             code += gcode
