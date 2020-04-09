@@ -79,6 +79,6 @@ struct eltwise_backward : public dnnl::eltwise_backward {
                     {DNNL_ARG_DIFF_SRC, diff_src}});
   }
 };
-}  // namespace ideep
+}  // namespace dil
 
 #endif

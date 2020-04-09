@@ -514,16 +514,14 @@ std::tuple<at::Tensor, at::Tensor> dil_linear_backward_weights(
 
   dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_reshaped);
   dil::tensor x = dbl::comm::try_gen_dil_tensor(input_reshaped);
+  auto diff_weight_type = get_dil_data_type(weight.scalar_type());
   dil::tensor gradw, gradb;
   if (bias_defined) {
-    dil::inner_product_backward_weights::compute(x, grady, gradw, gradb);
+    dil::inner_product_backward_weights::compute(x, grady, gradw, gradb, diff_weight_type);
   } else {
-    dil::inner_product_backward_weights::compute(x, grady, gradw);
+    dil::inner_product_backward_weights::compute(x, grady, gradw, diff_weight_type);
   }
 
-  // Extract device info from weight and data type info from input.
-  // since for current BF16 design, input is BF16 tensor while weight is FP32 tensor.  
-  auto options = weight.options().dtype(input.scalar_type());
   return std::tuple<at::Tensor, at::Tensor>{
     dbl::comm::gen_aten_tensor_by(gradw),
     dbl::comm::gen_aten_tensor_by(gradb)};
@@ -647,7 +645,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
     std::array<bool,3> grad_input_mask) {
   DEBUG("AtenIpexCPUDev::dil_native_batch_norm_backward\n");
   TORCH_CHECK(train, "mkldnn_batch_norm_backward: currently mkldnn only support train model");
-  dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output.is_contiguous() ? grad_output : grad_output.contiguous());
+  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_contiguous);
   dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
   dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
   dil::tensor m = dbl::comm::try_gen_dil_tensor(save_mean);
@@ -920,7 +919,8 @@ at::Tensor AtenIpexCPUDev::dil__softmax_backward_data(
   DEBUG("AtenIpexCPUDev::dil_softmax_backward\n");
   const int64_t wrapped_dim = at::maybe_wrap_dim(dim, self.dim());
   dil::tensor y = dbl::comm::try_gen_dil_tensor(output);
-  dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output.is_contiguous() ? grad_output : grad_output.contiguous());
+  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_contiguous);
   dil::tensor gradx;
   dil::softmax_backward::compute(y, grady, gradx, wrapped_dim);
   return dbl::comm::gen_aten_tensor_by(gradx);
@@ -948,7 +948,8 @@ at::Tensor AtenIpexCPUDev::dil_sigmoid_backward(
     const at::Tensor& output) {
   DEBUG("AtenIpexCPUDev::dil_sigmoid_backward\n");
   dil::tensor y = dbl::comm::try_gen_dil_tensor(output);
-  dil::tensor gy = dbl::comm::try_gen_dil_tensor(grad_output.is_contiguous() ? grad_output : grad_output.contiguous());
+  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  dil::tensor gy = dbl::comm::try_gen_dil_tensor(grad_output_contiguous);
   dil::tensor gx;
   dil::eltwise_backward::compute(y, gy, gx,
       dil::algorithm::eltwise_logistic_use_dst_for_bwd);
@@ -1018,10 +1019,12 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
   check_cat_no_zero_dim(tensors);
   dim = legacy_cat_wrap_dim(dim, tensors);
   std::vector<dil::tensor> x;
+  at::Tensor tensors_contiguous[tensors.size()];
   for (auto i = 0; i < tensors.size(); i++) {
     TORCH_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
       "Currently Mkldnn cat operators do not support empty tensor.");
-    x.push_back(dbl::comm::try_gen_dil_tensor(tensors[i].is_contiguous() ? tensors[i] : tensors[i].contiguous()));
+    tensors_contiguous[i] = tensors[i].is_contiguous() ? tensors[i] : tensors[i].contiguous();
+    x.push_back(dbl::comm::try_gen_dil_tensor(tensors_contiguous[i]));
   }
   dil::tensor y;
   dil::concat::compute(x, dim, y);
