@@ -180,11 +180,6 @@ private:
                                                              : data_type::f32;
       src_desc = src.get_desc().to_type(dst_data_type);
       weights_desc = weights.get_desc().to_type(dst_data_type);
-      // Don't set weight to format any in case DNNL brings in extra reorders.
-      // Reordering huge weights during inference might cause performance loss
-      if (dst_data_type != data_type::f32) {
-        weights_desc = weights_desc.to_format_any();
-      }
       if (with_bias) {
         DIL_ENFORCE(utils::one_of(bias.get_data_type(),
                                     data_type::f32, data_type::bf16),
@@ -284,18 +279,20 @@ struct inner_product_backward_weights
                       const tensor& diff_dst,
                       tensor& diff_weights,
                       tensor& diff_bias,
+                      const data_type diff_weight_type = data_type::undef,
                       const engine& aengine = engine::cpu_engine()) {
     compute_impl</*with_diff_bias=*/true>(
-        src, diff_dst, diff_weights, diff_bias);
+        src, diff_dst, diff_weights, diff_bias, diff_weight_type);
   }
 
   static void compute(const tensor& src,
                       const tensor& diff_dst,
                       tensor& diff_weights,
+                      const data_type diff_weight_type = data_type::undef,
                       const engine& aengine = engine::cpu_engine()) {
     static tensor dummy_diff_bias;
     compute_impl</*with_diff_bias=*/false>(
-        src, diff_dst, diff_weights, dummy_diff_bias);
+        src, diff_dst, diff_weights, dummy_diff_bias, diff_weight_type);
   }
 
 private:
@@ -304,23 +301,32 @@ private:
                            const tensor& diff_dst,
                            tensor& diff_weights,
                            tensor& diff_bias,
+                           const data_type diff_weight_type,
                            const engine& aengine = engine::cpu_engine()) {
     auto src_desc = src.get_desc().to_format_any();
     auto diff_dst_desc = diff_dst.get_desc().to_format_any();
     auto diff_weights_dims = src.get_dims();
     diff_weights_dims[0] = diff_dst.get_dim(1);
+    data_type diff_dst_type = diff_dst.get_data_type();
+    data_type diff_weight_type_in = data_type::undef== diff_weight_type ?
+                                    diff_dst_type : diff_weight_type;
     auto diff_weights_desc =
-        tensor::desc(diff_weights_dims, diff_dst.get_data_type(), tag::any);
+        tensor::desc(diff_weights_dims, diff_weight_type_in, tag::any);
 
-    // TODO: bf16 diff_bias
     auto diff_bias_desc =
-        tensor::desc({diff_dst.get_dim(1)}, data_type::f32, tag::any);
+        tensor::desc({diff_dst.get_dim(1)}, diff_weight_type_in, tag::any);
 
+    // for forward hint, weights_desc should have same data_type
+    // with other input desc, expect for bias_desc
+    auto weights_desc = diff_weights_desc;
+    if (diff_weight_type_in != diff_dst_type) {
+      weights_desc = weights_desc.to_type(diff_dst_type);
+    }
     auto forward_hints = with_diff_bias
         ? inner_product_forward::primitive_desc({prop_kind::forward, src_desc,
-            diff_weights_desc, diff_bias_desc, diff_dst_desc}, aengine)
+            weights_desc, diff_bias_desc, diff_dst_desc}, aengine)
         : inner_product_forward::primitive_desc({prop_kind::forward, src_desc,
-            diff_weights_desc, diff_dst_desc}, aengine);
+            weights_desc, diff_dst_desc}, aengine);
     auto pd = with_diff_bias
         ? primitive_desc({src_desc, diff_weights_desc, diff_bias_desc,
                           diff_dst_desc}, aengine, forward_hints)
