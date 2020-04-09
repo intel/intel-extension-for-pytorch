@@ -15,37 +15,15 @@ namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 template <typename scalar_t>
-class sigmoid_ker {};
-
-template <typename scalar_t>
-static inline void sigmoid(Tensor& output, const Tensor& self) {
-  auto queue = dpcppGetCurrentQueue();
-  int64_t rng, grng, tile_size, size;
-
-  parallel_for_setup(self.numel(), tile_size, rng, grng);
-  size = self.numel() * sizeof(scalar_t);
-  output.resize_as_(self);
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_acc =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, self.data_ptr<scalar_t>(), size);
-    auto out_acc = DPCPPAccessor<dpcpp_discard_w_mode>(
-        cgh, output.data_ptr<scalar_t>(), size);
-    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      size_t id = item.get_global_linear_id();
-      auto in_ptr = in_acc.template get_pointer<scalar_t>();
-      auto out_ptr = out_acc.template get_pointer<scalar_t>();
-      if (id < size / sizeof(scalar_t))
-        out_ptr[id] = 1 /
-            (1 + Numerics<scalar_t>::exp(-static_cast<scalar_t>(in_ptr[id])));
-    };
-
-    cgh.parallel_for<sigmoid_ker<scalar_t>>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(grng), DPCPP::range<1>(tile_size)),
-        kfn);
-  };
-
-  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+void sigmoid(Tensor& output, const Tensor& self) {
+  if (TensorImpl_Unwrap(output) == TensorImpl_Unwrap(self)) {
+    at::dpcpp::DPCPP_tensor_apply1<scalar_t>(
+        output, TensorSigmoidOp<scalar_t>());
+  } else {
+    output.resize_as_(self);
+    at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+        output, self, TensorSigmoidOp<scalar_t>());
+  }
 }
 
 Tensor& _sigmoid_out(Tensor& output, const Tensor& self) {
