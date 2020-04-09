@@ -204,6 +204,7 @@ void matmul_common(
     at::Scalar beta=1,
     at::Scalar alpha=1, 
     const dil::attr_t& attr = dil::attr_t()) {
+  DEBUG("AtenIpexCPUDev::matmul_common\n");
   float dst_coeff = alpha.to<float>();
   float sum_coeff = beta.to<float>();
   if (!bias.is_empty()) { 
@@ -290,7 +291,10 @@ at::Tensor AtenIpexCPUDev::dil_baddbmm(
     at::Scalar beta,
     at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_baddbmm\n");
-  at::Tensor result = dbl::comm::empty_dil_tensor(self.sizes(), self.options());
+  auto self_size = batch1.sizes();
+  std::vector<int64_t> result_size(self_size.begin(), self_size.end()-1);
+  result_size.push_back(batch2.size(-1));
+  at::Tensor result = dbl::comm::empty_dil_tensor(result_size, self.options());
   return dil_baddbmm_out(result, self, batch1, batch2, beta, alpha);
 }
 
@@ -398,6 +402,7 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_(
 }
 
 at::Tensor dil_maybe_multiply(const at::Tensor& grad_output, at::Scalar alpha=1) {
+  DEBUG("AtenIpexCPUDev::dil_maybe_multiply\n");
   if (alpha.toFloat() == 1) {
     return grad_output;
   }
