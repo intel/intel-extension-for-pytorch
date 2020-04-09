@@ -26,7 +26,7 @@ void setAutoDNNL(bool val) {
   AutoOptConfig::singleton().set_auto_dnnl(val);
 }
 
-void InitIpeModuleBindings(py::module m) {
+void InitIpexModuleBindings(py::module m) {
   m.def("_initialize_aten_bindings",
         []() { AtenIpexType::InitializeAtenBindings(); });
   m.def("_get_git_revs", []() { return GetRevisions(); });
@@ -36,8 +36,8 @@ void InitIpeModuleBindings(py::module m) {
 
 }  // namespace
 
-void InitIpeBindings(py::module m) { InitIpeModuleBindings(m); }
+void InitIpexBindings(py::module m) { InitIpexModuleBindings(m); }
 
 }  // namespace torch_ipex
 
-PYBIND11_MODULE(_torch_ipex, m) { torch_ipex::InitIpeBindings(m); }
+PYBIND11_MODULE(_torch_ipex, m) { torch_ipex::InitIpexBindings(m); }

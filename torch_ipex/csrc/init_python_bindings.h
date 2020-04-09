@@ -4,11 +4,9 @@
 
 namespace py = pybind11;
 
-namespace torch {
-namespace jit {
+namespace torch_ipex {
 
 // Initialize bindings for IPE module, tensor and optimization passes.
-void InitIpeBindings(py::module m);
+void InitIpexBindings(py::module m);
 
-}  // namespace jit
-}  // namespace torch
+}  // namespace torch_ipex
