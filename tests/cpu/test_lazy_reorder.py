@@ -8,7 +8,7 @@ import time
 import random
 import unittest
 from functools import reduce
-
+import copy
 import torch
 import _torch_ipex as ipex
 ipex._initialize_aten_bindings()
@@ -383,7 +383,7 @@ class TestLinearAlgebraOps(TestCase):
 
 class TestLinear(TestCase):
     def test_linear(self):
-        ipex.disable_auto_dnnl()
+        ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
         torch.manual_seed(rand_seed)
@@ -394,7 +394,7 @@ class TestLinear(TestCase):
 
         for bias in [True, False]:
             linear = torch.nn.Linear(in_features, out_features, bias=bias)
-            linear_dpcpp = linear.to(device=device)
+            linear_dpcpp = copy.deepcopy(linear).to(device=device)
             self.assertEqual(linear(x), linear_dpcpp(x_dpcpp))
 
     # we should first expose aten::linear, depend on https://github.com/pytorch/pytorch/pull/20039
@@ -406,15 +406,16 @@ class TestLinear(TestCase):
         in_features = torch.randint(3, 10, (1,)).item()
         out_features = torch.randint(3, 100, (1,)).item()
         x = torch.randn(3, in_features, dtype=torch.float32) * 10
-        
-        x1 = x.clone().requires_grad_()
-        x2 = x.clone().to(device=device).requires_grad_()
-        linear = torch.nn.Linear(in_features, out_features)
-        linear_dpcpp = torch.nn.Linear(in_features, out_features).to(device=device)
-        y1 = linear(x1).sum()
-        y2 = linear_dpcpp(x2).sum()
-        y1.backward()
-        y2.backward()
+        for bias in [True, False]:
+            x1 = x.clone().requires_grad_()
+            x2 = x.clone().to(device=device).requires_grad_()
+            linear = torch.nn.Linear(in_features, out_features, bias=bias)
+            linear_dpcpp =copy.deepcopy(linear).to(device=device)
+            y1 = linear(x1).sum()
+            y2 = linear_dpcpp(x2).sum()
+            y1.backward()
+            y2.backward()
+            self.assertEqual(x1.grad, x2.grad)
 
 class TestPool(TestCase):
     def test_avg_pool2d(self):
@@ -509,7 +510,7 @@ class TestBatchNorm(TestCase):
         x_dpcpp = x_cpu.to(device=device)
 
         bn = torch.nn.BatchNorm2d(3)
-        bn_dpcpp = torch.nn.BatchNorm2d(3).to(device=device)
+        bn_dpcpp =copy.deepcopy(bn).to(device=device)
         self.assertEqual(bn(x_cpu), bn_dpcpp(x_dpcpp))
 
     def test_batch_norm3d(self):
@@ -521,7 +522,7 @@ class TestBatchNorm(TestCase):
         x_dpcpp = x_cpu.to(device=device)
 
         bn = torch.nn.BatchNorm3d(3)
-        bn_dpcpp = torch.nn.BatchNorm3d(3).to(device=device)
+        bn_dpcpp = copy.deepcopy(bn).to(device=device)
         self.assertEqual(bn(x_cpu), bn_dpcpp(x_dpcpp))
 
     def test_batch_norm2d_backward(self):
@@ -534,7 +535,7 @@ class TestBatchNorm(TestCase):
         x_dpcpp = x.clone().to(device=device).requires_grad_()
 
         bn = torch.nn.BatchNorm2d(3)
-        bn_dpcpp = torch.nn.BatchNorm2d(3).to(device=device)
+        bn_dpcpp = copy.deepcopy(bn).to(device=device)
 
         y_cpu = bn(x_cpu).sum()
         y_dpcpp = bn_dpcpp(x_dpcpp).sum()
