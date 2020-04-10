@@ -1,5 +1,7 @@
 # DNNL
 if(USE_SYCL)
+  ## find DPCPP env
+  include(cmake/DPCPP.cmake)
   find_package(MKLDNN QUIET)
   if(NOT MKLDNN_FOUND)
     message(FATAL_ERROR "Cannot find DNNL")

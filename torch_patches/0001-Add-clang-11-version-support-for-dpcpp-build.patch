@@ -1,0 +1,25 @@
+From 123ad3386aa42a9757cb3054704601e2d672bc12 Mon Sep 17 00:00:00 2001
+From: "Ma, Jing1" <jing1.ma@intel.com>
+Date: Fri, 10 Apr 2020 11:37:37 +0800
+Subject: [PATCH] Add clang 11 version support for dpcpp build
+
+---
+ cmake/FindDPCPP.cmake | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/cmake/FindDPCPP.cmake b/cmake/FindDPCPP.cmake
+index 546e432..844a4f9 100644
+--- a/cmake/FindDPCPP.cmake
++++ b/cmake/FindDPCPP.cmake
+@@ -42,7 +42,7 @@ if(sycl_root_hints)
+ endif()
+ 
+ # XXX: workaround to use OpenCL from DPC++ package
+-set(DPCPP_COMPILER_VERSION 10.0.0)
++set(DPCPP_COMPILER_VERSION 11.0.0)
+ 
+ if(DEFINED ENV{DPCPP_ROOT})
+     list(INSERT CMAKE_PREFIX_PATH 0
+-- 
+2.7.4
+

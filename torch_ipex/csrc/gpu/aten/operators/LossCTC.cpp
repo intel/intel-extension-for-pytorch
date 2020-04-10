@@ -111,7 +111,7 @@ void ctc_loss_log_alpha_kernel(
   int64_t __la_target_stride = log_alpha.stride(2);
 
   auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
-  DPCPP::range<2> global_range, local_range;
+  DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
       get_work_range(sycl_queue, 2 * __max_input_length + 1, __batch_size);
 
@@ -341,7 +341,7 @@ void ctc_loss_backward_log_beta_kernel(
   int64_t __lb_target_stride = log_beta.stride(2);
 
   auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
-  DPCPP::range<2> global_range, local_range;
+  DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
       get_work_range(sycl_queue, 2 * __max_input_length + 1, __batch_size);
 
@@ -562,7 +562,7 @@ void ctc_loss_backward_collect_nonblank_kernel(
   int64_t lb_target_stride = log_beta.stride(2);
 
   auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
-  DPCPP::range<2> global_range, local_range;
+  DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
       get_work_range(sycl_queue, max_target_length, batch_size);
 
@@ -584,7 +584,7 @@ void ctc_loss_backward_collect_nonblank_kernel(
     auto tg_batch_offsets_acc =
         DPCPPAccessor<dpcpp_r_mode>(cgh, tg_batch_offsets.data_ptr());
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
-      scalar_t* gradient_data = gradient_acc.template get_pointer<scalar_t>();
+      auto* gradient_data = gradient_acc.template get_pointer<scalar_t>();
       scalar_t* grad_out_data = grad_out_acc.template get_pointer<scalar_t>();
       scalar_t* log_alpha_data = log_alpha_acc.template get_pointer<scalar_t>();
       scalar_t* log_beta_data = log_beta_acc.template get_pointer<scalar_t>();
@@ -691,7 +691,7 @@ void ctc_loss_backward_collect_kernel(
   int64_t lb_target_stride = log_beta.stride(2);
 
   auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
-  DPCPP::range<2> global_range, local_range;
+  DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
       get_work_range(sycl_queue, log_probs.size(0), batch_size);
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -810,7 +810,7 @@ void ctc_loss_zero_padded_gradients(
     int64_t num_labels /* D */) {
   auto& sycl_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  DPCPP::range<2> global_range, local_range;
+  DPCPP::range<2> global_range(1, 1), local_range(1, 1);
   std::tie(global_range, local_range) =
       get_work_range(sycl_queue, max_input_length, batch_size);
 

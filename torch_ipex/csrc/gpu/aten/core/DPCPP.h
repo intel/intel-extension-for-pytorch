@@ -3,7 +3,9 @@
 #include <CL/sycl.hpp>
 #include <utils/Profiler.h>
 
+#if defined(USE_COMPUTECPP)
 #include <SYCL/event.h>
+#endif
 #include <chrono>
 
 // alias for dpcpp namespace
