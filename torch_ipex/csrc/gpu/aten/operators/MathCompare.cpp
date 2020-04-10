@@ -13,7 +13,6 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-namespace {
 
 template <typename T, typename TOut>
 struct TensorLTOp {
@@ -99,7 +98,6 @@ void logicalTensor(
   }
 }
 
-} // namespace
 
 template <typename scalar_t>
 void ltTensor(Tensor& self_, const Tensor& src1, const Tensor& src2) {

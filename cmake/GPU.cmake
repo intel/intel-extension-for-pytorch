@@ -3,7 +3,7 @@
 ## For ComputeCPP
 include(cmake/DPCPP.cmake)
 
-IF(USE_COMPUTECPP)
+IF(USE_COMPUTECPP OR USE_DPCPP)
   INCLUDE_DIRECTORIES(SYSTEM ${ComputeCpp_INCLUDE_DIRS} ${OpenCL_INCLUDE_DIRS})
   LIST(APPEND Caffe2_PUBLIC_DEPENDENCY_LIBS ${COMPUTECPP_RUNTIME_LIBRARY})
   MESSAGE(STATUS "ComputeCpp found. Compiling with SYCL support")
@@ -207,6 +207,12 @@ add_dependencies(torch_ipex install_dpcpp_gpu_includes)
 
 IF(USE_COMPUTECPP)
   add_sycl_to_target(TARGET torch_ipex SOURCES ${DPCPP_SRCS})
+ENDIF()
+
+IF(USE_DPCPP)
+  #add_library(c10_sycl ${C10_SYCL_SRCS} ${C10_CUDA_HEADERS})
+  set_source_files_properties(${DPCPP_SRCS} COMPILE_FLAGS "-fsycl -D__STRICT_ANSI__")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl -fsycl-device-code-split=per_source")
 ENDIF()
 
 # if(USE_DPCPP)

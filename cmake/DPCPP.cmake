@@ -46,6 +46,7 @@ find_file(INTEL_SYCL_VERSION
         ${sycl_root_hints}
     PATH_SUFFIXES
         include/CL/sycl
+        lib/clang/11.0.0/include/CL/sycl
         lib/clang/10.0.0/include/CL/sycl
         lib/clang/9.0.0/include/CL/sycl
         lib/clang/8.0.0/include/CL/sycl
@@ -82,7 +83,7 @@ if(INTEL_SYCL_VERSION)
 
     set(USE_DPCPP true)
     #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_DPCPP" PARENT_SCOPE)
-    #add_definitions(-DUSE_DPCPP)
+    add_definitions(-DUSE_DPCPP)
 
     message(STATUS "Intel SYCL include: ${SYCL_INCLUDE_DIR}")
     message(STATUS "Intel SYCL library: ${SYCL_LIBRARY}")
@@ -110,7 +111,7 @@ else()
         -no-serial-memop
         CACHE STRING "")
     set(ComputeCpp_DIR ${sycl_root_hint})
-    FIND_PACKAGE(ComputeCpp)
+    include(cmake/Modules/FindComputeCpp.cmake)
     if(NOT ComputeCpp_FOUND)
         message(FATAL_ERROR "SYCL not found")
     endif()
