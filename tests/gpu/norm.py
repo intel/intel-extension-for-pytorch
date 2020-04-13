@@ -4,19 +4,12 @@ import torch.nn as nn
 
 import torch_ipex
 
-cpu_device = torch.device("cpu")
-sycl_device = torch.device("dpcpp")
+device = torch.device("dpcpp")
 
-a = torch.arange(9, dtype= torch.float) - 4
-b = a.reshape((3, 3))
-a_sycl=a.to("dpcpp")
-b_sycl=b.to("dpcpp")
-print("CPU")
-print(torch.norm(a))
+x_cpu = torch.tensor([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]], dtype=torch.float32)
+print(x_cpu.norm(p='fro', dim=[0, 1]))
+print(x_cpu.norm(p='fro', dim=[0]))
 
-print(torch.norm(b))
-
-print("SYCL")
-print(torch.norm(a_sycl).to("cpu"))
-
-print(torch.norm(b_sycl).to("cpu"))
+x_dpcpp = torch.tensor([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]], dtype=torch.float32, device=device)
+print(x_dpcpp.norm(p='fro', dim=[0, 1]).cpu())
+print(x_dpcpp.norm(p='fro', dim=[0]).cpu())

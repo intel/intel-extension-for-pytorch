@@ -944,4 +944,20 @@ struct TensorTPowOp {
   const T val;
 };
 
+// TODO: support complex type
+template <typename T>
+struct TensorRealOp {
+  void operator()(T& out, T& in) const {
+    out = in;
+  }
+};
+
+// TODO: support complex type
+template <typename T>
+struct TensorConjOp {
+  void operator()(T& out, T& in) const {
+    out = in;
+  }
+};
+
 #endif

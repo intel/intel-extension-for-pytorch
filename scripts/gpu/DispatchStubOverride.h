@@ -99,3 +99,5 @@ static Tensor _pdist_forward(const Tensor & self, double p); // aten::_pdist_for
 static Tensor _pdist_backward(const Tensor & grad, const Tensor & self, double p, const Tensor & pdist); // aten::_pdist_backward(Tensor grad, Tensor self, float p, Tensor pdist) -> Tensor
 static Tensor & cross_out(Tensor & out, const Tensor & self, const Tensor & other, c10::optional<int64_t> dim); // aten::cross.out(Tensor self, Tensor other, int? dim=None, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor cross(const Tensor & self, const Tensor & other, c10::optional<int64_t> dim); // aten::cross(Tensor self, Tensor other, int? dim=None) -> Tensor
+static Tensor & real_out(Tensor & out, const Tensor & self); // aten::real.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+static Tensor & conj_out(Tensor & out, const Tensor & self); // aten::conj.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)

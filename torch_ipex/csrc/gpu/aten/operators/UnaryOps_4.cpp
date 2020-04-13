@@ -69,5 +69,29 @@ Tensor& sign_(Tensor& self) {
   return at::AtenIpexTypeDPCPP::sign_out(self, self);
 }
 
+Tensor& real_out(Tensor& out, const Tensor& self) {
+  // TODO: support complex type
+  // AT_DISPATCH_ALL_TYPES_AND_COMPLEX(iter.dtype(), "real", [&]() {
+  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "real", [&]() {
+    out.resize_as_(self);
+    DPCPP_tensor_apply2<scalar_t, scalar_t>(
+        out, self, TensorRealOp<scalar_t>());
+  });
+
+  return out;
+}
+
+Tensor& conj_out(Tensor& out, const Tensor& self) {
+  // TODO: support complex type
+  // AT_DISPATCH_ALL_TYPES_AND_COMPLEX(iter.dtype(), "conj", [&]() {
+  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "conj", [&]() {
+    out.resize_as_(self);
+    DPCPP_tensor_apply2<scalar_t, scalar_t>(
+        out, self, TensorConjOp<scalar_t>());
+  });
+
+  return out;
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
