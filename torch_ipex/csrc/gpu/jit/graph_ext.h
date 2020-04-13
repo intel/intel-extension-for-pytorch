@@ -2,16 +2,16 @@
 
 #include <vector>
 #include <memory>
-#include <ideep.hpp>
+#include <dnnl.hpp>
 #include "accelerated_ops.h"
 #include <c10/util/Optional.h>
-#include <torch/csrc/jit/ir/ir.h>
-#include <torch/csrc/jit/ir/constants.h>
+#include <torch/csrc/jit/ir.h>
+#include <torch/csrc/jit/constants.h>
 
 namespace torch { namespace jit {
-using namespace ideep;
-using dataType = ideep::tensor::data_type;
-using formatTag = ideep::format;
+using namespace dnnl;
+using dataType = dnnl::memory::data_type;
+using formatTag = dnnl::memory::format_tag;
 using formatList = std::vector<formatTag>;
 using groupsList = std::vector<int64_t>;
 
@@ -58,18 +58,22 @@ public:
   // Op Format protocol, adjustFormats according to inputs???
   void propagateFormats();
 
+  #if 0
   bool isReorder() const {
-    return this->kind() == dnnl::reorder;
+    return this->kind() == dpcpp::reorder;
   }
+  #endif
 
   bool isDNNLOps () const ;
 
+  #if 0
   bool isConv2d () const {
-    return this->kind() == dnnl::conv2d;
+    return this->kind() == dpcpp::conv2d;
   }
   bool isBatchNorm () const {
-    return this->kind() == dnnl::batch_norm;
+    return this->kind() == dpcpp::batch_norm;
   }
+  #endif
 
   void initFormatInfo();
 
@@ -90,6 +94,7 @@ class Conv2dNode : public NodeExt {
 public:
   bool couldInferFormats() const;
   bool hasConstantParams() const;
+  #if 0
   void fixWeightFormatIfPossible();
   formatTag expectedWeightFormat(
       c10::ArrayRef<int64_t> sizes,
@@ -97,6 +102,7 @@ public:
       c10::List<int64_t> padding,
       c10::List<int64_t> dilation,
       int64_t groups, dataType dtype = dataType::f32) const;
+  #endif
 };
 
 class BatchNorm2dNode : public NodeExt {

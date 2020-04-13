@@ -187,6 +187,9 @@ set(DPCPP_SRCS)
 set(DPCPP_ATEN_SRCS)
 add_subdirectory(torch_ipex/csrc/gpu/aten)
 list(APPEND DPCPP_SRCS ${DPCPP_ATEN_SRCS})
+set(DPCPP_JIT_SRCS)
+add_subdirectory(torch_ipex/csrc/gpu/jit)
+list(APPEND DPCPP_SRCS ${DPCPP_JIT_SRCS})
 
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 

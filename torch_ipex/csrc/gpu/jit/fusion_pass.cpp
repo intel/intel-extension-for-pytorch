@@ -1,13 +1,16 @@
 #include <string>
+#include <iostream>
 #include "graph_ext.h"
 #include "fusion_pass.h"
 #include "accelerated_ops.h"
 #include <torch/csrc/utils/hash.h>
-#include <torch/csrc/jit/runtime/operator.h>
+#include <torch/csrc/jit/operator.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
-#include <torch/csrc/jit/ir/alias_analysis.h>
+#include <torch/csrc/jit/passes/alias_analysis.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
-#include <torch/csrc/jit/frontend/error_report.h>
+#include <torch/csrc/jit/script/error_report.h>
+#include <torch/csrc/jit/pass_manager.h>
+
 
 using namespace torch::jit;
 
@@ -37,7 +40,7 @@ class OpFuser {
   using Symbols = std::vector<Symbol>;
   using RuleTab = std::unordered_map<::std::pair<Symbol, Symbol>, Symbol>;
   using Rule = RuleTab::iterator;
-  static RuleTab dnnlRules;
+  static RuleTab dpcppRules;
 
 public:
   OpFuser(Block* block, std::shared_ptr<Graph> graph)
@@ -69,8 +72,8 @@ public:
     if (curr->owningBlock() != block_)
       return c10::nullopt;
 
-    auto choice = dnnlRules.find({prev->kind(), curr->kind()});
-    if (choice != dnnlRules.end())
+    auto choice = dpcppRules.find({prev->kind(), curr->kind()});
+    if (choice != dpcppRules.end())
       return choice;
 
     return c10::nullopt;
@@ -88,8 +91,8 @@ public:
   // currently we only have to fold conv2d + batch_norm
   //
   bool isFoldable(Node* node, Node* prev) {
-    bool foldable = (node->kind() == dnnl::batch_norm
-        && prev->kind() == dnnl::conv2d);
+    bool foldable = (node->kind() == aten::batch_norm
+        && prev->kind() == aten::conv2d);
 
     //
     // Check whether all the sources are constant ???
@@ -121,7 +124,7 @@ public:
 
   Node* createBatchNormFoldWeight(Node *conv2d, Node *batch_norm) {
     auto g = conv2d->owningGraph();
-    auto newNode = g->create(dnnl::fold_weight);
+    auto newNode = g->create(dpcpp::fold_weight_sym);
     newNode->setScope(conv2d->scope());
 
     // We need following parameters
@@ -140,7 +143,7 @@ public:
 
   Node* createBatchNormFoldBias(Node *conv2d, Node *batch_norm) {
     auto g = conv2d->owningGraph();
-    auto newNode = g->create(dnnl::fold_bias);
+    auto newNode = g->create(dpcpp::fold_bias_sym);
     newNode->setScope(conv2d->scope());
 
     // We need following information
@@ -300,6 +303,7 @@ public:
     Node* pos = node;
     bool changed = false;
 
+    // no rewrite here, check all aten Ops
     if (nodeExt->isDNNLOps()) {
       //
       // Check whether we could fuse to one certain value path
@@ -327,19 +331,13 @@ public:
 };
 
 // TODO: These rules should be more scalable
-OpFuser::RuleTab OpFuser::dnnlRules = {
-  {{dnnl::conv2d, dnnl::relu}, dnnl::conv2d_relu},
-  {{dnnl::conv2d, dnnl::relu_}, dnnl::conv2d_relu},
-  /*
-  {{dnnl::batch_norm, dnnl::relu}, dnnl::batch_norm_relu},
-  {{dnnl::batch_norm, dnnl::relu_}, dnnl::batch_norm_relu},
-  */
-  {{dnnl::conv2d_sum, dnnl::relu}, dnnl::conv2d_sum_relu},
-  {{dnnl::conv2d_sum, dnnl::relu_}, dnnl::conv2d_sum_relu},
-
-  {{dnnl::conv2d, dnnl::sum}, dnnl::conv2d_sum},
-  {{dnnl::conv2d, dnnl::sum_}, dnnl::conv2d_sum},
-  // {{dnnl::conv2d_relu, dnnl::sum}, dnnl::conv2d_relu_sum}
+OpFuser::RuleTab OpFuser::dpcppRules = {
+  {{aten::conv2d, aten::relu}, dpcpp::conv2d_relu_sym},
+  {{aten::conv2d, Symbol::fromQualString("aten::relu_")}, dpcpp::conv2d_relu_sym},
+  {{dpcpp::conv2d_sum_sym, aten::relu}, dpcpp::conv2d_sum_relu_sym},
+  {{dpcpp::conv2d_sum_sym, Symbol::fromQualString("aten::relu_")}, dpcpp::conv2d_sum_relu_sym},
+  {{aten::conv2d, aten::add}, dpcpp::conv2d_sum_sym},
+  {{aten::conv2d, aten::add_}, dpcpp::conv2d_sum_sym},
 };
 
 void FusionPass(std::shared_ptr<Graph> &graph) {
@@ -349,6 +347,15 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   OpFuser(graph->block(), graph).run();
 
   // TODO: Some post processing?? ECS/EDC/Peephole???
+  std::cout<<graph->toString(true);
   ConstantPropagation(graph);
 }
+
+void InitFusionPass() {
+  RegisterPass pass_3([](std::shared_ptr<Graph>& g) {
+    torch::jit::FusionPass(g);
+  });
+}
+
+
 }} // namespace torch::jit

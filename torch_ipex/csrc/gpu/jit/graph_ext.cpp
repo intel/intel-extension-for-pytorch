@@ -5,7 +5,7 @@ namespace torch { namespace jit {
 void NodeExt::initFormatInfo() {
   std::vector<int64_t> formatInfo (
       this->inputs().size() + this->outputs().size(),
-      formatTag::any);
+      (int64_t)formatTag::any);
 
   this->is_(attr::format_info, std::move(formatInfo));
 }
@@ -43,7 +43,7 @@ void NodeExt::setGroupInfo(int64_t groups) {
 Node *NodeExt::createReorder(Value *v, Graph *g, formatTag from, formatTag to) {
   NodeExt *reorder = nullptr;
   if (from != to) {
-    reorder = reinterpret_cast<NodeExt *>(g->create(dnnl::reorder));
+    reorder = reinterpret_cast<NodeExt *>(g->create(dpcpp::reorder_sym));
     reorder->output()->setDebugName(v->debugName() + ".reorder");
     reorder->output()->setType(v->type());
   }
@@ -112,8 +112,10 @@ void NodeExt::propagateFormats() {
   setOutputFormat(inputFormat());
 }
 
+// TODO:
 bool NodeExt::isDNNLOps() const {
-  return std::string(this->kind().ns().toQualString()) == "namespaces::dnnl";
+  return true;
+  // return std::string(this->kind().ns().toQualString()) == "namespaces::dpcpp";
 }
 
 // XXX: ??? Do we duplicated all the info ???
@@ -186,6 +188,7 @@ bool Conv2dNode::hasConstantParams() const {
   return has;
 }
 
+#if 0
 formatTag Conv2dNode::expectedWeightFormat(
     c10::ArrayRef<int64_t> sizes,
     c10::List<int64_t> stride,
@@ -222,6 +225,7 @@ void Conv2dNode::fixWeightFormatIfPossible() {
     this->prependReorders(use_list {{this, 1}}, {natureWeightFormat}, {groups});
   }
 }
+#endif
 
 bool BatchNorm2dNode::hasConstantParams() const {
   bool has =

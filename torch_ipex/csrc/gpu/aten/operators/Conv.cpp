@@ -18,6 +18,28 @@ namespace impl {
 constexpr int input_batch_size_dim = 0; // also grad_input
 constexpr int weight_output_channels_dim = 0;
 
+typedef struct conv_attr {
+  static const int64_t kind_with_relu = 0b01;
+  static const int64_t kind_with_sum = 0b10;
+
+  conv_attr() : scale_(1.0), alpha_(0.f), beta_(0.f), attr_(0) {}
+  conv_attr(float scale, float alpha, float beta, int64_t attr) :
+      scale_(scale), alpha_(alpha), beta_(beta), attr_(attr) {}
+
+  bool with_relu() {
+    return attr_ & kind_with_relu;
+  }
+
+  bool with_sum() {
+    return attr_ & kind_with_sum;
+  }
+
+  float scale_;
+  float alpha_;
+  float beta_;
+  int64_t attr_;
+} conv_attr_t;
+
 static std::vector<int64_t> conv_output_size(
     IntArrayRef input_size,
     IntArrayRef weight_size,
@@ -38,18 +60,15 @@ static std::vector<int64_t> conv_output_size(
 }
 
 at::Tensor convolution(
+    at::Tensor& output,
     const at::Tensor& input,
     const at::Tensor& weight,
     const at::Tensor& bias,
     IntArrayRef padding,
     IntArrayRef stride,
     IntArrayRef dilation,
-    int64_t groups) {
-  auto output = at::empty(
-      conv_output_size(
-          input.sizes(), weight.sizes(), padding, stride, dilation, groups),
-      input.options());
-
+    int64_t groups,
+    conv_attr_t attr) {
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
@@ -151,9 +170,21 @@ at::Tensor convolution(
         _padding));
   }
 
+  primitive_attr pattr;
+  post_ops po;
+  if (attr.with_sum()) {
+    po.append_sum(attr.scale_);
+  }
+
+  if (attr.with_relu()) {
+    po.append_eltwise(1.0, algorithm::eltwise_relu, attr.alpha_, attr.beta_);
+  }
+
+  pattr.set_post_ops(po);
+
   std::shared_ptr<convolution_forward::primitive_desc> conv_forward_pd;
   conv_forward_pd.reset(
-      new convolution_forward::primitive_desc(*conv_forward_desc, engine));
+      new convolution_forward::primitive_desc(*conv_forward_desc, pattr, engine));
 
   auto input_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
   dpcpp_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
@@ -971,7 +1002,8 @@ static auto view3d(const at::Tensor& tensor) -> at::Tensor {
 
 using namespace impl;
 
-Tensor convolution_overrideable(
+Tensor _convolution_out(
+    Tensor& output_r,
     const Tensor& input_r,
     const Tensor& weight_r,
     const Tensor& bias_r,
@@ -980,7 +1012,9 @@ Tensor convolution_overrideable(
     IntArrayRef dilation_,
     bool transposed_,
     IntArrayRef output_padding_,
-    int64_t groups_) {
+    int64_t groups_,
+    conv_attr_t attr) {
+  auto output = output_r;
   auto input = input_r.contiguous();
   auto weight = weight_r;
   auto bias = bias_r;
@@ -1009,13 +1043,13 @@ Tensor convolution_overrideable(
     weight = view4d(weight);
   }
 
-  Tensor output;
+  Tensor output_;
   if (params.is_depthwise(input, weight)) {
     auto kernel_size = weight.sizes().slice(2);
     auto stride = params.stride;
     auto padding = params.padding;
     auto dilation = params.dilation;
-    output = at::thnn_conv_depthwise2d(
+    output_ = at::thnn_conv_depthwise2d(
         input.contiguous(),
         weight,
         kernel_size,
@@ -1024,21 +1058,138 @@ Tensor convolution_overrideable(
         padding,
         dilation);
   } else {
-    output = convolution(
+    auto output = output_r.resize_(conv_output_size(
+        input_r.sizes(), weight_r.sizes(),
+        params.padding, params.stride, params.dilation, params.groups));
+
+    output_ = convolution(
+        output,
         input,
         weight,
         bias,
         params.padding,
         params.stride,
         params.dilation,
-        params.groups);
+        params.groups,
+        attr);
   }
 
   if (k == 3) {
-    output = view3d(output);
+    output_ = view3d(output_);
   }
 
-  return output;
+  return output_;
+}
+
+Tensor _convolution(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    conv_attr_t attr) {
+  auto output_r = at::empty({0}, input_r.options());
+
+  return _convolution_out(
+      output_r,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      attr);
+}
+
+Tensor convolution_sum(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    Tensor& accumu,
+    Scalar alpha,
+    Scalar beta,
+    Scalar scale) {
+  conv_attr_t attr(
+      scale.to<float>(),
+      alpha.to<float>(),
+      beta.to<float>(),
+      conv_attr_t::kind_with_sum);
+  return _convolution_out(
+      accumu, input_r, weight_r, bias_r, stride_, padding_, dilation_,
+      transposed_, output_padding_, groups_, attr);
+}
+
+Tensor convolution_sum_relu(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    Tensor& accumu,
+    Scalar alpha,
+    Scalar beta,
+    Scalar scale) {
+  conv_attr_t attr(
+      scale.to<float>(),
+      alpha.to<float>(),
+      beta.to<float>(),
+      conv_attr_t::kind_with_relu | conv_attr_t::kind_with_sum);
+  return _convolution_out(
+      accumu, input_r, weight_r, bias_r, stride_, padding_, dilation_,
+      transposed_, output_padding_, groups_, attr);
+}
+
+Tensor convolution_relu(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    Scalar alpha,
+    Scalar beta,
+    Scalar scale) {
+  conv_attr_t attr(
+      scale.to<float>(),
+      alpha.to<float>(),
+      beta.to<float>(),
+      conv_attr_t::kind_with_relu);
+  return _convolution(input_r, weight_r, bias_r, stride_, padding_, dilation_,
+      transposed_, output_padding_, groups_, attr);
+}
+
+Tensor convolution_overrideable(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_) {
+  return _convolution(input_r, weight_r, bias_r, stride_, padding_, dilation_,
+      transposed_, output_padding_, groups_, conv_attr_t());
 }
 
 std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(

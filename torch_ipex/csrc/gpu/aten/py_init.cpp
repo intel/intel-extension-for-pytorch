@@ -1,5 +1,6 @@
 #include <Python.h>
 #include <ATen/aten_ipex_type_default.h>
+#include <../jit/fusion_pass.h>
 
 
 // static PyObject* M_PyInstanceMethod_New(PyObject *self, PyObject *func)
@@ -18,6 +19,7 @@ void torch_ipex_init() {
   // TODO:
   printf("loading _torch_ipex.so ++\n");
   at::RegisterAtenTypeFunctions();
+  torch::jit::InitFusionPass();
   printf("loading _torch_ipex.so --\n");
 }
 // PyObject* PyInit__torch_ipex() {
