@@ -635,6 +635,10 @@ at::Tensor AtenIpexTypeDefault::addmm(const at::Tensor & self, const at::Tensor 
   return AtenIpexTypeDPCPP::addmm(self, mat1, mat2, beta, alpha);
 }
 
+at::Tensor & AtenIpexTypeDefault::addmm_(at::Tensor & self, const at::Tensor & mat1, const at::Tensor & mat2, at::Scalar beta, at::Scalar alpha) {
+  return AtenIpexTypeDPCPP::addmm_(self, mat1, mat2, beta, alpha);
+}
+
 at::Scalar AtenIpexTypeDefault::_local_scalar_dense(const at::Tensor & self) {
   return AtenIpexTypeDPCPP::_local_scalar_dense(self);
 }
@@ -1945,6 +1949,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::addmm(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::addmm>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::addmm_(Tensor(a!) self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::addmm_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_local_scalar_dense(Tensor self) -> Scalar")
       .impl_unboxedOnlyKernel<at::Scalar(const at::Tensor &), &AtenIpexTypeDefault::_local_scalar_dense>(at::TensorTypeId::DPCPPTensorId)
