@@ -3,6 +3,7 @@
 
 #include <c10/core/Device.h>
 #include <c10/util/Optional.h>
+#include <torch/csrc/utils/pybind.h>
 
 #include <cstring>
 #include <sstream>
@@ -11,6 +12,7 @@
 
 #include "aten_ipex_type.h"
 #include "auto_opt_config.h"
+#include "aten_ipex_type_ext.h"
 
 namespace torch_ipex {
 namespace {
@@ -32,6 +34,19 @@ void InitIpexModuleBindings(py::module m) {
   m.def("_get_git_revs", []() { return GetRevisions(); });
   m.def("enable_auto_dnnl", []() { setAutoDNNL(true); });
   m.def("disable_auto_dnnl", []() { setAutoDNNL(false); });
+  m.def("packed_add_",
+        [](at::Tensor &top_half, at::Tensor &bot_half,
+           const at::Tensor &grad, float alpha) {
+          AtenIpexTypeExt::packed_add_(top_half, bot_half, grad, alpha);
+        });
+  m.def("interaction_forward",
+        [](const std::vector<at::Tensor> &input) {
+          return AtenIpexTypeExt::interaction_forward(input);
+        });
+  m.def("interaction_backward",
+        [](const at::Tensor &grad_out, const std::vector<at::Tensor> &input) {
+          return AtenIpexTypeExt::interaction_backward(grad_out, input);
+        });
 }
 
 }  // namespace

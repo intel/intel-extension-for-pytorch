@@ -1,7 +1,8 @@
 import os
 import torch
 from .version import __version__
-import _torch_ipex as core
+from .optim import *
+from .ops import *
+import _torch_ipex
 
-core._initialize_aten_bindings()
-
+_torch_ipex._initialize_aten_bindings()

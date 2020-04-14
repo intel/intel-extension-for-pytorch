@@ -217,7 +217,7 @@ version = get_build_version(ipex_git_sha)
 create_version_files(base_dir, version, ipex_git_sha, torch_git_sha)
 
 # Generate the code before globbing!
-generate_ipex_cpu_aten_code(base_dir)
+# generate_ipex_cpu_aten_code(base_dir)
 
 # Constant known variables used throughout this file
 
@@ -243,7 +243,11 @@ setup(
     author='Intel/PyTorch Dev Team',
     # Exclude the build files.
     #packages=find_packages(exclude=['build']),
-    packages=['torch_ipex', 'intel_pytorch_extension'],
+    packages=[
+      'torch_ipex',
+      'intel_pytorch_extension',
+      'intel_pytorch_extension.optim',
+      'intel_pytorch_extension.ops'],
     package_dir={'torch_ipex': 'torch_ipex_py', 'intel_pytorch_extension': 'intel_pytorch_extension_py'},
     zip_safe=False,
     ext_modules=[DPCPPExt('_torch_ipex')],
