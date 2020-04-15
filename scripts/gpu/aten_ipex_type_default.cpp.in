@@ -495,6 +495,14 @@ at::Tensor & AtenIpexTypeDefault::sqrt_out(at::Tensor & out, const at::Tensor & 
   return AtenIpexTypeDPCPP::sqrt_out(out, self);
 }
 
+std::tuple<at::Tensor,at::Tensor> AtenIpexTypeDefault::std_mean(const at::Tensor & self, bool unbiased) {
+  return AtenIpexTypeDPCPP::std_mean(self, unbiased);
+}
+
+std::tuple<at::Tensor,at::Tensor> AtenIpexTypeDefault::std_mean(const at::Tensor & self, at::IntArrayRef dim, bool unbiased, bool keepdim) {
+  return AtenIpexTypeDPCPP::std_mean(self, dim, unbiased, keepdim);
+}
+
 at::Tensor AtenIpexTypeDefault::prod(const at::Tensor & self, c10::optional<at::ScalarType> dtype) {
   return AtenIpexTypeDPCPP::prod(self, dtype);
 }
@@ -553,6 +561,14 @@ at::Tensor AtenIpexTypeDefault::var(const at::Tensor & self, bool unbiased) {
 
 at::Tensor AtenIpexTypeDefault::var(const at::Tensor & self, at::IntArrayRef dim, bool unbiased, bool keepdim) {
   return AtenIpexTypeDPCPP::var(self, dim, unbiased, keepdim);
+}
+
+std::tuple<at::Tensor,at::Tensor> AtenIpexTypeDefault::var_mean(const at::Tensor & self, bool unbiased) {
+  return AtenIpexTypeDPCPP::var_mean(self, unbiased);
+}
+
+std::tuple<at::Tensor,at::Tensor> AtenIpexTypeDefault::var_mean(const at::Tensor & self, at::IntArrayRef dim, bool unbiased, bool keepdim) {
+  return AtenIpexTypeDPCPP::var_mean(self, dim, unbiased, keepdim);
 }
 
 at::Tensor AtenIpexTypeDefault::_s_where(const at::Tensor & condition, const at::Tensor & self, const at::Tensor & other) {
@@ -1845,6 +1861,12 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::sqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::sqrt_out>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::std_mean(Tensor self, bool unbiased=True) -> (Tensor, Tensor)")
+      .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor>(const at::Tensor &, bool), &AtenIpexTypeDefault::std_mean>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::std_mean.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> (Tensor, Tensor)")
+      .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor>(const at::Tensor &, at::IntArrayRef, bool, bool), &AtenIpexTypeDefault::std_mean>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::prod(Tensor self, *, ScalarType? dtype=None) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::ScalarType>), &AtenIpexTypeDefault::prod>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -1889,6 +1911,12 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::var.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, bool, bool), &AtenIpexTypeDefault::var>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::var_mean(Tensor self, bool unbiased=True) -> (Tensor, Tensor)")
+      .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor>(const at::Tensor &, bool), &AtenIpexTypeDefault::var_mean>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::var_mean.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> (Tensor, Tensor)")
+      .impl_unboxedOnlyKernel<std::tuple<at::Tensor,at::Tensor>(const at::Tensor &, at::IntArrayRef, bool, bool), &AtenIpexTypeDefault::var_mean>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_s_where(Tensor condition, Tensor self, Tensor other) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::_s_where>(at::TensorTypeId::DPCPPTensorId)

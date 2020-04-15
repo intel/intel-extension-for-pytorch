@@ -383,5 +383,41 @@ Tensor _var(const Tensor& self, bool unbiased) {
       result, self, IntArrayRef{}, unbiased, false, false);
 }
 
+std::tuple<Tensor, Tensor> var_mean(
+    const Tensor& self,
+    IntArrayRef dim,
+    bool unbiased,
+    bool keepdim) {
+  Tensor result1 = at::empty({0}, self.options());
+  Tensor result2 = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::std_var_mean_out(
+      "var_mean", result1, result2, self, dim, unbiased, keepdim, false);
+}
+
+std::tuple<Tensor, Tensor> std_mean(
+    const Tensor& self,
+    IntArrayRef dim,
+    bool unbiased,
+    bool keepdim) {
+  Tensor result1 = at::empty({0}, self.options());
+  Tensor result2 = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::std_var_mean_out(
+      "std_mean", result1, result2, self, dim, unbiased, keepdim, true);
+}
+
+std::tuple<Tensor, Tensor> std_mean(const Tensor& self, bool unbiased) {
+  Tensor result1 = at::empty({0}, self.options());
+  Tensor result2 = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::std_var_mean_out(
+      "std_mean", result1, result2, self, {}, unbiased, false, true);
+}
+
+std::tuple<Tensor, Tensor> var_mean(const Tensor& self, bool unbiased) {
+  Tensor result1 = at::empty({0}, self.options());
+  Tensor result2 = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::std_var_mean_out(
+      "var_mean", result1, result2, self, {}, unbiased, false, false);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

@@ -245,6 +245,10 @@ Tensor & sum_out(Tensor & out, const Tensor & self, IntArrayRef dim, bool keepdi
 
 Tensor & sqrt_out(Tensor & out, const Tensor & self); // aten::sqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 
+std::tuple<Tensor,Tensor> std_mean(const Tensor & self, bool unbiased); // aten::std_mean(Tensor self, bool unbiased=True) -> (Tensor, Tensor)
+
+std::tuple<Tensor,Tensor> std_mean(const Tensor & self, IntArrayRef dim, bool unbiased, bool keepdim); // aten::std_mean.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> (Tensor, Tensor)
+
 Tensor prod(const Tensor & self, c10::optional<ScalarType> dtype); // aten::prod(Tensor self, *, ScalarType? dtype=None) -> Tensor
 
 Tensor prod(const Tensor & self, int64_t dim, bool keepdim, c10::optional<ScalarType> dtype); // aten::prod.dim_int(Tensor self, int dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor
@@ -274,6 +278,10 @@ Tensor & trunc_out(Tensor & out, const Tensor & self); // aten::trunc.out(Tensor
 Tensor var(const Tensor & self, bool unbiased); // aten::var(Tensor self, bool unbiased=True) -> Tensor
 
 Tensor var(const Tensor & self, IntArrayRef dim, bool unbiased, bool keepdim); // aten::var.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> Tensor
+
+std::tuple<Tensor,Tensor> var_mean(const Tensor & self, bool unbiased); // aten::var_mean(Tensor self, bool unbiased=True) -> (Tensor, Tensor)
+
+std::tuple<Tensor,Tensor> var_mean(const Tensor & self, IntArrayRef dim, bool unbiased, bool keepdim); // aten::var_mean.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> (Tensor, Tensor)
 
 Tensor _s_where(const Tensor & condition, const Tensor & self, const Tensor & other); // aten::_s_where(Tensor condition, Tensor self, Tensor other) -> Tensor
 

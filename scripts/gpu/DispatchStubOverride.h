@@ -101,3 +101,7 @@ static Tensor & cross_out(Tensor & out, const Tensor & self, const Tensor & othe
 static Tensor cross(const Tensor & self, const Tensor & other, c10::optional<int64_t> dim); // aten::cross(Tensor self, Tensor other, int? dim=None) -> Tensor
 static Tensor & real_out(Tensor & out, const Tensor & self); // aten::real.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor & conj_out(Tensor & out, const Tensor & self); // aten::conj.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+static std::tuple<Tensor,Tensor> std_mean(const Tensor & self, bool unbiased); // aten::std_mean(Tensor self, bool unbiased=True) -> (Tensor, Tensor)
+static std::tuple<Tensor,Tensor> std_mean(const Tensor & self, IntArrayRef dim, bool unbiased, bool keepdim); // aten::std_mean.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> (Tensor, Tensor)
+static std::tuple<Tensor,Tensor> var_mean(const Tensor & self, bool unbiased); // aten::var_mean(Tensor self, bool unbiased=True) -> (Tensor, Tensor)
+static std::tuple<Tensor,Tensor> var_mean(const Tensor & self, IntArrayRef dim, bool unbiased, bool keepdim); // aten::var_mean.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> (Tensor, Tensor)
