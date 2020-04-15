@@ -10,3 +10,6 @@
 [submodule "third_party/pytorch"]
 	path = third_party/pytorch
 	url = ssh://git@gitlab.devtools.intel.com:29418/intel-pytorch-extension/pytorch.git
+[submodule "third_party/xsmm"]
+	path = third_party/xsmm
+	url = https://github.com/hfp/libxsmm.git

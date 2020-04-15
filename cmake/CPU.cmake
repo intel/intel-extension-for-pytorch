@@ -49,6 +49,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512f")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512bw")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512vl")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mf16c")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
 # These flags are not available in GCC-4.8.5. Set only when using clang.
 # Compared against https://gcc.gnu.org/onlinedocs/gcc-4.8.5/gcc/Option-Summary.html
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
@@ -110,6 +111,7 @@ include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
 include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
+include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
 
 # sources
 set(DPCPP_SRCS)
@@ -119,10 +121,23 @@ set(DPCPP_CPU_SRCS)
 add_subdirectory(${DPCPP_ROOT})
 add_subdirectory(${DPCPP_ROOT}/cpu)
 
+# libxsmm
+include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
+ExternalProject_Add(xsmm
+  SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/xsmm
+  BUILD_IN_SOURCE 1
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND
+    make
+    "AVX=3"
+    "-j"
+  INSTALL_COMMAND ""
+  )
 # Compile code with pybind11
 set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS})
 pybind11_add_module(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl)
+target_link_libraries(${PLUGIN_NAME} PRIVATE ${DPCPP_THIRD_PARTY_ROOT}/xsmm/lib/libxsmm.a)
 
 set(ATEN_THREADING "OMP" CACHE STRING "ATen parallel backend")
 message(STATUS "Using ATen parallel backend: ${ATEN_THREADING}")
@@ -139,3 +154,4 @@ endif()
 target_compile_options(${PLUGIN_NAME} PRIVATE "-DC10_BUILD_MAIN_LIB")
 add_dependencies(${PLUGIN_NAME} pybind11)
 add_dependencies(${PLUGIN_NAME} dnnl)
+add_dependencies(${PLUGIN_NAME} xsmm)
