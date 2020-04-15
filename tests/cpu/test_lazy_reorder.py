@@ -400,7 +400,7 @@ class TestLinear(TestCase):
 
     # we should first expose aten::linear, depend on https://github.com/pytorch/pytorch/pull/20039
     def test_linear_backward(self):
-        ipex.disable_auto_dnnl()
+        ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)

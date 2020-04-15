@@ -1005,7 +1005,7 @@ Tensor& std_var_out(
       at::isFloatingType(self.scalar_type()) ||
           at::isComplexType(self.scalar_type()),
       "std and var only support floating-point dtypes");
-
+  // complex data type support has not been verified
   if (at::isComplexType(self.scalar_type())) {
     ScalarType dtype = c10::toValueType(get_dtype(result, self, {}, true));
     Tensor real_in = self.real().to(dtype);
@@ -1037,6 +1037,73 @@ Tensor& std_var_out(
     }
   }
   return result;
+}
+
+std::tuple<Tensor&, Tensor&> std_var_mean_out(
+    const char* fname,
+    Tensor& result1,
+    Tensor& result2,
+    const Tensor& self,
+    IntArrayRef dim,
+    bool unbiased,
+    bool keepdim,
+    bool take_sqrt) {
+  AT_ASSERT(result1.defined() && result2.defined());
+  TORCH_CHECK(
+      at::isFloatingType(self.scalar_type()) ||
+          at::isComplexType(self.scalar_type()),
+      fname,
+      " only support floating-point dtypes");
+  TORCH_CHECK(
+      result1.scalar_type() == result2.scalar_type(),
+      "provided by result1 dtype must match dtype of result2. Got ",
+      toString(result1.scalar_type()),
+      " and ",
+      toString(result2.scalar_type()),
+      ".");
+  // complex data type support has not been verified
+  if (at::isComplexType(self.scalar_type())) {
+    ScalarType dtype = c10::toValueType(get_dtype(result1, self, {}, true));
+    Tensor real_in = self.real().to(dtype);
+    Tensor real_out_var = at::empty({0}, self.options().dtype(dtype));
+    Tensor real_out_mean = at::empty({0}, self.options().dtype(dtype));
+    auto iter = make_reduction(
+        fname, real_out_var, real_out_mean, real_in, dim, keepdim, dtype);
+    if (iter.numel() == 0) {
+      real_out_var.fill_(NAN);
+      real_out_mean.fill_(NAN);
+    } else {
+      std_var_kernel(iter, unbiased, false);
+    }
+    Tensor imag_in = self.imag().to(dtype);
+    Tensor imag_out_var = at::empty({0}, self.options().dtype(dtype));
+    Tensor imag_out_mean = at::empty({0}, self.options().dtype(dtype));
+    iter = make_reduction(
+        fname, imag_out_var, imag_out_mean, imag_in, dim, keepdim, dtype);
+    if (iter.numel() == 0) {
+      imag_out_var.fill_(NAN);
+      imag_out_mean.fill_(NAN);
+    } else {
+      std_var_kernel(iter, unbiased, false);
+    }
+    at::add_out(result1, real_out_var, imag_out_var);
+    take_sqrt ? at::sqrt_out(result1, result1) : result1;
+    at::add_out(
+        result2,
+        real_out_mean,
+        at::mul(imag_out_mean, std::complex<double>{0.0, 1.0}));
+  } else {
+    ScalarType dtype = get_dtype(result1, self, {}, true);
+    auto iter =
+        make_reduction(fname, result1, result2, self, dim, keepdim, dtype);
+    if (iter.numel() == 0) {
+      result1.fill_(NAN);
+      result2.fill_(NAN);
+    } else {
+      std_var_kernel(iter, unbiased, take_sqrt);
+    }
+  }
+  return std::tuple<Tensor&, Tensor&>(result1, result2);
 }
 
 } // namespace AtenIpexTypeDPCPP

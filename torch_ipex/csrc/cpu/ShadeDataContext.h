@@ -89,7 +89,7 @@ struct ShadeDataContext {
     auto data_type = shade_data_context->data_type;
 
     if (data_type == SHADE_DATA_TYPE::DIL) {
-      TORCH_INTERNAL_ASSERT(tensor.is_contiguous());
+      TORCH_WARN(tensor.is_contiguous());
       auto raw_cpu_data = tensor.storage().data_ptr().get();
       if (raw_cpu_data == nullptr) {
         // the dnnl tensor does not share data with raw tensor data.

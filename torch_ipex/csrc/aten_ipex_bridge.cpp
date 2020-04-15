@@ -154,7 +154,7 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   // Branch 2.1: Dense + Dil Tensor
   if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
     // All aten::tensor with dnnl::tensor should be contiguous
-    TORCH_INTERNAL_ASSERT(ipexTensor.is_contiguous());
+    TORCH_WARN(ipexTensor.is_contiguous());
     TORCH_INTERNAL_ASSERT(! (shade_data_context->dil_tensor.is_empty()));
     dil::tensor &dil_tensor = shade_data_context->dil_tensor;
     if (dil_tensor.is_public_format()) {
