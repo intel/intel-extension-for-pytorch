@@ -9,6 +9,7 @@ import random
 import unittest
 from functools import reduce
 import copy
+import sys
 import torch
 import _torch_ipex as ipex
 ipex._initialize_aten_bindings()
@@ -34,7 +35,7 @@ device = torch.device("dpcpp:0")
 class TestConv(TestCase):
     def test_Conv2d_with_cpu(self):
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         conv_cpu = torch.nn.Conv2d(1, 1, (3, 3))
         conv_dpcpp = torch.nn.Conv2d(1, 1, (3, 3)).to(device=device)
@@ -70,7 +71,7 @@ class TestConv(TestCase):
     def test_seq_conv(self):
         ipex.disable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_seq_conv rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         res_cpu = self._seq_conf('cpu', rand_seed)
 
         ipex.enable_auto_dnnl()
@@ -81,7 +82,7 @@ class TestBinaryOp(TestCase):
     def test_add(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         N = torch.randint(3, 10, (1,)).item()
         C = torch.randint(3, 100, (1,)).item()
@@ -121,7 +122,7 @@ class TestBinaryOp(TestCase):
     def test_add_(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_dil_add_ rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         res_dcpp_dnnl = self._test_add_("dpcpp:0", rand_seed)
 
         ipex.disable_auto_dnnl()
@@ -139,7 +140,7 @@ class TestBinaryOp(TestCase):
     def test_mul(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         N = torch.randint(3, 10, (1,)).item()
         C = torch.randint(3, 100, (1,)).item()
@@ -176,7 +177,7 @@ class TestBinaryOp(TestCase):
     def test_mul_(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_mul_ rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         a1 = self._test_mul_(device, rand_seed)
         a2 = self._test_mul_('cpu', rand_seed)
         self.assertEqual(a2, a1.to('cpu'))
@@ -191,7 +192,7 @@ class TestRelu(TestCase):
     def test_relu_(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_relu_ rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         a1 = self._test_relu_(device, rand_seed)
         a2 = self._test_relu_('cpu', rand_seed)
         self.assertEqual(a2, a1.to('cpu'))
@@ -199,7 +200,7 @@ class TestRelu(TestCase):
     def test_relu(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x_cpu = torch.randn((4, 5), dtype=torch.float32) * 10
         x_dpcpp = x_cpu.to(device=device)
@@ -208,7 +209,7 @@ class TestRelu(TestCase):
     def test_relu_backward(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x = torch.randn((4, 5), dtype=torch.float32) * 10
         x_cpu = x.clone().requires_grad_()
@@ -234,7 +235,7 @@ class TestMixOp(TestCase):
     def test_conv_add_relu_(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_dil_add_ rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         res_dcpp_dnnl, input_dpcpp_dnnl, _ = self._test_conv_add_relu_("dpcpp:0", rand_seed)
 
         ipex.disable_auto_dnnl()
@@ -256,7 +257,7 @@ class TestLinearAlgebraOps(TestCase):
     def test_mm(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         M, N, O = 23, 8, 12
         b1_cpu = torch.randn(M, N, dtype=torch.float32)
@@ -279,7 +280,7 @@ class TestLinearAlgebraOps(TestCase):
     def test_bmm(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         num_batches = 10
         M, N, O = 23, 8, 12
@@ -303,7 +304,7 @@ class TestLinearAlgebraOps(TestCase):
     def test_addmm(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         for i in range(8, 12, 2):
             for j in range(8, 12, 2):
@@ -330,7 +331,7 @@ class TestLinearAlgebraOps(TestCase):
     def test_addbmm(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         for i in range(8, 12, 2):
             for j in range(8, 12, 2):
@@ -357,7 +358,7 @@ class TestLinearAlgebraOps(TestCase):
     def test_baddbmm(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         for i in range(8, 12, 2):
             for j in range(8, 12, 2):
@@ -385,7 +386,7 @@ class TestLinear(TestCase):
     def test_linear(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         in_features = torch.randint(3, 10, (1,)).item()
         out_features = torch.randint(3, 100, (1,)).item()
@@ -401,7 +402,7 @@ class TestLinear(TestCase):
     def test_linear_backward(self):
         ipex.disable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         in_features = torch.randint(3, 10, (1,)).item()
         out_features = torch.randint(3, 100, (1,)).item()
@@ -421,7 +422,7 @@ class TestPool(TestCase):
     def test_avg_pool2d(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         N = torch.randint(3, 10, (1,)).item()
         C = torch.randint(3, 10, (1,)).item()
@@ -440,7 +441,7 @@ class TestPool(TestCase):
     def test_avg_pool3d(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         N = torch.randint(3, 10, (1,)).item()
         C = torch.randint(3, 10, (1,)).item()
@@ -459,7 +460,7 @@ class TestPool(TestCase):
     def test_avg_pool2d_backward(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x = torch.randn(10, 3, 64, 64, dtype=torch.float32) * 10
 
@@ -481,7 +482,7 @@ class TestPool(TestCase):
     def test_avg_pool3d_backward(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x = torch.randn(10, 3, 64, 64, 64, dtype=torch.float32) * 10
 
@@ -504,7 +505,7 @@ class TestBatchNorm(TestCase):
     def test_batch_norm2d(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x_cpu = torch.randn(64, 3, 35, 45, dtype=torch.float32) * 10
         x_dpcpp = x_cpu.to(device=device)
@@ -516,7 +517,7 @@ class TestBatchNorm(TestCase):
     def test_batch_norm3d(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x_cpu = torch.randn(4, 3, 30, 30, 30, dtype=torch.float32) * 10
         x_dpcpp = x_cpu.to(device=device)
@@ -528,7 +529,7 @@ class TestBatchNorm(TestCase):
     def test_batch_norm2d_backward(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x = torch.randn(64, 3, 35, 45, dtype=torch.float32) * 10
         x_cpu = x.clone().requires_grad_()
@@ -547,7 +548,7 @@ class TestTensorShape(TestCase):
     def test_reshape(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x_cpu = torch.randn(3, 4, 5, dtype=torch.float32) * 10
         x_dpcpp = x_cpu.to(device=device)
@@ -556,7 +557,7 @@ class TestTensorShape(TestCase):
     def test_cat(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x_cpu = torch.randn(4, 5, dtype=torch.float32) * 10
         x_dpcpp = x_cpu.to(device=device)
@@ -577,7 +578,7 @@ class TestTensorShape(TestCase):
     def test_cat_backward(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x = torch.randn((4, 5), dtype=torch.float32) * 10
         x_cpu = x.clone().requires_grad_()
@@ -592,7 +593,7 @@ class TestSoftMax(TestCase):
     def test_softmax(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x_cpu = torch.randn(3, 4, 5, dtype=torch.float32) * 10
         x_dpcpp = x_cpu.to(device=device)
@@ -603,7 +604,7 @@ class TestSoftMax(TestCase):
     def test_softmax_backward(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x = torch.randn(3, 4, 5, dtype=torch.float32) * 10
         for dim in range(x.ndim):
@@ -620,7 +621,7 @@ class TestSigmoid(TestCase):
     def test_sigmoid(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x_cpu = torch.randn(4, 5, dtype=torch.float32) * 10
         x_dpcpp = x_cpu.to(device=device)
@@ -633,7 +634,7 @@ class TestSigmoid(TestCase):
     def test_sigmoid_backward(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x = torch.randn(4, 5, dtype=torch.float32) * 10
         x_cpu = x.clone().requires_grad_()
@@ -650,7 +651,7 @@ class TestDropout(TestCase):
     def test_dropout(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         p = 0.2
         input = torch.randn(1000, dtype=torch.float32)
@@ -675,7 +676,7 @@ class TestSplit(TestCase):
     def test_split(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x = torch.randn(5, 5, dtype=torch.float32) * 10
         x_dpcpp = x.clone().to(device=device)
@@ -712,7 +713,7 @@ class TestSplit(TestCase):
     def test_split_backward(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
-        print("test_Conv2d_with_cpu rand sed: {}".format(rand_seed))
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         x = torch.randn(5, 5, dtype=torch.float32) * 10
         x1 = x.clone().requires_grad_()
