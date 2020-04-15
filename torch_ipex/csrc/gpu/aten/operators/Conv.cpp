@@ -89,6 +89,39 @@ at::Tensor convolution(
   memory::dims _stride = {sh, sw};
   memory::dims _padding = {ph, pw};
 
+
+if(input.ndimension() == 5){
+    int32_t id = input.size(2);
+    ih = input.size(3);
+    iw = input.size(4);
+
+    int32_t od = output.size(2);
+    oh = output.size(3);
+    ow = output.size(4);
+
+    int32_t kd = weight.size(2);
+    kh = weight.size(3);
+    kw = weight.size(4);
+
+    int32_t sd = stride[0];
+    sh = stride[1];
+    sw = stride[2];
+
+    int32_t pd = padding[0];
+    ph = padding[1];
+    pw = padding[2];
+
+    format_nchw = memory::format_tag::ncdhw;
+    format_weight = (g!= 1) ? memory::format_tag::goidhw : memory::format_tag::oidhw;
+
+    input_tz = {n, ic, id, ih, iw};
+    weight_tz = (g!= 1) ? memory::dims{g, oc/g, ic/g, kd, kh, kw} : memory::dims{oc, ic, kd, kh, kw};
+    output_tz = {n, oc, od, oh, ow};
+    _stride = {sd, sh, sw};
+    _padding = {pd, ph, pw};
+  }
+
+
   auto input_md = memory::desc({input_tz}, data_t, format_any);
   auto weight_md = memory::desc({weight_tz}, data_t, format_any);
   auto bias_md = memory::desc({bias_tz}, data_t, format_any);
@@ -227,6 +260,39 @@ Tensor dpcpp_convolution_backward_input(
   memory::dims output_tz = {n, oc, oh, ow};
   memory::dims _stride = {sh, sw};
   memory::dims _padding = {ph, pw};
+
+  if(grad_input.ndimension() == 5){
+    int32_t id = grad_input.size(2);
+    ih = grad_input.size(3);
+    iw = grad_input.size(4);
+
+    int32_t od = grad_output.size(2);
+    oh = grad_output.size(3);
+    ow = grad_output.size(4);
+
+    int32_t kd = weight.size(2);
+    kh = weight.size(3);
+    kw = weight.size(4);
+
+    int32_t sd = stride[0];
+    sh = stride[1];
+    sw = stride[2];
+
+    int32_t pd = padding[0];
+    ph = padding[1];
+    pw = padding[2];
+
+    format_nchw = memory::format_tag::ncdhw;
+    format_weight = (g!= 1) ? memory::format_tag::goidhw : memory::format_tag::oidhw;
+
+    input_tz = {n, ic, id, ih, iw};
+    weight_tz = (g!= 1) ? memory::dims{g, oc/g, ic/g, kd, kh, kw} : memory::dims{oc, ic, kd, kh, kw};
+    output_tz = {n, oc, od, oh, ow};
+    _stride = {sd, sh, sw};
+    _padding = {pd, ph, pw};
+
+    
+  }
 
   auto input_md = memory::desc({input_tz}, data_t, format_any);
   auto weight_md = memory::desc({weight_tz}, data_t, format_any);
@@ -382,6 +448,39 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   memory::dims output_tz = {n, oc, oh, ow};
   memory::dims _stride = {sh, sw};
   memory::dims _padding = {ph, pw};
+
+ if(input.ndimension() == 5){ 
+    int32_t id = input.size(2);
+    ih = input.size(3);
+    iw = input.size(4);
+
+    int32_t od = grad_output.size(2);
+    oh = grad_output.size(3);
+    ow = grad_output.size(4);
+
+    int32_t kd = grad_weight.size(2);
+    kh = grad_weight.size(3);
+    kw = grad_weight.size(4);
+
+    int32_t sd = stride[0];
+    sh = stride[1];
+    sw = stride[2];
+
+    int32_t pd = padding[0];
+    ph = padding[1];
+    pw = padding[2];
+
+    format_nchw = memory::format_tag::ncdhw;
+    format_weight = (g!= 1) ? memory::format_tag::goidhw : memory::format_tag::oidhw;
+
+    input_tz = {n, ic, id, ih, iw};
+    weight_tz = (g!= 1) ? memory::dims{g, oc/g, ic/g, kd, kh, kw} : memory::dims{oc, ic, kd, kh, kw};
+    output_tz = {n, oc, od, oh, ow};
+    _stride = {sd, sh, sw};
+    _padding = {pd, ph, pw};
+
+  } 
+
 
   memory::desc input_md({input_tz}, data_t, format_any);
   memory::desc weight_md({weight_tz}, data_t, format_any);
