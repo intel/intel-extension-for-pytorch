@@ -128,6 +128,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor sum(const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   at::Tensor & sum_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   at::Tensor & sqrt_out(at::Tensor & out, const at::Tensor & self);
+  std::tuple<at::Tensor,at::Tensor> std_mean(const at::Tensor & self, bool unbiased);
+  std::tuple<at::Tensor,at::Tensor> std_mean(const at::Tensor & self, at::IntArrayRef dim, bool unbiased, bool keepdim);
   at::Tensor prod(const at::Tensor & self, c10::optional<at::ScalarType> dtype);
   at::Tensor prod(const at::Tensor & self, int64_t dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   at::Tensor & prod_out(at::Tensor & out, const at::Tensor & self, int64_t dim, bool keepdim, c10::optional<at::ScalarType> dtype);
@@ -143,6 +145,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & trunc_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor var(const at::Tensor & self, bool unbiased);
   at::Tensor var(const at::Tensor & self, at::IntArrayRef dim, bool unbiased, bool keepdim);
+  std::tuple<at::Tensor,at::Tensor> var_mean(const at::Tensor & self, bool unbiased);
+  std::tuple<at::Tensor,at::Tensor> var_mean(const at::Tensor & self, at::IntArrayRef dim, bool unbiased, bool keepdim);
   at::Tensor _s_where(const at::Tensor & condition, const at::Tensor & self, const at::Tensor & other);
   at::Tensor norm(const at::Tensor & self, c10::optional<at::Scalar> p, at::ScalarType dtype);
   at::Tensor norm(const at::Tensor & self, at::Scalar p);
