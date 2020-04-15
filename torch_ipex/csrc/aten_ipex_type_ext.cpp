@@ -6,6 +6,7 @@
 #include "aten_ipex_type_ext.h"
 #include "cpu/vec/bf16_vec_kernel.h"
 #include "cpu/dil/dil.hpp"
+#include "libxsmm_utils.h"
 #include "utils.h"
 
 namespace torch_ipex {
@@ -135,24 +136,27 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor> & input) {
   auto vector_nums = total_feature_size / vector_size;
   TORCH_INTERNAL_ASSERT(total_feature_size % vector_size == 0);
   auto interact_feature_size = vector_nums * (vector_nums - 1) / 2;
+  auto tr_vector_size = sizeof(T) == 4 ? vector_size : vector_size / 2;
   auto out = at::empty({batch_size, interact_feature_size + vector_size}, input[0].options());
   auto out_data = out.data_ptr<T>();
 
+  auto mm_kernel = get_mm_kernel<T>(vector_nums, vector_nums, vector_size);
+  auto tr_kernel = get_tr_kernel(tr_vector_size, vector_nums, vector_nums);
+
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
+    T cat_buf[vector_nums * vector_size];
+    T tr_buf[vector_nums * vector_size];
+    T mm_buf[vector_nums * vector_nums];
+    T flat_buf[interact_feature_size];
     for (int64_t i = start; i < end; i++) {
-      T cat_buf[vector_nums * vector_size];
-      T mm_buf[vector_nums * vector_nums];
-      T flat_buf[interact_feature_size];
       uint32_t offset = 0;
       for (int j = 0; j < input.size(); j++) {
         std::memcpy(&cat_buf[offset], &input_data[j][i * feature_sizes[j]], feature_sizes[j] * sizeof(T));
         offset += feature_sizes[j];
       }
 
-      dil::tensor trs_in{{vector_nums, vector_size}, get_dil_data_type(input[0].scalar_type()), cat_buf};
-      dil::tensor mm_out{{vector_nums, vector_nums}, get_dil_data_type(input[0].scalar_type()), mm_buf};
-      auto trs_out = trs_in.transpose(0, 1);
-      dil::matmul_forward::compute(trs_in, trs_out, mm_out);
+      tr_kernel(cat_buf, &tr_vector_size, tr_buf, &vector_nums);
+      mm_kernel((xsmm_dtype<T> *)tr_buf, (xsmm_dtype<T> *)cat_buf, (xsmm_dtype<T> *)mm_buf);
       flat_triangle<T>(mm_buf, flat_buf, vector_nums);
       cat<T>(&input_data[0][i * vector_size], flat_buf,
              &out_data[i * (interact_feature_size + vector_size)],
@@ -168,6 +172,7 @@ at::Tensor AtenIpexTypeExt::interaction_forward(const std::vector<at::Tensor> & 
     for (const auto &in : input) { TORCH_INTERNAL_ASSERT(in.scalar_type() == at::kFloat); }
     return _interaction_forward<float>(input);
   } else {
+    TORCH_INTERNAL_ASSERT(input[0].scalar_type() == at::kBFloat16);
     for (const auto &in : input) { TORCH_INTERNAL_ASSERT(in.scalar_type() == at::kBFloat16); }
     return _interaction_forward<at::BFloat16>(input);
   }
