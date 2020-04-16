@@ -638,14 +638,14 @@ Tensor sum(const Tensor& self, c10::optional<ScalarType> dtype) {
   return at::AtenIpexTypeDPCPP::sum(self, std::vector<int64_t>{}, false, dtype);
 }
 
-Tensor& prod_out(
+Tensor& prod_out_impl(
     Tensor& result,
     const Tensor& self,
-    int64_t dim,
+    IntArrayRef dims,
     bool keepdim,
     c10::optional<ScalarType> opt_dtype) {
   ScalarType dtype = get_dtype(result, self, opt_dtype, true);
-  auto iter = make_reduction("prod", result, self, dim, keepdim, dtype);
+  auto iter = make_reduction("prod", result, self, dims, keepdim, dtype);
   if (iter.numel() == 0) {
     result.fill_(1);
   } else {
@@ -654,18 +654,27 @@ Tensor& prod_out(
   return result;
 }
 
+Tensor& prod_out(
+    Tensor& result,
+    const Tensor& self,
+    int64_t dim,
+    bool keepdim,
+    c10::optional<ScalarType> dtype) {
+  return at::AtenIpexTypeDPCPP::prod_out_impl(result, self, {dim}, keepdim, dtype);
+}
+
 Tensor prod(
     const Tensor& self,
     int64_t dim,
     bool keepdim,
     c10::optional<ScalarType> dtype) {
   Tensor result;
-  return at::AtenIpexTypeDPCPP::prod_out(result, self, dim, keepdim, dtype);
+  return at::AtenIpexTypeDPCPP::prod_out_impl(result, self, {dim}, keepdim, dtype);
 }
 
 Tensor prod(const Tensor& self, c10::optional<ScalarType> dtype) {
   Tensor result;
-  return at::AtenIpexTypeDPCPP::prod_out(result, self, {}, false, dtype);
+  return at::AtenIpexTypeDPCPP::prod_out_impl(result, self, {}, false, dtype);
 }
 
 Tensor& mean_out(
