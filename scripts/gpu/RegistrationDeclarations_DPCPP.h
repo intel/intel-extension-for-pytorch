@@ -695,6 +695,14 @@ Tensor _adaptive_avg_pool2d(const Tensor & self, IntArrayRef output_size); // at
 
 Tensor _adaptive_avg_pool2d_backward(const Tensor & grad_output, const Tensor & self); // aten::_adaptive_avg_pool2d_backward(Tensor grad_output, Tensor self) -> Tensor
 
+Tensor & adaptive_avg_pool3d_out(Tensor & out, const Tensor & self, IntArrayRef output_size); // aten::adaptive_avg_pool3d.out(Tensor self, int[3] output_size, *, Tensor(a!) out) -> Tensor(a!)
+
+Tensor adaptive_avg_pool3d(const Tensor & self, IntArrayRef output_size); // aten::adaptive_avg_pool3d(Tensor self, int[3] output_size) -> Tensor
+
+Tensor & adaptive_avg_pool3d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self); // aten::adaptive_avg_pool3d_backward.grad_input(Tensor grad_output, Tensor self, *, Tensor(a!) grad_input) -> Tensor(a!)
+
+Tensor adaptive_avg_pool3d_backward(const Tensor & grad_output, const Tensor & self); // aten::adaptive_avg_pool3d_backward(Tensor grad_output, Tensor self) -> Tensor
+
 std::tuple<Tensor &,Tensor &> adaptive_max_pool2d_out(Tensor & out, Tensor & indices, const Tensor & self, IntArrayRef output_size); // aten::adaptive_max_pool2d.out(Tensor self, int[2] output_size, *, Tensor(a!) out, Tensor(b!) indices) -> (Tensor(a!), Tensor(b!))
 
 std::tuple<Tensor,Tensor> adaptive_max_pool2d(const Tensor & self, IntArrayRef output_size); // aten::adaptive_max_pool2d(Tensor self, int[2] output_size) -> (Tensor, Tensor)

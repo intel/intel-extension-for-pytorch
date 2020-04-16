@@ -353,6 +353,10 @@ class AtenIpexTypeDefault {
   static at::Tensor adaptive_avg_pool2d(const at::Tensor & self, at::IntArrayRef output_size);
   static at::Tensor _adaptive_avg_pool2d(const at::Tensor & self, at::IntArrayRef output_size);
   static at::Tensor _adaptive_avg_pool2d_backward(const at::Tensor & grad_output, const at::Tensor & self);
+  static at::Tensor & adaptive_avg_pool3d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef output_size);
+  static at::Tensor adaptive_avg_pool3d(const at::Tensor & self, at::IntArrayRef output_size);
+  static at::Tensor & adaptive_avg_pool3d_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self);
+  static at::Tensor adaptive_avg_pool3d_backward(const at::Tensor & grad_output, const at::Tensor & self);
   static std::tuple<at::Tensor &,at::Tensor &> adaptive_max_pool2d_out(at::Tensor & out, at::Tensor & indices, const at::Tensor & self, at::IntArrayRef output_size);
   static std::tuple<at::Tensor,at::Tensor> adaptive_max_pool2d(const at::Tensor & self, at::IntArrayRef output_size);
   static at::Tensor & adaptive_max_pool2d_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & indices);

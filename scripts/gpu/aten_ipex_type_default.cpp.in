@@ -1395,6 +1395,22 @@ at::Tensor AtenIpexTypeDefault::_adaptive_avg_pool2d_backward(const at::Tensor &
   return AtenIpexTypeDPCPP::_adaptive_avg_pool2d_backward(grad_output, self);
 }
 
+at::Tensor & AtenIpexTypeDefault::adaptive_avg_pool3d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef output_size) {
+  return AtenIpexTypeDPCPP::adaptive_avg_pool3d_out(out, self, output_size);
+}
+
+at::Tensor AtenIpexTypeDefault::adaptive_avg_pool3d(const at::Tensor & self, at::IntArrayRef output_size) {
+  return AtenIpexTypeDPCPP::adaptive_avg_pool3d(self, output_size);
+}
+
+at::Tensor & AtenIpexTypeDefault::adaptive_avg_pool3d_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::adaptive_avg_pool3d_backward_out(grad_input, grad_output, self);
+}
+
+at::Tensor AtenIpexTypeDefault::adaptive_avg_pool3d_backward(const at::Tensor & grad_output, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::adaptive_avg_pool3d_backward(grad_output, self);
+}
+
 std::tuple<at::Tensor &,at::Tensor &> AtenIpexTypeDefault::adaptive_max_pool2d_out(at::Tensor & out, at::Tensor & indices, const at::Tensor & self, at::IntArrayRef output_size) {
   return AtenIpexTypeDPCPP::adaptive_max_pool2d_out(out, indices, self, output_size);
 }
@@ -2535,6 +2551,18 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::_adaptive_avg_pool2d_backward(Tensor grad_output, Tensor self) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::_adaptive_avg_pool2d_backward>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::adaptive_avg_pool3d.out(Tensor self, int[3] output_size, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::adaptive_avg_pool3d_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::adaptive_avg_pool3d(Tensor self, int[3] output_size) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::adaptive_avg_pool3d>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::adaptive_avg_pool3d_backward.grad_input(Tensor grad_output, Tensor self, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::adaptive_avg_pool3d_backward_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::adaptive_avg_pool3d_backward(Tensor grad_output, Tensor self) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::adaptive_avg_pool3d_backward>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::adaptive_max_pool2d.out(Tensor self, int[2] output_size, *, Tensor(a!) out, Tensor(b!) indices) -> (Tensor(a!), Tensor(b!))")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor &,at::Tensor &>(at::Tensor &, at::Tensor &, const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::adaptive_max_pool2d_out>(at::TensorTypeId::DPCPPTensorId)
