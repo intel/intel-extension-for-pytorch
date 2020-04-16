@@ -38,3 +38,27 @@ print("real: ")
 print(y.to("cpu"))
 print("real grad: ")
 print(x.grad[0].to("cpu"))
+
+
+x = torch.randn([1, 2, 2, 1, 1], device=cpu_device, dtype=dtype, requires_grad=True)
+grad = torch.ones([1, 2, 2, 1, 1], device=cpu_device, dtype=dtype, requires_grad=True)
+conv3 = nn.Conv3d(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
+y = conv3(x)
+y.backward(grad)
+
+conv3.to(sycl_device)
+x_dpcpp = x.to(sycl_device)
+y_dpcpp = conv3(x_dpcpp)
+grad_dpcpp = grad.to(sycl_device)
+
+y_dpcpp.backward(grad_dpcpp)
+
+print("ref: ")
+print(y)
+print("ref backward: ")
+print(x)
+
+print("real: ")
+print(y_dpcpp.to(cpu_device))
+print("real backward: ")
+print(x_dpcpp.to(cpu_device))
