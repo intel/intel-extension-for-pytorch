@@ -217,7 +217,7 @@ version = get_build_version(ipex_git_sha)
 create_version_files(base_dir, version, ipex_git_sha, torch_git_sha)
 
 # Generate the code before globbing!
-# generate_ipex_cpu_aten_code(base_dir)
+generate_ipex_cpu_aten_code(base_dir)
 
 # Constant known variables used throughout this file
 
