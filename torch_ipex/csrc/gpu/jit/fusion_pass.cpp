@@ -347,7 +347,7 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   OpFuser(graph->block(), graph).run();
 
   // TODO: Some post processing?? ECS/EDC/Peephole???
-  std::cout<<graph->toString(true);
+  // std::cout<<graph->toString(true);
   ConstantPropagation(graph);
 }
 

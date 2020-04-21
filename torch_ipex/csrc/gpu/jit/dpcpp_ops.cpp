@@ -12,7 +12,6 @@ at::Tensor& conv2d_sum(
     const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias,
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
     int64_t groups, at::Tensor& accumu, at::Scalar alpha) {
-  printf("Experimental: %s ...\n", __func__);
   at::AtenIpexTypeDPCPP::convolution_sum(input, weight, bias,
       stride, padding, dilation, false, {{0, 0}}, groups, accumu, alpha);
   return accumu;
@@ -22,7 +21,6 @@ at::Tensor& conv2d_sum_relu(
     const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias,
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
     int64_t groups, at::Tensor& accumu, at::Scalar alpha) {
-  printf("Experimental: %s ...\n", __func__);
   at::AtenIpexTypeDPCPP::convolution_sum_relu(input, weight, bias,
       stride, padding, dilation, false, {{0, 0}}, groups, accumu, alpha);
   return accumu;
@@ -32,7 +30,6 @@ at::Tensor conv2d_relu(
     const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias,
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
     int64_t groups) {
-  printf("Experimental: %s ...\n", __func__);
   return at::AtenIpexTypeDPCPP::convolution_relu(
       input, weight, bias, stride, padding, dilation, false, {{0, 0}}, groups);
 }
@@ -40,27 +37,23 @@ at::Tensor conv2d_relu(
 at::Tensor batch_norm(
     const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean,
     const at::Tensor& running_var, bool train, double momentum, double eps, bool use_cuda) {
-  printf("Experimental: %s ...\n", __func__);
   return at::empty_like(input);
 }
 
 at::Tensor fold_weight(
     const at::Tensor& weight, const at::Tensor& bn_weight, const at::Tensor& running_var, float eps) {
-  printf("Experimental: %s ...\n", __func__);
   return at::empty_like(weight);
 }
 
 at::Tensor fold_bias(
     const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& bn_weight,
     const at::Tensor& bn_bias, const at::Tensor& running_mean, const at::Tensor& running_var, float eps) {
-  printf("Experimental: %s ...\n", __func__);
   return at::empty_like(bias);
 }
 
 at::Tensor reorder(
     const at::Tensor& input,
     dnnl::memory::format_tag from, dnnl::memory::format_tag to, int64_t groups) {
-  printf("Experimental: %s ...\n", __func__);
   return at::empty_like(input);
 }
 
