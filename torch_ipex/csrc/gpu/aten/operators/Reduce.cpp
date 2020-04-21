@@ -660,7 +660,8 @@ Tensor& prod_out(
     int64_t dim,
     bool keepdim,
     c10::optional<ScalarType> dtype) {
-  return at::AtenIpexTypeDPCPP::prod_out_impl(result, self, {dim}, keepdim, dtype);
+  return at::AtenIpexTypeDPCPP::prod_out_impl(
+      result, self, {dim}, keepdim, dtype);
 }
 
 Tensor prod(
@@ -669,7 +670,8 @@ Tensor prod(
     bool keepdim,
     c10::optional<ScalarType> dtype) {
   Tensor result;
-  return at::AtenIpexTypeDPCPP::prod_out_impl(result, self, {dim}, keepdim, dtype);
+  return at::AtenIpexTypeDPCPP::prod_out_impl(
+      result, self, {dim}, keepdim, dtype);
 }
 
 Tensor prod(const Tensor& self, c10::optional<ScalarType> dtype) {

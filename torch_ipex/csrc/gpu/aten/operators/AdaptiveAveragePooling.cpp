@@ -5,7 +5,7 @@
 #include <core/Runtime.h>
 #include <vector>
 
-#include "AveragePooling.hpp"
+#include "Pooling.hpp"
 
 using namespace mkldnn;
 using namespace at::dpcpp;
@@ -19,10 +19,9 @@ void adaptive_avg_pool2d_out_template(
     IntArrayRef output_size) {
   TORCH_CHECK(
       (input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
-  int kW, kH, dW, dH;
+
   int64_t nInputCols, nInputRows, nInputPlane, batchSize;
-  int padW = 0;
-  int padH = 0;
+
   // bool ceil_mode = false;
   int64_t nOutputCols = output_size[1];
   int64_t nOutputRows = output_size[0];
@@ -33,30 +32,29 @@ void adaptive_avg_pool2d_out_template(
   nInputPlane = input.size(1);
   batchSize = input.size(0);
 
-  TORCH_CHECK(
-      (nInputRows % nOutputRows == 0),
-      "row input size is not "
-      "divisible by the output size "
-      "is not supported yet");
-  TORCH_CHECK(
-      (nInputCols % nOutputCols == 0),
-      "column input size is not "
-      "divisible by the output size "
-      "is not supported yet");
+  int dW = DPCPP::floor((float)2 * nInputCols / nOutputCols) -
+      DPCPP::floor((float)nInputCols / nOutputCols);
+  int dH = DPCPP::floor((float)2 * nInputRows / nOutputRows) -
+      DPCPP::floor((float)nInputRows / nOutputRows);
 
-  kW = nInputCols / nOutputCols;
-  kH = nInputRows / nOutputRows;
-  dW = kW;
-  dH = kH;
+  int kW = DPCPP::ceil((float)2 * nInputCols / nOutputCols) -
+      DPCPP::floor((float)nInputCols / nOutputCols);
+  int kH = DPCPP::ceil((float)2 * nInputRows / nOutputRows) -
+      DPCPP::floor((float)nInputRows / nOutputRows);
 
-  auto alg_kind = algorithm::pooling_avg;
+  int padW = (dW * (nOutputCols - 1) + kW - nInputCols) / 2;
+  int padH = (dH * (nOutputRows - 1) + kH - nInputRows) / 2;
+
+  auto alg_kind = algorithm::pooling_avg_exclude_padding;
   auto prop_kind = dnnl::prop_kind::forward_training;
+
+  Tensor input_ = input.contiguous();
 
   output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols});
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "adaptive_avg_pool2d", [&] {
-        auto input_data = input.data_ptr<scalar_t>();
+      input_.scalar_type(), "adaptive_avg_pool2d", [&] {
+        auto input_data = input_.data_ptr<scalar_t>();
         auto output_data = output.data_ptr<scalar_t>();
         avg_pool_out_frame<scalar_t>(
             input_data,
@@ -64,20 +62,20 @@ void adaptive_avg_pool2d_out_template(
             batchSize,
             nInputPlane,
             0,
-            nInputCols,
             nInputRows,
+            nInputCols,
             0,
-            nOutputCols,
             nOutputRows,
+            nOutputCols,
             0,
-            kW,
             kH,
+            kW,
             0,
-            dW,
             dH,
+            dW,
             0,
-            padW,
             padH,
+            padW,
             alg_kind,
             prop_kind);
       });
@@ -85,14 +83,15 @@ void adaptive_avg_pool2d_out_template(
 
 void adaptive_avg_pool2d_backward_out_template(
     Tensor& gradInput,
-    const Tensor& gradOutput,
+    const Tensor& gradOutput_,
     const Tensor& input) {
+  Tensor gradOutput = gradOutput_.contiguous();
+
   TORCH_CHECK(
       (input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
-  int kW, kH, dW, dH;
+
   int64_t nInputCols, nInputRows, nInputPlane, batchSize;
-  int padW = 0;
-  int padH = 0;
+
   auto output_size_vec = gradOutput.sizes();
   int64_t nOutputCols = output_size_vec[3];
   int64_t nOutputRows = output_size_vec[2];
@@ -103,23 +102,20 @@ void adaptive_avg_pool2d_backward_out_template(
   nInputPlane = input.size(1);
   batchSize = input.size(0);
 
-  TORCH_CHECK(
-      (nInputRows % nOutputRows == 0),
-      "row input size is not "
-      "divisible by the output size "
-      "is not supported yet");
-  TORCH_CHECK(
-      (nInputCols % nOutputCols == 0),
-      "column input size is not "
-      "divisible by the output size "
-      "is not supported yet");
+  int dW = DPCPP::floor((float)2 * nInputCols / nOutputCols) -
+      DPCPP::floor((float)nInputCols / nOutputCols);
+  int dH = DPCPP::floor((float)2 * nInputRows / nOutputRows) -
+      DPCPP::floor((float)nInputRows / nOutputRows);
 
-  kW = nInputCols / nOutputCols;
-  kH = nInputRows / nOutputRows;
-  dW = kW;
-  dH = kH;
+  int kW = DPCPP::ceil((float)2 * nInputCols / nOutputCols) -
+      DPCPP::floor((float)nInputCols / nOutputCols);
+  int kH = DPCPP::ceil((float)2 * nInputRows / nOutputRows) -
+      DPCPP::floor((float)nInputRows / nOutputRows);
 
-  auto alg_kind = algorithm::pooling_avg;
+  int padW = (dW * (nOutputCols - 1) + kW - nInputCols) / 2;
+  int padH = (dH * (nOutputRows - 1) + kH - nInputRows) / 2;
+
+  auto alg_kind = algorithm::pooling_avg_exclude_padding;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
@@ -132,20 +128,20 @@ void adaptive_avg_pool2d_backward_out_template(
             batchSize,
             nInputPlane,
             0,
-            nInputCols,
             nInputRows,
+            nInputCols,
             0,
-            nOutputCols,
             nOutputRows,
+            nOutputCols,
             0,
-            kW,
             kH,
+            kW,
             0,
-            dW,
             dH,
+            dW,
             0,
-            padW,
             padH,
+            padW,
             alg_kind,
             prop_kind);
       });
@@ -177,7 +173,7 @@ Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
     Tensor& gradInput,
     const Tensor& gradOutput,
     const Tensor& input) {
-  gradInput.resize_as_(input);
+  gradInput.resize_as_(input).zero_();
   impl::adaptive_avg_pool2d_backward_out_template(gradInput, gradOutput, input);
   return gradInput;
 }
@@ -185,7 +181,7 @@ Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
 Tensor _adaptive_avg_pool2d_backward(
     const Tensor& grad_output,
     const Tensor& self) {
-  auto grad_input = at::zeros_like(self);
+  auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
   impl::adaptive_avg_pool2d_backward_out_template(
       grad_input, grad_output, self);
   return grad_input;

@@ -6,6 +6,8 @@
 #include <core/Runtime.h>
 #include <utils/Math.h>
 
+#include "Pooling.hpp"
+
 using namespace mkldnn;
 using namespace at::dpcpp;
 using namespace at::native;
@@ -13,254 +15,6 @@ using namespace at::native;
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
-
-template <typename scalar_t>
-static void max_pool2d_with_indices_out_frame(
-    scalar_t* input_data,
-    scalar_t* output_data,
-    int64_t* indices_data,
-    int64_t nbatch,
-    int64_t nInputPlane,
-    int64_t inputWidth,
-    int64_t inputHeight,
-    int64_t outputWidth,
-    int64_t outputHeight,
-    int kW,
-    int kH,
-    int dW,
-    int dH,
-    int padW,
-    int padH,
-    algorithm alg_kind,
-    prop_kind prop_kind) {
-  at::Device curDevice = at::Device(at::kDPCPP, current_device());
-  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
-  auto strm = GpuStreamManager::Instance().get_stream();
-
-  auto data_t = memory::data_type::f32;
-  if (std::is_same<scalar_t, Half>::value == true) {
-    data_t = memory::data_type::f16;
-    prop_kind = dnnl::prop_kind::forward_inference;
-  }
-  auto format_nchw = memory::format_tag::nchw;
-
-  memory::dims input_tz = {nbatch, nInputPlane, inputHeight, inputWidth};
-  memory::dims output_tz = {nbatch, nInputPlane, outputHeight, outputWidth};
-  memory::dims kernel = {kH, kW};
-  memory::dims stride = {dH, dW};
-  memory::dims padding = {padH, padW};
-
-  // Currently, MKLDNN GPU doens't support format_any in pooling
-  auto input_md = memory::desc({input_tz}, data_t, format_nchw);
-  auto output_md = memory::desc({output_tz}, data_t, format_nchw);
-
-  auto input_usr_memory = memory(input_md, engine);
-  dpcpp_set_mkldnn_buffer(input_data, input_usr_memory);
-
-  auto output_usr_memory = memory(output_md, engine);
-  dpcpp_set_mkldnn_buffer(output_data, output_usr_memory);
-
-  std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
-  pooling_forward_desc.reset(new pooling_forward::desc(
-      prop_kind,
-      alg_kind,
-      input_md,
-      output_md,
-      stride,
-      kernel,
-      padding,
-      padding));
-
-  std::shared_ptr<pooling_forward::primitive_desc> pooling_forward_pd;
-  pooling_forward_pd.reset(
-      new pooling_forward::primitive_desc(*pooling_forward_desc, engine));
-
-  // auto expected_input_md = pooling_forward_pd->src_desc();
-  auto input_memory = input_usr_memory;
-
-  // Currently, DPCPP path doesn't support internal format.
-  // input has the same format with input_usr.
-  // if (input_md != expected_input_md) {
-  //   input_memory = memory(expected_input_md, engine);
-  //   reorder(input_usr_memory, input_memory).
-  //       execute(strm, input_usr_memory, input_memory);
-  // }
-
-  // auto expected_output_md = pooling_forward_pd->dst_desc();
-  auto output_memory = output_usr_memory;
-
-  // output has the same format with output_usr.
-  // if (output_md != expected_output_md) {
-  //   output_memory = memory(expected_output_md, engine);
-  // }
-
-  auto indices_md = pooling_forward_pd->workspace_desc();
-  auto indices_usr_memory =
-      memory({{{output_tz}, data_t, format_nchw}, engine});
-
-  auto indices_usr =
-      at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
-  dpcpp_set_mkldnn_buffer(
-      (void*)indices_usr.data_ptr<int32_t>(), indices_usr_memory);
-  memory indices_memory = indices_usr_memory;
-
-  std::shared_ptr<pooling_forward> pool_forward;
-  pool_forward.reset(new pooling_forward(*pooling_forward_pd));
-
-  // indices has the same format with indices_usr.
-  // if (indices_usr_memory.get_desc() != indices_md) {
-  //   indices_memory = memory(indices_md, engine);
-  // }
-
-  pool_forward->execute(
-      strm,
-      {{MKLDNN_ARG_SRC, input_memory},
-       {MKLDNN_ARG_DST, output_memory},
-       {MKLDNN_ARG_WORKSPACE, indices_memory}});
-
-  // reorder output
-  // if (output_memory != output_usr_memory) {
-  //   reorder(output_memory, output_usr_memory).
-  //       execute(strm, output_memory, output_usr_memory);
-  // }
-
-  // reorder workgroup
-
-  // if (indices_usr_memory.get_desc() != indices_md) {
-  //   reorder(indices_memory, indices_usr_memory).
-  //       execute(strm, indices_memory, indices_usr_memory);
-  // }
-
-  // reorder(indices_memory, indices_usr_memory).
-  //         execute(strm, indices_memory, indices_usr_memory);
-
-  dpcppMemoryCopyType(
-      (int64_t*)indices_data,
-      indices_usr.data_ptr<int32_t>(),
-      indices_usr.numel());
-}
-
-template <typename scalar_t>
-static void max_pool2d_with_indices_backward_out_frame(
-    scalar_t* gradInput_data,
-    scalar_t* gradOutput_data,
-    int64_t* indices_data,
-    int64_t nbatch,
-    int64_t nInputPlane,
-    int64_t inputWidth,
-    int64_t inputHeight,
-    int64_t outputWidth,
-    int64_t outputHeight,
-    int kW,
-    int kH,
-    int dW,
-    int dH,
-    int padW,
-    int padH,
-    algorithm alg_kind,
-    prop_kind prop_kind) {
-  at::Device curDevice = at::Device(at::kDPCPP, current_device());
-  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
-  auto strm = GpuStreamManager::Instance().get_stream();
-
-  auto data_t = memory::data_type::f32;
-  auto format_nchw = memory::format_tag::nchw;
-
-  memory::dims input_tz = {nbatch, nInputPlane, inputHeight, inputWidth};
-  memory::dims output_tz = {nbatch, nInputPlane, outputHeight, outputWidth};
-  memory::dims kernel = {kH, kW};
-  memory::dims stride = {dH, dW};
-  memory::dims padding = {padH, padW};
-
-  // Currently, MKLDNN GPU doens't support format_any in pooling
-  auto input_md = memory::desc({input_tz}, data_t, format_nchw);
-  auto output_md = memory::desc({output_tz}, data_t, format_nchw);
-
-  auto diff_dst_usr_memory =
-      memory({{{output_tz}, data_t, format_nchw}, engine});
-  dpcpp_set_mkldnn_buffer(gradOutput_data, diff_dst_usr_memory);
-
-  auto diff_src_usr_memory =
-      memory({{{input_tz}, data_t, format_nchw}, engine});
-  dpcpp_set_mkldnn_buffer(gradInput_data, diff_src_usr_memory);
-
-  std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
-  pooling_forward_desc.reset(new pooling_forward::desc(
-      prop_kind,
-      alg_kind,
-      input_md,
-      output_md,
-      stride,
-      kernel,
-      padding,
-      padding));
-  std::shared_ptr<pooling_forward::primitive_desc> pooling_forward_pd;
-  pooling_forward_pd.reset(
-      new pooling_forward::primitive_desc(*pooling_forward_desc, engine));
-
-  std::shared_ptr<pooling_backward::desc> pooling_backward_desc;
-  pooling_backward_desc.reset(new pooling_backward::desc(
-      alg_kind, input_md, output_md, stride, kernel, padding, padding));
-  std::shared_ptr<pooling_backward::primitive_desc> pooling_backward_pd;
-  pooling_backward_pd.reset(new pooling_backward::primitive_desc(
-      *pooling_backward_desc, engine, *pooling_forward_pd));
-
-  // auto diff_dst_md = pooling_backward_pd->diff_dst_desc();
-  auto diff_dst_memory = diff_dst_usr_memory;
-
-  // Currently, DPCPP path doesn't support internal format.
-  // diff_dst has the same format with dst.
-  // if (diff_dst_usr_memory.get_desc() != diff_dst_md) {
-  //   diff_dst_memory = memory(diff_dst_md, engine);
-  //   reorder(diff_dst_usr_memory, diff_dst_memory).
-  //       execute(strm, diff_dst_usr_memory, diff_dst_memory);
-  // }
-
-  // auto expected_diff_src_pd = pooling_backward_pd->diff_src_desc();
-  auto diff_src_memory = diff_src_usr_memory;
-
-  // diff_src has the same format with src.
-  // if (diff_src_usr_memory.get_desc() != expected_diff_src_pd) {
-  //   diff_src_memory = memory(expected_diff_src_pd, engine);
-  // }
-
-  std::shared_ptr<pooling_backward> pool_backward;
-
-  auto indices_usr =
-      at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
-  dpcppMemoryCopyType(
-      indices_usr.data_ptr<int32_t>(),
-      (int64_t*)indices_data,
-      indices_usr.numel());
-
-  pool_backward.reset(new pooling_backward(*pooling_backward_pd));
-
-  auto indices_md = pooling_forward_pd->workspace_desc();
-  auto indices_usr_memory = memory(
-      {{{output_tz}, (memory::data_type)indices_md.data.data_type, format_nchw},
-       engine});
-  dpcpp_set_mkldnn_buffer(
-      (void*)indices_usr.data_ptr<int32_t>(), indices_usr_memory);
-  auto indices_memory = indices_usr_memory;
-
-  // indices has the same format with indices.
-  // reorder indices if needed
-  // if (indices_usr_memory.get_desc() != indices_md) {
-  //   reorder(indices_usr_memory, indices_memory).
-  //       execute(strm, indices_usr_memory, indices_memory);
-  // }
-  pool_backward->execute(
-      strm,
-      {{MKLDNN_ARG_DIFF_DST, diff_dst_memory},
-       {MKLDNN_ARG_DIFF_SRC, diff_src_memory},
-       {MKLDNN_ARG_WORKSPACE, indices_memory}});
-
-  // Reorder diff_src
-  // if (diff_src_memory != diff_src_usr_memory) {
-  //   reorder(diff_src_memory, diff_src_usr_memory).
-  //       execute(strm, diff_src_memory, diff_src_usr_memory);
-  // }
-}
 
 void max_pool2d_with_indices_out_template(
     Tensor& output,
@@ -354,22 +108,27 @@ void max_pool2d_with_indices_out_template(
         scalar_t* output_data = output.data_ptr<scalar_t>();
         int64_t* indices_data = indices.data_ptr<int64_t>();
 
-        max_pool2d_with_indices_out_frame(
+        max_pool_out_frame<scalar_t>(
             input_data,
             output_data,
             indices_data,
             nbatch,
             nInputPlane,
-            inputWidth,
+            0,
             inputHeight,
-            outputWidth,
+            inputWidth,
+            0,
             outputHeight,
-            kW,
+            outputWidth,
+            0,
             kH,
-            dW,
+            kW,
+            0,
             dH,
-            padW,
+            dW,
+            0,
             padH,
+            padW,
             alg_kind,
             prop_kind);
       });
@@ -476,20 +235,25 @@ Tensor& max_pool2d_with_indices_backward_out_template(
         scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();
         int64_t* indices_data = indices.data_ptr<int64_t>();
 
-        max_pool2d_with_indices_backward_out_frame<scalar_t>(
+        max_pool_backward_out_frame<scalar_t>(
             gradInput_data,
             gradOutput_data,
             indices_data,
             nbatch,
             nInputPlane,
-            inputWidth,
+            0,
             inputHeight,
-            outputWidth,
+            inputWidth,
+            0,
             outputHeight,
-            kW,
+            outputWidth,
+            0,
             kH,
-            dW,
+            kW,
+            0,
             dH,
+            dW,
+            0,
             padH,
             padW,
             alg_kind,
@@ -573,7 +337,7 @@ Tensor max_pool2d_with_indices_backward(
     IntArrayRef dilation,
     bool ceil_mode,
     const Tensor& indices) {
-  auto grad_input = at::zeros_like(self);
+  auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
   return at::AtenIpexTypeDPCPP::max_pool2d_with_indices_backward_out(
       grad_input,
       grad_output,

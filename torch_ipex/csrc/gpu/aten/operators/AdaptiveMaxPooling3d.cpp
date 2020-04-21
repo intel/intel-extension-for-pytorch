@@ -7,20 +7,22 @@
 
 #include "Pooling.hpp"
 
-using namespace mkldnn;
+using namespace dnnl;
 using namespace at::dpcpp;
+
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-void adaptive_avg_pool3d_out_template(
+void adaptive_max_pool3d_out_template(
     Tensor& output,
-    Tensor const& input,
+    Tensor& indices,
+    const Tensor& input,
     IntArrayRef output_size) {
   for (int64_t i = 0; i < input.ndimension(); i++) {
     TORCH_CHECK(
         input.size(i) > 0,
-        "adaptive_avg_pool3d(): expected input to have non-empty spatial "
+        "adaptive_max_pool3d_dpcpp(): expected input to have non-empty spatial "
         "dimensions, "
         "but input has sizes ",
         input.sizes(),
@@ -33,6 +35,12 @@ void adaptive_avg_pool3d_out_template(
   TORCH_CHECK(
       (input.ndimension() == 4 || input.ndimension() == 5),
       "non-empty 4D or 5D (batch mode) tensor expected for input");
+
+  TORCH_CHECK(
+      output_size.size() == 3,
+      "adaptive_max_pool3d: internal error: output_size.size() must be 3");
+
+  Tensor input_ = input.contiguous();
 
   int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
   int64_t nblock = input.size(-4);
@@ -62,24 +70,26 @@ void adaptive_avg_pool3d_out_template(
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
 
-  auto alg_kind = algorithm::pooling_avg_exclude_padding;
-  auto prop_kind = prop_kind::forward_training;
-
-  Tensor input_ = input.contiguous();
-
-  if (input.ndimension() == 4) {
+  auto alg_kind = algorithm::pooling_max;
+  auto prop_kind = dnnl::prop_kind::forward_training;
+  if (input_.ndimension() == 4) {
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
+    indices.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
     output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
+    indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
   }
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input_.scalar_type(), "adaptive_avg_pool3d", [&] {
-        auto input_data = input_.data_ptr<scalar_t>();
-        auto output_data = output.data_ptr<scalar_t>();
-        avg_pool_out_frame<scalar_t>(
+      input_.scalar_type(), "adaptive_max_pool3d", [&] {
+        scalar_t* input_data = input_.data_ptr<scalar_t>();
+        scalar_t* output_data = output.data_ptr<scalar_t>();
+        int64_t* indices_data = indices.data_ptr<int64_t>();
+
+        max_pool_out_frame<scalar_t>(
             input_data,
             output_data,
+            indices_data,
             nbatch,
             nblock,
             inputDepth,
@@ -102,11 +112,12 @@ void adaptive_avg_pool3d_out_template(
       });
 }
 
-Tensor& adaptive_avg_pool3d_backward_out_template(
+Tensor& adaptive_max_pool3d_backward_out_template(
     Tensor& gradInput,
     const Tensor& gradOutput_,
-    const Tensor& input) {
-  auto gradOutput = gradOutput_.contiguous();
+    const Tensor& input,
+    const Tensor& indices) {
+  Tensor gradOutput = gradOutput_.contiguous();
 
   int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
   int64_t nblock = input.size(-4);
@@ -136,18 +147,23 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
   int padH = (dH * (gradOutputHeight - 1) + kH - gradInputHeight) / 2;
   int padW = (dW * (gradOutputWidth - 1) + kW - gradInputWidth) / 2;
 
-  auto alg_kind = algorithm::pooling_avg_exclude_padding;
-  auto prop_kind = prop_kind::forward_training;
+  gradInput.resize_as_(input);
+  gradInput.zero_();
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "adaptive_avg_pool3d_backward", [&] {
+  auto alg_kind = algorithm::pooling_max;
+  auto prop_kind = dnnl::prop_kind::forward_training;
+
+  AT_DISPATCH_FLOATING_TYPES(
+      input.scalar_type(), "adaptive_max_pool3d_backward", [&] {
         /* get raw pointers */
         scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();
         scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();
+        int64_t* indices_data = indices.data_ptr<int64_t>();
 
-        avg_pool_backward_out_frame<scalar_t>(
+        max_pool_backward_out_frame<scalar_t>(
             gradInput_data,
             gradOutput_data,
+            indices_data,
             nbatch,
             nblock,
             gradInputDepth,
@@ -173,38 +189,42 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
 
 } // namespace impl
 
-Tensor& adaptive_avg_pool3d_out(
+std::tuple<Tensor&, Tensor&> adaptive_max_pool3d_out(
     Tensor& out,
+    Tensor& indices,
     const Tensor& self,
     IntArrayRef output_size) {
-  impl::adaptive_avg_pool3d_out_template(out, self, output_size);
-  return out;
+  impl::adaptive_max_pool3d_out_template(out, indices, self, output_size);
+  return std::tuple<Tensor&, Tensor&>(out, indices);
 }
 
-Tensor adaptive_avg_pool3d(const Tensor& self, IntArrayRef output_size) {
-  auto output = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::adaptive_avg_pool3d_out(
-      output, self, output_size);
+std::tuple<Tensor, Tensor> adaptive_max_pool3d(
+    const Tensor& self,
+    IntArrayRef output_size) {
+  Tensor output = at::empty({0}, self.options());
+  Tensor indices = at::empty({0}, self.options().dtype(kLong));
+  return at::AtenIpexTypeDPCPP::adaptive_max_pool3d_out(
+      output, indices, self, output_size);
 }
 
-Tensor& adaptive_avg_pool3d_backward_out(
+Tensor& adaptive_max_pool3d_backward_out(
     Tensor& grad_input,
     const Tensor& grad_output,
-    const Tensor& self) {
-  grad_input.resize_as_(self).zero_();
-  impl::adaptive_avg_pool3d_backward_out_template(
-      grad_input, grad_output, self);
+    const Tensor& self,
+    const Tensor& indices) {
+  impl::adaptive_max_pool3d_backward_out_template(
+      grad_input, grad_output, self, indices);
   return grad_input;
 }
 
-Tensor adaptive_avg_pool3d_backward(
+Tensor adaptive_max_pool3d_backward(
     const Tensor& grad_output,
-    const Tensor& self) {
+    const Tensor& self,
+    const Tensor& indices) {
   auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
-  impl::adaptive_avg_pool3d_backward_out_template(
-      grad_input, grad_output, self);
+  impl::adaptive_max_pool3d_backward_out_template(
+      grad_input, grad_output, self, indices);
   return grad_input;
 }
-
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

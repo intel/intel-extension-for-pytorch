@@ -5,7 +5,7 @@
 #include <core/Runtime.h>
 #include <vector>
 
-#include "AveragePooling.hpp"
+#include "Pooling.hpp"
 
 using namespace mkldnn;
 using namespace at::dpcpp;
@@ -101,20 +101,20 @@ void avg_pool2d_out_template(
             nbatch,
             nInputPlane,
             0,
-            inputWidth,
             inputHeight,
+            inputWidth,
             0,
-            outputWidth,
             outputHeight,
+            outputWidth,
             0,
-            kW,
             kH,
+            kW,
             0,
-            dW,
             dH,
+            dW,
             0,
-            padW,
             padH,
+            padW,
             alg_kind,
             prop_kind);
       });
@@ -208,20 +208,20 @@ Tensor& avg_pool2d_backward_out_template(
             nbatch,
             nInputPlane,
             0,
-            inputWidth,
             inputHeight,
+            inputWidth,
             0,
-            outputWidth,
             outputHeight,
+            outputWidth,
             0,
-            kW,
             kH,
+            kW,
             0,
-            dW,
             dH,
+            dW,
             0,
-            padW,
             padH,
+            padW,
             alg_kind,
             prop_kind);
       });
@@ -307,7 +307,7 @@ Tensor avg_pool2d_backward(
     bool ceil_mode,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
-  Tensor grad_input = at::zeros_like(input);
+  Tensor grad_input = at::zeros_like(input, MemoryFormat::Contiguous);
   return at::AtenIpexTypeDPCPP::avg_pool2d_backward_out(
       grad_input,
       grad_output,
