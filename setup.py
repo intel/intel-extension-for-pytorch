@@ -179,7 +179,7 @@ class DPCPPBuild(build_ext, object):
       build_type = 'Debug'
 
     # install _torch_ipex.so as python module
-    if ext.name is 'torch_ipex' and _check_env_flag("USE_SYCL"):
+    if ext.name is 'torch_ipex':
       ext_dir = ext_dir + '/torch_ipex'
 
     cmake_args = [
@@ -191,8 +191,7 @@ class DPCPPBuild(build_ext, object):
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
         ]
 
-    if _check_env_flag("USE_SYCL"):
-      cmake_args += ['-DUSE_SYCL=1']
+    cmake_args += ['-DUSE_SYCL=1']
 
     if _check_env_flag("DPCPP_ENABLE_PROFILING"):
       cmake_args += ['-DDPCPP_ENABLE_PROFILING=1']
@@ -200,11 +199,8 @@ class DPCPPBuild(build_ext, object):
     build_args = ['-j', str(multiprocessing.cpu_count())]
 
     env = os.environ.copy()
-    if _check_env_flag("USE_SYCL"):
-      os.environ['CXX'] = 'compute++'
-      check_call([self.cmake, ext.project_dir] + cmake_args, cwd=ext.build_dir, env=env)
-    else:
-      check_call([self.cmake, ext.project_dir] + cmake_args, cwd=ext.build_dir, env=env)
+    os.environ['CXX'] = 'compute++'
+    check_call([self.cmake, ext.project_dir] + cmake_args, cwd=ext.build_dir, env=env)
 
     # build_args += ['VERBOSE=1']
     check_call(['make'] + build_args, cwd=ext.build_dir, env=env)
@@ -215,9 +211,6 @@ version = get_build_version(ipex_git_sha)
 
 # Generate version info (torch_xla.__version__)
 create_version_files(base_dir, version, ipex_git_sha, torch_git_sha)
-
-# Generate the code before globbing!
-generate_ipex_cpu_aten_code(base_dir)
 
 # Constant known variables used throughout this file
 

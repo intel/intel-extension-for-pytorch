@@ -18,8 +18,4 @@ include(cmake/Dependencies.cmake)
 
 add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/pybind11)
 
-IF(USE_SYCL)
-  include(cmake/GPU.cmake)
-ELSE()
-  include(cmake/CPU.cmake)
-ENDIF()
+include(cmake/GPU.cmake)
