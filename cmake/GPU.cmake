@@ -155,15 +155,17 @@ set(C10_DISABLE_NUMA ${CAFFE2_DISABLE_NUMA})
 # include_directories(${CAFFE2_OUT_ATEN_SRC_ROOT})
 
 # generate c10 dispatch registration
-add_custom_target(
-  gen_dpcpp_gpu_c10_dispatch_registration
-  COMMAND python gen-gpu-decl.py --gpu_decl=./ DPCPPGPUType.h DedicateType.h DispatchStubOverride.h RegistrationDeclarations.h
-  COMMAND python gen-gpu-ops.py --output_folder=./ DPCPPGPUType.h RegistrationDeclarations_DPCPP.h Functions_DPCPP.h
-  COMMAND cp ./aten_ipex_type_default.cpp.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp
-  COMMAND cp ./aten_ipex_type_default.h.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.h
-  COMMAND cp ./aten_ipex_type_dpcpp.h.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_dpcpp.h
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/scripts/gpu
-)
+if (SHOULD_GEN)
+  add_custom_target(
+    gen_dpcpp_gpu_c10_dispatch_registration
+    COMMAND python gen-gpu-decl.py --gpu_decl=./ DPCPPGPUType.h DedicateType.h DispatchStubOverride.h RegistrationDeclarations.h
+    COMMAND python gen-gpu-ops.py --output_folder=./ DPCPPGPUType.h RegistrationDeclarations_DPCPP.h Functions_DPCPP.h
+    COMMAND cp ./aten_ipex_type_default.cpp.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp
+    COMMAND cp ./aten_ipex_type_default.h.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.h
+    COMMAND cp ./aten_ipex_type_dpcpp.h.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_dpcpp.h
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/scripts/gpu
+  )
+endif()
 
 # includes installation
 add_custom_target(
@@ -200,7 +202,9 @@ target_link_libraries(torch_ipex PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME "_torch_ipex")
-add_dependencies(torch_ipex gen_dpcpp_gpu_c10_dispatch_registration)
+if (SHOULD_GEN)
+  add_dependencies(torch_ipex gen_dpcpp_gpu_c10_dispatch_registration)
+endif()
 add_dependencies(torch_ipex install_dpcpp_gpu_includes)
 # add_dependencies(torch_ipex ${DPCPP_DEP})
 # target_link_libraries(torch PUBLIC c10_sycl)

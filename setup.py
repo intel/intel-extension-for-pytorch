@@ -17,6 +17,7 @@ from sysconfig import get_paths
 
 import distutils.ccompiler
 import distutils.command.clean
+import git
 import glob
 import inspect
 import multiprocessing
@@ -119,6 +120,20 @@ def generate_ipex_cpu_aten_code(base_dir):
   os.chdir(cur_dir)
 
 
+def gpu_should_gen_aten_ops():
+    torch_ipex_git_root = "."
+    gpu_dedicate_type = "scripts/gpu/DedicateType.h"
+    gpu_dpcpp_type = "scripts/gpu/DPCPPGPUType.h"
+    gpu_dispatchstub_type = "scripts/gpu/DispatchStubOverride.h"
+    repo = git.Repo(torch_ipex_git_root)
+    gpu_dedicate_type_diff = repo.git.diff(gpu_dedicate_type)
+    gpu_dpcpp_type_diff = repo.git.diff(gpu_dpcpp_type)
+    gpu_dispatchstub_type_diff = repo.git.diff(gpu_dispatchstub_type)
+    return (gpu_dedicate_type_diff is not "") or \
+           (gpu_dpcpp_type_diff is not "") or \
+           (gpu_dispatchstub_type_diff is not "")
+
+
 class DPCPPExt(Extension, object):
   def __init__(self, name, project_dir=os.path.dirname(__file__)):
     Extension.__init__(self, name, sources=[])
@@ -192,6 +207,9 @@ class DPCPPBuild(build_ext, object):
         ]
 
     cmake_args += ['-DUSE_SYCL=1']
+
+    if gpu_should_gen_aten_ops():
+      cmake_args += ['-DSHOULD_GEN=1']
 
     if _check_env_flag("DPCPP_ENABLE_PROFILING"):
       cmake_args += ['-DDPCPP_ENABLE_PROFILING=1']
