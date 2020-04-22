@@ -210,9 +210,13 @@ class DPCPPBuild(build_ext, object):
 
     if gpu_should_gen_aten_ops():
       cmake_args += ['-DSHOULD_GEN=1']
+    else:
+      cmake_args += ['-DSHOULD_GEN=0']
 
     if _check_env_flag("DPCPP_ENABLE_PROFILING"):
       cmake_args += ['-DDPCPP_ENABLE_PROFILING=1']
+    else:
+      cmake_args += ['-DDPCPP_ENABLE_PROFILING=0']
 
     build_args = ['-j', str(multiprocessing.cpu_count())]
 

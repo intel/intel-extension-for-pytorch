@@ -69,6 +69,12 @@ at::Tensor convolution(
     IntArrayRef dilation,
     int64_t groups,
     conv_attr_t attr) {
+  if (!output.defined()) {
+    output = at::empty(conv_output_size(
+      input.sizes(), weight.sizes(), padding, stride, dilation, groups),
+      input.options());
+  }
+
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
@@ -173,7 +179,7 @@ at::Tensor convolution(
   primitive_attr pattr;
   post_ops po;
   if (attr.with_sum()) {
-    po.append_sum(attr.scale_);
+    po.append_sum(attr.alpha_);
   }
 
   if (attr.with_relu()) {
@@ -216,6 +222,8 @@ at::Tensor convolution(
   auto output_memory = output_usr_memory;
   if (output_usr_memory.get_desc() != expected_output_md) {
     output_memory = memory(expected_output_md, engine);
+    reorder(output_usr_memory, output_memory)
+        .execute(strm, output_usr_memory, output_memory);
   }
 
   std::shared_ptr<convolution_forward> conv_forward;
@@ -1058,10 +1066,6 @@ Tensor _convolution_out(
         padding,
         dilation);
   } else {
-    auto output = output_r.resize_(conv_output_size(
-        input_r.sizes(), weight_r.sizes(),
-        params.padding, params.stride, params.dilation, params.groups));
-
     output_ = convolution(
         output,
         input,
@@ -1092,8 +1096,7 @@ Tensor _convolution(
     IntArrayRef output_padding_,
     int64_t groups_,
     conv_attr_t attr) {
-  auto output_r = at::empty({0}, input_r.options());
-
+  Tensor output_r;
   return _convolution_out(
       output_r,
       input_r,
