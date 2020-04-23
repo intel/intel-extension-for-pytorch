@@ -1331,6 +1331,26 @@ at::Tensor & AtenIpexTypeDefault::hardtanh_(at::Tensor & self, at::Scalar min_va
   return AtenIpexTypeDPCPP::hardtanh_(self, min_val, max_val);
 }
 
+at::Tensor & AtenIpexTypeDefault::leaky_relu_out(at::Tensor & out, const at::Tensor & self, at::Scalar negative_slope) {
+  return AtenIpexTypeDPCPP::leaky_relu_out(out, self, negative_slope);
+}
+
+at::Tensor AtenIpexTypeDefault::leaky_relu(const at::Tensor & self, at::Scalar negative_slope) {
+  return AtenIpexTypeDPCPP::leaky_relu(self, negative_slope);
+}
+
+at::Tensor & AtenIpexTypeDefault::leaky_relu_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, at::Scalar negative_slope) {
+  return AtenIpexTypeDPCPP::leaky_relu_backward_out(grad_input, grad_output, self, negative_slope);
+}
+
+at::Tensor AtenIpexTypeDefault::leaky_relu_backward(const at::Tensor & grad_output, const at::Tensor & self, at::Scalar negative_slope) {
+  return AtenIpexTypeDPCPP::leaky_relu_backward(grad_output, self, negative_slope);
+}
+
+at::Tensor & AtenIpexTypeDefault::leaky_relu_(at::Tensor & self, at::Scalar negative_slope) {
+  return AtenIpexTypeDPCPP::leaky_relu_(self, negative_slope);
+}
+
 std::tuple<at::Tensor &,at::Tensor &> AtenIpexTypeDefault::log_sigmoid_forward_out(at::Tensor & output, at::Tensor & buffer, const at::Tensor & self) {
   return AtenIpexTypeDPCPP::log_sigmoid_forward_out(output, buffer, self);
 }
@@ -2535,6 +2555,21 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::hardtanh_(Tensor(a!) self, Scalar min_val=-1, Scalar max_val=1) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::hardtanh_>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::leaky_relu.out(Tensor self, Scalar negative_slope=0.01, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::leaky_relu_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::leaky_relu(Tensor self, Scalar negative_slope=0.01) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::leaky_relu>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::leaky_relu_backward.grad_input(Tensor grad_output, Tensor self, Scalar negative_slope, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::leaky_relu_backward_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::leaky_relu_backward(Tensor grad_output, Tensor self, Scalar negative_slope) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::leaky_relu_backward>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::leaky_relu_(Tensor(a!) self, Scalar negative_slope=0.01) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar), &AtenIpexTypeDefault::leaky_relu_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::log_sigmoid_forward.output(Tensor self, *, Tensor(a!) output, Tensor(b!) buffer) -> (Tensor(a!), Tensor(b!))")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor &,at::Tensor &>(at::Tensor &, at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::log_sigmoid_forward_out>(at::TensorTypeId::DPCPPTensorId)

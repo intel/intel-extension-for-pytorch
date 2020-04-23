@@ -82,6 +82,11 @@ struct TORCH_API SYCLType final {
   static Tensor & relu_(Tensor & self); // aten::relu_(Tensor(a!) self) -> Tensor(a!)
   static Tensor hardshrink(const Tensor & self, Scalar lambd); // aten::hardshrink(Tensor self, Scalar lambd=0.5) -> Tensor
   static Tensor hardshrink_backward(const Tensor & grad_out, const Tensor & self, Scalar lambd); // aten::hardshrink_backward(Tensor grad_out, Tensor self, Scalar lambd) -> Tensor
+  static Tensor & leaky_relu_out(Tensor & out, const Tensor & self, Scalar negative_slope); // aten::leaky_relu.out(Tensor self, Scalar negative_slope=0.01, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor leaky_relu(const Tensor & self, Scalar negative_slope); // aten::leaky_relu(Tensor self, Scalar negative_slope=0.01) -> Tensor
+  static Tensor & leaky_relu_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, Scalar negative_slope); // aten::leaky_relu_backward.grad_input(Tensor grad_output, Tensor self, Scalar negative_slope, *, Tensor(a!) grad_input) -> Tensor(a!)
+  static Tensor leaky_relu_backward(const Tensor & grad_output, const Tensor & self, Scalar negative_slope); // aten::leaky_relu_backward(Tensor grad_output, Tensor self, Scalar negative_slope) -> Tensor
+  static Tensor & leaky_relu_(Tensor & self, Scalar negative_slope); // aten::leaky_relu_(Tensor(a!) self, Scalar negative_slope=0.01) -> Tensor(a!)
   static Tensor & rsqrt_out(Tensor & out, const Tensor & self); // aten::rsqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor sigmoid(const Tensor & self); // aten::sigmoid(Tensor self) -> Tensor
   static Tensor & sigmoid_(Tensor & self); // aten::sigmoid_(Tensor(a!) self) -> Tensor(a!)
