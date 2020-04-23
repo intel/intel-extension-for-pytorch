@@ -653,6 +653,16 @@ Tensor & smooth_l1_loss_backward_out(Tensor & grad_input, const Tensor & grad_ou
 
 Tensor smooth_l1_loss_backward(const Tensor & grad_output, const Tensor & self, const Tensor & target, int64_t reduction); // aten::smooth_l1_loss_backward(Tensor grad_output, Tensor self, Tensor target, int reduction) -> Tensor
 
+Tensor & elu_out(Tensor & out, const Tensor & self, Scalar alpha, Scalar scale, Scalar input_scale); // aten::elu.out(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1, *, Tensor(a!) out) -> Tensor(a!)
+
+Tensor elu(const Tensor & self, Scalar alpha, Scalar scale, Scalar input_scale); // aten::elu(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -> Tensor
+
+Tensor & elu_backward_out(Tensor & grad_input, const Tensor & grad_output, Scalar alpha, Scalar scale, Scalar input_scale, const Tensor & output); // aten::elu_backward.grad_input(Tensor grad_output, Scalar alpha, Scalar scale, Scalar input_scale, Tensor output, *, Tensor(a!) grad_input) -> Tensor(a!)
+
+Tensor elu_backward(const Tensor & grad_output, Scalar alpha, Scalar scale, Scalar input_scale, const Tensor & output); // aten::elu_backward(Tensor grad_output, Scalar alpha, Scalar scale, Scalar input_scale, Tensor output) -> Tensor
+
+Tensor & elu_(Tensor & self, Scalar alpha, Scalar scale, Scalar input_scale); // aten::elu_(Tensor(a!) self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -> Tensor(a!)
+
 Tensor & hardtanh_out(Tensor & out, const Tensor & self, Scalar min_val, Scalar max_val); // aten::hardtanh.out(Tensor self, Scalar min_val=-1, Scalar max_val=1, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor hardtanh(const Tensor & self, Scalar min_val, Scalar max_val); // aten::hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -> Tensor

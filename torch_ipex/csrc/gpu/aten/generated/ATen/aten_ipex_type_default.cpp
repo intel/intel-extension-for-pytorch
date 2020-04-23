@@ -1311,6 +1311,26 @@ at::Tensor AtenIpexTypeDefault::smooth_l1_loss_backward(const at::Tensor & grad_
   return AtenIpexTypeDPCPP::smooth_l1_loss_backward(grad_output, self, target, reduction);
 }
 
+at::Tensor & AtenIpexTypeDefault::elu_out(at::Tensor & out, const at::Tensor & self, at::Scalar alpha, at::Scalar scale, at::Scalar input_scale) {
+  return AtenIpexTypeDPCPP::elu_out(out, self, alpha, scale, input_scale);
+}
+
+at::Tensor AtenIpexTypeDefault::elu(const at::Tensor & self, at::Scalar alpha, at::Scalar scale, at::Scalar input_scale) {
+  return AtenIpexTypeDPCPP::elu(self, alpha, scale, input_scale);
+}
+
+at::Tensor & AtenIpexTypeDefault::elu_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, at::Scalar alpha, at::Scalar scale, at::Scalar input_scale, const at::Tensor & output) {
+  return AtenIpexTypeDPCPP::elu_backward_out(grad_input, grad_output, alpha, scale, input_scale, output);
+}
+
+at::Tensor AtenIpexTypeDefault::elu_backward(const at::Tensor & grad_output, at::Scalar alpha, at::Scalar scale, at::Scalar input_scale, const at::Tensor & output) {
+  return AtenIpexTypeDPCPP::elu_backward(grad_output, alpha, scale, input_scale, output);
+}
+
+at::Tensor & AtenIpexTypeDefault::elu_(at::Tensor & self, at::Scalar alpha, at::Scalar scale, at::Scalar input_scale) {
+  return AtenIpexTypeDPCPP::elu_(self, alpha, scale, input_scale);
+}
+
 at::Tensor & AtenIpexTypeDefault::hardtanh_out(at::Tensor & out, const at::Tensor & self, at::Scalar min_val, at::Scalar max_val) {
   return AtenIpexTypeDPCPP::hardtanh_out(out, self, min_val, max_val);
 }
@@ -2540,6 +2560,21 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::smooth_l1_loss_backward(Tensor grad_output, Tensor self, Tensor target, int reduction) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, int64_t), &AtenIpexTypeDefault::smooth_l1_loss_backward>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::elu.out(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar, at::Scalar), &AtenIpexTypeDefault::elu_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::elu(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::Scalar, at::Scalar, at::Scalar), &AtenIpexTypeDefault::elu>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::elu_backward.grad_input(Tensor grad_output, Scalar alpha, Scalar scale, Scalar input_scale, Tensor output, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar, at::Scalar, const at::Tensor &), &AtenIpexTypeDefault::elu_backward_out>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::elu_backward(Tensor grad_output, Scalar alpha, Scalar scale, Scalar input_scale, Tensor output) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::Scalar, at::Scalar, at::Scalar, const at::Tensor &), &AtenIpexTypeDefault::elu_backward>(at::TensorTypeId::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::elu_(Tensor(a!) self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar, at::Scalar, at::Scalar), &AtenIpexTypeDefault::elu_>(at::TensorTypeId::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::hardtanh.out(Tensor self, Scalar min_val=-1, Scalar max_val=1, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::Scalar, at::Scalar), &AtenIpexTypeDefault::hardtanh_out>(at::TensorTypeId::DPCPPTensorId)

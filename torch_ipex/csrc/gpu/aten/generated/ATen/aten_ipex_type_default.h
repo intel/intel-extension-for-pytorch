@@ -332,6 +332,11 @@ class AtenIpexTypeDefault {
   static at::Tensor smooth_l1_loss(const at::Tensor & self, const at::Tensor & target, int64_t reduction);
   static at::Tensor & smooth_l1_loss_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & target, int64_t reduction);
   static at::Tensor smooth_l1_loss_backward(const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & target, int64_t reduction);
+  static at::Tensor & elu_out(at::Tensor & out, const at::Tensor & self, at::Scalar alpha, at::Scalar scale, at::Scalar input_scale);
+  static at::Tensor elu(const at::Tensor & self, at::Scalar alpha, at::Scalar scale, at::Scalar input_scale);
+  static at::Tensor & elu_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, at::Scalar alpha, at::Scalar scale, at::Scalar input_scale, const at::Tensor & output);
+  static at::Tensor elu_backward(const at::Tensor & grad_output, at::Scalar alpha, at::Scalar scale, at::Scalar input_scale, const at::Tensor & output);
+  static at::Tensor & elu_(at::Tensor & self, at::Scalar alpha, at::Scalar scale, at::Scalar input_scale);
   static at::Tensor & hardtanh_out(at::Tensor & out, const at::Tensor & self, at::Scalar min_val, at::Scalar max_val);
   static at::Tensor hardtanh(const at::Tensor & self, at::Scalar min_val, at::Scalar max_val);
   static at::Tensor & hardtanh_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, at::Scalar min_val, at::Scalar max_val);
