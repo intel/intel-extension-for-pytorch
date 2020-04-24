@@ -97,6 +97,7 @@ else()
 endif()
 
 set (PYTORCH_INCLUDES "${PYTORCH_INSTALL_DIR}/include")
+set (PYBIND_INCLUDES "${PROJECT_SOURCE_DIR}/third_party/pybind11/include")
 # set(PYTORCH_ROOT "${PROJECT_SOURCE_DIR}/third_party/pytorch")
 # set(PYTORCH_ATEN_SRC_ROOT "${PYTORCH_ROOT}/aten/src")
 # set(PYTORCH_ATEN_INCLUDES "${PYTORCH_ROOT}/aten/src/ATen")
@@ -106,6 +107,7 @@ set (PYTORCH_INCLUDES "${PYTORCH_INSTALL_DIR}/include")
 # set(PYTORCH_C10_UTIL_INCLUDES "${PYTORCH_ROOT}/c10/util")
 # set(PYTORCH_C10_MACROS_INCLUDES "${PYTORCH_ROOT}/c10/macros")
 
+
 set(DPCPP_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc")
 set(DPCPP_GPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/gpu")
 set(DPCPP_GPU_ATEN_SRC_ROOT "${DPCPP_GPU_ROOT}/aten")
@@ -113,6 +115,7 @@ set(DPCPP_GPU_ATEN_GENERATED "${DPCPP_GPU_ROOT}/aten/generated")
 
 include_directories(${PYTHON_INCLUDE_DIR})
 include_directories(${PYTORCH_INCLUDES})
+include_directories(${PYBIND_INCLUDES})
 # include_directories(${PYTORCH_ATEN_SRC_ROOT})
 # include_directories(${PYTORCH_ATEN_INCLUDES})
 # include_directories(${PYTORCH_ATEN_CORE_INCLUDES})

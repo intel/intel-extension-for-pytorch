@@ -1,45 +1,22 @@
-#include <Python.h>
+#include <torch/csrc/jit/pybind_utils.h>
+
 #include <ATen/aten_ipex_type_default.h>
 #include <../jit/fusion_pass.h>
+#include <../jit/weight_freeze.h>
+
+#include <pybind11/pybind11.h>
 
 
-// static PyObject* M_PyInstanceMethod_New(PyObject *self, PyObject *func)
-// {
-//   return PyInstanceMethod_New(func);
-// }
-// 
-// static PyMethodDef ModuleMethods[] = {
-// 	 { (char *)"M_PyInstanceMethod_New", (PyCFunction)M_PyInstanceMethod_New, METH_O, NULL},
-// 	 { NULL, NULL, 0, NULL }
-// };
+namespace py = pybind11;
 
-#ifdef __cplusplus
-// extern "C"{
-void torch_ipex_init() {
+PYBIND11_MODULE(_torch_ipex, m) {
   // TODO:
   printf("loading _torch_ipex.so ++\n");
+
+  m.doc() = "PyTorch Extension for Intel dGPU";
+
   at::RegisterAtenTypeFunctions();
   torch::jit::InitFusionPass();
+
   printf("loading _torch_ipex.so --\n");
 }
-// PyObject* PyInit__torch_ipex() {
-//   // TODO:
-//   static struct PyModuleDef module = {
-//     PyModuleDef_HEAD_INIT,
-//     "torch_ipex",
-//     NULL,
-//     -1,
-//     ModuleMethods,
-//     NULL,
-//     NULL,
-//     NULL,
-//     NULL
-//   };
-// 
-//   PyObject* m = PyModule_Create(&module);
-//   PyTypeObject* m_ = m;
-//   m_->tp_mro;
-//   return m;
-// }
-// }
-#endif
