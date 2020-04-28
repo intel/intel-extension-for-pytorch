@@ -1,20 +1,19 @@
 ## Included by CMakeLists
 
-## For ComputeCPP
-include(cmake/DPCPP.cmake)
-
-IF(USE_COMPUTECPP OR USE_DPCPP)
+IF(USE_COMPUTECPP)
   INCLUDE_DIRECTORIES(SYSTEM ${ComputeCpp_INCLUDE_DIRS} ${OpenCL_INCLUDE_DIRS})
   LIST(APPEND Caffe2_PUBLIC_DEPENDENCY_LIBS ${COMPUTECPP_RUNTIME_LIBRARY})
   MESSAGE(STATUS "ComputeCpp found. Compiling with SYCL support")
+ELSEIF(USE_DPCPP)
+  MESSAGE(STATUS "DPCPP found. Compiling with SYCL support")
 ELSE()
-  MESSAGE(FATAL_ERROR "ComputeCpp not found. Compiling without SYCL support")
+  MESSAGE(FATAL_ERROR "No ComputeCpp or DPCPP not found. Compiling without SYCL support")
 ENDIF()
 
 # ---[ Build flags
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2 -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-narrowing")
 # Eigen fails to build with some versions, so convert this to a warning
 # Details at http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1459

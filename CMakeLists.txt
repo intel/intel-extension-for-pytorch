@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+project(torch_ipex)
 
 set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)

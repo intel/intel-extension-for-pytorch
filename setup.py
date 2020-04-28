@@ -33,6 +33,11 @@ pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
 base_dir = os.path.dirname(os.path.abspath(__file__))
 python_include_dir = get_paths()['include']
 
+def _get_complier():
+    if not os.getenv("SYCLROOT") is None:
+        return "clang", "clang++"
+    else:
+        return "compute", "compute++"
 
 def _check_env_flag(name, default=''):
   return os.getenv(name, default).upper() in ['ON', '1', 'YES', 'TRUE', 'Y']
@@ -206,7 +211,11 @@ class DPCPPBuild(build_ext, object):
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
         ]
 
-    cmake_args += ['-DUSE_SYCL=1']
+    cc, cxx = _get_complier()
+    cmake_args += ['-DUSE_SYCL=1',
+                   '-DCMAKE_C_COMPILER=' + cc,
+                   '-DCMAKE_CXX_COMPILER=' + cxx,
+                   ]
 
     if gpu_should_gen_aten_ops():
       cmake_args += ['-DSHOULD_GEN=1']
@@ -218,11 +227,14 @@ class DPCPPBuild(build_ext, object):
     else:
       cmake_args += ['-DDPCPP_ENABLE_PROFILING=0']
 
-    build_args = ['-j', str(multiprocessing.cpu_count())]
+    command = [self.cmake, ext.project_dir] + cmake_args
+    print(' '.join(command))
 
     env = os.environ.copy()
-    os.environ['CXX'] = 'compute++'
-    check_call([self.cmake, ext.project_dir] + cmake_args, cwd=ext.build_dir, env=env)
+    check_call(command, cwd=ext.build_dir, env=env)
+
+
+    build_args = ['-j', str(multiprocessing.cpu_count())]
 
     # build_args += ['VERBOSE=1']
     check_call(['make'] + build_args, cwd=ext.build_dir, env=env)
@@ -254,7 +266,7 @@ setup(
     name='torch_ipex',
     version=version,
     description='Intel PyTorch Extension',
-    url='https://github.com/pytorch/xla',
+    # url='https://github.com/pytorch/ipex',
     author='Intel/PyTorch Dev Team',
     # Exclude the build files.
     #packages=find_packages(exclude=['build']),
