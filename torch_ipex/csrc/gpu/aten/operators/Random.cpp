@@ -103,5 +103,12 @@ Tensor& normal_(Tensor& self, double mean, double std, Generator* generator) {
   return self;
 }
 
+Tensor& uniform_(Tensor& self, double from, double to, Generator* generator) {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "uniform_", [&]() {
+    impl::uniform<scalar_t>(self, generator, from, to);
+  });
+  return self;
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

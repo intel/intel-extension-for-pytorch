@@ -19,6 +19,12 @@ struct numeric_limits {};
 
 template <>
 struct numeric_limits<uint8_t> {
+  static inline uint8_t lowest() {
+    return 0;
+  }
+  static inline uint8_t max() {
+    return UINT8_MAX;
+  }
   static inline uint8_t lower_bound() {
     return 0;
   }
@@ -29,6 +35,12 @@ struct numeric_limits<uint8_t> {
 
 template <>
 struct numeric_limits<int8_t> {
+  static inline int8_t lowest() {
+    return INT8_MIN;
+  }
+  static inline int8_t max() {
+    return INT8_MAX;
+  }
   static inline int8_t lower_bound() {
     return INT8_MIN;
   }
@@ -39,6 +51,12 @@ struct numeric_limits<int8_t> {
 
 template <>
 struct numeric_limits<int16_t> {
+  static inline int16_t lowest() {
+    return INT16_MIN;
+  }
+  static inline int16_t max() {
+    return INT16_MAX;
+  }
   static inline int16_t lower_bound() {
     return INT16_MIN;
   }
@@ -49,6 +67,12 @@ struct numeric_limits<int16_t> {
 
 template <>
 struct numeric_limits<int32_t> {
+  static inline int32_t lowest() {
+    return INT32_MIN;
+  }
+  static inline int32_t max() {
+    return INT32_MAX;
+  }
   static inline int32_t lower_bound() {
     return INT32_MIN;
   }
@@ -59,6 +83,12 @@ struct numeric_limits<int32_t> {
 
 template <>
 struct numeric_limits<int64_t> {
+  static inline int64_t lowest() {
+    return INT64_MIN;
+  }
+  static inline int64_t max() {
+    return INT64_MAX;
+  }
   static inline int64_t lower_bound() {
     return INT64_MIN;
   }
@@ -69,6 +99,12 @@ struct numeric_limits<int64_t> {
 
 template <>
 struct numeric_limits<at::Half> {
+  static inline at::Half lowest() {
+    return at::Half(0xFBFF, at::Half::from_bits());
+  }
+  static inline at::Half max() {
+    return at::Half(0x7BFF, at::Half::from_bits());
+  }
   static inline at::Half lower_bound() {
     return at::Half(0xFC00, at::Half::from_bits());
   }
@@ -79,6 +115,12 @@ struct numeric_limits<at::Half> {
 
 template <>
 struct numeric_limits<float> {
+  static inline float lowest() {
+    return -FLT_MAX;
+  }
+  static inline float max() {
+    return FLT_MAX;
+  }
   static inline float lower_bound() {
     return -static_cast<float>(inf);
   }
@@ -89,6 +131,12 @@ struct numeric_limits<float> {
 
 template <>
 struct numeric_limits<double> {
+  static inline double lowest() {
+    return -DBL_MAX;
+  }
+  static inline double max() {
+    return DBL_MAX;
+  }
   static inline double lower_bound() {
     return -inf;
   }
@@ -99,6 +147,12 @@ struct numeric_limits<double> {
 
 template <>
 struct numeric_limits<bool> {
+  static inline uint8_t lowest() {
+    return false;
+  }
+  static inline uint8_t max() {
+    return true;
+  }
   static inline uint8_t lower_bound() {
     return false;
   }
