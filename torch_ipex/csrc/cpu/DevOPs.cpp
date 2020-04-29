@@ -730,14 +730,14 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
       dbl::comm::gen_aten_tensor_by(gradb));
 }
 
-at::Tensor AtenIpexCPUDev::dil_max_pool2d(
+at::Tensor AtenIpexCPUDev::dil_max_pooling(
     const at::Tensor& input,
     at::IntArrayRef kernel_size,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     bool ceil_mode) {
-  DEBUG("AtenIpexCPUDev::dil_max_pool2d\n");
+  DEBUG("AtenIpexCPUDev::dil_max_pooling\n");
   CHECK_DNNL_OP_PRE_COND(input);
   return dbl::pool::_dil_pooling(
       input.is_contiguous() ? input : input.contiguous(),
@@ -747,26 +747,6 @@ at::Tensor AtenIpexCPUDev::dil_max_pool2d(
       dilation,
       ceil_mode,
       dil::algorithm::pooling_max);
-}
-
-std::tuple<at::Tensor, at::Tensor> AtenIpexCPUDev::dil_max_pool2d_with_indices(
-    const at::Tensor& input,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool ceil_mode) {
-  DEBUG("AtenIpexCPUDev::dil_max_pool2d_with_indices\n");
-  CHECK_DNNL_OP_PRE_COND(input);
-  auto output = dil_max_pool2d(
-      input,
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode);
-  // indices is already embedded in `output` as workspace
-  return std::make_tuple(output, output);
 }
 
 at::Tensor AtenIpexCPUDev::dil_avg_pool2d(
@@ -850,7 +830,7 @@ at::Tensor AtenIpexCPUDev::dil__adaptive_avg_pool2d(
       /*algo*/ dil::algorithm::pooling_avg);
 }
 
-at::Tensor AtenIpexCPUDev::dil_max_pool2d_backward(
+at::Tensor AtenIpexCPUDev::dil_max_pooling_backward(
     const at::Tensor& grad_output,
     const at::Tensor& output,
     const at::Tensor& input,
@@ -859,7 +839,7 @@ at::Tensor AtenIpexCPUDev::dil_max_pool2d_backward(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     bool ceil_mode) {
-  DEBUG("AtenIpexCPUDev::dil_max_pool2d_backward\n");
+  DEBUG("AtenIpexCPUDev::dil_max_pooling_backward\n");
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(output);
   CHECK_DNNL_OP_PRE_COND(input);
@@ -873,27 +853,6 @@ at::Tensor AtenIpexCPUDev::dil_max_pool2d_backward(
       dilation,
       ceil_mode,
       dil::algorithm::pooling_max);
-}
-
-at::Tensor AtenIpexCPUDev::dil_max_pool2d_with_indices_backward(
-    const at::Tensor& grad_output,
-    const at::Tensor& input,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool ceil_mode,
-    const at::Tensor& indices) {
-  DEBUG("AtenIpexCPUDev::dil_max_pool2d_with_indices_backward\n");
-  return dil_max_pool2d_backward(
-      grad_output,
-      indices,
-      input,
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode);
 }
 
 at::Tensor AtenIpexCPUDev::dil_avg_pool2d_backward(

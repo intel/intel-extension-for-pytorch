@@ -35,8 +35,6 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::avg_pool2d_backward(Tensor grad_output, Tensor self, int[2] kernel_size, int[2] stride, int[2] padding, bool ceil_mode, bool count_include_pad, int? divisor_override) -> Tensor',
     'aten::avg_pool3d(Tensor self, int[3] kernel_size, int[3] stride=[], int[3] padding=0, bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None) -> Tensor',
     'aten::avg_pool3d_backward(Tensor grad_output, Tensor self, int[3] kernel_size, int[3] stride, int[3] padding, bool ceil_mode, bool count_include_pad, int? divisor_override) -> Tensor',
-    'aten::max_pool2d_with_indices(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=0, int[2] dilation=1, bool ceil_mode=False) -> (Tensor, Tensor)',
-    'aten::max_pool2d_with_indices_backward(Tensor grad_output, Tensor self, int[2] kernel_size, int[2] stride, int[2] padding, int[2] dilation, bool ceil_mode, Tensor indices) -> Tensor',
     'aten::_adaptive_avg_pool2d(Tensor self, int[2] output_size) -> Tensor',
     'aten::_adaptive_avg_pool2d_backward(Tensor grad_output, Tensor self) -> Tensor',
     'aten::relu(Tensor self) -> Tensor',
