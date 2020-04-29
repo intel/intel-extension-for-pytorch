@@ -23,7 +23,7 @@
 
 ```bash
 ## conda env
-conda create -n <exten> --clone <yourenv>
+conda create -n <exten>
 conda activate <exten>
 ## check pytorch
 ## !!!  DO NOT IMPORT PYTORCH IN PYTORCH SOURCE DIR !!!
@@ -40,7 +40,7 @@ python ./setup.py clean
 export COMPUTECPP_DIR=/path/to/ComputeCpp-CE-1.1.3-Ubuntu-16.04-x86_64
 export CXX=${COMPUTECPP_DIR}/bin/compute++
 export PATH=${COMPUTECPP_DIR}/bin:${PATH}
-export LD_LIBRARY_PATH=${COMPUTECPP_DIR}/include:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${COMPUTECPP_DIR}/lib:${LD_LIBRARY_PATH}
 ## build
 VERBOSE=1 python ./setup.py install 2>&1 | tee ./build.log
 ```
