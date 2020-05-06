@@ -130,13 +130,19 @@ def gpu_should_gen_aten_ops():
     gpu_dedicate_type = "scripts/gpu/DedicateType.h"
     gpu_dpcpp_type = "scripts/gpu/DPCPPGPUType.h"
     gpu_dispatchstub_type = "scripts/gpu/DispatchStubOverride.h"
+    gpu_decl_script = "scripts/gpu/gen-gpu-decl.py"
+    gpu_gen_script = "scripts/gpu/gen-gpu-ops.py"
     repo = git.Repo(torch_ipex_git_root)
     gpu_dedicate_type_diff = repo.git.diff(gpu_dedicate_type)
     gpu_dpcpp_type_diff = repo.git.diff(gpu_dpcpp_type)
     gpu_dispatchstub_type_diff = repo.git.diff(gpu_dispatchstub_type)
+    gpu_decl_script_diff = repo.git.diff(gpu_decl_script)
+    gpu_gen_script_diff = repo.git.diff(gpu_gen_script)
     return (gpu_dedicate_type_diff is not "") or \
            (gpu_dpcpp_type_diff is not "") or \
-           (gpu_dispatchstub_type_diff is not "")
+           (gpu_dispatchstub_type_diff is not "") or \
+           (gpu_decl_script_diff is not "") or \
+           (gpu_gen_script_diff is not "")
 
 
 class DPCPPExt(Extension, object):

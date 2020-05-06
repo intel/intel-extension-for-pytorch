@@ -5,8 +5,8 @@
 #include <dnnl.hpp>
 #include "accelerated_ops.h"
 #include <c10/util/Optional.h>
-#include <torch/csrc/jit/ir.h>
-#include <torch/csrc/jit/constants.h>
+#include <torch/csrc/jit/ir/ir.h>
+#include <torch/csrc/jit/ir/constants.h>
 
 namespace torch { namespace jit {
 using namespace dnnl;

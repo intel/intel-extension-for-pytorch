@@ -16,28 +16,28 @@ class scalar_t_to_dnnl {
   const memory::data_type data_t;
   template <
       typename scalar_t,
-      c10::guts::enable_if_t<std::is_same<scalar_t, Half>::value, int> = 0>
+      std::enable_if_t<std::is_same<scalar_t, Half>::value, int> = 0>
   static memory::data_type to() {
     return memory::data_type::f16;
   };
 
   template <
       typename scalar_t,
-      c10::guts::enable_if_t<std::is_same<scalar_t, BFloat16>::value, int> = 0>
+      std::enable_if_t<std::is_same<scalar_t, BFloat16>::value, int> = 0>
   static memory::data_type to() {
     return memory::data_type::bf16;
   };
 
   template <
       typename scalar_t,
-      c10::guts::enable_if_t<std::is_same<scalar_t, float>::value, int> = 0>
+      std::enable_if_t<std::is_same<scalar_t, float>::value, int> = 0>
   static memory::data_type to() {
     return memory::data_type::f32;
   };
 
   template <
       typename scalar_t,
-      c10::guts::enable_if_t<std::is_same<scalar_t, double>::value, int> = 0>
+      std::enable_if_t<std::is_same<scalar_t, double>::value, int> = 0>
   static memory::data_type to() {
     TORCH_CHECK(0, " mkldnn not support for double");
   };

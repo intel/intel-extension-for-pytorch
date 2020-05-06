@@ -497,9 +497,7 @@ struct idx_functor {
 
   template <typename T>
   idx_functor(const TensorInfo<T, IndexType>& t_info)
-      : idx_functor(
-            t_info,
-            c10::guts::make_index_sequence<MAX_DPCPPTORCH_DIMS>{}) {}
+      : idx_functor(t_info, std::make_index_sequence<MAX_DPCPPTORCH_DIMS>{}) {}
 
   template <typename _Value, typename _Idx, typename _InAcc, typename _OutAcc>
   void operator()(
@@ -520,9 +518,7 @@ struct idx_functor {
 
  private:
   template <typename T, std::size_t... I>
-  idx_functor(
-      const TensorInfo<T, IndexType>& t_info,
-      c10::guts::index_sequence<I...>)
+  idx_functor(const TensorInfo<T, IndexType>& t_info, std::index_sequence<I...>)
       : dims(t_info.dims), sz{t_info.sizes[I]...}, st{t_info.strides[I]...} {}
 };
 

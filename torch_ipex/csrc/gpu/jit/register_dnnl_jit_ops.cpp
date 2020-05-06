@@ -1,5 +1,5 @@
-#include <torch/csrc/jit/operator.h>
-#include <torch/csrc/jit/custom_operator.h>
+#include <torch/csrc/jit/runtime/operator.h>
+#include <torch/csrc/jit/runtime/custom_operator.h>
 #include "dpcpp_ops.h"
 #include "accelerated_ops.h"
 #include "graph_ext.h"
@@ -7,10 +7,8 @@
 namespace torch {
 namespace jit {
 
-c10::OperatorOptions aliasAnalysisFromSchema() {
-  c10::OperatorOptions result;
-  result.setAliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA);
-  return result;
+c10::AliasAnalysisKind aliasAnalysisFromSchema() {
+  return c10::AliasAnalysisKind::FROM_SCHEMA;
 }
 
 at::Tensor toOptionalTensor(const IValue& v) {
@@ -49,9 +47,9 @@ RegisterOperators op({
               (std::move(peek(stack, 0, 7))).toTensor(),
               (std::move(peek(stack, 1, 7))).toTensor(),
               toOptionalTensor(std::move(peek(stack, 2, 7))),
-              (std::move(peek(stack, 3, 7))).toIntListRef(),
-              (std::move(peek(stack, 4, 7))).toIntListRef(),
-              (std::move(peek(stack, 5, 7))).toIntListRef(),
+              (std::move(peek(stack, 3, 7))).toIntVector(),
+              (std::move(peek(stack, 4, 7))).toIntVector(),
+              (std::move(peek(stack, 5, 7))).toIntVector(),
               (std::move(peek(stack, 6, 7))).toInt());
           drop(stack, 7);
           pack(stack, std::move(result));
@@ -117,19 +115,19 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
-      "dpcpp::conv2d_sum(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1, Tensor(a!) accumu, *, Scalar alpha=1) -> Tensor(a!)",
+      "dpcpp::conv2d_sum(Tensor(a!) accumu, *, Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1, Scalar alpha=1) -> Tensor(a!)",
       [] (const Node* node) ->Operation {
         return [] (Stack& stack) {
           auto output = (std::move(peek(stack, 7, 9))).toTensor();
           auto result = torch::jit::dpcpp::conv2d_sum(
+              output,
               (std::move(peek(stack, 0, 9))).toTensor(),
               (std::move(peek(stack, 1, 9))).toTensor(),
               toOptionalTensor(std::move(peek(stack, 2, 9))),
-              (std::move(peek(stack, 3, 9))).toIntListRef(),
-              (std::move(peek(stack, 4, 9))).toIntListRef(),
-              (std::move(peek(stack, 5, 9))).toIntListRef(),
+              (std::move(peek(stack, 3, 9))).toIntVector(),
+              (std::move(peek(stack, 4, 9))).toIntVector(),
+              (std::move(peek(stack, 5, 9))).toIntVector(),
               (std::move(peek(stack, 6, 9))).toInt(),
-              output,
               (std::move(peek(stack, 8, 9))).toScalar()
           );
           drop(stack, 9);
@@ -140,19 +138,19 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
-      "dpcpp::conv2d_sum_relu(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1, Tensor(a!) accumu, *, Scalar alpha=1) -> Tensor(a!)",
+      "dpcpp::conv2d_sum_relu(Tensor(a!) accumu, *, Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1, Scalar alpha=1) -> Tensor(a!)",
       [] (const Node* node) ->Operation {
         return [] (Stack& stack) {
           auto output = (std::move(peek(stack, 7, 9))).toTensor();
           auto result = torch::jit::dpcpp::conv2d_sum_relu(
+              output,
               (std::move(peek(stack, 0, 9))).toTensor(),
               (std::move(peek(stack, 1, 9))).toTensor(),
               toOptionalTensor(std::move(peek(stack, 2, 9))),
-              (std::move(peek(stack, 3, 9))).toIntListRef(),
-              (std::move(peek(stack, 4, 9))).toIntListRef(),
-              (std::move(peek(stack, 5, 9))).toIntListRef(),
+              (std::move(peek(stack, 3, 9))).toIntVector(),
+              (std::move(peek(stack, 4, 9))).toIntVector(),
+              (std::move(peek(stack, 5, 9))).toIntVector(),
               (std::move(peek(stack, 6, 9))).toInt(),
-              output,
               (std::move(peek(stack, 8, 9))).toScalar()
           );
           drop(stack, 9);

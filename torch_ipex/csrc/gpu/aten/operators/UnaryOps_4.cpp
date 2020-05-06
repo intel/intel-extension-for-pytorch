@@ -14,6 +14,17 @@ using namespace at::dpcpp;
 namespace at {
 namespace AtenIpexTypeDPCPP {
 
+IPEX_OUT_FLOAT_UNARY_FUNC_OPS(tanh_out, Numerics<scalar_t>::tanh, Real);
+
+Tensor& tanh_(Tensor& self) {
+  return at::AtenIpexTypeDPCPP::tanh_out(self, self);
+}
+
+Tensor tanh(const Tensor& self) {
+  auto result = at::empty_like(self);
+  return at::AtenIpexTypeDPCPP::tanh_out(result, self);
+}
+
 IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(erfinv_out, TensorErfinvOp);
 
 Tensor& erfinv_(Tensor& self) {

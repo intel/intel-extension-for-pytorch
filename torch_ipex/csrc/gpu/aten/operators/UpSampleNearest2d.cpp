@@ -285,11 +285,14 @@ static void upsample_nearest2d_backward_out_template(
 
 } // namespace impl
 
+// TODO: scales_h & scales_w
 Tensor& upsample_nearest2d_backward_out(
     Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef output_size,
-    IntArrayRef input_size) {
+    IntArrayRef input_size,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w) {
   impl::upsample_nearest2d_backward_out_template(
       grad_input, grad_output, output_size, input_size);
   return grad_input;
@@ -298,23 +301,31 @@ Tensor& upsample_nearest2d_backward_out(
 Tensor upsample_nearest2d_backward(
     const Tensor& grad_output,
     IntArrayRef output_size,
-    IntArrayRef input_size) {
+    IntArrayRef input_size,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w) {
   auto grad_input = at::zeros(input_size, grad_output.options());
   return at::AtenIpexTypeDPCPP::upsample_nearest2d_backward_out(
-      grad_input, grad_output, output_size, input_size);
+      grad_input, grad_output, output_size, input_size, scales_h, scales_w);
 }
 
 Tensor& upsample_nearest2d_out(
     Tensor& out,
     const Tensor& self,
-    IntArrayRef output_size) {
+    IntArrayRef output_size,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w) {
   impl::upsample_nearest2d_out_template(out, self, output_size);
   return out;
 }
-Tensor upsample_nearest2d(const Tensor& self, IntArrayRef output_size) {
+Tensor upsample_nearest2d(
+    const Tensor& self,
+    IntArrayRef output_size,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w) {
   auto output = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::upsample_nearest2d_out(
-      output, self, output_size);
+      output, self, output_size, scales_h, scales_w);
 }
 
 } // namespace AtenIpexTypeDPCPP

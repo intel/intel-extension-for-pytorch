@@ -5,8 +5,6 @@
 #include <ATen/native/TensorFactories.h>
 #include <c10/util/Exception.h>
 
-#include <aten_ipex_tensor_type.h>
-
 #include <ATen/aten_ipex_type_dpcpp.h>
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
@@ -319,7 +317,7 @@ Tensor empty(
       /*resizeable=*/true);
 
   auto tensor = detail::make_tensor<TensorImpl>(
-      storage_impl, at::torch_ipex::DPCPPTensorId());
+      storage_impl, c10::DispatchKey::DPCPPTensorId);
   // Default TensorImpl has size [0]
   if (size.size() != 1 || size[0] != 0) {
     tensor.unsafeGetTensorImpl()->set_sizes_contiguous(size);

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <torch/csrc/jit/custom_operator.h>
+#include <torch/csrc/jit/runtime/custom_operator.h>
 
 namespace torch { namespace jit {
 // XXX: PyTorch does not support nesting namespace

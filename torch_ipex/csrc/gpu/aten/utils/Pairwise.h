@@ -130,7 +130,6 @@ struct TensorTriOp {
       : stride0(stride0_), stride1(stride1_), k(k_) {}
 
   int mask(T& out, int64_t offset) const {
-
     if (offset < 1) {
       DPCPP_KER_STRING(format_str, "offset is %ld, mask is not supported!\n");
       DPCPP_PRINTF(format_str, offset);

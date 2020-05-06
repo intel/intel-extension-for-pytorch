@@ -1,13 +1,13 @@
 #include <ATen/ATen.h>
-#include <ATen/native/TensorIterator.h>
 #include <ATen/div_rtn.h>
+#include <ATen/native/TensorIterator.h>
 
+#include <ATen/aten_ipex_type_dpcpp.h>
 #include <core/ApplyUtils.h>
 #include <core/DPCPP.h>
-#include <core/TensorImplUtils.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
-#include <ATen/aten_ipex_type_dpcpp.h>
+#include <core/TensorImplUtils.h>
 
 #include <mkldnn.hpp>
 
@@ -21,7 +21,6 @@ using namespace at::native;
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
-
 
 static void im2col_out_template(
     Tensor& output,
@@ -155,7 +154,7 @@ static void im2col_backward_out_template(
       stride);
 }
 
-} // impl
+} // namespace impl
 
 Tensor& im2col_out(
     Tensor& out,
@@ -164,8 +163,7 @@ Tensor& im2col_out(
     IntArrayRef dilation,
     IntArrayRef padding,
     IntArrayRef stride) {
-  impl::im2col_out_template(
-      out, self, kernel_size, dilation, padding, stride);
+  impl::im2col_out_template(out, self, kernel_size, dilation, padding, stride);
   return out;
 }
 

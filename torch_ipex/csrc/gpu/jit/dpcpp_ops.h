@@ -7,15 +7,15 @@ namespace torch {
 namespace jit {
 namespace dpcpp {
 
-at::Tensor& conv2d_sum(
+at::Tensor& conv2d_sum(at::Tensor& accumu,
     const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias,
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
-    int64_t groups, at::Tensor& accumu, at::Scalar alpha);
+    int64_t groups, at::Scalar alpha);
 
-at::Tensor& conv2d_sum_relu(
+at::Tensor& conv2d_sum_relu(at::Tensor& accumu,
     const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias,
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
-    int64_t groups, at::Tensor& accumu, at::Scalar alpha);
+    int64_t groups, at::Scalar alpha);
 
 at::Tensor conv2d_relu(
     const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias,

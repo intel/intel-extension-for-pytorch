@@ -69,7 +69,10 @@ Tensor max(const Tensor& self, const Tensor& other) {
   return at::AtenIpexTypeDPCPP::max_out(out, self, other);
 }
 
-Tensor& __and___out(Tensor& result, const Tensor& self, const Tensor& other) {
+Tensor& bitwise_and_out(
+    Tensor& result,
+    const Tensor& self,
+    const Tensor& other) {
   AT_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Bool, self.scalar_type(), "__and___out", [&]() {
         impl::__and___out<scalar_t>(result, self, other);
@@ -77,16 +80,10 @@ Tensor& __and___out(Tensor& result, const Tensor& self, const Tensor& other) {
   return result;
 }
 
-Tensor __and__(const Tensor& self, const Tensor& other) {
-  auto result = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::__and___out(result, self, other);
-}
-
-Tensor& __iand__(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeDPCPP::__and___out(self, self, other);
-}
-
-Tensor& __or___out(Tensor& result, const Tensor& self, const Tensor& other) {
+Tensor& bitwise_or_out(
+    Tensor& result,
+    const Tensor& self,
+    const Tensor& other) {
   AT_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Bool, self.scalar_type(), "__or___out", [&]() {
         impl::__or___out<scalar_t>(result, self, other);
@@ -94,13 +91,20 @@ Tensor& __or___out(Tensor& result, const Tensor& self, const Tensor& other) {
   return result;
 }
 
-Tensor __or__(const Tensor& self, const Tensor& other) {
-  auto result = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::__or___out(result, self, other);
+Tensor& bitwise_and_out(Tensor& out, const Tensor& self, Scalar other) {
+  auto other_ = c10::scalar_to_tensor(other, kDPCPP);
+  // TODO: broadcast
+  auto new_other =
+      other_.resize_as_(self).fill_(other).toType(self.scalar_type());
+  return at::AtenIpexTypeDPCPP::bitwise_and_out(out, self, new_other);
 }
 
-Tensor& __ior__(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeDPCPP::__or___out(self, self, other);
+Tensor& bitwise_or_out(Tensor& out, const Tensor& self, Scalar other) {
+  auto other_ = c10::scalar_to_tensor(other, kDPCPP);
+  // TODO: broadcast
+  auto new_other =
+      other_.resize_as_(self).fill_(other).toType(self.scalar_type());
+  return at::AtenIpexTypeDPCPP::bitwise_or_out(out, self, new_other);
 }
 
 } // namespace AtenIpexTypeDPCPP

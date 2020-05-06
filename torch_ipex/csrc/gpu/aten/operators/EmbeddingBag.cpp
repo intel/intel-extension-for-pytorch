@@ -895,7 +895,9 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag(
     bool scale_grad_by_freq,
     int64_t mode,
     bool sparse,
-    const Tensor& per_sample_weights) {
+    const Tensor& per_sample_weights,
+    bool include_last_offset) {
+  // TODO: include_last_offset
   return impl::_embedding_bag_dpcpp(
       weight,
       indices,

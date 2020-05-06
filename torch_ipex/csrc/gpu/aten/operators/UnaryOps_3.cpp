@@ -3,6 +3,7 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <core/DPCPP.h>
+#include <utils/AccumulateType.h>
 #include <utils/Numerics.h>
 #include <utils/Pairwise.h>
 #include <utils/Pointwise.h>
@@ -41,26 +42,25 @@ Tensor& clamp_(Tensor& self, optional<Scalar> min, optional<Scalar> max) {
   return at::AtenIpexTypeDPCPP::clamp_out(self, self, min, max);
 }
 
-IPEX_OUT_INT_CALLABLE_1_UNARY_OPS(__and___out, TensorBitAndConstantOp);
-
-Tensor __and__(const Tensor& self, Scalar other) {
+Tensor clamp(const Tensor& self, optional<Scalar> min, optional<Scalar> max) {
   auto result = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::__and___out(result, self, other);
+  return at::AtenIpexTypeDPCPP::clamp_out(result, self, min, max);
 }
 
-Tensor& __iand__(Tensor& self, Scalar other) {
-  return at::AtenIpexTypeDPCPP::__and___out(self, self, other);
-}
-
-IPEX_OUT_INT_CALLABLE_1_UNARY_OPS(__or___out, TensorBitOrConstantOp);
-
-Tensor __or__(const Tensor& self, Scalar other) {
-  auto result = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::__or___out(result, self, other);
-}
-
-Tensor& __ior__(Tensor& self, Scalar other) {
-  return at::AtenIpexTypeDPCPP::__or___out(self, self, other);
+Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "reciprocal", [&] {
+    using acc_t = acc_type<scalar_t>;
+    if (at::dpcpp::TensorImpl_Unwrap(out) ==
+        at::dpcpp::TensorImpl_Unwrap(self)) {
+      at::dpcpp::DPCPP_tensor_apply1<scalar_t>(
+          out, TensorReciprocalOp<scalar_t, acc_t>());
+    } else {
+      at::AtenIpexTypeDPCPP::resize_as_(out, self, c10::nullopt);
+      at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+          out, self, TensorReciprocalOp<scalar_t, acc_t>());
+    }
+  });
+  return out;
 }
 
 } // namespace AtenIpexTypeDPCPP

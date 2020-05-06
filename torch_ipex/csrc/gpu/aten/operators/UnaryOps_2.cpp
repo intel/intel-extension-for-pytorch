@@ -36,7 +36,6 @@ IPEX_OUT_FLOAT_UNARY_FUNC_OPS(sqrt_out, Numerics<scalar_t>::sqrt, Real);
 
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(cos, Numerics<scalar_t>::cos, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(tan, Numerics<scalar_t>::tan, Real);
-IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(tanh, Numerics<scalar_t>::tanh, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(atan, Numerics<scalar_t>::atan, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(erf, Numerics<scalar_t>::erf, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(erfc, Numerics<scalar_t>::erfc, Real);

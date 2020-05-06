@@ -1,7 +1,7 @@
 #pragma once
 
-#include <torch/csrc/jit/ir.h>
-#include <torch/csrc/jit/script/module.h>
+#include <torch/csrc/jit/ir/ir.h>
+#include <torch/csrc/jit/api/module.h>
 
 namespace torch { namespace jit {
 //
@@ -14,12 +14,12 @@ namespace torch { namespace jit {
 // Like insert quant-dequant node pass, we took the same procedure
 //
 TORCH_API void FreezeParams(
-    const script::Module& moduleObj,
+    const Module& moduleObj,
     const std::string& method_name,
     const std::string& param_name);
 
 TORCH_API void FreezeFlags(
-    const script::Module& moduleObj,
+    const Module& moduleObj,
     const std::string& method_name,
     const std::string& flag_name,
     bool value);

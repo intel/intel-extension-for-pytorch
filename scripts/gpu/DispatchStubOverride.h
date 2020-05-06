@@ -28,7 +28,6 @@ static Tensor & acos_out(Tensor & out, const Tensor & self); // aten::acos.out(T
 static Tensor & asin_out(Tensor & out, const Tensor & self); // aten::asin.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor & atan_out(Tensor & out, const Tensor & self); // aten::atan.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor & tan_out(Tensor & out, const Tensor & self); // aten::tan.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-static Tensor & tanh_out(Tensor & out, const Tensor & self); // aten::tanh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor & atan2_(Tensor & self, const Tensor & other); // aten::atan2_(Tensor(a!) self, Tensor other) -> Tensor(a!)
 static Tensor atan2(const Tensor & self, const Tensor & other); // aten::atan2(Tensor self, Tensor other) -> Tensor
 static Tensor & atan2_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::atan2.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
@@ -105,3 +104,4 @@ static std::tuple<Tensor,Tensor> std_mean(const Tensor & self, bool unbiased); /
 static std::tuple<Tensor,Tensor> std_mean(const Tensor & self, IntArrayRef dim, bool unbiased, bool keepdim); // aten::std_mean.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> (Tensor, Tensor)
 static std::tuple<Tensor,Tensor> var_mean(const Tensor & self, bool unbiased); // aten::var_mean(Tensor self, bool unbiased=True) -> (Tensor, Tensor)
 static std::tuple<Tensor,Tensor> var_mean(const Tensor & self, IntArrayRef dim, bool unbiased, bool keepdim); // aten::var_mean.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> (Tensor, Tensor)
+static Tensor & reciprocal_out(Tensor & out, const Tensor & self); // aten::reciprocal.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)

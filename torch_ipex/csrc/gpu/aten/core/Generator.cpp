@@ -52,7 +52,8 @@ std::shared_ptr<DPCPPGenerator> createDPCPPGenerator(DeviceIndex device_index) {
 } // namespace dpcpp
 
 DPCPPGenerator::DPCPPGenerator(DeviceIndex device_index)
-    : Generator{Device(DeviceType::DPCPP, device_index)} {}
+    : Generator{Device(DeviceType::DPCPP, device_index),
+                DispatchKeySet(c10::DispatchKey::DPCPPTensorId)} {}
 
 void DPCPPGenerator::set_current_seed(uint64_t seed) {
   seed_ = seed;

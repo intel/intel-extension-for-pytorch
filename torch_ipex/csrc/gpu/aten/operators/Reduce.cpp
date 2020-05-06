@@ -1021,7 +1021,7 @@ Tensor& std_var_out(
   // complex data type support has not been verified
   if (at::isComplexType(self.scalar_type())) {
     ScalarType dtype = c10::toValueType(get_dtype(result, self, {}, true));
-    Tensor real_in = self.real().to(dtype);
+    Tensor real_in = at::real(self).to(dtype);
     Tensor real_out = at::empty({0}, self.options().dtype(dtype));
     auto iter =
         make_reduction("std or var", real_out, real_in, dim, keepdim, dtype);
@@ -1030,7 +1030,7 @@ Tensor& std_var_out(
     } else {
       std_var_kernel(iter, unbiased, false);
     }
-    Tensor imag_in = self.imag().to(dtype);
+    Tensor imag_in = at::imag(self).to(dtype);
     Tensor imag_out = at::empty({0}, self.options().dtype(dtype));
     iter = make_reduction("std or var", imag_out, imag_in, dim, keepdim, dtype);
     if (iter.numel() == 0) {
@@ -1077,7 +1077,7 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
   // complex data type support has not been verified
   if (at::isComplexType(self.scalar_type())) {
     ScalarType dtype = c10::toValueType(get_dtype(result1, self, {}, true));
-    Tensor real_in = self.real().to(dtype);
+    Tensor real_in = at::real(self).to(dtype);
     Tensor real_out_var = at::empty({0}, self.options().dtype(dtype));
     Tensor real_out_mean = at::empty({0}, self.options().dtype(dtype));
     auto iter = make_reduction(
@@ -1088,7 +1088,7 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
     } else {
       std_var_kernel(iter, unbiased, false);
     }
-    Tensor imag_in = self.imag().to(dtype);
+    Tensor imag_in = at::imag(self).to(dtype);
     Tensor imag_out_var = at::empty({0}, self.options().dtype(dtype));
     Tensor imag_out_mean = at::empty({0}, self.options().dtype(dtype));
     iter = make_reduction(
@@ -1117,6 +1117,62 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
     }
   }
   return std::tuple<Tensor&, Tensor&>(result1, result2);
+}
+
+Tensor& argmax_out(
+    Tensor& result,
+    const Tensor& self,
+    c10::optional<int64_t> dim,
+    bool keepdim) {
+  TORCH_CHECK(
+      self.numel() > 0,
+      "cannot perform reduction function argmax on a "
+      "tensor with no elements because the operation does not have an "
+      "identity");
+  Tensor in;
+  if (dim) {
+    in = self;
+  } else {
+    in = self.reshape({-1});
+    keepdim = false;
+  }
+
+  Tensor ignored = at::empty({0}, self.options());
+  return std::get<1>(
+      at::max_out(ignored, result, in, dim.value_or(0), keepdim));
+}
+
+Tensor argmax(const Tensor& self, c10::optional<int64_t> dim, bool keepdims) {
+  Tensor result = at::empty({0}, self.options().dtype(at::kLong));
+  return argmax_out(result, self, dim, keepdims);
+}
+
+Tensor& argmin_out(
+    Tensor& result,
+    const Tensor& self,
+    c10::optional<int64_t> dim,
+    bool keepdim) {
+  TORCH_CHECK(
+      self.numel() > 0,
+      "cannot perform reduction function argmin on a "
+      "tensor with no elements because the operation does not have an "
+      "identity");
+  Tensor in;
+  if (dim) {
+    in = self;
+  } else {
+    in = self.reshape({-1});
+    keepdim = false;
+  }
+
+  Tensor ignored = at::empty({0}, self.options());
+  return std::get<1>(
+      at::min_out(ignored, result, in, dim.value_or(0), keepdim));
+}
+
+Tensor argmin(const Tensor& self, c10::optional<int64_t> dim, bool keepdims) {
+  Tensor result = at::empty({0}, self.options().dtype(at::kLong));
+  return argmin_out(result, self, dim, keepdims);
 }
 
 } // namespace AtenIpexTypeDPCPP

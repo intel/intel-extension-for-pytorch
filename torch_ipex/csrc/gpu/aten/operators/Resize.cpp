@@ -12,7 +12,6 @@ namespace impl {
 Tensor& resize_(Tensor& self, IntArrayRef size) {
   auto* self_ = self.unsafeGetTensorImpl();
   TensorImpl_resizeImpl(self_, size, /*strides=*/c10::nullopt);
-  self_->maybe_zero_dim(size.size() == 0);
   return self;
 }
 

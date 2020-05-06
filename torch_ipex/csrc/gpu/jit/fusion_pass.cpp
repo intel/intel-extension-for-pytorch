@@ -4,12 +4,12 @@
 #include "fusion_pass.h"
 #include "accelerated_ops.h"
 #include <torch/csrc/utils/hash.h>
-#include <torch/csrc/jit/operator.h>
+#include <torch/csrc/jit/runtime/operator.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
-#include <torch/csrc/jit/passes/alias_analysis.h>
+#include <torch/csrc/jit/ir/alias_analysis.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
-#include <torch/csrc/jit/script/error_report.h>
-#include <torch/csrc/jit/pass_manager.h>
+#include <torch/csrc/jit/frontend/error_report.h>
+#include <torch/csrc/jit/passes/pass_manager.h>
 
 
 using namespace torch::jit;
@@ -201,7 +201,7 @@ public:
     }
 
     // throw
-    auto er = script::ErrorReport(node->sourceRange());
+    auto er = ErrorReport(node->sourceRange());
     er << "Schema not found for fusion process. \n";
     er << "Prev: " << *prev << "\n";
     er << "Node: " << *node << "\n";

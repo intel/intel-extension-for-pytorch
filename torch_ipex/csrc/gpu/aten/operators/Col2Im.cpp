@@ -1,13 +1,13 @@
 #include <ATen/ATen.h>
-#include <ATen/native/TensorIterator.h>
 #include <ATen/div_rtn.h>
+#include <ATen/native/TensorIterator.h>
 
+#include <ATen/aten_ipex_type_dpcpp.h>
 #include <core/ApplyUtils.h>
 #include <core/DPCPP.h>
-#include <core/TensorImplUtils.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
-#include <ATen/aten_ipex_type_dpcpp.h>
+#include <core/TensorImplUtils.h>
 
 #include <mkldnn.hpp>
 
@@ -137,7 +137,6 @@ static void col2im_out_template(
         }
       });
 }
-
 
 void col2im_backward_out_template(
     Tensor& grad_input,

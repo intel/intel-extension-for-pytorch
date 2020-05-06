@@ -528,6 +528,17 @@ struct TensorErfinvOp {
   }
 };
 
+template <typename T, typename acc>
+struct TensorReciprocalOp {
+  void operator()(T& out, T& in) const {
+    out = static_cast<acc>(1) / in;
+  }
+
+  void operator()(T& v) const {
+    v = static_cast<acc>(1) / v;
+  }
+};
+
 template <typename T>
 struct TensorSignOp {
   void operator()(T& out, T& in) const {

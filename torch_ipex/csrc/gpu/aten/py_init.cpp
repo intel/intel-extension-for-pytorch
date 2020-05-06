@@ -1,4 +1,4 @@
-#include <torch/csrc/jit/pybind_utils.h>
+#include <torch/csrc/jit/python/pybind_utils.h>
 
 #include <ATen/aten_ipex_type_default.h>
 #include <../jit/fusion_pass.h>

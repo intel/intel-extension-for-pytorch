@@ -64,7 +64,9 @@ Tensor& leaky_relu_backward_out(
 Tensor leaky_relu_backward(
     const Tensor& grad_output,
     const Tensor& self,
-    Scalar negative_slope) {
+    Scalar negative_slope,
+    bool self_is_result) {
+  // TODO: self_is_result
   Tensor grad_input = at::empty({0}, grad_output.options());
   return at::AtenIpexTypeDPCPP::leaky_relu_backward_out(
       grad_input, grad_output, self, negative_slope);

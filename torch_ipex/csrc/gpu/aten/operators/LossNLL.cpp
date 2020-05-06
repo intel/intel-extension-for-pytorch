@@ -236,7 +236,9 @@ void ClassNLLCriterion_updateOutput(
         }
       };
       cgh.parallel_for<DPCPP_K(updateOutputKernelName, scalar_t)>(
-          DPCPP::nd_range<1>(DPCPP::range<1>(local_size), DPCPP::range<1>(local_size)), kfn);
+          DPCPP::nd_range<1>(
+              DPCPP::range<1>(local_size), DPCPP::range<1>(local_size)),
+          kfn);
     };
 
     DPCPP_Q_ASYNC_SUBMIT(queue, cgf);

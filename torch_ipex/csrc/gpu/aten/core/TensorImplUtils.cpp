@@ -4,8 +4,6 @@
 #include <core/detail/TensorInfo.h>
 #include <utils/General.h>
 
-#include <aten_ipex_tensor_type.h>
-
 using namespace at::dpcpp::detail;
 
 namespace at {
@@ -15,7 +13,7 @@ TensorImpl* TensorImpl_new(caffe2::TypeMeta type_meta) {
   return c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
              c10::intrusive_ptr<at::StorageImpl>::reclaim(
                  StorageImpl_new(type_meta)),
-             at::torch_ipex::DPCPPTensorId())
+             c10::DispatchKey::DPCPPTensorId)
       .release();
 }
 
@@ -313,11 +311,18 @@ void TensorImpl_squeeze1d(
   TensorImpl_set(self, src);
 
   if (src->size(dimension) == 1) {
-    for (d = dimension; d < self->dim() - 1; d++) {
-      self->set_size(d, self->size(d + 1));
-      self->set_stride(d, self->stride(d + 1));
+    at::DimVector newSize(static_cast<size_t>(self->dim() - 1));
+    at::DimVector newStride(static_cast<size_t>(self->dim() - 1));
+    for (d = 0; d < dimension; d++) {
+      newSize[d] = self->size(d);
+      newStride[d] = self->stride(d);
     }
-    self->resize_dim((unsigned int)(self->dim() - 1));
+
+    for (d = dimension; d < self->dim() - 1; d++) {
+      newSize[d] = self->size(d + 1);
+      newStride[d] = self->stride(d + 1);
+    }
+    self->set_sizes_and_strides(newSize, newStride);
   }
 }
 
@@ -335,18 +340,24 @@ void TensorImpl_unsqueeze1d(
 
   TensorImpl_set(self, src);
 
-  self->resize_dim(self->dim() + 1);
-  for (d = self->dim() - 1; d > dimension; d--) {
-    self->set_size(d, self->size(d - 1));
-    self->set_stride(d, self->stride(d - 1));
+  at::DimVector newSize(static_cast<size_t>(/* size */ self->dim() + 1));
+  at::DimVector newStride(static_cast<size_t>(/* size */ self->dim() + 1));
+
+  for (d = self->dim(); d > dimension; d--) {
+    newSize[d] = self->size(d - 1);
+    newStride[d] = self->stride(d - 1);
   }
-  if (dimension + 1 < self->dim()) {
-    self->set_stride(
-        dimension, self->size(dimension + 1) * self->stride(dimension + 1));
+  if (dimension < self->dim()) {
+    newStride[dimension] = self->size(dimension) * self->stride(dimension);
   } else {
-    self->set_stride(dimension, 1);
+    newStride[dimension] = 1;
   }
-  self->set_size(dimension, 1);
+  newSize[dimension] = 1;
+  for (d = dimension - 1; d >= 0; d--) {
+    newSize[d] = self->size(d);
+    newStride[d] = self->stride(d);
+  }
+  self->set_sizes_and_strides(newSize, newStride);
 }
 
 bool TensorImpl_allContiguous(at::TensorImpl** inputs, int numInputs) {

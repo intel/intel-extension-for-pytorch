@@ -26,6 +26,7 @@ void Gather(
     const Tensor& src,
     int64_t dim,
     const Tensor& index) {
+  dim = maybe_wrap_dim(dim, tensor.dim());
   TORCH_CHECK(
       TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(index)) ==
           TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(src)),
@@ -35,8 +36,7 @@ void Gather(
           TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)),
       "Index tensor must have same dimensions as output tensor");
   TORCH_CHECK(
-      dim >= 0 &&
-          dim < TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)),
+      dim < TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)),
       "Index dimension is out of bounds");
   TORCH_CHECK(
       TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(src)) ==
@@ -332,11 +332,11 @@ ScatterAdd(
     int64_t dim,
     const Tensor& index,
     const Tensor& src) {
+  dim = maybe_wrap_dim(dim, tensor.dim());
   int index_ndim_legacy_all =
       TensorImpl_nDimensionLegacyAll(TensorImpl_Unwrap(index));
   TORCH_CHECK(
-      dim >= 0 &&
-          dim < TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)),
+      dim < TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)),
       "Index dimension is out of bounds");
   TORCH_CHECK(
       index_ndim_legacy_all == 0 ||

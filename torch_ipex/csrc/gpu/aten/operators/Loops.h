@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <ATen/core/Array.h>
 #include <ATen/detail/FunctionTraits.h>
 #include <ATen/native/TensorIterator.h>
 #include <core/detail/OffsetCalculator.h>
@@ -69,22 +70,22 @@ static OffsetCalculator<N> make_offset_calculator(const TensorIterator& iter) {
   return OffsetCalculator<N>(iter.ndim(), iter.shape().data(), strides.data());
 }
 
-template <typename traits, typename ptr_t, typename index_t, std::size_t... I>
+template <typename traits, typename ptr_t, std::size_t... INDEX>
 typename traits::ArgsTuple dereference_impl(
     ptr_t data[],
-    const index_t strides[],
-    int i,
-    c10::guts::index_sequence<I...>) {
-  return std::make_tuple(
-      *(typename traits::template arg<I>::type*)(data[I] + i * strides[I])...);
+    const int64_t* strides,
+    int64_t i,
+    std::index_sequence<INDEX...>) {
+  return std::make_tuple(*(typename traits::template arg<
+                           INDEX>::type*)(data[INDEX] + i * strides[INDEX])...);
 }
 
-template <typename traits, typename ptr_t, typename index_t>
+template <typename traits, typename ptr_t>
 typename traits::ArgsTuple dereference(
     ptr_t data[],
-    const index_t strides[],
-    int i) {
-  using Indices = c10::guts::make_index_sequence<traits::arity>;
+    const int64_t* strides,
+    int64_t i) {
+  using Indices = std::make_index_sequence<traits::arity>;
   return dereference_impl<traits>(data, strides, i, Indices{});
 }
 
@@ -207,7 +208,7 @@ void dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
       auto out_ptr = out_acc.template get_pointer<char>();
       at::detail::Array<in_ptr_t, MAX_INPUT_TENSOR_NUM> in_ptr;
-      at::detail::Array<uint32_t, MAX_TOTAL_TENSOR_NUM> offsets;
+      at::detail::Array<int64_t, MAX_TOTAL_TENSOR_NUM> offsets;
 
 #define ACCESSOR_DEREFER(n) in_ptr[n] = in_acc_##n.template get_pointer<char>();
       REPEAT_PATTERN(MAX_INPUT_TENSOR_NUM, ACCESSOR_DEREFER)

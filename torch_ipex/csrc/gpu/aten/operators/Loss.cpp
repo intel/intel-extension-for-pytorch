@@ -6,11 +6,11 @@
 
 #include <core/ApplyUtils.h>
 #include <core/DPCPP.h>
+#include <core/DPCPPTensorUtils.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/Runtime.h>
 #include <core/TensorImplUtils.h>
-#include <core/DPCPPTensorUtils.h>
 
 #include <utils/Numerics.h>
 
@@ -667,10 +667,10 @@ void MultiMarginCriterion_updateOutput(
     int64_t reduction) {
   const auto ndims = input.dim();
   TORCH_CHECK(
-    input.numel() > 0 && ndims <= 2,
-    "non-empty vector or matrix expected, got size: ",
-    input.sizes());
-  
+      input.numel() > 0 && ndims <= 2,
+      "non-empty vector or matrix expected, got size: ",
+      input.sizes());
+
   const int p_ = p.toInt();
   const double margin_ = margin.toDouble();
   TORCH_CHECK(p_ == 1 || p_ == 2, "only p == 1 and p == 2 supported");
@@ -685,10 +685,10 @@ void MultiMarginCriterion_updateOutput(
   }
 
   TORCH_CHECK(
-    target.numel() > 0 && target.dim() <= 1 && target.numel() == nframe,
-    "inconsistent target size, got: ",
-    target.sizes());
-  
+      target.numel() > 0 && target.dim() <= 1 && target.numel() == nframe,
+      "inconsistent target size, got: ",
+      target.sizes());
+
   // produce a scalar output for 1d input
   if (reduction == Reduction::None && target.dim() > 0) {
     output.resize_({nframe});
@@ -698,12 +698,13 @@ void MultiMarginCriterion_updateOutput(
 
   auto input_contiguous = input.contiguous();
   auto target_contiguous = target.contiguous();
-  auto weights_contiguous = (weights.defined()) ? weights.contiguous() : weights;
+  auto weights_contiguous =
+      (weights.defined()) ? weights.contiguous() : weights;
 
   scalar_t* input_data = input_contiguous.data_ptr<scalar_t>();
   int64_t* target_data = target_contiguous.data_ptr<int64_t>();
   scalar_t* output_data = output.data_ptr<scalar_t>();
-  scalar_t* weights_data = 
+  scalar_t* weights_data =
       weights.defined() ? weights_contiguous.data_ptr<scalar_t>() : NULL;
   bool has_weights = weights.defined() ? true : false;
 
@@ -727,18 +728,19 @@ void MultiMarginCriterion_updateOutput(
         auto input_ptr = input_acc.template get_pointer<scalar_t>();
         auto target_ptr = target_acc.template get_pointer<int64_t>();
         auto output_ptr = output_acc.template get_pointer<scalar_t>();
-        auto weights_ptr = has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
+        auto weights_ptr =
+            has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
         auto local_item_id = item_id.get_id(0);
         for (int i = local_item_id; i < nframe; i += local_size) {
           scalar_t sum = 0;
           auto target_idx = target_ptr[i];
-          auto input_target = input_ptr[i*dim + target_idx];
+          auto input_target = input_ptr[i * dim + target_idx];
           for (auto d = 0; d < dim; d++) {
-            scalar_t z = margin_ - input_target + input_ptr[i*dim + d];
+            scalar_t z = margin_ - input_target + input_ptr[i * dim + d];
             if (d == target_idx)
               continue;
             if (z > 0) {
-              scalar_t h = (p_ == 1) ? z : z*z;
+              scalar_t h = (p_ == 1) ? z : z * z;
               if (weights_ptr)
                 h *= weights_ptr[target_idx];
               sum += h;
@@ -748,26 +750,27 @@ void MultiMarginCriterion_updateOutput(
           output_ptr[i] = sum;
         }
       };
-      cgh.parallel_for<MultiMarginCriterionUpdateOutputKernel1<scalar_t> >(
+      cgh.parallel_for<MultiMarginCriterionUpdateOutputKernel1<scalar_t>>(
           DPCPP::range<1>(local_size), kfn);
     } else {
       auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
         auto input_ptr = input_acc.template get_pointer<scalar_t>();
         auto target_ptr = target_acc.template get_pointer<int64_t>();
         auto output_ptr = output_acc.template get_pointer<scalar_t>();
-        auto weights_ptr = has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
+        auto weights_ptr =
+            has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
         auto local_item_id = item_id.get_local_id(0);
         local_output_acc[local_item_id] = 0.0;
         for (int i = local_item_id; i < nframe; i += local_size) {
           scalar_t sum = 0;
           auto target_idx = target_ptr[i];
-          auto input_target = input_ptr[i*dim + target_idx];
+          auto input_target = input_ptr[i * dim + target_idx];
           for (auto d = 0; d < dim; d++) {
-            scalar_t z = margin_ - input_target + input_ptr[i*dim + d];
+            scalar_t z = margin_ - input_target + input_ptr[i * dim + d];
             if (d == target_idx)
               continue;
             if (z > 0) {
-              scalar_t h = (p_ == 1) ? z : z*z;
+              scalar_t h = (p_ == 1) ? z : z * z;
               if (weights_ptr)
                 h *= weights_ptr[target_idx];
               sum += h;
@@ -779,17 +782,20 @@ void MultiMarginCriterion_updateOutput(
           local_output_acc[local_item_id] += sum;
         }
 
-        //reduce
+        // reduce
         for (int64_t i = (local_size >> 1); i > 0; i >>= 1) {
           item_id.barrier(dpcpp_global_and_local_fence);
           if (local_item_id < i)
-            local_output_acc[local_item_id] += local_output_acc[local_item_id + i];
+            local_output_acc[local_item_id] +=
+                local_output_acc[local_item_id + i];
         }
         item_id.barrier(dpcpp_global_and_local_fence);
         output_ptr[0] = local_output_acc[0];
       };
-      cgh.parallel_for<MultiMarginCriterionUpdateOutputKernel2<scalar_t> >(
-          DPCPP::nd_range<1>(DPCPP::range<1>(local_size), DPCPP::range<1>(local_size)), kfn);
+      cgh.parallel_for<MultiMarginCriterionUpdateOutputKernel2<scalar_t>>(
+          DPCPP::nd_range<1>(
+              DPCPP::range<1>(local_size), DPCPP::range<1>(local_size)),
+          kfn);
     }
   };
 
@@ -808,10 +814,10 @@ void MultiMarginCriterion_updateGradInput(
     int64_t reduction) {
   const auto ndims = input.dim();
   TORCH_CHECK(
-    input.numel() > 0 && ndims <= 2,
-    "non-empty vector or matrix expected, got size: ",
-    input.sizes());
-  
+      input.numel() > 0 && ndims <= 2,
+      "non-empty vector or matrix expected, got size: ",
+      input.sizes());
+
   const int p_ = p.toInt();
   const double margin_ = margin.toDouble();
   TORCH_CHECK(p_ == 1 || p_ == 2, "only p == 1 and p == 2 supported");
@@ -826,22 +832,23 @@ void MultiMarginCriterion_updateGradInput(
   }
 
   TORCH_CHECK(
-    target.numel() > 0 && target.dim() <= 1 && target.numel() == nframe,
-    "inconsistent target size, got: ",
-    target.sizes());
+      target.numel() > 0 && target.dim() <= 1 && target.numel() == nframe,
+      "inconsistent target size, got: ",
+      target.sizes());
 
   grad_input.resize_as_(input);
   TORCH_CHECK(grad_input.is_contiguous(), "grad_input must be contiguous");
 
   auto input_contiguous = input.contiguous();
   auto target_contiguous = target.contiguous();
-  auto weights_contiguous = (weights.defined()) ? weights.contiguous() : weights;
+  auto weights_contiguous =
+      (weights.defined()) ? weights.contiguous() : weights;
 
   scalar_t* grad_input_data = grad_input.data_ptr<scalar_t>();
   scalar_t* grad_output_data = grad_output.data_ptr<scalar_t>();
   scalar_t* input_data = input_contiguous.data_ptr<scalar_t>();
   int64_t* target_data = target_contiguous.data_ptr<int64_t>();
-  scalar_t* weights_data = 
+  scalar_t* weights_data =
       weights.defined() ? weights_contiguous.data_ptr<scalar_t>() : NULL;
   bool has_weights = weights.defined() ? true : false;
   scalar_t g = (reduction == Reduction::Mean)
@@ -862,41 +869,43 @@ void MultiMarginCriterion_updateGradInput(
     auto weights_acc = has_weights
         ? DPCPPAccessor<dpcpp_r_mode>(cgh, weights_data)
         : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
-    
+
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
       auto grad_input_ptr = grad_input_acc.template get_pointer<scalar_t>();
       auto grad_output_ptr = grad_output_acc.template get_pointer<scalar_t>();
       auto input_ptr = input_acc.template get_pointer<scalar_t>();
       auto target_ptr = target_acc.template get_pointer<int64_t>();
-      auto weights_ptr = has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
+      auto weights_ptr =
+          has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
       auto local_item_id = item_id.get_id(0);
 
       for (int i = local_item_id; i < nframe; i += local_size) {
         auto target_idx = target_ptr[i];
-        auto input_target = input_ptr[i*dim + target_idx];
+        auto input_target = input_ptr[i * dim + target_idx];
         scalar_t grad_input_target = 0;
         for (auto d = 0; d < dim; d++) {
-          scalar_t z = margin_ - input_target + input_ptr[i*dim + d];
+          scalar_t z = margin_ - input_target + input_ptr[i * dim + d];
           if (d == target_idx)
             continue;
           if (z > 0) {
-            scalar_t h = (p_== 1) ? g : 2*g*z;
+            scalar_t h = (p_ == 1) ? g : 2 * g * z;
             if (weights_ptr)
               h *= weights_ptr[target_idx];
             grad_input_target -= h;
-            grad_input_ptr[i*dim + d] = h;
-          }
-          else
-              grad_input_ptr[i*dim + d] = 0;
+            grad_input_ptr[i * dim + d] = h;
+          } else
+            grad_input_ptr[i * dim + d] = 0;
         }
-        grad_input_ptr[i*dim + target_idx] = grad_input_target;
+        grad_input_ptr[i * dim + target_idx] = grad_input_target;
 
         for (auto d = 0; d < dim; d++)
-          grad_input_ptr[i*dim + d] *= reduction == Reduction::None ? grad_output_ptr[i] : grad_output_ptr[0];
+          grad_input_ptr[i * dim + d] *= reduction == Reduction::None
+              ? grad_output_ptr[i]
+              : grad_output_ptr[0];
       }
     };
-    cgh.parallel_for<MultiMarginCriterionUpdateGradInputKernel<scalar_t> >(
-          DPCPP::range<1>(local_size), kfn);
+    cgh.parallel_for<MultiMarginCriterionUpdateGradInputKernel<scalar_t>>(
+        DPCPP::range<1>(local_size), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
@@ -914,36 +923,37 @@ void MultilabelMarginCriterion_updateOutput(
   const auto ndims = input.dim();
 
   TORCH_CHECK(
-    input.numel() > 0 && ndims <= 2,
-    "non-empty vector or matrix expected, got size: ",
-    input.sizes());
-  
+      input.numel() > 0 && ndims <= 2,
+      "non-empty vector or matrix expected, got size: ",
+      input.sizes());
+
   int64_t nframe, dim;
   if (ndims <= 1) {
     nframe = 1;
     dim = (ndims == 0) ? 1 : input.size(0);
     TORCH_CHECK(
-      target.numel() > 0 && target.dim() <= 1 && target.numel() == dim,
-      "inconsistent size ",
-      target.sizes(),
-      " for ",
-      target_arg);
+        target.numel() > 0 && target.dim() <= 1 && target.numel() == dim,
+        "inconsistent size ",
+        target.sizes(),
+        " for ",
+        target_arg);
   } else {
     nframe = input.size(0);
     dim = input.size(1);
     TORCH_CHECK(
-      target.numel() > 0 && target.dim() == 2 && target.size(0) == nframe && target.size(1) == dim,
-      "inconsistent size ",
-      target.sizes(),
-      " for ",
-      target_arg);
+        target.numel() > 0 && target.dim() == 2 && target.size(0) == nframe &&
+            target.size(1) == dim,
+        "inconsistent size ",
+        target.sizes(),
+        " for ",
+        target_arg);
   }
 
   TORCH_CHECK(
-    target.min().item<int64_t>() >= -1, target_arg, " is out of range");
+      target.min().item<int64_t>() >= -1, target_arg, " is out of range");
   TORCH_CHECK(
-    target.max().item<int64_t>() < dim, target_arg, "is out of range");
-  
+      target.max().item<int64_t>() < dim, target_arg, "is out of range");
+
   auto input_contiguous = input.contiguous();
   auto target_contiguous = target.contiguous();
 
@@ -963,7 +973,7 @@ void MultilabelMarginCriterion_updateOutput(
   scalar_t* is_target_data = is_target.data_ptr<scalar_t>();
 
   auto queue = dpcppGetCurrentQueue();
-  int64_t local_size = 
+  int64_t local_size =
       queue.get_device()
           .template get_info<DPCPP::info::device::max_work_group_size>();
 
@@ -984,20 +994,20 @@ void MultilabelMarginCriterion_updateOutput(
         for (int i = local_item_id; i < nframe; i += local_size) {
           scalar_t sum = 0;
           for (int64_t ddt = 0; ddt < dim; ddt++) {
-            auto target_idx = target_ptr[i*dim + ddt];
+            auto target_idx = target_ptr[i * dim + ddt];
             if (target_idx < 0)
               break;
-            is_target_ptr[i*dim + target_idx] = 1;
+            is_target_ptr[i * dim + target_idx] = 1;
           }
           for (int64_t dt = 0; dt < dim; dt++) {
-            auto target_idx = target_ptr[i*dim + dt];
+            auto target_idx = target_ptr[i * dim + dt];
             if (target_idx < 0)
               break;
-            
-            auto input_target = input_ptr[i*dim + target_idx];
+
+            auto input_target = input_ptr[i * dim + target_idx];
             for (int64_t d = 0; d < dim; d++) {
-              if (!is_target_ptr[i*dim + d]) {
-                scalar_t z = 1.0 - input_target + input_ptr[i*dim + d];
+              if (!is_target_ptr[i * dim + d]) {
+                scalar_t z = 1.0 - input_target + input_ptr[i * dim + d];
                 if (z > 0)
                   sum += z;
               }
@@ -1007,8 +1017,8 @@ void MultilabelMarginCriterion_updateOutput(
           output_ptr[i] = sum;
         }
       };
-      cgh.parallel_for<MultilabelMarginCriterionUpdateOutputKernel1<scalar_t> >(
-            DPCPP::range<1>(local_size), kfn);
+      cgh.parallel_for<MultilabelMarginCriterionUpdateOutputKernel1<scalar_t>>(
+          DPCPP::range<1>(local_size), kfn);
     } else {
       auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
         auto input_ptr = input_acc.template get_pointer<scalar_t>();
@@ -1020,20 +1030,20 @@ void MultilabelMarginCriterion_updateOutput(
         for (int i = local_item_id; i < nframe; i += local_size) {
           scalar_t sum = 0;
           for (int64_t ddt = 0; ddt < dim; ddt++) {
-            auto target_idx = target_ptr[i*dim + ddt];
+            auto target_idx = target_ptr[i * dim + ddt];
             if (target_idx < 0)
               break;
-            is_target_ptr[i*dim + target_idx] = 1;
+            is_target_ptr[i * dim + target_idx] = 1;
           }
           for (int64_t dt = 0; dt < dim; dt++) {
-            auto target_idx = target_ptr[i*dim + dt];
+            auto target_idx = target_ptr[i * dim + dt];
             if (target_idx < 0)
               break;
-            
-            auto input_target = input_ptr[i*dim + target_idx];
+
+            auto input_target = input_ptr[i * dim + target_idx];
             for (int64_t d = 0; d < dim; d++) {
-              if (!is_target_ptr[i*dim + d]) {
-                scalar_t z = 1.0 - input_target + input_ptr[i*dim + d];
+              if (!is_target_ptr[i * dim + d]) {
+                scalar_t z = 1.0 - input_target + input_ptr[i * dim + d];
                 if (z > 0)
                   sum += z;
               }
@@ -1043,19 +1053,22 @@ void MultilabelMarginCriterion_updateOutput(
           if (reduction == Reduction::Mean)
             sum /= nframe;
           local_output_acc[local_item_id] += sum;
-      }
+        }
 
-      //reduce
-      for (int64_t i = (local_size >> 1); i > 0; i >>= 1) {
+        // reduce
+        for (int64_t i = (local_size >> 1); i > 0; i >>= 1) {
+          item_id.barrier(dpcpp_global_and_local_fence);
+          if (local_item_id < i)
+            local_output_acc[local_item_id] +=
+                local_output_acc[local_item_id + i];
+        }
         item_id.barrier(dpcpp_global_and_local_fence);
-        if (local_item_id < i)
-          local_output_acc[local_item_id] += local_output_acc[local_item_id + i];
-      }
-      item_id.barrier(dpcpp_global_and_local_fence);
-      output_ptr[0] = local_output_acc[0];
-    };
-    cgh.parallel_for<MultilabelMarginCriterionUpdateOutputKernel2<scalar_t> >(
-          DPCPP::nd_range<1>(DPCPP::range<1>(local_size), DPCPP::range<1>(local_size)), kfn);
+        output_ptr[0] = local_output_acc[0];
+      };
+      cgh.parallel_for<MultilabelMarginCriterionUpdateOutputKernel2<scalar_t>>(
+          DPCPP::nd_range<1>(
+              DPCPP::range<1>(local_size), DPCPP::range<1>(local_size)),
+          kfn);
     }
   };
 
@@ -1076,36 +1089,38 @@ void MultilabelMarginCriterion_updateGradInput(
   const auto ndims = input.dim();
 
   TORCH_CHECK(
-    input.numel() > 0 && ndims <= 2,
-    "non-empty vector or matrix expected, got size: ",
-    input.sizes());
-  
+      input.numel() > 0 && ndims <= 2,
+      "non-empty vector or matrix expected, got size: ",
+      input.sizes());
+
   int64_t nframe, dim;
   if (ndims <= 1) {
     nframe = 1;
     dim = (ndims == 0) ? 1 : input.size(0);
     TORCH_CHECK(
-      target.numel() > 0 && target.dim() <= 1 && target.numel() == dim,
-      "inconsistent size ",
-      target.sizes(),
-      " for ",
-      target_arg);
+        target.numel() > 0 && target.dim() <= 1 && target.numel() == dim,
+        "inconsistent size ",
+        target.sizes(),
+        " for ",
+        target_arg);
   } else {
     nframe = input.size(0);
     dim = input.size(1);
     TORCH_CHECK(
-      target.numel() > 0 && target.dim() == 2 && target.size(0) == nframe && target.size(1) == dim,
-      "inconsistent size ",
-      target.sizes(),
-      " for ",
-      target_arg);
+        target.numel() > 0 && target.dim() == 2 && target.size(0) == nframe &&
+            target.size(1) == dim,
+        "inconsistent size ",
+        target.sizes(),
+        " for ",
+        target_arg);
   }
-  checkSameDPCPP("multilabel_margin_loss_backward_out", target_arg, is_target_arg);
+  checkSameDPCPP(
+      "multilabel_margin_loss_backward_out", target_arg, is_target_arg);
 
   TORCH_CHECK(
-    target.min().item<int64_t>() >= -1, target_arg, " is out of range");
+      target.min().item<int64_t>() >= -1, target_arg, " is out of range");
   TORCH_CHECK(
-    target.max().item<int64_t>() < dim, target_arg, "is out of range");
+      target.max().item<int64_t>() < dim, target_arg, "is out of range");
 
   auto input_contiguous = input.contiguous();
   auto target_contiguous = target.contiguous();
@@ -1115,25 +1130,30 @@ void MultilabelMarginCriterion_updateGradInput(
   TORCH_CHECK(grad_input.is_contiguous(), "grad_input must be contiguous");
   grad_input.zero_();
 
-  auto is_target_cont_arg = TensorArg(is_target_contiguous, "is_target_cont", 5);
+  auto is_target_cont_arg =
+      TensorArg(is_target_contiguous, "is_target_cont", 5);
   TORCH_CHECK(
-      is_target_contiguous.min().item<scalar_t>() >= 0, is_target_cont_arg, " is out of range");
+      is_target_contiguous.min().item<scalar_t>() >= 0,
+      is_target_cont_arg,
+      " is out of range");
   TORCH_CHECK(
-      is_target_contiguous.max().item<scalar_t>() <= 1, is_target_cont_arg, " is out of range");
-  
+      is_target_contiguous.max().item<scalar_t>() <= 1,
+      is_target_cont_arg,
+      " is out of range");
+
   scalar_t* grad_input_data = grad_input.data_ptr<scalar_t>();
   scalar_t* grad_output_data = grad_output.data_ptr<scalar_t>();
   scalar_t* input_data = input_contiguous.data_ptr<scalar_t>();
   int64_t* target_data = target_contiguous.data_ptr<int64_t>();
   scalar_t* is_target_data = is_target_contiguous.data_ptr<scalar_t>();
   scalar_t g = static_cast<scalar_t>(
-      reduction == Reduction::Mean ? 1./(nframe * dim) : 1. / dim);
+      reduction == Reduction::Mean ? 1. / (nframe * dim) : 1. / dim);
 
   auto queue = dpcppGetCurrentQueue();
-  int64_t local_size = 
+  int64_t local_size =
       queue.get_device()
           .template get_info<DPCPP::info::device::max_work_group_size>();
-  
+
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto grad_input_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, grad_input_data);
     auto grad_output_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, grad_output_data);
@@ -1151,27 +1171,29 @@ void MultilabelMarginCriterion_updateGradInput(
 
       for (int i = local_item_id; i < nframe; i += local_size) {
         for (int64_t dt = 0; dt < dim; dt++) {
-          auto target_idx = target_ptr[i*dim + dt];
+          auto target_idx = target_ptr[i * dim + dt];
           if (target_idx < 0)
             break;
-          
-          auto input_target = input_ptr[i*dim + target_idx];
+
+          auto input_target = input_ptr[i * dim + target_idx];
           for (int64_t d = 0; d < dim; d++) {
-            if (!is_target_ptr[i*dim + d]) {
-              scalar_t z = 1.0 - input_target + input_ptr[i*dim + d];
+            if (!is_target_ptr[i * dim + d]) {
+              scalar_t z = 1.0 - input_target + input_ptr[i * dim + d];
               if (z > 0) {
-                grad_input_ptr[i*dim + target_idx] -= g;
-                grad_input_ptr[i*dim + d] += g;
+                grad_input_ptr[i * dim + target_idx] -= g;
+                grad_input_ptr[i * dim + d] += g;
               }
             }
           }
         }
         for (int64_t d = 0; d < dim; d++)
-          grad_input_ptr[i*dim + d] *= (reduction == Reduction::None) ? grad_output_ptr[i] : grad_output_ptr[0];
+          grad_input_ptr[i * dim + d] *= (reduction == Reduction::None)
+              ? grad_output_ptr[i]
+              : grad_output_ptr[0];
       }
     };
-    cgh.parallel_for<MultilabelMarginCriterionUpdateGradInputKernel<scalar_t> >(
-          DPCPP::range<1>(local_size), kfn);
+    cgh.parallel_for<MultilabelMarginCriterionUpdateGradInputKernel<scalar_t>>(
+        DPCPP::range<1>(local_size), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
@@ -1354,46 +1376,46 @@ Tensor smooth_l1_loss_backward(
       grad_input, grad_output, self, target, reduction);
 }
 
-Tensor & soft_margin_loss_out(
-    Tensor & out,
-    const Tensor & self,
-    const Tensor & target,
+Tensor& soft_margin_loss_out(
+    Tensor& out,
+    const Tensor& self,
+    const Tensor& target,
     int64_t reduction) {
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
       self.scalar_type(), "soft_margin_loss_out", [&] {
-          impl::SoftMarginCriterion_updateOutput<scalar_t>(
-              out, self, target, reduction);
+        impl::SoftMarginCriterion_updateOutput<scalar_t>(
+            out, self, target, reduction);
       });
   return out;
 }
 
 Tensor soft_margin_loss(
-    const Tensor & self,
-    const Tensor & target,
+    const Tensor& self,
+    const Tensor& target,
     int64_t reduction) {
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::soft_margin_loss_out(
       out, self, target, reduction);
 }
 
-Tensor & soft_margin_loss_backward_out(
-    Tensor & grad_input,
-    const Tensor & grad_output,
-    const Tensor & self,
-    const Tensor & target,
+Tensor& soft_margin_loss_backward_out(
+    Tensor& grad_input,
+    const Tensor& grad_output,
+    const Tensor& self,
+    const Tensor& target,
     int64_t reduction) {
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
       self.scalar_type(), "soft_margin_loss_backward_out", [&] {
-          impl::SoftMarginCriterion_updateGradInput<scalar_t>(
-              grad_input, grad_output, self, target, reduction);
+        impl::SoftMarginCriterion_updateGradInput<scalar_t>(
+            grad_input, grad_output, self, target, reduction);
       });
   return grad_input;
 }
 
 Tensor soft_margin_loss_backward(
-    const Tensor & grad_output,
-    const Tensor & self,
-    const Tensor & target,
+    const Tensor& grad_output,
+    const Tensor& self,
+    const Tensor& target,
     int64_t reduction) {
   Tensor grad_input = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::soft_margin_loss_backward_out(
@@ -1409,10 +1431,10 @@ Tensor& multi_margin_loss_out(
     const Tensor& weights,
     int64_t reduction) {
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-    self.scalar_type(), "multi_margin_loss_out", [&] {
-      impl::MultiMarginCriterion_updateOutput<scalar_t>(
-        out, self, target, p, margin, weights, reduction);
-    });
+      self.scalar_type(), "multi_margin_loss_out", [&] {
+        impl::MultiMarginCriterion_updateOutput<scalar_t>(
+            out, self, target, p, margin, weights, reduction);
+      });
   return out;
 }
 
@@ -1425,7 +1447,7 @@ Tensor multi_margin_loss(
     int64_t reduction) {
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::multi_margin_loss_out(
-    out, self, target, p, margin, weights, reduction);
+      out, self, target, p, margin, weights, reduction);
 }
 
 Tensor& multi_margin_loss_backward_out(
@@ -1438,10 +1460,17 @@ Tensor& multi_margin_loss_backward_out(
     const Tensor& weights,
     int64_t reduction) {
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-    self.scalar_type(), "multi_margin_loss_backward_out", [&] {
-      impl::MultiMarginCriterion_updateGradInput<scalar_t>(
-        grad_input, grad_output, self, target, p, margin, weights, reduction);
-    });
+      self.scalar_type(), "multi_margin_loss_backward_out", [&] {
+        impl::MultiMarginCriterion_updateGradInput<scalar_t>(
+            grad_input,
+            grad_output,
+            self,
+            target,
+            p,
+            margin,
+            weights,
+            reduction);
+      });
   return grad_input;
 }
 
@@ -1453,82 +1482,82 @@ Tensor multi_margin_loss_backward(
     Scalar margin,
     const Tensor& weights,
     int64_t reduction) {
- Tensor grad_input = at::empty({0}, self.options());
+  Tensor grad_input = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::multi_margin_loss_backward_out(
       grad_input, grad_output, self, target, p, margin, weights, reduction);
 }
 
-Tensor & multilabel_margin_loss_out(
-    Tensor & out,
-    const Tensor & self,
-    const Tensor & target,
+Tensor& multilabel_margin_loss_out(
+    Tensor& out,
+    const Tensor& self,
+    const Tensor& target,
     int64_t reduction) {
   Tensor is_target = at::empty({0}, self.options());
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-    self.scalar_type(), "multilabel_margin_loss_out", [&] {
-      impl::MultilabelMarginCriterion_updateOutput<scalar_t>(
-        out, self, target, reduction, is_target);
-    });
+      self.scalar_type(), "multilabel_margin_loss_out", [&] {
+        impl::MultilabelMarginCriterion_updateOutput<scalar_t>(
+            out, self, target, reduction, is_target);
+      });
   return out;
 }
 
 Tensor multilabel_margin_loss(
-    const Tensor & self,
-    const Tensor & target,
+    const Tensor& self,
+    const Tensor& target,
     int64_t reduction) {
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::multilabel_margin_loss_out(
-    out, self, target, reduction);
+      out, self, target, reduction);
 }
 
-std::tuple<Tensor &,Tensor &> multilabel_margin_loss_forward_out(
-    Tensor & output,
-    Tensor & is_target,
-    const Tensor & self,
-    const Tensor & target,
+std::tuple<Tensor&, Tensor&> multilabel_margin_loss_forward_out(
+    Tensor& output,
+    Tensor& is_target,
+    const Tensor& self,
+    const Tensor& target,
     int64_t reduction) {
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-    self.scalar_type(), "multilabel_margin_loss_forward_out", [&] {
-      impl::MultilabelMarginCriterion_updateOutput<scalar_t>(
-        output, self, target, reduction, is_target);
-    });
+      self.scalar_type(), "multilabel_margin_loss_forward_out", [&] {
+        impl::MultilabelMarginCriterion_updateOutput<scalar_t>(
+            output, self, target, reduction, is_target);
+      });
   return std::tuple<Tensor&, Tensor&>(output, is_target);
 }
 
-std::tuple<Tensor,Tensor> multilabel_margin_loss_forward(
-      const Tensor & self,
-      const Tensor & target,
-      int64_t reduction) {
+std::tuple<Tensor, Tensor> multilabel_margin_loss_forward(
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction) {
   Tensor output = at::empty({0}, self.options());
   Tensor is_target = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::multilabel_margin_loss_forward_out(
-    output, is_target, self, target, reduction);
+      output, is_target, self, target, reduction);
 }
 
-Tensor & multilabel_margin_loss_backward_out(
-    Tensor & grad_input,
-    const Tensor & grad_output,
-    const Tensor & self,
-    const Tensor & target,
+Tensor& multilabel_margin_loss_backward_out(
+    Tensor& grad_input,
+    const Tensor& grad_output,
+    const Tensor& self,
+    const Tensor& target,
     int64_t reduction,
-    const Tensor & is_target) {
+    const Tensor& is_target) {
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-    self.scalar_type(), "multilabel_margin_loss_backward_out", [&] {
-      impl::MultilabelMarginCriterion_updateGradInput<scalar_t>(
-        grad_input, grad_output, self, target, reduction, is_target);
-    });
+      self.scalar_type(), "multilabel_margin_loss_backward_out", [&] {
+        impl::MultilabelMarginCriterion_updateGradInput<scalar_t>(
+            grad_input, grad_output, self, target, reduction, is_target);
+      });
   return grad_input;
 }
 
 Tensor multilabel_margin_loss_backward(
-      const Tensor & grad_output,
-      const Tensor & self,
-      const Tensor & target,
-      int64_t reduction,
-      const Tensor & is_target) {
+    const Tensor& grad_output,
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction,
+    const Tensor& is_target) {
   Tensor grad_input = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::multilabel_margin_loss_backward_out(
-    grad_input, grad_output, self, target, reduction, is_target);
+      grad_input, grad_output, self, target, reduction, is_target);
 }
 
 } // namespace AtenIpexTypeDPCPP
