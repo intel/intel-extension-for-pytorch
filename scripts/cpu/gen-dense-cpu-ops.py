@@ -42,7 +42,6 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::sigmoid(Tensor self) -> Tensor',
     'aten::sigmoid_(Tensor(a!) self) -> Tensor(a!)',
     'aten::sigmoid_backward(Tensor grad_output, Tensor output) -> Tensor',
-    'aten::reshape(Tensor self, int[] shape) -> Tensor',
     'aten::transpose.int(Tensor(a) self, int dim0, int dim1) -> Tensor(a)',
     'aten::cat.out(Tensor[] tensors, int dim=0, *, Tensor(a!) out) -> Tensor(a!)',
     'aten::cat(Tensor[] tensors, int dim=0) -> Tensor',

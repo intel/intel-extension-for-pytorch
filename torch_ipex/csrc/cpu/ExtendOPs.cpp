@@ -447,5 +447,9 @@ at::Tensor AtenIpexTypeExt::max_pooling_backward(const at::Tensor& grad_output, 
     return cpu::AtenIpexCPUDev::dil_max_pooling_backward(grad_output, output, input, kernel_size, stride, padding, dilation, ceil_mode);
 }
 
+at::Tensor AtenIpexTypeExt::reshape(const at::Tensor& input, at::IntArrayRef size) {
+    return cpu::AtenIpexCPUDev::dil_reshape(input, size);
+}
+
 }  // namespace torch_ipex
 

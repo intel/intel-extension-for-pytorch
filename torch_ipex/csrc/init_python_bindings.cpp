@@ -88,6 +88,10 @@ void InitIpexModuleBindings(py::module m) {
         [](const at::Tensor& grad_output, const at::Tensor& output, const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
           return AtenIpexTypeExt::max_pooling_backward(grad_output, output, input, kernel_size, stride, padding, dilation, ceil_mode);
         });
+  m.def("reshape",
+        [](const at::Tensor& input, at::IntArrayRef size) {
+          return AtenIpexTypeExt::reshape(input, size);
+        });
   m.def("mlp_forward", &AtenIpexTypeMLPExt::forward);
   m.def("mlp_backward", &AtenIpexTypeMLPExt::backward);
   m.def("mlp_create_handle", &AtenIpexTypeMLPExt::create_handle);
