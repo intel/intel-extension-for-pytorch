@@ -1,12 +1,6 @@
-[submodule "third_party/pybind11"]
-	path = third_party/pybind11
-	url = https://github.com/pybind/pybind11.git
 [submodule "third_party/mkl-dnn"]
 	path = third_party/mkl-dnn
 	url = https://github.com/intel/mkl-dnn.git
 [submodule "third_party/dnnl_for_gpu"]
 	path = third_party/dnnl_for_gpu
 	url = ssh://git@gitlab.devtools.intel.com:29418/pytorch-ats/ideep.git
-[submodule "third_party/xsmm"]
-	path = third_party/xsmm
-	url = https://github.com/hfp/libxsmm.git

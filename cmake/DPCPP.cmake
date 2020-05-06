@@ -23,6 +23,7 @@ cmake_minimum_required(VERSION 3.4.3)
 #    return()
 #endif()
 #set(SYCL_cmake_included true)
+include(FindPackageHandleStandardArgs)
 
 set(sycl_root_hint)
 if(DEFINED SYCLROOT)
@@ -96,11 +97,59 @@ if(INTEL_SYCL_VERSION)
 
     include_directories(${SYCL_INCLUDE_DIR})
 
-    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsycl")
-    #set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl")
-
     list(APPEND EXTRA_SHARED_LIBS ${SYCL_LIBRARY})
     list(APPEND EXTRA_SHARED_LIBS ${OpenCL_LIBRARY})
+
+    #add pstl lib
+    # Try to find PSTL header from DPC++
+    find_path(PSTL_INCLUDE_DIRS
+            NAMES dpstd
+            PATHS
+            ${sycl_root_hints}
+            PATH_SUFFIXES
+            include
+            NO_DEFAULT_PATH)
+
+    find_package_handle_standard_args(PSTL
+            FOUND_VAR PSTL_FOUND
+            REQUIRED_VARS PSTL_INCLUDE_DIRS
+            )
+
+    #add tbb lib
+    find_path(TBB_INCLUDE_DIRS
+            NAMES tbb
+            PATHS
+            ${DPCPP_ROOT}/tbb/latest
+            $ENV{DPCPP_ROOT}/tbb/latest
+            PATH_SUFFIXES
+            include
+            NO_DEFAULT_PATH)
+
+    find_package_handle_standard_args(TBB
+            FOUND_VAR TBB_FOUND
+            REQUIRED_VARS TBB_INCLUDE_DIRS
+            )
+    if(${TBB_FOUND})
+        if(${PSTL_FOUND})
+            add_definitions(-D_PSTL_BACKEND_SYCL)
+
+            if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${PSTL_INCLUDE_DIRS})
+                include_directories(${PSTL_INCLUDE_DIRS})
+            endif()
+
+            if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${TBB_INCLUDE_DIRS})
+                include_directories(${TBB_INCLUDE_DIRS})
+            endif()
+
+            MESSAGE(STATUS "TBB directors " ${TBB_INCLUDE_DIRS})
+            MESSAGE(STATUS "PSTL directors " ${PSTL_INCLUDE_DIRS})
+        else()
+            MESSAGE(WARNING "PSTL not found. No PSTL")
+        endif()
+    else()
+        MESSAGE(WARNING "TBB not found. No PSTL")
+    endif()
+
 else()
     # ComputeCpp-specific flags
     # 1. Ignore the warning about undefined symbols in SYCL kernels - comes from

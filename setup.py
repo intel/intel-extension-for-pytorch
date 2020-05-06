@@ -3,6 +3,7 @@ from __future__ import print_function
 
 try:
     import torch
+    from torch.utils.cpp_extension import include_paths, library_paths
 except ImportError as e:
     print('Unable to import torch. Error:')
     print('\t', e)
@@ -15,7 +16,6 @@ from setuptools.command.build_ext import build_ext
 from distutils.spawn import find_executable
 from sysconfig import get_paths
 
-import distutils.ccompiler
 import distutils.command.clean
 import git
 import glob
@@ -31,13 +31,13 @@ import sys
 
 pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
 base_dir = os.path.dirname(os.path.abspath(__file__))
-python_include_dir = get_paths()['include']
 
 def _get_complier():
-    if not os.getenv("SYCLROOT") is None:
+    if not os.getenv("DPCPP_ROOT") is None:
+        # dpcpp build
         return "clang", "clang++"
     else:
-        return "compute", "compute++"
+        return "gcc", "compute++"
 
 def _check_env_flag(name, default=''):
   return os.getenv(name, default).upper() in ['ON', '1', 'YES', 'TRUE', 'Y']
@@ -202,13 +202,24 @@ class DPCPPBuild(build_ext, object):
     if ext.name is 'torch_ipex':
       ext_dir = ext_dir + '/torch_ipex'
 
+    def convert_cmake_dirs(paths):
+        def converttostr(input_seq, seperator):
+            # Join all the strings in list
+            final_str = seperator.join(input_seq)
+            return final_str
+        try:
+            return converttostr(paths, ";")
+        except:
+            return paths
+
     cmake_args = [
             '-DCMAKE_BUILD_TYPE=' + build_type,
-            '-DPYTORCH_INSTALL_DIR=' + pytorch_install_dir,
+            '-DPYTORCH_INCLUDE_DIR=' + convert_cmake_dirs(include_paths()),
+            '-DPYTORCH_LIBRARY_DIR=' + pytorch_install_dir + '/lib',
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DCMAKE_INSTALL_PREFIX=' + ext_dir,
             '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + ext_dir,
-            '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
+            '-DPYTHON_INCLUDE_DIR=' + distutils.sysconfig.get_python_inc(),
         ]
 
     cc, cxx = _get_complier()

@@ -2,17 +2,17 @@
 # of core files without having to trundle through all of ATen's CMakeLists.txt
 # Add files needed from jit folders
 LIST(APPEND DPCPP_COMMON_SRCS
-    ${DPCPP_ROOT}/aten_ipex_bridge.cpp
-    ${DPCPP_ROOT}/aten_ipex_type_default.cpp
-    ${DPCPP_ROOT}/aten_ipex_sparse_type_default.cpp
-    ${DPCPP_ROOT}/aten_ipex_type_ext.cpp
-    ${DPCPP_ROOT}/aten_ipex_type.cpp
-    ${DPCPP_ROOT}/dpcpp_allocator.cpp
-    ${DPCPP_ROOT}/init_python_bindings.cpp
-    ${DPCPP_ROOT}/ipex_tensor_impl.cpp
-    ${DPCPP_ROOT}/ipex_sparse_tensor_impl.cpp
-    ${DPCPP_ROOT}/version.cpp
-    ${DPCPP_ROOT}/utils.cpp
+    ${TORCH_IPEX_C_SOURCE_DIR}/aten_ipex_bridge.cpp
+    ${TORCH_IPEX_C_SOURCE_DIR}/aten_ipex_type_default.cpp
+    ${TORCH_IPEX_C_SOURCE_DIR}/aten_ipex_sparse_type_default.cpp
+    ${TORCH_IPEX_C_SOURCE_DIR}/aten_ipex_type_ext.cpp
+    ${TORCH_IPEX_C_SOURCE_DIR}/aten_ipex_type.cpp
+    ${TORCH_IPEX_C_SOURCE_DIR}/dpcpp_allocator.cpp
+    ${TORCH_IPEX_C_SOURCE_DIR}/init_python_bindings.cpp
+    ${TORCH_IPEX_C_SOURCE_DIR}/ipex_tensor_impl.cpp
+    ${TORCH_IPEX_C_SOURCE_DIR}/ipex_sparse_tensor_impl.cpp
+    ${TORCH_IPEX_C_SOURCE_DIR}/version.cpp
+    ${TORCH_IPEX_C_SOURCE_DIR}/utils.cpp
 )
 
 # Pass to parent
