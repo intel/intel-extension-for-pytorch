@@ -13,7 +13,7 @@ def embeddingbag(weights, inputs, offsets, scale_grad_by_freq, mode, sparse, per
     else:
         assert(0, "unimplement embeddingbag path in extension")
 
-    return ret;
+    return ret
 
 
 class EmbeddingBagFunction(Function):

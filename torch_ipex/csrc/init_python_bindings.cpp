@@ -57,6 +57,30 @@ void InitIpexModuleBindings(py::module m) {
            const at::Tensor &inputs, const at::Tensor &offsets) {
           return AtenIpexTypeExt::embedding_bag_backward(grad_out, weights, inputs, offsets);
         });
+  m.def("linear",
+        [](const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
+          return AtenIpexTypeExt::linear(input, weight, bias);
+        });
+  m.def("linear_backward",
+        [](const at::Tensor& input, const at::Tensor& grad_output, const at::Tensor& weight, std::array<bool,3> output_mask) {
+          return AtenIpexTypeExt::linear_backward(input, grad_output, weight, output_mask);
+        });
+  m.def("adaptive_avg_pool2d",
+        [](at::Tensor const& input, at::IntArrayRef output_size) {
+          return AtenIpexTypeExt::adaptive_avg_pool2d(input, output_size);
+        });
+  m.def("adaptive_avg_pool2d_backward",
+        [](const at::Tensor& grad_output, const at::Tensor& input) {
+          return AtenIpexTypeExt::adaptive_avg_pool2d_backward(grad_output, input);
+        });
+  m.def("max_pooling",
+        [](const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
+          return AtenIpexTypeExt::max_pooling(input, kernel_size, stride, padding, dilation, ceil_mode);
+        });
+  m.def("max_pooling_backward",
+        [](const at::Tensor& grad_output, const at::Tensor& output, const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
+          return AtenIpexTypeExt::max_pooling_backward(grad_output, output, input, kernel_size, stride, padding, dilation, ceil_mode);
+        });
   m.def("mlp_forward", &AtenIpexTypeMLPExt::forward);
   m.def("mlp_backward", &AtenIpexTypeMLPExt::backward);
   m.def("mlp_create_handle", &AtenIpexTypeMLPExt::create_handle);

@@ -8,6 +8,7 @@
 #include "dil/dil.hpp"
 #include "xsmm/libxsmm_utils.h"
 #include "../utils.h"
+#include "DevOPs.h"
 
 namespace torch_ipex {
 
@@ -420,6 +421,30 @@ at::Tensor AtenIpexTypeExt::embedding_bag_backward(const at::Tensor &grad_out,
     TORCH_INTERNAL_ASSERT(grad_out.scalar_type() == at::kBFloat16);
     return _embedding_bag_backward<at::BFloat16>(grad_out, weights, inputs, offsets);
   }
+}
+
+at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
+    return cpu::AtenIpexCPUDev::dil_linear(input, weight, bias);
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::linear_backward(const at::Tensor& input, const at::Tensor& grad_output, const at::Tensor& weight, std::array<bool,3> output_mask) {
+    return cpu::AtenIpexCPUDev::dil_linear_backward(input, grad_output, weight, output_mask);
+}
+
+at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d(at::Tensor const& input, at::IntArrayRef output_size) {
+    return cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(input, output_size);
+}
+
+at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d_backward(const at::Tensor& grad_output, const at::Tensor& input) {
+    return cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(grad_output, input);
+}
+
+at::Tensor AtenIpexTypeExt::max_pooling(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
+    return cpu::AtenIpexCPUDev::dil_max_pooling(input, kernel_size, stride, padding, dilation, ceil_mode);
+}
+
+at::Tensor AtenIpexTypeExt::max_pooling_backward(const at::Tensor& grad_output, const at::Tensor& output, const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
+    return cpu::AtenIpexCPUDev::dil_max_pooling_backward(grad_output, output, input, kernel_size, stride, padding, dilation, ceil_mode);
 }
 
 }  // namespace torch_ipex

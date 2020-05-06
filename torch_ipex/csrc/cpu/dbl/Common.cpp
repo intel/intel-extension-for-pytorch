@@ -19,9 +19,6 @@ dil::tensor dil_tensor_from_dense(const at::Tensor& tensor) {
   AT_ASSERTM(
     tensor.layout() == at::Layout::Strided,
     "dil_tensor_view_from_dense expects dense tensor input");
-  AT_ASSERTM(
-    !tensor.is_variable(),
-    "dil_tensor_view_from_dense: should not be a variable");
   at::ScalarType cur_type = tensor.scalar_type();
   return {tensor.sizes().vec(), get_dil_data_type(cur_type), tensor.data_ptr()};
 }

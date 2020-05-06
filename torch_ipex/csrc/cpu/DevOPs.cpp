@@ -512,7 +512,7 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_(
 at::Tensor AtenIpexCPUDev::dil_linear(
     const at::Tensor& self,
     const at::Tensor& weight,
-    const at::Tensor& bias) {
+    const c10::optional<at::Tensor>& bias) {
   DEBUG("AtenIpexCPUDev::dil_linear\n");
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(weight);
@@ -525,8 +525,9 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
 
   dil::tensor y;
-  if (bias.defined()) {
-    const dil::tensor b = dbl::comm::try_gen_dil_tensor(bias);
+  if (bias.has_value()) {
+    at::Tensor bias_vec = bias.value();
+    const dil::tensor b = dbl::comm::try_gen_dil_tensor(bias_vec);
     dil::inner_product_forward::compute(x, w, b, y);
   } else {
     dil::inner_product_forward::compute(x, w, y);
@@ -577,13 +578,15 @@ std::tuple<at::Tensor, at::Tensor> dil_linear_backward_weights(
   dil::tensor gradw, gradb;
   if (bias_defined) {
     dil::inner_product_backward_weights::compute(x, grady, gradw, gradb, diff_weight_type);
-  } else {
-    dil::inner_product_backward_weights::compute(x, grady, gradw, diff_weight_type);
-  }
-
-  return std::tuple<at::Tensor, at::Tensor>{
+    return std::tuple<at::Tensor, at::Tensor>{
     dbl::comm::gen_aten_tensor_by(gradw),
     dbl::comm::gen_aten_tensor_by(gradb)};
+  } else {
+    dil::inner_product_backward_weights::compute(x, grady, gradw, diff_weight_type);
+    return std::tuple<at::Tensor, at::Tensor>{
+    dbl::comm::gen_aten_tensor_by(gradw),
+    at::Tensor()};
+  }
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_linear_backward(
@@ -795,10 +798,10 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool3d(
                         : dil::algorithm::pooling_avg_exclude_padding);
 }
 
-at::Tensor AtenIpexCPUDev::dil__adaptive_avg_pool2d(
+at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
     at::Tensor const& input,
     at::IntArrayRef output_size) {
-  DEBUG("AtenIpexCPUDev::dil__adaptive_avg_pool2d\n");
+  DEBUG("AtenIpexCPUDev::dil_adaptive_avg_pool2d\n");
   CHECK_DNNL_OP_PRE_COND(input);
   auto output_size_vec =
       dbl::pool::expand_param_if_needed(output_size, "output_size", input.dim() - 2);
@@ -907,10 +910,10 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool3d_backward(
                         : dil::algorithm::pooling_avg_exclude_padding);
 }
 
-at::Tensor AtenIpexCPUDev::dil__adaptive_avg_pool2d_backward(
+at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(
     const at::Tensor& grad_output,
     const at::Tensor& input) {
-  DEBUG("AtenIpexCPUDev::dil__adaptive_avg_pool2d_backward\n");
+  DEBUG("AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward\n");
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(input);
   auto output_size_vec = grad_output.sizes();

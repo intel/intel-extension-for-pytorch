@@ -13,6 +13,7 @@ import sys
 import torch
 import _torch_ipex as ipex
 ipex._initialize_aten_bindings()
+import intel_pytorch_extension_py
 
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -553,6 +554,99 @@ class TestPool(TestCase):
         y_dpcpp.backward()
         self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
+    def test_max_pool2d(self):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+
+        for stride in [1, 2, 3]:
+            for H, W in [(64, 64), (35, 39), (16, 19), [7, 8]]:
+                x_cpu = torch.randn(N, C, H, W, dtype=torch.float32) * 10
+                x_dpcpp = x_cpu.to(device=device)
+
+                for ceil_mode in [False, True]:
+                    max_pool2d = torch.nn.MaxPool2d(
+                        kernel_size=3 if not ceil_mode else 7,
+                        stride=stride,
+                        padding=1,
+                        ceil_mode=ceil_mode)
+
+                    self.assertEqual(max_pool2d(x_cpu), max_pool2d(x_dpcpp))
+
+    def test_max_pool3d(self):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+
+        for stride in [1, 2, 3]:
+            for D, H, W in [(64, 64, 64), (35, 39, 35), (16, 19, 20), [7, 8, 9]]:
+                x_cpu = torch.randn(N, C, D, H, W, dtype=torch.float32) * 10
+                x_dpcpp = x_cpu.to(device=device)
+
+                for ceil_mode in [False, True]:
+                    max_pool3d = torch.nn.MaxPool3d(
+                        kernel_size=3 if not ceil_mode else 7,
+                        stride=stride,
+                        padding=1,
+                        ceil_mode=ceil_mode)
+
+                    self.assertEqual(max_pool3d(x_cpu), max_pool3d(x_dpcpp))
+
+    def test_max_pool2d_backward(self):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x = torch.randn(10, 3, 64, 64, dtype=torch.float32) * 10
+        for ceil_mode in [True]:
+            max_pool2d = torch.nn.MaxPool2d(
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                ceil_mode=ceil_mode)
+
+            x1 = x.clone().requires_grad_()
+            x2 = x.clone().to(device=device).requires_grad_()
+
+            y1 = max_pool2d(x1).sum()
+            y2 = max_pool2d(x2).sum()
+            y1.backward()
+            y2.backward()
+            self.assertEqual(x1.grad, x2.grad)
+
+    def test_max_pool3d_backward(self):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+
+        for stride in [1, 2, 3]:
+            for D, H, W in [(64, 64, 64), (35, 39, 35), (16, 19, 20), [7, 8, 9]]:
+                x = torch.randn(N, C, D, H, W, dtype=torch.float32) * 10
+                x1 = x.clone().requires_grad_()
+                x2 = x.clone().to(device=device).requires_grad_()
+
+                for ceil_mode in [False, True]:
+                    max_pool3d = torch.nn.MaxPool3d(
+                        kernel_size=3 if not ceil_mode else 7,
+                        stride=stride,
+                        padding=1,
+                        ceil_mode=ceil_mode)
+
+                    y1 = max_pool3d(x1).sum()
+                    y2 = max_pool3d(x2).sum()
+                    y1.backward()
+                    y2.backward()
+                    self.assertEqual(x1.grad, x2.grad)
+
 class TestBatchNorm(TestCase):
     def test_batch_norm2d(self):
         ipex.enable_auto_dnnl()
@@ -640,6 +734,20 @@ class TestTensorShape(TestCase):
         y_cpu.backward()
         y_dpcpp.backward()
         self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+
+    def test_transpose(self):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x = torch.randn(3, 4, 5, dtype=torch.float32) * 10
+        x_dpcpp = x.clone().to(device=device)
+        for dim1 in range(x.ndim):
+            for dim2 in range(x.ndim):
+                self.assertEqual(
+                    x.transpose(dim1, dim2),
+                    x_dpcpp.transpose(dim1, dim2),
+                )
 
 class TestSoftMax(TestCase):
     def test_softmax(self):
