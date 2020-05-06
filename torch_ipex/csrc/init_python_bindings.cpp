@@ -33,8 +33,15 @@ void InitIpexModuleBindings(py::module m) {
   m.def("_initialize_aten_bindings",
         []() { AtenIpexType::InitializeAtenBindings(); });
   m.def("_get_git_revs", []() { return GetRevisions(); });
-  m.def("enable_auto_dnnl", []() { setAutoDNNL(true); });
-  m.def("disable_auto_dnnl", []() { setAutoDNNL(false); });
+  m.def("enable_auto_dnnl", []() { AutoOptConfig::singleton().set_auto_dnnl(true); });
+  m.def("disable_auto_dnnl", []() { AutoOptConfig::singleton().set_auto_dnnl(false); });
+  m.def("get_auto_dnnl", []() { return AutoOptConfig::singleton().get_auto_dnnl(); });
+  m.def("enable_mix_bf16_fp32", []() { AutoOptConfig::singleton().set_mix_bf16_fp32(true); });
+  m.def("disable_mix_bf16_fp32", []() { AutoOptConfig::singleton().set_mix_bf16_fp32(false); });
+  m.def("get_mix_bf16_fp32", []() { return AutoOptConfig::singleton().get_mix_bf16_fp32(); });
+  m.def("enable_pure_bf16", []() { AutoOptConfig::singleton().set_pure_bf16(true); });
+  m.def("disable_pure_bf16", []() { AutoOptConfig::singleton().set_pure_bf16(false); });
+  m.def("get_pure_bf16", []() { return AutoOptConfig::singleton().get_pure_bf16(); });
   m.def("packed_add_",
         [](at::Tensor &top_half, at::Tensor &bot_half,
            const at::Tensor &grad, float alpha) {
