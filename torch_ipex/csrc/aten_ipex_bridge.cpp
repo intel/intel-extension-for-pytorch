@@ -57,35 +57,32 @@ void reorderDilTensor(const at::Tensor& ipexTensor) {
   TORCH_WARN(ipexTensor.is_contiguous());
   TORCH_INTERNAL_ASSERT(! (shade_data_context->dil_tensor.is_empty()));
   dil::tensor &dil_tensor = shade_data_context->dil_tensor;
+
+  dil::dims sizes = dil_tensor.get_dims();
+  dil::dims strides;
+
   if (dil_tensor.is_public_format()) {
     TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor.get_data_handle());
     TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data != nullptr);
     TORCH_INTERNAL_ASSERT(shade_data_context->cpu_del_fun != nullptr);
+    strides = dil_tensor.get_strides();
   } else {
     auto dims = dil_tensor.get_dims();
     // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
     at::Tensor cpu_tensor = at::empty(
-      std::vector<int64_t>(dims.begin(), dims.end()),
-      ipexTensor.options().device(c10::kCPU).layout(c10::kStrided));
+      sizes, ipexTensor.options().device(c10::kCPU).layout(c10::kStrided));
     TORCH_INTERNAL_ASSERT(cpu_tensor.scalar_type() == get_at_data_type(dil_tensor.get_data_type()));
     auto pub_tensor = dil_tensor.to_public(cpu_tensor.data_ptr(), dil_tensor.get_data_type());
+    strides = pub_tensor.get_strides();
     at::DataPtr& cpu_tensor_data_ptr = cpu_tensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr();
     ipexTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(cpu_tensor_data_ptr));
     // The tensor has been reset to new DataPtr, then we need to attach new shade data context.
     attachShadeDataConext(ipexTensor);
-
-    // In backprop phase, grad variable like conv2d.weight.grad might be 
-    // detached (in torch/csrc/autograd/functions/accumulate_grad.h) and
-    // forbids the metadata to be modified.
-    // In order to fallback a dil tensor to aten tensor, we temporarily set
-    // this flag to True, allowing `as_strided_` to modify the metadata.
-    auto ipexTensorImpl = ipexTensor.unsafeGetTensorImpl();
-    bool orig_allow_tensor_metadata_change = ipexTensorImpl->allow_tensor_metadata_change();
-    ipexTensorImpl->set_allow_tensor_metadata_change(true);
-    ipexTensor.as_strided_(dims, pub_tensor.get_strides());
-    ipexTensorImpl->set_allow_tensor_metadata_change(orig_allow_tensor_metadata_change);
     TORCH_INTERNAL_ASSERT(ipexTensor.is_contiguous());
   }
+
+  auto* ipexTensorImpl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
+  ipexTensorImpl->force_set_strided(sizes, strides);
 }
 
 

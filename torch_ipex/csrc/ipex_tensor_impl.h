@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/Tensor.h>
+#include <ATen/TensorUtils.h>
 #include <c10/core/Storage.h>
 #include <c10/core/TensorImpl.h>
 
@@ -22,6 +23,7 @@ class IPEXTensorImpl : public c10::TensorImpl {
   void keep_source_data_tensor(at::Tensor);
   void set_storage_data_ptr(c10::DataPtr);
   void set_dpcpp_tensor_id();
+  void force_set_strided(at::IntArrayRef size, at::IntArrayRef stride /*, optional<int64_t> storage_offset_*/);
 
   c10::Storage& get_storage() {
     return this->storage_;
