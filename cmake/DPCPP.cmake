@@ -47,6 +47,7 @@ find_file(INTEL_SYCL_VERSION
         ${sycl_root_hints}
     PATH_SUFFIXES
         include/CL/sycl
+        include/sycl/CL/sycl
         lib/clang/11.0.0/include/CL/sycl
         lib/clang/10.0.0/include/CL/sycl
         lib/clang/9.0.0/include/CL/sycl
