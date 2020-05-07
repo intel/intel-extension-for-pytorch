@@ -15,6 +15,9 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor);
 std::vector<at::Tensor> fallbackToCPUTensorList(const at::TensorList&);
 std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList&);
 
+void attachShadeDataConext(const at::Tensor& tensor);
+void cvtTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dstScalarType);
+
 // Convert CPU tensor to DPCPP tensor
 at::Tensor upgradeToDPCPPTensor(const at::Tensor& ipexTensor);
 at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& ipexTensor);

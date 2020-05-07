@@ -4,7 +4,7 @@
 #include <torch/csrc/autograd/function.h>
 #include <torch/csrc/autograd/record_function.h>
 #include "ExtendOPs.h"
-#include "vec/bf16_vec_kernel.h"
+#include "bf16/vec/bf16_vec_kernel.h"
 #include "dil/dil.hpp"
 #include "xsmm/libxsmm_utils.h"
 #include "../utils.h"

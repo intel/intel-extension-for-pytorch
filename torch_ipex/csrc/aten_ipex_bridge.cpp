@@ -12,6 +12,7 @@
 #include "ipex_tensor_impl.h"
 #include "ipex_sparse_tensor_impl.h"
 #include "cpu/ShadeDataContext.h"
+#include "cpu/bf16/Converter.h"
 #include "utils.h"
 
 namespace torch_ipex {
@@ -48,6 +49,44 @@ namespace bridge {
 
 
 at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor);
+
+void reorderDilTensor(const at::Tensor& ipexTensor) {
+  void *data_ctx = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
+  cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
+  // All aten::tensor with dnnl::tensor should be contiguous
+  TORCH_WARN(ipexTensor.is_contiguous());
+  TORCH_INTERNAL_ASSERT(! (shade_data_context->dil_tensor.is_empty()));
+  dil::tensor &dil_tensor = shade_data_context->dil_tensor;
+  if (dil_tensor.is_public_format()) {
+    TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor.get_data_handle());
+    TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data != nullptr);
+    TORCH_INTERNAL_ASSERT(shade_data_context->cpu_del_fun != nullptr);
+  } else {
+    auto dims = dil_tensor.get_dims();
+    // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
+    at::Tensor cpu_tensor = at::empty(
+      std::vector<int64_t>(dims.begin(), dims.end()),
+      ipexTensor.options().device(c10::kCPU).layout(c10::kStrided));
+    TORCH_INTERNAL_ASSERT(cpu_tensor.scalar_type() == get_at_data_type(dil_tensor.get_data_type()));
+    auto pub_tensor = dil_tensor.to_public(cpu_tensor.data_ptr(), dil_tensor.get_data_type());
+    at::DataPtr& cpu_tensor_data_ptr = cpu_tensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr();
+    ipexTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(cpu_tensor_data_ptr));
+    // The tensor has been reset to new DataPtr, then we need to attach new shade data context.
+    attachShadeDataConext(ipexTensor);
+
+    // In backprop phase, grad variable like conv2d.weight.grad might be 
+    // detached (in torch/csrc/autograd/functions/accumulate_grad.h) and
+    // forbids the metadata to be modified.
+    // In order to fallback a dil tensor to aten tensor, we temporarily set
+    // this flag to True, allowing `as_strided_` to modify the metadata.
+    auto ipexTensorImpl = ipexTensor.unsafeGetTensorImpl();
+    bool orig_allow_tensor_metadata_change = ipexTensorImpl->allow_tensor_metadata_change();
+    ipexTensorImpl->set_allow_tensor_metadata_change(true);
+    ipexTensor.as_strided_(dims, pub_tensor.get_strides());
+    ipexTensorImpl->set_allow_tensor_metadata_change(orig_allow_tensor_metadata_change);
+    TORCH_INTERNAL_ASSERT(ipexTensor.is_contiguous());
+  }
+}
 
 
 void attachShadeDataConext(const at::Tensor& tensor) {
@@ -153,39 +192,7 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
   // Branch 2.1: Dense + Dil Tensor
   if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
-    // All aten::tensor with dnnl::tensor should be contiguous
-    TORCH_WARN(ipexTensor.is_contiguous());
-    TORCH_INTERNAL_ASSERT(! (shade_data_context->dil_tensor.is_empty()));
-    dil::tensor &dil_tensor = shade_data_context->dil_tensor;
-    if (dil_tensor.is_public_format()) {
-      TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor.get_data_handle());
-      TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data != nullptr);
-      TORCH_INTERNAL_ASSERT(shade_data_context->cpu_del_fun != nullptr);
-    } else {
-      auto dims = dil_tensor.get_dims();
-      // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
-      at::Tensor cpu_tensor = at::empty(
-        std::vector<int64_t>(dims.begin(), dims.end()),
-        ipexTensor.options().device(c10::kCPU).layout(c10::kStrided));
-      TORCH_INTERNAL_ASSERT(cpu_tensor.scalar_type() == get_at_data_type(dil_tensor.get_data_type()));
-      auto pub_tensor = dil_tensor.to_public(cpu_tensor.data_ptr(), dil_tensor.get_data_type());
-      at::DataPtr& cpu_tensor_data_ptr = cpu_tensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr();
-      ipexTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(cpu_tensor_data_ptr));
-      // The tensor has been reset to new DataPtr, then we need to attach new shade data context.
-      attachShadeDataConext(ipexTensor);
-
-      // In backprop phase, grad variable like conv2d.weight.grad might be 
-      // detached (in torch/csrc/autograd/functions/accumulate_grad.h) and
-      // forbids the metadata to be modified.
-      // In order to fallback a dil tensor to aten tensor, we temporarily set
-      // this flag to True, allowing `as_strided_` to modify the metadata.
-      auto ipexTensorImpl = ipexTensor.unsafeGetTensorImpl();
-      bool orig_allow_tensor_metadata_change = ipexTensorImpl->allow_tensor_metadata_change();
-      ipexTensorImpl->set_allow_tensor_metadata_change(true);
-      ipexTensor.as_strided_(dims, pub_tensor.get_strides());
-      ipexTensorImpl->set_allow_tensor_metadata_change(orig_allow_tensor_metadata_change);
-      TORCH_INTERNAL_ASSERT(ipexTensor.is_contiguous());
-    }
+    reorderDilTensor(ipexTensor);
   }
 
   // Branch 2.2: Dense + CPU Tensor
@@ -492,6 +499,46 @@ std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& ten
   return dpcpp_tensor_vec;
 }
 
+void cvtTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dstScalarType) {
+  if (!(ipexTensor.defined()))
+    return;
+
+  TORCH_CHECK(dstScalarType == at::kBFloat16 || dstScalarType == at::kFloat);
+  if (ipexTensor.scalar_type() == dstScalarType)
+    return;
+
+  if (check_data_is_part_of_storage(ipexTensor))
+    return;
+
+  void *data_ptr = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get();
+  void *data_ctx = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
+  if ((data_ptr != data_ctx) && (data_ctx != nullptr)) {
+    // Shade data context has been attached
+    cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
+    if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
+      reorderDilTensor(ipexTensor);
+    }
+  }
+
+  auto* allocator = c10::GetAllocator(c10::DeviceType::DPCPP);
+  int64_t nelements = ipexTensor.numel();
+  auto dtype = c10::scalarTypeToTypeMeta(dstScalarType);
+  int64_t data_size = nelements * c10::elementSize(dstScalarType);
+  auto storage_impl = c10::make_intrusive<at::StorageImpl>(
+    dtype,
+    nelements,
+    allocator->allocate(data_size),
+    allocator,
+    /*resizeable=*/true);
+
+  if (dstScalarType == at::kBFloat16) {
+    torch_ipex::cpu::bf16::converter::fp32_to_bf16(storage_impl->data_ptr().get(), data_ptr, nelements);
+  } else {
+    torch_ipex::cpu::bf16::converter::bf16_to_fp32(storage_impl->data_ptr().get(), data_ptr, nelements);
+  }
+
+  ipexTensor.unsafeGetTensorImpl()->set_storage(storage_impl);
+}
 
 std::vector<at::Tensor> upgradeToDPCPPTensorVec(const std::vector<at::Tensor> &tensor_vec) {
   std::vector<at::Tensor> ret_dpcpp_tensor_vec;

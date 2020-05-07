@@ -104,4 +104,12 @@ bool check_auto_dnnl() {
   return AutoOptConfig::singleton().get_auto_dnnl();
 }
 
+bool check_data_is_part_of_storage(const at::Tensor& tensor) {
+  if (!(tensor.defined()))
+    return false;
+
+  return (tensor.storage_offset() == 0) &&
+         (tensor.numel() == tensor.storage().numel());
+}
+
 } // namespace torch_ipex

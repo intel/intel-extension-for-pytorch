@@ -110,13 +110,12 @@ struct ShadeDataContext {
         //   C = A[4:7, :]
         // All these tensors share same buffer of Tensor A with different storge offsets and elements.
         // So the context modification will impact all these tensors.
-        if (shade_data_context->dil_tensor.get_data_handle() == raw_cpu_data) {
-          if (shade_data_context->dil_tensor.get_nelems() == tensor.storage().numel()) {
-            if (shade_data_context->dil_tensor.get_data_type() == get_dil_data_type(tensor.scalar_type())) {
-              TORCH_INTERNAL_ASSERT(shade_data_context->dil_tensor.get_size() == tensor.storage().capacity());
-              return true;
-            }
-          }
+        if ((shade_data_context->dil_tensor.get_data_handle() == raw_cpu_data) &&
+            (shade_data_context->dil_tensor.get_nelems() == tensor.storage().numel()) &&
+            (shade_data_context->dil_tensor.get_data_type() == get_dil_data_type(tensor.scalar_type()))) {
+          //TODO: Do we need to check strides here?
+          TORCH_INTERNAL_ASSERT(shade_data_context->dil_tensor.get_size() == tensor.storage().capacity());
+          return true;
         }
       }
       TORCH_INTERNAL_ASSERT(false);

@@ -18,5 +18,6 @@ bool get_device_count(c10::Device dev_type, c10::DeviceIndex *count);
 dil::data_type get_dil_data_type(at::ScalarType);
 at::ScalarType get_at_data_type(dil::data_type);
 bool check_auto_dnnl();
+bool check_data_is_part_of_storage(const at::Tensor& tensor);
 
 } // namespace torch_ipex
