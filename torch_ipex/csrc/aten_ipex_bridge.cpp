@@ -50,7 +50,7 @@ namespace bridge {
 
 at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor);
 
-void reorderDilTensor(const at::Tensor& ipexTensor) {
+void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
   void *data_ctx = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
   cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
   // All aten::tensor with dnnl::tensor should be contiguous
@@ -89,12 +89,11 @@ void reorderDilTensor(const at::Tensor& ipexTensor) {
 void attachShadeDataConext(const at::Tensor& tensor) {
   auto tensor_storage_impl = tensor.storage().unsafeGetStorageImpl();
   auto& data_ptr = tensor_storage_impl->data_ptr();
-  // [NOTE]: We assume the real data of storage should be as same as its context.
-  //         Then we use the assumption to check if current tensor has contained
-  //         shade data context.
-  if (data_ptr.get() != data_ptr.get_context()) {
+
+  // Has contained shade context
+  if (check_tensor_own_shade_context(tensor))
     return;
-  }
+
   auto cur_del_fn = data_ptr.get_deleter();
   bool res = data_ptr.compare_exchange_deleter(cur_del_fn, &(c10::detail::deleteNothing));
   TORCH_INTERNAL_ASSERT(res);
@@ -189,7 +188,7 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
   // Branch 2.1: Dense + Dil Tensor
   if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
-    reorderDilTensor(ipexTensor);
+    reorderDilTensorToPublic(ipexTensor);
   }
 
   // Branch 2.2: Dense + CPU Tensor
@@ -496,24 +495,52 @@ std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& ten
   return dpcpp_tensor_vec;
 }
 
-void cvtTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dstScalarType) {
+
+void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarType dstScalarType) {
+  if (ipexTensor.device().type() == at::DeviceType::CPU) {
+    return reorderTensorToScalaraType(ipexTensor, dstScalarType);
+  }
+
+  TORCH_CHECK(dstScalarType == at::kBFloat16 || dstScalarType == at::kFloat);
+  auto tensor_dtype = ipexTensor.scalar_type();
+  TORCH_CHECK(tensor_dtype == at::kBFloat16 || tensor_dtype == at::kFloat);
+  if (tensor_dtype == dstScalarType)
+    return;
+
+  if (check_tensor_own_shade_context(ipexTensor)) {
+    // Shade data context has been attached
+    if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
+      cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(ipexTensor.storage().data_ptr().get_context());
+      shade_context->dil_tensor.to_type(get_dil_data_type(dstScalarType));
+      IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
+      ipex_tensor_impl->reset_data_type(dstScalarType);
+      ipex_tensor_impl->storage().unsafeGetStorageImpl()->set_dtype(at::scalarTypeToTypeMeta(dstScalarType));
+      return;
+    }
+  }
+
+  return reorderTensorToScalaraType(ipexTensor, dstScalarType);
+}
+
+
+void reorderTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dstScalarType) {
   if (!(ipexTensor.defined()))
     return;
 
   TORCH_CHECK(dstScalarType == at::kBFloat16 || dstScalarType == at::kFloat);
-  if (ipexTensor.scalar_type() == dstScalarType)
+
+  auto tensor_dtype = ipexTensor.scalar_type();
+  TORCH_CHECK(tensor_dtype == at::kBFloat16 || tensor_dtype == at::kFloat);
+  if (tensor_dtype == dstScalarType)
     return;
 
-  if (check_data_is_part_of_storage(ipexTensor))
+  if (!check_tensor_own_whole_storage(ipexTensor))
     return;
 
-  void *data_ptr = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get();
-  void *data_ctx = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
-  if ((data_ptr != data_ctx) && (data_ctx != nullptr)) {
+  if (check_tensor_own_shade_context(ipexTensor)) {
     // Shade data context has been attached
-    cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
     if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
-      reorderDilTensor(ipexTensor);
+      reorderDilTensorToPublic(ipexTensor);
     }
   }
 
@@ -528,6 +555,7 @@ void cvtTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dstScal
     allocator,
     /*resizeable=*/true);
 
+  void *data_ptr = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get();
   if (dstScalarType == at::kBFloat16) {
     torch_ipex::cpu::bf16::converter::fp32_to_bf16(storage_impl->data_ptr().get(), data_ptr, nelements);
   } else {

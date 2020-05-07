@@ -104,12 +104,24 @@ bool check_auto_dnnl() {
   return AutoOptConfig::singleton().get_auto_dnnl();
 }
 
-bool check_data_is_part_of_storage(const at::Tensor& tensor) {
+bool check_tensor_own_whole_storage(const at::Tensor& tensor) {
   if (!(tensor.defined()))
     return false;
 
   return (tensor.storage_offset() == 0) &&
          (tensor.numel() == tensor.storage().numel());
+}
+
+bool check_tensor_own_shade_context(const at::Tensor& tensor) {
+  if (!(tensor.defined()))
+    return false;
+
+  // [NOTE]: We assume the real data of storage should be as same as its context.
+  //         Then we use the assumption to check if current tensor has contained
+  //         shade data context.
+  void *data_ptr = tensor.unsafeGetTensorImpl()->storage().data_ptr().get();
+  void *data_ctx = tensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
+  return (data_ptr != data_ctx) && (data_ctx != nullptr);
 }
 
 } // namespace torch_ipex

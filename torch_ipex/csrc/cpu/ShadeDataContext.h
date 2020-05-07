@@ -87,6 +87,7 @@ struct ShadeDataContext {
     void *storage_context = tensor.storage().data_ptr().get_context();
     ShadeDataContext *shade_data_context = (ShadeDataContext*)storage_context;
     auto data_type = shade_data_context->data_type;
+    TORCH_INTERNAL_ASSERT((data_type == SHADE_DATA_TYPE::CPU_RAW) || (data_type == SHADE_DATA_TYPE::DIL));
 
     if (data_type == SHADE_DATA_TYPE::DIL) {
       TORCH_WARN(tensor.is_contiguous());
