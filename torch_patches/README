@@ -1,0 +1,13 @@
+0. Install python package lark-parser
+
+1. git clone https://github.com/pytorch/pytorch.git
+
+2. git checkout tags/v1.5.0-rc3 -b xxx  // xxx stands for the branch name
+
+3. git submodule sync && git submodule update --init --recursive
+
+4. patch  `dpcpp-v1.5-rc3.patch` and `dlrm_fp32.patch` to above pytorch xxx branch
+
+5. build pytorch with `python setup.py install`
+
+6. build extension with `python setup.py install`
