@@ -1,9 +1,9 @@
 #include <ATen/ATen.h>
-#include <ATen/AccumulateType.h>
 #include <ATen/NativeFunctions.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/NumericLimits.h>
+#include <utils/AccumulateType.h>
 #include <utils/Atomics.h>
 
 using namespace at::dpcpp;
@@ -49,7 +49,7 @@ void fractional_max_pool3d_out_frame(
     int poolSizeT,
     int poolSizeH,
     int poolSizeW) {
-  using accscalar_t = at::acc_type<scalar_t, /*is_cuda=*/true>;
+  using accscalar_t = acc_type<scalar_t>;
   auto queue = dpcppGetCurrentQueue();
   int outputPlaneSize = outputSizeT * outputSizeH * outputSizeW;
   int work_group_size = outputPlaneSize > 128 ? 128 : outputPlaneSize;
@@ -185,8 +185,7 @@ void fractional_max_pool3d_backward_out_frame(
       auto gradOutput_ptr = gradOutput_acc.template get_pointer<scalar_t>();
       auto indices_ptr = indices_acc.template get_pointer<int64_t>();
 
-      int ourOutputPoint =
-          item.get_global_id()[0];
+      int ourOutputPoint = item.get_global_id()[0];
       int plane = item.get_group()[1];
       int batch = item.get_group()[2];
 

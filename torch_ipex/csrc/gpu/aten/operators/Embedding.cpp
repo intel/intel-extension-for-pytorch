@@ -1,5 +1,5 @@
 #include <ATen/ATen.h>
-#include <ATen/AccumulateType.h>
+#include <utils/AccumulateType.h>
 
 #include <core/Context.h>
 #include <core/DPCPPTensorUtils.h>
@@ -36,7 +36,7 @@ static inline void embedding_backward_dpcpp_kernel(
   auto row_num_weights = numel_weights / stride;
   DPCPP::buffer<uint32_t, 1> idx_cnt(DPCPP::range<1>{(size_t)row_num_weights});
 
-  dpcpp_queue.submit([&](DPCPP::handler& cgh) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
     int64_t rng, GRange, tileSize;
 
     // KER1: calc indices count for each
@@ -91,7 +91,10 @@ static inline void embedding_backward_dpcpp_kernel(
             }
           }
         });
-  });
+  };
+
+  // launch kernel
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 
   // auto idx_cnt_host_acc = idx_cnt.get_access<read_mode>();
   // printf("idx_cnt [1]-%d [2]-%d [3]-%d [4]-%d [5]-%d [6]-%d [7]-%d [8]-%d

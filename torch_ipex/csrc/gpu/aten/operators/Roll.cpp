@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
-#include <ATen/AccumulateType.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/TensorTransformations.h>
+#include <utils/AccumulateType.h>
 
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
@@ -36,7 +36,8 @@ void roll_dpcpp_kernel(
   int64_t rng, GRange, tileSize;
   auto offset = ((size - start) * stride);
   parallel_for_setup(N, tileSize, rng, GRange);
-  dpcpp_queue.submit([&](DPCPP::handler& cgh) {
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_acc = DPCPPAccessor<read_mode>(cgh, in_tensor.data_ptr<scalar_t>());
     auto out_acc =
         DPCPPAccessor<write_mode>(cgh, out_tensor.data_ptr<scalar_t>());
@@ -60,7 +61,9 @@ void roll_dpcpp_kernel(
             out_ptr[linear_index] = in_ptr[source_idx];
           }
         });
-  });
+  };
+  // launch kernel
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 // Roll a tensor along a dimension

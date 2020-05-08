@@ -911,19 +911,20 @@ void index(
     TensorIterator& iter,
     IntArrayRef index_size,
     IntArrayRef index_stride) {
-  AT_DISPATCH_ALL_TYPES(iter.dtype(), "index", [&] {
-    using dtype = OpaqueType<sizeof(scalar_t)>;
-    dpcpp_index_kernel<DPCPP_K(index_kernel, scalar_t)>(
-        iter,
-        index_size,
-        index_stride,
-        // This lambda function only works in dpcpp kernel.
-        [](dpcpp_global_ptr_pt<char> out_data,
-           dpcpp_global_ptr_pt<char> in_data,
-           int64_t offset) {
-          *(dtype*)out_data = *(dtype*)(in_data + offset);
-        });
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half, at::ScalarType::Bool, iter.dtype(), "index", [&] {
+        using dtype = OpaqueType<sizeof(scalar_t)>;
+        dpcpp_index_kernel<DPCPP_K(index_kernel, scalar_t)>(
+            iter,
+            index_size,
+            index_stride,
+            // This lambda function only works in dpcpp kernel.
+            [](dpcpp_global_ptr_pt<char> out_data,
+               dpcpp_global_ptr_pt<char> in_data,
+               int64_t offset) {
+              *(dtype*)out_data = *(dtype*)(in_data + offset);
+            });
+      });
 }
 
 DPCPP_DEF_K1(index_put_kernel);

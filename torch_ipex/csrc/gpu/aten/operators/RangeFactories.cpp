@@ -1,7 +1,7 @@
-#include <ATen/AccumulateType.h>
 #include <ATen/Dispatch.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/TensorIterator.h>
+#include <utils/AccumulateType.h>
 
 #include <core/DPCPP.h>
 #include <core/Memory.h>
@@ -152,7 +152,7 @@ Tensor& logspace_dpcpp_out(
 Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
   AT_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, result.scalar_type(), "range_dpcpp", [&]() {
-        using accscalar_t = at::acc_type<scalar_t, true>;
+        using accscalar_t = acc_type<scalar_t>;
         auto xstart = start.to<accscalar_t>();
         auto xend = end.to<accscalar_t>();
         auto xstep = step.to<accscalar_t>();
@@ -210,7 +210,7 @@ Tensor& arange_dpcpp_out(
     Scalar step) {
   AT_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, result.scalar_type(), "arange_dpcpp", [&]() {
-        using accscalar_t = at::acc_type<scalar_t, true>;
+        using accscalar_t = acc_type<scalar_t>;
         auto xstart = start.to<accscalar_t>();
         auto xend = end.to<accscalar_t>();
         auto xstep = step.to<accscalar_t>();

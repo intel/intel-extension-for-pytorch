@@ -481,6 +481,11 @@ struct Numerics<at::Half> {
   static inline at::Half pow(at::Half a, at::Half b) {
     return DPCPP::pow(float(a), float(b));
   }
+
+  static inline at::Half max(at::Half a, at::Half b) {
+    return DPCPP::fmax(float(a), float(b));
+  }
+
   static inline at::Half abs(at::Half a) {
     return DPCPP::fabs(float(a));
   }

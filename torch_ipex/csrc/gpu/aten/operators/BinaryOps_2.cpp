@@ -33,7 +33,7 @@ static void div_kernel_dpcpp(TensorIterator& iter) {
           iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
     });
   } else {
-    AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "div", [&]() {
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "div", [&]() {
       dpcpp_kernel_for_tensor_iter<SyclOpDiv>(
           iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
     });

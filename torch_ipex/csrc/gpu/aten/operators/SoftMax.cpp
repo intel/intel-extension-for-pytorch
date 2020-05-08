@@ -1,8 +1,11 @@
 #include <ATen/ATen.h>
-#include <ATen/AccumulateType.h>
+#include <utils/AccumulateType.h>
 
 #include <core/Context.h>
 #include <core/Memory.h>
+#include <core/detail/TensorInfo.h>
+
+#include <utils/Numerics.h>
 
 using namespace at::dpcpp;
 
@@ -10,204 +13,248 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-template <typename scalar_t, template <typename> class Epilogue>
-class SoftmaxForwardKernelName {};
+template <typename...>
+class SpatialSoftmaxForwardKernelName {};
 
-template <typename scalar_t, template <typename> class Epilogue>
-class SoftmaxBackwardKernelName {};
+template <typename...>
+class SpatialSoftmaxBackwardKernelName {};
 
-template <typename T>
+template <typename T, typename AccumT, typename OutT>
 struct LogSoftMaxForwardEpilogue {
-  LogSoftMaxForwardEpilogue(T max_input, T sum)
-      : logsum(max_input + DPCPP::log(static_cast<float>(sum))) {}
-  T operator()(T input) const {
-    return static_cast<T>(input - logsum);
+  LogSoftMaxForwardEpilogue(AccumT max_input, AccumT sum)
+      : logsum(max_input + Numerics<AccumT>::log(sum)) {}
+
+  OutT operator()(T input) const {
+    return static_cast<OutT>(input - logsum);
   }
-  const T logsum;
+  const AccumT logsum;
 };
 
-template <typename T>
+template <typename T, typename AccumT, typename OutT>
 struct LogSoftMaxBackwardEpilogue {
-  LogSoftMaxBackwardEpilogue(T sum) : sum(sum) {}
-  T operator()(T gradOutput, T output) const {
+  LogSoftMaxBackwardEpilogue(AccumT sum) : sum(sum) {}
+
+  T operator()(OutT gradOutput, OutT output) const {
     return static_cast<T>(
-        gradOutput - DPCPP::exp(static_cast<T>(output)) * sum);
+        static_cast<AccumT>(gradOutput) -
+        Numerics<AccumT>::exp(static_cast<AccumT>(output)) * sum);
   }
 
-  const T sum;
+  const AccumT sum;
 };
 
-template <typename T>
+template <typename T, typename AccumT, typename OutT>
 struct SoftMaxForwardEpilogue {
-  SoftMaxForwardEpilogue(T max_input, T sum) : max_input(max_input), sum(sum) {}
-  T operator()(T input) const {
-    return static_cast<T>(
-        DPCPP::exp(static_cast<float>(input - max_input)) / sum);
+  SoftMaxForwardEpilogue(AccumT max_input, AccumT sum)
+      : max_input(max_input), sum(sum) {}
+
+  OutT operator()(T input) const {
+    return Numerics<OutT>::exp(static_cast<OutT>(input - max_input)) / sum;
   }
 
-  const T max_input;
-  const T sum;
+  const AccumT max_input;
+  const AccumT sum;
 };
 
-template <typename T>
+template <typename T, typename AccumT, typename OutT>
 struct SoftMaxBackwardEpilogue {
-  SoftMaxBackwardEpilogue(T sum) : sum(sum) {}
+  SoftMaxBackwardEpilogue(AccumT sum) : sum(sum) {}
+
   // XXX: gradOutput that we get here is really gradOutput * output
   // Look for cmul in SoftMax_updateGradInput
-  T operator()(T gradOutput, T output) const {
+  T operator()(OutT gradOutput, OutT output) const {
     return static_cast<T>(gradOutput - output * sum);
   }
 
-  const T sum;
+  const AccumT sum;
 };
 
-template <typename scalar_t, template <typename> class Epilogue>
-void SoftMaxForward(
-    scalar_t* output,
+template <typename reduce_op, typename nd_item_id, typename local_shared>
+static inline void reduce(
+    nd_item_id item_id,
+    const local_shared& local_shared_mem,
+    reduce_op bin_op) {
+  auto local_idx = item_id.get_local_id(0);
+  auto group_size = item_id.get_local_range().size();
+
+  decltype(group_size) __k = 1;
+  do {
+    item_id.barrier(DPCPP::access::fence_space::local_space);
+    if (local_idx % (2 * __k) == 0 && local_idx + __k < group_size) {
+      local_shared_mem[local_idx] = bin_op(
+          local_shared_mem[local_idx], local_shared_mem[local_idx + __k]);
+    }
+    __k *= 2;
+  } while (__k < group_size);
+  item_id.barrier(DPCPP::access::fence_space::local_space);
+}
+
+// It is naive implementation for the softmax. Not optimized if the dim_size is
+// small.
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename outscalar_t,
+    template <typename, typename, typename> class Epilogue>
+void SpatialSoftMaxForward(
+    outscalar_t* output,
     scalar_t* input,
-    int classes,
-    int out_size) {
-  static const auto write_mode = DPCPP::access::mode::discard_write;
-  static const auto read_mode = DPCPP::access::mode::read;
+    dpcpp::detail::TensorInfo<scalar_t, uint64_t> outer_info,
+    size_t outer_size,
+    size_t dim_size,
+    size_t dim_stride) {
   using local_accessor_t = DPCPP::accessor<
-      scalar_t,
+      accscalar_t,
       1,
       DPCPP::access::mode::read_write,
       DPCPP::access::target::local>;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  int64_t local_size =
-      dpcpp_queue.get_device()
-          .template get_info<DPCPP::info::device::max_work_group_size>();
-  int64_t global_size = out_size * local_size;
-  dpcpp_queue.submit([&](DPCPP::handler& cgh) {
-    auto in_acc = DPCPPAccessor<read_mode>(
-        cgh, input, out_size * classes * sizeof(scalar_t));
-    auto out_acc = DPCPPAccessor<write_mode>(
-        cgh, output, out_size * classes * sizeof(scalar_t));
+  size_t local_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+  local_size = std::min(local_size, dim_size);
+  size_t global_size = outer_size * local_size;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input);
+    auto out_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output);
     auto local_acc_max = local_accessor_t(local_size, cgh);
     auto local_acc_sum = local_accessor_t(local_size, cgh);
-    cgh.parallel_for<SoftmaxForwardKernelName<scalar_t, Epilogue>>(
+    cgh.parallel_for<SpatialSoftmaxForwardKernelName<
+        scalar_t,
+        Epilogue<scalar_t, accscalar_t, outscalar_t>>>(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)),
         [=](DPCPP::nd_item<1> item_id) {
-          int64_t local_id = item_id.get_local_id(0);
+          size_t local_id = item_id.get_local_id(0);
           auto group_id = item_id.get_group(0);
-          auto in_ptr =
-              in_acc.template get_pointer<scalar_t>() + classes * group_id;
+          auto data_offset =
+              dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(
+                  group_id, outer_info);
+          auto in_ptr = in_acc.template get_pointer<scalar_t>() + data_offset;
           auto out_ptr =
-              out_acc.template get_pointer<scalar_t>() + classes * group_id;
+              out_acc.template get_pointer<outscalar_t>() + data_offset;
           // get max
           auto max_input = in_ptr[0];
-          for (int i = local_id; i < classes; i += local_size) {
-            max_input = DPCPP::max(
-                static_cast<float>(max_input), static_cast<float>(in_ptr[i]));
+          for (uint32_t i = local_id; i < dim_size; i += local_size) {
+            max_input =
+                Numerics<scalar_t>::max(max_input, in_ptr[i * dim_stride]);
           }
-          local_acc_max[local_id] = max_input;
+          // to accscalar_t
+          local_acc_max[local_id] = static_cast<accscalar_t>(max_input);
 
-          for (int i = (local_size >> 1); i > 0; i >>= 1) {
-            item_id.barrier(DPCPP::access::fence_space::local_space);
-            if (local_id < i)
-              local_acc_max[local_id] = DPCPP::max(
-                  static_cast<float>(local_acc_max[local_id]),
-                  static_cast<float>(local_acc_max[local_id + i]));
-          }
-          item_id.barrier(DPCPP::access::fence_space::local_space);
+          reduce(item_id, local_acc_max, [](accscalar_t a, accscalar_t b) {
+            return Numerics<accscalar_t>::max(a, b);
+          });
 
           // get sum
-          auto sum_input = static_cast<scalar_t>(0);
-          for (int i = local_id; i < classes; i += local_size) {
-            sum_input += DPCPP::exp(
-                static_cast<float>(in_ptr[i]) -
-                static_cast<float>(local_acc_max[0]));
+          auto sum_input = static_cast<accscalar_t>(0);
+          for (size_t i = local_id; i < dim_size; i += local_size) {
+            // (NOTE) This arithmetic convension is to avoid dp_global_ptr cast
+            auto in_data = static_cast<accscalar_t>(in_ptr[i * dim_stride]);
+            sum_input += Numerics<accscalar_t>::exp(in_data - local_acc_max[0]);
           }
           local_acc_sum[local_id] = sum_input;
 
-          for (int i = (local_size >> 1); i > 0; i >>= 1) {
-            item_id.barrier(DPCPP::access::fence_space::local_space);
-            if (local_id < i)
-              local_acc_sum[local_id] += local_acc_sum[local_id + i];
-          }
-          item_id.barrier(DPCPP::access::fence_space::local_space);
-          Epilogue<scalar_t> epilogue(local_acc_max[0], local_acc_sum[0]);
+          reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
+            return a + b;
+          });
 
-          for (int i = local_id; i < classes; i += local_size) {
-            out_ptr[i] = epilogue(in_ptr[i]);
+          Epilogue<scalar_t, accscalar_t, outscalar_t> epilogue(
+              local_acc_max[0], local_acc_sum[0]);
+
+          for (size_t i = local_id; i < dim_size; i += local_size) {
+            out_ptr[i * dim_stride] = epilogue(in_ptr[i * dim_stride]);
           }
         });
-  });
+  };
+
+  // launch kernel
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename scalar_t, template <typename> class Epilogue>
-void SoftMaxBackward(
+// It is naive implementation for the softmax. Not optimized if the dim_size is
+// small.
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename outscalar_t,
+    template <typename, typename, typename> class Epilogue>
+void SpatialSoftMaxBackward(
     scalar_t* gradInput,
     scalar_t* output,
     scalar_t* gradOutput,
-    int classes,
-    int out_size) {
-  static const auto write_mode = DPCPP::access::mode::discard_write;
-  static const auto read_mode = DPCPP::access::mode::read;
+    dpcpp::detail::TensorInfo<scalar_t, uint64_t> outer_info,
+    size_t outer_size,
+    size_t dim_size,
+    size_t dim_stride) {
   using local_accessor_t = DPCPP::accessor<
-      scalar_t,
+      accscalar_t,
       1,
       DPCPP::access::mode::read_write,
       DPCPP::access::target::local>;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  int64_t local_size =
-      dpcpp_queue.get_device()
-          .template get_info<DPCPP::info::device::max_work_group_size>();
-  int64_t global_size = out_size * local_size;
-  dpcpp_queue.submit([&](DPCPP::handler& cgh) {
-    auto gradInput_acc = DPCPPAccessor<write_mode>(
-        cgh, gradInput, out_size * classes * sizeof(scalar_t));
-    auto output_acc = DPCPPAccessor<read_mode>(
-        cgh, output, out_size * classes * sizeof(scalar_t));
-    auto gradOutput_acc = DPCPPAccessor<read_mode>(
-        cgh, gradOutput, out_size * classes * sizeof(scalar_t));
+  size_t local_size = dpcppMaxWorkGroupSize(dpcpp_queue);
+  local_size = std::min(local_size, dim_size);
+  size_t global_size = outer_size * local_size;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto gradInput_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, gradInput);
+    auto output_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, output);
+    auto gradOutput_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, gradOutput);
     auto local_acc_sum = local_accessor_t(local_size, cgh);
-    cgh.parallel_for<SoftmaxBackwardKernelName<scalar_t, Epilogue>>(
+    cgh.parallel_for<SpatialSoftmaxBackwardKernelName<
+        scalar_t,
+        Epilogue<scalar_t, accscalar_t, outscalar_t>>>(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(global_size), DPCPP::range<1>(local_size)),
         [=](DPCPP::nd_item<1> item_id) {
-          int64_t local_id = item_id.get_local_id(0);
+          size_t local_id = item_id.get_local_id(0);
           auto group_id = item_id.get_group(0);
-          auto gradInput_ptr = gradInput_acc.template get_pointer<scalar_t>() +
-              classes * group_id;
+          auto data_offset =
+              dpcpp::detail::IndexToOffset<outscalar_t, uint64_t>::get(
+                  group_id, outer_info);
+          auto gradInput_ptr =
+              gradInput_acc.template get_pointer<scalar_t>() + data_offset;
           auto output_ptr =
-              output_acc.template get_pointer<scalar_t>() + classes * group_id;
+              output_acc.template get_pointer<outscalar_t>() + data_offset;
           auto gradOutput_ptr =
-              gradOutput_acc.template get_pointer<scalar_t>() +
-              classes * group_id;
+              gradOutput_acc.template get_pointer<outscalar_t>() + data_offset;
 
-          auto thread_sum = static_cast<scalar_t>(0);
-          for (int64_t i = local_id; i < classes; i += local_size) {
-            thread_sum += gradOutput_ptr[i];
+          auto thread_sum = static_cast<accscalar_t>(0);
+          for (size_t i = local_id; i < dim_size; i += local_size) {
+            thread_sum +=
+                static_cast<accscalar_t>(gradOutput_ptr[i * dim_stride]);
           }
           local_acc_sum[local_id] = thread_sum;
-          for (int64_t i = (local_size >> 1); i > 0; i >>= 1) {
-            item_id.barrier(DPCPP::access::fence_space::local_space);
-            if (local_id < i)
-              local_acc_sum[local_id] += local_acc_sum[local_id + i];
-          }
+
+          reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
+            return a + b;
+          });
+
           auto sum_k = local_acc_sum[0];
-          Epilogue<scalar_t> epilogue(sum_k);
-          for (int64_t i = local_id; i < classes; i += local_size)
-            gradInput_ptr[i] = epilogue(gradOutput_ptr[i], output_ptr[i]);
+          Epilogue<scalar_t, accscalar_t, outscalar_t> epilogue(sum_k);
+          for (size_t i = local_id; i < dim_size; i += local_size) {
+            gradInput_ptr[i * dim_stride] = epilogue(
+                gradOutput_ptr[i * dim_stride], output_ptr[i * dim_stride]);
+          }
         });
-  });
+  };
+
+  // launch kernel
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 } // namespace impl
 
-template <template <typename> class Epilogue>
+template <template <typename, typename, typename> class Epilogue>
 Tensor host_softmax(
     const Tensor& input_,
     const int64_t dim_,
     const bool half_to_float) {
-  TORCH_INTERNAL_ASSERT(
+  AT_ASSERTM(
       !half_to_float,
       "softmax with half to float conversion is not supported on DPCPP");
   auto input = input_.contiguous();
-  Tensor output = at::empty_like(input);
+  Tensor output = at::native::empty_like(input);
   if (input.dim() == 0)
     input = input.view(1);
   int64_t dim = maybe_wrap_dim(dim_, input.dim());
@@ -215,37 +262,41 @@ Tensor host_softmax(
       dim >= 0 && dim < input.dim(),
       "** dpcpp dim must be non-negative and less than input dimensions");
 
-  int64_t outer_size = 1;
-  int64_t dim_size = input.size(dim);
-
   if (input.numel() > 0) {
-    int64_t inner_size = 1;
-    for (int64_t i = 0; i < dim; ++i)
-      outer_size *= input.size(i);
-    for (int64_t i = dim + 1; i < input.dim(); ++i)
-      inner_size *= input.size(i);
-    if (inner_size == 1) {
-      AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-          input.scalar_type(), "host_softmax", [&] {
-            impl::SoftMaxForward<scalar_t, Epilogue>(
-                output.data_ptr<scalar_t>(),
-                input.data_ptr<scalar_t>(),
-                dim_size,
-                outer_size);
-          });
-    } else {
-    }
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+        input.scalar_type(), "host_softmax", [&] {
+          auto dim_stride = input.stride(dim);
+          auto dim_size = input.size(dim);
+          auto outer_numel = input.numel() / dim_size;
+          dpcpp::detail::TensorInfo<scalar_t, uint64_t> outer_info =
+              dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(input);
+          outer_info.reduceDim(dim);
+          outer_info.collapseDims();
+          using accscalar_t = acc_type<scalar_t>;
+          using outscalar_t = scalar_t;
+          impl::SpatialSoftMaxForward<
+              scalar_t,
+              accscalar_t,
+              outscalar_t,
+              Epilogue>(
+              output.data_ptr<outscalar_t>(),
+              input.data_ptr<scalar_t>(),
+              outer_info,
+              outer_numel,
+              dim_size,
+              dim_stride);
+        });
   }
   return output;
 }
 
-template <template <typename> class Epilogue>
+template <template <typename, typename, typename> class Epilogue>
 Tensor host_softmax_backward(
     const Tensor& grad_,
     const Tensor& output_,
     int64_t dim_,
     bool half_to_float) {
-  TORCH_INTERNAL_ASSERT(
+  AT_ASSERTM(
       !half_to_float,
       "softmax with half to float conversion is not supported on DPCPP");
   int64_t dim = maybe_wrap_dim(dim_, grad_.dim());
@@ -259,24 +310,25 @@ Tensor host_softmax_backward(
   auto output = output_.contiguous();
   if (output.dim() == 0)
     output = output.view(1);
-  int64_t outer_size = 1;
-  int64_t dim_size = output.size(dim);
-  int64_t inner_size = 1;
-  for (int64_t i = 0; i < dim; ++i)
-    outer_size *= output.size(i);
-  for (int64_t i = dim + 1; i < output.dim(); ++i)
-    inner_size *= output.size(i);
-  if (inner_size == 1) {
-    AT_DISPATCH_FLOATING_TYPES(gI.scalar_type(), "host_softmax_backward", [&] {
-      impl::SoftMaxBackward<scalar_t, Epilogue>(
-          gI.data_ptr<scalar_t>(),
-          output.data_ptr<scalar_t>(),
-          grad.data_ptr<scalar_t>(),
-          dim_size,
-          outer_size);
-    });
-  } else {
-  }
+  AT_DISPATCH_FLOATING_TYPES(grad.scalar_type(), "host_softmax_backward", [&] {
+    using accscalar_t = acc_type<scalar_t>;
+    using outscalar_t = scalar_t;
+    auto dim_stride = output.stride(dim);
+    auto dim_size = output.size(dim);
+    auto outer_numel = output.numel() / dim_size;
+    dpcpp::detail::TensorInfo<outscalar_t, uint64_t> outer_info =
+        dpcpp::detail::getTensorInfo<outscalar_t, uint64_t>(output);
+    outer_info.reduceDim(dim);
+    outer_info.collapseDims();
+    impl::SpatialSoftMaxBackward<scalar_t, accscalar_t, outscalar_t, Epilogue>(
+        gI.data_ptr<scalar_t>(),
+        output.data_ptr<outscalar_t>(),
+        grad.data_ptr<outscalar_t>(),
+        outer_info,
+        outer_numel,
+        dim_size,
+        dim_stride);
+  });
   return gI;
 }
 

@@ -1,5 +1,5 @@
 #include <ATen/ATen.h>
-#include <ATen/AccumulateType.h>
+#include <utils/AccumulateType.h>
 
 #include <core/Context.h>
 #include <core/DPCPP.h>
@@ -143,7 +143,7 @@ void compute_grad_weight_bags(
     int64_t per_sample_weights_stride,
     int64_t* segment_offsets,
     int64_t num_of_segments,
-    acc_type<scalar_t, true>* grad_weight_per_segment,
+    acc_type<scalar_t>* grad_weight_per_segment,
     bool scale_grad_by_freq,
     bool per_sample_weight_defined) {
   auto queue = dpcppGetCurrentQueue();
@@ -170,7 +170,7 @@ void compute_grad_weight_bags(
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto grad_weight_per_segment_ptr =
           acc_grad_weight_per_segment
-              .template get_pointer<acc_type<scalar_t, true>>();
+              .template get_pointer<acc_type<scalar_t>>();
       auto indices_ptr = acc_indices.template get_pointer<int64_t>();
       auto gradOutput_ptr = acc_gradOutput.template get_pointer<scalar_t>();
       auto offset2bag_ptr = acc_offset2bag.template get_pointer<int64_t>();
@@ -196,18 +196,18 @@ void compute_grad_weight_bags(
       const int idx_end =
           (id == num_of_segments - 1) ? numel : segment_offsets_ptr[id + 1];
 
-      acc_type<scalar_t, true> weight = 0;
+      acc_type<scalar_t> weight = 0;
       for (int idx = idx_begin; idx < idx_end; ++idx) {
         const int seq_number = offset2bag_ptr[idx];
         const int gradOutputRow = seq_number * stride;
 
-        acc_type<scalar_t, true> scale =
+        acc_type<scalar_t> scale =
             scale_grad_by_freq ? 1.0 / count_ptr[indices_ptr[idx]] : 1.0;
         if (per_sample_weight_defined) {
           scale *= per_sample_weights_ptr[idx * per_sample_weights_stride];
         }
 
-        acc_type<scalar_t, true> gradient =
+        acc_type<scalar_t> gradient =
             gradOutput_ptr[gradOutputRow + startFeature];
         if (mode_mean) {
           gradient /= bag_size_ptr[seq_number];
@@ -236,7 +236,7 @@ void compute_grad_weight(
     int64_t stride,
     int64_t* segment_offsets,
     int64_t num_of_segments,
-    acc_type<scalar_t, true>* grad_weight_per_segment,
+    acc_type<scalar_t>* grad_weight_per_segment,
     int padding_idx,
     bool scale_grad_by_fred) {
   auto queue = dpcppGetCurrentQueue();
@@ -258,7 +258,7 @@ void compute_grad_weight(
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto grad_weight_per_segment_ptr =
           acc_grad_weight_per_segment
-              .template get_pointer<acc_type<scalar_t, true>>();
+              .template get_pointer<acc_type<scalar_t>>();
       auto indices_ptr = acc_indices.template get_pointer<int64_t>();
       auto sort_ptr = acc_sort.template get_pointer<int64_t>();
       auto gradOutput_ptr = acc_gradOutput.template get_pointer<scalar_t>();
@@ -279,11 +279,11 @@ void compute_grad_weight(
       const int idx_end =
           (id == num_of_segments - 1) ? numel : segment_offsets_ptr[id + 1];
 
-      acc_type<scalar_t, true> weight = 0;
+      acc_type<scalar_t> weight = 0;
       for (int idx = idx_begin; idx < idx_end; idx++) {
         const int64_t target_row = sort_ptr[idx];
         if (target_row != padding_idx) {
-          const acc_type<scalar_t, true> scale =
+          const acc_type<scalar_t> scale =
               scale_grad_by_fred ? 1.0 / count_ptr[indices_ptr[idx]] : 1.0;
           weight += gradOutput_ptr[target_row * stride + startFeature] * scale;
         }
@@ -307,7 +307,7 @@ void sum_and_scatter(
     int64_t stride,
     int64_t* segment_offsets,
     int64_t num_of_segments,
-    const acc_type<scalar_t, true>* grad_weight_per_segment,
+    const acc_type<scalar_t>* grad_weight_per_segment,
     const int64_t* segment_sizes_offsets,
     int64_t num_of_partial_segments) {
   auto queue = dpcppGetCurrentQueue();
@@ -334,7 +334,7 @@ void sum_and_scatter(
           acc_segment_offsets.template get_pointer<int64_t>();
       auto grad_weight_per_segment_ptr =
           acc_grad_weight_per_segment
-              .template get_pointer<acc_type<scalar_t, true>>();
+              .template get_pointer<acc_type<scalar_t>>();
       auto segment_sizes_offsets_ptr =
           acc_segment_sizes_offsets.template get_pointer<int64_t>();
 
@@ -352,7 +352,7 @@ void sum_and_scatter(
       const int idx_end = (id == num_of_segments - 1)
           ? num_of_partial_segments
           : segment_sizes_offsets_ptr[id + 1];
-      acc_type<scalar_t, true> weight = 0;
+      acc_type<scalar_t> weight = 0;
       for (int idx = idx_begin; idx < idx_end; idx++) {
         weight += grad_weight_per_segment_ptr[idx * stride + startFeature];
       }
@@ -420,7 +420,7 @@ Tensor embedding_bag_backward_dpcpp_kernel(
       [&] {
         // For numerical stability, the dtype of `grad_weight_per_segment`
         // should match `acc_type`
-        using partial_weight_t = acc_type<scalar_t, true>;
+        using partial_weight_t = acc_type<scalar_t>;
         TensorOptions op;
         if (grad.dtype() == at::kHalf) {
           op = grad.options().dtype(at::kFloat);
@@ -502,7 +502,7 @@ void EmbeddingBag_updateOutputKernel(
     int64_t per_sample_weights_stride) {
   // the strategy here is that each bag x feature is handled by a single thread
 
-  using accscalar_t = acc_type<scalar_t, true>;
+  using accscalar_t = acc_type<scalar_t>;
   auto queue = dpcppGetCurrentQueue();
   int64_t chunksPerBag = CeilDiv(featureSize, (int64_t)64);
   int64_t numChunks = numBags * chunksPerBag;

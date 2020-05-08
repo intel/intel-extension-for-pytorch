@@ -1,5 +1,5 @@
 #include <ATen/ATen.h>
-#include <ATen/AccumulateType.h>
+#include <utils/AccumulateType.h>
 
 #include <core/Context.h>
 #include <core/DPCPP.h>

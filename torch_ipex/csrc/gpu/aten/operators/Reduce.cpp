@@ -560,8 +560,9 @@ static void std_var_kernel(
 }
 
 static void sum_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES(
-      iter.dtype(), "sum", [&]() { sum_kernel_impl<scalar_t>(iter); });
+  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, iter.dtype(), "sum", [&]() {
+    sum_kernel_impl<scalar_t>(iter);
+  });
 }
 
 static void prod_kernel(TensorIterator& iter) {
@@ -570,8 +571,9 @@ static void prod_kernel(TensorIterator& iter) {
 }
 
 static void mean_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES(
-      iter.dtype(), "mean", [&]() { mean_kernel_impl<scalar_t>(iter); });
+  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, iter.dtype(), "mean", [&]() {
+    mean_kernel_impl<scalar_t>(iter);
+  });
 }
 
 static void min_kernel(TensorIterator& iter) {

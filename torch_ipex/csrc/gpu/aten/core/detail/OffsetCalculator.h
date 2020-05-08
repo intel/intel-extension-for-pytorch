@@ -12,7 +12,7 @@
 
 template <int NARGS, typename index_t = uint32_t>
 struct OffsetCalculator {
-  static constexpr int MAX_DIMS = 10;
+  static constexpr int MAX_DIMS = 12;
 
   // The offset for each argument (in bytes). Wrapper around fixed-size array.
   using offset_type = at::dpcpp::Array<index_t, NARGS>;

@@ -23,8 +23,8 @@ typedef struct conv_attr {
   static const int64_t kind_with_sum = 0b10;
 
   conv_attr() : scale_(1.0), alpha_(0.f), beta_(0.f), attr_(0) {}
-  conv_attr(float scale, float alpha, float beta, int64_t attr) :
-      scale_(scale), alpha_(alpha), beta_(beta), attr_(attr) {}
+  conv_attr(float scale, float alpha, float beta, int64_t attr)
+      : scale_(scale), alpha_(alpha), beta_(beta), attr_(attr) {}
 
   bool with_relu() {
     return attr_ & kind_with_relu;
@@ -70,9 +70,10 @@ at::Tensor convolution(
     int64_t groups,
     conv_attr_t attr) {
   if (!output.defined()) {
-    output = at::empty(conv_output_size(
-      input.sizes(), weight.sizes(), padding, stride, dilation, groups),
-      input.options());
+    output = at::empty(
+        conv_output_size(
+            input.sizes(), weight.sizes(), padding, stride, dilation, groups),
+        input.options());
   }
 
   Device curDevice = Device(kDPCPP, current_device());
@@ -189,8 +190,8 @@ at::Tensor convolution(
   pattr.set_post_ops(po);
 
   std::shared_ptr<convolution_forward::primitive_desc> conv_forward_pd;
-  conv_forward_pd.reset(
-      new convolution_forward::primitive_desc(*conv_forward_desc, pattr, engine));
+  conv_forward_pd.reset(new convolution_forward::primitive_desc(
+      *conv_forward_desc, pattr, engine));
 
   auto input_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
   dpcpp_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
@@ -1131,8 +1132,17 @@ Tensor convolution_sum(
       beta.to<float>(),
       conv_attr_t::kind_with_sum);
   return _convolution_out(
-      accumu, input_r, weight_r, bias_r, stride_, padding_, dilation_,
-      transposed_, output_padding_, groups_, attr);
+      accumu,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      attr);
 }
 
 Tensor convolution_sum_relu(
@@ -1155,8 +1165,17 @@ Tensor convolution_sum_relu(
       beta.to<float>(),
       conv_attr_t::kind_with_relu | conv_attr_t::kind_with_sum);
   return _convolution_out(
-      accumu, input_r, weight_r, bias_r, stride_, padding_, dilation_,
-      transposed_, output_padding_, groups_, attr);
+      accumu,
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      attr);
 }
 
 Tensor convolution_relu(
@@ -1177,8 +1196,17 @@ Tensor convolution_relu(
       alpha.to<float>(),
       beta.to<float>(),
       conv_attr_t::kind_with_relu);
-  return _convolution(input_r, weight_r, bias_r, stride_, padding_, dilation_,
-      transposed_, output_padding_, groups_, attr);
+  return _convolution(
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      attr);
 }
 
 Tensor convolution_overrideable(
@@ -1191,8 +1219,17 @@ Tensor convolution_overrideable(
     bool transposed_,
     IntArrayRef output_padding_,
     int64_t groups_) {
-  return _convolution(input_r, weight_r, bias_r, stride_, padding_, dilation_,
-      transposed_, output_padding_, groups_, conv_attr_t());
+  return _convolution(
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      conv_attr_t());
 }
 
 std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(

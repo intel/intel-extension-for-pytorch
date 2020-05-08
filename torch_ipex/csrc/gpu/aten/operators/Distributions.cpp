@@ -1,5 +1,5 @@
 #include <ATen/ATen.h>
-#include <ATen/AccumulateType.h>
+#include <utils/AccumulateType.h>
 
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
@@ -27,7 +27,7 @@ void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto size = ret.numel() * sizeof(scalar_t);
   // First fill self with random number within range [0.0 - 1.0]
-  dpcpp_queue.submit([&](DPCPP::handler& cgh) {
+  auto cgf_1 = DPCPP_Q_CGF(cgh) {
     auto acc = DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size)
                    .get_access();
     int64_t tile_size, range, global_range;
@@ -36,10 +36,13 @@ void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
     FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
     cgh.parallel_for(num_work_items, uniform_rnd_filler);
-  });
+  };
+
+  // launch kernel
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_1);
 
   // Generate final bernoulli distributions
-  dpcpp_queue.submit([&](DPCPP::handler& cgh) {
+  auto cgf_2 = DPCPP_Q_CGF(cgh) {
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
     auto out_acc =
@@ -54,7 +57,10 @@ void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
             out_ptr[id] = out_ptr[id] < p_ ? 1.0f : 0.0f;
           }
         });
-  });
+  };
+
+  // launch kernel
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_2);
 }
 
 template <typename scalar_t>

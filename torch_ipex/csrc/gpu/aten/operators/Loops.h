@@ -400,7 +400,7 @@ void dpcpp_index_kernel(
 
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
+  using out_accessor_t = DPCPPAccessor<dpcpp_rw_mode>;
   using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
   using dpcpp_ptr_t = typename DPCPP::global_ptr<char>::pointer_t;
 

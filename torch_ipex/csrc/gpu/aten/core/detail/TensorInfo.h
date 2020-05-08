@@ -7,7 +7,7 @@ namespace at {
 namespace dpcpp {
 namespace detail {
 
-#define MAX_TENSORINFO_DIMS 10
+#define MAX_TENSORINFO_DIMS 12
 #define MAX_DPCPPTORCH_DIMS MAX_TENSORINFO_DIMS
 
 #define DPCPPTORCH_STR(X) #X
