@@ -18,12 +18,14 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
     git clone --recursive https://github.com/pytorch/pytorch
     cd pytorch
 
-    # if you are updating an existing checkout
+    # checkout source code to the specified version
+    git checkout v1.5.0-rc3
+    
+    # update submodules for the specified pytorch version
     git submodule sync
     git submodule update --init --recursive
 
-    # checkout source code to the specified version
-    git checkout v1.5.0-rc3
+
     ```
 
  2. Get Intel PyTorch Extension source
