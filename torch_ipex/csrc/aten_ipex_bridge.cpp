@@ -530,8 +530,11 @@ void reorderTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dst
   if (tensor_dtype == dstScalarType)
     return;
 
-  if (!check_tensor_own_whole_storage(ipexTensor))
+  if (!check_tensor_own_whole_storage(ipexTensor)) {
     return;
+  } else {
+    TORCH_INTERNAL_ASSERT(false);
+  }
 
   if (check_tensor_own_shade_context(ipexTensor)) {
     // Shade data context has been attached
