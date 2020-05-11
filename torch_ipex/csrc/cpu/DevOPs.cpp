@@ -239,6 +239,7 @@ at::Tensor& AtenIpexCPUDev::dil_add_out(
   const std::vector<float> scales{1.0, alpha.to<float>()};
   dil::sum::compute(scales, {x, y}, z);
 
+  dbl::comm::sync_shape_from_dil_to_aten(result, z);
   return result;
 }
 
@@ -254,7 +255,6 @@ at::Tensor AtenIpexCPUDev::dil_add(const at::Tensor& self, const at::Tensor& oth
   dil::sum::compute(scales, {x, y}, z);
 
   return dbl::comm::gen_aten_tensor_by(z);
-
 }
 
 at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other, at::Scalar alpha) {
@@ -267,6 +267,7 @@ at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other,
   const std::vector<float> scales{1.0, alpha.to<float>()};
   dil::sum::compute(scales, {dil_self, dil_other}, dil_self);
 
+  dbl::comm::sync_shape_from_dil_to_aten(self, dil_self);
   return self;
 }
 
@@ -282,6 +283,7 @@ at::Tensor& AtenIpexCPUDev::dil_mul_out(at::Tensor& result, const at::Tensor& se
 
   dil::binary::compute(dil_self, dil_other, dil_result, dil::algorithm::binary_mul);
 
+  dbl::comm::sync_shape_from_dil_to_aten(result, dil_result);
   return result;
 }
 
@@ -343,6 +345,8 @@ at::Tensor& AtenIpexCPUDev::dil_bmm_out(
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(batch2);
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   matmul_common(x, w, dil::tensor(), y);
+
+  dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
 
@@ -386,6 +390,7 @@ at::Tensor& AtenIpexCPUDev::dil_baddbmm_out(
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   auto attr_ = dil::attr_t::fuse_sum();
   matmul_common(x, w, bias, y, beta, alpha, attr_);
+  dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
 
@@ -484,6 +489,7 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_out(
     }
   }
   matmul_common(x_, w_, bias, y, beta, alpha, attr_);
+  dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
 
@@ -968,6 +974,7 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
     dil::algorithm::eltwise_relu,
     dil::prop_kind::forward_training,
     /*alpha*/ 0.0);
+  dbl::comm::sync_shape_from_dil_to_aten(input, dil_self);
   return input;
 }
 
@@ -1034,6 +1041,7 @@ at::Tensor& AtenIpexCPUDev::dil_sigmoid_(at::Tensor& self) {
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::eltwise_forward::compute(
       x, x, dil::algorithm::eltwise_logistic_use_dst_for_bwd, dil::prop_kind::forward);
+  dbl::comm::sync_shape_from_dil_to_aten(self, x);
   return self;
 }
 
@@ -1111,6 +1119,7 @@ at::Tensor& AtenIpexCPUDev::dil_cat_out(at::Tensor& result, at::TensorList tenso
   }
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   dil::concat::compute(x, dim, y);
+  dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
 

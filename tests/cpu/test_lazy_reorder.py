@@ -749,6 +749,33 @@ class TestTensorShape(TestCase):
                     x_dpcpp.transpose(dim1, dim2),
                 )
 
+    def test_view(self):
+        ipex.enable_auto_dnnl()
+        old_shape = (4, 16)
+        new_shape = (1, 4, 4, 4)
+
+        x_cpu = torch.randn(old_shape)
+        x_dpcpp = x_cpu.to(device=device).clone()
+        print(x_dpcpp.size())
+
+        x_cpu_view = x_cpu.view(new_shape)
+        print(x_cpu_view.size())
+        x_dpcpp_view = x_dpcpp.view(new_shape)
+        print(x_dpcpp_view.size())
+        
+        y = torch.randn(new_shape)
+        out_cpu = x_cpu_view * y
+        # test if the shape of x_dpcpp_view is compatible with y
+        out_dpcpp = x_dpcpp_view * y
+        self.assertEqual(out_cpu, out_dpcpp)
+
+        # test if metadata of x_dpcpp has not been altered
+        y = torch.randn(old_shape)
+        out_cpu = x_cpu * y
+        out_dpcpp = x_dpcpp * y
+        self.assertEqual(out_cpu, out_dpcpp)
+
+
 class TestSoftMax(TestCase):
     def test_softmax(self):
         ipex.enable_auto_dnnl()

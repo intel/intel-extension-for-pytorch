@@ -86,6 +86,14 @@ at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& opti
   return gen_aten_tensor_by(it);
 }
 
+void sync_shape_from_dil_to_aten(const at::Tensor& ipex_tensor, const dil::tensor &dil_tensor) {
+  dil::dims sizes = dil_tensor.get_dims();
+  dil::dims strides = dil_tensor.get_strides();
+  TORCH_INTERNAL_ASSERT(ipex_tensor.device().type() == at::DeviceType::DPCPP);
+  auto* _tensor_impl = (IPEXTensorImpl *)ipex_tensor.unsafeGetTensorImpl();
+  _tensor_impl->force_set_strided(sizes, strides);
+}
+
 }  // namespace comm
 }  // namespace dbl
 }  // namespace cpu

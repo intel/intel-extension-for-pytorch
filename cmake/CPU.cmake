@@ -16,7 +16,7 @@ add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
 # Define build type
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
   message("Debug build.")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -D_DEBUG")
 ELSE()
   message("Release build.")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
