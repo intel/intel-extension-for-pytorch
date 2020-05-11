@@ -497,10 +497,6 @@ std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& ten
 
 
 void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarType dstScalarType) {
-  if (ipexTensor.device().type() == at::DeviceType::CPU) {
-    return reorderTensorToScalaraType(ipexTensor, dstScalarType);
-  }
-
   TORCH_CHECK(dstScalarType == at::kBFloat16 || dstScalarType == at::kFloat);
   auto tensor_dtype = ipexTensor.scalar_type();
   TORCH_CHECK(tensor_dtype == at::kBFloat16 || tensor_dtype == at::kFloat);
