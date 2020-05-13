@@ -13,6 +13,14 @@ SET(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
 set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/cpu")
 add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
 
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
+
+FIND_PACKAGE(AVX)
+
+IF (NOT C_AVX512_FOUND)
+  message(FATAL_ERROR "Please build IPEX on Machines that support AVX512.")
+ENDIF()
+
 # Define build type
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
   message("Debug build.")
