@@ -24,7 +24,7 @@ class LinearFunction(Function):
         return (grad_input, grad_weight, grad_bias)
 
 def linear(input, weight, bias=None):
-    if input.device.type == 'dpcpp':
+    if input.device.type == 'dpcpp' and core.get_auto_dnnl():
         return LinearFunction.apply(input, weight, bias)
     return F_linear(input, weight, bias)
 
