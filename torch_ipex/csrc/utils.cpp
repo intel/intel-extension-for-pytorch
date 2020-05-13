@@ -80,7 +80,9 @@ dil::data_type get_dil_data_type(at::ScalarType at_dt) {
   }  else if (at_dt == at::ScalarType::QUInt8) {
     return dil::data_type::u8;
   } else {
+#if defined(_DEBUG)
     TORCH_WARN("DNNL does not support current data type.");
+#endif
     return dil::data_type::undef;
   }
 }
@@ -109,7 +111,8 @@ bool check_tensor_own_whole_storage(const at::Tensor& tensor) {
     return false;
 
   return (tensor.storage_offset() == 0) &&
-         (tensor.numel() == tensor.storage().numel());
+         (tensor.numel() == tensor.storage().numel()) &&
+         (tensor.itemsize() == tensor.storage().itemsize());
 }
 
 bool check_tensor_own_shade_context(const at::Tensor& tensor) {

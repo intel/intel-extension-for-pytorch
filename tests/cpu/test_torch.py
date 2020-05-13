@@ -81,7 +81,7 @@ from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MK
 from multiprocessing.reduction import ForkingPickler
 from common_device_type import instantiate_device_type_tests, \
     skipIf, skipCPUIfNoLapack, skipCUDAIfNoMagma, skipCUDAIfRocm, onlyCUDA, onlyCPU, \
-    dtypes, dtypesIfCUDA, deviceCountAtLeast, skipCUDAIf, precisionOverride
+    dtypes, dtypesIfCUDA, deviceCountAtLeast, skipCUDAIf, precisionOverride, ipex
 import torch.backends.quantized
 
 
@@ -8725,7 +8725,10 @@ class TestTorchDeviceType(TestCase):
 
         # Noncontig input
         x = torch.randn((2, 3, 4), dtype=dtype, device=device).transpose(2, 0)
-        self.assertFalse(x.is_contiguous())
+        if ipex.get_auto_dnnl():
+            self.assertTrue(x.is_contiguous())
+        else:
+            self.assertFalse(x.is_contiguous())
         result = torch.diagflat(x)
         expected = torch.diag(x.contiguous().view(-1))
         self.assertEqual(result, expected)
@@ -9773,8 +9776,12 @@ class TestTorchDeviceType(TestCase):
             y = torch.randn(5, 3, device=device).transpose(-1, -2)
             actual = torch.cdist(x, y, p=1, compute_mode=cm)
             expected = brute_cdist(x, y, p=1)
-            self.assertFalse(x.is_contiguous())
-            self.assertFalse(y.is_contiguous())
+            if ipex.get_auto_dnnl():
+                self.assertTrue(x.is_contiguous())
+                self.assertTrue(y.is_contiguous())
+            else:
+                self.assertFalse(x.is_contiguous())
+                self.assertFalse(y.is_contiguous())
             self.assertTrue(torch.allclose(expected, actual))
 
             x = torch.randn(7, 5, device=device)
@@ -9799,8 +9806,12 @@ class TestTorchDeviceType(TestCase):
             y = torch.randn(4, 3, 2, 5, 3, device=device).transpose(-1, -2)
             actual = torch.cdist(x, y, p=1, compute_mode=cm)
             expected = brute_cdist(x, y, p=1)
-            self.assertFalse(x.is_contiguous())
-            self.assertFalse(y.is_contiguous())
+            if ipex.get_auto_dnnl():
+                self.assertTrue(x.is_contiguous())
+                self.assertTrue(y.is_contiguous())
+            else:
+                self.assertFalse(x.is_contiguous())
+                self.assertFalse(y.is_contiguous())
             self.assertTrue(torch.allclose(expected, actual))
 
             x = torch.randn(7, 2, 7, 5, device=device)
@@ -9808,14 +9819,20 @@ class TestTorchDeviceType(TestCase):
             actual = torch.cdist(x, y, p=1, compute_mode=cm)
             expected = brute_cdist(x, y, p=1)
             self.assertTrue(x.is_contiguous())
-            self.assertFalse(y.is_contiguous())
+            if ipex.get_auto_dnnl():
+                self.assertTrue(y.is_contiguous())
+            else:
+                self.assertFalse(y.is_contiguous())
             self.assertTrue(torch.allclose(expected, actual))
 
             x = torch.randn(4, 5, 7, device=device).transpose(-1, -2)
             y = torch.randn(4, 3, 5, device=device)
             actual = torch.cdist(x, y, p=1, compute_mode=cm)
             expected = brute_cdist(x, y, p=1)
-            self.assertFalse(x.is_contiguous())
+            if ipex.get_auto_dnnl():
+                self.assertTrue(x.is_contiguous())
+            else:
+                self.assertFalse(x.is_contiguous())
             self.assertTrue(y.is_contiguous())
             self.assertTrue(torch.allclose(expected, actual))
 
@@ -10249,6 +10266,7 @@ class TestTorchDeviceType(TestCase):
 
     def test_copy_all_dtypes_and_devices(self, device):
         from copy import copy
+        ipex.enable_auto_dnnl()
         for dt in torch.testing.get_all_dtypes():
             x = torch.tensor([1, 2, 3, 4], dtype=dt, device=device)
             x_clone = x.clone()
@@ -10264,6 +10282,7 @@ class TestTorchDeviceType(TestCase):
             # copy is a shallow copy, only copies the tensor view,
             # not the data
             self.assertEqual(x, y)
+        ipex.enable_auto_dnnl()
 
     def test_resize_all_dtypes_and_devices(self, device):
         shape = (2, 2)
@@ -10761,7 +10780,8 @@ class TestTorchDeviceType(TestCase):
         self.assertEqual([(0, 1, 0, 0), (0, 1, 1, 0), (0, 1, 2, 0)],
                          [z.shape for z in torch.split(x, (0, 1, 2), dim=2)])
 
-        self.assertRaises(RuntimeError, lambda: torch.split(x, 0, dim=1))
+        with self.assertRaises(RuntimeError):
+            torch.split(x, 0, dim=1)
         # This is strange because the split size is larger than the dim size, but consistent with
         # how split handles that case generally (when no 0s are involved).
         self.assertEqual([(0, 1, 3, 0)], [z.shape for z in torch.split(x, 1, dim=0)])
@@ -12764,8 +12784,12 @@ class TestTorchDeviceType(TestCase):
         clone = transformation_fn(xc)
 
         if default_is_preserve:
-            self.assertFalse(clone.is_contiguous())
-            self.assertTrue(clone.is_contiguous(memory_format=memory_format))
+            if ipex.get_auto_dnnl():
+                self.assertTrue(clone.is_contiguous())
+                self.assertFalse(clone.is_contiguous(memory_format=memory_format))
+            else:
+                self.assertFalse(clone.is_contiguous())
+                self.assertTrue(clone.is_contiguous(memory_format=memory_format))
         else:
             self.assertTrue(clone.is_contiguous())
             self.assertFalse(clone.is_contiguous(memory_format=memory_format))
@@ -14398,7 +14422,6 @@ def generate_test_function(cls,
         # Runs the tensor op on CPU and device
         cpu_result = getattr(cpu_tensor, op_str)(*cpu_args)
         device_result = getattr(device_tensor, op_str)(*device_args)
-
         # Compares CPU and device inputs and outputs
         precision = half_precision if dtype == torch.half else float_precision
 
@@ -14512,4 +14535,5 @@ instantiate_device_type_tests(TestDevicePrecision, globals(), except_for='cpu')
 instantiate_device_type_tests(TestTensorDeviceOps, globals(), except_for='cpu')
 
 if __name__ == '__main__':
+    ipex.enable_auto_dnnl()
     run_tests()

@@ -61,6 +61,14 @@ bool dnnl_support_the_data_type_of(const std::vector<at::Tensor> &tensor_vec);
  */
 bool dnnl_support_the_dimension_of(const std::vector<at::Tensor> &tensor_vec);
 
+/**
+ * Check if the input tensor has data
+ *
+ * @param tensor_vec input tensors
+ *
+ */
+static inline bool dnnl_tensor_has_data(const std::vector<at::Tensor> &tensor_vec);
+
 }  // namespace chk
 }  // namespace dbl
 }  // namespace cpu

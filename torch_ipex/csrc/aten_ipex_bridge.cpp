@@ -64,9 +64,10 @@ at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor);
 void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
   void *data_ctx = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
   cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
-  // All aten::tensor with dnnl::tensor should be contiguous
+#if defined(_DEBUG)
   TORCH_WARN(ipexTensor.is_contiguous());
   TORCH_INTERNAL_ASSERT(! (shade_data_context->dil_tensor.is_empty()));
+#endif
   dil::tensor &dil_tensor = shade_data_context->dil_tensor;
 
   if (dil_tensor.is_public_format()) {
@@ -296,32 +297,6 @@ at::Tensor upgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
   IPEXTensorImpl::CopyMetadata(_tensor.unsafeGetTensorImpl(), cpuTensor.unsafeGetTensorImpl());
   CHECK_TENSOR(_tensor, cpuTensor);
   return _tensor;
-}
-
-at::Tensor shallowUpgradeToDPCPPShadeTensor(const at::Tensor& cpuTensor) {
-  if (!(cpuTensor.defined())) {
-    return at::Tensor();
-  }
-  TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
-  if (cpuTensor.is_sparse()) shallowUpgradeToDPCPPTensor(cpuTensor);
-
-  auto cpu_storage_impl = cpuTensor.storage().unsafeGetStorageImpl();
-  auto& data_ptr = cpu_storage_impl->data_ptr();
-  auto cur_del_fn = data_ptr.get_deleter();
-  bool res = data_ptr.compare_exchange_deleter(cur_del_fn, &(c10::detail::deleteNothing));
-  TORCH_INTERNAL_ASSERT(res);
-  // Make sure that does not triger free resource for set_ptr
-  cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
-  shade_data_context->cpu_raw_data = data_ptr.get();
-  shade_data_context->cpu_del_fun = cur_del_fn;
-  shade_data_context->data_type = cpu::SHADE_DATA_TYPE::CPU_RAW;
-  c10::DataPtr shade_data_ptr(
-    data_ptr.get(),
-    shade_data_context,
-    cpu::ShadeDataContext::freeShadeDataContext,
-    at::DeviceType::CPU);
-  cpuTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(shade_data_ptr));
-  return shallowUpgradeToDPCPPTensor(cpuTensor);
 }
 
 // Upgrade CPU tensor to DPCPP Tensor with shallow copy
