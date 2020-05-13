@@ -18,6 +18,7 @@
 namespace torch_ipex {
 namespace bridge {
 
+#if defined(_DEBUG)
 #define CHECK_TENSOR(a, b) \
   TORCH_INTERNAL_ASSERT(a.numel() == b.numel()); \
   TORCH_INTERNAL_ASSERT(a.dtype() == b.dtype()); \
@@ -30,13 +31,21 @@ namespace bridge {
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->is_wrapped_number() == b.unsafeGetTensorImpl()->is_wrapped_number()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->version_counter().current_version() == b.unsafeGetTensorImpl()->version_counter().current_version()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->allow_tensor_metadata_change() == b.unsafeGetTensorImpl()->allow_tensor_metadata_change())
+#else
+#define CHECK_TENSOR(a, b) ((void) 0)
+#endif
 
+#if defined(_DEBUG)
 #define CHECK_TENSOR_CRITICAL(a, b, may_alias) \
   TORCH_INTERNAL_ASSERT(!may_alias || a.data_ptr() == b.data_ptr()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->strides() == b.unsafeGetTensorImpl()->strides()); \
   TORCH_INTERNAL_ASSERT(a.unsafeGetTensorImpl()->storage_offset() == b.unsafeGetTensorImpl()->storage_offset()); \
   CHECK_TENSOR(a, b)
+#else
+#define CHECK_TENSOR_CRITICAL(a, b, may_alias) ((void) 0)
+#endif
 
+#if defined(_DEBUG)
 #define CHECK_SPARSE_TENSOR_CRITICAL(a, b, may_alias) \
   TORCH_INTERNAL_ASSERT(!may_alias || a._indices().data_ptr() == b._indices().data_ptr()); \
   TORCH_INTERNAL_ASSERT(!may_alias || a._values().data_ptr() == b._values().data_ptr()); \
@@ -46,43 +55,54 @@ namespace bridge {
   TORCH_INTERNAL_ASSERT(a.is_coalesced() == b.is_coalesced()); \
   CHECK_TENSOR(a._indices(), b._indices()); \
   CHECK_TENSOR(a._values(), b._values())
-
+#else
+#define CHECK_SPARSE_TENSOR_CRITICAL(a, b, may_alias) ((void) 0)
+#endif
 
 at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor);
 
 void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
   void *data_ctx = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
   cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
-  // All aten::tensor with dnnl::tensor should be contiguous
+#if defined(_DEBUG)
   TORCH_WARN(ipexTensor.is_contiguous());
   TORCH_INTERNAL_ASSERT(! (shade_data_context->dil_tensor.is_empty()));
+#endif
   dil::tensor &dil_tensor = shade_data_context->dil_tensor;
 
-  dil::dims sizes = dil_tensor.get_dims();
-  dil::dims strides;
-
   if (dil_tensor.is_public_format()) {
+#if defined(_DEBUG)
     TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor.get_data_handle());
     TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data != nullptr);
     TORCH_INTERNAL_ASSERT(shade_data_context->cpu_del_fun != nullptr);
-    strides = dil_tensor.get_strides();
+#endif
   } else {
-    auto dims = dil_tensor.get_dims();
-    // NOTE: int32_t dims from ideep::tensor but sizes needs int64_t
-    at::Tensor cpu_tensor = at::empty(
-      sizes, ipexTensor.options().device(c10::kCPU).layout(c10::kStrided));
-    TORCH_INTERNAL_ASSERT(cpu_tensor.scalar_type() == get_at_data_type(dil_tensor.get_data_type()));
-    auto pub_tensor = dil_tensor.to_public(cpu_tensor.data_ptr(), dil_tensor.get_data_type());
-    strides = pub_tensor.get_strides();
-    at::DataPtr& cpu_tensor_data_ptr = cpu_tensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr();
-    ipexTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(cpu_tensor_data_ptr));
-    // The tensor has been reset to new DataPtr, then we need to attach new shade data context.
-    attachShadeDataConext(ipexTensor);
+#if defined(_DEBUG)
+    auto& data_ptr = ipexTensor.storage().unsafeGetStorageImpl()->data_ptr();
+    TORCH_INTERNAL_ASSERT(data_ptr.get_deleter() == &(cpu::ShadeDataContext::freeShadeDataContext));
+    TORCH_INTERNAL_ASSERT(shade_data_context->cpu_del_fun == nullptr);
+#endif
+    auto pub_tensor = dil_tensor.to_public(nullptr, dil_tensor.get_data_type());
+
+    cpu::ShadeDataContext *new_shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
+    new_shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
+    new_shade_data_context->dil_tensor = pub_tensor;
+    // Share with DNNL raw data because it is plain format now
+    new_shade_data_context->cpu_raw_data = pub_tensor.get_data_handle();
+    // Cannot free CPU data because the the data is owned by DNNL
+    new_shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
+
+    // Create a new DataPtr instances because the DataPtr class does not support set
+    // its data or context directly
+    c10::DataPtr shade_data_ptr(
+      pub_tensor.get_data_handle(),
+      new_shade_data_context,
+      &(cpu::ShadeDataContext::freeShadeDataContext),
+      ipexTensor.device().type());
+
+    ipexTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(shade_data_ptr));
     TORCH_INTERNAL_ASSERT(ipexTensor.is_contiguous());
   }
-
-  auto* ipexTensorImpl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
-  ipexTensorImpl->force_set_strided(sizes, strides);
 }
 
 
@@ -277,32 +297,6 @@ at::Tensor upgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
   IPEXTensorImpl::CopyMetadata(_tensor.unsafeGetTensorImpl(), cpuTensor.unsafeGetTensorImpl());
   CHECK_TENSOR(_tensor, cpuTensor);
   return _tensor;
-}
-
-at::Tensor shallowUpgradeToDPCPPShadeTensor(const at::Tensor& cpuTensor) {
-  if (!(cpuTensor.defined())) {
-    return at::Tensor();
-  }
-  TORCH_INTERNAL_ASSERT(cpuTensor.device().type() == at::DeviceType::CPU);
-  if (cpuTensor.is_sparse()) shallowUpgradeToDPCPPTensor(cpuTensor);
-
-  auto cpu_storage_impl = cpuTensor.storage().unsafeGetStorageImpl();
-  auto& data_ptr = cpu_storage_impl->data_ptr();
-  auto cur_del_fn = data_ptr.get_deleter();
-  bool res = data_ptr.compare_exchange_deleter(cur_del_fn, &(c10::detail::deleteNothing));
-  TORCH_INTERNAL_ASSERT(res);
-  // Make sure that does not triger free resource for set_ptr
-  cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
-  shade_data_context->cpu_raw_data = data_ptr.get();
-  shade_data_context->cpu_del_fun = cur_del_fn;
-  shade_data_context->data_type = cpu::SHADE_DATA_TYPE::CPU_RAW;
-  c10::DataPtr shade_data_ptr(
-    data_ptr.get(),
-    shade_data_context,
-    cpu::ShadeDataContext::freeShadeDataContext,
-    at::DeviceType::CPU);
-  cpuTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(shade_data_ptr));
-  return shallowUpgradeToDPCPPTensor(cpuTensor);
 }
 
 // Upgrade CPU tensor to DPCPP Tensor with shallow copy

@@ -9,12 +9,13 @@ namespace dbl {
 namespace chk {
 
 bool dnnl_support_the_tensors(const std::vector<at::Tensor> &tensor_vec) {
-  return dnnl_support_the_dimension_of(tensor_vec) &&
+  return dnnl_tensor_has_data(tensor_vec) &&
+         dnnl_support_the_dimension_of(tensor_vec) &&
          dnnl_support_the_data_type_of(tensor_vec);
 }
 
 bool dnnl_inplace_support_the_tensors(const std::vector<at::Tensor> &tensor_vec) {
-  return dnnl_support_the_dimension_of(tensor_vec) &&
+  return dnnl_tensor_has_data(tensor_vec) &&
          dnnl_support_the_data_type_of(tensor_vec) &&
          dnnl_support_the_memory_layout_of(tensor_vec);
 }
@@ -49,6 +50,14 @@ bool dnnl_support_the_dimension_of(const std::vector<at::Tensor> &tensor_vec) {
       return false;
     }
   }
+
+  return true;
+}
+
+bool dnnl_tensor_has_data(const std::vector<at::Tensor> &tensor_vec) {
+  for (auto it = tensor_vec.begin(); it != tensor_vec.end(); ++it)
+    if (it->data_ptr() == nullptr)
+      return false;
 
   return true;
 }

@@ -239,6 +239,7 @@ at::Tensor& AtenIpexCPUDev::dil_add_out(
   const std::vector<float> scales{1.0, alpha.to<float>()};
   dil::sum::compute(scales, {x, y}, z);
 
+  dbl::comm::sync_shape_from_dil_to_aten(result, z);
   return result;
 }
 
@@ -254,7 +255,6 @@ at::Tensor AtenIpexCPUDev::dil_add(const at::Tensor& self, const at::Tensor& oth
   dil::sum::compute(scales, {x, y}, z);
 
   return dbl::comm::gen_aten_tensor_by(z);
-
 }
 
 at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other, at::Scalar alpha) {
@@ -267,6 +267,7 @@ at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other,
   const std::vector<float> scales{1.0, alpha.to<float>()};
   dil::sum::compute(scales, {dil_self, dil_other}, dil_self);
 
+  dbl::comm::sync_shape_from_dil_to_aten(self, dil_self);
   return self;
 }
 
@@ -282,6 +283,7 @@ at::Tensor& AtenIpexCPUDev::dil_mul_out(at::Tensor& result, const at::Tensor& se
 
   dil::binary::compute(dil_self, dil_other, dil_result, dil::algorithm::binary_mul);
 
+  dbl::comm::sync_shape_from_dil_to_aten(result, dil_result);
   return result;
 }
 
@@ -343,6 +345,8 @@ at::Tensor& AtenIpexCPUDev::dil_bmm_out(
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(batch2);
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   matmul_common(x, w, dil::tensor(), y);
+
+  dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
 
@@ -386,6 +390,7 @@ at::Tensor& AtenIpexCPUDev::dil_baddbmm_out(
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   auto attr_ = dil::attr_t::fuse_sum();
   matmul_common(x, w, bias, y, beta, alpha, attr_);
+  dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
 
@@ -484,6 +489,7 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_out(
     }
   }
   matmul_common(x_, w_, bias, y, beta, alpha, attr_);
+  dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
 
@@ -968,6 +974,7 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
     dil::algorithm::eltwise_relu,
     dil::prop_kind::forward_training,
     /*alpha*/ 0.0);
+  dbl::comm::sync_shape_from_dil_to_aten(input, dil_self);
   return input;
 }
 
@@ -1034,6 +1041,7 @@ at::Tensor& AtenIpexCPUDev::dil_sigmoid_(at::Tensor& self) {
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::eltwise_forward::compute(
       x, x, dil::algorithm::eltwise_logistic_use_dst_for_bwd, dil::prop_kind::forward);
+  dbl::comm::sync_shape_from_dil_to_aten(self, x);
   return self;
 }
 
@@ -1081,10 +1089,13 @@ at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::
 at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, int64_t dim1) {
   DEBUG("AtenIpexCPUDev::dil_transpose\n");
   CHECK_DNNL_OP_PRE_COND(self);
-  const dil::tensor& x = dbl::comm::try_gen_dil_tensor(self);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
+  TORCH_CHECK(x.ndims() > 0, "DNNL transpose cannot generate DNNL tensor for the input aten Tensor. input tensor dim: ", self.dim());
   dil::tensor y;
   std::vector<int> axes(x.ndims());
   std::iota(axes.begin(), axes.end(), 0);
+  dim0 = at::maybe_wrap_dim(dim0, self.dim());
+  dim1 = at::maybe_wrap_dim(dim1, self.dim());
   std::swap(axes[dim0], axes[dim1]);
   y.transpose_from(x, axes);
   return dbl::comm::gen_aten_tensor_by(y);
@@ -1102,7 +1113,7 @@ at::Tensor& AtenIpexCPUDev::dil_cat_out(at::Tensor& result, at::TensorList tenso
   DEBUG("AtenIpexCPUDev::dil_cat_out\n");
   CHECK_DNNL_OP_PRE_COND(result);
   check_cat_no_zero_dim(tensors);
-  dim = legacy_cat_wrap_dim(dim, tensors);
+  dim = at::legacy_cat_wrap_dim(dim, tensors);
   std::vector<dil::tensor> x;
   for (auto i =0; i< tensors.size(); i++) {
     TORCH_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
@@ -1111,13 +1122,14 @@ at::Tensor& AtenIpexCPUDev::dil_cat_out(at::Tensor& result, at::TensorList tenso
   }
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   dil::concat::compute(x, dim, y);
+  dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
 
 at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_cat\n");
   check_cat_no_zero_dim(tensors);
-  dim = legacy_cat_wrap_dim(dim, tensors);
+  dim = at::legacy_cat_wrap_dim(dim, tensors);
   std::vector<dil::tensor> x;
   at::Tensor tensors_contiguous[tensors.size()];
   for (auto i = 0; i < tensors.size(); i++) {
@@ -1145,6 +1157,8 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& s
              "entries, but got split_sizes=", split_sizes);
     sizes.push_back((int32_t)length);
   }
+
+  dim = at::maybe_wrap_dim(dim, self.dim());
   auto y = dil::spliter::compute(x, sizes, dim, false);
   for (auto j = 0; j < num_splits; j++) {
     splits[j] = dbl::comm::gen_aten_tensor_by(y[j]);
@@ -1155,6 +1169,7 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& s
 std::vector<at::Tensor> AtenIpexCPUDev::dil_split(const at::Tensor& self, int64_t split_size, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_split\n");
   CHECK_DNNL_OP_PRE_COND(self);
+  dim = at::maybe_wrap_dim(dim, self.dim());
   int64_t dim_size = self.size(dim);
   int64_t num_splits = 1;
   if (split_size != 0) {
