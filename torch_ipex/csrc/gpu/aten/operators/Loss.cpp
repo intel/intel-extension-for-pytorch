@@ -170,6 +170,36 @@ struct TensorBCEWeightsOp {
   }
 };
 
+template <typename T>
+struct TensorSoftMarginOp {
+  void operator()(T& out, T& in1, T& in2) const {
+    T one = ScalarConvert<float, T>::to(1.);
+    out = safe_log(one + Numerics<T>::exp(-one * in1 * in2));
+  }
+};
+
+template <typename T>
+struct TensorSoftMarginGradOp {
+  void operator()(T& out, T& in1, T& in2) const {
+    T one = ScalarConvert<float, T>::to(1.);
+    T z = Numerics<T>::exp(-one * in1 * in2);
+    out = -one * in2 * z / (one + z);
+  }
+};
+
+template <typename T>
+struct TensorSoftMarginNormOp {
+  TensorSoftMarginNormOp(T norm) : norm(norm) {}
+
+  void operator()(T& out, T& in1, T& in2) const {
+    T one = ScalarConvert<float, T>::to(1.);
+    T z = Numerics<T>::exp(-one * in1 * in2);
+    out = -one * norm * in2 * z / (one + z);
+  }
+
+  const T norm;
+};
+
 int check_size(const Tensor& t1, const Tensor& t2) {
   int d;
   if (t1.dim() != t2.dim())
@@ -554,6 +584,63 @@ void SmoothL1Criterion_updateGradInput(
       grad_input, input, target, TensorSmoothL1NormOp<scalar_t>(norm));
 }
 
+template <typename scalar_t>
+void SoftMarginCriterion_updateOutput(
+    Tensor& output,
+    const Tensor& input,
+    const Tensor& target,
+    int64_t reduction) {
+  TORCH_CHECK(check_size(input, target), "input and target shape do not match");
+
+  if (reduction == Reduction::None) {
+    output.resize_as_(input);
+    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+        output, input, target, TensorSoftMarginOp<scalar_t>());
+    return;
+  }
+
+  output.resize_({});
+  Tensor t1 = at::empty_like(input);
+  Tensor t2 = at::empty_like(input);
+  t1.fill_(ScalarConvert<int, scalar_t>::to(1));
+  at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+      t2, input, target, TensorSoftMarginOp<scalar_t>());
+
+  int64_t size0 = input.numel();
+  scalar_t* t1_data = t1.data_ptr<scalar_t>();
+  scalar_t* t2_data = t2.data_ptr<scalar_t>();
+  scalar_t* output_data = output.data_ptr<scalar_t>();
+  dnnl_inner_product_forward_frame<scalar_t>(
+      (int)size0, t1_data, t2_data, output_data);
+
+  if (reduction == Reduction::Mean)
+    output.div_(size0);
+}
+
+template <typename scalar_t>
+void SoftMarginCriterion_updateGradInput(
+    Tensor& grad_input,
+    const Tensor& grad_output,
+    const Tensor& input,
+    const Tensor& target,
+    int64_t reduction) {
+  TORCH_CHECK(check_size(input, target), "input and target shape do not match");
+  grad_input.resize_as_(input);
+
+  if (reduction == Reduction::None) {
+    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+        grad_input, input, target, TensorSoftMarginGradOp<scalar_t>());
+    at::mul_out(grad_input, grad_input, grad_output);
+    return;
+  }
+  scalar_t gradOutput0d = grad_output.item().to<scalar_t>();
+  scalar_t norm =
+      (reduction == Reduction::Mean ? 1. / (scalar_t)input.numel() : 1.) *
+      gradOutput0d;
+  at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+      grad_input, input, target, TensorSoftMarginNormOp<scalar_t>(norm));
+}
+
 } // namespace impl
 
 Tensor& binary_cross_entropy_out(
@@ -728,6 +815,52 @@ Tensor smooth_l1_loss_backward(
     int64_t reduction) {
   Tensor grad_input = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::smooth_l1_loss_backward_out(
+      grad_input, grad_output, self, target, reduction);
+}
+
+Tensor & soft_margin_loss_out(
+    Tensor & out,
+    const Tensor & self,
+    const Tensor & target,
+    int64_t reduction) {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+      self.scalar_type(), "soft_margin_loss_out", [&] {
+          impl::SoftMarginCriterion_updateOutput<scalar_t>(
+              out, self, target, reduction);
+      });
+  return out;
+}
+
+Tensor soft_margin_loss(
+    const Tensor & self,
+    const Tensor & target,
+    int64_t reduction) {
+  Tensor out = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::soft_margin_loss_out(
+      out, self, target, reduction);
+}
+
+Tensor & soft_margin_loss_backward_out(
+    Tensor & grad_input,
+    const Tensor & grad_output,
+    const Tensor & self,
+    const Tensor & target,
+    int64_t reduction) {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+      self.scalar_type(), "soft_margin_loss_backward_out", [&] {
+          impl::SoftMarginCriterion_updateGradInput<scalar_t>(
+              grad_input, grad_output, self, target, reduction);
+      });
+  return grad_input;
+}
+
+Tensor soft_margin_loss_backward(
+    const Tensor & grad_output,
+    const Tensor & self,
+    const Tensor & target,
+    int64_t reduction) {
+  Tensor grad_input = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::soft_margin_loss_backward_out(
       grad_input, grad_output, self, target, reduction);
 }
 
