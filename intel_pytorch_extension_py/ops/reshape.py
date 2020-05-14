@@ -11,7 +11,7 @@ class ReshapeFunction(Function):
         return output
 
 def reshape(input, size):
-    if input.device.type == 'dpcpp':
+    if input.device.type == 'dpcpp' and core.get_auto_dnnl():
         return ReshapeFunction.apply(input, size)
     return torch_reshape(input, size)
 

@@ -57,6 +57,7 @@ from functools import reduce
 import torch
 import _torch_ipex as ipex
 ipex._initialize_aten_bindings()
+import intel_pytorch_extension
 
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
