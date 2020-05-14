@@ -189,7 +189,7 @@ static inline void mm_backward(at::BFloat16 *out, const at::BFloat16 *in1, const
   }
   // mm backward w/ fp32
   mm_ker(tmp_in2, tmp_in1, tmp_out);
-  trunc_fp32_to_bf16(out, tmp_out, vector_nums * vector_size);
+  cvt_fp32_to_bf16(out, tmp_out, vector_nums * vector_size);
 }
 
 template<typename T>

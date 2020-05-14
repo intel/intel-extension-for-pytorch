@@ -15,6 +15,18 @@ SET(AVX512_CODE "
   }
 ")
 
+SET(AVX512_BF16_CODE "
+  #include <stdint.h>
+  #include <immintrin.h>
+
+  int main() {
+    __m512 src;
+    // detect avx512f and avx512bf16
+    _mm512_cvtneps_pbh(src);
+    return 0;
+  }
+")
+
 MACRO(CHECK_SSE lang type flags)
   SET(__FLAG_I 1)
   SET(CMAKE_REQUIRED_FLAGS_SAVE ${CMAKE_REQUIRED_FLAGS})
@@ -43,5 +55,8 @@ MACRO(CHECK_SSE lang type flags)
   MARK_AS_ADVANCED(${lang}_${type}_FOUND ${lang}_${type}_FLAGS)
 ENDMACRO()
 
-CHECK_SSE(C "AVX512" " ;-mavx512f -mavx512bw -mavx512vl ;/arch:AVX512")
-CHECK_SSE(CXX "AVX512" " ;-mavx512f -mavx512bw -mavx512vl ;/arch:AVX512")
+CHECK_SSE(C "AVX512" " ;-mavx512f -mavx512bw -mavx512vl")
+CHECK_SSE(CXX "AVX512" " ;-mavx512f -mavx512bw -mavx512vl")
+
+CHECK_SSE(C "AVX512_BF16" " ;-mavx512f -mavx512bf16")
+CHECK_SSE(CXX "AVX512_BF16" " ;-mavx512f -mavx512bf16")

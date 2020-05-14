@@ -46,14 +46,14 @@ inline void add_ker(at::BFloat16 *inout, at::BFloat16 *in, int len) {
     auto x1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i)));
     auto x2 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i)));
     x1 = _mm512_add_ps(x1, x2);
-    _mm256_storeu_si256((__m256i*)(inout + i), trunc_fp32_to_bf16(x1));
+    _mm256_storeu_si256((__m256i*)(inout + i), cvt_fp32_to_bf16(x1));
   }
   if(i < len) {
     auto mask = (1 << (len - i)) - 1;
     auto x1 = cvt_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, inout + i));
     auto x2 = cvt_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, in + i));
     x1 = _mm512_add_ps(x1, x2);
-    _mm256_mask_storeu_epi16(inout + i, mask, trunc_fp32_to_bf16(x1));
+    _mm256_mask_storeu_epi16(inout + i, mask, cvt_fp32_to_bf16(x1));
   }
 }
 

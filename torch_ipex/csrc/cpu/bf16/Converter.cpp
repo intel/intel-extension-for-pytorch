@@ -3,7 +3,7 @@
 #if defined(AVX512)
 #include "vec/vec_type_cvt.h"
 #define BF16_2_FP32(dst, src, len) cvt_bf16_to_fp32(dst, src, len)
-#define FP32_2_BF16(dst, src, len) trunc_fp32_to_bf16(dst, src, len)
+#define FP32_2_BF16(dst, src, len) cvt_fp32_to_bf16(dst, src, len)
 #else
 #define BF16_2_FP32(dst, src, len)
 #define FP32_2_BF16(dst, src, len)
