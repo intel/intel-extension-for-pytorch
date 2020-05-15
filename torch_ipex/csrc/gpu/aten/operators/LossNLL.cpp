@@ -175,9 +175,9 @@ void ClassNLLCriterion_updateOutput(
 
     DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
   } else if (input.dim() == 2) {
-    int batch_size = input.size(0);
+    int64_t batch_size = input.size(0);
     int n_target = input.size(1);
-    size_t local_size =
+    int64_t local_size =
         queue.get_device()
             .template get_info<DPCPP::info::device::max_work_group_size>();
     DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
@@ -195,7 +195,7 @@ void ClassNLLCriterion_updateOutput(
       auto local_total_weight_acc =
           dpcpp_local_acc_t<scalar_t>(local_size, cgh);
 
-      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
         auto input_ptr = input_acc.template get_pointer<scalar_t>();
         auto target_ptr = target_acc.template get_pointer<int64_t>();
         auto weights_ptr =
@@ -203,7 +203,7 @@ void ClassNLLCriterion_updateOutput(
         auto total_weight_ptr =
             total_weight_acc.template get_pointer<scalar_t>();
         auto output_ptr = output_acc.template get_pointer<scalar_t>();
-        int64_t local_id = item_id.get_id(0);
+        int64_t local_id = item_id.get_local_id(0);
         local_output_acc[local_id] = 0.0;
         local_total_weight_acc[local_id] = 0.0;
         for (int i = local_id; i < batch_size; i += local_size) {
@@ -220,12 +220,14 @@ void ClassNLLCriterion_updateOutput(
 
         // reduce
         for (int64_t i = (local_size >> 1); i > 0; i >>= 1) {
+          item_id.barrier(dpcpp_global_and_local_fence);
           if (local_id < i) {
             local_total_weight_acc[local_id] +=
                 local_total_weight_acc[local_id + i];
             local_output_acc[local_id] += local_output_acc[local_id + i];
           }
         }
+        item_id.barrier(dpcpp_global_and_local_fence);
 
         output_ptr[0] = local_output_acc[0];
         total_weight_ptr[0] = local_total_weight_acc[0];
@@ -234,7 +236,7 @@ void ClassNLLCriterion_updateOutput(
         }
       };
       cgh.parallel_for<DPCPP_K(updateOutputKernelName, scalar_t)>(
-          DPCPP::range<1>{local_size}, kfn);
+          DPCPP::nd_range<1>(DPCPP::range<1>(local_size), DPCPP::range<1>(local_size)), kfn);
     };
 
     DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
