@@ -449,6 +449,12 @@ class tensor : public memory {
     init(adims, adata_type, ahandle, aengine);
   }
 
+  // no format_tb, strides, buffer
+  tensor(const dims &adims, data_type adata_type, const dims &astrides,
+         void *ahandle, const engine &aengine = engine::cpu_engine()) {
+    init(adims, adata_type, astrides, ahandle, aengine);
+  }
+
   // no format_tag, no buffer
   tensor(const dims &adims, data_type adata_type,
          const engine &aengine = engine::cpu_engine()) {
@@ -478,6 +484,11 @@ class tensor : public memory {
   void init(const dims &adims, data_type adata_type, format_tag aformat_tag,
               void *ahandle, const engine &aengine = engine::cpu_engine()) {
     init({adims, adata_type, aformat_tag}, ahandle, aengine);
+  }
+
+  void init(const dims &adims, data_type adata_type, const dims &astrides,
+              void *ahandle, const engine &aengine = engine::cpu_engine()) {
+    init({adims, adata_type, astrides}, ahandle, aengine);
   }
 
   // format_tag, no buffer

@@ -12785,12 +12785,8 @@ class TestTorchDeviceType(TestCase):
         clone = transformation_fn(xc)
 
         if default_is_preserve:
-            if ipex.get_auto_dnnl():
-                self.assertTrue(clone.is_contiguous())
-                self.assertFalse(clone.is_contiguous(memory_format=memory_format))
-            else:
-                self.assertFalse(clone.is_contiguous())
-                self.assertTrue(clone.is_contiguous(memory_format=memory_format))
+            self.assertFalse(clone.is_contiguous())
+            self.assertTrue(clone.is_contiguous(memory_format=memory_format))
         else:
             self.assertTrue(clone.is_contiguous())
             self.assertFalse(clone.is_contiguous(memory_format=memory_format))
