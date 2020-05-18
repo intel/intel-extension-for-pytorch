@@ -12,6 +12,8 @@
 
 #include "aten_ipex_type.h"
 #include "auto_opt_config.h"
+#include "cpu/dil/dil.hpp"
+#include "cpu/ShadeDataContext.h"
 #include "cpu/ExtendOPs.h"
 #include "cpu/MlpOPs.h"
 
@@ -28,6 +30,28 @@ py::object GetRevisions() {
 void setAutoDNNL(bool val) {
   AutoOptConfig::singleton().set_auto_dnnl(val);
 }
+
+/// **** Only for unit test ****
+bool isDilTensor(const at::Tensor &tensor) {
+  return cpu::ShadeDataContext::isDilTensor(tensor);
+}
+
+dil::dims getDilTensorSizes(const at::Tensor &tensor) {
+  if (isDilTensor(tensor)) {
+    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
+    return dil_tensor.get_dims();
+  }
+  return dil::dims();
+}
+
+dil::dims getDilTensorStrides(const at::Tensor &tensor) {
+  if (isDilTensor(tensor)) {
+    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
+    return dil_tensor.get_strides();
+  }
+  return dil::dims();
+}
+/// ****************************
 
 void InitIpexModuleBindings(py::module m) {
   m.def("_initialize_aten_bindings",
@@ -97,6 +121,10 @@ void InitIpexModuleBindings(py::module m) {
   m.def("mlp_create_handle", &AtenIpexTypeMLPExt::create_handle);
   m.def("mlp_set_relu_mask", &AtenIpexTypeMLPExt::set_relu_mask);
   m.def("mlp_release_handle", &AtenIpexTypeMLPExt::release_handle);
+
+  m.def("is_dil_tensor", &isDilTensor);
+  m.def("get_dil_tensor_sizes", &getDilTensorSizes);
+  m.def("is_dil_tensor_strides", &getDilTensorStrides);
 }
 
 }  // namespace

@@ -315,6 +315,9 @@ class DenseOPCodeGen(object):
         code += '    }\n'
 
         code += '  } catch (std::exception& e) {\n'
+        code += '#if defined(_DEBUG)\n'
+        code += '    TORCH_WARN(e.what());\n'
+        code += '#endif\n'
         code += '  }\n\n'
 
 

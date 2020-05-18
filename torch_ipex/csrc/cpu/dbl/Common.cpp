@@ -36,7 +36,12 @@ at::Tensor dil_tensor_to_dense(const at::Tensor& tensor) {
 
 dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
   if (cpu::ShadeDataContext::isDilTensor(input)) {
-    return cpu::ShadeDataContext::getDilTensor(input);
+    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(input);
+    if (!check_aten_dil_shape_info(input, dil_tensor)) {
+      //TODO(Eikan): Pinzhen will fix the issue here
+      TORCH_INTERNAL_ASSERT(false);
+    }
+    return dil_tensor;
   } else {
     return dil_tensor_from_dense(input);
   }

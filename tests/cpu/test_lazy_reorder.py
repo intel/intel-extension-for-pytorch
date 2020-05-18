@@ -756,12 +756,18 @@ class TestTensorShape(TestCase):
 
         x_cpu = torch.randn(old_shape)
         x_dpcpp = x_cpu.to(device=device).clone()
-        print(x_dpcpp.size())
+        self.assertTrue(ipex.is_dil_tensor(x_dpcpp))
+        self.assertEqual(ipex.get_dil_tensor_sizes(x_dpcpp), [4, 16])
+        self.assertEqual(ipex.is_dil_tensor_strides(x_dpcpp), [16, 1])
 
         x_cpu_view = x_cpu.view(new_shape)
-        print(x_cpu_view.size())
+        self.assertEqual(x_cpu_view.size(), [1, 4, 4, 4])
+        self.assertEqual(x_cpu_view.stride(), [64, 16, 4, 1])
+
         x_dpcpp_view = x_dpcpp.view(new_shape)
-        print(x_dpcpp_view.size())
+        self.assertTrue(ipex.is_dil_tensor(x_dpcpp_view))
+        self.assertEqual(ipex.get_dil_tensor_sizes(x_dpcpp_view), [1, 4, 4, 4])
+        self.assertEqual(ipex.is_dil_tensor_strides(x_dpcpp_view), [64, 16, 4, 1])
         
         y = torch.randn(new_shape)
         out_cpu = x_cpu_view * y

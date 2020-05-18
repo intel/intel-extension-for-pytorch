@@ -11,6 +11,7 @@
 
 #include "ipex_tensor_impl.h"
 #include "ipex_sparse_tensor_impl.h"
+#include "cpu/dbl/Common.h"
 #include "cpu/ShadeDataContext.h"
 #include "cpu/bf16/Converter.h"
 #include "utils.h"
@@ -65,7 +66,6 @@ void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
   void *data_ctx = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
   cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
 #if defined(_DEBUG)
-  TORCH_WARN(ipexTensor.is_contiguous());
   TORCH_INTERNAL_ASSERT(! (shade_data_context->dil_tensor.is_empty()));
 #endif
   dil::tensor &dil_tensor = shade_data_context->dil_tensor;
@@ -75,6 +75,7 @@ void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
     TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor.get_data_handle());
     TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data != nullptr);
     TORCH_INTERNAL_ASSERT(shade_data_context->cpu_del_fun != nullptr);
+    TORCH_INTERNAL_ASSERT(check_aten_dil_shape_info(ipexTensor, dil_tensor));
 #endif
   } else {
 #if defined(_DEBUG)
@@ -101,7 +102,7 @@ void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
       ipexTensor.device().type());
 
     ipexTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(shade_data_ptr));
-    TORCH_INTERNAL_ASSERT(ipexTensor.is_contiguous());
+    cpu::dbl::comm::sync_shape_from_dil_to_aten(ipexTensor, pub_tensor);
   }
 }
 
