@@ -20,7 +20,7 @@ dil::tensor dil_tensor_from_dense(const at::Tensor& tensor) {
     tensor.layout() == at::Layout::Strided,
     "dil_tensor_view_from_dense expects dense tensor input");
   at::ScalarType cur_type = tensor.scalar_type();
-  return {tensor.sizes().vec(), get_dil_data_type(cur_type), tensor.data_ptr()};
+  return {tensor.sizes().vec(), get_dil_data_type(cur_type), tensor.strides().vec(), tensor.data_ptr()};
 }
 
 at::Tensor dil_tensor_to_dense(const at::Tensor& tensor) {
@@ -38,7 +38,6 @@ dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
   if (cpu::ShadeDataContext::isDilTensor(input)) {
     return cpu::ShadeDataContext::getDilTensor(input);
   } else {
-    TORCH_INTERNAL_ASSERT(input.is_contiguous());
     return dil_tensor_from_dense(input);
   }
 }
@@ -60,7 +59,6 @@ at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
     shade_data_context,
     cpu::ShadeDataContext::freeShadeDataContext,
     at::DeviceType::DPCPP);
-  auto tensor_sizes = dil_tensor.get_dims();
   auto at_data_type = get_at_data_type(dil_tensor.get_data_type());
   auto storage_impl = c10::make_intrusive<at::StorageImpl>(
     at::scalarTypeToTypeMeta(at_data_type),
@@ -69,10 +67,14 @@ at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
     nullptr,
     /*resizeable=*/false);
   auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::DPCPPTensorId);
-  if (tensor_sizes.size() != 1 || tensor_sizes[0] != 0) {
+  if (dil_tensor.is_public_format()) {
+    dbl::comm::sync_shape_from_dil_to_aten(_tensor, dil_tensor);
+  } else {
+    // Blockformat does not inlcude stride information
+    auto tensor_sizes = dil_tensor.get_dims();
+    TORCH_INTERNAL_ASSERT(tensor_sizes.size() != 1 || tensor_sizes[0] != 0);
     _tensor.unsafeGetTensorImpl()->set_sizes_contiguous(tensor_sizes);
   }
-  TORCH_INTERNAL_ASSERT(_tensor.is_contiguous());
   TORCH_INTERNAL_ASSERT(_tensor.layout() == c10::kStrided);
   return _tensor;
 }

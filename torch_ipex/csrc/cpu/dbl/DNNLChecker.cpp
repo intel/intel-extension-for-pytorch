@@ -56,7 +56,7 @@ bool dnnl_support_the_dimension_of(const std::vector<at::Tensor> &tensor_vec) {
 
 bool dnnl_tensor_has_data(const std::vector<at::Tensor> &tensor_vec) {
   for (auto it = tensor_vec.begin(); it != tensor_vec.end(); ++it)
-    if (it->data_ptr() == nullptr)
+    if (it->numel() == 0)
       return false;
 
   return true;
