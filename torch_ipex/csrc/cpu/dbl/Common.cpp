@@ -36,7 +36,11 @@ at::Tensor dil_tensor_to_dense(const at::Tensor& tensor) {
 
 dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
   if (cpu::ShadeDataContext::isDilTensor(input)) {
-    return cpu::ShadeDataContext::getDilTensor(input);
+    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(input);
+    if (dil_tensor.is_public_format()) {
+      dil_tensor.set_dims_and_strides(input.sizes().vec(), input.strides().vec());
+    }
+    return dil_tensor;
   } else {
     return dil_tensor_from_dense(input);
   }
