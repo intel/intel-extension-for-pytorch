@@ -368,12 +368,12 @@ class TestLinearAlgebraOps(TestCase):
 
                 addbmm_cpu = torch.addbmm(res_cpu, b1_cpu, b2_cpu, beta=beta, alpha=alpha)
                 addbmm_dpcpp = torch.addbmm(res_dpcpp, b1_dpcpp, b2_dpcpp, beta=beta, alpha=alpha)
-                self.assertEqual(addbmm_cpu, addbmm_dpcpp)
+                self.assertEqual(addbmm_cpu, addbmm_dpcpp, 1e-4)
                 y_cpu = torch.randn(M, O, dtype=torch.float32)
                 y_dpcpp = y_cpu.to(device=device)
                 torch.addbmm(res_cpu, b1_cpu, b2_cpu, beta=beta, alpha=alpha, out=y_cpu)
                 torch.addbmm(res_dpcpp, b1_dpcpp, b2_dpcpp, beta=beta, alpha=alpha, out=y_dpcpp)
-                self.assertEqual(y_cpu, y_dpcpp)
+                self.assertEqual(y_cpu, y_dpcpp, 1e-4)
 
     def test_baddbmm(self):
         ipex.enable_auto_dnnl()
@@ -683,7 +683,6 @@ class TestBatchNorm(TestCase):
 
         bn = torch.nn.BatchNorm2d(3)
         bn_dpcpp = copy.deepcopy(bn).to(device=device)
-
         y_cpu = bn(x_cpu).sum()
         y_dpcpp = bn_dpcpp(x_dpcpp).sum()
         y_cpu.backward()
@@ -758,7 +757,7 @@ class TestTensorShape(TestCase):
         x_dpcpp = x_cpu.to(device=device).clone()
         self.assertTrue(ipex.is_dil_tensor(x_dpcpp))
         self.assertEqual(ipex.get_dil_tensor_sizes(x_dpcpp), [4, 16])
-        self.assertEqual(ipex.is_dil_tensor_strides(x_dpcpp), [16, 1])
+        self.assertEqual(ipex.get_dil_tensor_strides(x_dpcpp), [16, 1])
 
         x_cpu_view = x_cpu.view(new_shape)
         self.assertEqual(x_cpu_view.size(), [1, 4, 4, 4])
@@ -766,13 +765,14 @@ class TestTensorShape(TestCase):
 
         x_dpcpp_view = x_dpcpp.view(new_shape)
         self.assertTrue(ipex.is_dil_tensor(x_dpcpp_view))
-        self.assertEqual(ipex.get_dil_tensor_sizes(x_dpcpp_view), [1, 4, 4, 4])
-        self.assertEqual(ipex.is_dil_tensor_strides(x_dpcpp_view), [64, 16, 4, 1])
         
         y = torch.randn(new_shape)
         out_cpu = x_cpu_view * y
         # test if the shape of x_dpcpp_view is compatible with y
         out_dpcpp = x_dpcpp_view * y
+        self.assertTrue(ipex.is_dil_tensor(out_dpcpp))
+        self.assertEqual(ipex.get_dil_tensor_sizes(out_dpcpp), [1, 4, 4, 4])
+        self.assertEqual(ipex.get_dil_tensor_strides(out_dpcpp), [64, 16, 4, 1])
         self.assertEqual(out_cpu, out_dpcpp)
 
         # test if metadata of x_dpcpp has not been altered

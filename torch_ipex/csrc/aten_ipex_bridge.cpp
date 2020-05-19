@@ -75,7 +75,6 @@ void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
     TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor.get_data_handle());
     TORCH_INTERNAL_ASSERT(shade_data_context->cpu_raw_data != nullptr);
     TORCH_INTERNAL_ASSERT(shade_data_context->cpu_del_fun != nullptr);
-    TORCH_INTERNAL_ASSERT(check_aten_dil_shape_info(ipexTensor, dil_tensor));
 #endif
   } else {
 #if defined(_DEBUG)

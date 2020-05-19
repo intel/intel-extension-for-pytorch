@@ -124,7 +124,7 @@ void InitIpexModuleBindings(py::module m) {
 
   m.def("is_dil_tensor", &isDilTensor);
   m.def("get_dil_tensor_sizes", &getDilTensorSizes);
-  m.def("is_dil_tensor_strides", &getDilTensorStrides);
+  m.def("get_dil_tensor_strides", &getDilTensorStrides);
 }
 
 }  // namespace
