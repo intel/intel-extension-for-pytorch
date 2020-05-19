@@ -43,6 +43,8 @@ int64_t dpcppMaxComputeUnitSize();
 
 int64_t dpcppMaxComputeUnitSize(DPCPP::queue& queue);
 
+std::string getPreferredPlatform();
+
 void parallel_for_setup(
     int64_t n,
     int64_t& tileSize,
