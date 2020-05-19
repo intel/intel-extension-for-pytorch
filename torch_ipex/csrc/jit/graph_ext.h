@@ -2,23 +2,21 @@
 
 #include <vector>
 #include <memory>
-
-#include "cpu/dil/dil.hpp"
+#include <ideep.hpp>
 #include "accelerated_ops.h"
-
 #include <c10/util/Optional.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/ir/constants.h>
 
 namespace torch { namespace jit {
-using namespace dil;
-using dataType = dil::tensor::data_type;
-using formatTag = dil::format_tag;
+using namespace ideep;
+using dataType = ideep::tensor::data_type;
+using formatTag = ideep::format;
 using formatList = std::vector<formatTag>;
 using groupsList = std::vector<int64_t>;
 
-//static constexpr auto natureFormat = formatTag::nchw;
-//static constexpr auto natureWeightFormat = formatTag::oihw;
+static constexpr auto natureFormat = formatTag::nchw;
+static constexpr auto natureWeightFormat = formatTag::oihw;
 
 // attributes for pyrys ops to decide which format is on
 // Or what formats transfered by reorder
@@ -73,7 +71,7 @@ public:
     return this->kind() == dnnl::batch_norm;
   }
 
-  //void initFormatInfo();
+  void initFormatInfo();
 
   template <class T> T* cast() {
     return reinterpret_cast<T*>(this);
@@ -81,19 +79,18 @@ public:
 private:
   // we save formats as Ints attribute internally
   const std::vector<int64_t>& getFormatInfo() const;
-  /*
+
   static Node* createReorder(
       Value *v, Graph *g, formatTag from, formatTag to);
   static Node* insertReorder(
       Value *v, Node *insert_point, formatTag from, formatTag to);
-  */
 };
 
 class Conv2dNode : public NodeExt {
 public:
   bool couldInferFormats() const;
   bool hasConstantParams() const;
-  //void fixWeightFormatIfPossible();
+  void fixWeightFormatIfPossible();
   formatTag expectedWeightFormat(
       c10::ArrayRef<int64_t> sizes,
       c10::List<int64_t> stride,
@@ -101,7 +98,6 @@ public:
       c10::List<int64_t> dilation,
       int64_t groups, dataType dtype = dataType::f32) const;
 };
-
 
 class BatchNorm2dNode : public NodeExt {
 public:

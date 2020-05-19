@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include "cpu/dil/dil.hpp"
+#include <ideep.hpp>
 #include <torch/csrc/jit/ir/ir.h>
 
 namespace torch { namespace jit {

@@ -10,7 +10,6 @@
 #include <torch/csrc/jit/runtime/operator_options.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
 #include "jit/fusion_pass.h"
-#include "jit/op_rewrite.h"
 
 #include <cstring>
 #include <sstream>
@@ -148,23 +147,8 @@ using namespace torch::jit;
 
 void InitIpexBindings(py::module m) {
   InitIpexModuleBindings(m);
-
-  // fro jit path
-  RegisterPass pass_1([](std::shared_ptr<Graph>& g) {
-    if (AutoOptConfig::singleton().get_jit_fuse()) {
-      torch::jit::OpRewritePass(g);
-    }
-  });
-  /*
-  RegisterPass pass_2([](std::shared_ptr<Graph>& g) {
-    if (AutoOptConfig::singleton().get_jit_fuse()) {
-      std::cout<<"uisng pass2"<<std::endl;
-      torch::jit::FormatOptimize(g);
-    }
-  });
-  */
   // jit fusion pass
-  RegisterPass pass3([](std::shared_ptr<Graph>& g) {
+  RegisterPass pass([](std::shared_ptr<Graph>& g) {
     if (AutoOptConfig::singleton().get_jit_fuse()) {
       torch::jit::FusionPass(g);
     }
