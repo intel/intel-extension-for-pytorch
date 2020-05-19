@@ -25,7 +25,8 @@ dil::tensor conv2d_impl(
     at::IntArrayRef padding,
     at::IntArrayRef stride,
     at::IntArrayRef dilation,
-    int64_t groups);
+    int64_t groups,
+    const dil::attr_t& attr = dil::attr_t());
 
 }  // namespace conv
 }  // namespace dbl

@@ -31,7 +31,8 @@ dil::tensor conv2d_impl(
     at::IntArrayRef padding,
     at::IntArrayRef stride,
     at::IntArrayRef dilation,
-    int64_t groups) {
+    int64_t groups,
+    const dil::attr_t& attr) {
   std::vector<int64_t> kernel_size(x.ndims());
   // mkldnn conv2d weights could have been re-ordered to 5d by
   // mkldnn_reorder_conv2d_weight
@@ -61,7 +62,11 @@ dil::tensor conv2d_impl(
       {dilation.begin(), dilation.end()},
       {padding.begin(), padding.end()},
       {padding.begin(), padding.end()},
-      groups);
+      groups,
+      dil::scale_t(),
+      dil::scale_t(),
+      dil::scale_t(),
+      attr);
   } else {
     dil::convolution_forward::compute(
       x,
@@ -72,7 +77,11 @@ dil::tensor conv2d_impl(
       {dilation.begin(), dilation.end()},
       {padding.begin(), padding.end()},
       {padding.begin(), padding.end()},
-      groups);
+      groups,
+      dil::scale_t(),
+      dil::scale_t(),
+      dil::scale_t(),
+      attr);
   }
   return y;
 }

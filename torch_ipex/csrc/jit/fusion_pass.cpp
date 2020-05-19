@@ -88,19 +88,20 @@ public:
   // currently we only have to fold conv2d + batch_norm
   //
   bool isFoldable(Node* node, Node* prev) {
-    bool foldable = (node->kind() == dnnl::batch_norm
-        && prev->kind() == dnnl::conv2d);
-
+    bool foldable = (node->kind() == aten::batch_norm
+        && prev->kind() == aten::conv2d);
     //
     // Check whether all the sources are constant ???
     // Does performance improve no matter we do it pre-compiling or runtime?
     //
+
     auto* conv2d = reinterpret_cast<NodeExt *>(prev)->cast<Conv2dNode>();
     auto* batch_norm = reinterpret_cast<NodeExt *>(node)->cast<BatchNorm2dNode>();
 
     foldable = foldable
       && conv2d->hasConstantParams()
       && batch_norm->hasConstantParams();
+
     return foldable;
   }
 
@@ -125,6 +126,7 @@ public:
     newNode->setScope(conv2d->scope());
 
     // We need following parameters
+
     newNode->addInput(conv2d->input(1));  // Conv2d weights
     newNode->addInput(batch_norm->input(1)); // Batch norm weights
     newNode->addInput(batch_norm->input(4)); // running_var (delta)
@@ -134,7 +136,6 @@ public:
     newNode->output()->copyMetadata(conv2d->input(1));
     newNode->output()->setType(conv2d->input(1)->type());
     newNode->output()->setDebugName(conv2d->input(1)->debugName() + ".bn_folded");
-
     return newNode;
   }
 
@@ -198,7 +199,8 @@ public:
     }
 
     // throw
-    auto er = script::ErrorReport(node->sourceRange());
+    //auto er = script::ErrorReport(node->sourceRange());
+    auto er = ErrorReport(node->sourceRange());
     er << "Schema not found for fusion process. \n";
     er << "Prev: " << *prev << "\n";
     er << "Node: " << *node << "\n";
@@ -323,7 +325,7 @@ public:
     }
 
     return std::make_pair(++pos->iterator(), changed);
-}
+  }
 };
 
 // TODO: These rules should be more scalable
@@ -334,12 +336,14 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
   {{dnnl::batch_norm, dnnl::relu}, dnnl::batch_norm_relu},
   {{dnnl::batch_norm, dnnl::relu_}, dnnl::batch_norm_relu},
   */
+  /*
   {{dnnl::conv2d_sum, dnnl::relu}, dnnl::conv2d_sum_relu},
   {{dnnl::conv2d_sum, dnnl::relu_}, dnnl::conv2d_sum_relu},
 
   {{dnnl::conv2d, dnnl::sum}, dnnl::conv2d_sum},
   {{dnnl::conv2d, dnnl::sum_}, dnnl::conv2d_sum},
-  // {{dnnl::conv2d_relu, dnnl::sum}, dnnl::conv2d_relu_sum}
+  {{dnnl::conv2d_relu, dnnl::sum}, dnnl::conv2d_relu_sum}
+  */
 };
 
 void FusionPass(std::shared_ptr<Graph> &graph) {

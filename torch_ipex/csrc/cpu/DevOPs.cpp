@@ -67,6 +67,41 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   return dbl::comm::gen_aten_tensor_by(std::move(dil_output));
 }
 
+at::Tensor AtenIpexCPUDev::dil_convolution_relu(
+    const at::Tensor & input,
+    const at::Tensor & weight,
+    const at::Tensor & bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups) {
+  DEBUG("AtenIpexCPUDev::dil_convolution\n");
+  dil::tensor dil_input;
+  dil::tensor dil_weight;
+  c10::optional<dil::tensor> dil_bias{c10::nullopt};
+
+  CHECK_DNNL_OP_PRE_COND(input);
+  CHECK_DNNL_OP_PRE_COND(weight);
+  dil_input = dbl::comm::try_gen_dil_tensor(input);
+  dil_weight = dbl::comm::try_gen_dil_tensor(weight);
+  if (bias.defined()) {
+    CHECK_DNNL_OP_PRE_COND(bias);
+    dil_bias = dbl::comm::try_gen_dil_tensor(bias);
+  }
+
+  dil::tensor dil_output = dbl::conv::conv2d_impl(
+    dil_input,
+    dil_weight,
+    dil_bias,
+    padding,
+    stride,
+    dilation,
+    groups,
+    dil::attr_t::fuse_relu());
+
+  return dbl::comm::gen_aten_tensor_by(dil_output);
+}
+
 at::Tensor dil_convolution_backward_input(
     at::IntArrayRef input_size, const at::Tensor& grad_output, const at::Tensor& weight,
     at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups, bool bias_defined)

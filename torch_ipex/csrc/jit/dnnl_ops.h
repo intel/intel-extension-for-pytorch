@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ideep.hpp>
+#include "cpu/dil/dil.hpp"
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
 

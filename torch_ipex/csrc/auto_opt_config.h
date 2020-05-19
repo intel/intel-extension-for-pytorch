@@ -17,6 +17,14 @@ public:
     return auto_dnnl_;
   }
 
+  inline void set_jit_fuse(bool jit_fuse) {
+    jit_fuse_ = jit_fuse;
+  }
+
+  inline bool get_jit_fuse() {
+    return jit_fuse_;
+  }
+
   inline void set_mix_bf16_fp32(bool value) {
     mix_bf16_fp32_ = value;
   }
@@ -39,6 +47,7 @@ private:
 
 private:
   bool auto_dnnl_;
+  bool jit_fuse_;
   bool mix_bf16_fp32_;
   bool pure_bf16_;
 };

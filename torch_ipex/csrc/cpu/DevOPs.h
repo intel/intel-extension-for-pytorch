@@ -69,6 +69,10 @@ class AtenIpexCPUDev {
   static at::Tensor dil_cat(at::TensorList tensors, int64_t dim);
   static std::vector<at::Tensor> dil_split_with_sizes(const at::Tensor& self, at::IntArrayRef split_sizes, int64_t dim);
   static std::vector<at::Tensor> dil_split(const at::Tensor& self, int64_t split_size, int64_t dim);
+
+  // for JIT ops
+  static at::Tensor dil_convolution_relu(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups);
+
 };
 
 }  // namespace cpu

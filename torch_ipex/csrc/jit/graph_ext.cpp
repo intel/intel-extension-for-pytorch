@@ -2,6 +2,7 @@
 #include "accelerated_ops.h"
 
 namespace torch { namespace jit {
+/*
 void NodeExt::initFormatInfo() {
   std::vector<int64_t> formatInfo (
       this->inputs().size() + this->outputs().size(),
@@ -9,7 +10,7 @@ void NodeExt::initFormatInfo() {
 
   this->is_(attr::format_info, std::move(formatInfo));
 }
-
+*/
 const std::vector<int64_t>& NodeExt::getFormatInfo() const {
   return this->is(attr::format_info);
 }
@@ -40,6 +41,7 @@ void NodeExt::setGroupInfo(int64_t groups) {
   this->i_(attr::group_info, groups);
 }
 
+/*
 Node *NodeExt::createReorder(Value *v, Graph *g, formatTag from, formatTag to) {
   NodeExt *reorder = nullptr;
   if (from != to) {
@@ -106,7 +108,7 @@ Node* NodeExt::appendReorder(formatTag to, int i) {
 
   return reorder;
 }
-
+*/
 void NodeExt::propagateFormats() {
   // TODO: Need consultant with acceleration libraries
   setOutputFormat(inputFormat());
@@ -185,7 +187,7 @@ bool Conv2dNode::hasConstantParams() const {
 
   return has;
 }
-
+/*
 formatTag Conv2dNode::expectedWeightFormat(
     c10::ArrayRef<int64_t> sizes,
     c10::List<int64_t> stride,
@@ -207,7 +209,6 @@ formatTag Conv2dNode::expectedWeightFormat(
   return desc.get_internal_format();
 }
 
-
 void Conv2dNode::fixWeightFormatIfPossible() {
   if (couldInferFormats()) {
     auto tensor = toIValue(this->input(1))->toTensor();
@@ -222,8 +223,9 @@ void Conv2dNode::fixWeightFormatIfPossible() {
     this->prependReorders(use_list {{this, 1}}, {natureWeightFormat}, {groups});
   }
 }
-
+*/
 bool BatchNorm2dNode::hasConstantParams() const {
+  /*
   bool has =
     this->input(1)->node()->kind() == prim::Constant
       && this->input(2)->node()->kind() == prim::Constant
@@ -234,6 +236,8 @@ bool BatchNorm2dNode::hasConstantParams() const {
   // TODO: more check to make sure
 
   return has;
+  */
+  return true;
 }
 
 }} // namespace torch::jit

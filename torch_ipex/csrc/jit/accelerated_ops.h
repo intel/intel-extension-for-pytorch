@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ideep.hpp>
+#include "cpu/dil/dil.hpp"
 #include <torch/csrc/jit/runtime/custom_operator.h>
 
 namespace torch { namespace jit {
