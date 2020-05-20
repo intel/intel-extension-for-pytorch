@@ -65,6 +65,10 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor',
 ]
 
+_FN_BF16_FUNCS_WITH_SIMPLE_ATEN_SIG = [
+
+]
+
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
 _SHALLOW_FALLBACK_TO_CPU_TENSOR = 'shallowFallbackToCPUTensor'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR = 'shallowUpgradeToDPCPPTensor'
@@ -177,6 +181,13 @@ class DenseOPCodeGen(object):
                 return True
         return False
 
+    def is_bf16_func(self, simple_aten_sig):
+        stripped_str = simple_aten_sig.replace(' ', '')
+        for item in _FN_BF16_FUNCS_WITH_SIMPLE_ATEN_SIG:
+            if stripped_str == item.replace(' ', ''):
+                return True
+        return False
+
     def is_bypass_func(self, cpp_sig):
         for frx in _FN_BYPASS_REGEX:
             if re.match(frx, cpp_sig.def_name):
@@ -256,6 +267,13 @@ class DenseOPCodeGen(object):
             func_dec_str = func_dec_str.replace(key, _TYPE_NSMAP[key])
         return func_dec_str
 
+    def get_tensor_parameter(self, cpp_sig):
+        tensor_param_vars = []
+        for param in cpp_sig.input_params:
+            if param.core_type == 'Tensor':
+                tensor_param_vars.append(param.name)
+        return tensor_param_vars
+
     def gen_func_signature(self, cpp_func_str):
         cpp_func_str_h = cpp_func_str
         for key in _TYPE_NSMAP:
@@ -269,6 +287,32 @@ class DenseOPCodeGen(object):
 
         return (cpp_func_str_h, cpp_func_str_cpp)
 
+    def gen_bf16_code(self, cpp_sig, aten_func_sig_str):
+        # Does not plan to support in-place tensor
+        code = ''
+
+        reorder_func_name = 'reorderTensorToScalaraType'
+        if self.is_dnnl_func(aten_func_sig_str):
+            reorder_func_name = 'reorderTensorToScalarTypeForDNNL'
+
+        tensor_param_vars = self.get_tensor_parameter(cpp_sig)
+        if not self.is_bf16_func(aten_func_sig_str):
+            code += '  if (check_mix_bf16_fp32()) {\n'
+            for tensor_param_var in tensor_param_vars:
+                code += '    bridge::{}({}, at::kFloat);\n'.format(reorder_func_name, tensor_param_var)
+            code += '  }\n'
+            return code
+        else:
+            code += '  if (check_mix_bf16_fp32()) {\n'
+            code += '    std::vector<at::Tensor> dnnl_input_tensors;\n'
+            for tensor_param_var in tensor_param_vars:
+                code += '    dnnl_input_tensors.push_back({});\n'.format(tensor_param_var)
+            code += '    if (bf16::chk::bf16_support_the_tensors(dnnl_input_tensors))\n {'
+            for tensor_param_var in tensor_param_vars:
+                code += '      bridge::{}({}, at::kBFloat16);\n'.format(reorder_func_name, tensor_param_var)
+            code += '    }\n'
+            code += '  }\n'
+
     def gen_dnnl_code(self, cpp_sig, aten_func_sig_str):
         code = ''
 
@@ -278,11 +322,9 @@ class DenseOPCodeGen(object):
         if not self.is_dnnl_func(aten_func_sig_str):
             return code
 
+        dnnl_tensor_param_vars = self.get_tensor_parameter(cpp_sig)
         param_vars = []
-        dnnl_tensor_param_vars = []
         for param in cpp_sig.input_params:
-            if param.core_type == 'Tensor':
-                dnnl_tensor_param_vars.append(param.name)
             param_vars.append(param.name)
 
         code += '  try {\n'
@@ -475,6 +517,7 @@ class DenseOPCodeGen(object):
             if is_conv_overrideable_func(cpp_sig.def_name):
                 code += '  return AtenIpexCPUDev::dil_{}({});\n'.format(cpp_sig.def_name, ', '.join([param.name for param in cpp_sig.input_params]))
             else:
+                code += self.gen_bf16_code(cpp_sig, aten_func_sig_str)
                 code += self.gen_dnnl_code(cpp_sig, aten_func_sig_str)
                 code += self.gen_fallback_prepare_code(cpp_sig)
                 code += self.gen_fallback_code(cpp_sig)

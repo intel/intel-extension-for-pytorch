@@ -517,17 +517,13 @@ void reorderTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dst
   if (!(ipexTensor.defined()))
     return;
 
-  TORCH_CHECK(dstScalarType == at::kBFloat16 || dstScalarType == at::kFloat);
-
   auto tensor_dtype = ipexTensor.scalar_type();
-  TORCH_CHECK(tensor_dtype == at::kBFloat16 || tensor_dtype == at::kFloat);
-  if (tensor_dtype == dstScalarType)
+  if ((tensor_dtype != at::kBFloat16 && tensor_dtype != at::kFloat) || tensor_dtype == dstScalarType)
     return;
 
   if (!check_tensor_own_whole_storage(ipexTensor)) {
-    return;
-  } else {
     TORCH_INTERNAL_ASSERT(false);
+    return;
   }
 
   if (check_tensor_own_shade_context(ipexTensor)) {

@@ -106,6 +106,10 @@ bool check_auto_dnnl() {
   return AutoOptConfig::singleton().get_auto_dnnl();
 }
 
+bool check_mix_bf16_fp32() {
+  return AutoOptConfig::singleton().get_mix_bf16_fp32();
+}
+
 bool check_tensor_own_whole_storage(const at::Tensor& tensor) {
   if (!(tensor.defined()))
     return false;
