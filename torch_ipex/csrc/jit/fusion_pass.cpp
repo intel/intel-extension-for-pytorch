@@ -262,14 +262,14 @@ public:
     // Y-merge like case
     //
     if (safe && node->inputs().size() > 1) {
-      TORCH_INTERNAL_ASSERT(r);
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(r);
       auto rule = *r.value();
       auto& schema = matchSchemaForFusion(rule.second, v->node(), node);
       auto o_schema = node->schema();
 
       auto pos = v->node()->inputs().size();
 
-      TORCH_INTERNAL_ASSERT(schema.arguments().size()
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(schema.arguments().size()
           == pos + node->inputs().size() -1);
 
       for (int i = 0; i < node->inputs().size(); ++ i) {

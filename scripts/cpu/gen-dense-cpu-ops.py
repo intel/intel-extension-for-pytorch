@@ -304,7 +304,7 @@ class DenseOPCodeGen(object):
                 param_seq_str = param_var
                 if param_var in dnnl_tensor_param_vars:
                     if param_var == 'out' and is_out_func(fname):
-                        code += '      TORCH_INTERNAL_ASSERT({}.is_contiguous());\n'.format(param_var)
+                        code += '      TORCH_INTERNAL_ASSERT_DEBUG_ONLY({}.is_contiguous());\n'.format(param_var)
                     else:
                         param_seq_str = '{}.is_contiguous() ? {} : {}.contiguous()'.format(param_var, param_var, param_var)
                 param_seq_str_vec.append(param_seq_str)
@@ -334,10 +334,10 @@ class DenseOPCodeGen(object):
                 ipex_name = '_ipex_{}'.format(param.name)
                 param.ipex_name = ipex_name
                 check_cond = '{}.device().type() == at::DeviceType::DPCPP'.format(param.name)
-                op_check_code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond)
+                op_check_code += '  TORCH_INTERNAL_ASSERT_DEBUG_ONLY({});\n'.format(check_cond)
                 code += '  at::TensorOptions {} = {}.device(at::DeviceType::CPU);\n'.format(ipex_name, param.name)
             elif param.core_type == 'Storage':
-                code += '  TORCH_INTERNAL_ASSERT({}.device_type() == c10::DeviceType::DPCPP);\n'.format(param.name)
+                code += '  TORCH_INTERNAL_ASSERT_DEBUG_ONLY({}.device_type() == c10::DeviceType::DPCPP);\n'.format(param.name)
             elif param.core_type == 'MemoryFormat':
                 if param.is_optional:
                     check_cond = '{}.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous'.format(param.name)
@@ -352,7 +352,7 @@ class DenseOPCodeGen(object):
                 assert param.core_type == 'Tensor'
                 ipex_name = '_ipex_{}'.format(param.name)
                 check_cond = '{}.layout() == c10::kStrided'.format(param.name)
-                op_check_code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond)
+                op_check_code += '  TORCH_INTERNAL_ASSERT_DEBUG_ONLY({});\n'.format(check_cond)
                 code += '  auto&& {} = bridge::{}({});\n'.format(ipex_name, _SHALLOW_FALLBACK_TO_CPU_TENSOR, param.name)
                 param.ipex_name = ipex_name
         return op_check_code + code

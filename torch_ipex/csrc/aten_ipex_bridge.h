@@ -10,9 +10,7 @@ namespace torch_ipex {
 namespace bridge {
 
 // Convert DPCPP tensor to CPU tensor
-at::Tensor fallbackToCPUTensor(const at::Tensor& ipexTensor);
 at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor);
-std::vector<at::Tensor> fallbackToCPUTensorList(const at::TensorList&);
 std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList&);
 
 void attachShadeDataConext(const at::Tensor& tensor);
@@ -51,9 +49,7 @@ void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarTy
 void reorderTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dstScalarType);
 
 // Convert CPU tensor to DPCPP tensor
-at::Tensor upgradeToDPCPPTensor(const at::Tensor& ipexTensor);
 at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& ipexTensor);
-std::vector<at::Tensor> upgradeToDPCPPTensorVec(const std::vector<at::Tensor> &);
 std::vector<at::Tensor> shallowUpgradeToDPCPPTensorVec(const std::vector<at::Tensor> &);
 
 // The last character A means alias. This function is for aten alias
