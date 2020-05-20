@@ -275,16 +275,14 @@ public:
 
 // TODO: These rules should be more scalable
 OpFuser::RuleTab OpFuser::dnnlRules = {
-  {{aten::conv2d, aten::relu}, dnnl::conv2d_relu},
-  {{aten::conv2d, Symbol::fromQualString("aten::relu_")}, dnnl::conv2d_relu},
-  /*
-  {{AtenIpexCPUDev::conv2d_sum, AtenIpexCPUDev::relu}, AtenIpexCPUDev::conv2d_sum_relu},
-  {{AtenIpexCPUDev::conv2d_sum, dnnl::relu_}, AtenIpexCPUDev::conv2d_sum_relu},
+  {{aten::conv2d, aten::relu}, ipex::conv2d_relu},
+  {{aten::conv2d, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_relu},
+  {{ipex::conv2d_sum, aten::relu}, ipex::conv2d_sum_relu},
+  {{ipex::conv2d_sum, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_sum_relu},
 
-  {{aten::conv2d, aten::add}, AtenIpexCPUDev::conv2d_sum},
-  {{aten::conv2d, aten::add_}, AtenIpexCPUDev::conv2d_sum},
-  {{AtenIpexCPUDev::conv2d_relu, aten::add}, AtenIpexCPUDev::conv2d_relu_sum}
-  */
+  {{aten::conv2d, aten::add}, ipex::conv2d_sum},
+  {{aten::conv2d, aten::add_}, ipex::conv2d_sum},
+  //{{dnnl::conv2d_relu, aten::add}, dnnl::conv2d_relu_sum}
 };
 
 void FusionPass(std::shared_ptr<Graph> &graph) {

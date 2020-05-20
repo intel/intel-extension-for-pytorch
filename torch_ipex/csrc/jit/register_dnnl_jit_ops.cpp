@@ -25,7 +25,7 @@ using namespace torch_ipex::cpu;
 
 RegisterOperators op({
     Operator(
-      "dnnl::conv2d_relu(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
+      "ipex::conv2d_relu(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
       [] (const Node* node) ->Operation {
         if (torch_ipex::check_auto_dnnl()) {
           return [] (Stack& stack) {
@@ -42,60 +42,65 @@ RegisterOperators op({
             return 0;
           };
         } else {
-          TORCH_CHECK(false, "PyTorch native path not support convolution relu fusion now")
+          TORCH_CHECK(false, "PyTorch native path not support convolution relu fusion now");
         }
-      },
-      aliasAnalysisFromSchema()
-      )
-    /*
-    Operator(
-      "dnnl::conv2d_sum(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1, Tensor(a!) accumu, *, Scalar alpha=1) -> Tensor(a!)",
-      [] (const Node* node) ->Operation {
-        return [] (Stack& stack) {
-          auto output = (std::move(peek(stack, 7, 9))).toTensor();
-          auto result = AtenIpexCPUDev::conv2d_sum(
-              (std::move(peek(stack, 0, 9))).toTensor(),
-              (std::move(peek(stack, 1, 9))).toTensor(),
-              toOptionalTensor(std::move(peek(stack, 2, 9))),
-              (std::move(peek(stack, 3, 9))).toIntVector(),
-              (std::move(peek(stack, 4, 9))).toIntVector(),
-              (std::move(peek(stack, 5, 9))).toIntVector(),
-              (std::move(peek(stack, 6, 9))).toInt(),
-              output,
-              (std::move(peek(stack, 8, 9))).toScalar()
-          );
-          auto result = at::Tensor();
-          drop(stack, 9);
-          pack(stack, std::move(result));
-          return 0;
-        };
       },
       aliasAnalysisFromSchema()
       ),
     Operator(
-      "dnnl::conv2d_sum_relu(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1, Tensor(a!) accumu, *, Scalar alpha=1) -> Tensor(a!)",
+      "ipex::conv2d_sum(Tensor input, Tensor weight, Tensor? bias, int[2] stride, int[2] padding, int[2] dilation, int groups, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
       [] (const Node* node) ->Operation {
-        return [] (Stack& stack) {
-          auto output = (std::move(peek(stack, 7, 9))).toTensor();
-          auto result = AtenIpexCPUDev::conv2d_sum_relu(
-              (std::move(peek(stack, 0, 9))).toTensor(),
-              (std::move(peek(stack, 1, 9))).toTensor(),
-              toOptionalTensor(std::move(peek(stack, 2, 9))),
-              (std::move(peek(stack, 3, 9))).toIntVector(),
-              (std::move(peek(stack, 4, 9))).toIntVector(),
-              (std::move(peek(stack, 5, 9))).toIntVector(),
-              (std::move(peek(stack, 6, 9))).toInt(),
-              output,
-              (std::move(peek(stack, 8, 9))).toScalar()
-          );
-          auto result = at::Tensor();
-          drop(stack, 9);
-          pack(stack, std::move(result));
-          return 0;
-        };
+        if (torch_ipex::check_auto_dnnl()) {
+          return [] (Stack& stack) {
+            auto output = (std::move(peek(stack, 7, 9))).toTensor();
+            auto result = AtenIpexJITDev::dil_convolution_sum(
+                (std::move(peek(stack, 0, 9))).toTensor(),
+                (std::move(peek(stack, 1, 9))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 2, 9))),
+                (std::move(peek(stack, 3, 9))).toIntVector(),
+                (std::move(peek(stack, 4, 9))).toIntVector(),
+                (std::move(peek(stack, 5, 9))).toIntVector(),
+                (std::move(peek(stack, 6, 9))).toInt(),
+                output,
+                (std::move(peek(stack, 8, 9))).toScalar()
+            );
+            drop(stack, 9);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        } else {
+          TORCH_CHECK(false, "PyTorch native path not support convolution sum fusion now");
+        }
       },
       aliasAnalysisFromSchema()
-      ),*/
+      ),
+    Operator(
+      "ipex::conv2d_sum_relu(Tensor input, Tensor weight, Tensor? bias, int[2] stride, int[2] padding, int[2] dilation, int groups, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
+      [] (const Node* node) ->Operation {
+        if (torch_ipex::check_auto_dnnl()) {
+          return [] (Stack& stack) {
+            auto output = (std::move(peek(stack, 7, 9))).toTensor();
+            auto result = AtenIpexJITDev::dil_convolution_sum_relu(
+                (std::move(peek(stack, 0, 9))).toTensor(),
+                (std::move(peek(stack, 1, 9))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 2, 9))),
+                (std::move(peek(stack, 3, 9))).toIntVector(),
+                (std::move(peek(stack, 4, 9))).toIntVector(),
+                (std::move(peek(stack, 5, 9))).toIntVector(),
+                (std::move(peek(stack, 6, 9))).toInt(),
+                output,
+                (std::move(peek(stack, 8, 9))).toScalar()
+            );
+            drop(stack, 9);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        } else {
+          TORCH_CHECK(false, "PyTorch native path not support convolution sum relu fusion now");
+        }
+      },
+      aliasAnalysisFromSchema()
+      )
     });
 }
 }
