@@ -93,7 +93,7 @@ std::vector<at::Tensor> AtenIpexTypeMLPExt::backward(
     const at::Tensor &grad_output,
     const at::Tensor &input,
     const at::Tensor &weight) {
-  TORCH_INTERNAL_ASSERT(libxsmm_handle_ != nullptr);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(libxsmm_handle_ != nullptr);
   libxsmm_dnn_err_t global_status;
   auto nbn = input.size(0);
   auto nbc = input.size(1);
@@ -173,12 +173,12 @@ void *AtenIpexTypeMLPExt::create_handle(int N, int C, int K, int bn, int bc, int
 }
 
 at::Tensor AtenIpexTypeMLPExt::set_relu_mask(void *libxsmm_handle_) {
-  TORCH_INTERNAL_ASSERT(libxsmm_handle_ != nullptr);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(libxsmm_handle_ != nullptr);
   libxsmm_dnn_fullyconnected *handle = (libxsmm_dnn_fullyconnected*)libxsmm_handle_;
   libxsmm_dnn_err_t status;
   libxsmm_dnn_err_t global_status;
   libxsmm_dnn_tensor_datalayout* layout = libxsmm_dnn_fullyconnected_create_tensor_datalayout(handle, LIBXSMM_DNN_RELU_MASK, &status); CHKERR_LIBXSMM_DNN( status );
-  TORCH_INTERNAL_ASSERT(layout != nullptr);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(layout != nullptr);
   std::vector<long> dim_size;
   for (int i = layout->num_dims - 1; i >= 0; i--) {
     dim_size.push_back(layout->dim_size[i]);
@@ -192,7 +192,7 @@ at::Tensor AtenIpexTypeMLPExt::set_relu_mask(void *libxsmm_handle_) {
 }
 
 void AtenIpexTypeMLPExt::release_handle(void* libxsmm_handle_) {
-  TORCH_INTERNAL_ASSERT(libxsmm_handle_ != nullptr);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(libxsmm_handle_ != nullptr);
   libxsmm_dnn_err_t global_status;
   libxsmm_dnn_err_t status;
   libxsmm_dnn_fullyconnected* libxsmm_handle = (libxsmm_dnn_fullyconnected*)libxsmm_handle_;

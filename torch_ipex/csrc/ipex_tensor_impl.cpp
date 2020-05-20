@@ -70,7 +70,7 @@ void IPEXTensorImpl::reset_data_type(at::ScalarType dst_type) {
 
 void IPEXTensorImpl::copy_auto_grad(c10::TensorImpl *src_impl) {
   if (! src_impl->requires_grad()) {
-    TORCH_INTERNAL_ASSERT(! this->requires_grad());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(! this->requires_grad());
     return;
   }
 

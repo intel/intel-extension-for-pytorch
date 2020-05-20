@@ -24,8 +24,8 @@ dil::tensor dil_tensor_from_dense(const at::Tensor& tensor) {
 }
 
 at::Tensor dil_tensor_to_dense(const at::Tensor& tensor) {
-  TORCH_INTERNAL_ASSERT(cpu::ShadeDataContext::isDilTensor(tensor));
-  TORCH_INTERNAL_ASSERT(tensor.unsafeGetTensorImpl()->version_counter().current_version() == 1);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cpu::ShadeDataContext::isDilTensor(tensor));
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.unsafeGetTensorImpl()->version_counter().current_version() == 1);
   auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
   at::Tensor cpu_tensor = at::empty(
     dil_tensor.get_dims(),
@@ -76,10 +76,10 @@ at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
   } else {
     // Blockformat does not inlcude stride information
     auto tensor_sizes = dil_tensor.get_dims();
-    TORCH_INTERNAL_ASSERT(tensor_sizes.size() != 1 || tensor_sizes[0] != 0);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor_sizes.size() != 1 || tensor_sizes[0] != 0);
     _tensor.unsafeGetTensorImpl()->set_sizes_contiguous(tensor_sizes);
   }
-  TORCH_INTERNAL_ASSERT(_tensor.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_tensor.layout() == c10::kStrided);
   return _tensor;
 }
 
@@ -95,7 +95,7 @@ at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& opti
 void sync_shape_from_dil_to_aten(const at::Tensor& ipex_tensor, const dil::tensor &dil_tensor) {
   dil::dims sizes = dil_tensor.get_dims();
   dil::dims strides = dil_tensor.get_strides();
-  TORCH_INTERNAL_ASSERT(ipex_tensor.device().type() == at::DeviceType::DPCPP);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipex_tensor.device().type() == at::DeviceType::DPCPP);
   auto* _tensor_impl = (IPEXTensorImpl *)ipex_tensor.unsafeGetTensorImpl();
   _tensor_impl->force_set_strided(sizes, strides);
 }

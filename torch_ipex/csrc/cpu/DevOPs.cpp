@@ -28,10 +28,10 @@ namespace cpu {
 #define DEBUG(fmt)
 #endif
 
-#define CHECK_DNNL_OP_PRE_COND(tensor)                                    \
-  TORCH_INTERNAL_ASSERT(tensor.defined());                                \
-  TORCH_INTERNAL_ASSERT(tensor.is_contiguous());                          \
-  TORCH_INTERNAL_ASSERT(tensor.layout() == c10::kStrided)
+#define CHECK_DNNL_OP_PRE_COND(tensor)                                               \
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.defined());                                \
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.is_contiguous());                          \
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.layout() == c10::kStrided)
 
 at::Tensor AtenIpexCPUDev::dil_convolution(
     const at::Tensor & input,
@@ -41,6 +41,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     int64_t groups) {
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(false);
   DEBUG("AtenIpexCPUDev::dil_convolution\n");
   dil::tensor dil_input;
   dil::tensor dil_weight;
@@ -175,18 +176,18 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
 
 at::Tensor AtenIpexCPUDev::mkldnn_convolution(const at::Tensor & self, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups) {
   DEBUG("AtenIpexCPUDev::mkldnn_convolution\n");
-  TORCH_INTERNAL_ASSERT(self.defined());
-  TORCH_INTERNAL_ASSERT(weight.defined());
-  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(weight.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(!(bias.defined()) || (bias.defined() && bias.layout() == c10::kStrided));
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!(bias.defined()) || (bias.defined() && bias.layout() == c10::kStrided));
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
   auto&& _ipex_result = at::mkldnn_convolution(_ipex_self.contiguous(), _ipex_weight.contiguous(), _ipex_bias.contiguous(), padding, stride, dilation, groups);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  TORCH_INTERNAL_ASSERT(_ipex_result.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_ipex_result.is_contiguous());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_ipex_result.layout() == c10::kStrided);
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
 }
 
@@ -210,12 +211,12 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
 
 std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::mkldnn_convolution_backward(const at::Tensor & self, const at::Tensor & grad_output, const at::Tensor & weight, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups, std::array<bool,3> output_mask) {
   DEBUG("AtenIpexCPUDev::mkldnn_convolution_backward\n");
-  TORCH_INTERNAL_ASSERT(self.defined());
-  TORCH_INTERNAL_ASSERT(grad_output.defined());
-  TORCH_INTERNAL_ASSERT(weight.defined());
-  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(grad_output.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(weight.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_output.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_output.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);

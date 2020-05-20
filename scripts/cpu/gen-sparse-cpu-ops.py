@@ -260,10 +260,10 @@ class SparseOPCodeGen(object):
                 ipex_name = '_ipex_{}'.format(param.name)
                 param.ipex_name = ipex_name
                 check_cond = '{}.device().type() == at::DeviceType::DPCPP'.format(param.name)
-                op_check_code += '  TORCH_INTERNAL_ASSERT({});\n'.format(check_cond)
+                op_check_code += '  TORCH_INTERNAL_ASSERT_DEBUG_ONLY({});\n'.format(check_cond)
                 code += '  at::TensorOptions {} = {}.device(at::DeviceType::CPU);\n'.format(ipex_name, param.name)
             elif param.core_type == 'Storage':
-                code += '  TORCH_INTERNAL_ASSERT({}.device_type() == c10::DeviceType::DPCPP);\n'.format(param.name)
+                code += '  TORCH_INTERNAL_ASSERT_DEBUG_ONLY({}.device_type() == c10::DeviceType::DPCPP);\n'.format(param.name)
             elif param.core_type == 'MemoryFormat':
                 None
             elif param.core_type != 'Tensor':
