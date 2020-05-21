@@ -234,3 +234,20 @@ template <
     int Dims = 1>
 DPCPP_HOST using dpcpp_host_acc_t =
     DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_host_buf>;
+
+// printf utils
+#if defined(USE_DPCPP) && defined(__SYCL_DEVICE_ONLY__)
+  #define DPCPP_CONSTANT __attribute__((opencl_constant))
+#else
+  #define DPCPP_CONSTANT
+#endif
+
+#define DPCPP_KER_STRING(var, str) \
+  static const DPCPP_CONSTANT char var[] = str;
+
+#if defined(USE_DPCPP)
+  #define DPCPP_PRINTF cl::sycl::intel::experimental::printf
+#else
+  #define DPCPP_PRINTF printf
+#endif
+

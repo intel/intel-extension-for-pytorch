@@ -130,14 +130,11 @@ struct TensorTriOp {
       : stride0(stride0_), stride1(stride1_), k(k_) {}
 
   int mask(T& out, int64_t offset) const {
-#if defined(USE_COMPUTECPP)
-    if (offset < 1) {
-      printf("offset is %ld, mask is not supported!\n", offset);
-    }
-#elif defined(USE_DPCPP)
-    // TODO: Use DPCPP::stream
 
-#endif
+    if (offset < 1) {
+      DPCPP_KER_STRING(format_str, "offset is %ld, mask is not supported!\n");
+      DPCPP_PRINTF(format_str, offset);
+    }
 
     ptrdiff_t n = offset - 1;
     int64_t row, col;
