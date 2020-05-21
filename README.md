@@ -24,8 +24,6 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
     # update submodules for the specified pytorch version
     git submodule sync
     git submodule update --init --recursive
-
-
     ```
 
  2. Get Intel PyTorch Extension source
@@ -82,7 +80,7 @@ input = torch.randn(2, 4)
 model = Model()
 res = model(input)
 ```
-If the user want to explore the Intel PyTorch Extension, you just need to transform the above python script as follows.
+If you want to explore the Intel PyTorch Extension, you just need to transform the above python script as follows.
 ```python
 import torch
 import torch.nn as nn
@@ -103,6 +101,30 @@ input = torch.randn(2, 4).to('dpcpp')
 # Convert the model to Intel PyTorch Extension device
 model = Model().to('dpcpp')
 
+res = model(input)
+```
+In addition, Intel PyTorch Extension can auto dispatch an OP to DNNL if the OP is supported with DNNL. Currently, the feature is not enabled by default. If you want to enable the feature, you can refine the above code as follows.
+```python
+import torch
+import torch.nn as nn
+
+# Import Intel PyTorch Extension
+import intel_pytorch_extension as ipex
+
+class Model(nn.Module):
+    def __init__(self):
+        super(Model, self).__init__()
+        self.linear = nn.Linear(4, 5)
+
+    def forward(self, input):
+        return self.linear(input)
+
+# Convert the input tensor to Intel PyTorch Extension device
+input = torch.randn(2, 4).to('dpcpp')
+# Convert the model to Intel PyTorch Extension device
+model = Model().to('dpcpp')
+
+ipex.core.enable_auto_dnnl()
 res = model(input)
 ```
 
