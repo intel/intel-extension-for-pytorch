@@ -41,7 +41,6 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     int64_t groups) {
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(false);
   DEBUG("AtenIpexCPUDev::dil_convolution\n");
   dil::tensor dil_input;
   dil::tensor dil_weight;
