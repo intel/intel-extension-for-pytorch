@@ -7,7 +7,7 @@ IPEXSparseTensorImpl::IPEXSparseTensorImpl(at::DispatchKeySet type_set, const ca
 }
 
 IPEXSparseTensorImpl * IPEXSparseTensorImpl::get_ipex_sparse_impl(const at::Tensor& ipex_tensor) {
-  TORCH_INTERNAL_ASSERT(ipex_tensor.layout() == c10::kSparse);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipex_tensor.layout() == c10::kSparse);
   // TORCH_INTERNAL_ASSERT(ipex_tensor.device().type() == at::DeviceType::DPCPP);
   return static_cast<IPEXSparseTensorImpl*>(ipex_tensor.unsafeGetTensorImpl());
 }

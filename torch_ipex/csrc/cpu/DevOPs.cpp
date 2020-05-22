@@ -28,10 +28,10 @@ namespace cpu {
 #define DEBUG(fmt)
 #endif
 
-#define CHECK_DNNL_OP_PRE_COND(tensor)                                    \
-  TORCH_INTERNAL_ASSERT(tensor.defined());                                \
-  TORCH_INTERNAL_ASSERT(tensor.is_contiguous());                          \
-  TORCH_INTERNAL_ASSERT(tensor.layout() == c10::kStrided)
+#define CHECK_DNNL_OP_PRE_COND(tensor)                                               \
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.defined());                                \
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.is_contiguous());                          \
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.layout() == c10::kStrided)
 
 at::Tensor AtenIpexCPUDev::dil_convolution(
     const at::Tensor & input,
@@ -175,18 +175,18 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
 
 at::Tensor AtenIpexCPUDev::mkldnn_convolution(const at::Tensor & self, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups) {
   DEBUG("AtenIpexCPUDev::mkldnn_convolution\n");
-  TORCH_INTERNAL_ASSERT(self.defined());
-  TORCH_INTERNAL_ASSERT(weight.defined());
-  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(weight.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(!(bias.defined()) || (bias.defined() && bias.layout() == c10::kStrided));
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!(bias.defined()) || (bias.defined() && bias.layout() == c10::kStrided));
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
   auto&& _ipex_result = at::mkldnn_convolution(_ipex_self.contiguous(), _ipex_weight.contiguous(), _ipex_bias.contiguous(), padding, stride, dilation, groups);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  TORCH_INTERNAL_ASSERT(_ipex_result.is_contiguous());
-  TORCH_INTERNAL_ASSERT(_ipex_result.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_ipex_result.is_contiguous());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_ipex_result.layout() == c10::kStrided);
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
 }
 
@@ -210,12 +210,12 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
 
 std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::mkldnn_convolution_backward(const at::Tensor & self, const at::Tensor & grad_output, const at::Tensor & weight, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups, std::array<bool,3> output_mask) {
   DEBUG("AtenIpexCPUDev::mkldnn_convolution_backward\n");
-  TORCH_INTERNAL_ASSERT(self.defined());
-  TORCH_INTERNAL_ASSERT(grad_output.defined());
-  TORCH_INTERNAL_ASSERT(weight.defined());
-  TORCH_INTERNAL_ASSERT(self.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(grad_output.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT(weight.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_output.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_output.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
   auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
   auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
@@ -239,6 +239,7 @@ at::Tensor& AtenIpexCPUDev::dil_add_out(
   const std::vector<float> scales{1.0, alpha.to<float>()};
   dil::sum::compute(scales, {x, y}, z);
 
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(z.is_public_format() || check_tensor_own_whole_storage(result));
   dbl::comm::sync_shape_from_dil_to_aten(result, z);
   return result;
 }
@@ -267,6 +268,7 @@ at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other,
   const std::vector<float> scales{1.0, alpha.to<float>()};
   dil::sum::compute(scales, {dil_self, dil_other}, dil_self);
 
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_self.is_public_format() || check_tensor_own_whole_storage(self));
   dbl::comm::sync_shape_from_dil_to_aten(self, dil_self);
   return self;
 }
@@ -283,6 +285,7 @@ at::Tensor& AtenIpexCPUDev::dil_mul_out(at::Tensor& result, const at::Tensor& se
 
   dil::binary::compute(dil_self, dil_other, dil_result, dil::algorithm::binary_mul);
 
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_result.is_public_format() || check_tensor_own_whole_storage(result));
   dbl::comm::sync_shape_from_dil_to_aten(result, dil_result);
   return result;
 }
@@ -346,6 +349,7 @@ at::Tensor& AtenIpexCPUDev::dil_bmm_out(
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   matmul_common(x, w, dil::tensor(), y);
 
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(y.is_public_format() || check_tensor_own_whole_storage(result));
   dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
@@ -390,6 +394,8 @@ at::Tensor& AtenIpexCPUDev::dil_baddbmm_out(
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   auto attr_ = dil::attr_t::fuse_sum();
   matmul_common(x, w, bias, y, beta, alpha, attr_);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(y.is_public_format() || check_tensor_own_whole_storage(result));
   dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
@@ -489,6 +495,8 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_out(
     }
   }
   matmul_common(x_, w_, bias, y, beta, alpha, attr_);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(y.is_public_format() || check_tensor_own_whole_storage(result));
   dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
@@ -974,6 +982,8 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
     dil::algorithm::eltwise_relu,
     dil::prop_kind::forward_training,
     /*alpha*/ 0.0);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_self.is_public_format() || check_tensor_own_whole_storage(input));
   dbl::comm::sync_shape_from_dil_to_aten(input, dil_self);
   return input;
 }
@@ -1041,6 +1051,8 @@ at::Tensor& AtenIpexCPUDev::dil_sigmoid_(at::Tensor& self) {
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::eltwise_forward::compute(
       x, x, dil::algorithm::eltwise_logistic_use_dst_for_bwd, dil::prop_kind::forward);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(x.is_public_format() || check_tensor_own_whole_storage(self));
   dbl::comm::sync_shape_from_dil_to_aten(self, x);
   return self;
 }
@@ -1122,6 +1134,8 @@ at::Tensor& AtenIpexCPUDev::dil_cat_out(at::Tensor& result, at::TensorList tenso
   }
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   dil::concat::compute(x, dim, y);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(y.is_public_format() || check_tensor_own_whole_storage(result));
   dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
