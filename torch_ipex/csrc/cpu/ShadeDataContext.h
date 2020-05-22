@@ -94,6 +94,8 @@ struct ShadeDataContext {
       if (raw_cpu_data == nullptr) {
         // the dnnl tensor does not share data with raw tensor data.
         TORCH_INTERNAL_ASSERT_DEBUG_ONLY(! (shade_data_context->dil_tensor.is_empty()));
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(! (shade_data_context->dil_tensor.is_public_format()));
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(check_tensor_own_whole_storage(tensor));
         return true;
       } else {
         // The dnnl tensor shares some data with raw tensor.

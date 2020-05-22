@@ -239,6 +239,7 @@ at::Tensor& AtenIpexCPUDev::dil_add_out(
   const std::vector<float> scales{1.0, alpha.to<float>()};
   dil::sum::compute(scales, {x, y}, z);
 
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(z.is_public_format() || check_tensor_own_whole_storage(result));
   dbl::comm::sync_shape_from_dil_to_aten(result, z);
   return result;
 }
@@ -267,6 +268,7 @@ at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other,
   const std::vector<float> scales{1.0, alpha.to<float>()};
   dil::sum::compute(scales, {dil_self, dil_other}, dil_self);
 
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_self.is_public_format() || check_tensor_own_whole_storage(self));
   dbl::comm::sync_shape_from_dil_to_aten(self, dil_self);
   return self;
 }
@@ -283,6 +285,7 @@ at::Tensor& AtenIpexCPUDev::dil_mul_out(at::Tensor& result, const at::Tensor& se
 
   dil::binary::compute(dil_self, dil_other, dil_result, dil::algorithm::binary_mul);
 
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_result.is_public_format() || check_tensor_own_whole_storage(result));
   dbl::comm::sync_shape_from_dil_to_aten(result, dil_result);
   return result;
 }
@@ -346,6 +349,7 @@ at::Tensor& AtenIpexCPUDev::dil_bmm_out(
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   matmul_common(x, w, dil::tensor(), y);
 
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(y.is_public_format() || check_tensor_own_whole_storage(result));
   dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
@@ -390,6 +394,8 @@ at::Tensor& AtenIpexCPUDev::dil_baddbmm_out(
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   auto attr_ = dil::attr_t::fuse_sum();
   matmul_common(x, w, bias, y, beta, alpha, attr_);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(y.is_public_format() || check_tensor_own_whole_storage(result));
   dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
@@ -489,6 +495,8 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_out(
     }
   }
   matmul_common(x_, w_, bias, y, beta, alpha, attr_);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(y.is_public_format() || check_tensor_own_whole_storage(result));
   dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
@@ -974,6 +982,8 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
     dil::algorithm::eltwise_relu,
     dil::prop_kind::forward_training,
     /*alpha*/ 0.0);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_self.is_public_format() || check_tensor_own_whole_storage(input));
   dbl::comm::sync_shape_from_dil_to_aten(input, dil_self);
   return input;
 }
@@ -1041,6 +1051,8 @@ at::Tensor& AtenIpexCPUDev::dil_sigmoid_(at::Tensor& self) {
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::eltwise_forward::compute(
       x, x, dil::algorithm::eltwise_logistic_use_dst_for_bwd, dil::prop_kind::forward);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(x.is_public_format() || check_tensor_own_whole_storage(self));
   dbl::comm::sync_shape_from_dil_to_aten(self, x);
   return self;
 }
@@ -1122,6 +1134,8 @@ at::Tensor& AtenIpexCPUDev::dil_cat_out(at::Tensor& result, at::TensorList tenso
   }
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   dil::concat::compute(x, dim, y);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(y.is_public_format() || check_tensor_own_whole_storage(result));
   dbl::comm::sync_shape_from_dil_to_aten(result, y);
   return result;
 }
