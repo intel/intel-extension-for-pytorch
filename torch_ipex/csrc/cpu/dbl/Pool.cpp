@@ -151,7 +151,7 @@ at::Tensor _dil_pooling(
       algo,
       dil::prop_kind::forward);
 
-  return dbl::comm::gen_aten_tensor_by(y);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
 at::Tensor _dil_pooling_backward(
@@ -223,7 +223,7 @@ at::Tensor _dil_pooling_backward(
       {padding_vec_r.cbegin(), padding_vec_r.cend()},
       algo);
 
-  return dbl::comm::gen_aten_tensor_by(gradx);
+  return dbl::comm::gen_aten_tensor_by(std::move(gradx));
 }
 
 }  // namespace pool
