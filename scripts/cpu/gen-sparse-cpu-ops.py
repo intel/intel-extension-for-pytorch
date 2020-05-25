@@ -9,6 +9,7 @@ import string
 import sys
 import json
 
+from common.codegen import write_or_skip
 from common.cpp_sig_parser import CPPSig
 from common.aten_sig_parser import AtenSig
 
@@ -371,8 +372,7 @@ class SparseOPCodeGen(object):
 
     def gen_cpu_ops_shard(self, func_defs, cpp_path, header_path, num_shards=1):
         head_file_content = _H_HEADER.format(gen=os.path.basename(sys.argv[0]), hfuncs=''.join([f['dec'] for f in func_defs]))
-        with open(header_path, 'w') as header_file:
-            print(head_file_content, file=header_file)
+        write_or_skip(header_path, head_file_content)
 
         shards = [[] for _ in range(num_shards)]
         for idx, func in enumerate(func_defs):
@@ -383,10 +383,9 @@ class SparseOPCodeGen(object):
             defs_code = ''.join([f['def'] for f in shard])
 
             filename, ext = os.path.splitext(cpp_path)
-            shard_filename = f'{filename}_{idx}{ext}'
-            with open(shard_filename, 'w') as source_file:
-                source_file_content = _CPP_HEADER.format(gen=os.path.basename(sys.argv[0]), funcs=defs_code, regs=regs_code)
-                print(source_file_content, file=source_file)
+            shard_filepath = f'{filename}_{idx}{ext}'
+            shard_content = _CPP_HEADER.format(gen=os.path.basename(sys.argv[0]), funcs=defs_code, regs=regs_code)
+            write_or_skip(shard_filepath, shard_content)
 
     def gen_code(self):
         self.prepare_functions()
