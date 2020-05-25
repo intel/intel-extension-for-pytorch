@@ -409,8 +409,7 @@ std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& ten
 void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarType dstScalarType) {
   TORCH_CHECK(dstScalarType == at::kBFloat16 || dstScalarType == at::kFloat);
   auto tensor_dtype = ipexTensor.scalar_type();
-  TORCH_CHECK(tensor_dtype == at::kBFloat16 || tensor_dtype == at::kFloat);
-  if (tensor_dtype == dstScalarType)
+  if ((tensor_dtype != at::kBFloat16 && tensor_dtype != at::kFloat) || tensor_dtype == dstScalarType)
     return;
 
   if (check_tensor_own_shade_context(ipexTensor)) {
@@ -421,6 +420,7 @@ void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarTy
       IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
       ipex_tensor_impl->reset_data_type(dstScalarType);
       ipex_tensor_impl->storage().unsafeGetStorageImpl()->set_dtype(at::scalarTypeToTypeMeta(dstScalarType));
+      ipex_tensor_impl->set_storage(ipexTensor.storage());
       return;
     }
   }
@@ -435,10 +435,16 @@ void reorderTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dst
 
   auto tensor_dtype = ipexTensor.scalar_type();
   if ((tensor_dtype != at::kBFloat16 && tensor_dtype != at::kFloat) || tensor_dtype == dstScalarType)
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(false);
     return;
 
+  if (ipexTensor.is_sparse()) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipexTensor.layout() == c10::kSparse);
+    auto&& ipex_values = ipexTensor._values();
+    reorderTensorToScalaraType(ipex_values, dstScalarType);
+  }
+
   if (!check_tensor_own_whole_storage(ipexTensor)) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(false);
     return;
   }
 
@@ -468,6 +474,7 @@ void reorderTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dst
   }
 
   ipexTensor.unsafeGetTensorImpl()->set_storage(storage_impl);
+  attachShadeDataConext(ipexTensor);
 }
 
 
