@@ -252,6 +252,22 @@ class TestMixOp(TestCase):
 
         return conv_op_output, conv_op_input, add_src
 
+    def _test_conv_relu_(self, device, rand_seed):
+        ipex.enable_auto_dnnl()
+        torch.manual_seed(rand_seed)
+        conv_op = torch.nn.Conv2d(1, 1, (7, 7)).to(device=device)
+        conv_op_input = torch.rand((1, 1, 10, 10)).to(device=device)
+        conv_op_output = conv_op(conv_op_input)
+        conv_op_output.relu_()
+        return conv_op_output
+
+    def test_conv_relu_(self):
+        rand_seed = int(get_rand_seed())
+        res_dcpp_dnnl = self._test_conv_relu_("dpcpp:0", rand_seed)
+        self.assertTrue(ipex.is_dil_tensor(res_dcpp_dnnl))
+        res_cpu = self._test_conv_relu_("cpu", rand_seed)
+        self.assertEqual(res_cpu, res_dcpp_dnnl.to('cpu'))
+
     def test_conv_add_relu_(self):
         ipex.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
@@ -260,18 +276,18 @@ class TestMixOp(TestCase):
 
         ipex.disable_auto_dnnl()
         res_dcpp_cpu, input_dpcpp_cpu, _ = self._test_conv_add_relu_("dpcpp:0", rand_seed)
-
+        
         res_cpu, input_cpu, _ = self._test_conv_add_relu_("cpu", rand_seed)
         self.assertEqual(res_cpu, res_dcpp_cpu.to('cpu'))
         self.assertEqual(res_cpu, res_dcpp_dnnl.to('cpu'))
 
         ipex.enable_auto_dnnl()
-        res_dcpp_dnnl.sum()#.backward()
-        res_dcpp_cpu.sum()#.backward()
-        res_cpu.sum()#.backward()
+        res_dcpp_dnnl.sum().backward()
+        res_dcpp_cpu.sum().backward()
+        res_cpu.sum().backward()
 
-        #self.assertEqual(input_dpcpp_dnnl.grad.to('cpu'), input_cpu.grad, prec=0.0)
-        #self.assertEqual(input_dpcpp_cpu.grad.to('cpu'), input_cpu.grad, prec=0.0)
+        self.assertEqual(input_dpcpp_dnnl.grad.to('cpu'), input_cpu.grad, prec=0.0)
+        self.assertEqual(input_dpcpp_cpu.grad.to('cpu'), input_cpu.grad, prec=0.0)
 
 class TestLinearAlgebraOps(TestCase):
     def test_mm(self):
