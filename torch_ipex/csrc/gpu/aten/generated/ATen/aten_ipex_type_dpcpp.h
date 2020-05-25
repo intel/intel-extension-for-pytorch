@@ -182,6 +182,10 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor ge(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & ge_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
   at::Tensor & ge_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
+  at::Tensor glu(const at::Tensor & self, int64_t dim);
+  at::Tensor glu_backward(const at::Tensor & grad_output, const at::Tensor & self, int64_t dim);
+  at::Tensor & glu_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, int64_t dim);
+  at::Tensor & glu_out(at::Tensor & out, const at::Tensor & self, int64_t dim);
   at::Tensor gt(const at::Tensor & self, at::Scalar other);
   at::Tensor gt(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & gt_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
@@ -328,6 +332,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & prod_out(at::Tensor & out, const at::Tensor & self, int64_t dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   at::Tensor & put_(at::Tensor & self, const at::Tensor & index, const at::Tensor & source, bool accumulate);
   at::Tensor & range_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
+  at::Tensor & reciprocal_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor relu(const at::Tensor & self);
   at::Tensor & relu_(at::Tensor & self);
   at::Tensor remainder(const at::Tensor & self, at::Scalar other);

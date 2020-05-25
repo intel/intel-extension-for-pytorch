@@ -711,6 +711,22 @@ at::Tensor & AtenIpexTypeDefault::ge_out(at::Tensor & out, const at::Tensor & se
   return AtenIpexTypeDPCPP::ge_out(out, self, other);
 }
 
+at::Tensor AtenIpexTypeDefault::glu(const at::Tensor & self, int64_t dim) {
+  return AtenIpexTypeDPCPP::glu(self, dim);
+}
+
+at::Tensor AtenIpexTypeDefault::glu_backward(const at::Tensor & grad_output, const at::Tensor & self, int64_t dim) {
+  return AtenIpexTypeDPCPP::glu_backward(grad_output, self, dim);
+}
+
+at::Tensor & AtenIpexTypeDefault::glu_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, int64_t dim) {
+  return AtenIpexTypeDPCPP::glu_backward_out(grad_input, grad_output, self, dim);
+}
+
+at::Tensor & AtenIpexTypeDefault::glu_out(at::Tensor & out, const at::Tensor & self, int64_t dim) {
+  return AtenIpexTypeDPCPP::glu_out(out, self, dim);
+}
+
 at::Tensor AtenIpexTypeDefault::gt(const at::Tensor & self, at::Scalar other) {
   return AtenIpexTypeDPCPP::gt(self, other);
 }
@@ -1293,6 +1309,10 @@ at::Tensor & AtenIpexTypeDefault::put_(at::Tensor & self, const at::Tensor & ind
 
 at::Tensor & AtenIpexTypeDefault::range_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step) {
   return AtenIpexTypeDPCPP::range_out(out, start, end, step);
+}
+
+at::Tensor & AtenIpexTypeDefault::reciprocal_out(at::Tensor & out, const at::Tensor & self) {
+  return AtenIpexTypeDPCPP::reciprocal_out(out, self);
 }
 
 at::Tensor AtenIpexTypeDefault::relu(const at::Tensor & self) {
@@ -2227,6 +2247,18 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::ge.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::ge_out>(c10::DispatchKey::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::glu(Tensor self, int dim=-1) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, int64_t), &AtenIpexTypeDefault::glu>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::glu_backward(Tensor grad_output, Tensor self, int dim) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, int64_t), &AtenIpexTypeDefault::glu_backward>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::glu_backward.grad_input(Tensor grad_output, Tensor self, int dim, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, int64_t), &AtenIpexTypeDefault::glu_backward_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::glu.out(Tensor self, int dim=-1, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, int64_t), &AtenIpexTypeDefault::glu_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::gt.Scalar(Tensor self, Scalar other) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::Scalar), &AtenIpexTypeDefault::gt>(c10::DispatchKey::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -2664,6 +2696,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::range.out(Scalar start, Scalar end, Scalar step=1, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, at::Scalar, at::Scalar, at::Scalar), &AtenIpexTypeDefault::range_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::reciprocal.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::reciprocal_out>(c10::DispatchKey::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::relu(Tensor self) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &), &AtenIpexTypeDefault::relu>(c10::DispatchKey::DPCPPTensorId)

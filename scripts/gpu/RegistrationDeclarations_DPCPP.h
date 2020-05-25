@@ -353,6 +353,14 @@ Tensor & ge_out(Tensor & out, const Tensor & self, Scalar other); // aten::ge.Sc
 
 Tensor & ge_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::ge.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 
+Tensor glu(const Tensor & self, int64_t dim); // aten::glu(Tensor self, int dim=-1) -> Tensor
+
+Tensor glu_backward(const Tensor & grad_output, const Tensor & self, int64_t dim); // aten::glu_backward(Tensor grad_output, Tensor self, int dim) -> Tensor
+
+Tensor & glu_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, int64_t dim); // aten::glu_backward.grad_input(Tensor grad_output, Tensor self, int dim, *, Tensor(a!) grad_input) -> Tensor(a!)
+
+Tensor & glu_out(Tensor & out, const Tensor & self, int64_t dim); // aten::glu.out(Tensor self, int dim=-1, *, Tensor(a!) out) -> Tensor(a!)
+
 Tensor gt(const Tensor & self, Scalar other); // aten::gt.Scalar(Tensor self, Scalar other) -> Tensor
 
 Tensor gt(const Tensor & self, const Tensor & other); // aten::gt.Tensor(Tensor self, Tensor other) -> Tensor
@@ -644,6 +652,8 @@ Tensor & prod_out(Tensor & out, const Tensor & self, int64_t dim, bool keepdim, 
 Tensor & put_(Tensor & self, const Tensor & index, const Tensor & source, bool accumulate); // aten::put_(Tensor(a!) self, Tensor index, Tensor source, bool accumulate=False) -> Tensor(a!)
 
 Tensor & range_out(Tensor & out, Scalar start, Scalar end, Scalar step); // aten::range.out(Scalar start, Scalar end, Scalar step=1, *, Tensor(a!) out) -> Tensor(a!)
+
+Tensor & reciprocal_out(Tensor & out, const Tensor & self); // aten::reciprocal.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 
 Tensor relu(const Tensor & self); // aten::relu(Tensor self) -> Tensor
 

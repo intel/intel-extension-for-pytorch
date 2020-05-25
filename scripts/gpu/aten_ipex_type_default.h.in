@@ -182,6 +182,10 @@ class AtenIpexTypeDefault {
   static at::Tensor ge(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & ge_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
   static at::Tensor & ge_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
+  static at::Tensor glu(const at::Tensor & self, int64_t dim);
+  static at::Tensor glu_backward(const at::Tensor & grad_output, const at::Tensor & self, int64_t dim);
+  static at::Tensor & glu_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, int64_t dim);
+  static at::Tensor & glu_out(at::Tensor & out, const at::Tensor & self, int64_t dim);
   static at::Tensor gt(const at::Tensor & self, at::Scalar other);
   static at::Tensor gt(const at::Tensor & self, const at::Tensor & other);
   static at::Tensor & gt_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
@@ -328,6 +332,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & prod_out(at::Tensor & out, const at::Tensor & self, int64_t dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   static at::Tensor & put_(at::Tensor & self, const at::Tensor & index, const at::Tensor & source, bool accumulate);
   static at::Tensor & range_out(at::Tensor & out, at::Scalar start, at::Scalar end, at::Scalar step);
+  static at::Tensor & reciprocal_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor relu(const at::Tensor & self);
   static at::Tensor & relu_(at::Tensor & self);
   static at::Tensor remainder(const at::Tensor & self, at::Scalar other);
