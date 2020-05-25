@@ -91,6 +91,7 @@ void sync_shape_from_dil_to_aten(const at::Tensor& ipex_tensor, const dil::tenso
   dil::dims sizes = dil_tensor.get_dims();
   if (dil_tensor.is_public_format()) {
     dil::dims strides = dil_tensor.get_strides();
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipex_tensor.device().type() == at::DeviceType::DPCPP);
     auto* _tensor_impl = (IPEXTensorImpl *)ipex_tensor.unsafeGetTensorImpl();
     _tensor_impl->force_set_strided(sizes, strides);
   } else {

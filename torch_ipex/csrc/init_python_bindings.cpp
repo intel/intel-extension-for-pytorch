@@ -94,7 +94,7 @@ void InitIpexModuleBindings(py::module m) {
         });
 
   m.def("linear",
-        [](const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
+        [](const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias) {
           return AtenIpexTypeExt::linear(input, weight, bias);
         });
   m.def("linear_fuse_relu",

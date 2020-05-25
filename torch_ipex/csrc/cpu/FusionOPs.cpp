@@ -59,7 +59,7 @@ static at::Tensor& dil_convolution_inplace_fusion(
     const at::Tensor& input,
     const at::Tensor& weight,
     const at::Tensor& bias,
-    at::Tensor& accumu, 
+    at::Tensor& accumu,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
     at::IntArrayRef dilation,

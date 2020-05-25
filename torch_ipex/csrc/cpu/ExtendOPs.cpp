@@ -10,6 +10,7 @@
 #include "xsmm/libxsmm_utils.h"
 #include "../utils.h"
 #include "DevOPs.h"
+#include "CustomerOps.h"
 
 namespace torch_ipex {
 
@@ -449,8 +450,9 @@ AtenIpexTypeExt::embedding_bag_backward(const at::Tensor& grad, const at::Tensor
   return cpu::aten::embedding_bag::embedding_bag_backward_impl(grad, indices, offsets, offset2bag, bag_size, maximum_indices, num_weights, scale_grad_by_freq, mode, sparse, _per_sample_weights);
 }
 
-at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
-    return cpu::AtenIpexCPUDev::dil_linear(input, weight, bias);
+
+at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias) {
+    return NewLinearOp::apply(input, weight, bias);
 }
 
 at::Tensor AtenIpexTypeExt::linear_fuse_relu(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
