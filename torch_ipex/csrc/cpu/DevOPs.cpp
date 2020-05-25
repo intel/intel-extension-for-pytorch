@@ -549,6 +549,48 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   return dbl::comm::gen_aten_tensor_by(y);
 }
 
+at::Tensor AtenIpexCPUDev::dil_linear_fuse_relu(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias) {
+  DEBUG("AtenIpexCPUDev::dil_linear\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+  CHECK_DNNL_OP_PRE_COND(weight);
+  TORCH_CHECK(self.dim() >= 2,
+      "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
+
+  // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
+  auto self_reshaped = self.dim() > 2 ? self.reshape({-1, self.size(self.dim() - 1)}) : self;
+  const dil::tensor x = dbl::comm::try_gen_dil_tensor(self_reshaped);
+  const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
+
+  dil::tensor y;
+  if (bias.has_value()) {
+    at::Tensor bias_vec = bias.value();
+    const dil::tensor b = dbl::comm::try_gen_dil_tensor(bias_vec);
+    dil::inner_product_forward::compute(x, w, b, y,
+                                        /*src_scales=*/dil::scale_t(),
+                                        /*weight_scales=*/dil::scale_t(),
+                                        /*dst_scales=*/dil::scale_t(),
+                                        /*attr*/dil::attr_t::fuse_relu());
+  } else {
+    dil::inner_product_forward::compute(x, w, y,
+                                        /*src_scales=*/dil::scale_t(),
+                                        /*weight_scales=*/dil::scale_t(),
+                                        /*dst_scales=*/dil::scale_t(),
+                                        /*attr*/dil::attr_t::fuse_relu());
+  }
+
+  auto input_size = self.sizes();
+  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
+  output_size.push_back(weight.size(0));
+
+  if (self.dim() > 2) {
+    return dbl::comm::gen_aten_tensor_by(y).reshape(output_size);
+  }
+  return dbl::comm::gen_aten_tensor_by(y);
+}
+
 at::Tensor dil_linear_backward_input(
     at::IntArrayRef input_size, const at::Tensor& grad_output, const at::Tensor& weight){
   DEBUG("AtenIpexCPUDev::dil_linear_backward_input\n");
@@ -976,6 +1018,15 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
     /*alpha*/ 0.0);
   dbl::comm::sync_shape_from_dil_to_aten(input, dil_self);
   return input;
+}
+
+at::Tensor AtenIpexCPUDev::dil_relu_use_dst_for_bwd(const at::Tensor& grad_output, const at::Tensor& output) {
+  const dil::tensor& y = dbl::comm::try_gen_dil_tensor(output);
+  dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output);
+  dil::tensor gradx;
+  dil::eltwise_backward::compute(y, grady, gradx,
+          dil::algorithm::eltwise_relu_use_dst_for_bwd, /*alpha*/ 0.0);
+  return dbl::comm::gen_aten_tensor_by(gradx);
 }
 
 at::Tensor AtenIpexCPUDev::dil_threshold_backward(const at::Tensor& grad_output, const at::Tensor& input, at::Scalar threshold) {

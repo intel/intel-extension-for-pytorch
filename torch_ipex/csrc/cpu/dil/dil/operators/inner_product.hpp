@@ -163,7 +163,7 @@ private:
         }
       }
     } else {
-      op_attr = attr;
+      op_attr =  attr;
       src_desc = {src.get_dims(), data_type::f32, format_tag::any};
       if (src.has_scale()) {
         auto src_scale = src.get_scale();
@@ -233,7 +233,7 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
                       tensor& diff_src,
                       const engine& aengine = engine::cpu_engine()) {
     auto weights_ = weights;
-    if (diff_dst.get_data_type() == data_type::bf16) {
+    if (diff_dst.get_data_type() == data_type::bf16 && weights.get_data_type() != data_type::bf16) {
       weights_.init(weights.get_desc().to_type(data_type::bf16));
       weights_.reorder_from(weights);
     }
