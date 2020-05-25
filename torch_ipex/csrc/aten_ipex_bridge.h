@@ -13,7 +13,7 @@ namespace bridge {
 at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor);
 std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList&);
 
-void attachShadeDataConext(const at::Tensor& tensor);
+void attachShadeDataContext(const at::Tensor& tensor);
 
 /**
  * Reorder the DNNL tensor to the public format if the input tensor contains DNNL tensor.

@@ -106,7 +106,7 @@ void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
 }
 
 
-void attachShadeDataConext(const at::Tensor& tensor) {
+void attachShadeDataContext(const at::Tensor& tensor) {
   auto tensor_storage_impl = tensor.storage().unsafeGetStorageImpl();
   auto& data_ptr = tensor_storage_impl->data_ptr();
 
@@ -272,7 +272,7 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     CHECK_TENSOR_CRITICAL(_tensor, cpuTensor, true);
     //TODO: Cannot set reserved_ 
     //      dest_impl->reserved_ = src_impl->reserved_;
-    attachShadeDataConext(_tensor);
+    attachShadeDataContext(_tensor);
     return _tensor;
   }
 }
@@ -303,7 +303,7 @@ at::Tensor shallowUpgradeToDPCPPTensorA(const at::Tensor& ipexTensor, const at::
   ipex_impl->copy_auto_grad(cpuTensor.unsafeGetTensorImpl());
   CHECK_TENSOR_CRITICAL(_tensor, cpuTensor, true);
 
-  attachShadeDataConext(_tensor);
+  attachShadeDataContext(_tensor);
   return _tensor;
 }
 
@@ -388,7 +388,7 @@ const at::Tensor& shallowUpgradeToDPCPPTensorAW(const at::Tensor& ipexTensor, co
     ipex_tensor_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());
     ipex_tensor_impl->copy_auto_grad(cpuTensor.unsafeGetTensorImpl());
     CHECK_TENSOR_CRITICAL(ipexTensor, cpuTensor, true);
-    attachShadeDataConext(ipexTensor);
+    attachShadeDataContext(ipexTensor);
     return ipexTensor;
   }
 }
