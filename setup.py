@@ -151,6 +151,10 @@ class DPCPPClean(distutils.command.clean.clean, object):
 class DPCPPBuild(build_ext, object):
   def run(self):
     print("run")
+
+    # Generate the code before globbing!
+    generate_ipex_cpu_aten_code(base_dir)
+
     cmake = find_executable('cmake3') or find_executable('cmake')
     if cmake is None:
       raise RuntimeError(
@@ -220,8 +224,6 @@ version = get_build_version(ipex_git_sha)
 # Generate version info (torch_xla.__version__)
 create_version_files(base_dir, version, ipex_git_sha, torch_git_sha)
 
-# Generate the code before globbing!
-generate_ipex_cpu_aten_code(base_dir)
 
 # Constant known variables used throughout this file
 
