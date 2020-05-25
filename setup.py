@@ -170,6 +170,7 @@ class DPCPPBuild(build_ext, object):
       os.mkdir(ext.build_dir)
 
     build_type = 'Release'
+    use_ninja = False
 
     if _check_env_flag('DEBUG'):
       build_type = 'Debug'
@@ -193,6 +194,10 @@ class DPCPPBuild(build_ext, object):
     if _check_env_flag("DPCPP_ENABLE_PROFILING"):
       cmake_args += ['-DDPCPP_ENABLE_PROFILING=1']
 
+    if _check_env_flag("USE_NINJA"):
+      use_ninja = True
+      cmake_args += ['-GNinja']
+
     build_args = ['-j', str(multiprocessing.cpu_count())]
 
     env = os.environ.copy()
@@ -203,7 +208,10 @@ class DPCPPBuild(build_ext, object):
       check_call([self.cmake, ext.project_dir] + cmake_args, cwd=ext.build_dir, env=env)
 
     # build_args += ['VERBOSE=1']
-    check_call(['make'] + build_args, cwd=ext.build_dir, env=env)
+    if use_ninja:
+      check_call(['ninja'] + build_args, cwd=ext.build_dir, env=env)
+    else:
+      check_call(['make'] + build_args, cwd=ext.build_dir, env=env)
 
 
 ipex_git_sha, torch_git_sha = get_git_head_sha(base_dir)
