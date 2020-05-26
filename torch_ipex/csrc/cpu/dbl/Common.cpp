@@ -54,10 +54,10 @@ at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
   shade_data_context->dil_tensor = std::forward<dil::tensor>(dil_tensor);
   shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
   void *tensor_data = nullptr;
-  if (dil_tensor.is_public_format()) {
+  if (shade_data_context->dil_tensor->is_public_format()) {
     // The buffer of a tensor with public format is shared between CPU and DNNL
-    tensor_data = dil_tensor.get_data_handle();
-    shade_data_context->cpu_raw_data = dil_tensor.get_data_handle();
+    tensor_data = shade_data_context->dil_tensor->get_data_handle();
+    shade_data_context->cpu_raw_data = shade_data_context->dil_tensor->get_data_handle();
     shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
   }
   c10::DataPtr shade_data_ptr(
@@ -65,15 +65,15 @@ at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
     shade_data_context,
     cpu::ShadeDataContext::freeShadeDataContext,
     at::DeviceType::DPCPP);
-  auto at_data_type = get_at_data_type(dil_tensor.get_data_type());
+  auto at_data_type = get_at_data_type(shade_data_context->dil_tensor->get_data_type());
   auto storage_impl = c10::make_intrusive<at::StorageImpl>(
     at::scalarTypeToTypeMeta(at_data_type),
-    dil_tensor.get_nelems(),
+    shade_data_context->dil_tensor->get_nelems(),
     std::move(shade_data_ptr),
     nullptr,
     /*resizeable=*/false);
   auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::DPCPPTensorId);
-  dbl::comm::sync_shape_from_dil_to_aten(_tensor, dil_tensor);
+  dbl::comm::sync_shape_from_dil_to_aten(_tensor, shade_data_context->dil_tensor.value());
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_tensor.layout() == c10::kStrided);
   return _tensor;
 }
