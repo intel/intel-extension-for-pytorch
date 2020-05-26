@@ -55,5 +55,42 @@ class TestConv(TestCase):
         self.assertEqual(out_dpcpp.dtype, torch.bfloat16)
         self.assertEqual(out_dpcpp, out_cpu, 1e-2)
 
+class TestBatchNorm(TestCase):
+    def test_batch_norm2d(self):
+        ipex.enable_auto_dnnl()
+        ipex.enable_mix_bf16_fp32()
+        rand_seed = int(get_rand_seed())
+        rand_seed = 1
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x_cpu = torch.randn(64, 3, 35, 45, dtype=torch.float32) * 10
+        x_dpcpp = x_cpu.to(device=device)
+
+        bn = torch.nn.BatchNorm2d(3)
+        ipex.enable_mix_bf16_fp32()
+        bn_dpcpp_auto_bf16 =copy.deepcopy(bn).to(device=device)
+        res_auto_bf16 = bn_dpcpp_auto_bf16(x_dpcpp)
+
+        ipex.disable_mix_bf16_fp32()
+        bn_dpcpp_man_bf16 =copy.deepcopy(bn).to(device=device).to(torch.bfloat16)
+        res_man_bf16 = bn_dpcpp_man_bf16(x_dpcpp.to(torch.bfloat16))
+
+        self.assertEqual(res_man_bf16.float(), res_auto_bf16.float())
+        self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
+        self.assertEqual(res_auto_bf16.dtype, torch.bfloat16)
+
+    def test_batch_norm3d(self):
+        ipex.enable_auto_dnnl()
+        # ipex.enable_mix_bf16_fp32()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x_cpu = torch.randn(4, 3, 30, 30, 30, dtype=torch.float32) * 10
+        x_dpcpp = x_cpu.to(device=device)
+
+        bn = torch.nn.BatchNorm3d(3)
+        bn_dpcpp = copy.deepcopy(bn).to(device=device)
+        self.assertEqual(bn(x_cpu), bn_dpcpp(x_dpcpp))
+
 if __name__ == '__main__':
     test = unittest.main()

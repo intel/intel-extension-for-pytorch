@@ -300,10 +300,11 @@ class DenseOPCodeGen(object):
 
         tensor_param_vars = self.get_tensor_parameter(cpp_sig)
         if not self.is_bf16_func(aten_func_sig_str):
-            code += '  if (check_mix_bf16_fp32()) {\n'
-            for tensor_param_var in tensor_param_vars:
-                code += '    bridge::{}({}, at::kFloat);\n'.format(reorder_func_name, tensor_param_var)
-            code += '  }\n'
+            if len(tensor_param_vars) > 0:
+                code += '  if (check_mix_bf16_fp32()) {\n'
+                for tensor_param_var in tensor_param_vars:
+                    code += '    bridge::{}({}, at::kFloat);\n'.format(reorder_func_name, tensor_param_var)
+                code += '  }\n'
             return code
         else:
             code += '  if (check_mix_bf16_fp32()) {\n'
