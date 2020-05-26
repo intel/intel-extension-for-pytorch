@@ -6,6 +6,7 @@
 #include "ExtendOPs.h"
 #include "bf16/vec/bf16_vec_kernel.h"
 #include "dil/dil.hpp"
+#include "aten/aten.hpp"
 #include "xsmm/libxsmm_utils.h"
 #include "../utils.h"
 #include "DevOPs.h"
@@ -323,6 +324,7 @@ std::vector<at::Tensor> AtenIpexTypeExt::interaction_backward(const at::Tensor &
   }
 }
 
+#if 0
 template<typename T>
 static inline at::Tensor _embedding_bag_forward(const at::Tensor &weights, const at::Tensor &inputs, const at::Tensor &offsets) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weights.is_contiguous());
@@ -421,6 +423,30 @@ at::Tensor AtenIpexTypeExt::embedding_bag_backward(const at::Tensor &grad_out,
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.scalar_type() == at::kBFloat16);
     return _embedding_bag_backward<at::BFloat16>(grad_out, weights, inputs, offsets);
   }
+}
+#endif
+
+std::tuple<at::Tensor,at::Tensor,at::Tensor,at::Tensor>
+AtenIpexTypeExt::embedding_bag_forward(const at::Tensor& weight, const at::Tensor& indices,
+  const at::Tensor& offsets, bool scale_grad_by_freq, int64_t mode, bool sparse,
+  const c10::optional<at::Tensor>& per_sample_weights, bool include_last_offset) {
+  at::Tensor _per_sample_weights;
+  if(per_sample_weights.has_value()) {
+    _per_sample_weights =  per_sample_weights.value();
+  }
+  return cpu::aten::embedding_bag::embedding_bag_impl(weight, indices, offsets, scale_grad_by_freq, mode, sparse, _per_sample_weights, include_last_offset);
+}
+
+at::Tensor
+AtenIpexTypeExt::embedding_bag_backward(const at::Tensor& grad, const at::Tensor& indices,
+  const at::Tensor& offsets, const at::Tensor& offset2bag, const at::Tensor& bag_size, const at::Tensor& maximum_indices,
+  int64_t num_weights, bool scale_grad_by_freq, int64_t mode, bool sparse,
+  const c10::optional<at::Tensor>& per_sample_weights) {
+  at::Tensor _per_sample_weights;
+  if(per_sample_weights.has_value()) {
+    _per_sample_weights =  per_sample_weights.value();
+   }
+  return cpu::aten::embedding_bag::embedding_bag_backward_impl(grad, indices, offsets, offset2bag, bag_size, maximum_indices, num_weights, scale_grad_by_freq, mode, sparse, _per_sample_weights);
 }
 
 at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
