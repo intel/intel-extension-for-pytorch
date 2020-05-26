@@ -48,10 +48,10 @@ dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
   }
 }
 
-at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
+at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
   // Generate new CPU Tensor and store dil tensor at its storage
   cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
-  shade_data_context->dil_tensor = dil_tensor;
+  shade_data_context->dil_tensor = std::forward<dil::tensor>(dil_tensor);
   shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
   void *tensor_data = nullptr;
   if (dil_tensor.is_public_format()) {
@@ -84,7 +84,7 @@ at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& opti
      "'memory_format' argument is incompatible with mkldnn tensor");*/
   auto data_type = get_dil_data_type(at::typeMetaToScalarType(options.dtype()));
   dil::tensor it {sizes.vec(), data_type};
-  return gen_aten_tensor_by(it);
+  return gen_aten_tensor_by(std::move(it));
 }
 
 void sync_shape_from_dil_to_aten(const at::Tensor& ipex_tensor, const dil::tensor &dil_tensor) {
