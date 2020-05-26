@@ -54,8 +54,6 @@ dil::dims getDilTensorStrides(const at::Tensor &tensor) {
 /// ****************************
 
 void InitIpexModuleBindings(py::module m) {
-  m.def("_initialize_aten_bindings",
-        []() { AtenIpexType::InitializeAtenBindings(); });
   m.def("_get_git_revs", []() { return GetRevisions(); });
   m.def("enable_auto_dnnl", []() { AutoOptConfig::singleton().set_auto_dnnl(true); });
   m.def("disable_auto_dnnl", []() { AutoOptConfig::singleton().set_auto_dnnl(false); });
