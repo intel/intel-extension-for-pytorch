@@ -2,7 +2,10 @@ import torch
 from torch.autograd import Function
 import torch.nn.functional as F
 import _torch_ipex as core
-from torch.nn.modules.utils import _single
+from torch.nn.modules.utils import _single, _pair
+from typing import List
+
+Vector = List[int]
 
 torch_adaptive_avg_pool2d = torch._C._nn.adaptive_avg_pool2d
 torch_max_pool2d = torch.max_pool2d
@@ -49,14 +52,6 @@ def adaptive_avg_pool2d(input, output_size):
         pass
     return torch_adaptive_avg_pool2d(input, output_size)
 
-def max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode):
-    try:
-        if input.device.type == 'dpcpp' and core.get_auto_dnnl():
-            return MaxPoolingFunction.apply(input, kernel_size, stride, padding, dilation, ceil_mode)
-    except RuntimeError:
-        pass
-    return torch_max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode)
-
 def max_pool3d(input, kernel_size, stride, padding, dilation, ceil_mode):
     try:
         if input.device.type == 'dpcpp' and core.get_auto_dnnl():
@@ -64,6 +59,9 @@ def max_pool3d(input, kernel_size, stride, padding, dilation, ceil_mode):
     except RuntimeError:
         pass
     return torch_max_pool3d(input, kernel_size, stride, padding, dilation, ceil_mode)
+
+def max_pool2d(input, kernel_size: Vector, stride: Vector, padding: Vector, dilation: Vector, ceil_mode: bool):
+    return torch.ops.torch_ipex.max_pool2d(input, _pair(kernel_size), _pair(stride), _pair(padding), _pair(dilation), ceil_mode)
 
 torch._C._nn.adaptive_avg_pool2d = adaptive_avg_pool2d
 torch.max_pool2d = max_pool2d

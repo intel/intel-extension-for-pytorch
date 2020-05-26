@@ -474,7 +474,7 @@ at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d_backward(const at::Tensor& grad_
 }
 
 at::Tensor AtenIpexTypeExt::max_pooling(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
-    return cpu::AtenIpexCPUDev::dil_max_pooling(input, kernel_size, stride, padding, dilation, ceil_mode);
+    return NewMaxPoolingOp::apply(input, kernel_size, stride, padding, dilation, ceil_mode);
 }
 
 at::Tensor AtenIpexTypeExt::max_pooling_backward(const at::Tensor& grad_output, const at::Tensor& output, const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {

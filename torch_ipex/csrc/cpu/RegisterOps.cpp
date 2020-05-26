@@ -3,9 +3,9 @@
 
 static auto registry =
     torch::RegisterOperators()
-       .op("torch_ipex::linear",
-          [](const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias) {
-          return torch_ipex::AtenIpexTypeExt::linear(input, weight, bias);
+       .op("torch_ipex::linear", &torch_ipex::AtenIpexTypeExt::linear)
+       .op("torch_ipex::max_pool2d", [](const at::Tensor& self, c10::List<int64_t> kernel_size,
+          c10::List<int64_t> stride, c10::List<int64_t> padding, c10::List<int64_t> dilation, bool ceil_mode=false){
+          return torch_ipex::AtenIpexTypeExt::max_pooling(self, kernel_size.vec(), stride.vec(), padding.vec(), dilation.vec(), ceil_mode);
         });
-
 
