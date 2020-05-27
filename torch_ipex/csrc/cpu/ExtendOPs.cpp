@@ -10,7 +10,7 @@
 #include "xsmm/libxsmm_utils.h"
 #include "../utils.h"
 #include "DevOPs.h"
-#include "CustomerOps.h"
+#include "CustomOps.h"
 
 namespace torch_ipex {
 

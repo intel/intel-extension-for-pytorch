@@ -52,7 +52,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
     groups,
     dil::attr_t::fuse_relu());
 
-  return dbl::comm::gen_aten_tensor_by(dil_output);
+  return dbl::comm::gen_aten_tensor_by(std::move(dil_output));
 }
 
 static at::Tensor& dil_convolution_inplace_fusion(

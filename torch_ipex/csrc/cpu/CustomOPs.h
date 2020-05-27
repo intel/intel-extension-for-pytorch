@@ -9,8 +9,6 @@
 #include "torch_ipex/csrc/utils.h"
 #include "DevOPs.h"
 
-using namespace at;
-
 class NewLinearOp : public torch::autograd::Function<NewLinearOp> {
   public:
       static at::Tensor forward(
@@ -40,9 +38,9 @@ class NewLinearOp : public torch::autograd::Function<NewLinearOp> {
  
       if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
         grad_input = torch_ipex::cpu::AtenIpexCPUDev::dil_linear_backward_input(
-            input.sizes(), grad_output, weight);
+            input.sizes(), grad_output.contiguous(), weight);
         std::tie(grad_weight, grad_bias) = torch_ipex::cpu::AtenIpexCPUDev::dil_linear_backward_weights(
-            grad_output, input, weight, bias.defined());
+            grad_output.contiguous(), input, weight, bias.defined());
       } else {
         auto grad_input = grad_output.mm(weight);
         auto grad_weight = grad_output.t().mm(input);
@@ -69,6 +67,7 @@ class NewMaxPoolingOp : public torch::autograd::Function<NewMaxPoolingOp> {
         ctx->saved_data["padding"] = padding;
         ctx->saved_data["dilation"] = dilation;
         ctx->saved_data["ceil_mode"] = ceil_mode;
+
         if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
           at::Tensor output = torch_ipex::cpu::AtenIpexCPUDev::dil_max_pooling(input, kernel_size, stride,
               padding, dilation, ceil_mode);
@@ -89,12 +88,13 @@ class NewMaxPoolingOp : public torch::autograd::Function<NewMaxPoolingOp> {
       at::Tensor input = saved[0];
       at::Tensor indices = saved[1];
 
-      at::Tensor grad_output = grad_outputs[0];
+      at::Tensor grad_output = grad_outputs[0].contiguous();
       at::Tensor grad_input;
-      at::IntArrayRef kernel_size = at::IntArrayRef(ctx->saved_data["kernel_size"].toIntVector());
-      at::IntArrayRef stride = at::IntArrayRef(ctx->saved_data["stride"].toIntVector());
-      at::IntArrayRef padding = at::IntArrayRef(ctx->saved_data["padding"].toIntVector());
-      at::IntArrayRef dilation = at::IntArrayRef(ctx->saved_data["dilation"].toIntVector());
+
+      std::vector<int64_t> kernel_size = ctx->saved_data["kernel_size"].toIntVector();
+      std::vector<int64_t> stride = ctx->saved_data["stride"].toIntVector();
+      std::vector<int64_t> padding = ctx->saved_data["padding"].toIntVector();
+      std::vector<int64_t> dilation = ctx->saved_data["dilation"].toIntVector();
       bool ceil_mode = ctx->saved_data["ceil_mode"].toBool();
 
       if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
@@ -104,6 +104,6 @@ class NewMaxPoolingOp : public torch::autograd::Function<NewMaxPoolingOp> {
         grad_input = at::max_pool2d_with_indices_backward(grad_output, input, kernel_size,
             stride, padding, dilation, ceil_mode, indices);
       }
-      return {grad_input};
+      return {grad_input, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor()};
     }
 };
