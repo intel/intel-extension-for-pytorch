@@ -7,23 +7,7 @@ from typing import List
 
 Vector = List[int]
 
-torch_adaptive_avg_pool2d = torch._C._nn.adaptive_avg_pool2d
-torch_max_pool2d = torch.max_pool2d
 torch_max_pool3d = torch.max_pool3d
-
-class AdaptiveAvgPool2dFunction(Function):
-    @staticmethod
-    def forward(ctx, input, output_size):
-        output = core.adaptive_avg_pool2d(input, _single(output_size))
-        ctx.save_for_backward(input)
-        return output
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (input,) = ctx.saved_tensors
-        grad_output = grad_output.contiguous()
-        grad_input = core.adaptive_avg_pool2d_backward(grad_output, input)
-        return (grad_input, None)
 
 class MaxPoolingFunction(Function):
     @staticmethod
@@ -44,13 +28,8 @@ class MaxPoolingFunction(Function):
         grad_input = core.max_pooling_backward(grad_output, output, input, ctx.kernel_size, ctx.stride, ctx.padding, ctx.dilation, ctx.ceil_mode)
         return (grad_input, None, None, None, None, None)
 
-def adaptive_avg_pool2d(input, output_size):
-    try:
-        if input.device.type == 'dpcpp' and core.get_auto_dnnl():
-            return AdaptiveAvgPool2dFunction.apply(input, output_size)
-    except RuntimeError:
-        pass
-    return torch_adaptive_avg_pool2d(input, output_size)
+def adaptive_avg_pool2d(input, output_size: Vector):
+    return torch.ops.torch_ipex.adaptive_avg_pool2d(input, _pair(output_size))
 
 def max_pool3d(input, kernel_size, stride, padding, dilation, ceil_mode):
     try:

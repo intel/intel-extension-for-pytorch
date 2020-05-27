@@ -107,3 +107,38 @@ class NewMaxPoolingOp : public torch::autograd::Function<NewMaxPoolingOp> {
       return {grad_input, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor()};
     }
 };
+
+class NewApaptiveAvgPoolingOp : public torch::autograd::Function<NewApaptiveAvgPoolingOp> {
+  public:
+      static at::Tensor forward(
+        torch::autograd::AutogradContext* ctx,
+        at::Tensor input,
+        at::IntArrayRef output_size) {
+        ctx->save_for_backward({input});
+
+        at::Tensor output;
+        if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
+          output = torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(input, output_size);
+        } else {
+          output = at::_adaptive_avg_pool2d(input, output_size);
+        }
+        return output;
+      }
+
+    static torch::autograd::tensor_list backward(
+        torch::autograd::AutogradContext* ctx,
+        torch::autograd::tensor_list grad_outputs) {
+      auto saved = ctx->get_saved_variables();
+      at::Tensor input = saved[0];
+
+      at::Tensor grad_output = grad_outputs[0].contiguous();
+      at::Tensor grad_input;
+
+      if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
+        grad_input = torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(grad_output, input);
+      } else {
+        grad_input = at::_adaptive_avg_pool2d_backward(grad_output, input);
+      }
+      return {grad_input, at::Tensor()};
+    }
+};

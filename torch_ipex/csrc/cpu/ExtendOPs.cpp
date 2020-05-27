@@ -10,7 +10,7 @@
 #include "xsmm/libxsmm_utils.h"
 #include "../utils.h"
 #include "DevOPs.h"
-#include "CustomOps.h"
+#include "CustomOPs.h"
 
 namespace torch_ipex {
 
@@ -466,7 +466,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::linear_backward(
 }
 
 at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d(at::Tensor const& input, at::IntArrayRef output_size) {
-    return cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(input, output_size);
+    return NewApaptiveAvgPoolingOp::apply(input, output_size);
 }
 
 at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d_backward(const at::Tensor& grad_output, const at::Tensor& input) {
