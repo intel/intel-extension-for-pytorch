@@ -64,7 +64,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     dilation,
     groups);
 
-  return dbl::comm::gen_aten_tensor_by(dil_output);
+  return dbl::comm::gen_aten_tensor_by(std::move(dil_output));
 }
 
 at::Tensor dil_convolution_backward_input(
@@ -87,7 +87,7 @@ at::Tensor dil_convolution_backward_input(
       padding.vec(),
       padding.vec(),
       groups);
-  return dbl::comm::gen_aten_tensor_by(dil_grad_input);
+  return dbl::comm::gen_aten_tensor_by(std::move(dil_grad_input));
 }
 
 std::tuple<at::Tensor, at::Tensor> dil_convolution_backward_weights(
@@ -117,8 +117,8 @@ std::tuple<at::Tensor, at::Tensor> dil_convolution_backward_weights(
         groups,
         diff_weight_type);
     return std::make_tuple(
-        dbl::comm::gen_aten_tensor_by(dil_grad_weight),
-        dbl::comm::gen_aten_tensor_by(dil_grad_bias));
+        dbl::comm::gen_aten_tensor_by(std::move(dil_grad_weight)),
+        dbl::comm::gen_aten_tensor_by(std::move(dil_grad_bias)));
   } else {
     dil::convolution_backward_weights::compute(
         dil_input,
@@ -132,7 +132,7 @@ std::tuple<at::Tensor, at::Tensor> dil_convolution_backward_weights(
         groups,
         diff_weight_type);
     return std::make_tuple(
-        dbl::comm::gen_aten_tensor_by(dil_grad_weight),
+        dbl::comm::gen_aten_tensor_by(std::move(dil_grad_weight)),
         at::Tensor());
   } 
 }
@@ -255,7 +255,7 @@ at::Tensor AtenIpexCPUDev::dil_add(const at::Tensor& self, const at::Tensor& oth
   const std::vector<float> scales{1.0, alpha.to<float>()};
   dil::sum::compute(scales, {x, y}, z);
 
-  return dbl::comm::gen_aten_tensor_by(z);
+  return dbl::comm::gen_aten_tensor_by(std::move(z));
 }
 
 at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other, at::Scalar alpha) {
@@ -552,9 +552,9 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   output_size.push_back(weight.size(0));
 
   if (self.dim() > 2) {
-    return dbl::comm::gen_aten_tensor_by(y).reshape(output_size);
+    return dbl::comm::gen_aten_tensor_by(std::move(y)).reshape(output_size);
   }
-  return dbl::comm::gen_aten_tensor_by(y);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
 at::Tensor dil_linear_backward_input(
@@ -574,9 +574,9 @@ at::Tensor dil_linear_backward_input(
     grady, w, {input_reshaped_size.begin(), input_reshaped_size.end()}, gradx);
 
   if (input_size.size() > 2) {
-    return dbl::comm::gen_aten_tensor_by(gradx).reshape(input_size);
+    return dbl::comm::gen_aten_tensor_by(std::move(gradx)).reshape(input_size);
   }
-  return dbl::comm::gen_aten_tensor_by(gradx);
+  return dbl::comm::gen_aten_tensor_by(std::move(gradx));
 }
 
 std::tuple<at::Tensor, at::Tensor> dil_linear_backward_weights(
@@ -593,12 +593,12 @@ std::tuple<at::Tensor, at::Tensor> dil_linear_backward_weights(
   if (bias_defined) {
     dil::inner_product_backward_weights::compute(x, grady, gradw, gradb, diff_weight_type);
     return std::tuple<at::Tensor, at::Tensor>{
-    dbl::comm::gen_aten_tensor_by(gradw),
-    dbl::comm::gen_aten_tensor_by(gradb)};
+    dbl::comm::gen_aten_tensor_by(std::move(gradw)),
+    dbl::comm::gen_aten_tensor_by(std::move(gradb))};
   } else {
     dil::inner_product_backward_weights::compute(x, grady, gradw, diff_weight_type);
     return std::tuple<at::Tensor, at::Tensor>{
-    dbl::comm::gen_aten_tensor_by(gradw),
+    dbl::comm::gen_aten_tensor_by(std::move(gradw)),
     at::Tensor()};
   }
 }
@@ -632,8 +632,8 @@ std::tuple<at::Tensor, at::Tensor> _dil_dropout(
   dil::tensor y;
   dil::dropout_forward::compute(x, ratio, y, mask);
   return std::tuple<at::Tensor, at::Tensor>{
-      dbl::comm::gen_aten_tensor_by(y),
-      dbl::comm::gen_aten_tensor_by(mask)};
+      dbl::comm::gen_aten_tensor_by(std::move(y)),
+      dbl::comm::gen_aten_tensor_by(std::move(mask))};
 }
 
 at::Tensor AtenIpexCPUDev::dil_dropout(const at::Tensor& self, double ratio, bool train) {
@@ -657,7 +657,7 @@ at::Tensor AtenIpexCPUDev::dil_dropout_backward(
 
   dil::tensor dX;
   dil::dropout_backward::compute(mask_dil, dY, dX);
-  return dbl::comm::gen_aten_tensor_by(dX);
+  return dbl::comm::gen_aten_tensor_by(std::move(dX));
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_norm(
@@ -696,9 +696,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
       dil::sum::compute(scales_var, {v, saved_var}, v);
     }
     return std::make_tuple(
-        dbl::comm::gen_aten_tensor_by(y),
-        dbl::comm::gen_aten_tensor_by(saved_mean),
-        dbl::comm::gen_aten_tensor_by(saved_var));
+        dbl::comm::gen_aten_tensor_by(std::move(y)),
+        dbl::comm::gen_aten_tensor_by(std::move(saved_mean)),
+        dbl::comm::gen_aten_tensor_by(std::move(saved_var)));
   } else {
     if (use_running_stat) {
       dil::tensor m = dbl::comm::try_gen_dil_tensor(running_mean);
@@ -710,7 +710,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
           x, w, b, y, eps);
     }
     return std::make_tuple(
-        dbl::comm::gen_aten_tensor_by(y),
+        dbl::comm::gen_aten_tensor_by(std::move(y)),
         at::Tensor(),
         at::Tensor());
   }
@@ -742,9 +742,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
       x, m, v, grady, w, gradx, gradw, gradb, eps);
 
   return std::make_tuple(
-      dbl::comm::gen_aten_tensor_by(gradx),
-      dbl::comm::gen_aten_tensor_by(gradw),
-      dbl::comm::gen_aten_tensor_by(gradb));
+      dbl::comm::gen_aten_tensor_by(std::move(gradx)),
+      dbl::comm::gen_aten_tensor_by(std::move(gradw)),
+      dbl::comm::gen_aten_tensor_by(std::move(gradb)));
 }
 
 at::Tensor AtenIpexCPUDev::dil_max_pooling(
@@ -969,7 +969,7 @@ at::Tensor AtenIpexCPUDev::dil_relu(const at::Tensor& input) {
   dil::tensor y;
   dil::eltwise_forward::compute(
       x, y, dil::algorithm::eltwise_relu, dil::prop_kind::forward_training, /*alpha*/ 0.0);
-  return dbl::comm::gen_aten_tensor_by(y);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
 at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
@@ -998,7 +998,7 @@ at::Tensor AtenIpexCPUDev::dil_threshold_backward(const at::Tensor& grad_output,
   dil::tensor gradx;
   dil::eltwise_backward::compute(x, grady, gradx,
       dil::algorithm::eltwise_relu, /*alpha*/ 0.0);
-  return dbl::comm::gen_aten_tensor_by(gradx);
+  return dbl::comm::gen_aten_tensor_by(std::move(gradx));
 }
 
 at::Tensor AtenIpexCPUDev::dil__softmax(
@@ -1014,7 +1014,7 @@ at::Tensor AtenIpexCPUDev::dil__softmax(
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::tensor y;
   dil::softmax_forward::compute(x, y, wrapped_dim);
-  return dbl::comm::gen_aten_tensor_by(y);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
 at::Tensor AtenIpexCPUDev::dil__softmax_backward_data(
@@ -1032,7 +1032,7 @@ at::Tensor AtenIpexCPUDev::dil__softmax_backward_data(
   dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_contiguous);
   dil::tensor gradx;
   dil::softmax_backward::compute(y, grady, gradx, wrapped_dim);
-  return dbl::comm::gen_aten_tensor_by(gradx);
+  return dbl::comm::gen_aten_tensor_by(std::move(gradx));
 }
 
 at::Tensor AtenIpexCPUDev::dil_sigmoid(const at::Tensor& self) {
@@ -1042,7 +1042,7 @@ at::Tensor AtenIpexCPUDev::dil_sigmoid(const at::Tensor& self) {
   dil::tensor y;
   dil::eltwise_forward::compute(
       x, y, dil::algorithm::eltwise_logistic_use_dst_for_bwd, dil::prop_kind::forward);
-  return dbl::comm::gen_aten_tensor_by(y);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
 at::Tensor& AtenIpexCPUDev::dil_sigmoid_(at::Tensor& self) {
@@ -1069,7 +1069,7 @@ at::Tensor AtenIpexCPUDev::dil_sigmoid_backward(
   dil::tensor gx;
   dil::eltwise_backward::compute(y, gy, gx,
       dil::algorithm::eltwise_logistic_use_dst_for_bwd);
-  return dbl::comm::gen_aten_tensor_by(gx);
+  return dbl::comm::gen_aten_tensor_by(std::move(gx));
 }
 
 at::Tensor AtenIpexCPUDev::dil_reshape(const at::Tensor& self, at::IntArrayRef size) {
@@ -1082,7 +1082,7 @@ at::Tensor AtenIpexCPUDev::dil_reshape(const at::Tensor& self, at::IntArrayRef s
   const dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::tensor y{x};
   y.reshape(inferred_size);
-  return dbl::comm::gen_aten_tensor_by(y);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
 at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::MemoryFormat> optional_memory_format) {
@@ -1095,7 +1095,7 @@ at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::
   dil::tensor src = dbl::comm::try_gen_dil_tensor(self);
   dil::tensor dst;
   dil::direct_copy::compute(src, dst);
-  return dbl::comm::gen_aten_tensor_by(dst);
+  return dbl::comm::gen_aten_tensor_by(std::move(dst));
 }
 
 at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, int64_t dim1) {
@@ -1110,7 +1110,7 @@ at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, 
   dim1 = at::maybe_wrap_dim(dim1, self.dim());
   std::swap(axes[dim0], axes[dim1]);
   y.transpose_from(x, axes);
-  return dbl::comm::gen_aten_tensor_by(y);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
 inline void check_cat_no_zero_dim(at::TensorList tensors) {
@@ -1154,7 +1154,7 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
   }
   dil::tensor y;
   dil::concat::compute(x, dim, y);
-  return dbl::comm::gen_aten_tensor_by(y);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
 std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& self, at::IntArrayRef split_sizes, int64_t dim) {
@@ -1175,7 +1175,7 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& s
   dim = at::maybe_wrap_dim(dim, self.dim());
   auto y = dil::spliter::compute(x, sizes, dim, false);
   for (auto j = 0; j < num_splits; j++) {
-    splits[j] = dbl::comm::gen_aten_tensor_by(y[j]);
+    splits[j] = dbl::comm::gen_aten_tensor_by(std::move(y[j]));
   }
   return splits;
 }

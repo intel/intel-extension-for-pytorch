@@ -54,8 +54,6 @@ dil::dims getDilTensorStrides(const at::Tensor &tensor) {
 /// ****************************
 
 void InitIpexModuleBindings(py::module m) {
-  m.def("_initialize_aten_bindings",
-        []() { AtenIpexType::InitializeAtenBindings(); });
   m.def("_get_git_revs", []() { return GetRevisions(); });
   m.def("enable_auto_dnnl", []() { AutoOptConfig::singleton().set_auto_dnnl(true); });
   m.def("disable_auto_dnnl", []() { AutoOptConfig::singleton().set_auto_dnnl(false); });
@@ -80,14 +78,15 @@ void InitIpexModuleBindings(py::module m) {
           return AtenIpexTypeExt::interaction_backward(grad_out, input);
         });
   m.def("embedding_bag_forward",
-        [](const at::Tensor &weights, const at::Tensor &inputs, const at::Tensor &offsets) {
-          return AtenIpexTypeExt::embedding_bag_forward(weights, inputs, offsets);
+        [](const at::Tensor& weight, const at::Tensor& indices, const at::Tensor& offsets, bool scale_grad_by_freq, int64_t mode, bool sparse, const c10::optional<at::Tensor>& per_sample_weights, bool include_last_offset) {
+          return AtenIpexTypeExt::embedding_bag_forward(weight, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights, include_last_offset);
         });
+
   m.def("embedding_bag_backward",
-        [](const at::Tensor &grad_out, const at::Tensor &weights,
-           const at::Tensor &inputs, const at::Tensor &offsets) {
-          return AtenIpexTypeExt::embedding_bag_backward(grad_out, weights, inputs, offsets);
+        [](const at::Tensor& grad, const at::Tensor& indices, const at::Tensor& offsets, const at::Tensor offset2bag, const at::Tensor& bag_size, const at::Tensor& maximum_indices, int64_t num_weights, bool scale_grad_by_freq, int64_t mode, bool sparse, const c10::optional<at::Tensor>& per_sample_weights) {
+          return AtenIpexTypeExt::embedding_bag_backward(grad, indices, offsets, offset2bag, bag_size, maximum_indices, num_weights, scale_grad_by_freq, mode, sparse, per_sample_weights);
         });
+
   m.def("linear",
         [](const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
           return AtenIpexTypeExt::linear(input, weight, bias);
