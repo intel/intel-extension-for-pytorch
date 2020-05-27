@@ -14,6 +14,7 @@
 #include "dbl/Common.h"
 #include "dbl/Conv.h"
 #include "dbl/Pool.h"
+#include "bf16/BF16Checker.h"
 #include "ShadeDataContext.h"
 
 #include "dil/dil.hpp"
@@ -158,6 +159,18 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
 
 at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
   DEBUG("AtenIpexCPUDev::convolution_overrideable\n");
+  if (check_mix_bf16_fp32()) {
+    std::vector<at::Tensor> dnnl_input_tensors;
+    dnnl_input_tensors.push_back(input);
+    dnnl_input_tensors.push_back(weight);
+    dnnl_input_tensors.push_back(bias);
+    if (bf16::chk::bf16_support_the_tensors(dnnl_input_tensors, at::kBFloat16)) {
+      bridge::reorderTensorToScalaraType(input, at::kBFloat16);
+      bridge::reorderTensorToScalaraType(weight, at::kBFloat16);
+      bridge::reorderTensorToScalaraType(bias, at::kBFloat16);
+    }
+  }
+
   // NOTE: DO NOT always call contiguous. It may break lazy-reorder. Because contiguous will call reorder instantly.
   if (check_auto_dnnl()) {
     return dil_convolution(

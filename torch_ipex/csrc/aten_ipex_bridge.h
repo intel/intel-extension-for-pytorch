@@ -23,23 +23,6 @@ void attachShadeDataContext(const at::Tensor& tensor);
 void reorderDilTensorToPublic(const at::Tensor& ipexTensor);
 
 /**
- * Reorder the input tensor to the specified scalar type. It is an optimized version for
- * DNNL OP. It means that if DNNL supports current OP, you should call this API. Otherwise, you
- * should call @sa @ref reorderTensorToScalaraType
- * 
- * @param[in] ipexTensor    The input ipex tensor to be reordered to the spcified scalar type
- * @param[in] dstScalarType The scalar type which the input ipex tensor will be reordered to. It should
- *                          be at::kBFloat16 or at::kFloat
- * 
- * @note
- * If the input aten tensor is a DNNL tensor and DNNL supports current OP. Then we only
- * need to set the data type of DNNL tensor descriptor to the spcified scalar type. It can
- * avoid memory copy to improve performance. And we also need to reset the type meta of
- * IPEXTensorImpl and StorageImpl to the corresponding type meta of the specified scalar type.
- */
-void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarType dstScalarType);
-
-/**
  * Reorder the input tensor to the specified scalar type.
  * 
  * @param[in] ipexTensor    The input ipex tensor to be reordered to the spcified scalar type

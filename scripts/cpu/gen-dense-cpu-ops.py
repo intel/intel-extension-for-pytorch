@@ -291,9 +291,6 @@ class DenseOPCodeGen(object):
         code = ''
 
         reorder_func_name = 'reorderTensorToScalaraType'
-        if self.is_dnnl_func(aten_func_sig_str):
-            reorder_func_name = 'reorderTensorToScalarTypeForDNNL'
-
         tensor_param_vars = self.get_tensor_parameter(cpp_sig)
         if not self.is_bf16_func(aten_func_sig_str):
             return code

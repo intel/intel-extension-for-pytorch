@@ -406,29 +406,6 @@ std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& ten
 }
 
 
-void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarType dstScalarType) {
-  TORCH_CHECK(dstScalarType == at::kBFloat16 || dstScalarType == at::kFloat);
-  auto tensor_dtype = ipexTensor.scalar_type();
-  if ((tensor_dtype != at::kBFloat16 && tensor_dtype != at::kFloat) || tensor_dtype == dstScalarType)
-    return;
-
-  if (check_tensor_own_shade_context(ipexTensor)) {
-    // Shade data context has been attached
-    if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
-      cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(ipexTensor.storage().data_ptr().get_context());
-      shade_context->dil_tensor->to_type(get_dil_data_type(dstScalarType));
-      IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
-      ipex_tensor_impl->reset_data_type(dstScalarType);
-      ipex_tensor_impl->storage().unsafeGetStorageImpl()->set_dtype(at::scalarTypeToTypeMeta(dstScalarType));
-      ipex_tensor_impl->storage().unsafeGetStorageImpl()->set_numel(shade_context->dil_tensor->get_nelems());
-      return;
-    }
-  }
-
-  return reorderTensorToScalaraType(ipexTensor, dstScalarType);
-}
-
-
 void reorderTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dstScalarType) {
   if (!(ipexTensor.defined()))
     return;
@@ -450,11 +427,46 @@ void reorderTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dst
 
   if (check_tensor_own_shade_context(ipexTensor)) {
     // Shade data context has been attached
-    if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
-      reorderDilTensorToPublic(ipexTensor);
+    cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(ipexTensor.storage().data_ptr().get_context());
+    auto data_type = shade_context->data_type;
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY((data_type == cpu::SHADE_DATA_TYPE::CPU_RAW) || (data_type == cpu::SHADE_DATA_TYPE::DIL));
+    if (data_type == cpu::SHADE_DATA_TYPE::DIL) {
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_context->dil_tensor.has_value());
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(check_tensor_own_whole_storage(ipexTensor));
+      cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(ipexTensor.storage().data_ptr().get_context());
+
+      // Reorder DIL tensor to the dstType
+      auto new_type_desc = shade_context->dil_tensor->get_desc().to_type(get_dil_data_type(dstScalarType));
+      dil::tensor new_type_dil_tensor{new_type_desc};
+      new_type_dil_tensor.feed_from(shade_context->dil_tensor.value());
+
+      // Build new shade data context
+      cpu::ShadeDataContext *new_shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
+      new_shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
+      new_shade_data_context->dil_tensor = new_type_dil_tensor;
+      if (new_type_dil_tensor.is_public_format()) {
+        new_shade_data_context->cpu_raw_data = new_type_dil_tensor.get_data_handle();
+        new_shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
+      }
+
+      // Create a new DataPtr instances because the DataPtr class does not support set
+      // its data or context directly
+      c10::DataPtr shade_data_ptr(
+        new_shade_data_context->cpu_raw_data,
+        new_shade_data_context,
+        &(cpu::ShadeDataContext::freeShadeDataContext),
+        ipexTensor.device().type());
+
+      IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
+      ipex_tensor_impl->storage().set_data_ptr(std::move(shade_data_ptr));
+      ipex_tensor_impl->reset_data_type(dstScalarType);
+      ipex_tensor_impl->storage().unsafeGetStorageImpl()->set_dtype(at::scalarTypeToTypeMeta(dstScalarType));
+      ipex_tensor_impl->storage().unsafeGetStorageImpl()->set_numel(new_type_dil_tensor.get_nelems());
+      return;
     }
   }
 
+  // CPU tensor here
   auto* allocator = c10::GetAllocator(c10::DeviceType::DPCPP);
   int64_t nelements = ipexTensor.numel();
   auto dtype = c10::scalarTypeToTypeMeta(dstScalarType);
