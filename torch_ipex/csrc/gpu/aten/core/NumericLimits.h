@@ -114,6 +114,22 @@ struct numeric_limits<at::Half> {
 };
 
 template <>
+struct numeric_limits<at::BFloat16> {
+  static inline at::BFloat16 lowest() {
+    return c10::BFloat16(0xFF7F, at::BFloat16::from_bits());
+  }
+  static inline at::BFloat16 max() {
+    return c10::BFloat16(0x7F7F, at::BFloat16::from_bits());
+  }
+  static inline at::BFloat16 lower_bound() {
+    return at::BFloat16(0xFF80, at::BFloat16::from_bits());
+  }
+  static inline at::BFloat16 upper_bound() {
+    return at::BFloat16(0x7F80, at::BFloat16::from_bits());
+  }
+};
+
+template <>
 struct numeric_limits<float> {
   static inline float lowest() {
     return -FLT_MAX;

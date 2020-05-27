@@ -22,15 +22,20 @@ std::tuple<Tensor&, Tensor&> log_sigmoid_forward_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "log_sigmoid_forward", [&]() {
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPPOpLogSigmoid)>(
-        iter, [=](scalar_t x) -> scalar_t {
-          const scalar_t max = Numerics<scalar_t>::max(0, -x);
-          const scalar_t z =
-              Numerics<scalar_t>::exp(-max) + Numerics<scalar_t>::exp(-x - max);
-          return -(max + Numerics<scalar_t>::log(z));
-        });
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.dtype(),
+      "log_sigmoid_forward",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPPOpLogSigmoid)>(
+            iter, [=](scalar_t x) -> scalar_t {
+              const scalar_t max = Numerics<scalar_t>::max(0, -x);
+              const scalar_t z = Numerics<scalar_t>::exp(-max) +
+                  Numerics<scalar_t>::exp(-x - max);
+              return -(max + Numerics<scalar_t>::log(z));
+            });
+      });
 
   return std::tuple<Tensor&, Tensor&>{output, buffer};
 }
@@ -62,21 +67,22 @@ Tensor& log_sigmoid_backward_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "log_sigmoid_backward", [&]() {
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPPOpLogSigmoidBackward)>(
-        iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {
-          const scalar_t max = Numerics<scalar_t>::max(0, -x);
-          const scalar_t z =
-              Numerics<scalar_t>::exp(-max) + Numerics<scalar_t>::exp(-x - max);
-          scalar_t max_deriv = 0.f;
-          scalar_t sign = -1.f;
-          if (x < 0.f) {
-            max_deriv = -1.f;
-            sign = 1.f;
-          }
-          return grad_output * (-max_deriv - sign * ((z - 1.f) / z));
-        });
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.dtype(), "log_sigmoid_backward", [&]() {
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPPOpLogSigmoidBackward)>(
+            iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {
+              const scalar_t max = Numerics<scalar_t>::max(0, -x);
+              const scalar_t z = Numerics<scalar_t>::exp(-max) +
+                  Numerics<scalar_t>::exp(-x - max);
+              scalar_t max_deriv = 0.f;
+              scalar_t sign = -1.f;
+              if (x < 0.f) {
+                max_deriv = -1.f;
+                sign = 1.f;
+              }
+              return grad_output * (-max_deriv - sign * ((z - 1.f) / z));
+            });
+      });
 
   return grad_input;
 }

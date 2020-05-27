@@ -27,10 +27,12 @@ void sigmoid(Tensor& output, const Tensor& self) {
 }
 
 Tensor& _sigmoid_out(Tensor& output, const Tensor& self) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "_sigmoid_out", [&]() {
-        impl::sigmoid<scalar_t>(output, self);
-      });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "_sigmoid_out",
+      [&]() { impl::sigmoid<scalar_t>(output, self); });
   return output;
 }
 
@@ -53,8 +55,11 @@ Tensor& sigmoid_backward_out(
     const Tensor& output) {
   TORCH_CHECK(output.numel() == grad_output.numel(), "different elements ...");
   grad_input.resize_as_(output);
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      output.scalar_type(), "sigmoid_backward_out", [&]() {
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      output.scalar_type(),
+      "sigmoid_backward_out",
+      [&]() {
         at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
             grad_input, output, grad_output, TensorSigmoidGradOp<scalar_t>());
       });

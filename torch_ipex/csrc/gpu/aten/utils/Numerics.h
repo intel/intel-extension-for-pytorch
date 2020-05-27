@@ -465,7 +465,9 @@ struct Numerics<at::Half> {
   static inline at::Half cinv(at::Half a) {
     return 1.0f / a;
   }
-
+  static inline float min(at::Half a, at::Half b) {
+    return DPCPP::fmin(float(a), float(b));
+  }
   static inline at::Half add(at::Half a, at::Half b) {
     return a + b;
   }
@@ -489,8 +491,157 @@ struct Numerics<at::Half> {
   static inline at::Half abs(at::Half a) {
     return DPCPP::fabs(float(a));
   }
-
+  static inline at::Half fabs(at::Half a) {
+    return DPCPP::fabs(float(a));
+  }
   static inline bool isnan(at::Half a) {
+    return DPCPP::isnan((float)a);
+  }
+};
+
+template <>
+struct Numerics<at::BFloat16> {
+  static inline at::BFloat16 lower_bound() {
+    return at::numeric_limits<at::BFloat16>::lower_bound();
+  }
+  static inline at::BFloat16 upper_bound() {
+    return at::numeric_limits<at::BFloat16>::upper_bound();
+  }
+
+  static inline bool lt(at::BFloat16 a, at::BFloat16 b) {
+    return a < b;
+  }
+  static inline bool le(at::BFloat16 a, at::BFloat16 b) {
+    return a <= b;
+  }
+  static inline bool gt(at::BFloat16 a, at::BFloat16 b) {
+    return a > b;
+  }
+  static inline bool ge(at::BFloat16 a, at::BFloat16 b) {
+    return a >= b;
+  }
+  static inline bool eq(at::BFloat16 a, at::BFloat16 b) {
+    return a == b;
+  }
+  static inline bool ne(at::BFloat16 a, at::BFloat16 b) {
+    return a != b;
+  }
+
+  static inline at::BFloat16 exp(at::BFloat16 a) {
+    return DPCPP::exp(float(a));
+  }
+  static inline at::BFloat16 exp10(at::BFloat16 a) {
+    return DPCPP::exp10(float(a));
+  }
+  static inline at::BFloat16 log(at::BFloat16 a) {
+    return DPCPP::log(float(a));
+  }
+  static inline at::BFloat16 log10(at::BFloat16 a) {
+    return DPCPP::log10(float(a));
+  }
+  static inline at::BFloat16 log1p(at::BFloat16 a) {
+    return DPCPP::log1p(float(a));
+  }
+  static inline at::BFloat16 log2(at::BFloat16 a) {
+    return DPCPP::log2(float(a));
+  }
+  static inline at::BFloat16 expm1(at::BFloat16 a) {
+    return DPCPP::expm1(float(a));
+  }
+
+  static inline at::BFloat16 neg(at::BFloat16 a) {
+    return -a;
+  }
+  static inline at::BFloat16 sin(at::BFloat16 a) {
+    return DPCPP::sin(float(a));
+  }
+  static inline at::BFloat16 cos(at::BFloat16 a) {
+    return DPCPP::cos(float(a));
+  }
+  static inline at::BFloat16 sqrt(at::BFloat16 a) {
+    return DPCPP::sqrt(float(a));
+  }
+  static inline at::BFloat16 rsqrt(at::BFloat16 a) {
+    return DPCPP::rsqrt(float(a));
+  }
+  static inline at::BFloat16 ceil(at::BFloat16 a) {
+    return DPCPP::ceil(float(a));
+  }
+  static inline at::BFloat16 floor(at::BFloat16 a) {
+    return DPCPP::floor(float(a));
+  }
+  static inline at::BFloat16 trunc(at::BFloat16 a) {
+    return DPCPP::trunc(float(a));
+  }
+  static inline at::BFloat16 acos(at::BFloat16 a) {
+    return DPCPP::acos(float(a));
+  }
+  static inline at::BFloat16 cosh(at::BFloat16 a) {
+    return DPCPP::cosh(float(a));
+  }
+  static inline at::BFloat16 asin(at::BFloat16 a) {
+    return DPCPP::asin(float(a));
+  }
+  static inline at::BFloat16 sinh(at::BFloat16 a) {
+    return DPCPP::sinh(float(a));
+  }
+  static inline at::BFloat16 tan(at::BFloat16 a) {
+    return DPCPP::tan(float(a));
+  }
+  static inline at::BFloat16 atan(at::BFloat16 a) {
+    return DPCPP::atan(float(a));
+  }
+  static inline at::BFloat16 tanh(float a) {
+    return DPCPP::tanh(float(a));
+  }
+  static inline at::BFloat16 erf(float a) {
+    return DPCPP::erf(float(a));
+  }
+  static inline at::BFloat16 erfc(float a) {
+    return DPCPP::erfc(float(a));
+  }
+  static inline at::BFloat16 round(float a) {
+    return DPCPP::round(float(a));
+  }
+  static inline float min(at::BFloat16 a, at::BFloat16 b) {
+    return DPCPP::fmin(float(a), float(b));
+  }
+  static inline float max(at::BFloat16 a, at::BFloat16 b) {
+    return DPCPP::fmax(float(a), float(b));
+  }
+  static inline at::BFloat16 frac(at::BFloat16 a) {
+    return a - DPCPP::trunc(float(a));
+  }
+  static inline at::BFloat16 atan2(at::BFloat16 a, at::BFloat16 b) {
+    return DPCPP::atan2(float(a), float(b));
+  }
+  static inline at::BFloat16 cinv(at::BFloat16 a) {
+    return 1.0f / a;
+  }
+
+  static inline at::BFloat16 add(at::BFloat16 a, at::BFloat16 b) {
+    return a + b;
+  }
+  static inline at::BFloat16 div(at::BFloat16 a, at::BFloat16 b) {
+    return a / b;
+  }
+  static inline at::BFloat16 mul(at::BFloat16 a, at::BFloat16 b) {
+    return a * b;
+  }
+  static inline at::BFloat16 sub(at::BFloat16 a, at::BFloat16 b) {
+    return a - b;
+  }
+
+  static inline at::BFloat16 pow(at::BFloat16 a, at::BFloat16 b) {
+    return DPCPP::pow(float(a), float(b));
+  }
+  static inline at::BFloat16 abs(at::BFloat16 a) {
+    return DPCPP::fabs(float(a));
+  }
+  static inline at::BFloat16 fabs(at::BFloat16 a) {
+    return DPCPP::fabs(float(a));
+  }
+  static inline bool isnan(at::BFloat16 a) {
     return DPCPP::isnan((float)a);
   }
 };
@@ -625,10 +776,16 @@ struct Numerics<float> {
   static inline float atan2(float a, float b) {
     return DPCPP::atan2(a, b);
   }
+  static inline float min(float a, float b) {
+    return DPCPP::fmin(a, b);
+  }
   static inline float max(float a, float b) {
-    return cl::sycl::fmax(a, b);
+    return DPCPP::fmax(a, b);
   }
   static inline float abs(float a) {
+    return DPCPP::fabs(a);
+  }
+  static inline float fabs(float a) {
     return DPCPP::fabs(a);
   }
   static inline bool isnan(float a) {
@@ -765,10 +922,16 @@ struct Numerics<double> {
   static inline double atan2(double a, double b) {
     return DPCPP::atan2(a, b);
   }
+  static inline double min(double a, double b) {
+    return DPCPP::fmin(a, b);
+  }
   static inline double max(double a, double b) {
-    return cl::sycl::fmax(a, b);
+    return DPCPP::fmax(a, b);
   }
   static inline double abs(double a) {
+    return DPCPP::fabs(a);
+  }
+  static inline double fabs(double a) {
     return DPCPP::fabs(a);
   }
   static inline bool isnan(double a) {

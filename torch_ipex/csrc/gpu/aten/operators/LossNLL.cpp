@@ -107,7 +107,8 @@ void ClassNLLCriterion_updateOutput(
           scalar_t cur_weight = has_weights ? weights_ptr[cur_target]
                                             : static_cast<scalar_t>(1.0f);
           output_ptr[i * output_stride_0] =
-              -input_ptr[i * input_stride_0 + cur_target * input_stride_1] *
+              -static_cast<scalar_t>(
+                  input_ptr[i * input_stride_0 + cur_target * input_stride_1]) *
               cur_weight;
         }
       };
@@ -328,7 +329,8 @@ void ClassNLLCriterion_updateGradInput(
                                             : static_cast<scalar_t>(1.0f);
           gradInput_ptr
               [i * gradInput_stride_0 + cur_target * gradInput_stride_1] =
-                  -cur_weight * gradOutput_ptr[i * gradOutput_stride_0];
+                  -cur_weight *
+              static_cast<scalar_t>(gradOutput_ptr[i * gradOutput_stride_0]);
         }
       };
 
@@ -457,8 +459,12 @@ std::tuple<Tensor&, Tensor&> nll_loss_forward_out(
     const Tensor& weight,
     int64_t reduction,
     int64_t ignore_index) {
-  AT_DISPATCH_ALL_TYPES(
-      self.scalar_type(), "ClassNLLCriterion_updateOutput", [&]() {
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "ClassNLLCriterion_updateOutput",
+      [&]() {
         impl::ClassNLLCriterion_updateOutput<scalar_t>(
             self,
             target,
@@ -481,8 +487,12 @@ std::tuple<at::Tensor, at::Tensor> nll_loss_forward(
   auto output = at::empty({0}, self.options());
   auto total_weight = at::empty({0}, self.options());
 
-  AT_DISPATCH_ALL_TYPES(
-      self.scalar_type(), "ClassNLLCriterion_updateOutput", [&]() {
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "ClassNLLCriterion_updateOutput",
+      [&]() {
         impl::ClassNLLCriterion_updateOutput<scalar_t>(
             self,
             target,
@@ -505,8 +515,11 @@ Tensor& nll_loss_backward_out(
     int64_t reduction,
     int64_t ignore_index,
     const Tensor& total_weight) {
-  AT_DISPATCH_ALL_TYPES(
-      self.scalar_type(), "ClassNLLCriterion_updateGradInput", [&]() {
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "ClassNLLCriterion_updateGradInput",
+      [&]() {
         impl::ClassNLLCriterion_updateGradInput<scalar_t>(
             self,
             target,
@@ -530,8 +543,11 @@ Tensor nll_loss_backward(
     const Tensor& total_weight) {
   auto grad_input = at::zeros_like(self, c10::MemoryFormat::Contiguous);
 
-  AT_DISPATCH_ALL_TYPES(
-      self.scalar_type(), "ClassNLLCriterion_updateGradInput", [&]() {
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "ClassNLLCriterion_updateGradInput",
+      [&]() {
         impl::ClassNLLCriterion_updateGradInput<scalar_t>(
             self,
             target,

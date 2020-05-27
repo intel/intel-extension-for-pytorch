@@ -92,12 +92,14 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   } else {
     // auto src_contig = at::empty_like(iter.tensor(0),
     //      iter.tensor(1).options().dtype(iter.tensor(0).dtype()));
-    AT_DISPATCH_ALL_TYPES_AND2(kHalf, kBool, iter.dtype(0), "copy_", [&] {
-      using dst_t = scalar_t;
-      AT_DISPATCH_ALL_TYPES_AND2(kHalf, kBool, iter.dtype(1), "copy_", [&] {
-        CopyOp<dst_t, scalar_t>::apply(iter.tensor(0), iter.tensor(1));
-      });
-    });
+    AT_DISPATCH_ALL_TYPES_AND3(
+        kHalf, kBFloat16, kBool, iter.dtype(0), "copy_", [&] {
+          using dst_t = scalar_t;
+          AT_DISPATCH_ALL_TYPES_AND3(
+              kHalf, kBFloat16, kBool, iter.dtype(1), "copy_", [&] {
+                CopyOp<dst_t, scalar_t>::apply(iter.tensor(0), iter.tensor(1));
+              });
+        });
   }
 
   if (src_device != dst_device) {
@@ -117,9 +119,10 @@ void copy_from_cpu(TensorIterator& iter, bool non_blocking) {
       src_contig.data_ptr(),
       src.numel() * src.dtype().itemsize(),
       HostToDevice);
-  AT_DISPATCH_ALL_TYPES_AND2(
+  AT_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
       src.scalar_type(),
       "copy_from_cpu",
       [&]() {
@@ -162,9 +165,10 @@ void copy_from_cpu_async_(TensorIterator& iter) {
   }
 
   DPCPPGuard device_guard(dst.device());
-  AT_DISPATCH_ALL_TYPES_AND2(
+  AT_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
       src.scalar_type(),
       "copy_from_cpu_async",
       [&]() {
@@ -189,9 +193,10 @@ void copy_to_cpu_async_(TensorIterator& iter) {
 
   DPCPPGuard device_guard(src.device());
 
-  AT_DISPATCH_ALL_TYPES_AND2(
+  AT_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
       src.scalar_type(),
       "copy_to_cpu_async",
       [&]() {
@@ -211,9 +216,10 @@ void _copy__dpcpp(TensorIterator& iter, bool non_blocking) {
   Tensor& src = iter.tensor(1);
 
   TORCH_CHECK(dst.numel() == src.numel(), "sizes do not match");
-  AT_DISPATCH_ALL_TYPES_AND2(
+  AT_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
       src.scalar_type(),
       "_copy_dpcpp",
       [&]() {
@@ -263,9 +269,10 @@ void _copy__dpcpp(TensorIterator& iter, bool non_blocking) {
 }
 
 void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  AT_DISPATCH_ALL_TYPES_AND3(
       ScalarType::Half,
       ScalarType::Bool,
+      at::ScalarType::BFloat16,
       iter.tensor(0).scalar_type(),
       "_copy__dpcpp",
       [&]() { _copy__dpcpp<scalar_t>(iter, non_blocking); });

@@ -273,9 +273,14 @@ Tensor& bernoulli_(Tensor& self, const Tensor& p_, Generator* _generator) {
       _generator, getDefaultDPCPPGenerator());
   std::lock_guard<std::mutex> lock(gen->mutex_);
   // Call dpcpp kernel to generate bernoulli distribution
-  AT_DISPATCH_FLOATING_TYPES(p_.scalar_type(), "bernoulli_tensor_kernel", [&] {
-    impl::bernoulli_tensor_kernel<scalar_t>(self, p_, gen->current_seed());
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      p_.scalar_type(),
+      "bernoulli_tensor_kernel",
+      [&] {
+        impl::bernoulli_tensor_kernel<scalar_t>(self, p_, gen->current_seed());
+      });
   return self;
 }
 
@@ -284,8 +289,12 @@ Tensor& bernoulli_(Tensor& self, double p, Generator* _generator) {
       _generator, getDefaultDPCPPGenerator());
   std::lock_guard<std::mutex> lock(gen->mutex_);
   // Call dpcpp kernel to generate bernoulli distribution
-  AT_DISPATCH_FLOATING_TYPES(
-      self.scalar_type(), "bernoulli_scalar_kernel", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "bernoulli_scalar_kernel",
+      [&] {
         impl::bernoulli_scalar_kernel<scalar_t>(self, p, gen->current_seed());
       });
   return self;

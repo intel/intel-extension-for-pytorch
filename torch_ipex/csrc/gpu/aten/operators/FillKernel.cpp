@@ -25,10 +25,11 @@ struct TensorFillOp {
 };
 
 void fill_kernel_dpcpp(TensorIterator& iter, Scalar value) {
-  AT_DISPATCH_ALL_TYPES_AND2(kHalf, kBool, iter.dtype(), "fill_dpcpp", [&] {
-    at::dpcpp::DPCPP_tensor_apply1<scalar_t>(
-        iter.tensor(0), TensorFillOp<scalar_t>(value.to<scalar_t>()));
-  });
+  AT_DISPATCH_ALL_TYPES_AND3(
+      kHalf, kBFloat16, kBool, iter.dtype(), "fill_dpcpp", [&] {
+        at::dpcpp::DPCPP_tensor_apply1<scalar_t>(
+            iter.tensor(0), TensorFillOp<scalar_t>(value.to<scalar_t>()));
+      });
 }
 
 template <typename IndexType, int Dim>

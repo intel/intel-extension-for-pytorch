@@ -33,8 +33,12 @@ static void threshold_kernel(
     TensorIterator& iter,
     Scalar threshold_scalar,
     Scalar value_scalar) {
-  AT_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, iter.dtype(), "threshold", [&] {
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.dtype(),
+      "threshold",
+      [&] {
         scalar_t threshold = threshold_scalar.to<scalar_t>();
         scalar_t value = value_scalar.to<scalar_t>();
         bool all_contiguous = true;
@@ -114,13 +118,18 @@ Tensor hardshrink(const Tensor& self, Scalar lambd_) {
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "hardshrink", [&] {
-    auto lambd = lambd_.to<scalar_t>();
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardShrink)>(
-        iter, [=](scalar_t x) -> scalar_t {
-          return (x >= -lambd && x <= lambd) ? scalar_t(0) : x;
-        });
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "hardshrink",
+      [&] {
+        auto lambd = lambd_.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardShrink)>(
+            iter, [=](scalar_t x) -> scalar_t {
+              return (x >= -lambd && x <= lambd) ? scalar_t(0) : x;
+            });
+      });
   return out_tensor;
 }
 
@@ -137,8 +146,8 @@ Tensor hardshrink_backward(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "hardshrink_backward", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, self.scalar_type(), "hardshrink_backward", [&] {
         auto lambd = lambd_.to<scalar_t>();
         dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardShrinkBackward)>(
             iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {

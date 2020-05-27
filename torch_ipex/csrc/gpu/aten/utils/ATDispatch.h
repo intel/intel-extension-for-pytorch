@@ -1,6 +1,6 @@
 #pragma once
 
-// temp, the atomic operation only support for the float now
+// temp, the atomic operation only support for the float/bfloat16 now
 #define AT_DISPATCH_ALL_ATOMIC_TYPES(TYPE, NAME, ...)                        \
   [&] {                                                                      \
     const auto& the_type = TYPE;                                             \
@@ -8,6 +8,8 @@
     at::ScalarType _st = ::detail::scalar_type(the_type);                    \
     switch (_st) {                                                           \
       AT_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)        \
+      AT_PRIVATE_CASE_TYPE(                                                  \
+          at::ScalarType::BFloat16, at::BFloat16, __VA_ARGS__)               \
       default:                                                               \
         AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
     }                                                                        \

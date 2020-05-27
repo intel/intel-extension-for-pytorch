@@ -27,18 +27,23 @@ Tensor& softplus_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "softplus_forward", [&]() {
-    auto b = beta.to<scalar_t>();
-    auto t = threshold.to<scalar_t>();
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(softplus_forward)>(
-        iter, [=](scalar_t a) -> scalar_t {
-          return (
-              a * b > t
-                  ? a
-                  : Numerics<scalar_t>::log1p(Numerics<scalar_t>::exp(a * b)) /
-                      b);
-        });
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.dtype(),
+      "softplus_forward",
+      [&]() {
+        auto b = beta.to<scalar_t>();
+        auto t = threshold.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(softplus_forward)>(
+            iter, [=](scalar_t a) -> scalar_t {
+              return (
+                  a * b > t ? a
+                            : Numerics<scalar_t>::log1p(
+                                  Numerics<scalar_t>::exp(a * b)) /
+                          b);
+            });
+      });
 
   return out;
 }
@@ -66,17 +71,19 @@ Tensor& softplus_backward_out(
   iter.add_input(output);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "softplus_backward", [&]() {
-    auto b = beta.to<scalar_t>();
-    auto t = threshold.to<scalar_t>();
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(softplus_backward)>(
-        iter, [=](scalar_t grad_output_data, scalar_t output_data) -> scalar_t {
-          scalar_t beta_out = b * output_data;
-          scalar_t exp_bo = Numerics<scalar_t>::exp(beta_out);
-          return beta_out > t ? grad_output_data
-                              : grad_output_data * (exp_bo - 1) / exp_bo;
-        });
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.dtype(), "softplus_backward", [&]() {
+        auto b = beta.to<scalar_t>();
+        auto t = threshold.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(softplus_backward)>(
+            iter,
+            [=](scalar_t grad_output_data, scalar_t output_data) -> scalar_t {
+              scalar_t beta_out = b * output_data;
+              scalar_t exp_bo = Numerics<scalar_t>::exp(beta_out);
+              return beta_out > t ? grad_output_data
+                                  : grad_output_data * (exp_bo - 1) / exp_bo;
+            });
+      });
 
   return grad_input;
 }

@@ -96,6 +96,21 @@ struct TensorRemainderOp<at::Half> {
   const at::Half val;
 };
 
+template <>
+struct TensorRemainderOp<at::BFloat16> {
+  TensorRemainderOp(at::BFloat16 v) : val(v) {}
+
+  void operator()(at::BFloat16& out, at::BFloat16& in) const {
+    out = in - val * DPCPP::floor(float(in / val));
+  }
+
+  void operator()(at::BFloat16& v) const {
+    v = v - val * DPCPP::floor(float(v / val));
+  }
+
+  const at::BFloat16 val;
+};
+
 template <typename T>
 struct TensorFmodOp {
   TensorFmodOp(T v) : val((float)v) {}

@@ -263,8 +263,12 @@ Tensor host_softmax(
       "** dpcpp dim must be non-negative and less than input dimensions");
 
   if (input.numel() > 0) {
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-        input.scalar_type(), "host_softmax", [&] {
+    AT_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        input.scalar_type(),
+        "host_softmax",
+        [&] {
           auto dim_stride = input.stride(dim);
           auto dim_size = input.size(dim);
           auto outer_numel = input.numel() / dim_size;
@@ -310,25 +314,33 @@ Tensor host_softmax_backward(
   auto output = output_.contiguous();
   if (output.dim() == 0)
     output = output.view(1);
-  AT_DISPATCH_FLOATING_TYPES(grad.scalar_type(), "host_softmax_backward", [&] {
-    using accscalar_t = acc_type<scalar_t>;
-    using outscalar_t = scalar_t;
-    auto dim_stride = output.stride(dim);
-    auto dim_size = output.size(dim);
-    auto outer_numel = output.numel() / dim_size;
-    dpcpp::detail::TensorInfo<outscalar_t, uint64_t> outer_info =
-        dpcpp::detail::getTensorInfo<outscalar_t, uint64_t>(output);
-    outer_info.reduceDim(dim);
-    outer_info.collapseDims();
-    impl::SpatialSoftMaxBackward<scalar_t, accscalar_t, outscalar_t, Epilogue>(
-        gI.data_ptr<scalar_t>(),
-        output.data_ptr<outscalar_t>(),
-        grad.data_ptr<outscalar_t>(),
-        outer_info,
-        outer_numel,
-        dim_size,
-        dim_stride);
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      grad.scalar_type(),
+      "host_softmax_backward",
+      [&] {
+        using accscalar_t = acc_type<scalar_t>;
+        using outscalar_t = scalar_t;
+        auto dim_stride = output.stride(dim);
+        auto dim_size = output.size(dim);
+        auto outer_numel = output.numel() / dim_size;
+        dpcpp::detail::TensorInfo<outscalar_t, uint64_t> outer_info =
+            dpcpp::detail::getTensorInfo<outscalar_t, uint64_t>(output);
+        outer_info.reduceDim(dim);
+        outer_info.collapseDims();
+        impl::SpatialSoftMaxBackward<
+            scalar_t,
+            accscalar_t,
+            outscalar_t,
+            Epilogue>(
+            gI.data_ptr<scalar_t>(),
+            output.data_ptr<outscalar_t>(),
+            grad.data_ptr<outscalar_t>(),
+            outer_info,
+            outer_numel,
+            dim_size,
+            dim_stride);
+      });
   return gI;
 }
 

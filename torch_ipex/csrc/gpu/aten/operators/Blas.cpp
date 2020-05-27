@@ -299,10 +299,15 @@ Tensor& addmm_(
     const Tensor& mat2,
     Scalar beta,
     Scalar alpha) {
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "addmm_", [&]() {
-    impl::addmm<scalar_t>(
-        self, beta.to<float>(), self, alpha.to<float>(), mat1, mat2);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "addmm_",
+      [&]() {
+        impl::addmm<scalar_t>(
+            self, beta.to<float>(), self, alpha.to<float>(), mat1, mat2);
+      });
 
   return self;
 }
@@ -334,10 +339,15 @@ Tensor addmm(
     mat2 = mat2_;
   }
 
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "addmm", [&]() {
-    impl::addmm<scalar_t>(
-        r, beta.to<float>(), b_self, alpha.to<float>(), mat1, mat2);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "addmm",
+      [&]() {
+        impl::addmm<scalar_t>(
+            r, beta.to<float>(), b_self, alpha.to<float>(), mat1, mat2);
+      });
 
   return r;
 }
@@ -355,9 +365,15 @@ Tensor& mm_out(Tensor& result, const Tensor& self_, const Tensor& mat2_) {
     mat2 = mat2_;
   }
 
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "mm_out", [&]() {
-    impl::addmm<scalar_t>(result, scalar_t(0), result, scalar_t(1), self, mat2);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "mm_out",
+      [&]() {
+        impl::addmm<scalar_t>(
+            result, scalar_t(0), result, scalar_t(1), self, mat2);
+      });
 
   return result;
 }
@@ -376,15 +392,20 @@ Tensor& baddbmm_out(
     const Tensor& batch2,
     Scalar beta,
     Scalar alpha) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "baddbmm", [&]() {
-    impl::baddbmm<scalar_t>(
-        result,
-        beta.to<scalar_t>(),
-        self,
-        alpha.to<scalar_t>(),
-        batch1,
-        batch2);
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "baddbmm",
+      [&]() {
+        impl::baddbmm<scalar_t>(
+            result,
+            beta.to<scalar_t>(),
+            self,
+            alpha.to<scalar_t>(),
+            batch1,
+            batch2);
+      });
   return result;
 }
 

@@ -1207,10 +1207,15 @@ Tensor& binary_cross_entropy_out(
     const Tensor& target,
     const Tensor& weight,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "bce_loss_out", [&] {
-    impl::BCECriterion_updateOutput<scalar_t>(
-        out, self, target, weight, reduction);
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "bce_loss_out",
+      [&] {
+        impl::BCECriterion_updateOutput<scalar_t>(
+            out, self, target, weight, reduction);
+      });
   return out;
 }
 
@@ -1231,8 +1236,11 @@ Tensor& binary_cross_entropy_backward_out(
     const Tensor& target,
     const Tensor& weight,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "bce_loss_backward_out", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "bce_loss_backward_out",
+      [&] {
         impl::BCECriterion_updateGradInput<scalar_t>(
             grad_input, grad_output, self, target, weight, reduction);
       });
@@ -1255,9 +1263,14 @@ Tensor& mse_loss_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "mse_loss_out", [&] {
-    impl::MSECriterion_updateOutput<scalar_t>(out, self, target, reduction);
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "mse_loss_out",
+      [&] {
+        impl::MSECriterion_updateOutput<scalar_t>(out, self, target, reduction);
+      });
   return out;
 }
 
@@ -1272,8 +1285,11 @@ Tensor& mse_loss_backward_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "mse_loss_backward_out", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "mse_loss_backward_out",
+      [&] {
         impl::MSECriterion_updateGradInput<scalar_t>(
             grad_input, grad_output, self, target, reduction);
       });
@@ -1295,9 +1311,14 @@ Tensor& l1_loss_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "l1_loss_out", [&] {
-    impl::AbsCriterion_updateOutput<scalar_t>(out, self, target, reduction);
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "l1_loss_out",
+      [&] {
+        impl::AbsCriterion_updateOutput<scalar_t>(out, self, target, reduction);
+      });
   return out;
 }
 
@@ -1312,8 +1333,11 @@ Tensor& l1_loss_backward_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "l1_loss_backward_out", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "l1_loss_backward_out",
+      [&] {
         impl::AbsCriterion_updateGradInput<scalar_t>(
             grad_input, grad_output, self, target, reduction);
       });
@@ -1335,8 +1359,12 @@ Tensor& smooth_l1_loss_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "smooth_l1_loss_out", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "smooth_l1_loss_out",
+      [&] {
         impl::SmoothL1Criterion_updateOutput<scalar_t>(
             out, self, target, reduction);
       });
@@ -1358,8 +1386,11 @@ Tensor& smooth_l1_loss_backward_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "smooth_l1_loss_backward_out", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "smooth_l1_loss_backward_out",
+      [&] {
         impl::SmoothL1Criterion_updateGradInput<scalar_t>(
             grad_input, grad_output, self, target, reduction);
       });
@@ -1381,8 +1412,12 @@ Tensor& soft_margin_loss_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "soft_margin_loss_out", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "soft_margin_loss_out",
+      [&] {
         impl::SoftMarginCriterion_updateOutput<scalar_t>(
             out, self, target, reduction);
       });
@@ -1404,8 +1439,11 @@ Tensor& soft_margin_loss_backward_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "soft_margin_loss_backward_out", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "soft_margin_loss_backward_out",
+      [&] {
         impl::SoftMarginCriterion_updateGradInput<scalar_t>(
             grad_input, grad_output, self, target, reduction);
       });
@@ -1430,8 +1468,12 @@ Tensor& multi_margin_loss_out(
     Scalar margin,
     const Tensor& weights,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "multi_margin_loss_out", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "multi_margin_loss_out",
+      [&] {
         impl::MultiMarginCriterion_updateOutput<scalar_t>(
             out, self, target, p, margin, weights, reduction);
       });
@@ -1459,8 +1501,11 @@ Tensor& multi_margin_loss_backward_out(
     Scalar margin,
     const Tensor& weights,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "multi_margin_loss_backward_out", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "multi_margin_loss_backward_out",
+      [&] {
         impl::MultiMarginCriterion_updateGradInput<scalar_t>(
             grad_input,
             grad_output,
@@ -1493,8 +1538,12 @@ Tensor& multilabel_margin_loss_out(
     const Tensor& target,
     int64_t reduction) {
   Tensor is_target = at::empty({0}, self.options());
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "multilabel_margin_loss_out", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "multilabel_margin_loss_out",
+      [&] {
         impl::MultilabelMarginCriterion_updateOutput<scalar_t>(
             out, self, target, reduction, is_target);
       });
@@ -1516,8 +1565,12 @@ std::tuple<Tensor&, Tensor&> multilabel_margin_loss_forward_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "multilabel_margin_loss_forward_out", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "multilabel_margin_loss_forward_out",
+      [&] {
         impl::MultilabelMarginCriterion_updateOutput<scalar_t>(
             output, self, target, reduction, is_target);
       });
@@ -1541,8 +1594,11 @@ Tensor& multilabel_margin_loss_backward_out(
     const Tensor& target,
     int64_t reduction,
     const Tensor& is_target) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      self.scalar_type(), "multilabel_margin_loss_backward_out", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "multilabel_margin_loss_backward_out",
+      [&] {
         impl::MultilabelMarginCriterion_updateGradInput<scalar_t>(
             grad_input, grad_output, self, target, reduction, is_target);
       });

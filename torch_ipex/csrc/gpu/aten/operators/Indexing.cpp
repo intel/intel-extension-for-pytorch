@@ -1109,8 +1109,12 @@ Tensor trace(const Tensor& self) {
 Tensor& masked_fill_(Tensor& self, const Tensor& mask_, Scalar value) {
   Tensor mask;
   std::tie(mask) = expand_inplace(self, mask_, "masked_fill_");
-  AT_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, self.scalar_type(), "MaskedFill", [&]() {
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      self.scalar_type(),
+      "MaskedFill",
+      [&]() {
         if (mask.dtype() == at::ScalarType::Byte) {
           impl::MaskedFill<scalar_t>(self, mask, value);
         } else {
@@ -1128,10 +1132,12 @@ Tensor& masked_scatter_(
     Tensor& self,
     const Tensor& mask,
     const Tensor& source) {
-  AT_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, self.scalar_type(), "MaskedScatter", [&]() {
-        impl::MaskedScatter<scalar_t>(self, mask, source);
-      });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      self.scalar_type(),
+      "MaskedScatter",
+      [&]() { impl::MaskedScatter<scalar_t>(self, mask, source); });
   return self;
 }
 

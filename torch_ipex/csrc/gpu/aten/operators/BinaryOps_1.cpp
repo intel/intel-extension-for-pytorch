@@ -18,12 +18,17 @@ namespace impl {
 class SyclOpAdd {};
 
 static void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, iter.dtype(), "add", [&]() {
-    auto alpha = alpha_scalar.to<scalar_t>();
-    dpcpp_kernel_for_tensor_iter<SyclOpAdd>(
-        iter,
-        [=](scalar_t a, scalar_t b) -> scalar_t { return a + alpha * b; });
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "add",
+      [&]() {
+        auto alpha = alpha_scalar.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter<SyclOpAdd>(
+            iter,
+            [=](scalar_t a, scalar_t b) -> scalar_t { return a + alpha * b; });
+      });
 }
 
 static void sub_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {

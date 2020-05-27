@@ -26,12 +26,13 @@ Tensor& tanh_backward_out(
   iter.add_input(output);
   iter.build();
 
-  AT_DISPATCH_ALL_TYPES(iter.dtype(), "tanh_backward_out", [&]() {
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(tanh_backward)>(
-        iter, [](scalar_t output, scalar_t z) -> scalar_t {
-          return output * (1. - z * z);
-        });
-  });
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::BFloat16, iter.dtype(), "tanh_backward_out", [&]() {
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(tanh_backward)>(
+            iter, [](scalar_t output, scalar_t z) -> scalar_t {
+              return output * (1. - z * z);
+            });
+      });
 
   return grad_input;
 }
@@ -44,12 +45,17 @@ Tensor tanh_backward(const Tensor& grad_output, const Tensor& output) {
 DPCPP_DEF_K1(atan2);
 Tensor& atan2_out(Tensor& result, const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_op(result, self, other);
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "atan2", [&]() {
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(atan2)>(
-        iter, [](scalar_t a, scalar_t b) -> scalar_t {
-          return Numerics<scalar_t>::atan2(a, b);
-        });
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.dtype(),
+      "atan2",
+      [&]() {
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(atan2)>(
+            iter, [](scalar_t a, scalar_t b) -> scalar_t {
+              return Numerics<scalar_t>::atan2(a, b);
+            });
+      });
   return result;
 }
 

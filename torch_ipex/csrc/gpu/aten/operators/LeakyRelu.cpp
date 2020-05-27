@@ -17,14 +17,19 @@ Tensor& leaky_relu_out(Tensor& out, const Tensor& self, Scalar negative_slope) {
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "LeakyReLU", [&]() {
-    auto negval = negative_slope.to<scalar_t>();
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpLeakyElu)>(
-        iter, [=](scalar_t x) -> scalar_t {
-          x = (x >= 0) ? x : x * negval;
-          return x;
-        });
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "LeakyReLU",
+      [&]() {
+        auto negval = negative_slope.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpLeakyElu)>(
+            iter, [=](scalar_t x) -> scalar_t {
+              x = (x >= 0) ? x : x * negval;
+              return x;
+            });
+      });
   return out;
 }
 
@@ -46,8 +51,8 @@ Tensor& leaky_relu_backward_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      iter.dtype(), "LeakyReLU_backward", [&]() {
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.dtype(), "LeakyReLU_backward", [&]() {
         auto negval = negative_slope.to<scalar_t>();
 
         dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpLeakyEluBackward)>(

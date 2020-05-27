@@ -101,7 +101,7 @@ void ctc_loss_log_alpha_kernel(
     int64_t __tg_target_stride,
     int64_t __batch_size,
     int64_t __BLANK) {
-  constexpr scalar_t neginf = -INFINITY;
+  scalar_t neginf = -INFINITY;
 
   int64_t __lp_input_stride = log_probs.stride(0);
   int64_t __lp_batch_stride = log_probs.stride(1);
@@ -257,10 +257,12 @@ void ctc_loss_log_alpha_kernel(
                 Numerics<scalar_t>::exp(la2 - lamax) +
                 Numerics<scalar_t>::exp(la3 - lamax));
             log_alpha_data
-                [la_batch_offset + la_input_stride * t +
-                 la_target_stride * s] = tmp + lamax +
-                log_probs_data[lp_batch_offset + t * lp_input_stride +
-                               lp_char_stride * current_char];
+                [la_batch_offset + la_input_stride * t + la_target_stride * s] =
+                    tmp + lamax +
+                static_cast<scalar_t>(
+                        log_probs_data
+                            [lp_batch_offset + t * lp_input_stride +
+                             lp_char_stride * current_char]);
           } else {
             // otherwise we just set to neginf
             if (b < batch_size && s < 2 * max_target_length + 1)
@@ -282,11 +284,11 @@ void ctc_loss_log_alpha_kernel(
         if (target_length == 0) {
           // if the target is empty then there is no preceding BLANK state and
           // hence there is no path to merge
-          neg_log_likelihood_data[b] =
-              -log_alpha_data
+          neg_log_likelihood_data[b] = -static_cast<scalar_t>(
+              log_alpha_data
                   [la_batch_offset +
                    la_input_stride *
-                       (input_length - 1) /*+ la_target_stride * 0*/];
+                       (input_length - 1) /*+ la_target_stride * 0*/]);
         } else {
           scalar_t l1 = log_alpha_data
               [la_batch_offset + la_input_stride * (input_length - 1) +
@@ -297,7 +299,7 @@ void ctc_loss_log_alpha_kernel(
                      la_target_stride * (target_length * 2 - 1)]
               : neginf;
           scalar_t m = ((l1 > l2) ? l1 : l2);
-          m = ((m == neginf) ? 0 : m);
+          m = ((m == neginf) ? static_cast<scalar_t>(0.0f) : m);
           scalar_t log_likelihood = Numerics<scalar_t>::log(
                                         Numerics<scalar_t>::exp(l1 - m) +
                                         Numerics<scalar_t>::exp(l2 - m)) +
@@ -331,7 +333,7 @@ void ctc_loss_backward_log_beta_kernel(
     int64_t __tg_target_stride,
     int64_t __batch_size,
     int64_t __BLANK) {
-  constexpr scalar_t neginf = -INFINITY;
+  scalar_t neginf = -INFINITY;
 
   int64_t __lp_input_stride = log_probs.stride(0);
   int64_t __lp_batch_stride = log_probs.stride(1);
@@ -482,9 +484,10 @@ void ctc_loss_backward_log_beta_kernel(
                               Numerics<scalar_t>::exp(lb2 - lbmax) +
                               Numerics<scalar_t>::exp(lb3 - lbmax)) +
                 lbmax +
-                log_probs_data
-                    [lp_batch_offset + t * lp_input_stride +
-                     lp_char_stride * current_target_prime];
+                static_cast<scalar_t>(
+                              log_probs_data
+                                  [lp_batch_offset + t * lp_input_stride +
+                                   lp_char_stride * current_target_prime]);
 
             log_beta_data
                 [lb_batch_offset + lb_input_stride * t + lb_target_stride * s] =
@@ -634,12 +637,14 @@ void ctc_loss_backward_collect_nonblank_kernel(
                 [gr_batch_offset + t * gr_input_stride +
                  gr_char_stride * target],
             -Numerics<scalar_t>::exp(
-                log_alpha_data
-                    [la_batch_offset + la_input_stride * t +
-                     la_target_stride * (s * 2 + 1)] +
-                log_beta_data
-                    [lb_batch_offset + lb_input_stride * t +
-                     lb_target_stride * (s * 2 + 1)] +
+                static_cast<scalar_t>(
+                    log_alpha_data
+                        [la_batch_offset + la_input_stride * t +
+                         la_target_stride * (s * 2 + 1)]) +
+                static_cast<scalar_t>(
+                    log_beta_data
+                        [lb_batch_offset + lb_input_stride * t +
+                         lb_target_stride * (s * 2 + 1)]) +
                 nll - lp) *
                 gr);
       }
@@ -675,7 +680,7 @@ void ctc_loss_backward_collect_kernel(
     int64_t num_labels,
     int64_t BLANK,
     bool zero_infinity) {
-  constexpr scalar_t neginf = -INFINITY;
+  scalar_t neginf = -INFINITY;
 
   int64_t gr_input_stride = gradient.stride(0);
   int64_t gr_batch_stride = gradient.stride(1);
@@ -749,12 +754,12 @@ void ctc_loss_backward_collect_kernel(
           int64_t current_target_prime = get_target_prime(
               targets_data, tg_batch_offset, tg_target_stride, s, BLANK);
           scalar_t log_alpha_beta =
-              (log_alpha_data
-                   [la_batch_offset + la_input_stride * t +
-                    la_target_stride * s] +
-               log_beta_data
-                   [lb_batch_offset + lb_input_stride * t +
-                    lb_target_stride * s]);
+              static_cast<scalar_t>(log_alpha_data
+                                        [la_batch_offset + la_input_stride * t +
+                                         la_target_stride * s]) +
+              static_cast<scalar_t>(log_beta_data
+                                        [lb_batch_offset + lb_input_stride * t +
+                                         lb_target_stride * s]);
           scalar_t& lcab = gradient_data
               [gr_batch_offset + t * gr_input_stride +
                gr_char_stride * current_target_prime];
@@ -762,9 +767,10 @@ void ctc_loss_backward_collect_kernel(
             lcab = log_alpha_beta;
           } else {
             scalar_t max = ((lcab > log_alpha_beta) ? lcab : log_alpha_beta);
-            lcab = Numerics<scalar_t>::log(
-                       Numerics<scalar_t>::exp(lcab - max) +
-                       Numerics<scalar_t>::exp(log_alpha_beta - max)) +
+            lcab =
+                Numerics<scalar_t>::log(
+                    Numerics<scalar_t>::exp(static_cast<scalar_t>(lcab) - max) +
+                    Numerics<scalar_t>::exp(log_alpha_beta - max)) +
                 max;
           }
         }
@@ -780,7 +786,9 @@ void ctc_loss_backward_collect_kernel(
           scalar_t lp = log_probs_data
               [lp_batch_offset + t * lp_input_stride + lp_char_stride * c];
           res = (Numerics<scalar_t>::exp(lp) -
-                 Numerics<scalar_t>::exp(res + nll - lp)) *
+                 Numerics<scalar_t>::exp(
+                     static_cast<scalar_t>(res) + static_cast<scalar_t>(nll) -
+                     lp)) *
               gr;
         } else {
           res = 0.;
@@ -988,7 +996,7 @@ Tensor ctc_loss_backward_template(
     const Tensor& log_alpha,
     int64_t BLANK,
     bool zero_infinity) {
-  constexpr scalar_t neginf = -INFINITY;
+  scalar_t neginf = -INFINITY;
   using target_t =
       typename std::conditional<target_scalar_type == kInt, int, int64_t>::type;
   int64_t batch_size = log_probs.size(1);
@@ -1154,15 +1162,20 @@ std::tuple<Tensor, Tensor> _ctc_loss(
     int64_t blank,
     bool zero_infinity) {
   (void)zero_infinity; // only used for backward
-  return AT_DISPATCH_FLOATING_TYPES(log_probs.scalar_type(), "ctc_loss", [&] {
-    if (targets.scalar_type() == kLong) {
-      return impl::ctc_loss_template<scalar_t, kLong>(
-          log_probs, targets, input_lengths, target_lengths, blank);
-    } else {
-      return impl::ctc_loss_template<scalar_t, kInt>(
-          log_probs, targets, input_lengths, target_lengths, blank);
-    }
-  });
+  return AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      log_probs.scalar_type(),
+      "ctc_loss",
+      [&] {
+        if (targets.scalar_type() == kLong) {
+          return impl::ctc_loss_template<scalar_t, kLong>(
+              log_probs, targets, input_lengths, target_lengths, blank);
+        } else {
+          return impl::ctc_loss_template<scalar_t, kInt>(
+              log_probs, targets, input_lengths, target_lengths, blank);
+        }
+      });
 }
 
 Tensor _ctc_loss_backward(

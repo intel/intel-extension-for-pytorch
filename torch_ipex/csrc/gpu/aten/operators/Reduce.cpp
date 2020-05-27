@@ -339,7 +339,7 @@ struct NormOps {
   acc_t norm;
 
   inline acc_t reduce(acc_t acc, acc_t data) const {
-    return acc + DPCPP::pow(DPCPP::fabs(data), norm);
+    return acc + Numerics<acc_t>::pow(Numerics<acc_t>::fabs(data), norm);
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
@@ -347,7 +347,7 @@ struct NormOps {
   }
 
   inline acc_t project(acc_t a) const {
-    return DPCPP::pow(a, acc_t(1.0) / norm);
+    return Numerics<acc_t>::pow(a, acc_t(1.0) / norm);
   }
 
   inline acc_t sg_shfl_down(acc_t arg, int offset) const {
@@ -381,7 +381,7 @@ struct NormZeroOps {
 template <typename acc_t>
 struct NormOneOps {
   inline acc_t reduce(acc_t acc, acc_t data) const {
-    return acc + DPCPP::fabs(data);
+    return acc + Numerics<acc_t>::fabs(data);
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
@@ -401,11 +401,11 @@ struct NormOneOps {
 template <typename acc_t>
 struct AbsMinOps {
   inline acc_t reduce(acc_t acc, acc_t data) const {
-    return DPCPP::min(acc, DPCPP::fabs(data));
+    return Numerics<acc_t>::min(acc, Numerics<acc_t>::fabs(data));
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
-    return DPCPP::min(a, b);
+    return Numerics<acc_t>::min(a, b);
   }
 
   inline acc_t project(acc_t a) const {
@@ -421,11 +421,11 @@ struct AbsMinOps {
 template <typename acc_t>
 struct AbsMaxOps {
   inline acc_t reduce(acc_t acc, acc_t data) const {
-    return DPCPP::max(acc, DPCPP::fabs(data));
+    return Numerics<acc_t>::max(acc, Numerics<acc_t>::fabs(data));
   }
 
   inline acc_t combine(acc_t a, acc_t b) const {
-    return DPCPP::max(a, b);
+    return Numerics<acc_t>::max(a, b);
   }
 
   inline acc_t project(acc_t a) const {
@@ -560,9 +560,12 @@ static void std_var_kernel(
 }
 
 static void sum_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, iter.dtype(), "sum", [&]() {
-    sum_kernel_impl<scalar_t>(iter);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "sum",
+      [&]() { sum_kernel_impl<scalar_t>(iter); });
 }
 
 static void prod_kernel(TensorIterator& iter) {
@@ -571,9 +574,12 @@ static void prod_kernel(TensorIterator& iter) {
 }
 
 static void mean_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, iter.dtype(), "mean", [&]() {
-    mean_kernel_impl<scalar_t>(iter);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "mean",
+      [&]() { mean_kernel_impl<scalar_t>(iter); });
 }
 
 static void min_kernel(TensorIterator& iter) {
@@ -583,8 +589,12 @@ static void min_kernel(TensorIterator& iter) {
 }
 
 static void max_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES(
-      iter.dtype(), "max", [&]() { max_kernel_impl<scalar_t>(iter); });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "max",
+      [&]() { max_kernel_impl<scalar_t>(iter); });
 }
 
 static void norm_kernel(TensorIterator& iter, Scalar p) {
@@ -594,8 +604,12 @@ static void norm_kernel(TensorIterator& iter, Scalar p) {
     // type promotion that does cast and reduction in a single kernel
     return norm_kernel_impl<at::Half, float, float>(iter, p);
   }
-  AT_DISPATCH_FLOATING_TYPES(
-      iter.dtype(), "norm", [&]() { norm_kernel_impl<scalar_t>(iter, p); });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "norm",
+      [&]() { norm_kernel_impl<scalar_t>(iter, p); });
 }
 
 void and_kernel(TensorIterator& iter) {

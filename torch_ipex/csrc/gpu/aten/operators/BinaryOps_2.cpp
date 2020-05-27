@@ -19,8 +19,13 @@ class SyclOpMul {};
 class SyclOpDiv {};
 
 static void mul_kernel_dpcpp(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half, at::ScalarType::Bool, iter.dtype(), "mul", [&]() {
+  AT_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      iter.dtype(),
+      "mul",
+      [&]() {
         dpcpp_kernel_for_tensor_iter<SyclOpMul>(
             iter, [=](scalar_t a, scalar_t b) -> scalar_t { return a * b; });
       });
@@ -33,10 +38,15 @@ static void div_kernel_dpcpp(TensorIterator& iter) {
           iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
     });
   } else {
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "div", [&]() {
-      dpcpp_kernel_for_tensor_iter<SyclOpDiv>(
-          iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
-    });
+    AT_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        iter.dtype(),
+        "div",
+        [&]() {
+          dpcpp_kernel_for_tensor_iter<SyclOpDiv>(
+              iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
+        });
   }
 }
 

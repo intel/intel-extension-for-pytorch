@@ -64,7 +64,7 @@ class dists {
         const scalar_t grad,
         const scalar_t dist,
         const scalar_t p) {
-      return dist == 0.0 ? 0
+      return dist == 0.0 ? static_cast<scalar_t>(0)
                          : sign(diff) *
               Numerics<scalar_t>::pow(Numerics<scalar_t>::abs(diff), p - 1) *
               grad / Numerics<scalar_t>::pow(dist, p - 1);
@@ -87,7 +87,7 @@ class dists {
         const scalar_t grad,
         const scalar_t dist,
         const scalar_t p) {
-      return dist == 0.0 ? 0 : grad * diff / dist;
+      return dist == 0.0 ? static_cast<scalar_t>(0) : grad * diff / dist;
     }
   };
 
@@ -107,7 +107,7 @@ class dists {
         const scalar_t grad,
         const scalar_t dist,
         const scalar_t p) {
-      return dist == 0.0 ? 0
+      return dist == 0.0 ? static_cast<scalar_t>(0)
                          : diff *
               Numerics<scalar_t>::pow(Numerics<scalar_t>::abs(diff), p - 2) *
               grad / Numerics<scalar_t>::pow(dist, p - 1);
@@ -209,7 +209,7 @@ static void pdist_kernel_impl(
       const scalar_t* b = in_ptr + j * m + item_id.get_local_linear_id();
       scalar_t agg = 0.0;
       for (; a < end; a += stride, b += stride) {
-        F::inc(agg, Numerics<scalar_t>::abs(*a - *b), p);
+        F::inc(agg, Numerics<scalar_t>::abs(static_cast<scalar_t>(*a) - static_cast<scalar_t>(*b)), p);
       }
 
       agg = reduce_agg<scalar_t, F>(agg, item_id, shared);
@@ -295,7 +295,8 @@ static void pdist_backward_kernel_impl(
                            self_j += stride,
                            buff_i += stride,
                            buff_j += stride) {
-        const scalar_t res = F::backward(*self_i - *self_j, grad_k, dist_k, p);
+        const scalar_t res =
+            F::backward(static_cast<scalar_t>(*self_i) - static_cast<scalar_t>(*self_j), grad_k, dist_k, p);
         *buff_i = res;
         *buff_j = -res;
       }
@@ -316,24 +317,29 @@ void pdist_forward(Tensor& result, const Tensor& self, double p) {
   const double n2 = n - .5;
   const double n2_squared_minus_1 = n2 * n2 - 1;
 
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "pdist_dpcpp", [&] {
-    if (p == 0.0) {
-      pdist_kernel_impl<scalar_t, dists<scalar_t>::zero, 0>(
-          result, self, n, m, p, n2, n2_squared_minus_1);
-    } else if (p == 1.0) {
-      pdist_kernel_impl<scalar_t, dists<scalar_t>::one, 1>(
-          result, self, n, m, p, n2, n2_squared_minus_1);
-    } else if (p == 2.0) {
-      pdist_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
-          result, self, n, m, p, n2, n2_squared_minus_1);
-    } else if (std::isinf(p)) {
-      pdist_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
-          result, self, n, m, p, n2, n2_squared_minus_1);
-    } else {
-      pdist_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
-          result, self, n, m, p, n2, n2_squared_minus_1);
-    }
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "pdist_dpcpp",
+      [&] {
+        if (p == 0.0) {
+          pdist_kernel_impl<scalar_t, dists<scalar_t>::zero, 0>(
+              result, self, n, m, p, n2, n2_squared_minus_1);
+        } else if (p == 1.0) {
+          pdist_kernel_impl<scalar_t, dists<scalar_t>::one, 1>(
+              result, self, n, m, p, n2, n2_squared_minus_1);
+        } else if (p == 2.0) {
+          pdist_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
+              result, self, n, m, p, n2, n2_squared_minus_1);
+        } else if (std::isinf(p)) {
+          pdist_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
+              result, self, n, m, p, n2, n2_squared_minus_1);
+        } else {
+          pdist_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
+              result, self, n, m, p, n2, n2_squared_minus_1);
+        }
+      });
 }
 
 void pdist_backward(
@@ -356,74 +362,75 @@ void pdist_backward(
 
   Tensor buffer =
       at::empty({n - 1, result.size(0), result.size(1)}, result.options());
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "pdist_backward", [&] {
-    if (p == 1.0) {
-      pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::one, 0>(
-          buffer,
-          grad,
-          self,
-          dist,
-          grad.stride(0),
-          n,
-          m,
-          dist.numel(),
-          p,
-          n2,
-          n2_squared_minus_1);
-    } else if (p < 2.0) {
-      pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::lt_two, 1>(
-          buffer,
-          grad,
-          self,
-          dist,
-          grad.stride(0),
-          n,
-          m,
-          dist.numel(),
-          p,
-          n2,
-          n2_squared_minus_1);
-    } else if (p == 2.0) {
-      pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
-          buffer,
-          grad,
-          self,
-          dist,
-          grad.stride(0),
-          n,
-          m,
-          dist.numel(),
-          p,
-          n2,
-          n2_squared_minus_1);
-    } else if (std::isinf(p)) {
-      pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
-          buffer,
-          grad,
-          self,
-          dist,
-          grad.stride(0),
-          n,
-          m,
-          dist.numel(),
-          p,
-          n2,
-          n2_squared_minus_1);
-    } else {
-      pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
-          buffer,
-          grad,
-          self,
-          dist,
-          grad.stride(0),
-          n,
-          m,
-          dist.numel(),
-          p,
-          n2,
-          n2_squared_minus_1);
-    }
-  });
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, self.scalar_type(), "pdist_backward", [&] {
+        if (p == 1.0) {
+          pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::one, 0>(
+              buffer,
+              grad,
+              self,
+              dist,
+              grad.stride(0),
+              n,
+              m,
+              dist.numel(),
+              p,
+              n2,
+              n2_squared_minus_1);
+        } else if (p < 2.0) {
+          pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::lt_two, 1>(
+              buffer,
+              grad,
+              self,
+              dist,
+              grad.stride(0),
+              n,
+              m,
+              dist.numel(),
+              p,
+              n2,
+              n2_squared_minus_1);
+        } else if (p == 2.0) {
+          pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::two, 2>(
+              buffer,
+              grad,
+              self,
+              dist,
+              grad.stride(0),
+              n,
+              m,
+              dist.numel(),
+              p,
+              n2,
+              n2_squared_minus_1);
+        } else if (std::isinf(p)) {
+          pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::inf, 3>(
+              buffer,
+              grad,
+              self,
+              dist,
+              grad.stride(0),
+              n,
+              m,
+              dist.numel(),
+              p,
+              n2,
+              n2_squared_minus_1);
+        } else {
+          pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::p, 4>(
+              buffer,
+              grad,
+              self,
+              dist,
+              grad.stride(0),
+              n,
+              m,
+              dist.numel(),
+              p,
+              n2,
+              n2_squared_minus_1);
+        }
+      });
 
   at::sum_out(result, buffer, 0);
 }

@@ -286,9 +286,12 @@ Tensor lt(const Tensor& self, Scalar other_) {
 }
 
 Tensor& lt_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "ltTensor", [&]() {
-    impl::ltTensor<scalar_t>(out, self, other);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "ltTensor",
+      [&]() { impl::ltTensor<scalar_t>(out, self, other); });
 
   return out;
 }
@@ -318,9 +321,12 @@ Tensor gt(const Tensor& self, Scalar other_) {
 }
 
 Tensor& gt_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "gtTensor", [&]() {
-    impl::gtTensor<scalar_t>(out, self, other);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "gtTensor",
+      [&]() { impl::gtTensor<scalar_t>(out, self, other); });
 
   return out;
 }
@@ -349,9 +355,12 @@ Tensor ge(const Tensor& self, Scalar other_) {
 }
 
 Tensor& ge_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "geTensor", [&]() {
-    impl::geTensor<scalar_t>(out, self, other);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "geTensor",
+      [&]() { impl::geTensor<scalar_t>(out, self, other); });
 
   return out;
 }
@@ -380,9 +389,12 @@ Tensor le(const Tensor& self, Scalar other_) {
 }
 
 Tensor& le_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "leTensor", [&]() {
-    impl::leTensor<scalar_t>(out, self, other);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "leTensor",
+      [&]() { impl::leTensor<scalar_t>(out, self, other); });
 
   return out;
 }
@@ -410,10 +422,13 @@ Tensor eq(const Tensor& self, Scalar other_) {
 }
 
 Tensor& eq_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  AT_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Bool, self.scalar_type(), "eqTensor", [&]() {
-        impl::eqTensor<scalar_t>(out, self, other);
-      });
+  AT_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "eqTensor",
+      [&]() { impl::eqTensor<scalar_t>(out, self, other); });
 
   return out;
 }
@@ -451,9 +466,12 @@ Tensor ne(const Tensor& self, Scalar other_) {
 }
 
 Tensor& ne_out(Tensor& out, const Tensor& self, const Tensor& other) {
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "neTensor", [&]() {
-    impl::neTensor<scalar_t>(out, self, other);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "neTensor",
+      [&]() { impl::neTensor<scalar_t>(out, self, other); });
 
   return out;
 }

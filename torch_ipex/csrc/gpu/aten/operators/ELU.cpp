@@ -25,18 +25,24 @@ Tensor& elu_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "elu", [&]() {
-    auto negcoef = alpha.to<scalar_t>() * scale.to<scalar_t>();
-    auto poscoef = scale.to<scalar_t>();
-    auto negiptocoef = input_scale.to<scalar_t>();
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "elu",
+      [&]() {
+        auto negcoef = alpha.to<scalar_t>() * scale.to<scalar_t>();
+        auto poscoef = scale.to<scalar_t>();
+        auto negiptocoef = input_scale.to<scalar_t>();
 
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpElu)>(
-        iter, [=](scalar_t x) -> scalar_t {
-          x = x <= 0 ? (Numerics<scalar_t>::exp(x * negiptocoef) - 1) * negcoef
-                     : x * poscoef;
-          return x;
-        });
-  });
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpElu)>(
+            iter, [=](scalar_t x) -> scalar_t {
+              x = x <= 0
+                  ? (Numerics<scalar_t>::exp(x * negiptocoef) - 1) * negcoef
+                  : x * poscoef;
+              return x;
+            });
+      });
 
   return out;
 }
@@ -61,19 +67,20 @@ Tensor& elu_backward_out(
   iter.add_input(output);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "elu_backward", [&]() {
-    auto negcoef = alpha.to<scalar_t>() * scale.to<scalar_t>();
-    auto poscoef = scale.to<scalar_t>();
-    auto negiptocoef = input_scale.to<scalar_t>();
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.dtype(), "elu_backward", [&]() {
+        auto negcoef = alpha.to<scalar_t>() * scale.to<scalar_t>();
+        auto poscoef = scale.to<scalar_t>();
+        auto negiptocoef = input_scale.to<scalar_t>();
 
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpEluBackward)>(
-        iter, [=](scalar_t grad_output, scalar_t output) -> scalar_t {
-          if (output <= 0)
-            return grad_output * negiptocoef * (output + negcoef);
-          else
-            return grad_output * poscoef;
-        });
-  });
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpEluBackward)>(
+            iter, [=](scalar_t grad_output, scalar_t output) -> scalar_t {
+              if (output <= 0)
+                return grad_output * negiptocoef * (output + negcoef);
+              else
+                return grad_output * poscoef;
+            });
+      });
   return grad_input;
 }
 

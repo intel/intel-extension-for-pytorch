@@ -23,19 +23,24 @@ Tensor& hardtanh_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_ALL_TYPES(iter.dtype(), "hardtanh", [&]() {
-    auto min_ = min_val.to<scalar_t>();
-    auto max_ = max_val.to<scalar_t>();
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardTanh)>(
-        iter, [=](scalar_t x) -> scalar_t {
-          if (x < min_)
-            return min_;
-          else if (x > max_)
-            return max_;
-          else
-            return x;
-        });
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.dtype(),
+      "hardtanh",
+      [&]() {
+        auto min_ = min_val.to<scalar_t>();
+        auto max_ = max_val.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardTanh)>(
+            iter, [=](scalar_t x) -> scalar_t {
+              if (x < min_)
+                return min_;
+              else if (x > max_)
+                return max_;
+              else
+                return x;
+            });
+      });
 
   return out;
 }
@@ -68,17 +73,18 @@ Tensor& hardtanh_backward_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_ALL_TYPES(iter.dtype(), "hardtanh_backward", [&]() {
-    auto min_ = min_val.to<scalar_t>();
-    auto max_ = max_val.to<scalar_t>();
-    dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardTanhBackward)>(
-        iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {
-          if (x <= min_ || x >= max_)
-            return 0;
-          else
-            return grad_output;
-        });
-  });
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::BFloat16, iter.dtype(), "hardtanh_backward", [&]() {
+        auto min_ = min_val.to<scalar_t>();
+        auto max_ = max_val.to<scalar_t>();
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardTanhBackward)>(
+            iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {
+              if (x <= min_ || x >= max_)
+                return 0;
+              else
+                return grad_output;
+            });
+      });
 
   return grad_input;
 }

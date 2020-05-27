@@ -47,8 +47,9 @@ Tensor _s_where(
     const Tensor& self,
     const Tensor& other) {
   Tensor ret = at::empty(self.sizes(), self.options());
-  AT_DISPATCH_ALL_TYPES_AND2(
+  AT_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
+      at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       ret.scalar_type(),
       "where",
