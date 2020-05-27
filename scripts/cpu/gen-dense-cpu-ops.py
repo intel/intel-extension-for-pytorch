@@ -66,11 +66,7 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor',
 ]
 
-_FN_BF16_FUNCS_WITH_SIMPLE_ATEN_SIG = [
-    'aten::convolution_overrideable(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups) -> Tensor',
-    'aten::linear(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor',
-    'aten::native_batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps) -> (Tensor, Tensor, Tensor)',
-]
+_FN_BF16_FUNCS_WITH_SIMPLE_ATEN_SIG = _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
 _SHALLOW_FALLBACK_TO_CPU_TENSOR = 'shallowFallbackToCPUTensor'

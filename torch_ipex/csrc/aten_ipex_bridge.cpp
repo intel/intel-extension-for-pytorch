@@ -420,6 +420,7 @@ void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarTy
       IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
       ipex_tensor_impl->reset_data_type(dstScalarType);
       ipex_tensor_impl->storage().unsafeGetStorageImpl()->set_dtype(at::scalarTypeToTypeMeta(dstScalarType));
+      ipex_tensor_impl->storage().unsafeGetStorageImpl()->set_numel(shade_context->dil_tensor->get_nelems());
       ipex_tensor_impl->set_storage(ipexTensor.storage());
       return;
     }
@@ -474,7 +475,7 @@ void reorderTensorToScalaraType(const at::Tensor& ipexTensor, at::ScalarType dst
   }
 
   ipexTensor.unsafeGetTensorImpl()->set_storage(storage_impl);
-  attachShadeDataConext(ipexTensor);
+  attachShadeDataContext(ipexTensor);
 }
 
 
