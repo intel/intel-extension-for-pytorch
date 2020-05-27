@@ -465,7 +465,7 @@ class DenseOPCodeGen(object):
             defs_code = ''.join([f['def'] for f in shard])
 
             filename, ext = os.path.splitext(cpp_path)
-            shard_filepath = f'{filename}_{idx}{ext}'
+            shard_filepath = '%s_%s%s' % (filename, idx, ext)
             shard_content = _CPP_HEADER.format(gen=os.path.basename(sys.argv[0]), funcs=defs_code, regs=regs_code)
             write_or_skip(shard_filepath, shard_content)
 
