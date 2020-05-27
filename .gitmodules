@@ -1,6 +1,3 @@
-[submodule "third_party/mkl-dnn"]
-	path = third_party/mkl-dnn
-	url = https://github.com/intel/mkl-dnn.git
-[submodule "third_party/dnnl_for_gpu"]
-	path = third_party/dnnl_for_gpu
-	url = ssh://git@gitlab.devtools.intel.com:29418/pytorch-ats/ideep.git
+[submodule "third_party/oneDNN"]
+	path = third_party/oneDNN
+	url = https://github.com/oneapi-src/oneDNN.git
