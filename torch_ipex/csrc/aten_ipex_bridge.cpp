@@ -421,7 +421,6 @@ void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarTy
       ipex_tensor_impl->reset_data_type(dstScalarType);
       ipex_tensor_impl->storage().unsafeGetStorageImpl()->set_dtype(at::scalarTypeToTypeMeta(dstScalarType));
       ipex_tensor_impl->storage().unsafeGetStorageImpl()->set_numel(shade_context->dil_tensor->get_nelems());
-      ipex_tensor_impl->set_storage(ipexTensor.storage());
       return;
     }
   }

@@ -8,9 +8,9 @@ namespace cpu {
 namespace bf16 {
 namespace chk {
 
-bool bf16_support_the_tensors(const std::vector<at::Tensor> &tensor_vec) {
+bool bf16_support_the_tensors(const std::vector<at::Tensor> &tensor_vec, at::ScalarType dst_dtype) {
   for (auto it = tensor_vec.begin(); it != tensor_vec.end(); ++it) {
-    if (!check_tensor_own_whole_storage(*it)) {
+    if (!check_tensor_own_whole_storage(*it) && (it->scalar_type() != dst_dtype)) {
       return false;
     }
   }

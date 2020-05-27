@@ -296,18 +296,13 @@ class DenseOPCodeGen(object):
 
         tensor_param_vars = self.get_tensor_parameter(cpp_sig)
         if not self.is_bf16_func(aten_func_sig_str):
-            if len(tensor_param_vars) > 0:
-                code += '  if (check_mix_bf16_fp32()) {\n'
-                for tensor_param_var in tensor_param_vars:
-                    code += '    bridge::{}({}, at::kFloat);\n'.format(reorder_func_name, tensor_param_var)
-                code += '  }\n'
             return code
         else:
             code += '  if (check_mix_bf16_fp32()) {\n'
             code += '    std::vector<at::Tensor> dnnl_input_tensors;\n'
             for tensor_param_var in tensor_param_vars:
                 code += '    dnnl_input_tensors.push_back({});\n'.format(tensor_param_var)
-            code += '    if (bf16::chk::bf16_support_the_tensors(dnnl_input_tensors)) {\n'
+            code += '    if (bf16::chk::bf16_support_the_tensors(dnnl_input_tensors, at::kBFloat16)) {\n'
             for tensor_param_var in tensor_param_vars:
                 code += '      bridge::{}({}, at::kBFloat16);\n'.format(reorder_func_name, tensor_param_var)
             code += '    }\n'
@@ -368,6 +363,14 @@ class DenseOPCodeGen(object):
     def gen_fallback_prepare_code(self, cpp_sig):
         code = ''
         op_check_code = ''
+
+        tensor_param_vars = self.get_tensor_parameter(cpp_sig)
+        if len(tensor_param_vars) > 0:
+            code += '  if (check_mix_bf16_fp32()) {\n'
+            for tensor_param_var in tensor_param_vars:
+                code += '    bridge::reorderTensorToScalaraType({}, at::kFloat);\n'.format(tensor_param_var)
+            code += '  }\n'
+
         for param in cpp_sig.input_params:
             if param.core_type == 'TensorList':
                 ipex_name = '_ipex_{}'.format(param.name)
