@@ -14,6 +14,8 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
+DPCPP_DEF_K1(uniform_random_filler);
+
 template <typename scalar_t>
 void uniform(Tensor& self, Generator* _generator, double a, double b) {
   auto gen = at::get_generator_or_default<at::DPCPPGenerator>(
@@ -33,25 +35,31 @@ void uniform(Tensor& self, Generator* _generator, double a, double b) {
     parallel_for_setup(self.numel(), tile_size, range, global_range);
     auto num_work_items = DPCPP::nd_range<1>(
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
+    auto current_seed = gen->current_seed();
 
-    if (std::is_same<scalar_t, float>::value) {
-      FloatRandomFiller uniform_rnd_filler(
-          acc, range, gen->current_seed(), a, b);
-      cgh.parallel_for(num_work_items, uniform_rnd_filler);
-    } else if (std::is_same<scalar_t, at::Half>::value) {
-      HalfRandomFiller uniform_rnd_filler(
-          acc, range, gen->current_seed(), a, b);
-      cgh.parallel_for(num_work_items, uniform_rnd_filler);
-    } else {
-      DoubleRandomFiller uniform_rnd_filler(
-          acc, range, gen->current_seed(), a, b);
-      cgh.parallel_for(num_work_items, uniform_rnd_filler);
-    }
+    cgh.parallel_for<DPCPP_K(uniform_random_filler, scalar_t)>(num_work_items,
+      [=](cl::sycl::nd_item<1> item) {
+        if (std::is_same<scalar_t, float>::value) {
+          FloatRandomFiller uniform_rnd_filler(
+              acc, range, current_seed, a, b);
+          uniform_rnd_filler(item);
+        } else if (std::is_same<scalar_t, at::Half>::value) {
+          HalfRandomFiller uniform_rnd_filler(
+              acc, range, current_seed, a, b);
+          uniform_rnd_filler(item);
+        } else {
+          DoubleRandomFiller uniform_rnd_filler(
+              acc, range, current_seed, a, b);
+          uniform_rnd_filler(item);
+        }
+      });
   };
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
   queue.wait_and_throw();
 }
+
+DPCPP_DEF_K1(normal_random_filler);
 
 template <typename scalar_t, typename accreal>
 void normal(Tensor& self, double mean, double stdv, Generator* _generator) {
@@ -81,9 +89,11 @@ void normal(Tensor& self, double mean, double stdv, Generator* _generator) {
     parallel_for_setup(compute_num, tile_size, range, global_range);
     auto num_work_items = DPCPP::nd_range<1>(
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
-
-    NormalRandomFiller<accreal> normal_rnd_filler(acc, compute_num, stdv, mean);
-    cgh.parallel_for(num_work_items, normal_rnd_filler);
+    cgh.parallel_for<DPCPP_K(normal_random_filler, accreal, scalar_t)>(num_work_items,
+      [=](cl::sycl::nd_item<1> item) {
+        NormalRandomFiller<accreal> normal_rnd_filler(acc, compute_num, stdv, mean);
+        normal_rnd_filler(item);
+      });
   };
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);

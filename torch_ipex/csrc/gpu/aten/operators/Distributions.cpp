@@ -16,11 +16,13 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-template <typename scalar_t>
-class bernoulli_tensor_dpcpp_ker {};
+DPCPP_DEF_K1(bernoulli_tensor_dpcpp_ker);
 
-template <typename scalar_t>
-class bernoulli_scalar_dpcpp_ker {};
+DPCPP_DEF_K1(bernoulli_scalar_dpcpp_ker);
+
+DPCPP_DEF_K1(bernoulli_tensor_sycl_random_filler);
+
+DPCPP_DEF_K1(bernoulli_scalar_sycl_random_filler);
 
 template <typename scalar_t>
 void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
@@ -34,8 +36,12 @@ void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
     auto num_work_items = DPCPP::nd_range<1>(
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
-    FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
-    cgh.parallel_for(num_work_items, uniform_rnd_filler);
+    cgh.parallel_for<DPCPP_K(bernoulli_scalar_sycl_random_filler, scalar_t)>(num_work_items,
+      [=](cl::sycl::nd_item<1> item) {
+        FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
+        uniform_rnd_filler(item);
+      });
+
   };
 
   // launch kernel
@@ -47,7 +53,7 @@ void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
     auto out_acc =
         DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size);
-    cgh.parallel_for<bernoulli_scalar_dpcpp_ker<scalar_t>>(
+    cgh.parallel_for<DPCPP_K(bernoulli_scalar_dpcpp_ker, scalar_t)>(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size)),
         [=](DPCPP::nd_item<1> item) {
@@ -76,8 +82,11 @@ void bernoulli_tensor_kernel(Tensor& ret, const Tensor& p, uint64_t seed) {
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
     auto num_work_items = DPCPP::nd_range<1>(
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
-    FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
-    cgh.parallel_for(num_work_items, uniform_rnd_filler);
+    cgh.parallel_for<DPCPP_K(bernoulli_tensor_sycl_random_filler, scalar_t)>(num_work_items,
+      [=](cl::sycl::nd_item<1> item) {
+        FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
+        uniform_rnd_filler(item);
+      });
   };
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf1);
@@ -99,7 +108,7 @@ void bernoulli_tensor_kernel(Tensor& ret, const Tensor& p, uint64_t seed) {
       }
     };
 
-    cgh.parallel_for<bernoulli_tensor_dpcpp_ker<scalar_t>>(
+    cgh.parallel_for<DPCPP_K(bernoulli_tensor_dpcpp_ker, scalar_t)>(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size)),
         kfn);
@@ -145,8 +154,8 @@ int binary_search_for_multinomial(
   return start;
 }
 
-template <typename scalar_t>
-class sample_multinomial_with_replacement_syck_ker {};
+DPCPP_DEF_K1(sample_multinomial_with_replacement_syck_ker);
+
 template <typename scalar_t>
 void sample_multinomial_with_replacement(
     std::pair<uint64_t, uint64_t> seeds,
@@ -199,15 +208,15 @@ void sample_multinomial_with_replacement(
       }
     };
 
-    cgh.parallel_for<sample_multinomial_with_replacement_syck_ker<scalar_t>>(
+    cgh.parallel_for<DPCPP_K(sample_multinomial_with_replacement_syck_ker, scalar_t)>(
         DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename scalar_t>
-class sample_multinomial_without_replacement_syck_ker {};
+DPCPP_DEF_K1(sample_multinomial_without_replacement_syck_ker);
+
 template <typename scalar_t>
 void sample_multinomial_without_replacement(
     std::pair<uint64_t, uint64_t> seeds,
@@ -259,7 +268,7 @@ void sample_multinomial_without_replacement(
           ScalarConvert<int, scalar_t>::to(0);
     };
 
-    cgh.parallel_for<sample_multinomial_without_replacement_syck_ker<scalar_t>>(
+    cgh.parallel_for<DPCPP_K(sample_multinomial_without_replacement_syck_ker, scalar_t)>(
         range, kfn);
   };
 
