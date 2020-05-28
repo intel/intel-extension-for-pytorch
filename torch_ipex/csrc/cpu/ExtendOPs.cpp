@@ -453,7 +453,13 @@ at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& we
     return cpu::AtenIpexCPUDev::dil_linear(input, weight, bias);
 }
 
+at::Tensor AtenIpexTypeExt::linear_fuse_relu(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
+    RECORD_FUNCTION("linear_fuse_relu", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+    return cpu::AtenIpexCPUDev::dil_linear_fuse_relu(input, weight, bias);
+}
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::linear_backward(const at::Tensor& input, const at::Tensor& grad_output, const at::Tensor& weight, std::array<bool,3> output_mask) {
+    RECORD_FUNCTION("linear_backward", std::vector<c10::IValue>({input, grad_output, weight}), torch::autograd::Node::peek_at_next_sequence_nr());
     return cpu::AtenIpexCPUDev::dil_linear_backward(input, grad_output, weight, output_mask);
 }
 
@@ -475,6 +481,12 @@ at::Tensor AtenIpexTypeExt::max_pooling_backward(const at::Tensor& grad_output, 
 
 at::Tensor AtenIpexTypeExt::reshape(const at::Tensor& input, at::IntArrayRef size) {
     return cpu::AtenIpexCPUDev::dil_reshape(input, size);
+}
+
+
+at::Tensor AtenIpexTypeExt::relu_use_dst_for_bwd(const at::Tensor& grad_output, const at::Tensor& output) {
+  RECORD_FUNCTION("dil_relu_use_dst_for_bwd", std::vector<c10::IValue>({grad_output, output}), torch::autograd::Node::peek_at_next_sequence_nr());
+  return cpu::AtenIpexCPUDev::dil_relu_use_dst_for_bwd(grad_output, output);
 }
 
 }  // namespace torch_ipex
