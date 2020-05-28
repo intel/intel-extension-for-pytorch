@@ -55,6 +55,33 @@ class TestConv(TestCase):
         res_auto_bf16 = bn_auto_bf16(in_auto_bf16)
         self.assertEqual(res_auto_bf16.dtype, torch.bfloat16)
         self.assertEqual(res_man_bf16.float(), res_auto_bf16.float(), 1e-2)
+    
+    def test_conv_with_relu(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        _conv = torch.nn.Conv2d(1, 1, (3, 3))
+        bn_man_bf16 =copy.deepcopy(_conv).to(device=device).to(torch.bfloat16)
+        bn_auto_bf16 =copy.deepcopy(_conv).to(device=device)
+
+        _in_cpu = torch.rand((1, 1, 7, 7))
+        in_auto_bf16 = _in_cpu.to(device=device)
+        in_man_bf16 = in_auto_bf16.to(torch.bfloat16)
+
+        res_cpu_fp32 = _conv(_in_cpu)
+        res = res_cpu_fp32.relu_()
+
+        ipex.core.enable_auto_dnnl()
+        res_man_bf16 = bn_man_bf16(in_man_bf16)
+        res_man_bf16.relu_()
+        self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
+        self.assertEqual(res_cpu_fp32.bfloat16().float(), res_man_bf16, 1e-2)
+
+        ipex.core.enable_mix_bf16_fp32()
+        res_auto_bf16 = bn_auto_bf16(in_auto_bf16)
+        res_auto_bf16.relu_()
+        self.assertEqual(res_auto_bf16.dtype, torch.bfloat16)
+        self.assertEqual(res_man_bf16.float(), res_auto_bf16.float(), 1e-2)
 
 # class TestBatchNorm(TestCase):
 #     def test_batch_norm2d(self):

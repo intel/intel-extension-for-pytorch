@@ -66,7 +66,18 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor',
 ]
 
-_FN_BF16_FUNCS_WITH_SIMPLE_ATEN_SIG = _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG
+_FN_BF16_FUNCS_WITH_SIMPLE_ATEN_SIG = [
+    'aten::mul.Tensor(Tensor self, Tensor other) -> Tensor',
+    'aten::mul_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)',
+    'aten::mul.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)',
+    'aten::avg_pool2d(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=0, bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None) -> Tensor',
+    'aten::avg_pool3d(Tensor self, int[3] kernel_size, int[3] stride=[], int[3] padding=0, bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None) -> Tensor',
+    'aten::relu(Tensor self) -> Tensor',
+    'aten::relu_(Tensor(a!) self) -> Tensor(a!)',
+    'aten::convolution_overrideable(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups) -> Tensor',
+    'aten::convolution_backward_overrideable(Tensor grad_output, Tensor input, Tensor weight, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool[3] output_mask) -> (Tensor grad_input, Tensor grad_weight, Tensor grad_bias)',
+    'aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor',
+]
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
 _SHALLOW_FALLBACK_TO_CPU_TENSOR = 'shallowFallbackToCPUTensor'
