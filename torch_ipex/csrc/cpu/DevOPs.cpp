@@ -607,9 +607,9 @@ at::Tensor AtenIpexCPUDev::dil_linear_fuse_relu(
   output_size.push_back(weight.size(0));
 
   if (self.dim() > 2) {
-    return dbl::comm::gen_aten_tensor_by(y).reshape(output_size);
+    return dbl::comm::gen_aten_tensor_by(std::move(y)).reshape(output_size);
   }
-  return dbl::comm::gen_aten_tensor_by(y);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
 at::Tensor dil_linear_backward_input(
@@ -1049,7 +1049,7 @@ at::Tensor AtenIpexCPUDev::dil_relu_use_dst_for_bwd(const at::Tensor& grad_outpu
   dil::tensor gradx;
   dil::eltwise_backward::compute(y, grady, gradx,
           dil::algorithm::eltwise_relu_use_dst_for_bwd, /*alpha*/ 0.0);
-  return dbl::comm::gen_aten_tensor_by(gradx);
+  return dbl::comm::gen_aten_tensor_by(std::move(gradx));
 }
 
 at::Tensor AtenIpexCPUDev::dil_threshold_backward(const at::Tensor& grad_output, const at::Tensor& input, at::Scalar threshold) {
