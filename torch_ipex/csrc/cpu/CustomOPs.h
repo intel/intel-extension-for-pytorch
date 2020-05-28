@@ -15,7 +15,7 @@ class NewLinearOp : public torch::autograd::Function<NewLinearOp> {
         torch::autograd::AutogradContext* ctx,
         at::Tensor input,
         at::Tensor weight,
-        at::Tensor bias) {
+        at::Tensor bias = at::Tensor()) {
         ctx->save_for_backward({input, weight, bias});
         if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
           return torch_ipex::cpu::AtenIpexCPUDev::dil_linear(input, weight, bias);
@@ -42,8 +42,8 @@ class NewLinearOp : public torch::autograd::Function<NewLinearOp> {
         std::tie(grad_weight, grad_bias) = torch_ipex::cpu::AtenIpexCPUDev::dil_linear_backward_weights(
             grad_output.contiguous(), input, weight, bias.defined());
       } else {
-        auto grad_input = grad_output.mm(weight);
-        auto grad_weight = grad_output.t().mm(input);
+        grad_input = grad_output.mm(weight);
+        grad_weight = grad_output.t().mm(input);
         if (bias.defined()) {
           grad_bias = grad_output.sum(0);
         }
