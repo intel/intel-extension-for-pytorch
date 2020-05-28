@@ -91,9 +91,17 @@ void InitIpexModuleBindings(py::module m) {
         [](const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
           return AtenIpexTypeExt::linear(input, weight, bias);
         });
+  m.def("linear_fuse_relu",
+        [](const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
+          return AtenIpexTypeExt::linear_fuse_relu(input, weight, bias);
+        });
   m.def("linear_backward",
         [](const at::Tensor& input, const at::Tensor& grad_output, const at::Tensor& weight, std::array<bool,3> output_mask) {
           return AtenIpexTypeExt::linear_backward(input, grad_output, weight, output_mask);
+        });
+  m.def("relu_use_dst_backward",
+        [](const at::Tensor& grad_output, const at::Tensor& output) {
+          return AtenIpexTypeExt::relu_use_dst_for_bwd(grad_output, output);
         });
   m.def("adaptive_avg_pool2d",
         [](at::Tensor const& input, at::IntArrayRef output_size) {
