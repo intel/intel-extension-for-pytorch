@@ -453,6 +453,54 @@ class TestLinear(TestCase):
             y2.backward()
             self.assertEqual(x1.grad, x2.grad)
 
+class TestLinearFuseRelu(TestCase):
+    def test_linear_fuse_relu_forward(self):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        in_features = torch.randint(3, 10, (1,)).item()
+        out_features = torch.randint(3, 100, (1,)).item()
+        for dtype in [torch.bfloat16, torch.float]:
+            x = torch.randn(3, in_features) * 10
+            x = x.to(dtype).to('dpcpp')
+            for bias in [True, False]:
+                linear = torch.nn.Linear(in_features, out_features, bias=bias).to('dpcpp').to(dtype)
+                relu = torch.nn.ReLU()
+                linear_fuse_relu = intel_pytorch_extension_py.LinearFuseRelu(in_features, out_features, bias=bias)
+                linear_fuse_relu.weight.data = linear.weight.clone()
+                if bias:
+                    linear_fuse_relu.bias.data = linear.bias.clone()
+                self.assertEqual(relu(linear(x)).float(), linear_fuse_relu(x).float())
+
+    def test_linear_fuse_relu_backward(self):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        in_features = torch.randint(3, 10, (1,)).item()
+        out_features = torch.randint(3, 100, (1,)).item()
+        for dtype in [torch.bfloat16, torch.float]:
+            x = torch.randn(3, in_features) * 10
+            x = x.to(dtype).to('dpcpp')
+            for bias in [True, False]:
+                linear = torch.nn.Linear(in_features, out_features, bias=bias).to('dpcpp').to(dtype)
+                relu = torch.nn.ReLU()
+                linear_fuse_relu = intel_pytorch_extension_py.LinearFuseRelu(in_features, out_features, bias=bias)
+                linear_fuse_relu.weight.data = linear.weight.clone()
+                if bias:
+                    linear_fuse_relu.bias.data = linear.bias.clone()
+                x1 = x.clone().requires_grad_()
+                x2 = x.clone().requires_grad_()
+                y1 = relu(linear(x1).float()).sum()
+                y2 = linear_fuse_relu(x2).sum()
+                y1.backward()
+                y2.backward()
+                self.assertEqual(x1.grad.float(), x2.grad.float())
+                self.assertEqual(linear.weight.grad.float(), linear_fuse_relu.weight.grad.float())
+                if bias:
+                    self.assertEqual(linear.bias.grad.float(), linear_fuse_relu.bias.grad.float())
+
 class TestPool(TestCase):
     def test_avg_pool2d(self):
         ipex.enable_auto_dnnl()
