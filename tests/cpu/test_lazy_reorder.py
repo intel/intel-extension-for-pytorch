@@ -467,7 +467,7 @@ class TestLinearFuseRelu(TestCase):
             for bias in [True, False]:
                 linear = torch.nn.Linear(in_features, out_features, bias=bias).to('dpcpp').to(dtype)
                 relu = torch.nn.ReLU()
-                linear_fuse_relu = intel_pytorch_extension_py.LinearFuseRelu(in_features, out_features, bias=bias)
+                linear_fuse_relu = intel_pytorch_extension.LinearFuseRelu(in_features, out_features, bias=bias)
                 linear_fuse_relu.weight.data = linear.weight.clone()
                 if bias:
                     linear_fuse_relu.bias.data = linear.bias.clone()
@@ -486,7 +486,7 @@ class TestLinearFuseRelu(TestCase):
             for bias in [True, False]:
                 linear = torch.nn.Linear(in_features, out_features, bias=bias).to('dpcpp').to(dtype)
                 relu = torch.nn.ReLU()
-                linear_fuse_relu = intel_pytorch_extension_py.LinearFuseRelu(in_features, out_features, bias=bias)
+                linear_fuse_relu = intel_pytorch_extension.LinearFuseRelu(in_features, out_features, bias=bias)
                 linear_fuse_relu.weight.data = linear.weight.clone()
                 if bias:
                     linear_fuse_relu.bias.data = linear.bias.clone()
