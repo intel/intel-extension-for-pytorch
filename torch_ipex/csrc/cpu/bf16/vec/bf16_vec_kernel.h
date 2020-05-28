@@ -166,9 +166,9 @@ static inline void move_ker(at::BFloat16 *out, at::BFloat16 *in, int64_t len) {
   int64_t i = 0;
   for (; i < len - 63; i += 64) {
     auto in0 = _mm512_loadu_si512(in + i);
-    auto in1 = _mm512_loadu_si512(in + i + 16);
+    auto in1 = _mm512_loadu_si512(in + i + 32);
     _mm512_storeu_si512(out + i, in0);
-    _mm512_storeu_si512(out + i + 16, in1);
+    _mm512_storeu_si512(out + i + 32, in1);
   }
 
   if (i < len - 31) {
