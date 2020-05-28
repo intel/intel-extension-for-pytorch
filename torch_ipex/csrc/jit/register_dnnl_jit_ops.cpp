@@ -100,6 +100,19 @@ RegisterOperators op({
         }
       },
       aliasAnalysisFromSchema()
+      ),
+    Operator(
+      "ipex::prepack_weight(Tensor input, Tensor weight, Tensor? bias, int[2] stride, int[2] padding, int[2] dilation, int groups) -> Tensor(a!)",
+      [] (const Node* node) ->Operation {
+        if (torch_ipex::check_auto_dnnl()) {
+          return [] (Stack& stack) {
+            return 0;
+          };
+        } else {
+          TORCH_CHECK(false, "PyTorch native path not support prepack weight now");
+        }
+      },
+      aliasAnalysisFromSchema()
       )
     });
 }
