@@ -207,7 +207,6 @@ formatTag Conv2dNode::expectedWeightFormat(
   return desc.get_internal_format();
 }
 
-
 void Conv2dNode::fixWeightFormatIfPossible() {
   if (couldInferFormats()) {
     auto tensor = toIValue(this->input(1))->toTensor();

@@ -1,7 +1,8 @@
 #include <string>
-#include "graph_ext.h"
 #include "fusion_pass.h"
-#include "accelerated_ops.h"
+
+#include "cpu/FusionOPs.h"
+
 #include <torch/csrc/utils/hash.h>
 #include <torch/csrc/jit/runtime/operator.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
@@ -80,84 +81,38 @@ public:
     aliasDb_ = std::make_unique<AliasDb>(graph_);
   }
 
+  Node* fuseOpsWithNewKind(Node *curr, Value *v, Graph *g, NodeKind kind) {
+    auto newNode = g->create(kind);
+    auto prev = v->node();
+    newNode->insertBefore(prev);
+    newNode->setScope(prev->scope());
+    newNode->copyAttributes(*prev);
+
+    for (auto input : prev->inputs()) {
+      newNode->addInput(input);
+    }
+
+    for (auto input : curr->inputs()) {
+      if (input != v) {
+        newNode->addInput(input);
+      }
+    }
+
+    // Copy curr or prev?
+    newNode->output()->copyMetadata(prev->output());
+    newNode->output()->setType(prev->output()->type());
+
+    v->replaceAllUsesWith(newNode->output());
+    curr->replaceAllUsesWith(newNode);
+
+    prev->destroy();
+    curr->destroy();
+
+    return newNode;
+  }
+
   Node* fuseNodes(Node *curr, Value *path, Rule rule) {
     return fuseOpsWithNewKind(curr, path, curr->owningGraph(), rule->second);
-  }
-
-  //
-  // currently we only have to fold conv2d + batch_norm
-  //
-  bool isFoldable(Node* node, Node* prev) {
-    bool foldable = (node->kind() == dnnl::batch_norm
-        && prev->kind() == dnnl::conv2d);
-
-    //
-    // Check whether all the sources are constant ???
-    // Does performance improve no matter we do it pre-compiling or runtime?
-    //
-    auto* conv2d = reinterpret_cast<NodeExt *>(prev)->cast<Conv2dNode>();
-    auto* batch_norm = reinterpret_cast<NodeExt *>(node)->cast<BatchNorm2dNode>();
-
-    foldable = foldable
-      && conv2d->hasConstantParams()
-      && batch_norm->hasConstantParams();
-    return foldable;
-  }
-
-  Node* foldNodes(Node *conv2d, Node *batch_norm) {
-    // Change weight/bias source
-    auto* fold_weight = createBatchNormFoldWeight(conv2d, batch_norm);
-    fold_weight->insertBefore(conv2d);
-    conv2d->replaceInput(1, fold_weight->output());
-
-    auto* fold_bias = createBatchNormFoldBias(conv2d, batch_norm);
-    fold_bias->insertBefore(conv2d);
-    conv2d->replaceInput(2, fold_bias->output());
-
-    batch_norm->replaceAllUsesWith(conv2d);
-    batch_norm->destroy();
-    return conv2d;
-  }
-
-  Node* createBatchNormFoldWeight(Node *conv2d, Node *batch_norm) {
-    auto g = conv2d->owningGraph();
-    auto newNode = g->create(dnnl::fold_weight);
-    newNode->setScope(conv2d->scope());
-
-    // We need following parameters
-    newNode->addInput(conv2d->input(1));  // Conv2d weights
-    newNode->addInput(batch_norm->input(1)); // Batch norm weights
-    newNode->addInput(batch_norm->input(4)); // running_var (delta)
-    newNode->addInput(batch_norm->input(7)); // eps
-
-    // We get meta and type from conv2d weight value
-    newNode->output()->copyMetadata(conv2d->input(1));
-    newNode->output()->setType(conv2d->input(1)->type());
-    newNode->output()->setDebugName(conv2d->input(1)->debugName() + ".bn_folded");
-
-    return newNode;
-  }
-
-  Node* createBatchNormFoldBias(Node *conv2d, Node *batch_norm) {
-    auto g = conv2d->owningGraph();
-    auto newNode = g->create(dnnl::fold_bias);
-    newNode->setScope(conv2d->scope());
-
-    // We need following information
-    newNode->addInput(conv2d->input(1)); // Conv weight
-    newNode->addInput(conv2d->input(2)); // Conv bias
-    newNode->addInput(batch_norm->input(1)); // batch norm weight
-    newNode->addInput(batch_norm->input(2)); // batch norm bias
-    newNode->addInput(batch_norm->input(3)); // running_mean (mu)
-    newNode->addInput(batch_norm->input(4)); // running_var (delta)
-    newNode->addInput(batch_norm->input(7)); // eps
-
-    // We get meta and type from conv2d bias value
-    newNode->output()->copyMetadata(conv2d->input(2));
-    newNode->output()->setType(conv2d->input(2)->type());
-    newNode->output()->setDebugName(conv2d->input(2)->debugName() + ".bn_folded");
-
-    return newNode;
   }
 
   bool aliasIsSafeForSquashingValue(Node *node, Value *v) {
@@ -198,7 +153,7 @@ public:
     }
 
     // throw
-    auto er = script::ErrorReport(node->sourceRange());
+    auto er = ErrorReport(node->sourceRange());
     er << "Schema not found for fusion process. \n";
     er << "Prev: " << *prev << "\n";
     er << "Node: " << *node << "\n";
@@ -295,51 +250,39 @@ public:
   }
 
   std::pair<graph_node_list::iterator, bool> processNode(Node *node) {
-    auto nodeExt = reinterpret_cast<NodeExt *>(node);
 
     Node* pos = node;
     bool changed = false;
 
-    if (nodeExt->isDNNLOps()) {
-      //
-      // Check whether we could fuse to one certain value path
-      //
-      for (auto *v : node->inputs()) {
-        auto prev = v->node();
-        auto fuseRule = isFusable(node, prev);
+    //
+    // Check whether we could fuse to one certain value path
+    //
+    for (auto *v : node->inputs()) {
+      auto prev = v->node();
+      auto fuseRule = isFusable(node, prev);
 
-        // We can fuse only one path
-        if (fuseRule && aliasIsSafeForFusion(node, v, fuseRule)) {
-          pos = fuseNodes(node, v, fuseRule.value());
-          changed = true;
-          break;
-        } else if (isFoldable(node, prev)
-            && aliasIsSafeForSquashingValue(node, v)) {
-          pos = foldNodes(prev, node);
-          changed = true;
-          break;
-        }
+      // We can fuse only one path
+      if (fuseRule && aliasIsSafeForFusion(node, v, fuseRule)) {
+        pos = fuseNodes(node, v, fuseRule.value());
+        changed = true;
+        break;
       }
     }
-
     return std::make_pair(++pos->iterator(), changed);
-}
+  }
+
 };
 
 // TODO: These rules should be more scalable
 OpFuser::RuleTab OpFuser::dnnlRules = {
-  {{dnnl::conv2d, dnnl::relu}, dnnl::conv2d_relu},
-  {{dnnl::conv2d, dnnl::relu_}, dnnl::conv2d_relu},
-  /*
-  {{dnnl::batch_norm, dnnl::relu}, dnnl::batch_norm_relu},
-  {{dnnl::batch_norm, dnnl::relu_}, dnnl::batch_norm_relu},
-  */
-  {{dnnl::conv2d_sum, dnnl::relu}, dnnl::conv2d_sum_relu},
-  {{dnnl::conv2d_sum, dnnl::relu_}, dnnl::conv2d_sum_relu},
+  {{aten::conv2d, aten::relu}, ipex::conv2d_relu},
+  {{aten::conv2d, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_relu},
+  {{ipex::conv2d_sum, aten::relu}, ipex::conv2d_sum_relu},
+  {{ipex::conv2d_sum, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_sum_relu},
 
-  {{dnnl::conv2d, dnnl::sum}, dnnl::conv2d_sum},
-  {{dnnl::conv2d, dnnl::sum_}, dnnl::conv2d_sum},
-  // {{dnnl::conv2d_relu, dnnl::sum}, dnnl::conv2d_relu_sum}
+  {{aten::conv2d, aten::add}, ipex::conv2d_sum},
+  {{aten::conv2d, aten::add_}, ipex::conv2d_sum},
+  //{{dnnl::conv2d_relu, aten::add}, dnnl::conv2d_relu_sum}
 };
 
 void FusionPass(std::shared_ptr<Graph> &graph) {
@@ -351,4 +294,5 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   // TODO: Some post processing?? ECS/EDC/Peephole???
   ConstantPropagation(graph);
 }
+
 }} // namespace torch::jit

@@ -10,6 +10,7 @@
 #include "xsmm/libxsmm_utils.h"
 #include "../utils.h"
 #include "DevOPs.h"
+#include "CustomOPs.h"
 
 namespace torch_ipex {
 
@@ -449,8 +450,9 @@ AtenIpexTypeExt::embedding_bag_backward(const at::Tensor& grad, const at::Tensor
   return cpu::aten::embedding_bag::embedding_bag_backward_impl(grad, indices, offsets, offset2bag, bag_size, maximum_indices, num_weights, scale_grad_by_freq, mode, sparse, _per_sample_weights);
 }
 
-at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
-    return cpu::AtenIpexCPUDev::dil_linear(input, weight, bias);
+
+at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias) {
+    return NewLinearOp::apply(input, weight, bias);
 }
 
 at::Tensor AtenIpexTypeExt::linear_fuse_relu(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
@@ -464,7 +466,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::linear_backward(
 }
 
 at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d(at::Tensor const& input, at::IntArrayRef output_size) {
-    return cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(input, output_size);
+    return NewApaptiveAvgPoolingOp::apply(input, output_size);
 }
 
 at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d_backward(const at::Tensor& grad_output, const at::Tensor& input) {
@@ -472,7 +474,7 @@ at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d_backward(const at::Tensor& grad_
 }
 
 at::Tensor AtenIpexTypeExt::max_pooling(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
-    return cpu::AtenIpexCPUDev::dil_max_pooling(input, kernel_size, stride, padding, dilation, ceil_mode);
+    return NewMaxPoolingOp::apply(input, kernel_size, stride, padding, dilation, ceil_mode);
 }
 
 at::Tensor AtenIpexTypeExt::max_pooling_backward(const at::Tensor& grad_output, const at::Tensor& output, const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {

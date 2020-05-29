@@ -5,6 +5,12 @@
 #include <c10/util/Optional.h>
 #include <torch/csrc/utils/pybind.h>
 
+#include <torch/csrc/jit/python/pybind_utils.h>
+#include <torch/csrc/jit/runtime/custom_operator.h>
+#include <torch/csrc/jit/runtime/operator_options.h>
+#include <torch/csrc/jit/passes/pass_manager.h>
+#include "jit/fusion_pass.h"
+
 #include <cstring>
 #include <sstream>
 #include <string>
@@ -88,7 +94,7 @@ void InitIpexModuleBindings(py::module m) {
         });
 
   m.def("linear",
-        [](const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
+        [](const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias) {
           return AtenIpexTypeExt::linear(input, weight, bias);
         });
   m.def("linear_fuse_relu",
@@ -128,15 +134,26 @@ void InitIpexModuleBindings(py::module m) {
   m.def("mlp_create_handle", &AtenIpexTypeMLPExt::create_handle);
   m.def("mlp_set_relu_mask", &AtenIpexTypeMLPExt::set_relu_mask);
   m.def("mlp_release_handle", &AtenIpexTypeMLPExt::release_handle);
-
   m.def("is_dil_tensor", &isDilTensor);
   m.def("get_dil_tensor_sizes", &getDilTensorSizes);
   m.def("get_dil_tensor_strides", &getDilTensorStrides);
+  m.def("enable_jit", []() { AutoOptConfig::singleton().set_jit_fuse(true); });
+  m.def("disable_jit", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
+  m.def("get_jit", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
 }
 
 }  // namespace
+using namespace torch::jit;
 
-void InitIpexBindings(py::module m) { InitIpexModuleBindings(m); }
+void InitIpexBindings(py::module m) {
+  InitIpexModuleBindings(m);
+  // jit fusion pass
+  RegisterPass pass([](std::shared_ptr<Graph>& g) {
+    if (AutoOptConfig::singleton().get_jit_fuse()) {
+      torch::jit::FusionPass(g);
+    }
+  });
+}
 
 }  // namespace torch_ipex
 

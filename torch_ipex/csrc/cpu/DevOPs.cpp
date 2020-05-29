@@ -526,7 +526,7 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_(
 at::Tensor AtenIpexCPUDev::dil_linear(
     const at::Tensor& self,
     const at::Tensor& weight,
-    const c10::optional<at::Tensor>& bias) {
+    const at::Tensor& bias) {
   DEBUG("AtenIpexCPUDev::dil_linear\n");
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(weight);
@@ -539,9 +539,8 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
 
   dil::tensor y;
-  if (bias.has_value()) {
-    at::Tensor bias_vec = bias.value();
-    const dil::tensor b = dbl::comm::try_gen_dil_tensor(bias_vec);
+  if (bias.defined()) {
+    const dil::tensor b = dbl::comm::try_gen_dil_tensor(bias);
     dil::inner_product_forward::compute(x, w, b, y);
   } else {
     dil::inner_product_forward::compute(x, w, y);
@@ -599,7 +598,7 @@ at::Tensor AtenIpexCPUDev::dil_linear_fuse_relu(
   return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
-at::Tensor dil_linear_backward_input(
+at::Tensor AtenIpexCPUDev::dil_linear_backward_input(
     at::IntArrayRef input_size, const at::Tensor& grad_output, const at::Tensor& weight){
   DEBUG("AtenIpexCPUDev::dil_linear_backward_input\n");
   auto grad_output_reshaped = grad_output.dim() > 2 ?
@@ -621,7 +620,7 @@ at::Tensor dil_linear_backward_input(
   return dbl::comm::gen_aten_tensor_by(std::move(gradx));
 }
 
-std::tuple<at::Tensor, at::Tensor> dil_linear_backward_weights(
+std::tuple<at::Tensor, at::Tensor> AtenIpexCPUDev::dil_linear_backward_weights(
     const at::Tensor& grad_output, const at::Tensor& input, const at::Tensor& weight, bool bias_defined) {
   DEBUG("AtenIpexCPUDev::dil_linear_backward_weights\n");
   auto grad_output_reshaped = grad_output.dim() > 2 ?
