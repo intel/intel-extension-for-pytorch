@@ -6,7 +6,6 @@
 #include <sstream>
 
 float DPCPPEventStubImpl::elapsed() {
-  printf("DPCPPEventStubImpl elapsed ++\n");
   float us;
   event_.wait();
   auto start = event_.template get_profiling_info<
