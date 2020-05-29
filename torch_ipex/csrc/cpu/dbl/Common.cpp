@@ -99,7 +99,6 @@ void sync_shape_from_dil_to_aten(const at::Tensor& ipex_tensor, const dil::tenso
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(sizes.size() != 1 || sizes[0] != 0);
     ipex_tensor.unsafeGetTensorImpl()->set_sizes_contiguous(sizes);
   }
-
 }
 
 }  // namespace comm

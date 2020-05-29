@@ -136,9 +136,11 @@ include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
 set(DPCPP_SRCS)
 set(DPCPP_COMMON_SRCS)
 set(DPCPP_CPU_SRCS)
+set(DPCPP_JIT_SRCS)
 
 add_subdirectory(${DPCPP_ROOT})
 add_subdirectory(${DPCPP_ROOT}/cpu)
+add_subdirectory(${DPCPP_ROOT}/jit)
 
 # libxsmm
 include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
@@ -153,7 +155,7 @@ ExternalProject_Add(xsmm
   INSTALL_COMMAND ""
   )
 # Compile code with pybind11
-set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS})
+set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP_JIT_SRCS})
 pybind11_add_module(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 target_link_libraries(${PLUGIN_NAME} PRIVATE ${DPCPP_THIRD_PARTY_ROOT}/xsmm/lib/libxsmm.a)
 
