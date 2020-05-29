@@ -889,7 +889,7 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
   DEBUG("AtenIpexCPUDev::dil_adaptive_avg_pool2d\n");
   CHECK_DNNL_OP_PRE_COND(input);
   auto output_size_vec =
-      dbl::pool::expand_param_if_needed(output_size, "output_size", input.dim() - 2);
+      dbl::comm::expand_param_if_needed(output_size, "output_size", input.dim() - 2);
   std::vector<int64_t> kernel_size(input.dim() - 2);
   for (int64_t i = 2; i < input.dim(); ++i) {
     auto s1 = input.size(i);

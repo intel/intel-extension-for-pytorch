@@ -73,7 +73,7 @@ at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
     nullptr,
     /*resizeable=*/false);
   auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::DPCPPTensorId);
-  dbl::comm::sync_shape_from_dil_to_aten(_tensor, shade_data_context->dil_tensor.value());
+  sync_shape_from_dil_to_aten(_tensor, shade_data_context->dil_tensor.value());
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_tensor.layout() == c10::kStrided);
   return _tensor;
 }
@@ -98,6 +98,23 @@ void sync_shape_from_dil_to_aten(const at::Tensor& ipex_tensor, const dil::tenso
     // Blockformat does not inlcude stride information
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(sizes.size() != 1 || sizes[0] != 0);
     ipex_tensor.unsafeGetTensorImpl()->set_sizes_contiguous(sizes);
+  }
+}
+
+std::vector<int64_t> expand_param_if_needed(
+    at::IntArrayRef list_param,
+    const char* param_name,
+    int64_t expected_dim) {
+  if (list_param.size() == 1) {
+    return std::vector<int64_t>(expected_dim, list_param[0]);
+  } else if ((int64_t)list_param.size() != expected_dim) {
+    std::ostringstream ss;
+    ss << "expected " << param_name << " to be a single integer value or a "
+       << "list of " << expected_dim << " values to match the convolution "
+       << "dimensions, but got " << param_name << "=" << list_param;
+    AT_ERROR(ss.str());
+  } else {
+    return list_param.vec();
   }
 }
 

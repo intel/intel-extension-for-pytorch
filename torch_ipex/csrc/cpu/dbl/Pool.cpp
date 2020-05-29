@@ -7,22 +7,7 @@ namespace cpu {
 namespace dbl {
 namespace pool {
 
-inline std::vector<int64_t> expand_param_if_needed(
-    at::IntArrayRef list_param,
-    const char* param_name,
-    int64_t expected_dim) {
-  if (list_param.size() == 1) {
-    return std::vector<int64_t>(expected_dim, list_param[0]);
-  } else if ((int64_t)list_param.size() != expected_dim) {
-    std::ostringstream ss;
-    ss << "expected " << param_name << " to be a single integer value or a "
-       << "list of " << expected_dim << " values to match the convolution "
-       << "dimensions, but got " << param_name << "=" << list_param;
-    AT_ERROR(ss.str());
-  } else {
-    return list_param.vec();
-  }
-}
+using namespace dbl::comm;
 
 template<typename T>
 static inline T div_rtn(T x, T y) {
@@ -92,7 +77,7 @@ at::Tensor _dil_pooling(
   auto padding_vec_r = padding_vec;
   auto dilation_vec = expand_param_if_needed(dilation, "dilation", dims);
 
-  const dil::tensor& x = dbl::comm::try_gen_dil_tensor(input);
+  const dil::tensor& x = try_gen_dil_tensor(input);
   std::vector<int64_t> output_sizes;
 
   if (ceil_mode) {
@@ -151,7 +136,7 @@ at::Tensor _dil_pooling(
       algo,
       dil::prop_kind::forward);
 
-  return dbl::comm::gen_aten_tensor_by(std::move(y));
+  return gen_aten_tensor_by(std::move(y));
 }
 
 at::Tensor _dil_pooling_backward(
@@ -208,9 +193,9 @@ at::Tensor _dil_pooling_backward(
     }
   }
 
-  const dil::tensor& grady = dbl::comm::try_gen_dil_tensor(grad_output);
-  const dil::tensor& y = dbl::comm::try_gen_dil_tensor(output);
-  const dil::tensor& x = dbl::comm::try_gen_dil_tensor(input);
+  const dil::tensor& grady = try_gen_dil_tensor(grad_output);
+  const dil::tensor& y = try_gen_dil_tensor(output);
+  const dil::tensor& x = try_gen_dil_tensor(input);
   dil::tensor gradx;
   dil::pooling_backward::compute(
       grady,
@@ -223,7 +208,7 @@ at::Tensor _dil_pooling_backward(
       {padding_vec_r.cbegin(), padding_vec_r.cend()},
       algo);
 
-  return dbl::comm::gen_aten_tensor_by(std::move(gradx));
+  return gen_aten_tensor_by(std::move(gradx));
 }
 
 }  // namespace pool
