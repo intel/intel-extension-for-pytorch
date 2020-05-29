@@ -71,7 +71,7 @@ index 9bf762b..fd51ade 100644
  
              # construct fully connected operator
 -            LL = nn.Linear(int(n), int(m), bias=True)
-+            if self.use_ipex and self.bf16 and i == sigmoid_layer:
++            if self.use_ipex and self.bf16 and i != sigmoid_layer:
 +                LL = ipex.LinearFuseRelu(int(n), int(m), bias=True)
 +            else:
 +                LL = nn.Linear(int(n), int(m), bias=True)
