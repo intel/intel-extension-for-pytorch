@@ -37,22 +37,21 @@ void uniform(Tensor& self, Generator* _generator, double a, double b) {
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
     auto current_seed = gen->current_seed();
 
-    cgh.parallel_for<DPCPP_K(uniform_random_filler, scalar_t)>(num_work_items,
-      [=](cl::sycl::nd_item<1> item) {
-        if (std::is_same<scalar_t, float>::value) {
-          FloatRandomFiller uniform_rnd_filler(
-              acc, range, current_seed, a, b);
-          uniform_rnd_filler(item);
-        } else if (std::is_same<scalar_t, at::Half>::value) {
-          HalfRandomFiller uniform_rnd_filler(
-              acc, range, current_seed, a, b);
-          uniform_rnd_filler(item);
-        } else {
-          DoubleRandomFiller uniform_rnd_filler(
-              acc, range, current_seed, a, b);
-          uniform_rnd_filler(item);
-        }
-      });
+    cgh.parallel_for<DPCPP_K(uniform_random_filler, scalar_t)>(
+        num_work_items, [=](cl::sycl::nd_item<1> item) {
+          if (std::is_same<scalar_t, float>::value) {
+            FloatRandomFiller uniform_rnd_filler(
+                acc, range, current_seed, a, b);
+            uniform_rnd_filler(item);
+          } else if (std::is_same<scalar_t, at::Half>::value) {
+            HalfRandomFiller uniform_rnd_filler(acc, range, current_seed, a, b);
+            uniform_rnd_filler(item);
+          } else {
+            DoubleRandomFiller uniform_rnd_filler(
+                acc, range, current_seed, a, b);
+            uniform_rnd_filler(item);
+          }
+        });
   };
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
@@ -89,11 +88,12 @@ void normal(Tensor& self, double mean, double stdv, Generator* _generator) {
     parallel_for_setup(compute_num, tile_size, range, global_range);
     auto num_work_items = DPCPP::nd_range<1>(
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
-    cgh.parallel_for<DPCPP_K(normal_random_filler, accreal, scalar_t)>(num_work_items,
-      [=](cl::sycl::nd_item<1> item) {
-        NormalRandomFiller<accreal> normal_rnd_filler(acc, compute_num, stdv, mean);
-        normal_rnd_filler(item);
-      });
+    cgh.parallel_for<DPCPP_K(normal_random_filler, accreal, scalar_t)>(
+        num_work_items, [=](cl::sycl::nd_item<1> item) {
+          NormalRandomFiller<accreal> normal_rnd_filler(
+              acc, compute_num, stdv, mean);
+          normal_rnd_filler(item);
+        });
   };
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);

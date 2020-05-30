@@ -209,7 +209,11 @@ static void pdist_kernel_impl(
       const scalar_t* b = in_ptr + j * m + item_id.get_local_linear_id();
       scalar_t agg = 0.0;
       for (; a < end; a += stride, b += stride) {
-        F::inc(agg, Numerics<scalar_t>::abs(static_cast<scalar_t>(*a) - static_cast<scalar_t>(*b)), p);
+        F::inc(
+            agg,
+            Numerics<scalar_t>::abs(
+                static_cast<scalar_t>(*a) - static_cast<scalar_t>(*b)),
+            p);
       }
 
       agg = reduce_agg<scalar_t, F>(agg, item_id, shared);
@@ -295,8 +299,11 @@ static void pdist_backward_kernel_impl(
                            self_j += stride,
                            buff_i += stride,
                            buff_j += stride) {
-        const scalar_t res =
-            F::backward(static_cast<scalar_t>(*self_i) - static_cast<scalar_t>(*self_j), grad_k, dist_k, p);
+        const scalar_t res = F::backward(
+            static_cast<scalar_t>(*self_i) - static_cast<scalar_t>(*self_j),
+            grad_k,
+            dist_k,
+            p);
         *buff_i = res;
         *buff_j = -res;
       }

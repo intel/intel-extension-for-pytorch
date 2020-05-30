@@ -221,7 +221,7 @@ ENDIF()
 
 IF(USE_DPCPP)
   #add_library(c10_sycl ${C10_SYCL_SRCS} ${C10_CUDA_HEADERS})
-  set_source_files_properties(${DPCPP_SRCS} COMPILE_FLAGS "-fsycl -D__STRICT_ANSI__")
+  set_source_files_properties(${DPCPP_SRCS} COMPILE_FLAGS "-fsycl -D__STRICT_ANSI__ -fsycl-unnamed-lambda")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl -fsycl-device-code-split=per_source")
 ENDIF()
 

@@ -36,12 +36,11 @@ void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
     auto num_work_items = DPCPP::nd_range<1>(
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
-    cgh.parallel_for<DPCPP_K(bernoulli_scalar_sycl_random_filler, scalar_t)>(num_work_items,
-      [=](cl::sycl::nd_item<1> item) {
-        FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
-        uniform_rnd_filler(item);
-      });
-
+    cgh.parallel_for<DPCPP_K(bernoulli_scalar_sycl_random_filler, scalar_t)>(
+        num_work_items, [=](cl::sycl::nd_item<1> item) {
+          FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
+          uniform_rnd_filler(item);
+        });
   };
 
   // launch kernel
@@ -82,11 +81,11 @@ void bernoulli_tensor_kernel(Tensor& ret, const Tensor& p, uint64_t seed) {
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
     auto num_work_items = DPCPP::nd_range<1>(
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
-    cgh.parallel_for<DPCPP_K(bernoulli_tensor_sycl_random_filler, scalar_t)>(num_work_items,
-      [=](cl::sycl::nd_item<1> item) {
-        FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
-        uniform_rnd_filler(item);
-      });
+    cgh.parallel_for<DPCPP_K(bernoulli_tensor_sycl_random_filler, scalar_t)>(
+        num_work_items, [=](cl::sycl::nd_item<1> item) {
+          FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
+          uniform_rnd_filler(item);
+        });
   };
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf1);
@@ -208,7 +207,8 @@ void sample_multinomial_with_replacement(
       }
     };
 
-    cgh.parallel_for<DPCPP_K(sample_multinomial_with_replacement_syck_ker, scalar_t)>(
+    cgh.parallel_for<DPCPP_K(
+        sample_multinomial_with_replacement_syck_ker, scalar_t)>(
         DPCPP::nd_range<2>(global_range, local_range), kfn);
   };
 
@@ -268,8 +268,8 @@ void sample_multinomial_without_replacement(
           ScalarConvert<int, scalar_t>::to(0);
     };
 
-    cgh.parallel_for<DPCPP_K(sample_multinomial_without_replacement_syck_ker, scalar_t)>(
-        range, kfn);
+    cgh.parallel_for<DPCPP_K(
+        sample_multinomial_without_replacement_syck_ker, scalar_t)>(range, kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
