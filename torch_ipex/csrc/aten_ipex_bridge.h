@@ -3,6 +3,7 @@
 #include <ATen/Device.h>
 #include <ATen/Functions.h>
 #include <ATen/Tensor.h>
+#include "cpu/dbl/Common.h"
 
 #include <vector>
 
@@ -21,6 +22,13 @@ void attachShadeDataContext(const at::Tensor& tensor);
  * @param[in] ipexTensor The DNNL tensor of the input ipex tensor to be reordered to public format
  */
 void reorderDilTensorToPublic(const at::Tensor& ipexTensor);
+
+/**
+ * Reorder to a DNNL tensor with specified descriptor no matter input tensor is a DNNL tensor or not
+ * 
+ * @param[in] ipexTensor The input tensor to be reordered to the spcified DNNL descriptor
+ */
+void reorderDilTensorGeneric(const at::Tensor& ipexTensor, const dil::tensor::desc& dstDesc);
 
 /**
  * Reorder the input tensor to the specified scalar type. It is an optimized version for

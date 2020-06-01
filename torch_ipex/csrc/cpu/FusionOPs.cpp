@@ -20,6 +20,8 @@
 namespace torch_ipex {
 namespace cpu {
 
+using namespace dbl::comm;
+
 at::Tensor AtenIpexJITDev::dil_convolution_relu(
     const at::Tensor & input,
     const at::Tensor & weight,
@@ -35,11 +37,11 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
   auto input_contiguous = input.contiguous();
   auto weight_contiguous = weight.contiguous();
 
-  dil_input = dbl::comm::try_gen_dil_tensor(input_contiguous);
-  dil_weight = dbl::comm::try_gen_dil_tensor(weight_contiguous);
+  dil_input = try_gen_dil_tensor(input_contiguous);
+  dil_weight = try_gen_dil_tensor(weight_contiguous);
   if (bias.defined()) {
     auto bias_contiguous = bias.contiguous();
-    dil_bias = dbl::comm::try_gen_dil_tensor(bias_contiguous);
+    dil_bias = try_gen_dil_tensor(bias_contiguous);
   }
 
   dil::tensor dil_output = dbl::conv::conv2d_impl(
@@ -52,7 +54,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
     groups,
     dil::attr_t::fuse_relu());
 
-  return dbl::comm::gen_aten_tensor_by(std::move(dil_output));
+  return gen_aten_tensor_by(std::move(dil_output));
 }
 
 static at::Tensor& dil_convolution_inplace_fusion(
@@ -74,12 +76,12 @@ static at::Tensor& dil_convolution_inplace_fusion(
   auto weight_contiguous = weight.contiguous();
   auto output_contiguous = accumu.contiguous();
 
-  dil_input = dbl::comm::try_gen_dil_tensor(input_contiguous);
-  dil_weight = dbl::comm::try_gen_dil_tensor(weight_contiguous);
-  dil_output = dbl::comm::try_gen_dil_tensor(output_contiguous);
+  dil_input = try_gen_dil_tensor(input_contiguous);
+  dil_weight = try_gen_dil_tensor(weight_contiguous);
+  dil_output = try_gen_dil_tensor(output_contiguous);
   if (bias.defined()) {
     auto bias_contiguous = bias.contiguous();
-    dil_bias = dbl::comm::try_gen_dil_tensor(bias_contiguous);
+    dil_bias = try_gen_dil_tensor(bias_contiguous);
   }
 
   dbl::conv::conv2d_inplace_impl(
@@ -93,7 +95,7 @@ static at::Tensor& dil_convolution_inplace_fusion(
     groups,
     attr);
 
-  dbl::comm::sync_shape_from_dil_to_aten(accumu, dil_output);
+  sync_shape_from_dil_to_aten(accumu, dil_output);
   return accumu;
 }
 
