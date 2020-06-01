@@ -157,6 +157,7 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & exp_(at::Tensor & self);
   at::Tensor & exp_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor & expm1_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor & exponential_(at::Tensor & self, double lambd, at::Generator * generator);
   at::Tensor & eye_out(at::Tensor & out, int64_t n);
   at::Tensor & eye_out(at::Tensor & out, int64_t n, int64_t m);
   at::Tensor & fill_(at::Tensor & self, at::Scalar value);

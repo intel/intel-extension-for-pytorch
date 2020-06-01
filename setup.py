@@ -270,15 +270,6 @@ IS_WINDOWS = (platform.system() == 'Windows')
 IS_DARWIN = (platform.system() == 'Darwin')
 IS_LINUX = (platform.system() == 'Linux')
 
-
-def make_relative_rpath(path):
-  if IS_DARWIN:
-    return '-Wl,-rpath,@loader_path/' + path
-  elif IS_WINDOWS:
-    return ''
-  else:
-    return '-Wl,-rpath,$ORIGIN/' + path
-
 setup(
     name='torch_ipex',
     version=version,

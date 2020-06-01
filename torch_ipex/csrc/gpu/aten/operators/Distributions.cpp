@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/native/TensorIterator.h>
 #include <utils/AccumulateType.h>
 
 #include <core/Context.h>
@@ -8,6 +9,12 @@
 #include <utils/Numerics.h>
 
 #include "Random.h"
+#include "Loops.h"
+
+#ifdef USE_MKL_DPCPP
+#include <mkl_sycl.hpp>
+#include <mkl.h>
+#endif
 
 using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
@@ -275,6 +282,81 @@ void sample_multinomial_without_replacement(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
+template <typename scalar_t>
+class exponential_sycl_ker {};
+template<typename scalar_t, typename accscalar_t, typename dist_t, typename transform_t>
+void distribution_elementwise_grid_stride_kernel(at::TensorIterator& iter,
+                                                 int numel,
+                                                 std::pair<uint64_t, uint64_t> seeds,
+                                                 const dist_t dist_func,
+                                                 const transform_t transform_func) {
+
+  auto &sycl_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+  void* out_data = (void*)iter.data_ptr(0);
+
+  using out_accessor_t = dpcpp::DPCPPAccessor<dpcpp_discard_w_mode>;
+  auto offset_calc = at::dpcpp::make_offset_calculator<1>(iter);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    out_accessor_t out_acc = out_accessor_t (cgh, out_data);
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id)  {
+      size_t sample_id = item_id.get_id(0);
+      auto out_ptr = out_acc.template get_pointer<char>();
+      RandomState<Philox4_32_10> state(seeds.first, sample_id, seeds.second);
+      dist_func(&state);
+      float rand = state.uniform();
+      accscalar_t r = ScalarConvert<float, accscalar_t>::to(rand);
+      scalar_t ret = transform_func(r);
+      auto offset = offset_calc.get(sample_id)[0];
+      scalar_t* out = (scalar_t*)(out_ptr + offset);
+      *out = ret;
+    };
+
+    cgh.parallel_for<exponential_sycl_ker<scalar_t>>(
+      DPCPP::range<1>(numel),
+        kfn);
+  };
+
+  DPCPP_Q_ASYNC_SUBMIT(sycl_queue, cgf);
+}
+
+template<typename scalar_t,
+  typename accscalar_t,
+  typename dist_t,
+  typename transform_t>
+void distribution_nullary_kernel(at::TensorIterator& iter,
+                                 at::DPCPPGenerator* gen,
+                                 const dist_t& dist_func,
+                                 const transform_t transform_func) {
+  int64_t numel = iter.numel();
+  if (numel == 0) {
+    return;
+  }
+
+  std::pair<uint64_t, uint64_t> rng_engine_inputs;
+  {
+    // See Note [Acquire lock when using random generators]
+    std::lock_guard<std::mutex> lock(gen->mutex_);
+    rng_engine_inputs = gen->philox_engine_inputs(1);
+  }
+
+  if (!iter.can_use_32bit_indexing()) {
+    for (auto& sub_iter : iter.with_32bit_indexing()) {
+      distribution_nullary_kernel<scalar_t, accscalar_t>(sub_iter,
+                                                         gen,
+                                                         dist_func,
+                                                         transform_func);
+    }
+    return;
+  }
+
+  distribution_elementwise_grid_stride_kernel<scalar_t, accscalar_t>(
+    iter,
+    numel,
+    rng_engine_inputs,
+    dist_func,
+    transform_func);
+}
+
 } // namespace impl
 
 Tensor& bernoulli_(Tensor& self, const Tensor& p_, Generator* _generator) {
@@ -431,6 +513,51 @@ Tensor multinomial(
   at::AtenIpexTypeDPCPP::multinomial_out(
       ret, self, num_samples, replacement, generator);
   return ret;
+}
+
+Tensor& exponential_(Tensor& self, double lambda_, Generator* gen_) {
+  auto gen = get_generator_or_default<DPCPPGenerator>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
+#ifdef USE_MKL_DPCPP
+  if (lambda_ > 0) {
+    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
+      scalar_t displ = static_cast<scalar_t>(0.0);
+      scalar_t scale = static_cast<scalar_t>(std::abs(1/lambda_));
+      auto &sycl_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+      uint64_t seed;
+      {
+        // See Note [Acquire lock when using random generators]
+        std::lock_guard<std::mutex> lock(gen->mutex_);
+        seed = gen->current_seed();
+      }
+      mkl::rng::philox4x32x10 engine(sycl_queue, seed);
+      mkl::rng::exponential<scalar_t> distribution(displ, scale);
+      auto sycl_buffer = make_buffer<scalar_t>(self.data_ptr());
+      mkl::rng::generate(distribution, engine, self.numel(), sycl_buffer);
+    });
+  } else
+#endif
+  {
+    auto iter = TensorIterator::nullary_op(self);
+    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
+      using accscalar_t = acc_type<scalar_t>;
+      auto lambda = static_cast<accscalar_t>(lambda_);
+
+      // define lambda for exponential transformation
+      auto exponential_func = [lambda] (accscalar_t rand) {
+        accscalar_t sample;
+        sample = cl::sycl::log(rand);
+        return static_cast<scalar_t>(static_cast<accscalar_t>(-1.0) / lambda * sample);
+      };
+      impl::distribution_nullary_kernel<scalar_t, accscalar_t>(iter,
+                                                         gen,
+                                                         [] (RandomState<Philox4_32_10>* state) {
+                                                           return state->uniform(); },
+                                                         exponential_func);
+
+    });
+  }
+
+  return self;
 }
 
 } // namespace AtenIpexTypeDPCPP

@@ -56,7 +56,7 @@ if(MKL_DPCPP_HEADER)
     message(STATUS "Intel MKL DPCPP include dir: ${MKL_DPCPP_INCLUDE_DIR}")
     message(STATUS "Intel MKL DPCPP library: ${MKL_DPCPP_LIBRARY}")
 
-    add_definitions(-DUSE_MKL_SYCL)
+    add_definitions(-DUSE_MKL_DPCPP)
 
     include_directories(${MKL_DPCPP_INCLUDE_DIR})
 

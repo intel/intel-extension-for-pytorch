@@ -157,6 +157,7 @@ class AtenIpexTypeDefault {
   static at::Tensor & exp_(at::Tensor & self);
   static at::Tensor & exp_out(at::Tensor & out, const at::Tensor & self);
   static at::Tensor & expm1_out(at::Tensor & out, const at::Tensor & self);
+  static at::Tensor & exponential_(at::Tensor & self, double lambd, at::Generator * generator);
   static at::Tensor & eye_out(at::Tensor & out, int64_t n);
   static at::Tensor & eye_out(at::Tensor & out, int64_t n, int64_t m);
   static at::Tensor & fill_(at::Tensor & self, at::Scalar value);

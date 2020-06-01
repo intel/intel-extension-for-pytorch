@@ -202,6 +202,7 @@ add_library(torch_ipex SHARED ${DPCPP_SRCS})
 target_link_libraries(torch_ipex PUBLIC dnnl)
 target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libtorch_cpu.so)
 target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libc10.so)
+target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
 
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME "_torch_ipex")

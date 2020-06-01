@@ -113,5 +113,24 @@ void dpcppMemoryCopyType(scalar1* dst, const scalar2* src, size_t n_elements) {
   // launch kernel
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
+
+template <typename buffer_data_type, int dims = 1>
+cl::sycl::buffer<buffer_data_type, dims> make_buffer(void* virtual_ptr) {
+  static_assert(dims == 1, "buffer dims is not 1");
+
+  //get the uint8_t sycl buffer from the vptr.
+  auto raw_buf = at::dpcpp::dpcppGetBufferMap().template get_buffer<uint8_t>(virtual_ptr);
+  auto offset = at::dpcpp::dpcppGetBufferMap().get_offset(virtual_ptr);
+  assert(offset >= 0 && "the sycl buffer offset must >= 0");
+  auto range = cl::sycl::range<1>(raw_buf.get_size() - offset);
+  auto buf = cl::sycl::buffer<uint8_t, 1>(raw_buf,
+                                          cl::sycl::id<1>{static_cast<size_t>(offset)},
+                                          range);
+
+  //reinterpret the buffer to the required type.
+  range = cl::sycl::range<1>(buf.get_size()/sizeof(uint8_t));
+  return buf.template reinterpret<uint8_t, 1>(range);
+}
+
 } // namespace dpcpp
 } // namespace at

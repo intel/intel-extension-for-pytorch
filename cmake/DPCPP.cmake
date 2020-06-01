@@ -120,10 +120,10 @@ if(INTEL_SYCL_VERSION)
     find_path(TBB_INCLUDE_DIRS
             NAMES tbb
             PATHS
-            ${DPCPP_ROOT}/tbb/latest
-            $ENV{DPCPP_ROOT}/tbb/latest
+                ${DPCPP_ROOT}/tbb/latest
+                $ENV{DPCPP_ROOT}/tbb/latest
             PATH_SUFFIXES
-            include
+                include
             NO_DEFAULT_PATH)
 
     find_package_handle_standard_args(TBB
@@ -133,6 +133,20 @@ if(INTEL_SYCL_VERSION)
     if(${TBB_FOUND})
         if(${PSTL_FOUND})
             add_definitions(-D_PSTL_BACKEND_SYCL)
+
+            find_library(TBB_LIBRARY
+                    NAMES tbb
+                    HINTS
+                        ${DPCPP_ROOT}/tbb/latest
+                        $ENV{DPCPP_ROOT}/tbb/latest
+                    PATH_SUFFIXES
+                        lib/intel64/gcc4.8
+                    NO_DEFAULT_PATH)
+            if(NOT TBB_LIBRARY)
+                message(FATAL_ERROR "TBB library not found")
+            endif()
+
+            list(APPEND EXTRA_SHARED_LIBS ${TBB_LIBRARY})
 
             if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${PSTL_INCLUDE_DIRS})
                 include_directories(${PSTL_INCLUDE_DIRS})

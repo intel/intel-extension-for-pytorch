@@ -611,6 +611,10 @@ at::Tensor & AtenIpexTypeDefault::expm1_out(at::Tensor & out, const at::Tensor &
   return AtenIpexTypeDPCPP::expm1_out(out, self);
 }
 
+at::Tensor & AtenIpexTypeDefault::exponential_(at::Tensor & self, double lambd, at::Generator * generator) {
+  return AtenIpexTypeDPCPP::exponential_(self, lambd, generator);
+}
+
 at::Tensor & AtenIpexTypeDefault::eye_out(at::Tensor & out, int64_t n) {
   return AtenIpexTypeDPCPP::eye_out(out, n);
 }
@@ -2203,6 +2207,9 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::expm1.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &), &AtenIpexTypeDefault::expm1_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::exponential_(Tensor(a!) self, float lambd=1, *, Generator? generator=None) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, double, at::Generator *), &AtenIpexTypeDefault::exponential_>(c10::DispatchKey::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::eye.out(int n, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, int64_t), &AtenIpexTypeDefault::eye_out>(c10::DispatchKey::DPCPPTensorId)
