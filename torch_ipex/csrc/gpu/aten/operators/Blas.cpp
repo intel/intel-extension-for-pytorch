@@ -161,7 +161,6 @@ void mkldnnGemmImpl(
       {{DNNL_ARG_SRC, m1_memory},
        {DNNL_ARG_WEIGHTS, m2_memory},
        {DNNL_ARG_DST, r_memory}});
-  strm.wait();
 
 #undef TRANSPOSE_TRUE
 #undef TRANSPOSE_FALSE
