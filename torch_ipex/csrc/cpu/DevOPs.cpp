@@ -1183,6 +1183,9 @@ at::Tensor AtenIpexCPUDev::dil_relu(const at::Tensor& input) {
 at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
   DEBUG("AtenIpexCPUDev::dil_relu_\n");
   CHECK_DNNL_OP_PRE_COND(input);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   auto dil_self = dbl::comm::try_gen_dil_tensor(input);
   dil::eltwise_forward::compute(
     dil_self,
