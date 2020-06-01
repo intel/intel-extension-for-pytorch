@@ -11,11 +11,6 @@ namespace cpu {
 namespace dbl {
 namespace pool {
 
-inline std::vector<int64_t> expand_param_if_needed(
-    at::IntArrayRef list_param,
-    const char* param_name,
-    int64_t expected_dim);
-
 template<typename T>
 static inline T pooling_output_shape_pad_lr(
         T inputSize, T kernelSize, T pad_l, T pad_r, T stride, T dilation,

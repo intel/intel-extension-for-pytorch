@@ -11,7 +11,6 @@
 
 #include "ipex_tensor_impl.h"
 #include "ipex_sparse_tensor_impl.h"
-#include "cpu/dbl/Common.h"
 #include "cpu/ShadeDataContext.h"
 #include "cpu/bf16/Converter.h"
 #include "utils.h"
@@ -105,6 +104,41 @@ void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
   }
 }
 
+void reorderDilTensorGeneric(const at::Tensor& ipexTensor, const dil::tensor::desc& dstDesc) {
+  // ipexTensor is not required to be a DIL tensor
+  dil::tensor src = cpu::dbl::comm::try_gen_dil_tensor(ipexTensor);
+  dil::tensor dst {dstDesc};
+  dst.feed_from(src);
+
+  cpu::ShadeDataContext *new_shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
+  new_shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
+  new_shade_data_context->dil_tensor = dst;
+
+  if (dstDesc.is_plain()) {
+    // Share with DNNL raw data because it is plain format now
+    new_shade_data_context->cpu_raw_data = dst.get_data_handle();
+    // Cannot free CPU data because the the data is owned by DNNL
+    new_shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
+  } else {
+    // If tensor is of blocked format, cpu raw data means nothing here.
+    new_shade_data_context->cpu_raw_data = nullptr;
+    new_shade_data_context->cpu_del_fun = nullptr;
+  }
+
+  // Create a new DataPtr instances because the DataPtr class does not support set
+  // its data or context directly
+  c10::DataPtr shade_data_ptr(
+    new_shade_data_context->cpu_raw_data,
+    new_shade_data_context,
+    &(cpu::ShadeDataContext::freeShadeDataContext),
+    ipexTensor.device().type());
+
+  ipexTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(shade_data_ptr));
+
+  if (dstDesc.is_plain()) {
+    cpu::dbl::comm::sync_shape_from_dil_to_aten(ipexTensor, dst);
+  }
+}
 
 void attachShadeDataContext(const at::Tensor& tensor) {
   auto tensor_storage_impl = tensor.storage().unsafeGetStorageImpl();
