@@ -123,11 +123,11 @@ void Scatter(
     int64_t dim,
     const Tensor& index,
     const Tensor& src) {
+  dim = maybe_wrap_dim(dim, tensor.dim());
   int index_ndim_legacy_all =
       TensorImpl_nDimensionLegacyAll(TensorImpl_Unwrap(index));
   TORCH_CHECK(
-      dim >= 0 &&
-          dim < TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)),
+      dim < TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)),
       "Index dimension is out of bounds");
   TORCH_CHECK(
       index_ndim_legacy_all == 0 ||
@@ -235,11 +235,11 @@ void ScatterFill(
     int64_t dim,
     const Tensor& index,
     Scalar value_scalar) {
+  dim = maybe_wrap_dim(dim, tensor.dim());
   int index_ndim_legacy_all =
       TensorImpl_nDimensionLegacyAll(TensorImpl_Unwrap(index));
   TORCH_CHECK(
-      dim >= 0 &&
-          dim < TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)),
+      dim < TensorImpl_nDimensionLegacyNoScalars(TensorImpl_Unwrap(tensor)),
       "Index dimension is out of bounds");
   TORCH_CHECK(
       index_ndim_legacy_all == 0 ||

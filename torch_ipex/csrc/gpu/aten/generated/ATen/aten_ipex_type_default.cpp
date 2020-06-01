@@ -1039,6 +1039,38 @@ std::tuple<at::Tensor &,at::Tensor &> AtenIpexTypeDefault::max_pool3d_with_indic
   return AtenIpexTypeDPCPP::max_pool3d_with_indices_out(out, indices, self, kernel_size, stride, padding, dilation, ceil_mode);
 }
 
+at::Tensor AtenIpexTypeDefault::max_unpool2d(const at::Tensor & self, const at::Tensor & indices, at::IntArrayRef output_size) {
+  return AtenIpexTypeDPCPP::max_unpool2d(self, indices, output_size);
+}
+
+at::Tensor AtenIpexTypeDefault::max_unpool2d_backward(const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & indices, at::IntArrayRef output_size) {
+  return AtenIpexTypeDPCPP::max_unpool2d_backward(grad_output, self, indices, output_size);
+}
+
+at::Tensor & AtenIpexTypeDefault::max_unpool2d_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & indices, at::IntArrayRef output_size) {
+  return AtenIpexTypeDPCPP::max_unpool2d_backward_out(grad_input, grad_output, self, indices, output_size);
+}
+
+at::Tensor & AtenIpexTypeDefault::max_unpool2d_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & indices, at::IntArrayRef output_size) {
+  return AtenIpexTypeDPCPP::max_unpool2d_out(out, self, indices, output_size);
+}
+
+at::Tensor AtenIpexTypeDefault::max_unpool3d(const at::Tensor & self, const at::Tensor & indices, at::IntArrayRef output_size, at::IntArrayRef stride, at::IntArrayRef padding) {
+  return AtenIpexTypeDPCPP::max_unpool3d(self, indices, output_size, stride, padding);
+}
+
+at::Tensor AtenIpexTypeDefault::max_unpool3d_backward(const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & indices, at::IntArrayRef output_size, at::IntArrayRef stride, at::IntArrayRef padding) {
+  return AtenIpexTypeDPCPP::max_unpool3d_backward(grad_output, self, indices, output_size, stride, padding);
+}
+
+at::Tensor & AtenIpexTypeDefault::max_unpool3d_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & indices, at::IntArrayRef output_size, at::IntArrayRef stride, at::IntArrayRef padding) {
+  return AtenIpexTypeDPCPP::max_unpool3d_backward_out(grad_input, grad_output, self, indices, output_size, stride, padding);
+}
+
+at::Tensor & AtenIpexTypeDefault::max_unpool3d_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & indices, at::IntArrayRef output_size, at::IntArrayRef stride, at::IntArrayRef padding) {
+  return AtenIpexTypeDPCPP::max_unpool3d_out(out, self, indices, output_size, stride, padding);
+}
+
 at::Tensor AtenIpexTypeDefault::mean(const at::Tensor & self, c10::optional<at::ScalarType> dtype) {
   return AtenIpexTypeDPCPP::mean(self, dtype);
 }
@@ -2492,6 +2524,30 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::max_pool3d_with_indices.out(Tensor self, int[3] kernel_size, int[3] stride=[], int[3] padding=0, int[3] dilation=1, bool ceil_mode=False, *, Tensor(a!) out, Tensor(b!) indices) -> (Tensor(a!), Tensor(b!))")
       .impl_unboxedOnlyKernel<std::tuple<at::Tensor &,at::Tensor &>(at::Tensor &, at::Tensor &, const at::Tensor &, at::IntArrayRef, at::IntArrayRef, at::IntArrayRef, at::IntArrayRef, bool), &AtenIpexTypeDefault::max_pool3d_with_indices_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::max_unpool2d(Tensor self, Tensor indices, int[2] output_size) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::max_unpool2d>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::max_unpool2d_backward(Tensor grad_output, Tensor self, Tensor indices, int[2] output_size) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::max_unpool2d_backward>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::max_unpool2d_backward.grad_input(Tensor grad_output, Tensor self, Tensor indices, int[2] output_size, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::max_unpool2d_backward_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::max_unpool2d.out(Tensor self, Tensor indices, int[2] output_size, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, at::IntArrayRef), &AtenIpexTypeDefault::max_unpool2d_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::max_unpool3d(Tensor self, Tensor indices, int[3] output_size, int[3] stride, int[3] padding) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, at::IntArrayRef, at::IntArrayRef, at::IntArrayRef), &AtenIpexTypeDefault::max_unpool3d>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::max_unpool3d_backward(Tensor grad_output, Tensor self, Tensor indices, int[3] output_size, int[3] stride, int[3] padding) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, const at::Tensor &, const at::Tensor &, at::IntArrayRef, at::IntArrayRef, at::IntArrayRef), &AtenIpexTypeDefault::max_unpool3d_backward>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::max_unpool3d_backward.grad_input(Tensor grad_output, Tensor self, Tensor indices, int[3] output_size, int[3] stride, int[3] padding, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, const at::Tensor &, at::IntArrayRef, at::IntArrayRef, at::IntArrayRef), &AtenIpexTypeDefault::max_unpool3d_backward_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::max_unpool3d.out(Tensor self, Tensor indices, int[3] output_size, int[3] stride, int[3] padding, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, const at::Tensor &, at::IntArrayRef, at::IntArrayRef, at::IntArrayRef), &AtenIpexTypeDefault::max_unpool3d_out>(c10::DispatchKey::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::mean(Tensor self, *, ScalarType? dtype=None) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, c10::optional<at::ScalarType>), &AtenIpexTypeDefault::mean>(c10::DispatchKey::DPCPPTensorId)
