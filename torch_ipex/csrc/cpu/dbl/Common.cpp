@@ -57,7 +57,7 @@ dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
 at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
   // Generate new CPU Tensor and store dil tensor at its storage
   cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
-  auto dil_tensor_type = shade_data_context->dil_tensor->get_data_type();
+  auto dil_tensor_type = dil_tensor.get_data_type();
   shade_data_context->dil_tensor = std::forward<dil::tensor>(dil_tensor);
   shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
 
@@ -66,6 +66,7 @@ at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
   if (check_auto_mix_bf16_fp32() && dil_tensor_type == dil::data_type::bf16) {
     // If the user enables auto-mix-precision, then the aten tensor should always be float.
     // And even the dil tensor is plain format, it also cannot be shared with cpu buffer.
+    shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_BF_FP32;
     at_data_type = at::kFloat;
   } else {
     if (shade_data_context->dil_tensor->is_public_format()) {

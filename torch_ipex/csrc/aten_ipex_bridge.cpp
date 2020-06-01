@@ -91,7 +91,7 @@ void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun == nullptr);
 
     auto aten_tensor_scalar_type = ipexTensor.scalar_type();
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_scalar_type == at::kFloat);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_scalar_type == at::kFloat || aten_tensor_scalar_type == at::kBFloat16);
     pub_tensor = dil_tensor.to_public(nullptr, get_dil_data_type(aten_tensor_scalar_type));
   }
 
