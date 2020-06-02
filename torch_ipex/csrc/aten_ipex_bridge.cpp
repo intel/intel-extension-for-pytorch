@@ -461,12 +461,10 @@ void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarTy
   if (tensor_dtype != at::kFloat)
     return;
 
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY((check_tensor_own_shade_context(ipexTensor)));
   dil::tensor new_type_dil_tensor;
-
-  cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(ipexTensor.storage().data_ptr().get_context());
-  if (cpu::ShadeDataContext::isDilOwnTheTensor(ipexTensor)) {
+  if (check_tensor_own_shade_context(ipexTensor) && cpu::ShadeDataContext::isDilOwnTheTensor(ipexTensor)) {
     // The buffer ownership is DIL
+    cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(ipexTensor.storage().data_ptr().get_context());
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_context->dil_tensor.has_value());
     dil::tensor&& dil_tensor = std::move(shade_context->dil_tensor.value());
     if (get_at_data_type(dil_tensor.get_data_type()) == dstScalarType) {
