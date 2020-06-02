@@ -5,6 +5,12 @@
 #include <c10/util/Optional.h>
 #include <torch/csrc/utils/pybind.h>
 
+#include <torch/csrc/jit/python/pybind_utils.h>
+#include <torch/csrc/jit/runtime/custom_operator.h>
+#include <torch/csrc/jit/runtime/operator_options.h>
+#include <torch/csrc/jit/passes/pass_manager.h>
+#include "jit/fusion_pass.h"
+
 #include <cstring>
 #include <sstream>
 #include <string>
@@ -12,8 +18,11 @@
 
 #include "aten_ipex_type.h"
 #include "auto_opt_config.h"
+#include "cpu/dil/dil.hpp"
+#include "cpu/ShadeDataContext.h"
 #include "cpu/ExtendOPs.h"
 #include "cpu/MlpOPs.h"
+#include "cpu/Prepack.h"
 
 namespace torch_ipex {
 namespace {
@@ -29,9 +38,29 @@ void setAutoDNNL(bool val) {
   AutoOptConfig::singleton().set_auto_dnnl(val);
 }
 
+/// **** Only for unit test ****
+bool isDilTensor(const at::Tensor &tensor) {
+  return cpu::ShadeDataContext::isDilTensor(tensor);
+}
+
+dil::dims getDilTensorSizes(const at::Tensor &tensor) {
+  if (isDilTensor(tensor)) {
+    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
+    return dil_tensor.get_dims();
+  }
+  return dil::dims();
+}
+
+dil::dims getDilTensorStrides(const at::Tensor &tensor) {
+  if (isDilTensor(tensor)) {
+    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
+    return dil_tensor.get_strides();
+  }
+  return dil::dims();
+}
+/// ****************************
+
 void InitIpexModuleBindings(py::module m) {
-  m.def("_initialize_aten_bindings",
-        []() { AtenIpexType::InitializeAtenBindings(); });
   m.def("_get_git_revs", []() { return GetRevisions(); });
   m.def("enable_auto_dnnl", []() { AutoOptConfig::singleton().set_auto_dnnl(true); });
   m.def("disable_auto_dnnl", []() { AutoOptConfig::singleton().set_auto_dnnl(false); });
@@ -56,21 +85,30 @@ void InitIpexModuleBindings(py::module m) {
           return AtenIpexTypeExt::interaction_backward(grad_out, input);
         });
   m.def("embedding_bag_forward",
-        [](const at::Tensor &weights, const at::Tensor &inputs, const at::Tensor &offsets) {
-          return AtenIpexTypeExt::embedding_bag_forward(weights, inputs, offsets);
+        [](const at::Tensor& weight, const at::Tensor& indices, const at::Tensor& offsets, bool scale_grad_by_freq, int64_t mode, bool sparse, const c10::optional<at::Tensor>& per_sample_weights, bool include_last_offset) {
+          return AtenIpexTypeExt::embedding_bag_forward(weight, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights, include_last_offset);
         });
+
   m.def("embedding_bag_backward",
-        [](const at::Tensor &grad_out, const at::Tensor &weights,
-           const at::Tensor &inputs, const at::Tensor &offsets) {
-          return AtenIpexTypeExt::embedding_bag_backward(grad_out, weights, inputs, offsets);
+        [](const at::Tensor& grad, const at::Tensor& indices, const at::Tensor& offsets, const at::Tensor offset2bag, const at::Tensor& bag_size, const at::Tensor& maximum_indices, int64_t num_weights, bool scale_grad_by_freq, int64_t mode, bool sparse, const c10::optional<at::Tensor>& per_sample_weights) {
+          return AtenIpexTypeExt::embedding_bag_backward(grad, indices, offsets, offset2bag, bag_size, maximum_indices, num_weights, scale_grad_by_freq, mode, sparse, per_sample_weights);
         });
+
   m.def("linear",
-        [](const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
+        [](const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias) {
           return AtenIpexTypeExt::linear(input, weight, bias);
+        });
+  m.def("linear_fuse_relu",
+        [](const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
+          return AtenIpexTypeExt::linear_fuse_relu(input, weight, bias);
         });
   m.def("linear_backward",
         [](const at::Tensor& input, const at::Tensor& grad_output, const at::Tensor& weight, std::array<bool,3> output_mask) {
           return AtenIpexTypeExt::linear_backward(input, grad_output, weight, output_mask);
+        });
+  m.def("relu_use_dst_backward",
+        [](const at::Tensor& grad_output, const at::Tensor& output) {
+          return AtenIpexTypeExt::relu_use_dst_for_bwd(grad_output, output);
         });
   m.def("adaptive_avg_pool2d",
         [](at::Tensor const& input, at::IntArrayRef output_size) {
@@ -97,11 +135,27 @@ void InitIpexModuleBindings(py::module m) {
   m.def("mlp_create_handle", &AtenIpexTypeMLPExt::create_handle);
   m.def("mlp_set_relu_mask", &AtenIpexTypeMLPExt::set_relu_mask);
   m.def("mlp_release_handle", &AtenIpexTypeMLPExt::release_handle);
+  m.def("is_dil_tensor", &isDilTensor);
+  m.def("get_dil_tensor_sizes", &getDilTensorSizes);
+  m.def("get_dil_tensor_strides", &getDilTensorStrides);
+  m.def("enable_jit", []() { AutoOptConfig::singleton().set_jit_fuse(true); });
+  m.def("disable_jit", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
+  m.def("get_jit", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
+  m.def("prepack_conv_weight", &AtenIpexPrepack::prepack_conv_weight);
 }
 
 }  // namespace
+using namespace torch::jit;
 
-void InitIpexBindings(py::module m) { InitIpexModuleBindings(m); }
+void InitIpexBindings(py::module m) {
+  InitIpexModuleBindings(m);
+  // jit fusion pass
+  RegisterPass pass([](std::shared_ptr<Graph>& g) {
+    if (AutoOptConfig::singleton().get_jit_fuse()) {
+      torch::jit::FusionPass(g);
+    }
+  });
+}
 
 }  // namespace torch_ipex
 

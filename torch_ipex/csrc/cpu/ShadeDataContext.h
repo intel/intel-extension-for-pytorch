@@ -2,6 +2,7 @@
 
 #include <ATen/Tensor.h>
 #include <c10/util/Exception.h>
+#include <c10/util/Optional.h>
 
 #include "dil/dil.hpp"
 
@@ -13,9 +14,9 @@ namespace cpu {
 enum SHADE_DATA_TYPE {CPU_RAW, DIL};
 
 struct ShadeDataContext {
+  c10::optional<dil::tensor> dil_tensor; ///< DNNL memory buffer for lazy reorder
   void              *cpu_raw_data; ///< The raw memory buffer of storage
   c10::DeleterFnPtr  cpu_del_fun;  ///< Delete function to release cpu_raw_data
-  dil::tensor        dil_tensor;   ///< DNNL memory buffer for lazy reorder
 
   SHADE_DATA_TYPE    data_type;    ///< Memory buffer type
 
@@ -26,18 +27,19 @@ struct ShadeDataContext {
 
   ~ShadeDataContext() {
     if (this->data_type == SHADE_DATA_TYPE::DIL) { // DIL Tensor
-      if (this->dil_tensor.is_public_format()) {
-        TORCH_INTERNAL_ASSERT(this->cpu_raw_data != nullptr);
-        TORCH_INTERNAL_ASSERT(this->dil_tensor.get_data_handle() == this->cpu_raw_data);
-        TORCH_INTERNAL_ASSERT(this->cpu_del_fun == &(c10::detail::deleteNothing));
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(this->dil_tensor.has_value());
+      if (this->dil_tensor->is_public_format()) {
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(this->cpu_raw_data != nullptr);
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(this->dil_tensor->get_data_handle() == this->cpu_raw_data);
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(this->cpu_del_fun == &(c10::detail::deleteNothing));
       } else {
         // If dil tensor is block format, the cpu raw data means nothing here.
-        TORCH_INTERNAL_ASSERT(this->cpu_raw_data == nullptr);
-        TORCH_INTERNAL_ASSERT(this->cpu_del_fun == nullptr);
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(this->cpu_raw_data == nullptr);
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(this->cpu_del_fun == nullptr);
       }
     } else { // CPU Tensor here
-      TORCH_INTERNAL_ASSERT(this->cpu_del_fun != nullptr);
-      TORCH_INTERNAL_ASSERT(this->cpu_del_fun != &(c10::detail::deleteNothing));
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(this->cpu_del_fun != nullptr);
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(this->cpu_del_fun != &(c10::detail::deleteNothing));
       this->cpu_del_fun(this->cpu_raw_data);
       this->cpu_raw_data = nullptr;
     }
@@ -49,10 +51,10 @@ struct ShadeDataContext {
    * @param raw_data Raw pointer of @class ShadeDataContext
    */
   static void freeShadeDataContext(void *raw_data) {
-    TORCH_INTERNAL_ASSERT(raw_data != nullptr);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(raw_data != nullptr);
     ShadeDataContext *shade_data_ctx = (ShadeDataContext*)raw_data;
     auto data_type = shade_data_ctx->data_type;
-    TORCH_INTERNAL_ASSERT((data_type == SHADE_DATA_TYPE::CPU_RAW) || (data_type == SHADE_DATA_TYPE::DIL));
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY((data_type == SHADE_DATA_TYPE::CPU_RAW) || (data_type == SHADE_DATA_TYPE::DIL));
     delete shade_data_ctx;
   }
 
@@ -74,11 +76,11 @@ struct ShadeDataContext {
    * only contains DNNL buffer, it obiviouly is DNNL tensor
    */
   static inline bool isDilTensor(const at::Tensor &tensor) {
-    TORCH_INTERNAL_ASSERT(tensor.has_storage());
-    TORCH_INTERNAL_ASSERT(tensor.layout() == c10::Layout::Strided);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.layout() == c10::Layout::Strided);
 
     if (tensor.device().type() != c10::DeviceType::DPCPP) {
-      TORCH_INTERNAL_ASSERT(tensor.device().type() == c10::DeviceType::CPU);
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.device().type() == c10::DeviceType::CPU);
       return false;
     }
 
@@ -87,20 +89,20 @@ struct ShadeDataContext {
     void *storage_context = tensor.storage().data_ptr().get_context();
     ShadeDataContext *shade_data_context = (ShadeDataContext*)storage_context;
     auto data_type = shade_data_context->data_type;
-    TORCH_INTERNAL_ASSERT((data_type == SHADE_DATA_TYPE::CPU_RAW) || (data_type == SHADE_DATA_TYPE::DIL));
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY((data_type == SHADE_DATA_TYPE::CPU_RAW) || (data_type == SHADE_DATA_TYPE::DIL));
 
     if (data_type == SHADE_DATA_TYPE::DIL) {
-#if defined(_DEBUG)
-      TORCH_WARN(tensor.is_contiguous());
-#endif
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->dil_tensor.has_value());
       auto raw_cpu_data = tensor.storage().data_ptr().get();
       if (raw_cpu_data == nullptr) {
         // the dnnl tensor does not share data with raw tensor data.
-        TORCH_INTERNAL_ASSERT(! (shade_data_context->dil_tensor.is_empty()));
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(! (shade_data_context->dil_tensor->is_empty()));
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(! (shade_data_context->dil_tensor->is_public_format()));
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(check_tensor_own_whole_storage(tensor));
         return true;
       } else {
         // The dnnl tensor shares some data with raw tensor.
-        TORCH_INTERNAL_ASSERT(shade_data_context->dil_tensor.is_public_format());
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->dil_tensor->is_public_format());
 
         // For the case:
         //   1. There is a tensor named A
@@ -113,15 +115,11 @@ struct ShadeDataContext {
         //   C = A[4:7, :]
         // All these tensors share same buffer of Tensor A with different storge offsets and elements.
         // So the context modification will impact all these tensors.
-        if ((shade_data_context->dil_tensor.get_data_handle() == raw_cpu_data) &&
-            (shade_data_context->dil_tensor.get_nelems() == tensor.storage().numel()) &&
-            (shade_data_context->dil_tensor.get_data_type() == get_dil_data_type(tensor.scalar_type()))) {
-          //TODO: Do we need to check strides here?
-          TORCH_INTERNAL_ASSERT(shade_data_context->dil_tensor.get_size() == tensor.storage().capacity());
+        if (check_tensor_own_whole_storage(tensor)) {
+          TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->dil_tensor->get_size() == tensor.storage().capacity());
           return true;
         }
       }
-      TORCH_INTERNAL_ASSERT(false);
     }
 
     return false;
@@ -144,17 +142,14 @@ struct ShadeDataContext {
    * @return If the input tensor does not contain DNNL buffer, the function will return
    * an empty DNNL buffer. The caller should check the return buffer is empty or not.
    */
-  static inline dil::tensor getDilTensor(const at::Tensor &tensor) {
-    TORCH_INTERNAL_ASSERT(tensor.has_storage());
+  static inline dil::tensor& getDilTensor(const at::Tensor &tensor) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
     void *raw_context = tensor.storage().data_ptr().get_context();
-    TORCH_INTERNAL_ASSERT(raw_context != nullptr);
-    if (isDilTensor(tensor)) {
-      ShadeDataContext *shade_data_context = (ShadeDataContext*)raw_context;
-      return shade_data_context->dil_tensor;
-    } else {
-      TORCH_INTERNAL_ASSERT(false);
-      return dil::tensor();
-    }
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(raw_context != nullptr);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(isDilTensor(tensor));
+    ShadeDataContext *shade_data_context = (ShadeDataContext*)raw_context;
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->dil_tensor.has_value());
+    return *(shade_data_context->dil_tensor);
   }
 
   /**
@@ -166,15 +161,15 @@ struct ShadeDataContext {
    * and return it to the caller. Otherwise, the function will return nullptr
    */
   static inline void * getCpuRawData(const at::Tensor &tensor) {
-    TORCH_INTERNAL_ASSERT(tensor.has_storage());
-    TORCH_INTERNAL_ASSERT(tensor.unsafeGetTensorImpl()->unique_version());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.unsafeGetTensorImpl()->unique_version());
     if (isCpuTensor(tensor)) {
       auto& data_ptr = tensor.storage().data_ptr();
       ShadeDataContext *shade_data_context = (ShadeDataContext*)(data_ptr.get_context());
-      TORCH_INTERNAL_ASSERT(shade_data_context != nullptr);
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context != nullptr);
       return shade_data_context->cpu_raw_data;
     } else {
-      TORCH_INTERNAL_ASSERT(false);
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(false);
       return nullptr;
     }
   }

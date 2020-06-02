@@ -10,18 +10,4 @@
 
 namespace torch_ipex {
 
-namespace {
-
-void AtenInitialize() {
-  cpu::RegisterIpexDenseOPs();
-  cpu::RegisterIpexSparseOPs();
-}
-
-}  // namespace
-
-void AtenIpexType::InitializeAtenBindings() {
-  static std::once_flag once;
-  std::call_once(once, []() { AtenInitialize(); });
-}
-
 } // namespace torch_ipe

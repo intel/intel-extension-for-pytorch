@@ -81,18 +81,6 @@ class tensor : public memory {
       return static_cast<data_type>(data.data_type);
     }
 
-    inline dims get_strides() const {
-      DIL_ENFORCE(is_plain(), "Call to_public() before get_strides()");
-      const auto& strides = blocking_strides();
-      if (!is_grouped()) {
-        return dims(strides, strides + data.ndims);
-      } else {
-        auto ret = dims(strides + 1, strides + data.ndims);
-        ret[0] = std::min(strides[0], strides[1]);
-        return ret;
-      }
-    }
-
     /** returns true if memory descriptor is zero */
     bool is_zero() const { return data.ndims == 0; }
 
@@ -379,6 +367,17 @@ class tensor : public memory {
       return const_cast<dnnl_memory_desc_t&>(data).format_desc.blocking.strides;
     }
 
+    inline dims get_strides() const {
+      const auto& strides = blocking_strides();
+      if (!is_grouped()) {
+        return dims(strides, strides + data.ndims);
+      } else {
+        auto ret = dims(strides + 1, strides + data.ndims);
+        ret[0] = std::min(strides[0], strides[1]);
+        return ret;
+      }
+    }
+
     void set_g(dim groups) {
       auto reserved_size = sizeof(((dnnl_memory_extra_desc_t *)0)->reserved);
       auto offset = reserved_size / sizeof(dim) - 1;
@@ -582,7 +581,20 @@ class tensor : public memory {
   /// Returns dimension vector
   inline dims get_dims() const { return get_desc().get_dims(); }
 
-  inline dims get_strides() const { return get_desc().get_strides(); }
+  inline dims get_strides() const {
+    DIL_ENFORCE(is_public_format(), "Call to_public() before get_strides()");
+    return get_desc().get_strides();
+  }
+
+  inline void set_dims_and_strides(const dims &adims, const dims &astrides) {
+    DIL_ENFORCE(is_public_format(), "Call to_public() before set_dims_and_strides()");
+    DIL_ENFORCE(adims.size() == astrides.size(), "Dims and strides must have the same size");
+    if (get_dims() == adims && get_strides() == astrides)
+      return;
+    auto new_desc = desc(adims, get_data_type(), astrides);
+    DIL_ENFORCE(get_size() == new_desc.get_size(), "Invalid dims and strides for the original desc");
+    set_desc(new_desc);
+  }
 
   /// Return element number of the param.
   /// The number is the meaning values for a tensor, instead of whole buffer.

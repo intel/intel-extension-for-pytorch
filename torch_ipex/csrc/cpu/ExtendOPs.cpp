@@ -6,26 +6,28 @@
 #include "ExtendOPs.h"
 #include "bf16/vec/bf16_vec_kernel.h"
 #include "dil/dil.hpp"
+#include "aten/aten.hpp"
 #include "xsmm/libxsmm_utils.h"
 #include "../utils.h"
 #include "DevOPs.h"
+#include "CustomOPs.h"
 
 namespace torch_ipex {
 
 void AtenIpexTypeExt::packed_add_(at::Tensor & top_half, at::Tensor & bot_half, const at::Tensor & grad, float alpha) {
-  TORCH_INTERNAL_ASSERT(grad.scalar_type() == at::ScalarType::BFloat16);
-  TORCH_INTERNAL_ASSERT(top_half.scalar_type() == at::ScalarType::BFloat16);
-  TORCH_INTERNAL_ASSERT(bot_half.scalar_type() == at::ScalarType::BFloat16);
-  TORCH_INTERNAL_ASSERT(grad.device().type() == at::DeviceType::DPCPP);
-  TORCH_INTERNAL_ASSERT(top_half.device().type() == at::DeviceType::DPCPP);
-  TORCH_INTERNAL_ASSERT(bot_half.device().type() == at::DeviceType::DPCPP);
-  TORCH_INTERNAL_ASSERT(top_half.sizes() == bot_half.sizes());
-  TORCH_INTERNAL_ASSERT(top_half.is_contiguous());
-  TORCH_INTERNAL_ASSERT(bot_half.is_contiguous());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad.scalar_type() == at::ScalarType::BFloat16);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half.scalar_type() == at::ScalarType::BFloat16);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bot_half.scalar_type() == at::ScalarType::BFloat16);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad.device().type() == at::DeviceType::DPCPP);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half.device().type() == at::DeviceType::DPCPP);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bot_half.device().type() == at::DeviceType::DPCPP);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half.sizes() == bot_half.sizes());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half.is_contiguous());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bot_half.is_contiguous());
 
   RECORD_FUNCTION("packed_add_", std::vector<c10::IValue>({top_half, bot_half, grad, alpha}), torch::autograd::Node::peek_at_next_sequence_nr());
   if (grad.is_sparse()) {
-    TORCH_INTERNAL_ASSERT(top_half.dim() == 2);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half.dim() == 2);
     auto sparse_nnz = grad._nnz();
     auto sparse_dim = grad.sparse_dim();
     auto values = grad._values();
@@ -34,14 +36,14 @@ void AtenIpexTypeExt::packed_add_(at::Tensor & top_half, at::Tensor & bot_half, 
     auto feature_size = values.stride(0);
     auto indices_accessor = indices.accessor<int64_t, 2>();
 
-    TORCH_INTERNAL_ASSERT(values.is_contiguous());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(values.is_contiguous());
     auto value_ptr = values.data_ptr<at::BFloat16>();
     auto top_half_ptr = top_half.data_ptr<at::BFloat16>();
     auto bot_half_ptr = bot_half.data_ptr<at::BFloat16>();
 
-    TORCH_INTERNAL_ASSERT(value_ptr != nullptr);
-    TORCH_INTERNAL_ASSERT(top_half_ptr != nullptr);
-    TORCH_INTERNAL_ASSERT(bot_half_ptr != nullptr);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(value_ptr != nullptr);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half_ptr != nullptr);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bot_half_ptr != nullptr);
 
     std::vector<int64_t> sparse_stride(sparse_dim);
     for (int64_t d = 0; d < sparse_dim; d++) {
@@ -80,7 +82,7 @@ void AtenIpexTypeExt::packed_add_(at::Tensor & top_half, at::Tensor & bot_half, 
       }
     });
   } else {
-    TORCH_INTERNAL_ASSERT(grad.is_contiguous());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad.is_contiguous());
     //TODO: vector implementation basing on vector size
     union packed_bf16 {
       unsigned short s[2];
@@ -201,15 +203,15 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor> & input) {
   std::vector<uint32_t> feature_sizes(input.size());
   std::vector<T *> input_data(input.size());
   for (int i = 0; i < input.size(); i++) {
-    TORCH_INTERNAL_ASSERT(input[i].is_contiguous());
-    TORCH_INTERNAL_ASSERT(input[i].device().is_dpcpp());
-    TORCH_INTERNAL_ASSERT(input[i].dim() == 2);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].is_contiguous());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].device().is_dpcpp());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].dim() == 2);
     feature_sizes[i] = input[i].sizes()[1];
     total_feature_size += input[i].sizes()[1];
     input_data[i] = input[i].data_ptr<T>();
   }
   auto vector_nums = total_feature_size / vector_size;
-  TORCH_INTERNAL_ASSERT(total_feature_size % vector_size == 0);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(total_feature_size % vector_size == 0);
   auto interact_feature_size = vector_nums * (vector_nums - 1) / 2;
   auto tr_vector_size = sizeof(T) == 4 ? vector_size : vector_size / 2;
   auto out = at::empty({batch_size, interact_feature_size + vector_size}, input[0].options());
@@ -239,7 +241,7 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor> & input) {
 
 template<typename T>
 inline std::vector<at::Tensor> _interaction_backward(const at::Tensor & grad_out, const std::vector<at::Tensor> & input) {
-  TORCH_INTERNAL_ASSERT(grad_out.is_contiguous());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.is_contiguous());
   RECORD_FUNCTION("_interaction_backward", std::vector<c10::IValue>({grad_out, input}), torch::autograd::Node::peek_at_next_sequence_nr());
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
@@ -257,7 +259,7 @@ inline std::vector<at::Tensor> _interaction_backward(const at::Tensor & grad_out
     output_data[i] = output[i].data_ptr<T>();
   }
   auto vector_nums = total_feature_size / vector_size;
-  TORCH_INTERNAL_ASSERT(total_feature_size % vector_size == 0);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(total_feature_size % vector_size == 0);
   auto interact_feature_size = vector_nums * (vector_nums - 1) / 2;
   auto grad_out_data = grad_out.data_ptr<T>();
 
@@ -305,11 +307,11 @@ inline std::vector<at::Tensor> _interaction_backward(const at::Tensor & grad_out
 
 at::Tensor AtenIpexTypeExt::interaction_forward(const std::vector<at::Tensor> & input) {
   if (input[0].scalar_type() == at::kFloat) {
-    for (const auto &in : input) { TORCH_INTERNAL_ASSERT(in.scalar_type() == at::kFloat); }
+    for (const auto &in : input) { TORCH_INTERNAL_ASSERT_DEBUG_ONLY(in.scalar_type() == at::kFloat); }
     return _interaction_forward<float>(input);
   } else {
-    TORCH_INTERNAL_ASSERT(input[0].scalar_type() == at::kBFloat16);
-    for (const auto &in : input) { TORCH_INTERNAL_ASSERT(in.scalar_type() == at::kBFloat16); }
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[0].scalar_type() == at::kBFloat16);
+    for (const auto &in : input) { TORCH_INTERNAL_ASSERT_DEBUG_ONLY(in.scalar_type() == at::kBFloat16); }
     return _interaction_forward<at::BFloat16>(input);
   }
 }
@@ -318,18 +320,19 @@ std::vector<at::Tensor> AtenIpexTypeExt::interaction_backward(const at::Tensor &
   if (grad_out.scalar_type() == at::kFloat) {
     return _interaction_backward<float>(grad_out, input);
   } else {
-    TORCH_INTERNAL_ASSERT(grad_out.scalar_type() == at::kBFloat16);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.scalar_type() == at::kBFloat16);
     return _interaction_backward<at::BFloat16>(grad_out, input);
   }
 }
 
+#if 0
 template<typename T>
 static inline at::Tensor _embedding_bag_forward(const at::Tensor &weights, const at::Tensor &inputs, const at::Tensor &offsets) {
-  TORCH_INTERNAL_ASSERT(weights.is_contiguous());
-  TORCH_INTERNAL_ASSERT(inputs.is_contiguous());
-  TORCH_INTERNAL_ASSERT(offsets.is_contiguous());
-  TORCH_INTERNAL_ASSERT(inputs.dim() == 1);
-  TORCH_INTERNAL_ASSERT(weights.dim() == 2);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weights.is_contiguous());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(inputs.is_contiguous());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(offsets.is_contiguous());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(inputs.dim() == 1);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weights.dim() == 2);
   RECORD_FUNCTION("_embedding_bag_forward", std::vector<c10::IValue>({weights, inputs, offsets}), torch::autograd::Node::peek_at_next_sequence_nr());
   auto batch_size = offsets.size(0);
   auto num_input = inputs.size(0);
@@ -345,7 +348,7 @@ static inline at::Tensor _embedding_bag_forward(const at::Tensor &weights, const
       auto inputs_start = offsets_data[i];
       auto inputs_end = (i < batch_size - 1) ? offsets_data[i + 1] : num_input;
       // TODO: add acc_t support for bag size larger than 1
-      TORCH_INTERNAL_ASSERT(inputs_end - inputs_start == 1);
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(inputs_end - inputs_start == 1);
       auto out_data_ptr = &output_data[i * vector_size];
       #pragma omp simd
       for (int64_t v = 0; v < vector_size; v++) out_data_ptr[v] = 0.0;
@@ -361,8 +364,8 @@ static inline at::Tensor _embedding_bag_forward(const at::Tensor &weights, const
 template<typename T>
 static inline at::Tensor _embedding_bag_backward(const at::Tensor &grad_out,
     const at::Tensor &weights, const at::Tensor &inputs, const at::Tensor offsets) {
-  TORCH_INTERNAL_ASSERT(inputs.dim() == 1);
-  TORCH_INTERNAL_ASSERT(grad_out.dim() == 2);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(inputs.dim() == 1);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.dim() == 2);
   RECORD_FUNCTION("_embedding_bag_backward", std::vector<c10::IValue>({grad_out, weights, inputs, offsets}), torch::autograd::Node::peek_at_next_sequence_nr());
   auto batch_size = offsets.size(0);
   auto num_input = inputs.size(0);
@@ -408,7 +411,7 @@ at::Tensor AtenIpexTypeExt::embedding_bag_forward(const at::Tensor &weights, con
   if (weights.scalar_type() == at::kFloat) {
     return _embedding_bag_forward<float>(weights, inputs, offsets);
   } else {
-    TORCH_INTERNAL_ASSERT(weights.scalar_type() == at::kBFloat16);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weights.scalar_type() == at::kBFloat16);
     return _embedding_bag_forward<at::BFloat16>(weights, inputs, offsets);
   }
 }
@@ -418,21 +421,52 @@ at::Tensor AtenIpexTypeExt::embedding_bag_backward(const at::Tensor &grad_out,
   if (grad_out.scalar_type() == at::kFloat) {
     return _embedding_bag_backward<float>(grad_out, weights, inputs, offsets);
   } else {
-    TORCH_INTERNAL_ASSERT(grad_out.scalar_type() == at::kBFloat16);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.scalar_type() == at::kBFloat16);
     return _embedding_bag_backward<at::BFloat16>(grad_out, weights, inputs, offsets);
   }
 }
+#endif
 
-at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
-    return cpu::AtenIpexCPUDev::dil_linear(input, weight, bias);
+std::tuple<at::Tensor,at::Tensor,at::Tensor,at::Tensor>
+AtenIpexTypeExt::embedding_bag_forward(const at::Tensor& weight, const at::Tensor& indices,
+  const at::Tensor& offsets, bool scale_grad_by_freq, int64_t mode, bool sparse,
+  const c10::optional<at::Tensor>& per_sample_weights, bool include_last_offset) {
+  at::Tensor _per_sample_weights;
+  if(per_sample_weights.has_value()) {
+    _per_sample_weights =  per_sample_weights.value();
+  }
+  return cpu::aten::embedding_bag::embedding_bag_impl(weight, indices, offsets, scale_grad_by_freq, mode, sparse, _per_sample_weights, include_last_offset);
+}
+
+at::Tensor
+AtenIpexTypeExt::embedding_bag_backward(const at::Tensor& grad, const at::Tensor& indices,
+  const at::Tensor& offsets, const at::Tensor& offset2bag, const at::Tensor& bag_size, const at::Tensor& maximum_indices,
+  int64_t num_weights, bool scale_grad_by_freq, int64_t mode, bool sparse,
+  const c10::optional<at::Tensor>& per_sample_weights) {
+  at::Tensor _per_sample_weights;
+  if(per_sample_weights.has_value()) {
+    _per_sample_weights =  per_sample_weights.value();
+   }
+  return cpu::aten::embedding_bag::embedding_bag_backward_impl(grad, indices, offsets, offset2bag, bag_size, maximum_indices, num_weights, scale_grad_by_freq, mode, sparse, _per_sample_weights);
+}
+
+
+at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias) {
+    return NewLinearOp::apply(input, weight, bias);
+}
+
+at::Tensor AtenIpexTypeExt::linear_fuse_relu(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
+    RECORD_FUNCTION("linear_fuse_relu", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+    return cpu::AtenIpexCPUDev::dil_linear_fuse_relu(input, weight, bias);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::linear_backward(const at::Tensor& input, const at::Tensor& grad_output, const at::Tensor& weight, std::array<bool,3> output_mask) {
+    RECORD_FUNCTION("linear_backward", std::vector<c10::IValue>({input, grad_output, weight}), torch::autograd::Node::peek_at_next_sequence_nr());
     return cpu::AtenIpexCPUDev::dil_linear_backward(input, grad_output, weight, output_mask);
 }
 
 at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d(at::Tensor const& input, at::IntArrayRef output_size) {
-    return cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(input, output_size);
+    return NewApaptiveAvgPoolingOp::apply(input, output_size);
 }
 
 at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d_backward(const at::Tensor& grad_output, const at::Tensor& input) {
@@ -440,7 +474,7 @@ at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d_backward(const at::Tensor& grad_
 }
 
 at::Tensor AtenIpexTypeExt::max_pooling(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
-    return cpu::AtenIpexCPUDev::dil_max_pooling(input, kernel_size, stride, padding, dilation, ceil_mode);
+    return NewMaxPoolingOp::apply(input, kernel_size, stride, padding, dilation, ceil_mode);
 }
 
 at::Tensor AtenIpexTypeExt::max_pooling_backward(const at::Tensor& grad_output, const at::Tensor& output, const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
@@ -449,6 +483,12 @@ at::Tensor AtenIpexTypeExt::max_pooling_backward(const at::Tensor& grad_output, 
 
 at::Tensor AtenIpexTypeExt::reshape(const at::Tensor& input, at::IntArrayRef size) {
     return cpu::AtenIpexCPUDev::dil_reshape(input, size);
+}
+
+
+at::Tensor AtenIpexTypeExt::relu_use_dst_for_bwd(const at::Tensor& grad_output, const at::Tensor& output) {
+  RECORD_FUNCTION("dil_relu_use_dst_for_bwd", std::vector<c10::IValue>({grad_output, output}), torch::autograd::Node::peek_at_next_sequence_nr());
+  return cpu::AtenIpexCPUDev::dil_relu_use_dst_for_bwd(grad_output, output);
 }
 
 }  // namespace torch_ipex

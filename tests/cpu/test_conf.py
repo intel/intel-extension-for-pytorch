@@ -5,7 +5,6 @@ from functools import reduce
 
 import torch
 import _torch_ipex as ipex
-ipex._initialize_aten_bindings()
 
 import torch.nn as nn
 import torch.backends.cudnn as cudnn

@@ -24,8 +24,8 @@ dil::tensor dil_tensor_from_dense(const at::Tensor& tensor) {
 }
 
 at::Tensor dil_tensor_to_dense(const at::Tensor& tensor) {
-  TORCH_INTERNAL_ASSERT(cpu::ShadeDataContext::isDilTensor(tensor));
-  TORCH_INTERNAL_ASSERT(tensor.unsafeGetTensorImpl()->version_counter().current_version() == 1);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cpu::ShadeDataContext::isDilTensor(tensor));
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.unsafeGetTensorImpl()->version_counter().current_version() == 1);
   auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
   at::Tensor cpu_tensor = at::empty(
     dil_tensor.get_dims(),
@@ -36,22 +36,28 @@ at::Tensor dil_tensor_to_dense(const at::Tensor& tensor) {
 
 dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
   if (cpu::ShadeDataContext::isDilTensor(input)) {
-    return cpu::ShadeDataContext::getDilTensor(input);
+    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(input);
+    if ((!check_aten_dil_shape_info(input, dil_tensor)) && dil_tensor.is_public_format()) {
+      dil_tensor.set_dims_and_strides(input.sizes().vec(), input.strides().vec());
+    }
+    // Does not support the case if the dil tensor is block format but it is just a part of tensor buffer
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_tensor.is_public_format() || check_tensor_own_whole_storage(input));
+    return dil_tensor;
   } else {
     return dil_tensor_from_dense(input);
   }
 }
 
-at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
+at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
   // Generate new CPU Tensor and store dil tensor at its storage
   cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
-  shade_data_context->dil_tensor = dil_tensor;
+  shade_data_context->dil_tensor = std::forward<dil::tensor>(dil_tensor);
   shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
   void *tensor_data = nullptr;
-  if (dil_tensor.is_public_format()) {
+  if (shade_data_context->dil_tensor->is_public_format()) {
     // The buffer of a tensor with public format is shared between CPU and DNNL
-    tensor_data = dil_tensor.get_data_handle();
-    shade_data_context->cpu_raw_data = dil_tensor.get_data_handle();
+    tensor_data = shade_data_context->dil_tensor->get_data_handle();
+    shade_data_context->cpu_raw_data = shade_data_context->dil_tensor->get_data_handle();
     shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
   }
   c10::DataPtr shade_data_ptr(
@@ -59,23 +65,16 @@ at::Tensor gen_aten_tensor_by(dil::tensor dil_tensor) {
     shade_data_context,
     cpu::ShadeDataContext::freeShadeDataContext,
     at::DeviceType::DPCPP);
-  auto at_data_type = get_at_data_type(dil_tensor.get_data_type());
+  auto at_data_type = get_at_data_type(shade_data_context->dil_tensor->get_data_type());
   auto storage_impl = c10::make_intrusive<at::StorageImpl>(
     at::scalarTypeToTypeMeta(at_data_type),
-    dil_tensor.get_nelems(),
+    shade_data_context->dil_tensor->get_nelems(),
     std::move(shade_data_ptr),
     nullptr,
     /*resizeable=*/false);
   auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::DPCPPTensorId);
-  if (dil_tensor.is_public_format()) {
-    dbl::comm::sync_shape_from_dil_to_aten(_tensor, dil_tensor);
-  } else {
-    // Blockformat does not inlcude stride information
-    auto tensor_sizes = dil_tensor.get_dims();
-    TORCH_INTERNAL_ASSERT(tensor_sizes.size() != 1 || tensor_sizes[0] != 0);
-    _tensor.unsafeGetTensorImpl()->set_sizes_contiguous(tensor_sizes);
-  }
-  TORCH_INTERNAL_ASSERT(_tensor.layout() == c10::kStrided);
+  sync_shape_from_dil_to_aten(_tensor, shade_data_context->dil_tensor.value());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_tensor.layout() == c10::kStrided);
   return _tensor;
 }
 
@@ -85,15 +84,38 @@ at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& opti
      "'memory_format' argument is incompatible with mkldnn tensor");*/
   auto data_type = get_dil_data_type(at::typeMetaToScalarType(options.dtype()));
   dil::tensor it {sizes.vec(), data_type};
-  return gen_aten_tensor_by(it);
+  return gen_aten_tensor_by(std::move(it));
 }
 
 void sync_shape_from_dil_to_aten(const at::Tensor& ipex_tensor, const dil::tensor &dil_tensor) {
   dil::dims sizes = dil_tensor.get_dims();
-  dil::dims strides = dil_tensor.get_strides();
-  TORCH_INTERNAL_ASSERT(ipex_tensor.device().type() == at::DeviceType::DPCPP);
-  auto* _tensor_impl = (IPEXTensorImpl *)ipex_tensor.unsafeGetTensorImpl();
-  _tensor_impl->force_set_strided(sizes, strides);
+  if (dil_tensor.is_public_format()) {
+    dil::dims strides = dil_tensor.get_strides();
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipex_tensor.device().type() == at::DeviceType::DPCPP);
+    auto* _tensor_impl = (IPEXTensorImpl *)ipex_tensor.unsafeGetTensorImpl();
+    _tensor_impl->force_set_strided(sizes, strides);
+  } else {
+    // Blockformat does not inlcude stride information
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(sizes.size() != 1 || sizes[0] != 0);
+    ipex_tensor.unsafeGetTensorImpl()->set_sizes_contiguous(sizes);
+  }
+}
+
+std::vector<int64_t> expand_param_if_needed(
+    at::IntArrayRef list_param,
+    const char* param_name,
+    int64_t expected_dim) {
+  if (list_param.size() == 1) {
+    return std::vector<int64_t>(expected_dim, list_param[0]);
+  } else if ((int64_t)list_param.size() != expected_dim) {
+    std::ostringstream ss;
+    ss << "expected " << param_name << " to be a single integer value or a "
+       << "list of " << expected_dim << " values to match the convolution "
+       << "dimensions, but got " << param_name << "=" << list_param;
+    AT_ERROR(ss.str());
+  } else {
+    return list_param.vec();
+  }
 }
 
 }  // namespace comm

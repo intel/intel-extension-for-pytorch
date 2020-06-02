@@ -127,4 +127,13 @@ bool check_tensor_own_shade_context(const at::Tensor& tensor) {
   return (data_ptr != data_ctx) && (data_ctx != nullptr);
 }
 
+bool check_aten_dil_shape_info(const at::Tensor& ipex_tensor, const dil::tensor &dil_tensor) {
+  if (dil_tensor.is_public_format()) {
+    return ipex_tensor.sizes().vec() == dil_tensor.get_dims() &&
+          ipex_tensor.strides().vec() == dil_tensor.get_strides();
+  } else {
+    return ipex_tensor.sizes().vec() == dil_tensor.get_dims();
+  }
+}
+
 } // namespace torch_ipex
