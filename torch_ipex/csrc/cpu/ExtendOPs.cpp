@@ -451,8 +451,12 @@ AtenIpexTypeExt::embedding_bag_backward(const at::Tensor& grad, const at::Tensor
 }
 
 
-at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias) {
-    return NewLinearOp::apply(input, weight, bias);
+at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
+  if (bias.has_value()) {
+    return NewLinearOp::apply(input, weight, bias.value());
+  } else {
+    return NewLinearOp::apply(input, weight);
+  }
 }
 
 at::Tensor AtenIpexTypeExt::linear_fuse_relu(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {

@@ -40,7 +40,7 @@ def max_pool3d(input, kernel_size, stride, padding, dilation, ceil_mode):
     return torch_max_pool3d(input, kernel_size, stride, padding, dilation, ceil_mode)
 
 def max_pool2d(input, kernel_size: Vector, stride: Vector, padding: Vector, dilation: Vector, ceil_mode: bool):
-    if not stride:
+    if len(_pair(stride)) == 0:
         stride = kernel_size
     return torch.ops.torch_ipex.max_pool2d(input, _pair(kernel_size), _pair(stride), _pair(padding), _pair(dilation), ceil_mode)
 
