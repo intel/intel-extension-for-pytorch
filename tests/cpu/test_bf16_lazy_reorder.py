@@ -248,31 +248,31 @@ class TestBinOPs(TestCase):
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_a))
                 self.assertEqual(x_auto_mix_a, x_man_bf16_a.float())
 
-# class TestLinear(TestCase):
-#     def test_linear(self):
-#         rand_seed = int(get_rand_seed())
-#         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-#         torch.manual_seed(rand_seed)
-#         in_features = torch.randint(3, 10, (1,)).item()
-#         out_features = torch.randint(3, 100, (1,)).item()
-#         x_auto_mix = torch.randn(3, in_features, dtype=torch.float32, device=device) * 10
-#         x_man_bf16 = x_auto_mix.to(torch.bfloat16)
+class TestLinear(TestCase):
+    def test_linear(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        in_features = torch.randint(3, 10, (1,)).item()
+        out_features = torch.randint(3, 100, (1,)).item()
+        x_auto_mix = torch.randn(3, in_features, dtype=torch.float32, device=device) * 10
+        x_man_bf16 = x_auto_mix.to(torch.bfloat16)
 
-#         for bias in [True, False]:
-#             linear = torch.nn.Linear(in_features, out_features, bias=bias)
+        for bias in [True, False]:
+            linear = torch.nn.Linear(in_features, out_features, bias=bias)
 
-#             linear_auto_mix = copy.deepcopy(linear).to(device=device)
-#             linear_man_bf16 = copy.deepcopy(linear).to(device=device).to(torch.bfloat16)
+            linear_auto_mix = copy.deepcopy(linear).to(device=device)
+            linear_man_bf16 = copy.deepcopy(linear).to(device=device).to(torch.bfloat16)
 
-#             with AutoDNNL(True), AutoMixPrecision(False):
-#                 res_man_bf16 = linear_man_bf16(x_man_bf16)
-#                 self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
+            with AutoDNNL(True), AutoMixPrecision(False):
+                res_man_bf16 = linear_man_bf16(x_man_bf16)
+                self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
 
-#                 with AutoMixPrecision(True):
-#                     res_auto_mix = linear_auto_mix(x_auto_mix)
-#                     self.assertEqual(res_auto_mix.dtype, torch.float)
-#                     self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
-#                     self.assertEqual(res_auto_mix, res_man_bf16.float())
+                with AutoMixPrecision(True):
+                    res_auto_mix = linear_auto_mix(x_auto_mix)
+                    self.assertEqual(res_auto_mix.dtype, torch.float)
+                    self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
+                    self.assertEqual(res_auto_mix, res_man_bf16.float())
 
 class TestPool(TestCase):
     def test_avg_pool2d(self):
@@ -395,7 +395,6 @@ class TestLinearAlgebraOps(TestCase):
     def _gen_mm_tensor(self, seed, batches = None):
         torch.manual_seed(seed)
         M, N, O = 23, 8, 12
-        M, N, O = 3, 2, 3
         if batches != None:
             x_auto_mix_a = torch.randn(batches, M, N, dtype=torch.float32, device=device)
             x_auto_mix_b = torch.randn(batches, N, O, dtype=torch.float32, device=device)
