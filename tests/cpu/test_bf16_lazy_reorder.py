@@ -511,13 +511,19 @@ class TestLinearAlgebraOps(TestCase):
             for j in range(8, 12, 2):
                 alpha = i / 10
                 beta = j / 10
-                num_batches = 2
+                batches = 2
 
-                x_auto_mix_a, x_auto_mix_b, add_auto_mix, x_man_bf16_a, x_man_bf16_b, add_man_bf16 = self._gen_mm_tensor(rand_seed, num_batches)
+                M, N, O = 23, 8, 12
+                x_auto_mix_a = torch.randn(batches, M, N, dtype=torch.float32, device=device)
+                x_auto_mix_b = torch.randn(batches, N, O, dtype=torch.float32, device=device)
+                add_auto_mix = torch.randn(batches, M, O, dtype=torch.float32, device=device)
+
+                x_man_bf16_a = x_auto_mix_a.to(torch.bfloat16)
+                x_man_bf16_b = x_auto_mix_b.to(torch.bfloat16)
+                add_man_bf16 = add_auto_mix.to(torch.bfloat16)
 
                 with AutoDNNL(True), AutoMixPrecision(False):
                     res_man_bf16 = torch.baddbmm(add_man_bf16, x_man_bf16_a, x_man_bf16_b, beta=beta, alpha=alpha)
-
                     with AutoMixPrecision(True):
                         res_auto_mix = torch.baddbmm(add_auto_mix, x_auto_mix_a, x_auto_mix_b, beta=beta, alpha=alpha)
                         self.assertEqual(res_auto_mix.dtype, torch.float)
