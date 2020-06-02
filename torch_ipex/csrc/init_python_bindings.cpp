@@ -43,6 +43,24 @@ bool isDilTensor(const at::Tensor &tensor) {
   return cpu::ShadeDataContext::isDilTensor(tensor);
 }
 
+bool isBF16DilTensor(const at::Tensor &tensor) {
+  if (isDilTensor(tensor)) {
+    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
+    return dil_tensor.get_data_type() == dil::data_type::bf16;
+  }
+
+  return false;
+}
+
+bool isFP32DilTensor(const at::Tensor &tensor) {
+  if (isDilTensor(tensor)) {
+    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
+    return dil_tensor.get_data_type() == dil::data_type::f32;
+  }
+
+  return false;
+}
+
 dil::dims getDilTensorSizes(const at::Tensor &tensor) {
   if (isDilTensor(tensor)) {
     auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
@@ -136,6 +154,8 @@ void InitIpexModuleBindings(py::module m) {
   m.def("mlp_set_relu_mask", &AtenIpexTypeMLPExt::set_relu_mask);
   m.def("mlp_release_handle", &AtenIpexTypeMLPExt::release_handle);
   m.def("is_dil_tensor", &isDilTensor);
+  m.def("is_bf16_dil_tensor", &isBF16DilTensor);
+  m.def("is_fp32_dil_tensor", &isFP32DilTensor);
   m.def("get_dil_tensor_sizes", &getDilTensorSizes);
   m.def("get_dil_tensor_strides", &getDilTensorStrides);
   m.def("enable_jit", []() { AutoOptConfig::singleton().set_jit_fuse(true); });

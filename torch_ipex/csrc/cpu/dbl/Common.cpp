@@ -6,6 +6,7 @@
 
 #include "cpu/dil/dil_pin_singletons.hpp"
 #include "cpu/ShadeDataContext.h"
+#include "torch_ipex/csrc/aten_ipex_bridge.h"
 #include "torch_ipex/csrc/ipex_tensor_impl.h"
 #include "torch_ipex/csrc/utils.h"
 #include "torch_ipex/csrc/auto_opt_config.h"
@@ -34,6 +35,11 @@ at::Tensor dil_tensor_to_dense(const at::Tensor& tensor) {
   return cpu_tensor;
 }
 
+void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor) {
+  if (check_auto_mix_bf16_fp32())
+    bridge::reorderTensorToScalarTypeForDNNL(tensor, at::kBFloat16);
+}
+
 dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
   if (cpu::ShadeDataContext::isDilTensor(input)) {
     auto dil_tensor = cpu::ShadeDataContext::getDilTensor(input);
@@ -51,21 +57,31 @@ dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
 at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
   // Generate new CPU Tensor and store dil tensor at its storage
   cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
+  auto dil_tensor_type = dil_tensor.get_data_type();
   shade_data_context->dil_tensor = std::forward<dil::tensor>(dil_tensor);
   shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
+
   void *tensor_data = nullptr;
-  if (shade_data_context->dil_tensor->is_public_format()) {
-    // The buffer of a tensor with public format is shared between CPU and DNNL
-    tensor_data = shade_data_context->dil_tensor->get_data_handle();
-    shade_data_context->cpu_raw_data = shade_data_context->dil_tensor->get_data_handle();
-    shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
+  auto at_data_type = get_at_data_type(dil_tensor_type);
+  if (check_auto_mix_bf16_fp32() && dil_tensor_type == dil::data_type::bf16) {
+    // If the user enables auto-mix-precision, then the aten tensor should always be float.
+    // And even the dil tensor is plain format, it also cannot be shared with cpu buffer.
+    shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_BF_FP32;
+    at_data_type = at::kFloat;
+  } else {
+    if (shade_data_context->dil_tensor->is_public_format()) {
+      // The buffer of a tensor with public format is shared between CPU and DNNL
+      tensor_data = shade_data_context->dil_tensor->get_data_handle();
+      shade_data_context->cpu_raw_data = shade_data_context->dil_tensor->get_data_handle();
+      shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
+    }
   }
+
   c10::DataPtr shade_data_ptr(
     tensor_data,
     shade_data_context,
     cpu::ShadeDataContext::freeShadeDataContext,
     at::DeviceType::DPCPP);
-  auto at_data_type = get_at_data_type(shade_data_context->dil_tensor->get_data_type());
   auto storage_impl = c10::make_intrusive<at::StorageImpl>(
     at::scalarTypeToTypeMeta(at_data_type),
     shade_data_context->dil_tensor->get_nelems(),
