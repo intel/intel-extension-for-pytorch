@@ -462,34 +462,34 @@ void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarTy
     return;
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY((check_tensor_own_shade_context(ipexTensor)));
+  dil::tensor new_type_dil_tensor;
+
   cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(ipexTensor.storage().data_ptr().get_context());
   if (cpu::ShadeDataContext::isDilOwnTheTensor(ipexTensor)) {
+    // The buffer ownership is DIL
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_context->dil_tensor.has_value());
     dil::tensor&& dil_tensor = std::move(shade_context->dil_tensor.value());
     if (get_at_data_type(dil_tensor.get_data_type()) == dstScalarType) {
-      // The data type of DIL tensor is same as the destination data type
-      // DO NOTHING
+      // The data type of DIL tensor is same as the destination data type. DO NOTHING
+      return;
     } else {
       TORCH_CHECK(check_tensor_own_whole_storage(ipexTensor),
         "Intel Extension for PyTorch does not support the data is just a part of its storage for auto mix-precision.");
 
       auto new_type_desc = dil_tensor.get_desc().to_type(get_dil_data_type(dstScalarType));
-      dil::tensor new_type_dil_tensor{new_type_desc};
+      new_type_dil_tensor.init(new_type_desc);
       new_type_dil_tensor.feed_from(shade_context->dil_tensor.value());
-      shade_context->dil_tensor = new_type_dil_tensor;
-      shade_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_BF_FP32;
     }
-    return;
+  } else {
+    // The buffer ownership is CPU
+    TORCH_CHECK(check_tensor_own_whole_storage(ipexTensor),
+      "Intel Extension for PyTorch does not support the data is just a part of its storage for auto mix-precision.");
+
+    dil::tensor&& temp_dil_tensor = cpu::dbl::comm::dil_tensor_from_dense(ipexTensor);
+    auto new_type_desc = temp_dil_tensor.get_desc().to_type(get_dil_data_type(dstScalarType));
+    new_type_dil_tensor.init(new_type_desc);
+    new_type_dil_tensor.feed_from(temp_dil_tensor);
   }
-
-  // The buffer ownership is CPU
-  TORCH_CHECK(check_tensor_own_whole_storage(ipexTensor),
-    "Intel Extension for PyTorch does not support the data is just a part of its storage for auto mix-precision.");
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor_dtype == at::kFloat);
-
-  dil::tensor&& temp_dil_tensor = cpu::dbl::comm::dil_tensor_from_dense(ipexTensor);
-  dil::tensor new_type_dil_tensor = temp_dil_tensor.get_desc().to_type(get_dil_data_type(dstScalarType));;
-  new_type_dil_tensor.feed_from(temp_dil_tensor);
 
   // Build new shade data context
   cpu::ShadeDataContext *new_shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
