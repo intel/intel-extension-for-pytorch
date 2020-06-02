@@ -22,26 +22,25 @@ void dpcpp_eltwise(
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
-  int32_t n = input.size(0);
-  int32_t ic = input.size(1);
-  int32_t ih = input.size(2);
-  int32_t iw = input.size(3);
+  std::vector<int64_t> dims;
+  for (size_t i = 0; i < input.dim(); i++) {
+    dims.push_back(input.size(i));
+  }
 
-  auto data_t = memory::data_type::f32;
-  auto format_nchw = memory::format_tag::nchw;
-
-  memory::dims input_tz = {n, ic, ih, iw};
-  auto input_md = memory::desc({input_tz}, data_t, format_nchw);
+  memory::dims input_tz = dims;
+  auto data_t = dt_to_dnnl(input.scalar_type());
+  auto format_any = get_dnnl_default_format(input.dim());
+  auto input_md = memory::desc({input_tz}, data_t, format_any);
 
   eltwise_forward::desc eltwise_eltwiseFwd_desc(
       prop_kind::forward, alg_kind, input_md, alpha, beta);
   auto eltwise_forward_pd =
       eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, engine);
 
-  auto input_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
+  auto input_usr_memory = memory({{{input_tz}, data_t, format_any}, engine});
   dpcpp_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
 
-  auto output_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
+  auto output_usr_memory = memory({{{input_tz}, data_t, format_any}, engine});
   dpcpp_set_mkldnn_buffer(output.data_ptr(), output_usr_memory);
 
   auto strm = GpuStreamManager::Instance().get_stream();

@@ -42,15 +42,10 @@ static void threshold_kernel(
         scalar_t threshold = threshold_scalar.to<scalar_t>();
         scalar_t value = value_scalar.to<scalar_t>();
         bool all_contiguous = true;
-        //(TODO) temp relu solution for relu FP16 support
-        bool use_fp16 = false;
-        if (iter.dtype() == ScalarType::Half) {
-          use_fp16 = true;
-        }
         for (int i = 0; i < iter.ntensors(); i++) {
           all_contiguous = all_contiguous && iter.tensor(i).is_contiguous();
         }
-        if (threshold == 0 && value == 0 && all_contiguous && !use_fp16
+        if (threshold == 0 && value == 0 && all_contiguous
             /*is_contiguous<scalar_t>(iter.get_strides().data())*/) {
           dpcpp_threshold_kernel<scalar_t>(iter);
         } else {
@@ -65,11 +60,14 @@ static void threshold_kernel(
 } // namespace impl
 
 Tensor relu(const Tensor& self) {
-  return at::threshold(self, 0, 0);
+  Tensor result = at::empty_like(self);
+  at::dpcpp::dpcpp_eltwise<mkldnn::algorithm::eltwise_relu>(result, self, 0.0f, 0.0f);
+  return result;
 }
 
 Tensor& relu_(Tensor& self) {
-  return at::threshold_(self, 0, 0);
+  at::dpcpp::dpcpp_eltwise<mkldnn::algorithm::eltwise_relu>(self, self, 0.0f, 0.0f);
+  return self;
 }
 
 static Tensor threshold_out(
