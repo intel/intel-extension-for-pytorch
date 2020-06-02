@@ -457,7 +457,7 @@ std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& ten
 void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarType dstScalarType) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dstScalarType == at::kBFloat16);
   auto tensor_dtype = ipexTensor.scalar_type();
-  TORCH_CHECK(!(tensor_dtype == at::kBFloat16), "Please disalbe auto mix-precision if you want to enable BFloat16 manually");
+  TORCH_CHECK(!(tensor_dtype == at::kBFloat16), "Please disable auto mix-precision if you want to enable BFloat16 manually");
   if (tensor_dtype != at::kFloat)
     return;
 
