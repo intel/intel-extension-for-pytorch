@@ -122,14 +122,14 @@ cl::sycl::buffer<buffer_data_type, dims> make_buffer(void* virtual_ptr) {
   auto raw_buf = at::dpcpp::dpcppGetBufferMap().template get_buffer<uint8_t>(virtual_ptr);
   auto offset = at::dpcpp::dpcppGetBufferMap().get_offset(virtual_ptr);
   assert(offset >= 0 && "the sycl buffer offset must >= 0");
-  auto range = cl::sycl::range<1>(raw_buf.get_size() - offset);
-  auto buf = cl::sycl::buffer<uint8_t, 1>(raw_buf,
-                                          cl::sycl::id<1>{static_cast<size_t>(offset)},
+  auto range = cl::sycl::range<dims>(raw_buf.get_size() - offset);
+  auto buf = cl::sycl::buffer<uint8_t, dims>(raw_buf,
+                                          cl::sycl::id<dims>{static_cast<size_t>(offset)},
                                           range);
 
   //reinterpret the buffer to the required type.
-  range = cl::sycl::range<1>(buf.get_size()/sizeof(uint8_t));
-  return buf.template reinterpret<uint8_t, 1>(range);
+  range = cl::sycl::range<dims>(buf.get_size()/sizeof(buffer_data_type));
+  return buf.template reinterpret<buffer_data_type, dims>(range);
 }
 
 } // namespace dpcpp

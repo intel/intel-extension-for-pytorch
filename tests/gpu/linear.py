@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch_ipex
+import torch.nn.functional as F
 
 
 dtype = torch.float
@@ -47,3 +48,40 @@ print("y_dpcpp", y_dpcpp.to("cpu"))
 y_dpcpp.backward(torch.tensor([[1.01, 8.32], [2.4, 3.22]], device=dpcpp_device))
 print("dpcpp input grad", x_dpcpp.grad.to("cpu"))
 print("dpcpp linear grad", linear.weight.grad.to("cpu"))
+
+
+#new added case for the shared weights in one tensor
+
+dtype = torch.float
+cpu_device = torch.device("cpu")
+sycl_device = torch.device("dpcpp")
+
+# functionality
+x_cpu = torch.ones([3, 4], device=cpu_device, dtype=dtype)
+grad_cpu = torch.ones([3, 2], device=cpu_device, dtype=dtype)
+weight = torch.ones([3, 8], device=cpu_device, dtype=dtype)
+
+weight[:, 4:] = 2
+
+print(x_cpu)
+print(weight)
+
+print(weight[:, :4])
+y_cpu = F.linear(x_cpu, weight[:, :4])
+print(y_cpu)
+y_cpu = F.linear(x_cpu, weight[:, 4:])
+print(y_cpu)
+
+print("--------------------------------------------------------------------")
+
+x_sycl = x_cpu.to(sycl_device)
+weight_sycl = weight.to(sycl_device)
+print(x_sycl.cpu())
+print(weight_sycl.cpu())
+
+y_sycl = F.linear(x_sycl, weight_sycl[:, :4])
+print(y_sycl.cpu())
+y_sycl = F.linear(x_sycl, weight_sycl[:, 4:])
+print(y_sycl.cpu())
+
+

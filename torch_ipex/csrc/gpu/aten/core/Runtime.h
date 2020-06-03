@@ -21,7 +21,10 @@ static inline void dpcpp_set_mkldnn_buffer(void* vptr, mkldnn::memory& memory) {
   //
   // TODO: check size mismatch between vptr and mkldnn::memory
   //
-
+#if defined(USE_DPCPP)
+  auto buffer = make_buffer<uint8_t>(vptr);
+  memory.template set_sycl_buffer<uint8_t, 1>(buffer);
+#elif defined(USE_COMPUTECPP)
   if (dpcppGetBufferMap().get_offset(vptr) == 0) {
     // if offset is 0, which means this dpcpp_buffer is exact the corresponding
     // one for this vptr, we can safely set it to mkl-dnn dpcpp API
@@ -48,7 +51,7 @@ static inline void dpcpp_set_mkldnn_buffer(void* vptr, mkldnn::memory& memory) {
     memory.template set_sycl_buffer<uint8_t, 1>(buffer);
 #endif
   }
-  return;
+#endif
 }
 
 //
@@ -64,7 +67,7 @@ static inline memory::data_type dt_to_dnnl(const ScalarType scalar_type) {
   }
 }
 
-static inline static memory::format_tag get_dnnl_default_format(int ndims) {
+static inline memory::format_tag get_dnnl_default_format(int ndims) {
   switch (ndims) {
     case 1:
       return memory::format_tag::a;

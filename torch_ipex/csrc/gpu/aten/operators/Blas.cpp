@@ -6,13 +6,6 @@
 
 #include "InnerProduct.hpp"
 
-#define ERROR_ONLY_FP_TYPES(func)                                  \
-  TORCH_CHECK(                                                     \
-      0,                                                           \
-      #func,                                                       \
-      "for DPCPP tensors only supports floating-point types. Try " \
-      "converting the tensors with .float()");
-
 using namespace dnnl;
 using namespace at::dpcpp;
 
@@ -20,104 +13,49 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
+#if defined(USE_COMPUTECPP)
+Tensor computecpp_workaround(const Tensor& t) {
+  if (dpcppGetBufferMap().get_offset(t.data_ptr()) != 0) {
+    return t.clone();
+  }
+  return t;
+}
+#endif
+
+#if defined(USE_COMPUTECPP)
 template <typename scalar_t>
 void mkldnnGemmImpl(
-    Tensor& r_,
+    Tensor& result_,
     scalar_t beta,
     scalar_t alpha,
-    const Tensor& _m1,
-    const Tensor& _m2) {
-  char transpose_r, transpose_m1, transpose_m2;
+    const Tensor& m1_,
+    const Tensor& m2_) {
+  Tensor result = computecpp_workaround(result_);
+  Tensor m1 = computecpp_workaround(m1_);
+  Tensor m2 = computecpp_workaround(m2_);
+#else
+template <typename scalar_t>
+void mkldnnGemmImpl(
+    Tensor& result,
+    scalar_t beta,
+    scalar_t alpha,
+    const Tensor& m1,
+    const Tensor& m2) {
+#endif
+  size_t dims = result.dim();
+  TORCH_CHECK(dims == 2 || dims == 3, "mkldnn matmul only works with 2D or 3D, got ", dims);
+  TORCH_CHECK(dims == m1.dim() && dims == m2.dim(), "mkldnn input matrixes must have the same ranks");
 
-#define TRANSPOSE_TRUE 't'
-#define TRANSPOSE_FALSE 'n'
-// n == 1 || ldc >= max(1, m)
-#define Max(X, Y) ((X) > (Y) ? (X) : (Y))
-#define LDC_COND(M, N, LDC) ((N) == 1 || (LDC) >= Max(1, M))
-
-  Tensor m1 = _m1, m2 = _m2;
-
-  /* r_ */
-  if (r_.stride(0) == 1 && LDC_COND(r_.size(0), r_.size(1), r_.stride(1))) {
-    // if column major, no swap, no transpose
-    m1 = _m2;
-    m2 = _m1;
-    // Tensor swap = _m2;
-    // m2 = _m1;
-    // m1 = swap;
-    transpose_r = TRANSPOSE_TRUE;
-  } else if (
-      r_.stride(1) == 1 && LDC_COND(r_.size(1), r_.size(0), r_.stride(0))) {
-    // if row majoar
-    transpose_r = TRANSPOSE_FALSE;
-  } else {
-    // make r_ FORTRAN contiguous
-    TORCH_CHECK(0, "THDPCPP addmm r unsupported transpose");
+  int64_t m = result.size(-2);
+  int64_t n = result.size(-1);
+  int64_t k = m1.size(-1);
+  int64_t mb = 1;
+  if (dims == 3) {
+    mb = result.size(0);
+    TORCH_CHECK(mb == m1.size(0) && mb == m2.size(0), "batch size mismatch, result mb: ",\
+        mb, "m1 mb", m1.size(0), " m2 mb: ", m2.size(0));
   }
-
-#undef LDC_COND
-
-  int64_t transpose_size0 = (transpose_r == TRANSPOSE_FALSE ? 0 : 1);
-  int64_t transpose_size1 = (transpose_r == TRANSPOSE_FALSE ? 1 : 0);
-  int64_t m = r_.size(transpose_size0);
-  int64_t n = r_.size(transpose_size1);
-  int64_t k = m1.size(transpose_size1);
-  int64_t ldr = r_.size(transpose_size1);
-
-  /* m1 */
-  /* Need ldm1_ >= max(1, (transpose_m1 == 'n' ? m : k)) */
-  if (m1.stride(transpose_size0) == 1 &&
-      m1.stride(transpose_size1) >= Max(1, m)) {
-    // column major
-    transpose_m1 = TRANSPOSE_TRUE;
-  } else if (
-      m1.stride(transpose_size1) == 1 &&
-      m1.stride(transpose_size0) >= Max(1, k)) {
-    // row major
-    transpose_m1 = TRANSPOSE_FALSE;
-  } else {
-    TORCH_CHECK(0, "THDPCPP addmm m1 unsupported transpose");
-  }
-
-  /* m2 */
-  /* Need ldm2_ >= max(1, (transpose_m2 == 'n' ? k : n)) */
-  if (m2.stride(transpose_size0) == 1 &&
-      m2.stride(transpose_size1) >= Max(1, k)) {
-    // column major
-    transpose_m2 = TRANSPOSE_TRUE;
-  } else if (
-      m2.stride(transpose_size1) == 1 &&
-      m2.stride(transpose_size0) >= Max(1, n)) {
-    // row major
-    transpose_m2 = TRANSPOSE_FALSE;
-  } else {
-    TORCH_CHECK(0, "THDPCPP addmm m2 unsupported transpose");
-  }
-
-  int64_t ldm1 =
-      (transpose_m1 == TRANSPOSE_TRUE ? m1.size(transpose_size0)
-                                      : m1.size(transpose_size1));
-  int64_t ldm2 =
-      (transpose_m2 == TRANSPOSE_TRUE ? m2.size(transpose_size0)
-                                      : m2.size(transpose_size1));
-
-  // assume dnnl_notrans = 0 & dnnl_trans = 1
-  auto transpose_m1_ = transpose_m1 == TRANSPOSE_FALSE ? 'N' : 'T';
-  auto transpose_m2_ = transpose_m2 == TRANSPOSE_FALSE ? 'N' : 'T';
-
-  // Reference from THBlas_(gemm)
-  // Fix mkl-dnn generic_gemm type check failure
-  if (n == 1)
-    ldr = m;
-
-  at::Device curDevice = at::Device(at::kDPCPP, current_device());
-  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
-  auto strm = GpuStreamManager::Instance().get_stream();
-
-  memory::dims m1_strides =
-      transpose_m1_ == 'N' ? memory::dims{ldm1, 1} : memory::dims{1, ldm1};
-  memory::dims m2_strides =
-      transpose_m2_ == 'N' ? memory::dims{ldm2, 1} : memory::dims{1, ldm2};
+  TORCH_CHECK(k == m2.size(-2), "size mismatch, m1: ", m1.sizes(), " m2: ", m2.sizes());
 
   memory::data_type data_t;
   if (std::is_same<scalar_t, at::Half>::value) {
@@ -127,9 +65,21 @@ void mkldnnGemmImpl(
   } else {
     data_t = memory::data_type::f32;
   }
-  memory::desc m1_md({m, k}, data_t, m1_strides);
-  memory::desc m2_md({k, n}, data_t, m2_strides);
-  memory::desc r_md({m, n}, data_t, {ldr, 1});
+  memory::desc m1_md;
+  memory::desc m2_md;
+  memory::desc r_md;
+  if (dims == 2) {
+    m1_md = memory::desc({m, k}, data_t, {m1.stride(0), m1.stride(1)});
+    m2_md = memory::desc({k, n}, data_t, {m2.stride(0), m2.stride(1)});
+    r_md = memory::desc({m, n}, data_t, {result.stride(0), result.stride(1)});
+  } else {
+    m1_md = memory::desc({mb, m, k}, data_t,
+      {m1.stride(0), m1.stride(1), m1.stride(2)});
+    m2_md = memory::desc({mb, k, n}, data_t,
+      {m2.stride(0), m2.stride(1), m2.stride(2)});
+    r_md = memory::desc({mb, m, n}, data_t,
+      {result.stride(0), result.stride(1), result.stride(2)});
+  }
 
   primitive_attr attr;
   if (alpha != 1.f)
@@ -139,6 +89,10 @@ void mkldnnGemmImpl(
     po.append_sum(beta);
     attr.set_post_ops(po);
   }
+
+  at::Device curDevice = at::Device(at::kDPCPP, current_device());
+  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
+  auto strm = GpuStreamManager::Instance().get_stream();
 
   std::shared_ptr<dnnl::matmul::desc> matmul_desc;
   matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
@@ -154,291 +108,214 @@ void mkldnnGemmImpl(
   dpcpp_set_mkldnn_buffer(m2.data_ptr(), m2_memory);
 
   auto r_memory = memory({r_md, engine});
-  dpcpp_set_mkldnn_buffer(r_.data_ptr(), r_memory);
+  dpcpp_set_mkldnn_buffer(result.data_ptr(), r_memory);
 
-  matmul_p->execute(
-      strm,
-      {{DNNL_ARG_SRC, m1_memory},
-       {DNNL_ARG_WEIGHTS, m2_memory},
-       {DNNL_ARG_DST, r_memory}});
+  matmul_p->execute(strm,
+                    {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
+                     {DNNL_ARG_DST, r_memory}});
 
-#undef TRANSPOSE_TRUE
-#undef TRANSPOSE_FALSE
+#if defined(USE_COMPUTECPP)
+  if (!result_.is_same(result))
+    result_.copy_(result_);
+#endif
+}
+
+bool check_broadcast(const Tensor& src, const IntArrayRef& shape){
+  auto src_dim = src.dim();
+  auto tgt_dim = shape.size();
+  if (src_dim == 0 || src_dim > tgt_dim)
+    return false;
+  do {
+    src_dim--;
+    tgt_dim--;
+    auto size = src.size(src_dim);
+    if (size != 1 && size != shape[tgt_dim])
+      return false;
+  } while(src_dim);
+  return true;
 }
 
 template <typename scalar_t>
-void addmm(
-    Tensor& r_,
-    scalar_t beta,
-    Tensor& t,
-    scalar_t alpha,
-    const Tensor& m1,
-    const Tensor& m2) {
-  if ((m1.dim() != 2) || (m2.dim() != 2))
-    TORCH_CHECK(
-        0, "2D tensors expected, got ", m1.dim(), "D, ", m2.dim(), "D tensors");
-
-  if (t.dim() != 2)
-    TORCH_CHECK(0, "2D tensor expected, got ", t.dim(), "D tensor for t");
-
-  if (m1.size(1) != m2.size(0)) {
-    DPCPPDescBuff bm1 = TensorImpl_sizeDesc(m1.unsafeGetTensorImpl());
-    DPCPPDescBuff bm2 = TensorImpl_sizeDesc(m2.unsafeGetTensorImpl());
-    TORCH_CHECK(0, "size mismatch, m1: ", bm1.str, " m2: ", bm2.str);
+void gemm_broadcast(Tensor& result,
+                    const Tensor& m1,
+                    const Tensor& m2,
+                    scalar_t beta,
+                    scalar_t alpha,
+                    const Tensor bias = at::Tensor()) {
+  std::vector<int64_t> result_shape;
+  auto dim = m1.dim();
+  if (dim == 2) {
+    result_shape = std::vector<int64_t>{m1.size(0), m2.size(1)};
+  } else {
+    result_shape = std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(2)};
   }
-
-  if ((t.size(0) != m1.size(0)) || (t.size(1) != m2.size(1))) {
-    DPCPPDescBuff bt = TensorImpl_sizeDesc(t.unsafeGetTensorImpl());
-    DPCPPDescBuff bm1 = TensorImpl_sizeDesc(m1.unsafeGetTensorImpl());
-    DPCPPDescBuff bm2 = TensorImpl_sizeDesc(m2.unsafeGetTensorImpl());
-    TORCH_CHECK(
-        0, "size mismatch, t:", bt.str, " m1: ", bm1.str, " m2: ", bm2.str);
+  if (bias.defined() && beta) {
+    TORCH_CHECK(check_broadcast(bias, result_shape),
+                "bias ", bias.sizes(), " cannot broadcast to ", result_shape);
+    Tensor bc_bias;
+    std::tie(bc_bias) = expand_size(bias, result_shape, "gemm_broadcast");
+    if (!result.is_same(bc_bias))
+      result.resize_(bc_bias.sizes()).copy_(bc_bias);
+  } else {
+    result.resize_(result_shape);
   }
-
-  if (TensorImpl_Unwrap(t) != TensorImpl_Unwrap(r_)) {
-    r_.resize_as_(t);
-    if (beta != 0.0) {
-      r_.copy_(t);
-    }
-  }
-
-  mkldnnGemmImpl(r_, beta, alpha, m1, m2);
+  mkldnnGemmImpl(result, beta, alpha, m1, m2);
 }
-
-static std::vector<at::Tensor> initTensorArray(
-    const std::vector<at::Tensor>& tensors) {
-  int numt = tensors.size();
-  std::vector<at::Tensor> _tensors;
-
-  for (int i = 0; i < numt; i++) {
-    Tensor tmp = at::empty({0}, tensors[i].options());
-    tmp.resize_as_(tensors[i]);
-    tmp.copy_(tensors[i]);
-    _tensors.push_back(tmp);
-  }
-
-  return _tensors;
-}
-
-static std::vector<at::Tensor> squeeze1dTensorArray(
-    std::vector<at::Tensor>& tensors) {
-  std::vector<at::Tensor> squeezed;
-  for (int i = 0; i < tensors.size(); i++)
-    squeezed.push_back(at::squeeze(tensors[i], 0));
-  return squeezed;
-}
-
-static std::vector<at::Tensor> unsqueeze1dTensorArray(
-    std::vector<at::Tensor>& tensors) {
-  std::vector<at::Tensor> unsqueezed;
-  for (int i = 0; i < tensors.size(); i++)
-    unsqueezed.push_back(at::unsqueeze(tensors[i], 0));
-  return unsqueezed;
-}
-
-template <typename scalar_t>
-void baddbmm(
-    Tensor& result,
-    scalar_t beta,
-    const Tensor& t,
-    scalar_t alpha,
-    const Tensor& batch1,
-    const Tensor& batch2) {
-  checkBackend("baddbmm", {result, t, batch1, batch2}, Backend::DPCPP);
-  TORCH_CHECK(t.dim() == 3, "expected 3D tensor");
-  TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
-  TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
-  TORCH_CHECK(t.size(0) == batch1.size(0), "equal number of batches expected");
-  TORCH_CHECK(t.size(0) == batch2.size(0), "equal number of batches expected");
-  TORCH_CHECK(t.size(1) == batch1.size(1), "wrong matrix size");
-  TORCH_CHECK(t.size(2) == batch2.size(2), "wrong matrix size");
-  TORCH_CHECK(batch1.size(2) == batch2.size(1), "wrong matrix size");
-
-  if (TensorImpl_Unwrap(t) != TensorImpl_Unwrap(result)) {
-    result.resize_as_(t);
-    if (beta != 0.0) {
-      result.copy_(t);
-    }
-  }
-
-  // TODO: This is the work-around implementation for BatchGemm. We should
-  // replace it when Blas library is available.
-  auto num_batches = result.size(0);
-
-  // First split t, batch1, batch2 into chunks along 0 dim
-  auto ts = at::chunk(t, num_batches, 0);
-  auto b1s = at::chunk(batch1, num_batches, 0);
-  auto b2s = at::chunk(batch2, num_batches, 0);
-
-  // Initiliaze Tensor array and init value from tensor vector
-  auto _ts = initTensorArray(ts);
-  auto _b1s = initTensorArray(b1s);
-  auto _b2s = initTensorArray(b2s);
-
-  // Squeeze tensor in tensor array along 0 dim
-  auto _ts_squeezed = squeeze1dTensorArray(_ts);
-  auto _b1s_squeezed = squeeze1dTensorArray(_b1s);
-  auto _b2s_squeezed = squeeze1dTensorArray(_b2s);
-
-  // Use GEMM to do th computation
-  for (int i = 0; i < num_batches; i++)
-    mkldnnGemmImpl(
-        _ts_squeezed[i], beta, alpha, _b1s_squeezed[i], _b2s_squeezed[i]);
-
-  // Unsqueeze t tensor array and concat to result array along 0 dim
-  auto _ts_unsqueezed = unsqueeze1dTensorArray(_ts_squeezed);
-  at::cat_out(result, _ts_unsqueezed, 0);
-}
-
 } // namespace impl
 
 Tensor& addmm_(
     Tensor& self,
-    const Tensor& mat1,
-    const Tensor& mat2,
+    const Tensor& m1,
+    const Tensor& m2,
     Scalar beta,
     Scalar alpha) {
+  checkBackend("addmm_", {self, m1, m2}, Backend::DPCPP);
+  TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(self.size(0) ==  m1.size(0) && self.size(1) == m2.size(1),
+              "size mismatch input ", self.sizes(), " m1 ", m1.sizes(), " m2 ", m2.sizes());
+
   AT_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "addmm_",
-      [&]() {
-        impl::addmm<scalar_t>(
-            self, beta.to<float>(), self, alpha.to<float>(), mat1, mat2);
-      });
+    at::ScalarType::Half,
+    at::ScalarType::BFloat16,
+    self.scalar_type(),
+    "addmm",
+    [&]() {
+      impl::gemm_broadcast(self, m1, m2, beta.to<scalar_t>(), alpha.to<scalar_t>(), self);
+    });
 
   return self;
 }
 
 Tensor addmm(
-    const Tensor& self,
-    const Tensor& mat1_,
-    const Tensor& mat2_,
+    const Tensor& input,
+    const Tensor& m1,
+    const Tensor& m2,
     Scalar beta,
     Scalar alpha) {
-  Tensor b_self_;
-  std::tie(b_self_) =
-      expand_size(self, {mat1_.size(0), mat2_.size(1)}, "addmm");
-  Tensor r = at::empty({0}, self.options());
+  checkBackend("addmm", {input, m1, m2}, Backend::DPCPP);
+  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
 
-  Tensor b_self, mat1, mat2;
-  if (dpcppGetBufferMap().get_offset(b_self_.data_ptr()) != 0 ||
-      dpcppGetBufferMap().get_offset(mat1_.data_ptr()) != 0 ||
-      dpcppGetBufferMap().get_offset(mat2_.data_ptr()) != 0) {
-    b_self = at::empty_like(b_self_);
-    b_self.copy_(b_self_);
-    mat1 = at::empty_like(mat1_);
-    mat1.copy_(mat1_);
-    mat2 = at::empty_like(mat2_);
-    mat2.copy_(mat2_);
-  } else {
-    b_self = b_self_;
-    mat1 = mat1_;
-    mat2 = mat2_;
-  }
-
+  auto result = at::empty({0}, input.options());
   AT_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "addmm",
-      [&]() {
-        impl::addmm<scalar_t>(
-            r, beta.to<float>(), b_self, alpha.to<float>(), mat1, mat2);
-      });
+    at::ScalarType::Half,
+    at::ScalarType::BFloat16,
+    result.scalar_type(),
+    "addmm",
+    [&]() {
+      impl::gemm_broadcast(result, m1, m2, beta.to<scalar_t>(), alpha.to<scalar_t>(), input);
+    });
 
-  return r;
+  return result;
 }
 
-Tensor& mm_out(Tensor& result, const Tensor& self_, const Tensor& mat2_) {
-  Tensor self, mat2;
-  if (dpcppGetBufferMap().get_offset(self_.data_ptr()) != 0 ||
-      dpcppGetBufferMap().get_offset(mat2_.data_ptr()) != 0) {
-    self = at::empty_like(self_);
-    self.copy_(self_);
-    mat2 = at::empty_like(mat2_);
-    mat2.copy_(mat2_);
-  } else {
-    self = self_;
-    mat2 = mat2_;
-  }
+Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
+  checkBackend("mm_out", {result, self, mat2}, Backend::DPCPP);
+  TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(mat2.dim() == 2, "expected 2D tensor");
 
-  AT_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "mm_out",
-      [&]() {
-        impl::addmm<scalar_t>(
-            result, scalar_t(0), result, scalar_t(1), self, mat2);
-      });
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+    at::ScalarType::Half,
+    at::ScalarType::BFloat16,
+    self.scalar_type(),
+    "mm_out",
+    [&]() {
+      impl::gemm_broadcast<scalar_t>(result, self, mat2, 0, 1);
+    });
 
   return result;
 }
 
 Tensor mm(const Tensor& self, const Tensor& mat2) {
   auto result = at::empty({0}, self.options());
-  result.resize_({self.size(0), mat2.size(1)});
+  at::AtenIpexTypeDPCPP::mm_out(result, self, mat2);
+  return result;
+}
 
-  return at::AtenIpexTypeDPCPP::mm_out(result, self, mat2);
+Tensor& baddbmm_(
+  Tensor& self,
+  const Tensor& batch1,
+  const Tensor& batch2,
+  Scalar beta,
+  Scalar alpha) {
+  checkBackend("baddbmm_", {self, batch1, batch2}, Backend::DPCPP);
+  TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
+  TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
+  TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
+  TORCH_CHECK(self.size(0) == batch1.size(0) && \
+              self.size(1) == batch1.size(1) && \
+              self.size(2) == batch2.size(2),
+              "size mismatch input ", self.sizes(),
+              " batch1 ", batch1.sizes(), " batch2 ", batch2.sizes());
+
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+    at::ScalarType::Half,
+    at::ScalarType::BFloat16,
+    self.scalar_type(),
+    "baddbmm_",
+    [&]() {
+      impl::gemm_broadcast(self, batch1, batch2, beta.to<scalar_t>(), alpha.to<scalar_t>(), self);
+    });
+
+  return self;
 }
 
 Tensor& baddbmm_out(
     Tensor& result,
-    const Tensor& self,
+    const Tensor& input,
     const Tensor& batch1,
     const Tensor& batch2,
     Scalar beta,
     Scalar alpha) {
+  checkBackend("baddbmm_out", {input, batch1, batch2}, Backend::DPCPP);
+  TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
+  TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
+
   AT_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "baddbmm",
-      [&]() {
-        impl::baddbmm<scalar_t>(
-            result,
-            beta.to<scalar_t>(),
-            self,
-            alpha.to<scalar_t>(),
-            batch1,
-            batch2);
-      });
+    at::ScalarType::Half,
+    at::ScalarType::BFloat16,
+    input.scalar_type(),
+    "baddbmm_out",
+    [&]() {
+      impl::gemm_broadcast(result, batch1, batch2, beta.to<scalar_t>(), alpha.to<scalar_t>(), input);
+    });
+
   return result;
 }
 
 Tensor baddbmm(
-    const Tensor& self,
+    const Tensor& input,
     const Tensor& batch1,
     const Tensor& batch2,
     Scalar beta,
     Scalar alpha) {
-  auto result = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::baddbmm_out(
-      result, self, batch1, batch2, beta, alpha);
-}
-
-Tensor& baddbmm_(
-    Tensor& self,
-    const Tensor& batch1,
-    const Tensor& batch2,
-    Scalar beta,
-    Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::baddbmm_out(
-      self, self, batch1, batch2, beta, alpha);
-}
-
-Tensor bmm(const Tensor& self, const Tensor& batch2) {
-  auto result =
-      at::empty({self.size(0), self.size(1), batch2.size(2)}, self.options());
-  return at::AtenIpexTypeDPCPP::baddbmm_out(result, result, self, batch2, 0, 1);
+  Tensor r = at::empty({0}, input.options());
+  at::AtenIpexTypeDPCPP::baddbmm_out(r, input, batch1, batch2, beta, alpha);
+  return r;
 }
 
 Tensor& bmm_out(Tensor& result, const Tensor& self, const Tensor& batch2) {
-  result.resize_({self.size(0), self.size(1), batch2.size(2)});
-  return at::AtenIpexTypeDPCPP::baddbmm_out(result, result, self, batch2, 0, 1);
+  checkBackend("bmm_out", {result, self, batch2}, Backend::DPCPP);
+  TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
+  TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
+
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+    at::ScalarType::Half,
+    at::ScalarType::BFloat16,
+    self.scalar_type(),
+    "bmm_out",
+    [&]() {
+      impl::gemm_broadcast<scalar_t>(result, self, batch2, 0, 1);
+    });
+  return result;
 }
 
+Tensor bmm(const Tensor& self, const Tensor& batch2) {
+  auto result = at::empty({0}, self.options());
+  at::AtenIpexTypeDPCPP::bmm_out(result, self, batch2);
+  return result;
+}
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
