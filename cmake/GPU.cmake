@@ -95,39 +95,15 @@ else()
   message(FATAL_ERROR, "Cannot find installed PyTorch directory")
 endif()
 
-set (PYBIND_INCLUDES "${PROJECT_SOURCE_DIR}/third_party/pybind11/include")
-# set(PYTORCH_ROOT "${PROJECT_SOURCE_DIR}/third_party/pytorch")
-# set(PYTORCH_ATEN_SRC_ROOT "${PYTORCH_ROOT}/aten/src")
-# set(PYTORCH_ATEN_INCLUDES "${PYTORCH_ROOT}/aten/src/ATen")
-# set(PYTORCH_ATEN_CORE_INCLUDES "${PYTORCH_ROOT}/aten/src/ATen/core")
-# set(PYTORCH_C10_CORE_INCLUDES "${PYTORCH_ROOT}/c10/core")
-# set(PYTORCH_C10_DPCPP_INCLUDES "${PYTORCH_ROOT}/c10/dpcpp")
-# set(PYTORCH_C10_UTIL_INCLUDES "${PYTORCH_ROOT}/c10/util")
-# set(PYTORCH_C10_MACROS_INCLUDES "${PYTORCH_ROOT}/c10/macros")
-
 set(DPCPP_GPU_ROOT "${TORCH_IPEX_C_SOURCE_DIR}/gpu")
 set(DPCPP_GPU_ATEN_SRC_ROOT "${DPCPP_GPU_ROOT}/aten")
 set(DPCPP_GPU_ATEN_GENERATED "${DPCPP_GPU_ROOT}/aten/generated")
 
 include_directories(${PYTHON_INCLUDE_DIR})
-include_directories(${PYBIND_INCLUDES})
-# include_directories(${PYTORCH_ATEN_SRC_ROOT})
-# include_directories(${PYTORCH_ATEN_INCLUDES})
-# include_directories(${PYTORCH_ATEN_CORE_INCLUDES})
-# include_directories(${PYTORCH_C10_CORE_INCLUDES})
-# include_directories(${PYTORCH_C10_DPCPP_INCLUDES})
-# include_directories(${PYTORCH_C10_UTIL_INCLUDES})
-# include_directories(${PYTORCH_C10_MACROS_INCLUDES})
 include_directories(${TORCH_IPEX_C_SOURCE_DIR})
 include_directories(${DPCPP_GPU_ROOT})
 include_directories(${DPCPP_GPU_ATEN_SRC_ROOT})
 include_directories(${DPCPP_GPU_ATEN_GENERATED})
-
-set(C10_USE_GFLAGS ${USE_GFLAGS})
-set(C10_USE_GLOG ${USE_GLOG})
-set(C10_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
-set(C10_USE_NUMA ${USE_NUMA})
-set(C10_DISABLE_NUMA ${CAFFE2_DISABLE_NUMA})
 
 # configure_file(
 #     "${PYTORCH_C10_MACROS_INCLUDES}/cmake_macros.h.in"
@@ -165,25 +141,10 @@ if (SHOULD_GEN)
   )
 endif()
 
-# includes installation
-add_custom_target(
-  install_dpcpp_gpu_includes
-  COMMAND rm -rf "${CMAKE_BINARY_DIR}/include"
-  COMMAND mkdir "${CMAKE_BINARY_DIR}/include"
-  COMMAND mkdir "${CMAKE_BINARY_DIR}/include/torch"
-  COMMAND mkdir "${CMAKE_BINARY_DIR}/include/torch/extension"
-  COMMAND mkdir "${CMAKE_BINARY_DIR}/include/torch/extension/dpcpp"
-  COMMAND cp "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/gpu/includes/*.h" "${CMAKE_BINARY_DIR}/include/torch/extension/dpcpp"
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-)
-
-# dependencies
-# set(DPCPP_DEP)
-# include(cmake/Dependencies.cmake)
-
 # sources
 set(DPCPP_SRCS)
-
+set(TORCH_IPEX_PUBLIC_HEADER)
+#set_target_properties(dnnl PROPERTIES PRIVATE_HEADER "")
 set(DPCPP_ATEN_SRCS)
 add_subdirectory(torch_ipex/csrc/gpu/aten)
 list(APPEND DPCPP_SRCS ${DPCPP_ATEN_SRCS})
@@ -205,30 +166,25 @@ target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libc10.so)
 target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
 
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
-set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME "_torch_ipex")
+set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
+if(DEFINED TORCH_IPEX_PUBLIC_HEADER)
+  set_target_properties(torch_ipex PROPERTIES PUBLIC_HEADER ${TORCH_IPEX_PUBLIC_HEADER})
+endif()
+
 if (SHOULD_GEN)
   add_dependencies(torch_ipex gen_dpcpp_gpu_c10_dispatch_registration)
 endif()
-add_dependencies(torch_ipex install_dpcpp_gpu_includes)
-# add_dependencies(torch_ipex ${DPCPP_DEP})
-# target_link_libraries(torch PUBLIC c10_sycl)
-# target_include_directories(torch INTERFACE $<INSTALL_INTERFACE:include>)
-# target_include_directories(torch PRIVATE ${Caffe2_SYCL_INCLUDE})
-# target_link_libraries(torch PRIVATE ${Caffe2_SYCL_DEPENDENCY_LIBS})
 
 IF(USE_COMPUTECPP)
   add_sycl_to_target(TARGET torch_ipex SOURCES ${DPCPP_SRCS})
-ENDIF()
-
-IF(USE_DPCPP)
-  #add_library(c10_sycl ${C10_SYCL_SRCS} ${C10_CUDA_HEADERS})
+ELSEIF(USE_DPCPP)
   set_source_files_properties(${DPCPP_SRCS} COMPILE_FLAGS "-fsycl -D__STRICT_ANSI__ -fsycl-unnamed-lambda")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl -fsycl-device-code-split=per_source")
 ENDIF()
 
-# if(USE_DPCPP)
-#   set_source_files_properties(${Caffe2_SYCL_SRCS} COMPILE_FLAGS "-fsycl -D__STRICT_ANSI__ -DUSE_DPCPP")
-#   target_link_libraries(torch PRIVATE "-fsycl")
-# endif()
-
 add_dependencies(torch_ipex dnnl)
+set_target_properties(dnnl PROPERTIES PUBLIC_HEADER "")
+
+install(TARGETS ${LIB_NAME}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

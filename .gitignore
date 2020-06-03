@@ -6,7 +6,7 @@
 # aten/build/ will stop being cleaned.  So be careful when
 # refactoring this file!
 
-## PyTorch
+## torch_ipex
 
 .coverage
 .hypothesis
@@ -21,77 +21,12 @@
 */**/**/*.pyc
 */**/**/**/*.pyc
 */**/**/**/**/*.pyc
-aten/build/
-aten/src/ATen/Config.h
-aten/src/ATen/cuda/CUDAConfig.h
-caffe2/cpp_test/
-dist/
-docs/src/**/*
-docs/cpp/build
-docs/cpp/source/api
-log
-test/.coverage
-test/.hypothesis/
-test/cpp/api/mnist
-test/custom_operator/model.pt
-test/data/legacy_modules.t7
-test/data/*.pt
-dropout_model.pt
-test/generated_type_hints_smoketest.py
-test/htmlcov
-test/cpp_extensions/install/
-third_party/build/
-tools/shared/_utils_internal.py
-torch.egg-info/
-torch/__init__.pyi
-torch/nn/functional.pyi
-torch/nn/modules/*.pyi
-torch/csrc/autograd/generated/*
-torch/csrc/cudnn/cuDNN.cpp
-torch/csrc/generated
-torch/csrc/generic/TensorMethods.cpp
-torch/csrc/jit/generated/*
-torch/csrc/jit/fuser/config.h
-torch/csrc/nn/THCUNN.cpp
-torch/csrc/nn/THCUNN.cwrap
-torch/csrc/nn/THNN_generic.cpp
-torch/csrc/nn/THNN_generic.cwrap
-torch/csrc/nn/THNN_generic.h
-torch/csrc/nn/THNN.cpp
-torch/csrc/nn/THNN.cwrap
-torch/csrc/nn/THSYCLNN.cpp
-torch/csrc/nn/THSYCLNN.cwrap
-torch/bin/
-torch/cmake/
-torch/lib/*.a*
-torch/lib/*.dll*
-torch/lib/*.exe*
-torch/lib/*.dylib*
-torch/lib/*.h
-torch/lib/*.lib
-torch/lib/*.so*
-torch/lib/protobuf*.pc
-torch/lib/build
-torch/lib/caffe2/
-torch/lib/cmake
-torch/lib/include
-torch/lib/pkgconfig
-torch/lib/protoc
-torch/lib/protobuf/
-torch/lib/tmp_install
-torch/lib/torch_shm_manager
-torch/lib/site-packages/
-torch/lib/python*
-torch/lib64
-torch/include/
-torch/share/
-torch/test/
-torch/version.py
 
-intel_pytorch_extension_py/version.py
 torch_ipex/csrc/version.cpp
 torch_ipex/csrc/aten_ipex_sparse_type_default.*
 torch_ipex/csrc/cpu/SparseOPs.*
+torch_ipex/include/
+torch_ipex/lib/
 
 # Root level file used in CI to specify certain env configs.
 # E.g., see .circleci/config.yaml

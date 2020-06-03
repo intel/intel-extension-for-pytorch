@@ -23,4 +23,4 @@ print("ready __init__ ...")
 # else:
 #     import _torch_ipex
 
-import _torch_ipex
+from .lib import torch_ipex
