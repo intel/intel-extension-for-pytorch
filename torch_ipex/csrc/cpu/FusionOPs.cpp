@@ -23,9 +23,9 @@ namespace cpu {
 using namespace dbl::comm;
 
 at::Tensor AtenIpexJITDev::dil_convolution_relu(
-    const at::Tensor & input,
-    const at::Tensor & weight,
-    const at::Tensor & bias,
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
@@ -100,9 +100,9 @@ static at::Tensor& dil_convolution_inplace_fusion(
 }
 
 at::Tensor& AtenIpexJITDev::dil_convolution_sum(
-    const at::Tensor & input,
-    const at::Tensor & weight,
-    const at::Tensor & bias,
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
@@ -115,9 +115,9 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum(
 }
 
 at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
-    const at::Tensor & input,
-    const at::Tensor & weight,
-    const at::Tensor & bias,
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
@@ -127,6 +127,47 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
   auto scale = alpha.to<float>();
   return dil_convolution_inplace_fusion(input, weight, bias, accumu, stride, padding,
       dilation, groups, dil::attr_t::residual(scale));
+}
+
+at::Tensor AtenIpexJITDev::dil_linear_fuse_relu(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const at::Tensor& bias) {
+  TORCH_CHECK(self.dim() >= 2,
+      "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
+  auto input_contiguous = self.contiguous();
+  auto weight_contiguous = weight.contiguous();
+
+  // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
+  auto self_reshaped = self.dim() > 2 ? self.reshape({-1, input_contiguous.size(self.dim() - 1)}) : self;
+  const dil::tensor x = try_gen_dil_tensor(self_reshaped);
+  const dil::tensor w = try_gen_dil_tensor(weight_contiguous);
+
+  dil::tensor y;
+  if (bias.defined()) {
+    auto bias_contiguous = bias.contiguous();
+    const dil::tensor b = try_gen_dil_tensor(bias_contiguous);
+    dil::inner_product_forward::compute(x, w, b, y,
+                                        /*src_scales=*/dil::scale_t(),
+                                        /*weight_scales=*/dil::scale_t(),
+                                        /*dst_scales=*/dil::scale_t(),
+                                        /*attr*/dil::attr_t::fuse_relu());
+  } else {
+    dil::inner_product_forward::compute(x, w, y,
+                                        /*src_scales=*/dil::scale_t(),
+                                        /*weight_scales=*/dil::scale_t(),
+                                        /*dst_scales=*/dil::scale_t(),
+                                        /*attr*/dil::attr_t::fuse_relu());
+  }
+
+  auto input_size = self.sizes();
+  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
+  output_size.push_back(weight.size(0));
+
+  if (self.dim() > 2) {
+    return gen_aten_tensor_by(std::move(y)).reshape(output_size);
+  }
+  return gen_aten_tensor_by(std::move(y));
 }
 
 }  // namespace cpu

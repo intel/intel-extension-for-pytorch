@@ -150,6 +150,16 @@ class CascadedConv2dBnSumRelu(nn.Module):
         b = self.bn2(b)
         return F.relu(a.add_(b), inplace=True)
 
+class LinearRelu(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearRelu, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        return F.relu(self.linear(x), inplace=True)
+
 class Tester(TestCase):
     n = 32
     c = 3
@@ -166,6 +176,14 @@ class Tester(TestCase):
         test_output(
             CascadedConv2dBnSumRelu(self.c, 64, 32, kernel_size=3, stride=1),
             torch.rand(self.n, self.c, self.h, self.w))
+
+    def test_output_linear_relu(self):
+        test_output(
+            LinearRelu(self.c, 32, bias=True),
+            torch.rand(self.n, self.c))
+        test_output(
+            LinearRelu(self.c, 32, bias=False),
+            torch.rand(self.n, self.c))
 
 if __name__ == '__main__':
     core.enable_auto_dnnl()
