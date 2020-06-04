@@ -525,15 +525,15 @@ void EmbeddingBag_updateOutputKernel(
     auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input);
     auto offset_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, offsets);
     auto weight_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, weight);
-    auto output_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, output);
-    auto offset2bag_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, offset2bag);
-    auto bag_size_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, bag_size);
+    auto output_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output);
+    auto offset2bag_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, offset2bag);
+    auto bag_size_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, bag_size);
     auto per_sample_weights_acc = per_sample_weights_defined
         ? DPCPPAccessor<dpcpp_r_mode>(cgh, per_sample_weights)
         : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer);
     auto max_indices_acc = mode == MODE_MAX
-        ? DPCPPAccessor<dpcpp_w_mode>(cgh, max_indices)
-        : DPCPPAccessor<dpcpp_w_mode>(cgh, dummy_buffer);
+        ? DPCPPAccessor<dpcpp_discard_w_mode>(cgh, max_indices)
+        : DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dummy_buffer);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
       auto input_ptr = in_acc.template get_pointer<int64_t>();
@@ -823,16 +823,13 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
   int64_t numBags = offsets.size(0);
   int64_t featureSize = weight.size(1);
 
-  auto bag_size = at::zeros(offsets.sizes(), indices.options());
-  auto offset2bag = at::zeros(
-      {indices.size(0)},
-      indices.options()); // offset2bag = [0 0 0 0 0]
-
-  auto output = at::zeros({offsets.size(0), weight.size(1)}, weight.options());
-
+  auto bag_size = at::empty(offsets.sizes(), indices.options());
+  auto offset2bag = at::empty({indices.size(0)}, indices.options());
+  auto output = at::empty({offsets.size(0), weight.size(1)}, weight.options());
   Tensor max_indices;
-
-  max_indices = at::zeros({offsets.size(0), weight.size(1)}, indices.options());
+  if (MODE_MAX)
+    max_indices =
+        at::empty({offsets.size(0), weight.size(1)}, indices.options());
 
   AT_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
