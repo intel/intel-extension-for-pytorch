@@ -71,7 +71,10 @@ class AtenIpexCPUDev {
   static at::Tensor dil_cat(at::TensorList tensors, int64_t dim);
   static std::vector<at::Tensor> dil_split_with_sizes(const at::Tensor& self, at::IntArrayRef split_sizes, int64_t dim);
   static std::vector<at::Tensor> dil_split(const at::Tensor& self, int64_t split_size, int64_t dim);
-
+  static at::Tensor dil_gelu(const at::Tensor& input);
+  static at::Tensor dil_gelu_backward(const at::Tensor& grad_output, const at::Tensor& input);
+  static std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_native_layer_norm(const at::Tensor& X, const at::Tensor& gamma, const at::Tensor& beta, int64_t M, int64_t N, double eps);
+  static std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_native_layer_norm_backward(const at::Tensor& dY, const at::Tensor& X, const at::Tensor& mean, const at::Tensor& rstd, const at::Tensor& gamma, int64_t M, int64_t N, std::array<bool, 3> grad_input_mask);
 };
 
 }  // namespace cpu

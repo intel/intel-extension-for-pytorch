@@ -18,7 +18,7 @@ class NewLinearOp : public torch::autograd::Function<NewLinearOp> {
         at::Tensor bias = at::Tensor()) {
         ctx->save_for_backward({input, weight, bias});
         if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
-          return torch_ipex::cpu::AtenIpexCPUDev::dil_linear(input, weight, bias);
+          return torch_ipex::cpu::AtenIpexCPUDev::dil_linear(input.is_contiguous() ? input : input.contiguous(), weight, bias);
         } else {
           return at::linear(input, weight, bias);
         }
