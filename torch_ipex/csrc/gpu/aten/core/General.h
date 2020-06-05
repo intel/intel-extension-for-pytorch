@@ -79,6 +79,14 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#ifndef M_SQRT1_2
+# define M_SQRT1_2	0.70710678118654752440
+#endif
+
+#ifndef M_2_SQRTPI
+#define  M_2_SQRTPI      1.12837916709551257390
+#endif
+
 #if 0
 typedef void (*THErrorHandlerFunction)(const char *msg, void *data);
 typedef void (*THArgErrorHandlerFunction)(int argNumber, const char *msg, void *data);

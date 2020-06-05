@@ -183,6 +183,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor ge(const at::Tensor & self, const at::Tensor & other);
   at::Tensor & ge_out(at::Tensor & out, const at::Tensor & self, at::Scalar other);
   at::Tensor & ge_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
+  at::Tensor gelu(const at::Tensor & self);
+  at::Tensor gelu_backward(const at::Tensor & grad, const at::Tensor & self);
   at::Tensor glu(const at::Tensor & self, int64_t dim);
   at::Tensor glu_backward(const at::Tensor & grad_output, const at::Tensor & self, int64_t dim);
   at::Tensor & glu_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, const at::Tensor & self, int64_t dim);
@@ -336,6 +338,8 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & pow_out(at::Tensor & out, const at::Tensor & self, at::Scalar exponent);
   at::Tensor & pow_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & exponent);
   at::Tensor & pow_out(at::Tensor & out, at::Scalar self, const at::Tensor & exponent);
+  at::Tensor prelu(const at::Tensor & self, const at::Tensor & weight);
+  std::tuple<at::Tensor,at::Tensor> prelu_backward(const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & weight);
   at::Tensor prod(const at::Tensor & self, c10::optional<at::ScalarType> dtype);
   at::Tensor prod(const at::Tensor & self, int64_t dim, bool keepdim, c10::optional<at::ScalarType> dtype);
   at::Tensor & prod_out(at::Tensor & out, const at::Tensor & self, int64_t dim, bool keepdim, c10::optional<at::ScalarType> dtype);
@@ -358,6 +362,12 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & resize_as_(at::Tensor & self, const at::Tensor & the_template, c10::optional<at::MemoryFormat> memory_format);
   at::Tensor roll(const at::Tensor & self, at::IntArrayRef shifts, at::IntArrayRef dims);
   at::Tensor & round_out(at::Tensor & out, const at::Tensor & self);
+  at::Tensor rrelu(const at::Tensor & self, at::Scalar lower, at::Scalar upper, bool training, at::Generator * generator);
+  at::Tensor & rrelu_(at::Tensor & self, at::Scalar lower, at::Scalar upper, bool training, at::Generator * generator);
+  at::Tensor rrelu_with_noise(const at::Tensor & self, const at::Tensor & noise, at::Scalar lower, at::Scalar upper, bool training, at::Generator * generator);
+  at::Tensor & rrelu_with_noise_(at::Tensor & self, const at::Tensor & noise, at::Scalar lower, at::Scalar upper, bool training, at::Generator * generator);
+  at::Tensor rrelu_with_noise_backward(const at::Tensor & grad_output, const at::Tensor & self, const at::Tensor & noise, at::Scalar lower, at::Scalar upper, bool training, bool self_is_result);
+  at::Tensor & rrelu_with_noise_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & noise, at::Scalar lower, at::Scalar upper, bool training, at::Generator * generator);
   at::Tensor & rsqrt_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor rsub(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha);
   at::Tensor rsub(const at::Tensor & self, at::Scalar other, at::Scalar alpha);
