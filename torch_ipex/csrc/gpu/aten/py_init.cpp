@@ -9,14 +9,14 @@
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(_torch_ipex, m) {
+PYBIND11_MODULE(torch_ipex, m) {
   // TODO:
-  printf("loading _torch_ipex.so ++\n");
+  printf("loading torch_ipex.so ++\n");
 
   m.doc() = "PyTorch Extension for Intel dGPU";
 
   at::RegisterAtenTypeFunctions();
   torch::jit::InitFusionPass();
 
-  printf("loading _torch_ipex.so --\n");
+  printf("loading torch_ipex.so --\n");
 }
