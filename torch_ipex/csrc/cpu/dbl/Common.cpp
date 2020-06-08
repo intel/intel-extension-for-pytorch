@@ -36,8 +36,84 @@ at::Tensor dil_tensor_to_dense(const at::Tensor& tensor) {
 }
 
 void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor) {
-  if (check_auto_mix_bf16_fp32())
-    bridge::reorderTensorToScalarTypeForDNNL(tensor, at::kBFloat16);
+  if (!check_auto_mix_bf16_fp32())
+    return;
+
+  auto tensor_dtype = tensor.scalar_type();
+  TORCH_CHECK(!(tensor_dtype == at::kBFloat16), "Please disable auto mix-precision if you want to enable BFloat16 manually");
+  if (tensor_dtype != at::kFloat)
+    return;
+
+  reorder_to_dtype(tensor, at::kBFloat16);
+}
+
+void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type) {
+  dil::tensor::memory::desc dst_desc;
+  if (check_tensor_own_shade_context(tensor) && cpu::ShadeDataContext::isDilOwnTheTensor(tensor)) {
+    // The buffer ownership is DIL
+    cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(tensor.storage().data_ptr().get_context());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_context->dil_tensor.has_value());
+    dil::tensor&& dil_tensor = std::move(shade_context->dil_tensor.value());
+    if (get_at_data_type(dil_tensor.get_data_type()) == dst_scalar_type) {
+      // The data type of DIL tensor is same as the destination data type. DO NOTHING
+      return;
+    }
+
+    TORCH_CHECK(check_tensor_own_whole_storage(tensor),
+      "Intel Extension for PyTorch does not support the data is just a part of its storage for auto mix-precision.");
+    dst_desc = dil_tensor.get_desc().to_type(get_dil_data_type(dst_scalar_type));
+  } else {
+    // The buffer ownership is CPU
+    TORCH_CHECK(check_tensor_own_whole_storage(tensor),
+      "Intel Extension for PyTorch does not support the data is just a part of its storage for auto mix-precision.");
+    dil::tensor temp_dil_tensor = cpu::dbl::comm::dil_tensor_from_dense(tensor);
+    dst_desc = temp_dil_tensor.get_desc().to_type(get_dil_data_type(dst_scalar_type));
+  }
+  reorder_to_desc(tensor, dst_desc);
+}
+
+void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc) {
+  dil::tensor new_type_dil_tensor;
+  new_type_dil_tensor.init(expected_desc);
+
+  bool contains_dil_tensor_buffer = check_tensor_own_shade_context(tensor) && cpu::ShadeDataContext::isDilOwnTheTensor(tensor);
+  if (contains_dil_tensor_buffer) {
+    cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(tensor.storage().data_ptr().get_context());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_context->dil_tensor.has_value());
+    new_type_dil_tensor.feed_from(shade_context->dil_tensor.value());
+  } else {
+    new_type_dil_tensor.feed_from(cpu::dbl::comm::dil_tensor_from_dense(tensor));
+  }
+
+  equip_dil_buffer(tensor,  new_type_dil_tensor);
+}
+
+void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_tensor_buffer) {
+  // Build new shade data context
+  cpu::ShadeDataContext *new_shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
+  new_shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
+  new_shade_data_context->dil_tensor = dil_tensor_buffer;
+
+  void *tensor_data = nullptr;
+  if (dil_tensor_buffer.get_data_type() != get_dil_data_type(tensor.scalar_type())) {
+    new_shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_BF16_FP32;
+  } else {
+    if (dil_tensor_buffer.is_public_format()) {
+      tensor_data = dil_tensor_buffer.get_data_handle();
+      sync_shape_from_dil_to_aten(tensor, dil_tensor_buffer);
+    }
+  }
+
+  // Create a new DataPtr instances because the DataPtr class does not support set
+  // its data or context directly
+  c10::DataPtr shade_data_ptr(
+    tensor_data,
+    new_shade_data_context,
+    &(cpu::ShadeDataContext::freeShadeDataContext),
+    tensor.device().type());
+
+  IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)tensor.unsafeGetTensorImpl();
+  ipex_tensor_impl->storage().set_data_ptr(std::move(shade_data_ptr));
 }
 
 dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
@@ -66,7 +142,7 @@ at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
   if (check_auto_mix_bf16_fp32() && dil_tensor_type == dil::data_type::bf16) {
     // If the user enables auto-mix-precision, then the aten tensor should always be float.
     // And even the dil tensor is plain format, it also cannot be shared with cpu buffer.
-    shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_BF_FP32;
+    shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_BF16_FP32;
     at_data_type = at::kFloat;
   } else {
     if (shade_data_context->dil_tensor->is_public_format()) {

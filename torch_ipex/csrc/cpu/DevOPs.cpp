@@ -50,15 +50,29 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   CHECK_DNNL_OP_PRE_COND(weight);
 
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
-  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
-
   dil_input = dbl::comm::try_gen_dil_tensor(input);
-  dil_weight = dbl::comm::try_gen_dil_tensor(weight);
+
   if (bias.defined()) {
     CHECK_DNNL_OP_PRE_COND(bias);
     dbl::comm::reorder_to_bf16_for_mix_prec(bias);
     dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
+
+  // Reorder weight
+  auto kdims = weight.dim() - 2;
+  auto stride_vec = dbl::comm::expand_param_if_needed(stride, "stride", kdims);
+  auto padding_vec = dbl::comm::expand_param_if_needed(padding, "padding", kdims);
+  auto dilation_vec = dbl::comm::expand_param_if_needed(dilation, "dilation", kdims);
+  auto packed_desc = dil::convolution_forward::expected_weights_desc(
+    weight.sizes().vec(),
+    dil_input.get_data_type(),
+    stride_vec,
+    padding_vec,
+    padding_vec,
+    dilation_vec,
+    groups);
+  dbl::comm::reorder_to_desc(weight, packed_desc);
+  dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
   dil::tensor dil_output = dbl::conv::conv2d_impl(
     dil_input,
