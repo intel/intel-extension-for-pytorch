@@ -93,6 +93,19 @@ class Conv2dRelu_Fixed(nn.Module):
     def forward(self, x):
         return F.relu(self.conv(x), inplace=True)
 
+class Conv2dSum(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dSum, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
+        self.conv1 = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
+    
+    def forward(self, x):
+        a = self.conv(x)
+        b = self.conv1(x)
+        return a+b
+
 class CascadedConv2dBnSumRelu(nn.Module):
     def __init__(self, in_channels, mid_channels, out_channels, **kwargs):
         super(CascadedConv2dBnSumRelu, self).__init__()
@@ -127,7 +140,7 @@ class LinearRelu(nn.Module):
 
 class Tester(TestCase):
 
-    def _test_output(self, model, x):
+    def _test_output(self, model, x, kind):
         modelName = model.__class__.__name__
         core.disable_jit()
 
@@ -145,15 +158,10 @@ class Tester(TestCase):
 
         core.enable_jit()
         fused_model = torch.jit.script(model)
-        # bn folding, removing it after solve some issue
-        core.disable_auto_dnnl()
-        fused_model = wrap_cpp_module(torch._C._jit_pass_fold_convbn(fused_model._c))
-        core.enable_auto_dnnl()
-        # prepack convolution weight
-        fused_model = wrap_cpp_module(core._jit_prepack_conv_weight(fused_model._c))
         with torch.no_grad():
             # conv relu fusion, conv sum fusion or conv sum relu fusion
-            print(fused_model.graph_for(x))
+            graph =  fused_model.graph_for(x)
+            print(graph)
             fresult = fused_model(x)
 
         # print(result)
@@ -162,23 +170,36 @@ class Tester(TestCase):
 
         self.assertEqual(result, fresult)
 
+        # check if the fused node exists in the graph
+        self.assertTrue(any(n.kind() == kind for n in graph.nodes()))
+
     def test_output_conv_relu(self):
         self._test_output(
             Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 224, 224))
+            torch.randn(32, 3, 224, 224),
+            "ipex::conv2d_relu")
+
+    def test_output_conv_sum(self):
+        self._test_output(
+            Conv2dSum(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224),
+            "ipex::conv2d_sum")
 
     def test_output_cascaded_conv2d_bn_sum_relu(self):
         self._test_output(
             CascadedConv2dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
-            torch.rand(32, 3, 224, 224))
+            torch.rand(32, 3, 224, 224),
+            "ipex::conv2d_sum_relu")
 
     def test_output_linear_relu(self):
         self._test_output(
             LinearRelu(3, 32, bias=True),
-            torch.rand(32, 3))
+            torch.rand(32, 3),
+            "ipex::linear_relu")
         self._test_output(
             LinearRelu(3, 32, bias=False),
-            torch.rand(32, 3))
+            torch.rand(32, 3),
+            "ipex::linear_relu")
 
 if __name__ == '__main__':
     core.enable_auto_dnnl()
