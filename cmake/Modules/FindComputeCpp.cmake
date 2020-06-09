@@ -61,8 +61,8 @@ if(DEFINED ComputeCpp_DIR)
   set(computecpp_find_hint ${ComputeCpp_DIR})
 elseif(DEFINED ENV{COMPUTECPP_DIR})
   set(computecpp_find_hint $ENV{COMPUTECPP_DIR})
-elseif(DEFINED SYCLROOT)
-  set(computecpp_find_hint ${SYCLROOT})
+elseif(DEFINED DPCPP_ROOT)
+  set(computecpp_find_hint ${DPCPP_ROOT})
 endif()
 
 # Used for running executables on the host
