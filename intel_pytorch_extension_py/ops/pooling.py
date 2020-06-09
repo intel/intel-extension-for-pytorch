@@ -44,6 +44,6 @@ def max_pool2d(input, kernel_size: Vector, stride: Vector, padding: Vector, dila
         stride = kernel_size
     return torch.ops.torch_ipex.max_pool2d(input, _pair(kernel_size), _pair(stride), _pair(padding), _pair(dilation), ceil_mode)
 
-torch._C._nn.adaptive_avg_pool2d = adaptive_avg_pool2d
+F.adaptive_avg_pool2d = adaptive_avg_pool2d
 torch.max_pool2d = max_pool2d
 torch.max_pool3d = max_pool3d

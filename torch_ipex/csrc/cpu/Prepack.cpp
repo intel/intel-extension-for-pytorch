@@ -2,6 +2,7 @@
 #include "dbl/Common.h"
 #include "torch_ipex/csrc/aten_ipex_bridge.h"
 #include "torch_ipex/csrc/utils.h"
+#include "torch_ipex/csrc/auto_opt_config.h"
 
 namespace torch_ipex {
 
@@ -48,10 +49,14 @@ at::Tensor AtenIpexJITPrepack::prepack_conv_weight(
   auto padding_vec = expand_param_if_needed(padding, "padding", kdims);
   auto dilation_vec = expand_param_if_needed(dilation, "dilation", kdims);
 
+  auto weight_type = torch_ipex::get_dil_data_type(weight.scalar_type());
+  if (check_auto_mix_bf16_fp32()) {
+    weight_type = dil::data_type::bf16;
+  }
   auto packed_desc =
       dil::convolution_forward::expected_weights_desc(
           weight.sizes().vec(),
-          torch_ipex::get_dil_data_type(weight.scalar_type()),
+          weight_type,
           stride_vec,
           padding_vec,
           padding_vec,
