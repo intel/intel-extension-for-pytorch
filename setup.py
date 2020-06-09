@@ -31,7 +31,6 @@ import shutil
 import subprocess
 import sys
 
-pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
 def _get_complier():
@@ -222,7 +221,7 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
     cmake_args = [
             '-DCMAKE_BUILD_TYPE=' + build_type,
             '-DPYTORCH_INCLUDE_DIR=' + convert_cmake_dirs(include_paths()),
-            '-DPYTORCH_LIBRARY_DIR=' + pytorch_install_dir + '/lib',
+            '-DPYTORCH_LIBRARY_DIR=' + convert_cmake_dirs(library_paths()),
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DCMAKE_INSTALL_PREFIX=' + '/'.join([str(ext_dir.parent.absolute()), ext.name]),
             '-DPYTHON_INCLUDE_DIR=' + distutils.sysconfig.get_python_inc(),

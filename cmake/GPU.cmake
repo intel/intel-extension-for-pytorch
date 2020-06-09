@@ -168,7 +168,7 @@ target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
 if(DEFINED TORCH_IPEX_PUBLIC_HEADER)
-  set_target_properties(torch_ipex PROPERTIES PUBLIC_HEADER ${TORCH_IPEX_PUBLIC_HEADER})
+  set_target_properties(torch_ipex PROPERTIES PUBLIC_HEADER "${TORCH_IPEX_PUBLIC_HEADER}")
 endif()
 
 if (SHOULD_GEN)
