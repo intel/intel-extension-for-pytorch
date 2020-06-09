@@ -1,15 +1,5 @@
 ## Included by CMakeLists
 
-IF(USE_COMPUTECPP)
-  INCLUDE_DIRECTORIES(SYSTEM ${ComputeCpp_INCLUDE_DIRS} ${OpenCL_INCLUDE_DIRS})
-  LIST(APPEND Caffe2_PUBLIC_DEPENDENCY_LIBS ${COMPUTECPP_RUNTIME_LIBRARY})
-  MESSAGE(STATUS "ComputeCpp found. Compiling with SYCL support")
-ELSEIF(USE_DPCPP)
-  MESSAGE(STATUS "DPCPP found. Compiling with SYCL support")
-ELSE()
-  MESSAGE(FATAL_ERROR "No ComputeCpp or DPCPP not found. Compiling without SYCL support")
-ENDIF()
-
 # ---[ Build flags
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 14)
@@ -81,12 +71,11 @@ set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -fno-omit-fram
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-math-errno")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
+# ---[ Main build
+
 if (DPCPP_ENABLE_PROFILING)
   add_definitions(-DDPCPP_PROFILING)
 endif()
-
-
-# ---[ Main build
 
 # includes
 if(DEFINED PYTORCH_INCLUDE_DIR)
@@ -105,29 +94,6 @@ include_directories(${DPCPP_GPU_ROOT})
 include_directories(${DPCPP_GPU_ATEN_SRC_ROOT})
 include_directories(${DPCPP_GPU_ATEN_GENERATED})
 
-# configure_file(
-#     "${PYTORCH_C10_MACROS_INCLUDES}/cmake_macros.h.in"
-#     "${CMAKE_BINARY_DIR}/c10/macros/cmake_macros.h")
-# include_directories(${CMAKE_BINARY_DIR})
-
-# configure_file(
-#     "${PYTORCH_ATEN_INCLUDES}/Config.h.in"
-#     "${CMAKE_BINARY_DIR}/include/ATen/Config.h")
-# set(DPCPP_OUT_INCLUDE "${CMAKE_BINARY_DIR}/include")
-# include_directories(${DPCPP_OUT_INCLUDE})
-
-# do not compile pytorch any more
-# use generated files for current stage
-# we will generate files by ourselves in future
-# so it is unnecessary to take efforts to integrate pytorch gen system
-#
-# set(PYTORCH_OUT_ATEN_SRC_ROOT "${CMAKE_BINARY_DIR}/aten/src")
-# include_directories(${PYTORCH_OUT_ATEN_SRC_ROOT})
-#
-# # workaround for THGeneral.h
-# set(CAFFE2_OUT_ATEN_SRC_ROOT "${CMAKE_BINARY_DIR}/third_party/pytorch/caffe2/aten/src")
-# include_directories(${CAFFE2_OUT_ATEN_SRC_ROOT})
-
 # generate c10 dispatch registration
 if (SHOULD_GEN)
   add_custom_target(
@@ -143,26 +109,27 @@ endif()
 
 # sources
 set(DPCPP_SRCS)
-set(TORCH_IPEX_PUBLIC_HEADER)
-#set_target_properties(dnnl PROPERTIES PRIVATE_HEADER "")
+set(DPCPP_JIT_SRCS)
 set(DPCPP_ATEN_SRCS)
+set(TORCH_IPEX_PUBLIC_HEADER)
+
 add_subdirectory(torch_ipex/csrc/gpu/aten)
 list(APPEND DPCPP_SRCS ${DPCPP_ATEN_SRCS})
-set(DPCPP_JIT_SRCS)
+
 add_subdirectory(torch_ipex/csrc/gpu/jit)
 list(APPEND DPCPP_SRCS ${DPCPP_JIT_SRCS})
+
+add_library(torch_ipex SHARED ${DPCPP_SRCS})
 
 # pytorch library
 if(DEFINED PYTORCH_LIBRARY_DIR)
   link_directories(${PYTORCH_LIBRARY_DIR})
+  target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libtorch_cpu.so)
+  target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libc10.so)
 else()
   message(FATAL_ERROR, "Cannot find PyTorch library directory")
 endif()
 
-add_library(torch_ipex SHARED ${DPCPP_SRCS})
-target_link_libraries(torch_ipex PUBLIC dnnl)
-target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libtorch_cpu.so)
-target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libc10.so)
 target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
 
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
@@ -175,15 +142,36 @@ if (SHOULD_GEN)
   add_dependencies(torch_ipex gen_dpcpp_gpu_c10_dispatch_registration)
 endif()
 
-IF(USE_COMPUTECPP)
+find_package(oneDNN QUIET)
+if(ONEDNN_FOUND)
+  target_link_libraries(torch_ipex PUBLIC dnnl)
+  include_directories(BEFORE SYSTEM ${ONEDNN_INCLUDE_DIR})
+  add_dependencies(torch_ipex dnnl)
+else()
+  message(FATAL_ERROR "Cannot find oneDNN")
+endif()
+
+find_package(MKLDPCPP QUIET)
+if (MKLDPCPP_FOUND)
+  # add_dependencies(torch_ipex onemkl)
+else()
+  message(WARNING "Cannot find oneMKL.")
+endif()
+
+include(cmake/DPCPP.cmake)
+if(USE_COMPUTECPP)
+  include_directories(SYSTEM ${ComputeCpp_INCLUDE_DIRS} ${OpenCL_INCLUDE_DIRS})
+  target_link_libraries(torch_ipex PUBLIC ${COMPUTECPP_RUNTIME_LIBRARY})
   add_sycl_to_target(TARGET torch_ipex SOURCES ${DPCPP_SRCS})
-ELSEIF(USE_DPCPP)
+  message(STATUS "ComputeCpp found. Compiling with SYCL support")
+elseif(USE_DPCPP)
   set_source_files_properties(${DPCPP_SRCS} COMPILE_FLAGS "-fsycl -D__STRICT_ANSI__ -fsycl-unnamed-lambda")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl -fsycl-device-code-split=per_source")
-ENDIF()
+  message(STATUS "DPCPP found. Compiling with SYCL support")
+else()
+  message(FATAL_ERROR "ComputeCpp or DPCPP NOT found. Compiling without SYCL support")
+endif()
 
-add_dependencies(torch_ipex dnnl)
-set_target_properties(dnnl PROPERTIES PUBLIC_HEADER "")
 
 install(TARGETS ${LIB_NAME}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

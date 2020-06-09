@@ -19,6 +19,8 @@
 
 cmake_minimum_required(VERSION 3.4.3)
 
+if (NOT MKLDPCPP_FOUND)
+
 set(mkl_dpcpp_root_hint)
 if(DEFINED MKL_DPCPP_ROOT)
     set(mkl_dpcpp_root_hint ${MKL_DPCPP_ROOT})
@@ -64,6 +66,11 @@ if(MKL_DPCPP_HEADER)
     list(APPEND EXTRA_SHARED_LIBS ${MKL_DPCPP_LIBRARY_DIR}/libmkl_intel_ilp64.so)
     list(APPEND EXTRA_SHARED_LIBS ${MKL_DPCPP_LIBRARY_DIR}/libmkl_core.so)
     list(APPEND EXTRA_SHARED_LIBS ${MKL_DPCPP_LIBRARY_DIR}/libmkl_sequential.so)
+    set(MKLDPCPP_FOUND TRUE)
+    message(WARNING "Intel oneMKL found.")
 else()
-    message(WARNING "Intel oneMKL Header not found. No SYCL MKL")
+  message(WARNING "Intel oneMKL not found. No DPCPP MKL support")
+endif()
+
+
 endif()
