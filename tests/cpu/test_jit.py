@@ -162,8 +162,44 @@ class Tester(TestCase):
 
         self.assertEqual(result, fresult)
 
+    def _test_output_bf16(self, model, x):
+        modelName = model.__class__.__name__
+
+        core.enable_auto_dnnl()
+        core.enable_jit()
+        core.disable_mix_bf16_fp32()
+
+        model = model.to('dpcpp').eval()
+        x = x.to('dpcpp')
+        x2 = x.clone()
+
+        fused_model = torch.jit.script(copy.deepcopy(model))
+
+        # bn folding, removing it after solve some issue, using mix_preci? to check
+        core.disable_auto_dnnl()
+        fused_model = wrap_cpp_module(torch._C._jit_pass_fold_convbn(fused_model._c))
+        core.enable_auto_dnnl()
+
+        core.enable_mix_bf16_fp32()
+        # prepack convolution weight, weight will be a bf16 tensor 
+        fused_model = wrap_cpp_module(core._jit_prepack_conv_weight(fused_model._c))
+        with torch.no_grad():
+            # bf16, native path
+            result = model(x)
+            # bf16, jit path
+            fresult = fused_model(x2)
+
+        #print(result)
+        #print(fresult)
+
+        self.assertEqual(fresult, result)
+
     def test_output_conv_relu(self):
         self._test_output(
+            Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224))
+
+        self._test_output_bf16(
             Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224))
 
@@ -172,11 +208,23 @@ class Tester(TestCase):
             CascadedConv2dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 224, 224))
 
+        '''
+        self._test_output_bf16(
+            CascadedConv2dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
+            torch.rand(32, 3, 224, 224))
+        '''
+
     def test_output_linear_relu(self):
         self._test_output(
             LinearRelu(3, 32, bias=True),
             torch.rand(32, 3))
+        self._test_output_bf16(
+            LinearRelu(3, 32, bias=True),
+            torch.rand(32, 3))
         self._test_output(
+            LinearRelu(3, 32, bias=False),
+            torch.rand(32, 3))
+        self._test_output_bf16(
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3))
 
