@@ -186,3 +186,6 @@ TAGS
 # Files generated when a patch is rejected
 *.orig
 *.rej
+
+# vs code tags
+.vscode-ctags
