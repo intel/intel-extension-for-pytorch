@@ -64,25 +64,39 @@ at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor);
 void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
   void *data_ctx = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
   cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
-#if defined(_DEBUG)
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(! (shade_data_context->dil_tensor->is_empty()));
-#endif
   dil::tensor &dil_tensor = *shade_data_context->dil_tensor;
+  dil::tensor pub_tensor;
 
   if (dil_tensor.is_public_format()) {
-#if defined(_DEBUG)
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor->get_data_handle());
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data != nullptr);
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun != nullptr);
-#endif
+    if (cpu::ShadeDataContext::isTensorMixPrecision(ipexTensor)) {
+      auto& data_ptr = ipexTensor.storage().unsafeGetStorageImpl()->data_ptr();
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(data_ptr.get() == nullptr);
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data == nullptr);
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun == nullptr);
+
+      auto aten_tensor_scalar_type = ipexTensor.scalar_type();
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_scalar_type == at::kFloat);
+      auto new_type_desc = dil_tensor.get_desc().to_type(get_dil_data_type(aten_tensor_scalar_type));
+      pub_tensor.init(new_type_desc);
+      pub_tensor.feed_from(dil_tensor);
+    } else {
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor->get_data_handle());
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data != nullptr);
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun != nullptr);
+    }
   } else {
-#if defined(_DEBUG)
     auto& data_ptr = ipexTensor.storage().unsafeGetStorageImpl()->data_ptr();
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(data_ptr.get_deleter() == &(cpu::ShadeDataContext::freeShadeDataContext));
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun == nullptr);
-#endif
-    auto pub_tensor = dil_tensor.to_public(nullptr, dil_tensor.get_data_type());
 
+    auto aten_tensor_scalar_type = ipexTensor.scalar_type();
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_scalar_type == at::kFloat || aten_tensor_scalar_type == at::kBFloat16);
+    pub_tensor = dil_tensor.to_public(nullptr, get_dil_data_type(aten_tensor_scalar_type));
+  }
+
+  if (!pub_tensor.is_empty()) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(pub_tensor.is_public_format());
     cpu::ShadeDataContext *new_shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
     new_shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
     new_shade_data_context->dil_tensor = pub_tensor;
@@ -189,7 +203,7 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   }
 
   // Branch 2: Dense Tensor
-  
+
   // Branch 2.0: Dense + CPU Tensor + w/o context.
   // Supposing only Aten inplace op w/ Resize internally will run into this branch,
   // since new DataPtr has replaced orignal one, then DPCPP tensor loses context info.
@@ -304,7 +318,7 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     ipex_impl->copy_meta_info(cpu_tensor_impl);
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(! cpuTensor.requires_grad());
     CHECK_TENSOR_CRITICAL(_tensor, cpuTensor, true);
-    //TODO: Cannot set reserved_ 
+    //TODO: Cannot set reserved_
     //      dest_impl->reserved_ = src_impl->reserved_;
     attachShadeDataContext(_tensor);
     return _tensor;
@@ -441,25 +455,56 @@ std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& ten
 
 
 void reorderTensorToScalarTypeForDNNL(const at::Tensor& ipexTensor, at::ScalarType dstScalarType) {
-  TORCH_CHECK(dstScalarType == at::kBFloat16 || dstScalarType == at::kFloat);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dstScalarType == at::kBFloat16);
   auto tensor_dtype = ipexTensor.scalar_type();
-  TORCH_CHECK(tensor_dtype == at::kBFloat16 || tensor_dtype == at::kFloat);
-  if (tensor_dtype == dstScalarType)
+  TORCH_CHECK(!(tensor_dtype == at::kBFloat16), "Please disable auto mix-precision if you want to enable BFloat16 manually");
+  if (tensor_dtype != at::kFloat)
     return;
 
-  if (check_tensor_own_shade_context(ipexTensor)) {
-    // Shade data context has been attached
-    if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
-      cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(ipexTensor.storage().data_ptr().get_context());
-      shade_context->dil_tensor->to_type(get_dil_data_type(dstScalarType));
-      IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
-      ipex_tensor_impl->reset_data_type(dstScalarType);
-      ipex_tensor_impl->storage().unsafeGetStorageImpl()->set_dtype(at::scalarTypeToTypeMeta(dstScalarType));
+  dil::tensor new_type_dil_tensor;
+  if (check_tensor_own_shade_context(ipexTensor) && cpu::ShadeDataContext::isDilOwnTheTensor(ipexTensor)) {
+    // The buffer ownership is DIL
+    cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(ipexTensor.storage().data_ptr().get_context());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_context->dil_tensor.has_value());
+    dil::tensor&& dil_tensor = std::move(shade_context->dil_tensor.value());
+    if (get_at_data_type(dil_tensor.get_data_type()) == dstScalarType) {
+      // The data type of DIL tensor is same as the destination data type. DO NOTHING
       return;
+    } else {
+      TORCH_CHECK(check_tensor_own_whole_storage(ipexTensor),
+        "Intel Extension for PyTorch does not support the data is just a part of its storage for auto mix-precision.");
+
+      auto new_type_desc = dil_tensor.get_desc().to_type(get_dil_data_type(dstScalarType));
+      new_type_dil_tensor.init(new_type_desc);
+      new_type_dil_tensor.feed_from(shade_context->dil_tensor.value());
     }
+  } else {
+    // The buffer ownership is CPU
+    TORCH_CHECK(check_tensor_own_whole_storage(ipexTensor),
+      "Intel Extension for PyTorch does not support the data is just a part of its storage for auto mix-precision.");
+
+    dil::tensor&& temp_dil_tensor = cpu::dbl::comm::dil_tensor_from_dense(ipexTensor);
+    auto new_type_desc = temp_dil_tensor.get_desc().to_type(get_dil_data_type(dstScalarType));
+    new_type_dil_tensor.init(new_type_desc);
+    new_type_dil_tensor.feed_from(temp_dil_tensor);
   }
 
-  return reorderTensorToScalaraType(ipexTensor, dstScalarType);
+  // Build new shade data context
+  cpu::ShadeDataContext *new_shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
+  new_shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
+  new_shade_data_context->dil_tensor = new_type_dil_tensor;
+  new_shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_BF_FP32;
+
+  // Create a new DataPtr instances because the DataPtr class does not support set
+  // its data or context directly
+  c10::DataPtr shade_data_ptr(
+    nullptr,
+    new_shade_data_context,
+    &(cpu::ShadeDataContext::freeShadeDataContext),
+    ipexTensor.device().type());
+
+  IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
+  ipex_tensor_impl->storage().set_data_ptr(std::move(shade_data_ptr));
 }
 
 

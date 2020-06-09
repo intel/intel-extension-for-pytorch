@@ -48,10 +48,15 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
 
   CHECK_DNNL_OP_PRE_COND(input);
   CHECK_DNNL_OP_PRE_COND(weight);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+
   dil_input = dbl::comm::try_gen_dil_tensor(input);
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
   if (bias.defined()) {
     CHECK_DNNL_OP_PRE_COND(bias);
+    dbl::comm::reorder_to_bf16_for_mix_prec(bias);
     dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
 
@@ -134,7 +139,7 @@ std::tuple<at::Tensor, at::Tensor> dil_convolution_backward_weights(
     return std::make_tuple(
         dbl::comm::gen_aten_tensor_by(std::move(dil_grad_weight)),
         at::Tensor());
-  } 
+  }
 }
 
 std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_backward(
@@ -143,6 +148,11 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
 {
   DEBUG("AtenIpexCPUDev::dil_convolution_backward\n");
   at::Tensor grad_output = grad_output_t.is_contiguous() ? grad_output_t : grad_output_t.contiguous();
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+
   at::Tensor grad_input, grad_weight, grad_bias;
   if (output_mask[0]) {
     grad_input = dil_convolution_backward_input(
@@ -232,6 +242,11 @@ at::Tensor& AtenIpexCPUDev::dil_add_out(
   DEBUG("AtenIpexCPUDev::dil_add_out\n");
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(other);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(other);
+  dbl::comm::reorder_to_bf16_for_mix_prec(result);
+
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::tensor y = dbl::comm::try_gen_dil_tensor(other);
 
@@ -248,6 +263,10 @@ at::Tensor AtenIpexCPUDev::dil_add(const at::Tensor& self, const at::Tensor& oth
   DEBUG("AtenIpexCPUDev::dil_add\n");
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(other);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(other);
+
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::tensor y = dbl::comm::try_gen_dil_tensor(other);
 
@@ -262,6 +281,10 @@ at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other,
   DEBUG("AtenIpexCPUDev::dil_add_\n");
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(other);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(other);
+
   auto dil_self = dbl::comm::try_gen_dil_tensor(self);
   auto dil_other = dbl::comm::try_gen_dil_tensor(other);
 
@@ -279,6 +302,10 @@ at::Tensor& AtenIpexCPUDev::dil_mul_out(at::Tensor& result, const at::Tensor& se
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(other);
 
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(other);
+  dbl::comm::reorder_to_bf16_for_mix_prec(result);
+
   auto dil_result = dbl::comm::try_gen_dil_tensor(result);
   auto dil_self = dbl::comm::try_gen_dil_tensor(self);
   auto dil_other = dbl::comm::try_gen_dil_tensor(other);
@@ -292,29 +319,38 @@ at::Tensor& AtenIpexCPUDev::dil_mul_out(at::Tensor& result, const at::Tensor& se
 
 at::Tensor AtenIpexCPUDev::dil_mul(const at::Tensor& self, const at::Tensor& other) {
   DEBUG("AtenIpexCPUDev::dil_mul\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(other);
+
   at::Tensor result = dbl::comm::empty_dil_tensor(self.sizes(), self.options());
+
   return dil_mul_out(result, self, other);
 }
 
 at::Tensor& AtenIpexCPUDev::dil_mul_(at::Tensor& self, const at::Tensor& other) {
   DEBUG("AtenIpexCPUDev::dil_mul_\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(other);
+
   return dil_mul_out(self, self, other);
 }
 
 void matmul_common(
     const dil::tensor &x,
     const dil::tensor &w,
-    const dil::tensor &bias, 
+    const dil::tensor &bias,
     dil::tensor &y,
     at::Scalar beta=1,
-    at::Scalar alpha=1, 
+    at::Scalar alpha=1,
     const dil::attr_t& attr = dil::attr_t()) {
   DEBUG("AtenIpexCPUDev::matmul_common\n");
   float dst_coeff = alpha.to<float>();
   float sum_coeff = beta.to<float>();
-  if (!bias.is_empty()) { 
+  if (!bias.is_empty()) {
     // DNNL only supports bias in 1xN dims
-    // use bias for sum can save tensor memory copy 
+    // use bias for sum can save tensor memory copy
     if (dst_coeff == 1.0f  && sum_coeff == 1.0f && bias.get_dim(0) == 1) {
       dil::matmul_forward::compute(x, w, bias, y);
       return;
@@ -327,9 +363,13 @@ void matmul_common(
 }
 
 at::Tensor AtenIpexCPUDev::dil_bmm(
-    const at::Tensor& self, 
+    const at::Tensor& self,
     const at::Tensor& mat2) {
   DEBUG("AtenIpexCPUDev::dil_bmm\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(mat2);
+
   auto self_size = self.sizes();
   std::vector<int64_t> result_size(self_size.begin(), self_size.end()-1);
   result_size.push_back(mat2.size(-1));
@@ -338,12 +378,17 @@ at::Tensor AtenIpexCPUDev::dil_bmm(
 }
 
 at::Tensor& AtenIpexCPUDev::dil_bmm_out(
-    at::Tensor &result, 
-    const at::Tensor& batch1, 
+    at::Tensor &result,
+    const at::Tensor& batch1,
     const at::Tensor& batch2) {
   DEBUG("AtenIpexCPUDev::dil_bmm_out\n");
   CHECK_DNNL_OP_PRE_COND(batch1);
   CHECK_DNNL_OP_PRE_COND(batch2);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(result);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
+
   const dil::tensor x = dbl::comm::try_gen_dil_tensor(batch1);
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(batch2);
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
@@ -358,6 +403,10 @@ at::Tensor AtenIpexCPUDev::dil_mm(
     const at::Tensor& self,
     const at::Tensor& mat2) {
   DEBUG("AtenIpexCPUDev::dil_mm\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(mat2);
+
   return dil_bmm(self, mat2);
 }
 
@@ -366,20 +415,31 @@ at::Tensor& AtenIpexCPUDev::dil_mm_out(
     const at::Tensor& self,
     const at::Tensor& mat2) {
   DEBUG("AtenIpexCPUDev::dil_mm_out\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(result);
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(mat2);
+
   return dil_bmm_out(result, self, mat2);
 }
 
 at::Tensor& AtenIpexCPUDev::dil_baddbmm_out(
-    at::Tensor &result, 
-    const at::Tensor& self, 
-    const at::Tensor& batch1, 
-    const at::Tensor& batch2, 
-    at::Scalar beta, 
+    at::Tensor &result,
+    const at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    at::Scalar beta,
     at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_baddbmm_out\n");
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(batch1);
   CHECK_DNNL_OP_PRE_COND(batch2);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(result);
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
+
   const dil::tensor x = dbl::comm::try_gen_dil_tensor(batch1);
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(batch2);
   dil::tensor bias;
@@ -407,6 +467,11 @@ at::Tensor AtenIpexCPUDev::dil_baddbmm(
     at::Scalar beta,
     at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_baddbmm\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
+
   auto self_size = batch1.sizes();
   std::vector<int64_t> result_size(self_size.begin(), self_size.end()-1);
   result_size.push_back(batch2.size(-1));
@@ -421,6 +486,11 @@ at::Tensor& AtenIpexCPUDev::dil_baddbmm_(
     at::Scalar beta,
     at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_baddbmm_\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
+
   at::Tensor result = at::empty({0}, self.options());
   return dil_baddbmm_out(self, result, batch1, batch2, beta, alpha);
 }
@@ -432,7 +502,13 @@ at::Tensor& AtenIpexCPUDev::dil_addmm_out(
     const at::Tensor& mat2,
     at::Scalar beta,
     at::Scalar alpha) {
-  DEBUG("AtenIpexCPUDev::dil_addmm_out\n");   
+  DEBUG("AtenIpexCPUDev::dil_addmm_out\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(result);
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(mat1);
+  dbl::comm::reorder_to_bf16_for_mix_prec(mat2);
+
   return dil_baddbmm_out(result, self, mat1, mat2, beta, alpha);
 }
 
@@ -443,6 +519,11 @@ at::Tensor AtenIpexCPUDev::dil_addmm(
     at::Scalar beta,
     at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_addmm\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
+
   return dil_baddbmm(self, batch1, batch2, beta, alpha);
 }
 
@@ -453,6 +534,11 @@ at::Tensor& AtenIpexCPUDev::dil_addmm_(
     at::Scalar beta,
     at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_addmm_\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
+
   return dil_baddbmm_(self, batch1, batch2, beta, alpha);
 }
 
@@ -467,6 +553,12 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_out(
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(batch1);
   CHECK_DNNL_OP_PRE_COND(batch2);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(result);
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
+
   // addbmm(batch1*batch2) [b,n,m] * [b,m,p] = [n,p] can be treated as:
   // [n, b*m] * [b*m, p] = [n, p]
   // For batch1: reorder from [b, n, m] to [n, b, m], reshape to [n, b*m]
@@ -484,8 +576,8 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_out(
   auto w_ = w.reshape(w_dims);
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
   auto attr_ = dil::attr_t::fuse_sum();
- 
-  dil::tensor bias; 
+
+  dil::tensor bias;
   if (self.numel() != 0) {
     bias = dbl::comm::try_gen_dil_tensor(self);
     if (bias.ndims() < x_.ndims()) {
@@ -508,6 +600,11 @@ at::Tensor AtenIpexCPUDev::dil_addbmm(
     at::Scalar beta,
     at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_addbmm\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
+
   at::Tensor result = dbl::comm::empty_dil_tensor(self.sizes(), self.options());
   return dil_addbmm_out(result, self, batch1, batch2, beta, alpha);
 }
@@ -519,6 +616,11 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_(
     at::Scalar beta,
     at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_addbmm_\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
+
   at::Tensor result = at::empty({0}, self.options());
   return dil_addbmm_out(self, result, batch1, batch2, beta, alpha);
 }
@@ -533,6 +635,9 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   TORCH_CHECK(self.dim() >= 2,
       "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
 
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+
   // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
   auto self_reshaped = self.dim() > 2 ? self.reshape({-1, self.size(self.dim() - 1)}) : self;
   const dil::tensor x = dbl::comm::try_gen_dil_tensor(self_reshaped);
@@ -540,6 +645,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
 
   dil::tensor y;
   if (bias.defined()) {
+    dbl::comm::reorder_to_bf16_for_mix_prec(bias);
     const dil::tensor b = dbl::comm::try_gen_dil_tensor(bias);
     dil::inner_product_forward::compute(x, w, b, y);
   } else {
@@ -566,6 +672,9 @@ at::Tensor AtenIpexCPUDev::dil_linear_fuse_relu(
   TORCH_CHECK(self.dim() >= 2,
       "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
 
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+
   // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
   auto self_reshaped = self.dim() > 2 ? self.reshape({-1, self.size(self.dim() - 1)}) : self;
   const dil::tensor x = dbl::comm::try_gen_dil_tensor(self_reshaped);
@@ -574,6 +683,7 @@ at::Tensor AtenIpexCPUDev::dil_linear_fuse_relu(
   dil::tensor y;
   if (bias.has_value()) {
     at::Tensor bias_vec = bias.value();
+    dbl::comm::reorder_to_bf16_for_mix_prec(bias_vec);
     const dil::tensor b = dbl::comm::try_gen_dil_tensor(bias_vec);
     dil::inner_product_forward::compute(x, w, b, y,
                                         /*src_scales=*/dil::scale_t(),
@@ -601,6 +711,10 @@ at::Tensor AtenIpexCPUDev::dil_linear_fuse_relu(
 at::Tensor AtenIpexCPUDev::dil_linear_backward_input(
     at::IntArrayRef input_size, const at::Tensor& grad_output, const at::Tensor& weight){
   DEBUG("AtenIpexCPUDev::dil_linear_backward_input\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+
   auto grad_output_reshaped = grad_output.dim() > 2 ?
     grad_output.reshape({-1, grad_output.size(grad_output.dim() - 1)}) : grad_output;
   dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_reshaped);
@@ -623,6 +737,11 @@ at::Tensor AtenIpexCPUDev::dil_linear_backward_input(
 std::tuple<at::Tensor, at::Tensor> AtenIpexCPUDev::dil_linear_backward_weights(
     const at::Tensor& grad_output, const at::Tensor& input, const at::Tensor& weight, bool bias_defined) {
   DEBUG("AtenIpexCPUDev::dil_linear_backward_weights\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+
   auto grad_output_reshaped = grad_output.dim() > 2 ?
     grad_output.reshape({-1, grad_output.size(grad_output.dim() - 1)}) : grad_output;
   auto input_reshaped = input.dim() > 2 ? input.reshape({-1, input.size(input.dim() - 1)}) : input;
@@ -651,6 +770,11 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_linear_backwa
   CHECK_DNNL_OP_PRE_COND(input);
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(weight);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+
   at::Tensor grad_input, grad_weight, grad_bias;
   if (output_mask[0]) {
     grad_input = dil_linear_backward_input(input.sizes(), grad_output, weight);
@@ -680,6 +804,9 @@ std::tuple<at::Tensor, at::Tensor> _dil_dropout(
 at::Tensor AtenIpexCPUDev::dil_dropout(const at::Tensor& self, double ratio, bool train) {
   DEBUG("AtenIpexCPUDev::dil_dropout\n");
   CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
   return std::get<0>(_dil_dropout(self, ratio));
 }
 
@@ -692,10 +819,12 @@ at::Tensor AtenIpexCPUDev::dil_dropout_backward(
   if (ratio == 0 || grady.numel() == 0) {
     return grady;
   }
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grady);
+  dbl::comm::reorder_to_bf16_for_mix_prec(mask);
+
   dil::tensor dY = dbl::comm::try_gen_dil_tensor(grady);
   dil::tensor mask_dil = dbl::comm::try_gen_dil_tensor(mask);
-
-
   dil::tensor dX;
   dil::dropout_backward::compute(mask_dil, dY, dX);
   return dbl::comm::gen_aten_tensor_by(std::move(dX));
@@ -717,6 +846,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
              "mkldnn_batch_norm: currently mkldnn only support 2d and 3d batchnorm");
   TORCH_CHECK(weight.defined() && bias.defined(),
              "mkldnn_batch_norm: currently mkldnn only support affine model");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
   const dil::tensor b = dbl::comm::try_gen_dil_tensor(bias);
@@ -770,8 +902,13 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
   DEBUG("AtenIpexCPUDev::dil_native_batch_norm_backward\n");
   CHECK_DNNL_OP_PRE_COND(input);
   CHECK_DNNL_OP_PRE_COND(weight);
+
   TORCH_CHECK(train, "mkldnn_batch_norm_backward: currently mkldnn only support train model");
   auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_contiguous);
   dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
   dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
@@ -797,6 +934,9 @@ at::Tensor AtenIpexCPUDev::dil_max_pooling(
     bool ceil_mode) {
   DEBUG("AtenIpexCPUDev::dil_max_pooling\n");
   CHECK_DNNL_OP_PRE_COND(input);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   return dbl::pool::_dil_pooling(
       input.is_contiguous() ? input : input.contiguous(),
       kernel_size,
@@ -819,6 +959,9 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool2d(
   CHECK_DNNL_OP_PRE_COND(input);
   TORCH_CHECK(!divisor_override.has_value(),
            "dil_avg_pooling operator does not support divisor");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   return dbl::pool::_dil_pooling(
       input.is_contiguous() ? input : input.contiguous(),
       kernel_size,
@@ -842,6 +985,9 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool3d(
   CHECK_DNNL_OP_PRE_COND(input);
   TORCH_CHECK(!divisor_override.has_value(),
            "dil_avg_pooling operator does not support divisor");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   return dbl::pool::_dil_pooling(
       input.is_contiguous() ? input : input.contiguous(),
       kernel_size,
@@ -854,10 +1000,13 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool3d(
 }
 
 at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
-    at::Tensor const& input,
+    const at::Tensor& input,
     at::IntArrayRef output_size) {
   DEBUG("AtenIpexCPUDev::dil_adaptive_avg_pool2d\n");
   CHECK_DNNL_OP_PRE_COND(input);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   auto output_size_vec =
       dbl::comm::expand_param_if_needed(output_size, "output_size", input.dim() - 2);
   std::vector<int64_t> kernel_size(input.dim() - 2);
@@ -872,7 +1021,7 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
   }
   std::vector<int64_t> padding{0, 0};
   std::vector<int64_t> dilation{1, 1};
-  
+
   if (input.dim() == 5) {
     padding.push_back(0);
     dilation.push_back(1);
@@ -901,6 +1050,11 @@ at::Tensor AtenIpexCPUDev::dil_max_pooling_backward(
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(output);
   CHECK_DNNL_OP_PRE_COND(input);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   return dbl::pool::_dil_pooling_backward(
       grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
       output.is_contiguous() ? output : output.contiguous(),
@@ -925,7 +1079,10 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool2d_backward(
   DEBUG("AtenIpexCPUDev::dil_avg_pool2d_backward\n");
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(input);
-  
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   return dbl::pool::_dil_pooling_backward(
       grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
       grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
@@ -951,6 +1108,10 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool3d_backward(
   DEBUG("AtenIpexCPUDev::dil_avg_pool3d_backward\n");
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(input);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   std::vector<int64_t> dilation{1, 1};
   return dbl::pool::_dil_pooling_backward(
       grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
@@ -971,6 +1132,10 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(
   DEBUG("AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward\n");
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(input);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   auto output_size_vec = grad_output.sizes();
   std::vector<int64_t> kernel_size(input.dim() - 2);
   for (size_t i = 2; i < input.dim(); ++i) {
@@ -984,13 +1149,12 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(
   }
   std::vector<int64_t> padding{0, 0};
   std::vector<int64_t> dilation{1, 1};
-  
+
   if (input.dim() == 5) {
     padding.push_back(0);
     dilation.push_back(1);
   }
 
- 
   return dbl::pool::_dil_pooling_backward(
       grad_output,
       grad_output,
@@ -1006,6 +1170,9 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(
 at::Tensor AtenIpexCPUDev::dil_relu(const at::Tensor& input) {
   DEBUG("AtenIpexCPUDev::dil_relu\n");
   CHECK_DNNL_OP_PRE_COND(input);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   const dil::tensor& x = dbl::comm::try_gen_dil_tensor(input);
   dil::tensor y;
   dil::eltwise_forward::compute(
@@ -1016,6 +1183,9 @@ at::Tensor AtenIpexCPUDev::dil_relu(const at::Tensor& input) {
 at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
   DEBUG("AtenIpexCPUDev::dil_relu_\n");
   CHECK_DNNL_OP_PRE_COND(input);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   auto dil_self = dbl::comm::try_gen_dil_tensor(input);
   dil::eltwise_forward::compute(
     dil_self,
@@ -1030,6 +1200,13 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
 }
 
 at::Tensor AtenIpexCPUDev::dil_relu_use_dst_for_bwd(const at::Tensor& grad_output, const at::Tensor& output) {
+  DEBUG("AtenIpexCPUDev::dil_relu_use_dst_for_bwd\n");
+  CHECK_DNNL_OP_PRE_COND(grad_output);
+  CHECK_DNNL_OP_PRE_COND(output);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(output);
+
   const dil::tensor& y = dbl::comm::try_gen_dil_tensor(output);
   dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output);
   dil::tensor gradx;
@@ -1042,6 +1219,10 @@ at::Tensor AtenIpexCPUDev::dil_threshold_backward(const at::Tensor& grad_output,
   DEBUG("AtenIpexCPUDev::dil_threshold_backward\n");
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(input);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+
   // TODO: support bounded relu. `threshold` is ignored for now
   dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
   dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output);
@@ -1060,6 +1241,9 @@ at::Tensor AtenIpexCPUDev::dil__softmax(
   AT_ASSERTM(
       !half_to_float,
       "softmax with half to float conversion is not supported on Mkldnn");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
   const int64_t wrapped_dim = at::maybe_wrap_dim(dim, self.dim());
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::tensor y;
@@ -1076,6 +1260,11 @@ at::Tensor AtenIpexCPUDev::dil__softmax_backward_data(
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(output);
   CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
   const int64_t wrapped_dim = at::maybe_wrap_dim(dim, self.dim());
   dil::tensor y = dbl::comm::try_gen_dil_tensor(output);
   auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
@@ -1087,6 +1276,9 @@ at::Tensor AtenIpexCPUDev::dil__softmax_backward_data(
 
 at::Tensor AtenIpexCPUDev::dil_sigmoid(const at::Tensor& self) {
   DEBUG("AtenIpexCPUDev::dil_sigmoid\n");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
   CHECK_DNNL_OP_PRE_COND(self);
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::tensor y;
@@ -1098,6 +1290,9 @@ at::Tensor AtenIpexCPUDev::dil_sigmoid(const at::Tensor& self) {
 at::Tensor& AtenIpexCPUDev::dil_sigmoid_(at::Tensor& self) {
   DEBUG("AtenIpexCPUDev::dil_sigmoid_\n");
   CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::eltwise_forward::compute(
       x, x, dil::algorithm::eltwise_logistic_use_dst_for_bwd, dil::prop_kind::forward);
@@ -1113,6 +1308,10 @@ at::Tensor AtenIpexCPUDev::dil_sigmoid_backward(
   DEBUG("AtenIpexCPUDev::dil_sigmoid_backward\n");
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(output);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(output);
+
   dil::tensor y = dbl::comm::try_gen_dil_tensor(output);
   auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
   dil::tensor gy = dbl::comm::try_gen_dil_tensor(grad_output_contiguous);
@@ -1125,6 +1324,9 @@ at::Tensor AtenIpexCPUDev::dil_sigmoid_backward(
 at::Tensor AtenIpexCPUDev::dil_reshape(const at::Tensor& self, at::IntArrayRef size) {
   DEBUG("AtenIpexCPUDev::dil_reshape\n");
   CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
   auto inferred_size = at::infer_size(size, self.numel());
   if (self.sizes() == inferred_size) {
     return self;
@@ -1138,10 +1340,8 @@ at::Tensor AtenIpexCPUDev::dil_reshape(const at::Tensor& self, at::IntArrayRef s
 at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::MemoryFormat> optional_memory_format) {
   DEBUG("AtenIpexCPUDev::dil_clone\n");
   CHECK_DNNL_OP_PRE_COND(self);
-  TORCH_CHECK(
-      !optional_memory_format.has_value(),
-      "unsupported memory format option ",
-      optional_memory_format.value());
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
   dil::tensor src = dbl::comm::try_gen_dil_tensor(self);
   dil::tensor dst;
   dil::direct_copy::compute(src, dst);
@@ -1151,6 +1351,9 @@ at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::
 at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, int64_t dim1) {
   DEBUG("AtenIpexCPUDev::dil_transpose\n");
   CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   TORCH_CHECK(x.ndims() > 0, "DNNL transpose cannot generate DNNL tensor for the input aten Tensor. input tensor dim: ", self.dim());
   dil::tensor y;
@@ -1174,12 +1377,18 @@ inline void check_cat_no_zero_dim(at::TensorList tensors) {
 at::Tensor& AtenIpexCPUDev::dil_cat_out(at::Tensor& result, at::TensorList tensors, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_cat_out\n");
   CHECK_DNNL_OP_PRE_COND(result);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(result);
+
   check_cat_no_zero_dim(tensors);
   dim = at::legacy_cat_wrap_dim(dim, tensors);
   std::vector<dil::tensor> x;
   for (auto i =0; i< tensors.size(); i++) {
     TORCH_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
       "Currently Mkldnn cat operators do not support empty tensor.");
+
+    dbl::comm::reorder_to_bf16_for_mix_prec(tensors[i]);
+
     x.push_back(dbl::comm::try_gen_dil_tensor(tensors[i]));
   }
   dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
@@ -1200,6 +1409,7 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
     TORCH_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
       "Currently Mkldnn cat operators do not support empty tensor.");
     tensors_contiguous[i] = tensors[i].is_contiguous() ? tensors[i] : tensors[i].contiguous();
+    dbl::comm::reorder_to_bf16_for_mix_prec(tensors_contiguous[i]);
     x.push_back(dbl::comm::try_gen_dil_tensor(tensors_contiguous[i]));
   }
   dil::tensor y;
@@ -1210,6 +1420,9 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
 std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& self, at::IntArrayRef split_sizes, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_split_with_sizes\n");
   CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   int64_t num_splits = split_sizes.size();
   std::vector<at::Tensor> splits(num_splits);
@@ -1245,6 +1458,105 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split(const at::Tensor& self, int64_
   int64_t last_split_size = split_size - (split_size * num_splits - dim_size);
   split_sizes[num_splits-1] = last_split_size;
   return dil_split_with_sizes(self, split_sizes, dim);
+}
+
+at::Tensor AtenIpexCPUDev::dil_gelu(const at::Tensor& input) {
+  DEBUG("AtenIpexCPUDev::dil_gelu\n");
+  CHECK_DNNL_OP_PRE_COND(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
+  dil::tensor y;
+  dil::eltwise_forward::compute(
+      x, y, dil::algorithm::eltwise_gelu_tanh, dil::prop_kind::forward_training, /*alpha*/ 0.0);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
+}
+
+at::Tensor AtenIpexCPUDev::dil_gelu_backward(const at::Tensor& grad_output, const at::Tensor& input) {
+  DEBUG("AtenIpexCPUDev::dil_gelu_backward\n");
+  CHECK_DNNL_OP_PRE_COND(grad_output);
+  CHECK_DNNL_OP_PRE_COND(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
+  dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output);
+  dil::tensor gradx;
+  dil::eltwise_backward::compute(x, grady, gradx,
+      dil::algorithm::eltwise_gelu_tanh, /*alpha*/ 0.0);
+  return dbl::comm::gen_aten_tensor_by(std::move(gradx));
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_norm(
+    const at::Tensor& X,
+    const at::Tensor& gamma /* optional */,
+    const at::Tensor& beta /* optional */,
+    int64_t M,
+    int64_t N,
+    double eps) {
+  DEBUG("AtenIpexCPUDev::dil_native_layer_norm\n");
+  CHECK_DNNL_OP_PRE_COND(X);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(X);
+  const dil::tensor scale = dbl::comm::try_gen_dil_tensor(gamma);
+  const dil::tensor shift = dbl::comm::try_gen_dil_tensor(beta);
+  int64_t i = 0;
+  auto j = X.size(0);
+  std::vector<int64_t> input_size;
+  while(j <= M) {
+    input_size.push_back(X.size(i++));
+    j *= X.size(i);
+  }
+  input_size.push_back(N);
+  auto src = x.reshape(input_size);
+  dil::tensor y, mean, variance;
+  dil::layer_normalization_forward::compute(
+        src,
+        scale,
+        shift,
+        y,
+        mean,
+        variance,
+        eps);
+  return std::make_tuple(
+        dbl::comm::gen_aten_tensor_by(std::move(y)).reshape(X.sizes()),
+        dbl::comm::gen_aten_tensor_by(std::move(mean)),
+        dbl::comm::gen_aten_tensor_by(std::move(variance)));
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_norm_backward(
+    const at::Tensor& dY,
+    const at::Tensor& X,
+    const at::Tensor& mean,
+    const at::Tensor& rstd,
+    const at::Tensor& gamma,
+    int64_t M,
+    int64_t N,
+    std::array<bool, 3> grad_input_mask) {
+  DEBUG("AtenIpexCPUDev::dil_native_layer_norm_backward\n");
+  CHECK_DNNL_OP_PRE_COND(dY);
+  CHECK_DNNL_OP_PRE_COND(X);
+  dil::tensor dy = dbl::comm::try_gen_dil_tensor(dY);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(X);
+  dil::tensor m = dbl::comm::try_gen_dil_tensor(mean);
+  dil::tensor r = dbl::comm::try_gen_dil_tensor(rstd);
+  dil::tensor g = dbl::comm::try_gen_dil_tensor(gamma);
+  int64_t i = 0;
+  auto j = X.size(0);
+  std::vector<int64_t> input_size;
+  while(j <= M) {
+    input_size.push_back(X.size(i++));
+    j *= X.size(i);
+  }
+  input_size.push_back(N);
+  auto src = x.reshape(input_size);
+  auto grady = dy.reshape(input_size);
+  dil::tensor gradx, gradg, gradb;
+  float eps = 1e-5;
+  dil::layer_normalization_backward::compute(
+        src, m, r, grady, g, gradx, gradg, gradb, eps);
+
+  return std::make_tuple(
+      dbl::comm::gen_aten_tensor_by(std::move(gradx)).reshape(X.sizes()),
+      dbl::comm::gen_aten_tensor_by(std::move(gradg)),
+      dbl::comm::gen_aten_tensor_by(std::move(gradb)));
 }
 
 }  // namespace cpu

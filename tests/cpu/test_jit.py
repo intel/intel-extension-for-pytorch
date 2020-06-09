@@ -83,41 +83,6 @@ SIZE = 100
 torch._C._jit_set_profiling_mode(False)
 torch._C._jit_set_profiling_executor(False)
 
-def test_output(model, x):
-    modelName = model.__class__.__name__
-    core.disable_jit()
-
-    model = model.to('dpcpp').eval()
-    x = x.to('dpcpp')
-    with torch.no_grad():
-        result = model(x)
-
-    smodel = torch.jit.script(model)
-    smodel.eval()
-    with torch.no_grad():
-        sresult = smodel(x)
-
-    print(f'\nAre {modelName} and Scripted{modelName} outputs the same: ',
-          torch.allclose(
-              sresult, result, rtol=1e-05, atol=1e-06, equal_nan=False))
-
-    core.enable_jit()
-    pmodel = torch.jit.script(model)
-    # bn folding
-    pmodel = wrap_cpp_module(torch._C._jit_pass_fold_convbn(pmodel._c))
-    with torch.no_grad():
-        # conv relu fusion, conv sum fusion or conv sum relu fusion
-        print(pmodel.graph_for(x))
-        presult = pmodel(x)
-
-    # print(result)
-    # print(sresult)
-    # print(presult)
-
-    print(f'\nWith or without pyrys, are Scripted{modelName} outputs the same: ',
-          torch.allclose(
-                sresult, presult, rtol=1e-05, atol=1e-06, equal_nan=False))
-
 class Conv2dRelu_Fixed(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dRelu_Fixed, self).__init__()
@@ -150,22 +115,70 @@ class CascadedConv2dBnSumRelu(nn.Module):
         b = self.bn2(b)
         return F.relu(a.add_(b), inplace=True)
 
+class LinearRelu(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearRelu, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        return F.relu(self.linear(x), inplace=True)
+
 class Tester(TestCase):
-    n = 32
-    c = 3
-    h = 224
-    w = 224
-    print('input size: (%d, %d, %d, %d)' % (n, c, h, w))
+
+    def _test_output(self, model, x):
+        modelName = model.__class__.__name__
+        core.disable_jit()
+
+        model = model.to('dpcpp').eval()
+        x = x.to('dpcpp')
+        with torch.no_grad():
+            result = model(x)
+
+        script_model = torch.jit.script(model)
+        script_model.eval()
+        with torch.no_grad():
+            sresult = script_model(x)
+
+        self.assertEqual(result, sresult)
+
+        core.enable_jit()
+        fused_model = torch.jit.script(model)
+        # bn folding, removing it after solve some issue
+        core.disable_auto_dnnl()
+        fused_model = wrap_cpp_module(torch._C._jit_pass_fold_convbn(fused_model._c))
+        core.enable_auto_dnnl()
+        # prepack convolution weight
+        fused_model = wrap_cpp_module(core._jit_prepack_conv_weight(fused_model._c))
+        with torch.no_grad():
+            # conv relu fusion, conv sum fusion or conv sum relu fusion
+            print(fused_model.graph_for(x))
+            fresult = fused_model(x)
+
+        # print(result)
+        # print(sresult)
+        # print(fresult)
+
+        self.assertEqual(result, fresult)
 
     def test_output_conv_relu(self):
-        test_output(
-            Conv2dRelu_Fixed(self.c, 32, kernel_size=3, stride=1),
-            torch.rand(self.n, self.c, self.h, self.w))
+        self._test_output(
+            Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224))
 
     def test_output_cascaded_conv2d_bn_sum_relu(self):
-        test_output(
-            CascadedConv2dBnSumRelu(self.c, 64, 32, kernel_size=3, stride=1),
-            torch.rand(self.n, self.c, self.h, self.w))
+        self._test_output(
+            CascadedConv2dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
+            torch.rand(32, 3, 224, 224))
+
+    def test_output_linear_relu(self):
+        self._test_output(
+            LinearRelu(3, 32, bias=True),
+            torch.rand(32, 3))
+        self._test_output(
+            LinearRelu(3, 32, bias=False),
+            torch.rand(32, 3))
 
 if __name__ == '__main__':
     core.enable_auto_dnnl()

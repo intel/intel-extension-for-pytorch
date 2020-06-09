@@ -24,7 +24,7 @@ class AtenIpexTypeExt {
       const c10::optional<at::Tensor>& per_sample_weights);
 
   static at::Tensor linear_fuse_relu(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias);
-  static at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias = at::Tensor());
+  static at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias);
   static std::tuple<at::Tensor, at::Tensor, at::Tensor> linear_backward(const at::Tensor& input, const at::Tensor& grad_output, const at::Tensor& weight, std::array<bool,3> output_mask);
   static at::Tensor relu_use_dst_for_bwd(const at::Tensor& grad_output, const at::Tensor& output);
   static at::Tensor adaptive_avg_pool2d(at::Tensor const& input, at::IntArrayRef output_size);
