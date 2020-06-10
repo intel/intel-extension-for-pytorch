@@ -7,8 +7,9 @@ set(aten_generate_src
   "${PROJECT_ATEN_GEN}/aten_ipex_type_default.cpp"
 )
 
-FILE(GLOB GPU_ATEN_CORE_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/core/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/utils/*.h")
-set(TORCH_IPEX_PUBLIC_HEADER ${GPU_ATEN_CORE_HEADER} ${TORCH_IPEX_PUBLIC_HEADER} PARENT_SCOPE)
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/core" "${CMAKE_CURRENT_SOURCE_DIR}/utils"
+        DESTINATION include
+        FILES_MATCHING PATTERN "*.h")
 
 set(aten_src)
 list(APPEND aten_src ${aten_functions_src})

@@ -8,7 +8,7 @@ def _find_dpcpp_home():
 
 def _here_paths():
     here = os.path.abspath(__file__)
-    torch_ipex_path = os.path.dirname(os.path.dirname(here))
+    torch_ipex_path = os.path.dirname(here)
     return torch_ipex_path
 
 

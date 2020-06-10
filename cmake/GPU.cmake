@@ -112,8 +112,6 @@ endif()
 set(DPCPP_SRCS)
 set(DPCPP_JIT_SRCS)
 set(DPCPP_ATEN_SRCS)
-set(TORCH_IPEX_PUBLIC_HEADER)
-
 add_subdirectory(torch_ipex/csrc/gpu/aten)
 list(APPEND DPCPP_SRCS ${DPCPP_ATEN_SRCS})
 
@@ -135,9 +133,6 @@ target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
 
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
-if(DEFINED TORCH_IPEX_PUBLIC_HEADER)
-  set_target_properties(torch_ipex PROPERTIES PUBLIC_HEADER "${TORCH_IPEX_PUBLIC_HEADER}")
-endif()
 
 if (SHOULD_GEN)
   add_dependencies(torch_ipex gen_dpcpp_gpu_c10_dispatch_registration)
@@ -175,5 +170,4 @@ endif()
 
 
 install(TARGETS ${LIB_NAME}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
