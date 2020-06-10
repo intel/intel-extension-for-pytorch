@@ -304,7 +304,7 @@ static inline void dpcpp_binary_loop(
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   int64_t rng, GRange, tileSize;
   parallel_for_setup(n, tileSize, rng, GRange);
-  dpcpp_queue.submit([&](DPCPP::handler& cgh) {
+  auto cgf = DPCPP_Q_CGF(cgh) {
     auto in1_Acc = DPCPPAccessor<read_mode>(cgh, in1_ptr, n * s1);
     auto in2_Acc = DPCPPAccessor<read_mode>(cgh, in2_ptr, n * s2);
     auto out_Acc = DPCPPAccessor<write_mode>(cgh, out_ptr, n * s0);
@@ -321,7 +321,9 @@ static inline void dpcpp_binary_loop(
                 input1_ptr[SyclConvertToActualOffset(arg1_t, globalid * s1)],
                 input2_ptr[SyclConvertToActualOffset(arg2_t, globalid * s2)]);
         });
-  });
+  };
+
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
 template <class op_type, typename func_t>
