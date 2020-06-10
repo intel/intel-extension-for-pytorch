@@ -165,6 +165,13 @@ struct TensorSub2Op {
 };
 
 template <typename T>
+struct TensorBCE2Op {
+  void operator()(T& out, T& in, T& tar) const {
+    out = (tar - (T)(1.)) * Numerics<T>::max(Numerics<T>::log((T)1 - in), (T)(-100)) - tar * Numerics<T>::max(Numerics<T>::log(in), (T)(-100));
+  }
+};
+
+template <typename T>
 struct TensorBCEOp {
   void operator()(T& out, T& in, T& tar) const {
     out = -(safe_log(in) * tar + safe_log((T)1. - in) * ((T)1. - tar));
@@ -317,9 +324,11 @@ void BCECriterion_updateOutput(
   }
 
   output.resize_({});
-  int size = input.numel();
+  Tensor output_ = at::empty(input.sizes(), input.options());
+
 
   if (weights.defined()) {
+    int size = input.numel();
     Tensor t0 = at::empty_like(input);
 
     at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
@@ -331,40 +340,50 @@ void BCECriterion_updateOutput(
 
     dnnl_inner_product_forward_frame<scalar_t>(
         size, t0_data, weights_data, output_data);
+    
+    if (reduction == at::Reduction::Mean) {
+      output.div_(size);
+    }
+    return;
 
   } else {
-    Tensor t1 = at::empty_like(input);
-    Tensor t2 = at::empty_like(input);
-    Tensor o1 = at::zeros_like(output);
+    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+        output_, input, target, TensorBCE2Op<scalar_t>());   
 
-    at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
-        t1, input, TensorLog1Op<scalar_t>());
+    // Tensor t1 = at::empty_like(input);
+    // Tensor t2 = at::empty_like(input);
+    // Tensor o1 = at::zeros_like(output);
 
-    scalar_t* t1_data = t1.data_ptr<scalar_t>();
-    scalar_t* target_data = target.data_ptr<scalar_t>();
-    scalar_t* o1_data = o1.data_ptr<scalar_t>();
+    // at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+    //     t1, input, TensorLog1Op<scalar_t>());
 
-    dnnl_inner_product_forward_frame<scalar_t>(
-        size, t1_data, target_data, o1_data);
+    // scalar_t* t1_data = t1.data_ptr<scalar_t>();
+    // scalar_t* target_data = target.data_ptr<scalar_t>();
+    // scalar_t* o1_data = o1.data_ptr<scalar_t>();
 
-    at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
-        t1, input, TensorLog2Op<scalar_t>());
+    // dnnl_inner_product_forward_frame<scalar_t>(
+    //     size, t1_data, target_data, o1_data);
 
-    at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
-        t2, target, TensorSub2Op<scalar_t>());
+    // at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+    //     t1, input, TensorLog2Op<scalar_t>());
 
-    t1_data = t1.data_ptr<scalar_t>();
-    scalar_t* t2_data = t2.data_ptr<scalar_t>();
-    scalar_t* output_data = output.data_ptr<scalar_t>();
+    // at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+    //     t2, target, TensorSub2Op<scalar_t>());
 
-    dnnl_inner_product_forward_frame<scalar_t>(
-        size, t1_data, t2_data, output_data);
+    // t1_data = t1.data_ptr<scalar_t>();
+    // scalar_t* t2_data = t2.data_ptr<scalar_t>();
+    // scalar_t* output_data = output.data_ptr<scalar_t>();
 
-    output.mul_(-1).sub_(o1);
+    // dnnl_inner_product_forward_frame<scalar_t>(
+    //     size, t1_data, t2_data, output_data);
+
+    // output.mul_(-1).sub_(o1);
   }
-
+  optional<ScalarType> dtype;
   if (reduction == at::Reduction::Mean) {
-    output.div_(size);
+    at::AtenIpexTypeDPCPP::mean_out(output, output_, IntArrayRef{}, false, dtype);
+  } else if(reduction == at::Reduction::Sum) {
+    at::AtenIpexTypeDPCPP::sum_out(output, output_, IntArrayRef{}, false, dtype);
   }
 }
 
