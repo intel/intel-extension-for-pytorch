@@ -16,6 +16,7 @@
 #include "cpu/ShadeDataContext.h"
 #include "cpu/ExtendOPs.h"
 #include "cpu/MlpOPs.h"
+#include "cpu/toolkit/sklearn.h"
 
 namespace torch_ipex {
 namespace {
@@ -132,6 +133,8 @@ void InitIpexModuleBindings(py::module m) {
   m.def("is_dil_tensor", &isDilTensor);
   m.def("get_dil_tensor_sizes", &getDilTensorSizes);
   m.def("get_dil_tensor_strides", &getDilTensorStrides);
+
+  m.def("roc_auc_score", &toolkit::roc_auc_score);
 }
 
 }  // namespace
