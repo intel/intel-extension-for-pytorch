@@ -5,11 +5,24 @@
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
+#include <utils/Profiler.h>
 
 #include <mkldnn.hpp>
 #include <vector>
 
 using namespace mkldnn;
+
+#ifndef DPCPP_PROFILING
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)    \
+  { (prim).execute((stream), ##__VA_ARGS__); }
+#else
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                \
+  {                                                         \
+    auto e = (prim).execute_sycl((stream), ##__VA_ARGS__);  \
+    e.wait();                                               \
+    dpcpp_log("dpcpp_kernel", e);                           \
+  }
+#endif
 
 namespace at {
 namespace dpcpp {

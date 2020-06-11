@@ -74,6 +74,7 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 # ---[ Main build
 
 if (DPCPP_ENABLE_PROFILING)
+  message(WARNING, "DPCPP profiling is enabled! Only support SYNC execution mode!")
   add_definitions(-DDPCPP_PROFILING)
 endif()
 

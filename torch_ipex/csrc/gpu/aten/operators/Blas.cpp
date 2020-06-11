@@ -110,9 +110,9 @@ void mkldnnGemmImpl(
   auto r_memory = memory({r_md, engine});
   dpcpp_set_mkldnn_buffer(result.data_ptr(), r_memory);
 
-  matmul_p->execute(strm,
-                    {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
-                     {DNNL_ARG_DST, r_memory}});
+  DPCPP_ONEDNN_EXEC(*matmul_p, strm,
+    {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
+      {DNNL_ARG_DST, r_memory}});
 
 #if defined(USE_COMPUTECPP)
   if (!result_.is_same(result))

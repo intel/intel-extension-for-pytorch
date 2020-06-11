@@ -88,7 +88,7 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   }
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  layer_normalization_forward(lnorm_fwd_pd).execute(strm, args);
+  DPCPP_ONEDNN_EXEC(layer_normalization_forward(lnorm_fwd_pd), strm, args);
 
   return std::make_tuple(output.view(X.sizes()), mean, rstd);
 }
@@ -200,7 +200,7 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
   }
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  layer_normalization_backward(lnorm_bwd_pd).execute(strm, args);
+  DPCPP_ONEDNN_EXEC(layer_normalization_backward(lnorm_bwd_pd), strm, args);
 
   if (useScaleShift) {
     dpcppMemcpyAsync(

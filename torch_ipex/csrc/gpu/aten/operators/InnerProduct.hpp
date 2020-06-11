@@ -85,8 +85,7 @@ void mkldnn_inner_product(
   }
 
   ip_forward.reset(new inner_product_forward(ip_forward_pd));
-  ip_forward->execute(
-      strm,
+  DPCPP_ONEDNN_EXEC(*ip_forward, strm,
       {{MKLDNN_ARG_SRC, input_usr_memory},
        {MKLDNN_ARG_WEIGHTS, weight_usr_memory},
        {MKLDNN_ARG_BIAS, *bias_usr_memory},

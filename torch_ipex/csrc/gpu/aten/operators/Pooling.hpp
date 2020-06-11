@@ -132,8 +132,8 @@ static void avg_pool_out_frame(
   // input has the same format with input_usr.
   // if (input_usr_memory.get_desc() != input_d) {
   //   input_memory = memory(input_d, engine);
-  //   reorder(input_usr_memory, input_memory).
-  //       execute(strm, input_usr_memory, input_memory);
+  //   DPCPP_ONEDNN_EXEC(reorder(input_usr_memory, input_memory),
+  //       strm, input_usr_memory, input_memory);
   // }
 
   // auto output_d = pooling_forward_pd->dst_desc();
@@ -146,13 +146,13 @@ static void avg_pool_out_frame(
 
   std::shared_ptr<pooling_forward> pool_forward;
   pool_forward.reset(new pooling_forward(*pooling_forward_pd));
-  pool_forward->execute(
-      strm, {{MKLDNN_ARG_SRC, input_memory}, {MKLDNN_ARG_DST, output_memory}});
+  DPCPP_ONEDNN_EXEC(*pool_forward, strm,
+    {{MKLDNN_ARG_SRC, input_memory}, {MKLDNN_ARG_DST, output_memory}});
 
   // reorder output
   // if (output_memory != output_usr_memory) {
-  //   reorder(output_memory, output_usr_memory).
-  //       execute(strm, output_memory, output_usr_memory);
+  //   DPCPP_ONEDNN_EXEC(reorder(output_memory, output_usr_memory),
+  //       strm, output_memory, output_usr_memory);
   // }
 }
 
@@ -257,8 +257,8 @@ static void avg_pool_backward_out_frame(
   // diff_dst has the same format with dst.
   // if (diff_dst_usr_memory.get_desc() != diff_dst_md) {
   //   diff_dst_memory = memory(diff_dst_md, engine);
-  //   reorder(diff_dst_usr_memory, diff_dst_memory).
-  //       execute(strm, diff_dst_usr_memory, diff_dst_memory);
+  //   DPCPP_ONEDNN_EXEC(reorder(diff_dst_usr_memory, diff_dst_memory),
+  //       strm, diff_dst_usr_memory, diff_dst_memory);
   // }
 
   // auto diff_src_md = pooling_backward_pd->diff_src_desc();
@@ -272,15 +272,14 @@ static void avg_pool_backward_out_frame(
   std::shared_ptr<pooling_backward> pool_backward;
   pool_backward.reset(new pooling_backward(*pooling_backward_pd));
 
-  pool_backward->execute(
-      strm,
+  DPCPP_ONEDNN_EXEC(*pool_backward, strm,
       {{MKLDNN_ARG_DIFF_DST, diff_dst_memory},
        {MKLDNN_ARG_DIFF_SRC, diff_src_memory}});
 
   // Reorder diff_src
   // if (diff_src_memory != diff_src_usr_memory) {
-  //   reorder(diff_src_memory, diff_src_usr_memory).
-  //       execute(strm, diff_src_memory, diff_src_usr_memory);
+  //   DPCPP_ONEDNN_EXEC(reorder(diff_src_memory, diff_src_usr_memory),
+  //       strm, diff_src_memory, diff_src_usr_memory);
   // }
 }
 
@@ -372,8 +371,8 @@ static void max_pool_out_frame(
   // input has the same format with input_usr.
   // if (input_md != expected_input_md) {
   //   input_memory = memory(expected_input_md, engine);
-  //   reorder(input_usr_memory, input_memory).
-  //       execute(strm, input_usr_memory, input_memory);
+  //   DPCPP_ONEDNN_EXEC(reorder(input_usr_memory, input_memory),
+  //       strm, input_usr_memory, input_memory);
   // }
 
   // auto expected_output_md = pooling_forward_pd->dst_desc();
@@ -401,27 +400,26 @@ static void max_pool_out_frame(
   //   indices_memory = memory(indices_md, engine);
   // }
 
-  pool_forward->execute(
-      strm,
+  DPCPP_ONEDNN_EXEC(*pool_forward, strm,
       {{MKLDNN_ARG_SRC, input_memory},
        {MKLDNN_ARG_DST, output_memory},
        {MKLDNN_ARG_WORKSPACE, indices_memory}});
 
   // reorder output
   // if (output_memory != output_usr_memory) {
-  //   reorder(output_memory, output_usr_memory).
-  //       execute(strm, output_memory, output_usr_memory);
+  //   DPCPP_ONEDNN_EXEC(reorder(output_memory, output_usr_memory),
+  //       strm, output_memory, output_usr_memory);
   // }
 
   // reorder workgroup
 
   // if (indices_usr_memory.get_desc() != indices_md) {
-  //   reorder(indices_memory, indices_usr_memory).
-  //       execute(strm, indices_memory, indices_usr_memory);
+  //   DPCPP_ONEDNN_EXEC(reorder(indices_memory, indices_usr_memory),
+  //       strm, indices_memory, indices_usr_memory);
   // }
 
-  // reorder(indices_memory, indices_usr_memory).
-  //         execute(strm, indices_memory, indices_usr_memory);
+  // DPCPP_ONEDNN_EXEC(reorder(indices_memory, indices_usr_memory),
+  //         strm, indices_memory, indices_usr_memory);
 
   dpcppMemoryCopyType(
       (int64_t*)indices_data,
@@ -539,8 +537,8 @@ static void max_pool_backward_out_frame(
   // diff_dst has the same format with dst.
   // if (diff_dst_usr_memory.get_desc() != diff_dst_md) {
   //   diff_dst_memory = memory(diff_dst_md, engine);
-  //   reorder(diff_dst_usr_memory, diff_dst_memory).
-  //       execute(strm, diff_dst_usr_memory, diff_dst_memory);
+  //   DPCPP_ONEDNN_EXEC(reorder(diff_dst_usr_memory, diff_dst_memory),
+  //       strm, diff_dst_usr_memory, diff_dst_memory);
   // }
 
   // auto expected_diff_src_pd = pooling_backward_pd->diff_src_desc();
@@ -573,19 +571,18 @@ static void max_pool_backward_out_frame(
   // indices has the same format with indices.
   // reorder indices if needed
   // if (indices_usr_memory.get_desc() != indices_md) {
-  //   reorder(indices_usr_memory, indices_memory).
-  //       execute(strm, indices_usr_memory, indices_memory);
+  //   DPCPP_ONEDNN_EXEC(reorder(indices_usr_memory, indices_memory),
+  //       strm, indices_usr_memory, indices_memory);
   // }
-  pool_backward->execute(
-      strm,
+  DPCPP_ONEDNN_EXEC(*pool_backward, strm,
       {{MKLDNN_ARG_DIFF_DST, diff_dst_memory},
        {MKLDNN_ARG_DIFF_SRC, diff_src_memory},
        {MKLDNN_ARG_WORKSPACE, indices_memory}});
 
   // Reorder diff_src
   // if (diff_src_memory != diff_src_usr_memory) {
-  //   reorder(diff_src_memory, diff_src_usr_memory).
-  //       execute(strm, diff_src_memory, diff_src_usr_memory);
+  //   DPCPP_ONEDNN_EXEC(reorder(diff_src_memory, diff_src_usr_memory),
+  //       strm, diff_src_memory, diff_src_usr_memory);
   // }
 }
 

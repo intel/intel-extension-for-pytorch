@@ -204,78 +204,77 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
       auto weights_layer_memory = weights_layer_usr_memory;
       if (weights_layer_usr_memory.get_desc() != expected_weights_layer_md) {
         weights_layer_memory = memory(expected_weights_layer_md, engine);
-        reorder(weights_layer_usr_memory, weights_layer_memory)
-            .execute(strm, weights_layer_usr_memory, weights_layer_memory);
+        DPCPP_ONEDNN_EXEC(reorder(weights_layer_usr_memory, weights_layer_memory),
+            strm, weights_layer_usr_memory, weights_layer_memory);
       }
 
       auto expected_weights_iter_md = lstm_forward_pd->weights_iter_desc();
       auto weights_iter_memory = weights_iter_usr_memory;
       if (weights_iter_usr_memory.get_desc() != expected_weights_iter_md) {
         weights_iter_memory = memory(expected_weights_iter_md, engine);
-        reorder(weights_iter_usr_memory, weights_iter_memory)
-            .execute(strm, weights_iter_usr_memory, weights_iter_memory);
+        DPCPP_ONEDNN_EXEC(reorder(weights_iter_usr_memory, weights_iter_memory),
+            strm, weights_iter_usr_memory, weights_iter_memory);
       }
 
       auto expected_bias_md = lstm_forward_pd->bias_desc();
       auto bias_memory = bias_usr_memory;
       if (bias_usr_memory.get_desc() != expected_bias_md) {
         bias_memory = memory(expected_bias_md, engine);
-        reorder(bias_usr_memory, bias_memory)
-            .execute(strm, bias_usr_memory, bias_memory);
+        DPCPP_ONEDNN_EXEC(reorder(bias_usr_memory, bias_memory),
+            strm, bias_usr_memory, bias_memory);
       }
 
       auto expected_src_layer_md = lstm_forward_pd->src_layer_desc();
       auto src_layer_memory = src_layer_usr_memory;
       if (src_layer_usr_memory.get_desc() != expected_src_layer_md) {
         src_layer_memory = memory(expected_src_layer_md, engine);
-        reorder(src_layer_usr_memory, src_layer_memory)
-            .execute(strm, src_layer_usr_memory, src_layer_memory);
+        DPCPP_ONEDNN_EXEC(reorder(src_layer_usr_memory, src_layer_memory),
+            strm, src_layer_usr_memory, src_layer_memory);
       }
 
       auto expected_src_iter_md = lstm_forward_pd->src_iter_desc();
       auto src_iter_memory = src_iter_usr_memory;
       if (src_iter_usr_memory.get_desc() != expected_src_iter_md) {
         src_iter_memory = memory(expected_src_iter_md, engine);
-        reorder(src_iter_usr_memory, src_iter_memory)
-            .execute(strm, src_iter_usr_memory, src_iter_memory);
+        DPCPP_ONEDNN_EXEC(reorder(src_iter_usr_memory, src_iter_memory),
+            strm, src_iter_usr_memory, src_iter_memory);
       }
 
       auto expected_src_iter_c_md = lstm_forward_pd->src_iter_c_desc();
       auto src_iter_c_memory = src_iter_c_usr_memory;
       if (src_iter_c_usr_memory.get_desc() != expected_src_iter_c_md) {
         src_iter_c_memory = memory(expected_src_iter_c_md, engine);
-        reorder(src_iter_c_usr_memory, src_iter_c_memory)
-            .execute(strm, src_iter_c_usr_memory, src_iter_c_memory);
+        DPCPP_ONEDNN_EXEC(reorder(src_iter_c_usr_memory, src_iter_c_memory),
+            strm, src_iter_c_usr_memory, src_iter_c_memory);
       }
 
       auto expected_dst_layer_md = lstm_forward_pd->dst_layer_desc();
       auto dst_layer_memory = dst_layer_usr_memory;
       if (dst_layer_usr_memory.get_desc() != expected_dst_layer_md) {
         dst_layer_memory = memory(expected_dst_layer_md, engine);
-        reorder(dst_layer_usr_memory, dst_layer_memory)
-            .execute(strm, dst_layer_usr_memory, dst_layer_memory);
+        DPCPP_ONEDNN_EXEC(reorder(dst_layer_usr_memory, dst_layer_memory),
+            strm, dst_layer_usr_memory, dst_layer_memory);
       }
 
       auto expected_dst_iter_md = lstm_forward_pd->dst_iter_desc();
       auto dst_iter_memory = dst_iter_usr_memory;
       if (dst_iter_usr_memory.get_desc() != expected_dst_iter_md) {
         dst_iter_memory = memory(expected_dst_iter_md, engine);
-        reorder(dst_iter_usr_memory, dst_iter_memory)
-            .execute(strm, dst_iter_usr_memory, dst_iter_memory);
+        DPCPP_ONEDNN_EXEC(reorder(dst_iter_usr_memory, dst_iter_memory),
+            strm, dst_iter_usr_memory, dst_iter_memory);
       }
 
       auto expected_dst_iter_c_md = lstm_forward_pd->dst_iter_c_desc();
       auto dst_iter_c_memory = dst_iter_c_usr_memory;
       if (dst_iter_c_usr_memory.get_desc() != expected_dst_iter_c_md) {
         dst_iter_c_memory = memory(expected_dst_iter_c_md, engine);
-        reorder(dst_iter_c_usr_memory, dst_iter_c_memory)
-            .execute(strm, dst_iter_c_usr_memory, dst_iter_c_memory);
+        DPCPP_ONEDNN_EXEC(reorder(dst_iter_c_usr_memory, dst_iter_c_memory),
+            strm, dst_iter_c_usr_memory, dst_iter_c_memory);
       }
 
       std::shared_ptr<lstm_forward> lstm1_forward;
       lstm1_forward.reset(new lstm_forward(*lstm_forward_pd));
-      lstm1_forward->execute(
-          strm,
+      DPCPP_ONEDNN_EXEC(*lstm1_forward, strm,
           {{DNNL_ARG_SRC_LAYER, src_layer_memory},
            {DNNL_ARG_SRC_ITER, src_iter_memory},
            {DNNL_ARG_SRC_ITER_C, src_iter_c_memory},
@@ -287,18 +286,18 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
            {DNNL_ARG_DST_ITER_C, dst_iter_c_memory}});
 
       if (dst_layer_memory != dst_layer_usr_memory) {
-        reorder(dst_layer_memory, dst_layer_usr_memory)
-            .execute(strm, dst_layer_memory, dst_layer_usr_memory);
+        DPCPP_ONEDNN_EXEC(reorder(dst_layer_memory, dst_layer_usr_memory),
+            strm, dst_layer_memory, dst_layer_usr_memory);
       }
 
       if (dst_iter_memory != dst_iter_usr_memory) {
-        reorder(dst_iter_memory, dst_iter_usr_memory)
-            .execute(strm, dst_iter_memory, dst_iter_usr_memory);
+        DPCPP_ONEDNN_EXEC(reorder(dst_iter_memory, dst_iter_usr_memory),
+            strm, dst_iter_memory, dst_iter_usr_memory);
       }
 
       if (dst_iter_c_memory != dst_iter_c_usr_memory) {
-        reorder(dst_iter_c_memory, dst_iter_c_usr_memory)
-            .execute(strm, dst_iter_c_memory, dst_iter_c_usr_memory);
+        DPCPP_ONEDNN_EXEC(reorder(dst_iter_c_memory, dst_iter_c_usr_memory),
+            strm, dst_iter_c_memory, dst_iter_c_usr_memory);
       }
     }
     if (num_directions == 1) {

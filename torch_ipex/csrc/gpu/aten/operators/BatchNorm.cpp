@@ -174,7 +174,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   args.insert({MKLDNN_ARG_MEAN, mean_memory});
   args.insert({MKLDNN_ARG_VARIANCE, var_memory});
 
-  bn_fwd->execute(strm, args);
+  DPCPP_ONEDNN_EXEC(*bn_fwd, strm, args);
 
   if (training && running_mean.defined() && running_var.defined()) {
     dpcppMemoryScale1(
@@ -376,7 +376,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     args.insert({MKLDNN_ARG_DIFF_SCALE_SHIFT, grad_weight_bias_memory});
   }
 
-  bn_bwd->execute(strm, args);
+  DPCPP_ONEDNN_EXEC(*bn_bwd, strm, args);
 
   if ((bool)(flags & normalization_flags::use_scale_shift)) {
     dpcppMemcpyAsync(
