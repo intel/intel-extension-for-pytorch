@@ -505,9 +505,19 @@ void EmbeddingBag_updateOutputKernel(
 
   using accscalar_t = acc_type<scalar_t>;
   auto queue = dpcppGetCurrentQueue();
-  int64_t chunksPerBag = CeilDiv(featureSize, (int64_t)64);
+  auto workersPerChunk = [featureSize] () -> int64_t {
+    int64_t _workersPerChunk = 64;
+    if (featureSize < 64 && featureSize >= 32) {
+      _workersPerChunk = 32;
+    } else if (featureSize < 32) {
+      _workersPerChunk = 16;
+    }
+    return _workersPerChunk;
+  } ();
+  int64_t chunksPerBag = CeilDiv(featureSize, (int64_t)workersPerChunk);
   int64_t numChunks = numBags * chunksPerBag;
-  int64_t kernel_range = 1024 * 64;
+  int64_t kernel_range = 1024 * workersPerChunk;
+  int64_t chunksPerWorkGroup = 256 / workersPerChunk;
   bool per_sample_weights_defined = per_sample_weights ? true : false;
   DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
@@ -611,7 +621,8 @@ void EmbeddingBag_updateOutputKernel(
     // kick off kernel
     cgh.parallel_for<DPCPP_K(EmbeddingbagSycl, scalar_t)>(
         DPCPP::nd_range<2>(
-            DPCPP::range<2>(kernel_range, 4), DPCPP::range<2>(64, 4)),
+            DPCPP::range<2>(kernel_range, chunksPerWorkGroup),
+            DPCPP::range<2>(workersPerChunk, chunksPerWorkGroup)),
         kfn);
   };
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
