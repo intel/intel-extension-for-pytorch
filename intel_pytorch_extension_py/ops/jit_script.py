@@ -7,9 +7,9 @@ torch._C._jit_set_profiling_executor(False)
 
 orig_script = torch.jit.script
 
-def script_(obj, *args, **kwargs):
+def script_(obj, optimize=None, _frames_up=0, _rcb=None):
     torch.jit.script = orig_script
-    jit_m = orig_script(obj, *args, **kwargs)
+    jit_m = orig_script(obj, optimize=optimize, _frames_up=_frames_up+1, _rcb=_rcb)
     torch.jit.script = script_
 
     if core.get_jit():

@@ -80,8 +80,6 @@ device = 'dpcpp:0'
 #device = 'cpu:0'
 SIZE = 100
 
-torch._C._jit_set_profiling_mode(False)
-torch._C._jit_set_profiling_executor(False)
 
 class Conv2dRelu_Fixed(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
