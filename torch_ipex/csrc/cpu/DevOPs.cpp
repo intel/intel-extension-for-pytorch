@@ -133,7 +133,8 @@ std::tuple<at::Tensor, at::Tensor> dil_convolution_backward_weights(
   const dil::tensor dil_input = dbl::comm::try_gen_dil_tensor(input);
 
   dil::tensor dil_grad_weight, dil_grad_bias;
-  auto diff_weight_type = get_dil_data_type(weight.scalar_type());
+  dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
+  auto diff_weight_type = w.get_data_type();
   auto weight_size = weight.sizes();
 
   if (bias_defined) {
@@ -667,7 +668,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   dbl::comm::reorder_to_bf16_for_mix_prec(weight);
 
   // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
-  auto self_reshaped = self.dim() > 2 ? self.reshape({-1, self.size(self.dim() - 1)}) : self;
+  auto self_reshaped = self.dim() > 2 ? dil_reshape(self, {-1, self.size(self.dim() - 1)}) : self;
   const dil::tensor x = dbl::comm::try_gen_dil_tensor(self_reshaped);
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
 
@@ -704,7 +705,7 @@ at::Tensor AtenIpexCPUDev::dil_linear_fuse_relu(
   dbl::comm::reorder_to_bf16_for_mix_prec(weight);
 
   // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
-  auto self_reshaped = self.dim() > 2 ? self.reshape({-1, self.size(self.dim() - 1)}) : self;
+  auto self_reshaped = self.dim() > 2 ? dil_reshape(self, {-1, self.size(self.dim() - 1)}) : self;
   const dil::tensor x = dbl::comm::try_gen_dil_tensor(self_reshaped);
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
 
@@ -744,7 +745,7 @@ at::Tensor AtenIpexCPUDev::dil_linear_backward_input(
   dbl::comm::reorder_to_bf16_for_mix_prec(weight);
 
   auto grad_output_reshaped = grad_output.dim() > 2 ?
-    grad_output.reshape({-1, grad_output.size(grad_output.dim() - 1)}) : grad_output;
+    dil_reshape(grad_output, {-1, grad_output.size(grad_output.dim() - 1)}) : grad_output;
   dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_reshaped);
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
 
@@ -771,12 +772,14 @@ std::tuple<at::Tensor, at::Tensor> AtenIpexCPUDev::dil_linear_backward_weights(
   dbl::comm::reorder_to_bf16_for_mix_prec(weight);
 
   auto grad_output_reshaped = grad_output.dim() > 2 ?
-    grad_output.reshape({-1, grad_output.size(grad_output.dim() - 1)}) : grad_output;
-  auto input_reshaped = input.dim() > 2 ? input.reshape({-1, input.size(input.dim() - 1)}) : input;
+    dil_reshape(grad_output, {-1, grad_output.size(grad_output.dim() - 1)}) : grad_output;
+  auto input_reshaped = input.dim() > 2 ? dil_reshape(input, {-1, input.size(input.dim() - 1)}) : input;
 
   dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_reshaped);
   dil::tensor x = dbl::comm::try_gen_dil_tensor(input_reshaped);
-  auto diff_weight_type = get_dil_data_type(weight.scalar_type());
+  dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
+  auto diff_weight_type = w.get_data_type();
+
   dil::tensor gradw, gradb;
   if (bias_defined) {
     dil::inner_product_backward_weights::compute(x, grady, gradw, gradb, diff_weight_type);
