@@ -81,6 +81,28 @@ device = 'dpcpp:0'
 SIZE = 100
 
 
+class Conv2dBatchNorm2d_Fixed(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBatchNorm2d_Fixed, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
+        self.bn = nn.BatchNorm2d(out_channels, eps=0.001)
+
+    def forward(self, x):
+        return self.bn(self.conv(x))
+
+class Conv3dBatchNorm3d_Fixed(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv3dBatchNorm3d_Fixed, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = nn.Conv3d(in_channels, out_channels, bias=False, **kwargs)
+        self.bn = nn.BatchNorm3d(out_channels, eps=0.001)
+
+    def forward(self, x):
+        return self.bn(self.conv(x))
+
 class Conv2dRelu_Fixed(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dRelu_Fixed, self).__init__()
@@ -98,7 +120,7 @@ class Conv2dSum(nn.Module):
         torch.manual_seed(seed)
         self.conv = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
         self.conv1 = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
-    
+
     def forward(self, x):
         a = self.conv(x)
         b = self.conv1(x)
@@ -141,6 +163,7 @@ class Tester(TestCase):
     def _test_output(self, model, x, kind):
         modelName = model.__class__.__name__
         core.disable_jit()
+        core.disable_mix_bf16_fp32()
 
         model = model.to('dpcpp').eval()
         x = x.to('dpcpp')
@@ -168,7 +191,6 @@ class Tester(TestCase):
 
         self.assertEqual(result, fresult)
 
-
         # check if the fused node exists in the graph
         self.assertTrue(any(n.kind() == kind for n in graph.nodes()))
 
@@ -191,7 +213,7 @@ class Tester(TestCase):
         core.enable_auto_dnnl()
 
         core.enable_mix_bf16_fp32()
-        # prepack convolution weight, weight will be a bf16 tensor 
+        # prepack convolution weight, weight will be a bf16 tensor
         fused_model = wrap_cpp_module(core._jit_prepack_conv_weight(fused_model._c))
         with torch.no_grad():
             # bf16, native path
@@ -204,12 +226,38 @@ class Tester(TestCase):
 
         self.assertEqual(fresult, result)
 
+    def test_output_conv_bn_2d(self):
+        self._test_output(
+            Conv2dBatchNorm2d_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224),
+            "aten::conv2d")
+
+        '''
+        self._test_output_bf16(
+            Conv2dBatchNorm2d_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224))
+        '''
+
+    def test_output_conv_bn_3d(self):
+        self._test_output(
+            Conv3dBatchNorm3d_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 112, 112, 112),
+            "aten::conv3d")
+
+        '''
+        self._test_output_bf16(
+            Conv3dBatchNorm3d_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 112, 112, 112))
+        '''
 
     def test_output_conv_relu(self):
         self._test_output(
             Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
             "ipex::conv2d_relu")
+        self._test_output_bf16(
+            Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224))
 
     def test_output_conv_sum(self):
         self._test_output(

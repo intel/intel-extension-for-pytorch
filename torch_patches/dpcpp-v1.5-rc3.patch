@@ -395,13 +395,31 @@ index 9a4c9b3eb9..6d0240564a 100644
      return DeviceType::CPU;
    } else if (tid == DispatchKey::SparseCUDATensorId) {
 diff --git a/torch/csrc/jit/passes/quantization.cpp b/torch/csrc/jit/passes/quantization.cpp
-index a6a9fca462..7c740af04b 100644
+index a6a9fca462..d42a05fd4a 100644
 --- a/torch/csrc/jit/passes/quantization.cpp
 +++ b/torch/csrc/jit/passes/quantization.cpp
-@@ -1758,22 +1758,83 @@ std::tuple<at::Tensor, at::Tensor> FoldConvBatchNorm2dHelper::
+@@ -1718,7 +1718,7 @@ class FoldConvBatchNorm2dHelper {
+    * and record informations for the modifications of the graph without
+    * actually performing these modifications.
+    */
+-  void analyze(Module& module);
++  void analyze(Module& module, const PatternInfo& pattern);
+   /**
+    * In this step we perform all the modifications including
+    * setting the attributes for conv module, rewriting values
+@@ -1753,27 +1753,91 @@ class FoldConvBatchNorm2dHelper {
+ std::tuple<at::Tensor, at::Tensor> FoldConvBatchNorm2dHelper::
+     computeUpdatedConvWeightAndBias(const ConvBNParameters& p) {
+   at::Tensor bn_var_rsqrt = at::rsqrt(p.bn_rv + p.bn_eps);
+-  at::Tensor new_w = p.conv_w * (p.bn_w * bn_var_rsqrt).reshape({-1, 1, 1, 1});
++  const int64_t ndim = p.conv_w.dim();
++  c10::SmallVector<int64_t, 5> sizes(ndim, 1);
++  sizes.at(0) = -1;
++  at::Tensor new_w = p.conv_w * (p.bn_w * bn_var_rsqrt).reshape(sizes);
+   at::Tensor new_b = (p.conv_b - p.bn_rm) * bn_var_rsqrt * p.bn_w + p.bn_b;
    return std::make_tuple(new_w, new_b);
  }
-
+ 
 +bool extractOptionalBNParams(
 +    const script::Module& bn,
 +    ConvBNParameters& r) {
@@ -476,7 +494,7 @@ index a6a9fca462..7c740af04b 100644
 +      !hastensor(bn, "running_mean") || !hastensor(bn, "running_var")) {
      return false;
    }
-
+ 
    r.bn_rm = bn.attr("running_mean").toTensor();
    r.bn_rv = bn.attr("running_var").toTensor();
 -  r.bn_eps = bn.attr("eps").toDouble();
@@ -485,25 +503,30 @@ index a6a9fca462..7c740af04b 100644
 +  if (!extractOptionalBNParams(bn, r)) {
 +    return false;
 +  }
-
+ 
    r.conv_w = conv.attr("weight").toTensor();
    r.conv_b = at::zeros_like(r.bn_rm);
-@@ -1788,9 +1849,9 @@ bool FoldConvBatchNorm2dHelper::tryExtractingConvBNParameters(
- void FoldConvBatchNorm2dHelper::analyze(Module& module) {
-   const PatternInfo pattern = PatternInfo::parse_from_str(R"IR(
- graph(%self, %x):
+@@ -1785,15 +1849,8 @@ bool FoldConvBatchNorm2dHelper::tryExtractingConvBNParameters(
+   return true;
+ }
+ 
+-void FoldConvBatchNorm2dHelper::analyze(Module& module) {
+-  const PatternInfo pattern = PatternInfo::parse_from_str(R"IR(
+-graph(%self, %x):
 -    %conv_submodule = match::module[name="Conv2d"](%self)
-+    %conv_submodule = match::module[name=".Conv2d"](%self)
-     %conv_out = prim::CallMethod[name="forward"](%conv_submodule, %x)
+-    %conv_out = prim::CallMethod[name="forward"](%conv_submodule, %x)
 -    %bn_submodule = match::module[name="BatchNorm2d"](%self)
-+    %bn_submodule = match::module[name=".BatchNorm2d"](%self)
-     %bn_out = prim::CallMethod[name="forward"](%bn_submodule, %conv_out)
-     return (%bn_out))IR");
-
-@@ -1921,6 +1982,58 @@ void FoldConvBatchNorm2dHelper::transform() {
+-    %bn_out = prim::CallMethod[name="forward"](%bn_submodule, %conv_out)
+-    return (%bn_out))IR");
+ 
++void FoldConvBatchNorm2dHelper::analyze(Module& module, const PatternInfo& pattern) {
+   const Graph& pattern_graph = *pattern.pattern_graph;
+   const auto& vmap = pattern.vmap;
+   Value* pattern_conv_out = vmap.at("conv_out");
+@@ -1921,6 +1978,78 @@ void FoldConvBatchNorm2dHelper::transform() {
    }
  }
-
+ 
 +
 +void replaceConv2dBiasWithGetAttr(Module& module) {
 +  auto graph = module.get_method("forward").graph();
@@ -556,17 +579,64 @@ index a6a9fca462..7c740af04b 100644
 +  }
 +}
 +
++void addBiasForConv3dIfNone(Module& module) {
++  auto t = module.type()->expect<ClassType>();
++  auto real_typename = t->name()->qualifiedName();
++  const std::string pattern_name("Conv3d");
++  if (real_typename.size() >= pattern_name.size() &&
++      (0 == real_typename.compare(real_typename.size() - pattern_name.size(),
++                                  pattern_name.size(), pattern_name))) {
++    if (!t->hasAttribute("bias")) {
++      auto optional_tensor_type = OptionalType::create(TensorType::get());
++      t->addAttribute("bias", optional_tensor_type, true);
++      auto optional_tensor = c10::optional<at::Tensor>();
++      module.setattr("bias", optional_tensor);
++      replaceConv2dBiasWithGetAttr(module);
++    }
++  }
++  for (Module m : module.children()) {
++    addBiasForConv3dIfNone(m);
++  }
++}
++
  } // namespace
-
+ 
  TORCH_API Module InsertObservers(
-@@ -2083,6 +2196,7 @@ void QuantFusion(std::shared_ptr<Graph>& graph) {
+@@ -2081,10 +2210,31 @@ void QuantFusion(std::shared_ptr<Graph>& graph) {
+ }
+ 
  Module FoldConvBatchNorm2d(const Module& module) {
-   FoldConvBatchNorm2dHelper h;
+-  FoldConvBatchNorm2dHelper h;
++  FoldConvBatchNorm2dHelper h1, h2;
    Module m = module.clone();
+-  h.analyze(m);
+-  h.transform();
 +  addBiasForConv2dIfNone(m);
-   h.analyze(m);
-   h.transform();
++  addBiasForConv3dIfNone(m);
++
++  const PatternInfo& pattern2d = PatternInfo::parse_from_str(R"IR(
++graph(%self, %x):
++    %conv_submodule = match::module[name=".Conv2d"](%self)
++    %conv_out = prim::CallMethod[name="forward"](%conv_submodule, %x)
++    %bn_submodule = match::module[name=".BatchNorm2d"](%self)
++    %bn_out = prim::CallMethod[name="forward"](%bn_submodule, %conv_out)
++    return (%bn_out))IR");
++
++  const PatternInfo& pattern3d = PatternInfo::parse_from_str(R"IR(
++graph(%self, %x):
++    %conv_submodule = match::module[name=".Conv3d"](%self)
++    %conv_out = prim::CallMethod[name="forward"](%conv_submodule, %x)
++    %bn_submodule = match::module[name=".BatchNorm3d"](%self)
++    %bn_out = prim::CallMethod[name="forward"](%bn_submodule, %conv_out)
++    return (%bn_out))IR");
++
++  h1.analyze(m, pattern2d);
++  h1.transform();
++  h2.analyze(m, pattern3d);
++  h2.transform();
    return m;
+ }
+ 
 diff --git a/torch/csrc/utils/tensor_layouts.cpp b/torch/csrc/utils/tensor_layouts.cpp
 index 6fcd84f3db..e42a7baf27 100644
 --- a/torch/csrc/utils/tensor_layouts.cpp
