@@ -105,7 +105,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   memory::dims input_tz;
   get_dnnl_format(input, dnnl_format, input_tz);
 
-  auto data_t = dt_to_dnnl(input.type().scalarType());
+  auto data_t = dt_to_dnnl(input.scalar_type());
 
   auto input_md = memory::desc({input_tz}, data_t, dnnl_format);
 

@@ -4,9 +4,9 @@
 #  MKL_FOUND             : set to true if a library implementing the CBLAS interface is found
 #
 # The following are set after configuration is done:
-#  ONEDNN_FOUND          : set to true if mkl-dnn is found.
-#  ONEDNN_INCLUDE_DIR    : path to mkl-dnn include dir.
-#  ONEDNN_LIBRARIES      : list of libraries for mkl-dnn
+#  ONEDNN_FOUND          : set to true if oneDNN is found.
+#  ONEDNN_INCLUDE_DIR    : path to oneDNN include dir.
+#  ONEDNN_LIBRARIES      : list of libraries for oneDNN
 #
 # The following variables are used:
 #  ONEDNN_USE_NATIVE_ARCH : Whether native CPU instructions should be used in ONEDNN. This should be turned off for
@@ -16,11 +16,6 @@ IF (NOT ONEDNN_FOUND)
 
 SET(ONEDNN_LIBRARIES)
 SET(ONEDNN_INCLUDE_DIR)
-
-IF(MSVC)
-  MESSAGE(STATUS "MKL-DNN needs omp 3+ which is not supported in MSVC so far")
-  RETURN()
-ENDIF(MSVC)
 
 SET(ONEDNN_ROOT "${PROJECT_SOURCE_DIR}/third_party/oneDNN")
 
@@ -52,14 +47,14 @@ ELSE()
   ENDIF()
 ENDIF()
 
-SET(DNNL_BUILD_TESTS FALSE CACHE BOOL "build with mkl-dnn tests" FORCE)
-SET(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "build with mkl-dnn examples" FORCE)
+SET(DNNL_BUILD_TESTS FALSE CACHE BOOL "build with oneDNN tests" FORCE)
+SET(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "build with oneDNN examples" FORCE)
 SET(DNNL_ENABLE_CONCURRENT_EXEC TRUE CACHE BOOL "multi-thread primitive execution" FORCE)
 SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 ADD_SUBDIRECTORY(${ONEDNN_ROOT} EXCLUDE_FROM_ALL)
 IF(NOT TARGET dnnl)
-  MESSAGE("Failed to include MKL-DNN target")
+  MESSAGE("Failed to include oneDNN target")
   RETURN()
 ENDIF(NOT TARGET dnnl)
 IF(NOT APPLE AND CMAKE_COMPILER_IS_GNUCC)
@@ -73,6 +68,6 @@ LIST(APPEND ONEDNN_INCLUDE_DIR ${DNNL_INCLUDES})
 LIST(APPEND ONEDNN_LIBRARIES dnnl)
 
 SET(ONEDNN_FOUND TRUE)
-MESSAGE(STATUS "Found MKL-DNN: TRUE")
+MESSAGE(STATUS "Found oneDNN: TRUE")
 
 ENDIF(NOT ONEDNN_FOUND)
