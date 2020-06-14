@@ -24,7 +24,7 @@ using namespace mkldnn;
     auto wait = DPCPP_PROF_NOW();             \
     (stream).wait();                          \
     auto end = DPCPP_PROF_NOW();              \
-    DPCPP_PROF_KER_DUMP(start, wait, end);    \
+    DPCPP_PROF_KER_PRINT(start, wait, end);   \
   }
 #elif defined(USE_DPCPP)
 #define DPCPP_ONEDNN_EXEC(prim, stream, ...)                \
@@ -34,7 +34,7 @@ using namespace mkldnn;
     auto wait = DPCPP_PROF_NOW();                           \
     (stream).wait();                                        \
     auto end = DPCPP_PROF_NOW();                            \
-    DPCPP_PROF_KER_DUMP(start, wait, end);                  \
+    DPCPP_PROF_KER_PRINT(start, wait, end);                 \
     dpcpp_log("dpcpp_kernel", e);                           \
   }
 #else

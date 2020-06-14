@@ -9,5 +9,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(TORCH_IPEX_C_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/torch_ipex/csrc")
 
+include(CMakeDependentOption)
 option(DPCPP_ENABLE_PROFILING "Enable profiling for DPCPP" OFF)
+cmake_dependent_option(DPCPP_KER_PRINT "Print kernel time" OFF "DPCPP_ENABLE_PROFILING" OFF)
+
 include(cmake/GPU.cmake)

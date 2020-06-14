@@ -78,6 +78,10 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 if (DPCPP_ENABLE_PROFILING)
   message(WARNING, " DPCPP profiling is enabled! All kernels are running under SYNC execution mode!")
   add_definitions(-DDPCPP_PROFILING)
+  if (DPCPP_KER_PRINT)
+    message(WARNING, " Print out kernel submit and execution time! Host time will be increased due to screen print in each kernel!")
+    add_definitions(-DDPCPP_PROFILING_KER_PRINT)
+  endif()
 endif()
 
 # includes

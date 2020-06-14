@@ -31,15 +31,15 @@ namespace DPCPP = cl::sycl;
 #define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)   \
   { (q).submit((cgf), ##__VA_ARGS__); }
 #else
-#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)    \
-  {                                         \
-    auto start = DPCPP_PROF_NOW();          \
+#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)        \
+  {                                             \
+    auto start = DPCPP_PROF_NOW();              \
     auto e = (q).submit((cgf), ##__VA_ARGS__);  \
-    auto wait = DPCPP_PROF_NOW();           \
-    (q).wait_and_throw();                     \
-    auto end = DPCPP_PROF_NOW();            \
-    DPCPP_PROF_KER_DUMP(start, wait, end);  \
-    dpcpp_log("dpcpp_kernel", e);           \
+    auto wait = DPCPP_PROF_NOW();               \
+    (q).wait_and_throw();                       \
+    auto end = DPCPP_PROF_NOW();                \
+    DPCPP_PROF_KER_PRINT(start, wait, end);     \
+    dpcpp_log("dpcpp_kernel", e);               \
   }
 #define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)   \
   DPCPP_Q_SYNC_SUBMIT((q), (cgf), ##__VA_ARGS__)
