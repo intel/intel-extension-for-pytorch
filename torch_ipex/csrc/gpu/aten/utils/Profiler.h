@@ -4,8 +4,21 @@
 
 #include <CL/sycl.hpp>
 #include <sstream>
+#include <chrono>
+#include <iostream>
 
 using namespace torch::autograd::profiler;
+
+#define DPCPP_PROF_NOW() std::chrono::steady_clock::now()
+#define DPCPP_PROF_KER_DUMP(start, wait, end)                                                       \
+    auto __dpcpp_prof_total = std::chrono::duration_cast<std::chrono::microseconds>(end - start);   \
+    auto __dpcpp_prof_wait = std::chrono::duration_cast<std::chrono::microseconds>(wait - start);   \
+    auto __dpcpp_prof_kernel = std::chrono::duration_cast<std::chrono::microseconds>(end - wait);   \
+    std::cout<< "[ " << __FUNCTION__ << " ] in " << __FILE__ << std::endl                           \
+      << "Total time: " << __dpcpp_prof_total.count() << " us, "                                    \
+      << "Submit time: " << __dpcpp_prof_wait.count() << " us, "                                    \
+      << "Kernel time: " << __dpcpp_prof_kernel.count() << " us" << std::endl;
+
 
 struct DPCPPEventStubImpl : public DPCPPEventStubBase {
  public:

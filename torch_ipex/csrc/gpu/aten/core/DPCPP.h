@@ -6,7 +6,7 @@
 #if defined(USE_COMPUTECPP)
 #include <SYCL/event.h>
 #endif
-#include <chrono>
+
 
 // alias for dpcpp namespace
 namespace DPCPP = cl::sycl;
@@ -23,22 +23,26 @@ namespace DPCPP = cl::sycl;
 
 #define DPCPP_Q_KFN(...) [=](__VA_ARGS__)
 #define DPCPP_Q_CGF(h) [&](DPCPP::handler & h)
-#define DPCPP_Q_SUBMIT(q, cgf, ...) q.submit(cgf, ##__VA_ARGS__)
+#define DPCPP_Q_SUBMIT(q, cgf, ...) (q)).submit((cgf), ##__VA_ARGS__)
 
 #ifndef DPCPP_PROFILING
 #define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)    \
-  { q.submit(cgf, ##__VA_ARGS__).wait(); }
+  { (q).submit((cgf), ##__VA_ARGS__).wait(); }
 #define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)   \
-  { q.submit(cgf, ##__VA_ARGS__); }
+  { (q).submit((cgf), ##__VA_ARGS__); }
 #else
-#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)   \
-  {                                        \
-    auto e = q.submit(cgf, ##__VA_ARGS__); \
-    e.wait();                              \
-    dpcpp_log("dpcpp_kernel", e);          \
+#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)    \
+  {                                         \
+    auto start = DPCPP_PROF_NOW();          \
+    auto e = (q).submit((cgf), ##__VA_ARGS__);  \
+    auto wait = DPCPP_PROF_NOW();           \
+    (q).wait_and_throw();                     \
+    auto end = DPCPP_PROF_NOW();            \
+    DPCPP_PROF_KER_DUMP(start, wait, end);  \
+    dpcpp_log("dpcpp_kernel", e);           \
   }
-#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)  \
-  DPCPP_Q_SYNC_SUBMIT(q, cgf, ##__VA_ARGS__)
+#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)   \
+  DPCPP_Q_SYNC_SUBMIT((q), (cgf), ##__VA_ARGS__)
 #endif
 
 // the descriptor as entity attribute
@@ -58,7 +62,8 @@ namespace DPCPP = cl::sycl;
 #endif
 
 // dpcpp device info
-static constexpr auto dpcpp_dev_type = DPCPP::info::device::device_type;
+static constexpr auto dpcpp_dev_type =
+    DPCPP::info::device::device_type;
 static constexpr auto dpcpp_dev_max_units =
     DPCPP::info::device::max_compute_units;
 static constexpr auto dpcpp_dev_max_item_dims =
@@ -82,8 +87,7 @@ static constexpr auto dpcpp_w_mode = DPCPP::access::mode::write;
 static constexpr auto dpcpp_rw_mode = DPCPP::access::mode::read_write;
 static constexpr auto dpcpp_atomic_rw_mode = DPCPP::access::mode::atomic;
 static constexpr auto dpcpp_discard_w_mode = DPCPP::access::mode::discard_write;
-static constexpr auto dpcpp_discard_rw_mode =
-    DPCPP::access::mode::discard_read_write;
+static constexpr auto dpcpp_discard_rw_mode = DPCPP::access::mode::discard_read_write;
 
 // dpcpp access address space
 static constexpr auto dpcpp_priv_space =

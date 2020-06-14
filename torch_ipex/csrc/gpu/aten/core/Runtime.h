@@ -13,15 +13,33 @@
 using namespace mkldnn;
 
 #ifndef DPCPP_PROFILING
-#define DPCPP_ONEDNN_EXEC(prim, stream, ...)    \
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)  \
   { (prim).execute((stream), ##__VA_ARGS__); }
 #else
+#ifdef USE_COMPUTECPP
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)  \
+  {                                           \
+    auto start = DPCPP_PROF_NOW();            \
+    (prim).execute((stream), ##__VA_ARGS__);  \
+    auto wait = DPCPP_PROF_NOW();             \
+    (stream).wait();                          \
+    auto end = DPCPP_PROF_NOW();              \
+    DPCPP_PROF_KER_DUMP(start, wait, end);    \
+  }
+#elif defined(USE_DPCPP)
 #define DPCPP_ONEDNN_EXEC(prim, stream, ...)                \
   {                                                         \
+    auto start = DPCPP_PROF_NOW();                          \
     auto e = (prim).execute_sycl((stream), ##__VA_ARGS__);  \
-    e.wait();                                               \
+    auto wait = DPCPP_PROF_NOW();                           \
+    (stream).wait();                                        \
+    auto end = DPCPP_PROF_NOW();                            \
+    DPCPP_PROF_KER_DUMP(start, wait, end);                  \
     dpcpp_log("dpcpp_kernel", e);                           \
   }
+#else
+#error("Unsupported compiler!!!")
+#endif
 #endif
 
 namespace at {
