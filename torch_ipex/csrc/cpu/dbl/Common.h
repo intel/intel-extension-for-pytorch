@@ -25,7 +25,7 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dtype);
 /**
  * Reorder the input tensor to the expected descriptor.
  *
- * @param[in] tensor        The tensor to be reordered to the spcified scalar type
+ * @param[in] tensor        The tensor to be reordered to the spcified oneDNN descriptor
  * @param[in] expected_desc The dil buffer of the input tensor will be reordered to expected_desc
  */
 void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc);

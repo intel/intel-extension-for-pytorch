@@ -58,20 +58,34 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
 
-  // Reorder weight
-  auto kdims = weight.dim() - 2;
-  auto stride_vec = dbl::comm::expand_param_if_needed(stride, "stride", kdims);
-  auto padding_vec = dbl::comm::expand_param_if_needed(padding, "padding", kdims);
-  auto dilation_vec = dbl::comm::expand_param_if_needed(dilation, "dilation", kdims);
-  auto packed_desc = dil::convolution_forward::expected_weights_desc(
-    weight.sizes().vec(),
-    dil_input.get_data_type(),
-    stride_vec,
-    padding_vec,
-    padding_vec,
-    dilation_vec,
-    groups);
-  dbl::comm::reorder_to_desc(weight, packed_desc);
+  // Prepack weight tensor if it's either a *cpu tensor* or a *plain dil tensor*
+  //
+  // Note: weight tensor will not be re-packed unless user has implicitly
+  //       triggered `to_public` by accessing its data
+  //       One caveat is when the input size has changed and prepacked weight
+  //       might not be the best fit for new input size, the weight will not
+  //       be re-packed in such cases, but it still ensures the correctness
+  //
+  // TODO: once semantics of "own shade context" is equivalent to
+  //       "is dil tensor", we could remove the first check below
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+  if (!check_tensor_own_shade_context(weight) ||
+      !cpu::ShadeDataContext::isDilOwnTheTensor(weight) ||
+      cpu::ShadeDataContext::getDilTensor(weight).is_public_format()) {
+    auto packed_desc = dil::convolution_forward::expected_weights_desc(
+      weight.sizes().vec(),
+      dil_input.get_data_type(),
+      stride.vec(),
+      padding.vec(),
+      padding.vec(),
+      dilation.vec(),
+      groups,
+      dil::algorithm::convolution_direct,
+      dil::prop_kind::forward,
+      dil_input.get_data_type(),
+      input.sizes().vec());
+    dbl::comm::reorder_to_desc(weight, packed_desc);
+  }
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
   dil::tensor dil_output = dbl::conv::conv2d_impl(

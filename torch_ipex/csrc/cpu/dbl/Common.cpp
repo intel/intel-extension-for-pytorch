@@ -100,6 +100,8 @@ void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_tensor_buffer) {
   } else {
     if (dil_tensor_buffer.is_public_format()) {
       tensor_data = dil_tensor_buffer.get_data_handle();
+      new_shade_data_context->cpu_raw_data = tensor_data;
+      new_shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
       sync_shape_from_dil_to_aten(tensor, dil_tensor_buffer);
     }
   }
