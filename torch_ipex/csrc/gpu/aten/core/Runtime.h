@@ -6,40 +6,64 @@
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <utils/Profiler.h>
+#include <utils/Timer.h>
 
 #include <mkldnn.hpp>
 #include <vector>
 
 using namespace mkldnn;
 
-#ifndef DPCPP_PROFILING
-#define DPCPP_ONEDNN_EXEC(prim, stream, ...)  \
-  { (prim).execute((stream), ##__VA_ARGS__); }
-#else
+
 #ifdef USE_COMPUTECPP
-#define DPCPP_ONEDNN_EXEC(prim, stream, ...)  \
-  {                                           \
-    auto start = DPCPP_PROF_NOW();            \
-    (prim).execute((stream), ##__VA_ARGS__);  \
-    auto wait = DPCPP_PROF_NOW();             \
-    (stream).wait();                          \
-    auto end = DPCPP_PROF_NOW();              \
-    DPCPP_PROF_KER_PRINT(start, wait, end);   \
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                                   \
+  {                                                                            \
+    auto verbose = dpcpp_verbose();                                            \
+    auto force_sync = dpcpp_force_sync();                                      \
+    IPEX_TIMER(t, verbose, __func__);                                          \
+    if (force_sync) {                                                          \
+      (prim).execute((stream), ##__VA_ARGS__);                                 \
+      if (verbose)                                                             \
+        t.now("submit");                                                       \
+      (stream).wait();                                                         \
+      if (verbose)                                                             \
+        t.now("wait");                                                         \
+    } else {                                                                   \
+      (prim).execute((stream), ##__VA_ARGS__);                                 \
+      if (verbose)                                                             \
+        t.now("submit");                                                       \
+    }                                                                          \
   }
 #elif defined(USE_DPCPP)
-#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                \
-  {                                                         \
-    auto start = DPCPP_PROF_NOW();                          \
-    auto e = (prim).execute_sycl((stream), ##__VA_ARGS__);  \
-    auto wait = DPCPP_PROF_NOW();                           \
-    (stream).wait();                                        \
-    auto end = DPCPP_PROF_NOW();                            \
-    DPCPP_PROF_KER_PRINT(start, wait, end);                 \
-    dpcpp_log("dpcpp_kernel", e);                           \
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                                   \
+  {                                                                            \
+    DPCPP::event e;                                                            \
+    auto verbose = dpcpp_verbose();                                            \
+    auto force_sync = dpcpp_force_sync();                                      \
+    IPEX_TIMER(t, verbose, __func__);                                          \
+    if (force_sync) {                                                          \
+      if (verbose) {                                                           \
+        e = (prim).execute_sycl((stream), ##__VA_ARGS__);                      \
+        t.now("submit");                                                       \
+      } else {                                                                 \
+        (prim).execute((stream), ##__VA_ARGS__);                               \
+      }                                                                        \
+      (stream).wait();                                                         \
+      if (verbose)                                                             \
+        t.now("wait");                                                         \
+    } else {                                                                   \
+      if (verbose) {                                                           \
+        e = (prim).execute_sycl((stream), ##__VA_ARGS__);                      \
+        t.now("submit");                                                       \
+      } else {                                                                 \
+        (prim).execute((stream), ##__VA_ARGS__);                               \
+      }                                                                        \
+    }                                                                          \
+    if (verbose) {                                                             \
+      dpcpp_log("dpcpp_kernel", e);                                            \
+    }                                                                          \
   }
 #else
 #error("Unsupported compiler!!!")
-#endif
 #endif
 
 namespace at {

@@ -9,21 +9,6 @@
 
 using namespace torch::autograd::profiler;
 
-#ifdef DPCPP_PROFILING_KER_PRINT
-#define DPCPP_PROF_NOW() std::chrono::steady_clock::now()
-#define DPCPP_PROF_KER_PRINT(start, wait, end)                                                      \
-    auto __dpcpp_prof_total = std::chrono::duration_cast<std::chrono::microseconds>(end - start);   \
-    auto __dpcpp_prof_wait = std::chrono::duration_cast<std::chrono::microseconds>(wait - start);   \
-    auto __dpcpp_prof_kernel = std::chrono::duration_cast<std::chrono::microseconds>(end - wait);   \
-    std::cout<< "[ " << __FUNCTION__ << " ] in " << __FILE__ << std::endl                           \
-      << "Total time: " << __dpcpp_prof_total.count() << " us, "                                    \
-      << "Submit time: " << __dpcpp_prof_wait.count() << " us, "                                    \
-      << "Kernel time: " << __dpcpp_prof_kernel.count() << " us" << std::endl;
-#else
-#define DPCPP_PROF_NOW() 0
-#define DPCPP_PROF_KER_PRINT(start, wait, end)
-#endif
-
 struct DPCPPEventStubImpl : public DPCPPEventStubBase {
  public:
   DPCPPEventStubImpl() = delete;
@@ -45,3 +30,15 @@ struct DPCPPProvfilerStubsImpl : public DPCPPStubs {
 };
 
 void dpcpp_log(std::string name, cl::sycl::event& dpcpp_event);
+
+enum {ENV_VERBOSE = 0, ENV_FORCE_SYNC};
+
+int dpcpp_env(int env);
+
+inline int dpcpp_verbose() {
+  return dpcpp_env(ENV_VERBOSE);
+}
+
+inline int dpcpp_force_sync() {
+  return dpcpp_env(ENV_FORCE_SYNC);
+}

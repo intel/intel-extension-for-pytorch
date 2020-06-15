@@ -239,16 +239,6 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
     else:
       cmake_args += ['-DSHOULD_GEN=0']
 
-    if _check_env_flag("DPCPP_ENABLE_PROFILING"):
-      cmake_args += ['-DDPCPP_ENABLE_PROFILING=1']
-    else:
-      cmake_args += ['-DDPCPP_ENABLE_PROFILING=0']
-
-    if _check_env_flag("DPCPP_KER_PRINT"):
-      cmake_args += ['-DDPCPP_KER_PRINT=1']
-    else:
-      cmake_args += ['-DDPCPP_KER_PRINT=0']
-
     command = [self.cmake, ext.project_dir] + cmake_args
     print(' '.join(command))
 

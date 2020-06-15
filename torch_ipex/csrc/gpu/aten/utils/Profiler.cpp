@@ -26,7 +26,6 @@ float DPCPPEventStubImpl::elapsed() {
   return us;
 }
 
-#ifdef DPCPP_PROFILING
 void dpcpp_log(std::string name, cl::sycl::event& dpcpp_event) {
   auto stub = std::make_shared<DPCPPEventStubImpl>(dpcpp_event);
   mark_dpcpp(name, stub);
@@ -40,4 +39,36 @@ struct RegisterDPCPPMethods {
 };
 
 static RegisterDPCPPMethods reg;
-#endif
+
+int dpcpp_env(int env_type) {
+  static struct {
+    int level = [&]() -> int {
+      auto env = std::getenv("IPEX_VERBOSE");
+      int _level = 0;
+      if (env) {
+        _level = std::stoi(env, 0, 10);
+      }
+      std::cout << "IPEX-VERBOSE-LEVEL: " << _level << std::endl;
+      return _level;
+    } ();
+
+    int force_sync = [&]() -> int {
+      auto env = std::getenv("FORCE_SYNC");
+      int _force_sync = 0;
+      if (env) {
+        _force_sync = std::stoi(env, 0, 10);
+      }
+      std::cout << "Force SYNC: " << _force_sync << std::endl;
+      return _force_sync;
+    } ();
+  } env;
+
+  switch (env_type) {
+  case ENV_VERBOSE:
+    return env.level;
+  case ENV_FORCE_SYNC:
+    return env.force_sync;
+  default:
+    return 0;
+  }
+}
