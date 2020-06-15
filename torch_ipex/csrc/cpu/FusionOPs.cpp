@@ -37,10 +37,15 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
   auto input_contiguous = input.contiguous();
   auto weight_contiguous = weight.contiguous();
 
+  reorder_to_bf16_for_mix_prec(input_contiguous);
+  reorder_to_bf16_for_mix_prec(weight_contiguous);
+
   dil_input = try_gen_dil_tensor(input_contiguous);
   dil_weight = try_gen_dil_tensor(weight_contiguous);
   if (bias.defined()) {
     auto bias_contiguous = bias.contiguous();
+
+    reorder_to_bf16_for_mix_prec(bias_contiguous);
     dil_bias = try_gen_dil_tensor(bias_contiguous);
   }
 
@@ -76,11 +81,16 @@ static at::Tensor& dil_convolution_inplace_fusion(
   auto weight_contiguous = weight.contiguous();
   auto output_contiguous = accumu.contiguous();
 
+  reorder_to_bf16_for_mix_prec(input_contiguous);
+  reorder_to_bf16_for_mix_prec(weight_contiguous);
+  reorder_to_bf16_for_mix_prec(output_contiguous);
+
   dil_input = try_gen_dil_tensor(input_contiguous);
   dil_weight = try_gen_dil_tensor(weight_contiguous);
   dil_output = try_gen_dil_tensor(output_contiguous);
   if (bias.defined()) {
     auto bias_contiguous = bias.contiguous();
+    reorder_to_bf16_for_mix_prec(bias_contiguous);
     dil_bias = try_gen_dil_tensor(bias_contiguous);
   }
 
@@ -138,6 +148,9 @@ at::Tensor AtenIpexJITDev::dil_linear_fuse_relu(
   auto input_contiguous = self.contiguous();
   auto weight_contiguous = weight.contiguous();
 
+  reorder_to_bf16_for_mix_prec(input_contiguous);
+  reorder_to_bf16_for_mix_prec(weight_contiguous);
+
   // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
   auto self_reshaped = self.dim() > 2 ? self.reshape({-1, input_contiguous.size(self.dim() - 1)}) : self;
   const dil::tensor x = try_gen_dil_tensor(self_reshaped);
@@ -146,6 +159,7 @@ at::Tensor AtenIpexJITDev::dil_linear_fuse_relu(
   dil::tensor y;
   if (bias.defined()) {
     auto bias_contiguous = bias.contiguous();
+    reorder_to_bf16_for_mix_prec(bias_contiguous);
     const dil::tensor b = try_gen_dil_tensor(bias_contiguous);
     dil::inner_product_forward::compute(x, w, b, y,
                                         /*src_scales=*/dil::scale_t(),

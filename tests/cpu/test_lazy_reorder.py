@@ -239,6 +239,30 @@ class TestRelu(TestCase):
         y_dpcpp.backward()
         self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
+class TestGelu(TestCase):
+    def test_gelu(self):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x_cpu = torch.randn((4, 5), dtype=torch.float32) * 10
+        x_dpcpp = x_cpu.to(device=device)
+        self.assertEqual(F.gelu(x_cpu), F.gelu(x_dpcpp), 0.001)
+
+    def test_gelu_backward(self):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x = torch.randn((4, 5), dtype=torch.float32) * 10
+        x_cpu = x.clone().requires_grad_()
+        x_dpcpp = x.clone().to(device=device).requires_grad_()
+        y_cpu = F.gelu(x_cpu).sum()
+        y_dpcpp = F.gelu(x_dpcpp).sum()
+        y_cpu.backward()
+        y_dpcpp.backward()
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad, 0.001)
+
 class TestMixOp(TestCase):
     def _test_conv_add_relu_(self, device, rand_seed):
         torch.manual_seed(rand_seed)
@@ -751,6 +775,33 @@ class TestBatchNorm(TestCase):
         y_cpu.backward()
         y_dpcpp.backward()
         self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+
+class TestLayerNorm(TestCase):
+    def test_layer_norm(self):
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input = torch.randn(2, 5, 10, 10, dtype=torch.float32) 
+        input_dpcpp=input.to(device=device)
+        m = torch.nn.LayerNorm([10, 10])
+        self.assertEqual(m(input), m(input_dpcpp))
+
+    def test_layer_norm_backward(self): 
+        ipex.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input = torch.randn(2, 5, 10, 10, dtype=torch.float32) 
+        input_cpu = input.clone().requires_grad_() 
+        input_dpcpp=input.clone().to(device=device).requires_grad_() 
+        m = torch.nn.LayerNorm([10, 10])
+        m_dpcpp = copy.deepcopy(m).to(device=device)
+        y_cpu = m(input_cpu).sum()
+        y_cpu.backward() 
+        y_dpcpp = m_dpcpp(input_dpcpp).sum()
+        y_dpcpp.backward()
+        self.assertEqual(input_cpu.grad, input_dpcpp.grad)
 
 class TestTensorShape(TestCase):
     def test_reshape(self):

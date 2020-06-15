@@ -1,5 +1,5 @@
 diff --git a/aten/src/ATen/SparseTensorImpl.cpp b/aten/src/ATen/SparseTensorImpl.cpp
-index a7354047ca..3bf11a646f 100644
+index a735404..3bf11a6 100644
 --- a/aten/src/ATen/SparseTensorImpl.cpp
 +++ b/aten/src/ATen/SparseTensorImpl.cpp
 @@ -9,6 +9,8 @@ namespace {
@@ -12,7 +12,7 @@ index a7354047ca..3bf11a646f 100644
        return kCUDA;
      } else {
 diff --git a/aten/src/ATen/core/VariableFallbackKernel.cpp b/aten/src/ATen/core/VariableFallbackKernel.cpp
-index 11d03495c6..3cb40c8cb7 100644
+index 11d0349..3cb40c8 100644
 --- a/aten/src/ATen/core/VariableFallbackKernel.cpp
 +++ b/aten/src/ATen/core/VariableFallbackKernel.cpp
 @@ -32,9 +32,9 @@ void variable_fallback_kernel(const OperatorHandle& op, Stack* stack) {
@@ -30,7 +30,7 @@ index 11d03495c6..3cb40c8cb7 100644
  
  }
 diff --git a/aten/src/ATen/native/sparse/SparseTensor.cpp b/aten/src/ATen/native/sparse/SparseTensor.cpp
-index 8ce6045ddc..ba7f79e54e 100644
+index 8ce6045..ba7f79e 100644
 --- a/aten/src/ATen/native/sparse/SparseTensor.cpp
 +++ b/aten/src/ATen/native/sparse/SparseTensor.cpp
 @@ -76,6 +76,8 @@ SparseTensor new_sparse(const TensorOptions& options) {
@@ -43,7 +43,7 @@ index 8ce6045ddc..ba7f79e54e 100644
      dispatch_key = DispatchKey::SparseCPUTensorId;
    }
 diff --git a/c10/core/Backend.h b/c10/core/Backend.h
-index 5f3d8c7733..a47240b139 100644
+index 5f3d8c7..a47240b 100644
 --- a/c10/core/Backend.h
 +++ b/c10/core/Backend.h
 @@ -25,18 +25,22 @@ namespace c10 {
@@ -185,7 +185,7 @@ index 5f3d8c7733..a47240b139 100644
      case Backend::SparseCUDA:
      case Backend::SparseHIP:
 diff --git a/c10/core/Device.cpp b/c10/core/Device.cpp
-index 82a02fdf04..82680381ed 100644
+index 82a02fd..8268038 100644
 --- a/c10/core/Device.cpp
 +++ b/c10/core/Device.cpp
 @@ -13,7 +13,7 @@
@@ -215,7 +215,7 @@ index 82a02fdf04..82680381ed 100644
  } // namespace
  
 diff --git a/c10/core/Device.h b/c10/core/Device.h
-index f1249e865f..31f15e82d5 100644
+index f1249e8..31f15e8 100644
 --- a/c10/core/Device.h
 +++ b/c10/core/Device.h
 @@ -86,6 +86,11 @@ struct C10_API Device final {
@@ -231,7 +231,7 @@ index f1249e865f..31f15e82d5 100644
    std::string str() const;
  
 diff --git a/c10/core/DeviceType.cpp b/c10/core/DeviceType.cpp
-index 017267cd97..486b02e1ec 100644
+index 017267c..486b02e 100644
 --- a/c10/core/DeviceType.cpp
 +++ b/c10/core/DeviceType.cpp
 @@ -27,6 +27,8 @@ std::string DeviceTypeName(DeviceType d, bool lower_case) {
@@ -252,7 +252,7 @@ index 017267cd97..486b02e1ec 100644
      default:
        return false;
 diff --git a/c10/core/DeviceType.h b/c10/core/DeviceType.h
-index 9f759666d7..23f68080d4 100644
+index 9f75966..23f6808 100644
 --- a/c10/core/DeviceType.h
 +++ b/c10/core/DeviceType.h
 @@ -23,11 +23,12 @@ enum class DeviceType : int16_t {
@@ -278,7 +278,7 @@ index 9f759666d7..23f68080d4 100644
  // define explicit int constant
  constexpr int COMPILE_TIME_MAX_DEVICE_TYPES =
 diff --git a/c10/core/DispatchKey.cpp b/c10/core/DispatchKey.cpp
-index cf20e515c2..b093a648b0 100644
+index cf20e51..b093a64 100644
 --- a/c10/core/DispatchKey.cpp
 +++ b/c10/core/DispatchKey.cpp
 @@ -36,6 +36,10 @@ const char* toString(DispatchKey t) {
@@ -293,7 +293,7 @@ index cf20e515c2..b093a648b0 100644
        return "BackendSelect";
      case DispatchKey::TESTING_ONLY_GenericModeTensorId:
 diff --git a/c10/core/DispatchKey.h b/c10/core/DispatchKey.h
-index da7c3c564e..1330c2be6c 100644
+index da7c3c5..1330c2b 100644
 --- a/c10/core/DispatchKey.h
 +++ b/c10/core/DispatchKey.h
 @@ -90,6 +90,9 @@ enum class DispatchKey : uint8_t {
@@ -307,7 +307,7 @@ index da7c3c564e..1330c2be6c 100644
    // To see some example about how to use this, check out MSNPU
    PrivateUse1_TensorId,
 diff --git a/c10/core/Layout.h b/c10/core/Layout.h
-index c5ecc8908a..4aab4408f5 100644
+index c5ecc89..4aab440 100644
 --- a/c10/core/Layout.h
 +++ b/c10/core/Layout.h
 @@ -15,6 +15,7 @@ constexpr auto kMkldnn = Layout::Mkldnn;
@@ -319,7 +319,7 @@ index c5ecc8908a..4aab4408f5 100644
      case Backend::SparseHIP:
        return Layout::Sparse;
 diff --git a/c10/core/TensorImpl.h b/c10/core/TensorImpl.h
-index de11b22141..57513aeb89 100644
+index de11b22..57513ae 100644
 --- a/c10/core/TensorImpl.h
 +++ b/c10/core/TensorImpl.h
 @@ -425,7 +425,8 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
@@ -362,7 +362,7 @@ index de11b22141..57513aeb89 100644
      return (key_set_ == from) || (is_dense(key_set_) && is_dense(from)) || (is_sparse(key_set_) && is_sparse(from));
    }
 diff --git a/c10/core/TensorOptions.h b/c10/core/TensorOptions.h
-index 9a4c9b3eb9..6d0240564a 100644
+index 9a4c9b3..6d02405 100644
 --- a/c10/core/TensorOptions.h
 +++ b/c10/core/TensorOptions.h
 @@ -398,6 +398,8 @@ struct C10_API TensorOptions {
@@ -394,8 +394,251 @@ index 9a4c9b3eb9..6d0240564a 100644
    } else if (tid == DispatchKey::SparseCPUTensorId) {
      return DeviceType::CPU;
    } else if (tid == DispatchKey::SparseCUDATensorId) {
+diff --git a/torch/csrc/jit/passes/quantization.cpp b/torch/csrc/jit/passes/quantization.cpp
+index a6a9fca462..d42a05fd4a 100644
+--- a/torch/csrc/jit/passes/quantization.cpp
++++ b/torch/csrc/jit/passes/quantization.cpp
+@@ -1718,7 +1718,7 @@ class FoldConvBatchNorm2dHelper {
+    * and record informations for the modifications of the graph without
+    * actually performing these modifications.
+    */
+-  void analyze(Module& module);
++  void analyze(Module& module, const PatternInfo& pattern);
+   /**
+    * In this step we perform all the modifications including
+    * setting the attributes for conv module, rewriting values
+@@ -1753,27 +1753,91 @@ class FoldConvBatchNorm2dHelper {
+ std::tuple<at::Tensor, at::Tensor> FoldConvBatchNorm2dHelper::
+     computeUpdatedConvWeightAndBias(const ConvBNParameters& p) {
+   at::Tensor bn_var_rsqrt = at::rsqrt(p.bn_rv + p.bn_eps);
+-  at::Tensor new_w = p.conv_w * (p.bn_w * bn_var_rsqrt).reshape({-1, 1, 1, 1});
++  const int64_t ndim = p.conv_w.dim();
++  c10::SmallVector<int64_t, 5> sizes(ndim, 1);
++  sizes.at(0) = -1;
++  at::Tensor new_w = p.conv_w * (p.bn_w * bn_var_rsqrt).reshape(sizes);
+   at::Tensor new_b = (p.conv_b - p.bn_rm) * bn_var_rsqrt * p.bn_w + p.bn_b;
+   return std::make_tuple(new_w, new_b);
+ }
+ 
++bool extractOptionalBNParams(
++    const script::Module& bn,
++    ConvBNParameters& r) {
++  auto bn_forward = bn.get_method("forward");
++  auto graph = bn_forward.graph();
++  const PatternInfo& pattern_bn = PatternInfo::parse_from_str(R"(
++      graph(%a, %weight, %bias, %running_mean, %running_var,
++          %training, %momentum, %eps, %cudnn_enabled):
++        %bn_out = aten::batch_norm(%a, %weight, %bias, %running_mean,
++            %running_var, %training, %momentum, %eps, %cudnn_enabled)
++        return (%bn_out) )");
++  const Graph& pattern_bn_graph = *pattern_bn.pattern_graph;
++  const auto& bn_vmap = pattern_bn.vmap;
++
++  const auto& matches = findPatternMatches(pattern_bn_graph, *graph);
++
++  if (matches.size() > 1) {
++    return false;
++  }
++
++  if (bn.hasattr("eps")) {
++    r.bn_eps = bn.attr("eps").toDouble();
++  } else {
++    auto optional_eps = toIValue(matches[0].values_map.at(bn_vmap.at("eps")));
++    if(!optional_eps) {
++      return false;
++    }
++    r.bn_eps = optional_eps.value().toDouble();
++  }
++  r.bn_w = at::ones_like(bn.attr("running_mean").toTensor());
++  if (bn.hasattr("weight")) {
++    if (bn.attr("weight").isTensor()) {
++      r.bn_w = bn.attr("weight").toTensor();
++    }
++  } else {
++    auto optional_bn_weight =
++      toIValue(matches[0].values_map.at(bn_vmap.at("weight")));
++    if (!optional_bn_weight) {
++      return false;
++    }
++    if (optional_bn_weight.value().isTensor()) {
++      r.bn_w = optional_bn_weight.value().toTensor();
++    }
++  }
++  r.bn_b = at::zeros_like(bn.attr("running_mean").toTensor());
++  if (bn.hasattr("bias")) {
++    if (bn.attr("bias").isTensor()) {
++      r.bn_b = bn.attr("bias").toTensor();
++    }
++  } else {
++    auto optional_bn_bias =
++      toIValue(matches[0].values_map.at(bn_vmap.at("bias")));
++    if (!optional_bn_bias) {
++      return false;
++    }
++
++    if (optional_bn_bias.value().isTensor()) {
++      r.bn_b = optional_bn_bias.value().toTensor();
++    }
++  }
++  return true;
++}
++
+ bool FoldConvBatchNorm2dHelper::tryExtractingConvBNParameters(
+     Module& conv,
+     Module& bn,
+     ConvBNParameters& r) {
+   if (!hastensor(conv, "weight") || !conv.hasattr("bias") ||
+-      !hastensor(bn, "weight") || !hastensor(bn, "bias") ||
+-      !hastensor(bn, "running_mean") || !hastensor(bn, "running_var") ||
+-      !bn.hasattr("eps")) {
++      !hastensor(bn, "running_mean") || !hastensor(bn, "running_var")) {
+     return false;
+   }
+ 
+   r.bn_rm = bn.attr("running_mean").toTensor();
+   r.bn_rv = bn.attr("running_var").toTensor();
+-  r.bn_eps = bn.attr("eps").toDouble();
+-  r.bn_w = bn.attr("weight").toTensor();
+-  r.bn_b = bn.attr("bias").toTensor();
++  if (!extractOptionalBNParams(bn, r)) {
++    return false;
++  }
+ 
+   r.conv_w = conv.attr("weight").toTensor();
+   r.conv_b = at::zeros_like(r.bn_rm);
+@@ -1785,15 +1849,8 @@ bool FoldConvBatchNorm2dHelper::tryExtractingConvBNParameters(
+   return true;
+ }
+ 
+-void FoldConvBatchNorm2dHelper::analyze(Module& module) {
+-  const PatternInfo pattern = PatternInfo::parse_from_str(R"IR(
+-graph(%self, %x):
+-    %conv_submodule = match::module[name="Conv2d"](%self)
+-    %conv_out = prim::CallMethod[name="forward"](%conv_submodule, %x)
+-    %bn_submodule = match::module[name="BatchNorm2d"](%self)
+-    %bn_out = prim::CallMethod[name="forward"](%bn_submodule, %conv_out)
+-    return (%bn_out))IR");
+ 
++void FoldConvBatchNorm2dHelper::analyze(Module& module, const PatternInfo& pattern) {
+   const Graph& pattern_graph = *pattern.pattern_graph;
+   const auto& vmap = pattern.vmap;
+   Value* pattern_conv_out = vmap.at("conv_out");
+@@ -1921,6 +1978,78 @@ void FoldConvBatchNorm2dHelper::transform() {
+   }
+ }
+ 
++
++void replaceConv2dBiasWithGetAttr(Module& module) {
++  auto graph = module.get_method("forward").graph();
++  // Only looks fors _convolution pattern.
++  // Thus assumes that tracing will have always gotten rid of aten::conv2d.
++  // If it did not, BN folding will fail.
++  const PatternInfo& pattern_convolution = PatternInfo::parse_from_str(R"(
++      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
++          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
++          %deterministic:bool, %cudnn_enabled:bool):
++        %conv_out = aten::_convolution(%a, %w, %b, %stride, %padding, %dilation,
++            %transposed, %output_padding, %groups, %benchmark, %deterministic, %cudnn_enabled)
++        return (%conv_out) )");
++  const Graph& pattern_convolution_graph = *pattern_convolution.pattern_graph;
++  const auto& convolution_vmap = pattern_convolution.vmap;
++
++  const auto& matches = findPatternMatches(pattern_convolution_graph, *graph);
++  for (const auto& match : matches) {
++    // We come here only if the bias was not present in the module.
++    // In that case, the corresponding graph will not have getAttr("bias")
++    // Insert that in the graph.
++    // And change _convolution to take the new value.
++    auto conv_node = match.values_map.at(convolution_vmap.at("conv_out"))->node();
++    WithInsertPoint ins(conv_node);
++    Value* bias_attr_val =
++      graph->insertGetAttr(graph->inputs()[0], "bias")
++          ->setType(TensorType::get());
++    constexpr size_t conv_bias_index = 2;
++    conv_node->replaceInput(conv_bias_index, bias_attr_val);
++  }
++}
++
++void addBiasForConv2dIfNone(Module& module) {
++  auto t = module.type()->expect<ClassType>();
++  auto real_typename = t->name()->qualifiedName();
++  const std::string pattern_name("Conv2d");
++  if (real_typename.size() >= pattern_name.size() &&
++      (0 == real_typename.compare(real_typename.size() - pattern_name.size(),
++                                  pattern_name.size(), pattern_name))) {
++    if (!t->hasAttribute("bias")) {
++      auto optional_tensor_type = OptionalType::create(TensorType::get());
++      t->addAttribute("bias", optional_tensor_type, true);
++      auto optional_tensor = c10::optional<at::Tensor>();
++      module.setattr("bias", optional_tensor);
++      replaceConv2dBiasWithGetAttr(module);
++    }
++  }
++  for (Module m : module.children()) {
++    addBiasForConv2dIfNone(m);
++  }
++}
++
++void addBiasForConv3dIfNone(Module& module) {
++  auto t = module.type()->expect<ClassType>();
++  auto real_typename = t->name()->qualifiedName();
++  const std::string pattern_name("Conv3d");
++  if (real_typename.size() >= pattern_name.size() &&
++      (0 == real_typename.compare(real_typename.size() - pattern_name.size(),
++                                  pattern_name.size(), pattern_name))) {
++    if (!t->hasAttribute("bias")) {
++      auto optional_tensor_type = OptionalType::create(TensorType::get());
++      t->addAttribute("bias", optional_tensor_type, true);
++      auto optional_tensor = c10::optional<at::Tensor>();
++      module.setattr("bias", optional_tensor);
++      replaceConv2dBiasWithGetAttr(module);
++    }
++  }
++  for (Module m : module.children()) {
++    addBiasForConv3dIfNone(m);
++  }
++}
++
+ } // namespace
+ 
+ TORCH_API Module InsertObservers(
+@@ -2081,10 +2210,31 @@ void QuantFusion(std::shared_ptr<Graph>& graph) {
+ }
+ 
+ Module FoldConvBatchNorm2d(const Module& module) {
+-  FoldConvBatchNorm2dHelper h;
++  FoldConvBatchNorm2dHelper h1, h2;
+   Module m = module.clone();
+-  h.analyze(m);
+-  h.transform();
++  addBiasForConv2dIfNone(m);
++  addBiasForConv3dIfNone(m);
++
++  const PatternInfo& pattern2d = PatternInfo::parse_from_str(R"IR(
++graph(%self, %x):
++    %conv_submodule = match::module[name=".Conv2d"](%self)
++    %conv_out = prim::CallMethod[name="forward"](%conv_submodule, %x)
++    %bn_submodule = match::module[name=".BatchNorm2d"](%self)
++    %bn_out = prim::CallMethod[name="forward"](%bn_submodule, %conv_out)
++    return (%bn_out))IR");
++
++  const PatternInfo& pattern3d = PatternInfo::parse_from_str(R"IR(
++graph(%self, %x):
++    %conv_submodule = match::module[name=".Conv3d"](%self)
++    %conv_out = prim::CallMethod[name="forward"](%conv_submodule, %x)
++    %bn_submodule = match::module[name=".BatchNorm3d"](%self)
++    %bn_out = prim::CallMethod[name="forward"](%bn_submodule, %conv_out)
++    return (%bn_out))IR");
++
++  h1.analyze(m, pattern2d);
++  h1.transform();
++  h2.analyze(m, pattern3d);
++  h2.transform();
+   return m;
+ }
+ 
 diff --git a/torch/csrc/utils/tensor_layouts.cpp b/torch/csrc/utils/tensor_layouts.cpp
-index 6fcd84f3db..e42a7baf27 100644
+index 6fcd84f..e42a7ba 100644
 --- a/torch/csrc/utils/tensor_layouts.cpp
 +++ b/torch/csrc/utils/tensor_layouts.cpp
 @@ -23,6 +23,7 @@ void initializeLayouts() {
@@ -407,7 +650,7 @@ index 6fcd84f3db..e42a7baf27 100644
  
    PyObject *sparse_coo_layout = THPLayout_New(at::Layout::Sparse, "torch.sparse_coo");
 diff --git a/torch/csrc/utils/tensor_new.cpp b/torch/csrc/utils/tensor_new.cpp
-index 85add73c57..ea90778e4b 100644
+index 85add73..ea90778 100644
 --- a/torch/csrc/utils/tensor_new.cpp
 +++ b/torch/csrc/utils/tensor_new.cpp
 @@ -59,6 +59,8 @@ Backend backendToBackendOfDeviceType(Backend b, DeviceType d) {
@@ -435,3 +678,16 @@ index 85add73c57..ea90778e4b 100644
                  || dispatch_key == c10::DispatchKey::SparseCUDATensorId
                  || dispatch_key == c10::DispatchKey::SparseHIPTensorId,
                  "new(): expected DispatchKey: ", c10::DispatchKey::SparseCPUTensorId,
+diff --git a/torch/csrc/utils/tensor_types.cpp b/torch/csrc/utils/tensor_types.cpp
+index e6b851a..3fa1a88 100644
+--- a/torch/csrc/utils/tensor_types.cpp
++++ b/torch/csrc/utils/tensor_types.cpp
+@@ -21,6 +21,8 @@ static const char* backend_to_string(const at::Backend& backend) {
+     case at::Backend::CUDA: return "torch.cuda";
+     case at::Backend::SparseCPU: return "torch.sparse";
+     case at::Backend::SparseCUDA: return "torch.cuda.sparse";
++    case at::Backend::DPCPP: return "torch.dpcpp";
++    case at::Backend::SparseDPCPP: return "torch.dpcpp.sparse";
+     default: AT_ERROR("Unimplemented backend ", backend);
+   }
+ }

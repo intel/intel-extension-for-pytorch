@@ -466,7 +466,7 @@ at::Tensor AtenIpexTypeExt::linear_fuse_relu(const at::Tensor& input, const at::
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::linear_backward(const at::Tensor& input, const at::Tensor& grad_output, const at::Tensor& weight, std::array<bool,3> output_mask) {
     RECORD_FUNCTION("linear_backward", std::vector<c10::IValue>({input, grad_output, weight}), torch::autograd::Node::peek_at_next_sequence_nr());
-    return cpu::AtenIpexCPUDev::dil_linear_backward(input, grad_output, weight, output_mask);
+    return cpu::AtenIpexCPUDev::dil_linear_backward(input.is_contiguous() ? input : input.contiguous(), grad_output, weight, output_mask);
 }
 
 at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d(at::Tensor const& input, at::IntArrayRef output_size) {

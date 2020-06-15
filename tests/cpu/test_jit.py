@@ -80,43 +80,28 @@ device = 'dpcpp:0'
 #device = 'cpu:0'
 SIZE = 100
 
-torch._C._jit_set_profiling_mode(False)
-torch._C._jit_set_profiling_executor(False)
 
-def test_output(model, x):
-    modelName = model.__class__.__name__
-    core.disable_jit()
+class Conv2dBatchNorm2d_Fixed(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dBatchNorm2d_Fixed, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
+        self.bn = nn.BatchNorm2d(out_channels, eps=0.001)
 
-    model = model.to('dpcpp').eval()
-    x = x.to('dpcpp')
-    with torch.no_grad():
-        result = model(x)
+    def forward(self, x):
+        return self.bn(self.conv(x))
 
-    smodel = torch.jit.script(model)
-    smodel.eval()
-    with torch.no_grad():
-        sresult = smodel(x)
+class Conv3dBatchNorm3d_Fixed(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv3dBatchNorm3d_Fixed, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = nn.Conv3d(in_channels, out_channels, bias=False, **kwargs)
+        self.bn = nn.BatchNorm3d(out_channels, eps=0.001)
 
-    print(f'\nAre {modelName} and Scripted{modelName} outputs the same: ',
-          torch.allclose(
-              sresult, result, rtol=1e-05, atol=1e-06, equal_nan=False))
-
-    core.enable_jit()
-    pmodel = torch.jit.script(model)
-    # bn folding
-    pmodel = wrap_cpp_module(torch._C._jit_pass_fold_convbn(pmodel._c))
-    with torch.no_grad():
-        # conv relu fusion, conv sum fusion or conv sum relu fusion
-        print(pmodel.graph_for(x))
-        presult = pmodel(x)
-
-    # print(result)
-    # print(sresult)
-    # print(presult)
-
-    print(f'\nWith or without pyrys, are Scripted{modelName} outputs the same: ',
-          torch.allclose(
-                sresult, presult, rtol=1e-05, atol=1e-06, equal_nan=False))
+    def forward(self, x):
+        return self.bn(self.conv(x))
 
 class Conv2dRelu_Fixed(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -127,6 +112,19 @@ class Conv2dRelu_Fixed(nn.Module):
 
     def forward(self, x):
         return F.relu(self.conv(x), inplace=True)
+
+class Conv2dSum(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(Conv2dSum, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
+        self.conv1 = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
+
+    def forward(self, x):
+        a = self.conv(x)
+        b = self.conv1(x)
+        return a+b
 
 class CascadedConv2dBnSumRelu(nn.Module):
     def __init__(self, in_channels, mid_channels, out_channels, **kwargs):
@@ -161,29 +159,144 @@ class LinearRelu(nn.Module):
         return F.relu(self.linear(x), inplace=True)
 
 class Tester(TestCase):
-    n = 32
-    c = 3
-    h = 224
-    w = 224
-    print('input size: (%d, %d, %d, %d)' % (n, c, h, w))
+
+    def _test_output(self, model, x, kind):
+        modelName = model.__class__.__name__
+        core.disable_jit()
+        core.disable_mix_bf16_fp32()
+
+        model = model.to('dpcpp').eval()
+        x = x.to('dpcpp')
+        with torch.no_grad():
+            result = model(x)
+
+        script_model = torch.jit.script(model)
+        script_model.eval()
+        with torch.no_grad():
+            sresult = script_model(x)
+
+        self.assertEqual(result, sresult)
+
+        core.enable_jit()
+        fused_model = torch.jit.script(model)
+        with torch.no_grad():
+            # conv relu fusion, conv sum fusion or conv sum relu fusion
+            graph =  fused_model.graph_for(x)
+            print(graph)
+            fresult = fused_model(x)
+
+        # print(result)
+        # print(sresult)
+        # print(fresult)
+
+        self.assertEqual(result, fresult)
+
+        # check if the fused node exists in the graph
+        self.assertTrue(any(n.kind() == kind for n in graph.nodes()))
+
+    def _test_output_bf16(self, model, x):
+        modelName = model.__class__.__name__
+
+        core.enable_auto_dnnl()
+        core.enable_jit()
+        core.disable_mix_bf16_fp32()
+
+        model = model.to('dpcpp').eval()
+        x = x.to('dpcpp')
+        x2 = x.clone()
+
+        fused_model = torch.jit.script(copy.deepcopy(model))
+
+        # bn folding, removing it after solve some issue, using mix_preci? to check
+        core.disable_auto_dnnl()
+        fused_model = wrap_cpp_module(torch._C._jit_pass_fold_convbn(fused_model._c))
+        core.enable_auto_dnnl()
+
+        core.enable_mix_bf16_fp32()
+        # prepack convolution weight, weight will be a bf16 tensor
+        fused_model = wrap_cpp_module(core._jit_prepack_conv_weight(fused_model._c))
+        with torch.no_grad():
+            # bf16, native path
+            result = model(x)
+            # bf16, jit path
+            fresult = fused_model(x2)
+
+        #print(result)
+        #print(fresult)
+
+        self.assertEqual(fresult, result)
+
+    def test_output_conv_bn_2d(self):
+        self._test_output(
+            Conv2dBatchNorm2d_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224),
+            "aten::conv2d")
+
+        '''
+        self._test_output_bf16(
+            Conv2dBatchNorm2d_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224))
+        '''
+
+    def test_output_conv_bn_3d(self):
+        self._test_output(
+            Conv3dBatchNorm3d_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 112, 112, 112),
+            "aten::conv3d")
+
+        '''
+        self._test_output_bf16(
+            Conv3dBatchNorm3d_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 112, 112, 112))
+        '''
 
     def test_output_conv_relu(self):
-        test_output(
-            Conv2dRelu_Fixed(self.c, 32, kernel_size=3, stride=1),
-            torch.rand(self.n, self.c, self.h, self.w))
+        self._test_output(
+            Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224),
+            "ipex::conv2d_relu")
+        self._test_output_bf16(
+            Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224))
+
+    def test_output_conv_sum(self):
+        self._test_output(
+            Conv2dSum(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224),
+            "ipex::conv2d_sum")
+
+        self._test_output_bf16(
+            Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224))
 
     def test_output_cascaded_conv2d_bn_sum_relu(self):
-        test_output(
-            CascadedConv2dBnSumRelu(self.c, 64, 32, kernel_size=3, stride=1),
-            torch.rand(self.n, self.c, self.h, self.w))
+        self._test_output(
+            CascadedConv2dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
+            torch.rand(32, 3, 224, 224),
+            "ipex::conv2d_sum_relu")
+
+        '''
+        self._test_output_bf16(
+            CascadedConv2dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
+            torch.rand(32, 3, 224, 224))
+        '''
 
     def test_output_linear_relu(self):
-        test_output(
-            LinearRelu(self.c, 32, bias=True),
-            torch.rand(self.n, self.c))
-        test_output(
-            LinearRelu(self.c, 32, bias=False),
-            torch.rand(self.n, self.c))
+        self._test_output(
+            LinearRelu(3, 32, bias=True),
+            torch.rand(32, 3),
+            "ipex::linear_relu")
+        self._test_output_bf16(
+            LinearRelu(3, 32, bias=True),
+            torch.rand(32, 3))
+        self._test_output(
+            LinearRelu(3, 32, bias=False),
+            torch.rand(32, 3),
+            "ipex::linear_relu")
+        self._test_output_bf16(
+            LinearRelu(3, 32, bias=False),
+            torch.rand(32, 3))
+
 
 if __name__ == '__main__':
     core.enable_auto_dnnl()

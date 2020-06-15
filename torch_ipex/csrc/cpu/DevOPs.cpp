@@ -1370,11 +1370,6 @@ at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::
   CHECK_DNNL_OP_PRE_COND(self);
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
-
-  TORCH_CHECK(
-      !optional_memory_format.has_value(),
-      "unsupported memory format option ",
-      optional_memory_format.value());
   dil::tensor src = dbl::comm::try_gen_dil_tensor(self);
   dil::tensor dst;
   dil::direct_copy::compute(src, dst);
@@ -1491,6 +1486,105 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split(const at::Tensor& self, int64_
   int64_t last_split_size = split_size - (split_size * num_splits - dim_size);
   split_sizes[num_splits-1] = last_split_size;
   return dil_split_with_sizes(self, split_sizes, dim);
+}
+
+at::Tensor AtenIpexCPUDev::dil_gelu(const at::Tensor& input) {
+  DEBUG("AtenIpexCPUDev::dil_gelu\n");
+  CHECK_DNNL_OP_PRE_COND(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
+  dil::tensor y;
+  dil::eltwise_forward::compute(
+      x, y, dil::algorithm::eltwise_gelu_tanh, dil::prop_kind::forward_training, /*alpha*/ 0.0);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
+}
+
+at::Tensor AtenIpexCPUDev::dil_gelu_backward(const at::Tensor& grad_output, const at::Tensor& input) {
+  DEBUG("AtenIpexCPUDev::dil_gelu_backward\n");
+  CHECK_DNNL_OP_PRE_COND(grad_output);
+  CHECK_DNNL_OP_PRE_COND(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
+  dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output);
+  dil::tensor gradx;
+  dil::eltwise_backward::compute(x, grady, gradx,
+      dil::algorithm::eltwise_gelu_tanh, /*alpha*/ 0.0);
+  return dbl::comm::gen_aten_tensor_by(std::move(gradx));
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_norm(
+    const at::Tensor& X,
+    const at::Tensor& gamma /* optional */,
+    const at::Tensor& beta /* optional */,
+    int64_t M,
+    int64_t N,
+    double eps) {
+  DEBUG("AtenIpexCPUDev::dil_native_layer_norm\n");
+  CHECK_DNNL_OP_PRE_COND(X);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(X);
+  const dil::tensor scale = dbl::comm::try_gen_dil_tensor(gamma);
+  const dil::tensor shift = dbl::comm::try_gen_dil_tensor(beta);
+  int64_t i = 0;
+  auto j = X.size(0);
+  std::vector<int64_t> input_size;
+  while(j <= M) {
+    input_size.push_back(X.size(i++));
+    j *= X.size(i);
+  }
+  input_size.push_back(N);
+  auto src = x.reshape(input_size);
+  dil::tensor y, mean, variance;
+  dil::layer_normalization_forward::compute(
+        src,
+        scale,
+        shift,
+        y,
+        mean,
+        variance,
+        eps);
+  return std::make_tuple(
+        dbl::comm::gen_aten_tensor_by(std::move(y)).reshape(X.sizes()),
+        dbl::comm::gen_aten_tensor_by(std::move(mean)),
+        dbl::comm::gen_aten_tensor_by(std::move(variance)));
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_norm_backward(
+    const at::Tensor& dY,
+    const at::Tensor& X,
+    const at::Tensor& mean,
+    const at::Tensor& rstd,
+    const at::Tensor& gamma,
+    int64_t M,
+    int64_t N,
+    std::array<bool, 3> grad_input_mask) {
+  DEBUG("AtenIpexCPUDev::dil_native_layer_norm_backward\n");
+  CHECK_DNNL_OP_PRE_COND(dY);
+  CHECK_DNNL_OP_PRE_COND(X);
+  dil::tensor dy = dbl::comm::try_gen_dil_tensor(dY);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(X);
+  dil::tensor m = dbl::comm::try_gen_dil_tensor(mean);
+  dil::tensor r = dbl::comm::try_gen_dil_tensor(rstd);
+  dil::tensor g = dbl::comm::try_gen_dil_tensor(gamma);
+  int64_t i = 0;
+  auto j = X.size(0);
+  std::vector<int64_t> input_size;
+  while(j <= M) {
+    input_size.push_back(X.size(i++));
+    j *= X.size(i);
+  }
+  input_size.push_back(N);
+  auto src = x.reshape(input_size);
+  auto grady = dy.reshape(input_size);
+  dil::tensor gradx, gradg, gradb;
+  float eps = 1e-5;
+  dil::layer_normalization_backward::compute(
+        src, m, r, grady, g, gradx, gradg, gradb, eps);
+
+  return std::make_tuple(
+      dbl::comm::gen_aten_tensor_by(std::move(gradx)).reshape(X.sizes()),
+      dbl::comm::gen_aten_tensor_by(std::move(gradg)),
+      dbl::comm::gen_aten_tensor_by(std::move(gradb)));
 }
 
 }  // namespace cpu
