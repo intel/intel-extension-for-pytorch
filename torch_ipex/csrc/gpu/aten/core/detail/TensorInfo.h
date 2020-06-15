@@ -7,7 +7,9 @@ namespace at {
 namespace dpcpp {
 namespace detail {
 
-#define MAX_TENSORINFO_DIMS 12
+// TODO: To restore this value to 12 after USM is enabled.
+// Setting to 5 is to work-around dpcpp kernel argument limitation (1024B).
+#define MAX_TENSORINFO_DIMS 5
 #define MAX_DPCPPTORCH_DIMS MAX_TENSORINFO_DIMS
 
 #define DPCPPTORCH_STR(X) #X
