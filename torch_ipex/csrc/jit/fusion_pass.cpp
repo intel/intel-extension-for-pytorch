@@ -277,13 +277,22 @@ public:
 OpFuser::RuleTab OpFuser::dnnlRules = {
   {{aten::conv2d, aten::relu}, ipex::conv2d_relu},
   {{aten::conv2d, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_relu},
+  {{aten::conv2d, aten::add}, ipex::conv2d_sum},
+  {{aten::conv2d, aten::add_}, ipex::conv2d_sum},
   {{ipex::conv2d_sum, aten::relu}, ipex::conv2d_sum_relu},
   {{ipex::conv2d_sum, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_sum_relu},
 
-  {{aten::conv2d, aten::add}, ipex::conv2d_sum},
-  {{aten::conv2d, aten::add_}, ipex::conv2d_sum},
   {{Symbol::fromQualString("torch_ipex::linear"), aten::relu}, ipex::linear_relu},
   {{Symbol::fromQualString("torch_ipex::linear"), Symbol::fromQualString("aten::relu_")}, ipex::linear_relu},
+
+  // 3d ops
+  {{aten::conv3d, aten::relu}, ipex::conv3d_relu},
+  {{aten::conv3d, Symbol::fromQualString("aten::relu_")}, ipex::conv3d_relu},
+  {{aten::conv3d, aten::add}, ipex::conv3d_sum},
+  {{aten::conv3d, aten::add_}, ipex::conv3d_sum},
+  {{ipex::conv3d_sum, aten::relu}, ipex::conv3d_sum_relu},
+  {{ipex::conv3d_sum, Symbol::fromQualString("aten::relu_")}, ipex::conv3d_sum_relu},
+
   //{{dnnl::conv2d_relu, aten::add}, dnnl::conv2d_relu_sum}
 };
 
