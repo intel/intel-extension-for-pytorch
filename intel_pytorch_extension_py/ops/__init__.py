@@ -6,3 +6,4 @@ from .reshape import *
 from .mlp import * 
 from .linear_fuse_relu import *
 from .module import *
+from .jit_script import *
