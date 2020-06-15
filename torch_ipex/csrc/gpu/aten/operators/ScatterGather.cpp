@@ -484,6 +484,7 @@ Tensor& gather_out(
     int64_t dim,
     const Tensor& index,
     bool sparse_grad) {
+  out.resize_(index.sizes());
   AT_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Bool, self.scalar_type(), "Gather", [&]() {
         impl::Gather<scalar_t>(out, self, dim, index);
@@ -497,7 +498,6 @@ Tensor gather(
     const Tensor& index,
     bool sparse_grad) {
   Tensor out = at::empty({0}, self.options());
-  out.resize_(index.sizes());
   return at::AtenIpexTypeDPCPP::gather_out(out, self, dim, index, sparse_grad);
 }
 
