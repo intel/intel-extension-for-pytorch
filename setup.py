@@ -254,7 +254,7 @@ setup(
       'intel_pytorch_extension',
       'intel_pytorch_extension.optim',
       'intel_pytorch_extension.ops'],
-    package_dir={'torch_ipex': 'torch_ipex_py', 'intel_pytorch_extension': 'intel_pytorch_extension_py'},
+    package_dir={'intel_pytorch_extension': 'intel_pytorch_extension_py'},
     zip_safe=False,
     ext_modules=[DPCPPExt('_torch_ipex')],
     cmdclass={

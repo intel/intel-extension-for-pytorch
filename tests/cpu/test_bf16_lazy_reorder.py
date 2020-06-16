@@ -32,7 +32,7 @@ from common_ipex_conf import AutoMixPrecision, AutoDNNL
 def get_rand_seed():
     return int(time.time() * 1000000000)
 
-device = torch.device("dpcpp:0")
+device = ipex.DEVICE
 class TestConv(TestCase):
     def test_Conv2d_with_cpu(self):
         rand_seed = int(get_rand_seed())

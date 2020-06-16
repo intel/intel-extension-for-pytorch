@@ -19,16 +19,16 @@ class TestEMB(TestCase):
         cpu_offsets = torch.LongTensor([0,4])
         cpu_output = cpu_emb(cpu_input, cpu_offsets)
 
-        dpcpp_emb = copy.deepcopy(cpu_emb).to('dpcpp:0')
-        dpcpp_input = cpu_input.clone().detach().to('dpcpp:0')
-        dpcpp_offsets = cpu_offsets.clone().detach().to('dpcpp:0')
+        dpcpp_emb = copy.deepcopy(cpu_emb).to(ipex.DEVICE)
+        dpcpp_input = cpu_input.clone().detach().to(ipex.DEVICE)
+        dpcpp_offsets = cpu_offsets.clone().detach().to(ipex.DEVICE)
         dpcpp_output = dpcpp_emb(dpcpp_input, dpcpp_offsets)
 
         self.assertEqual(cpu_output, dpcpp_output.to('cpu'))
 
         # Backward testing
         cpu_gy = torch.rand(2, 3, device='cpu')
-        dpcpp_gy = cpu_gy.clone().detach().to('dpcpp:0')
+        dpcpp_gy = cpu_gy.clone().detach().to(ipex.DEVICE)
         cpu_output.backward(cpu_gy)
         dpcpp_output.backward(dpcpp_gy)
 
@@ -71,12 +71,12 @@ class TestSparse(TestCase):
         y1.add_(x2)
 
         # test sparse + sparse
-        y2 = x1.clone().to('dpcpp:0')
-        y2.add_(x2.to('dpcpp:0'))
+        y2 = x1.clone().to(ipex.DEVICE)
+        y2.add_(x2.to(ipex.DEVICE))
 
         # test dense + sparse
-        y3 = x1.clone().to_dense().to('dpcpp:0')
-        y3.add_(x2.to('dpcpp:0'))
+        y3 = x1.clone().to_dense().to(ipex.DEVICE)
+        y3.add_(x2.to(ipex.DEVICE))
 
         expected = x1.to_dense() + x2.to_dense()
         self.assertEqual(y1.to_dense(), expected)
@@ -90,20 +90,20 @@ class TestSparse(TestCase):
         self.assertEqual(z2.to('cpu'), z1)
 
         # test _dimI, _dimV]
-        self.assertEqual(x1._dimI(), x1.to('dpcpp:0')._dimI())
-        self.assertEqual(x1._dimV(), x1.to('dpcpp:0')._dimV())
+        self.assertEqual(x1._dimI(), x1.to(ipex.DEVICE)._dimI())
+        self.assertEqual(x1._dimV(), x1.to(ipex.DEVICE)._dimV())
 
         # test coalesce
         c1 = x1.coalesce()
-        c2 = x1.to('dpcpp:0').coalesce().to('cpu')
+        c2 = x1.to(ipex.DEVICE).coalesce().to('cpu')
         self.assertEqual(c1._indices(), c2._indices())
         self.assertEqual(c1._values(), c2._values())
 
         # test indices and values
         x1 = x1.coalesce()
-        self.assertEqual(x1.indices(), x1.to('dpcpp:0').indices())
-        self.assertEqual(x1.values(), x1.to('dpcpp:0').values())
-        
+        self.assertEqual(x1.indices(), x1.to(ipex.DEVICE).indices())
+        self.assertEqual(x1.values(), x1.to(ipex.DEVICE).values())
+
     def test_basic_ops(self):
         self._test_basic_ops_shape(9, 12, [5, 6])
         self._test_basic_ops_shape(9, 12, [10, 10, 10])
