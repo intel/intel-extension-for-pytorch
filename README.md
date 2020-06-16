@@ -39,8 +39,8 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
  3. Add an new backend for Intel PyTorch Extension
     ```bash
     # Apply git patch to pytorch code
-    cd ${intel_pytorch_extension_directory}
-    git apply torch_patches/dpcpp-v1.5-rc3.patch ${pytorch_directory}
+    cd ${pytorch_directory}
+    git apply ${intel_pytorch_extension_directory}/torch_patches/dpcpp-v1.5-rc3.patch
     ```
  
  4. Build and install PyTorch (Refer to [PyTorch guide](https://github.com/pytorch/pytorch#install-pytorch) for more details)
