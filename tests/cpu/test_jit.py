@@ -205,7 +205,7 @@ class LinearRelu(nn.Module):
 
 class Tester(TestCase):
 
-    def _test_output(self, model, x, kind):
+    def _test_output(self, model, x, kind=None):
         modelName = model.__class__.__name__
         core.disable_jit()
         core.disable_mix_bf16_fp32()
@@ -227,7 +227,7 @@ class Tester(TestCase):
         with torch.no_grad():
             # conv relu fusion, conv sum fusion or conv sum relu fusion
             graph =  fused_model.graph_for(x)
-            print(graph)
+            # print(graph)
             fresult = fused_model(x)
 
         # print(result)
@@ -237,9 +237,10 @@ class Tester(TestCase):
         self.assertEqual(result, fresult)
 
         # check if the fused node exists in the graph
-        self.assertTrue(any(n.kind() == kind for n in graph.nodes()))
+        if kind is not None:
+            self.assertTrue(any(n.kind() == kind for n in graph.nodes()))
 
-    def _test_output_bf16(self, model, x):
+    def _test_output_bf16(self, model, x, kind=None, prec=None):
         modelName = model.__class__.__name__
 
         core.enable_auto_dnnl()
@@ -264,114 +265,131 @@ class Tester(TestCase):
             # bf16, native path
             result = model(x)
             # bf16, jit path
+            graph =  fused_model.graph_for(x2)
+            # print(graph)
             fresult = fused_model(x2)
 
         #print(result)
         #print(fresult)
 
-        self.assertEqual(fresult, result)
+        self.assertEqual(fresult, result, prec=prec)
+
+        # check if the fused node exists in the graph
+        if kind is not None:
+            self.assertTrue(any(n.kind() == kind for n in graph.nodes()))
+
 
     def test_output_conv_bn_2d(self):
         self._test_output(
             Conv2dBatchNorm2d_Fixed(3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
-            "aten::conv2d")
-
-        '''
+            kind="aten::conv2d")
         self._test_output_bf16(
             Conv2dBatchNorm2d_Fixed(3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 224, 224))
-        '''
+            torch.randn(32, 3, 224, 224),
+            kind="aten::conv2d",
+            prec=0.02)
+
 
     def test_output_conv_bn_3d(self):
         self._test_output(
             Conv3dBatchNorm3d_Fixed(3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
-            "aten::conv3d")
-
-        '''
+            kind="aten::conv3d")
         self._test_output_bf16(
             Conv3dBatchNorm3d_Fixed(3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 112, 112, 112))
-        '''
+            torch.randn(32, 3, 112, 112, 112),
+            kind="aten::conv3d",
+            prec=0.02)
+        
 
     def test_output_conv_relu_2d(self):
         self._test_output(
             Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
-            "ipex::conv2d_relu")
+            kind="ipex::conv2d_relu")
         self._test_output_bf16(
             Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 224, 224))
+            torch.randn(32, 3, 224, 224),
+            kind="ipex::conv2d_relu")
+
 
     def test_output_conv_relu_3d(self):
         self._test_output(
             Conv3dRelu_Fixed(3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
-            "ipex::conv3d_relu")
+            kind="ipex::conv3d_relu")
         self._test_output_bf16(
             Conv3dRelu_Fixed(3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 112, 112, 112))
+            torch.randn(32, 3, 112, 112, 112),
+            kind="ipex::conv3d_relu")
+
 
     def test_output_conv_sum_2d(self):
         self._test_output(
             Conv2dSum(3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
-            "ipex::conv2d_sum")
-
+            kind="ipex::conv2d_sum")
         self._test_output_bf16(
-            Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 224, 224))
+            Conv2dSum(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 224, 224),
+            kind="ipex::conv2d_sum",
+            prec=0.02)
+        
 
     def test_output_conv_sum_3d(self):
         self._test_output(
             Conv3dSum(3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
-            "ipex::conv3d_sum")
-
+            kind="ipex::conv3d_sum")
         self._test_output_bf16(
-            Conv3dRelu_Fixed(3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 112, 112, 112))
+            Conv3dSum(3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 112, 112, 112),
+            kind="ipex::conv3d_sum",
+            prec=0.02)
+        
 
     def test_output_cascaded_conv_bn_sum_relu_2d(self):
         self._test_output(
             CascadedConv2dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 224, 224),
-            "ipex::conv2d_sum_relu")
-
-        '''
+            kind="ipex::conv2d_sum_relu")
         self._test_output_bf16(
             CascadedConv2dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
-            torch.rand(32, 3, 224, 224))
-        '''
+            torch.rand(32, 3, 224, 224),
+            kind="ipex::conv2d_sum_relu",
+            prec=0.02)
+        
 
     def test_output_cascaded_conv_bn_sum_relu_3d(self):
         self._test_output(
             CascadedConv3dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 112, 112, 112),
-            "ipex::conv3d_sum_relu")
-
-        '''
+            kind="ipex::conv3d_sum_relu")
         self._test_output_bf16(
             CascadedConv3dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
-            torch.rand(32, 3, 112, 112, 112))
-        '''
+            torch.rand(32, 3, 112, 112, 112),
+            kind="ipex::conv3d_sum_relu",
+            prec=0.02)
+        
 
     def test_output_linear_relu(self):
         self._test_output(
             LinearRelu(3, 32, bias=True),
             torch.rand(32, 3),
-            "ipex::linear_relu")
+            kind="ipex::linear_relu")
         self._test_output_bf16(
             LinearRelu(3, 32, bias=True),
-            torch.rand(32, 3))
+            torch.rand(32, 3),
+            kind="ipex::linear_relu")
         self._test_output(
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
-            "ipex::linear_relu")
+            kind="ipex::linear_relu")
         self._test_output_bf16(
             LinearRelu(3, 32, bias=False),
-            torch.rand(32, 3))
+            torch.rand(32, 3),
+            kind="ipex::linear_relu")
 
 
 if __name__ == '__main__':
