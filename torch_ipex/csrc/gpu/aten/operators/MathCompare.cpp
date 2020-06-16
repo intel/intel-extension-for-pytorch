@@ -355,12 +355,14 @@ Tensor ge(const Tensor& self, Scalar other_) {
 }
 
 Tensor& ge_out(Tensor& out, const Tensor& self, const Tensor& other) {
+  Tensor b_self, b_other;
+  std::tie(b_self, b_other) = expand_outplace(self, other);
   AT_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "geTensor",
-      [&]() { impl::geTensor<scalar_t>(out, self, other); });
+      [&]() { impl::geTensor<scalar_t>(out, b_self, b_other); });
 
   return out;
 }
