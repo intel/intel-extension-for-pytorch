@@ -23,6 +23,24 @@ static inline DPCPP_DEVICE void atomicAdd(
   } while (!address_var.compare_exchange_strong(assumed, newval));
 }
 
+#if defined(USE_DPCPP)
+static inline DPCPP_DEVICE void atomicAdd(
+    const dpcpp_global_ptr_pt<double>& address,
+    double val) {
+  unsigned long long * address_as_ull = (unsigned long long *)address;
+  unsigned long long assumed = *address_as_ull;
+  unsigned long long newval;
+
+  dpcpp_multi_ptr<unsigned long long, dpcpp_global_space> address_multi_ptr(
+      address_as_ull);
+  DPCPP::atomic<unsigned long long> address_var(address_multi_ptr);
+
+  do {
+    newval = __double_as_long_long(val + __long_long_as_double(assumed));
+  } while (!address_var.compare_exchange_strong(assumed, newval));
+}
+#endif
+
 static inline DPCPP_DEVICE void atomicAdd(
     const dpcpp_global_ptr_pt<at::Half>& address,
     at::Half val) {

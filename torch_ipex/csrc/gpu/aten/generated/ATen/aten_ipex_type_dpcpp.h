@@ -444,6 +444,10 @@ namespace AtenIpexTypeDPCPP {
   at::Tensor & trunc_out(at::Tensor & out, const at::Tensor & self);
   at::Tensor unfold(const at::Tensor & self, int64_t dimension, int64_t size, int64_t step);
   at::Tensor & uniform_(at::Tensor & self, double from, double to, at::Generator * generator);
+  at::Tensor upsample_bicubic2d(const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w);
+  at::Tensor upsample_bicubic2d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w);
+  at::Tensor & upsample_bicubic2d_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w);
+  at::Tensor & upsample_bicubic2d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w);
   at::Tensor upsample_nearest2d(const at::Tensor & self, at::IntArrayRef output_size, c10::optional<double> scales_h, c10::optional<double> scales_w);
   at::Tensor upsample_nearest2d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, c10::optional<double> scales_h, c10::optional<double> scales_w);
   at::Tensor & upsample_nearest2d_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, c10::optional<double> scales_h, c10::optional<double> scales_w);
