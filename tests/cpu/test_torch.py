@@ -17,23 +17,23 @@ Copyright (c) 2016-present, Facebook Inc. All rights reserved.
 
 All contributions by Facebook:
 Copyright (c) 2016 Facebook Inc.
- 
+
 All contributions by Google:
 Copyright (c) 2015 Google Inc.
 All rights reserved.
- 
+
 All contributions by Yangqing Jia:
 Copyright (c) 2015 Yangqing Jia
 All rights reserved.
- 
+
 All contributions from Caffe:
 Copyright(c) 2013, 2014, 2015, the respective contributors
 All rights reserved.
- 
+
 All other contributions:
 Copyright(c) 2015, 2016 the respective contributors
 All rights reserved.
- 
+
 Caffe2 uses a copyright model similar to Caffe: each contributor holds
 copyright over their contributions to Caffe2. The project versioning records
 all such contribution and copyright details. If a contributor wants to further
@@ -83,7 +83,7 @@ from common_device_type import instantiate_device_type_tests, \
     skipIf, skipCPUIfNoLapack, skipCUDAIfNoMagma, skipCUDAIfRocm, onlyCUDA, onlyCPU, \
     dtypes, dtypesIfCUDA, deviceCountAtLeast, skipCUDAIf, precisionOverride, ipex
 import torch.backends.quantized
-import intel_pytorch_extension
+import intel_pytorch_extension as ipex
 
 
 # load_tests from common_utils is used to automatically filter tests for
@@ -5734,7 +5734,7 @@ tensor([[[1., 1., 1.,  ..., 1., 1., 1.],
         self.assertEqual(e1, e2)
 
     def test_batch_norm_cpu_inference(self):
-        # input nchw in (2,1,1,1), (2,2,2,2) 
+        # input nchw in (2,1,1,1), (2,2,2,2)
         inputs = [
             torch.tensor([[[[-0.5000]]], [[[0.5000]]]]),
             torch.tensor([
@@ -5746,7 +5746,7 @@ tensor([[[1., 1., 1.,  ..., 1., 1., 1.],
                     [[0.1000, 1.0000], [1.0000, 0.1000]],
                     [[1.0000, 0.5000], [1.5000, -1.5000]]
                 ]])]
-        # output nchw in (2,1,1,1), (2,2,2,2) 
+        # output nchw in (2,1,1,1), (2,2,2,2)
         outputs = [
             torch.tensor([
                 [[[-0.499997496604919433593750000]]],
@@ -5772,9 +5772,9 @@ tensor([[[1., 1., 1.,  ..., 1., 1., 1.],
             output2 = m(input2).permute(0, 1, 3, 2)
             # channels last case
             input3 = input1.contiguous(memory_format=torch.channels_last)
-            for name, param in m.named_parameters():    
-                if param.requires_grad:    
-                    if param.data.dim() == 4:    
+            for name, param in m.named_parameters():
+                if param.requires_grad:
+                    if param.data.dim() == 4:
                         param.data = param.data.contiguous(memory_format=torch.channels_last)
             output3 = m(input3)
             self.assertEqual(output3, outputs[i])
@@ -6289,7 +6289,7 @@ class TestTorchDeviceType(TestCase):
             if dtype == torch.bfloat16 and device == 'cuda':
                 self.assertRaises(RuntimeError, lambda: a.logical_not())
                 continue
-            if (dtype == torch.half or dtype == torch.float16) and (device == 'cpu' or device == 'dpcpp'):
+            if (dtype == torch.half or dtype == torch.float16) and (device == 'cpu' or device == ipex.DEVICE):
                 continue
             expected_res = torch.tensor([0, 0, 1], dtype=dtype, device=device)
             # new tensor
@@ -6303,7 +6303,7 @@ class TestTorchDeviceType(TestCase):
                 if out_dtype == torch.bfloat16 and device == 'cuda':
                     self.assertRaises(RuntimeError, lambda: torch.logical_not(a, out=b))
                     continue
-                if out_dtype == torch.float16 and device == 'dpcpp':
+                if out_dtype == torch.float16 and device == ipex.DEVICE:
                     continue
                 torch.logical_not(a, out=b)
                 self.assertEqual(expected_res.bool(), b.bool())
@@ -6323,13 +6323,13 @@ class TestTorchDeviceType(TestCase):
             for other_dtype in torch.testing.get_all_dtypes():
                 b = torch.tensor([1, 0, 0, 10], dtype=other_dtype, device=device)
 
-                if device == 'dpcpp' and dtype == torch.float16:
+                if device == ipex.DEVICE and dtype == torch.float16:
                     with self.assertRaises(RuntimeError):
                         a.logical_xor(b)
                     continue
 
                 # Skip bfloat16 on CUDA. Remove this after bfloat16 is supported on CUDA.
-                if (device != 'cpu' and device != 'dpcpp') and torch.bfloat16 in (dtype, other_dtype):
+                if (device != 'cpu' and device != ipex.DEVICE) and torch.bfloat16 in (dtype, other_dtype):
                     with self.assertRaises(RuntimeError):
                         a.logical_xor(b)
                     continue
@@ -6349,7 +6349,7 @@ class TestTorchDeviceType(TestCase):
             # in-place
             b = torch.tensor([1, 0, 0, 10], dtype=dtype, device=device)
             # Skip bfloat16 on CUDA. Remove this after bfloat16 is supported on CUDA.
-            if (device != 'cpu' and device != 'dpcpp') and dtype == torch.bfloat16:
+            if (device != 'cpu' and device != ipex.DEVICE) and dtype == torch.bfloat16:
                 with self.assertRaises(RuntimeError):
                     a.logical_xor_(b)
                 continue
@@ -8726,7 +8726,7 @@ class TestTorchDeviceType(TestCase):
 
         # Noncontig input
         x = torch.randn((2, 3, 4), dtype=dtype, device=device).transpose(2, 0)
-        if ipex.get_auto_dnnl():
+        if ipex.get_auto_optimization():
             self.assertTrue(x.is_contiguous())
         else:
             self.assertFalse(x.is_contiguous())
@@ -9144,7 +9144,7 @@ class TestTorchDeviceType(TestCase):
             run_test(tensor_dims, some)
 
     def test_randperm(self, device):
-        if device == 'cpu' or device == 'dpcpp':
+        if device == 'cpu' or device == ipex.DEVICE:
             rng_device = None
         else:
             rng_device = [device]
@@ -9157,7 +9157,7 @@ class TestTorchDeviceType(TestCase):
             for dtype in (torch.long, torch.half, torch.float):
                 if n > 2049 and dtype == torch.half:  # Large n for torch.half will raise an exception, do not test here.
                     continue
-                if device == 'dpcpp' and dtype == torch.half:
+                if device == ipex.DEVICE and dtype == torch.half:
                     continue
                 with torch.random.fork_rng(devices=rng_device):
                     res1 = torch.randperm(n, dtype=dtype, device=device)
@@ -9181,7 +9181,7 @@ class TestTorchDeviceType(TestCase):
                                         (torch.float, 2**24 + 1, 2**24 + 2),
                                         (torch.double, 2**25,  # 2**53 + 1 is too large to run
                                          2**53 + 2)):
-            if device == 'dpcpp' and dtype == torch.half:
+            if device == ipex.DEVICE and dtype == torch.half:
                 continue
             res = torch.empty(0, dtype=dtype, device=device)
             torch.randperm(small_n, out=res)  # No exception expected
@@ -9777,7 +9777,7 @@ class TestTorchDeviceType(TestCase):
             y = torch.randn(5, 3, device=device).transpose(-1, -2)
             actual = torch.cdist(x, y, p=1, compute_mode=cm)
             expected = brute_cdist(x, y, p=1)
-            if ipex.get_auto_dnnl():
+            if ipex.get_auto_optimization():
                 self.assertTrue(x.is_contiguous())
                 self.assertTrue(y.is_contiguous())
             else:
@@ -9807,7 +9807,7 @@ class TestTorchDeviceType(TestCase):
             y = torch.randn(4, 3, 2, 5, 3, device=device).transpose(-1, -2)
             actual = torch.cdist(x, y, p=1, compute_mode=cm)
             expected = brute_cdist(x, y, p=1)
-            if ipex.get_auto_dnnl():
+            if ipex.get_auto_optimization():
                 self.assertTrue(x.is_contiguous())
                 self.assertTrue(y.is_contiguous())
             else:
@@ -9820,7 +9820,7 @@ class TestTorchDeviceType(TestCase):
             actual = torch.cdist(x, y, p=1, compute_mode=cm)
             expected = brute_cdist(x, y, p=1)
             self.assertTrue(x.is_contiguous())
-            if ipex.get_auto_dnnl():
+            if ipex.get_auto_optimization():
                 self.assertTrue(y.is_contiguous())
             else:
                 self.assertFalse(y.is_contiguous())
@@ -9830,7 +9830,7 @@ class TestTorchDeviceType(TestCase):
             y = torch.randn(4, 3, 5, device=device)
             actual = torch.cdist(x, y, p=1, compute_mode=cm)
             expected = brute_cdist(x, y, p=1)
-            if ipex.get_auto_dnnl():
+            if ipex.get_auto_optimization():
                 self.assertTrue(x.is_contiguous())
             else:
                 self.assertFalse(x.is_contiguous())
@@ -10250,7 +10250,7 @@ class TestTorchDeviceType(TestCase):
         for dt in torch.testing.get_all_dtypes():
             if dt == torch.bfloat16:
                 continue
-            if (dt == torch.half or dt == torch.float16) and (device == 'cpu' or device == 'dpcpp'):
+            if (dt == torch.half or dt == torch.float16) and (device == 'cpu' or device == ipex.DEVICE):
                 continue
 
             x = torch.randint(5, (0, 1, 3, 0), dtype=dt, device=device)
@@ -10267,14 +10267,14 @@ class TestTorchDeviceType(TestCase):
 
     def test_copy_all_dtypes_and_devices(self, device):
         from copy import copy
-        ipex.enable_auto_dnnl()
+        ipex.get_auto_optimization()
         for dt in torch.testing.get_all_dtypes():
             x = torch.tensor([1, 2, 3, 4], dtype=dt, device=device)
             x_clone = x.clone()
             if (self.device_type == 'cuda' and dt == torch.bfloat16):
                 self.assertRaises(RuntimeError, lambda: copy(x))
                 continue
-            if self.device_type == 'dpcpp' and dt == torch.float16:
+            if self.device_type == ipex.DEVICE and dt == torch.float16:
                 continue
             if SKIP_TEST_CASE_DOES_NOT_SUPPORT_BF16 and dt == torch.bfloat16:
                 continue
@@ -10283,7 +10283,7 @@ class TestTorchDeviceType(TestCase):
             # copy is a shallow copy, only copies the tensor view,
             # not the data
             self.assertEqual(x, y)
-        ipex.enable_auto_dnnl()
+        ipex.enable_auto_optimization(False)
 
     def test_resize_all_dtypes_and_devices(self, device):
         shape = (2, 2)
@@ -10317,7 +10317,7 @@ class TestTorchDeviceType(TestCase):
                 if (self.device_type == 'cuda' and dt == torch.bfloat16):
                     self.assertRaises(RuntimeError, lambda: x.fill_(1))
                     continue
-                if self.device_type == 'dpcpp' and dt == torch.float16:
+                if self.device_type == ipex.DEVICE and dt == torch.float16:
                     continue
                 bound = 100 if dt in (torch.uint8, torch.int8) else 2000
                 for n in range(-bound, bound, bound // 10):
@@ -10334,7 +10334,7 @@ class TestTorchDeviceType(TestCase):
                 # `x - y` is used inside of the assertEqual
                 self.assertRaises(RuntimeError, lambda: x - y)
                 continue
-            if (self.device_type == 'dpcpp' and dt == torch.float16):
+            if (self.device_type == ipex.DEVICE and dt == torch.float16):
                 # `x - y` is used inside of the assertEqual
                 self.assertRaises(RuntimeError, lambda: x - y)
                 continue
@@ -10349,7 +10349,7 @@ class TestTorchDeviceType(TestCase):
             if (self.device_type == 'cuda' and dt == torch.bfloat16):
                 self.assertRaises(RuntimeError, lambda: torch.cat((x, x), 0))
                 continue
-            if (self.device_type == 'dpcpp' and dt == torch.float16):
+            if (self.device_type == ipex.DEVICE and dt == torch.float16):
                 continue
             if SKIP_TEST_CASE_DOES_NOT_SUPPORT_BF16 and dt == torch.bfloat16:
                 continue
@@ -10386,7 +10386,7 @@ class TestTorchDeviceType(TestCase):
                     self.assertEqual(shape, torch.empty_like(torch.zeros(shape, device=device, dtype=dt)).shape)
                     self.assertEqual(shape, torch.empty_strided(shape, (0,) * len(shape), device=device, dtype=dt).shape)
 
-                if (dt == torch.half or dt == torch.float16) and (device == "cpu" or device == "dpcpp"):
+                if (dt == torch.half or dt == torch.float16) and (device == "cpu" or device == ipex.DEVICE):
                     # update once random is implemented for half on CPU
                     None
                 else:
@@ -10419,9 +10419,9 @@ class TestTorchDeviceType(TestCase):
 
     def test_eye(self, device):
         for dtype in torch.testing.get_all_dtypes():
-            if dtype == torch.bfloat16 and device != 'cpu' and device != 'dpcpp':
+            if dtype == torch.bfloat16 and device != 'cpu' and device != ipex.DEVICE:
                 continue
-            if (dtype == torch.float16 or dtype == torch.half) and (device == 'cpu' or device == 'dpcpp'):
+            if (dtype == torch.float16 or dtype == torch.half) and (device == 'cpu' or device == ipex.DEVICE):
                 continue
             if SKIP_TEST_CASE_DOES_NOT_SUPPORT_BF16 and dtype == torch.bfloat16:
                 continue
@@ -10518,7 +10518,7 @@ class TestTorchDeviceType(TestCase):
             x = torch.tensor([1, 2, 3, 4], device=device, dtype=dt)
             b = torch.tensor([2], device=device, dtype=dt)
 
-            if (dt == torch.half or dt == torch.float16) and (device == 'cpu' or device == 'dpcpp'):
+            if (dt == torch.half or dt == torch.float16) and (device == 'cpu' or device == ipex.DEVICE):
                 self.assertRaises(RuntimeError, lambda: x.lt(2))
                 continue
 
@@ -10704,7 +10704,7 @@ class TestTorchDeviceType(TestCase):
                         self.assertRaises(RuntimeError, lambda: src.masked_select(mask))
                         continue
 
-                    if dt == torch.half and (self.device_type == 'cpu' or self.device_type == 'dpcpp'):
+                    if dt == torch.half and (self.device_type == 'cpu' or self.device_type == ipex.DEVICE):
                         self.assertRaises(RuntimeError, lambda: src.masked_select(mask))
                         continue
 
@@ -12375,7 +12375,7 @@ class TestTorchDeviceType(TestCase):
 
         run_test(device, True)
 
-        if self.device_type == 'cpu' or self.device_type == 'dpcpp':
+        if self.device_type == 'cpu' or self.device_type == ipex.DEVICE:
             # Error checking, no pivoting variant on CPU
             with self.assertRaisesRegex(RuntimeError, 'lu without pivoting is not implemented on the CPU'):
                 torch.lu(torch.empty(1, 2, 2), pivot=False)
@@ -13996,7 +13996,7 @@ def _number(floating, integer, dtype):
 
 # Converts half dtype to float when device is cpu
 def _convert_t(dtype, device):
-    if (device == 'cpu' or device == 'dpcpp' or device == 'dpcpp:0') and dtype == torch.half:
+    if (device == 'cpu' or device == ipex.DEVICE or device == ipex.DEVICE) and dtype == torch.half:
         return torch.float
     return dtype
 
@@ -14532,5 +14532,5 @@ instantiate_device_type_tests(TestDevicePrecision, globals(), except_for='cpu')
 instantiate_device_type_tests(TestTensorDeviceOps, globals(), except_for='cpu')
 
 if __name__ == '__main__':
-    ipex.enable_auto_dnnl()
+    ipex.enable_auto_optimization()
     run_tests()

@@ -6,6 +6,9 @@ from .optim import *
 from .ops import *
 import _torch_ipex as core
 
+
+DEVICE = 'dpcpp'
+
 def get_auto_optimization():
     return core.get_auto_dnnl()
 

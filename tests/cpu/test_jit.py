@@ -59,7 +59,7 @@ import torch.nn as nn
 from torch.jit._recursive import wrap_cpp_module
 import copy
 
-import intel_pytorch_extension
+import intel_pytorch_extension as ipex
 from intel_pytorch_extension import core
 
 import torch.nn as nn
@@ -76,7 +76,7 @@ from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MK
     IS_SANDCASTLE, load_tests, brute_pdist, brute_cdist, slowTest, \
     skipCUDANonDefaultStreamIf, skipCUDAMemoryLeakCheckIf
 
-device = 'dpcpp:0'
+device = ipex.DEVICE
 #device = 'cpu:0'
 SIZE = 100
 
@@ -210,8 +210,8 @@ class Tester(TestCase):
         core.disable_jit()
         core.disable_mix_bf16_fp32()
 
-        model = model.to('dpcpp').eval()
-        x = x.to('dpcpp')
+        model = model.to(device).eval()
+        x = x.to(device)
         with torch.no_grad():
             result = model(x)
 
@@ -246,8 +246,8 @@ class Tester(TestCase):
         core.enable_jit()
         core.disable_mix_bf16_fp32()
 
-        model = model.to('dpcpp').eval()
-        x = x.to('dpcpp')
+        model = model.to(ipex.DEVICE).eval()
+        x = x.to(ipex.DEVICE)
         x2 = x.clone()
 
         fused_model = torch.jit.script(copy.deepcopy(model))

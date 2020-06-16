@@ -16,8 +16,8 @@ def interact_features(x, ly):
     Z = torch.bmm(T, torch.transpose(T, 1, 2))
     _, ni, nj = Z.shape
     offset =  0
-    li = torch.tensor([i for i in range(ni) for j in range(i + offset)], device='dpcpp')
-    lj = torch.tensor([j for i in range(nj) for j in range(i + offset)], device='dpcpp')
+    li = torch.tensor([i for i in range(ni) for j in range(i + offset)], device=ipex.DEVICE)
+    lj = torch.tensor([j for i in range(nj) for j in range(i + offset)], device=ipex.DEVICE)
     Zflat = Z[:, li, lj]
     # concatenate dense features and interactions
     R = torch.cat([x] + [Zflat], dim=1)
@@ -25,12 +25,12 @@ def interact_features(x, ly):
 
 def run(dtype='float32'):
     print("##################### testing with %s"% str(dtype))
-    x1 = torch.randn([2048, 128], device='dpcpp').to(dtype).clone().detach().requires_grad_()
+    x1 = torch.randn([2048, 128], device=ipex.DEVICE).to(dtype).clone().detach().requires_grad_()
     x2 = x1.clone().detach().requires_grad_()
     ly1 = []
     ly2 = []
     for i in range(0, 26):
-        V = torch.randn([2048, 128], device='dpcpp').to(dtype).clone().detach().requires_grad_()
+        V = torch.randn([2048, 128], device=ipex.DEVICE).to(dtype).clone().detach().requires_grad_()
         ly1.append(V)
         ly2.append(V.clone().detach().requires_grad_())
 
