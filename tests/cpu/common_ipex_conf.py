@@ -2,34 +2,34 @@ import intel_pytorch_extension as ipex
 
 class AutoMixPrecision(object):
     def __init__(self, enable_or_not = False):
-        self.old_value = ipex.core.get_mix_bf16_fp32()
+        self.old_value = ipex.get_auto_mix_precision()
         self.enable_or_not = enable_or_not
 
     def __enter__(self):
         if self.enable_or_not:
-            ipex.core.enable_mix_bf16_fp32()
+            ipex.enable_auto_mix_precision(bf16=True)
         else:
-            ipex.core.disable_mix_bf16_fp32()
+            ipex.enable_auto_mix_precision(bf16=False)
 
     def __exit__(self, *args, **kwargs):
         if self.old_value:
-            ipex.core.enable_mix_bf16_fp32()
+            ipex.enable_auto_mix_precision(bf16=True)
         else:
-            ipex.core.disable_mix_bf16_fp32()
+            ipex.enable_auto_mix_precision(bf16=False)
 
 class AutoDNNL(object):
     def __init__(self, enable_or_not = False):
-        self.old_value = ipex.core.get_auto_dnnl()
+        self.old_value = ipex.get_auto_optimization()
         self.enable_or_not = enable_or_not
 
     def __enter__(self):
         if self.enable_or_not:
-            ipex.core.enable_auto_dnnl()
+            ipex.enable_auto_optimization()
         else:
-            ipex.core.disable_auto_dnnl()
+            ipex.enable_auto_optimization(False)
 
     def __exit__(self, *args, **kwargs):
         if self.old_value:
-            ipex.core.enable_auto_dnnl()
+            ipex.enable_auto_optimization()
         else:
-            ipex.core.disable_auto_dnnl()
+            ipex.enable_auto_optimization(False)

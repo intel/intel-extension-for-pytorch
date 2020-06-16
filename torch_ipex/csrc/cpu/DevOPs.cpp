@@ -50,15 +50,43 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   CHECK_DNNL_OP_PRE_COND(weight);
 
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
-  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
-
   dil_input = dbl::comm::try_gen_dil_tensor(input);
-  dil_weight = dbl::comm::try_gen_dil_tensor(weight);
+
   if (bias.defined()) {
     CHECK_DNNL_OP_PRE_COND(bias);
     dbl::comm::reorder_to_bf16_for_mix_prec(bias);
     dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
+
+  // Prepack weight tensor if it's either a *cpu tensor* or a *plain dil tensor*
+  //
+  // Note: weight tensor will not be re-packed unless user has implicitly
+  //       triggered `to_public` by accessing its data
+  //       One caveat is when the input size has changed and prepacked weight
+  //       might not be the best fit for new input size, the weight will not
+  //       be re-packed in such cases, but it still ensures the correctness
+  //
+  // TODO: once semantics of "own shade context" is equivalent to
+  //       "is dil tensor", we could remove the first check below
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+  if (!check_tensor_own_shade_context(weight) ||
+      !cpu::ShadeDataContext::isDilOwnTheTensor(weight) ||
+      cpu::ShadeDataContext::getDilTensor(weight).is_public_format()) {
+    auto packed_desc = dil::convolution_forward::expected_weights_desc(
+      weight.sizes().vec(),
+      dil_input.get_data_type(),
+      stride.vec(),
+      padding.vec(),
+      padding.vec(),
+      dilation.vec(),
+      groups,
+      dil::algorithm::convolution_direct,
+      dil::prop_kind::forward,
+      dil_input.get_data_type(),
+      input.sizes().vec());
+    dbl::comm::reorder_to_desc(weight, packed_desc);
+  }
+  dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
   dil::tensor dil_output = dbl::conv::conv2d_impl(
     dil_input,
