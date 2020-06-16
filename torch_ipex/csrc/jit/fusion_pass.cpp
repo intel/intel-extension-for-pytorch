@@ -1,5 +1,6 @@
 #include <string>
 #include "fusion_pass.h"
+#include "graph_rewrite.h"
 
 #include "cpu/FusionOPs.h"
 
@@ -277,17 +278,29 @@ public:
 OpFuser::RuleTab OpFuser::dnnlRules = {
   {{aten::conv2d, aten::relu}, ipex::conv2d_relu},
   {{aten::conv2d, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_relu},
+  {{aten::conv2d, aten::add}, ipex::conv2d_sum},
+  {{aten::conv2d, aten::add_}, ipex::conv2d_sum},
   {{ipex::conv2d_sum, aten::relu}, ipex::conv2d_sum_relu},
   {{ipex::conv2d_sum, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_sum_relu},
 
-  {{aten::conv2d, aten::add}, ipex::conv2d_sum},
-  {{aten::conv2d, aten::add_}, ipex::conv2d_sum},
   {{Symbol::fromQualString("torch_ipex::linear"), aten::relu}, ipex::linear_relu},
   {{Symbol::fromQualString("torch_ipex::linear"), Symbol::fromQualString("aten::relu_")}, ipex::linear_relu},
+
+  // 3d ops
+  {{aten::conv3d, aten::relu}, ipex::conv3d_relu},
+  {{aten::conv3d, Symbol::fromQualString("aten::relu_")}, ipex::conv3d_relu},
+  {{aten::conv3d, aten::add}, ipex::conv3d_sum},
+  {{aten::conv3d, aten::add_}, ipex::conv3d_sum},
+  {{ipex::conv3d_sum, aten::relu}, ipex::conv3d_sum_relu},
+  {{ipex::conv3d_sum, Symbol::fromQualString("aten::relu_")}, ipex::conv3d_sum_relu},
+
   //{{dnnl::conv2d_relu, aten::add}, dnnl::conv2d_relu_sum}
 };
 
 void FusionPass(std::shared_ptr<Graph> &graph) {
+  // Replace _convolution with conv2d or conv3d
+  graph_rewrite::replaceConvolutionWithAtenConv(graph);
+
   // Pattern based fusion was lack of alias analysis
   // ??? It may either be too conservative or too aggressive ???
   // getSubgraphRewriter().runOnGraph(graph);
