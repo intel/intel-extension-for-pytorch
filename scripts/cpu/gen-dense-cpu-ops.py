@@ -22,9 +22,9 @@ _FN_BYPASS_REGEX = [
 ]
 
 _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
-    # 'aten::add.Tensor(Tensor self, Tensor other, *, Scalar alpha=1) -> Tensor',
-    # 'aten::add_.Tensor(Tensor(a!) self, Tensor other, *, Scalar alpha=1) -> Tensor(a!)',
-    # 'aten::add.out(Tensor self, Tensor other, *, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)',
+    'aten::add.Tensor(Tensor self, Tensor other, *, Scalar alpha=1) -> Tensor',
+    'aten::add_.Tensor(Tensor(a!) self, Tensor other, *, Scalar alpha=1) -> Tensor(a!)',
+    'aten::add.out(Tensor self, Tensor other, *, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)',
     'aten::mul.Tensor(Tensor self, Tensor other) -> Tensor',
     'aten::mul_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)',
     'aten::mul.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)',
@@ -66,8 +66,8 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor',
     'aten::gelu(Tensor self) -> Tensor',
     'aten::gelu_backward(Tensor grad, Tensor self) -> Tensor',
-    'aten::native_layer_norm(Tensor input, Tensor? weight, Tensor? bias, int M, int N, float eps) -> (Tensor, Tensor, Tensor)',
-    'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)'
+    #'aten::native_layer_norm(Tensor input, Tensor? weight, Tensor? bias, int M, int N, float eps) -> (Tensor, Tensor, Tensor)',
+    #'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)'
 ]
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'

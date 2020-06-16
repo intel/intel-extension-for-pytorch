@@ -1,6 +1,7 @@
 #include "Conv.h"
 
 #include "Common.h"
+#include "cpu/ShadeDataContext.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -144,6 +145,43 @@ void conv2d_inplace_impl(
       dil::scale_t(),
       dil::scale_t(),
       attr);
+  }
+}
+
+void prepack_conv_weights(
+    const at::Tensor& input,
+    const dil::tensor& dil_input,
+    const at::Tensor& weight,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups) {
+  // Prepack weight tensor if it's either a *cpu tensor* or a *plain dil tensor*
+  //
+  // Note: weight tensor will not be re-packed unless user has implicitly
+  //       triggered `to_public` by accessing its data
+  //       One caveat is when the input size has changed and prepacked weight
+  //       might not be the best fit for new input size, the weight will not
+  //       be re-packed in such cases, but it still ensures the correctness
+  //
+  // TODO: once semantics of "own shade context" is equivalent to
+  //       "is dil tensor", we could remove the first check below
+  if (!check_tensor_own_shade_context(weight) ||
+      !cpu::ShadeDataContext::isDilOwnTheTensor(weight) ||
+      cpu::ShadeDataContext::getDilTensor(weight).is_public_format()) {
+    auto packed_desc = dil::convolution_forward::expected_weights_desc(
+      weight.sizes().vec(),
+      dil_input.get_data_type(),
+      stride.vec(),
+      padding.vec(),
+      padding.vec(),
+      dilation.vec(),
+      groups,
+      dil::algorithm::convolution_direct,
+      dil::prop_kind::forward,
+      dil_input.get_data_type(),
+      input.sizes().vec());
+    dbl::comm::reorder_to_desc(weight, packed_desc);
   }
 }
 

@@ -163,7 +163,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("disable_jit", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
   m.def("get_jit", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
   m.def("prepack_conv_weight", &AtenIpexPrepack::prepack_conv_weight);
-  m.def("_jit_prepack_conv_weight", &torch::jit::prepack_conv_weight);
 }
 
 }  // namespace
