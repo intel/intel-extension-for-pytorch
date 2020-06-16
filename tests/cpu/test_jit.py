@@ -258,8 +258,7 @@ class Tester(TestCase):
         core.enable_auto_dnnl()
 
         core.enable_mix_bf16_fp32()
-        # prepack convolution weight, weight will be a bf16 tensor
-        fused_model = wrap_cpp_module(core._jit_prepack_conv_weight(fused_model._c))
+
         with torch.no_grad():
             # bf16, native path
             result = model(x)

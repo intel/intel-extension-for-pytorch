@@ -58,34 +58,9 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
 
-  // Prepack weight tensor if it's either a *cpu tensor* or a *plain dil tensor*
-  //
-  // Note: weight tensor will not be re-packed unless user has implicitly
-  //       triggered `to_public` by accessing its data
-  //       One caveat is when the input size has changed and prepacked weight
-  //       might not be the best fit for new input size, the weight will not
-  //       be re-packed in such cases, but it still ensures the correctness
-  //
-  // TODO: once semantics of "own shade context" is equivalent to
-  //       "is dil tensor", we could remove the first check below
   dbl::comm::reorder_to_bf16_for_mix_prec(weight);
-  if (!check_tensor_own_shade_context(weight) ||
-      !cpu::ShadeDataContext::isDilOwnTheTensor(weight) ||
-      cpu::ShadeDataContext::getDilTensor(weight).is_public_format()) {
-    auto packed_desc = dil::convolution_forward::expected_weights_desc(
-      weight.sizes().vec(),
-      dil_input.get_data_type(),
-      stride.vec(),
-      padding.vec(),
-      padding.vec(),
-      dilation.vec(),
-      groups,
-      dil::algorithm::convolution_direct,
-      dil::prop_kind::forward,
-      dil_input.get_data_type(),
-      input.sizes().vec());
-    dbl::comm::reorder_to_desc(weight, packed_desc);
-  }
+  dbl::conv::prepack_conv_weights(input, dil_input, 
+    weight, stride, padding, dilation, groups);
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
   dil::tensor dil_output = dbl::conv::conv2d_impl(
@@ -177,7 +152,8 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
 {
   DEBUG("AtenIpexCPUDev::dil_convolution_backward\n");
   at::Tensor grad_output = grad_output_t.is_contiguous() ? grad_output_t : grad_output_t.contiguous();
-
+  CHECK_DNNL_OP_PRE_COND(input);
+  CHECK_DNNL_OP_PRE_COND(weight);
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
   dbl::comm::reorder_to_bf16_for_mix_prec(weight);
@@ -741,6 +717,8 @@ at::Tensor AtenIpexCPUDev::dil_linear_backward_input(
     at::IntArrayRef input_size, const at::Tensor& grad_output, const at::Tensor& weight){
   DEBUG("AtenIpexCPUDev::dil_linear_backward_input\n");
 
+  CHECK_DNNL_OP_PRE_COND(grad_output);
+  CHECK_DNNL_OP_PRE_COND(weight);
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
   dbl::comm::reorder_to_bf16_for_mix_prec(weight);
 
@@ -767,6 +745,9 @@ std::tuple<at::Tensor, at::Tensor> AtenIpexCPUDev::dil_linear_backward_weights(
     const at::Tensor& grad_output, const at::Tensor& input, const at::Tensor& weight, bool bias_defined) {
   DEBUG("AtenIpexCPUDev::dil_linear_backward_weights\n");
 
+  CHECK_DNNL_OP_PRE_COND(input);
+  CHECK_DNNL_OP_PRE_COND(grad_output);
+  CHECK_DNNL_OP_PRE_COND(weight);
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
   dbl::comm::reorder_to_bf16_for_mix_prec(weight);
@@ -798,13 +779,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_linear_backwa
     const at::Tensor& input, const at::Tensor& grad_output,
     const at::Tensor& weight, std::array<bool,3> output_mask) {
   DEBUG("AtenIpexCPUDev::dil_linear_backward\n");
-  CHECK_DNNL_OP_PRE_COND(input);
-  CHECK_DNNL_OP_PRE_COND(grad_output);
-  CHECK_DNNL_OP_PRE_COND(weight);
-
-  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
-  dbl::comm::reorder_to_bf16_for_mix_prec(input);
-  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
 
   at::Tensor grad_input, grad_weight, grad_bias;
   if (output_mask[0]) {
@@ -1307,10 +1281,9 @@ at::Tensor AtenIpexCPUDev::dil__softmax_backward_data(
 
 at::Tensor AtenIpexCPUDev::dil_sigmoid(const at::Tensor& self) {
   DEBUG("AtenIpexCPUDev::dil_sigmoid\n");
-
+  CHECK_DNNL_OP_PRE_COND(self);
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
 
-  CHECK_DNNL_OP_PRE_COND(self);
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
   dil::tensor y;
   dil::eltwise_forward::compute(

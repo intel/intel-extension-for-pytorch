@@ -18,8 +18,6 @@ def script_(obj, optimize=None, _frames_up=0, _rcb=None):
         jit_m = wrap_cpp_module(torch._C._jit_pass_fold_convbn(jit_m._c))
         core.enable_auto_dnnl()
 
-        jit_m = wrap_cpp_module(core._jit_prepack_conv_weight(jit_m._c))
-    
     return jit_m
 
 

@@ -38,16 +38,19 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
   auto weight_contiguous = weight.contiguous();
 
   reorder_to_bf16_for_mix_prec(input_contiguous);
-  reorder_to_bf16_for_mix_prec(weight_contiguous);
-
   dil_input = try_gen_dil_tensor(input_contiguous);
-  dil_weight = try_gen_dil_tensor(weight_contiguous);
+
   if (bias.defined()) {
     auto bias_contiguous = bias.contiguous();
 
     reorder_to_bf16_for_mix_prec(bias_contiguous);
     dil_bias = try_gen_dil_tensor(bias_contiguous);
   }
+
+  reorder_to_bf16_for_mix_prec(weight_contiguous);
+  dbl::conv::prepack_conv_weights(input_contiguous, dil_input, 
+    weight_contiguous, stride, padding, dilation, groups);
+  dil_weight = try_gen_dil_tensor(weight_contiguous);
 
   dil::tensor dil_output = dbl::conv::conv2d_impl(
     dil_input,
@@ -82,17 +85,20 @@ static at::Tensor& dil_convolution_inplace_fusion(
   auto output_contiguous = accumu.contiguous();
 
   reorder_to_bf16_for_mix_prec(input_contiguous);
-  reorder_to_bf16_for_mix_prec(weight_contiguous);
   reorder_to_bf16_for_mix_prec(output_contiguous);
-
   dil_input = try_gen_dil_tensor(input_contiguous);
-  dil_weight = try_gen_dil_tensor(weight_contiguous);
   dil_output = try_gen_dil_tensor(output_contiguous);
+
   if (bias.defined()) {
     auto bias_contiguous = bias.contiguous();
     reorder_to_bf16_for_mix_prec(bias_contiguous);
     dil_bias = try_gen_dil_tensor(bias_contiguous);
   }
+
+  reorder_to_bf16_for_mix_prec(weight_contiguous);
+  dbl::conv::prepack_conv_weights(input_contiguous, dil_input, 
+    weight_contiguous, stride, padding, dilation, groups);
+  dil_weight = try_gen_dil_tensor(weight_contiguous);
 
   dbl::conv::conv2d_inplace_impl(
     dil_input,
