@@ -8,7 +8,7 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-static void upsample_linear_out_dpcpp_kernel(
+static void upsample_nearest_out_dpcpp_kernel(
     Tensor& output,
     const Tensor& input_,
     IntArrayRef output_size,
@@ -54,7 +54,7 @@ static void upsample_linear_out_dpcpp_kernel(
 
   auto resampling_desc = resampling_forward::desc(
       prop_kind::forward,
-      algorithm::resampling_linear,
+      algorithm::resampling_nearest,
       factors,
       *src_desc,
       *dst_desc);
@@ -70,7 +70,7 @@ static void upsample_linear_out_dpcpp_kernel(
       .execute(strm, {{DNNL_ARG_SRC, src}, {DNNL_ARG_DST, dst}});
 }
 
-static void upsample_linear_backward_out_dpcpp_kernel(
+static void upsample_nearest_backward_out_dpcpp_kernel(
     Tensor& grad_input,
     const Tensor& grad_output_,
     IntArrayRef output_size,
@@ -116,7 +116,7 @@ static void upsample_linear_backward_out_dpcpp_kernel(
 
   auto resampling_desc = resampling_forward::desc(
       prop_kind::forward,
-      algorithm::resampling_linear,
+      algorithm::resampling_nearest,
       factors,
       *src_desc,
       *dst_desc);
@@ -124,7 +124,7 @@ static void upsample_linear_backward_out_dpcpp_kernel(
   resampling_pd = resampling_forward::primitive_desc(resampling_pd.get());
 
   auto resampling_bwd_desc = resampling_backward::desc(
-      algorithm::resampling_linear,
+      algorithm::resampling_nearest,
       factors,
       *src_desc,
       resampling_pd.dst_desc());
@@ -147,267 +147,195 @@ static void upsample_linear_backward_out_dpcpp_kernel(
 
 using namespace impl;
 
-Tensor& upsample_trilinear3d_out(
+Tensor& upsample_nearest3d_out(
     Tensor& output,
     const Tensor& input,
     IntArrayRef output_size,
-    bool align_corners,
     c10::optional<double> scales_d,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    upsample_linear_out_dpcpp_kernel(
-        output,
-        input,
-        output_size,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-        scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+  upsample_nearest_out_dpcpp_kernel(
+      output,
+      input,
+      output_size,
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
+      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
   return output;
 }
 
-Tensor upsample_trilinear3d(
+Tensor upsample_nearest3d(
     const Tensor& input,
     IntArrayRef output_size,
-    bool align_corners,
     c10::optional<double> scales_d,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
   auto output = at::empty({0}, input.options());
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    upsample_linear_out_dpcpp_kernel(
-        output,
-        input,
-        output_size,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-        scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+  upsample_nearest_out_dpcpp_kernel(
+      output,
+      input,
+      output_size,
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
+      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
   return output;
 }
 
-Tensor& upsample_trilinear3d_backward_out(
+Tensor& upsample_nearest3d_backward_out(
     Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
-    bool align_corners,
     c10::optional<double> scales_d,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    upsample_linear_backward_out_dpcpp_kernel(
-        grad_input,
-        grad_output,
-        output_size,
-        input_size,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-        scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+  upsample_nearest_backward_out_dpcpp_kernel(
+      grad_input,
+      grad_output,
+      output_size,
+      input_size,
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
+      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
   return grad_input;
 }
 
-Tensor upsample_trilinear3d_backward(
+Tensor upsample_nearest3d_backward(
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
-    bool align_corners,
     c10::optional<double> scales_d,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
   auto grad_input = at::empty({0}, grad_output.options());
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    upsample_linear_backward_out_dpcpp_kernel(
-        grad_input,
-        grad_output,
-        output_size,
-        input_size,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
-        scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+  upsample_nearest_backward_out_dpcpp_kernel(
+      grad_input,
+      grad_output,
+      output_size,
+      input_size,
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
+      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
   return grad_input;
 }
 
-Tensor& upsample_bilinear2d_out(
+Tensor& upsample_nearest2d_out(
     Tensor& output,
     const Tensor& input,
     IntArrayRef output_size,
-    bool align_corners,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    upsample_linear_out_dpcpp_kernel(
-        output,
-        input,
-        output_size,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
+  upsample_nearest_out_dpcpp_kernel(
+      output,
+      input,
+      output_size,
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
   return output;
 }
 
-Tensor upsample_bilinear2d(
+Tensor upsample_nearest2d(
     const Tensor& input,
     IntArrayRef output_size,
-    bool align_corners,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
   auto output = at::empty({0}, input.options());
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    upsample_linear_out_dpcpp_kernel(
-        output,
-        input,
-        output_size,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
+  upsample_nearest_out_dpcpp_kernel(
+      output,
+      input,
+      output_size,
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
   return output;
 }
 
-Tensor& upsample_bilinear2d_backward_out(
+Tensor& upsample_nearest2d_backward_out(
     Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
-    bool align_corners,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    upsample_linear_backward_out_dpcpp_kernel(
-        grad_input,
-        grad_output,
-        output_size,
-        input_size,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
+  upsample_nearest_backward_out_dpcpp_kernel(
+      grad_input,
+      grad_output,
+      output_size,
+      input_size,
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
   return grad_input;
 }
 
-Tensor upsample_bilinear2d_backward(
+Tensor upsample_nearest2d_backward(
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
-    bool align_corners,
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
   auto grad_input = at::empty({0}, grad_output.options());
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    upsample_linear_backward_out_dpcpp_kernel(
-        grad_input,
-        grad_output,
-        output_size,
-        input_size,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
+  upsample_nearest_backward_out_dpcpp_kernel(
+      grad_input,
+      grad_output,
+      output_size,
+      input_size,
+      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
+      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
   return grad_input;
 }
 
-Tensor& upsample_linear1d_out(
+Tensor& upsample_nearest1d_out(
     Tensor& output,
     const Tensor& input,
     IntArrayRef output_size,
-    bool align_corners,
     c10::optional<double> scales) {
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    upsample_linear_out_dpcpp_kernel(
-        output,
-        input,
-        output_size,
-        scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+  upsample_nearest_out_dpcpp_kernel(
+      output,
+      input,
+      output_size,
+      scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
   return output;
 }
 
-Tensor upsample_linear1d(
+Tensor upsample_nearest1d(
     const Tensor& input,
     IntArrayRef output_size,
-    bool align_corners,
     c10::optional<double> scales) {
   auto output = at::empty({0}, input.options());
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    impl::upsample_linear_out_dpcpp_kernel(
-        output,
-        input,
-        output_size,
-        scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+  upsample_nearest_out_dpcpp_kernel(
+      output,
+      input,
+      output_size,
+      scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
   return output;
 }
 
-Tensor& upsample_linear1d_backward_out(
+Tensor& upsample_nearest1d_backward_out(
     Tensor& grad_input,
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
-    bool align_corners,
     c10::optional<double> scales) {
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    upsample_linear_backward_out_dpcpp_kernel(
-        grad_input,
-        grad_output,
-        output_size,
-        input_size,
-        scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+  upsample_nearest_backward_out_dpcpp_kernel(
+      grad_input,
+      grad_output,
+      output_size,
+      input_size,
+      scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
   return grad_input;
 }
 
-Tensor upsample_linear1d_backward(
+Tensor upsample_nearest1d_backward(
     const Tensor& grad_output,
     IntArrayRef output_size,
     IntArrayRef input_size,
-    bool align_corners,
     c10::optional<double> scales) {
   auto grad_input = at::zeros(input_size, grad_output.options());
-  if (align_corners)
-    printf(
-        "we don't support this path by currently as oneDNN don't support this "
-        "algorithm!\n");
-  else
-    upsample_linear_backward_out_dpcpp_kernel(
-        grad_input,
-        grad_output,
-        output_size,
-        input_size,
-        scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+  upsample_nearest_backward_out_dpcpp_kernel(
+      grad_input,
+      grad_output,
+      output_size,
+      input_size,
+      scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
   return grad_input;
 }
 

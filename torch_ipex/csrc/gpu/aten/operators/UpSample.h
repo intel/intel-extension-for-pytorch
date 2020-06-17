@@ -1,8 +1,15 @@
 #include <math.h>
 
 #include <ATen/ATen.h>
+#include <ATen/Config.h>
+#include <ATen/NativeFunctions.h>
 #include <ATen/TensorUtils.h>
+
+#include <core/DPCPPUtils.h>
+#include <core/Runtime.h>
+
 #include <utils/Atomics.h>
+#include <utils/ParamUtils.h>
 
 namespace at {
 namespace dpcpp {
@@ -17,8 +24,6 @@ DPCPP_DEVICE inline scalar_t max(scalar_t a, scalar_t b) {
   return a > b ? a : b;
 }
 
-DPCPP_DEF_K1(nearest_neighbor_4d_dpcpp_kernel);
-DPCPP_DEF_K1(nearest_neighbor_4d_bwd_dpcpp_kernel);
 DPCPP_DEF_K1(bicubic2d);
 DPCPP_DEF_K1(bicubic2d_bwd);
 
@@ -109,15 +114,6 @@ static inline scalar_t area_pixel_compute_source_index(
   }
 }
 
-DPCPP_DEVICE static int nearest_neighbor_compute_source_index(
-    const float scale,
-    int dst_index,
-    int input_size) {
-  const int src_index =
-      min(static_cast<int>(DPCPP::floor(dst_index * scale)), input_size - 1);
-  return src_index;
-}
-
 template <typename scalar_t>
 static scalar_t upsample_get_value_bounded(
     const dpcpp_global_ptr_pt<scalar_t>& data,
@@ -129,8 +125,7 @@ static scalar_t upsample_get_value_bounded(
     int y) {
   int access_x = max(min(x, width - 1), static_cast<int>(0));
   int access_y = max(min(y, height - 1), static_cast<int>(0));
-  return data[batch * height * width * channel +
-              channel * height * width + 
+  return data[batch * height * width * channel + channel * height * width +
               access_y * width + access_x];
 }
 
@@ -146,7 +141,10 @@ static void upsample_increment_value_bounded(
     scalar_t value) {
   int64_t access_x = max(min(x, width - 1), static_cast<int>(0));
   int64_t access_y = max(min(y, height - 1), static_cast<int>(0));
-  atomicAdd(&data[batch * height * width * channel + channel * height * width + access_y * width + access_x], value);
+  atomicAdd(
+      &data[batch * height * width * channel + channel * height * width +
+            access_y * width + access_x],
+      value);
 }
 
 // Based on
@@ -188,6 +186,71 @@ static inline scalar_t cubic_interp1d(
   get_cubic_upsample_coefficients<scalar_t>(coeffs, t);
 
   return x0 * coeffs[0] + x1 * coeffs[1] + x2 * coeffs[2] + x3 * coeffs[3];
+}
+
+static inline void set_params(
+    IntArrayRef input_size,
+    IntArrayRef output_size,
+    dnnl::memory::dims& src_dims,
+    dnnl::memory::dims& dst_dims,
+    std::vector<float>& factors,
+    int64_t ndims,
+    const double& scales_w = 0.0,
+    const double& scales_h = 0.0,
+    const double& scales_d = 0.0) {
+  int64_t n, c, id, ih, iw, od, oh, ow;
+
+  n = input_size[0];
+  c = input_size[1];
+  id = ih = iw = od = oh = ow = 1;
+  if (ndims == 5) {
+    od = output_size[0];
+    oh = output_size[1];
+    ow = output_size[2];
+
+    id = input_size[2];
+    ih = input_size[3];
+    iw = input_size[4];
+  }
+  if (ndims == 4) {
+    oh = output_size[0];
+    ow = output_size[1];
+
+    ih = input_size[2];
+    iw = input_size[3];
+  }
+  if (ndims == 3) {
+    ow = output_size[0];
+    iw = input_size[2];
+  }
+
+  const float depth_scale = scales_d != 0.0
+      ? scales_d
+      : (std::round((float)od / (float)id * 100) / 100);
+  const float height_scale = scales_h != 0.0
+      ? scales_h
+      : (std::round((float)oh / (float)ih * 100) / 100);
+  const float width_scale = scales_w != 0.0
+      ? scales_w
+      : (std::round((float)ow / (float)iw * 100) / 100);
+
+  src_dims = {n, c};
+  dst_dims = {n, c};
+  if (ndims == 5) {
+    factors.push_back(depth_scale);
+    src_dims.push_back(id);
+    dst_dims.push_back(od);
+  }
+  if (ndims >= 4) {
+    factors.push_back(height_scale);
+    src_dims.push_back(ih);
+    dst_dims.push_back(oh);
+  }
+  if (ndims >= 3) {
+    factors.push_back(width_scale);
+    src_dims.push_back(iw);
+    dst_dims.push_back(ow);
+  }
 }
 
 } // namespace dpcpp
