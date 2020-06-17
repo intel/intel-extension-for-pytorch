@@ -13,6 +13,8 @@ import sys
 import torch
 import intel_pytorch_extension as ipex
 
+from common_ipex_conf import AutoMixPrecision, AutoDNNL
+
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from torch.nn import Parameter
