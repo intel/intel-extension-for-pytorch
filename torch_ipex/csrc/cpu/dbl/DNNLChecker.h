@@ -53,6 +53,14 @@ bool dnnl_support_the_memory_layout_of(const std::vector<at::Tensor> &tensor_vec
 bool dnnl_support_the_data_type_of(const std::vector<at::Tensor> &tensor_vec);
 
 /**
+ * Check if the device type of the input tenosrs can be supported by DNNL
+ *
+ * @param tensor_vec input tensors
+ *
+ */
+bool dnnl_support_the_device_type_of(const std::vector<at::Tensor> &tensor_vec);
+
+/**
  * Check if the dimension of the input tenosrs can be supported by DNNL. The dimension
  * of the input tensor should be > 0.
  *
