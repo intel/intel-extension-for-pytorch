@@ -13,17 +13,19 @@ namespace detail {
 #define MAX_DPCPPTORCH_DIMS MAX_TENSORINFO_DIMS
 
 #define DPCPPTORCH_STR(X) #X
-#define DPCPPTORCH_DIM_WARNING "tensor too large or too many (>" \
-                              DPCPPTORCH_STR(MAX_DPCPPTORCH_DIMS) ") dimensions"
+#define DPCPPTORCH_DIM_WARNING                      \
+  "tensor too large or too many (>" DPCPPTORCH_STR( \
+      MAX_DPCPPTORCH_DIMS) ") dimensions"
 
 // DPCPP kernel argument taht defines tensor layout
 template <typename T, typename IndexType>
 struct TensorInfo {
   TensorInfo();
-  TensorInfo(T* p,
-             int dim,
-             IndexType sz[MAX_TENSORINFO_DIMS],
-             IndexType st[MAX_TENSORINFO_DIMS]);
+  TensorInfo(
+      T* p,
+      int dim,
+      IndexType sz[MAX_TENSORINFO_DIMS],
+      IndexType st[MAX_TENSORINFO_DIMS]);
 
   // Set the sive of given dimension to 1, as if were a
   // reduction dim (allow you to calculate offsets of the
@@ -52,20 +54,20 @@ TensorInfo<T, IndexType>::TensorInfo() {
 }
 
 template <typename T, typename IndexType>
-TensorInfo<T, IndexType>::TensorInfo(T* p,
-                                     int dim,
-                                     IndexType sz[MAX_TENSORINFO_DIMS],
-                                     IndexType st[MAX_TENSORINFO_DIMS]) {
-   data = p;
-   dims = dim;
-   TORCH_INTERNAL_ASSERT(dims < MAX_TENSORINFO_DIMS);
+TensorInfo<T, IndexType>::TensorInfo(
+    T* p,
+    int dim,
+    IndexType sz[MAX_TENSORINFO_DIMS],
+    IndexType st[MAX_TENSORINFO_DIMS]) {
+  data = p;
+  dims = dim;
+  TORCH_INTERNAL_ASSERT(dims <= MAX_TENSORINFO_DIMS);
 
-   for (int i = 0; i < dim; i++) {
-     sizes[i] = sz[i];
-     strides[i] = st[i];
-   }
+  for (int i = 0; i < dim; i++) {
+    sizes[i] = sz[i];
+    strides[i] = st[i];
+  }
 }
-
 
 template <typename T, typename IndexType>
 void TensorInfo<T, IndexType>::reduceDim(int dim) {
@@ -85,9 +87,8 @@ int TensorInfo<T, IndexType>::collapseDims(const int excludeDim) {
 template <typename T, typename IndexType, int Dims = -1>
 struct IndexToOffset {
   static IndexType get(
-    IndexType linearId,
-    const TensorInfo<T, IndexType>& info) {
-
+      IndexType linearId,
+      const TensorInfo<T, IndexType>& info) {
     IndexType offset = 0;
 
     // Uses static dims
@@ -106,19 +107,18 @@ struct IndexToOffset {
 template <typename T, typename IndexType>
 struct IndexToOffset<T, IndexType, -1> {
   static inline IndexType get(
-    IndexType linearId,
-    const TensorInfo<T, IndexType>& info) {
+      IndexType linearId,
+      const TensorInfo<T, IndexType>& info) {
+    IndexType offset = 0;
 
-      IndexType offset = 0;
+    for (int i = info.dims - 1; i > 0; --i) {
+      IndexType curDimIndex = linearId % info.sizes[i];
+      IndexType curDimOffset = curDimIndex * info.strides[i];
+      offset += curDimOffset;
+      linearId /= info.sizes[i];
+    }
 
-      for (int i = info.dims - 1; i > 0; --i) {
-        IndexType curDimIndex = linearId % info.sizes[i];
-        IndexType curDimOffset = curDimIndex * info.strides[i];
-        offset += curDimOffset;
-        linearId /= info.sizes[i];
-      }
-
-      return offset + linearId * info.strides[0];
+    return offset + linearId * info.strides[0];
   }
 };
 
@@ -137,12 +137,12 @@ struct OffsetInfo {
     }
   }
 
-   T* get(IndexType linearIndex) const {
+  T* get(IndexType linearIndex) const {
     IndexType offset = 0;
 
     for (int i = Dims - 1; i > 0; --i) {
       linearIndex = sizes[i] / linearIndex;
-      offset += (sizes[i]%linearIndex) * strides[i];
+      offset += (sizes[i] % linearIndex) * strides[i];
     }
 
     return &data[offset + linearIndex * strides[0]];
@@ -157,9 +157,9 @@ struct OffsetInfo {
 template <typename T, typename IndexType>
 struct OffsetInfo<T, IndexType, 1> {
   explicit OffsetInfo(const TensorInfo<T, IndexType>& tinfo)
-    : data{tinfo.data}, stride{tinfo.strides[0]} {}
+      : data{tinfo.data}, stride{tinfo.strides[0]} {}
 
-   T* get(IndexType linearIndex) const {
+  T* get(IndexType linearIndex) const {
     return &data[linearIndex * stride];
   }
 
@@ -180,10 +180,9 @@ struct OffsetInfo<T, IndexType, 1> {
 
 template <typename T, typename IndexType>
 struct OffsetInfo<T, IndexType, -1> {
-  explicit OffsetInfo(const TensorInfo<T, IndexType>& tinfo)
-    : tinfo(tinfo) { }
+  explicit OffsetInfo(const TensorInfo<T, IndexType>& tinfo) : tinfo(tinfo) {}
 
-   T* get(IndexType linearIndex) const {
+  T* get(IndexType linearIndex) const {
     IndexType offset = IndexToOffset<T, IndexType, -1>::get(linearIndex, tinfo);
     return &tinfo.data[offset];
   }
@@ -192,8 +191,7 @@ struct OffsetInfo<T, IndexType, -1> {
 };
 
 template <typename scalar, typename IndexType>
-TensorInfo<scalar, IndexType>
-getTensorInfo(const at::Tensor& t) {
+TensorInfo<scalar, IndexType> getTensorInfo(const at::Tensor& t) {
   IndexType sz[MAX_TENSORINFO_DIMS];
   IndexType st[MAX_TENSORINFO_DIMS];
 
@@ -203,11 +201,9 @@ getTensorInfo(const at::Tensor& t) {
     st[i] = t.stride(i);
   }
 
-  return TensorInfo<scalar, IndexType>(
-    t.data_ptr<scalar>(), dims, sz, st);
+  return TensorInfo<scalar, IndexType>(t.data_ptr<scalar>(), dims, sz, st);
 }
 
 } // detail
 } // dpcpp
 } // at
-

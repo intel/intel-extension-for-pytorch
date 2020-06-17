@@ -1775,6 +1775,38 @@ at::Tensor & AtenIpexTypeDefault::upsample_bicubic2d_out(at::Tensor & out, const
   return AtenIpexTypeDPCPP::upsample_bicubic2d_out(out, self, output_size, align_corners, scales_h, scales_w);
 }
 
+at::Tensor AtenIpexTypeDefault::upsample_bilinear2d(const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
+  return AtenIpexTypeDPCPP::upsample_bilinear2d(self, output_size, align_corners, scales_h, scales_w);
+}
+
+at::Tensor AtenIpexTypeDefault::upsample_bilinear2d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
+  return AtenIpexTypeDPCPP::upsample_bilinear2d_backward(grad_output, output_size, input_size, align_corners, scales_h, scales_w);
+}
+
+at::Tensor & AtenIpexTypeDefault::upsample_bilinear2d_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
+  return AtenIpexTypeDPCPP::upsample_bilinear2d_backward_out(grad_input, grad_output, output_size, input_size, align_corners, scales_h, scales_w);
+}
+
+at::Tensor & AtenIpexTypeDefault::upsample_bilinear2d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
+  return AtenIpexTypeDPCPP::upsample_bilinear2d_out(out, self, output_size, align_corners, scales_h, scales_w);
+}
+
+at::Tensor AtenIpexTypeDefault::upsample_linear1d(const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales) {
+  return AtenIpexTypeDPCPP::upsample_linear1d(self, output_size, align_corners, scales);
+}
+
+at::Tensor AtenIpexTypeDefault::upsample_linear1d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales) {
+  return AtenIpexTypeDPCPP::upsample_linear1d_backward(grad_output, output_size, input_size, align_corners, scales);
+}
+
+at::Tensor & AtenIpexTypeDefault::upsample_linear1d_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales) {
+  return AtenIpexTypeDPCPP::upsample_linear1d_backward_out(grad_input, grad_output, output_size, input_size, align_corners, scales);
+}
+
+at::Tensor & AtenIpexTypeDefault::upsample_linear1d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales) {
+  return AtenIpexTypeDPCPP::upsample_linear1d_out(out, self, output_size, align_corners, scales);
+}
+
 at::Tensor AtenIpexTypeDefault::upsample_nearest2d(const at::Tensor & self, at::IntArrayRef output_size, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   return AtenIpexTypeDPCPP::upsample_nearest2d(self, output_size, scales_h, scales_w);
 }
@@ -1789,6 +1821,22 @@ at::Tensor & AtenIpexTypeDefault::upsample_nearest2d_backward_out(at::Tensor & g
 
 at::Tensor & AtenIpexTypeDefault::upsample_nearest2d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef output_size, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   return AtenIpexTypeDPCPP::upsample_nearest2d_out(out, self, output_size, scales_h, scales_w);
+}
+
+at::Tensor AtenIpexTypeDefault::upsample_trilinear3d(const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
+  return AtenIpexTypeDPCPP::upsample_trilinear3d(self, output_size, align_corners, scales_d, scales_h, scales_w);
+}
+
+at::Tensor AtenIpexTypeDefault::upsample_trilinear3d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
+  return AtenIpexTypeDPCPP::upsample_trilinear3d_backward(grad_output, output_size, input_size, align_corners, scales_d, scales_h, scales_w);
+}
+
+at::Tensor & AtenIpexTypeDefault::upsample_trilinear3d_backward_out(at::Tensor & grad_input, const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
+  return AtenIpexTypeDPCPP::upsample_trilinear3d_backward_out(grad_input, grad_output, output_size, input_size, align_corners, scales_d, scales_h, scales_w);
+}
+
+at::Tensor & AtenIpexTypeDefault::upsample_trilinear3d_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
+  return AtenIpexTypeDPCPP::upsample_trilinear3d_out(out, self, output_size, align_corners, scales_d, scales_h, scales_w);
 }
 
 at::Tensor AtenIpexTypeDefault::var(const at::Tensor & self, bool unbiased) {
@@ -3145,6 +3193,30 @@ void RegisterAtenTypeFunctions() {
   .op(torch::RegisterOperators::options().schema("aten::upsample_bicubic2d.out(Tensor self, int[2] output_size, bool align_corners, float? scales_h=None, float? scales_w=None, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, bool, c10::optional<double>, c10::optional<double>), &AtenIpexTypeDefault::upsample_bicubic2d_out>(c10::DispatchKey::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::upsample_bilinear2d(Tensor self, int[2] output_size, bool align_corners, float? scales_h=None, float? scales_w=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, bool, c10::optional<double>, c10::optional<double>), &AtenIpexTypeDefault::upsample_bilinear2d>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::upsample_bilinear2d_backward(Tensor grad_output, int[2] output_size, int[4] input_size, bool align_corners, float? scales_h=None, float? scales_w=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, at::IntArrayRef, bool, c10::optional<double>, c10::optional<double>), &AtenIpexTypeDefault::upsample_bilinear2d_backward>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::upsample_bilinear2d_backward.grad_input(Tensor grad_output, int[2] output_size, int[4] input_size, bool align_corners, float? scales_h=None, float? scales_w=None, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, at::IntArrayRef, bool, c10::optional<double>, c10::optional<double>), &AtenIpexTypeDefault::upsample_bilinear2d_backward_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::upsample_bilinear2d.out(Tensor self, int[2] output_size, bool align_corners, float? scales_h=None, float? scales_w=None, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, bool, c10::optional<double>, c10::optional<double>), &AtenIpexTypeDefault::upsample_bilinear2d_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::upsample_linear1d(Tensor self, int[1] output_size, bool align_corners, float? scales=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, bool, c10::optional<double>), &AtenIpexTypeDefault::upsample_linear1d>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::upsample_linear1d_backward(Tensor grad_output, int[1] output_size, int[3] input_size, bool align_corners, float? scales=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, at::IntArrayRef, bool, c10::optional<double>), &AtenIpexTypeDefault::upsample_linear1d_backward>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::upsample_linear1d_backward.grad_input(Tensor grad_output, int[1] output_size, int[3] input_size, bool align_corners, float? scales=None, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, at::IntArrayRef, bool, c10::optional<double>), &AtenIpexTypeDefault::upsample_linear1d_backward_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::upsample_linear1d.out(Tensor self, int[1] output_size, bool align_corners, float? scales=None, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, bool, c10::optional<double>), &AtenIpexTypeDefault::upsample_linear1d_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::upsample_nearest2d(Tensor self, int[2] output_size, float? scales_h=None, float? scales_w=None) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, c10::optional<double>, c10::optional<double>), &AtenIpexTypeDefault::upsample_nearest2d>(c10::DispatchKey::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
@@ -3156,6 +3228,18 @@ void RegisterAtenTypeFunctions() {
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::upsample_nearest2d.out(Tensor self, int[2] output_size, float? scales_h=None, float? scales_w=None, *, Tensor(a!) out) -> Tensor(a!)")
       .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, c10::optional<double>, c10::optional<double>), &AtenIpexTypeDefault::upsample_nearest2d_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::upsample_trilinear3d(Tensor self, int[3] output_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, bool, c10::optional<double>, c10::optional<double>, c10::optional<double>), &AtenIpexTypeDefault::upsample_trilinear3d>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::upsample_trilinear3d_backward(Tensor grad_output, int[3] output_size, int[5] input_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> Tensor")
+      .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, at::IntArrayRef, at::IntArrayRef, bool, c10::optional<double>, c10::optional<double>, c10::optional<double>), &AtenIpexTypeDefault::upsample_trilinear3d_backward>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::upsample_trilinear3d_backward.grad_input(Tensor grad_output, int[3] output_size, int[5] input_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None, *, Tensor(a!) grad_input) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, at::IntArrayRef, bool, c10::optional<double>, c10::optional<double>, c10::optional<double>), &AtenIpexTypeDefault::upsample_trilinear3d_backward_out>(c10::DispatchKey::DPCPPTensorId)
+      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
+  .op(torch::RegisterOperators::options().schema("aten::upsample_trilinear3d.out(Tensor self, int[3] output_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None, *, Tensor(a!) out) -> Tensor(a!)")
+      .impl_unboxedOnlyKernel<at::Tensor &(at::Tensor &, const at::Tensor &, at::IntArrayRef, bool, c10::optional<double>, c10::optional<double>, c10::optional<double>), &AtenIpexTypeDefault::upsample_trilinear3d_out>(c10::DispatchKey::DPCPPTensorId)
       .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options().schema("aten::var(Tensor self, bool unbiased=True) -> Tensor")
       .impl_unboxedOnlyKernel<at::Tensor(const at::Tensor &, bool), &AtenIpexTypeDefault::var>(c10::DispatchKey::DPCPPTensorId)
