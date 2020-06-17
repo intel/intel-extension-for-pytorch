@@ -180,9 +180,11 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
       std::vector<at::Tensor> dnnl_input_tensors;
       dnnl_input_tensors.push_back(input);
       dnnl_input_tensors.push_back(weight);
-      dnnl_input_tensors.push_back(bias);
+      if (bias.defined()) {
+        dnnl_input_tensors.push_back(bias);
+      }
       if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
-        return AtenIpexCPUDev::dil_convolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.is_contiguous() ? bias : bias.contiguous(), stride, padding, dilation, groups);
+        return AtenIpexCPUDev::dil_convolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined() && !bias.is_contiguous() ? bias.contiguous() : bias, stride, padding, dilation, groups);
     }
   } catch (std::exception& e) {
 #if defined(_DEBUG)
