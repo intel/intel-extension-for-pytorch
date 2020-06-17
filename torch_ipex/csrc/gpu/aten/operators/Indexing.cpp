@@ -111,15 +111,12 @@ void indexSelect(
   auto src_data = src.data_ptr<scalar_t>();
   auto dst_data = dst.data_ptr<scalar_t>();
   auto idx_data = indices.data_ptr<int64_t>();
-  auto src_size = src.nbytes();
-  auto dst_size = dst.nbytes();
-  auto idx_size = dst.nbytes();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, src_data, src_size);
+    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, src_data);
     auto dst_acc =
-        DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data, dst_size);
-    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data, idx_size);
+        DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data);
+    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data);
 
     __cgh.parallel_for_work_group<DPCPP_K(index_select_ker, scalar_t)>(
         DPCPP::range</*dim=*/1>(num_slices),
@@ -353,15 +350,12 @@ void indexAdd(
   auto src_data = src.data_ptr();
   auto dst_data = dst.data_ptr();
   auto idx_data = indices.data_ptr();
-  auto src_size = src.storage().numel() * (src.dtype().itemsize());
-  auto dst_size = dst.storage().numel() * (dst.dtype().itemsize());
-  auto idx_size = indices.storage().numel() * (indices.dtype().itemsize());
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, src_data, src_size);
+    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, src_data);
     auto dst_acc =
-        DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data, dst_size);
-    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data, idx_size);
+        DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data);
+    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data);
 
     __cgh.parallel_for_work_group<DPCPP_K(index_add_ker, scalar_t)>(
         DPCPP::range</*dim=*/1>(numIndices),
@@ -464,13 +458,11 @@ void indexFill(
 
   auto dst_data = dst.data_ptr();
   auto idx_data = indices.data_ptr();
-  auto dst_size = dst.storage().numel() * (dst.dtype().itemsize());
-  auto idx_size = indices.storage().numel() * (indices.dtype().itemsize());
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto dst_acc =
-        DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data, dst_size);
-    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data, idx_size);
+        DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data);
+    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data);
 
     __cgh.parallel_for_work_group<DPCPP_K(index_fill_ker, scalar_t)>(
         DPCPP::range</*dim=*/1>(numIndices),
