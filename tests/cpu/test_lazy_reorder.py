@@ -882,7 +882,7 @@ class TestTensorShape(TestCase):
             y = torch.randn(new_shape)
             out_cpu = x_cpu_view * y
             # test if the shape of x_dpcpp_view is compatible with y
-            out_dpcpp = x_dpcpp_view * y
+            out_dpcpp = x_dpcpp_view * y.to(device)
             self.assertTrue(ipex.is_dil_tensor(out_dpcpp))
             self.assertEqual(ipex.get_dil_tensor_sizes(out_dpcpp), [1, 4, 4, 4])
             self.assertEqual(ipex.get_dil_tensor_strides(out_dpcpp), [64, 16, 4, 1])
