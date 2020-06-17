@@ -255,7 +255,10 @@ template <typename _Tp, const int N>
 struct get_mask {
   template <typename _Idx, typename _Input>
   _Tp operator()(const _Idx __idx, const _Input& __input) const {
-    return _Tp(__input[__idx]);
+    if (__input[__idx])
+      return _Tp(1);
+    else
+      return _Tp(0);
   }
 };
 
@@ -483,7 +486,7 @@ struct create_mask {
     // 1. apply __pred
     auto __temp = __pred(__input[__idx]);
     // 2. initialize mask
-    __input[__idx] = __temp;
+//    __input[__idx] = __temp;
     return _Tp(__temp);
   }
 };
