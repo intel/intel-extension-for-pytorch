@@ -81,7 +81,7 @@ input = torch.randn(2, 4)
 model = Model()
 res = model(input)
 ```
-You just need to transform the above python script as follows and then the extension will be enabled and accelerate the computation automatically. Besides that the not only imperative mode but also JIT mode.
+You just need to transform the above python script as follows and then the extension will be enabled and accelerate the computation automatically.
 ```python
 import torch
 import torch.nn as nn
