@@ -14,6 +14,7 @@
 #include "dbl/Common.h"
 #include "dbl/Conv.h"
 #include "dbl/Pool.h"
+#include "dbl/DNNLChecker.h"
 #include "ShadeDataContext.h"
 
 #include "dil/dil.hpp"
@@ -173,19 +174,31 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
 
 at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
   DEBUG("AtenIpexCPUDev::convolution_overrideable\n");
-  // NOTE: DO NOT always call contiguous. It may break lazy-reorder. Because contiguous will call reorder instantly.
-  if (check_auto_dnnl()) {
-    return dil_convolution(
-      input.is_contiguous() ? input : input.contiguous(),
-      weight.is_contiguous() ? weight : weight.contiguous(),
-      bias.defined() ? (bias.is_contiguous() ? bias :bias.contiguous()) : bias,
-      stride,
-      padding,
-      dilation,
-      groups);
-  } else {
-    return mkldnn_convolution(input, weight, bias, padding, stride, dilation, groups);
+
+  try {
+    if (check_auto_dnnl()) {
+      std::vector<at::Tensor> dnnl_input_tensors;
+      dnnl_input_tensors.push_back(input);
+      dnnl_input_tensors.push_back(weight);
+      dnnl_input_tensors.push_back(bias);
+      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+        return AtenIpexCPUDev::dil_convolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.is_contiguous() ? bias : bias.contiguous(), stride, padding, dilation, groups);
+    }
+  } catch (std::exception& e) {
+#if defined(_DEBUG)
+    TORCH_WARN(e.what());
+#endif
   }
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bias.layout() == c10::kStrided);
+  auto&& _ipex_input = bridge::shallowFallbackToCPUTensor(input);
+  auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
+  auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
+  auto&& _ipex_result = at::mkldnn_convolution(_ipex_input, _ipex_weight, _ipex_bias, padding, stride, dilation, groups);
+  static_cast<void>(_ipex_result); // Avoid warnings in case not used
+  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
 }
 
 at::Tensor AtenIpexCPUDev::mkldnn_convolution(const at::Tensor & self, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups) {

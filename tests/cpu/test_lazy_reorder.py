@@ -13,6 +13,8 @@ import sys
 import torch
 import intel_pytorch_extension as ipex
 
+from common_ipex_conf import AutoMixPrecision, AutoDNNL
+
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from torch.nn import Parameter
@@ -26,8 +28,6 @@ from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MK
     IS_WINDOWS, PY3, NO_MULTIPROCESSING_SPAWN, do_test_dtypes, do_test_empty_full, \
     IS_SANDCASTLE, load_tests, brute_pdist, brute_cdist, slowTest, \
     skipCUDANonDefaultStreamIf, skipCUDAMemoryLeakCheckIf
-
-from common_ipex_conf import AutoMixPrecision, AutoDNNL
 
 def get_rand_seed():
     return int(time.time() * 1000000000)
@@ -884,7 +884,7 @@ class TestTensorShape(TestCase):
             y = torch.randn(new_shape)
             out_cpu = x_cpu_view * y
             # test if the shape of x_dpcpp_view is compatible with y
-            out_dpcpp = x_dpcpp_view * y
+            out_dpcpp = x_dpcpp_view * y.to(device)
             self.assertTrue(ipex.core.is_dil_tensor(out_dpcpp))
             self.assertEqual(ipex.core.get_dil_tensor_sizes(out_dpcpp), [1, 4, 4, 4])
             self.assertEqual(ipex.core.get_dil_tensor_strides(out_dpcpp), [64, 16, 4, 1])
