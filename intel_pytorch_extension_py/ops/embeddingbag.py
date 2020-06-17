@@ -15,8 +15,13 @@ def embeddingbag(weights, inputs, offsets, scale_grad_by_freq, mode, sparse, per
     else:
         assert(0, "unimplement embeddingbag path in extension")
 '''
+torch_embedding_bag = torch.embedding_bag
+
 def embeddingbag(weights, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights, include_last_offset):
-    ret = EmbeddingBagFunction.apply(weights, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights, include_last_offset)
+    if indices.device==torch.device("dpcpp"):
+        ret = EmbeddingBagFunction.apply(weights, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights, include_last_offset)
+    else:
+        ret = torch_embedding_bag(weights, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights, include_last_offset)
     return ret
 
 
