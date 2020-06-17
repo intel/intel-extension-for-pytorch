@@ -207,7 +207,7 @@ class Tester(TestCase):
 
     def _test_output(self, model, x, kind=None):
         modelName = model.__class__.__name__
-        core.disable_jit()
+        core.disable_jit_opt()
         core.disable_mix_bf16_fp32()
 
         model = model.to(device).eval()
@@ -222,7 +222,7 @@ class Tester(TestCase):
 
         self.assertEqual(result, sresult)
 
-        core.enable_jit()
+        core.enable_jit_opt()
         fused_model = torch.jit.script(model)
         with torch.no_grad():
             # conv relu fusion, conv sum fusion or conv sum relu fusion
@@ -244,7 +244,7 @@ class Tester(TestCase):
         modelName = model.__class__.__name__
 
         core.enable_auto_dnnl()
-        core.enable_jit()
+        core.enable_jit_opt()
         core.disable_mix_bf16_fp32()
 
         model = model.to(ipex.DEVICE).eval()
@@ -300,7 +300,7 @@ class Tester(TestCase):
             torch.randn(32, 3, 112, 112, 112),
             kind="aten::conv3d",
             prec=0.02)
-        
+
 
     def test_output_conv_relu_2d(self):
         self._test_output(
@@ -333,8 +333,8 @@ class Tester(TestCase):
             Conv2dSum(3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
             kind="ipex::conv2d_sum",
-            prec=0.02)
-        
+            prec=0.04)
+
 
     def test_output_conv_sum_3d(self):
         self._test_output(
@@ -345,8 +345,8 @@ class Tester(TestCase):
             Conv3dSum(3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
             kind="ipex::conv3d_sum",
-            prec=0.02)
-        
+            prec=0.04)
+
 
     def test_output_cascaded_conv_bn_sum_relu_2d(self):
         self._test_output(
@@ -358,7 +358,7 @@ class Tester(TestCase):
             torch.rand(32, 3, 224, 224),
             kind="ipex::conv2d_sum_relu",
             prec=0.02)
-        
+
 
     def test_output_cascaded_conv_bn_sum_relu_3d(self):
         self._test_output(
@@ -370,7 +370,7 @@ class Tester(TestCase):
             torch.rand(32, 3, 112, 112, 112),
             kind="ipex::conv3d_sum_relu",
             prec=0.02)
-        
+
 
     def test_output_linear_relu(self):
         self._test_output(

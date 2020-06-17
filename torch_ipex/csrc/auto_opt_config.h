@@ -32,15 +32,8 @@ public:
     return mix_bf16_fp32_;
   }
 
-  inline void set_pure_bf16(bool value) {
-    pure_bf16_ = value;
-  }
-  inline bool get_pure_bf16() {
-    return pure_bf16_;
-  }
-
 private:
-  AutoOptConfig() : auto_dnnl_(false), mix_bf16_fp32_(false), pure_bf16_(false) {}
+  AutoOptConfig() : auto_dnnl_(true), mix_bf16_fp32_(false), jit_fuse_(true) {}
   ~AutoOptConfig() = default;
   AutoOptConfig(const AutoOptConfig&) = default;
   AutoOptConfig& operator=(const AutoOptConfig&) = default;
@@ -49,7 +42,6 @@ private:
   bool auto_dnnl_;
   bool jit_fuse_;
   bool mix_bf16_fp32_;
-  bool pure_bf16_;
 };
 
 } // namespace torch_ipex
