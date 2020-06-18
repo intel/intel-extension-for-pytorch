@@ -52,8 +52,12 @@ void adaptive_avg_pool2d_out_template(
 
   output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols});
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input_.scalar_type(), "adaptive_avg_pool2d", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      input_.scalar_type(),
+      "adaptive_avg_pool2d",
+      [&] {
         auto input_data = input_.data_ptr<scalar_t>();
         auto output_data = output.data_ptr<scalar_t>();
         avg_pool_out_frame<scalar_t>(
@@ -118,8 +122,12 @@ void adaptive_avg_pool2d_backward_out_template(
   auto alg_kind = algorithm::pooling_avg_exclude_padding;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "adaptive_avg_pool2d_backward", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      input.scalar_type(),
+      "adaptive_avg_pool2d_backward",
+      [&] {
         auto gradOutput_data = gradOutput.data_ptr<scalar_t>();
         auto gradInput_data = gradInput.data_ptr<scalar_t>();
         avg_pool_backward_out_frame<scalar_t>(

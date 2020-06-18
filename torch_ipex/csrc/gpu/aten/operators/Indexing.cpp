@@ -911,8 +911,13 @@ void index(
     TensorIterator& iter,
     IntArrayRef index_size,
     IntArrayRef index_stride) {
-  AT_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half, at::ScalarType::Bool, iter.dtype(), "index", [&] {
+  AT_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      iter.dtype(),
+      "index",
+      [&] {
         using dtype = OpaqueType<sizeof(scalar_t)>;
         dpcpp_index_kernel<DPCPP_K(index_kernel, scalar_t)>(
             iter,
@@ -1020,10 +1025,13 @@ Tensor& index_select_out(
     const Tensor& self,
     int64_t dim,
     const Tensor& index) {
-  AT_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Bool, self.scalar_type(), "indexSelect", [&]() {
-        impl::indexSelect<scalar_t>(out, self, dim, index);
-      });
+  AT_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "indexSelect",
+      [&]() { impl::indexSelect<scalar_t>(out, self, dim, index); });
   return out;
 }
 
@@ -1033,8 +1041,9 @@ Tensor index_select(const Tensor& self, int64_t dim, const Tensor& index) {
 }
 
 Tensor& nonzero_out(Tensor& out, const Tensor& self) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  AT_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
+      at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       self.scalar_type(),
       "indexSelect",
@@ -1052,9 +1061,12 @@ Tensor& index_add_(
     int64_t dim,
     const Tensor& index,
     const Tensor& source) {
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "indexAdd", [&]() {
-    impl::indexAdd<scalar_t>(self, dim, index, source);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "indexAdd",
+      [&]() { impl::indexAdd<scalar_t>(self, dim, index, source); });
   return self;
 }
 
@@ -1063,9 +1075,12 @@ Tensor& index_fill_(
     int64_t dim,
     const Tensor& index,
     Scalar value) {
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "indexFill", [&]() {
-    impl::indexFill<scalar_t>(self, dim, index, value);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "indexFill",
+      [&]() { impl::indexFill<scalar_t>(self, dim, index, value); });
   return self;
 }
 
@@ -1084,8 +1099,9 @@ Tensor& index_fill_(
 }
 
 Tensor& diag_out(Tensor& out, const Tensor& self, int64_t diagonal) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  AT_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
+      at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       self.scalar_type(),
       "Diag",
@@ -1144,10 +1160,12 @@ Tensor& masked_scatter_(
 Tensor& masked_select_out(Tensor& out, const Tensor& self, const Tensor& mask) {
   Tensor b_self, b_mask;
   std::tie(b_self, b_mask) = expand_outplace(self, mask, "masked_select_out");
-  AT_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, self.scalar_type(), "MaskedSelect", [&]() {
-        impl::MaskedSelect<scalar_t>(out, b_self, b_mask);
-      });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      self.scalar_type(),
+      "MaskedSelect",
+      [&]() { impl::MaskedSelect<scalar_t>(out, b_self, b_mask); });
   return out;
 }
 
@@ -1261,10 +1279,12 @@ Tensor& _index_put_impl_(
 }
 
 Tensor& take_out(Tensor& out, const Tensor& self, const Tensor& index) {
-  AT_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, self.scalar_type(), "Take", [&]() {
-        impl::Take<scalar_t>(out, self, index);
-      });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      self.scalar_type(),
+      "Take",
+      [&]() { impl::Take<scalar_t>(out, self, index); });
 
   return out;
 }

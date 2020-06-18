@@ -240,6 +240,8 @@ void dnnl_inner_product_forward_frame(
   memory::data_type data_t;
   if (std::is_same<scalar_t, at::Half>::value) {
     data_t = memory::data_type::f16;
+  } else if (std::is_same<scalar_t, at::BFloat16>::value) {
+    data_t = memory::data_type::bf16;
   } else {
     data_t = memory::data_type::f32;
   }
@@ -277,7 +279,9 @@ void dnnl_inner_product_forward_frame(
   bias_usr_memory.reset(new memory({{{}, data_t, format_x}, engine}));
 
   ip_forward.reset(new inner_product_forward(ip_forward_pd));
-  DPCPP_ONEDNN_EXEC(*ip_forward, strm,
+  DPCPP_ONEDNN_EXEC(
+      *ip_forward,
+      strm,
       {{MKLDNN_ARG_SRC, input_usr_memory},
        {MKLDNN_ARG_WEIGHTS, weight_usr_memory},
        {MKLDNN_ARG_BIAS, *bias_usr_memory},

@@ -143,6 +143,23 @@ struct TopKTypeConfig<at::Half> {
   }
 };
 
+template <>
+struct TopKTypeConfig<at::BFloat16> {
+  typedef uint32_t RadixType;
+
+  static inline RadixType convert(at::BFloat16 v) {
+    RadixType x = *((uint16_t*)&v);
+    RadixType mask = -((x >> 15)) | 0x8000;
+    return (x ^ mask);
+  }
+
+  static inline at::BFloat16 deconvert(RadixType v) {
+    RadixType mask = ((v >> 15) - 1) | 0x8000;
+    auto v_de = v ^ mask;
+    return *((at::BFloat16*)&v_de);
+  }
+};
+
 template <typename T>
 struct Bitfield {};
 
@@ -692,9 +709,14 @@ std::tuple<at::Tensor&, at::Tensor&> topk_out(
     bool largest,
     bool sorted) {
   auto dim_ = maybe_wrap_dim(dim, TensorImpl_Unwrap(self));
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "Topk", [&]() {
-    Topk<scalar_t>(values, indices, self, k, dim_, largest, sorted);
-  });
+  AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "Topk",
+      [&]() {
+        Topk<scalar_t>(values, indices, self, k, dim_, largest, sorted);
+      });
 
   return std::forward_as_tuple(values, indices);
 }

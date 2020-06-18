@@ -152,7 +152,7 @@ static void RReLU_updateOutput(
               {
                 double rand = state.uniform();
                 scalar_t r = ScalarConvert<double, scalar_t>::to(rand * (upper-lower) + lower);
-                in_ptr[id] = in_ptr[id] * r;
+                in_ptr[id] = static_cast<scalar_t>(in_ptr[id]) * r;
                 noise_ptr[id] = r;
               }
               else
@@ -189,7 +189,7 @@ static void RReLU_updateOutput(
               {
                 double rand = state.uniform();
                 scalar_t r = ScalarConvert<double, scalar_t>::to(rand * (upper-lower) + lower);
-                out_ptr[id] = in_ptr[id] * r;
+                out_ptr[id] = static_cast<scalar_t>(in_ptr[id]) * r;
                 noise_ptr[id] = r;
               }
               else
@@ -287,7 +287,7 @@ void inline prelu_kernel_share_weights(
         auto out_ptr = out_acc.template get_pointer<scalar_t>();      
         auto in_ptr = in_acc.template get_pointer<scalar_t>();
         auto id = itemId.get_id(0);
-        out_ptr[id] = (in_ptr[id] >= 0) ? in_ptr[id] : weight_val * in_ptr[id];
+        out_ptr[id] = (in_ptr[id] >= 0) ? in_ptr[id] : weight_val * static_cast<scalar_t>(in_ptr[id]);
       });
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -326,7 +326,7 @@ void inline prelu_kernel_multi_weights(
 
         int64_t channel = (id % input_stride0) / input_stride1;
         scalar_t input_data_val = in_ptr[id];
-        out_ptr[id] = (input_data_val > 0) ? input_data_val : weight_ptr[channel] * input_data_val;
+        out_ptr[id] = (input_data_val > 0) ? input_data_val : static_cast<scalar_t>(weight_ptr[channel]) * input_data_val;
       });
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -364,8 +364,8 @@ void inline prelu_backward_kernel_share_weights(
         auto grad_out_ptr = grad_out_acc.template get_pointer<scalar_t>();
         auto id = itemId.get_id(0);
 
-        in_grad_ptr[id] = (in_ptr[id] > 0) ? grad_out_ptr[id] : weight_val * grad_out_ptr[id];
-        weight_grad_collector_ptr[id] = (in_ptr[id] > 0) ? scalar_t(0) : in_ptr[id] * grad_out_ptr[id];
+        in_grad_ptr[id] = (in_ptr[id] > 0) ? grad_out_ptr[id] : weight_val * static_cast<scalar_t>(grad_out_ptr[id]);
+        weight_grad_collector_ptr[id] = (in_ptr[id] > 0) ? scalar_t(0) : static_cast<scalar_t>(in_ptr[id]) * static_cast<scalar_t>(grad_out_ptr[id]);
       });
   };
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
@@ -412,7 +412,7 @@ void inline prelu_backward_kernel_multi_weights(
         int64_t channel = (id % input_stride0) / input_stride1;
         scalar_t input_data_val = in_ptr[id];
         scalar_t grad_out_data_val = grad_out_ptr[id];        
-        in_grad_ptr[id] = (input_data_val > 0) ? grad_out_data_val : weight_ptr[channel] * grad_out_data_val;
+        in_grad_ptr[id] = (input_data_val > 0) ? grad_out_data_val : static_cast<scalar_t>(weight_ptr[channel]) * grad_out_data_val;
         weight_grad_collector_ptr[id] = (input_data_val > 0) ? scalar_t(0) : input_data_val * grad_out_data_val;
       }
     );
@@ -439,7 +439,7 @@ void GeluKernelImpl(const Tensor& X, Tensor& Y){
         auto id = itemId.get_id(0);
 
         Y_ptr[id] = DPCPP::erf(X_ptr[id] * M_SQRT1_2);
-        Y_ptr[id] = (Y_ptr[id]+ scalar_t(1)) * X_ptr[id] * scalar_t(0.5);
+        Y_ptr[id] = (static_cast<scalar_t>(Y_ptr[id]) + scalar_t(1)) * static_cast<scalar_t>(X_ptr[id]) * scalar_t(0.5);
       }
     );
   };
@@ -454,7 +454,7 @@ void GeluBackwardKernelImpl(
   const Tensor& dY,
   const Tensor& X,
   Tensor& dX){
-  constexpr auto kAlpha = M_2_SQRTPI * M_SQRT1_2 * scalar_t(0.5);
+  auto kAlpha = M_2_SQRTPI * M_SQRT1_2 * scalar_t(0.5);
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto total_threads = X.numel();
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -469,7 +469,7 @@ void GeluBackwardKernelImpl(
         auto dX_ptr = dX_acc.template get_pointer<scalar_t>();
         auto id = itemId.get_id(0);
 
-        dX_ptr[id] = DPCPP::exp(-scalar_t(0.5) * X_ptr[id] * X_ptr[id]);
+        dX_ptr[id] = Numerics<scalar_t>::exp(-scalar_t(0.5) * static_cast<scalar_t>(X_ptr[id]) * static_cast<scalar_t>(X_ptr[id]));
         dX_ptr[id] = dY_ptr[id] * 
         (scalar_t(0.5) * (scalar_t(1) + DPCPP::erf(X_ptr[id] * M_SQRT1_2)) + X_ptr[id] * kAlpha * dX_ptr[id]);
       }
@@ -527,13 +527,13 @@ Tensor threshold_backward(
     Scalar threshold) {
   return threshold_out(nullopt, self, threshold, 0, grad);
 }
-//TODO : add at_dispatch for type HALF
+
 Tensor rrelu_with_noise(const Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, Generator * generator){
   auto self_ = self.contiguous();
   Tensor output = at::empty_like(self_);
   auto lower_ = lower.toDouble();
   auto upper_ = upper.toDouble();
-  AT_DISPATCH_FLOATING_TYPES( self.scalar_type(), "RReLU_updateOutput", [&]() {
+  AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateOutput", [&]() {
     impl::RReLU_updateOutput<scalar_t>(
       self,
       output,
@@ -550,7 +550,7 @@ Tensor rrelu_with_noise(const Tensor & self, const Tensor & noise, Scalar lower,
 Tensor & rrelu_with_noise_(Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, Generator * generator){
   auto lower_ = lower.toDouble();
   auto upper_ = upper.toDouble();
-  AT_DISPATCH_FLOATING_TYPES( self.scalar_type(), "RReLU_updateOutput", [&]() {
+  AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateOutput", [&]() {
     impl::RReLU_updateOutput<scalar_t>(
       self,
       self,
@@ -567,7 +567,7 @@ Tensor & rrelu_with_noise_(Tensor & self, const Tensor & noise, Scalar lower, Sc
 Tensor & rrelu_with_noise_out(Tensor & out, const Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, Generator * generator){
   auto lower_ = lower.toDouble();
   auto upper_ = upper.toDouble();
-  AT_DISPATCH_FLOATING_TYPES( self.scalar_type(), "RReLU_updateOutput", [&]() {
+  AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateOutput", [&]() {
     impl::RReLU_updateOutput<scalar_t>(
       self,
       out,
@@ -585,7 +585,7 @@ Tensor rrelu_with_noise_backward(const Tensor & grad_output, const Tensor & self
   Tensor grad_input = at::empty_like(grad_output);
   auto lower_ = lower.toDouble();
   auto upper_ = upper.toDouble();
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF( self.scalar_type(), "RReLU_updateGradInput", [&]() {
+  AT_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateGradInput", [&]() {
     impl::RReLU_updateGradInput<scalar_t>(
       grad_output,
       self,
@@ -620,7 +620,7 @@ Tensor prelu(const Tensor& self, const Tensor& weight_) {
 
   // case1: shared weight for all channels
   if (weight_num == 1) {
-    AT_DISPATCH_FLOATING_TYPES(input.scalar_type(), "prelu", [&] {
+    AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, input.scalar_type(), "prelu", [&] {
       impl::prelu_kernel_share_weights<scalar_t>(result, input, weight);
     });
   }
@@ -641,7 +641,7 @@ Tensor prelu(const Tensor& self, const Tensor& weight_) {
       "Mismatch of parameter numbers and input channel size. Found parameter numbers = ", weight_num,
       " and channel size = ", channel_size, ".");
 
-    AT_DISPATCH_FLOATING_TYPES(input.scalar_type(), "prelu", [&] {
+    AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, input.scalar_type(), "prelu", [&] {
       impl::prelu_kernel_multi_weights<scalar_t>(
         result,
         input,
@@ -674,7 +674,7 @@ std::tuple<Tensor, Tensor> prelu_backward(const Tensor& grad_out_, const Tensor&
 
   // case1: shared parameter for all channels
   if (weight_num == 1) {
-    AT_DISPATCH_FLOATING_TYPES(input.scalar_type(), "prelu_backward", [&] {
+    AT_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, input.scalar_type(), "prelu_backward", [&] {
       impl::prelu_backward_kernel_share_weights<scalar_t>(input, weight, grad_out, input_grad, weight_grad_collector);
     });
     //fix me: fill_() returns RuntimeError when input weight_grad_collector.sum() is without '.item()'
@@ -697,7 +697,7 @@ std::tuple<Tensor, Tensor> prelu_backward(const Tensor& grad_out_, const Tensor&
       "Mismatch of parameter numbers and input channel size. Found parameter numbers = ", weight_num,
       " and channel size = ", channel_size, ".");
 
-    AT_DISPATCH_FLOATING_TYPES(input.scalar_type(), "prelu_backward", [&] {
+    AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, input.scalar_type(), "prelu_backward", [&] {
       impl::prelu_backward_kernel_multi_weights<scalar_t>(
         input,
         weight,
@@ -771,7 +771,7 @@ Tensor hardshrink_backward(
 Tensor gelu(const Tensor & self){
   auto self_ = self.contiguous();
   Tensor Y = at::empty_like(self_);
-  AT_DISPATCH_FLOATING_TYPES(self_.scalar_type(), "GeluKernelImpl", [&](){
+  AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self_.scalar_type(), "GeluKernelImpl", [&](){
     impl::GeluKernelImpl<scalar_t>(self_, Y);
   });
   return Y;
@@ -780,7 +780,7 @@ Tensor gelu(const Tensor & self){
 Tensor gelu_backward(const Tensor & grad, const Tensor & self){
   auto self_ = self.contiguous();
   Tensor dX = at::empty_like(self_);
-  AT_DISPATCH_FLOATING_TYPES(self_.scalar_type(), "GeluBackwardKernelImpl", [&](){
+  AT_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, self_.scalar_type(), "GeluBackwardKernelImpl", [&](){
     impl::GeluBackwardKernelImpl<scalar_t>(grad, self_, dX);
   });
   return dX;

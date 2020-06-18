@@ -414,7 +414,8 @@ Tensor embedding_bag_backward_dpcpp_kernel(
       segment_offset.data_ptr<int64_t>(),
       num_segments);
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+  AT_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
       grad.scalar_type(),
       "embedding_bag_backward_dpcpp_compute_grad_weight",
       [&] {
@@ -822,8 +823,12 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
 
   max_indices = at::zeros({offsets.size(0), weight.size(1)}, indices.options());
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      weight.scalar_type(), "embedding_bag_dpcpp", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      weight.scalar_type(),
+      "embedding_bag_dpcpp",
+      [&] {
         EmbeddingBag_updateOutputKernel<scalar_t>(
             indices.data_ptr<int64_t>(),
             offsets.data_ptr<int64_t>(),

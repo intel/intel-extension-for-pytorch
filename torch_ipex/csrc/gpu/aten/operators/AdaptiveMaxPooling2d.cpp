@@ -68,8 +68,12 @@ void adaptive_max_pool2d_out_template(
   output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
   indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input_.scalar_type(), "adaptive_max_pool2d", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      input_.scalar_type(),
+      "adaptive_max_pool2d",
+      [&] {
         scalar_t* input_data = input_.data_ptr<scalar_t>();
         scalar_t* output_data = output.data_ptr<scalar_t>();
         int64_t* indices_data = indices.data_ptr<int64_t>();
@@ -136,8 +140,12 @@ Tensor& adaptive_max_pool2d_backward_out_template(
   auto alg_kind = algorithm::pooling_max;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  AT_DISPATCH_FLOATING_TYPES(
-      input.scalar_type(), "adaptive_max_pool2d_backward", [&] {
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      input.scalar_type(),
+      "adaptive_max_pool2d_backward",
+      [&] {
         /* get raw pointers */
         scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();
         scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();

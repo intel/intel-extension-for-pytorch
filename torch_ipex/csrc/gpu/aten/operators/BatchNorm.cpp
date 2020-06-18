@@ -210,15 +210,20 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm(
       Backend::DPCPP);
 
   if (input.scalar_type() != at::ScalarType::Float &&
-      input.scalar_type() != at::ScalarType::Half) {
+      input.scalar_type() != at::ScalarType::Half &&
+      input.scalar_type() != at::ScalarType::BFloat16) {
     // TODO: add more scalar type support.
     std::stringstream ss;
     ss << "DPCPP batch_norm backend got unsupported type="
        << input.scalar_type();
     TORCH_CHECK(0, ss.str());
   } else
-    return AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-        input.scalar_type(), "batch_norm", [&] {
+    return AT_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        input.scalar_type(),
+        "batch_norm",
+        [&] {
           return impl::batch_norm_template<scalar_t>(
               input,
               weight,
@@ -284,7 +289,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   memory::format_tag dnnl_format;
   memory::dims input_tz;
   impl::get_dnnl_format(input, dnnl_format, input_tz);
-  auto data_t = memory::data_type::f32;
+  auto data_t = dt_to_dnnl(input.scalar_type());
 
   auto input_md = memory::desc({input_tz}, data_t, dnnl_format);
   auto grad_output_md = input_md;
