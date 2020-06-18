@@ -162,7 +162,7 @@
 #define SCALAR_ARGS_DECL_2 SCALAR_ARGS_DECL_1, Scalar val2
 #define SCALAR_ARGS_DECL_3 SCALAR_ARGS_DECL_2, Scalar val3
 
-#define IPEX_INT_CALLABLE_OPS(                                       \
+#define IPEX_INT_OR_FLOAT_CALLABLE_OPS(                                       \
     op, callable, types, oprand_num, arg_num, callable_args_num)     \
   namespace impl {                                                   \
   IMPLEMENT_POINTWISE_##oprand_num##_CALLABLE_##callable_args_num(   \
@@ -212,7 +212,7 @@
   IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND2, 1, 2, 0)
 
 #define IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(op, callable) \
-  IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND_HALF, 1, 2, 0)
+  IPEX_INT_OR_FLOAT_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND_HALF, 1, 2, 0)
 
 #define IPEX_ALL_CALLABLE_1_UNARY_OPS(op, callable) \
   IPEX_CALLABLE_OPS(op, callable, ALL_TYPES_AND2, 1, 11 /* inplace */, 1)
@@ -221,7 +221,7 @@
   IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND2, 1, 11 /* inplace */, 1)
 
 #define IPEX_INT_CALLABLE_1_UNARY_OPS(op, callable) \
-  IPEX_INT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 11 /* inplace */, 1)
+  IPEX_INT_OR_FLOAT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 11 /* inplace */, 1)
 
 #define IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(op, callable) \
   IPEX_CALLABLE_OPS(op, callable, ALL_TYPES_AND2, 1, 2, 1)
@@ -230,7 +230,7 @@
   IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND2, 1, 2, 1)
 
 #define IPEX_OUT_INT_CALLABLE_1_UNARY_OPS(op, callable) \
-  IPEX_INT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 2, 1)
+  IPEX_INT_OR_FLOAT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 2, 1)
 
 #define IPEX_ALL_CALLABLE_2_UNARY_OPS(op, callable) \
   IPEX_CALLABLE_OPS(op, callable, ALL_TYPES_AND2, 1, 11 /* inplace */, 2)
@@ -239,7 +239,7 @@
   IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND2, 1, 11 /* inplace */, 2)
 
 #define IPEX_INT_CALLABLE_2_UNARY_OPS(op, callable) \
-  IPEX_INT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 11 /* inplace */, 2)
+  IPEX_INT_OR_FLOAT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 11 /* inplace */, 2)
 
 #define IPEX_OUT_ALL_CALLABLE_2_UNARY_OPS(op, callable) \
   IPEX_CALLABLE_OPS(op, callable, ALL_TYPES_AND2, 1, 2, 2)
@@ -248,7 +248,7 @@
   IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND2, 1, 2, 2)
 
 #define IPEX_OUT_INT_CALLABLE_2_UNARY_OPS(op, callable) \
-  IPEX_INT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 2, 2)
+  IPEX_INT_OR_FLOAT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 1, 2, 2)
 
 // Binary
 #define IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(op, callable) \
@@ -258,7 +258,7 @@
   IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND2, 2, 3, 0)
 
 #define IPEX_OUT_INT_CALLABLE_0_BINARY_OPS(op, callable) \
-  IPEX_INT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 0)
+  IPEX_INT_OR_FLOAT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 0)
 
 #define IPEX_OUT_ALL_CALLABLE_1_BINARY_OPS(op, callable) \
   IPEX_CALLABLE_OPS(op, callable, ALL_TYPES_AND2, 2, 3, 1)
@@ -267,7 +267,7 @@
   IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND2, 2, 3, 1)
 
 #define IPEX_OUT_INT_CALLABLE_1_BINARY_OPS(op, callable) \
-  IPEX_INT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 1)
+  IPEX_INT_OR_FLOAT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 1)
 
 #define IPEX_OUT_ALL_CALLABLE_2_BINARY_OPS(op, callable) \
   IPEX_CALLABLE_OPS(op, callable, ALL_TYPES_AND2, 2, 3, 2)
@@ -276,7 +276,7 @@
   IPEX_CALLABLE_OPS(op, callable, FLOATING_TYPES_AND2, 2, 3, 2)
 
 #define IPEX_OUT_INT_CALLABLE_2_BINARY_OPS(op, callable) \
-  IPEX_INT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 2)
+  IPEX_INT_OR_FLOAT_CALLABLE_OPS(op, callable, INTEGRAL_TYPES, 2, 3, 2)
 
 template <typename T>
 struct TensorATan2Op {
