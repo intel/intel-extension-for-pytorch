@@ -94,8 +94,7 @@ static void col2im_kernel(
     const int64_t dilation_w,
     T* data_im) {
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  auto total_threads = channels * output_width * output_height;
-
+  auto total_threads = channels * width * height;
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, data_col);
     auto out_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, data_im);
