@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Dispatch.h>
 #include <ATen/ExpandUtils.h>
+#include <torch/csrc/autograd/record_function.h>
 
 #include <core/TensorImplUtils.h>
 
@@ -13,17 +14,36 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
+
+#if defined(USE_COMPUTECPP)
+Tensor computecpp_workaround(const Tensor& t) {
+  if (dpcppGetBufferMap().get_offset(t.data_ptr()) != 0) {
+    return t.clone();
+  }
+  return t;
+}
+
 template <typename scalar_t>
 void mkldnnGemmImpl(
     Tensor& result_,
     scalar_t beta,
     scalar_t alpha,
     const Tensor& m1_,
-    const Tensor& m2_) {
-  Tensor result = result_.contiguous();
-  Tensor m1 = m1_.contiguous();
-  Tensor m2 = m2_.contiguous();
-
+    const Tensor& m2_,
+    bool with_relu) {
+  Tensor result = computecpp_workaround(result_);
+  Tensor m1 = computecpp_workaround(m1_);
+  Tensor m2 = computecpp_workaround(m2_);
+#else
+template <typename scalar_t>
+void mkldnnGemmImpl(
+    Tensor& result,
+    scalar_t beta,
+    scalar_t alpha,
+    const Tensor& m1,
+    const Tensor& m2,
+    bool with_relu) {
+#endif
   size_t dims = result.dim();
   TORCH_CHECK(dims == 2 || dims == 3, "mkldnn matmul only works with 2D or 3D, got ", dims);
   TORCH_CHECK(dims == m1.dim() && dims == m2.dim(), "mkldnn input matrixes must have the same ranks");
@@ -64,13 +84,14 @@ void mkldnnGemmImpl(
   }
 
   primitive_attr attr;
+  post_ops po;
   if (alpha != 1.f)
     attr.set_output_scales(/* mask */ 0, {(float)alpha});
-  if (beta != 0.f) {
-    post_ops po;
+  if (beta != 0.f)
     po.append_sum(beta);
-    attr.set_post_ops(po);
-  }
+  if (with_relu)
+    po.append_eltwise(1.f, dnnl::algorithm::eltwise_relu, 0.f, 0.f);;
+  attr.set_post_ops(po);
 
   at::Device curDevice = at::Device(at::kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
@@ -96,10 +117,10 @@ void mkldnnGemmImpl(
     {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
       {DNNL_ARG_DST, r_memory}});
 
-
+#if defined(USE_COMPUTECPP)
   if (!result_.is_same(result))
     result_.copy_(result_);
-
+#endif
 }
 
 bool check_broadcast(const Tensor& src, const IntArrayRef& shape){
@@ -123,7 +144,8 @@ void gemm_broadcast(Tensor& result,
                     const Tensor& m2,
                     scalar_t beta,
                     scalar_t alpha,
-                    const Tensor bias = at::Tensor()) {
+                    const Tensor bias = at::Tensor(),
+                    bool with_relu = false) {
   std::vector<int64_t> result_shape;
   auto dim = m1.dim();
   if (dim == 2) {
@@ -141,7 +163,7 @@ void gemm_broadcast(Tensor& result,
   } else {
     result.resize_(result_shape);
   }
-  mkldnnGemmImpl(result, beta, alpha, m1, m2);
+  mkldnnGemmImpl(result, beta, alpha, m1, m2, with_relu);
 }
 } // namespace impl
 
@@ -299,5 +321,36 @@ Tensor bmm(const Tensor& self, const Tensor& batch2) {
   at::AtenIpexTypeDPCPP::bmm_out(result, self, batch2);
   return result;
 }
+
+// FIXME: should not be here
+Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & bias) {
+  RECORD_FUNCTION("linear_relu",
+                  std::vector<c10::IValue>({input, weight, bias}));
+  if (input.dim() == 2 && bias.defined()) {
+    // Fused op is marginally faster.
+    checkBackend("linear_relu", {input, weight, bias}, Backend::DPCPP);
+    TORCH_CHECK(input.dim() == 2, "expected 2D tensor");
+    TORCH_CHECK(weight.dim() == 2, "expected 2D tensor");
+
+    auto result = at::empty({0}, input.options());
+    AT_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      result.scalar_type(),
+      "linear_relu",
+      [&]() {
+        impl::gemm_broadcast(result, input, weight.t(), 1.f, 1.f, bias, true);
+      });
+
+    return result;
+  }
+
+  auto output = at::matmul(input, weight.t());
+  if (bias.defined()) {
+    output.add_(bias);
+  }
+  return at::relu(output);
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
