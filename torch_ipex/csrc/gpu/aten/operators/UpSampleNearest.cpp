@@ -45,7 +45,7 @@ static void upsample_nearest_out_dpcpp_kernel(
   memory::format_tag data_format = ndims == 5
       ? memory::format_tag::ncdhw
       : (ndims == 4 ? memory::format_tag::nchw : memory::format_tag::ncw);
-  memory::data_type data_type = dt_to_dnnl(input.type().scalarType());
+  memory::data_type data_type = dt_to_dnnl(input.scalar_type());
 
   std::shared_ptr<memory::desc> src_desc, dst_desc;
   src_desc.reset(new memory::desc(src_dims, data_type, data_format));
@@ -66,8 +66,8 @@ static void upsample_nearest_out_dpcpp_kernel(
   memory dst(resampling_pd.dst_desc(), eng);
   dpcpp_set_mkldnn_buffer(output.data_ptr(), dst);
 
-  resampling_forward(resampling_pd)
-      .execute(strm, {{DNNL_ARG_SRC, src}, {DNNL_ARG_DST, dst}});
+  DPCPP_ONEDNN_EXEC(resampling_forward(resampling_pd),
+      strm, {{DNNL_ARG_SRC, src}, {DNNL_ARG_DST, dst}});
 }
 
 static void upsample_nearest_backward_out_dpcpp_kernel(
@@ -107,7 +107,7 @@ static void upsample_nearest_backward_out_dpcpp_kernel(
   memory::format_tag data_format = ndims == 5
       ? memory::format_tag::ncdhw
       : (ndims == 4 ? memory::format_tag::nchw : memory::format_tag::ncw);
-  memory::data_type data_type = dt_to_dnnl(grad_output.type().scalarType());
+  memory::data_type data_type = dt_to_dnnl(grad_output.scalar_type());
 
   std::shared_ptr<memory::desc> src_desc, dst_desc;
   src_desc.reset(new memory::desc(src_dims, data_type, data_format));
@@ -138,9 +138,8 @@ static void upsample_nearest_backward_out_dpcpp_kernel(
   memory grad_dst(resampling_bwd_pd.diff_dst_desc(), eng);
   dpcpp_set_mkldnn_buffer(grad_output.data_ptr(), grad_dst);
 
-  resampling_backward(resampling_bwd_pd)
-      .execute(
-          strm, {{DNNL_ARG_DIFF_SRC, grad_src}, {DNNL_ARG_DIFF_DST, grad_dst}});
+  DPCPP_ONEDNN_EXEC(resampling_backward(resampling_bwd_pd),
+      strm, {{DNNL_ARG_DIFF_SRC, grad_src}, {DNNL_ARG_DIFF_DST, grad_dst}});
 }
 
 } // namespace impl
