@@ -661,7 +661,6 @@ class TestPool(TestCase):
             y_cpu,
             y_dpcpp)
 
-        self.assertEqual("cpu", y_cpu.device.type)
         self.assertEqual(device, y_dpcpp.device.type)
 
     def test_adaptive_avg_pool2d_backward_not_divisible(self):
@@ -682,10 +681,7 @@ class TestPool(TestCase):
         y_dpcpp.backward()
         self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
-        self.assertEqual("cpu", x_cpu.grad.device.type)
         self.assertEqual(device, x_dpcpp.grad.device.type)
-
-        self.assertEqual("cpu", y_cpu.device.type)
         self.assertEqual(device, y_dpcpp.device.type)
 
     def test_max_pool2d(self):
@@ -735,7 +731,6 @@ class TestPool(TestCase):
                     y_dpcpp = max_pool2d(x_dpcpp)
                     self.assertEqual(y_cpu, y_dpcpp)
 
-                    self.assertEqual("cpu", y_cpu.device.type)
                     self.assertEqual(device, y_dpcpp.device.type)
 
     def test_max_pool3d(self):
@@ -805,10 +800,7 @@ class TestPool(TestCase):
             y2.backward()
             self.assertEqual(x1.grad, x2.grad)
 
-            self.assertEqual("cpu", x1.grad.device.type)
             self.assertEqual(device, x2.grad.device.type)
-
-            self.assertEqual("cpu", y1.device.type)
             self.assertEqual(device, y2.device.type)
 
     def test_max_pool3d_backward(self):

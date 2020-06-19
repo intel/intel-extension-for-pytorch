@@ -76,9 +76,9 @@ class NewMaxPoolingOp : public torch::autograd::Function<NewMaxPoolingOp> {
             ctx->save_for_backward({input, output});
             return output;
           }
-        } catch(std::exception& e) {
+        } catch (std::exception& e) {
 #if defined(_DEBUG)
-    TORCH_WARN(e.what());
+          TORCH_WARN(e.what());
 #endif
         }
         at::Tensor output, indices;
@@ -117,9 +117,9 @@ class NewMaxPoolingOp : public torch::autograd::Function<NewMaxPoolingOp> {
               grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), indices.is_contiguous() ? indices : indices.contiguous(), input.is_contiguous() ? input : input.contiguous(), kernel_size, stride, padding, dilation, ceil_mode);
           return {grad_input, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor()};
         }
-      } catch(std::exception& e) {
+      } catch (std::exception& e) {
 #if defined(_DEBUG)
-    TORCH_WARN(e.what());
+        TORCH_WARN(e.what());
 #endif
       }
       if (input.device().type() == c10::DeviceType::DPCPP) {
@@ -150,9 +150,9 @@ class NewApaptiveAvgPoolingOp : public torch::autograd::Function<NewApaptiveAvgP
           if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
             return torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(input.is_contiguous() ? input : input.contiguous(), output_size);
           } 
-        } catch(std::exception& e) {
+        } catch (std::exception& e) {
 #if defined(_DEBUG)
-    TORCH_WARN(e.what());
+          TORCH_WARN(e.what());
 #endif
         }
         if (input.device().type() == c10::DeviceType::DPCPP) {
@@ -179,9 +179,9 @@ class NewApaptiveAvgPoolingOp : public torch::autograd::Function<NewApaptiveAvgP
           grad_input = torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), input.is_contiguous() ? input : input.contiguous());
           return {grad_input, at::Tensor()};
         }
-      } catch(std::exception& e) {
+      } catch (std::exception& e) {
 #if defined(_DEBUG)
-    TORCH_WARN(e.what());
+        TORCH_WARN(e.what());
 #endif
       }
       if (input.device().type() == c10::DeviceType::DPCPP) {
