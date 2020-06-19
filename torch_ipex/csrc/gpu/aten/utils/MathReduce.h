@@ -91,9 +91,9 @@ DPCPP_DEVICE void kernelTransformReduceInnermostDimIndex(
   int64_t batch = totalElements / (n * stride);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data, src_size);
-    auto tgt1_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tgt1_data, tgt1_size);
-    auto tgt2_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tgt2_data, tgt2_size);
+    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data);
+    auto tgt1_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tgt1_data);
+    auto tgt2_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tgt2_data);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto src_ptr = src_acc.template get_pointer<K>();
@@ -162,9 +162,9 @@ DPCPP_DEVICE void kernelTransformReduceOuterDimIndex(
   int64_t batch = totalElements / (n * stride);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data, src_size);
-    auto tgt1_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tgt1_data, tgt1_size);
-    auto tgt2_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tgt2_data, tgt2_size);
+    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data);
+    auto tgt1_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tgt1_data);
+    auto tgt2_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tgt2_data);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto src_ptr = src_acc.template get_pointer<K>();

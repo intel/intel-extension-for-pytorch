@@ -35,8 +35,8 @@ typename std::enable_if<!IS_HALF(scalar_t), void>::type scanThrust(
 
   auto& queue = getCurrentDPCPPStream().dpcpp_queue();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data, src_size);
-    auto acc_dst = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dst_data, dst_size);
+    auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data);
+    auto acc_dst = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dst_data);
     // (TODO) single_task need replaced due to low efficiency
     cgh.single_task<scanthrust_dpcpp_ker<scalar_t, BinaryFunction>>([=]() {
       auto ptr_dst = acc_dst.template get_pointer<scalar_t>();
@@ -69,8 +69,8 @@ void scanOuterDim(
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data, src_size);
-    auto tgt_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tgt_data, tgt_size);
+    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data);
+    auto tgt_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tgt_data);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto src_ptr = src_acc.template get_pointer<scalar_t>();
@@ -120,8 +120,8 @@ void scanInnermostDim(
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data, src_size);
-    auto tgt_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tgt_data, tgt_size);
+    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data);
+    auto tgt_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tgt_data);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto src_ptr = src_acc.template get_pointer<scalar_t>();

@@ -40,8 +40,7 @@ static inline void embedding_backward_dpcpp_kernel(
     int64_t rng, GRange, tileSize;
 
     // KER1: calc indices count for each
-    auto idx_acc = DPCPPAccessor<read_mode>(
-        cgh, indices_data, num_indices * sizeof(int64_t));
+    auto idx_acc = DPCPPAccessor<read_mode>(cgh, indices_data);
 
     if (scale_grad_by_freq) {
       auto idx_cnt_acc = idx_cnt.get_access<write_mode>(cgh);
@@ -63,10 +62,8 @@ static inline void embedding_backward_dpcpp_kernel(
 
     // KER2: calc gradient weight
     auto idx_cnt_acc = idx_cnt.get_access<read_mode>(cgh);
-    auto g_acc = DPCPPAccessor<read_mode>(
-        cgh, grad_data, num_indices * stride * sizeof(scalar_t));
-    auto gw_acc = DPCPPAccessor<rw_mode, scalar_t>(
-        cgh, grad_weight_data, numel_weights * sizeof(scalar_t));
+    auto g_acc = DPCPPAccessor<read_mode>(cgh, grad_data);
+    auto gw_acc = DPCPPAccessor<rw_mode, scalar_t>(cgh, grad_weight_data);
 
     parallel_for_setup(stride, tileSize, rng, GRange);
     cgh.parallel_for<embedding_dense_backeward_dpcpp_ker<scalar_t>>(

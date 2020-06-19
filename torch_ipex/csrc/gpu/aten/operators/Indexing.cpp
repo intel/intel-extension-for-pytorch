@@ -648,10 +648,8 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
 
   // command group functions
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_maskLong =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, maskLong_data, maskLong_size);
-    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_discard_w_mode>(
-        cgh, maskPrefixSum_data, maskPrefixSum_size);
+    auto acc_maskLong = DPCPPAccessor<dpcpp_r_mode>(cgh, maskLong_data);
+    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, maskPrefixSum_data);
 
     // kernel function per work-item
     auto kfn = DPCPP_Q_KFN() {
@@ -756,9 +754,9 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
   // command group functions
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto acc_maskLong =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, maskLong_data, maskLong_size);
+        DPCPPAccessor<dpcpp_r_mode>(cgh, maskLong_data);
     auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_discard_w_mode>(
-        cgh, maskPrefixSum_data, maskPrefixSum_size);
+        cgh, maskPrefixSum_data);
 
     // kernel function per work-item
     auto kfn = DPCPP_Q_KFN() {

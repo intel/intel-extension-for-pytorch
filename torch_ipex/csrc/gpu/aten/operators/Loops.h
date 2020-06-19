@@ -305,9 +305,9 @@ static inline void dpcpp_binary_loop(
   int64_t rng, GRange, tileSize;
   parallel_for_setup(n, tileSize, rng, GRange);
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in1_Acc = DPCPPAccessor<read_mode>(cgh, in1_ptr, n * s1);
-    auto in2_Acc = DPCPPAccessor<read_mode>(cgh, in2_ptr, n * s2);
-    auto out_Acc = DPCPPAccessor<write_mode>(cgh, out_ptr, n * s0);
+    auto in1_Acc = DPCPPAccessor<read_mode>(cgh, in1_ptr);
+    auto in2_Acc = DPCPPAccessor<read_mode>(cgh, in2_ptr);
+    auto out_Acc = DPCPPAccessor<write_mode>(cgh, out_ptr);
     cgh.parallel_for<KernelName<op_type, arg0_t, arg1_t, arg2_t>>(
         DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
         [=](DPCPP::nd_item<1> item) {

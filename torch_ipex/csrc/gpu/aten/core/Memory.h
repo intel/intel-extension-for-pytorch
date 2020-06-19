@@ -66,13 +66,13 @@ class DPCPPAccessor {
                       .template get_access<AccMode, global_access>(cgh)) {}
 
   DPCPPAccessor(DPCPP::handler& cgh, const void* virtual_ptr, size_t n_bytes)
-      : offset_(dpcppGetBufferMap().get_offset(virtual_ptr)),
+      : offset_(0),
         accessor_(dpcppGetBufferMap()
                       .template get_buffer<ScalarT>(virtual_ptr)
                       .template get_access<AccMode, global_access>(
                           cgh,
                           DPCPP::range<1>(n_bytes),
-                          DPCPP::id<1>(offset_))) {}
+                          DPCPP::id<1>(dpcppGetBufferMap().get_offset(virtual_ptr)))) {}
 
   const Accessor& get_access() const {
     return accessor_;

@@ -585,12 +585,12 @@ static void launch_reduce_kernel(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, reduction.src);
     auto out0_acc = DPCPPAccessor<dpcpp_discard_w_mode>(
-        cgh, reduction.dst0, sizeof(output_t) * config.num_outputs);
+        cgh, reduction.dst0);
     auto out1_acc = reduction.noutputs <= 1
         ? DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dummy_buffer)
         : // dummy
         DPCPPAccessor<dpcpp_discard_w_mode>(
-            cgh, reduction.dst1, sizeof(output_t) * config.num_outputs);
+            cgh, reduction.dst1);
     auto local_acc = dpcpp_local_acc_t<acc_t>(config.work_group_size, cgh);
 
     auto global_reduce_acc = config.should_global_reduce()

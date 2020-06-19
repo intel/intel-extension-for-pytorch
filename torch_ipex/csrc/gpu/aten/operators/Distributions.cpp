@@ -57,8 +57,7 @@ void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
   auto cgf_2 = DPCPP_Q_CGF(cgh) {
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
-    auto out_acc =
-        DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size);
+    auto out_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>());
     cgh.parallel_for<DPCPP_K(bernoulli_scalar_dpcpp_ker, scalar_t)>(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size)),
@@ -100,9 +99,9 @@ void bernoulli_tensor_kernel(Tensor& ret, const Tensor& p, uint64_t seed) {
   // Generate final bernoulli distributions
   auto cgf2 = DPCPP_Q_CGF(cgh) {
     auto in_acc =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, p.data_ptr<scalar_t>(), size);
+        DPCPPAccessor<dpcpp_r_mode>(cgh, p.data_ptr<scalar_t>());
     auto out_acc =
-        DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size);
+        DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>());
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
