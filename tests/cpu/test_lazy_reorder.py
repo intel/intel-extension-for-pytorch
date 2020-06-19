@@ -11,8 +11,9 @@ from functools import reduce
 import copy
 import sys
 import torch
-import _torch_ipex as ipex
-import intel_pytorch_extension
+import intel_pytorch_extension as ipex
+
+from common_ipex_conf import AutoMixPrecision, AutoDNNL
 
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -31,7 +32,7 @@ from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MK
 def get_rand_seed():
     return int(time.time() * 1000000000)
 
-device = torch.device("dpcpp:0")
+device = ipex.DEVICE
 class TestConv(TestCase):
     def test_Conv2d_with_cpu(self):
         rand_seed = int(get_rand_seed())
@@ -46,10 +47,10 @@ class TestConv(TestCase):
         input_cpu = torch.rand((1, 1, 7, 7))
         input_dpcpp = input_cpu.to(device=device)
 
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         out_dpcpp = conv_dpcpp(input_dpcpp)
 
-        ipex.disable_auto_dnnl()
+        ipex.core.disable_auto_dnnl()
         out_dpcpp_cpu = out_dpcpp.to('cpu')
         out_cpu = conv_cpu(input_cpu)
         self.assertEqual(out_dpcpp.size(), out_cpu.size())
@@ -59,7 +60,7 @@ class TestConv(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         with torch.backends.mkldnn.flags(enabled=False):
             input = torch.rand((1, 1, 7, 7))
             for bias in [True, False]:
@@ -88,18 +89,18 @@ class TestConv(TestCase):
         return out_dpcpp3
 
     def test_seq_conv(self):
-        ipex.disable_auto_dnnl()
+        ipex.core.disable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         res_cpu = self._seq_conf('cpu', rand_seed)
 
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         res_dpcpp = self._seq_conf(device, rand_seed)
         self.assertEqual(res_cpu, res_dpcpp.to('cpu'))
 
 class TestBinaryOp(TestCase):
     def test_add(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -139,25 +140,25 @@ class TestBinaryOp(TestCase):
         return a1
 
     def test_add_(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        res_dcpp_dnnl = self._test_add_("dpcpp:0", rand_seed)
+        res_dcpp_dnnl = self._test_add_(device, rand_seed)
 
-        ipex.disable_auto_dnnl()
-        res_dcpp_cpu = self._test_add_("dpcpp:0", rand_seed)
+        ipex.core.disable_auto_dnnl()
+        res_dcpp_cpu = self._test_add_(device, rand_seed)
 
         res_cpu = self._test_add_("cpu", rand_seed)
         self.assertEqual(res_cpu, res_dcpp_cpu.to('cpu'))
         self.assertEqual(res_cpu, res_dcpp_dnnl.to('cpu'))
 
     def test_add_scalar(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         a = torch.rand((8, 8)).to(device=device)
         a += 2
 
     def test_mul(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -194,7 +195,7 @@ class TestBinaryOp(TestCase):
         return a
 
     def test_mul_(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         a1 = self._test_mul_(device, rand_seed)
@@ -209,7 +210,7 @@ class TestRelu(TestCase):
         return a
 
     def test_relu_(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         a1 = self._test_relu_(device, rand_seed)
@@ -217,7 +218,7 @@ class TestRelu(TestCase):
         self.assertEqual(a2, a1.to('cpu'))
 
     def test_relu(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -226,7 +227,7 @@ class TestRelu(TestCase):
         self.assertEqual(torch.relu(x_cpu), torch.relu(x_dpcpp))
 
     def test_relu_backward(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -241,7 +242,7 @@ class TestRelu(TestCase):
 
 class TestGelu(TestCase):
     def test_gelu(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -250,7 +251,7 @@ class TestGelu(TestCase):
         self.assertEqual(F.gelu(x_cpu), F.gelu(x_dpcpp), 0.001)
 
     def test_gelu_backward(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -276,7 +277,7 @@ class TestMixOp(TestCase):
         return conv_op_output, conv_op_input, add_src
 
     def _test_conv_relu_(self, device, rand_seed):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         torch.manual_seed(rand_seed)
         conv_op = torch.nn.Conv2d(1, 1, (7, 7)).to(device=device)
         conv_op_input = torch.rand((1, 1, 10, 10)).to(device=device)
@@ -286,25 +287,25 @@ class TestMixOp(TestCase):
 
     def test_conv_relu_(self):
         rand_seed = int(get_rand_seed())
-        res_dcpp_dnnl = self._test_conv_relu_("dpcpp:0", rand_seed)
-        self.assertTrue(ipex.is_dil_tensor(res_dcpp_dnnl))
+        res_dcpp_dnnl = self._test_conv_relu_(device, rand_seed)
+        self.assertTrue(ipex.core.is_dil_tensor(res_dcpp_dnnl))
         res_cpu = self._test_conv_relu_("cpu", rand_seed)
         self.assertEqual(res_cpu, res_dcpp_dnnl.to('cpu'))
 
     def test_conv_add_relu_(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        res_dcpp_dnnl, input_dpcpp_dnnl, _ = self._test_conv_add_relu_("dpcpp:0", rand_seed)
+        res_dcpp_dnnl, input_dpcpp_dnnl, _ = self._test_conv_add_relu_(device, rand_seed)
 
-        ipex.disable_auto_dnnl()
-        res_dcpp_cpu, input_dpcpp_cpu, _ = self._test_conv_add_relu_("dpcpp:0", rand_seed)
-        
+        ipex.core.disable_auto_dnnl()
+        res_dcpp_cpu, input_dpcpp_cpu, _ = self._test_conv_add_relu_(device, rand_seed)
+
         res_cpu, input_cpu, _ = self._test_conv_add_relu_("cpu", rand_seed)
         self.assertEqual(res_cpu, res_dcpp_cpu.to('cpu'))
         self.assertEqual(res_cpu, res_dcpp_dnnl.to('cpu'))
 
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         res_dcpp_dnnl.sum().backward()
         res_dcpp_cpu.sum().backward()
         res_cpu.sum().backward()
@@ -314,7 +315,7 @@ class TestMixOp(TestCase):
 
 class TestLinearAlgebraOps(TestCase):
     def test_mm(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -337,7 +338,7 @@ class TestLinearAlgebraOps(TestCase):
         self.assertEqual(y_cpu, y_dpcpp)
 
     def test_bmm(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -361,7 +362,7 @@ class TestLinearAlgebraOps(TestCase):
         self.assertEqual(y_cpu, y_dpcpp)
 
     def test_addmm(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -388,7 +389,7 @@ class TestLinearAlgebraOps(TestCase):
                 self.assertEqual(y_cpu, y_dpcpp)
 
     def test_addbmm(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -415,7 +416,7 @@ class TestLinearAlgebraOps(TestCase):
                 self.assertEqual(y_cpu, y_dpcpp, 1e-4)
 
     def test_baddbmm(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -443,7 +444,7 @@ class TestLinearAlgebraOps(TestCase):
 
 class TestLinear(TestCase):
     def test_linear(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -459,7 +460,7 @@ class TestLinear(TestCase):
 
     # we should first expose aten::linear, depend on https://github.com/pytorch/pytorch/pull/20039
     def test_linear_backward(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -479,7 +480,7 @@ class TestLinear(TestCase):
 
 class TestLinearFuseRelu(TestCase):
     def test_linear_fuse_relu_forward(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -487,18 +488,18 @@ class TestLinearFuseRelu(TestCase):
         out_features = torch.randint(3, 100, (1,)).item()
         for dtype in [torch.bfloat16, torch.float]:
             x = torch.randn(3, in_features) * 10
-            x = x.to(dtype).to('dpcpp')
+            x = x.to(dtype).to(ipex.DEVICE)
             for bias in [True, False]:
-                linear = torch.nn.Linear(in_features, out_features, bias=bias).to('dpcpp').to(dtype)
+                linear = torch.nn.Linear(in_features, out_features, bias=bias).to(ipex.DEVICE).to(dtype)
                 relu = torch.nn.ReLU()
-                linear_fuse_relu = intel_pytorch_extension.LinearFuseRelu(in_features, out_features, bias=bias)
+                linear_fuse_relu = ipex.LinearFuseRelu(in_features, out_features, bias=bias)
                 linear_fuse_relu.weight.data = linear.weight.clone()
                 if bias:
                     linear_fuse_relu.bias.data = linear.bias.clone()
                 self.assertEqual(relu(linear(x)).float(), linear_fuse_relu(x).float())
 
     def test_linear_fuse_relu_backward(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -506,11 +507,11 @@ class TestLinearFuseRelu(TestCase):
         out_features = torch.randint(3, 100, (1,)).item()
         for dtype in [torch.bfloat16, torch.float]:
             x = torch.randn(3, in_features) * 10
-            x = x.to(dtype).to('dpcpp')
+            x = x.to(dtype).to(ipex.DEVICE)
             for bias in [True, False]:
-                linear = torch.nn.Linear(in_features, out_features, bias=bias).to('dpcpp').to(dtype)
+                linear = torch.nn.Linear(in_features, out_features, bias=bias).to(ipex.DEVICE).to(dtype)
                 relu = torch.nn.ReLU()
-                linear_fuse_relu = intel_pytorch_extension.LinearFuseRelu(in_features, out_features, bias=bias)
+                linear_fuse_relu = ipex.LinearFuseRelu(in_features, out_features, bias=bias)
                 linear_fuse_relu.weight.data = linear.weight.clone()
                 if bias:
                     linear_fuse_relu.bias.data = linear.bias.clone()
@@ -527,7 +528,7 @@ class TestLinearFuseRelu(TestCase):
 
 class TestPool(TestCase):
     def test_avg_pool2d(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -546,7 +547,7 @@ class TestPool(TestCase):
             self.assertEqual(avg_pool2d(x_cpu), avg_pool2d(x_dpcpp))
 
     def test_avg_pool3d(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -565,7 +566,7 @@ class TestPool(TestCase):
             self.assertEqual(avg_pool3d(x_cpu), avg_pool3d(x_dpcpp))
 
     def test_avg_pool2d_backward(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -587,7 +588,7 @@ class TestPool(TestCase):
             self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
     def test_avg_pool3d_backward(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -609,7 +610,7 @@ class TestPool(TestCase):
             self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
     def test_adaptive_avg_pool2d(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -625,7 +626,7 @@ class TestPool(TestCase):
             adaptive_avg_pool2d(x_dpcpp))
 
     def test_adaptive_avg_pool2d_backward(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -642,7 +643,7 @@ class TestPool(TestCase):
         self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
     def test_max_pool2d(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -664,7 +665,7 @@ class TestPool(TestCase):
                     self.assertEqual(max_pool2d(x_cpu), max_pool2d(x_dpcpp))
 
     def test_max_pool3d(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -686,7 +687,7 @@ class TestPool(TestCase):
                     self.assertEqual(max_pool3d(x_cpu), max_pool3d(x_dpcpp))
 
     def test_max_pool2d_backward(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -708,7 +709,7 @@ class TestPool(TestCase):
             self.assertEqual(x1.grad, x2.grad)
 
     def test_max_pool3d_backward(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -736,319 +737,319 @@ class TestPool(TestCase):
 
 class TestBatchNorm(TestCase):
     def test_batch_norm2d(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x_cpu = torch.randn(64, 3, 35, 45, dtype=torch.float32) * 10
-        x_dpcpp = x_cpu.to(device=device)
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x_cpu = torch.randn(64, 3, 35, 45, dtype=torch.float32) * 10
+            x_dpcpp = x_cpu.to(device=device)
 
-        bn = torch.nn.BatchNorm2d(3)
-        bn_dpcpp =copy.deepcopy(bn).to(device=device)
-        self.assertEqual(bn(x_cpu), bn_dpcpp(x_dpcpp))
+            bn = torch.nn.BatchNorm2d(3)
+            bn_dpcpp =copy.deepcopy(bn).to(device=device)
+            self.assertEqual(bn(x_cpu), bn_dpcpp(x_dpcpp))
 
     def test_batch_norm3d(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x_cpu = torch.randn(4, 3, 30, 30, 30, dtype=torch.float32) * 10
-        x_dpcpp = x_cpu.to(device=device)
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x_cpu = torch.randn(4, 3, 30, 30, 30, dtype=torch.float32) * 10
+            x_dpcpp = x_cpu.to(device=device)
 
-        bn = torch.nn.BatchNorm3d(3)
-        bn_dpcpp = copy.deepcopy(bn).to(device=device)
-        self.assertEqual(bn(x_cpu), bn_dpcpp(x_dpcpp))
+            bn = torch.nn.BatchNorm3d(3)
+            bn_dpcpp = copy.deepcopy(bn).to(device=device)
+            self.assertEqual(bn(x_cpu), bn_dpcpp(x_dpcpp))
 
     def test_batch_norm2d_backward(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x = torch.randn(64, 3, 35, 45, dtype=torch.float32) * 10
-        x_cpu = x.clone().requires_grad_()
-        x_dpcpp = x.clone().to(device=device).requires_grad_()
-
-        bn = torch.nn.BatchNorm2d(3)
-        bn_dpcpp = copy.deepcopy(bn).to(device=device)
-        y_cpu = bn(x_cpu).sum()
-        y_dpcpp = bn_dpcpp(x_dpcpp).sum()
-        y_cpu.backward()
-        y_dpcpp.backward()
-        self.assertEqual(x_cpu.grad, x_dpcpp.grad)
-
-class TestLayerNorm(TestCase):
-    def test_layer_norm(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        input = torch.randn(2, 5, 10, 10, dtype=torch.float32) 
-        input_dpcpp=input.to(device=device)
-        m = torch.nn.LayerNorm([10, 10])
-        self.assertEqual(m(input), m(input_dpcpp))
-
-    def test_layer_norm_backward(self): 
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        input = torch.randn(2, 5, 10, 10, dtype=torch.float32) 
-        input_cpu = input.clone().requires_grad_() 
-        input_dpcpp=input.clone().to(device=device).requires_grad_() 
-        m = torch.nn.LayerNorm([10, 10])
-        m_dpcpp = copy.deepcopy(m).to(device=device)
-        y_cpu = m(input_cpu).sum()
-        y_cpu.backward() 
-        y_dpcpp = m_dpcpp(input_dpcpp).sum()
-        y_dpcpp.backward()
-        self.assertEqual(input_cpu.grad, input_dpcpp.grad)
-
-class TestTensorShape(TestCase):
-    def test_reshape(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x_cpu = torch.randn(3, 4, 5, dtype=torch.float32) * 10
-        x_dpcpp = x_cpu.to(device=device)
-        self.assertEqual(torch.reshape(x_cpu, (6, 10)), torch.reshape(x_dpcpp, (6, 10)))
-
-    def test_cat(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x_cpu = torch.randn(4, 5, dtype=torch.float32) * 10
-        x_dpcpp = x_cpu.to(device=device)
-        for dim in [0, 1]:
-            self.assertEqual(torch.cat((x_cpu, x_cpu, x_cpu), dim=dim), torch.cat((x_dpcpp, x_dpcpp, x_dpcpp), dim=dim))
-        #cat_out
-        y_cpu = torch.randn(12, 5, dtype=torch.float32)*10
-        y_dpcpp = y_cpu.to(device=device)
-        torch.cat((x_cpu, x_cpu, x_cpu), dim=0, out=y_cpu),
-        torch.cat((x_dpcpp, x_dpcpp, x_dpcpp), dim=0, out=y_dpcpp)
-        self.assertEqual(y_cpu, y_dpcpp)
-        y_cpu = torch.randn(4, 15, dtype=torch.float32)*10
-        y_dpcpp = y_cpu.to(device=device)
-        torch.cat((x_cpu, x_cpu, x_cpu), dim=1, out=y_cpu),
-        torch.cat((x_dpcpp, x_dpcpp, x_dpcpp), dim=1, out=y_dpcpp)
-        self.assertEqual(y_cpu, y_dpcpp)
-
-    def test_cat_backward(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x = torch.randn((4, 5), dtype=torch.float32) * 10
-        x_cpu = x.clone().requires_grad_()
-        x_dpcpp = x.clone().to(device=device).requires_grad_()
-        y_cpu = torch.cat((x_cpu, x_cpu, x_cpu)).sum()
-        y_dpcpp = torch.cat((x_dpcpp, x_dpcpp, x_dpcpp)).sum()
-        y_cpu.backward()
-        y_dpcpp.backward()
-        self.assertEqual(x_cpu.grad, x_dpcpp.grad)
-
-    def test_transpose(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x = torch.randn(3, 4, 5, dtype=torch.float32) * 10
-        x_dpcpp = x.clone().to(device=device)
-        for dim1 in range(x.ndim):
-            for dim2 in range(x.ndim):
-                self.assertEqual(
-                    x.transpose(dim1, dim2),
-                    x_dpcpp.transpose(dim1, dim2),
-                )
-
-    def test_view(self):
-        ipex.enable_auto_dnnl()
-        old_shape = (4, 16)
-        new_shape = (1, 4, 4, 4)
-
-        x_cpu = torch.randn(old_shape)
-        x_dpcpp = x_cpu.to(device=device).clone()
-        self.assertTrue(ipex.is_dil_tensor(x_dpcpp))
-        self.assertEqual(ipex.get_dil_tensor_sizes(x_dpcpp), [4, 16])
-        self.assertEqual(ipex.get_dil_tensor_strides(x_dpcpp), [16, 1])
-
-        x_cpu_view = x_cpu.view(new_shape)
-        self.assertEqual(x_cpu_view.size(), [1, 4, 4, 4])
-        self.assertEqual(x_cpu_view.stride(), [64, 16, 4, 1])
-
-        x_dpcpp_view = x_dpcpp.view(new_shape)
-        self.assertTrue(ipex.is_dil_tensor(x_dpcpp_view))
-        
-        y = torch.randn(new_shape)
-        out_cpu = x_cpu_view * y
-        # test if the shape of x_dpcpp_view is compatible with y
-        out_dpcpp = x_dpcpp_view * y
-        self.assertTrue(ipex.is_dil_tensor(out_dpcpp))
-        self.assertEqual(ipex.get_dil_tensor_sizes(out_dpcpp), [1, 4, 4, 4])
-        self.assertEqual(ipex.get_dil_tensor_strides(out_dpcpp), [64, 16, 4, 1])
-        self.assertEqual(out_cpu, out_dpcpp)
-
-        # test if metadata of x_dpcpp has not been altered
-        y = torch.randn(old_shape)
-        out_cpu = x_cpu * y
-        out_dpcpp = x_dpcpp * y
-        self.assertEqual(out_cpu, out_dpcpp)
-
-
-class TestSoftMax(TestCase):
-    def test_softmax(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x_cpu = torch.randn(3, 4, 5, dtype=torch.float32) * 10
-        x_dpcpp = x_cpu.to(device=device)
-        for dim in range(x_cpu.ndim):
-            softmax = torch.nn.Softmax(dim=dim)
-            self.assertEqual(softmax(x_cpu), softmax(x_dpcpp))
-
-    def test_softmax_backward(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x = torch.randn(3, 4, 5, dtype=torch.float32) * 10
-        for dim in range(x.ndim):
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x = torch.randn(64, 3, 35, 45, dtype=torch.float32) * 10
             x_cpu = x.clone().requires_grad_()
             x_dpcpp = x.clone().to(device=device).requires_grad_()
-            softmax = torch.nn.Softmax(dim=dim)
-            y_cpu = softmax(x_cpu).sum()
-            y_dpcpp = softmax(x_dpcpp).sum()
+
+            bn = torch.nn.BatchNorm2d(3)
+            bn_dpcpp = copy.deepcopy(bn).to(device=device)
+            y_cpu = bn(x_cpu).sum()
+            y_dpcpp = bn_dpcpp(x_dpcpp).sum()
             y_cpu.backward()
             y_dpcpp.backward()
             self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
+class TestLayerNorm(TestCase):
+    def test_layer_norm(self):
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            input = torch.randn(2, 5, 10, 10, dtype=torch.float32)
+            input_dpcpp=input.to(device=device)
+            m = torch.nn.LayerNorm([10, 10])
+            self.assertEqual(m(input), m(input_dpcpp))
+
+    def test_layer_norm_backward(self):
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            input = torch.randn(2, 5, 10, 10, dtype=torch.float32)
+            input_cpu = input.clone().requires_grad_()
+            input_dpcpp=input.clone().to(device=device).requires_grad_()
+            m = torch.nn.LayerNorm([10, 10])
+            m_dpcpp = copy.deepcopy(m).to(device=device)
+            y_cpu = m(input_cpu).sum()
+            y_cpu.backward()
+            y_dpcpp = m_dpcpp(input_dpcpp).sum()
+            y_dpcpp.backward()
+            self.assertEqual(input_cpu.grad, input_dpcpp.grad)
+
+class TestTensorShape(TestCase):
+    def test_reshape(self):
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x_cpu = torch.randn(3, 4, 5, dtype=torch.float32) * 10
+            x_dpcpp = x_cpu.to(device=device)
+            self.assertEqual(torch.reshape(x_cpu, (6, 10)), torch.reshape(x_dpcpp, (6, 10)))
+
+    def test_cat(self):
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x_cpu = torch.randn(4, 5, dtype=torch.float32) * 10
+            x_dpcpp = x_cpu.to(device=device)
+            for dim in [0, 1]:
+                self.assertEqual(torch.cat((x_cpu, x_cpu, x_cpu), dim=dim), torch.cat((x_dpcpp, x_dpcpp, x_dpcpp), dim=dim))
+            #cat_out
+            y_cpu = torch.randn(12, 5, dtype=torch.float32)*10
+            y_dpcpp = y_cpu.to(device=device)
+            torch.cat((x_cpu, x_cpu, x_cpu), dim=0, out=y_cpu),
+            torch.cat((x_dpcpp, x_dpcpp, x_dpcpp), dim=0, out=y_dpcpp)
+            self.assertEqual(y_cpu, y_dpcpp)
+            y_cpu = torch.randn(4, 15, dtype=torch.float32)*10
+            y_dpcpp = y_cpu.to(device=device)
+            torch.cat((x_cpu, x_cpu, x_cpu), dim=1, out=y_cpu),
+            torch.cat((x_dpcpp, x_dpcpp, x_dpcpp), dim=1, out=y_dpcpp)
+            self.assertEqual(y_cpu, y_dpcpp)
+
+    def test_cat_backward(self):
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x = torch.randn((4, 5), dtype=torch.float32) * 10
+            x_cpu = x.clone().requires_grad_()
+            x_dpcpp = x.clone().to(device=device).requires_grad_()
+            y_cpu = torch.cat((x_cpu, x_cpu, x_cpu)).sum()
+            y_dpcpp = torch.cat((x_dpcpp, x_dpcpp, x_dpcpp)).sum()
+            y_cpu.backward()
+            y_dpcpp.backward()
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+
+    def test_transpose(self):
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x = torch.randn(3, 4, 5, dtype=torch.float32) * 10
+            x_dpcpp = x.clone().to(device=device)
+            for dim1 in range(x.ndim):
+                for dim2 in range(x.ndim):
+                    self.assertEqual(
+                        x.transpose(dim1, dim2),
+                        x_dpcpp.transpose(dim1, dim2),
+                )
+
+    def test_view(self):
+        with AutoDNNL(True):
+            old_shape = (4, 16)
+            new_shape = (1, 4, 4, 4)
+
+            x_cpu = torch.randn(old_shape)
+            x_dpcpp = x_cpu.to(device=device).clone()
+            self.assertTrue(ipex.core.is_dil_tensor(x_dpcpp))
+            self.assertEqual(ipex.core.get_dil_tensor_sizes(x_dpcpp), [4, 16])
+            self.assertEqual(ipex.core.get_dil_tensor_strides(x_dpcpp), [16, 1])
+
+            x_cpu_view = x_cpu.view(new_shape)
+            self.assertEqual(x_cpu_view.size(), [1, 4, 4, 4])
+            self.assertEqual(x_cpu_view.stride(), [64, 16, 4, 1])
+
+            x_dpcpp_view = x_dpcpp.view(new_shape)
+            self.assertTrue(ipex.core.is_dil_tensor(x_dpcpp_view))
+
+            y = torch.randn(new_shape)
+            out_cpu = x_cpu_view * y
+            # test if the shape of x_dpcpp_view is compatible with y
+            out_dpcpp = x_dpcpp_view * y.to(device)
+            self.assertTrue(ipex.core.is_dil_tensor(out_dpcpp))
+            self.assertEqual(ipex.core.get_dil_tensor_sizes(out_dpcpp), [1, 4, 4, 4])
+            self.assertEqual(ipex.core.get_dil_tensor_strides(out_dpcpp), [64, 16, 4, 1])
+            self.assertEqual(out_cpu, out_dpcpp)
+
+            # test if metadata of x_dpcpp has not been altered
+            y = torch.randn(old_shape)
+            out_cpu = x_cpu * y
+            out_dpcpp = x_dpcpp * y
+            self.assertEqual(out_cpu, out_dpcpp)
+
+
+class TestSoftMax(TestCase):
+    def test_softmax(self):
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x_cpu = torch.randn(3, 4, 5, dtype=torch.float32) * 10
+            x_dpcpp = x_cpu.to(device=device)
+            for dim in range(x_cpu.ndim):
+                softmax = torch.nn.Softmax(dim=dim)
+                self.assertEqual(softmax(x_cpu), softmax(x_dpcpp))
+
+    def test_softmax_backward(self):
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x = torch.randn(3, 4, 5, dtype=torch.float32) * 10
+            for dim in range(x.ndim):
+                x_cpu = x.clone().requires_grad_()
+                x_dpcpp = x.clone().to(device=device).requires_grad_()
+                softmax = torch.nn.Softmax(dim=dim)
+                y_cpu = softmax(x_cpu).sum()
+                y_dpcpp = softmax(x_dpcpp).sum()
+                y_cpu.backward()
+                y_dpcpp.backward()
+                self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+
 class TestSigmoid(TestCase):
     def test_sigmoid(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x_cpu = torch.randn(4, 5, dtype=torch.float32) * 10
-        x_dpcpp = x_cpu.to(device=device)
-        self.assertEqual(torch.sigmoid(x_cpu), torch.sigmoid(x_dpcpp))
-        # inplace
-        torch.sigmoid_(x_cpu)
-        torch.sigmoid_(x_dpcpp)
-        self.assertEqual(x_cpu, x_dpcpp)
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x_cpu = torch.randn(4, 5, dtype=torch.float32) * 10
+            x_dpcpp = x_cpu.to(device=device)
+            self.assertEqual(torch.sigmoid(x_cpu), torch.sigmoid(x_dpcpp))
+            # inplace
+            torch.sigmoid_(x_cpu)
+            torch.sigmoid_(x_dpcpp)
+            self.assertEqual(x_cpu, x_dpcpp)
 
     def test_sigmoid_backward(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x = torch.randn(4, 5, dtype=torch.float32) * 10
-        x_cpu = x.clone().requires_grad_()
-        x_dpcpp = x.clone().to(device=device).requires_grad_()
-        y_cpu = torch.sigmoid(x_cpu)
-        y_dpcpp = torch.sigmoid(x_dpcpp)
-        self.assertEqual(y_cpu, y_dpcpp)
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x = torch.randn(4, 5, dtype=torch.float32) * 10
+            x_cpu = x.clone().requires_grad_()
+            x_dpcpp = x.clone().to(device=device).requires_grad_()
+            y_cpu = torch.sigmoid(x_cpu)
+            y_dpcpp = torch.sigmoid(x_dpcpp)
+            self.assertEqual(y_cpu, y_dpcpp)
 
-        y_cpu.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+            y_cpu.sum().backward()
+            y_dpcpp.sum().backward()
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
 class TestDropout(TestCase):
     def test_dropout(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        p = 0.2
-        input = torch.randn(1000, dtype=torch.float32)
-        input = input.fill_(1 - p)
-        module = torch.nn.Dropout(p)
-        input_dpcpp = input.clone().to(device=device).requires_grad_()
-        output_dpcpp = module(input_dpcpp)
-        self.assertLess(abs(output_dpcpp.data.mean() - (1 - p)), 0.05)
-        output_dpcpp.backward(input_dpcpp)
-        self.assertLess(abs(input_dpcpp.grad.data.mean() - (1 - p)), 0.05)
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            p = 0.2
+            input = torch.randn(1000, dtype=torch.float32)
+            input = input.fill_(1 - p)
+            module = torch.nn.Dropout(p)
+            input_dpcpp = input.clone().to(device=device).requires_grad_()
+            output_dpcpp = module(input_dpcpp)
+            self.assertLess(abs(output_dpcpp.data.mean() - (1 - p)), 0.05)
+            output_dpcpp.backward(input_dpcpp)
+            self.assertLess(abs(input_dpcpp.grad.data.mean() - (1 - p)), 0.05)
 
-        # check eval mode doesn't change anything
-        for inplace in [True, False]:
-            module = torch.nn.Dropout(p, inplace).eval()
-            self.assertEqual(input_dpcpp, module(input_dpcpp))
+            # check eval mode doesn't change anything
+            for inplace in [True, False]:
+                module = torch.nn.Dropout(p, inplace).eval()
+                self.assertEqual(input_dpcpp, module(input_dpcpp))
 
-        # Check that these don't raise errors
-        module.__repr__()
-        str(module)
+            # Check that these don't raise errors
+            module.__repr__()
+            str(module)
 
 class TestSplit(TestCase):
     def test_split(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x = torch.randn(5, 5, dtype=torch.float32) * 10
-        x_dpcpp = x.clone().to(device=device)
-        for dim in [0, 1]:
-            self.assertEqual(
-                torch.split(x, (2,3), dim=dim)[0],
-                torch.split(x_dpcpp, (2,3), dim=dim)[0],
-            )
-            self.assertEqual(
-                torch.split(x, (2,3), dim=dim)[1],
-                torch.split(x_dpcpp, (2,3), dim=dim)[1],
-            )
-            self.assertEqual(
-                torch.split(x, 3, dim=dim)[0],
-                torch.split(x_dpcpp, 3, dim=dim)[0],
-            )
-            self.assertEqual(
-                torch.split(x, 3, dim=dim)[1],
-                torch.split(x_dpcpp, 3, dim=dim)[1],
-            )
-            self.assertEqual(
-                torch.split(x, 2, dim=dim)[0],
-                torch.split(x_dpcpp, 2, dim=dim)[0],
-            )
-            self.assertEqual(
-                torch.split(x, 2, dim=dim)[1],
-                torch.split(x_dpcpp, 2, dim=dim)[1],
-            )
-            self.assertEqual(
-                torch.split(x, 2, dim=dim)[2],
-                torch.split(x_dpcpp, 2, dim=dim)[2],
-            )
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x = torch.randn(5, 5, dtype=torch.float32) * 10
+            x_dpcpp = x.clone().to(device=device)
+            for dim in [0, 1]:
+                self.assertEqual(
+                    torch.split(x, (2,3), dim=dim)[0],
+                    torch.split(x_dpcpp, (2,3), dim=dim)[0],
+                )
+                self.assertEqual(
+                    torch.split(x, (2,3), dim=dim)[1],
+                    torch.split(x_dpcpp, (2,3), dim=dim)[1],
+                )
+                self.assertEqual(
+                    torch.split(x, 3, dim=dim)[0],
+                    torch.split(x_dpcpp, 3, dim=dim)[0],
+                )
+                self.assertEqual(
+                    torch.split(x, 3, dim=dim)[1],
+                    torch.split(x_dpcpp, 3, dim=dim)[1],
+                )
+                self.assertEqual(
+                    torch.split(x, 2, dim=dim)[0],
+                    torch.split(x_dpcpp, 2, dim=dim)[0],
+                )
+                self.assertEqual(
+                    torch.split(x, 2, dim=dim)[1],
+                    torch.split(x_dpcpp, 2, dim=dim)[1],
+                )
+                self.assertEqual(
+                    torch.split(x, 2, dim=dim)[2],
+                    torch.split(x_dpcpp, 2, dim=dim)[2],
+                )
 
     def test_split_backward(self):
-        ipex.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        x = torch.randn(5, 5, dtype=torch.float32) * 10
-        x1 = x.clone().requires_grad_()
-        x2 = x.clone().to(device=device).requires_grad_()
-        for dim in [0, 1]:
-            y1 = torch.split(x1, (2,3), dim=dim)[0].sum() \
-                    + torch.split(x1, (2,3), dim=dim)[1].sum()
-            y2 = torch.split(x2, (2,3), dim=dim)[0].sum() \
-                    + torch.split(x2, (2,3), dim=dim)[1].sum()
-            y1.backward()
-            y2.backward()
-            self.assertEqual(x1.grad, x2.grad)
-            y1 = torch.split(x1, 3, dim=dim)[0].sum() \
-                    + torch.split(x1, 3, dim=dim)[1].sum()
-            y2 = torch.split(x2, 3, dim=dim)[0].sum() \
-                    + torch.split(x2, 3, dim=dim)[1].sum()
-            y1.backward()
-            y2.backward()
-            self.assertEqual(x1.grad, x2.grad)
-            y1 = torch.split(x1, 2, dim=dim)[0].sum() \
-                    + torch.split(x1, 2, dim=dim)[1].sum() \
-                    + torch.split(x1, 2, dim=dim)[2].sum()
-            y2 = torch.split(x2, 2, dim=dim)[0].sum() \
-                    + torch.split(x2, 2, dim=dim)[1].sum() \
-                    + torch.split(x2, 2, dim=dim)[2].sum()
-            y1.backward()
-            y2.backward()
-            self.assertEqual(x1.grad, x2.grad)
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x = torch.randn(5, 5, dtype=torch.float32) * 10
+            x1 = x.clone().requires_grad_()
+            x2 = x.clone().to(device=device).requires_grad_()
+            for dim in [0, 1]:
+                y1 = torch.split(x1, (2,3), dim=dim)[0].sum() \
+                        + torch.split(x1, (2,3), dim=dim)[1].sum()
+                y2 = torch.split(x2, (2,3), dim=dim)[0].sum() \
+                        + torch.split(x2, (2,3), dim=dim)[1].sum()
+                y1.backward()
+                y2.backward()
+                self.assertEqual(x1.grad, x2.grad)
+                y1 = torch.split(x1, 3, dim=dim)[0].sum() \
+                        + torch.split(x1, 3, dim=dim)[1].sum()
+                y2 = torch.split(x2, 3, dim=dim)[0].sum() \
+                        + torch.split(x2, 3, dim=dim)[1].sum()
+                y1.backward()
+                y2.backward()
+                self.assertEqual(x1.grad, x2.grad)
+                y1 = torch.split(x1, 2, dim=dim)[0].sum() \
+                        + torch.split(x1, 2, dim=dim)[1].sum() \
+                        + torch.split(x1, 2, dim=dim)[2].sum()
+                y2 = torch.split(x2, 2, dim=dim)[0].sum() \
+                        + torch.split(x2, 2, dim=dim)[1].sum() \
+                        + torch.split(x2, 2, dim=dim)[2].sum()
+                y1.backward()
+                y2.backward()
+                self.assertEqual(x1.grad, x2.grad)
 
 if __name__ == '__main__':
     test = unittest.main()

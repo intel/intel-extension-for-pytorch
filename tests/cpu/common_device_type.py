@@ -17,23 +17,23 @@ Copyright (c) 2016-present, Facebook Inc. All rights reserved.
 
 All contributions by Facebook:
 Copyright (c) 2016 Facebook Inc.
- 
+
 All contributions by Google:
 Copyright (c) 2015 Google Inc.
 All rights reserved.
- 
+
 All contributions by Yangqing Jia:
 Copyright (c) 2015 Yangqing Jia
 All rights reserved.
- 
+
 All contributions from Caffe:
 Copyright(c) 2013, 2014, 2015, the respective contributors
 All rights reserved.
- 
+
 All other contributions:
 Copyright(c) 2015, 2016 the respective contributors
 All rights reserved.
- 
+
 Caffe2 uses a copyright model similar to Caffe: each contributor holds
 copyright over their contributions to Caffe2. The project versioning records
 all such contribution and copyright details. If a contributor wants to further
@@ -49,7 +49,7 @@ import threading
 from functools import wraps
 import unittest
 import torch
-import _torch_ipex as ipex
+import intel_pytorch_extension as ipex
 import copy
 from common_utils import TestCase, TEST_WITH_ROCM, TEST_MKL, \
     skipCUDANonDefaultStreamIf
@@ -254,7 +254,7 @@ class CPUTestBase(DeviceTypeTestBase):
     device_type = 'cpu'
 
 class DPCPPTestBase(DeviceTypeTestBase):
-    device_type = 'dpcpp'
+    device_type = ipex.DEVICE
 
     @classmethod
     def get_primary_device(cls):
@@ -262,7 +262,7 @@ class DPCPPTestBase(DeviceTypeTestBase):
 
     @classmethod
     def get_all_devices(cls):
-        return ['dpcpp']
+        return [ipex.DEVICE]
 
     # Returns the dtypes the test has requested.
     # Prefers device-specific dtype specifications over generic ones.
@@ -276,7 +276,7 @@ class DPCPPTestBase(DeviceTypeTestBase):
 
     @classmethod
     def setUpClass(cls):
-        cls.primary_device = 'dpcpp'
+        cls.primary_device = ipex.DEVICE
 
 class CUDATestBase(DeviceTypeTestBase):
     device_type = 'cuda'

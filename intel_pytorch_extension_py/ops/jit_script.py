@@ -12,14 +12,12 @@ def script_(obj, optimize=None, _frames_up=0, _rcb=None):
     jit_m = orig_script(obj, optimize=optimize, _frames_up=_frames_up+1, _rcb=_rcb)
     torch.jit.script = script_
 
-    if core.get_jit():
+    if core.get_jit_opt():
         # bypass buggy broadcastable ops in dnnl during folding
         core.disable_auto_dnnl()
         jit_m = wrap_cpp_module(torch._C._jit_pass_fold_convbn(jit_m._c))
         core.enable_auto_dnnl()
 
-        jit_m = wrap_cpp_module(core._jit_prepack_conv_weight(jit_m._c))
-    
     return jit_m
 
 

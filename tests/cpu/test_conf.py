@@ -22,12 +22,12 @@ from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MK
 
 class TestOptConf(TestCase):
     def test_auto_dnnl(self):
-        self.assertFalse(ipex.get_auto_dnnl())
-        ipex.enable_auto_dnnl()
         self.assertTrue(ipex.get_auto_dnnl())
         ipex.disable_auto_dnnl()
         self.assertFalse(ipex.get_auto_dnnl())
-    
+        ipex.enable_auto_dnnl()
+        self.assertTrue(ipex.get_auto_dnnl())
+
     def test_mix_bf16_fp32(self):
         self.assertFalse(ipex.get_mix_bf16_fp32())
         ipex.enable_mix_bf16_fp32()
@@ -35,12 +35,12 @@ class TestOptConf(TestCase):
         ipex.disable_mix_bf16_fp32()
         self.assertFalse(ipex.get_mix_bf16_fp32())
 
-    def test_pure_bf16(self):
-        self.assertFalse(ipex.get_pure_bf16())
-        ipex.enable_pure_bf16()
-        self.assertTrue(ipex.get_pure_bf16())
-        ipex.disable_pure_bf16()
-        self.assertFalse(ipex.get_pure_bf16())
+    def test_jit_fuse(self):
+        self.assertTrue(ipex.get_jit_opt())
+        ipex.disable_jit_opt()
+        self.assertFalse(ipex.get_jit_opt())
+        ipex.enable_jit_opt()
+        self.assertTrue(ipex.get_jit_opt())
 
 if __name__ == '__main__':
     test = unittest.main()

@@ -87,9 +87,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("enable_mix_bf16_fp32", []() { AutoOptConfig::singleton().set_mix_bf16_fp32(true); });
   m.def("disable_mix_bf16_fp32", []() { AutoOptConfig::singleton().set_mix_bf16_fp32(false); });
   m.def("get_mix_bf16_fp32", []() { return AutoOptConfig::singleton().get_mix_bf16_fp32(); });
-  m.def("enable_pure_bf16", []() { AutoOptConfig::singleton().set_pure_bf16(true); });
-  m.def("disable_pure_bf16", []() { AutoOptConfig::singleton().set_pure_bf16(false); });
-  m.def("get_pure_bf16", []() { return AutoOptConfig::singleton().get_pure_bf16(); });
   m.def("packed_add_",
         [](at::Tensor &top_half, at::Tensor &bot_half,
            const at::Tensor &grad, float alpha) {
@@ -159,11 +156,10 @@ void InitIpexModuleBindings(py::module m) {
   m.def("is_fp32_dil_tensor", &isFP32DilTensor);
   m.def("get_dil_tensor_sizes", &getDilTensorSizes);
   m.def("get_dil_tensor_strides", &getDilTensorStrides);
-  m.def("enable_jit", []() { AutoOptConfig::singleton().set_jit_fuse(true); });
-  m.def("disable_jit", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
-  m.def("get_jit", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
+  m.def("enable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(true); });
+  m.def("disable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
+  m.def("get_jit_opt", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
   m.def("prepack_conv_weight", &AtenIpexPrepack::prepack_conv_weight);
-  m.def("_jit_prepack_conv_weight", &torch::jit::prepack_conv_weight);
 }
 
 }  // namespace

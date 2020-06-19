@@ -13,14 +13,14 @@ namespace cpu {
 
 enum SHADE_DATA_TYPE {CPU_RAW, DIL};
 
-enum MIX_PREC_TYPE {NONE, MIX_BF_FP32};
+enum MIX_PREC_TYPE {NONE, MIX_BF16_FP32};
 
 #define SANITY_CHECK_SHADE_DATA_CONTEXT(THIS) \
   { \
     if (THIS->data_type == SHADE_DATA_TYPE::DIL) { \
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(THIS->dil_tensor.has_value()); \
       if (THIS->dil_tensor->is_public_format()) { \
-        if (THIS->mix_prec_type == MIX_PREC_TYPE::MIX_BF_FP32) { \
+        if (THIS->mix_prec_type == MIX_PREC_TYPE::MIX_BF16_FP32) { \
           TORCH_INTERNAL_ASSERT_DEBUG_ONLY(THIS->cpu_raw_data == nullptr); \
           TORCH_INTERNAL_ASSERT_DEBUG_ONLY(THIS->dil_tensor->get_data_handle() != THIS->cpu_raw_data); \
           TORCH_INTERNAL_ASSERT_DEBUG_ONLY(THIS->cpu_del_fun == nullptr); \
@@ -217,7 +217,7 @@ struct ShadeDataContext {
     // Check mix_precision
     void *raw_context = tensor.storage().data_ptr().get_context();
     ShadeDataContext *shade_data_context = (ShadeDataContext*)raw_context;
-    if (shade_data_context->mix_prec_type == MIX_PREC_TYPE::MIX_BF_FP32) {
+    if (shade_data_context->mix_prec_type == MIX_PREC_TYPE::MIX_BF16_FP32) {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(res);
     } else {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!res);

@@ -32,7 +32,7 @@ from common_ipex_conf import AutoMixPrecision, AutoDNNL
 def get_rand_seed():
     return int(time.time() * 1000000000)
 
-device = torch.device("dpcpp:0")
+device = ipex.DEVICE
 class TestConv(TestCase):
     def test_Conv2d_with_cpu(self):
         rand_seed = int(get_rand_seed())
@@ -118,26 +118,6 @@ class TestBatchNorm(TestCase):
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix))
 
                 self.assertEqual(res_man_bf16.float(), res_auto_mix)
-
-class TestLayerNorm(TestCase):
-    def test_layer_norm(self):
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-
-        x_fp32 = torch.randn(2, 5, 10, 10, dtype=torch.float32, device=device)
-        x_bf16 = x_fp32.to(torch.bfloat16)
-
-        m = torch.nn.LayerNorm([10, 10])
-        m_man_bf16 =copy.deepcopy(m).to(device=device)
-        m_auto_mix =copy.deepcopy(m).to(device=device)
-
-        res_fp32 = m(x_fp32)
-
-        with AutoDNNL(True), AutoMixPrecision(False):
-            res_man_bf16 = m_man_bf16(x_bf16)
-            self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
-            self.assertEqual(res_fp32.bfloat16().float(), res_man_bf16, 2e-2)
 
 class TestRelu(TestCase):
     def test_relu(self):

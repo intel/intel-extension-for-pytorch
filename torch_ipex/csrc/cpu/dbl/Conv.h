@@ -39,6 +39,15 @@ void conv2d_inplace_impl(
     int64_t groups,
     const dil::attr_t& attr = dil::attr_t());
 
+void prepack_conv_weights(
+    const at::Tensor& input,
+    const dil::tensor& dil_input,
+    const at::Tensor& weight,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups);
+
 }  // namespace conv
 }  // namespace dbl
 }  // namespace cpu

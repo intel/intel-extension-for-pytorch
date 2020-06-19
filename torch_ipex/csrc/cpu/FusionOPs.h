@@ -14,9 +14,16 @@ namespace torch { namespace jit {
 namespace ipex {
   static auto conv2d_relu = Symbol::fromQualString("ipex::conv2d_relu");
   static auto conv2d_sum = Symbol::fromQualString("ipex::conv2d_sum");
-  static auto conv2d_relu_sum = Symbol::fromQualString("ipex::conv2d_relu_sum");
+  // static auto conv2d_relu_sum = Symbol::fromQualString("ipex::conv2d_relu_sum");
+  // static auto conv3d_relu_sum = Symbol::fromQualString("ipex::conv3d_relu_sum");
   static auto conv2d_sum_relu = Symbol::fromQualString("ipex::conv2d_sum_relu");
   static auto linear_relu = Symbol::fromQualString("ipex::linear_relu");
+
+  // 3d ops
+  static auto conv3d_relu = Symbol::fromQualString("ipex::conv3d_relu");
+  static auto conv3d_sum = Symbol::fromQualString("ipex::conv3d_sum");
+  static auto conv3d_sum_relu = Symbol::fromQualString("ipex::conv3d_sum_relu");
+
 }
 
 }} // namespace torch::jit
