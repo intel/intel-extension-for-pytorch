@@ -77,9 +77,9 @@ class NewMaxPoolingOp : public torch::autograd::Function<NewMaxPoolingOp> {
             return output;
           }
         } catch(std::exception& e) {
-          #if defined(_DEBUG)
-          TORCH_WARN(e.what());
-          #endif
+#if defined(_DEBUG)
+    TORCH_WARN(e.what());
+#endif
         }
         at::Tensor output, indices;
         if (input.device().type() == c10::DeviceType::DPCPP) {
@@ -118,9 +118,9 @@ class NewMaxPoolingOp : public torch::autograd::Function<NewMaxPoolingOp> {
           return {grad_input, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor()};
         }
       } catch(std::exception& e) {
-          #if defined(_DEBUG)
-          TORCH_WARN(e.what());
-          #endif
+#if defined(_DEBUG)
+    TORCH_WARN(e.what());
+#endif
       }
       if (input.device().type() == c10::DeviceType::DPCPP) {
         auto&& _ipex_grad_output = torch_ipex::bridge::shallowFallbackToCPUTensor(grad_output);
@@ -151,16 +151,16 @@ class NewApaptiveAvgPoolingOp : public torch::autograd::Function<NewApaptiveAvgP
             return torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(input.is_contiguous() ? input : input.contiguous(), output_size);
           } 
         } catch(std::exception& e) {
-          #if defined(_DEBUG)
-          TORCH_WARN(e.what());
-          #endif
+#if defined(_DEBUG)
+    TORCH_WARN(e.what());
+#endif
         }
-        if (input.device().type() == c10::DeviceType::DPCPP){
+        if (input.device().type() == c10::DeviceType::DPCPP) {
           auto&& _ipex_input = torch_ipex::bridge::shallowFallbackToCPUTensor(input);
           auto&& _ipex_result = at::_adaptive_avg_pool2d(_ipex_input, output_size);
           static_cast<void>(_ipex_result); // Avoid warnings in case not used
           return torch_ipex::bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
-        } else{
+        } else {
           return at::_adaptive_avg_pool2d(input, output_size);
         }
       }
@@ -180,19 +180,19 @@ class NewApaptiveAvgPoolingOp : public torch::autograd::Function<NewApaptiveAvgP
           return {grad_input, at::Tensor()};
         }
       } catch(std::exception& e) {
-          #if defined(_DEBUG)
-          TORCH_WARN(e.what());
-          #endif
-        }
-        if (input.device().type() == c10::DeviceType::DPCPP){
-          auto&& _ipex_grad_output = torch_ipex::bridge::shallowFallbackToCPUTensor(grad_output);
-          auto&& _ipex_input = torch_ipex::bridge::shallowFallbackToCPUTensor(input);
-          auto&& _ipex_result = at::_adaptive_avg_pool2d_backward(_ipex_grad_output, _ipex_input);
-          static_cast<void>(_ipex_result); // Avoid warnings in case not used
-          grad_input = torch_ipex::bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
-        } else {
-          grad_input = at::_adaptive_avg_pool2d_backward(grad_output, input);
-        }
+#if defined(_DEBUG)
+    TORCH_WARN(e.what());
+#endif
+      }
+      if (input.device().type() == c10::DeviceType::DPCPP) {
+        auto&& _ipex_grad_output = torch_ipex::bridge::shallowFallbackToCPUTensor(grad_output);
+        auto&& _ipex_input = torch_ipex::bridge::shallowFallbackToCPUTensor(input);
+        auto&& _ipex_result = at::_adaptive_avg_pool2d_backward(_ipex_grad_output, _ipex_input);
+        static_cast<void>(_ipex_result); // Avoid warnings in case not used
+        grad_input = torch_ipex::bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+      } else {
+        grad_input = at::_adaptive_avg_pool2d_backward(grad_output, input);
+      }
       return {grad_input, at::Tensor()};
     }
 };
