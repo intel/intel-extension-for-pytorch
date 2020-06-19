@@ -1,0 +1,1972 @@
+From cc2f261746b8d47c5d69e2e515068bb23e16cedc Mon Sep 17 00:00:00 2001
+From: hongzhen <hongzhen.liu@intel.com>
+Date: Fri, 19 Jun 2020 13:24:19 +0800
+Subject: [PATCH] enable Intel Extension for CPU, enable CCL backend
+
+Signed-off-by: hongzhen <hongzhen.liu@intel.com>
+---
+ aten/src/ATen/SparseTensorImpl.cpp            |   2 +
+ aten/src/ATen/core/VariableFallbackKernel.cpp |   8 +-
+ aten/src/ATen/cpu/vec256/vec256.h             |   1 +
+ aten/src/ATen/cpu/vec256/vec256_bfloat16.h    | 578 ++++++++++++++++++++++++++
+ aten/src/ATen/native/TensorIterator.cpp       |   8 +-
+ aten/src/ATen/native/TensorIterator.h         |   5 +-
+ aten/src/ATen/native/cpu/AtomicAddFloat.h     |  33 ++
+ aten/src/ATen/native/cpu/IndexKernel.cpp      |  24 +-
+ aten/src/ATen/native/cpu/Loops.h              |   4 +-
+ aten/src/ATen/native/sparse/SparseTensor.cpp  |   2 +
+ aten/src/TH/generic/THTensorApply.hpp         |   2 +-
+ c10/core/Backend.h                            |  32 +-
+ c10/core/Device.cpp                           |   5 +-
+ c10/core/Device.h                             |   5 +
+ c10/core/DeviceType.cpp                       |   3 +
+ c10/core/DeviceType.h                         |   4 +-
+ c10/core/DispatchKey.cpp                      |   4 +
+ c10/core/DispatchKey.h                        |   3 +
+ c10/core/Layout.h                             |   1 +
+ c10/core/TensorImpl.h                         |  14 +-
+ c10/core/TensorOptions.h                      |   8 +
+ docs/source/distributed.rst                   |  26 +-
+ setup.py                                      |   1 +
+ torch/csrc/distributed/c10d/init.cpp          |  53 +++
+ torch/csrc/utils/tensor_layouts.cpp           |   1 +
+ torch/csrc/utils/tensor_new.cpp               |   4 +
+ torch/distributed/distributed_c10d.py         | 236 ++++++++++-
+ torch/lib/c10d/ProcessGroup.hpp               |  16 +
+ torch/lib/c10d/ProcessGroupMPI.cpp            | 200 +++++++++
+ torch/lib/c10d/ProcessGroupMPI.hpp            |  12 +
+ torch/lib/c10d/Types.hpp                      |   4 +
+ 31 files changed, 1268 insertions(+), 31 deletions(-)
+ create mode 100644 aten/src/ATen/cpu/vec256/vec256_bfloat16.h
+ create mode 100644 aten/src/ATen/native/cpu/AtomicAddFloat.h
+
+diff --git a/aten/src/ATen/SparseTensorImpl.cpp b/aten/src/ATen/SparseTensorImpl.cpp
+index a7354047..3bf11a6 100644
+--- a/aten/src/ATen/SparseTensorImpl.cpp
++++ b/aten/src/ATen/SparseTensorImpl.cpp
+@@ -9,6 +9,8 @@ namespace {
+   DeviceType sparseTensorSetToDeviceType(DispatchKeySet key_set) {
+     if (key_set.has(DispatchKey::SparseCPUTensorId)) {
+       return kCPU;
++    } else if (key_set.has(DispatchKey::SparseDPCPPTensorId)) {
++      return kDPCPP;
+     } else if (key_set.has(DispatchKey::SparseCUDATensorId)) {
+       return kCUDA;
+     } else {
+diff --git a/aten/src/ATen/core/VariableFallbackKernel.cpp b/aten/src/ATen/core/VariableFallbackKernel.cpp
+index 11d0349..3cb40c8 100644
+--- a/aten/src/ATen/core/VariableFallbackKernel.cpp
++++ b/aten/src/ATen/core/VariableFallbackKernel.cpp
+@@ -32,9 +32,9 @@ void variable_fallback_kernel(const OperatorHandle& op, Stack* stack) {
+     Dispatcher::singleton().callBoxed(op, stack);
+ }
+ 
+-static auto registry = Dispatcher::singleton().registerBackendFallbackKernel(
+-    DispatchKey::VariableTensorId,
+-    KernelFunction::makeFromBoxedFunction<&variable_fallback_kernel>()
+-);
++// static auto registry = Dispatcher::singleton().registerBackendFallbackKernel(
++//     DispatchKey::VariableTensorId,
++//     KernelFunction::makeFromBoxedFunction<&variable_fallback_kernel>()
++// );
+ 
+ }
+diff --git a/aten/src/ATen/cpu/vec256/vec256.h b/aten/src/ATen/cpu/vec256/vec256.h
+index 240e331..c5c44bb 100644
+--- a/aten/src/ATen/cpu/vec256/vec256.h
++++ b/aten/src/ATen/cpu/vec256/vec256.h
+@@ -4,6 +4,7 @@
+ 
+ #include <ATen/cpu/vec256/vec256_base.h>
+ #include <ATen/cpu/vec256/vec256_float.h>
++#include <ATen/cpu/vec256/vec256_bfloat16.h>
+ #include <ATen/cpu/vec256/vec256_double.h>
+ #include <ATen/cpu/vec256/vec256_int.h>
+ #include <ATen/cpu/vec256/vec256_qint.h>
+diff --git a/aten/src/ATen/cpu/vec256/vec256_bfloat16.h b/aten/src/ATen/cpu/vec256/vec256_bfloat16.h
+new file mode 100644
+index 0000000..c8a2f16
+--- /dev/null
++++ b/aten/src/ATen/cpu/vec256/vec256_bfloat16.h
+@@ -0,0 +1,578 @@
++#pragma once
++
++// DO NOT DEFINE STATIC DATA IN THIS HEADER!
++// See Note [Do not compile initializers with AVX]
++
++#include <ATen/cpu/vec256/intrinsics.h>
++#include <ATen/cpu/vec256/vec256_base.h>
++#if defined(CPU_CAPABILITY_AVX2) && !defined(_MSC_VER)
++#include <sleef.h>
++#endif
++
++namespace at {
++namespace vec256 {
++// See Note [Acceptable use of anonymous namespace in header]
++namespace {
++
++#if defined(CPU_CAPABILITY_AVX2) && !defined(_MSC_VER)
++
++static inline void cvtbf16_fp32(const __m256i& a, __m256& o1, __m256& o2) {
++  __m128i lo = _mm256_extractf128_si256(a, 0);
++  __m128i hi = _mm256_extractf128_si256(a, 1);
++  o1 = _mm256_castsi256_ps(_mm256_slli_epi32(_mm256_cvtepu16_epi32(lo), 16));
++  o2 = _mm256_castsi256_ps(_mm256_slli_epi32(_mm256_cvtepu16_epi32(hi), 16));
++}
++static inline __m256i cvtfp32_bf16(const __m256& a, const __m256& b) {
++  __m256i lo = _mm256_castps_si256(a);
++  __m256i hi = _mm256_castps_si256(b);
++  __m256i nan = _mm256_set1_epi32(0x7fc0);
++  __m256i mask_lo = _mm256_castps_si256(_mm256_cmp_ps(a, a, _CMP_ORD_Q));
++  __m256i mask_hi = _mm256_castps_si256(_mm256_cmp_ps(b, b, _CMP_ORD_Q));
++  __m256i ones = _mm256_set1_epi32(0x1);
++  __m256i vec_bias = _mm256_set1_epi32(0x7fff);
++  // uint32_t lsb = (input >> 16) & 1;
++  auto t_lo = _mm256_and_si256(_mm256_srli_epi32(lo, 16), ones);
++  auto t_hi = _mm256_and_si256(_mm256_srli_epi32(hi, 16), ones);
++  // uint32_t rounding_bias = 0x7fff + lsb;
++  t_lo = _mm256_add_epi32(t_lo, vec_bias);
++  t_hi = _mm256_add_epi32(t_hi, vec_bias);
++  // input += rounding_bias;
++  t_lo = _mm256_add_epi32(t_lo, lo);
++  t_hi = _mm256_add_epi32(t_hi, hi);
++  // input = input >> 16;
++  t_lo = _mm256_srli_epi32(t_lo, 16);
++  t_hi = _mm256_srli_epi32(t_hi, 16);
++  // Check NaN before converting back to bf16
++  t_lo = _mm256_blendv_epi8(nan, t_lo, mask_lo);
++  t_hi = _mm256_blendv_epi8(nan, t_hi, mask_hi);
++
++  t_lo = _mm256_packus_epi32(t_lo, t_hi);      // t_hi[4-7] t_lo[4-7] t_hi[0-4] t_lo[0-4]
++  return _mm256_permute4x64_epi64(t_lo, 0xd8); // 11        01        10        00
++}
++
++template <> class Vec256<BFloat16> {
++private:
++  __m256i values;
++public:
++  using value_type = uint16_t;
++  static constexpr int size() {
++    return 16;
++  }
++  Vec256() {}
++  Vec256(__m256i v) : values(v) {}
++  Vec256(BFloat16 val) {
++    value_type uw = val.x;
++    values = _mm256_set1_epi16(uw);
++  }
++  Vec256(BFloat16 val1, BFloat16 val2, BFloat16 val3, BFloat16 val4,
++         BFloat16 val5, BFloat16 val6, BFloat16 val7, BFloat16 val8,
++         BFloat16 val9, BFloat16 val10, BFloat16 val11, BFloat16 val12,
++         BFloat16 val13, BFloat16 val14, BFloat16 val15, BFloat16 val16) {
++    values = _mm256_setr_epi16(
++        val1.x, val2.x, val3.x, val4.x, val5.x, val6.x, val7.x, val8.x,
++        val9.x, val10.x, val11.x, val12.x, val13.x, val14.x, val15.x, val16.x);
++  }
++  operator __m256i() const {
++    return values;
++  }
++  BFloat16& operator[](int idx) = delete;
++  const BFloat16& operator[](int idx) const  = delete;
++  int zero_mask() const {
++    // returns an integer mask where all zero elements are translated to 1-bit and others are translated to 0-bit
++    __m256i cmp = _mm256_cmpeq_epi16(values, _mm256_set1_epi16(0));
++    return _mm256_movemask_epi8(cmp);
++  }
++  static Vec256<BFloat16> loadu(const void* ptr) {
++    return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr));
++  }
++  static Vec256<BFloat16> loadu(const void* ptr, int16_t count) {
++    __at_align32__ int16_t tmp_values[size()];
++    std::memcpy(tmp_values, ptr, count * sizeof(int16_t));
++    return loadu(tmp_values);
++  }
++  void store(void* ptr, int count = size()) const {
++    if (count == size()) {
++      _mm256_storeu_si256(reinterpret_cast<__m256i*>(ptr), values);
++    } else if (count > 0) {
++      __at_align32__ int16_t tmp_values[size()];
++      _mm256_storeu_si256(reinterpret_cast<__m256i*>(tmp_values), values);
++      std::memcpy(ptr, tmp_values, count * sizeof(int16_t));
++    }
++  }
++  template <int64_t mask>
++  static Vec256<BFloat16> blend(const Vec256<BFloat16>& a, const Vec256<BFloat16>& b) {
++    __at_align32__ int16_t tmp_values[size()];
++    a.store(tmp_values);
++    if (mask & 0x01)
++      tmp_values[0] = _mm256_extract_epi16(b.values, 0);
++    if (mask & 0x02)
++      tmp_values[1] = _mm256_extract_epi16(b.values, 1);
++    if (mask & 0x04)
++      tmp_values[2] = _mm256_extract_epi16(b.values, 2);
++    if (mask & 0x08)
++      tmp_values[3] = _mm256_extract_epi16(b.values, 3);
++    if (mask & 0x10)
++      tmp_values[4] = _mm256_extract_epi16(b.values, 4);
++    if (mask & 0x20)
++      tmp_values[5] = _mm256_extract_epi16(b.values, 5);
++    if (mask & 0x40)
++      tmp_values[6] = _mm256_extract_epi16(b.values, 6);
++    if (mask & 0x80)
++      tmp_values[7] = _mm256_extract_epi16(b.values, 7);
++    if (mask & 0x100)
++      tmp_values[8] = _mm256_extract_epi16(b.values, 8);
++    if (mask & 0x200)
++      tmp_values[9] = _mm256_extract_epi16(b.values, 9);
++    if (mask & 0x400)
++      tmp_values[10] = _mm256_extract_epi16(b.values, 10);
++    if (mask & 0x800)
++      tmp_values[11] = _mm256_extract_epi16(b.values, 11);
++    if (mask & 0x1000)
++      tmp_values[12] = _mm256_extract_epi16(b.values, 12);
++    if (mask & 0x2000)
++      tmp_values[13] = _mm256_extract_epi16(b.values, 13);
++    if (mask & 0x4000)
++      tmp_values[14] = _mm256_extract_epi16(b.values, 14);
++    if (mask & 0x8000)
++      tmp_values[15] = _mm256_extract_epi16(b.values, 15);
++    return loadu(tmp_values);
++  }
++  static Vec256<BFloat16> blendv(const Vec256<BFloat16>& a,
++      const Vec256<BFloat16>& b, const Vec256<BFloat16>& mask) {
++    return _mm256_blendv_epi8(a.values, b.values, mask.values);
++  }
++  template<typename step_t>
++  static Vec256<BFloat16> arange(BFloat16 base = 0.f, step_t step = static_cast<step_t>(1)) {
++    return Vec256<BFloat16>(
++      base,             base +      step, base +  2 * step, base +  3 * step,
++      base +  4 * step, base +  5 * step, base +  6 * step, base +  7 * step,
++      base +  8 * step, base +  9 * step, base + 10 * step, base + 11 * step,
++      base + 12 * step, base + 13 * step, base + 14 * step, base + 15 * step);
++  }
++  static Vec256<BFloat16> set(const Vec256<BFloat16>& a,
++      const Vec256<BFloat16>& b, int64_t count = size()) {
++    switch (count) {
++      case 0:
++        return a;
++      case 1:
++        return blend<1>(a, b);
++      case 2:
++        return blend<3>(a, b);
++      case 3:
++        return blend<7>(a, b);
++      case 4:
++        return blend<15>(a, b);
++      case 5:
++        return blend<31>(a, b);
++      case 6:
++        return blend<63>(a, b);
++      case 7:
++        return blend<127>(a, b);
++      case 8:
++        return blend<255>(a, b);
++      case 9:
++        return blend<511>(a, b);
++      case 10:
++        return blend<1023>(a, b);
++      case 11:
++        return blend<2047>(a, b);
++      case 12:
++        return blend<4095>(a, b);
++      case 13:
++        return blend<8191>(a, b);
++      case 14:
++        return blend<16383>(a, b);
++      case 15:
++        return blend<32767>(a, b);
++    }
++    return b;
++  }
++  Vec256<BFloat16> map(const __m256 (*vop)(__m256)) const {
++    __m256 lo, hi;
++    cvtbf16_fp32(values, lo, hi);
++    auto o1 = vop(lo);
++    auto o2 = vop(hi);
++    return cvtfp32_bf16(o1, o2);
++  }
++  Vec256<BFloat16> abs() const {
++    __m256 lo, hi;
++    cvtbf16_fp32(values, lo, hi);
++    auto mask = _mm256_set1_ps(-0.f);
++    auto o1 = _mm256_andnot_ps(mask, lo);
++    auto o2 = _mm256_andnot_ps(mask, hi);
++    return cvtfp32_bf16(o1, o2);
++  }
++  Vec256<BFloat16> angle() const {
++    return _mm256_set1_epi16(0);
++  }
++  Vec256<BFloat16> real() const {
++    return *this;
++  }
++  Vec256<BFloat16> imag() const {
++    return _mm256_set1_epi16(0);
++  }
++  Vec256<BFloat16> conj() const {
++    return *this;
++  }
++  Vec256<BFloat16> acos() const {
++    return map(Sleef_acosf8_u10);
++  }
++  Vec256<BFloat16> asin() const {
++    return map(Sleef_asinf8_u10);
++  }
++  Vec256<BFloat16> atan() const {
++    return map(Sleef_atanf8_u10);
++  }
++  Vec256<BFloat16> atan2(const Vec256<BFloat16> &b) const {
++    __m256 lo, hi;
++    __m256 b1, b2;
++    cvtbf16_fp32(values, lo, hi);
++    cvtbf16_fp32(b.values, b1, b2);
++    auto o1 = Sleef_atan2f8_u10(lo, b1);
++    auto o2 = Sleef_atan2f8_u10(hi, b2);
++    return cvtfp32_bf16(o1, o2);
++  }
++  Vec256<BFloat16> erf() const {
++    return map(Sleef_erff8_u10);
++  }
++  Vec256<BFloat16> erfc() const {
++    return map(Sleef_erfcf8_u15);
++  }
++  Vec256<BFloat16> erfinv() const {
++    __at_align32__ int16_t tmp[size()];
++    store(tmp);
++    for (int64_t i = 0; i < size(); i++) {
++      tmp[i] = calc_erfinv((float)tmp[i]);
++    }
++    return loadu(tmp);
++  }
++  Vec256<BFloat16> exp() const {
++    return map(Sleef_expf8_u10);
++  }
++  Vec256<BFloat16> expm1() const {
++    return map(Sleef_expm1f8_u10);
++  }
++  Vec256<BFloat16> fmod(const Vec256<BFloat16> & q) const {
++    __m256 x_lo, x_hi;
++    cvtbf16_fp32(values, x_lo, x_hi);
++    __m256 q_lo, q_hi;
++    cvtbf16_fp32(q.values, q_lo, q_hi);
++    auto o1 = Sleef_fmodf8(x_lo, q_lo);
++    auto o2 = Sleef_fmodf8(x_hi, q_hi);
++    return cvtfp32_bf16(o1, o2);
++  }
++  Vec256<BFloat16> log() const {
++    return map(Sleef_logf8_u10);
++  }
++  Vec256<BFloat16> log2() const {
++    return map(Sleef_log2f8_u10);
++  }
++  Vec256<BFloat16> log10() const {
++    return map(Sleef_log10f8_u10);
++  }
++  Vec256<BFloat16> log1p() const {
++    return map(Sleef_log1pf8_u10);
++  }
++  Vec256<BFloat16> frac() const;
++  Vec256<BFloat16> sin() const {
++    return map(Sleef_sinf8_u10);
++  }
++  Vec256<BFloat16> sinh() const {
++    return map(Sleef_sinhf8_u10);
++  }
++  Vec256<BFloat16> cos() const {
++    return map(Sleef_cosf8_u10);
++  }
++  Vec256<BFloat16> cosh() const {
++    return map(Sleef_coshf8_u10);
++  }
++  Vec256<BFloat16> ceil() const {
++    __m256 lo, hi;
++    cvtbf16_fp32(values, lo, hi);
++    auto o1 = _mm256_ceil_ps(lo);
++    auto o2 = _mm256_ceil_ps(hi);
++    return cvtfp32_bf16(o1, o2);
++  }
++  Vec256<BFloat16> floor() const {
++    __m256 lo, hi;
++    cvtbf16_fp32(values, lo, hi);
++    auto o1 = _mm256_floor_ps(lo);
++    auto o2 = _mm256_floor_ps(hi);
++    return cvtfp32_bf16(o1, o2);
++  }
++  Vec256<BFloat16> neg() const {
++    __m256 lo, hi;
++    cvtbf16_fp32(values, lo, hi);
++    auto mask = _mm256_set1_ps(-0.f);
++    auto o1 = _mm256_xor_ps(mask, lo);
++    auto o2 = _mm256_xor_ps(mask, hi);
++    return cvtfp32_bf16(o1, o2);
++  }
++  Vec256<BFloat16> round() const {
++    __m256 lo, hi;
++    cvtbf16_fp32(values, lo, hi);
++    auto o1 = _mm256_round_ps(lo, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
++    auto o2 = _mm256_round_ps(hi, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
++    return cvtfp32_bf16(o1, o2);
++  }
++  Vec256<BFloat16> tan() const {
++    return map(Sleef_tanf8_u10);
++  }
++  Vec256<BFloat16> tanh() const {
++    return map(Sleef_tanhf8_u10);
++  }
++  Vec256<BFloat16> trunc() const {
++    __m256 lo, hi;
++    cvtbf16_fp32(values, lo, hi);
++    auto o1 = _mm256_round_ps(lo, (_MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC));
++    auto o2 = _mm256_round_ps(hi, (_MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC));
++    return cvtfp32_bf16(o1, o2);
++  }
++  Vec256<BFloat16> lgamma() const {
++    return map(Sleef_lgammaf8_u10);
++  }
++  Vec256<BFloat16> sqrt() const {
++    __m256 lo, hi;
++    cvtbf16_fp32(values, lo, hi);
++    auto o1 = _mm256_sqrt_ps(lo);
++    auto o2 = _mm256_sqrt_ps(hi);
++    return cvtfp32_bf16(o1, o2);
++  }
++  Vec256<BFloat16> reciprocal() const {
++    __m256 lo, hi;
++    cvtbf16_fp32(values, lo, hi);
++    auto ones = _mm256_set1_ps(1);
++    auto o1 = _mm256_div_ps(ones, lo);
++    auto o2 = _mm256_div_ps(ones, hi);
++    return cvtfp32_bf16(o1, o2);
++  }
++  Vec256<BFloat16> rsqrt() const {
++    __m256 lo, hi;
++    cvtbf16_fp32(values, lo, hi);
++    auto ones = _mm256_set1_ps(1);
++    auto o1 = _mm256_div_ps(ones, _mm256_sqrt_ps(lo));
++    auto o2 = _mm256_div_ps(ones, _mm256_sqrt_ps(hi));
++    return cvtfp32_bf16(o1, o2);
++  }
++  Vec256<BFloat16> pow(const Vec256<BFloat16> &b) const {
++    __m256 lo, hi;
++    __m256 b1, b2;
++    cvtbf16_fp32(values, lo, hi);
++    cvtbf16_fp32(b.values, b1, b2);
++    auto o1 = Sleef_powf8_u10(lo, b1);
++    auto o2 = Sleef_powf8_u10(hi, b2);
++    return cvtfp32_bf16(o1, o2);
++  }
++
++  Vec256<BFloat16> inline operator>(const Vec256<BFloat16>& other) const;
++  Vec256<BFloat16> inline operator<(const Vec256<BFloat16>& other) const;
++  Vec256<BFloat16> inline operator>=(const Vec256<BFloat16>& other) const;
++  Vec256<BFloat16> inline operator<=(const Vec256<BFloat16>& other) const;
++  Vec256<BFloat16> inline operator==(const Vec256<BFloat16>& other) const;
++  Vec256<BFloat16> inline operator!=(const Vec256<BFloat16>& other) const;
++
++  Vec256<BFloat16> eq(const Vec256<BFloat16>& other) const;
++  Vec256<BFloat16> ne(const Vec256<BFloat16>& other) const;
++  Vec256<BFloat16> gt(const Vec256<BFloat16>& other) const;
++  Vec256<BFloat16> ge(const Vec256<BFloat16>& other) const;
++  Vec256<BFloat16> lt(const Vec256<BFloat16>& other) const;
++  Vec256<BFloat16> le(const Vec256<BFloat16>& other) const;
++};
++
++template<typename Op>
++Vec256<BFloat16> static inline bfloat16_binary_op_as_fp32(const Vec256<BFloat16>& a, const Vec256<BFloat16>& b, Op op) {
++  __m256 a_lo, a_hi;
++  __m256 b_lo, b_hi;
++  cvtbf16_fp32(__m256i(a), a_lo, a_hi);
++  cvtbf16_fp32(__m256i(b), b_lo, b_hi);
++  auto o1 = op(a_lo, b_lo);
++  auto o2 = op(a_hi, b_hi);
++  return cvtfp32_bf16(o1, o2);
++}
++
++Vec256<BFloat16> inline Vec256<BFloat16>::operator>(const Vec256<BFloat16>& other) const {
++  return bfloat16_binary_op_as_fp32(*this, other, [](__m256 x, __m256 y) {
++    return _mm256_cmp_ps(x, y, _CMP_GT_OQ);
++  });
++}
++Vec256<BFloat16> inline Vec256<BFloat16>::operator<(const Vec256<BFloat16>& other) const {
++  return bfloat16_binary_op_as_fp32(*this, other, [](__m256 x, __m256 y) {
++    return _mm256_cmp_ps(x, y, _CMP_LT_OQ);
++  });
++}
++Vec256<BFloat16> inline Vec256<BFloat16>::operator>=(const Vec256<BFloat16>& other) const {
++  return bfloat16_binary_op_as_fp32(*this, other, [](__m256 x, __m256 y) {
++    return _mm256_cmp_ps(x, y, _CMP_GE_OQ);
++  });
++}
++Vec256<BFloat16> inline Vec256<BFloat16>::operator<=(const Vec256<BFloat16>& other) const {
++  return bfloat16_binary_op_as_fp32(*this, other, [](__m256 x, __m256 y) {
++    return _mm256_cmp_ps(x, y, _CMP_LE_OQ);
++  });
++}
++Vec256<BFloat16> inline Vec256<BFloat16>::operator==(const Vec256<BFloat16>& other) const {
++  return bfloat16_binary_op_as_fp32(*this, other, [](__m256 x, __m256 y) {
++    return _mm256_cmp_ps(x, y, _CMP_EQ_OQ);
++  });
++}
++Vec256<BFloat16> inline Vec256<BFloat16>::operator!=(const Vec256<BFloat16>& other) const {
++  return bfloat16_binary_op_as_fp32(*this, other, [](__m256 x, __m256 y) {
++    return _mm256_cmp_ps(x, y, _CMP_NEQ_OQ);
++  });
++}
++
++Vec256<BFloat16> inline operator+(const Vec256<BFloat16>& a, const Vec256<BFloat16>& b) {
++  return bfloat16_binary_op_as_fp32(a, b, [](const __m256& x, const __m256& y) { return _mm256_add_ps(x, y); });
++}
++Vec256<BFloat16> inline operator-(const Vec256<BFloat16>& a, const Vec256<BFloat16>& b) {
++  return bfloat16_binary_op_as_fp32(a, b, [](const __m256& x, const __m256& y) { return _mm256_sub_ps(x, y); });
++}
++Vec256<BFloat16> inline operator*(const Vec256<BFloat16>& a, const Vec256<BFloat16>& b) {
++  return bfloat16_binary_op_as_fp32(a, b, [](const __m256& x, const __m256& y) { return _mm256_mul_ps(x, y); });
++}
++Vec256<BFloat16> inline operator/(const Vec256<BFloat16>& a, const Vec256<BFloat16>& b) {
++  return bfloat16_binary_op_as_fp32(a, b, [](const __m256& x, const __m256& y) { return _mm256_div_ps(x, y); });
++}
++
++Vec256<BFloat16> inline operator&(const Vec256<BFloat16>& a, const Vec256<BFloat16>& b) {
++  return _mm256_and_si256(a, b);
++}
++Vec256<BFloat16> inline operator|(const Vec256<BFloat16>& a, const Vec256<BFloat16>& b) {
++  return _mm256_or_si256(a, b);
++}
++Vec256<BFloat16> inline operator^(const Vec256<BFloat16>& a, const Vec256<BFloat16>& b) {
++  return _mm256_xor_si256(a, b);
++}
++
++Vec256<BFloat16> Vec256<BFloat16>::eq(const Vec256<BFloat16>& other) const {
++  return (*this == other) & Vec256<BFloat16>(1.0f);
++}
++
++Vec256<BFloat16> Vec256<BFloat16>::ne(const Vec256<BFloat16>& other) const {
++  return (*this != other) & Vec256<BFloat16>(1.0f);
++}
++
++Vec256<BFloat16> Vec256<BFloat16>::gt(const Vec256<BFloat16>& other) const {
++  return (*this > other) & Vec256<BFloat16>(1.0f);
++}
++
++Vec256<BFloat16> Vec256<BFloat16>::ge(const Vec256<BFloat16>& other) const {
++  return (*this >= other) & Vec256<BFloat16>(1.0f);
++}
++
++Vec256<BFloat16> Vec256<BFloat16>::lt(const Vec256<BFloat16>& other) const {
++  return (*this < other) & Vec256<BFloat16>(1.0f);
++}
++
++Vec256<BFloat16> Vec256<BFloat16>::le(const Vec256<BFloat16>& other) const {
++  return (*this <= other) & Vec256<BFloat16>(1.0f);
++}
++
++// frac. Implement this here so we can use subtraction
++Vec256<BFloat16> Vec256<BFloat16>::frac() const {
++  return *this - this->trunc();
++}
++
++// Implements the IEEE 754 201X `maximum` operation, which propagates NaN if
++// either input is a NaN.
++template <>
++Vec256<BFloat16> inline maximum(const Vec256<BFloat16>& a, const Vec256<BFloat16>& b) {
++  __m256 a_lo, a_hi;
++  __m256 b_lo, b_hi;
++  cvtbf16_fp32(__m256i(a), a_lo, a_hi);
++  cvtbf16_fp32(__m256i(b), b_lo, b_hi);
++  auto max_lo = _mm256_max_ps(a_lo, b_lo);
++  auto max_hi = _mm256_max_ps(a_hi, b_hi);
++  auto nan_lo = _mm256_cmp_ps(a_lo, b_lo, _CMP_UNORD_Q);
++  auto nan_hi = _mm256_cmp_ps(a_hi, b_hi, _CMP_UNORD_Q);
++  // Exploit the fact that all-ones is a NaN.
++  auto o1 = _mm256_or_ps(max_lo, nan_lo);
++  auto o2 = _mm256_or_ps(max_hi, nan_hi);
++  return cvtfp32_bf16(o1, o2);
++}
++
++// Implements the IEEE 754 201X `minimum` operation, which propagates NaN if
++// either input is a NaN.
++template <>
++Vec256<BFloat16> inline minimum(const Vec256<BFloat16>& a, const Vec256<BFloat16>& b) {
++  __m256 a_lo, a_hi;
++  __m256 b_lo, b_hi;
++  cvtbf16_fp32(__m256i(a), a_lo, a_hi);
++  cvtbf16_fp32(__m256i(b), b_lo, b_hi);
++  auto min_lo = _mm256_min_ps(a_lo, b_lo);
++  auto min_hi = _mm256_min_ps(a_hi, b_hi);
++  auto nan_lo = _mm256_cmp_ps(a_lo, b_lo, _CMP_UNORD_Q);
++  auto nan_hi = _mm256_cmp_ps(a_hi, b_hi, _CMP_UNORD_Q);
++  // Exploit the fact that all-ones is a NaN.
++  auto o1 = _mm256_or_ps(min_lo, nan_lo);
++  auto o2 = _mm256_or_ps(min_hi, nan_hi);
++  return cvtfp32_bf16(o1, o2);
++}
++
++template <>
++Vec256<BFloat16> inline clamp(const Vec256<BFloat16>& a,
++    const Vec256<BFloat16>& min, const Vec256<BFloat16>& max) {
++  __m256 a_lo, a_hi;
++  __m256 min_lo, min_hi;
++  __m256 max_lo, max_hi;
++  cvtbf16_fp32(__m256i(a), a_lo, a_hi);
++  cvtbf16_fp32(__m256i(min), min_lo, min_hi);
++  cvtbf16_fp32(__m256i(max), max_lo, max_hi);
++  auto o1 = _mm256_min_ps(max_lo, _mm256_max_ps(min_lo, a_lo));
++  auto o2 = _mm256_min_ps(max_hi, _mm256_max_ps(min_hi, a_hi));
++  return cvtfp32_bf16(o1, o2);
++}
++
++template <>
++Vec256<BFloat16> inline clamp_max(const Vec256<BFloat16>& a, const Vec256<BFloat16>& max) {
++  __m256 a_lo, a_hi;
++  __m256 max_lo, max_hi;
++  cvtbf16_fp32(__m256i(a), a_lo, a_hi);
++  cvtbf16_fp32(__m256i(max), max_lo, max_hi);
++  auto o1 = _mm256_min_ps(max_lo, a_lo);
++  auto o2 = _mm256_min_ps(max_hi, a_hi);
++  return cvtfp32_bf16(o1, o2);
++}
++
++template <>
++Vec256<BFloat16> inline clamp_min(const Vec256<BFloat16>& a, const Vec256<BFloat16>& min) {
++  __m256 a_lo, a_hi;
++  __m256 min_lo, min_hi;
++  cvtbf16_fp32(__m256i(a), a_lo, a_hi);
++  cvtbf16_fp32(__m256i(min), min_lo, min_hi);
++  auto o1 = _mm256_max_ps(min_lo, a_lo);
++  auto o2 = _mm256_max_ps(min_hi, a_hi);
++  return cvtfp32_bf16(o1, o2);
++}
++
++template <>
++inline void convert(const BFloat16* src, BFloat16* dst, int64_t n) {
++  int64_t i;
++#pragma unroll
++  for (i = 0; i <= (n - Vec256<BFloat16>::size()); i += Vec256<BFloat16>::size()) {
++    auto vsrc = _mm256_loadu_si256(reinterpret_cast<__m256i*>((void*)(src + i)));
++    _mm256_storeu_si256(reinterpret_cast<__m256i*>((void*)(dst + i)), vsrc);
++  }
++#pragma unroll
++  for (; i < n; i++) {
++    dst[i] = src[i];
++  }
++}
++
++template <>
++Vec256<BFloat16> inline fmadd(const Vec256<BFloat16>& a,
++    const Vec256<BFloat16>& b, const Vec256<BFloat16>& c) {
++  __m256 a_lo, a_hi;
++  __m256 b_lo, b_hi;
++  __m256 c_lo, c_hi;
++  cvtbf16_fp32(__m256i(a), a_lo, a_hi);
++  cvtbf16_fp32(__m256i(b), b_lo, b_hi);
++  cvtbf16_fp32(__m256i(c), c_lo, c_hi);
++  auto o1 = _mm256_fmadd_ps(a_lo, b_lo, c_lo);
++  auto o2 = _mm256_fmadd_ps(a_hi, b_hi, c_hi);
++  return cvtfp32_bf16(o1, o2);
++}
++
++#endif
++
++}}}
+diff --git a/aten/src/ATen/native/TensorIterator.cpp b/aten/src/ATen/native/TensorIterator.cpp
+index 1200713..32c9757 100644
+--- a/aten/src/ATen/native/TensorIterator.cpp
++++ b/aten/src/ATen/native/TensorIterator.cpp
+@@ -526,18 +526,18 @@ int TensorIterator::num_reduce_dims() const {
+     }                                                                     \
+   }
+ 
+-void TensorIterator::for_each(loop_t loop) {
+-  for_each(LOOP_WRAPPER(ntensors(), loop));
++void TensorIterator::for_each(loop_t loop, int64_t grain_size) {
++  for_each(LOOP_WRAPPER(ntensors(), loop), grain_size);
+ }
+ 
+-void TensorIterator::for_each(loop2d_t loop) {
++void TensorIterator::for_each(loop2d_t loop, int64_t grain_size) {
+   int64_t numel = this->numel();
+   if (numel == 0) {
+     return;
+   } else if (numel < internal::GRAIN_SIZE || at::get_num_threads() == 1) {
+     return serial_for_each(loop, {0, numel});
+   } else {
+-    at::parallel_for(0, numel, internal::GRAIN_SIZE, [&](int64_t begin, int64_t end) {
++    at::parallel_for(0, numel, grain_size, [&](int64_t begin, int64_t end) {
+       serial_for_each(loop, {begin, end});
+     });
+   }
+diff --git a/aten/src/ATen/native/TensorIterator.h b/aten/src/ATen/native/TensorIterator.h
+index 5d66ebb..2fc725a 100644
+--- a/aten/src/ATen/native/TensorIterator.h
++++ b/aten/src/ATen/native/TensorIterator.h
+@@ -9,6 +9,7 @@
+ #include <c10/util/Optional.h>
+ #include <ATen/MemoryOverlap.h>
+ #include <ATen/NamedTensorUtils.h>
++#include <ATen/Parallel.h>
+ 
+ // TensorIterator is a helper class for element-wise operations, such as
+ // arithmetic, comparisons, and trigonometric functions. It handles
+@@ -263,8 +264,8 @@ struct CAFFE2_API TensorIterator {
+     return c10::fetch_and_cast<T>(op.tensor.scalar_type(), op.data);
+   }
+ 
+-  void for_each(loop_t loop);
+-  void for_each(loop2d_t loop);
++  void for_each(loop_t loop, int64_t grain_size = at::internal::GRAIN_SIZE);
++  void for_each(loop2d_t loop, int64_t grain_size = at::internal::GRAIN_SIZE);
+ 
+   void parallel_reduce(loop2d_t loop);
+ 
+diff --git a/aten/src/ATen/native/cpu/AtomicAddFloat.h b/aten/src/ATen/native/cpu/AtomicAddFloat.h
+new file mode 100644
+index 0000000..aad289b
+--- /dev/null
++++ b/aten/src/ATen/native/cpu/AtomicAddFloat.h
+@@ -0,0 +1,33 @@
++#ifndef ATOMIC_ADD_FLOAT
++#define ATOMIC_ADD_FLOAT
++
++#if (defined(__x86_64__) || defined(__i386__))
++#include "ATen/native/cpu/Intrinsics.h"
++#else
++#define _mm_pause()
++#endif
++
++#include <atomic>
++
++static inline void cpu_atomic_add_float(float* dst, float fvalue)
++{
++  typedef union {
++    unsigned intV;
++    float floatV;
++  } uf32_t;
++
++  uf32_t new_value, old_value;
++  std::atomic<unsigned>* dst_intV = (std::atomic<unsigned>*)(dst);
++
++  old_value.floatV = *dst;
++  new_value.floatV = old_value.floatV + fvalue;
++
++  unsigned* old_intV = (unsigned*)(&old_value.intV);
++  while (!std::atomic_compare_exchange_strong(dst_intV, old_intV, new_value.intV)) {
++    _mm_pause();
++    old_value.floatV = *dst;
++    new_value.floatV = old_value.floatV + fvalue;
++  }
++}
++
++#endif
+diff --git a/aten/src/ATen/native/cpu/IndexKernel.cpp b/aten/src/ATen/native/cpu/IndexKernel.cpp
+index ee124d2..1099256 100644
+--- a/aten/src/ATen/native/cpu/IndexKernel.cpp
++++ b/aten/src/ATen/native/cpu/IndexKernel.cpp
+@@ -6,6 +6,7 @@
+ #include <ATen/native/TensorIterator.h>
+ #include <ATen/Parallel.h>
+ #include <ATen/cpu/vec256/vec256.h>
++#include <ATen/native/cpu/AtomicAddFloat.h>
+ 
+ namespace at { namespace native {
+ namespace {
+@@ -62,6 +63,10 @@ void cpu_index_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRef
+                       const func_t& f, bool serial_execution=false)
+ {
+   int ntensor = iter.ntensors();
++  // When launch the index parallel version, set a relative samll grain size less than the INTERNAL::GRAIN_SIZE
++  // to make the whole available thread numbers get more balanced work load and a better cache location.
++  // The grain size here is chosen by the op benchmark to overcome the thread launch overhead
++  const int index_parallel_grain_size = 3000;
+   auto loop = [&](char** data, const int64_t* strides, int64_t n) {
+     auto indexer = Indexer(ntensor - 2, &data[2], &strides[2], index_size, index_stride);
+     char* dst = data[0];
+@@ -88,7 +93,7 @@ void cpu_index_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRef
+   if (serial_execution) {
+     iter.serial_for_each(loop, {0, iter.numel()});
+   } else {
+-    iter.for_each(loop);
++    iter.for_each(loop, index_parallel_grain_size);
+   }
+ }
+ 
+@@ -106,11 +111,18 @@ void index_put_kernel(TensorIterator& iter, IntArrayRef index_size, IntArrayRef
+   AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(at::ScalarType::Half, at::ScalarType::Bool, at::ScalarType::BFloat16,
+     iter.dtype(), "index_put", [&] {
+     if (accumulate) {
+-      // TODO: investigate parallelization of the accumulate kernel. Unlike the non-accumulate case,
+-      // this needs to be thread-safe.
+-      cpu_index_kernel<scalar_t>(iter, index_size, index_stride, [](char* dst, char* src, int64_t offset) {
+-        *(scalar_t*)(dst + offset) += *(scalar_t*)src;
+-      }, /*serial_execution=*/true);
++      bool use_parallel_for = ((iter.numel() >= internal::GRAIN_SIZE) && (at::get_num_threads() > 1));
++      if (iter.dtype() == at::ScalarType::Float && use_parallel_for) {
++        cpu_index_kernel<float>(iter, index_size, index_stride, [](char* dst, char* src, int64_t offset) {
++          cpu_atomic_add_float((float*)(dst + offset), *(float*)src);
++        });
++      } else {
++        // TODO: investigate parallelization of the accumulate kernel. Unlike the non-accumulate case,
++        // this needs to be thread-safe.
++        cpu_index_kernel<scalar_t>(iter, index_size, index_stride, [](char* dst, char* src, int64_t offset) {
++          *(scalar_t*)(dst + offset) += *(scalar_t*)src;
++        }, /*serial_execution=*/true);
++      }
+     } else {
+       cpu_index_kernel<scalar_t>(iter, index_size, index_stride, [](char* dst, char* src, int64_t offset) {
+         *(scalar_t*)(dst + offset) = *(scalar_t*)src;
+diff --git a/aten/src/ATen/native/cpu/Loops.h b/aten/src/ATen/native/cpu/Loops.h
+index 14fdefe..97313dc 100644
+--- a/aten/src/ATen/native/cpu/Loops.h
++++ b/aten/src/ATen/native/cpu/Loops.h
+@@ -205,7 +205,7 @@ template <typename func_t, typename vec_func_t>
+ void cpu_kernel_vec(TensorIterator& iter, func_t&& op, vec_func_t&& vop) {
+   using traits = function_traits<func_t>;
+   TORCH_INTERNAL_ASSERT(iter.ntensors() >= traits::arity + 1);
+-
++  const int loop_vec_parallel_grain_size = 1024;
+   iter.for_each([&](char** data, const int64_t* strides, int64_t n) {
+     if (is_contiguous<traits>(strides)) {
+       return vectorized_loop(data, n, 0, std::forward<func_t>(op), std::forward<vec_func_t>(vop));
+@@ -219,7 +219,7 @@ void cpu_kernel_vec(TensorIterator& iter, func_t&& op, vec_func_t&& vop) {
+         }
+       });
+     }
+-  });
++  }, loop_vec_parallel_grain_size);
+   iter.cast_outputs();
+ }
+ 
+diff --git a/aten/src/ATen/native/sparse/SparseTensor.cpp b/aten/src/ATen/native/sparse/SparseTensor.cpp
+index 8ce6045..ba7f79e 100644
+--- a/aten/src/ATen/native/sparse/SparseTensor.cpp
++++ b/aten/src/ATen/native/sparse/SparseTensor.cpp
+@@ -76,6 +76,8 @@ SparseTensor new_sparse(const TensorOptions& options) {
+   DispatchKey dispatch_key;
+   if (options.device().is_cuda()) {
+     dispatch_key = DispatchKey::SparseCUDATensorId;
++  } else if (options.device().is_dpcpp()) {
++    dispatch_key = DispatchKey::SparseDPCPPTensorId;
+   } else {
+     dispatch_key = DispatchKey::SparseCPUTensorId;
+   }
+diff --git a/aten/src/TH/generic/THTensorApply.hpp b/aten/src/TH/generic/THTensorApply.hpp
+index b5aa71a..c5144a2 100644
+--- a/aten/src/TH/generic/THTensorApply.hpp
++++ b/aten/src/TH/generic/THTensorApply.hpp
+@@ -78,7 +78,7 @@ if (std::isnan(val)) break;
+ #else
+ #define PRAGMA(P)         _Pragma(#P)
+ #define PRAGMA_IVDEP      PRAGMA(ivdep)
+-#define PRAGMA_SIMD       PRAGMA(simd)
++#define PRAGMA_SIMD       PRAGMA(omp simd)
+ #endif
+ 
+ #define TH_TENSOR_APPLY2_PARALLEL(SIZE, CONTIG1, CONTIG2, TYPE1, TENSOR1, TYPE2, TENSOR2, CODE, THRESHOLD) \
+diff --git a/c10/core/Backend.h b/c10/core/Backend.h
+index 5f3d8c7..a47240b 100644
+--- a/c10/core/Backend.h
++++ b/c10/core/Backend.h
+@@ -25,18 +25,22 @@ namespace c10 {
+  * or "SparseCUDA"; backend in torch.backends is something like "MKL" or
+  * "CUDNN".
+  */
+-enum class Backend { CPU, CUDA, HIP, SparseCPU, SparseCUDA, SparseHIP, MSNPU, XLA, QuantizedCPU, Undefined, MkldnnCPU, NumOptions };
++enum class Backend { CPU, CUDA, HIP, SparseCPU, SparseCUDA, SparseHIP, MSNPU, XLA, QuantizedCPU, Undefined, MkldnnCPU, DPCPP, SparseDPCPP, NumOptions };
+ 
+ static inline Backend toSparse(Backend b) {
+   switch (b) {
+     case Backend::CPU:
+       return Backend::SparseCPU;
++    case Backend::DPCPP:
++      return Backend::SparseDPCPP;
+     case Backend::CUDA:
+       return Backend::SparseCUDA;
+     case Backend::HIP:
+       return Backend::SparseHIP;
+     case Backend::SparseCPU:
+       return Backend::SparseCPU;
++    case Backend::SparseDPCPP:
++      return Backend::SparseDPCPP;
+     case Backend::SparseCUDA:
+       return Backend::SparseCUDA;
+     case Backend::SparseHIP:
+@@ -58,6 +62,10 @@ static inline Backend toDense(Backend b) {
+       return Backend::MSNPU;
+     case Backend::XLA:
+       return Backend::XLA;
++    case Backend::DPCPP:
++      return Backend::DPCPP;
++    case Backend::SparseDPCPP:
++      return Backend::DPCPP;
+     case Backend::SparseCPU:
+       return Backend::CPU;
+     case Backend::SparseCUDA:
+@@ -82,6 +90,10 @@ static inline Backend dispatchKeyToBackend(DispatchKey t) {
+     return Backend::MSNPU;
+   } else if (t == DispatchKey::XLATensorId || t == DispatchKey::XLAPreAutograd) {
+     return Backend::XLA;
++  } else if (t == DispatchKey::DPCPPTensorId) {
++    return Backend::DPCPP;
++  } else if (t == DispatchKey::SparseDPCPPTensorId) {
++    return Backend::SparseDPCPP;
+   } else if (t == DispatchKey::SparseCPUTensorId) {
+     return Backend::SparseCPU;
+   } else if (t == DispatchKey::SparseCUDATensorId) {
+@@ -111,6 +123,10 @@ static inline DispatchKey backendToDispatchKey(Backend b) {
+       return DispatchKey::MSNPUTensorId;
+     case Backend::XLA:
+       return DispatchKey::XLATensorId;
++    case Backend::DPCPP:
++      return DispatchKey::DPCPPTensorId;
++    case Backend::SparseDPCPP:
++      return DispatchKey::SparseDPCPPTensorId;
+     case Backend::SparseCPU:
+       return DispatchKey::SparseCPUTensorId;
+     case Backend::SparseCUDA:
+@@ -146,6 +162,9 @@ static inline DeviceType backendToDeviceType(Backend b) {
+       return DeviceType::CUDA;
+     case Backend::SparseHIP:
+       return DeviceType::HIP;
++    case Backend::DPCPP:
++    case Backend::SparseDPCPP:
++      return DeviceType::DPCPP;
+     case Backend::MkldnnCPU:
+     case Backend::QuantizedCPU:
+       return DeviceType::CPU;
+@@ -158,12 +177,14 @@ static inline DeviceType backendToDeviceType(Backend b) {
+ 
+ static inline Backend backendToCPU(Backend b) {
+   switch (b) {
++    case Backend::DPCPP:
+     case Backend::CPU:
+       return Backend::CPU;
+     case Backend::CUDA:
+       return Backend::CPU;
+     case Backend::HIP:
+       return Backend::CPU;
++    case Backend::SparseDPCPP:
+     case Backend::SparseCPU:
+       return Backend::SparseCPU;
+     case Backend::SparseCUDA:
+@@ -186,12 +207,14 @@ static inline Backend backendToCPU(Backend b) {
+ 
+ static inline Backend backendToCUDA(Backend b) {
+   switch (b) {
++    case Backend::DPCPP:
+     case Backend::CPU:
+     case Backend::CUDA:
+     case Backend::HIP:
+     case Backend::MSNPU:
+     case Backend::XLA:
+       return Backend::CUDA;
++    case Backend::SparseDPCPP:
+     case Backend::SparseCPU:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
+@@ -205,12 +228,14 @@ static inline Backend backendToCUDA(Backend b) {
+ 
+ static inline Backend backendToHIP(Backend b) {
+   switch (b) {
++    case Backend::DPCPP:
+     case Backend::CPU:
+     case Backend::CUDA:
+     case Backend::HIP:
+     case Backend::MSNPU:
+     case Backend::XLA:
+       return Backend::HIP;
++    case Backend::SparseDPCPP:
+     case Backend::SparseCPU:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
+@@ -225,6 +250,8 @@ static inline Backend backendToHIP(Backend b) {
+ // TODO: This probably shouldn't actually be static inline
+ static inline const char* toString(Backend b) {
+   switch (b) {
++    case Backend::DPCPP:
++      return "DPCPP";
+     case Backend::CPU:
+       return "CPU";
+     case Backend::CUDA:
+@@ -235,6 +262,8 @@ static inline const char* toString(Backend b) {
+       return "MSNPU";
+     case Backend::XLA:
+       return "XLA";
++    case Backend::SparseDPCPP:
++      return "SparseDPCPP";
+     case Backend::SparseCPU:
+       return "SparseCPU";
+     case Backend::SparseCUDA:
+@@ -252,6 +281,7 @@ static inline const char* toString(Backend b) {
+ 
+ static inline bool isSparse(Backend b) {
+   switch (b) {
++    case Backend::SparseDPCPP:
+     case Backend::SparseCPU:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
+diff --git a/c10/core/Device.cpp b/c10/core/Device.cpp
+index 82a02fd..8268038 100644
+--- a/c10/core/Device.cpp
++++ b/c10/core/Device.cpp
+@@ -13,7 +13,7 @@
+ namespace c10 {
+ namespace {
+ DeviceType parse_type(const std::string& device_string) {
+-  static const std::array<std::pair<std::string, DeviceType>, 9> types = {{
++  static const std::array<std::pair<std::string, DeviceType>, 10> types = {{
+       {"cpu", DeviceType::CPU},
+       {"cuda", DeviceType::CUDA},
+       {"mkldnn", DeviceType::MKLDNN},
+@@ -23,6 +23,7 @@ DeviceType parse_type(const std::string& device_string) {
+       {"hip", DeviceType::HIP},
+       {"msnpu", DeviceType::MSNPU},
+       {"xla", DeviceType::XLA},
++      {"dpcpp", DeviceType::DPCPP},
+   }};
+   auto device = std::find_if(
+       types.begin(),
+@@ -34,7 +35,7 @@ DeviceType parse_type(const std::string& device_string) {
+     return device->second;
+   }
+   AT_ERROR(
+-      "Expected one of cpu, cuda, mkldnn, opengl, opencl, ideep, hip, msnpu device type at start of device string: ", device_string);
++      "Expected one of cpu, cuda, mkldnn, opengl, opencl, ideep, dpcpp, hip, msnpu device type at start of device string: ", device_string);
+ }
+ } // namespace
+ 
+diff --git a/c10/core/Device.h b/c10/core/Device.h
+index f1249e8..31f15e8 100644
+--- a/c10/core/Device.h
++++ b/c10/core/Device.h
+@@ -86,6 +86,11 @@ struct C10_API Device final {
+     return type_ == DeviceType::CPU;
+   }
+ 
++  /// Return true if the device is of DPCPP type.
++  bool is_dpcpp() const noexcept {
++    return type_ == DeviceType::DPCPP;
++  }
++
+   /// Same string as returned from operator<<.
+   std::string str() const;
+ 
+diff --git a/c10/core/DeviceType.cpp b/c10/core/DeviceType.cpp
+index 017267c..486b02e 100644
+--- a/c10/core/DeviceType.cpp
++++ b/c10/core/DeviceType.cpp
+@@ -27,6 +27,8 @@ std::string DeviceTypeName(DeviceType d, bool lower_case) {
+       return lower_case ? "msnpu" : "MSNPU";
+     case DeviceType::XLA:
+       return lower_case ? "xla" : "XLA";
++    case DeviceType::DPCPP:
++      return lower_case ? "dpcpp" : "DPCPP";
+     default:
+       AT_ERROR(
+           "Unknown device: ",
+@@ -59,6 +61,7 @@ bool isValidDeviceType(DeviceType d) {
+     case DeviceType::FPGA:
+     case DeviceType::MSNPU:
+     case DeviceType::XLA:
++    case DeviceType::DPCPP:
+       return true;
+     default:
+       return false;
+diff --git a/c10/core/DeviceType.h b/c10/core/DeviceType.h
+index 9f75966..23f6808 100644
+--- a/c10/core/DeviceType.h
++++ b/c10/core/DeviceType.h
+@@ -23,11 +23,12 @@ enum class DeviceType : int16_t {
+   FPGA = 7, // FPGA
+   MSNPU = 8, // MSNPU
+   XLA = 9, // XLA / TPU
++  DPCPP = 10, // DPCPP
+   // NB: If you add more devices:
+   //  - Change the implementations of DeviceTypeName and isValidDeviceType
+   //    in DeviceType.cpp
+   //  - Change the number below
+-  COMPILE_TIME_MAX_DEVICE_TYPES = 10,
++  COMPILE_TIME_MAX_DEVICE_TYPES = 11,
+   ONLY_FOR_TEST = 20901, // This device type is only for test.
+ };
+ 
+@@ -36,6 +37,7 @@ constexpr DeviceType kCUDA = DeviceType::CUDA;
+ constexpr DeviceType kHIP = DeviceType::HIP;
+ constexpr DeviceType kMSNPU = DeviceType::MSNPU;
+ constexpr DeviceType kXLA = DeviceType::XLA;
++constexpr DeviceType kDPCPP = DeviceType::DPCPP;
+ 
+ // define explicit int constant
+ constexpr int COMPILE_TIME_MAX_DEVICE_TYPES =
+diff --git a/c10/core/DispatchKey.cpp b/c10/core/DispatchKey.cpp
+index cf20e51..b093a64 100644
+--- a/c10/core/DispatchKey.cpp
++++ b/c10/core/DispatchKey.cpp
+@@ -36,6 +36,10 @@ const char* toString(DispatchKey t) {
+       return "QuantizedCPUTensorId";
+     case DispatchKey::VariableTensorId:
+       return "VariableTensorId";
++    case DispatchKey::DPCPPTensorId:
++      return "DPCPPTensorId";
++    case DispatchKey::SparseDPCPPTensorId:
++      return "SparseDPCPPTensorId";
+     case DispatchKey::BackendSelect:
+       return "BackendSelect";
+     case DispatchKey::TESTING_ONLY_GenericModeTensorId:
+diff --git a/c10/core/DispatchKey.h b/c10/core/DispatchKey.h
+index da7c3c5..1330c2b 100644
+--- a/c10/core/DispatchKey.h
++++ b/c10/core/DispatchKey.h
+@@ -90,6 +90,9 @@ enum class DispatchKey : uint8_t {
+   SparseCUDATensorId, // registered at build/aten/src/ATen/SparseCUDAType.cpp
+   SparseHIPTensorId,  // TODO: I think this is not actually used, due to Note [Masquerading as CUDA]
+ 
++  DPCPPTensorId, // DPCPP only
++  SparseDPCPPTensorId, // DPCPP only
++
+   // Here are reserved backends for user-defined backends, see Note [Private use TensorId]
+   // To see some example about how to use this, check out MSNPU
+   PrivateUse1_TensorId,
+diff --git a/c10/core/Layout.h b/c10/core/Layout.h
+index c5ecc89..4aab440 100644
+--- a/c10/core/Layout.h
++++ b/c10/core/Layout.h
+@@ -15,6 +15,7 @@ constexpr auto kMkldnn = Layout::Mkldnn;
+ inline Layout layout_from_backend(Backend backend) {
+   switch (backend) {
+     case Backend::SparseCPU:
++    case Backend::SparseDPCPP:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
+       return Layout::Sparse;
+diff --git a/c10/core/TensorImpl.h b/c10/core/TensorImpl.h
+index de11b22..57513ae 100644
+--- a/c10/core/TensorImpl.h
++++ b/c10/core/TensorImpl.h
+@@ -425,7 +425,8 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+     // NB: This method is not virtual and avoid dispatches for performance reasons.
+     return key_set_.has(DispatchKey::SparseCPUTensorId) ||
+            key_set_.has(DispatchKey::SparseCUDATensorId) ||
+-           key_set_.has(DispatchKey::SparseHIPTensorId);
++           key_set_.has(DispatchKey::SparseHIPTensorId) ||
++           key_set_.has(DispatchKey::SparseDPCPPTensorId);
+   }
+ 
+   bool is_quantized() const {
+@@ -433,6 +434,11 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+     return key_set_.has(DispatchKey::QuantizedCPUTensorId);
+   }
+ 
++  bool is_dpcpp() const {
++    return key_set_.has(DispatchKey::DPCPPTensorId) ||
++           key_set_.has(DispatchKey::SparseDPCPPTensorId);
++  }
++
+   bool is_cuda() const {
+     // NB: This method is not virtual and avoid dispatches for performance reasons.
+     return key_set_.has(DispatchKey::CUDATensorId) ||
+@@ -866,12 +872,14 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+     auto is_dense = [](DispatchKeySet ts) {
+       return ts.has(DispatchKey::CPUTensorId) ||
+              ts.has(DispatchKey::CUDATensorId) ||
+-             ts.has(DispatchKey::HIPTensorId);
++             ts.has(DispatchKey::HIPTensorId) ||
++             ts.has(DispatchKey::DPCPPTensorId);
+     };
+     auto is_sparse = [](DispatchKeySet ts) {
+       return ts.has(DispatchKey::SparseCPUTensorId) ||
+              ts.has(DispatchKey::SparseCUDATensorId) ||
+-             ts.has(DispatchKey::SparseHIPTensorId);
++             ts.has(DispatchKey::SparseHIPTensorId) ||
++             ts.has(DispatchKey::SparseDPCPPTensorId);
+     };
+     return (key_set_ == from) || (is_dense(key_set_) && is_dense(from)) || (is_sparse(key_set_) && is_sparse(from));
+   }
+diff --git a/c10/core/TensorOptions.h b/c10/core/TensorOptions.h
+index 9a4c9b3..6d02405 100644
+--- a/c10/core/TensorOptions.h
++++ b/c10/core/TensorOptions.h
+@@ -398,6 +398,8 @@ struct C10_API TensorOptions {
+             return DispatchKey::MSNPUTensorId;
+           case DeviceType::XLA:
+             return DispatchKey::XLATensorId;
++          case DeviceType::DPCPP:
++            return DispatchKey::DPCPPTensorId;
+           default:
+             AT_ERROR("Unsupported device type for dense layout: ", device().type());
+         }
+@@ -409,6 +411,8 @@ struct C10_API TensorOptions {
+             return DispatchKey::SparseCUDATensorId;
+           case DeviceType::HIP:
+             return DispatchKey::SparseHIPTensorId;
++          case DeviceType::DPCPP:
++            return DispatchKey::SparseDPCPPTensorId;
+           default:
+             AT_ERROR("Unsupported device type for sparse layout: ", device().type());
+         }
+@@ -634,6 +638,10 @@ inline DeviceType computeDeviceType(DispatchKey tid) {
+     return DeviceType::MSNPU;
+   } else if (tid == DispatchKey::XLATensorId) {
+     return DeviceType::XLA;
++  } else if (tid == DispatchKey::DPCPPTensorId) {
++    return DeviceType::DPCPP;
++  } else if (tid == DispatchKey::SparseDPCPPTensorId) {
++    return DeviceType::DPCPP;
+   } else if (tid == DispatchKey::SparseCPUTensorId) {
+     return DeviceType::CPU;
+   } else if (tid == DispatchKey::SparseCUDATensorId) {
+diff --git a/docs/source/distributed.rst b/docs/source/distributed.rst
+index 180d1d4..6c5645a 100644
+--- a/docs/source/distributed.rst
++++ b/docs/source/distributed.rst
+@@ -10,7 +10,7 @@ Distributed communication package - torch.distributed
+ Backends
+ --------
+ 
+-``torch.distributed`` supports three backends, each with
++``torch.distributed`` supports three built-in backends, each with
+ different capabilities. The table below shows which functions are available
+ for use with CPU / CUDA tensors.
+ MPI supports CUDA only if the implementation used to build PyTorch supports it.
+@@ -37,6 +37,8 @@ MPI supports CUDA only if the implementation used to build PyTorch supports it.
+ +------------+-----+-----+-----+-----+-----+-----+
+ | scatter    | ✓   | ✘   | ✓   | ?   | ✘   | ✘   |
+ +------------+-----+-----+-----+-----+-----+-----+
++| all_to_all | ✘   | ✘   | ✓   | ?   | ✘   | ✘   |
+++------------+-----+-----+-----+-----+-----+-----+
+ | barrier    | ✓   | ✘   | ✓   | ?   | ✘   | ✓   |
+ +------------+-----+-----+-----+-----+-----+-----+
+ 
+@@ -317,6 +319,8 @@ Collective functions
+ 
+ .. autofunction:: scatter
+ 
++.. autofunction:: all_to_all
++
+ .. autofunction:: barrier
+ 
+ .. autoclass:: ReduceOp
+@@ -397,6 +401,26 @@ of 16
+ 
+ .. _distributed-launch:
+ 
++Third-party backends
++ --------------------
++ 
++Besides the GLOO/MPI/NCCL backends, PyTorch distributed supports third-party backends
++through a run-time register mechanism.
++For references on how to develop a third-party backend through C++ Extension,
++please refer to `Tutorials - Custom C++ and CUDA Extensions <https://pytorch.org/
++tutorials/advanced/cpp_extension.html>`_ and `test/cpp_extensions/cpp_c10d_extension.cpp`.
++The capability of third-party backends are decided by their own implementations.
++
++The new backend derives from `c10d.ProcessGroup` and registers the backend name and the
++instantiating interface through :func:`torch.distributed.Backend.register_backend` when
++imported.
++
++When manually importing this backend and invoking :func:`torch.distributed.init_process_group`
++with the corresponding backend name, the `torch.distributed` package runs on the new backend.
++
++.. warning::
++    The support of third-party backend is experimental and subject to change.
++
+ Launch utility
+ --------------
+ 
+diff --git a/setup.py b/setup.py
+index 7352d3b..977f8fc 100644
+--- a/setup.py
++++ b/setup.py
+@@ -811,6 +811,7 @@ if __name__ == '__main__':
+                 'include/c10/cuda/impl/*.h',
+                 'include/c10/hip/*.h',
+                 'include/c10/hip/impl/*.h',
++                'include/c10d/*.hpp',
+                 'include/caffe2/**/*.h',
+                 'include/torch/*.h',
+                 'include/torch/csrc/*.h',
+diff --git a/torch/csrc/distributed/c10d/init.cpp b/torch/csrc/distributed/c10d/init.cpp
+index dce5201..3b2e4fe 100644
+--- a/torch/csrc/distributed/c10d/init.cpp
++++ b/torch/csrc/distributed/c10d/init.cpp
+@@ -204,6 +204,10 @@ They are used in specifying strategies for reduction collectives, e.g.,
+       .def(py::init<>())
+       .def_readwrite("timeout", &::c10d::BarrierOptions::timeout);
+ 
++  py::class_<::c10d::AllToAllOptions>(module, "AllToAllOptions")
++      .def(py::init<>())
++      .def_readwrite("timeout", &::c10d::AllToAllOptions::timeout);
++
+   auto store =
+       py::class_<::c10d::Store, std::shared_ptr<::c10d::Store>, PythonStore>(
+           module, "Store")
+@@ -470,6 +474,55 @@ They are used in specifying strategies for reduction collectives, e.g.,
+               py::call_guard<py::gil_scoped_release>())
+ 
+           .def(
++              "alltoall_base",
++              &::c10d::ProcessGroup::alltoall_base,
++              py::arg("output_tensor"),
++              py::arg("input_tensor"),
++              py::arg("output_split_sizes"),
++              py::arg("input_split_sizes"),
++              py::arg("opts") = ::c10d::AllToAllOptions(),
++              py::call_guard<py::gil_scoped_release>())
++
++          .def(
++              "alltoall_base",
++              [](::c10d::ProcessGroup& pg,
++                 at::Tensor& output,
++                 at::Tensor& input,
++                 std::vector<int64_t> outputSplitSizes,
++                 std::vector<int64_t> inputSplitSizes) {
++                return pg.alltoall_base(
++                    output,
++                    input,
++                    outputSplitSizes,
++                    inputSplitSizes,
++                    ::c10d::AllToAllOptions());
++              },
++              py::arg("output"),
++              py::arg("input"),
++              py::arg("output_split_sizes"),
++              py::arg("input_split_sizes"),
++              py::call_guard<py::gil_scoped_release>())
++
++          .def(
++              "alltoall",
++              &::c10d::ProcessGroup::alltoall,
++              py::arg("output_tensor"),
++              py::arg("input_tensor"),
++              py::arg("opts") = ::c10d::AllToAllOptions(),
++              py::call_guard<py::gil_scoped_release>())
++
++          .def(
++              "alltoall",
++              [](::c10d::ProcessGroup& pg,
++                 std::vector<at::Tensor>& output,
++                 std::vector<at::Tensor>& input) {
++                return pg.alltoall(output, input, ::c10d::AllToAllOptions());
++              },
++              py::arg("output"),
++              py::arg("input"),
++              py::call_guard<py::gil_scoped_release>())
++
++          .def(
+               "send",
+               &::c10d::ProcessGroup::send,
+               py::call_guard<py::gil_scoped_release>())
+diff --git a/torch/csrc/utils/tensor_layouts.cpp b/torch/csrc/utils/tensor_layouts.cpp
+index 6fcd84f..e42a7ba 100644
+--- a/torch/csrc/utils/tensor_layouts.cpp
++++ b/torch/csrc/utils/tensor_layouts.cpp
+@@ -23,6 +23,7 @@ void initializeLayouts() {
+   registerLayoutObject((THPLayout*)strided_layout, at::Backend::CUDA);
+   registerLayoutObject((THPLayout*)strided_layout, at::Backend::MSNPU);
+   registerLayoutObject((THPLayout*)strided_layout, at::Backend::XLA);
++  registerLayoutObject((THPLayout*)strided_layout, at::Backend::DPCPP);
+   registerLayoutObject((THPLayout*)strided_layout, at::Backend::QuantizedCPU);
+ 
+   PyObject *sparse_coo_layout = THPLayout_New(at::Layout::Sparse, "torch.sparse_coo");
+diff --git a/torch/csrc/utils/tensor_new.cpp b/torch/csrc/utils/tensor_new.cpp
+index 85add73..ea90778 100644
+--- a/torch/csrc/utils/tensor_new.cpp
++++ b/torch/csrc/utils/tensor_new.cpp
+@@ -59,6 +59,8 @@ Backend backendToBackendOfDeviceType(Backend b, DeviceType d) {
+     case DeviceType::XLA:
+       TORCH_CHECK(!isSparse(b), "Sparse not implemented for XLA");
+       return Backend::XLA;
++    case DeviceType::DPCPP:
++      return Backend::DPCPP;
+     default:
+       AT_ERROR("Unknown device type");
+   }
+@@ -333,6 +335,7 @@ Tensor legacy_new_from_sequence(
+ void check_base_legacy_new(c10::DispatchKey dispatch_key, at::Layout expected_layout) {
+   if (expected_layout == c10::kStrided) {
+     TORCH_CHECK(dispatch_key == c10::DispatchKey::CPUTensorId
++                || dispatch_key == c10::DispatchKey::DPCPPTensorId
+                 || dispatch_key == c10::DispatchKey::CUDATensorId
+                 || dispatch_key == c10::DispatchKey::HIPTensorId
+                 || dispatch_key == c10::XLATensorId(),
+@@ -344,6 +347,7 @@ void check_base_legacy_new(c10::DispatchKey dispatch_key, at::Layout expected_la
+   } else if(expected_layout == c10::kSparse) {
+     // NOTE: no sparse XLA
+     TORCH_CHECK(dispatch_key == c10::DispatchKey::SparseCPUTensorId
++                || dispatch_key == c10::DispatchKey::SparseDPCPPTensorId
+                 || dispatch_key == c10::DispatchKey::SparseCUDATensorId
+                 || dispatch_key == c10::DispatchKey::SparseHIPTensorId,
+                 "new(): expected DispatchKey: ", c10::DispatchKey::SparseCPUTensorId,
+diff --git a/torch/distributed/distributed_c10d.py b/torch/distributed/distributed_c10d.py
+index 4ca9596..ac2dcc4 100644
+--- a/torch/distributed/distributed_c10d.py
++++ b/torch/distributed/distributed_c10d.py
+@@ -11,6 +11,7 @@ from .rendezvous import rendezvous, register_rendezvous_handler  # noqa: F401
+ from . import (
+     AllreduceOptions,
+     AllreduceCoalescedOptions,
++    AllToAllOptions,
+     BroadcastOptions,
+     GatherOptions,
+     ReduceOptions,
+@@ -44,7 +45,8 @@ except ImportError:
+ 
+ class Backend(object):
+     """
+-    An enum-like class of available backends: GLOO, NCCL, and MPI.
++    An enum-like class of available backends: GLOO, NCCL, MPI, and other registered
++    backends.
+ 
+     The values of this class are lowercase strings, e.g., ``"gloo"``. They can
+     be accessed as attributes, e.g., ``Backend.NCCL``.
+@@ -75,8 +77,29 @@ class Backend(object):
+                              "on CPU tensors.")
+         elif value == Backend.UNDEFINED:
+             raise ValueError("Invalid backend: '{}'".format(name))
++        elif value != Backend.GLOO and value != Backend.NCCL and value != Backend.MPI:
++            value = name
+         return value
+ 
++    @classmethod
++    def register_backend(cls, name, func):
++        """
++        Registers a new backend.
++
++        This class method is used by 3rd party cpp extension to register new backend.
++
++        Arguments:
++            name (str): Backend name matching with the one in `init_process_group()`.
++            func (function): Function handler that instantiates the backend.
++                             The function should be implemented in the backend cpp extension
++                             and takes four arguments, including prefix_store, rank,
++                             world_size, and timeout.
++
++        .. note:: This support of 3rd party backend is experimental and subject to change.
++
++        """ 
++        setattr(Backend, name.upper(), func)
++
+ # `_backend`, `dist_backend`, and `reduce_op` are here to maintain backward
+ # compatibility with pre-c10d distributed package.
+ # TODO: remove them when users are ready to take a hard dependency on PyTorch 1.
+@@ -451,7 +474,7 @@ def _new_process_group_helper(world_size,
+             return GroupMember.NON_GROUP_MEMBER
+         _pg_map[pg] = (Backend.MPI, None)
+         _pg_names[pg] = group_name
+-    else:
++    elif (backend == Backend.GLOO or backend == Backend.NCCL):
+         # If this is a subgroup (which means group_ranks is specified),
+         # we check if the current process is a member of the new group.
+         if not is_default_group:
+@@ -482,8 +505,26 @@ def _new_process_group_helper(world_size,
+                 timeout)
+             _pg_map[pg] = (Backend.NCCL, store)
+             _pg_names[pg] = group_name
+-        else:
+-            raise RuntimeError("Unsupported distributed backend by group")
++    else:
++        # If this is a subgroup (which means group_ranks is specified),
++        # we check if the current process is a member of the new group.
++        if not is_default_group:
++            rank = _default_pg.rank()
++
++        # Use the group name as prefix in the default store, such that
++        # a single store can be reused by multiple groups.
++        prefix_store = PrefixStore(group_name, store)
++
++        pg = getattr(Backend, backend.upper())(
++            prefix_store,
++            rank,
++            world_size,
++            group_ranks,
++            timeout)
++        if not pg:
++            return GroupMember.NON_GROUP_MEMBER
++        _pg_map[pg] = (backend, store)
++        _pg_names[pg] = group_name
+ 
+     return pg
+ 
+@@ -1461,6 +1502,193 @@ def reduce_scatter(output,
+         work.wait()
+ 
+ 
++def all_to_all_single(output,
++                      input,
++                      output_split_sizes=None,
++                      input_split_sizes=None,
++                      group=group.WORLD,
++                      async_op=False):
++    """
++    Each process splits input tensor and then scatters the split list
++    to all processes in a group. Then concatenate the received tensors from all
++    the processes in the group and return single output tensor.
++
++    Arguments:
++        output (Tensor): Gathered cancatenated output tensor.
++        input (Tensor): Input tensor to scatter.
++        output_split_sizes: (list[Int], optional): Output split sizes for dim 0
++            if specified None or empty, dim 0 of ``output`` tensor must divide
++            equally by ``world_size``.
++        input_split_sizes: (list[Int], optional): Input split sizes for dim 0
++            if specified None or empty, dim 0 of ``input`` tensor must divide
++            equally by ``world_size``.
++        group (ProcessGroup, optional): The process group to work on.
++        async_op (bool, optional): Whether this op should be an async op.
++
++    Returns:
++        Async work handle, if async_op is set to True.
++        None, if not async_op or if not part of the group.
++
++    .. warning::
++        `all_to_all_single` is experimental and subject to change.
++
++    Examples:
++        >>> input = torch.arange(4) + rank * 4
++        >>> input
++        tensor([0, 1, 2, 3])     # Rank 0
++        tensor([4, 5, 6, 7])     # Rank 1
++        tensor([8, 9, 10, 11])   # Rank 2
++        tensor([12, 13, 14, 15]) # Rank 3
++        >>> output = torch.empty([4], dtype=torch.int64)
++        >>> dist.all_to_all_single(output, input)
++        >>> output
++        tensor([0, 4, 8, 12])    # Rank 0
++        tensor([1, 5, 9, 13])    # Rank 1
++        tensor([2, 6, 10, 14])   # Rank 2
++        tensor([3, 7, 11, 15])   # Rank 3
++
++        >>> # Essentially, it is similar to following operation:
++        >>> scatter_list = list(input.chunk(world_size))
++        >>> gather_list  = list(output.chunk(world_size))
++        >>> for i in range(world_size):
++        >>>   dist.scatter(gather_list[i], scatter_list if i == rank else [], src = i)
++
++        >>> # Another example with uneven split
++        >>> input
++        tensor([0, 1, 2, 3, 4, 5])                                       # Rank 0
++        tensor([10, 11, 12, 13, 14, 15, 16, 17, 18])                     # Rank 1
++        tensor([20, 21, 22, 23, 24])                                     # Rank 2
++        tensor([30, 31, 32, 33, 34, 35, 36])                             # Rank 3
++        >>> input_splits
++        [2, 2, 1, 1]                                                     # Rank 0
++        [3, 2, 2, 2]                                                     # Rank 1
++        [2, 1, 1, 1]                                                     # Rank 2
++        [2, 2, 2, 1]                                                     # Rank 3
++        >>> output_splits
++        [2, 3, 2, 2]                                                     # Rank 0
++        [2, 2, 1, 2]                                                     # Rank 1
++        [1, 2, 1, 2]                                                     # Rank 2
++        [1, 2, 1, 1]                                                     # Rank 3
++        >>> output = ...
++        >>> dist.all_to_all_single(output, input, output_splits, input_splits)
++        >>> output
++        tensor([ 0,  1, 10, 11, 12, 20, 21, 30, 31])                     # Rank 0
++        tensor([ 2,  3, 13, 14, 22, 32, 33])                             # Rank 1
++        tensor([ 4, 15, 16, 23, 34, 35])                                 # Rank 2
++        tensor([ 5, 17, 18, 24, 36])                                     # Rank 3
++    """
++    if _rank_not_in_group(group):
++        return
++
++    opts = AllToAllOptions()
++    _check_single_tensor(output, "output")
++    _check_single_tensor(input, "input")
++    output_split_sizes = [] if output_split_sizes is None else output_split_sizes
++    input_split_sizes = [] if input_split_sizes is None else input_split_sizes
++
++    if group == GroupMember.WORLD:
++        _check_default_pg()
++        work = _default_pg.alltoall_base(output, input, output_split_sizes, input_split_sizes, opts)
++    else:
++        work = group.alltoall_base(output, input, output_split_sizes, input_split_sizes, opts)
++
++    if async_op:
++        return work
++    else:
++        work.wait()
++
++def all_to_all(output_tensor_list,
++               input_tensor_list,
++               group=group.WORLD,
++               async_op=False):
++    """
++    Each process scatters list of input tensors to all processes in a group and
++    return gathered list of tensors in output list.
++
++    Arguments:
++        output_tensor_list (list[Tensor]): List of tensors to be gathered one 
++            per rank.
++        input_tensor_list (list[Tensor]): List of tensors to scatter one per rank.
++        group (ProcessGroup, optional): The process group to work on.
++        async_op (bool, optional): Whether this op should be an async op.
++
++    Returns:
++        Async work handle, if async_op is set to True.
++        None, if not async_op or if not part of the group.
++
++    .. warning::
++        `all_to_all` is experimental and subject to change.
++
++    Examples:
++        >>> input = torch.arange(4) + rank * 4
++        >>> input = list(input.chunk(4))
++        >>> input
++        [tensor([0]), tensor([1]), tensor([2]), tensor([3])]     # Rank 0
++        [tensor([4]), tensor([5]), tensor([6]), tensor([7])]     # Rank 1
++        [tensor([8]), tensor([9]), tensor([10]), tensor([11])]   # Rank 2
++        [tensor([12]), tensor([13]), tensor([14]), tensor([15])] # Rank 3
++        >>> output = list(torch.empty([4], dtype=torch.int64).chunk(4))
++        >>> dist.all_to_all(output, input)
++        >>> output
++        [tensor([0]), tensor([4]), tensor([8]), tensor([12])]    # Rank 0
++        [tensor([1]), tensor([5]), tensor([9]), tensor([13])]    # Rank 1
++        [tensor([2]), tensor([6]), tensor([10]), tensor([14])]   # Rank 2
++        [tensor([3]), tensor([7]), tensor([11]), tensor([15])]   # Rank 3
++
++        >>> # Essentially, it is similar to following operation:
++        >>> scatter_list = input
++        >>> gather_list  = output
++        >>> for i in range(world_size):
++        >>>   dist.scatter(gather_list[i], scatter_list if i == rank else [], src = i)
++
++        >>> input
++        tensor([0, 1, 2, 3, 4, 5])                                       # Rank 0
++        tensor([10, 11, 12, 13, 14, 15, 16, 17, 18])                     # Rank 1
++        tensor([20, 21, 22, 23, 24])                                     # Rank 2
++        tensor([30, 31, 32, 33, 34, 35, 36])                             # Rank 3
++        >>> input_splits
++        [2, 2, 1, 1]                                                     # Rank 0
++        [3, 2, 2, 2]                                                     # Rank 1
++        [2, 1, 1, 1]                                                     # Rank 2
++        [2, 2, 2, 1]                                                     # Rank 3
++        >>> output_splits
++        [2, 3, 2, 2]                                                     # Rank 0
++        [2, 2, 1, 2]                                                     # Rank 1
++        [1, 2, 1, 2]                                                     # Rank 2
++        [1, 2, 1, 1]                                                     # Rank 3
++        >>> input = list(input.split(input_splits))
++        >>> input
++        [tensor([0, 1]), tensor([2, 3]), tensor([4]), tensor([5])]                   # Rank 0
++        [tensor([10, 11, 12]), tensor([13, 14]), tensor([15, 16]), tensor([17, 18])] # Rank 1
++        [tensor([20, 21]), tensor([22]), tensor([23]), tensor([24])]                 # Rank 2
++        [tensor([30, 31]), tensor([32, 33]), tensor([34, 35]), tensor([36])]         # Rank 3
++        >>> output = ...
++        >>> dist.all_to_all(output, input)
++        >>> output
++        [tensor([0, 1]), tensor([10, 11, 12]), tensor([20, 21]), tensor([30, 31])]   # Rank 0
++        [tensor([2, 3]), tensor([13, 14]), tensor([22]), tensor([32, 33])]           # Rank 1
++        [tensor([4]), tensor([15, 16]), tensor([23]), tensor([34, 35])]              # Rank 2
++        [tensor([5]), tensor([17, 18]), tensor([24]), tensor([36])]                  # Rank 3
++    """
++    if _rank_not_in_group(group):
++        return
++
++    opts = AllToAllOptions()
++    _check_tensor_list(output_tensor_list, "output_tensor_list")
++    _check_tensor_list(input_tensor_list, "input_tensor_list")
++
++    if group == GroupMember.WORLD:
++        _check_default_pg()
++        work = _default_pg.alltoall(output_tensor_list, input_tensor_list, opts)
++    else:
++        work = group.alltoall(output_tensor_list, input_tensor_list, opts)
++
++    if async_op:
++        return work
++    else:
++        work.wait()
++
++
+ def barrier(group=group.WORLD,
+             async_op=False):
+     """
+diff --git a/torch/lib/c10d/ProcessGroup.hpp b/torch/lib/c10d/ProcessGroup.hpp
+index ac29f13..c98b1a9 100644
+--- a/torch/lib/c10d/ProcessGroup.hpp
++++ b/torch/lib/c10d/ProcessGroup.hpp
+@@ -162,6 +162,22 @@ class ProcessGroup {
+       std::vector<std::vector<at::Tensor>>& inputTensors,
+       const ReduceScatterOptions& opts = ReduceScatterOptions()) = 0;
+ 
++  virtual std::shared_ptr<ProcessGroup::Work> alltoall_base(
++      at::Tensor& outputTensor,
++      at::Tensor& inputTensor,
++      std::vector<int64_t>& outputSplitSizes,
++      std::vector<int64_t>& inputSplitSizes,
++      const AllToAllOptions& opts = AllToAllOptions()) {
++    throw std::runtime_error("ProcessGroup does not support alltoall");
++  }
++
++  virtual std::shared_ptr<ProcessGroup::Work> alltoall(
++      std::vector<at::Tensor>& outputTensors,
++      std::vector<at::Tensor>& inputTensors,
++      const AllToAllOptions& opts = AllToAllOptions()) {
++    throw std::runtime_error("ProcessGroup does not support alltoall");
++  }
++
+   virtual std::shared_ptr<ProcessGroup::Work> send(
+       std::vector<at::Tensor>& tensors,
+       int dstRank,
+diff --git a/torch/lib/c10d/ProcessGroupMPI.cpp b/torch/lib/c10d/ProcessGroupMPI.cpp
+index d09620a..a822783 100644
+--- a/torch/lib/c10d/ProcessGroupMPI.cpp
++++ b/torch/lib/c10d/ProcessGroupMPI.cpp
+@@ -1,5 +1,6 @@
+ #include <c10d/ProcessGroupMPI.hpp>
+ 
++#include <limits>
+ #include <map>
+ 
+ #include <c10/core/DeviceGuard.h>
+@@ -91,6 +92,72 @@ void checkSameSizeAndType(
+   }
+ }
+ 
++void checkSplitSizes(
++    const std::vector<int64_t>& split_sizes,
++    const at::Tensor& tensor,
++    int group_size) {
++  if (split_sizes.size() == 0) {
++    TORCH_CHECK(
++        tensor.size(0) % group_size == 0,
++        "Tensor's dim 0 does not divide equally across group size");
++  } else {
++    TORCH_CHECK(
++        split_sizes.size() == group_size,
++        "Number of tensor splits not equal to group size");
++    int sum = std::accumulate(split_sizes.begin(), split_sizes.end(), 0);
++    TORCH_CHECK(
++        sum == tensor.size(0), "Split sizes doesn't match total dim 0 size");
++  }
++}
++
++int64_t computeLengthsAndOffsets(
++    const std::vector<int64_t>& split_sizes,
++    const at::Tensor& tensor,
++    std::vector<int>* lengths,
++    std::vector<int>* offsets) {
++  int64_t group_size = lengths->size();
++  bool equal_splits = false;
++  int64_t dim0_size = tensor.size(0);
++  int64_t row_size = (dim0_size ? tensor.numel() / dim0_size : 1);
++  int64_t split_size = 0;
++  int64_t offset = 0;
++
++  if (split_sizes.size() == 0) {
++    equal_splits = true;
++    split_size = tensor.size(0) / group_size;
++  }
++  for (int i = 0; i < group_size; i++) {
++    int64_t length = row_size * (equal_splits ? split_size : split_sizes[i]);
++    TORCH_INTERNAL_ASSERT(
++        length <= std::numeric_limits<int>::max() &&
++            offset <= std::numeric_limits<int>::max(),
++        "Length or offset larger than INT_MAX not supported");
++    (*lengths)[i] = length;
++    (*offsets)[i] = offset;
++    offset += length;
++  }
++  return offset;
++}
++
++int64_t computeLengthsAndOffsets(
++    const std::vector<at::Tensor>& tensors,
++    std::vector<int>* lengths,
++    std::vector<int>* offsets) {
++  int64_t group_size = lengths->size();
++  int64_t offset = 0;
++  for (int i = 0; i < group_size; i++) {
++    int64_t length = tensors[i].numel();
++    TORCH_INTERNAL_ASSERT(
++        length <= std::numeric_limits<int>::max() &&
++            offset <= std::numeric_limits<int>::max(),
++        "Length or offset larger than INT_MAX not supported");
++    (*lengths)[i] = length;
++    (*offsets)[i] = offset;
++    offset += length;
++  }
++  return offset;
++}
++
+ } // namespace
+ 
+ ProcessGroupMPI::AsyncWork::AsyncWork(at::Tensor tensor, MPI_Request request)
+@@ -588,6 +655,139 @@ std::shared_ptr<ProcessGroup::Work> ProcessGroupMPI::reduce_scatter(
+   throw std::runtime_error("ProcessGroupMPI does not support reduce_scatter");
+ }
+ 
++std::shared_ptr<ProcessGroup::Work> ProcessGroupMPI::alltoall_base(
++    at::Tensor& outputTensor,
++    at::Tensor& inputTensor,
++    std::vector<int64_t>& outputSplitSizes,
++    std::vector<int64_t>& inputSplitSizes,
++    const AllToAllOptions& opts) {
++  checkSingleTensorHelper(inputTensor);
++  checkSingleTensorHelper(outputTensor);
++
++  if (outputSplitSizes.size() == 0 && inputSplitSizes.size() == 0) {
++    // We can use alltoall
++    TORCH_CHECK(
++        outputTensor.numel() == inputTensor.numel() &&
++            outputTensor.type() == inputTensor.type(),
++        "Tensors are not equal in size or data type");
++    TORCH_CHECK(
++        outputTensor.size(0) % size_ == 0,
++        "Tensor's dim 0 does not divide equally across group size");
++
++    std::function<void(std::unique_ptr<WorkEntry>&)> runFunc =
++        [opts, this](std::unique_ptr<WorkEntry>& entry) {
++          auto srcdata = (entry->src)[0];
++          auto dstdata = (entry->dst)[0];
++          c10::DeviceGuard guard(srcdata.device());
++          std::unique_lock<std::mutex> globalLock(pgGlobalMutex_);
++          MPI_CHECK(MPI_Alltoall(
++              srcdata.data_ptr(),
++              srcdata.numel() / size_,
++              mpiDatatype.at(srcdata.scalar_type()),
++              dstdata.data_ptr(),
++              dstdata.numel() / size_,
++              mpiDatatype.at(dstdata.scalar_type()),
++              pgComm_));
++        };
++    std::vector<at::Tensor> inputTensors = {inputTensor};
++    std::vector<at::Tensor> outputTensors = {outputTensor};
++    auto entry = std::unique_ptr<WorkEntry>(
++        new WorkEntry(&inputTensors, &outputTensors, std::move(runFunc)));
++    return enqueue(std::move(entry));
++  } else {
++    // Need alltoallv
++    checkSplitSizes(inputSplitSizes, inputTensor, size_);
++    checkSplitSizes(outputSplitSizes, outputTensor, size_);
++    std::function<void(std::unique_ptr<WorkEntry>&)> runFunc =
++        [opts, this, inputSplitSizes, outputSplitSizes](
++            std::unique_ptr<WorkEntry>& entry) {
++          auto srcdata = (entry->src)[0];
++          auto dstdata = (entry->dst)[0];
++          std::vector<int> send_lengths(size_);
++          std::vector<int> recv_lengths(size_);
++          std::vector<int> send_offsets(size_);
++          std::vector<int> recv_offsets(size_);
++          computeLengthsAndOffsets(
++              inputSplitSizes, srcdata, &send_lengths, &send_offsets);
++          computeLengthsAndOffsets(
++              outputSplitSizes, dstdata, &recv_lengths, &recv_offsets);
++          c10::DeviceGuard guard(srcdata.device());
++          std::unique_lock<std::mutex> globalLock(pgGlobalMutex_);
++          MPI_CHECK(MPI_Alltoallv(
++              srcdata.data_ptr(),
++              send_lengths.data(),
++              send_offsets.data(),
++              mpiDatatype.at(srcdata.scalar_type()),
++              dstdata.data_ptr(),
++              recv_lengths.data(),
++              recv_offsets.data(),
++              mpiDatatype.at(dstdata.scalar_type()),
++              pgComm_));
++        };
++    std::vector<at::Tensor> inputTensors = {inputTensor};
++    std::vector<at::Tensor> outputTensors = {outputTensor};
++    auto entry = std::unique_ptr<WorkEntry>(
++        new WorkEntry(&inputTensors, &outputTensors, std::move(runFunc)));
++    return enqueue(std::move(entry));
++  }
++}
++std::shared_ptr<ProcessGroup::Work> ProcessGroupMPI::alltoall(
++    std::vector<at::Tensor>& outputTensors,
++    std::vector<at::Tensor>& inputTensors,
++    const AllToAllOptions& opts) {
++  TORCH_CHECK(
++      inputTensors.size() == size_,
++      "Number of input tensors are not equal to group size");
++  TORCH_CHECK(
++      outputTensors.size() == size_,
++      "Number of output tensors are not equal to group size");
++  std::function<void(std::unique_ptr<WorkEntry>&)> runFunc =
++      [opts, this](std::unique_ptr<WorkEntry>& entry) {
++        std::vector<int> send_lengths(size_);
++        std::vector<int> recv_lengths(size_);
++        std::vector<int> send_offsets(size_);
++        std::vector<int> recv_offsets(size_);
++        auto srcdata = entry->src;
++        auto dstdata = entry->dst;
++        int64_t src_len =
++            computeLengthsAndOffsets(srcdata, &send_lengths, &send_offsets);
++        int64_t dst_len =
++            computeLengthsAndOffsets(dstdata, &recv_lengths, &recv_offsets);
++        std::vector<int64_t> send_lengthsL(
++            send_lengths.begin(), send_lengths.end());
++        std::vector<int64_t> recv_lengthsL(
++            recv_lengths.begin(), recv_lengths.end());
++        at::Tensor srcFlatData = at::empty({src_len}, srcdata[0].options());
++        at::Tensor dstFlatData = at::empty({dst_len}, dstdata[0].options());
++        auto srcFlatDataSplits =
++            srcFlatData.split_with_sizes(c10::IntArrayRef(send_lengthsL), 0);
++        for (int i = 0; i < size_; i++) {
++          srcFlatDataSplits[i].copy_(srcdata[i].view({-1}));
++        }
++        c10::DeviceGuard guard1(srcdata[0].device());
++        std::unique_lock<std::mutex> globalLock(pgGlobalMutex_);
++        MPI_CHECK(MPI_Alltoallv(
++            srcFlatData.data_ptr(),
++            send_lengths.data(),
++            send_offsets.data(),
++            mpiDatatype.at(srcdata[0].scalar_type()),
++            dstFlatData.data_ptr(),
++            recv_lengths.data(),
++            recv_offsets.data(),
++            mpiDatatype.at(dstdata[0].scalar_type()),
++            pgComm_));
++
++        auto dstFlatDataSplits =
++            dstFlatData.split_with_sizes(c10::IntArrayRef(recv_lengthsL), 0);
++        for (int i = 0; i < size_; i++) {
++          dstdata[i].view({-1}).copy_(dstFlatDataSplits[i]);
++        }
++      };
++  auto entry = std::unique_ptr<WorkEntry>(
++      new WorkEntry(&inputTensors, &outputTensors, std::move(runFunc)));
++  return enqueue(std::move(entry));
++}
++
+ std::shared_ptr<ProcessGroup::Work> ProcessGroupMPI::send(
+     std::vector<at::Tensor>& tensors,
+     int dstRank,
+diff --git a/torch/lib/c10d/ProcessGroupMPI.hpp b/torch/lib/c10d/ProcessGroupMPI.hpp
+index eb42c11..79648f3 100644
+--- a/torch/lib/c10d/ProcessGroupMPI.hpp
++++ b/torch/lib/c10d/ProcessGroupMPI.hpp
+@@ -155,6 +155,18 @@ class ProcessGroupMPI : public ProcessGroup {
+       std::vector<std::vector<at::Tensor>>& inputTensors,
+       const ReduceScatterOptions& opts = ReduceScatterOptions()) override;
+ 
++  std::shared_ptr<ProcessGroup::Work> alltoall_base(
++      at::Tensor& outputTensor,
++      at::Tensor& inputTensor,
++      std::vector<int64_t>& outputSplitSizes,
++      std::vector<int64_t>& inputSplitSizes,
++      const AllToAllOptions& opts = AllToAllOptions()) override;
++
++  std::shared_ptr<ProcessGroup::Work> alltoall(
++      std::vector<at::Tensor>& outputTensors,
++      std::vector<at::Tensor>& inputTensors,
++      const AllToAllOptions& opts = AllToAllOptions()) override;
++
+   std::shared_ptr<ProcessGroup::Work> send(
+       std::vector<at::Tensor>& tensors,
+       int dstRank,
+diff --git a/torch/lib/c10d/Types.hpp b/torch/lib/c10d/Types.hpp
+index 335f4c5..03b2e59 100644
+--- a/torch/lib/c10d/Types.hpp
++++ b/torch/lib/c10d/Types.hpp
+@@ -57,6 +57,10 @@ struct ReduceScatterOptions {
+   std::chrono::milliseconds timeout = kUnsetTimeout;
+ };
+ 
++struct AllToAllOptions {
++  std::chrono::milliseconds timeout = kUnsetTimeout;
++};
++
+ struct BarrierOptions {
+   std::chrono::milliseconds timeout = kUnsetTimeout;
+ };
+-- 
+1.8.3.1
+
