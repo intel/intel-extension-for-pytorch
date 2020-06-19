@@ -416,8 +416,8 @@ class TestOP(TestCase):
         self.assertRaises(RuntimeError, lambda: tensor.view(15, -1, -1))
 
         # TODO(Eikan): DNNL OP does not support >6 dim tensor, so we disable it temporily. When we fix it, we will open it
-        old_dnnl_conf = ipex.get_auto_dnnl()
-        ipex.disable_auto_dnnl()
+        old_dnnl_conf = ipex.core.get_auto_dnnl()
+        ipex.core.disable_auto_dnnl()
         # test view when tensor is not contiguous in every dimension, but only
         # contiguous dimensions are touched.
         tensor = torch.rand(4, 2, 5, 1, 6, 2, 9, 3, device=device).transpose(-1, 2).transpose(-2, 3)
@@ -444,9 +444,9 @@ class TestOP(TestCase):
         view_size = [1, 1, 2, 1, 4, 3, 1, 1, 9, 1, 2, 1, 2, 3, 1, 5, 1, 1]
         self.assertEqual(tensor.view(*view_size), contig_tensor.view(*view_size))
         if old_dnnl_conf:
-            ipex.enable_auto_dnnl()
+            ipex.core.enable_auto_dnnl()
         else:
-            ipex.disable_auto_dnnl()
+            ipex.core.disable_auto_dnnl()
 
         # invalid views
         self.assertRaises(RuntimeError, lambda: tensor.view(-1))
@@ -948,5 +948,4 @@ class TestConv(TestCase):
         self.assertEqual(inputs_dpcpp.grad.to('cpu'), inputs_cpu.grad, prec=1e-4)
 
 if __name__ == '__main__':
-    ipex.enable_auto_dnnl()
     test = unittest.main()
