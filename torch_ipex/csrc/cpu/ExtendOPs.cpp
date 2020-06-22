@@ -473,22 +473,17 @@ at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d(at::Tensor const& input, at::Int
     return NewApaptiveAvgPoolingOp::apply(input, output_size);
 }
 
-at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d_backward(const at::Tensor& grad_output, const at::Tensor& input) {
-    return cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), input.is_contiguous() ? input : input.contiguous());
+at::Tensor AtenIpexTypeExt::max_pool2d(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
+    return NewMaxPool2dOp::apply(input, kernel_size, stride, padding, dilation, ceil_mode);
 }
 
-at::Tensor AtenIpexTypeExt::max_pooling(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
-    return NewMaxPoolingOp::apply(input.is_contiguous() ? input : input.contiguous(), kernel_size, stride, padding, dilation, ceil_mode);
-}
-
-at::Tensor AtenIpexTypeExt::max_pooling_backward(const at::Tensor& grad_output, const at::Tensor& output, const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
-    return cpu::AtenIpexCPUDev::dil_max_pooling_backward(grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), output.is_contiguous() ? output : output.contiguous(), input.is_contiguous() ? input : input.contiguous(), kernel_size, stride, padding, dilation, ceil_mode);
+at::Tensor AtenIpexTypeExt::max_pool3d(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
+    return NewMaxPool3dOp::apply(input, kernel_size, stride, padding, dilation, ceil_mode);
 }
 
 at::Tensor AtenIpexTypeExt::reshape(const at::Tensor& input, at::IntArrayRef size) {
     return cpu::AtenIpexCPUDev::dil_reshape(input.is_contiguous() ? input : input.contiguous(), size);
 }
-
 
 at::Tensor AtenIpexTypeExt::relu_use_dst_for_bwd(const at::Tensor& grad_output, const at::Tensor& output) {
   RECORD_FUNCTION("dil_relu_use_dst_for_bwd", std::vector<c10::IValue>({grad_output, output}), torch::autograd::Node::peek_at_next_sequence_nr());
@@ -497,3 +492,18 @@ at::Tensor AtenIpexTypeExt::relu_use_dst_for_bwd(const at::Tensor& grad_output, 
 
 }  // namespace torch_ipex
 
+namespace {
+  static auto dispatch = torch::RegisterOperators()
+    .op("torch_ipex::linear", &torch_ipex::AtenIpexTypeExt::linear)
+    .op("torch_ipex::max_pool2d", [](const at::Tensor& self, c10::List<int64_t> kernel_size,
+      c10::List<int64_t> stride, c10::List<int64_t> padding, c10::List<int64_t> dilation, bool ceil_mode=false){
+      return torch_ipex::AtenIpexTypeExt::max_pool2d(self, kernel_size.vec(), stride.vec(), padding.vec(), dilation.vec(), ceil_mode);
+    })
+    .op("torch_ipex::max_pool3d", [](const at::Tensor& self, c10::List<int64_t> kernel_size,
+      c10::List<int64_t> stride, c10::List<int64_t> padding, c10::List<int64_t> dilation, bool ceil_mode=false){
+      return torch_ipex::AtenIpexTypeExt::max_pool3d(self, kernel_size.vec(), stride.vec(), padding.vec(), dilation.vec(), ceil_mode);
+    })
+    .op("torch_ipex::adaptive_avg_pool2d", [](const at::Tensor&self, c10::List<int64_t> output_size) {
+      return torch_ipex::AtenIpexTypeExt::adaptive_avg_pool2d(self, output_size.vec());
+    });
+}
