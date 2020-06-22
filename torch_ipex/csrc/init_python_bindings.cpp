@@ -108,18 +108,6 @@ void InitIpexModuleBindings(py::module m) {
           return AtenIpexTypeExt::embedding_bag_backward(grad, indices, offsets, offset2bag, bag_size, maximum_indices, num_weights, scale_grad_by_freq, mode, sparse, per_sample_weights);
         });
 
-  m.def("linear_fuse_relu",
-        [](const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
-          return AtenIpexTypeExt::linear_fuse_relu(input, weight, bias);
-        });
-  m.def("linear_backward",
-        [](const at::Tensor& input, const at::Tensor& grad_output, const at::Tensor& weight, std::array<bool,3> output_mask) {
-          return AtenIpexTypeExt::linear_backward(input, grad_output, weight, output_mask);
-        });
-  m.def("relu_use_dst_backward",
-        [](const at::Tensor& grad_output, const at::Tensor& output) {
-          return AtenIpexTypeExt::relu_use_dst_for_bwd(grad_output, output);
-        });
   m.def("reshape",
         [](const at::Tensor& input, at::IntArrayRef size) {
           return AtenIpexTypeExt::reshape(input, size);

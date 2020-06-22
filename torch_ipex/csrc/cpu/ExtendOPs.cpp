@@ -459,16 +459,6 @@ at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& we
   }
 }
 
-at::Tensor AtenIpexTypeExt::linear_fuse_relu(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
-    RECORD_FUNCTION("linear_fuse_relu", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
-    return cpu::AtenIpexCPUDev::dil_linear_fuse_relu(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias);
-}
-
-std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::linear_backward(const at::Tensor& input, const at::Tensor& grad_output, const at::Tensor& weight, std::array<bool,3> output_mask) {
-    RECORD_FUNCTION("linear_backward", std::vector<c10::IValue>({input, grad_output, weight}), torch::autograd::Node::peek_at_next_sequence_nr());
-    return cpu::AtenIpexCPUDev::dil_linear_backward(input.is_contiguous() ? input : input.contiguous(), grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), output_mask);
-}
-
 at::Tensor AtenIpexTypeExt::adaptive_avg_pool2d(at::Tensor const& input, at::IntArrayRef output_size) {
     return NewApaptiveAvgPoolingOp::apply(input, output_size);
 }
@@ -483,11 +473,6 @@ at::Tensor AtenIpexTypeExt::max_pool3d(const at::Tensor& input, at::IntArrayRef 
 
 at::Tensor AtenIpexTypeExt::reshape(const at::Tensor& input, at::IntArrayRef size) {
     return cpu::AtenIpexCPUDev::dil_reshape(input.is_contiguous() ? input : input.contiguous(), size);
-}
-
-at::Tensor AtenIpexTypeExt::relu_use_dst_for_bwd(const at::Tensor& grad_output, const at::Tensor& output) {
-  RECORD_FUNCTION("dil_relu_use_dst_for_bwd", std::vector<c10::IValue>({grad_output, output}), torch::autograd::Node::peek_at_next_sequence_nr());
-  return cpu::AtenIpexCPUDev::dil_relu_use_dst_for_bwd(grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), output.is_contiguous() ? output : output.contiguous());
 }
 
 }  // namespace torch_ipex
