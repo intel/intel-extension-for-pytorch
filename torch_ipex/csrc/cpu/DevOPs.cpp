@@ -263,7 +263,7 @@ at::Tensor& dil_add_common(
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(other);
 
-  TORCH_CHECK(self.sizes().equals(other.sizes()),
+  IPEX_CHECK(self.sizes().equals(other.sizes()),
       "dil add not support broadcast yet");
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
@@ -308,7 +308,7 @@ at::Tensor& dil_mul_common(
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(other);
 
-  TORCH_CHECK(self.sizes().equals(other.sizes()),
+  IPEX_CHECK(self.sizes().equals(other.sizes()),
       "dil mul not support broadcast yet");
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
@@ -438,7 +438,7 @@ at::Tensor& dil_baddbmm_common(
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch1.dim() == 3 && batch2.dim() == 3);
   dil::dims inferred_size{batch1.size(0), batch1.size(1), batch2.size(2)};
-  TORCH_CHECK(self.sizes().equals(inferred_size),
+  IPEX_CHECK(self.sizes().equals(inferred_size),
       "dil baddbmm not support broadcast yet");
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
@@ -506,7 +506,7 @@ at::Tensor& dil_addmm_common(
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(mat1.dim() == 2 && mat2.dim() == 2);
   dil::dims inferred_size{mat1.size(0), mat2.size(1)};
-  TORCH_CHECK(self.sizes().equals(inferred_size),
+  IPEX_CHECK(self.sizes().equals(inferred_size),
       "dil addmm not support broadcast yet");
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
@@ -568,7 +568,7 @@ at::Tensor& dil_addbmm_common(
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch1.dim() == 3 && batch2.dim() == 3);
   dil::dims inferred_size{batch1.size(1), batch2.size(2)};
-  TORCH_CHECK(self.sizes().equals(inferred_size),
+  IPEX_CHECK(self.sizes().equals(inferred_size),
       "dil addbmm not support broadcast yet");
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
@@ -635,7 +635,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   DEBUG("AtenIpexCPUDev::dil_linear\n");
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(weight);
-  TORCH_CHECK(self.dim() >= 2,
+  IPEX_CHECK(self.dim() >= 2,
       "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
@@ -672,7 +672,7 @@ at::Tensor AtenIpexCPUDev::dil_linear_fuse_relu(
   DEBUG("AtenIpexCPUDev::dil_linear\n");
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(weight);
-  TORCH_CHECK(self.dim() >= 2,
+  IPEX_CHECK(self.dim() >= 2,
       "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
@@ -791,7 +791,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_linear_backwa
 std::tuple<at::Tensor, at::Tensor> _dil_dropout(
     const at::Tensor& self,
     double ratio) {
-  TORCH_CHECK(
+  IPEX_CHECK(
       ratio >= 0 && ratio < 1 && self.numel() != 0,
       "dropout probability has to be between 0 and 1, but got ",
       ratio);
@@ -845,9 +845,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
   DEBUG("AtenIpexCPUDev::dil_native_batch_norm\n");
   CHECK_DNNL_OP_PRE_COND(input);
   CHECK_DNNL_OP_PRE_COND(weight);
-  TORCH_CHECK(input.dim() == 4 || input.dim() == 5,
+  IPEX_CHECK(input.dim() == 4 || input.dim() == 5,
              "mkldnn_batch_norm: currently mkldnn only support 2d and 3d batchnorm");
-  TORCH_CHECK(weight.defined() && bias.defined(),
+  IPEX_CHECK(weight.defined() && bias.defined(),
              "mkldnn_batch_norm: currently mkldnn only support affine model");
 
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
@@ -906,7 +906,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
   CHECK_DNNL_OP_PRE_COND(input);
   CHECK_DNNL_OP_PRE_COND(weight);
 
-  TORCH_CHECK(train, "mkldnn_batch_norm_backward: currently mkldnn only support train model");
+  IPEX_CHECK(train, "mkldnn_batch_norm_backward: currently mkldnn only support train model");
   auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
 
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
@@ -960,7 +960,7 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool2d(
     c10::optional<int64_t> divisor_override) {
   DEBUG("AtenIpexCPUDev::dil_avg_pool2d\n");
   CHECK_DNNL_OP_PRE_COND(input);
-  TORCH_CHECK(!divisor_override.has_value(),
+  IPEX_CHECK(!divisor_override.has_value(),
            "dil_avg_pooling operator does not support divisor");
 
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
@@ -986,7 +986,7 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool3d(
     c10::optional<int64_t> divisor_override) {
   DEBUG("AtenIpexCPUDev::dil_avg_pool3d\n");
   CHECK_DNNL_OP_PRE_COND(input);
-  TORCH_CHECK(!divisor_override.has_value(),
+  IPEX_CHECK(!divisor_override.has_value(),
            "dil_avg_pooling operator does not support divisor");
 
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
@@ -1016,8 +1016,8 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
   for (int64_t i = 2; i < input.dim(); ++i) {
     auto s1 = input.size(i);
     auto s2 = output_size_vec[i - 2];
-    TORCH_CHECK(s2 != 0, "output size can not be zero");
-    TORCH_CHECK(
+    IPEX_CHECK(s2 != 0, "output size can not be zero");
+    IPEX_CHECK(
         s1 % s2 == 0,
         "input size is not divisible by the output size is not supported yet");
     kernel_size[i - 2] = s1 / s2;
@@ -1144,8 +1144,8 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(
   for (size_t i = 2; i < input.dim(); ++i) {
     auto s1 = input.size(i);
     auto s2 = output_size_vec[i];
-    TORCH_CHECK(s2 != 0, "output size can not be zero");
-    TORCH_CHECK(
+    IPEX_CHECK(s2 != 0, "output size can not be zero");
+    IPEX_CHECK(
         s1 % s2 == 0,
         "input size is not divisible by the output size is not supported yet");
     kernel_size[i - 2] = s1 / s2;
@@ -1365,7 +1365,7 @@ at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
 
   dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
-  TORCH_CHECK(x.ndims() > 0, "DNNL transpose cannot generate DNNL tensor for the input aten Tensor. input tensor dim: ", self.dim());
+  IPEX_CHECK(x.ndims() > 0, "DNNL transpose cannot generate DNNL tensor for the input aten Tensor. input tensor dim: ", self.dim());
   dil::tensor y;
   std::vector<int> axes(x.ndims());
   std::iota(axes.begin(), axes.end(), 0);
@@ -1379,7 +1379,7 @@ at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, 
 inline void check_cat_no_zero_dim(at::TensorList tensors) {
   for (size_t i = 0; i < tensors.size(); ++i) {
     auto& t = tensors[i];
-    TORCH_CHECK(t.dim() > 0,
+    IPEX_CHECK(t.dim() > 0,
       "zero-dimensional tensor (at position ", i, ") cannot be concatenated");
   }
 }
@@ -1394,7 +1394,7 @@ at::Tensor& AtenIpexCPUDev::dil_cat_out(at::Tensor& result, at::TensorList tenso
   dim = at::legacy_cat_wrap_dim(dim, tensors);
   std::vector<dil::tensor> x;
   for (auto i =0; i< tensors.size(); i++) {
-    TORCH_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
+    IPEX_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
       "Currently Mkldnn cat operators do not support empty tensor.");
 
     dbl::comm::reorder_to_bf16_for_mix_prec(tensors[i]);
@@ -1416,7 +1416,7 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
   std::vector<dil::tensor> x;
   at::Tensor tensors_contiguous[tensors.size()];
   for (auto i = 0; i < tensors.size(); i++) {
-    TORCH_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
+    IPEX_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
       "Currently Mkldnn cat operators do not support empty tensor.");
     tensors_contiguous[i] = tensors[i].is_contiguous() ? tensors[i] : tensors[i].contiguous();
     dbl::comm::reorder_to_bf16_for_mix_prec(tensors_contiguous[i]);
@@ -1439,7 +1439,7 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& s
   std::vector<int32_t> sizes;
   for (auto i = 0; i < num_splits; i++) {
     auto length = split_sizes[i];
-    TORCH_CHECK(length >= 0,
+    IPEX_CHECK(length >= 0,
              "split_with_sizes expects split_sizes have only non-negative ",
              "entries, but got split_sizes=", split_sizes);
     sizes.push_back((int32_t)length);
