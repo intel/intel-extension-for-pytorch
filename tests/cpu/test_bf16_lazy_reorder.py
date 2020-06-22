@@ -463,7 +463,7 @@ class TestLinearAlgebraOps(TestCase):
     def test_bmm(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        x_auto_mix_a, x_auto_mix_b, _, x_man_bf16_a, x_man_bf16_b, _ = self._gen_mm_tensor(rand_seed)
+        x_auto_mix_a, x_auto_mix_b, _, x_man_bf16_a, x_man_bf16_b, _ = self._gen_mm_tensor(rand_seed, batches=16)
 
         with AutoDNNL(True), AutoMixPrecision(False):
             res_man_bf16 = torch.bmm(x_man_bf16_a, x_man_bf16_b)
@@ -477,8 +477,7 @@ class TestLinearAlgebraOps(TestCase):
     def test_bmm_out(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        x_auto_mix_a, x_auto_mix_b, res_auto_mix, x_man_bf16_a, x_man_bf16_b, res_man_bf16 = self._gen_mm_tensor(rand_seed)
-
+        x_auto_mix_a, x_auto_mix_b, res_auto_mix, x_man_bf16_a, x_man_bf16_b, res_man_bf16 = self._gen_mm_tensor(rand_seed, batches=16)
         with AutoDNNL(True), AutoMixPrecision(False):
             torch.bmm(x_man_bf16_a, x_man_bf16_b, out=res_man_bf16)
             self.assertEqual(res_man_bf16.dtype, torch.bfloat16)

@@ -33,6 +33,13 @@ def get_rand_seed():
     return int(time.time() * 1000000000)
 
 device = ipex.DEVICE
+
+def convert_blocked(t):
+    assert t.dim() == 4, "only support converting 4d tensor"
+    c = t.size(1)
+    t = t.clone().to(device)
+    return F.conv2d(t, torch.ones(c, 1, 1, 1).to(device), groups=c)
+
 class TestConv(TestCase):
     def test_Conv2d_with_cpu(self):
         rand_seed = int(get_rand_seed())
@@ -201,6 +208,78 @@ class TestBinaryOp(TestCase):
         a1 = self._test_mul_(device, rand_seed)
         a2 = self._test_mul_('cpu', rand_seed)
         self.assertEqual(a2, a1.to('cpu'))
+
+    def test_mixed_format(self):
+        ipex.core.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+
+        shape = (2, 3, 4, 5)
+
+        for fname in ['add', 'mul']:
+
+            x_cpu = torch.ones(shape) * 5
+            y_cpu = torch.ones(shape) * 4
+
+            # block tensor is a dpcpp tensor
+            x_plain = x_cpu.clone().to(device)
+            y_plain = y_cpu.clone().to(device)
+            x_block = convert_blocked(x_cpu.clone())
+            y_block = convert_blocked(y_cpu.clone())
+
+            fn = getattr(torch, fname)
+            ref = fn(x_cpu, y_cpu)
+
+            # test add, mul
+            def test_outplace(a, b):
+                a = a.clone()
+                b = b.clone()
+                self.assertEqual(fn(a, b), ref)
+
+            test_outplace(x_plain, y_plain)
+            test_outplace(x_plain, y_block)
+            test_outplace(y_block, x_plain)
+            test_outplace(x_block, y_block)
+
+            # test add_out, mul_out
+            def test_out(a, b, o):
+                a = a.clone()
+                b = b.clone()
+                o = o.clone()
+                y = fn(a, b, out=o)
+                self.assertEqual(y, ref)
+                self.assertEqual(o, ref)
+
+            out = torch.ones(shape).to(device)
+            test_out(x_plain, y_plain, out)
+            test_out(x_plain, y_block, out)
+            test_out(y_block, x_plain, out)
+            test_out(x_block, y_block, out)
+            out = torch.ones(1).to(device)
+            test_out(x_plain, y_plain, out)
+            test_out(x_plain, y_block, out)
+            test_out(y_block, x_plain, out)
+            test_out(x_block, y_block, out)
+
+            # test add_, mul_
+            def test_inplace(a, b):
+                a = a.clone()
+                b = b.clone()
+                y = getattr(a, fname + '_')(b)
+                self.assertEqual(a, ref)
+                self.assertEqual(y, ref)
+
+            test_inplace(x_plain, y_plain)
+            test_inplace(x_plain, y_block)
+            test_inplace(y_block, x_plain)
+            test_inplace(x_block, y_block)
+
+            # test broadcast
+            scalar = torch.ones(1).to(device)
+            self.assertEqual(fn(x_plain, scalar), fn(x_cpu, scalar))
+            self.assertEqual(fn(scalar, x_plain), fn(scalar, x_cpu))
+
 
 class TestRelu(TestCase):
     def _test_relu_(self, device, rand_seed):
@@ -388,6 +467,11 @@ class TestLinearAlgebraOps(TestCase):
                 torch.addmm(input=res_dpcpp, mat1=b1_dpcpp, mat2=b2_dpcpp, alpha=alpha, beta=beta, out=y_dpcpp)
                 self.assertEqual(y_cpu, y_dpcpp)
 
+                res_cpu.addmm_(mat1=b1_cpu, mat2=b2_cpu, alpha=alpha, beta=beta)
+                res_dpcpp.addmm_(mat1=b1_cpu, mat2=b2_cpu, alpha=alpha, beta=beta)
+                self.assertEqual(res_cpu, res_dpcpp)
+
+
     def test_addbmm(self):
         ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
@@ -415,6 +499,10 @@ class TestLinearAlgebraOps(TestCase):
                 torch.addbmm(res_dpcpp, b1_dpcpp, b2_dpcpp, beta=beta, alpha=alpha, out=y_dpcpp)
                 self.assertEqual(y_cpu, y_dpcpp, 1e-4)
 
+                res_cpu.addbmm_(b1_cpu, b2_cpu, beta=beta, alpha=alpha)
+                res_dpcpp.addbmm_(b1_dpcpp, b2_dpcpp, beta=beta, alpha=alpha)
+                self.assertEqual(res_cpu, res_dpcpp, 1e-4)
+
     def test_baddbmm(self):
         ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
@@ -441,6 +529,9 @@ class TestLinearAlgebraOps(TestCase):
                 torch.baddbmm(res_cpu, b1_cpu, b2_cpu, alpha=alpha, beta=beta, out=y_cpu),
                 torch.baddbmm(res_dpcpp, b1_dpcpp, b2_dpcpp, alpha=alpha, beta=beta, out=y_dpcpp),
                 self.assertEqual(y_cpu, y_dpcpp)
+                res_cpu.baddbmm_(b1_cpu, b2_cpu, alpha=alpha, beta=beta)
+                res_dpcpp.baddbmm_(b1_cpu, b2_cpu, alpha=alpha, beta=beta)
+                self.assertEqual(res_cpu, res_dpcpp)
 
 class TestLinear(TestCase):
     def test_linear(self):
@@ -642,6 +733,48 @@ class TestPool(TestCase):
         y_dpcpp.backward()
         self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
+    def test_adaptive_avg_pool2d_not_divisible(self):
+        ipex.core.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+        x_cpu = torch.randn(N, C, 224, 224, dtype=torch.float32) * 100
+        x_dpcpp = x_cpu.to(device=device)
+        # test the fallback to cpu when the input size is not divisible by the output size
+        adaptive_avg_pool2d = torch.nn.AdaptiveAvgPool2d(6)
+
+        y_cpu = adaptive_avg_pool2d(x_cpu)
+        y_dpcpp = adaptive_avg_pool2d(x_dpcpp)
+
+        self.assertEqual(
+            y_cpu,
+            y_dpcpp)
+
+        self.assertEqual(device, y_dpcpp.device.type)
+
+    def test_adaptive_avg_pool2d_backward_not_divisible(self):
+        ipex.core.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x = torch.randn(10, 3, 224, 224, dtype=torch.float32) * 100
+
+        x_cpu = x.clone().requires_grad_()
+        x_dpcpp = x.clone().to(device=device).requires_grad_()
+        # test the fallback to cpu when the input size is not divisible by the output size
+        adaptive_avg_pool2d = torch.nn.AdaptiveAvgPool2d(6)
+
+        y_cpu = adaptive_avg_pool2d(x_cpu).sum()
+        y_dpcpp = adaptive_avg_pool2d(x_dpcpp).sum()
+        y_cpu.backward()
+        y_dpcpp.backward()
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+
+        self.assertEqual(device, x_dpcpp.grad.device.type)
+        self.assertEqual(device, y_dpcpp.device.type)
+
     def test_max_pool2d(self):
         ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
@@ -663,6 +796,33 @@ class TestPool(TestCase):
                         ceil_mode=ceil_mode)
 
                     self.assertEqual(max_pool2d(x_cpu), max_pool2d(x_dpcpp))
+
+    def test_max_pool2d_double(self):
+        ipex.core.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+
+        for stride in [1, 2, 3]:
+            for H, W in [(64, 64), (35, 39), (16, 19), [7, 8]]:
+                # test the fallback to cpu when the input is double
+                x_cpu = torch.randn(N, C, H, W, dtype=torch.double) * 10
+                x_dpcpp = x_cpu.to(device=device)
+
+                for ceil_mode in [False, True]:
+                    max_pool2d = torch.nn.MaxPool2d(
+                        kernel_size=3 if not ceil_mode else 7,
+                        stride=stride,
+                        padding=1,
+                        ceil_mode=ceil_mode)
+
+                    y_cpu = max_pool2d(x_cpu)
+                    y_dpcpp = max_pool2d(x_dpcpp)
+                    self.assertEqual(y_cpu, y_dpcpp)
+
+                    self.assertEqual(device, y_dpcpp.device.type)
 
     def test_max_pool3d(self):
         ipex.core.enable_auto_dnnl()
@@ -707,6 +867,32 @@ class TestPool(TestCase):
             y1.backward()
             y2.backward()
             self.assertEqual(x1.grad, x2.grad)
+
+    def test_max_pool2d_backward_double(self):
+        ipex.core.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        # test the fallback to cpu when the input is double
+        x = torch.randn(10, 3, 64, 64, dtype=torch.double) * 10
+        for ceil_mode in [True]:
+            max_pool2d = torch.nn.MaxPool2d(
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                ceil_mode=ceil_mode)
+
+            x1 = x.clone().requires_grad_()
+            x2 = x.clone().to(device=device).requires_grad_()
+
+            y1 = max_pool2d(x1).sum()
+            y2 = max_pool2d(x2).sum()
+            y1.backward()
+            y2.backward()
+            self.assertEqual(x1.grad, x2.grad)
+
+            self.assertEqual(device, x2.grad.device.type)
+            self.assertEqual(device, y2.device.type)
 
     def test_max_pool3d_backward(self):
         ipex.core.enable_auto_dnnl()

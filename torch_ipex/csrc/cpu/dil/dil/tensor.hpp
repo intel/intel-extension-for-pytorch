@@ -89,7 +89,7 @@ class tensor : public memory {
     inline dim_t nelems(bool with_padding = false) const {
       if (is_zero()) return 0;
       auto dims = with_padding ? data.padded_dims : data.dims;
-      return std::accumulate(dims, dims + data.ndims, 1,
+      return std::accumulate(dims, dims + data.ndims, (dim_t)1,
                              std::multiplies<dim_t>());
     }
 
@@ -155,7 +155,7 @@ class tensor : public memory {
       // compute compatible block_dims with v0.x
       dims block_dims(data.ndims, 1);
       for (auto i = 0; i < blk.inner_nblks; i++) {
-        block_dims[blk.inner_idxs[i]] *= blk.inner_blks[i]; 
+        block_dims[blk.inner_idxs[i]] *= blk.inner_blks[i];
       }
       for (auto i = 0; i < data.ndims; i++) {
         if (data.dims[i] < block_dims[i]) continue;
@@ -749,7 +749,7 @@ class tensor : public memory {
                    data_type dst_type = data_type::f32) const {
     auto dst_desc = get_desc();
 
-    // If we get a non-plain blocking format, say `Acdb16A`, we may not be able 
+    // If we get a non-plain blocking format, say `Acdb16A`, we may not be able
     // to recover it to its "unblocked" format `acdb`. Instead, we will convert
     // it to its default format `abcd` based on its dimensions.
     if (!is_public_format()) {
@@ -828,7 +828,7 @@ class tensor : public memory {
     // TODO(xpz): support per-channel dequantize
     DIL_ENFORCE(get_scale().size() == 1, "Incorrect scale size");
     dst.feed_from(*this);
-    return dst;  
+    return dst;
   }
 
   // reorder src to part of this tensor
@@ -875,9 +875,9 @@ class tensor : public memory {
   /// Return whether the param has a scale
   bool has_scale() const { return scale_ != nullptr && !scale_->empty(); }
 
-  /// Return whether the param has a zero_point 
+  /// Return whether the param has a zero_point
   bool has_zero_point() const { return zero_point_ != nullptr && !zero_point_->empty(); }
-  
+
   /// Return the zero_point of this param.
   const std::vector<int32_t> &get_zero_point() const { return *zero_point_.get(); }
 

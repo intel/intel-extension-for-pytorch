@@ -89,6 +89,15 @@ void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected
 }
 
 void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_tensor_buffer) {
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+      tensor.device().is_dpcpp(),
+      "dil buffer can only be equipped to dpcpp tensor");
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+      check_tensor_own_whole_storage(tensor),
+      "dil buffer can only be equipped to tensors that own the whole storage, "
+      "as dil buffer is going to replace the original storage");
+
   // Build new shade data context
   cpu::ShadeDataContext *new_shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
   new_shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
@@ -97,13 +106,10 @@ void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_tensor_buffer) {
   void *tensor_data = nullptr;
   if (dil_tensor_buffer.get_data_type() != get_dil_data_type(tensor.scalar_type())) {
     new_shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_BF16_FP32;
-  } else {
-    if (dil_tensor_buffer.is_public_format()) {
-      tensor_data = dil_tensor_buffer.get_data_handle();
-      new_shade_data_context->cpu_raw_data = tensor_data;
-      new_shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
-      sync_shape_from_dil_to_aten(tensor, dil_tensor_buffer);
-    }
+  } else if (dil_tensor_buffer.is_public_format()) {
+    tensor_data = dil_tensor_buffer.get_data_handle();
+    new_shade_data_context->cpu_raw_data = tensor_data;
+    new_shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
   }
 
   // Create a new DataPtr instances because the DataPtr class does not support set
@@ -116,6 +122,12 @@ void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_tensor_buffer) {
 
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)tensor.unsafeGetTensorImpl();
   ipex_tensor_impl->storage().set_data_ptr(std::move(shade_data_ptr));
+ 
+  // After equip_dil_buffer(), whole storage should be managed by dil tensor,
+  // and thus storage metadata should be overwritten by dil tensor 
+  // Note: Storage::set_numel() might be removed later
+  ipex_tensor_impl->storage().set_numel(dil_tensor_buffer.get_nelems());
+  cpu::dbl::comm::sync_shape_from_dil_to_aten(tensor, dil_tensor_buffer);
 }
 
 dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
