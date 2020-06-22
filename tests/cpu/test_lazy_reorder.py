@@ -732,9 +732,9 @@ class TestPool(TestCase):
         y_cpu.backward()
         y_dpcpp.backward()
         self.assertEqual(x_cpu.grad, x_dpcpp.grad)
-    
+
     def test_adaptive_avg_pool2d_not_divisible(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -755,7 +755,7 @@ class TestPool(TestCase):
         self.assertEqual(device, y_dpcpp.device.type)
 
     def test_adaptive_avg_pool2d_backward_not_divisible(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -796,9 +796,9 @@ class TestPool(TestCase):
                         ceil_mode=ceil_mode)
 
                     self.assertEqual(max_pool2d(x_cpu), max_pool2d(x_dpcpp))
-    
+
     def test_max_pool2d_double(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -817,7 +817,7 @@ class TestPool(TestCase):
                         stride=stride,
                         padding=1,
                         ceil_mode=ceil_mode)
-                    
+
                     y_cpu = max_pool2d(x_cpu)
                     y_dpcpp = max_pool2d(x_dpcpp)
                     self.assertEqual(y_cpu, y_dpcpp)
@@ -867,9 +867,9 @@ class TestPool(TestCase):
             y1.backward()
             y2.backward()
             self.assertEqual(x1.grad, x2.grad)
-    
+
     def test_max_pool2d_backward_double(self):
-        ipex.enable_auto_dnnl()
+        ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
