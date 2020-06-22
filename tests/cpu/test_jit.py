@@ -81,107 +81,54 @@ device = ipex.DEVICE
 SIZE = 100
 
 
-class Conv2dBatchNorm2d_Fixed(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(Conv2dBatchNorm2d_Fixed, self).__init__()
+conv_module = {2 : torch.nn.Conv2d, 3 : torch.nn.Conv3d}
+bn_module = {2 : torch.nn.BatchNorm2d, 3 : torch.nn.BatchNorm3d}
+
+class ConvBatchNorm_Fixed(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(ConvBatchNorm_Fixed, self).__init__()
         seed = 2018
         torch.manual_seed(seed)
-        self.conv = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
-        self.bn = nn.BatchNorm2d(out_channels, eps=0.001)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.bn = bn_module[dim](out_channels, eps=0.001)
 
     def forward(self, x):
         return self.bn(self.conv(x))
 
-class Conv3dBatchNorm3d_Fixed(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(Conv3dBatchNorm3d_Fixed, self).__init__()
+class ConvRelu_Fixed(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(ConvRelu_Fixed, self).__init__()
         seed = 2018
         torch.manual_seed(seed)
-        self.conv = nn.Conv3d(in_channels, out_channels, bias=False, **kwargs)
-        self.bn = nn.BatchNorm3d(out_channels, eps=0.001)
-
-    def forward(self, x):
-        return self.bn(self.conv(x))
-
-class Conv2dRelu_Fixed(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(Conv2dRelu_Fixed, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.conv = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
 
     def forward(self, x):
         return F.relu(self.conv(x), inplace=True)
 
-class Conv3dRelu_Fixed(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(Conv3dRelu_Fixed, self).__init__()
+class ConvSum(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(ConvSum, self).__init__()
         seed = 2018
         torch.manual_seed(seed)
-        self.conv = nn.Conv3d(in_channels, out_channels, bias=False, **kwargs)
-
-    def forward(self, x):
-        return F.relu(self.conv(x), inplace=True)
-
-class Conv2dSum(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(Conv2dSum, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.conv = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
-        self.conv1 = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.conv1 = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
 
     def forward(self, x):
         a = self.conv(x)
         b = self.conv1(x)
         return a+b
 
-class Conv3dSum(nn.Module):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super(Conv3dSum, self).__init__()
-        seed = 2018
-        torch.manual_seed(seed)
-        self.conv = nn.Conv3d(in_channels, out_channels, bias=False, **kwargs)
-        self.conv1 = nn.Conv3d(in_channels, out_channels, bias=False, **kwargs)
-
-    def forward(self, x):
-        a = self.conv(x)
-        b = self.conv1(x)
-        return a+b
-
-class CascadedConv2dBnSumRelu(nn.Module):
-    def __init__(self, in_channels, mid_channels, out_channels, **kwargs):
-        super(CascadedConv2dBnSumRelu, self).__init__()
+class CascadedConvBnSumRelu(nn.Module):
+    def __init__(self, dim, in_channels, mid_channels, out_channels, **kwargs):
+        super(CascadedConvBnSumRelu, self).__init__()
         torch.manual_seed(2018)
-        self.conv = nn.Conv2d(in_channels, mid_channels, bias=False, **kwargs)
-        self.conv1 = nn.Conv2d(
+        self.conv = conv_module[dim](in_channels, mid_channels, bias=False, **kwargs)
+        self.conv1 = conv_module[dim](
             mid_channels, out_channels, bias=False, padding=1, **kwargs)
-        self.conv2 = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
-        self.bn = nn.BatchNorm2d(mid_channels, eps=0.001)
-        self.bn1 = nn.BatchNorm2d(out_channels, eps=0.001)
-        self.bn2 = nn.BatchNorm2d(out_channels, eps=0.001)
-
-    def forward(self, x):
-        a = self.conv(x)
-        a = self.bn(a)
-        a = F.relu(a, inplace=True)
-        a = self.conv1(a)
-        a = self.bn1(a)
-        b = self.conv2(x)
-        b = self.bn2(b)
-        return F.relu(a.add_(b), inplace=True)
-
-class CascadedConv3dBnSumRelu(nn.Module):
-    def __init__(self, in_channels, mid_channels, out_channels, **kwargs):
-        super(CascadedConv3dBnSumRelu, self).__init__()
-        torch.manual_seed(2018)
-        self.conv = nn.Conv3d(in_channels, mid_channels, bias=False, **kwargs)
-        self.conv1 = nn.Conv3d(
-            mid_channels, out_channels, bias=False, padding=1, **kwargs)
-        self.conv2 = nn.Conv3d(in_channels, out_channels, bias=False, **kwargs)
-        self.bn = nn.BatchNorm3d(mid_channels, eps=0.001)
-        self.bn1 = nn.BatchNorm3d(out_channels, eps=0.001)
-        self.bn2 = nn.BatchNorm3d(out_channels, eps=0.001)
+        self.conv2 = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.bn = bn_module[dim](mid_channels, eps=0.001)
+        self.bn1 = bn_module[dim](out_channels, eps=0.001)
+        self.bn2 = bn_module[dim](out_channels, eps=0.001)
 
     def forward(self, x):
         a = self.conv(x)
@@ -280,11 +227,11 @@ class Tester(TestCase):
 
     def test_output_conv_bn_2d(self):
         self._test_output(
-            Conv2dBatchNorm2d_Fixed(3, 32, kernel_size=3, stride=1),
+            ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
             kind="aten::conv2d")
         self._test_output_bf16(
-            Conv2dBatchNorm2d_Fixed(3, 32, kernel_size=3, stride=1),
+            ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
             kind="aten::conv2d",
             prec=0.02)
@@ -292,11 +239,11 @@ class Tester(TestCase):
 
     def test_output_conv_bn_3d(self):
         self._test_output(
-            Conv3dBatchNorm3d_Fixed(3, 32, kernel_size=3, stride=1),
+            ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
             kind="aten::conv3d")
         self._test_output_bf16(
-            Conv3dBatchNorm3d_Fixed(3, 32, kernel_size=3, stride=1),
+            ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
             kind="aten::conv3d",
             prec=0.02)
@@ -304,33 +251,33 @@ class Tester(TestCase):
 
     def test_output_conv_relu_2d(self):
         self._test_output(
-            Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
+            ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
             kind="ipex::conv2d_relu")
         self._test_output_bf16(
-            Conv2dRelu_Fixed(3, 32, kernel_size=3, stride=1),
+            ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
             kind="ipex::conv2d_relu")
 
 
     def test_output_conv_relu_3d(self):
         self._test_output(
-            Conv3dRelu_Fixed(3, 32, kernel_size=3, stride=1),
+            ConvRelu_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
             kind="ipex::conv3d_relu")
         self._test_output_bf16(
-            Conv3dRelu_Fixed(3, 32, kernel_size=3, stride=1),
+            ConvRelu_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
             kind="ipex::conv3d_relu")
 
 
     def test_output_conv_sum_2d(self):
         self._test_output(
-            Conv2dSum(3, 32, kernel_size=3, stride=1),
+            ConvSum(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
             kind="ipex::conv2d_sum")
         self._test_output_bf16(
-            Conv2dSum(3, 32, kernel_size=3, stride=1),
+            ConvSum(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
             kind="ipex::conv2d_sum",
             prec=0.04)
@@ -338,11 +285,11 @@ class Tester(TestCase):
 
     def test_output_conv_sum_3d(self):
         self._test_output(
-            Conv3dSum(3, 32, kernel_size=3, stride=1),
+            ConvSum(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
             kind="ipex::conv3d_sum")
         self._test_output_bf16(
-            Conv3dSum(3, 32, kernel_size=3, stride=1),
+            ConvSum(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
             kind="ipex::conv3d_sum",
             prec=0.04)
@@ -350,11 +297,11 @@ class Tester(TestCase):
 
     def test_output_cascaded_conv_bn_sum_relu_2d(self):
         self._test_output(
-            CascadedConv2dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
+            CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 224, 224),
             kind="ipex::conv2d_sum_relu")
         self._test_output_bf16(
-            CascadedConv2dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
+            CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 224, 224),
             kind="ipex::conv2d_sum_relu",
             prec=0.02)
@@ -362,11 +309,11 @@ class Tester(TestCase):
 
     def test_output_cascaded_conv_bn_sum_relu_3d(self):
         self._test_output(
-            CascadedConv3dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
+            CascadedConvBnSumRelu(3, 3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 112, 112, 112),
             kind="ipex::conv3d_sum_relu")
         self._test_output_bf16(
-            CascadedConv3dBnSumRelu(3, 64, 32, kernel_size=3, stride=1),
+            CascadedConvBnSumRelu(3, 3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 112, 112, 112),
             kind="ipex::conv3d_sum_relu",
             prec=0.02)
