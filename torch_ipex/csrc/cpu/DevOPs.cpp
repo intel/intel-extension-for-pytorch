@@ -254,107 +254,95 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::mkldnn_convolution_
   return std::tuple<at::Tensor,at::Tensor,at::Tensor>(bridge::shallowUpgradeToDPCPPTensor(std::get<0>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<1>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<2>(_ipex_result)));
 }
 
-at::Tensor& AtenIpexCPUDev::dil_add_out(
+template<bool inplace>
+at::Tensor& dil_add_common(
     at::Tensor& result,
     const at::Tensor& self,
     const at::Tensor& other,
     at::Scalar alpha) {
-  DEBUG("AtenIpexCPUDev::dil_add_out\n");
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(other);
 
+  TORCH_CHECK(self.sizes().equals(other.sizes()),
+      "dil add not support broadcast yet");
+
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
   dbl::comm::reorder_to_bf16_for_mix_prec(other);
-  dbl::comm::reorder_to_bf16_for_mix_prec(result);
 
-  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
-  dil::tensor y = dbl::comm::try_gen_dil_tensor(other);
+  auto x = dbl::comm::try_gen_dil_tensor(self);
+  auto y = dbl::comm::try_gen_dil_tensor(other);
+  auto z = inplace ? x : dil::tensor();
 
-  dil::tensor z = dbl::comm::try_gen_dil_tensor(result);
-  const std::vector<float> scales{1.0, alpha.to<float>()};
-  dil::sum::compute(scales, {x, y}, z);
+  dil::sum::compute({1.0, alpha.to<float>()}, {x, y}, z);
 
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(z.is_public_format() || check_tensor_own_whole_storage(result));
-  dbl::comm::sync_shape_from_dil_to_aten(result, z);
+  if (!inplace) {
+    dbl::comm::equip_dil_buffer(result, z);
+  }
   return result;
+}
+
+at::Tensor& AtenIpexCPUDev::dil_add_out(at::Tensor& result, const at::Tensor& self, const at::Tensor& other, at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_add_out\n");
+
+  return dil_add_common</*inplace=*/false>(result, self, other, alpha);
 }
 
 at::Tensor AtenIpexCPUDev::dil_add(const at::Tensor& self, const at::Tensor& other, at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_add\n");
-  CHECK_DNNL_OP_PRE_COND(self);
-  CHECK_DNNL_OP_PRE_COND(other);
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(other);
-
-  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
-  dil::tensor y = dbl::comm::try_gen_dil_tensor(other);
-
-  dil::tensor z;
-  const std::vector<float> scales{1.0, alpha.to<float>()};
-  dil::sum::compute(scales, {x, y}, z);
-
-  return dbl::comm::gen_aten_tensor_by(std::move(z));
+  auto result = dbl::comm::empty_dil_tensor({0}, self.options());
+  return dil_add_common</*inplace=*/false>(result, self, other, alpha);
 }
 
 at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other, at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_add_\n");
+
+  return dil_add_common</*inplace=*/true>(self, self, other, alpha);
+}
+
+template<bool inplace>
+at::Tensor& dil_mul_common(
+    at::Tensor& result,
+    const at::Tensor& self,
+    const at::Tensor& other) {
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(other);
+
+  TORCH_CHECK(self.sizes().equals(other.sizes()),
+      "dil mul not support broadcast yet");
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
   dbl::comm::reorder_to_bf16_for_mix_prec(other);
 
-  auto dil_self = dbl::comm::try_gen_dil_tensor(self);
-  auto dil_other = dbl::comm::try_gen_dil_tensor(other);
+  auto x = dbl::comm::try_gen_dil_tensor(self);
+  auto y = dbl::comm::try_gen_dil_tensor(other);
+  auto z = inplace ? x : dil::tensor();
 
-  const std::vector<float> scales{1.0, alpha.to<float>()};
-  dil::sum::compute(scales, {dil_self, dil_other}, dil_self);
+  dil::binary::compute(x, y, z, dil::algorithm::binary_mul);
 
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_self.is_public_format() || check_tensor_own_whole_storage(self));
-  dbl::comm::sync_shape_from_dil_to_aten(self, dil_self);
-  return self;
+  if (!inplace) {
+    dbl::comm::equip_dil_buffer(result, z);
+  }
+  return result;
 }
 
 at::Tensor& AtenIpexCPUDev::dil_mul_out(at::Tensor& result, const at::Tensor& self, const at::Tensor& other) {
   DEBUG("AtenIpexCPUDev::dil_mul_out\n");
-  CHECK_DNNL_OP_PRE_COND(result);
-  CHECK_DNNL_OP_PRE_COND(self);
-  CHECK_DNNL_OP_PRE_COND(other);
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(other);
-  dbl::comm::reorder_to_bf16_for_mix_prec(result);
-
-  auto dil_result = dbl::comm::try_gen_dil_tensor(result);
-  auto dil_self = dbl::comm::try_gen_dil_tensor(self);
-  auto dil_other = dbl::comm::try_gen_dil_tensor(other);
-
-  dil::binary::compute(dil_self, dil_other, dil_result, dil::algorithm::binary_mul);
-
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_result.is_public_format() || check_tensor_own_whole_storage(result));
-  dbl::comm::sync_shape_from_dil_to_aten(result, dil_result);
-  return result;
+  return dil_mul_common</*inplace=*/false>(result, self, other);
 }
 
 at::Tensor AtenIpexCPUDev::dil_mul(const at::Tensor& self, const at::Tensor& other) {
   DEBUG("AtenIpexCPUDev::dil_mul\n");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(other);
-
-  at::Tensor result = dbl::comm::empty_dil_tensor(self.sizes(), self.options());
-
-  return dil_mul_out(result, self, other);
+  auto result = dbl::comm::empty_dil_tensor({0}, self.options());
+  return dil_mul_common</*inplace=*/false>(result, self, other);
 }
 
 at::Tensor& AtenIpexCPUDev::dil_mul_(at::Tensor& self, const at::Tensor& other) {
   DEBUG("AtenIpexCPUDev::dil_mul_\n");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(other);
-
-  return dil_mul_out(self, self, other);
+  return dil_mul_common</*inplace=*/true>(self, self, other);
 }
 
 void matmul_common(
@@ -382,65 +370,101 @@ void matmul_common(
       dil::scale_t(), dil::scale_t(), dil::scale_t(), attr);
 }
 
-at::Tensor AtenIpexCPUDev::dil_bmm(
-    const at::Tensor& self,
-    const at::Tensor& mat2) {
+at::Tensor AtenIpexCPUDev::dil_bmm(const at::Tensor& self, const at::Tensor& mat2) {
   DEBUG("AtenIpexCPUDev::dil_bmm\n");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(mat2);
-
-  auto self_size = self.sizes();
-  std::vector<int64_t> result_size(self_size.begin(), self_size.end()-1);
-  result_size.push_back(mat2.size(-1));
-  at::Tensor result = dbl::comm::empty_dil_tensor(result_size, self.options());
+  auto result = dbl::comm::empty_dil_tensor({0}, self.options());
   return dil_bmm_out(result, self, mat2);
 }
 
-at::Tensor& AtenIpexCPUDev::dil_bmm_out(
-    at::Tensor &result,
-    const at::Tensor& batch1,
-    const at::Tensor& batch2) {
+at::Tensor& AtenIpexCPUDev::dil_bmm_out(at::Tensor &result, const at::Tensor& batch1, const at::Tensor& batch2) {
   DEBUG("AtenIpexCPUDev::dil_bmm_out\n");
   CHECK_DNNL_OP_PRE_COND(batch1);
   CHECK_DNNL_OP_PRE_COND(batch2);
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(result);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch1.dim() == 3 && batch2.dim() == 3);
+  dil::dims inferred_size{batch1.size(0), batch1.size(1), batch2.size(2)};
+
   dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
   dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
 
-  const dil::tensor x = dbl::comm::try_gen_dil_tensor(batch1);
-  const dil::tensor w = dbl::comm::try_gen_dil_tensor(batch2);
-  dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
+  auto x = dbl::comm::try_gen_dil_tensor(batch1);
+  auto w = dbl::comm::try_gen_dil_tensor(batch2);
+  dil::tensor y;
   matmul_common(x, w, dil::tensor(), y);
 
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(y.is_public_format() || check_tensor_own_whole_storage(result));
-  dbl::comm::sync_shape_from_dil_to_aten(result, y);
+  dbl::comm::equip_dil_buffer(result, y);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(result.sizes().equals(inferred_size));
   return result;
 }
 
-at::Tensor AtenIpexCPUDev::dil_mm(
-    const at::Tensor& self,
-    const at::Tensor& mat2) {
+at::Tensor AtenIpexCPUDev::dil_mm(const at::Tensor& self, const at::Tensor& mat2) {
   DEBUG("AtenIpexCPUDev::dil_mm\n");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(mat2);
-
-  return dil_bmm(self, mat2);
+  auto result = dbl::comm::empty_dil_tensor({0}, self.options());
+  return dil_mm_out(result, self, mat2);
 }
 
-at::Tensor& AtenIpexCPUDev::dil_mm_out(
-    at::Tensor& result,
-    const at::Tensor& self,
-    const at::Tensor& mat2) {
+at::Tensor& AtenIpexCPUDev::dil_mm_out(at::Tensor& result, const at::Tensor& self, const at::Tensor& mat2) {
   DEBUG("AtenIpexCPUDev::dil_mm_out\n");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(result);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.dim() == 2 && mat2.dim() == 2);
+  dil::dims inferred_size{self.size(0), mat2.size(1)};
+
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
   dbl::comm::reorder_to_bf16_for_mix_prec(mat2);
 
-  return dil_bmm_out(result, self, mat2);
+  auto x = dbl::comm::try_gen_dil_tensor(self);
+  auto w = dbl::comm::try_gen_dil_tensor(mat2);
+  dil::tensor y;
+  matmul_common(x, w, dil::tensor(), y);
+
+  dbl::comm::equip_dil_buffer(result, y);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(result.sizes().equals(inferred_size));
+  return result;
+}
+
+template <bool inplace>
+at::Tensor& dil_baddbmm_common(
+    at::Tensor &result,
+    const at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    at::Scalar beta,
+    at::Scalar alpha) {
+  CHECK_DNNL_OP_PRE_COND(self);
+  CHECK_DNNL_OP_PRE_COND(batch1);
+  CHECK_DNNL_OP_PRE_COND(batch2);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch1.dim() == 3 && batch2.dim() == 3);
+  dil::dims inferred_size{batch1.size(0), batch1.size(1), batch2.size(2)};
+  TORCH_CHECK(self.sizes().equals(inferred_size),
+      "dil baddbmm not support broadcast yet");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
+  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
+
+  auto x = dbl::comm::try_gen_dil_tensor(batch1);
+  auto w = dbl::comm::try_gen_dil_tensor(batch2);
+  dil::tensor bias;
+  if (self.numel() != 0) {
+    bias = dbl::comm::try_gen_dil_tensor(self);
+    if (bias.ndims() < x.ndims()) {
+      auto bias_dims = bias.get_dims();
+      bias_dims.insert(bias_dims.begin(), 1);
+      bias.reshape(bias_dims);
+    }
+  }
+  auto y = inplace ? dbl::comm::try_gen_dil_tensor(self) : dil::tensor();
+  auto attr_ = dil::attr_t::fuse_sum();
+  matmul_common(x, w, bias, y, beta, alpha, attr_);
+
+  if (!inplace) {
+    dbl::comm::equip_dil_buffer(result, y);
+  }
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(result.sizes().equals(inferred_size));
+  return result;
 }
 
 at::Tensor& AtenIpexCPUDev::dil_baddbmm_out(
@@ -451,17 +475,46 @@ at::Tensor& AtenIpexCPUDev::dil_baddbmm_out(
     at::Scalar beta,
     at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_baddbmm_out\n");
+
+  return dil_baddbmm_common</*inplace=*/false>(result, self, batch1, batch2, beta, alpha);
+}
+
+at::Tensor AtenIpexCPUDev::dil_baddbmm(const at::Tensor& self, const at::Tensor& batch1, const at::Tensor & batch2, at::Scalar beta, at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_baddbmm\n");
+
+  auto result = dbl::comm::empty_dil_tensor({0}, self.options());
+  return dil_baddbmm_common</*inplace=*/false>(result, self, batch1, batch2, beta, alpha);
+}
+
+at::Tensor& AtenIpexCPUDev::dil_baddbmm_(at::Tensor& self, const at::Tensor& batch1, const at::Tensor& batch2, at::Scalar beta, at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_baddbmm_\n");
+
+  return dil_baddbmm_out(self, self, batch1, batch2, beta, alpha);
+}
+
+template<bool inplace>
+at::Tensor& dil_addmm_common(
+    at::Tensor& result,
+    const at::Tensor& self,
+    const at::Tensor& mat1,
+    const at::Tensor& mat2,
+    at::Scalar beta,
+    at::Scalar alpha) {
   CHECK_DNNL_OP_PRE_COND(self);
-  CHECK_DNNL_OP_PRE_COND(batch1);
-  CHECK_DNNL_OP_PRE_COND(batch2);
+  CHECK_DNNL_OP_PRE_COND(mat1);
+  CHECK_DNNL_OP_PRE_COND(mat2);
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(result);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(mat1.dim() == 2 && mat2.dim() == 2);
+  dil::dims inferred_size{mat1.size(0), mat2.size(1)};
+  TORCH_CHECK(self.sizes().equals(inferred_size),
+      "dil addmm not support broadcast yet");
+
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
+  dbl::comm::reorder_to_bf16_for_mix_prec(mat1);
+  dbl::comm::reorder_to_bf16_for_mix_prec(mat2);
 
-  const dil::tensor x = dbl::comm::try_gen_dil_tensor(batch1);
-  const dil::tensor w = dbl::comm::try_gen_dil_tensor(batch2);
+  auto x = dbl::comm::try_gen_dil_tensor(mat1);
+  auto w = dbl::comm::try_gen_dil_tensor(mat2);
   dil::tensor bias;
   if (self.numel() != 0) {
     bias = dbl::comm::try_gen_dil_tensor(self);
@@ -471,110 +524,53 @@ at::Tensor& AtenIpexCPUDev::dil_baddbmm_out(
       bias.reshape(bias_dims);
     }
   }
-  dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
+  auto y = inplace ? dbl::comm::try_gen_dil_tensor(self) : dil::tensor();
   auto attr_ = dil::attr_t::fuse_sum();
   matmul_common(x, w, bias, y, beta, alpha, attr_);
 
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(y.is_public_format() || check_tensor_own_whole_storage(result));
-  dbl::comm::sync_shape_from_dil_to_aten(result, y);
+  if (!inplace) {
+    dbl::comm::equip_dil_buffer(result, y);
+  }
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(result.sizes().equals(inferred_size));
   return result;
 }
 
-at::Tensor AtenIpexCPUDev::dil_baddbmm(
-    const at::Tensor& self,
-    const at::Tensor& batch1,
-    const at::Tensor & batch2,
-    at::Scalar beta,
-    at::Scalar alpha) {
-  DEBUG("AtenIpexCPUDev::dil_baddbmm\n");
-
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
-
-  auto self_size = batch1.sizes();
-  std::vector<int64_t> result_size(self_size.begin(), self_size.end()-1);
-  result_size.push_back(batch2.size(-1));
-  at::Tensor result = dbl::comm::empty_dil_tensor(result_size, self.options());
-  return dil_baddbmm_out(result, self, batch1, batch2, beta, alpha);
-}
-
-at::Tensor& AtenIpexCPUDev::dil_baddbmm_(
-    at::Tensor& self,
-    const at::Tensor& batch1,
-    const at::Tensor& batch2,
-    at::Scalar beta,
-    at::Scalar alpha) {
-  DEBUG("AtenIpexCPUDev::dil_baddbmm_\n");
-
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
-
-  at::Tensor result = at::empty({0}, self.options());
-  return dil_baddbmm_out(self, result, batch1, batch2, beta, alpha);
-}
-
-at::Tensor& AtenIpexCPUDev::dil_addmm_out(
-    at::Tensor& result,
-    const at::Tensor& self,
-    const at::Tensor& mat1,
-    const at::Tensor& mat2,
-    at::Scalar beta,
-    at::Scalar alpha) {
+at::Tensor& AtenIpexCPUDev::dil_addmm_out(at::Tensor& result, const at::Tensor& self, const at::Tensor& mat1, const at::Tensor& mat2, at::Scalar beta, at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_addmm_out\n");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(result);
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(mat1);
-  dbl::comm::reorder_to_bf16_for_mix_prec(mat2);
-
-  return dil_baddbmm_out(result, self, mat1, mat2, beta, alpha);
+  return dil_addmm_common</*inplace=*/false>(result, self, mat1, mat2, beta, alpha);
 }
 
-at::Tensor AtenIpexCPUDev::dil_addmm(
-    const at::Tensor& self,
-    const at::Tensor& batch1,
-    const at::Tensor & batch2,
-    at::Scalar beta,
-    at::Scalar alpha) {
+at::Tensor AtenIpexCPUDev::dil_addmm(const at::Tensor& self, const at::Tensor& mat1, const at::Tensor & mat2, at::Scalar beta, at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_addmm\n");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
-
-  return dil_baddbmm(self, batch1, batch2, beta, alpha);
+  auto result = dbl::comm::empty_dil_tensor({0}, self.options());
+  return dil_addmm_common</*inplace=*/false>(result, self, mat1, mat2, beta, alpha);
 }
 
-at::Tensor& AtenIpexCPUDev::dil_addmm_(
-    at::Tensor& self,
-    const at::Tensor& batch1,
-    const at::Tensor & batch2,
-    at::Scalar beta,
-    at::Scalar alpha) {
+at::Tensor& AtenIpexCPUDev::dil_addmm_(at::Tensor& self, const at::Tensor& mat1, const at::Tensor & mat2, at::Scalar beta, at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_addmm_\n");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
-
-  return dil_baddbmm_(self, batch1, batch2, beta, alpha);
+  return dil_addmm_common</*inplace=*/false>(self, self, mat1, mat2, beta, alpha);
 }
 
-at::Tensor& AtenIpexCPUDev::dil_addbmm_out(
+template<bool inplace>
+at::Tensor& dil_addbmm_common(
     at::Tensor& result,
     const at::Tensor &self,
     const at::Tensor &batch1,
     const at::Tensor &batch2,
     at::Scalar beta,
     at::Scalar alpha) {
-  DEBUG("AtenIpexCPUDev::dil_addbmm_out\n");
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(batch1);
   CHECK_DNNL_OP_PRE_COND(batch2);
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(result);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch1.dim() == 3 && batch2.dim() == 3);
+  dil::dims inferred_size{batch1.size(1), batch2.size(2)};
+  TORCH_CHECK(self.sizes().equals(inferred_size),
+      "dil addbmm not support broadcast yet");
+
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
   dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
   dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
@@ -583,18 +579,16 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_out(
   // [n, b*m] * [b*m, p] = [n, p]
   // For batch1: reorder from [b, n, m] to [n, b, m], reshape to [n, b*m]
   // For batch2: reshape from [b, m, p] to [b*m, p]
-  const dil::tensor x = dbl::comm::try_gen_dil_tensor(batch1);
-  dil::tensor w = dbl::comm::try_gen_dil_tensor(batch2);
+  auto x = dbl::comm::try_gen_dil_tensor(batch1);
+  auto w = dbl::comm::try_gen_dil_tensor(batch2);
 
   auto x_ = x;
   if (x.get_dim(0) > 1) {
     x_ = x.transpose(0, 1);
   }
-  dil::dims x_dims = {x.get_dim(1), x.get_dim(0) * x.get_dim(2)};
-  x_ = x_.reshape(x_dims);
-  dil::dims w_dims = {w.get_dim(0) * w.get_dim(1), w.get_dim(2)};
-  auto w_ = w.reshape(w_dims);
-  dil::tensor y = dbl::comm::try_gen_dil_tensor(result);
+  x_ = x_.reshape({x.get_dim(1), x.get_dim(0) * x.get_dim(2)});
+  auto w_ = w.reshape({w.get_dim(0) * w.get_dim(1), w.get_dim(2)});
+  auto y = inplace ? dbl::comm::try_gen_dil_tensor(self) : dil::tensor();
   auto attr_ = dil::attr_t::fuse_sum();
 
   dil::tensor bias;
@@ -608,41 +602,30 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_out(
   }
   matmul_common(x_, w_, bias, y, beta, alpha, attr_);
 
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(y.is_public_format() || check_tensor_own_whole_storage(result));
-  dbl::comm::sync_shape_from_dil_to_aten(result, y);
+  if (!inplace) {
+    dbl::comm::equip_dil_buffer(result, y);
+  }
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(result.sizes().equals(inferred_size));
   return result;
 }
 
-at::Tensor AtenIpexCPUDev::dil_addbmm(
-    const at::Tensor &self,
-    const at::Tensor &batch1,
-    const at::Tensor &batch2,
-    at::Scalar beta,
-    at::Scalar alpha) {
-  DEBUG("AtenIpexCPUDev::dil_addbmm\n");
+at::Tensor& AtenIpexCPUDev::dil_addbmm_out(at::Tensor& result, const at::Tensor &self, const at::Tensor &batch1, const at::Tensor &batch2, at::Scalar beta, at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_addbmm_out\n");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
-
-  at::Tensor result = dbl::comm::empty_dil_tensor(self.sizes(), self.options());
-  return dil_addbmm_out(result, self, batch1, batch2, beta, alpha);
+  return dil_addbmm_common</*inplace=*/false>(result, self, batch1, batch2, beta, alpha);
 }
 
-at::Tensor& AtenIpexCPUDev::dil_addbmm_(
-    at::Tensor& self,
-    const at::Tensor& batch1,
-    const at::Tensor& batch2,
-    at::Scalar beta,
-    at::Scalar alpha) {
+at::Tensor AtenIpexCPUDev::dil_addbmm(const at::Tensor &self, const at::Tensor &batch1, const at::Tensor &batch2, at::Scalar beta, at::Scalar alpha) {
+  DEBUG("AtenIpexCPUDev::dil_addbmm\n");
+
+  auto result = dbl::comm::empty_dil_tensor({0}, self.options());
+  return dil_addbmm_common</*inplace=*/false>(result, self, batch1, batch2, beta, alpha);
+}
+
+at::Tensor& AtenIpexCPUDev::dil_addbmm_(at::Tensor& self, const at::Tensor& batch1, const at::Tensor& batch2, at::Scalar beta, at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_addbmm_\n");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
-  dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
-
-  at::Tensor result = at::empty({0}, self.options());
-  return dil_addbmm_out(self, result, batch1, batch2, beta, alpha);
+  return dil_addbmm_common</*inplace=*/true>(self, self, batch1, batch2, beta, alpha);
 }
 
 at::Tensor AtenIpexCPUDev::dil_linear(
@@ -1354,6 +1337,14 @@ at::Tensor AtenIpexCPUDev::dil_reshape(const at::Tensor& self, at::IntArrayRef s
   dil::tensor y{x};
   y.reshape(inferred_size);
   return dbl::comm::gen_aten_tensor_by(std::move(y));
+}
+
+int64_t AtenIpexCPUDev::dil_size(const at::Tensor & self, int64_t dim) {
+  DEBUG("AtenIpexCPUDev::dil_size\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  dim = at::maybe_wrap_dim(dim, self.dim(), false);
+  return self.sizes()[dim];
 }
 
 at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::MemoryFormat> optional_memory_format) {
