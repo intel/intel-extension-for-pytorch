@@ -135,8 +135,6 @@ else()
   message(FATAL_ERROR, "Cannot find PyTorch library directory")
 endif()
 
-target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
-
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
 
@@ -174,6 +172,7 @@ else()
   message(FATAL_ERROR "ComputeCpp or DPCPP NOT found. Compiling without SYCL support")
 endif()
 
+target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
 
 install(TARGETS ${LIB_NAME}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

@@ -48,7 +48,7 @@ if(MKL_DPCPP_HEADER)
         PATH_SUFFIXES lib
                       lib/intel64
         NO_DEFAULT_PATH)
-    if(NOT SYCL_LIBRARY)
+    if(NOT MKL_DPCPP_LIBRARY)
         message(FATAL_ERROR "DPCPP library mkl_sycl not found")
     endif()
 
