@@ -10,7 +10,6 @@
 #include <torch/csrc/jit/runtime/operator_options.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
 #include "jit/fusion_pass.h"
-#include "jit/prepack_weight.h"
 
 #include <cstring>
 #include <sstream>
@@ -23,7 +22,6 @@
 #include "cpu/ShadeDataContext.h"
 #include "cpu/ExtendOPs.h"
 #include "cpu/MlpOPs.h"
-#include "cpu/Prepack.h"
 
 namespace torch_ipex {
 namespace {
@@ -110,10 +108,6 @@ void InitIpexModuleBindings(py::module m) {
           return AtenIpexTypeExt::embedding_bag_backward(grad, indices, offsets, offset2bag, bag_size, maximum_indices, num_weights, scale_grad_by_freq, mode, sparse, per_sample_weights);
         });
 
-  m.def("linear",
-        [](const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias) {
-          return AtenIpexTypeExt::linear(input, weight, bias);
-        });
   m.def("linear_fuse_relu",
         [](const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
           return AtenIpexTypeExt::linear_fuse_relu(input, weight, bias);
@@ -125,22 +119,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("relu_use_dst_backward",
         [](const at::Tensor& grad_output, const at::Tensor& output) {
           return AtenIpexTypeExt::relu_use_dst_for_bwd(grad_output, output);
-        });
-  m.def("adaptive_avg_pool2d",
-        [](at::Tensor const& input, at::IntArrayRef output_size) {
-          return AtenIpexTypeExt::adaptive_avg_pool2d(input, output_size);
-        });
-  m.def("adaptive_avg_pool2d_backward",
-        [](const at::Tensor& grad_output, const at::Tensor& input) {
-          return AtenIpexTypeExt::adaptive_avg_pool2d_backward(grad_output, input);
-        });
-  m.def("max_pooling",
-        [](const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
-          return AtenIpexTypeExt::max_pooling(input, kernel_size, stride, padding, dilation, ceil_mode);
-        });
-  m.def("max_pooling_backward",
-        [](const at::Tensor& grad_output, const at::Tensor& output, const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
-          return AtenIpexTypeExt::max_pooling_backward(grad_output, output, input, kernel_size, stride, padding, dilation, ceil_mode);
         });
   m.def("reshape",
         [](const at::Tensor& input, at::IntArrayRef size) {
@@ -159,7 +137,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("enable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(true); });
   m.def("disable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
   m.def("get_jit_opt", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
-  m.def("prepack_conv_weight", &AtenIpexPrepack::prepack_conv_weight);
 }
 
 }  // namespace
