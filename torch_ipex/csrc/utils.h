@@ -23,4 +23,12 @@ bool check_tensor_own_whole_storage(const at::Tensor& tensor);
 bool check_tensor_own_shade_context(const at::Tensor& tensor);
 bool check_aten_dil_shape_info(const at::Tensor& ipex_tensor, const dil::tensor &dil_tensor);
 
+// A light-weight TORCH_CHECK that does not collect any backtrace info
+#define IPEX_CHECK(cond, ...)                                                  \
+  if (!(cond)) {                                                               \
+    throw std::runtime_error(                                                  \
+      c10::detail::if_empty_then(                                              \
+        c10::str(__VA_ARGS__),                                                 \
+        "Expected " #cond " to be true, but got false."));                     \
+  }
 } // namespace torch_ipex
