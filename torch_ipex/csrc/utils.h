@@ -24,6 +24,7 @@ bool check_tensor_own_shade_context(const at::Tensor& tensor);
 bool check_aten_dil_shape_info(const at::Tensor& ipex_tensor, const dil::tensor &dil_tensor);
 
 // A light-weight TORCH_CHECK that does not collect any backtrace info
+#if defined(_DEBUG)
 #define IPEX_CHECK(cond, ...)                                                  \
   if (!(cond)) {                                                               \
     throw std::runtime_error(                                                  \
@@ -31,4 +32,9 @@ bool check_aten_dil_shape_info(const at::Tensor& ipex_tensor, const dil::tensor 
         c10::str(__VA_ARGS__),                                                 \
         "Expected " #cond " to be true, but got false."));                     \
   }
+#else
+// quick path of IPEX_CHECK without reporting message
+#define IPEX_CHECK(cond, ...)                                                  \
+  if (!(cond)) { throw std::exception(); }
+#endif
 } // namespace torch_ipex
