@@ -17,9 +17,13 @@ namespace dbl {
 namespace comm {
 
 dil::tensor dil_tensor_from_dense(const at::Tensor& tensor) {
-  AT_ASSERTM(
+  TORCH_CHECK(
     tensor.layout() == at::Layout::Strided,
-    "dil_tensor_view_from_dense expects dense tensor input");
+    "dil_tensor_from_dense expects dense tensor input");
+  TORCH_CHECK(tensor.scalar_type() == at::ScalarType::Float
+             "dil_tensor_from_dense expects tensor of at::ScalarType::Float");
+  TORCH_CHECK(tensor.dim() <= 5,
+             "Can't convert cpu tensor with the number of dimensions > 5");
   at::ScalarType cur_type = tensor.scalar_type();
   return {tensor.sizes().vec(), get_dil_data_type(cur_type), tensor.strides().vec(), tensor.data_ptr()};
 }

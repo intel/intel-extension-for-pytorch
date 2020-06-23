@@ -149,7 +149,7 @@ at::Tensor AtenIpexJITDev::dil_linear_fuse_relu(
     const at::Tensor& self,
     const at::Tensor& weight,
     const at::Tensor& bias) {
-  TORCH_CHECK(self.dim() >= 2,
+  IPEX_CHECK(self.dim() >= 2,
       "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
   auto input_contiguous = self.contiguous();
   auto weight_contiguous = weight.contiguous();
