@@ -48,52 +48,28 @@ void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor) {
 }
 
 void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type) {
-  dil::tensor::memory::desc dst_desc;
-  if (check_tensor_own_shade_context(tensor) && cpu::ShadeDataContext::isDilOwnTheTensor(tensor)) {
-    // The buffer ownership is DIL
-    cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(tensor.storage().data_ptr().get_context());
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_context->dil_tensor.has_value());
-    dil::tensor&& dil_tensor = std::move(shade_context->dil_tensor.value());
-    if (get_at_data_type(dil_tensor.get_data_type()) == dst_scalar_type) {
-      // The data type of DIL tensor is same as the destination data type. DO NOTHING
-      return;
-    }
-
-    TORCH_CHECK(check_tensor_own_whole_storage(tensor),
-      "Intel Extension for PyTorch does not support the data is just a part of its storage for auto mix-precision.");
-    dst_desc = dil_tensor.get_desc().to_type(get_dil_data_type(dst_scalar_type));
-  } else {
-    // The buffer ownership is CPU
-    TORCH_CHECK(check_tensor_own_whole_storage(tensor),
-      "Intel Extension for PyTorch does not support the data is just a part of its storage for auto mix-precision.");
-    dil::tensor temp_dil_tensor = cpu::dbl::comm::dil_tensor_from_dense(tensor);
-    dst_desc = temp_dil_tensor.get_desc().to_type(get_dil_data_type(dst_scalar_type));
+  auto src = try_gen_dil_tensor(tensor);
+  if (get_at_data_type(src.get_data_type()) == dst_scalar_type) {
+    // The data type of DIL tensor is same as the dst data type. DO NOTHING
+    return;
   }
+  auto dst_desc = src.get_desc().to_type(get_dil_data_type(dst_scalar_type));
   reorder_to_desc(tensor, dst_desc);
 }
 
 void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc) {
-  dil::tensor new_type_dil_tensor;
-  new_type_dil_tensor.init(expected_desc);
-
-  bool contains_dil_tensor_buffer = check_tensor_own_shade_context(tensor) && cpu::ShadeDataContext::isDilOwnTheTensor(tensor);
-  if (contains_dil_tensor_buffer) {
-    cpu::ShadeDataContext *shade_context = (cpu::ShadeDataContext*)(tensor.storage().data_ptr().get_context());
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_context->dil_tensor.has_value());
-    new_type_dil_tensor.feed_from(shade_context->dil_tensor.value());
-  } else {
-    new_type_dil_tensor.feed_from(cpu::dbl::comm::dil_tensor_from_dense(tensor));
-  }
-
-  equip_dil_buffer(tensor,  new_type_dil_tensor);
+  auto src = try_gen_dil_tensor(tensor);
+  dil::tensor dst {expected_desc};
+  dst.feed_from(src);
+  equip_dil_buffer(tensor,  dst);
 }
 
 void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_tensor_buffer) {
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+  TORCH_CHECK(
       tensor.device().is_dpcpp(),
       "dil buffer can only be equipped to dpcpp tensor");
 
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+  TORCH_CHECK(
       check_tensor_own_whole_storage(tensor),
       "dil buffer can only be equipped to tensors that own the whole storage, "
       "as dil buffer is going to replace the original storage");
