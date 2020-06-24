@@ -1,12 +1,205 @@
 #include <ATen/ATen.h>
 
+#include <core/DPCPP.h>
+#include <core/DPCPPUtils.h>
 #include <core/TensorImplUtils.h>
+#include <core/detail/IndexUtils.h>
 
 using namespace at::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
+
+#ifdef USE_USM
+constexpr int CAT_ARRAY_BATCH_SIZE = 1024;
+constexpr int CAT_ARRAY_MAX_INPUT_DIMS = 3;
+
+// Similar to any other IndexToOffset calculation for copying along a given
+// dimension.
+template <typename IndexType, int Dims>
+struct CatArrIndexToOffset {
+  static inline IndexType compute(
+      const IndexType outputSize[Dims],
+      const IndexType outputStride[Dims],
+      const IndexType dimSize,
+      const unsigned int concatDim,
+      IndexType linearIndex) {
+    // linearIndex is not really linear index, but instead the offset in
+    // input tensor. If the input tensor is contiguous, then this offset
+    // is the linear index, but if the input tensor is channels last, then
+    // it is the linear index of the permuted contiguous tensor
+    IndexType offset = 0;
+
+#pragma unroll
+    for (int i = Dims - 1; i >= 1; --i) {
+      IndexType curDimSize = i == concatDim ? dimSize : outputSize[i];
+      IndexType nextDimIndex = linearIndex / curDimSize;
+      IndexType curDimIndex = linearIndex - curDimSize * nextDimIndex;
+      IndexType curDimOffset = curDimIndex * outputStride[i];
+      offset += curDimOffset;
+      linearIndex = nextDimIndex;
+    }
+
+    return offset + linearIndex * outputStride[0];
+  }
+};
+
+template <typename T, typename IndexType>
+struct CatArrInputTensor {
+  T* input;
+  IndexType offset;
+  IndexType dimSize;
+  IndexType nElements;
+};
+
+template<typename IndexType, unsigned int MaxDims>
+struct OutputTensorSizeStride {
+  IndexType outputSize[MaxDims];
+  IndexType outputStride[MaxDims];
+};
+
+DPCPP_DEF_K2(CatArrayBatchKer, typename T, typename IndexType, int Dims);
+/**
+  * Kernel used to concatenated grimDim.y tensors into an output tensor. Uses a
+  * grid-stride loop based off of the blockIdx.x, threadIdx.x for each input to
+  * copy each element from each input tensor into the output.
+  *
+  * output: base pointer to the storage associated with the output tensor
+  * inputs: GPU-allocated array of input metadata for each input to concatenate
+  *         in the kernel
+  * os: the size/stride vectors for the output tensor
+  * concatDim: dimension along which we are concatenating
+  * dimStride: the stride of the output tensor at the concatDim
+  *
+  * The most important assumption made is that the input tensors are contiguous.
+  */
+template <typename T, typename IndexType, int Dims>
+void CatArrayBatchedCopy(
+    T* output,
+    CatArrInputTensor<T, IndexType>* inputs,
+    OutputTensorSizeStride<IndexType, CAT_ARRAY_MAX_INPUT_DIMS> os,
+    const int concatDim,
+    IndexType dimStride,
+    int batchCounter) {
+
+  auto queue = dpcppGetCurrentQueue();
+
+  //Get grid where x dim fills half gpu and y dim is number of tensors.
+  //This will have cating two tensors fill the entire grid, but prevent
+  //many threads from needlessly load meta data if their sizes is small.
+
+  auto numCU = queue.get_device().get_info<DPCPP::info::device::max_compute_units>();
+  auto numWI = queue.get_device().get_info<DPCPP::info::device::max_work_group_size>();
+  DPCPP::range<2> global_range(numCU * numWI / 2, batchCounter);
+  DPCPP::range<2> local_range(numWI, 1);
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
+      IndexType wg = item.get_group(0);
+      IndexType wg_size = item.get_local_range(0);
+      IndexType wi = item.get_local_id(0);
+      IndexType tid = wg * wg_size + wi;
+      IndexType in = item.get_group(1);
+
+      IndexType nElements = inputs[in].nElements;
+
+      if(tid >= nElements) return;
+
+      T* data = inputs[in].input;
+      IndexType offset = inputs[in].offset;
+      IndexType dimSize = inputs[in].dimSize;
+      IndexType dataOffset = offset * dimStride;
+
+      IndexType stride = item.get_group_range(0) * wg_size;
+
+      while (tid < nElements) {
+        IndexType elementOffset = CatArrIndexToOffset<IndexType, Dims>::compute(
+                      os.outputSize, os.outputStride, dimSize, concatDim, tid);
+        output[dataOffset + elementOffset] = data[tid];
+
+        tid += stride;
+      }
+    };
+    cgh.parallel_for<DPCPP_K(CatArrayBatchKer, T, IndexType, Dims)>(
+        DPCPP::nd_range<2>(global_range, local_range), kfn);
+  };
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf)
+}
+
+template <typename scalar_t>
+void parallel_cat(Tensor &out, const TensorList &inputs,
+                  int64_t dimension, int nDims) {
+  // First, let's set up our kernel parameters. We start with a raw pointer to
+  // the storage for the output Tensor.
+  scalar_t *data = out.data_ptr<scalar_t>();
+
+  // Kernel Parameter
+  long tensorMetadataSize =
+    sizeof(CatArrInputTensor<scalar_t, unsigned int>) * CAT_ARRAY_BATCH_SIZE;
+  auto d_inputs_storage = at::empty(
+    {tensorMetadataSize}, out.options().dtype(at::kByte));
+  auto d_inputs = static_cast<CatArrInputTensor<scalar_t, unsigned int> *>(
+    d_inputs_storage.data_ptr());
+
+  OutputTensorSizeStride<unsigned int, CAT_ARRAY_MAX_INPUT_DIMS> param;
+
+  // Next, let's initialize the size, stride arrays for the output Tensor.
+  for (int i = 0; i < nDims; ++i) {
+    param.outputSize[i] = at::native::size(out, i);
+    param.outputStride[i] = out.stride(i);
+  }
+
+  // Now we loop
+  int batchCounter = 0;
+  int64_t offset = 0;
+  for (int i = 0; i < inputs.size() ; i += CAT_ARRAY_BATCH_SIZE) {
+    // Re-allocate stackInputs every iteration to avoid read-after-write hazard
+    {
+      auto stackInputs_storage = at::empty({tensorMetadataSize},
+          out.options().dtype(at::kByte).device(at::kCPU));
+      auto stackInputs =
+        static_cast<CatArrInputTensor<scalar_t, unsigned int> *>(
+          stackInputs_storage.data_ptr());
+      for (batchCounter = 0;
+           batchCounter < CAT_ARRAY_BATCH_SIZE &&
+             (i+batchCounter) < inputs.size();
+           ++batchCounter) {
+        int64_t dimSize = at::native::size(inputs[i+batchCounter], dimension);
+
+        stackInputs[batchCounter].input =
+          inputs[i+batchCounter].data_ptr<scalar_t>();
+        stackInputs[batchCounter].offset = offset;
+        stackInputs[batchCounter].dimSize = dimSize;
+        stackInputs[batchCounter].nElements = inputs[i+batchCounter].numel();
+
+        // update offset
+        offset += dimSize;
+      }
+      d_inputs_storage.copy_(stackInputs_storage);
+    }
+
+#define HANDLE_CASE(DIMS) \
+    CatArrayBatchedCopy<scalar_t, unsigned int, DIMS>(\
+            data, d_inputs, param, dimension, param.outputStride[dimension],\
+            batchCounter);
+    switch (nDims) {
+      case 1:
+        HANDLE_CASE(1);
+        break;
+      case 2:
+        HANDLE_CASE(2);
+        break;
+      case 3:
+        HANDLE_CASE(3);
+        break;
+      default:
+        break;
+    }
+#undef HANDLE_CASE
+  }
+}
+#endif
 
 void check_shape_except_dim(Tensor& first, Tensor& second, int dimension) {
   int first_dims = first.dim();
@@ -87,24 +280,41 @@ static void cat(
   }
   result.resize_(size);
 
-  offset = 0;
-  for (j = 0; j < numInputs; j++) {
-    if (should_skip(inputs[j]))
-      continue;
-    int64_t dimSize = inputs[j].size(dimension);
-    auto nt = at::empty_like(result);
-    auto result_impl = TensorImpl_Unwrap(result);
-    TensorImpl_setStorageNd(
-        TensorImpl_Unwrap(nt),
-        TensorImpl_getStoragePtr(result_impl),
-        result.storage_offset(),
-        result.dim(),
-        TensorImpl_getSizePtr(result_impl),
-        TensorImpl_getStridePtr(result_impl));
-    nt = nt.narrow(dimension, offset, dimSize);
-    nt.copy_(inputs[j]);
-    offset += dimSize;
+  const bool all32BitIndexable = std::all_of(inputs.begin(), inputs.end(),
+    [] (const Tensor& t) {
+      return dpcpp::detail::canUse32BitIndexMath(t);
+    });
+  const bool allContiguous = std::all_of(inputs.begin(), inputs.end(),
+    [](const Tensor& t) {
+      return !t.defined() || t.is_contiguous();
+    });
+
+#ifdef USE_USM
+  if (inputs.size() > 1 &&
+      !hasSkippedInput &&
+      result.dim() <= CAT_ARRAY_MAX_INPUT_DIMS &&
+      dpcpp::detail::canUse32BitIndexMath(result) &&
+      allContiguous &&
+      all32BitIndexable) {
+    AT_DISPATCH_ALL_TYPES_AND3(
+        at::ScalarType::Half, at::ScalarType::Bool, at::ScalarType::BFloat16,
+        result.scalar_type(), "cat_dpcpp", [&]() {
+      parallel_cat<scalar_t>(result, inputs, dimension, nDims);
+    });
+  } else {
+#endif
+    offset = 0;
+    for (j = 0; j < numInputs; j++) {
+      if (should_skip(inputs[j]))
+        continue;
+      int64_t dimSize = inputs[j].size(dimension);
+      Tensor nt = at::narrow(result, dimension, offset, dimSize);
+      nt.copy_(inputs[j]);
+      offset += dimSize;
+    }
+#ifdef USE_USM
   }
+#endif
 }
 
 } // namespace impl
