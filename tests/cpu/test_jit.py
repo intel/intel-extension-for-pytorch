@@ -152,7 +152,7 @@ class LinearRelu(nn.Module):
 
 class Tester(TestCase):
 
-    def _test_output(self, model, x, kind=None):
+    def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None):
         modelName = model.__class__.__name__
         core.disable_jit_opt()
         core.disable_mix_bf16_fp32()
@@ -164,76 +164,92 @@ class Tester(TestCase):
 
         script_model = torch.jit.script(model)
         script_model.eval()
+
+        trace_model = torch.jit.trace(model, x)
+        trace_model.eval()
         with torch.no_grad():
             sresult = script_model(x)
+            tresult = trace_model(x)
 
         self.assertEqual(result, sresult)
+        self.assertEqual(result, tresult)
 
         core.enable_jit_opt()
-        fused_model = torch.jit.script(model)
+        script_fused_model = torch.jit.script(model)
+        trace_fused_model = torch.jit.trace(model, x)
         with torch.no_grad():
             # conv relu fusion, conv sum fusion or conv sum relu fusion
-            graph =  fused_model.graph_for(x)
-            # print(graph)
-            fresult = fused_model(x)
+            script_graph =  script_fused_model.graph_for(x)
+            fused_sresult = script_fused_model(x)
 
-        # print(result)
-        # print(sresult)
-        # print(fresult)
+            trace_graph = trace_fused_model.graph_for(x)
+            fused_tresult = trace_fused_model(x)
 
-        self.assertEqual(result, fresult)
+        self.assertEqual(result, fused_sresult)
+        self.assertEqual(result, fused_tresult)
 
         # check if the fused node exists in the graph
-        if kind is not None:
-            self.assertTrue(any(n.kind() == kind for n in graph.nodes()))
+        if kind_in_graph is not None:
+            self.assertTrue(any(n.kind() == kind_in_graph for n in script_graph.nodes()))
+            self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+        
+        # check if certain node does not exist in the graph
+        if kind_not_in_graph is not None:
+            self.assertTrue(all(n.kind() != kind_not_in_graph for n in script_graph.nodes()))
+            self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
-    def _test_output_bf16(self, model, x, kind=None, prec=None):
+
+    def _test_output_bf16(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None):
         modelName = model.__class__.__name__
 
         core.enable_auto_dnnl()
         core.enable_jit_opt()
-        core.disable_mix_bf16_fp32()
-
+        core.enable_mix_bf16_fp32()
+        
         model = model.to(ipex.DEVICE).eval()
         x = x.to(ipex.DEVICE)
         x2 = x.clone()
+        x3 = x.clone()
+        
+        script_fused_model = torch.jit.script(copy.deepcopy(model))
+        trace_fused_model = torch.jit.trace(copy.deepcopy(model), x3)
 
-        fused_model = torch.jit.script(copy.deepcopy(model))
-
-        # bn folding, removing it after solve some issue, using mix_preci? to check
-        core.disable_auto_dnnl()
-        fused_model = wrap_cpp_module(torch._C._jit_pass_fold_convbn(fused_model._c))
-        core.enable_auto_dnnl()
-
-        core.enable_mix_bf16_fp32()
 
         with torch.no_grad():
             # bf16, native path
             result = model(x)
-            # bf16, jit path
-            graph =  fused_model.graph_for(x2)
-            # print(graph)
-            fresult = fused_model(x2)
+            # bf16, jit script path
+            script_graph =  script_fused_model.graph_for(x2)
+            fused_sresult = script_fused_model(x2)
+            # bf 16, jit trace path
+            trace_graph = trace_fused_model.graph_for(x3)
+            fused_tresult = trace_fused_model(x3)
 
-        #print(result)
-        #print(fresult)
-
-        self.assertEqual(fresult, result, prec=prec)
+        self.assertEqual(fused_sresult, result, prec=prec)
+        self.assertEqual(fused_tresult, result, prec=prec)
 
         # check if the fused node exists in the graph
-        if kind is not None:
-            self.assertTrue(any(n.kind() == kind for n in graph.nodes()))
-
+        if kind_in_graph is not None:
+            self.assertTrue(any(n.kind() == kind_in_graph for n in script_graph.nodes()))
+            self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+        
+        # check if certain node does not exist in the graph
+        if kind_not_in_graph is not None:
+            self.assertTrue(all(n.kind() != kind_not_in_graph for n in script_graph.nodes()))
+            self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
+    
 
     def test_output_conv_bn_2d(self):
         self._test_output(
             ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
-            kind="aten::conv2d")
+            kind_in_graph="aten::conv2d",
+            kind_not_in_graph="aten::batch_norm",)
         self._test_output_bf16(
             ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
-            kind="aten::conv2d",
+            kind_in_graph="aten::conv2d",
+            kind_not_in_graph="aten::batch_norm",
             prec=0.02)
 
 
@@ -241,11 +257,13 @@ class Tester(TestCase):
         self._test_output(
             ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
-            kind="aten::conv3d")
+            kind_in_graph="aten::conv3d",
+            kind_not_in_graph="aten::batch_norm",)
         self._test_output_bf16(
             ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
-            kind="aten::conv3d",
+            kind_in_graph="aten::conv3d",
+            kind_not_in_graph="aten::batch_norm",
             prec=0.02)
 
 
@@ -253,33 +271,33 @@ class Tester(TestCase):
         self._test_output(
             ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
-            kind="ipex::conv2d_relu")
+            kind_in_graph="ipex::conv2d_relu")
         self._test_output_bf16(
             ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
-            kind="ipex::conv2d_relu")
+            kind_in_graph="ipex::conv2d_relu")
 
 
     def test_output_conv_relu_3d(self):
         self._test_output(
             ConvRelu_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
-            kind="ipex::conv3d_relu")
+            kind_in_graph="ipex::conv3d_relu")
         self._test_output_bf16(
             ConvRelu_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
-            kind="ipex::conv3d_relu")
+            kind_in_graph="ipex::conv3d_relu")
 
 
     def test_output_conv_sum_2d(self):
         self._test_output(
             ConvSum(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
-            kind="ipex::conv2d_sum")
+            kind_in_graph="ipex::conv2d_sum")
         self._test_output_bf16(
             ConvSum(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 224, 224),
-            kind="ipex::conv2d_sum",
+            kind_in_graph="ipex::conv2d_sum",
             prec=0.04)
 
 
@@ -287,11 +305,11 @@ class Tester(TestCase):
         self._test_output(
             ConvSum(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
-            kind="ipex::conv3d_sum")
+            kind_in_graph="ipex::conv3d_sum")
         self._test_output_bf16(
             ConvSum(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 112, 112, 112),
-            kind="ipex::conv3d_sum",
+            kind_in_graph="ipex::conv3d_sum",
             prec=0.04)
 
 
@@ -299,11 +317,13 @@ class Tester(TestCase):
         self._test_output(
             CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 224, 224),
-            kind="ipex::conv2d_sum_relu")
+            kind_in_graph="ipex::conv2d_sum_relu",
+            kind_not_in_graph="aten::batch_norm")
         self._test_output_bf16(
             CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 224, 224),
-            kind="ipex::conv2d_sum_relu",
+            kind_in_graph="ipex::conv2d_sum_relu",
+            kind_not_in_graph="aten::batch_norm",
             prec=0.02)
 
 
@@ -311,11 +331,13 @@ class Tester(TestCase):
         self._test_output(
             CascadedConvBnSumRelu(3, 3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 112, 112, 112),
-            kind="ipex::conv3d_sum_relu")
+            kind_in_graph="ipex::conv3d_sum_relu",
+            kind_not_in_graph="aten::batch_norm",)
         self._test_output_bf16(
             CascadedConvBnSumRelu(3, 3, 64, 32, kernel_size=3, stride=1),
             torch.rand(32, 3, 112, 112, 112),
-            kind="ipex::conv3d_sum_relu",
+            kind_in_graph="ipex::conv3d_sum_relu",
+            kind_not_in_graph="aten::batch_norm",
             prec=0.02)
 
 
@@ -323,21 +345,22 @@ class Tester(TestCase):
         self._test_output(
             LinearRelu(3, 32, bias=True),
             torch.rand(32, 3),
-            kind="ipex::linear_relu")
+            kind_in_graph="ipex::linear_relu")
         self._test_output_bf16(
             LinearRelu(3, 32, bias=True),
             torch.rand(32, 3),
-            kind="ipex::linear_relu")
+            kind_in_graph="ipex::linear_relu")
         self._test_output(
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
-            kind="ipex::linear_relu")
+            kind_in_graph="ipex::linear_relu")
         self._test_output_bf16(
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
-            kind="ipex::linear_relu")
+            kind_in_graph="ipex::linear_relu")
 
 
 if __name__ == '__main__':
+    torch.manual_seed(2020)
     core.enable_auto_dnnl()
     test = unittest.main()
