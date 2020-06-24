@@ -447,7 +447,7 @@ std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& ten
   for (size_t i = 0; i < tensor_list.size(); ++i) {
     const at::Tensor& tensor = tensor_list[i];
     if (tensor.defined()) {
-      dpcpp_tensor_vec[i] = shallowFallbackToCPUTensorImpl(tensor);
+      dpcpp_tensor_vec[i] = shallowFallbackToCPUTensor(tensor);
     }
   }
   return dpcpp_tensor_vec;
