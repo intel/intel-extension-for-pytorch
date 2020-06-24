@@ -24,17 +24,6 @@ dil::tensor dil_tensor_from_dense(const at::Tensor& tensor) {
   return {tensor.sizes().vec(), get_dil_data_type(cur_type), tensor.strides().vec(), tensor.data_ptr()};
 }
 
-at::Tensor dil_tensor_to_dense(const at::Tensor& tensor) {
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cpu::ShadeDataContext::isDilTensor(tensor));
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.unsafeGetTensorImpl()->version_counter().current_version() == 1);
-  auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
-  at::Tensor cpu_tensor = at::empty(
-    dil_tensor.get_dims(),
-    tensor.options().device(c10::kCPU).layout(c10::kStrided));
-  dil_tensor.to_public(cpu_tensor.data_ptr(), dil_tensor.get_data_type());
-  return cpu_tensor;
-}
-
 void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor) {
   if (!check_auto_mix_bf16_fp32())
     return;
@@ -54,6 +43,31 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type) 
     return;
   }
   auto dst_desc = src.get_desc().to_type(get_dil_data_type(dst_scalar_type));
+  reorder_to_desc(tensor, dst_desc);
+}
+
+void reorder_to_public(const at::Tensor& tensor) {
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cpu::ShadeDataContext::isDilTensor(tensor));
+  auto& dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
+  auto dst_desc = dil_tensor.get_desc();
+  auto aten_tensor_scalar_type = tensor.scalar_type();
+  auto *shade_data_context = (cpu::ShadeDataContext*)tensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
+  if (!dil_tensor.is_public_format()) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.storage().unsafeGetStorageImpl()->data_ptr().get_deleter() == &(cpu::ShadeDataContext::freeShadeDataContext));
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun == nullptr);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_scalar_type == at::kFloat || aten_tensor_scalar_type == at::kBFloat16);
+    dst_desc = dst_desc.to_default_format();
+  } else if (cpu::ShadeDataContext::isTensorMixPrecision(tensor)) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.storage().unsafeGetStorageImpl()->data_ptr().get() == nullptr);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data == nullptr);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun == nullptr);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_scalar_type == at::kFloat);
+  } else {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor->get_data_handle());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun != nullptr);
+    return;
+  }
+  dst_desc = dst_desc.to_type(get_dil_data_type(aten_tensor_scalar_type));
   reorder_to_desc(tensor, dst_desc);
 }
 

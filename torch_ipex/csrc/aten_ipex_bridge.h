@@ -16,20 +16,6 @@ std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList&);
 
 void attachShadeDataContext(const at::Tensor& tensor);
 
-/**
- * Reorder the DNNL tensor to the public format if the input tensor contains DNNL tensor.
- *
- * @param[in] ipexTensor The DNNL tensor of the input ipex tensor to be reordered to public format
- */
-void reorderDilTensorToPublic(const at::Tensor& ipexTensor);
-
-/**
- * Reorder to a DNNL tensor with specified descriptor no matter input tensor is a DNNL tensor or not
- *
- * @param[in] ipexTensor The input tensor to be reordered to the spcified DNNL descriptor
- */
-void reorderDilTensorGeneric(const at::Tensor& ipexTensor, const dil::tensor::desc& dstDesc);
-
 // Convert CPU tensor to DPCPP tensor
 at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& ipexTensor);
 std::vector<at::Tensor> shallowUpgradeToDPCPPTensorVec(const std::vector<at::Tensor> &);
