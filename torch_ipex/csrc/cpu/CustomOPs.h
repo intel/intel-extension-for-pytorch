@@ -18,8 +18,25 @@ class NewLinearOp : public torch::autograd::Function<NewLinearOp> {
         at::Tensor weight,
         at::Tensor bias = at::Tensor()) {
         ctx->save_for_backward({input, weight, bias});
-        if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
-          return torch_ipex::cpu::AtenIpexCPUDev::dil_linear(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.is_contiguous() ? bias : bias.contiguous());
+        try {
+          if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
+            return torch_ipex::cpu::AtenIpexCPUDev::dil_linear(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.is_contiguous() ? bias : bias.contiguous());
+          } 
+        } catch (std::exception& e) {
+#if defined(_DEBUG)
+          TORCH_WARN(e.what());
+#endif
+        }
+        if (input.device().type() == c10::DeviceType::DPCPP) {
+          TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input.layout() == c10::kStrided);
+          TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
+          TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bias.layout() == c10::kStrided);
+          auto&& _ipex_input = torch_ipex::bridge::shallowFallbackToCPUTensor(input);
+          auto&& _ipex_weight = torch_ipex::bridge::shallowFallbackToCPUTensor(weight);
+          auto&& _ipex_bias = torch_ipex::bridge::shallowFallbackToCPUTensor(bias);
+          auto&& _ipex_result = at::linear(_ipex_input, _ipex_weight, _ipex_bias);
+          static_cast<void>(_ipex_result); // Avoid warnings in case not used
+          return torch_ipex::bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
         } else {
           return at::linear(input, weight, bias);
         }
@@ -36,20 +53,44 @@ class NewLinearOp : public torch::autograd::Function<NewLinearOp> {
       at::Tensor grad_output = grad_outputs[0];
       at::Tensor grad_input, grad_weight;
       at::Tensor grad_bias = torch::Tensor();
- 
-      if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
-        grad_input = torch_ipex::cpu::AtenIpexCPUDev::dil_linear_backward_input(
-            input.sizes(), grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), weight.is_contiguous() ? weight : weight.contiguous());
-        std::tie(grad_weight, grad_bias) = torch_ipex::cpu::AtenIpexCPUDev::dil_linear_backward_weights(
-            grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined());
+
+      try {
+        if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
+          grad_input = torch_ipex::cpu::AtenIpexCPUDev::dil_linear_backward_input(
+              input.sizes(), grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), weight.is_contiguous() ? weight : weight.contiguous());
+          std::tie(grad_weight, grad_bias) = torch_ipex::cpu::AtenIpexCPUDev::dil_linear_backward_weights(
+              grad_output.is_contiguous() ? grad_output : grad_output.contiguous(), input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined());
+          return {grad_input, grad_weight, grad_bias};
+        } 
+      } catch (std::exception& e) {
+#if defined(_DEBUG)
+          TORCH_WARN(e.what());
+#endif
+      }
+      if (input.device().type() == c10::DeviceType::DPCPP) {
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input.layout() == c10::kStrided);
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
+        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_output.layout() == c10::kStrided);
+        auto&& _ipex_input = torch_ipex::bridge::shallowFallbackToCPUTensor(input);
+        auto&& _ipex_weight = torch_ipex::bridge::shallowFallbackToCPUTensor(weight);
+        auto&& _ipex_grad_output = torch_ipex::bridge::shallowFallbackToCPUTensor(grad_output);
+        grad_input = _ipex_grad_output.mm(_ipex_weight);
+        grad_weight = _ipex_grad_output.t().mm(_ipex_input);
+        if (bias.defined()) {
+          grad_bias = _ipex_grad_output.sum(0);
+        }
+        static_cast<void>(grad_input);
+        static_cast<void>(grad_weight);
+        static_cast<void>(grad_bias);
+        return {torch_ipex::bridge::shallowUpgradeToDPCPPTensor(grad_input), torch_ipex::bridge::shallowUpgradeToDPCPPTensor(grad_weight), torch_ipex::bridge::shallowUpgradeToDPCPPTensor(grad_bias)};
       } else {
         grad_input = grad_output.mm(weight);
         grad_weight = grad_output.t().mm(input);
         if (bias.defined()) {
           grad_bias = grad_output.sum(0);
         }
+        return {grad_input, grad_weight, grad_bias};
       }
-      return {grad_input, grad_weight, grad_bias};
     }
 };
 
