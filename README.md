@@ -43,7 +43,7 @@ $ sudo shutdown -r 0
 
 ## **Compiler Version and Setting:**
 
-### **DPC++ compiler:** **0420** nightly build (**Contact:** Maslov, Oleg <oleg.maslov@intel.com>)
+### **DPC++ compiler:** **0420** nightly build (**Contact:** [Kurkov, Vasiliy A](vasiliy.a.kurkov@intel.com) or [Maslov, Oleg](oleg.maslov@intel.com))
 - Environment Variables Setting for DPC++:
 ```
 export DPCPP_ROOT=/${PATH_TO_Your_Compiler}/linux_prod/compiler/linux
