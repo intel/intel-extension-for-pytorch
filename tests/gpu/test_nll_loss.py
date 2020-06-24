@@ -32,3 +32,71 @@ class TestNNMethod(TestCase):
         print("SYCL: ", input_dpcpp.grad.to("cpu"))
         self.assertEqual(output, output_dpcpp.cpu())
         self.assertEqual(input_dpcpp.grad, input_dpcpp.grad.cpu())
+
+
+        # input is of size N x C x H x W = 3 x 5 x 2 x 2
+        input = torch.randn(3, 5, 2, 2)
+        # each element in target has to have 0 <= value < C
+        target = torch.tensor([[[0, 1], [2, 3]],
+                               [[3, 2], [1, 0]],
+                               [[4, 1], [2, 3]]])
+        input_dpcpp = input.to("dpcpp")
+        target_dpcpp = target.to("dpcpp")
+
+        input.requires_grad = True
+        output = F.nll_loss(input, target, reduction='none')
+        x = torch.ones([3, 2, 2], dtype=torch.float)
+        output.backward(x)
+        print("none CPU: ", output)
+        print("none CPU grad: ", input.grad)
+        input_dpcpp.requires_grad = True
+
+        output_dpcpp = F.nll_loss(input_dpcpp, target_dpcpp, reduction='none')
+        x_dpcpp = x.to("dpcpp")
+        output_dpcpp.backward(x_dpcpp)
+        print("none SYCL: ", output_dpcpp.to("cpu"))
+        print("none SYCL grad: ", input_dpcpp.grad.to("cpu"))
+
+        self.assertEqual(output, output_dpcpp.cpu())
+        self.assertEqual(input_dpcpp.grad, input_dpcpp.grad.cpu())
+        input.grad.detach_()
+        input.grad.zero_()
+        input_dpcpp.grad.detach_()
+        input_dpcpp.grad.zero_()
+
+        output = F.nll_loss(input, target, reduction='sum')
+        x = torch.tensor((0.5), dtype=torch.float)
+        output.backward(x)
+        print("sum CPU: ", output)
+        print("sum CPU grad: ", input.grad)
+
+        output_dpcpp = F.nll_loss(input_dpcpp, target_dpcpp, reduction='sum')
+        x_dpcpp = x.to("dpcpp")
+        output_dpcpp.backward(x_dpcpp)
+        print("sum SYCL: ", output_dpcpp.to("cpu"))
+        print("sum SYCL grad: ", input_dpcpp.grad.to("cpu"))
+
+        self.assertEqual(output, output_dpcpp.cpu())
+        self.assertEqual(input_dpcpp.grad, input_dpcpp.grad.cpu())
+        input.grad.detach_()
+        input.grad.zero_()
+        input_dpcpp.grad.detach_()
+        input_dpcpp.grad.zero_()
+
+
+        output = F.nll_loss(input, target, reduction='mean')
+        output.backward(x)
+        print("mean CPU: ", output)
+        print("mean CPU grad: ", input.grad)
+
+        output_dpcpp = F.nll_loss(input_dpcpp, target_dpcpp, reduction='mean')
+        output_dpcpp.backward(x_dpcpp)
+        print("mean SYCL: ", output_dpcpp.to("cpu"))
+        print("mean SYCL grad: ", input_dpcpp.grad.to("cpu"))
+
+        self.assertEqual(output, output_dpcpp.cpu())
+        self.assertEqual(input_dpcpp.grad, input_dpcpp.grad.cpu())
+        input.grad.detach_()
+        input.grad.zero_()
+        input_dpcpp.grad.detach_()
+        input_dpcpp.grad.zero_()
