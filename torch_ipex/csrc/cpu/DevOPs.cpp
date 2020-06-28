@@ -1351,7 +1351,6 @@ at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::
   DEBUG("AtenIpexCPUDev::dil_clone\n");
   CHECK_DNNL_OP_PRE_COND(self);
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
   dil::tensor src = dbl::comm::try_gen_dil_tensor(self);
   dil::tensor dst;
   dil::direct_copy::compute(src, dst);
