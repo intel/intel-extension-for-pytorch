@@ -242,12 +242,12 @@ class Tester(TestCase):
     def test_output_conv_bn_2d(self):
         self._test_output(
             ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 224, 224),
+            torch.randn(32, 3, 64, 64),
             kind_in_graph="aten::conv2d",
             kind_not_in_graph="aten::batch_norm",)
         self._test_output_bf16(
             ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 224, 224),
+            torch.randn(32, 3, 64, 64),
             kind_in_graph="aten::conv2d",
             kind_not_in_graph="aten::batch_norm",
             prec=0.02)
@@ -256,12 +256,12 @@ class Tester(TestCase):
     def test_output_conv_bn_3d(self):
         self._test_output(
             ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 112, 112, 112),
+            torch.randn(32, 3, 32, 32, 32),
             kind_in_graph="aten::conv3d",
             kind_not_in_graph="aten::batch_norm",)
         self._test_output_bf16(
             ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 112, 112, 112),
+            torch.randn(32, 3, 32, 32, 32),
             kind_in_graph="aten::conv3d",
             kind_not_in_graph="aten::batch_norm",
             prec=0.02)
@@ -270,33 +270,33 @@ class Tester(TestCase):
     def test_output_conv_relu_2d(self):
         self._test_output(
             ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 224, 224),
+            torch.randn(32, 3, 64, 64),
             kind_in_graph="ipex::conv2d_relu")
         self._test_output_bf16(
             ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 224, 224),
+            torch.randn(32, 3, 64, 64),
             kind_in_graph="ipex::conv2d_relu")
 
 
     def test_output_conv_relu_3d(self):
         self._test_output(
             ConvRelu_Fixed(3, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 112, 112, 112),
+            torch.randn(32, 3, 32, 32, 32),
             kind_in_graph="ipex::conv3d_relu")
         self._test_output_bf16(
             ConvRelu_Fixed(3, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 112, 112, 112),
+            torch.randn(32, 3, 32, 32, 32),
             kind_in_graph="ipex::conv3d_relu")
 
 
     def test_output_conv_sum_2d(self):
         self._test_output(
             ConvSum(2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 224, 224),
+            torch.randn(32, 3, 64, 64),
             kind_in_graph="ipex::conv2d_sum")
         self._test_output_bf16(
             ConvSum(2, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 224, 224),
+            torch.randn(32, 3, 64, 64),
             kind_in_graph="ipex::conv2d_sum",
             prec=0.04)
 
@@ -304,11 +304,11 @@ class Tester(TestCase):
     def test_output_conv_sum_3d(self):
         self._test_output(
             ConvSum(3, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 112, 112, 112),
+            torch.randn(32, 3, 32, 32, 32),
             kind_in_graph="ipex::conv3d_sum")
         self._test_output_bf16(
             ConvSum(3, 3, 32, kernel_size=3, stride=1),
-            torch.randn(32, 3, 112, 112, 112),
+            torch.randn(32, 3, 32, 32, 32),
             kind_in_graph="ipex::conv3d_sum",
             prec=0.04)
 
@@ -316,12 +316,12 @@ class Tester(TestCase):
     def test_output_cascaded_conv_bn_sum_relu_2d(self):
         self._test_output(
             CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
-            torch.rand(32, 3, 224, 224),
+            torch.rand(32, 3, 64, 64),
             kind_in_graph="ipex::conv2d_sum_relu",
             kind_not_in_graph="aten::batch_norm")
         self._test_output_bf16(
             CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
-            torch.rand(32, 3, 224, 224),
+            torch.rand(32, 3, 64, 64),
             kind_in_graph="ipex::conv2d_sum_relu",
             kind_not_in_graph="aten::batch_norm",
             prec=0.02)
@@ -330,12 +330,12 @@ class Tester(TestCase):
     def test_output_cascaded_conv_bn_sum_relu_3d(self):
         self._test_output(
             CascadedConvBnSumRelu(3, 3, 64, 32, kernel_size=3, stride=1),
-            torch.rand(32, 3, 112, 112, 112),
+            torch.rand(32, 3, 32, 32, 32),
             kind_in_graph="ipex::conv3d_sum_relu",
             kind_not_in_graph="aten::batch_norm",)
         self._test_output_bf16(
             CascadedConvBnSumRelu(3, 3, 64, 32, kernel_size=3, stride=1),
-            torch.rand(32, 3, 112, 112, 112),
+            torch.rand(32, 3, 32, 32, 32),
             kind_in_graph="ipex::conv3d_sum_relu",
             kind_not_in_graph="aten::batch_norm",
             prec=0.02)
