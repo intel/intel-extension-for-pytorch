@@ -1082,6 +1082,29 @@ class TestTensorShape(TestCase):
             out_dpcpp = x_dpcpp * y
             self.assertEqual(out_cpu, out_dpcpp)
 
+            with  AutoMixPrecision(True):
+                # test share storage for view
+                src_1 = torch.randn(5120, 1, 128, device=device)
+                src_2 = torch.randn(5120, 1, 128, device=device)
+                res_bf16 = src_1 + src_2
+                res_bf16_other = src_1 + src_2
+                self.assertTrue(ipex.core.is_dil_tensor(res_bf16))
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_bf16))
+                self.assertTrue(ipex.core.get_dil_tensor_sizes(res_bf16), [5120, 1, 128])
+                self.assertEqual(list(res_bf16.size()), [5120, 1, 128])
+                res_fp32_view = res_bf16.view(1280, 4, 1, 128)
+                self.assertTrue(ipex.core.is_dil_tensor(res_bf16))
+                self.assertTrue(ipex.core.is_dil_tensor(res_fp32_view))
+                self.assertFalse(ipex.core.is_bf16_dil_tensor(res_bf16))
+                self.assertFalse(ipex.core.is_bf16_dil_tensor(res_fp32_view))
+                self.assertEqual(list(res_fp32_view.size()), [1280, 4, 1, 128])
+                tmp_res = res_bf16 + res_bf16_other
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_bf16))
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_fp32_view))
+                tmp_res = res_fp32_view.index_select(0, torch.LongTensor([0, 1]))
+                self.assertTrue(ipex.core.get_dil_tensor_sizes(res_fp32_view), [5120, 1, 128])
+                self.assertTrue(ipex.core.get_dil_tensor_sizes(res_fp32_view), [5120, 1, 128])
+                self.assertEqual(list(tmp_res.size()), [2, 4, 1, 128])
 
 class TestSoftMax(TestCase):
     def test_softmax(self):
