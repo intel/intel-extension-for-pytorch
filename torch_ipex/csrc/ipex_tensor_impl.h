@@ -23,7 +23,7 @@ class IPEXTensorImpl : public c10::TensorImpl {
   void keep_source_data_tensor(at::Tensor);
   void set_storage_data_ptr(c10::DataPtr);
   void set_dpcpp_tensor_id();
-  void force_set_strided(at::IntArrayRef size, at::IntArrayRef stride /*, optional<int64_t> storage_offset_*/);
+  void set_strided(at::IntArrayRef size, at::IntArrayRef stride, int64_t storage_offset);
   void reset_data_type(at::ScalarType dst_type);
 
   c10::Storage& get_storage() {

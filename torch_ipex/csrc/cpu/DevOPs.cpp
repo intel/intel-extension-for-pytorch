@@ -32,7 +32,6 @@ namespace cpu {
 
 #define CHECK_DNNL_OP_PRE_COND(tensor)                                               \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.defined());                                \
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.is_contiguous());                          \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.layout() == c10::kStrided)
 
 at::Tensor AtenIpexCPUDev::dil_convolution(
@@ -1429,6 +1428,69 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& s
   }
   return splits;
 }
+
+
+at::Tensor dil_as_strided(const at::Tensor& self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset_) {
+  DEBUG("AtenIpexCPUDev::dil_as_strided\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  // share storage
+  auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
+  self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
+  auto result = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::DPCPPTensorId);
+
+  auto* _tensor_impl = (IPEXTensorImpl *)result.unsafeGetTensorImpl();
+  _tensor_impl->copy_meta_info(self.unsafeGetTensorImpl());
+  _tensor_impl->copy_auto_grad(self.unsafeGetTensorImpl());
+
+  auto storage_offset = storage_offset_.value_or(self.storage_offset());
+  _tensor_impl->set_strided(size, stride, storage_offset);
+  return result;
+}
+
+
+at::Tensor AtenIpexCPUDev::dil_slice(const at::Tensor & self, int64_t dim, int64_t start, int64_t end, int64_t step) {
+  DEBUG("AtenIpexCPUDev::dil_slice\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
+  // Port from aten/src/ATen/native/TensorShape.cpp
+  int64_t ndim = self.dim();
+  if (ndim == 0) {
+    AT_INDEX_ERROR("dil_slice() cannot be applied to a 0-dim tensor.");
+  }
+  dim = at::maybe_wrap_dim(dim, ndim);
+  auto sizes = self.sizes().vec();
+  auto strides = self.strides().vec();
+  // TODO: support negative strides
+  TORCH_CHECK(step > 0, "slice step must be positive");
+  if (start < 0) {
+    start += sizes[dim];
+  }
+  if (end < 0) {
+    end += sizes[dim];
+  }
+  if (start < 0) {
+    start = 0;
+  } else if (start >= sizes[dim]) {
+    start = sizes[dim];
+  }
+  if (end < start) {
+    end = start;
+  } else if (end >= sizes[dim]) {
+    end = sizes[dim];
+  }
+  auto storage_offset = self.storage_offset() + start * strides[dim];
+  auto len = end - start;
+  sizes[dim] = (len + step - 1) / step;  // round-up
+  strides[dim] *= step;
+
+  auto result = dil_as_strided(self, sizes, strides, storage_offset);
+  // namedinference::propagate_names(result, self);
+  return result;
+}
+
 
 std::vector<at::Tensor> AtenIpexCPUDev::dil_split(const at::Tensor& self, int64_t split_size, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_split\n");

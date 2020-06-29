@@ -131,21 +131,28 @@ static inline void checkInBoundsForStorage(
       " are out of bounds for storage with numel ", new_storage_size);
 }
 
-void IPEXTensorImpl::force_set_strided(at::IntArrayRef size, at::IntArrayRef stride /*, optional<int64_t> storage_offset_*/) {
+void IPEXTensorImpl::set_strided(at::IntArrayRef size, at::IntArrayRef stride, int64_t storage_offset) {
   // Port from setStrided in Aten/native/Resize.h
-  checkInBoundsForStorage(size, stride, this->storage_offset(), this->storage());
-  
-  AT_ASSERT(size.size() == stride.size());
-  if (this->sizes() == size && this->strides() == stride) {
-    return;
-  }
+  checkInBoundsForStorage(size, stride, storage_offset_, this->storage());
 
   // In backprop phase, grad variable might be detached (in accumulate_grad.h)
   // and forbids the metadata to be modified.
   // Here we force the metadata changeable, so that we can modify its strides.
   bool orig_allow_tensor_metadata_change = this->allow_tensor_metadata_change();
   this->set_allow_tensor_metadata_change(true);
+
+  /* storage offset */
+  TORCH_CHECK(storage_offset >= 0, "Tensor: invalid storage offset ", storage_offset);
+  this->set_storage_offset(storage_offset);
+
+  /* size and stride */
+  AT_ASSERT(size.size() == stride.size());
+  if (this->sizes() == size && this->strides() == stride) {
+    return;
+  }
   this->set_sizes_and_strides(size, stride);
+
+  // Restore allow_tensor_metadata_change
   this->set_allow_tensor_metadata_change(orig_allow_tensor_metadata_change);
 }
 
