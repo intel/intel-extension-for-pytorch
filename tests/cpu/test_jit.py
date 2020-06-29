@@ -224,7 +224,11 @@ class Tester(TestCase):
             # bf 16, jit trace path
             trace_graph = trace_fused_model.graph_for(x3)
             fused_tresult = trace_fused_model(x3)
-
+        
+        # disable mix_bf16_fp32 when the calculation is done 
+        # to avoid affecting other scripts
+        core.disable_mix_bf16_fp32()
+        
         self.assertEqual(fused_sresult, result, prec=prec)
         self.assertEqual(fused_tresult, result, prec=prec)
 
