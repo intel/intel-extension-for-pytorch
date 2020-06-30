@@ -80,7 +80,6 @@ class TestBatchNorm(TestCase):
             self.assertEqual(res_bf16.dtype, torch.bfloat16)
 
             with AutoMixPrecision(True):
-                ipex.core.enable_mix_bf16_fp32()
                 self.assertEqual(x_auto_mix.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix))
                 res_auto_mix = bn_auto_mix(x_auto_mix)
@@ -108,7 +107,6 @@ class TestBatchNorm(TestCase):
             self.assertEqual(x_man_bf16.dtype, torch.bfloat16)
 
             with AutoMixPrecision(True):
-                ipex.core.enable_mix_bf16_fp32()
                 self.assertEqual(x_auto_mix.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix))
                 res_auto_mix = bn_auto_mix(x_auto_mix)
