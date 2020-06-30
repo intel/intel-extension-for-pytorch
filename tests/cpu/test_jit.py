@@ -192,7 +192,7 @@ class Tester(TestCase):
         if kind_in_graph is not None:
             self.assertTrue(any(n.kind() == kind_in_graph for n in script_graph.nodes()))
             self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
-        
+
         # check if certain node does not exist in the graph
         if kind_not_in_graph is not None:
             self.assertTrue(all(n.kind() != kind_not_in_graph for n in script_graph.nodes()))
@@ -205,12 +205,12 @@ class Tester(TestCase):
         core.enable_auto_dnnl()
         core.enable_jit_opt()
         core.enable_mix_bf16_fp32()
-        
+
         model = model.to(ipex.DEVICE).eval()
         x = x.to(ipex.DEVICE)
         x2 = x.clone()
         x3 = x.clone()
-        
+
         script_fused_model = torch.jit.script(copy.deepcopy(model))
         trace_fused_model = torch.jit.trace(copy.deepcopy(model), x3)
 
@@ -224,11 +224,11 @@ class Tester(TestCase):
             # bf 16, jit trace path
             trace_graph = trace_fused_model.graph_for(x3)
             fused_tresult = trace_fused_model(x3)
-        
-        # disable mix_bf16_fp32 when the calculation is done 
+
+        # disable mix_bf16_fp32 when the calculation is done
         # to avoid affecting other scripts
         core.disable_mix_bf16_fp32()
-        
+
         self.assertEqual(fused_sresult, result, prec=prec)
         self.assertEqual(fused_tresult, result, prec=prec)
 
@@ -236,12 +236,12 @@ class Tester(TestCase):
         if kind_in_graph is not None:
             self.assertTrue(any(n.kind() == kind_in_graph for n in script_graph.nodes()))
             self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
-        
+
         # check if certain node does not exist in the graph
         if kind_not_in_graph is not None:
             self.assertTrue(all(n.kind() != kind_not_in_graph for n in script_graph.nodes()))
             self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
-    
+
 
     def test_output_conv_bn_2d(self):
         self._test_output(
@@ -362,6 +362,23 @@ class Tester(TestCase):
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex::linear_relu")
+
+
+    def test_jit_function(self):
+        # test hool trace and script can works for function
+        def fn(input, weight, bias):
+            return F.linear(input, weight, bias)
+
+        input = torch.randn(2, 4)
+        weight = torch.randn(5, 4)
+        bias = torch.randn(5)
+        result = fn(input, weight, bias)
+
+        scripted_fn = torch.jit.script(fn)
+        traced_fn = torch.jit.trace(fn, (input, weight, bias))
+
+        self.assertEqual(scripted_fn(input, weight, bias), result)
+        self.assertEqual(traced_fn(input, weight, bias), result)
 
 
 if __name__ == '__main__':
