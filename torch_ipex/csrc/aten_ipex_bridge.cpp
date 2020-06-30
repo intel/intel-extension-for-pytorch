@@ -93,6 +93,7 @@ void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
     auto aten_tensor_scalar_type = ipexTensor.scalar_type();
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_scalar_type == at::kFloat || aten_tensor_scalar_type == at::kBFloat16);
     pub_tensor = dil_tensor.to_public(nullptr, get_dil_data_type(aten_tensor_scalar_type));
+    cpu::dbl::comm::sync_shape_from_dil_to_aten(ipexTensor, pub_tensor);
   }
 
   if (!pub_tensor.is_empty()) {
@@ -114,7 +115,6 @@ void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
       ipexTensor.device().type());
 
     ipexTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(shade_data_ptr));
-    cpu::dbl::comm::sync_shape_from_dil_to_aten(ipexTensor, pub_tensor);
   }
 }
 
