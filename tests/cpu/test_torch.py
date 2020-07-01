@@ -10265,6 +10265,7 @@ class TestTorchDeviceType(TestCase):
         self.assertEqual(torch.empty(0, device=device), x.unfold(0, 0, 2))
         self.assertEqual(torch.tensor([0.5], device=device), x.unfold(0, 1, 1))
 
+    @unittest.skipIf(SKIP_TEST_CASE_FOR_DPCPP_STORAGE, "IPEX does not support copy")
     def test_copy_all_dtypes_and_devices(self, device):
         from copy import copy
         ipex.get_auto_optimization()
@@ -12834,6 +12835,7 @@ class TestTorchDeviceType(TestCase):
             self._test_memory_format_transformations(
                 device, get_generator(mf, shape), transformation_fn, mf, default_is_preserve=True)
 
+    @unittest.skipIf(SKIP_TEST_CASE_FOR_DPCPP_STORAGE, "IPEX feature limitation")
     def test_memory_format_clone(self, device):
         def get_generator(memory_format, shape):
             def input_generator_fn(device):
