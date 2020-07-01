@@ -1,0 +1,46 @@
+From d390da9922d27b110eb3024f060a39903e4782b2 Mon Sep 17 00:00:00 2001
+From: "Huang, Zhiyuan" <zhiyuan.huang@intel.com>
+Date: Thu, 4 Jun 2020 18:44:45 -0700
+Subject: [PATCH 2/5] Imporve Half/FP16 data type by using built-in bit_cast
+
+Convert between unsigned short and sycl::half by bit_cast
+---
+ c10/util/Half-inl.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/c10/util/Half-inl.h b/c10/util/Half-inl.h
+index f3ef954a58..19eb92b770 100644
+--- a/c10/util/Half-inl.h
++++ b/c10/util/Half-inl.h
+@@ -12,6 +12,10 @@
+ #include <hip/hip_fp16.h>
+ #endif
+ 
++#if defined(USE_DPCPP)
++#include <CL/sycl.hpp>
++#endif
++
+ namespace c10 {
+ 
+ /// Constructors
+@@ -19,6 +23,8 @@ namespace c10 {
+ inline C10_HOST_DEVICE Half::Half(float value) {
+ #if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+   x = __half_as_short(__float2half(value));
++#elif defined(USE_DPCPP)
++  x = __builtin_bit_cast(unsigned short, cl::sycl::half(value));
+ #else
+   x = detail::fp16_ieee_from_fp32_value(value);
+ #endif
+@@ -29,6 +35,8 @@ inline C10_HOST_DEVICE Half::Half(float value) {
+ inline C10_HOST_DEVICE Half::operator float() const {
+ #if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+   return __half2float(*reinterpret_cast<const __half*>(&x));
++#elif defined(USE_DPCPP)
++  return float(__builtin_bit_cast(cl::sycl::half, x));
+ #else
+   return detail::fp16_ieee_to_fp32_value(x);
+ #endif
+-- 
+2.17.1
+

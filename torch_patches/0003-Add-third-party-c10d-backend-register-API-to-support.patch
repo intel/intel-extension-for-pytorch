@@ -1,0 +1,63 @@
+From 96b9cbd7a5fcf134927236040d2272478e2c040d Mon Sep 17 00:00:00 2001
+From: chengjun <chengjun.lu@intel.com>
+Date: Thu, 11 Jun 2020 18:14:57 +0800
+Subject: [PATCH 3/5] Add third party c10d backend register API to support
+ oneCCL integraton
+
+---
+ torch/distributed/distributed_c10d.py | 25 +++++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
+
+diff --git a/torch/distributed/distributed_c10d.py b/torch/distributed/distributed_c10d.py
+index 4ca9596f62..bca7f21d78 100644
+--- a/torch/distributed/distributed_c10d.py
++++ b/torch/distributed/distributed_c10d.py
+@@ -65,9 +65,10 @@ class Backend(object):
+     TCP = "tcp"
+ 
+     def __new__(cls, name):
+-        if not isinstance(name, string_classes):
+-            raise ValueError("Backend name must be a string, but got: {}".format(name))
+-        value = getattr(Backend, name.upper(), Backend.UNDEFINED)
++        if isinstance(name, string_classes):
++            value = getattr(Backend, name.upper(), Backend.UNDEFINED)
++        else:
++            value = name
+ 
+         if value == Backend.TCP:
+             raise ValueError("TCP backend has been deprecated. Please use "
+@@ -77,6 +78,16 @@ class Backend(object):
+             raise ValueError("Invalid backend: '{}'".format(name))
+         return value
+ 
++    @classmethod
++    def register_backend(cls, name, func):
++        """Registers a new backend.
++        This class method is used by 3rd party cpp extension to register new backend.
++        Arguments:
++            name (str): Backend name matching with the one in `init_process_group()`.
++            func (function): Function handler that instantiates the backend.
++        """
++        setattr(Backend, name.upper(), func)
++
+ # `_backend`, `dist_backend`, and `reduce_op` are here to maintain backward
+ # compatibility with pre-c10d distributed package.
+ # TODO: remove them when users are ready to take a hard dependency on PyTorch 1.
+@@ -483,7 +494,13 @@ def _new_process_group_helper(world_size,
+             _pg_map[pg] = (Backend.NCCL, store)
+             _pg_names[pg] = group_name
+         else:
+-            raise RuntimeError("Unsupported distributed backend by group")
++            pg = backend(
++                prefix_store,
++                rank,
++                world_size,
++                timeout)
++            _pg_map[pg] = (backend, store)
++            _pg_names[pg] = group_name
+ 
+     return pg
+ 
+-- 
+2.17.1
+
