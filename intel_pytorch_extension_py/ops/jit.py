@@ -14,7 +14,7 @@ def script_(obj, optimize=None, _frames_up=0, _rcb=None):
     jit_m = orig_script(obj, optimize=optimize, _frames_up=_frames_up+1, _rcb=_rcb)
     torch.jit.script = script_
 
-    if core.get_jit_opt() and isinstance(jit_m, torch._C.ScriptModule):
+    if core.get_jit_opt() and hasattr(jit_m, '_c'):
         # Disable mix precision in model fusion, since mixed precision cannot
         # bring any benefits for inference, but will lead to loss of accuracy
         orig_mixed_type = ipex.get_auto_mix_precision()
@@ -31,7 +31,7 @@ def trace_(func, example_inputs, *args, **kwargs):
     ipex.enable_auto_mix_precision(None)
     jit_m = orig_trace(func, example_inputs, *args, **kwargs)
 
-    if core.get_jit_opt() and isinstance(jit_m, torch._C.ScriptModule):
+    if core.get_jit_opt() and hasattr(jit_m, '_c'):
         jit_m = wrap_cpp_module(torch._C._jit_pass_fold_convbn(jit_m._c))
     ipex.enable_auto_mix_precision(orig_mixed_type)
     return jit_m
