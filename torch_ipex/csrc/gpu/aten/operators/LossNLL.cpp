@@ -612,7 +612,7 @@ void spatial_class_nll_criterion_update_output_kernel(
       auto target_ptr = target_acc.template get_pointer<long>();
       auto weight_ptr = weight_acc.template get_pointer<scalar_t>();
 
-      auto local_idx = item_id.get_local_id();
+      auto local_idx = item_id.get_local_linear_id();
       auto global_idx = item_id.get_global_linear_id();
       auto global_range_size = item_id.get_global_range().size();
       auto num_combine = (numel + global_range_size - 1)/ global_range_size;
@@ -1064,7 +1064,22 @@ std::tuple<Tensor&,Tensor&> nll_loss2d_forward_out(
       output.fill_(0);
       total_weight.fill_(0);
 
+#if defined(USE_DPCPP)
       AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_forward", [&](){
+#else
+//        computecpp only supports 32bit atomic ops
+#define AT_DISPATCH_FLOAT(TYPE, NAME, ...)                                   \
+  [&] {                                                                      \
+    const auto& the_type = TYPE;                                             \
+    at::ScalarType _st = ::detail::scalar_type(the_type);                    \
+    switch (_st) {                                                           \
+      AT_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)        \
+      default:                                                               \
+        AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
+    }                                                                        \
+  }()
+      AT_DISPATCH_FLOAT(self.scalar_type(), "nll_loss2d_dpcpp_forward", [&](){
+#endif
         using accscalar_t = acc_type<scalar_t>;
         impl::spatial_class_nll_criterion_update_output_kernel<scalar_t, accscalar_t>(
           output,
