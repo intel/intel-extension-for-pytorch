@@ -263,7 +263,7 @@ public:
       auto fuseRule = isFusable(node, prev);
 
       // We can fuse only one path
-      if (fuseRule && aliasIsSafeForFusion(node, v, fuseRule)) {
+      if ((node->owningBlock() == prev->owningBlock()) && fuseRule && aliasIsSafeForFusion(node, v, fuseRule)) {
         pos = fuseNodes(node, v, fuseRule.value());
         changed = true;
         break;
