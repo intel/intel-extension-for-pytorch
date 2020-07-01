@@ -11,33 +11,33 @@
 ### **Python:** 3.6.x
 
 ### **GitPython:**
-```
-$ python3 -m pip install GitPython==3.1.1
+```bash
+python3 -m pip install GitPython==3.1.1
 ```
 
 ### **UMD Component Installation:**
-```
-$ sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-gmmlib_20.1.1_amd64.deb
-$ sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-igc-core_1.0.4053_amd64.deb
-$ sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-igc-opencl_1.0.4053_amd64.deb
-$ sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-opencl_20.21.16886_amd64.deb
-$ sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-ocloc_20.21.16886_amd64.deb
-$ sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-level-zero-gpu_0.8.16886_amd64.deb
-$ sudo dpkg -i *.deb
+```bash
+sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-gmmlib_20.1.1_amd64.deb
+sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-igc-core_1.0.4053_amd64.deb
+sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-igc-opencl_1.0.4053_amd64.deb
+sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-opencl_20.21.16886_amd64.deb
+sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-ocloc_20.21.16886_amd64.deb
+sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-level-zero-gpu_0.8.16886_amd64.deb
+sudo dpkg -i *.deb
 ```
 
 ### **Intel OpenCL SDK Installation (Only for ComputeCpp):**
 Download from http://registrationcenter-download.intel.com/akdlm/irc_nas/vcp/12526/intel_sdk_for_opencl_2017_7.0.0.2568_x64.gz
-```
-$ tar xzf intel_sdk_for_opencl_2017_7.0.0.2568_x64.gz
-$ cd intel_sdk_for_opencl_2017_7.0.0.2568_x64/
-$ sudo ./install.sh
+```bash
+tar xzf intel_sdk_for_opencl_2017_7.0.0.2568_x64.gz
+cd intel_sdk_for_opencl_2017_7.0.0.2568_x64/
+sudo ./install.sh
 ```
 
 ### **Add ubuntu user to video group:**
-```
-$ sudo usermod -a -G video $USER
-$ sudo shutdown -r 0
+```bash
+sudo usermod -a -G video $USER
+sudo shutdown -r 0
 ```
 **Note:** please update $USER to your ubuntu username.
 
@@ -45,7 +45,7 @@ $ sudo shutdown -r 0
 
 ### **DPC++ compiler:** **0420** nightly build (**Contact:** [Kurkov, Vasiliy A](vasiliy.a.kurkov@intel.com) or [Maslov, Oleg](oleg.maslov@intel.com))
 - Environment Variables Setting for DPC++:
-```
+```bash
 export DPCPP_ROOT=/${PATH_TO_Your_Compiler}/linux_prod/compiler/linux
 export LD_LIBRARY_PATH=${DPCPP_ROOT}/lib:${DPCPP_ROOT}/compiler/lib/intel64_lin:${LD_LIBRARY_PATH}
 export INTELOCLSDKROOT=${DPCPP_ROOT}
@@ -55,7 +55,7 @@ export PATH=${DPCPP_ROOT}/bin:$PATH
 ### **ComputeCpp compiler:** CE 1.1.3 Device Compiler - clang version 6.0.0  (based on LLVM 6.0.0svn)
 Please download from https://developer.codeplay.com/products/computecpp/ce/download and install.
 - Environment Variables Setting for ComputeCpp:
-```
+```bash
 export INTELOCLSDKROOT=/${PATH_TO_Your_Intel_OpenCL_SDK}
 export COMPUTECPP_DIR=/${PATH_TO_Your_ComputeCpp} 
 export CXX=${ COMPUTECPP_DIR}/bin/compute++
@@ -69,7 +69,7 @@ export PATH=${COMPUTECPP_DIR}/bin:$PATH
 ### **Validation:**
 Finally, compile and execute the following program and check the result. It is optional.
 - Source Code:
-```
+```c++
 // source file: device_enum.cpp
 #include <CL/sycl.hpp>
 #include <stdlib.h>
@@ -110,36 +110,37 @@ int main() {
 | ComputeCpp | `$ compute++ -I $COMPUTECPP_DIR/include device_enum.cpp -L~/.local/lib -lComputeCpp -o device_enum` | 
 
 - Desired Result:
-```
-$ ./device_enum
-platform-1 device-1 ...
-Non-GPU device
-platform-2 device-1 ...
-Intel(R) Gen9 HD Graphics NEO
-Intel(R) Corporation 
+```bash
+./device_enum
+
+  platform-1 device-1 ...
+  Non-GPU device
+  platform-2 device-1 ...
+  Intel(R) Gen9 HD Graphics NEO
+  Intel(R) Corporation 
 ```
 
 ## Repo preparation:
 1.  Download source code of corresponding PyTorch
-```
-$ git clone https://gitlab.devtools.intel.com/intel-pytorch-extension/pytorch.git -b pytorch-1.5
-$ cd pytorch
-$ git submodule update --init --recursive
+```bash
+git clone https://gitlab.devtools.intel.com/intel-pytorch-extension/pytorch.git -b pytorch-1.5
+cd pytorch
+git submodule update --init --recursive
 ```
 **Note:** Please upload SSH public keys of your building machine onto gitlab "settings", refer to [**this link**](https://gitlab.devtools.intel.com/help/ssh/README#locating-an-existing-ssh-key-pair) for more details.
 
 2.  Download source code of Intel GPU Extension for PyTorch
-```
-$ git clone https://gitlab.devtools.intel.com/intel-pytorch-extension/intel-pytorch-extension -b <RELEASE_TAG>
-$ cd intel-pytorch-extension
-$ git submodule update --init --recursive
+```bash
+git clone https://gitlab.devtools.intel.com/intel-pytorch-extension/intel-pytorch-extension -b <RELEASE_TAG>
+cd intel-pytorch-extension
+git submodule update --init --recursive
 ```
 
 ## Build and Install PyTorch:
-```
-$ export USE_CUDNN=0 USE_FBGEMM=0 USE_NNPACK=0 BUILD_CAFFE2_OPS=0
-$ cd pytorch
-$ python3 setup.py install --user
+```bash
+export USE_CUDNN=0 USE_FBGEMM=0 USE_NNPACK=0 BUILD_CAFFE2_OPS=0
+cd pytorch
+python3 setup.py install --user
 ```
 **Note:** You can choose your favorite compiler for building PyTorch, which could be the same or different from the one for building Intel PyTorch Extension.
 We recommend using **GCC** compiler for building PyTorch (unset $CXX if already set for ComputeCpp before). 
@@ -147,26 +148,26 @@ We recommend using **GCC** compiler for building PyTorch (unset $CXX if already 
 ## Build and Install Intel PyTorch Extension:
 
 ### Downgrade to gcc5 (only for ***ComputeCpp***, not needed for DPC++)
-```
-$ sudo apt install gcc-5 g++-5
-$ sudo mv /usr/include/c++/7 /usr/include/c++/7_bak
-$ sudo ln -s /usr/include/c++/5 /usr/include/c++/7
-$ sudo mv /usr/lib/gcc/x86_64-linux-gnu/7 /usr/lib/gcc/x86_64-linux-gnu/7_bak
-$ sudo ln -s /usr/lib/gcc/x86_64-linux-gnu/5 /usr/lib/gcc/x86_64-linux-gnu/7
+```bash
+sudo apt install gcc-5 g++-5
+sudo mv /usr/include/c++/7 /usr/include/c++/7_bak
+sudo ln -s /usr/include/c++/5 /usr/include/c++/7
+sudo mv /usr/lib/gcc/x86_64-linux-gnu/7 /usr/lib/gcc/x86_64-linux-gnu/7_bak
+sudo ln -s /usr/lib/gcc/x86_64-linux-gnu/5 /usr/lib/gcc/x86_64-linux-gnu/7
 ```
 
 ### Build intel-pytorch-extension
-```
-$ cd intel-pytorch-extension
-$ python3 setup.py install --user
+```bash
+cd intel-pytorch-extension
+python3 setup.py install --user
 ```
 
 ## Caveat:
 ### 1. Set https proxy:
 Please configure http(s).proxy for git, otherwise you will get an error similar to “fatal: unable to access 'https://gitlab.devtools.intel.com/intel-pytorch-extension/pytorch.git/': gnutls_handshake() failed: The TLS connection was non-properly terminated.”
-```
-$ git config --global http.proxy YourAddress:Port
-$ git config --global https.proxy YourAddress:Port
+```bash
+git config --global http.proxy YourAddress:Port
+git config --global https.proxy YourAddress:Port
 ```
 ### 2. Build order of PyTorch and extension:
 Please build intel-pytorch-extension after pytorch is built and installed, otherwise you will get an error “ModuleNotFoundError: No module named 'torch'”.
@@ -182,7 +183,7 @@ No solid solution so far. Try to reboot your machine and see whether it disappea
 
 ### 4. Downgrade to gcc5 for ComputeCpp build:
 In ComputeCpp build, gcc5 is required while gcc7.5 is the default Ubuntu18.04 compiler. Without downgrading to gcc5, you will get following compile error:
-```
+```bash
 /usr/lib/gcc/x86_64-linux-gnu/7.5.0/../../../../include/c++/7.5.0/tuple:1452:14: error: no matching conversion for functional-style cast from '__global double' to '__result_type'
       (aka 'tuple<__global double>')
       return __result_type(std::forward<_Elements>(__args)...);
