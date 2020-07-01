@@ -35,9 +35,9 @@ pytest ${PATH_To_Your_Extension_Source_Code}/tests/gpu/${Test_Name}
 3. Test Fuction should start with "test_"
 4. Default tolerant value of `assertEqual()` 1e-05, use `assertEqual(True, torch.allclose(y_cpu, y_dpcpp.cpu()), rtol, atol, equal_nan=False)` for different one.
 
-### Example
+## Example
 
-General case study:
+### General case study:
 ```python
 import torch
 import torch_ipex
@@ -85,7 +85,7 @@ class TestTorchMethod2(TestCase):
         self.assertEqual(y, y_dpcpp.to(cpu_device))
 ```
 
-## Skip certain case with reason and comments
+### Skip certain case with reason and comments:
 ```python
 import torch
 import torch_ipex
