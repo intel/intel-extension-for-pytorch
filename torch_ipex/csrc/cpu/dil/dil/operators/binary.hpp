@@ -23,7 +23,8 @@ struct binary : public dnnl::binary {
     } else {
       pd = primitive_desc(
           {aalgorithm, src0_desc, src1_desc, src0_desc.to_format_any()}, aengine);
-      dst.reinit_if_possible(pd.dst_desc());
+      // propagate src group info
+      dst.reinit_if_possible({pd.dst_desc(), src0.get_groups()});
     }
 
     auto expected_src0 = src0.reorder_if_differ_in(pd.src0_desc());

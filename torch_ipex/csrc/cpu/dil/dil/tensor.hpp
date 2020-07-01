@@ -586,6 +586,10 @@ class tensor : public memory {
     return get_desc().get_strides();
   }
 
+  inline bool is_grouped() const { return get_desc().is_grouped(); }
+
+  inline dim get_groups() const { return get_desc().g(); }
+
   inline void set_dims_and_strides(const dims &adims, const dims &astrides) {
     DIL_ENFORCE(is_public_format(), "Call to_public() before set_dims_and_strides()");
     DIL_ENFORCE(adims.size() == astrides.size(), "Dims and strides must have the same size");
