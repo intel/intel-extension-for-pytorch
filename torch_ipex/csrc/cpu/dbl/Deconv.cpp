@@ -40,9 +40,7 @@ dil::tensor deconvolution_impl(
     const dil::attr_t& attr) {
   const dil::dims x_dims = x.get_dims();
   const dil::dims w_dims = w.get_dims();
-  std::vector<int64_t> input_size{x_dims.cbegin(), x_dims.cend()};
-  std::vector<int64_t> kernel_size{w_dims.cbegin(), w_dims.cend()};
-  std::vector<int64_t> output_sizes = calc_deconv_input_size(input_size, kernel_size, padding, output_padding, stride, dilation, groups);
+  std::vector<int64_t> output_sizes = calc_deconv_input_size(x_dims, w_dims, padding, output_padding, stride, dilation, groups);
 
   dil::tensor y;
   if (b.has_value()) {
@@ -72,6 +70,63 @@ dil::tensor deconvolution_impl(
       attr);
   }
   return y;
+}
+
+void prepack_deconv_weights(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    at::IntArrayRef dilation,
+    int64_t groups,
+    bool with_bias) {
+  // Prepack weight tensor if it's either a *cpu tensor* or a *plain dil tensor*
+  //
+  // Note: weight tensor will not be re-packed unless user has implicitly
+  //       triggered `to_public` by accessing its data
+  //       One caveat is when the input size has changed and prepacked weight
+  //       might not be the best fit for new input size, the weight will not
+  //       be re-packed in such cases, but it still ensures the correctness
+  //
+  // TODO: once semantics of "own shade context" is equivalent to
+  //       "is dil tensor", we could remove the first check below
+  if (!check_tensor_own_shade_context(weight) ||
+      !cpu::ShadeDataContext::isDilOwnTheTensor(weight) ||
+      cpu::ShadeDataContext::getDilTensor(weight).is_public_format()) {
+
+    auto dil_weight = dbl::comm::try_gen_dil_tensor(weight);
+    auto output_sizes = calc_deconv_input_size(input.sizes(), weight.sizes(), padding, output_padding, stride, dilation, groups);
+    auto packed_desc = dil::convolution_transpose_forward::expected_weights_desc(
+        weight.sizes().vec(),
+        dil_weight.get_data_type(),
+        stride.vec(),
+        padding.vec(),
+        padding.vec(),
+        dilation.vec(),
+        groups,
+        dil::algorithm::deconvolution_direct,
+        dil::prop_kind::forward,
+        input.sizes().vec(),
+        output_sizes,
+        with_bias);
+
+    if (packed_desc.is_default()) {
+      // In some cases of grouped deconv, there's no optimized kernel using
+      // blocked weight. So if queried format is still a public (plain) format,
+      // we should skip the plain-to-plain reorder. (e.g. g8ic32oc80sp7k3)
+      // 
+      // TODO: Now we're deciding whether to prepack weight based on if it's
+      // already been a blocked tensor. But if its optimzal format is not
+      // blocked, we are wasting time to query format on each call because of
+      // pd-creation overhead.
+      return;
+    }
+
+    dil::tensor packed_weight {packed_desc};
+    packed_weight.feed_from(dil_weight, /*is_deconv_weights=*/true);
+    dbl::comm::equip_dil_buffer(weight, packed_weight);
+  }
 }
 
 }  // namespace deconv

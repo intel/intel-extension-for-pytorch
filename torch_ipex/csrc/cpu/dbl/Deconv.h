@@ -31,6 +31,16 @@ dil::tensor deconvolution_impl(
     int64_t groups,
     const dil::attr_t& attr = dil::attr_t());
 
+void prepack_deconv_weights(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    at::IntArrayRef dilation,
+    int64_t groups,
+    bool with_bias);
+
 }  // namespace deconv
 }  // namespace dbl
 }  // namespace cpu
