@@ -205,7 +205,7 @@ at::Tensor AtenIpexCPUDev::dil_deconvolution(
   // dbl::deconv::prepack_deconv_weights(input, dil_input,
   //   weight, stride, padding, dilation, groups);
 
-  dil_weight = dbl::comm::try_gen_dil_tensor(weight).transpose_(0, 1);
+  dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
   dil::tensor dil_output = dbl::deconv::deconvolution_impl(
     dil_input,

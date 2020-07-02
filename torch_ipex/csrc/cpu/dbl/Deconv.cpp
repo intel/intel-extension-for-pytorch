@@ -42,7 +42,6 @@ dil::tensor deconvolution_impl(
   const dil::dims w_dims = w.get_dims();
   std::vector<int64_t> input_size{x_dims.cbegin(), x_dims.cend()};
   std::vector<int64_t> kernel_size{w_dims.cbegin(), w_dims.cend()};
-  std::swap(kernel_size[0], kernel_size[1]);
   std::vector<int64_t> output_sizes = calc_deconv_input_size(input_size, kernel_size, padding, output_padding, stride, dilation, groups);
 
   dil::tensor y;
