@@ -105,6 +105,52 @@ class TestConv(TestCase):
         res_dpcpp = self._seq_conf(device, rand_seed)
         self.assertEqual(res_cpu, res_dpcpp.to('cpu'))
 
+class TestDeonv(TestCase):
+    def test_Deonv2d_with_cpu(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        deconv_cpu = torch.nn.ConvTranspose2d(1, 1, (3, 3))
+        deconv_dpcpp = torch.nn.ConvTranspose2d(1, 1, (3, 3)).to(device=device)
+
+        deconv_dpcpp.weight.data = deconv_cpu.weight.data.to(device=device)
+        deconv_dpcpp.bias.data = deconv_cpu.bias.data.to(device=device)
+
+        input_cpu = torch.rand((1, 1, 7, 7))
+        input_dpcpp = input_cpu.to(device=device)
+
+        ipex.core.enable_auto_dnnl()
+        out_dpcpp = deconv_dpcpp(input_dpcpp)
+
+        ipex.core.disable_auto_dnnl()
+        out_dpcpp_cpu = out_dpcpp.to('cpu')
+        out_cpu = deconv_cpu(input_cpu)
+        self.assertEqual(out_dpcpp.size(), out_cpu.size())
+        self.assertEqual(out_cpu, out_dpcpp_cpu)
+
+    def _seq_conf(self, device, rand_seed):
+        torch.manual_seed(rand_seed)
+        deconv_dpcpp1 = torch.nn.ConvTranspose2d(1, 1, (7, 7)).to(device=device)
+        deconv_dpcpp2 = torch.nn.ConvTranspose2d(1, 1, (5, 5)).to(device=device)
+        deconv_dpcpp3 = torch.nn.ConvTranspose2d(1, 1, (3, 3)).to(device=device)
+        input_cpu = torch.rand((1, 1, 10, 10))
+        input_dpcpp = input_cpu.to(device=device)
+
+        out_dpcpp1 = deconv_dpcpp1(input_dpcpp)
+        out_dpcpp2 = deconv_dpcpp2(out_dpcpp1)
+        out_dpcpp3 = deconv_dpcpp3(out_dpcpp2)
+        return out_dpcpp3
+
+    def test_seq_deconv(self):
+        ipex.core.disable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        res_cpu = self._seq_conf('cpu', rand_seed)
+
+        ipex.core.enable_auto_dnnl()
+        res_dpcpp = self._seq_conf(device, rand_seed)
+        self.assertEqual(res_cpu, res_dpcpp.to('cpu'))
+
 class TestBinaryOp(TestCase):
     def test_add(self):
         ipex.core.enable_auto_dnnl()

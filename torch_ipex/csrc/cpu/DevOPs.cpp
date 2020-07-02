@@ -13,6 +13,7 @@
 #include "torch_ipex/csrc/utils.h"
 #include "dbl/Common.h"
 #include "dbl/Conv.h"
+#include "dbl/Deconv.h"
 #include "dbl/Pool.h"
 #include "dbl/DNNLChecker.h"
 #include "ShadeDataContext.h"
@@ -60,11 +61,11 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   }
 
   dbl::comm::reorder_to_bf16_for_mix_prec(weight);
-  dbl::conv::prepack_conv_weights(input, dil_input, 
+  dbl::conv::prepack_conv_weights(input, dil_input,
     weight, stride, padding, dilation, groups);
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
-  dil::tensor dil_output = dbl::conv::conv2d_impl(
+  dil::tensor dil_output = dbl::conv::convolution_impl(
     dil_input,
     dil_weight,
     dil_bias,
@@ -172,6 +173,53 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
   return std::make_tuple(grad_input, grad_weight, grad_bias);
 }
 
+at::Tensor AtenIpexCPUDev::dil_deconvolution(
+    const at::Tensor & input,
+    const at::Tensor & weight,
+    const at::Tensor & bias,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding,
+    at::IntArrayRef stride,
+    at::IntArrayRef dilation,
+    int64_t groups) {
+  DEBUG("AtenIpexCPUDev::dil_deconvolution\n");
+  dil::tensor dil_input;
+  dil::tensor dil_weight;
+  c10::optional<dil::tensor> dil_bias{c10::nullopt};
+
+  CHECK_DNNL_OP_PRE_COND(input);
+  CHECK_DNNL_OP_PRE_COND(weight);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  dil_input = dbl::comm::try_gen_dil_tensor(input);
+
+  if (bias.defined()) {
+    CHECK_DNNL_OP_PRE_COND(bias);
+    dbl::comm::reorder_to_bf16_for_mix_prec(bias);
+    dil_bias = dbl::comm::try_gen_dil_tensor(bias);
+  }
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+
+  // TODO
+  // dbl::deconv::prepack_deconv_weights(input, dil_input,
+  //   weight, stride, padding, dilation, groups);
+
+  dil_weight = dbl::comm::try_gen_dil_tensor(weight.transpose(0, 1));
+
+  dil::tensor dil_output = dbl::deconv::deconvolution_impl(
+    dil_input,
+    dil_weight,
+    dil_bias,
+    padding,
+    output_padding,
+    stride,
+    dilation,
+    groups);
+
+  return dbl::comm::gen_aten_tensor_by(std::move(dil_output));
+}
+
 at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
   DEBUG("AtenIpexCPUDev::convolution_overrideable\n");
 
@@ -184,7 +232,11 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
         dnnl_input_tensors.push_back(bias);
       }
       if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
-        return AtenIpexCPUDev::dil_convolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined() && !bias.is_contiguous() ? bias.contiguous() : bias, stride, padding, dilation, groups);
+        if (transposed) {
+          return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined() && !bias.is_contiguous() ? bias.contiguous() : bias, padding, output_padding, stride, dilation, groups);
+        } else {
+          return AtenIpexCPUDev::dil_convolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined() && !bias.is_contiguous() ? bias.contiguous() : bias, stride, padding, dilation, groups);
+        }
     }
   } catch (std::exception& e) {
 #if defined(_DEBUG)
@@ -198,25 +250,8 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
   auto&& _ipex_input = bridge::shallowFallbackToCPUTensor(input);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
-  auto&& _ipex_result = at::mkldnn_convolution(_ipex_input, _ipex_weight, _ipex_bias, padding, stride, dilation, groups);
+  auto&& _ipex_result = at::convolution(_ipex_input, _ipex_weight, _ipex_bias, stride, padding, dilation, transposed, output_padding, groups);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
-}
-
-at::Tensor AtenIpexCPUDev::mkldnn_convolution(const at::Tensor & self, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups) {
-  DEBUG("AtenIpexCPUDev::mkldnn_convolution\n");
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.defined());
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.defined());
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!(bias.defined()) || (bias.defined() && bias.layout() == c10::kStrided));
-  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
-  auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
-  auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
-  auto&& _ipex_result = at::mkldnn_convolution(_ipex_self.contiguous(), _ipex_weight.contiguous(), _ipex_bias.contiguous(), padding, stride, dilation, groups);
-  static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_ipex_result.is_contiguous());
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_ipex_result.layout() == c10::kStrided);
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
 }
 
@@ -224,17 +259,25 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
   DEBUG("AtenIpexCPUDev::convolution_backward_overrideable\n");
   // NOTE: DO NOT always call contiguous. It may break lazy-reorder. Because contiguous will call reorder instantly.
   if (check_auto_dnnl()) {
-    return dil_convolution_backward(
-      input.is_contiguous() ? input : input.contiguous(),
-      grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
-      weight.is_contiguous() ? weight : weight.contiguous(),
-      padding,
-      stride,
-      dilation,
-      groups,
-      output_mask);
+    if (transposed) {
+      IPEX_CHECK(false, "deconvolution backward not support for dnnl path now");
+    } else {
+      return AtenIpexCPUDev::dil_convolution_backward(
+        input.is_contiguous() ? input : input.contiguous(),
+        grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
+        weight.is_contiguous() ? weight : weight.contiguous(),
+        padding,
+        stride,
+        dilation,
+        groups,
+        output_mask);
+    }
   } else {
-    return mkldnn_convolution_backward(input, grad_output, weight, padding, stride, dilation, groups, output_mask);
+    if (transposed) {
+      IPEX_CHECK(false, "deconvolution backward not support for native path now");
+    } else {
+      return AtenIpexCPUDev::mkldnn_convolution_backward(input, grad_output, weight, padding, stride, dilation, groups, output_mask);
+    }
   }
 }
 

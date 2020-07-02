@@ -18,7 +18,7 @@ std::vector<int64_t> calc_conv_output_size(
     at::IntArrayRef stride,
     at::IntArrayRef dilation);
 
-dil::tensor conv2d_impl(
+dil::tensor convolution_impl(
     const dil::tensor& x,
     const dil::tensor& w,
     const c10::optional<dil::tensor>& b,
@@ -28,7 +28,7 @@ dil::tensor conv2d_impl(
     int64_t groups,
     const dil::attr_t& attr = dil::attr_t());
 
-void conv2d_inplace_impl(
+void convolution_inplace_impl(
     const dil::tensor& x,
     const dil::tensor& w,
     const c10::optional<dil::tensor>& b,
