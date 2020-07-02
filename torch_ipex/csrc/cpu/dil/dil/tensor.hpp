@@ -667,23 +667,55 @@ class tensor : public memory {
 
   // no data copy
   tensor make_grouped_weights(int groups, bool is_deconv = false) const {
-    if (groups <= 1) return *this;
 
-    auto old_desc = get_desc();
-    auto old_groups = old_desc.g();
-    if (old_groups > 1) {
-      // weights have already been pre-converted if old_groups > 1
-      DIL_ENFORCE(old_groups == groups,
-                    "groups does not match the pre-converted weights");
-      return *this;
+    // DNNL and Framework have different ways in describing weight dimensions.
+    // This difference is reflected in two cases: grouped conv & deconv.
+    // This function would be better called `make_compatible_weights`. 
+    // 
+    //                                   fwk dims          dnnl dims
+    // groups <= 1:
+    //                    conv weight:   o, i, ...         no action
+    //                  deconv weight:   i, o, ...      -> o, i, h, w
+    //
+    // groups > 1:
+    //   already grouped, conv weight:   g, o, i, ...      no action
+    //   no grouped,      conv weight:   o, i, ...      -> g, o/g, i, ...
+    //   already grouped, deconv weight: g, i/g, o, ... -> g, o, i/g, ...
+    //   no grouped,      deconv weight: i, o, ...      -> g, o, i/g, ...
+
+    auto desc = get_desc();
+    if (groups <= 1) {
+      if (is_deconv) {
+        auto transposed_desc = desc.transpose(0, 1);
+        auto this_copy = *this;
+        return this_copy.set_desc(transposed_desc);
+      } else {
+        return *this;
+      }
+    };
+
+    if (desc.is_grouped()) {
+      DIL_ENFORCE(
+          desc.g() == groups,
+          "groups does not match the pre-converted weights");
+      if (is_deconv) {
+        auto transposed_grouped_desc = desc.transpose(1, 2);
+        auto this_copy = *this;
+        return this_copy.set_desc(transposed_grouped_desc);
+      } else {
+        return *this; // no action
+      }
+    } else {
+      if (is_deconv) {
+        auto transposed_grouped_desc = desc.to_grouped(groups).transpose(1, 2);
+        auto this_copy = *this;
+        return this_copy.set_desc(transposed_grouped_desc);
+      } else {
+        auto grouped_desc = desc.to_grouped(groups);
+        auto this_copy = *this;
+        return this_copy.set_desc(grouped_desc);
+      }
     }
-
-    auto grouped_desc =
-        is_deconv
-            ? old_desc.transpose(0, 1).to_grouped(groups).transpose(1, 2)
-            : old_desc.to_grouped(groups);
-    auto this_copy = *this;
-    return this_copy.set_desc(grouped_desc);
   }
 
   /// Recreate a param with completely different content from old one
