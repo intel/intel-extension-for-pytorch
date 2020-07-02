@@ -199,12 +199,9 @@ at::Tensor AtenIpexCPUDev::dil_deconvolution(
     dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
-
-  // TODO
-  // dbl::deconv::prepack_deconv_weights(input, dil_input,
-  //   weight, stride, padding, dilation, groups);
-
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight);;
+  dbl::deconv::prepack_deconv_weights(
+      input, weight, stride, padding, output_padding, dilation, groups, bias.defined());
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
   dil::tensor dil_output = dbl::deconv::deconvolution_impl(
