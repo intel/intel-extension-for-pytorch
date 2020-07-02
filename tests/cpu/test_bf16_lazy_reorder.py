@@ -68,12 +68,12 @@ class TestDeconv(TestCase):
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
 
-        _deconv = torch.nn.ConvTranspose2d(1, 1, (3, 3))
+        _deconv = torch.nn.ConvTranspose2d(2, 3, (3, 3))
 
         bn_man_bf16 =copy.deepcopy(_deconv).to(device=device).to(torch.bfloat16)
         bn_auto_mix =copy.deepcopy(_deconv).to(device=device)
 
-        _in_cpu = torch.rand((1, 1, 7, 7))
+        _in_cpu = torch.rand((1, 2, 7, 7))
         in_auto_mix = _in_cpu.to(device=device)
         in_man_bf16 = in_auto_mix.to(torch.bfloat16)
 

@@ -110,13 +110,13 @@ class TestDeonv(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        deconv_cpu = torch.nn.ConvTranspose2d(1, 1, (3, 3))
-        deconv_dpcpp = torch.nn.ConvTranspose2d(1, 1, (3, 3)).to(device=device)
+        deconv_cpu = torch.nn.ConvTranspose2d(2, 3, (3, 3))
+        deconv_dpcpp = torch.nn.ConvTranspose2d(2, 3, (3, 3)).to(device=device)
 
         deconv_dpcpp.weight.data = deconv_cpu.weight.data.to(device=device)
         deconv_dpcpp.bias.data = deconv_cpu.bias.data.to(device=device)
 
-        input_cpu = torch.rand((1, 1, 7, 7))
+        input_cpu = torch.rand((1, 2, 7, 7))
         input_dpcpp = input_cpu.to(device=device)
 
         ipex.core.enable_auto_dnnl()
@@ -130,10 +130,10 @@ class TestDeonv(TestCase):
 
     def _seq_conf(self, device, rand_seed):
         torch.manual_seed(rand_seed)
-        deconv_dpcpp1 = torch.nn.ConvTranspose2d(1, 1, (7, 7)).to(device=device)
-        deconv_dpcpp2 = torch.nn.ConvTranspose2d(1, 1, (5, 5)).to(device=device)
-        deconv_dpcpp3 = torch.nn.ConvTranspose2d(1, 1, (3, 3)).to(device=device)
-        input_cpu = torch.rand((1, 1, 10, 10))
+        deconv_dpcpp1 = torch.nn.ConvTranspose2d(2, 3, (7, 7)).to(device=device)
+        deconv_dpcpp2 = torch.nn.ConvTranspose2d(3, 4, (5, 5)).to(device=device)
+        deconv_dpcpp3 = torch.nn.ConvTranspose2d(4, 5, (3, 3)).to(device=device)
+        input_cpu = torch.rand((1, 2, 10, 10))
         input_dpcpp = input_cpu.to(device=device)
 
         out_dpcpp1 = deconv_dpcpp1(input_dpcpp)
