@@ -13,7 +13,7 @@ class TestNNMethod(TestCase):
         # functionality
         x_cpu = torch.ones([1, 2, 3, 3], device=cpu_device)
         x_dpcpp = torch.ones([1, 2, 3, 3], device=dpcpp_device)
-        self.assertEqual(x_dpcpp, x_dpcpp.to(cpu_device))
+        self.assertEqual(x_cpu, x_dpcpp.to(cpu_device))
 
         conv1 = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
 

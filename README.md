@@ -10,9 +10,10 @@
 
 ### **Python:** 3.6.x
 
-### **GitPython:**
+### **Required Package:**
 ```bash
 python3 -m pip install GitPython==3.1.1
+python3 -m pip install lark-parser>=0.8.9
 ```
 
 ### **UMD Component Installation:**

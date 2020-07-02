@@ -1,5 +1,5 @@
 import torch
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import torch_ipex
 from torch.testing._internal.common_utils import TestCase
 import pytest

@@ -12,7 +12,7 @@
 
 *  Install Pytest
 ```bash
-python3 -m pip install pytest matplitlib
+python3 -m pip install pytest
 ```
 
 ## Find and Run tests
