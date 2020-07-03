@@ -52,7 +52,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
     weight_contiguous, stride, padding, dilation, groups);
   dil_weight = try_gen_dil_tensor(weight_contiguous);
 
-  dil::tensor dil_output = dbl::conv::conv2d_impl(
+  dil::tensor dil_output = dbl::conv::convolution_impl(
     dil_input,
     dil_weight,
     dil_bias,
@@ -100,7 +100,7 @@ static at::Tensor& dil_convolution_inplace_fusion(
     weight_contiguous, stride, padding, dilation, groups);
   dil_weight = try_gen_dil_tensor(weight_contiguous);
 
-  dbl::conv::conv2d_inplace_impl(
+  dbl::conv::convolution_inplace_impl(
     dil_input,
     dil_weight,
     dil_bias,

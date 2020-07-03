@@ -25,7 +25,7 @@ std::vector<int64_t> calc_conv_output_size(
   return output_size;
 }
 
-dil::tensor conv2d_impl(
+dil::tensor convolution_impl(
     const dil::tensor& x,
     const dil::tensor& w,
     const c10::optional<dil::tensor>& b,
@@ -87,7 +87,7 @@ dil::tensor conv2d_impl(
   return y;
 }
 
-void conv2d_inplace_impl(
+void convolution_inplace_impl(
     const dil::tensor& x,
     const dil::tensor& w,
     const c10::optional<dil::tensor>& b,

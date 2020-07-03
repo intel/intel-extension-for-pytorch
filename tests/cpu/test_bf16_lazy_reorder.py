@@ -62,6 +62,35 @@ class TestConv(TestCase):
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_bf16))
                 self.assertEqual(res_man_bf16.float(), res_auto_bf16.float(), 1e-2)
 
+class TestDeconv(TestCase):
+    def test_Deconv2d_with_cpu(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+
+        _deconv = torch.nn.ConvTranspose2d(2, 3, (3, 3))
+
+        bn_man_bf16 =copy.deepcopy(_deconv).to(device=device).to(torch.bfloat16)
+        bn_auto_mix =copy.deepcopy(_deconv).to(device=device)
+
+        _in_cpu = torch.rand((1, 2, 7, 7))
+        in_auto_mix = _in_cpu.to(device=device)
+        in_man_bf16 = in_auto_mix.to(torch.bfloat16)
+
+        res_cpu_fp32 = _deconv(_in_cpu)
+
+        with AutoDNNL(True), AutoMixPrecision(False):
+            res_man_bf16 = bn_man_bf16(in_man_bf16)
+            self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
+            self.assertEqual(res_cpu_fp32.bfloat16().float(), res_man_bf16, 1e-2)
+
+            with AutoMixPrecision(True):
+                self.assertEqual(in_auto_mix.dtype, torch.float)
+                self.assertFalse(ipex.core.is_bf16_dil_tensor(in_auto_mix))
+                res_auto_bf16 = bn_auto_mix(in_auto_mix)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_bf16))
+                self.assertEqual(res_man_bf16.float(), res_auto_bf16.float(), 1e-2)
+
 class TestBatchNorm(TestCase):
     def test_batch_norm2d(self):
         rand_seed = int(get_rand_seed())
