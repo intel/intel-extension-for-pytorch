@@ -3,6 +3,7 @@
 #include <ATen/Context.h>
 #include <ATen/CPUGenerator.h>
 #include <ATen/InferSize.h>
+#include <ATen/NamedTensorUtils.h>
 #include <c10/util/Exception.h>
 #include <c10/util/Logging.h>
 
@@ -1487,10 +1488,51 @@ at::Tensor AtenIpexCPUDev::dil_slice(const at::Tensor & self, int64_t dim, int64
   strides[dim] *= step;
 
   auto result = dil_as_strided(self, sizes, strides, storage_offset);
-  // namedinference::propagate_names(result, self);
+  at::namedinference::propagate_names(result, self);
   return result;
 }
 
+at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, int64_t dim, int64_t index) {
+  DEBUG("AtenIpexCPUDev::dil_select\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
+  // Port from aten/src/ATen/native/TensorShape.cpp
+  int64_t ndim = self.dim();
+  if (ndim == 0) {
+    AT_INDEX_ERROR("select() cannot be applied to a 0-dim tensor.");
+  }
+  dim = at::maybe_wrap_dim(dim, ndim);
+  auto size = self.size(dim);
+  if (index < -size || index >= size) {
+    if (self.has_names() && self.names()[dim] != at::Dimname::wildcard()) {
+      AT_INDEX_ERROR("select(): index ", index, " out of range for tensor of size ",
+                     self.sizes(), " at dimension ", self.names()[dim]);
+    }
+    AT_INDEX_ERROR("select(): index ", index, " out of range for tensor of size ",
+                   self.sizes(), " at dimension ", dim);
+  }
+  if (index < 0) {
+    index += size;
+  }
+  if (self.is_sparse()) {
+    IPEX_CHECK(false, "Got a sparse tensor in select. Should not reach here.");
+    // return at::select(self, dim, index);
+  }
+  auto sizes = self.sizes().vec();
+  auto strides = self.strides().vec();
+  auto storage_offset = self.storage_offset() + index * strides[dim];
+  sizes.erase(sizes.begin() + dim);
+  strides.erase(strides.begin() + dim);
+  auto result = dil_as_strided(self, sizes, strides, storage_offset);
+  at::namedinference::propagate_names_except(result, self, {dim});
+  return result;
+}
+
+at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, at::Dimname dim, int64_t index) {
+  return dil_select(self, at::dimname_to_position(self, dim), index);
+}
 
 std::vector<at::Tensor> AtenIpexCPUDev::dil_split(const at::Tensor& self, int64_t split_size, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_split\n");
