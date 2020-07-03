@@ -35,7 +35,15 @@ class TestTorchMethod(TestCase):
         print(y_out.to("cpu"))
         print(z_out.to("cpu"))
         print(n_out.to("cpu"))
-        self.assertEqual(x, x_out.cpu(), 1e-2)
+        self.assertEqual(x[0], x_out[0].cpu())
+        self.assertEqual(x[1], x_out[1].cpu())
+        self.assertEqual(x[2], x_out[2].cpu())
+        # The std POW in different compiler packages, gcc, computecpp and dpc++, give the results with big gap.
+        # Vanilla cpu : 0x47c35000, DPC++ GPU : 0x47c35001, ComputeCpp GPU : 0x47c35002
+        # The potential reason is differenct default rounding mode in compilers.
+        # Here we enlarge the tolerance to pass this case.
+        self.assertEqual(x[3], x_out[3].cpu(), 0.1)
+        self.assertEqual(x[4], x_out[4].cpu())
         self.assertEqual(y, y_out.cpu())
         self.assertEqual(z, z_out.cpu())
         self.assertEqual(n, n_out.cpu())
