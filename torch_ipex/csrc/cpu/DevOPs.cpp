@@ -1329,9 +1329,37 @@ at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::
   DEBUG("AtenIpexCPUDev::dil_clone\n");
   CHECK_DNNL_OP_PRE_COND(self);
 
-  dil::tensor src = dbl::comm::try_gen_dil_tensor(self);
-  dil::tensor dst;
-  dil::direct_copy::compute(src, dst);
+  auto memory_format =
+      optional_memory_format.value_or(at::MemoryFormat::Preserve);
+
+  if (memory_format == at::MemoryFormat::Preserve) {
+    if (!self.is_non_overlapping_and_dense()) {
+      memory_format = self.suggest_memory_format();
+    }
+  }
+
+  IPEX_CHECK(
+      memory_format == at::MemoryFormat::Preserve ||
+          memory_format == at::MemoryFormat::Contiguous,
+      "dil_clone only support Preserve of Contiguous");
+
+  auto src = dbl::comm::try_gen_dil_tensor(self);
+  auto dst_desc =
+      memory_format == at::MemoryFormat::Preserve
+          ? src.get_desc()
+          : src.get_desc().to_default_format();
+  dil::tensor dst{dst_desc};
+  src.reorder_to(dst);
+
+  if (src.has_scale()) {
+    dst.set_scale(src.get_scale());
+  }
+  if (src.has_zero_point()) {
+    dst.set_zero_point(src.get_zero_point());
+  }
+  if (src.has_workspace()) {
+    dst.copy_workspace(src);
+  }
   return dbl::comm::gen_aten_tensor_by(std::move(dst));
 }
 
