@@ -120,6 +120,24 @@ inline dnnl::algorithm rnn_kind_to_activation(rnn_kind rnn) {
   }
 }
 
+inline size_t data_type_size(data_type dt) {
+  switch (dt) {
+    case data_type::f16:
+    case data_type::bf16:
+      return 2;
+    case data_type::f32:
+    case data_type::s32:
+      return 4;
+    case data_type::s8:
+    case data_type::u8:
+      return 1;
+    case data_type::undef:
+    default:
+      DIL_ENFORCE(false, "unknown data_type");
+  }
+  return 0; /* not supposed to be reachable */
+}
+
 inline std::pair<std::vector<float>, std::vector<float>> compute_scales(
     float src_scale, float dst_scale, std::vector<float> weight_scales) {
   auto scale_size = weight_scales.size();

@@ -22,8 +22,13 @@ struct sum : public dnnl::sum {
       pd = primitive_desc(dst.get_desc(), scales, src_descs, aengine);
     } else {
       pd = primitive_desc(scales, src_descs, aengine);
+      auto dst_desc = tensor::desc(pd.dst_desc(), srcs[0].get_groups());
+      if (!dst_desc.is_dense()) {
+        dst_desc = dst_desc.to_default_format();
+        pd = primitive_desc(dst_desc, scales, src_descs, aengine);
+      }
       // propagate src group info
-      dst.reinit_if_possible({pd.dst_desc(), srcs[0].get_groups()});
+      dst.reinit_if_possible(dst_desc);
     }
 
     exec_args args {{DNNL_ARG_DST, dst}};
