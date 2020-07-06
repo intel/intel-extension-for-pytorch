@@ -65,7 +65,7 @@ def get_git_head_sha(base_dir):
 
 
 def get_build_version(ipex_git_sha):
-  version = os.getenv('TORCH_IPEX_VERSION', '0.1')
+  version = os.getenv('TORCH_IPEX_VERSION', '1.0.0')
   if _check_env_flag('VERSIONED_IPEX_BUILD', default='0'):
     try:
       version += '+' + ipex_git_sha[:7]
@@ -115,14 +115,14 @@ def generate_ipex_cpu_aten_code(base_dir):
   os.chdir(cur_dir)
 
 
-class DPCPPExt(Extension, object):
+class IPEXExt(Extension, object):
   def __init__(self, name, project_dir=os.path.dirname(__file__)):
     Extension.__init__(self, name, sources=[])
     self.project_dir = os.path.abspath(project_dir)
     self.build_dir = os.path.join(project_dir, 'build')
 
 
-class DPCPPClean(distutils.command.clean.clean, object):
+class IPEXClean(distutils.command.clean.clean, object):
 
   def run(self):
     import glob
@@ -148,7 +148,7 @@ class DPCPPClean(distutils.command.clean.clean, object):
     distutils.command.clean.clean.run(self)
 
 
-class DPCPPBuild(build_ext, object):
+class IPEXBuild(build_ext, object):
   def run(self):
     print("run")
 
@@ -256,8 +256,8 @@ setup(
       'intel_pytorch_extension.ops'],
     package_dir={'intel_pytorch_extension': 'intel_pytorch_extension_py'},
     zip_safe=False,
-    ext_modules=[DPCPPExt('_torch_ipex')],
+    ext_modules=[IPEXExt('_torch_ipex')],
     cmdclass={
-        'build_ext': DPCPPBuild,
-        'clean': DPCPPClean,
+        'build_ext': IPEXBuild,
+        'clean': IPEXClean,
     })
