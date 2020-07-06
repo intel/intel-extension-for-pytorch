@@ -2,9 +2,12 @@
 #include <core/DPCPPUtils.h>
 #include <core/Exception.h>
 #include <core/Memory.h>
+#include <tensor/Context.h>
 #include <mutex>
 
+
 using namespace at::dpcpp;
+using namespace at::AtenIpexTypeDPCPP;
 
 struct NaiveAllocator {
   // lock around all operations
@@ -30,7 +33,10 @@ struct NaiveAllocator {
 NaiveAllocator naive_allocator;
 
 static inline void NaiveAllocatorDeleter(void* ptr) {
-  naive_allocator.free(ptr);
+  auto ctx = (DPCPPTensorContext*)ptr;
+  auto data = ctx->data();
+  naive_allocator.free(data);
+  delete ctx;
 }
 
 struct DPCPPDefaultAllocator : public at::Allocator {
@@ -41,8 +47,9 @@ struct DPCPPDefaultAllocator : public at::Allocator {
     if (size != 0) {
       p = naive_allocator.malloc(size);
     }
+    auto ctx = new DPCPPTensorContext(p);
     return {p,
-            p,
+            ctx,
             &NaiveAllocatorDeleter,
             at::Device(at::DeviceType::DPCPP, device)};
   }

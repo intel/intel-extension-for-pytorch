@@ -3,6 +3,15 @@
 namespace at {
 namespace AtenIpexTypeDPCPP {
 
+Tensor slice(
+    const Tensor& self,
+    int64_t dim,
+    int64_t start,
+    int64_t end,
+    int64_t step) {
+  return at::native::slice(self, dim, start, end, step);
+}
+
 Tensor as_strided(
     const Tensor& self,
     IntArrayRef size,

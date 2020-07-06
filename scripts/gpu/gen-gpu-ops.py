@@ -91,6 +91,10 @@ _FN_BLACKLIST = set([
 #    'zeros_like',
 ])
 
+_FN_BLKFMT_SUPPORTED = set([
+    'convolution_overrideable'
+])
+
 _FN_BLACKLIST_REGEX = [
     # ATEN functions
     r'[^(]*cudnn',
@@ -342,6 +346,13 @@ def is_blacklisted_fn(fname, mapsig):
     if re.match(frx, fname) or re.match(frx, mapsig):
       return True
   return False
+
+
+def is_blkfmt_supported(fname):
+  if fname in _FN_BLKFMT_SUPPORTED:
+    return True
+  else:
+    return False
 
 
 def get_outfn_options(fname, mapsig):
@@ -819,7 +830,26 @@ def generate_aten_to_xla(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
     ptype = param_type(p)
     cptype = type_core(ptype)
     pname = param_name(p)
-    param_vars.append(pname)
+    if not is_blkfmt_supported(fname):
+      if cptype == 'TensorList':
+        _pname = "_{}".format(pname)
+        code += ('  auto {} = AtenIpexTypeDPCPP::to_plain_if_needed({});\n').format(
+            _pname, pname)
+        param_vars.append(_pname)
+      elif cptype == 'Tensor':
+        if not type_is_const(ptype):
+          code += ('  {} = AtenIpexTypeDPCPP::to_plain_if_needed({});\n').format(
+              pname, pname)
+          param_vars.append(pname)
+        else:
+          _pname = "_{}".format(pname)
+          code += ('  auto {} = AtenIpexTypeDPCPP::to_plain_if_needed({});\n').format(
+              _pname, pname)
+          param_vars.append(_pname)
+      else:
+        param_vars.append(pname)
+    else:
+      param_vars.append(pname)
     # if cptype == 'TensorList':
     #   xname = 'l_{}'.format(pname)
     #   code += ('  auto {} = bridge::XlaCreateTensorList({});\n').format(
@@ -837,6 +867,7 @@ def generate_aten_to_xla(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
     # else:
     #   xname = tfetcher.add(pname, is_write_param(fnopts, pname, True))
     #   param_vars.append(xname)
+
     if p == ref_param and not get_optional(fnopts, 'ref_param'):
       xla_ref_param = param_vars[-1]
   # code += tfetcher.generate_fetches()

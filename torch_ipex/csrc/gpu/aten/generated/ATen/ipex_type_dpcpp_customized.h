@@ -2,9 +2,12 @@
 #define IPEX_TYPE_DPCPP_CUSTOMIZED_H
 
 #include <ATen/ATen.h>
+#include <tensor/Context.h>
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
+
+struct DPCPPTensorContext;
 
 at::Tensor convolution_sum(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups, at::Tensor& accumu, at::Scalar alpha=0.f, at::Scalar beta=0.f, at::Scalar scale=1.0);
 
@@ -19,6 +22,12 @@ at::Tensor & std_var_out(at::Tensor & result, const at::Tensor & self, at::IntAr
 std::tuple<Tensor&,Tensor&> std_var_mean_out(const char* fname, Tensor &result1, Tensor &result2, const Tensor &self, IntArrayRef dim, bool unbiased, bool keepdim, bool take_sqrt);
 
 at::Tensor linear_relu(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias);
+
+at::Tensor empty_opaque_tensor(DPCPPTensorContext::Meta& meta, const TensorOptions& options, c10::optional<MemoryFormat> optional_memory_format);
+
+at::Tensor to_plain_if_needed(const Tensor& tensor);
+
+TensorList to_plain_if_needed(TensorList tensor);
 }
 }
 

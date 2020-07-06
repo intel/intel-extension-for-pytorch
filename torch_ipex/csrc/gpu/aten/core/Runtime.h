@@ -69,6 +69,28 @@ using namespace mkldnn;
 namespace at {
 namespace dpcpp {
 
+static inline mkldnn::memory dpcpp_mkldnn_memory(
+    mkldnn::memory::desc md, mkldnn::engine& engine, void* ptr) {
+#ifdef USE_USM
+  {
+    return mkldnn::memory(md, engine, ptr);
+  {
+#else
+  {
+  #if defined(USE_DPCPP)
+    auto buffer = make_buffer<uint8_t>(ptr);
+  #elif defined(USE_COMPUTECPP)
+    if (dpcppGetBufferMap().get_offset(vptr) != 0) {
+      TORCH_CHECK(
+          0, "the offset of dpcpp buffer is not 0. We don't support this case.");
+    }
+    auto buffer = dpcppGetBufferMap().get_buffer(ptr);
+  #endif
+    return mkldnn::memory(md, engine, buffer);
+  }
+#endif
+}
+
 //
 // convert vptr to OneDNN's DPCPP buffer
 //
