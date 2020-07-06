@@ -173,6 +173,10 @@ public:
 
   bool aliasIsSafeForFusion(Node *node, Value *v, c10::optional<Rule> r) {
     bool safe = false;
+    // Returns false if the two nodes to be fused do not have the same owning block
+    if (node->owningBlock() != v->node()->owningBlock()) {
+      return safe;
+    }
     // TODO: it might be flawed because we don't have 'alias must' information
     //
     // Simple fusion, unary ops:

@@ -25,7 +25,7 @@ std::vector<int64_t> calc_conv_output_size(
   return output_size;
 }
 
-dil::tensor conv2d_impl(
+dil::tensor convolution_impl(
     const dil::tensor& x,
     const dil::tensor& w,
     const c10::optional<dil::tensor>& b,
@@ -87,7 +87,7 @@ dil::tensor conv2d_impl(
   return y;
 }
 
-void conv2d_inplace_impl(
+void convolution_inplace_impl(
     const dil::tensor& x,
     const dil::tensor& w,
     const c10::optional<dil::tensor>& b,
@@ -169,9 +169,10 @@ void prepack_conv_weights(
   if (!check_tensor_own_shade_context(weight) ||
       !cpu::ShadeDataContext::isDilOwnTheTensor(weight) ||
       cpu::ShadeDataContext::getDilTensor(weight).is_public_format()) {
+    auto dil_weight = dbl::comm::try_gen_dil_tensor(weight);
     auto packed_desc = dil::convolution_forward::expected_weights_desc(
       weight.sizes().vec(),
-      dil_input.get_data_type(),
+      dil_weight.get_data_type(),
       stride.vec(),
       padding.vec(),
       padding.vec(),
@@ -181,7 +182,22 @@ void prepack_conv_weights(
       dil::prop_kind::forward,
       dil_input.get_data_type(),
       input.sizes().vec());
-    dbl::comm::reorder_to_desc(weight, packed_desc);
+
+    if (packed_desc.is_default()) {
+      // In some cases of grouped conv, there's no optimized kernel using 
+      // blocked weight. So if queried format is still a public (plain) format,
+      // we should skip the plain-to-plain reorder. (e.g. g8ic32oc80sp7k3)
+      // 
+      // TODO: Now we're deciding whether to prepack weight based on if it's
+      // already been a blocked tensor. But if its optimzal format is not
+      // blocked, we are wasting time to query format on each call because of
+      // pd-creation overhead.
+      return;
+    }
+
+    dil::tensor packed_weight {packed_desc};
+    packed_weight.feed_from(dil_weight);
+    dbl::comm::equip_dil_buffer(weight, packed_weight);
   }
 }
 

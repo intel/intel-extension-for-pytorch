@@ -56,6 +56,8 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
       algorithm aalgorithm = algorithm::deconvolution_direct,
       prop_kind aprop_kind = prop_kind::forward,
       const dims& src_dims = dims(),
+      const dims& dst_dims = dims(),
+      bool with_bias = true,
       const attr_t& attr = attr_t(),
       const engine& aengine = engine::cpu_engine()) {
 
@@ -71,26 +73,41 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
     auto g = grouped ? dims_in[0] : 1;
     auto dilates_ = utils::get_compatible_dilates(dilates);
 
-    auto ic = g * dims_in[1 + grouped];
-    auto oc = g * dims_in[0 + grouped];
-    auto kh = dims_in[ndims - 2];
-    auto kw = dims_in[ndims - 1];
-    auto h = 8 * kh;
-    auto w = 8 * kw;
-    auto oh = (h - 1) * strides[0] + (1 + (kh - 1) * (dilates[0])) - padding_l[0] - padding_r[0];
-    auto ow = (w - 1) * strides[1] + (1 + (kw - 1) * (dilates[1])) - padding_l[1] - padding_r[1];
+    dims x_dims, y_dims;
+    if (src_dims.empty() || dst_dims.empty()) {
+      auto ic = g * dims_in[1 + grouped];
+      auto oc = g * dims_in[0 + grouped];
+      auto kh = dims_in[ndims - 2];
+      auto kw = dims_in[ndims - 1];
+      auto h = 8 * kh;
+      auto w = 8 * kw;
+      auto oh = (h - 1) * strides[0] + (1 + (kh - 1) * (dilates[0])) - padding_l[0] - padding_r[0];
+      auto ow = (w - 1) * strides[1] + (1 + (kw - 1) * (dilates[1])) - padding_l[1] - padding_r[1];
 
-    dims x_dims = {1, ic, h, w};
-    dims y_dims = {1, oc, oh, ow};
+      x_dims = {1, ic, h, w};
+      y_dims = {1, oc, oh, ow};
+    } else {
+      x_dims = src_dims;
+      y_dims = dst_dims;
+    }
+
     auto x_dtype = (dtype != data_type::s8) ? dtype : data_type::u8;
     auto y_dtype = (dtype != data_type::s8) ? dtype : data_type::s32;
-
     tensor::desc src_desc(x_dims, x_dtype);
     tensor::desc dst_desc(y_dims, y_dtype);
 
-    auto pd = get_primitive_desc</*with_bias=*/false>(
-        src_desc, weights_desc, tensor::desc(), dst_desc, strides, dilates_,
-        padding_l, padding_r, attr_t(), aalgorithm, aprop_kind);
+    primitive_desc pd;
+    // existence of bias may also affect the queried format (e.g. g8i32o64sp7k3)
+    if (with_bias) {
+      tensor::desc bias_desc({y_dims[1]}, y_dtype);
+      pd = get_primitive_desc</*with_bias=*/true>(
+          src_desc, weights_desc, bias_desc, dst_desc, strides, dilates_,
+          padding_l, padding_r, attr_t(), aalgorithm, aprop_kind);
+    } else {
+      pd = get_primitive_desc</*with_bias=*/false>(
+          src_desc, weights_desc, tensor::desc(), dst_desc, strides, dilates_,
+          padding_l, padding_r, attr_t(), aalgorithm, aprop_kind);
+    }
 
     // embed group info into weights_desc
     if (grouped) {

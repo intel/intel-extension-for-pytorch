@@ -150,6 +150,22 @@ class LinearRelu(nn.Module):
     def forward(self, x):
         return F.relu(self.linear(x), inplace=True)
 
+class ConvSumInDiffBlock(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(ConvSumInDiffBlock, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+    
+    def forward(self, x):
+        y = self.conv(x)
+        if y.size(1) != x.size(1):
+            y += F.pad(x,
+                       (0, 0, 0, 0, 0, y.size(1) - x.size(1)), 'constant', 0.)
+        else:
+            y += x
+        return y
+
 class Tester(TestCase):
 
     def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None):
@@ -379,6 +395,17 @@ class Tester(TestCase):
 
         self.assertEqual(scripted_fn(input, weight, bias), result)
         self.assertEqual(traced_fn(input, weight, bias), result)
+
+
+    def test_jit_conv_sum_in_diff_block(self):
+        self._test_output(
+            ConvSumInDiffBlock(2, 3, 32, kernel_size=1, stride=1, padding=0),
+            torch.rand(32, 3, 64, 64),
+            kind_not_in_graph="ipex::conv2d_sum")
+        self._test_output_bf16(
+            ConvSumInDiffBlock(2, 3, 32, kernel_size=1, stride=1, padding=0),
+            torch.rand(32, 3, 64, 64),
+            kind_not_in_graph="ipex::conv2d_sum")
 
 
 if __name__ == '__main__':
