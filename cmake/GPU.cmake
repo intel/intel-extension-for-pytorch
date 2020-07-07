@@ -94,13 +94,9 @@ include_directories(${DPCPP_GPU_ATEN_GENERATED})
 
 # generate c10 dispatch registration
 if(SHOULD_COPY)
-  add_custom_command(
-    OUTPUT ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp
-    COMMAND cp ./aten_ipex_type_default.cpp.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp
-    COMMAND cp ./aten_ipex_type_default.h.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.h
-    COMMAND cp ./aten_ipex_type_dpcpp.h.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_dpcpp.h
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/scripts/gpu
-  )
+  execute_process(COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/gpu/aten_ipex_type_default.cpp.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp)
+  execute_process(COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/gpu/aten_ipex_type_default.h.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.h)
+  execute_process(COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/gpu/aten_ipex_type_dpcpp.h.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_dpcpp.h)
 endif()
 
 # sources
