@@ -109,6 +109,16 @@ class tensor : public memory {
       return true;
     }
 
+    inline size_t get_item_size() const {
+      return utils::data_type_size(get_data_type());
+    }
+
+    inline bool is_dense(bool with_padding = false) const {
+      if (utils::one_of(format_kind(), dnnl_format_kind_any, dnnl_format_kind_undef))
+        return false;
+      return nelems(with_padding) * get_item_size() == get_size();
+    }
+
     inline bool is_nhwc() const {
       if (!is_plain() || data.ndims != 4) return false;
       const auto &dims = data.dims;
@@ -590,16 +600,6 @@ class tensor : public memory {
 
   inline dim get_groups() const { return get_desc().g(); }
 
-  inline void set_dims_and_strides(const dims &adims, const dims &astrides) {
-    DIL_ENFORCE(is_public_format(), "Call to_public() before set_dims_and_strides()");
-    DIL_ENFORCE(adims.size() == astrides.size(), "Dims and strides must have the same size");
-    if (get_dims() == adims && get_strides() == astrides)
-      return;
-    auto new_desc = desc(adims, get_data_type(), astrides);
-    DIL_ENFORCE(get_size() == new_desc.get_size(), "Invalid dims and strides for the original desc");
-    set_desc(new_desc);
-  }
-
   /// Return element number of the param.
   /// The number is the meaning values for a tensor, instead of whole buffer.
   /// It is the number without counting in paddings.
@@ -609,6 +609,14 @@ class tensor : public memory {
   inline data_type get_data_type() const { return get_desc().get_data_type(); }
 
   inline size_t get_size() const { return get_desc().get_size(); }
+
+  inline bool is_dense(bool with_padding = false) const {
+    return get_desc().is_dense(with_padding);
+  }
+
+  inline size_t get_item_size() const {
+    return get_desc().get_item_size();
+  }
 
   /// Return whether the tensor is empty
   inline bool is_empty() const {
@@ -775,8 +783,7 @@ class tensor : public memory {
   }
 
   inline void reorder_to(tensor &dst, const attr_t &aattr = attr_t()) const {
-    auto pd = dnnl::reorder::primitive_desc(*this, dst, aattr);
-    dnnl::reorder(pd)
+    dnnl::reorder({get_engine(), get_desc(), dst.get_engine(), dst.get_desc(), aattr})
         .execute(stream::default_stream(), const_cast<tensor &>(*this), dst);
   }
 
@@ -901,6 +908,8 @@ class tensor : public memory {
 
   /// Decide wether there is an extra tensor packed in
   bool has_workspace() const { return workspace_ != nullptr; }
+
+  void copy_workspace(const tensor& other) { workspace_ = other.workspace_; }
 
   /// Return the scale of this param.
   const scale_t &get_scale() const { return *scale_.get(); }

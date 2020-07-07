@@ -216,6 +216,130 @@ class TestGelu(TestCase):
                 zero_base = torch.zeros_like(res)
                 self.assertEqual(res, zero_base)
 
+class TestShape(TestCase):
+    def _check_tensor_shape(self, t1, t2):
+        self.assertEqual(t1.size(), t2.size())
+        self.assertEqual(t1.stride(), t2.stride())
+        self.assertEqual(t1.storage_offset(), t2.storage_offset())
+
+    def test_slice(self):
+        with AutoDNNL(True), AutoMixPrecision(True):
+            x_cpu = torch.rand(10, 10, 10)
+            x_cpu_slice = x_cpu[3:7, 3:7, 5]
+
+            x_dpcpp = x_cpu.to(device=device)
+            self.assertFalse(ipex.core.is_bf16_dil_tensor(x_dpcpp))
+
+            # the storage should be converted to bf16 on slicing
+            x_dpcpp_slice = x_dpcpp[3:7, 3:7, 5]
+            self.assertTrue(ipex.core.is_bf16_dil_tensor(x_dpcpp))
+            self.assertTrue(ipex.core.is_bf16_dil_tensor(x_dpcpp_slice))
+
+            # check shape info
+            self._check_tensor_shape(x_cpu, x_dpcpp)
+            self._check_tensor_shape(x_cpu_slice, x_dpcpp_slice)
+
+            # simple binary op
+            y_cpu = x_cpu_slice * x_cpu_slice
+            y_dpcpp = x_dpcpp_slice * x_dpcpp_slice
+            self.assertEqual(y_cpu, y_dpcpp, 0.01)
+
+            # check sliced data. This should convert the storage back to fp32
+            self.assertEqual(x_cpu_slice, x_dpcpp_slice, 0.01)
+            self.assertEqual(x_cpu, x_dpcpp, 0.01)
+            self.assertFalse(ipex.core.is_bf16_dil_tensor(x_dpcpp))
+            self.assertFalse(ipex.core.is_bf16_dil_tensor(x_dpcpp_slice))
+
+            # check shape info
+            self._check_tensor_shape(x_cpu, x_dpcpp)
+            self._check_tensor_shape(x_cpu_slice, x_dpcpp_slice)
+
+    def test_cat_slice(self):
+        with AutoDNNL(True), AutoMixPrecision(True):
+            x_cpu = torch.rand(10)
+            y_cpu = torch.cat([x_cpu, x_cpu, x_cpu])
+
+            x_dpcpp = x_cpu.to(device=device)
+            y_dpcpp = torch.cat([x_dpcpp, x_dpcpp, x_dpcpp])
+
+            res_cpu = y_cpu[0:10] * y_cpu[10:20] * y_cpu[20:30]
+            res_dpcpp = y_dpcpp[0:10] * y_dpcpp[10:20] * y_dpcpp[20:30]
+            self.assertEqual(res_cpu, res_dpcpp, 0.01)
+
+    def test_sliced_binary(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+
+        with AutoDNNL(True), AutoMixPrecision(True):
+            x_cpu = torch.rand(10, 10, 10)
+            x_cpu_slice = x_cpu[3:7, 3:7, 5]
+
+            x_dpcpp = x_cpu.to(device=device)
+            x_dpcpp_slice = x_dpcpp[3:7, 3:7, 5]
+
+            # test mul
+            y_cpu = x_cpu_slice * x_cpu_slice
+            y_dpcpp = x_dpcpp_slice * x_dpcpp_slice
+            self._check_tensor_shape(y_cpu, y_dpcpp)
+            self.assertEqual(y_cpu, y_dpcpp, 0.01)
+
+            # test sum
+            y_cpu = x_cpu_slice + x_cpu_slice
+            y_dpcpp = x_dpcpp_slice + x_dpcpp_slice
+            self._check_tensor_shape(y_cpu, y_dpcpp)
+            self.assertEqual(y_cpu, y_dpcpp, 0.01)
+
+    def test_extract_sliced(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+
+        with AutoDNNL(True), AutoMixPrecision(True):
+            x_cpu = torch.rand(10, 10, 10)
+            x_cpu_slice = x_cpu[3:7, 3:7, 5]
+
+            x_dpcpp = x_cpu.to(device=device)
+            x_dpcpp_slice = x_dpcpp[3:7, 3:7, 5]
+
+            x_cpu_slice_clone = x_cpu_slice.clone()
+            x_dpcpp_slice_clone = x_dpcpp_slice.clone()
+            self._check_tensor_shape(x_cpu_slice_clone, x_dpcpp_slice_clone)
+            self.assertEqual(x_cpu_slice_clone, x_dpcpp_slice_clone, 0.01)
+
+
+    # def test_sliced_eltwise(self):
+    #     rand_seed = int(get_rand_seed())
+    #     print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+    #     torch.manual_seed(rand_seed)
+
+    #     with AutoDNNL(True), AutoMixPrecision(True):
+    #         x_cpu = torch.rand(10, 10, 10)
+    #         x_cpu_slice = x_cpu[3:7, 3:7, 5]
+
+    #         x_dpcpp = x_cpu.to(device=device)
+    #         x_dpcpp_slice = x_dpcpp[3:7, 3:7, 5]
+
+    #         y_cpu = F.relu(x_cpu_slice)
+    #         y_dpcpp = F.relu(x_dpcpp_slice)
+    #         self._check_tensor_shape(y_cpu, y_dpcpp)
+    #         self.assertEqual(y_cpu, y_dpcpp, 0.01)
+
+    def test_linear_with_sliced_bias(self):
+        bias = torch.rand(30)
+        x_cpu = torch.rand(20, 30)
+        w_cpu = torch.rand(10, 30)
+        b_cpu = torch.rand(30)
+        y_cpu = F.linear(x_cpu, w_cpu, b_cpu[10:20])
+
+        x_dpcpp = x_cpu.to(device=device)
+        w_dpcpp = w_cpu.to(device=device)
+        b_dpcpp = b_cpu.to(device=device)
+        with AutoDNNL(True), AutoMixPrecision(True):
+            y_dpcpp = F.linear(x_dpcpp, w_dpcpp, b_dpcpp[10:20])
+
+        self.assertEqual(y_cpu, y_dpcpp, 0.1)
+
 class TestBinOPs(TestCase):
     def _gen_shapes(self):
         dims = torch.randint(1, 10, (1,))

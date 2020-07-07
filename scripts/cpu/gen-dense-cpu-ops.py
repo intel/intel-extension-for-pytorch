@@ -67,6 +67,9 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor',
     'aten::gelu(Tensor self) -> Tensor',
     'aten::gelu_backward(Tensor grad, Tensor self) -> Tensor',
+    'aten::slice.Tensor(Tensor(a) self, int dim=0, int start=0, int end=9223372036854775807, int step=1) -> Tensor(a)',
+    'aten::select.int(Tensor(a) self, int dim, int index) -> Tensor(a)',
+    'aten::select.Dimname(Tensor(a) self, Dimname dim, int index) -> Tensor(a)',
     #'aten::native_layer_norm(Tensor input, Tensor? weight, Tensor? bias, int M, int N, float eps) -> (Tensor, Tensor, Tensor)',
     #'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)'
 ]
@@ -307,11 +310,6 @@ class DenseOPCodeGen(object):
             param_seq_str_vec = []
             for param_var in param_vars:
                 param_seq_str = param_var
-                if param_var in dnnl_tensor_param_vars:
-                    if param_var == 'out' and is_out_func(fname):
-                        code += '      TORCH_INTERNAL_ASSERT_DEBUG_ONLY({}.is_contiguous());\n'.format(param_var)
-                    else:
-                        param_seq_str = '{}.is_contiguous() ? {} : {}.contiguous()'.format(param_var, param_var, param_var)
                 param_seq_str_vec.append(param_seq_str)
             code += '      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))\n'
             code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))

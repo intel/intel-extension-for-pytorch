@@ -109,34 +109,7 @@ struct ShadeDataContext {
 
     SANITY_CHECK_SHADE_DATA_CONTEXT(shade_data_context);
 
-    if (data_type == SHADE_DATA_TYPE::DIL) {
-      auto raw_cpu_data = tensor.storage().data_ptr().get();
-      if (raw_cpu_data == nullptr) {
-        // the dnnl tensor does not share data with raw tensor data.
-        return true;
-      } else {
-        // The dnnl tensor shares some data with raw tensor.
-        TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->dil_tensor->is_public_format());
-
-        // For the case:
-        //   1. There is a tensor named A
-        //   2. There is a tensor named B that shares some data with A
-        //   3. There is a tensor named C that shares some data with A
-        //   4. There is a tensor named C that shares some data with B
-        // example:
-        //   A = torch.rand((10, 10))
-        //   B = A[2:5, :]
-        //   C = A[4:7, :]
-        // All these tensors share same buffer of Tensor A with different storge offsets and elements.
-        // So the context modification will impact all these tensors.
-        if (check_tensor_own_whole_storage(tensor)) {
-          TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->dil_tensor->get_size() == tensor.storage().capacity());
-          return true;
-        }
-      }
-    }
-
-    return false;
+    return data_type == SHADE_DATA_TYPE::DIL;
   }
 
   /**
@@ -156,7 +129,7 @@ struct ShadeDataContext {
    * @return If the input tensor does not contain DNNL buffer, the function will return
    * an empty DNNL buffer. The caller should check the return buffer is empty or not.
    */
-  static inline dil::tensor& getDilTensor(const at::Tensor &tensor) {
+  static inline dil::tensor& getDilStorage(const at::Tensor &tensor) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
     void *raw_context = tensor.storage().data_ptr().get_context();
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(raw_context != nullptr);
@@ -208,7 +181,7 @@ struct ShadeDataContext {
    * @param tensor input aten tensor
    */
   static inline bool isTensorMixPrecision(const at::Tensor &tensor) {
-    auto dil_tensor_type = getDilTensor(tensor).get_data_type();
+    auto dil_tensor_type = getDilStorage(tensor).get_data_type();
     auto aten_tensor_type = tensor.scalar_type();
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_type == at::kFloat || aten_tensor_type == at::kBFloat16);
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_tensor_type == dil::data_type::bf16 || dil_tensor_type == dil::data_type::f32);

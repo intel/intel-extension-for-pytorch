@@ -93,7 +93,7 @@ void prepack_deconv_weights(
   //       "is dil tensor", we could remove the first check below
   if (!check_tensor_own_shade_context(weight) ||
       !cpu::ShadeDataContext::isDilOwnTheTensor(weight) ||
-      cpu::ShadeDataContext::getDilTensor(weight).is_public_format()) {
+      cpu::ShadeDataContext::getDilStorage(weight).is_public_format()) {
 
     auto dil_weight = dbl::comm::try_gen_dil_tensor(weight);
     auto output_sizes = calc_deconv_input_size(input.sizes(), weight.sizes(), padding, output_padding, stride, dilation, groups);

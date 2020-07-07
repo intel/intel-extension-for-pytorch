@@ -61,99 +61,6 @@ namespace bridge {
 
 at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor);
 
-void reorderDilTensorToPublic(const at::Tensor& ipexTensor) {
-  void *data_ctx = ipexTensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
-  cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(! (shade_data_context->dil_tensor->is_empty()));
-  dil::tensor &dil_tensor = *shade_data_context->dil_tensor;
-  dil::tensor pub_tensor;
-
-  if (dil_tensor.is_public_format()) {
-    if (cpu::ShadeDataContext::isTensorMixPrecision(ipexTensor)) {
-      auto& data_ptr = ipexTensor.storage().unsafeGetStorageImpl()->data_ptr();
-      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(data_ptr.get() == nullptr);
-      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data == nullptr);
-      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun == nullptr);
-
-      auto aten_tensor_scalar_type = ipexTensor.scalar_type();
-      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_scalar_type == at::kFloat);
-      auto new_type_desc = dil_tensor.get_desc().to_type(get_dil_data_type(aten_tensor_scalar_type));
-      pub_tensor.init(new_type_desc);
-      pub_tensor.feed_from(dil_tensor);
-    } else {
-      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor->get_data_handle());
-      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data != nullptr);
-      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun != nullptr);
-    }
-  } else {
-    auto& data_ptr = ipexTensor.storage().unsafeGetStorageImpl()->data_ptr();
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(data_ptr.get_deleter() == &(cpu::ShadeDataContext::freeShadeDataContext));
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun == nullptr);
-
-    auto aten_tensor_scalar_type = ipexTensor.scalar_type();
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_scalar_type == at::kFloat || aten_tensor_scalar_type == at::kBFloat16);
-    pub_tensor = dil_tensor.to_public(nullptr, get_dil_data_type(aten_tensor_scalar_type));
-    cpu::dbl::comm::sync_shape_from_dil_to_aten(ipexTensor, pub_tensor);
-  }
-
-  if (!pub_tensor.is_empty()) {
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(pub_tensor.is_public_format());
-    cpu::ShadeDataContext *new_shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
-    new_shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
-    new_shade_data_context->dil_tensor = pub_tensor;
-    // Share with DNNL raw data because it is plain format now
-    new_shade_data_context->cpu_raw_data = pub_tensor.get_data_handle();
-    // Cannot free CPU data because the the data is owned by DNNL
-    new_shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
-
-    // Create a new DataPtr instances because the DataPtr class does not support set
-    // its data or context directly
-    c10::DataPtr shade_data_ptr(
-      pub_tensor.get_data_handle(),
-      new_shade_data_context,
-      &(cpu::ShadeDataContext::freeShadeDataContext),
-      ipexTensor.device().type());
-
-    ipexTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(shade_data_ptr));
-  }
-}
-
-void reorderDilTensorGeneric(const at::Tensor& ipexTensor, const dil::tensor::desc& dstDesc) {
-  // ipexTensor is not required to be a DIL tensor
-  dil::tensor src = cpu::dbl::comm::try_gen_dil_tensor(ipexTensor);
-  dil::tensor dst {dstDesc};
-  dst.feed_from(src);
-
-  cpu::ShadeDataContext *new_shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
-  new_shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
-  new_shade_data_context->dil_tensor = dst;
-
-  if (dstDesc.is_plain()) {
-    // Share with DNNL raw data because it is plain format now
-    new_shade_data_context->cpu_raw_data = dst.get_data_handle();
-    // Cannot free CPU data because the the data is owned by DNNL
-    new_shade_data_context->cpu_del_fun = &(c10::detail::deleteNothing);
-  } else {
-    // If tensor is of blocked format, cpu raw data means nothing here.
-    new_shade_data_context->cpu_raw_data = nullptr;
-    new_shade_data_context->cpu_del_fun = nullptr;
-  }
-
-  // Create a new DataPtr instances because the DataPtr class does not support set
-  // its data or context directly
-  c10::DataPtr shade_data_ptr(
-    new_shade_data_context->cpu_raw_data,
-    new_shade_data_context,
-    &(cpu::ShadeDataContext::freeShadeDataContext),
-    ipexTensor.device().type());
-
-  ipexTensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(shade_data_ptr));
-
-  if (dstDesc.is_plain()) {
-    cpu::dbl::comm::sync_shape_from_dil_to_aten(ipexTensor, dst);
-  }
-}
-
 void attachShadeDataContext(const at::Tensor& tensor) {
   auto tensor_storage_impl = tensor.storage().unsafeGetStorageImpl();
   auto& data_ptr = tensor_storage_impl->data_ptr();
@@ -218,7 +125,7 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
   // Branch 2.1: Dense + Dil Tensor
   if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
-    reorderDilTensorToPublic(ipexTensor);
+    cpu::dbl::comm::reorder_to_public(ipexTensor);
   }
 
   // Branch 2.2: Dense + CPU Tensor

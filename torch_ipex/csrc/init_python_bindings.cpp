@@ -44,7 +44,7 @@ bool isDilTensor(const at::Tensor &tensor) {
 
 bool isBF16DilTensor(const at::Tensor &tensor) {
   if (isDilTensor(tensor)) {
-    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
+    auto dil_tensor = cpu::ShadeDataContext::getDilStorage(tensor);
     return dil_tensor.get_data_type() == dil::data_type::bf16;
   }
 
@@ -53,24 +53,24 @@ bool isBF16DilTensor(const at::Tensor &tensor) {
 
 bool isFP32DilTensor(const at::Tensor &tensor) {
   if (isDilTensor(tensor)) {
-    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
+    auto dil_tensor = cpu::ShadeDataContext::getDilStorage(tensor);
     return dil_tensor.get_data_type() == dil::data_type::f32;
   }
 
   return false;
 }
 
-dil::dims getDilTensorSizes(const at::Tensor &tensor) {
+dil::dims getDilStorageSizes(const at::Tensor &tensor) {
   if (isDilTensor(tensor)) {
-    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
+    auto dil_tensor = cpu::ShadeDataContext::getDilStorage(tensor);
     return dil_tensor.get_dims();
   }
   return dil::dims();
 }
 
-dil::dims getDilTensorStrides(const at::Tensor &tensor) {
+dil::dims getDilStorageStrides(const at::Tensor &tensor) {
   if (isDilTensor(tensor)) {
-    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
+    auto dil_tensor = cpu::ShadeDataContext::getDilStorage(tensor);
     return dil_tensor.get_strides();
   }
   return dil::dims();
@@ -120,8 +120,8 @@ void InitIpexModuleBindings(py::module m) {
   m.def("is_dil_tensor", &isDilTensor);
   m.def("is_bf16_dil_tensor", &isBF16DilTensor);
   m.def("is_fp32_dil_tensor", &isFP32DilTensor);
-  m.def("get_dil_tensor_sizes", &getDilTensorSizes);
-  m.def("get_dil_tensor_strides", &getDilTensorStrides);
+  m.def("get_dil_tensor_sizes", &getDilStorageSizes);
+  m.def("get_dil_tensor_strides", &getDilStorageStrides);
   m.def("enable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(true); });
   m.def("disable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
   m.def("get_jit_opt", []() { return AutoOptConfig::singleton().get_jit_fuse(); });

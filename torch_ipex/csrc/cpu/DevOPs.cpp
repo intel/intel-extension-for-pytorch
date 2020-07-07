@@ -3,6 +3,7 @@
 #include <ATen/Context.h>
 #include <ATen/CPUGenerator.h>
 #include <ATen/InferSize.h>
+#include <ATen/NamedTensorUtils.h>
 #include <c10/util/Exception.h>
 #include <c10/util/Logging.h>
 
@@ -32,7 +33,6 @@ namespace cpu {
 
 #define CHECK_DNNL_OP_PRE_COND(tensor)                                               \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.defined());                                \
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.is_contiguous());                          \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.layout() == c10::kStrided)
 
 at::Tensor AtenIpexCPUDev::dil_convolution(
@@ -1329,9 +1329,37 @@ at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::
   DEBUG("AtenIpexCPUDev::dil_clone\n");
   CHECK_DNNL_OP_PRE_COND(self);
 
-  dil::tensor src = dbl::comm::try_gen_dil_tensor(self);
-  dil::tensor dst;
-  dil::direct_copy::compute(src, dst);
+  auto memory_format =
+      optional_memory_format.value_or(at::MemoryFormat::Preserve);
+
+  if (memory_format == at::MemoryFormat::Preserve) {
+    if (!self.is_non_overlapping_and_dense()) {
+      memory_format = self.suggest_memory_format();
+    }
+  }
+
+  IPEX_CHECK(
+      memory_format == at::MemoryFormat::Preserve ||
+          memory_format == at::MemoryFormat::Contiguous,
+      "dil_clone only support Preserve of Contiguous");
+
+  auto src = dbl::comm::try_gen_dil_tensor(self);
+  auto dst_desc =
+      memory_format == at::MemoryFormat::Preserve
+          ? src.get_desc()
+          : src.get_desc().to_default_format();
+  dil::tensor dst{dst_desc};
+  src.reorder_to(dst);
+
+  if (src.has_scale()) {
+    dst.set_scale(src.get_scale());
+  }
+  if (src.has_zero_point()) {
+    dst.set_zero_point(src.get_zero_point());
+  }
+  if (src.has_workspace()) {
+    dst.copy_workspace(src);
+  }
   return dbl::comm::gen_aten_tensor_by(std::move(dst));
 }
 
@@ -1428,6 +1456,110 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& s
     splits[j] = dbl::comm::gen_aten_tensor_by(std::move(y[j]));
   }
   return splits;
+}
+
+
+at::Tensor dil_as_strided(const at::Tensor& self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset_) {
+  DEBUG("AtenIpexCPUDev::dil_as_strided\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  // share storage
+  auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
+  self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
+  auto result = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::DPCPPTensorId);
+
+  auto* _tensor_impl = (IPEXTensorImpl *)result.unsafeGetTensorImpl();
+  _tensor_impl->copy_meta_info(self.unsafeGetTensorImpl());
+  _tensor_impl->copy_auto_grad(self.unsafeGetTensorImpl());
+
+  auto storage_offset = storage_offset_.value_or(self.storage_offset());
+  _tensor_impl->set_strided(size, stride, storage_offset);
+  return result;
+}
+
+
+at::Tensor AtenIpexCPUDev::dil_slice(const at::Tensor & self, int64_t dim, int64_t start, int64_t end, int64_t step) {
+  DEBUG("AtenIpexCPUDev::dil_slice\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
+  // Port from aten/src/ATen/native/TensorShape.cpp
+  int64_t ndim = self.dim();
+  if (ndim == 0) {
+    AT_INDEX_ERROR("dil_slice() cannot be applied to a 0-dim tensor.");
+  }
+  dim = at::maybe_wrap_dim(dim, ndim);
+  auto sizes = self.sizes().vec();
+  auto strides = self.strides().vec();
+  // TODO: support negative strides
+  TORCH_CHECK(step > 0, "slice step must be positive");
+  if (start < 0) {
+    start += sizes[dim];
+  }
+  if (end < 0) {
+    end += sizes[dim];
+  }
+  if (start < 0) {
+    start = 0;
+  } else if (start >= sizes[dim]) {
+    start = sizes[dim];
+  }
+  if (end < start) {
+    end = start;
+  } else if (end >= sizes[dim]) {
+    end = sizes[dim];
+  }
+  auto storage_offset = self.storage_offset() + start * strides[dim];
+  auto len = end - start;
+  sizes[dim] = (len + step - 1) / step;  // round-up
+  strides[dim] *= step;
+
+  auto result = dil_as_strided(self, sizes, strides, storage_offset);
+  at::namedinference::propagate_names(result, self);
+  return result;
+}
+
+at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, int64_t dim, int64_t index) {
+  DEBUG("AtenIpexCPUDev::dil_select\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
+  // Port from aten/src/ATen/native/TensorShape.cpp
+  int64_t ndim = self.dim();
+  if (ndim == 0) {
+    AT_INDEX_ERROR("select() cannot be applied to a 0-dim tensor.");
+  }
+  dim = at::maybe_wrap_dim(dim, ndim);
+  auto size = self.size(dim);
+  if (index < -size || index >= size) {
+    if (self.has_names() && self.names()[dim] != at::Dimname::wildcard()) {
+      AT_INDEX_ERROR("select(): index ", index, " out of range for tensor of size ",
+                     self.sizes(), " at dimension ", self.names()[dim]);
+    }
+    AT_INDEX_ERROR("select(): index ", index, " out of range for tensor of size ",
+                   self.sizes(), " at dimension ", dim);
+  }
+  if (index < 0) {
+    index += size;
+  }
+  if (self.is_sparse()) {
+    IPEX_CHECK(false, "Got a sparse tensor in select. Should not reach here.");
+    // return at::select(self, dim, index);
+  }
+  auto sizes = self.sizes().vec();
+  auto strides = self.strides().vec();
+  auto storage_offset = self.storage_offset() + index * strides[dim];
+  sizes.erase(sizes.begin() + dim);
+  strides.erase(strides.begin() + dim);
+  auto result = dil_as_strided(self, sizes, strides, storage_offset);
+  at::namedinference::propagate_names_except(result, self, {dim});
+  return result;
+}
+
+at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, at::Dimname dim, int64_t index) {
+  return dil_select(self, at::dimname_to_position(self, dim), index);
 }
 
 std::vector<at::Tensor> AtenIpexCPUDev::dil_split(const at::Tensor& self, int64_t split_size, int64_t dim) {
