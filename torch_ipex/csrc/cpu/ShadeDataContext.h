@@ -156,7 +156,7 @@ struct ShadeDataContext {
    * @return If the input tensor does not contain DNNL buffer, the function will return
    * an empty DNNL buffer. The caller should check the return buffer is empty or not.
    */
-  static inline dil::tensor& getDilTensor(const at::Tensor &tensor) {
+  static inline dil::tensor& getDilStorage(const at::Tensor &tensor) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
     void *raw_context = tensor.storage().data_ptr().get_context();
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(raw_context != nullptr);
@@ -208,7 +208,7 @@ struct ShadeDataContext {
    * @param tensor input aten tensor
    */
   static inline bool isTensorMixPrecision(const at::Tensor &tensor) {
-    auto dil_tensor_type = getDilTensor(tensor).get_data_type();
+    auto dil_tensor_type = getDilStorage(tensor).get_data_type();
     auto aten_tensor_type = tensor.scalar_type();
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_type == at::kFloat || aten_tensor_type == at::kBFloat16);
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_tensor_type == dil::data_type::bf16 || dil_tensor_type == dil::data_type::f32);

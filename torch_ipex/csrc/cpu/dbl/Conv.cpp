@@ -168,7 +168,7 @@ void prepack_conv_weights(
   //       "is dil tensor", we could remove the first check below
   if (!check_tensor_own_shade_context(weight) ||
       !cpu::ShadeDataContext::isDilOwnTheTensor(weight) ||
-      cpu::ShadeDataContext::getDilTensor(weight).is_public_format()) {
+      cpu::ShadeDataContext::getDilStorage(weight).is_public_format()) {
     auto dil_weight = dbl::comm::try_gen_dil_tensor(weight);
     auto packed_desc = dil::convolution_forward::expected_weights_desc(
       weight.sizes().vec(),

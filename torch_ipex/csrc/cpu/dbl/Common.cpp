@@ -48,7 +48,7 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type) 
 
 void reorder_to_public(const at::Tensor& tensor) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cpu::ShadeDataContext::isDilTensor(tensor));
-  auto& dil_tensor = cpu::ShadeDataContext::getDilTensor(tensor);
+  auto& dil_tensor = cpu::ShadeDataContext::getDilStorage(tensor);
   auto dst_desc = dil_tensor.get_desc();
   auto aten_tensor_scalar_type = tensor.scalar_type();
   auto *shade_data_context = (cpu::ShadeDataContext*)tensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
@@ -122,7 +122,7 @@ void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_tensor_buffer) {
 
 dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
   if (cpu::ShadeDataContext::isDilTensor(input)) {
-    auto dil_tensor = cpu::ShadeDataContext::getDilTensor(input);
+    auto dil_tensor = cpu::ShadeDataContext::getDilStorage(input);
     if ((!check_aten_dil_shape_info(input, dil_tensor)) && dil_tensor.is_public_format()) {
       dil_tensor.set_dims_and_strides(input.sizes().vec(), input.strides().vec());
     }
