@@ -9,7 +9,6 @@ namespace cpu {
 namespace dbl {
 namespace comm {
 
-dil::tensor dil_tensor_from_dense(const at::Tensor& tensor);
 void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor);
 
 /**
@@ -37,11 +36,11 @@ void reorder_to_public(const at::Tensor& tensor);
 void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc);
 
 /**
- * Set the buffer of the input tensor to the dil tensor
+ * Replace the whole original storage with a dil storage `dil_buffer`
  * @param[in] tensor            The input tensor
  * @param[in] dil_tensor_buffer The dil tensor buffer
  */
-void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_tensor_buffer);
+void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer);
 
 dil::tensor try_gen_dil_tensor(const at::Tensor &input);
 at::Tensor gen_aten_tensor_by(dil::tensor&& tensor);

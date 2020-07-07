@@ -307,11 +307,6 @@ class DenseOPCodeGen(object):
             param_seq_str_vec = []
             for param_var in param_vars:
                 param_seq_str = param_var
-                if param_var in dnnl_tensor_param_vars:
-                    if param_var == 'out' and is_out_func(fname):
-                        code += '      TORCH_INTERNAL_ASSERT_DEBUG_ONLY({}.is_contiguous());\n'.format(param_var)
-                    else:
-                        param_seq_str = '{}.is_contiguous() ? {} : {}.contiguous()'.format(param_var, param_var, param_var)
                 param_seq_str_vec.append(param_seq_str)
             code += '      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))\n'
             code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))

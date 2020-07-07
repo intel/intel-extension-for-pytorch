@@ -902,6 +902,8 @@ class tensor : public memory {
   /// Decide wether there is an extra tensor packed in
   bool has_workspace() const { return workspace_ != nullptr; }
 
+  void copy_workspace(const tensor& other) { workspace_ = other.workspace_; }
+
   /// Return the scale of this param.
   const scale_t &get_scale() const { return *scale_.get(); }
 
