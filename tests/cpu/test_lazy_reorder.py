@@ -255,6 +255,29 @@ class TestBinaryOp(TestCase):
         a2 = self._test_mul_('cpu', rand_seed)
         self.assertEqual(a2, a1.to('cpu'))
 
+    def test_binary_propagate_group(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        ipex.core.enable_auto_dnnl()
+
+        input = torch.rand((1, 64, 7, 7))
+
+        input_cpu = input.clone().requires_grad_()
+        input_dpcpp = input.clone().to(device=device).requires_grad_()
+        conv_cpu = torch.nn.Conv2d(64, 64, (3, 3), groups=8)
+        conv_dpcpp = copy.deepcopy(conv_cpu).to(device=device)
+        conv_cpu(input_cpu)
+        conv_dpcpp(input_dpcpp)
+
+        y_cpu = conv_cpu.weight.add(conv_cpu.weight)
+        y_dpcpp = conv_dpcpp.weight.add(conv_dpcpp.weight)
+        self.assertEqual(y_cpu, y_dpcpp)
+
+        y_cpu = conv_cpu.weight.mul(conv_cpu.weight)
+        y_dpcpp = conv_dpcpp.weight.mul(conv_dpcpp.weight)
+        self.assertEqual(y_cpu, y_dpcpp)
+
     def test_mixed_format(self):
         ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())

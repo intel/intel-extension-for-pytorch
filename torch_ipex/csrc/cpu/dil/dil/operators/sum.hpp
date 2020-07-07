@@ -22,7 +22,8 @@ struct sum : public dnnl::sum {
       pd = primitive_desc(dst.get_desc(), scales, src_descs, aengine);
     } else {
       pd = primitive_desc(scales, src_descs, aengine);
-      dst.reinit_if_possible(pd.dst_desc());
+      // propagate src group info
+      dst.reinit_if_possible({pd.dst_desc(), srcs[0].get_groups()});
     }
 
     exec_args args {{DNNL_ARG_DST, dst}};
