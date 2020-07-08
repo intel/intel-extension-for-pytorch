@@ -52,6 +52,11 @@ class TestTorchMethod(TestCase):
         self.assertEqual(y_cpu1.div(y_cpu2),
                          y_dpcpp1.div(y_dpcpp2).to(cpu_device))
 
+        print("floor_divide y_cpu", y_cpu1.floor_divide(y_cpu2))
+        print("floor_divide y_dpcpp", y_dpcpp1.floor_divide(y_dpcpp2).to(cpu_device))
+        self.assertEqual(y_cpu1.floor_divide(y_cpu2),
+                         (y_dpcpp1.floor_divide(y_dpcpp2)).to(cpu_device))
+
         print("__and__ y_cpu", y_cpu1_int.__and__(y_cpu2_int))
         print("__and__ y_dpcpp", y_dpcpp1_int.__and__(
             y_dpcpp2_int).to(cpu_device))

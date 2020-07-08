@@ -109,5 +109,36 @@ Tensor& div_(Tensor& self, const Tensor& other) {
   return at::AtenIpexTypeDPCPP::div_out(self, self, other);
 }
 
+Tensor& floor_divide_out(
+    Tensor& result,
+    const Tensor& self,
+    const Tensor& other) {
+  auto iter = TensorIterator::binary_op(
+      result,
+      self,
+      other,
+      /*check_mem_overlap=*/true);
+  impl::div_kernel_dpcpp(iter);
+  if (result.is_floating_point()) {
+    result.trunc_();
+  }
+  return result;
+}
+
+Tensor floor_divide(const Tensor& self, const Tensor& other) {
+  Tensor result;
+  auto iter = TensorIterator::binary_op(result, self, other);
+  impl::div_kernel_dpcpp(iter);
+
+  auto out = iter.output();
+  if (out.is_floating_point()) {
+    out.trunc_();
+  }
+  return out;
+}
+
+Tensor& floor_divide_(Tensor& self, const Tensor& other) {
+  return at::AtenIpexTypeDPCPP::floor_divide_out(self, self, other);
+}
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

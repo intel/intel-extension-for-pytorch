@@ -398,12 +398,13 @@ struct TORCH_API SYCLType final {
   static std::tuple<Tensor,Tensor> nll_loss2d_forward(const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index); // aten::nll_loss2d_forward(Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index) -> (Tensor output, Tensor total_weight)
   static Tensor & nll_loss2d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index, const Tensor & total_weight); // aten::nll_loss2d_backward.grad_input(Tensor grad_output, Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index, Tensor total_weight, *, Tensor(a!) grad_input) -> Tensor(a!)
   static Tensor nll_loss2d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index, const Tensor & total_weight); // aten::nll_loss2d_backward(Tensor grad_output, Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index, Tensor total_weight) -> Tensor
-
+  static Tensor floor_divide(const Tensor & self, const Tensor & other); // aten::floor_divide(Tensor self, Tensor other) -> Tensor
+  static Tensor & floor_divide_(Tensor & self, const Tensor & other); // aten::floor_divide_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
+  static Tensor & floor_divide_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::floor_divide.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 
 };
   static Tensor isnan(const Tensor & self); // aten::isnan(Tensor self) -> Tensor
   static bool equal(const Tensor & self, const Tensor & other); // aten::equal(Tensor self, Tensor other) -> bool
   static Tensor & multinomial_out(Tensor & out, const Tensor & self, int64_t num_samples, bool replacement, Generator * generator); // aten::multinomial.out(Tensor self, int num_samples, bool replacement=False, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
   static Tensor multinomial(const Tensor & self, int64_t num_samples, bool replacement, Generator * generator); // aten::multinomial(Tensor self, int num_samples, bool replacement=False, *, Generator? generator=None) -> Tensor
-
 } // namespace at
