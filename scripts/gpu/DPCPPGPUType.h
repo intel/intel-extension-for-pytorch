@@ -401,6 +401,10 @@ struct TORCH_API SYCLType final {
   static Tensor floor_divide(const Tensor & self, const Tensor & other); // aten::floor_divide(Tensor self, Tensor other) -> Tensor
   static Tensor & floor_divide_(Tensor & self, const Tensor & other); // aten::floor_divide_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
   static Tensor & floor_divide_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::floor_divide.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor reflection_pad1d(const Tensor & self, IntArrayRef padding); // aten::reflection_pad1d(Tensor self, int[2] padding) -> Tensor
+  static Tensor reflection_pad1d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef padding); // aten::reflection_pad1d_backward(Tensor grad_output, Tensor self, int[2] padding) -> Tensor
+  static Tensor & reflection_pad1d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef padding); // aten::reflection_pad1d_backward.grad_input(Tensor grad_output, Tensor self, int[2] padding, *, Tensor(a!) grad_input) -> Tensor(a!)
+  static Tensor & reflection_pad1d_out(Tensor & out, const Tensor & self, IntArrayRef padding); // aten::reflection_pad1d.out(Tensor self, int[2] padding, *, Tensor(a!) out) -> Tensor(a!)
 
 };
   static Tensor isnan(const Tensor & self); // aten::isnan(Tensor self) -> Tensor
