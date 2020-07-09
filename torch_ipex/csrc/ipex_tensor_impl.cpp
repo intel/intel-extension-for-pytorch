@@ -102,7 +102,7 @@ void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl) {
   this->is_channels_last_3d_contiguous_ = src_impl->is_contiguous(at::MemoryFormat::ChannelsLast3d);
   this->is_non_overlapping_and_dense_ = src_impl->is_non_overlapping_and_dense();
   this->is_wrapped_number_ = src_impl->is_wrapped_number();
-  this->set_version_counter(src_impl->version_counter().current_version());
+  this->set_version_counter(src_impl->version_counter());
   bool allow_tensor_metadata_change_ = src_impl->allow_tensor_metadata_change();
   this->set_allow_tensor_metadata_change(allow_tensor_metadata_change_);
   if (src_impl->named_tensor_meta() != nullptr) {
@@ -186,7 +186,7 @@ void IPEXTensorImpl::CopyMetadata(c10::TensorImpl *dest_impl, const c10::TensorI
     dest_impl->set_wrapped_number(src_impl->is_wrapped_number());
   }
 
-  dest_impl->set_version_counter(src_impl->version_counter().current_version());
+  dest_impl->set_version_counter(src_impl->version_counter());
 
   bool allow_tensor_metadata_change_ = src_impl->allow_tensor_metadata_change();
   dest_impl->set_allow_tensor_metadata_change(allow_tensor_metadata_change_);
