@@ -610,13 +610,15 @@ class TestLinear(TestCase):
         torch.manual_seed(rand_seed)
         in_features = torch.randint(3, 10, (1,)).item()
         out_features = torch.randint(3, 100, (1,)).item()
-        x = torch.randn(3, in_features, dtype=torch.float32) * 10
-        x_dpcpp = x.to(device=device)
-
         for bias in [True, False]:
-            linear = torch.nn.Linear(in_features, out_features, bias=bias)
-            linear_dpcpp = copy.deepcopy(linear).to(device=device)
-            self.assertEqual(linear(x), linear_dpcpp(x_dpcpp))
+            input_shape = [in_features]
+            for input_dim in [1, 2, 3, 4]:
+                if input_dim != 1:  input_shape.insert(0, torch.randint(3, 10, (1,)).item())
+                x = torch.randn(input_shape, dtype=torch.float32) * 10
+                x_dpcpp = x.to(device=device)
+                linear = torch.nn.Linear(in_features, out_features, bias=bias)
+                linear_dpcpp = copy.deepcopy(linear).to(device=device)
+                self.assertEqual(linear(x), linear_dpcpp(x_dpcpp))
 
     # we should first expose aten::linear, depend on https://github.com/pytorch/pytorch/pull/20039
     def test_linear_backward(self):
@@ -626,17 +628,20 @@ class TestLinear(TestCase):
         torch.manual_seed(rand_seed)
         in_features = torch.randint(3, 10, (1,)).item()
         out_features = torch.randint(3, 100, (1,)).item()
-        x = torch.randn(3, in_features, dtype=torch.float32) * 10
         for bias in [True, False]:
-            x1 = x.clone().requires_grad_()
-            x2 = x.clone().to(device=device).requires_grad_()
-            linear = torch.nn.Linear(in_features, out_features, bias=bias)
-            linear_dpcpp =copy.deepcopy(linear).to(device=device)
-            y1 = linear(x1).sum()
-            y2 = linear_dpcpp(x2).sum()
-            y1.backward()
-            y2.backward()
-            self.assertEqual(x1.grad, x2.grad)
+            input_shape = [in_features]
+            for input_dim in [1, 2, 3, 4]:
+                if input_dim != 1:  input_shape.insert(0, torch.randint(3, 10, (1,)).item())
+                x  = torch.randn(input_shape, dtype=torch.float32) * 10
+                x1 = x.clone().requires_grad_()
+                x2 = x.clone().to(device=device).requires_grad_()
+                linear = torch.nn.Linear(in_features, out_features, bias=bias)
+                linear_dpcpp =copy.deepcopy(linear).to(device=device)
+                y1 = linear(x1).sum()
+                y2 = linear_dpcpp(x2).sum()
+                y1.backward()
+                y2.backward()
+                self.assertEqual(x1.grad, x2.grad)
 
 class TestPool(TestCase):
     def test_avg_pool2d(self):

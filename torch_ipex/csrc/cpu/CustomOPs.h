@@ -74,8 +74,23 @@ class NewLinearOp : public torch::autograd::Function<NewLinearOp> {
         auto&& _ipex_input = torch_ipex::bridge::shallowFallbackToCPUTensor(input);
         auto&& _ipex_weight = torch_ipex::bridge::shallowFallbackToCPUTensor(weight);
         auto&& _ipex_grad_output = torch_ipex::bridge::shallowFallbackToCPUTensor(grad_output);
-        grad_input = _ipex_grad_output.mm(_ipex_weight);
-        grad_weight = _ipex_grad_output.t().mm(_ipex_input);
+        if (input.dim() <= 2){
+          if (input.dim() == 1) {
+            _ipex_grad_output = _ipex_grad_output.unsqueeze(0);
+            _ipex_input = _ipex_input.unsqueeze(0);
+          }
+          grad_input = _ipex_grad_output.mm(_ipex_weight);
+          if (input.dim() == 1) grad_input = grad_input.squeeze_(0);
+          grad_weight = _ipex_grad_output.t().mm(_ipex_input);
+        }
+        else{ //input.dim() > 2
+          std::vector<int64_t> mm_output_size;
+          mm_output_size.push_back(-1);
+          mm_output_size.push_back(weight.sizes()[0]);
+          _ipex_grad_output = _ipex_grad_output.reshape(mm_output_size);
+          grad_input = _ipex_grad_output.mm(_ipex_weight).reshape(input.sizes());
+          grad_weight = _ipex_grad_output.t().mm(_ipex_input.view({-1, input.sizes()[input.dim() - 1]}));
+        }
         if (bias.defined()) {
           grad_bias = _ipex_grad_output.sum(0);
         }
@@ -84,8 +99,23 @@ class NewLinearOp : public torch::autograd::Function<NewLinearOp> {
         static_cast<void>(grad_bias);
         return {torch_ipex::bridge::shallowUpgradeToDPCPPTensor(grad_input), torch_ipex::bridge::shallowUpgradeToDPCPPTensor(grad_weight), torch_ipex::bridge::shallowUpgradeToDPCPPTensor(grad_bias)};
       } else {
-        grad_input = grad_output.mm(weight);
-        grad_weight = grad_output.t().mm(input);
+        if (input.dim() <= 2){
+          if (input.dim() == 1) {
+            grad_output = grad_output.unsqueeze(0);
+            input = input.unsqueeze(0);
+          }
+          grad_input = grad_output.mm(weight);
+          if (input.dim() == 1) grad_input = grad_input.squeeze_(0);
+          grad_weight = grad_output.t().mm(input);
+        }
+        else if (input.dim() > 2){
+          std::vector<int64_t> mm_output_size;
+          mm_output_size.push_back(-1);
+          mm_output_size.push_back(weight.sizes()[0]);
+          grad_output = grad_output.reshape(mm_output_size);
+          grad_input = grad_output.mm(weight).reshape(input.sizes());
+          grad_weight = grad_output.t().mm(input.view({-1, input.sizes()[input.dim() - 1]}));
+        }
         if (bias.defined()) {
           grad_bias = grad_output.sum(0);
         }
