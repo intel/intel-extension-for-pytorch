@@ -941,18 +941,24 @@ void index_put(
           });
     });
   } else {
-    AT_DISPATCH_ALL_TYPES(iter.dtype(), "index_put", [&] {
-      using dtype = OpaqueType<sizeof(scalar_t)>;
-      dpcpp_index_kernel<DPCPP_K(index_put_kernel, scalar_t)>(
-          iter,
-          index_size,
-          index_stride,
-          [](char *out_data,
-             char *in_data,
-             int64_t offset) {
-            *(dtype*)(out_data + offset) = *(dtype*)in_data;
-          });
-    });
+    AT_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      iter.dtype(),
+      "index_put",
+      [&] {
+        using dtype = OpaqueType<sizeof(scalar_t)>;
+        dpcpp_index_kernel<DPCPP_K(index_put_kernel, scalar_t)>(
+            iter,
+            index_size,
+            index_stride,
+            [](char *out_data,
+               char *in_data,
+               int64_t offset) {
+              *(dtype*)(out_data + offset) = *(dtype*)in_data;
+            });
+      });
   }
 }
 
@@ -1208,18 +1214,24 @@ Tensor& put_(
           });
     });
   } else {
-    AT_DISPATCH_ALL_TYPES(self.scalar_type(), "put_", [&] {
-      using dtype = impl::OpaqueType<sizeof(scalar_t)>;
-      impl::put<scalar_t, DPCPP_K(dpcpp_put_kernel, scalar_t)>(
-          self,
-          index,
-          source,
-          [](dpcpp_global_ptr_pt<char> out_data,
-             dpcpp_global_ptr_pt<char> in_data,
-             uint64_t offset) {
-            *(dtype*)(out_data + offset) = *(dtype*)in_data;
-          });
-    });
+    AT_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      at::ScalarType::Bool,
+      self.scalar_type(),
+      "put_",
+      [&] {
+        using dtype = impl::OpaqueType<sizeof(scalar_t)>;
+        impl::put<scalar_t, DPCPP_K(dpcpp_put_kernel, scalar_t)>(
+            self,
+            index,
+            source,
+            [](dpcpp_global_ptr_pt<char> out_data,
+               dpcpp_global_ptr_pt<char> in_data,
+               uint64_t offset) {
+              *(dtype*)(out_data + offset) = *(dtype*)in_data;
+            });
+      });
   }
 
   return self;
