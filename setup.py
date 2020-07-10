@@ -126,86 +126,6 @@ def generate_ipex_cpu_aten_code(base_dir):
   os.chdir(cur_dir)
 
 
-def gpu_should_gen_aten_ops():
-    torch_ipex_git_root = "."
-    gpu_dedicate_type = "scripts/gpu/DedicateType.h"
-    gpu_dpcpp_type = "scripts/gpu/DPCPPGPUType.h"
-    gpu_dispatchstub_type = "scripts/gpu/DispatchStubOverride.h"
-    gpu_decl_script = "scripts/gpu/gen-gpu-decl.py"
-    gpu_gen_script = "scripts/gpu/gen-gpu-ops.py"
-    repo = git.Repo(torch_ipex_git_root)
-    gpu_dedicate_type_diff = repo.git.diff(gpu_dedicate_type)
-    gpu_dpcpp_type_diff = repo.git.diff(gpu_dpcpp_type)
-    gpu_dispatchstub_type_diff = repo.git.diff(gpu_dispatchstub_type)
-    gpu_decl_script_diff = repo.git.diff(gpu_decl_script)
-    gpu_gen_script_diff = repo.git.diff(gpu_gen_script)
-    return (gpu_dedicate_type_diff is not "") or \
-           (gpu_dpcpp_type_diff is not "") or \
-           (gpu_dispatchstub_type_diff is not "") or \
-           (gpu_decl_script_diff is not "") or \
-           (gpu_gen_script_diff is not "")
-
-def fileExists(filename):
-  if os.path.exists(filename):
-    return True
-  else:
-    return False
-
-def compare(file1, file2):
-  fp1 = open(file1, 'r')
-  fp2 = open(file2, 'r')
-  file_list1 = [i for i in fp1]
-  file_list2 = [i for i in fp2]
-  if (len(file_list1) != len(file_list2)):
-    return False
-  else:
-    for line in zip(file_list1, file_list2):
-      if line[0] != line[1]:
-        return False
-    return True
-
-def gpu_gen_and_should_copy(base_dir):
-  cur_dir = os.path.abspath(os.path.curdir)
-  os.chdir(os.path.join(base_dir, 'scripts', 'gpu'))
-  generate_code_cmd = ['python', \
-                      'gen-gpu-decl.py', \
-                      '--gpu_decl=./', \
-                      'DPCPPGPUType.h', \
-                      'DedicateType.h', \
-                      'DispatchStubOverride.h', \
-                      'RegistrationDeclarations.h']
-  if subprocess.call(generate_code_cmd) != 0:
-    print("Failed to run '{}'".format(generate_code_cmd), file=sys.stderr)
-    os.chdir(cur_dir)
-    sys.exit(1)
-  
-  generate_code_cmd =['python', \
-                      'gen-gpu-ops.py', \
-                      '--output_folder=./', \
-                      'DPCPPGPUType.h', \
-                      'RegistrationDeclarations_DPCPP.h', \
-                      'Functions_DPCPP.h']
-  if subprocess.call(generate_code_cmd) != 0:
-    print("Failed to run '{}'".format(generate_code_cmd), file=sys.stderr)
-    os.chdir(cur_dir)
-    sys.exit(1)
-
-  gen_dir = os.path.join(base_dir, 'torch_ipex/csrc/gpu/aten/generated/ATen')
-  if fileExists(os.path.join(gen_dir, 'aten_ipex_type_default.cpp')) and \
-    fileExists(os.path.join(gen_dir, 'aten_ipex_type_default.h')) and \
-    fileExists(os.path.join(gen_dir, 'aten_ipex_type_dpcpp.h')):
-    if compare('aten_ipex_type_default.cpp.in', os.path.join(gen_dir, 'aten_ipex_type_default.cpp')) and \
-      compare('aten_ipex_type_default.h.in', os.path.join(gen_dir, 'aten_ipex_type_default.h')) and \
-      compare('aten_ipex_type_dpcpp.h.in', os.path.join(gen_dir, 'aten_ipex_type_dpcpp.h')):
-      os.chdir(cur_dir)
-      return False
-    else:
-      os.chdir(cur_dir)
-      return True
-  else:
-    os.chdir(cur_dir)
-    return True
-
 class DPCPPExt(Extension, object):
   def __init__(self, name, project_dir=os.path.dirname(__file__)):
     Extension.__init__(self, name, sources=[])
@@ -286,6 +206,7 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
             '-DCMAKE_INSTALL_PREFIX=' + '/'.join([str(ext_dir.parent.absolute()), ext.name]),
             '-DPYTHON_INCLUDE_DIR=' + distutils.sysconfig.get_python_inc(),
             '-DLIB_NAME=' + ext.name,
+            '-DPYTHON_EXECUTABLE={}'.format(sys.executable),
         ]
 
     cc, cxx = _get_complier()
@@ -293,11 +214,6 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
                    '-DCMAKE_C_COMPILER=' + cc,
                    '-DCMAKE_CXX_COMPILER=' + cxx,
                    ]
-
-    if gpu_gen_and_should_copy(base_dir):
-      cmake_args += ['-DSHOULD_COPY=1']
-    else:
-      cmake_args += ['-DSHOULD_COPY=0']
 
     command = [self.cmake, ext.project_dir] + cmake_args
     print(' '.join(command))

@@ -128,6 +128,7 @@ build_ios
 .build_debug/*
 .build_release/*
 distribute/*
+dist/
 *.testbin
 *.bin
 cmake_build

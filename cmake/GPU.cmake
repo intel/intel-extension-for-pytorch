@@ -92,11 +92,14 @@ include_directories(${DPCPP_GPU_ATEN_SRC_ROOT})
 include_directories(${DPCPP_GPU_ATEN_GENERATED})
 
 # generate c10 dispatch registration
-if(SHOULD_COPY)
-  execute_process(COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/gpu/aten_ipex_type_default.cpp.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp)
-  execute_process(COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/gpu/aten_ipex_type_default.h.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.h)
-  execute_process(COMMAND cp ${PROJECT_SOURCE_DIR}/scripts/gpu/aten_ipex_type_dpcpp.h.in ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_dpcpp.h)
-endif()
+add_custom_command(OUTPUT
+          ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp
+          ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.h
+          ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_dpcpp.h
+        COMMAND
+          "${PYTHON_EXECUTABLE}" ${PROJECT_SOURCE_DIR}/scripts/gpu/dispatch_gen.py --install_dir ${DPCPP_GPU_ATEN_GENERATED}/ATen/
+        DEPENDS
+          ${PROJECT_SOURCE_DIR}/scripts/gpu/DPCPPGPUType.h)
 
 # sources
 set(DPCPP_SRCS)
