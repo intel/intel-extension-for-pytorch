@@ -27,6 +27,8 @@ at::Tensor empty_opaque_tensor(DPCPPTensorContext::Meta& meta, const TensorOptio
 
 at::Tensor to_plain_if_needed(const Tensor& tensor);
 
+at::Tensor to_plain_if_needed_(const Tensor& tensor);
+
 TensorList to_plain_if_needed(TensorList tensor);
 }
 }

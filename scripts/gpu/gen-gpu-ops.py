@@ -838,7 +838,7 @@ def generate_aten_to_xla(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
         param_vars.append(_pname)
       elif cptype == 'Tensor':
         if not type_is_const(ptype):
-          code += ('  {} = AtenIpexTypeDPCPP::to_plain_if_needed({});\n').format(
+          code += ('  {} = AtenIpexTypeDPCPP::to_plain_if_needed_({});\n').format(
               pname, pname)
           param_vars.append(pname)
         else:

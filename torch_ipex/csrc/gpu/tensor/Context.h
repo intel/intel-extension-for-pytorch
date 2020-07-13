@@ -112,29 +112,29 @@ public:
   // set underlying tensor context to given `const` tensor
   static void set_tensor_ctx(
       const at::Tensor& t, DPCPPTensorContext&& _ctx) {
-    data_t src = t.unsafeGetTensorImpl()->
+    data_t cur_raw_data = t.unsafeGetTensorImpl()->
         storage().unsafeGetStorageImpl()->data_ptr().get();
-    data_t dst = _ctx.data();
+    data_t tag_raw_data = _ctx.data();
 
-    auto ctx = new DPCPPTensorContext(_ctx);
-    at::DataPtr dptr(ctx->data(),
-                     ctx,
-                     DPCPPAllocator_get()->raw_deleter(),
-                     t.device().type());
+    auto tag_ctx = new DPCPPTensorContext(_ctx);
+    at::DataPtr tag_dptr(tag_ctx->data(),
+                         tag_ctx,
+                         DPCPPAllocator_get()->raw_deleter(),
+                         t.device().type());
 
     // release raw data to avoid auto-free after data_ptr dtor
-    DPCPPTensorContext* src_ctx =
+    DPCPPTensorContext* cur_ctx =
         (DPCPPTensorContext*)t.unsafeGetTensorImpl()->
         storage().unsafeGetStorageImpl()->data_ptr().release_context();
 
     // swap and old data_ptr dtor
     t.unsafeGetTensorImpl()->
-        storage().unsafeGetStorageImpl()->set_data_ptr(std::move(dptr));
+        storage().unsafeGetStorageImpl()->set_data_ptr(std::move(tag_dptr));
 
     // t->data == ctx->data. raw data is released and reclaim in new data_ptr
     // t->data != ctx->data. old raw data is released and should be deleted by us
-    if (src != dst)
-      delete src_ctx;
+    if (cur_raw_data != tag_raw_data)
+      DPCPPAllocator_get()->raw_deleter()(cur_ctx);
   }
 };
 

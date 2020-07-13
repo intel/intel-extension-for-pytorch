@@ -51,6 +51,19 @@ Tensor to_plain_if_needed(const Tensor& tensor) {
     return tensor;
 }
 
+Tensor to_plain_if_needed_(const Tensor& tensor) {
+  if (tensor.options().backend() != at::Backend::DPCPP ||
+      !DPCPPTensorConvertor::is_opaque_tensor(tensor))
+    return tensor;
+
+  auto plain = to_plain_if_needed(tensor);
+  auto plain_ctx =
+      (DPCPPTensorContext*)plain.unsafeGetTensorImpl()->
+      storage().unsafeGetStorageImpl()->data_ptr().release_context();
+  DPCPPTensorContext::set_tensor_ctx(tensor, std::move(*plain_ctx));
+  return tensor;
+}
+
 TensorList to_plain_if_needed(TensorList tensors) {
   std::vector<Tensor> _tensors;
   for(auto tensor : tensors) {
