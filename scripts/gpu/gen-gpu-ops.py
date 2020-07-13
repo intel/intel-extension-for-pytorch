@@ -92,7 +92,9 @@ _FN_BLACKLIST = set([
 ])
 
 _FN_BLKFMT_SUPPORTED = set([
-    'convolution_overrideable'
+    'convolution_overrideable',
+    'relu',
+    'relu_',
 ])
 
 _FN_BLACKLIST_REGEX = [

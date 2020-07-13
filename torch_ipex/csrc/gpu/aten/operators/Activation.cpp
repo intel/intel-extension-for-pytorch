@@ -481,7 +481,7 @@ void GeluBackwardKernelImpl(
 } // namespace impl
 
 Tensor relu(const Tensor& self) {
-  Tensor result = at::empty_like(self);
+  Tensor result;
   at::dpcpp::dpcpp_eltwise<mkldnn::algorithm::eltwise_relu>(result, self, 0.0f, 0.0f);
   return result;
 }
