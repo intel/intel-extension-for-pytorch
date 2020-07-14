@@ -226,8 +226,13 @@ at::Tensor convolution(
 
   mkldnn::memory output_usr_memory;
   if (output.defined()) {
-    output_usr_memory = dpcpp_mkldnn_memory(
-        {{output_tz}, data_t, format_nchw}, engine, output.data_ptr());
+    auto output_ctx =
+        at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(output);
+    output_usr_memory = output_ctx.is_plain() ?
+        dpcpp_mkldnn_memory(
+            {{output_tz}, data_t, format_nchw}, engine, output.data_ptr()) :
+        dpcpp_mkldnn_memory(
+            {output_ctx.meta()}, engine, output.data_ptr());
   } else {
     auto expected_output_md = conv_forward_pd->dst_desc();
     auto plain_output_md =
