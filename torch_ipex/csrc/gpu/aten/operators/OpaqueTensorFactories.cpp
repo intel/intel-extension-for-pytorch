@@ -38,10 +38,21 @@ Tensor empty_opaque_tensor(
   return tensor;
 }
 
-Tensor to_plain_if_needed(const Tensor& tensor) {
-  if (!lazy_reorder_enabled() ||
-      tensor.options().backend() != at::Backend::DPCPP ||
+inline bool need_to_plain(const Tensor& tensor) {
+  if (!lazy_reorder_enabled())
+    return false;
+
+  if (!tensor.defined())
+    return false;
+
+  if (tensor.options().backend() != at::Backend::DPCPP ||
       !DPCPPTensorConvertor::is_opaque_tensor(tensor))
+    return false;
+  return true;
+}
+
+Tensor to_plain_if_needed(const Tensor& tensor) {
+  if (!need_to_plain(tensor))
     return tensor;
 
   auto _tensor = at::AtenIpexTypeDPCPP::empty(
@@ -53,9 +64,7 @@ Tensor to_plain_if_needed(const Tensor& tensor) {
 }
 
 Tensor to_plain_if_needed_(const Tensor& tensor) {
-  if (!lazy_reorder_enabled() ||
-      tensor.options().backend() != at::Backend::DPCPP ||
-      !DPCPPTensorConvertor::is_opaque_tensor(tensor))
+  if (!need_to_plain(tensor))
     return tensor;
 
   auto plain = to_plain_if_needed(tensor);
