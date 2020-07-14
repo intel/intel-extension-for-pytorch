@@ -15,8 +15,6 @@ using namespace at::dpcpp;
 namespace at {
 namespace dpcpp {
 
-#define LAZY_REORDER
-
 template <algorithm alg_kind>
 void dpcpp_eltwise(
     at::Tensor& output,
@@ -36,49 +34,50 @@ void dpcpp_eltwise(
   auto format_any = get_dnnl_default_format(input.dim());
   auto input_md = memory::desc({input_tz}, data_t, format_any);
 
-#ifndef LAZY_REORDER
-  auto input_usr_memory = dpcpp_mkldnn_memory(input_md, engine, input.data_ptr());
-#else
-  auto input_ctx =
-      at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
-  input_md = input_ctx.is_plain() ? input_md : input_ctx.meta();
-  auto input_usr_memory =
-      dpcpp_mkldnn_memory(input_md, engine, input.data_ptr());
-#endif
+  memory input_usr_memory;
+  if (!lazy_reorder_enabled()) {
+    input_usr_memory = dpcpp_mkldnn_memory(input_md, engine, input.data_ptr());
+  } else {
+    auto input_ctx =
+        at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
+    input_md = input_ctx.is_plain() ? input_md : input_ctx.meta();
+    input_usr_memory =
+        dpcpp_mkldnn_memory(input_md, engine, input.data_ptr());
+  }
 
   eltwise_forward::desc eltwise_eltwiseFwd_desc(
       prop_kind::forward, alg_kind, input_md, alpha, beta);
   auto eltwise_forward_pd =
       eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, engine);
 
-#ifndef LAZY_REORDER
-  if (!output.defined())
-    output = at::empty_like(input);
-  auto output_usr_memory =
-      dpcpp_mkldnn_memory(eltwise_forward_pd.dst_desc(), engine, output.data_ptr());
-#else
-  mkldnn::memory output_usr_memory;
-  if (output.defined()) {
-    auto output_ctx =
-        at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(output);
-    auto output_md = output_ctx.is_plain() ? input_md : output_ctx.meta();
-    output_usr_memory =
-        dpcpp_mkldnn_memory(output_md, engine, output.data_ptr());
-  } else {
-    auto plain_output_md = memory::desc({input_tz}, data_t, format_any);
-    auto expected_output_md = eltwise_forward_pd.dst_desc();
-    if (plain_output_md != expected_output_md) {
-      output = at::AtenIpexTypeDPCPP::empty_opaque_tensor(
-          expected_output_md, input.options(), c10::nullopt);
-      output_usr_memory = dpcpp_mkldnn_memory(
-          expected_output_md, engine, output.data_ptr());
-    } else {
+  memory output_usr_memory;
+  if (!lazy_reorder_enabled()) {
+    if (!output.defined())
       output = at::empty_like(input);
-      output_usr_memory = dpcpp_mkldnn_memory(
-          plain_output_md, engine, output.data_ptr());
+    output_usr_memory = dpcpp_mkldnn_memory(
+        eltwise_forward_pd.dst_desc(), engine, output.data_ptr());
+  } else {
+    if (output.defined()) {
+      auto output_ctx =
+          at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(output);
+      auto output_md = output_ctx.is_plain() ? input_md : output_ctx.meta();
+      output_usr_memory =
+          dpcpp_mkldnn_memory(output_md, engine, output.data_ptr());
+    } else {
+      auto plain_output_md = memory::desc({input_tz}, data_t, format_any);
+      auto expected_output_md = eltwise_forward_pd.dst_desc();
+      if (plain_output_md != expected_output_md) {
+        output = at::AtenIpexTypeDPCPP::empty_opaque_tensor(
+            expected_output_md, input.options(), c10::nullopt);
+        output_usr_memory = dpcpp_mkldnn_memory(
+            expected_output_md, engine, output.data_ptr());
+      } else {
+        output = at::empty_like(input);
+        output_usr_memory = dpcpp_mkldnn_memory(
+            plain_output_md, engine, output.data_ptr());
+      }
     }
   }
-#endif
 
   auto strm = GpuStreamManager::Instance().get_stream();
   std::shared_ptr<mkldnn::primitive> eltwise_fwd;
@@ -87,7 +86,6 @@ void dpcpp_eltwise(
       {{MKLDNN_ARG_SRC, input_usr_memory},
        {MKLDNN_ARG_DST, output_usr_memory}});
 }
-#undef LAZY_REORDER
 
 template <algorithm alg_kind>
 void dpcpp_eltwise_backward(

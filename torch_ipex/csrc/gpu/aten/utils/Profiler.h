@@ -2,6 +2,7 @@
 
 #include <torch/csrc/autograd/profiler.h>
 
+#include <utils/Env.h>
 #include <CL/sycl.hpp>
 #include <sstream>
 #include <chrono>
@@ -30,10 +31,6 @@ struct DPCPPProvfilerStubsImpl : public DPCPPStubs {
 };
 
 void dpcpp_log(std::string name, cl::sycl::event& dpcpp_event);
-
-enum {ENV_VERBOSE = 0, ENV_FORCE_SYNC};
-
-int dpcpp_env(int env);
 
 inline int dpcpp_verbose() {
   return dpcpp_env(ENV_VERBOSE);

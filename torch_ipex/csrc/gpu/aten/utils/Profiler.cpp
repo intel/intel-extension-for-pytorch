@@ -39,36 +39,3 @@ struct RegisterDPCPPMethods {
 };
 
 static RegisterDPCPPMethods reg;
-
-int dpcpp_env(int env_type) {
-  static struct {
-    int level = [&]() -> int {
-      auto env = std::getenv("IPEX_VERBOSE");
-      int _level = 0;
-      if (env) {
-        _level = std::stoi(env, 0, 10);
-      }
-      std::cout << "IPEX-VERBOSE-LEVEL: " << _level << std::endl;
-      return _level;
-    } ();
-
-    int force_sync = [&]() -> int {
-      auto env = std::getenv("FORCE_SYNC");
-      int _force_sync = 0;
-      if (env) {
-        _force_sync = std::stoi(env, 0, 10);
-      }
-      std::cout << "Force SYNC: " << _force_sync << std::endl;
-      return _force_sync;
-    } ();
-  } env;
-
-  switch (env_type) {
-  case ENV_VERBOSE:
-    return env.level;
-  case ENV_FORCE_SYNC:
-    return env.force_sync;
-  default:
-    return 0;
-  }
-}

@@ -9,8 +9,6 @@
 
 #include <utils/ParamUtils.h>
 
-#define LAZY_REORDER
-
 using namespace mkldnn;
 using namespace at::dpcpp;
 using namespace at::native;
@@ -76,10 +74,8 @@ at::Tensor convolution(
   auto output_size = conv_output_size(
       input.sizes(), weight.sizes(), padding, stride, dilation, groups);
 
-#ifndef LAZY_REORDER
-  if (!output.defined())
+  if (!lazy_reorder_enabled() && !output.defined())
     output = at::empty(output_size, input.options());
-#endif
 
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
@@ -198,57 +194,57 @@ at::Tensor convolution(
   conv_forward_pd.reset(new convolution_forward::primitive_desc(
       *conv_forward_desc, pattr, engine));
 
-#ifndef LAZY_REORDER
-  auto input_usr_memory = dpcpp_mkldnn_memory(
-      {{input_tz}, data_t, format_nchw}, engine, input.data_ptr());
+  memory input_usr_memory, weight_usr_memory, output_usr_memory;
+  if (!lazy_reorder_enabled()) {
+    input_usr_memory = dpcpp_mkldnn_memory(
+        {{input_tz}, data_t, format_nchw}, engine, input.data_ptr());
 
-  auto weight_usr_memory = dpcpp_mkldnn_memory(
-      {{weight_tz}, data_t, format_weight}, engine, weight.data_ptr());
+    weight_usr_memory = dpcpp_mkldnn_memory(
+        {{weight_tz}, data_t, format_weight}, engine, weight.data_ptr());
 
-  auto output_usr_memory = dpcpp_mkldnn_memory(
-      {{output_tz}, data_t, format_nchw}, engine, output.data_ptr());
-#else
-  auto input_ctx =
-      at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
-  auto input_usr_memory = input_ctx.is_plain() ?
-      dpcpp_mkldnn_memory(
-          {{input_tz}, data_t, format_nchw}, engine, input.data_ptr()) :
-      dpcpp_mkldnn_memory(
-          {input_ctx.meta()}, engine, input.data_ptr());
-
-  auto weight_ctx =
-      at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(weight);
-  auto weight_usr_memory = weight_ctx.is_plain() ?
-      dpcpp_mkldnn_memory(
-          {{weight_tz}, data_t, format_nchw}, engine, weight.data_ptr()) :
-      dpcpp_mkldnn_memory(
-          {weight_ctx.meta()}, engine, weight.data_ptr());
-
-  mkldnn::memory output_usr_memory;
-  if (output.defined()) {
-    auto output_ctx =
-        at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(output);
-    output_usr_memory = output_ctx.is_plain() ?
-        dpcpp_mkldnn_memory(
-            {{output_tz}, data_t, format_nchw}, engine, output.data_ptr()) :
-        dpcpp_mkldnn_memory(
-            {output_ctx.meta()}, engine, output.data_ptr());
+    output_usr_memory = dpcpp_mkldnn_memory(
+        {{output_tz}, data_t, format_nchw}, engine, output.data_ptr());
   } else {
-    auto expected_output_md = conv_forward_pd->dst_desc();
-    auto plain_output_md =
-        mkldnn::memory::desc({output_tz}, data_t, format_nchw);
-    if (expected_output_md != plain_output_md) {
-      output = empty_opaque_tensor(
-          expected_output_md, input.options(), c10::nullopt);
-      output_usr_memory = dpcpp_mkldnn_memory(
-          expected_output_md, engine, output.data_ptr());
+    auto input_ctx =
+        at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
+    input_usr_memory = input_ctx.is_plain() ?
+        dpcpp_mkldnn_memory(
+            {{input_tz}, data_t, format_nchw}, engine, input.data_ptr()) :
+        dpcpp_mkldnn_memory(
+            {input_ctx.meta()}, engine, input.data_ptr());
+
+    auto weight_ctx =
+        at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(weight);
+    weight_usr_memory = weight_ctx.is_plain() ?
+        dpcpp_mkldnn_memory(
+            {{weight_tz}, data_t, format_nchw}, engine, weight.data_ptr()) :
+        dpcpp_mkldnn_memory(
+            {weight_ctx.meta()}, engine, weight.data_ptr());
+
+    if (output.defined()) {
+      auto output_ctx =
+          at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(output);
+      output_usr_memory = output_ctx.is_plain() ?
+          dpcpp_mkldnn_memory(
+              {{output_tz}, data_t, format_nchw}, engine, output.data_ptr()) :
+          dpcpp_mkldnn_memory(
+              {output_ctx.meta()}, engine, output.data_ptr());
     } else {
-      output = at::empty(output_size, input.options());
-      output_usr_memory = dpcpp_mkldnn_memory(
-          plain_output_md, engine, output.data_ptr());
+      auto expected_output_md = conv_forward_pd->dst_desc();
+      auto plain_output_md =
+          mkldnn::memory::desc({output_tz}, data_t, format_nchw);
+      if (expected_output_md != plain_output_md) {
+        output = empty_opaque_tensor(
+            expected_output_md, input.options(), c10::nullopt);
+        output_usr_memory = dpcpp_mkldnn_memory(
+            expected_output_md, engine, output.data_ptr());
+      } else {
+        output = at::empty(output_size, input.options());
+        output_usr_memory = dpcpp_mkldnn_memory(
+            plain_output_md, engine, output.data_ptr());
+      }
     }
   }
-#endif
 
   auto expected_input_md = conv_forward_pd->src_desc();
   auto input_memory = input_usr_memory;
@@ -270,8 +266,10 @@ at::Tensor convolution(
   auto output_memory = output_usr_memory;
   if (output_usr_memory.get_desc() != expected_output_md) {
     output_memory = memory(expected_output_md, engine);
-    DPCPP_ONEDNN_EXEC(reorder(output_usr_memory, output_memory),
-        strm, output_usr_memory, output_memory);
+    if (attr.with_sum()) {
+      DPCPP_ONEDNN_EXEC(reorder(output_usr_memory, output_memory),
+          strm, output_usr_memory, output_memory);
+    }
   }
 
   std::shared_ptr<convolution_forward> conv_forward;
@@ -290,12 +288,10 @@ at::Tensor convolution(
        {MKLDNN_ARG_BIAS, *bias_usr_memory},
        {MKLDNN_ARG_DST, output_memory}});
 
-#ifndef LAZY_REORDER
-  if (output_memory != output_usr_memory) {
+  if (!lazy_reorder_enabled() && output_memory != output_usr_memory) {
     DPCPP_ONEDNN_EXEC(reorder(output_memory, output_usr_memory),
         strm, output_memory, output_usr_memory);
   }
-#endif
 
   return output;
 }

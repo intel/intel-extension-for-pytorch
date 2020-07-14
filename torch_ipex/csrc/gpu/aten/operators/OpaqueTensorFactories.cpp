@@ -39,7 +39,8 @@ Tensor empty_opaque_tensor(
 }
 
 Tensor to_plain_if_needed(const Tensor& tensor) {
-  if (tensor.options().backend() != at::Backend::DPCPP ||
+  if (!lazy_reorder_enabled() ||
+      tensor.options().backend() != at::Backend::DPCPP ||
       !DPCPPTensorConvertor::is_opaque_tensor(tensor))
     return tensor;
 
@@ -52,7 +53,8 @@ Tensor to_plain_if_needed(const Tensor& tensor) {
 }
 
 Tensor to_plain_if_needed_(const Tensor& tensor) {
-  if (tensor.options().backend() != at::Backend::DPCPP ||
+  if (!lazy_reorder_enabled() ||
+      tensor.options().backend() != at::Backend::DPCPP ||
       !DPCPPTensorConvertor::is_opaque_tensor(tensor))
     return tensor;
 
@@ -65,6 +67,9 @@ Tensor to_plain_if_needed_(const Tensor& tensor) {
 }
 
 TensorList to_plain_if_needed(TensorList tensors) {
+  if (!lazy_reorder_enabled())
+    return tensors;
+
   std::vector<Tensor> _tensors;
   for(auto tensor : tensors) {
     _tensors.push_back(to_plain_if_needed(tensor));
