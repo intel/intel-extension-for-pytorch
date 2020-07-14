@@ -8,7 +8,7 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 
 Tensor empty_opaque_tensor(
-    DPCPPTensorContext::Meta& meta,
+    DPCPPTensorContext::Meta meta,
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
   auto* allocator = at::dpcpp::getDPCPPDeviceAllocator();

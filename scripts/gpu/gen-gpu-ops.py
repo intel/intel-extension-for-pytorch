@@ -95,6 +95,7 @@ _FN_BLKFMT_SUPPORTED = set([
     'convolution_overrideable',
     'relu',
     'relu_',
+    'native_batch_norm',
 ])
 
 _FN_BLACKLIST_REGEX = [
