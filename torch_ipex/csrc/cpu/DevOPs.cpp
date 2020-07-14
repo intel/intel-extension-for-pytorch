@@ -51,6 +51,12 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   CHECK_DNNL_OP_PRE_COND(input);
   CHECK_DNNL_OP_PRE_COND(weight);
 
+  if (check_auto_mix_int8_fp32()) {
+    if (check_int8_calibration()) {
+      insert_or_updata_observer(input);
+    }
+  }
+
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
   dil_input = dbl::comm::try_gen_dil_tensor(input);
 
@@ -78,7 +84,13 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     dilation,
     groups);
 
-  return dbl::comm::gen_aten_tensor_by(std::move(dil_output));
+  auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
+  if (check_auto_mix_int8_fp32()) {
+    if (check_int8_calibration()) {
+      insert_or_updata_observer(aten_output);
+    }
+  }
+  return aten_ouput;
 }
 
 at::Tensor dil_convolution_backward_input(
@@ -223,7 +235,6 @@ at::Tensor AtenIpexCPUDev::dil_deconvolution(
 
 at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
   DEBUG("AtenIpexCPUDev::convolution_overrideable\n");
-
   try {
     if (check_auto_dnnl()) {
       std::vector<at::Tensor> dnnl_input_tensors;
@@ -232,12 +243,13 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
       if (bias.defined()) {
         dnnl_input_tensors.push_back(bias);
       }
-      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))
+      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
         if (transposed) {
           return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined() && !bias.is_contiguous() ? bias.contiguous() : bias, padding, output_padding, stride, dilation, groups);
         } else {
           return AtenIpexCPUDev::dil_convolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined() && !bias.is_contiguous() ? bias.contiguous() : bias, stride, padding, dilation, groups);
         }
+      }
     }
   } catch (std::exception& e) {
 #if defined(_DEBUG)

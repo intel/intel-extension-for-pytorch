@@ -18,6 +18,7 @@
 
 #include "aten_ipex_type.h"
 #include "auto_opt_config.h"
+
 #include "cpu/dil/dil.hpp"
 #include "cpu/ShadeDataContext.h"
 #include "cpu/ExtendOPs.h"
@@ -84,7 +85,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_auto_dnnl", []() { return AutoOptConfig::singleton().get_auto_dnnl(); });
   m.def("enable_mix_bf16_fp32", []() { AutoOptConfig::singleton().set_mix_bf16_fp32(true); });
   m.def("disable_mix_bf16_fp32", []() { AutoOptConfig::singleton().set_mix_bf16_fp32(false); });
-  m.def("get_mix_bf16_fp32", []() { return AutoOptConfig::singleton().get_mix_bf16_fp32(); });
+  m.def("get_mix_bf16_fp32", []() { return AutoOptConfig::singleton().get_mix_bf16_fp32(); }); 
   m.def("packed_add_",
         [](at::Tensor &top_half, at::Tensor &bot_half,
            const at::Tensor &grad, float alpha) {
@@ -127,6 +128,21 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_jit_opt", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
   m.def("set_execution_mode", [](bool train) { AutoOptConfig::singleton().set_train(train); }, py::arg("train"));
   m.def("get_train", []() { return AutoOptConfig::singleton().get_train(); });
+  
+  // int8 path
+
+  m.def("enable_mix_int8_fp32", []() { AutoOptConfig::singleton().set_mix_int8_fp32(true); });
+  m.def("disable_mix_int8_fp32", []() { AutoOptConfig::singleton().set_mix_int8_fp32(false); });
+  m.def("get_mix_int8_fp32", []() { return AutoOptConfig::singleton().get_mix_int8_fp32(); });
+  m.def("enable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(true); });
+  m.def("disable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(false); });
+  m.def("get_int8_calibration", []() { return AutoOptConfig::singleton().get_int8_calibration(); });
+  m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
+  m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
+  m.def("add_indictors", []() { AutoOptConfig::singleton().add_indictors(); });
+  m.def("print_observer", []() { AutoOptConfig::singleton().print_observer(); });
+  m.def("print_indictor", []() { AutoOptConfig::singleton().print_indictor(); });
+
 }
 
 }  // namespace

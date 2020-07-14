@@ -111,14 +111,37 @@ dil::tensor reorder_dil_tensor_to_dtype(const dil::tensor &dil_tensor, dil::data
   return dst;
 }
 
-void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type) {
-  auto src = try_gen_dil_storage(tensor);
-  if (get_at_data_type(src.get_data_type()) == dst_scalar_type) {
-    // The data type of DIL tensor is same as the dst data type. DO NOTHING
+void reorder_to_int8_for_mix_prec(const at::Tensor& tensor) {
+  if (!check_auto_mix_int8_fp32())
     return;
+
+  auto tensor_dtype = tensor.scalar_type();
+  TORCH_CHECK(!(tensor_dtype == at::kByte || tensor_dtype == at::kChar), "Please disable auto mix-precision if you want to enable int8/uint8 manually");
+  if (tensor_dtype != at::kFloat)
+    return;
+
+  reorder_to_dtype(tensor, at::kByte);
+}
+
+void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type) {
+  auto src = try_gen_dil_tensor(tensor);
+  if (check_auto_mix_int8_fp32()) {
+    auto src_dil_type = src.get_data_type();
+    if (src_dil_type == dil::data_type::s8 || src_dil_type == dil::data_type::u8) {
+      return;
+    }
+
+    std::tie(std::vector<float>scale, std::vector<float> zero_point) = get_indictor_scales(false);
+    auto dst_desc = src.get_desc().to_type(get_dil_data_type(dst_scalar_type));
+    reorder_to_desc(tensor, dst_desc, scale);
+  } else {
+    if (get_at_data_type(src.get_data_type()) == dst_scalar_type) {
+      // The data type of DIL tensor is same as the dst data type. DO NOTHING
+      return;
+    }
+    auto dst_desc = src.get_desc().to_type(get_dil_data_type(dst_scalar_type));
+    reorder_to_desc(tensor, dst_desc);
   }
-  auto dst_desc = src.get_desc().to_type(get_dil_data_type(dst_scalar_type));
-  reorder_to_desc(tensor, dst_desc);
 }
 
 void equip_dil_buffer_nosync_shape(const at::Tensor& tensor, dil::tensor dil_buffer) {
