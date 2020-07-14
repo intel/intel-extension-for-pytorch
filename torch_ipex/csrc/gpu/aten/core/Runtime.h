@@ -70,21 +70,22 @@ namespace at {
 namespace dpcpp {
 
 //
-// convert vptr to MKL-DNN's DPCPP buffer
+// convert vptr to OneDNN's DPCPP buffer
 //
-static inline void dpcpp_set_mkldnn_buffer(void* vptr, mkldnn::memory& memory) {
+template <typename buffer_data_type = uint8_t, int dims = 1>
+DPCPP::buffer<buffer_data_type, 1> dpcpp_set_onednn_buffer(void* vptr) {
   //
   // TODO: check size mismatch between vptr and mkldnn::memory
   //
 #if defined(USE_DPCPP)
   auto buffer = make_buffer<uint8_t>(vptr);
-  memory.template set_sycl_buffer<uint8_t, 1>(buffer);
+  return buffer;
 #elif defined(USE_COMPUTECPP)
   if (dpcppGetBufferMap().get_offset(vptr) == 0) {
     // if offset is 0, which means this dpcpp_buffer is exact the corresponding
     // one for this vptr, we can safely set it to mkl-dnn dpcpp API
     auto buffer = dpcppGetBufferMap().get_buffer(vptr);
-    memory.template set_sycl_buffer<uint8_t, 1>(buffer);
+    return buffer;
   } else {
     // Currently, memory offset can't have representation in dpcpp buffer.It's
     // difficult to handle
@@ -103,7 +104,7 @@ static inline void dpcpp_set_mkldnn_buffer(void* vptr, mkldnn::memory& memory) {
     dpcppMemcpy(convert_ptr, vptr, mkldnn_size, DeviceToDevice);
 
     auto buffer = dpcppGetBufferMap().get_buffer(convert_ptr);
-    memory.template set_sycl_buffer<uint8_t, 1>(buffer);
+    return buffer;
 #endif
   }
 #endif

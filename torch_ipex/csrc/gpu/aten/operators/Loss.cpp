@@ -271,14 +271,14 @@ void dnnl_inner_product_forward_frame(
   auto ip_forward_pd =
       inner_product_forward::primitive_desc(*ipFwd_desc, engine);
 
-  auto input_usr_memory = memory({{{input_tz}, data_t, format_nc}, engine});
-  dpcpp_set_mkldnn_buffer(input_data, input_usr_memory);
+  auto input_usr_buf = dpcpp_set_onednn_buffer(input_data);
+  auto input_usr_memory = memory({{{input_tz}, data_t, format_nc}, engine, input_usr_buf});
 
-  auto weight_usr_memory = memory({{{weight_tz}, data_t, format_oi}, engine});
-  dpcpp_set_mkldnn_buffer(target_data, weight_usr_memory);
+  auto weight_usr_buf = dpcpp_set_onednn_buffer(target_data);
+  auto weight_usr_memory = memory({{{weight_tz}, data_t, format_oi}, engine, weight_usr_buf});
 
-  auto output_usr_memory = memory({{{output_tz}, data_t, format_nc}, engine});
-  dpcpp_set_mkldnn_buffer(output_data, output_usr_memory);
+  auto output_usr_buf = dpcpp_set_onednn_buffer(output_data);
+  auto output_usr_memory = memory({{{output_tz}, data_t, format_nc}, engine, output_usr_buf});
 
   std::shared_ptr<inner_product_forward> ip_forward;
   std::shared_ptr<memory> bias_usr_memory;
@@ -340,7 +340,7 @@ void BCECriterion_updateOutput(
 
     dnnl_inner_product_forward_frame<scalar_t>(
         size, t0_data, weights_data, output_data);
-    
+
     if (reduction == at::Reduction::Mean) {
       output.div_(size);
     }
@@ -348,7 +348,7 @@ void BCECriterion_updateOutput(
 
   } else {
     at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
-        output_, input, target, TensorBCE2Op<scalar_t>());   
+        output_, input, target, TensorBCE2Op<scalar_t>());
 
     // Tensor t1 = at::empty_like(input);
     // Tensor t2 = at::empty_like(input);

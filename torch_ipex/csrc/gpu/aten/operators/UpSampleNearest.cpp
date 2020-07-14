@@ -61,10 +61,10 @@ static void upsample_nearest_out_dpcpp_kernel(
   auto resampling_pd = resampling_forward::primitive_desc(resampling_desc, eng);
   resampling_pd = resampling_forward::primitive_desc(resampling_pd.get());
 
-  memory src(resampling_pd.src_desc(), eng);
-  dpcpp_set_mkldnn_buffer(input.data_ptr(), src);
-  memory dst(resampling_pd.dst_desc(), eng);
-  dpcpp_set_mkldnn_buffer(output.data_ptr(), dst);
+  auto src_buf = dpcpp_set_onednn_buffer(input.data_ptr());
+  auto dst_buf = dpcpp_set_onednn_buffer(output.data_ptr());
+  memory src(resampling_pd.src_desc(), eng, src_buf);
+  memory dst(resampling_pd.dst_desc(), eng, dst_buf);
 
   DPCPP_ONEDNN_EXEC(resampling_forward(resampling_pd),
       strm, {{DNNL_ARG_SRC, src}, {DNNL_ARG_DST, dst}});
@@ -133,10 +133,10 @@ static void upsample_nearest_backward_out_dpcpp_kernel(
   resampling_bwd_pd =
       resampling_backward::primitive_desc(resampling_bwd_pd.get());
 
-  memory grad_src(resampling_bwd_pd.diff_src_desc(), eng);
-  dpcpp_set_mkldnn_buffer(grad_input.data_ptr(), grad_src);
-  memory grad_dst(resampling_bwd_pd.diff_dst_desc(), eng);
-  dpcpp_set_mkldnn_buffer(grad_output.data_ptr(), grad_dst);
+  auto grad_src_buf = dpcpp_set_onednn_buffer(grad_input.data_ptr());
+  auto grad_dst_buf = dpcpp_set_onednn_buffer(grad_output.data_ptr());
+  memory grad_src(resampling_bwd_pd.diff_src_desc(), eng, grad_src_buf);
+  memory grad_dst(resampling_bwd_pd.diff_dst_desc(), eng, grad_dst_buf);
 
   DPCPP_ONEDNN_EXEC(resampling_backward(resampling_bwd_pd),
       strm, {{DNNL_ARG_DIFF_SRC, grad_src}, {DNNL_ARG_DIFF_DST, grad_dst}});

@@ -37,11 +37,11 @@ void dpcpp_eltwise(
   auto eltwise_forward_pd =
       eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, engine);
 
-  auto input_usr_memory = memory({{{input_tz}, data_t, format_any}, engine});
-  dpcpp_set_mkldnn_buffer(input.data_ptr(), input_usr_memory);
+  auto input_buf = dpcpp_set_onednn_buffer(input.data_ptr());
+  auto input_usr_memory = memory({{{input_tz}, data_t, format_any}, engine, input_buf});
 
-  auto output_usr_memory = memory({{{input_tz}, data_t, format_any}, engine});
-  dpcpp_set_mkldnn_buffer(output.data_ptr(), output_usr_memory);
+  auto ouput_buf = dpcpp_set_onednn_buffer(output.data_ptr());
+  auto output_usr_memory = memory({{{input_tz}, data_t, format_any}, engine, ouput_buf});
 
   auto strm = GpuStreamManager::Instance().get_stream();
   std::shared_ptr<mkldnn::primitive> eltwise_fwd;
@@ -82,14 +82,14 @@ void dpcpp_eltwise_backward(
   auto eltwise_backward_pd = eltwise_backward::primitive_desc(
       eltwise_reluBwd_desc, engine, eltwise_forward_pd);
 
-  auto src_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  dpcpp_set_mkldnn_buffer(src, src_usr_memory);
+  auto src_buf = dpcpp_set_onednn_buffer(src);
+  auto src_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine, src_buf});
 
-  auto diff_dst_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  dpcpp_set_mkldnn_buffer(diff_dst, diff_dst_memory);
+  auto diff_dst_buf = dpcpp_set_onednn_buffer(diff_dst);
+  auto diff_dst_memory = memory({{{input_tz}, data_t, format_nchw}, engine, diff_dst_buf});
 
-  auto diff_src_memory = memory({{{input_tz}, data_t, format_nchw}, engine});
-  dpcpp_set_mkldnn_buffer(diff_src, diff_src_memory);
+  auto diff_src_buf = dpcpp_set_onednn_buffer(diff_src);
+  auto diff_src_memory = memory({{{input_tz}, data_t, format_nchw}, engine, diff_src_buf});
 
   auto strm = GpuStreamManager::Instance().get_stream();
   std::shared_ptr<mkldnn::primitive> eltwise_bwd;

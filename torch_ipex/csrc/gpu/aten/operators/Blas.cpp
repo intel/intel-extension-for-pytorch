@@ -105,14 +105,15 @@ void mkldnnGemmImpl(
   std::shared_ptr<dnnl::matmul> matmul_p;
   matmul_p.reset(new dnnl::matmul(*matmul_pd));
 
-  auto m1_memory = memory({m1_md, engine});
-  dpcpp_set_mkldnn_buffer(m1.data_ptr(), m1_memory);
+  auto m1_buf = dpcpp_set_onednn_buffer(m1.data_ptr());
+  auto m1_memory = memory({m1_md, engine, m1_buf});
 
-  auto m2_memory = memory({m2_md, engine});
-  dpcpp_set_mkldnn_buffer(m2.data_ptr(), m2_memory);
+  auto m2_buf = dpcpp_set_onednn_buffer(m2.data_ptr());
+  auto m2_memory = memory({m2_md, engine, m2_buf});
 
-  auto r_memory = memory({r_md, engine});
-  dpcpp_set_mkldnn_buffer(result.data_ptr(), r_memory);
+  auto r_buf = dpcpp_set_onednn_buffer(result.data_ptr());
+  auto r_memory = memory({r_md, engine, r_buf});
+
 
   DPCPP_ONEDNN_EXEC(*matmul_p, strm,
     {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
