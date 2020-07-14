@@ -14,7 +14,7 @@ namespace cpu {
 
 enum SHADE_DATA_TYPE {CPU_RAW, DIL};
 
-enum MIX_PREC_TYPE {NONE, MIX_BF16_FP32};
+enum MIX_PREC_TYPE {NONE, MIX_BF16_FP32, MIX_INT8_FP32};
 
 #define SANITY_CHECK_SHADE_DATA_CONTEXT(THIS) \
   { \
@@ -22,6 +22,10 @@ enum MIX_PREC_TYPE {NONE, MIX_BF16_FP32};
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(THIS->dil_tensor.has_value()); \
       if (THIS->dil_tensor->is_public_format()) { \
         if (THIS->mix_prec_type == MIX_PREC_TYPE::MIX_BF16_FP32) { \
+          TORCH_INTERNAL_ASSERT_DEBUG_ONLY(THIS->cpu_raw_data == nullptr); \
+          TORCH_INTERNAL_ASSERT_DEBUG_ONLY(THIS->dil_tensor->get_data_handle() != THIS->cpu_raw_data); \
+          TORCH_INTERNAL_ASSERT_DEBUG_ONLY(THIS->cpu_del_fun == nullptr); \
+        } else if (THIS->mix_prec_type == MIX_PREC_TYPE::MIX_INT8_FP32) { \
           TORCH_INTERNAL_ASSERT_DEBUG_ONLY(THIS->cpu_raw_data == nullptr); \
           TORCH_INTERNAL_ASSERT_DEBUG_ONLY(THIS->dil_tensor->get_data_handle() != THIS->cpu_raw_data); \
           TORCH_INTERNAL_ASSERT_DEBUG_ONLY(THIS->cpu_del_fun == nullptr); \
@@ -193,14 +197,17 @@ struct ShadeDataContext {
   static inline bool isTensorMixPrecision(const at::Tensor &tensor) {
     auto dil_tensor_type = getDilStorage(tensor).get_data_type();
     auto aten_tensor_type = tensor.scalar_type();
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_type == at::kFloat || aten_tensor_type == at::kBFloat16);
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_tensor_type == dil::data_type::bf16 || dil_tensor_type == dil::data_type::f32);
-    auto res = dil_tensor_type == dil::data_type::bf16 && aten_tensor_type == at::kFloat;
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_type == at::kFloat || aten_tensor_type == at::kBFloat16
+        || aten_tensor_type == at::kByte || aten_tensor_type == at::kChar);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_tensor_type == dil::data_type::bf16 || dil_tensor_type == dil::data_type::f32
+        || dil_tensor_type == dil::data_type::u8 || dil_tensor_type == dil::data_type::s8);
+    auto res = (dil_tensor_type == dil::data_type::bf16 || dil_tensor_type == dil::data_type::u8
+        || dil_tensor_type == dil::data_type::s8) && aten_tensor_type == at::kFloat ;
 
     // Check mix_precision
     void *raw_context = tensor.storage().data_ptr().get_context();
     ShadeDataContext *shade_data_context = (ShadeDataContext*)raw_context;
-    if (shade_data_context->mix_prec_type == MIX_PREC_TYPE::MIX_BF16_FP32) {
+    if (shade_data_context->mix_prec_type == MIX_PREC_TYPE::MIX_BF16_FP32 || shade_data_context->mix_prec_type == MIX_PREC_TYPE::MIX_INT8_FP32) {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(res);
     } else {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!res);
