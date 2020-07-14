@@ -5,7 +5,8 @@
 
 #include <core/TensorImplUtils.h>
 
-#include "InnerProduct.hpp"
+#include <core/Runtime.h>
+#include <dnnl.hpp>
 
 using namespace dnnl;
 using namespace at::dpcpp;
@@ -163,7 +164,8 @@ void gemm_broadcast(Tensor& result,
   } else {
     result.resize_(result_shape);
   }
-  mkldnnGemmImpl(result, beta, alpha, m1, m2, with_relu);
+
+  mkldnnGemmImpl<scalar_t>(result, beta, alpha, m1, m2, with_relu);
 }
 } // namespace impl
 
@@ -186,7 +188,7 @@ Tensor& addmm_(
     self.scalar_type(),
     "addmm",
     [&]() {
-      impl::gemm_broadcast(self, m1, m2, beta.to<scalar_t>(), alpha.to<scalar_t>(), self);
+      impl::gemm_broadcast<scalar_t>(self, m1, m2, beta.to<scalar_t>(), alpha.to<scalar_t>(), self);
     });
 
   return self;
@@ -209,7 +211,7 @@ Tensor addmm(
     result.scalar_type(),
     "addmm",
     [&]() {
-      impl::gemm_broadcast(result, m1, m2, beta.to<scalar_t>(), alpha.to<scalar_t>(), input);
+      impl::gemm_broadcast<scalar_t>(result, m1, m2, beta.to<scalar_t>(), alpha.to<scalar_t>(), input);
     });
 
   return result;
@@ -260,7 +262,7 @@ Tensor& baddbmm_(
     self.scalar_type(),
     "baddbmm_",
     [&]() {
-      impl::gemm_broadcast(self, batch1, batch2, beta.to<scalar_t>(), alpha.to<scalar_t>(), self);
+      impl::gemm_broadcast<scalar_t>(self, batch1, batch2, beta.to<scalar_t>(), alpha.to<scalar_t>(), self);
     });
 
   return self;
@@ -283,7 +285,7 @@ Tensor& baddbmm_out(
     input.scalar_type(),
     "baddbmm_out",
     [&]() {
-      impl::gemm_broadcast(result, batch1, batch2, beta.to<scalar_t>(), alpha.to<scalar_t>(), input);
+      impl::gemm_broadcast<scalar_t>(result, batch1, batch2, beta.to<scalar_t>(), alpha.to<scalar_t>(), input);
     });
 
   return result;
@@ -339,7 +341,7 @@ Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & b
       result.scalar_type(),
       "linear_relu",
       [&]() {
-        impl::gemm_broadcast(result, input, weight.t(), 1.f, 1.f, bias, true);
+        impl::gemm_broadcast<scalar_t>(result, input, weight.t(), 1.f, 1.f, bias, true);
       });
 
     return result;
