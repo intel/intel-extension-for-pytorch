@@ -22,7 +22,7 @@ def enable_auto_optimization(mixed_dtype = None):
 
     """
     if mixed_dtype != None:
-        core.enable_auto_dnnl(True)
+        core.enable_auto_dnnl()
     enable_auto_mix_precision(mixed_dtype)
 
 def get_auto_optimization():
