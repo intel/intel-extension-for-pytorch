@@ -69,7 +69,7 @@ using namespace mkldnn;
 namespace at {
 namespace dpcpp {
 
-static inline mkldnn::memory dpcpp_mkldnn_memory(
+static inline mkldnn::memory dpcpp_onednn_memory(
     mkldnn::memory::desc md, mkldnn::engine& engine, void* ptr) {
 #ifdef USE_USM
   {
@@ -87,47 +87,6 @@ static inline mkldnn::memory dpcpp_mkldnn_memory(
     auto buffer = dpcppGetBufferMap().get_buffer(ptr);
   #endif
     return mkldnn::memory(md, engine, buffer);
-  }
-#endif
-}
-
-//
-// convert vptr to OneDNN's DPCPP buffer
-//
-template <typename buffer_data_type = uint8_t, int dims = 1>
-DPCPP::buffer<buffer_data_type, 1> dpcpp_set_onednn_buffer(void* vptr) {
-  //
-  // TODO: check size mismatch between vptr and mkldnn::memory
-  //
-#if defined(USE_DPCPP)
-  auto buffer = make_buffer<uint8_t>(vptr);
-  return buffer;
-#elif defined(USE_COMPUTECPP)
-  if (dpcppGetBufferMap().get_offset(vptr) == 0) {
-    // if offset is 0, which means this dpcpp_buffer is exact the corresponding
-    // one for this vptr, we can safely set it to mkl-dnn dpcpp API
-    auto buffer = dpcppGetBufferMap().get_buffer(vptr);
-    return buffer;
-  } else {
-    // Currently, memory offset can't have representation in dpcpp buffer.It's
-    // difficult to handle
-    // the buffer reclaim of copied buffer and implaced mkldnn operation. If
-    // encounter non-zero
-    // offset, we currently throw a error. This will not be an issue when usm is
-    // available.
-    TORCH_CHECK(
-        0, "the offset of dpcpp buffer is not 0. We don't support this case.");
-#if 0
-    // If offset is not 0, we need to copy a new dpcpp buffer with correct base addr, then pass to MKL-DNN
-    size_t mkldnn_size = memory.get_desc().get_size();
-    auto convert_ptr = DPCPPmalloc(mkldnn_size, dpcppGetBufferMap());
-    // TODO: Should we use async copy here?
-    // TODO: dpcpp_buffer life cycle?
-    dpcppMemcpy(convert_ptr, vptr, mkldnn_size, DeviceToDevice);
-
-    auto buffer = dpcppGetBufferMap().get_buffer(convert_ptr);
-    return buffer;
-#endif
   }
 #endif
 }

@@ -174,8 +174,8 @@ public:
     auto engine = GpuEngineManager::Instance().get_engine(curDevice);
     auto strm = GpuStreamManager::Instance().get_stream();
 
-    auto from_mem = dpcpp_mkldnn_memory(from_md, engine, from.data_ptr());
-    auto to_mem = dpcpp_mkldnn_memory(to_md, engine, to.data_ptr());
+    auto from_mem = dpcpp_onednn_memory(from_md, engine, from.data_ptr());
+    auto to_mem = dpcpp_onednn_memory(to_md, engine, to.data_ptr());
 
     DPCPP_ONEDNN_EXEC(dnnl::reorder(from_mem, to_mem), strm, from_mem, to_mem);
     return true;

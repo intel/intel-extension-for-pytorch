@@ -128,7 +128,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   auto batch_norm_forward_pd = batch_normalization_forward::primitive_desc(
       batch_norm_forward_desc, engine);
 
-  auto input_usr_memory = dpcpp_mkldnn_memory(
+  auto input_usr_memory = dpcpp_onednn_memory(
       input_md, engine, input.data_ptr());
 
   if (lazy_reorder_enabled()) {
@@ -141,7 +141,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
     }
   }
 
-  auto output_usr_memory = dpcpp_mkldnn_memory(
+  auto output_usr_memory = dpcpp_onednn_memory(
       batch_norm_forward_pd.dst_desc(), engine, output.data_ptr());
 
   std::shared_ptr<mkldnn::primitive> bn_fwd;
@@ -156,7 +156,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   if ((bool)(flag & normalization_flags::use_scale_shift)) {
     auto weight_bias =
         at::empty(2 * feature_num, weight.options().dtype(ScalarType::Float));
-    auto weight_bias_memory = dpcpp_mkldnn_memory(
+    auto weight_bias_memory = dpcpp_onednn_memory(
         batch_norm_forward_pd.weights_desc(), engine, weight_bias.data_ptr());
     Tensor _weight = weight.to(ScalarType::Float);
     Tensor _bias = bias.to(ScalarType::Float);
@@ -193,9 +193,9 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
     var_data = save_var.data_ptr();
   }
 
-  auto mean_memory = dpcpp_mkldnn_memory(
+  auto mean_memory = dpcpp_onednn_memory(
       batch_norm_forward_pd.mean_desc(), engine, mean_data);
-  auto var_memory = dpcpp_mkldnn_memory(
+  auto var_memory = dpcpp_onednn_memory(
       batch_norm_forward_pd.variance_desc(), engine, var_data);
 
   args.insert({MKLDNN_ARG_MEAN, mean_memory});
@@ -348,28 +348,27 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   auto bn_bwd_pd = batch_normalization_backward::primitive_desc(
       bwd_desc, engine, batch_norm_forward_pd);
 
-  auto input_usr_buf = dpcpp_set_onednn_buffer(input.data_ptr());
-  auto input_usr_memory = memory({{{input_tz}, data_t, dnnl_format}, engine, input_usr_buf});
+  auto input_usr_memory = dpcpp_onednn_memory(
+      {{input_tz}, data_t, dnnl_format}, engine, input.data_ptr());
 
-  auto grad_output_buf = dpcpp_set_onednn_buffer(grad_output.data_ptr());
-  auto grad_output_memory = memory({{{input_tz}, data_t, dnnl_format}, engine, grad_output_buf});
+  auto grad_output_memory = dpcpp_onednn_memory(
+      {{input_tz}, data_t, dnnl_format}, engine, grad_output.data_ptr());
 
   memory mean_memory, var_memory;
   if (training) {
-    auto mean_buf = dpcpp_set_onednn_buffer(save_mean.data_ptr());
-    auto var_buf = dpcpp_set_onednn_buffer(save_var.data_ptr());
-    mean_memory = memory(batch_norm_forward_pd.mean_desc(), engine, mean_buf);
-    var_memory = memory(batch_norm_forward_pd.variance_desc(), engine, var_buf);
+    mean_memory = dpcpp_onednn_memory(
+        batch_norm_forward_pd.mean_desc(), engine, save_mean.data_ptr());
+    var_memory = dpcpp_onednn_memory(
+        batch_norm_forward_pd.variance_desc(), engine, save_var.data_ptr());
   } else {
-    auto mean_buf = dpcpp_set_onednn_buffer(running_mean.data_ptr());
-    auto var_buf = dpcpp_set_onednn_buffer(running_var.data_ptr());
-    mean_memory = memory(batch_norm_forward_pd.mean_desc(), engine, mean_buf);
-    var_memory = memory(batch_norm_forward_pd.variance_desc(), engine, var_buf);
+    mean_memory = dpcpp_onednn_memory(
+        batch_norm_forward_pd.mean_desc(), engine, running_mean.data_ptr());
+    var_memory = dpcpp_onednn_memory(
+        batch_norm_forward_pd.variance_desc(), engine, running_var.data_ptr());
   }
 
-  auto grad_input_buf = dpcpp_set_onednn_buffer(grad_input.data_ptr());
-  auto grad_input_memory = memory({{{input_tz}, data_t, dnnl_format}, engine, grad_input_buf});
-
+  auto grad_input_memory = dpcpp_onednn_memory(
+      {{input_tz}, data_t, dnnl_format}, engine, grad_input.data_ptr());
 
   auto strm = GpuStreamManager::Instance().get_stream();
   std::shared_ptr<mkldnn::primitive> bn_bwd;
@@ -398,14 +397,12 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
             feature_num * sizeof(float),
         0,
         feature_num * sizeof(float));
-    auto weight_bias_buf = dpcpp_set_onednn_buffer(weight_bias.data_ptr());
-    auto weight_bias_memory =
-        memory(batch_norm_forward_pd.weights_desc(), engine, weight_bias_buf);
+    auto weight_bias_memory = dpcpp_onednn_memory(
+        batch_norm_forward_pd.weights_desc(), engine, weight_bias.data_ptr());
 
     grad_weight_bias = at::empty(2 * feature_num, weight.options());
-    auto grad_weight_bias_buf = dpcpp_set_onednn_buffer(grad_weight_bias.data_ptr());
-    auto grad_weight_bias_memory =
-        memory(bn_bwd_pd.diff_weights_desc(), engine, grad_weight_bias_buf);
+    auto grad_weight_bias_memory = dpcpp_onednn_memory(
+        bn_bwd_pd.diff_weights_desc(), engine, grad_weight_bias.data_ptr());
 
     args.insert({MKLDNN_ARG_SCALE_SHIFT, weight_bias_memory});
     args.insert({MKLDNN_ARG_DIFF_SCALE_SHIFT, grad_weight_bias_memory});

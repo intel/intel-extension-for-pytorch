@@ -160,41 +160,32 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
       lstm_forward_pd.reset(
           new lstm_forward::primitive_desc(*lstm_forward_desc, engine));
 
-      auto weights_layer_usr_buf = dpcpp_set_onednn_buffer(weight_arr_i[index].data_ptr());
-      auto weights_layer_usr_memory =
-          memory({{{weights_layer_dims}, data_t, format_ldigo}, engine, weights_layer_usr_buf});
+      auto weights_layer_usr_memory = dpcpp_onednn_memory(
+          {{weights_layer_dims}, data_t, format_ldigo}, engine, weight_arr_i[index].data_ptr());
 
-      auto weights_iter_usr_buf = dpcpp_set_onednn_buffer(weight_arr_h[index].data_ptr());
-      auto weights_iter_usr_memory =
-          memory({{{weights_iter_dims}, data_t, format_ldigo}, engine, weights_iter_usr_buf});
+      auto weights_iter_usr_memory = dpcpp_onednn_memory(
+          {{weights_iter_dims}, data_t, format_ldigo}, engine, weight_arr_h[index].data_ptr());
 
-      auto bias_usr_buf = dpcpp_set_onednn_buffer(bias_arr[index].data_ptr());
-      auto bias_usr_memory =
-          memory({{{bias_dims}, data_t, format_ldgo}, engine, bias_usr_buf});
+      auto bias_usr_memory = dpcpp_onednn_memory(
+          {{bias_dims}, data_t, format_ldgo}, engine, bias_arr[index].data_ptr());
 
-      auto src_layer_usr_buf = dpcpp_set_onednn_buffer(layer_x.data_ptr());
-      auto src_layer_usr_memory =
-          memory({{{src_layer_dims}, data_t, format_tnc}, engine, src_layer_usr_buf});
+      auto src_layer_usr_memory = dpcpp_onednn_memory(
+          {{src_layer_dims}, data_t, format_tnc}, engine, layer_x.data_ptr());
 
-      auto src_iter_usr_buf = dpcpp_set_onednn_buffer(layer_hx[index].data_ptr());
-      auto src_iter_usr_memory =
-          memory({{{src_iter_dims}, data_t, format_ldnc}, engine, src_iter_usr_buf});
+      auto src_iter_usr_memory = dpcpp_onednn_memory(
+          {{src_iter_dims}, data_t, format_ldnc}, engine, layer_hx[index].data_ptr());
 
-      auto src_iter_c_usr_buf = dpcpp_set_onednn_buffer(layer_cx[index].data_ptr());
-      auto src_iter_c_usr_memory =
-          memory({{{src_iter_c_dims}, data_t, format_ldnc}, engine, src_iter_c_usr_buf});
+      auto src_iter_c_usr_memory = dpcpp_onednn_memory(
+          {{src_iter_c_dims}, data_t, format_ldnc}, engine, layer_cx[index].data_ptr());
 
-      auto dst_layer_usr_buf = dpcpp_set_onednn_buffer(layer_y[direction].data_ptr());
-      auto dst_layer_usr_memory =
-          memory({{{dst_layer_dims}, data_t, format_tnc}, engine, dst_layer_usr_buf});
+      auto dst_layer_usr_memory = dpcpp_onednn_memory(
+          {{dst_layer_dims}, data_t, format_tnc}, engine, layer_y[direction].data_ptr());
 
-      auto dst_iter_usr_buf = dpcpp_set_onednn_buffer(hy_arr[index].data_ptr());
-      auto dst_iter_usr_memory =
-          memory({{{dst_iter_dims}, data_t, format_ldnc}, engine, dst_iter_usr_buf});
+      auto dst_iter_usr_memory = dpcpp_onednn_memory(
+          {{dst_iter_dims}, data_t, format_ldnc}, engine, hy_arr[index].data_ptr());
 
-      auto dst_iter_c_usr_buf = dpcpp_set_onednn_buffer(cy_arr[index].data_ptr());
-      auto dst_iter_c_usr_memory =
-          memory({{{dst_iter_c_dims}, data_t, format_ldnc}, engine, dst_iter_c_usr_buf});
+      auto dst_iter_c_usr_memory = dpcpp_onednn_memory(
+          {{dst_iter_c_dims}, data_t, format_ldnc}, engine, cy_arr[index].data_ptr());
 
       auto expected_weights_layer_md = lstm_forward_pd->weights_layer_desc();
       auto weights_layer_memory = weights_layer_usr_memory;

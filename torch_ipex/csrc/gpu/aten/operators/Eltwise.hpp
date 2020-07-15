@@ -36,13 +36,13 @@ void dpcpp_eltwise(
 
   memory input_usr_memory;
   if (!lazy_reorder_enabled()) {
-    input_usr_memory = dpcpp_mkldnn_memory(input_md, engine, input.data_ptr());
+    input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
   } else {
     auto input_ctx =
         at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
     input_md = input_ctx.is_plain() ? input_md : input_ctx.meta();
     input_usr_memory =
-        dpcpp_mkldnn_memory(input_md, engine, input.data_ptr());
+        dpcpp_onednn_memory(input_md, engine, input.data_ptr());
   }
 
   eltwise_forward::desc eltwise_eltwiseFwd_desc(
@@ -54,7 +54,7 @@ void dpcpp_eltwise(
   if (!lazy_reorder_enabled()) {
     if (!output.defined())
       output = at::empty_like(input);
-    output_usr_memory = dpcpp_mkldnn_memory(
+    output_usr_memory = dpcpp_onednn_memory(
         eltwise_forward_pd.dst_desc(), engine, output.data_ptr());
   } else {
     if (output.defined()) {
@@ -62,18 +62,18 @@ void dpcpp_eltwise(
           at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(output);
       auto output_md = output_ctx.is_plain() ? input_md : output_ctx.meta();
       output_usr_memory =
-          dpcpp_mkldnn_memory(output_md, engine, output.data_ptr());
+          dpcpp_onednn_memory(output_md, engine, output.data_ptr());
     } else {
       auto plain_output_md = memory::desc({input_tz}, data_t, format_any);
       auto expected_output_md = eltwise_forward_pd.dst_desc();
       if (plain_output_md != expected_output_md) {
         output = at::AtenIpexTypeDPCPP::empty_opaque_tensor(
             expected_output_md, input.options(), c10::nullopt);
-        output_usr_memory = dpcpp_mkldnn_memory(
+        output_usr_memory = dpcpp_onednn_memory(
             expected_output_md, engine, output.data_ptr());
       } else {
         output = at::empty_like(input);
-        output_usr_memory = dpcpp_mkldnn_memory(
+        output_usr_memory = dpcpp_onednn_memory(
             plain_output_md, engine, output.data_ptr());
       }
     }
@@ -118,14 +118,14 @@ void dpcpp_eltwise_backward(
   auto eltwise_backward_pd = eltwise_backward::primitive_desc(
       eltwise_reluBwd_desc, engine, eltwise_forward_pd);
 
-  auto src_buf = dpcpp_set_onednn_buffer(src);
-  auto src_usr_memory = memory({{{input_tz}, data_t, format_nchw}, engine, src_buf});
+  auto src_usr_memory = dpcpp_onednn_memory(
+      {{input_tz}, data_t, format_nchw}, engine, src);
 
-  auto diff_dst_buf = dpcpp_set_onednn_buffer(diff_dst);
-  auto diff_dst_memory = memory({{{input_tz}, data_t, format_nchw}, engine, diff_dst_buf});
+  auto diff_dst_memory = dpcpp_onednn_memory(
+      {{input_tz}, data_t, format_nchw}, engine, diff_dst);
 
-  auto diff_src_buf = dpcpp_set_onednn_buffer(diff_src);
-  auto diff_src_memory = memory({{{input_tz}, data_t, format_nchw}, engine, diff_src_buf});
+  auto diff_src_memory = dpcpp_onednn_memory(
+      {{input_tz}, data_t, format_nchw}, engine, diff_src);
 
   auto strm = GpuStreamManager::Instance().get_stream();
   std::shared_ptr<mkldnn::primitive> eltwise_bwd;

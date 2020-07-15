@@ -104,11 +104,11 @@ static void avg_pool_out_frame(
   auto input_md = memory::desc({input_tz}, data_t, format);
   auto output_md = memory::desc({output_tz}, data_t, format);
 
-  auto input_buf = dpcpp_set_onednn_buffer(input_data);
-  auto input_usr_memory = memory({{{input_tz}, data_t, format}, engine, input_buf});
+  auto input_usr_memory = dpcpp_onednn_memory(
+      {{input_tz}, data_t, format}, engine, input_data);
 
-  auto ouput_buf = dpcpp_set_onednn_buffer(output_data);
-  auto output_usr_memory = memory({{{output_tz}, data_t, format}, engine, ouput_buf});
+  auto output_usr_memory = dpcpp_onednn_memory(
+      {{output_tz}, data_t, format}, engine, output_data);
 
   std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
   pooling_forward_desc.reset(new pooling_forward::desc(
@@ -222,12 +222,11 @@ static void avg_pool_backward_out_frame(
   auto gradInput_md = memory::desc({gradInput_tz}, data_t, format);
   auto gradOutput_md = memory::desc({gradOutput_tz}, data_t, format);
 
-  auto diff_dst_buf = dpcpp_set_onednn_buffer(gradOutput_data);
-  auto diff_dst_usr_memory =
-      memory({{{gradOutput_tz}, data_t, format}, engine, diff_dst_buf});
+  auto diff_dst_usr_memory = dpcpp_onednn_memory(
+      {{gradOutput_tz}, data_t, format}, engine, gradOutput_data);
 
-  auto diff_src_buf = dpcpp_set_onednn_buffer(gradInput_data);
-  auto diff_src_usr_memory = memory({{{gradInput_tz}, data_t, format}, engine, diff_src_buf});
+  auto diff_src_usr_memory = dpcpp_onednn_memory(
+      {{gradInput_tz}, data_t, format}, engine, gradInput_data);
 
   std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
   pooling_forward_desc.reset(new pooling_forward::desc(
@@ -343,11 +342,9 @@ static void max_pool_out_frame(
   auto input_md = memory::desc({input_tz}, data_t, format);
   auto output_md = memory::desc({output_tz}, data_t, format);
 
-  auto input_usr_buf = dpcpp_set_onednn_buffer(input_data);
-  auto input_usr_memory = memory(input_md, engine, input_usr_buf);
+  auto input_usr_memory = dpcpp_onednn_memory(input_md, engine, input_data);
 
-  auto output_usr_buf = dpcpp_set_onednn_buffer(output_data);
-  auto output_usr_memory = memory(output_md, engine, output_usr_buf);
+  auto output_usr_memory = dpcpp_onednn_memory(output_md, engine, output_data);
 
   std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
   pooling_forward_desc.reset(new pooling_forward::desc(
@@ -387,8 +384,8 @@ static void max_pool_out_frame(
 
   auto indices_usr =
       at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
-  auto indices_buf = dpcpp_set_onednn_buffer((void*)indices_usr.data_ptr<int32_t>());
-  auto indices_usr_memory = memory({{{output_tz}, data_t, format}, engine, indices_buf});
+  auto indices_usr_memory = dpcpp_onednn_memory(
+      {{output_tz}, data_t, format}, engine, indices_usr.data_ptr());
   memory indices_memory = indices_usr_memory;
 
   std::shared_ptr<pooling_forward> pool_forward;
@@ -501,12 +498,11 @@ static void max_pool_backward_out_frame(
   auto gradInput_md = memory::desc({gradInput_tz}, data_t, format);
   auto gradOutput_md = memory::desc({gradOutput_tz}, data_t, format);
 
-  auto diff_dst_buf = dpcpp_set_onednn_buffer(gradOutput_data);
-  auto diff_dst_usr_memory =
-      memory({{{gradOutput_tz}, data_t, format}, engine, diff_dst_buf});
+  auto diff_dst_usr_memory = dpcpp_onednn_memory(
+      {{gradOutput_tz}, data_t, format}, engine, gradOutput_data);
 
-  auto diff_src_buf = dpcpp_set_onednn_buffer(gradInput_data);
-  auto diff_src_usr_memory = memory({{{gradInput_tz}, data_t, format}, engine, diff_src_buf});
+  auto diff_src_usr_memory = dpcpp_onednn_memory(
+      {{gradInput_tz}, data_t, format}, engine, gradInput_data);
 
   std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
   pooling_forward_desc.reset(new pooling_forward::desc(
@@ -560,10 +556,9 @@ static void max_pool_backward_out_frame(
   pool_backward.reset(new pooling_backward(*pooling_backward_pd));
 
   auto indices_md = pooling_forward_pd->workspace_desc();
-  auto indices_usr_buf = dpcpp_set_onednn_buffer((void*)indices_usr.data_ptr<int32_t>());
-  auto indices_usr_memory = memory(
-      {{{gradOutput_tz}, (memory::data_type)indices_md.data.data_type, format},
-       engine, indices_usr_buf});
+  auto indices_usr_memory = dpcpp_onednn_memory(
+      {{gradOutput_tz}, (memory::data_type)indices_md.data.data_type, format},
+       engine, indices_usr.data_ptr());
   auto indices_memory = indices_usr_memory;
 
   // indices has the same format with indices.
