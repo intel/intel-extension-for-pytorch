@@ -27,8 +27,14 @@ def test_lazy_reorder():
     bn1.to("dpcpp")
     bn2.to("dpcpp")
     x_dpcpp = x_cpu.to("dpcpp")
+    print("iter-1 ...")
     y_dpcpp = relu(bn1(conv1(x_dpcpp)))
     z_dpcpp = relu_(bn2(conv2(y_dpcpp)))
+
+    print("iter-2 ...")
+    y_dpcpp = relu(bn1(conv1(x_dpcpp)))
+    z_dpcpp = relu_(bn2(conv2(y_dpcpp)))
+
     z_dpcpp.tanh_()
     print("dpcpp", z_dpcpp.to("cpu"))
 

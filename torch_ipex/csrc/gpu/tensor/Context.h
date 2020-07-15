@@ -104,6 +104,11 @@ public:
   mem_dtype_t dtype() const { return meta_.data_type(); }
 
 public:
+  static DPCPPTensorContext release_tensor_ctx(const at::Tensor& t) {
+    return *(DPCPPTensorContext*)t.unsafeGetTensorImpl()->
+        storage().unsafeGetStorageImpl()->data_ptr().release_context();
+  }
+
   static DPCPPTensorContext get_tensor_ctx(const at::Tensor& t) {
     return *(DPCPPTensorContext*)t.unsafeGetTensorImpl()->
         storage().unsafeGetStorageImpl()->data_ptr().get_context();
@@ -193,8 +198,7 @@ public:
 
     auto to = to_plain(from);
 
-    DPCPPTensorContext ctx = *(DPCPPTensorContext*)
-        to.unsafeGetTensorImpl()->storage().data_ptr().get_context();
+    auto ctx = DPCPPTensorContext::get_tensor_ctx(to);
     DPCPPTensorContext::set_tensor_ctx(from, std::move(ctx));
     return from;
   }

@@ -3,46 +3,34 @@
 #include <iostream>
 
 
+#define DPCPP_ENV_TYPE_DEF(type, var, log)          \
+    int type = [&]() -> int {                       \
+      auto env = std::getenv(#var);                 \
+      int _##type = 0;                              \
+      if (env) {                                    \
+        _##type = std::stoi(env, 0, 10);            \
+      }                                             \
+      std::cout << #log << ": " << _##type << "\n"; \
+      return _##type;                               \
+    } ()
+
 int dpcpp_env(int env_type) {
   static struct {
-    int level = [&]() -> int {
-      auto env = std::getenv("IPEX_VERBOSE");
-      int _level = 0;
-      if (env) {
-        _level = std::stoi(env, 0, 10);
-      }
-      std::cout << "IPEX-VERBOSE-LEVEL: " << _level << "\n";
-      return _level;
-    } ();
-
-    int force_sync = [&]() -> int {
-      auto env = std::getenv("FORCE_SYNC");
-      int _force_sync = 0;
-      if (env) {
-        _force_sync = std::stoi(env, 0, 10);
-      }
-      std::cout << "Force SYNC: " << _force_sync << "\n";
-      return _force_sync;
-    } ();
-
-    int lazy_reorder = [&]() -> int {
-      auto env = std::getenv("LAZY_REORDER");
-      int _lazy_reorder = 0;
-      if (env) {
-        _lazy_reorder = std::stoi(env, 0, 10);
-      }
-      std::cout << "Lazy Reorder: " << _lazy_reorder << "\n";
-      return _lazy_reorder;
-    } ();
+    DPCPP_ENV_TYPE_DEF(verbose, IPEX_VERBOSE, IPEX-VERBOSE-LEVEL);
+    DPCPP_ENV_TYPE_DEF(force_sync, FORCE_SYNC, Force-SYNC);
+    DPCPP_ENV_TYPE_DEF(lazy_reorder, LAZY_REORDER, Lazy-Reorder);
+    DPCPP_ENV_TYPE_DEF(weight_opt, WEIGHT_OPT, Weight-OPT);
   } env;
 
   switch (env_type) {
   case ENV_VERBOSE:
-    return env.level;
+    return env.verbose;
   case ENV_FORCE_SYNC:
     return env.force_sync;
   case ENV_LAZY_REORDER:
     return env.lazy_reorder;
+  case ENV_WEIGHT_OPT:
+    return env.weight_opt;
   default:
     return 0;
   }

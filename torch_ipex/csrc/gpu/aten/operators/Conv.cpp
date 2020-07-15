@@ -257,9 +257,26 @@ at::Tensor convolution(
   auto expected_weight_md = conv_forward_pd->weights_desc();
   auto weight_memory = weight_usr_memory;
   if (weight_usr_memory.get_desc() != expected_weight_md) {
-    weight_memory = memory(expected_weight_md, engine);
+    Tensor weight_opt;
+    if (weight_opt_enabled()) {
+      weight_opt = empty_opaque_tensor(
+          expected_weight_md, weight.options(), c10::nullopt);
+      weight_memory = dpcpp_mkldnn_memory(
+          expected_weight_md, engine, weight_opt.data_ptr());
+    } else {
+      weight_memory = memory(expected_weight_md, engine);
+    }
+
     DPCPP_ONEDNN_EXEC(reorder(weight_usr_memory, weight_memory),
         strm, weight_usr_memory, weight_memory);
+
+    if (weight_opt_enabled()) {
+      strm.wait();
+      auto weight_opt_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::
+          release_tensor_ctx(weight_opt);
+      at::AtenIpexTypeDPCPP::DPCPPTensorContext::
+          set_tensor_ctx(weight, std::move(weight_opt_ctx));
+    }
   }
 
   auto expected_output_md = conv_forward_pd->dst_desc();
