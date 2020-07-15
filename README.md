@@ -1,19 +1,18 @@
 # Intel GPU Extension for PyTorch
 
-> This is Intel GPU Extension for PyTorch Repo
+*  The Intel GPU Extension for PyTorch is a directed optimized solution for PyTorch end-users to run PyTorch workloads on Intel Graphics cards.
 
 ## Pre-requirements:
 
-### **HW proxy:** Intel Gen9 Graphics
+### **HW proxy:** Intel Gen9 Graphics, Intel DG1 Graphics
 
 ### **OS:** Ubuntu-18.04
 
 ### **Python:** 3.6.x
 
-### **Required Package:**
+### **Dependence:**
 ```bash
-python3 -m pip install GitPython==3.1.1
-python3 -m pip install lark-parser>=0.8.9
+python3 -m pip install -r requirements.txt
 ```
 
 ### **UMD Component Installation:**
@@ -40,7 +39,8 @@ sudo ./install.sh
 sudo usermod -a -G video $USER
 sudo shutdown -r 0
 ```
-**Note:** please update $USER to your ubuntu username.
+**Note:**
+<br>please update $USER to your ubuntu username.
 
 ## **Compiler Version and Setting:**
 
@@ -63,9 +63,9 @@ export CXX=${ COMPUTECPP_DIR}/bin/compute++
 export LD_LIBRARY_PATH=${COMPUTECPP_DIR}/lib/:${LD_LIBRARY_PATH}
 export PATH=${COMPUTECPP_DIR}/bin:$PATH
 ```
-**Note:** Please update ${PATH_TO_Your_Intel_OpenCL_SDK} to where you install Intel OpenCL SDK. It is /opt/intel/opencl by default.
-
-**Note:** Please update ${PATH_TO_Your_ComputeCpp} to where you install ComputeCpp compiler. 
+**Note:**
+<br>Please update ${PATH_TO_Your_Intel_OpenCL_SDK} to where you install Intel OpenCL SDK. It is /opt/intel/opencl by default.
+<br>Please update ${PATH_TO_Your_ComputeCpp} to where you install ComputeCpp compiler. 
 
 ### **Validation:**
 Finally, compile and execute the following program and check the result. It is optional.
@@ -107,10 +107,10 @@ int main() {
 
 | Compiler | Command |
 | ------ | ------ |
-| DPC++ | `$ clang++ -I $DPCPP_ROOT/include/sycl device_enum.cpp -L~/.local/lib -fsycl -o device_enum` |
-| ComputeCpp | `$ compute++ -I $COMPUTECPP_DIR/include device_enum.cpp -L~/.local/lib -lComputeCpp -o device_enum` | 
+| DPC++ | `$ clang++ -I $DPCPP_ROOT/include/sycl device_enum.cpp -L $DPCPP_ROOT/lib -fsycl -o device_enum` |
+| ComputeCpp | `$ compute++ -I $COMPUTECPP_DIR/include device_enum.cpp -L $COMPUTECPP_DIR/lib -lComputeCpp -o device_enum` | 
 
-- Desired Result:
+- Expected result:
 ```bash
 ./device_enum
 
@@ -124,29 +124,32 @@ int main() {
 ## Repo preparation:
 1.  Download source code of corresponding PyTorch
 ```bash
-git clone https://gitlab.devtools.intel.com/intel-pytorch-extension/pytorch.git -b pytorch-1.5
+git clone https://github.com/pytorch/pytorch.git -b v1.5.0
 cd pytorch
 git submodule update --init --recursive
 ```
-**Note:** Please upload SSH public keys of your building machine onto gitlab "settings", refer to [**this link**](https://gitlab.devtools.intel.com/help/ssh/README#locating-an-existing-ssh-key-pair) for more details.
 
 2.  Download source code of Intel GPU Extension for PyTorch
 ```bash
-git clone https://gitlab.devtools.intel.com/intel-pytorch-extension/intel-pytorch-extension -b <RELEASE_TAG>
+git clone ssh://git@gitlab.devtools.intel.com:29418/intel-pytorch-extension/intel-pytorch-extension.git
 cd intel-pytorch-extension
 git submodule update --init --recursive
 ```
+**Note:**
+<br>Please upload SSH public keys of your building machine onto gitlab "settings", refer to [**this link**](https://gitlab.devtools.intel.com/help/ssh/README#locating-an-existing-ssh-key-pair) for more details.
 
 ## Build and Install PyTorch:
 ```bash
 export USE_CUDNN=0 USE_FBGEMM=0 USE_NNPACK=0 BUILD_CAFFE2_OPS=0
 cd pytorch
+git am <PATH_To_intel-pytorch-extension>/torch_patches/*
 python3 setup.py install --user
 ```
-**Note:** You can choose your favorite compiler for building PyTorch, which could be the same or different from the one for building Intel PyTorch Extension.
-We recommend using **GCC** compiler for building PyTorch (unset $CXX if already set for ComputeCpp before). 
+**Note:**
+<br>You can choose your favorite compiler for building PyTorch, which could be the same or different from the one for building Intel PyTorch Extension.
+<br>We recommend using **GCC** compiler for building PyTorch (unset $CXX if already set for ComputeCpp before). 
 
-## Build and Install Intel PyTorch Extension:
+## Build and Install Intel GPU Extension for PyTorch:
 
 ### Downgrade to gcc5 (only for ***ComputeCpp***, not needed for DPC++)
 ```bash
@@ -163,9 +166,46 @@ cd intel-pytorch-extension
 python3 setup.py install --user
 ```
 
+## Programming Model:
+*  ```import torch_ipex``` is a MUST before running any cases with Intel GPU Extension for PyTorch.
+*  New devcie "dpcpp" is added into PyTorch proper. Must convert Tensors/Operators/Models onto DPCPP device before running with this Extension.
+
+## Supported Models:
+Please download pre-optimized models for this Extension through below command:
+```bash
+git clone ssh://git@gitlab.devtools.intel.com:29418/intel-pytorch-extension/gpu-optimized-models.git
+```
+
+***On Gen9*** :
+
+| Model          | Verified Workload                         |
+|----------------|-------------------------------------------|
+| ResNet50       | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
+| Bert           | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
+| MobileNet V1   | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
+| NCF            | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
+| DLRM           | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
+| GNMT           | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
+| Transformer LT | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
+
+***On DG1*** :
+
+| Model          | Verified Workload                         |
+|----------------|-------------------------------------------|
+| ResNet50       | Inference: FP32/BFP16/FP16 |
+| Bert           | Inference: FP32/BFP16 |
+| MobileNet V1   | Inference: FP32/BFP16/FP16 |
+| NCF            | Inference: FP32/BFP16/FP16 |
+| DLRM           | Inference: FP32/BFP16/FP16 |
+| GNMT           | Inference: FP32/BFP16/FP16 |
+
+## Known issues:
+*  Tensor.new() is not supported on DPCPP device. The alternative solution is Tensor.to("cpu").new().to("dpcpp").
+*  Model.storage() is not supported on DPCPP device. The alternative solution is Model.to("cpu").storage().
+
 ## Caveat:
 ### 1. Set https proxy:
-Please configure http(s).proxy for git, otherwise you will get an error similar to “fatal: unable to access 'https://gitlab.devtools.intel.com/intel-pytorch-extension/pytorch.git/': gnutls_handshake() failed: The TLS connection was non-properly terminated.”
+Please configure http(s).proxy for git, otherwise you will get an error similar to “fatal: unable to access 'https://git@gitlab.devtools.intel.com:29418/intel-pytorch-extension/intel-pytorch-extension.git': gnutls_handshake() failed: The TLS connection was non-properly terminated.”
 ```bash
 git config --global http.proxy YourAddress:Port
 git config --global https.proxy YourAddress:Port
