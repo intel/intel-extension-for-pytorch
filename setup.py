@@ -1,15 +1,6 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
-try:
-    import torch
-    from torch.utils.cpp_extension import include_paths, library_paths
-except ImportError as e:
-    print('Unable to import torch. Error:')
-    print('\t', e)
-    print('You need to install pytorch first.')
-    sys.exit(1)
-
 from subprocess import check_call
 from setuptools import setup, Extension, find_packages, distutils
 import setuptools.command.build_ext
@@ -30,6 +21,15 @@ import re
 import shutil
 import subprocess
 import sys
+
+try:
+    import torch
+    from torch.utils.cpp_extension import include_paths, library_paths
+except ImportError as e:
+    print('Unable to import torch. Error:')
+    print('\t', e)
+    print('You need to install pytorch first.')
+    sys.exit(1)
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
