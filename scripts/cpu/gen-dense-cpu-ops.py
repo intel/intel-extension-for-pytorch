@@ -70,6 +70,7 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::slice.Tensor(Tensor(a) self, int dim=0, int start=0, int end=9223372036854775807, int step=1) -> Tensor(a)',
     'aten::select.int(Tensor(a) self, int dim, int index) -> Tensor(a)',
     'aten::select.Dimname(Tensor(a) self, Dimname dim, int index) -> Tensor(a)',
+    'aten::view(Tensor(a) self, int[] size) -> Tensor(a)',
     #'aten::native_layer_norm(Tensor input, Tensor? weight, Tensor? bias, int M, int N, float eps) -> (Tensor, Tensor, Tensor)',
     #'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)'
 ]

@@ -1116,8 +1116,8 @@ class TestTensorShape(TestCase):
                 res_fp32_view = res_bf16.view(1280, 4, 1, 128)
                 self.assertTrue(ipex.core.is_dil_tensor(res_bf16))
                 self.assertTrue(ipex.core.is_dil_tensor(res_fp32_view))
-                self.assertFalse(ipex.core.is_bf16_dil_tensor(res_bf16))
-                self.assertFalse(ipex.core.is_bf16_dil_tensor(res_fp32_view))
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_bf16))
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_fp32_view))
                 self.assertEqual(list(res_fp32_view.size()), [1280, 4, 1, 128])
                 tmp_res = res_bf16 + res_bf16_other
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_bf16))

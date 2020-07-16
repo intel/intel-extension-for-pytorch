@@ -1558,6 +1558,43 @@ at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, int64_t dim, int6
   return result;
 }
 
+at::Tensor alias_with_sizes_and_strides(
+    const at::Tensor& self,
+    const c10::IntArrayRef sizes,
+    const c10::IntArrayRef strides) {
+
+  // share storage
+  auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
+  self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
+  auto self_ = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::DPCPPTensorId);
+
+  auto* _tensor_impl = (IPEXTensorImpl *)self_.unsafeGetTensorImpl();
+  _tensor_impl->copy_meta_info(self.unsafeGetTensorImpl());
+  _tensor_impl->copy_auto_grad(self.unsafeGetTensorImpl());
+
+  auto storage_offset = self.storage_offset();
+  _tensor_impl->set_strided(sizes, strides, storage_offset);
+
+  at::namedinference::propagate_names(self_, self);
+  return self_;
+}
+
+at::Tensor AtenIpexCPUDev::dil_view(const at::Tensor & self, at::IntArrayRef size) {
+  DEBUG("AtenIpexCPUDev::dil_view\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  // Port from aten/src/ATen/native/TensorShape.cpp
+  auto inferred_size = at::infer_size(size, self.numel());
+  auto stride = at::detail::computeStride(self.sizes(),
+                                          self.strides(),
+                                          inferred_size);
+  TORCH_CHECK(stride.has_value(), "view size is "
+    "not compatible with input tensor's size and stride (at least one dimension"
+    " spans across two contiguous subspaces). Use .reshape(...) instead.");
+  auto stride_value = *stride;
+  return alias_with_sizes_and_strides(self, inferred_size, stride_value);
+}
+
 at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, at::Dimname dim, int64_t index) {
   return dil_select(self, at::dimname_to_position(self, dim), index);
 }
