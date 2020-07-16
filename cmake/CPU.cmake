@@ -8,7 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 SET(DNNL_BUILD_TESTS FALSE CACHE BOOL "" FORCE)
 SET(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "" FORCE)
 SET(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
-# SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
+SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/cpu")
 add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
@@ -175,9 +175,11 @@ else()
   message(FATAL_ERROR "Unknown ATen parallel backend: ${ATEN_THREADING}")
 endif()
 
-target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl)
 add_dependencies(${PLUGIN_NAME} pybind11)
+
 add_dependencies(${PLUGIN_NAME} dnnl)
+target_link_libraries(${PLUGIN_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/src/libdnnl.a)
+
 add_dependencies(${PLUGIN_NAME} xsmm)
 
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
