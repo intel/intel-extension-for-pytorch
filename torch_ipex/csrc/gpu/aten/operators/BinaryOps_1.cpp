@@ -5,10 +5,12 @@
 
 #include <core/DPCPP.h>
 #include <utils/Pointwise.h>
+#include <oneDNN/oneDNN.h>
 
 #include "Loops.h"
 
 using namespace at::dpcpp;
+using namespace at::dpcpp::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -53,6 +55,10 @@ static Tensor wrapped_scalar_tensor(Scalar scalar) {
   return tensor;
 }
 
+static bool is_wrapped_number(const Tensor& t) {
+  return t.unsafeGetTensorImpl()->is_wrapped_number();
+}
+
 // Basic checking for all sub functions.
 static inline void sub_check(const Tensor& self, const Tensor& other) {
   TORCH_CHECK(
@@ -70,9 +76,26 @@ static inline void sub_check(const Tensor& self, const Tensor& other) {
 
 Tensor& add_out(
     Tensor& result,
-    const Tensor& self,
-    const Tensor& other,
+    const Tensor& _self,
+    const Tensor& _other,
     Scalar alpha) {
+  Tensor self, other;
+  if (1.0 == alpha.to<float>() &&
+      _self.defined() &&
+      _other.defined() &&
+      _self.sizes() == _other.sizes() &&
+      !impl::is_wrapped_number(_self) &&
+      !impl::is_wrapped_number(_other) &&
+      (!DPCPPTensorContext::is_plain(_self) ||
+       !DPCPPTensorContext::is_plain(_other))) {
+    oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
+    return result;
+  } else {
+    result = to_plain_if_needed(result);
+    self = to_plain_if_needed(_self);
+    other = to_plain_if_needed(_other);
+  }
+
   auto iter = TensorIterator::binary_op(
       result,
       self,
@@ -84,8 +107,23 @@ Tensor& add_out(
   return result;
 }
 
-Tensor add(const Tensor& self, const Tensor& other, Scalar alpha) {
-  Tensor result;
+Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
+  Tensor result, self, other;
+  if (1.0 == alpha.to<float>() &&
+      _self.defined() &&
+      _other.defined() &&
+      _self.sizes() == _other.sizes() &&
+      !impl::is_wrapped_number(_self) &&
+      !impl::is_wrapped_number(_other) &&
+      (!DPCPPTensorContext::is_plain(_self) ||
+       !DPCPPTensorContext::is_plain(_other))) {
+    oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
+    return result;
+  } else {
+    self = to_plain_if_needed(_self);
+    other = to_plain_if_needed(_other);
+  }
+
   auto iter = TensorIterator::binary_op(result, self, other);
   impl::alpha_check(iter, alpha);
   impl::add_kernel_dpcpp(iter, alpha);

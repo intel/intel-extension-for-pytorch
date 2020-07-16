@@ -105,6 +105,13 @@ public:
   mem_dtype_t dtype() const { return meta_.data_type(); }
 
 public:
+  static bool is_plain(const at::Tensor& t) {
+    if (!t.defined())
+      return true;
+    auto ctx = get_tensor_ctx(t);
+    return ctx.is_plain();
+  }
+
   static DPCPPTensorContext release_tensor_ctx(const at::Tensor& t) {
     return *(DPCPPTensorContext*)t.unsafeGetTensorImpl()->
         storage().unsafeGetStorageImpl()->data_ptr().release_context();

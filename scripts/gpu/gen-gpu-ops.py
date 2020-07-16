@@ -96,6 +96,9 @@ _FN_BLKFMT_SUPPORTED = set([
     'relu',
     'relu_',
     'native_batch_norm',
+    'add_',
+    'add',
+    'add_out',
 ])
 
 _FN_BLACKLIST_REGEX = [

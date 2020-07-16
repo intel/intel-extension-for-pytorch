@@ -84,12 +84,14 @@ endif()
 set(DPCPP_GPU_ROOT "${TORCH_IPEX_C_SOURCE_DIR}/gpu")
 set(DPCPP_GPU_ATEN_SRC_ROOT "${DPCPP_GPU_ROOT}/aten")
 set(DPCPP_GPU_ATEN_GENERATED "${DPCPP_GPU_ROOT}/aten/generated")
+set(DPCPP_GPU_ONEDNN "${DPCPP_GPU_ROOT}/oneDNN")
 
 include_directories(${PYTHON_INCLUDE_DIR})
 include_directories(${TORCH_IPEX_C_SOURCE_DIR})
 include_directories(${DPCPP_GPU_ROOT})
 include_directories(${DPCPP_GPU_ATEN_SRC_ROOT})
 include_directories(${DPCPP_GPU_ATEN_GENERATED})
+include_directories(${DPCPP_GPU_ONEDNN})
 
 # generate c10 dispatch registration
 add_custom_command(OUTPUT
