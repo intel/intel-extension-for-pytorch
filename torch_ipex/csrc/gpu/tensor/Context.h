@@ -87,6 +87,7 @@ public:
       return false;
     } else {
       TORCH_CHECK(1, "fail to check tensor meta ...");
+      return false;
     }
   }
 
@@ -190,6 +191,7 @@ public:
     auto to = at::AtenIpexTypeDPCPP::empty(
         ctx.dims(), from.options(), c10::nullopt);
     convert(to, from);
+    return to;
   }
 
   static at::Tensor to_plain_(at::Tensor& from) {

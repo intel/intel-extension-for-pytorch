@@ -80,7 +80,7 @@ static inline mkldnn::memory dpcpp_onednn_memory(
   #if defined(USE_DPCPP)
     auto buffer = make_buffer<uint8_t>(ptr);
   #elif defined(USE_COMPUTECPP)
-    if (dpcppGetBufferMap().get_offset(vptr) != 0) {
+    if (dpcppGetBufferMap().get_offset(ptr) != 0) {
       TORCH_CHECK(
           0, "the offset of dpcpp buffer is not 0. We don't support this case.");
     }
