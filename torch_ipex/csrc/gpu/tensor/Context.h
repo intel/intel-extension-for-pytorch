@@ -166,6 +166,7 @@ public:
 
     auto opaque_ctx = from_is_opaque_tensor ? from_ctx : to_ctx;
     mem_desc_t opaque_md = {opaque_ctx.meta().data};
+    // FIXME: to decide AB or BA plain format
     mem_desc_t plain_md =
         {opaque_ctx.dims(), opaque_ctx.dtype(), opaque_ctx.get_plain_tag()};
     mem_desc_t from_md = from_is_opaque_tensor ? opaque_md : plain_md;

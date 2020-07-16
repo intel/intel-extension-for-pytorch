@@ -272,6 +272,7 @@ at::Tensor convolution(
 
     if (weight_opt_enabled()) {
       strm.wait();
+      // FIXME: thread safty
       auto weight_opt_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::
           release_tensor_ctx(weight_opt);
       at::AtenIpexTypeDPCPP::DPCPPTensorContext::
