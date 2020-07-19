@@ -34,9 +34,10 @@ cd intel_sdk_for_opencl_2017_7.0.0.2568_x64/
 sudo ./install.sh
 ```
 
-### **Add ubuntu user to video group:**
+### **Add ubuntu user to video and render group:**
 ```bash
 sudo usermod -a -G video $USER
+sudo usermod -a -G render $USER
 sudo shutdown -r 0
 ```
 **Note:**
