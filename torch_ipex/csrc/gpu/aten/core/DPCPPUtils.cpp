@@ -117,10 +117,14 @@ static void initBufferMapPoolCallOnce() {
 }
 
 cl::sycl::codeplay::PointerMapper& dpcppGetBufferMap() {
+#ifndef USE_USM
   initBufferMapPoolCallOnce();
   DeviceIndex device_id;
   AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
   return *gBufferMapPoolPtr[device_id];
+#else
+  throw(std::runtime_error("Invalid call get sycl buffer map in USM mode"));
+#endif
 }
 
 int dpcppGetDeviceIdFromPtr(DeviceIndex* device_id, void* ptr) {

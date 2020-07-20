@@ -519,35 +519,34 @@ void EmbeddingBag_updateOutputKernel(
   int64_t kernel_range = 1024 * workersPerChunk;
   int64_t chunksPerWorkGroup = 256 / workersPerChunk;
   bool per_sample_weights_defined = per_sample_weights ? true : false;
-  DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input);
-    auto offset_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, offsets);
-    auto weight_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, weight);
-    auto output_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output);
-    auto offset2bag_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, offset2bag);
-    auto bag_size_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, bag_size);
-    auto per_sample_weights_acc = per_sample_weights_defined
-        ? DPCPPAccessor<dpcpp_r_mode>(cgh, per_sample_weights)
-        : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer);
-    auto max_indices_acc = mode == MODE_MAX
-        ? DPCPPAccessor<dpcpp_discard_w_mode>(cgh, max_indices)
-        : DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dummy_buffer);
+    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input);
+    auto offsets_data = get_buffer<dpcpp_r_mode>(cgh, offsets);
+    auto weight_data = get_buffer<dpcpp_r_mode>(cgh, weight);
+    auto output_data= get_buffer<dpcpp_discard_w_mode>(cgh, output);
+    auto offset2bag_data = get_buffer<dpcpp_discard_w_mode>(cgh, offset2bag);
+    auto bag_size_data = get_buffer<dpcpp_discard_w_mode>(cgh, bag_size);
+    // use the weight handler as the dummy handler.
+    // The kernel would not access the data thru the per_sample_weights_ptr in false case
+    auto per_sample_weights_data = per_sample_weights_defined
+                                  ? get_buffer<dpcpp_r_mode>(cgh, per_sample_weights)
+                                  : weight_data;
+    // use the offset2bag handler as the dummy handler.
+    // The kernel would not access the data thru the max_indices_ptr in false case
+    auto max_indices_data = mode == MODE_MAX
+                           ? get_buffer<dpcpp_discard_w_mode>(cgh, max_indices)
+                           : offset2bag_data;
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
-      auto input_ptr = in_acc.template get_pointer<int64_t>();
-      auto offsets_ptr = offset_acc.template get_pointer<int64_t>();
-      auto weight_ptr = weight_acc.template get_pointer<scalar_t>();
-      auto output_ptr = output_acc.template get_pointer<scalar_t>();
-      auto offset2bag_ptr = offset2bag_acc.template get_pointer<int64_t>();
-      auto bag_size_ptr = bag_size_acc.template get_pointer<int64_t>();
-      auto per_sample_weights_ptr = per_sample_weights_defined
-          ? per_sample_weights_acc.template get_pointer<scalar_t>()
-          : NULL;
-      auto max_indices_ptr = mode == MODE_MAX
-          ? max_indices_acc.template get_pointer<int64_t>()
-          : NULL;
+      auto input_ptr = get_pointer(input_data);
+      auto offsets_ptr = get_pointer(offsets_data);
+      auto weight_ptr = get_pointer(weight_data);
+      auto output_ptr= get_pointer(output_data);
+      auto offset2bag_ptr = get_pointer(offset2bag_data);
+      auto bag_size_ptr = get_pointer(bag_size_data);
+      auto per_sample_weights_ptr = get_pointer(per_sample_weights_data);
+      auto max_indices_ptr = get_pointer(max_indices_data);
 
       int64_t chunkOffset = item.get_group()[0] * item.get_local_range()[1] +
           item.get_local_id()[1];
@@ -558,7 +557,7 @@ void EmbeddingBag_updateOutputKernel(
             item.get_local_id(0);
         if (featureDim < featureSize) {
           int64_t bag = chunk / chunksPerBag;
-          scalar_t* weightFeat = weight_ptr + featureDim * weight_stride1;
+          auto weightFeat = weight_ptr + featureDim * weight_stride1;
           int64_t begin = offsets_ptr[bag];
           int64_t end =
               (bag < numBags - 1) ? (offsets_ptr[bag + 1]) : numIndices;

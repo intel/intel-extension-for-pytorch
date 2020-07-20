@@ -38,10 +38,20 @@ class DPCPPStreamImpl {
                   DPCPP::queue(at::dpcpp::getGlobalContext(),
                    dpcppGetDeviceSelector(di),
                    asyncHandler,
-                   DPCPP::property::queue::enable_profiling()) :
+#ifndef USE_USM
+                   {DPCPP::property::queue::enable_profiling()}) :
+#else
+                   {DPCPP::property::queue::in_order(),
+                    DPCPP::property::queue::enable_profiling()}) :
+#endif
                   DPCPP::queue(at::dpcpp::getGlobalContext(),
                    dpcppGetDeviceSelector(di),
+#ifndef USE_USM
                    asyncHandler);
+#else
+                   asyncHandler,
+                   {DPCPP::property::queue::in_order()});
+#endif
             } ()
         ), device_index_(di) {}
 

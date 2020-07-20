@@ -2,6 +2,7 @@
 #include <core/Allocator.h>
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
+#include <core/CachingAllocator.h>
 
 namespace at {
 namespace dpcpp {
@@ -30,7 +31,11 @@ DPCPP::context getGlobalContext() {
 }
 
 at::Allocator* getDPCPPDeviceAllocator() {
+#if defined(USE_USM)
+  return dpcpp_getCachingAllocator();
+#else
   return DPCPPAllocator_get();
+#endif
 }
 
 } // namespace dpcpp

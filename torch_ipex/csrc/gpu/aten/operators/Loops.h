@@ -177,51 +177,51 @@ void dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
   using ret_t = typename traits::result_type;
 
   int64_t numel = iter.numel();
-
-  void* out_data = (void*)iter.data_ptr(0);
-  // Initial the in_data with some dummy valid address.
-  at::detail::Array<char*, MAX_INPUT_TENSOR_NUM> in_data((char*)out_data);
-  for (int i = 0; i < n_in_tensors; i++) {
-    // The life will be much easier in UMS
-    in_data[i] = (char*)iter.data_ptr(i + 1);
-  }
-
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
-  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
-  using in_ptr_t = typename DPCPP::global_ptr<char>::pointer_t;
-
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    out_accessor_t out_acc = out_accessor_t(__cgh, out_data);
+    auto out_data = get_buffer<dpcpp_discard_w_mode>(__cgh, (char*)iter.data_ptr(0));
+#ifdef USE_USM
+    at::detail::Array<char*, MAX_INPUT_TENSOR_NUM> in_ptrs;
+    for (size_t i = 0; i < n_in_tensors; i++) {
+      in_ptrs[i] = get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(i + 1));
+    }
+#else
+    // Initial the in_data with some dummy valid address.
+    at::detail::Array<char*, MAX_INPUT_TENSOR_NUM> in_data((char*)iter.data_ptr(0));
+    for (int i = 0; i < n_in_tensors; i++) {
+      in_data[i] = (char*)iter.data_ptr(i + 1);
+    }
 
 #define ACCESSOR_DEFINE(n) \
-  in_accessor_t in_acc_##n = in_accessor_t(__cgh, in_data[n]);
+  auto in_acc_##n = get_buffer<dpcpp_r_mode>(__cgh, in_data[n]);
     REPEAT_PATTERN(MAX_INPUT_TENSOR_NUM, ACCESSOR_DEFINE)
 #undef ACCESSOR_DEFINE
+#endif
 
-#define OFFSET_DEFINE(n) \
-  SyclOffsetCal<uint32_t> __off_##n = make_offset_calculator<uint32_t>(iter, n);
-    REPEAT_PATTERN(MAX_TOTAL_TENSOR_NUM, OFFSET_DEFINE)
-#undef OFFSET_DEFINE
+    at::detail::Array<SyclOffsetCal<uint32_t>, MAX_TOTAL_TENSOR_NUM> tensor_offsets;
+    for (size_t i = 0; i < n_in_tensors + 1; i++) {
+      tensor_offsets[i] = make_offset_calculator<uint32_t>(iter, i);
+    }
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto out_ptr = out_acc.template get_pointer<char>();
-      at::detail::Array<in_ptr_t, MAX_INPUT_TENSOR_NUM> in_ptr;
-      at::detail::Array<int64_t, MAX_TOTAL_TENSOR_NUM> offsets;
-
-#define ACCESSOR_DEREFER(n) in_ptr[n] = in_acc_##n.template get_pointer<char>();
+      auto linear_idx = item_id.get_id(0);
+      auto out_ptr = get_pointer(out_data);
+#ifndef USE_USM
+      at::detail::Array<char*, MAX_INPUT_TENSOR_NUM> in_ptrs;
+#define ACCESSOR_DEREFER(n) in_ptrs[n] = in_acc_##n.template get_pointer();
       REPEAT_PATTERN(MAX_INPUT_TENSOR_NUM, ACCESSOR_DEREFER)
 #undef ACCESSOR_DEREFER
+#endif
 
-      auto linear_idx = item_id.get_id(0);
-#define OFFSET_GET(n) offsets[n] = __off_##n.get(linear_idx);
-      REPEAT_PATTERN(MAX_TOTAL_TENSOR_NUM, OFFSET_GET)
-#undef OFFSET_GET
+      at::detail::Array<int64_t, MAX_TOTAL_TENSOR_NUM> offsets;
+      for (size_t i = 0; i < n_in_tensors + 1; i++) {
+        offsets[i] = tensor_offsets[i].get(linear_idx);
+      }
 
       ret_t* out = (ret_t*)(out_ptr + offsets[0]);
       *out = c10::guts::apply(
-          f, dereference<traits>(&in_ptr.data[0], &offsets.data[1], 1));
+          f, dereference<traits>(&in_ptrs.data[0], &offsets.data[1], 1));
     };
 
     __cgh.parallel_for<DPCPP_K(dpcpp_loops_kernel_impl, kernel_name, ret_t)>(
@@ -251,118 +251,84 @@ void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
   dpcpp_loops_kernel_impl<scalar_t>(iter, f);
 }
 
-// all three operands contiguous
-template <typename traits>
-static inline bool is_binary_contiguous(const int64_t* strides) {
-  return strides[0] == sizeof(typename traits::result_type) &&
-      strides[1] == sizeof(typename traits::arg1_t) &&
-      strides[2] == sizeof(typename traits::arg2_t);
-}
+DPCPP_DEF_K1(dpcpp_index_kernel);
+template <typename kernel_name, typename func_t>
+void dpcpp_index_kernel_impl(
+  TensorIterator& iter,
+  IntArrayRef index_size,
+  IntArrayRef index_stride,
+  const func_t f) {
+  size_t num_indices = index_size.size();
+  auto numel = iter.numel();
+  at::detail::Array<int64_t, MAX_TENSORINFO_DIMS> sizes(0);
+  at::detail::Array<int64_t, MAX_TENSORINFO_DIMS> strides(0);
+  for (size_t i = 0; i < num_indices; i++) {
+    sizes[i] = index_size[i];
+    strides[i] = index_stride[i];
+  }
 
-// arg1 is a scalar, output and arg2 are contiguous
-template <typename traits>
-static inline bool is_binary_contiguous_s1(const int64_t* strides) {
-  return strides[0] == sizeof(typename traits::result_type) &&
-      strides[1] == 0 && strides[2] == sizeof(typename traits::arg2_t);
-}
-
-// arg2 is a scalar, output and arg1 are contiguous
-template <typename traits>
-static inline bool is_binary_contiguous_s2(const int64_t* strides) {
-  return strides[0] == sizeof(typename traits::result_type) &&
-      strides[1] == sizeof(typename traits::arg1_t) && strides[2] == 0;
-}
-
-// result is
-static inline bool is_reduction(char** data, const int64_t* strides) {
-  return strides[0] == 0 && strides[1] == 0 && data[0] == data[1];
-}
-
-#define LOOP_HEADER(func_t, data, strides)       \
-  using traits = binary_function_traits<func_t>; \
-  using arg0_t = typename traits::result_type;   \
-  using arg1_t = typename traits::arg1_t;        \
-  using arg2_t = typename traits::arg2_t;        \
-  char* out_ptr = data[0];                       \
-  const char* in1_ptr = data[1];                 \
-  const char* in2_ptr = data[2];                 \
-  int64_t s0 = strides[0], s1 = strides[1], s2 = strides[2];
-
-template <class op_type, typename arg0_t, typename arg1_t, typename arg2_t>
-class KernelName {};
-
-template <class op_type, typename func_t>
-static inline void dpcpp_binary_loop(
-    char** data,
-    const int64_t* strides,
-    int64_t i,
-    int64_t n,
-    const func_t op) {
-  LOOP_HEADER(func_t, data, strides)
-  static const auto write_mode = DPCPP::access::mode::discard_write;
-  static const auto read_mode = DPCPP::access::mode::read;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  int64_t rng, GRange, tileSize;
-  parallel_for_setup(n, tileSize, rng, GRange);
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in1_Acc = DPCPPAccessor<read_mode>(cgh, in1_ptr);
-    auto in2_Acc = DPCPPAccessor<read_mode>(cgh, in2_ptr);
-    auto out_Acc = DPCPPAccessor<write_mode>(cgh, out_ptr);
-    cgh.parallel_for<KernelName<op_type, arg0_t, arg1_t, arg2_t>>(
-        DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
-        [=](DPCPP::nd_item<1> item) {
-          int64_t globalid = item.get_global_linear_id();
-          auto input1_ptr = in1_Acc.template get_pointer<arg1_t>();
-          auto input2_ptr = in2_Acc.template get_pointer<arg2_t>();
-          auto output_ptr = out_Acc.template get_pointer<arg0_t>();
 
-          if (globalid < rng)
-            output_ptr[SyclConvertToActualOffset(arg0_t, globalid * s0)] = op(
-                input1_ptr[SyclConvertToActualOffset(arg1_t, globalid * s1)],
-                input2_ptr[SyclConvertToActualOffset(arg2_t, globalid * s2)]);
-        });
+  auto cgf = DPCPP_Q_CGF(__cgh) {
+    auto out_data = get_buffer<dpcpp_discard_w_mode>(__cgh, (char*)iter.data_ptr(0));
+    auto in_data = get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(1));
+#ifdef USE_USM
+    using index_buf_type = decltype(get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(0)));
+    at::detail::Array<index_buf_type, MAX_TENSORINFO_DIMS> index_ptrs;
+    for (size_t i = 0; i < num_indices; i++) {
+      index_ptrs[i] = get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(i + 2));
+    }
+#else
+    // Initial the index_datas with some dummy valid address.
+    auto index_datas =
+      at::detail::Array<char*, MAX_TENSORINFO_DIMS>((char*)iter.data_ptr(1));
+    for (size_t i = 0; i < num_indices; i++) {
+      index_datas[i] = (char*)iter.data_ptr(i + 2);
+    }
+#define ACCESSOR_DEFINE(n) \
+  auto in_acc_##n = get_buffer<dpcpp_r_mode>(__cgh, index_datas[n]);
+    REPEAT_PATTERN(MAX_TENSORINFO_DIMS, ACCESSOR_DEFINE)
+#undef ACCESSOR_DEFINE
+#endif
+
+
+    auto offset_calc = make_offset_calculator<3>(iter);
+
+    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+      auto linear_idx = item_id.get_linear_id();
+      auto offsets    = offset_calc.get(linear_idx);
+      auto out_ptr = get_pointer(out_data) + offsets[0];
+      auto in_ptr = get_pointer(in_data) + offsets[1];
+#ifndef USE_USM
+      at::detail::Array<char*, MAX_TENSORINFO_DIMS> index_ptrs;
+#define ACCESSOR_DEREFER(n) \
+  index_ptrs[n] = in_acc_##n.template get_pointer();
+      REPEAT_PATTERN(MAX_TENSORINFO_DIMS, ACCESSOR_DEREFER)
+#undef ACCESSOR_DEREFER
+#endif
+      int64_t offset  = 0;
+      //#pragma unroll
+      for (size_t i = 0; i < num_indices; i++) {
+        int64_t index = *(int64_t*)(index_ptrs[i] + offsets[2]);
+        if (index >= -sizes[i] && index < sizes[i]) {
+          if (index < 0) {
+            index += sizes[i];
+          }
+          offset += index * strides[i];
+        }
+        else {
+          DPCPP_KER_STRING(err_info, "index %ld out of bounds, expected [%ld, %ld)\n");
+          DPCPP_PRINTF(err_info, index, -sizes[i], sizes[i]);
+        }
+      }
+      f(out_ptr, in_ptr, offset);
+    };
+    __cgh.parallel_for<DPCPP_K(dpcpp_index_kernel, kernel_name)>(
+      DPCPP::range</*dim=*/1>(numel), kfn);
   };
-
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <class op_type, typename func_t>
-void dpcpp_binary_kernel(TensorIterator& iter, const func_t& op) {
-  using traits = binary_function_traits<func_t>;
-  static_assert(
-      std::is_same<typename traits::result_type, typename traits::arg1_t>::
-          value,
-      "all types must match");
-  static_assert(
-      std::is_same<typename traits::result_type, typename traits::arg2_t>::
-          value,
-      "all types must match");
-
-  // int64_t n = iter.numel();
-  // if (n == 0)
-  //   return;
-
-  // auto strides = iter.get_strides();
-  // while (strides.size() < 2 * iter.ntensors()) {
-  //   strides.push_back(0);
-  // }
-
-  // auto data = iter.get_base_ptrs().data();
-
-  iter.for_each([&](char** data, const int64_t* strides, int64_t n) {
-    if (is_binary_contiguous<traits>(strides)) {
-      dpcpp_binary_loop<op_type>(data, strides, 0, n, op);
-    } else if (is_binary_contiguous_s1<traits>(strides)) {
-      dpcpp_binary_loop<op_type>(data, strides, 0, n, op);
-    } else if (is_binary_contiguous_s2<traits>(strides)) {
-      dpcpp_binary_loop<op_type>(data, strides, 0, n, op);
-    } else {
-      dpcpp_binary_loop<op_type>(data, strides, 0, n, op);
-    }
-  });
-}
-
-DPCPP_DEF_K1(dpcpp_index_kernel);
 template <typename kernel_name, typename func_t>
 void dpcpp_index_kernel(
     TensorIterator& iter,
@@ -371,9 +337,15 @@ void dpcpp_index_kernel(
     const func_t f) {
   auto numel = iter.numel();
 
-  if (iter.numel() == 0) {
+  if (numel == 0) {
     return;
   }
+
+  size_t num_indices = index_size.size();
+  TORCH_INTERNAL_ASSERT(num_indices == index_stride.size());
+  TORCH_INTERNAL_ASSERT(
+    num_indices == static_cast<size_t>(iter.ntensors()) - 2);
+  TORCH_INTERNAL_ASSERT(num_indices <= MAX_TENSORINFO_DIMS);
 
   if (!iter.can_use_32bit_indexing()) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
@@ -382,78 +354,8 @@ void dpcpp_index_kernel(
     return;
   }
 
-  size_t num_indices = index_size.size();
-  TORCH_INTERNAL_ASSERT(num_indices == index_stride.size());
-  TORCH_INTERNAL_ASSERT(
-      num_indices == static_cast<size_t>(iter.ntensors()) - 2);
-  TORCH_INTERNAL_ASSERT(num_indices <= MAX_TENSORINFO_DIMS);
-
-  void* out_data = (void*)iter.data_ptr(0);
-  void* in_data = (void*)iter.data_ptr(1);
-  auto sizes = at::detail::Array<int64_t, MAX_TENSORINFO_DIMS>(0);
-  auto strides = at::detail::Array<int64_t, MAX_TENSORINFO_DIMS>(0);
-  // Initial the index_ptrs with some dummy valid address.
-  auto index_ptrs =
-      at::detail::Array<char*, MAX_TENSORINFO_DIMS>((char*)in_data);
-  for (size_t i = 0; i < num_indices; i++) {
-    sizes[i] = index_size[i];
-    strides[i] = index_stride[i];
-    index_ptrs[i] = (char*)iter.data_ptr(i + 2);
-  }
-
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-
-  using out_accessor_t = DPCPPAccessor<dpcpp_rw_mode>;
-  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
-  using dpcpp_ptr_t = typename DPCPP::global_ptr<char>::pointer_t;
-
-  auto cgf = DPCPP_Q_CGF(__cgh) {
-    out_accessor_t out_acc = out_accessor_t(__cgh, out_data);
-    in_accessor_t in_acc = in_accessor_t(__cgh, in_data);
-
-#define ACCESSOR_DEFINE(n) \
-  in_accessor_t in_acc_##n = in_accessor_t(__cgh, index_ptrs[n]);
-    REPEAT_PATTERN(MAX_TENSORINFO_DIMS, ACCESSOR_DEFINE)
-#undef ACCESSOR_DEFINE
-
-    auto offset_calc = make_offset_calculator<3>(iter);
-
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto out_ptr = out_acc.template get_pointer<char>();
-      auto in_ptr = in_acc.template get_pointer<char>();
-      at::detail::Array<dpcpp_ptr_t, MAX_TENSORINFO_DIMS> index_ptr;
-
-#define ACCESSOR_DEREFER(n) \
-  index_ptr[n] = in_acc_##n.template get_pointer<char>();
-      REPEAT_PATTERN(MAX_TENSORINFO_DIMS, ACCESSOR_DEREFER)
-#undef ACCESSOR_DEREFER
-
-      auto linear_idx = item_id.get_id(0);
-      auto offsets = offset_calc.get(linear_idx);
-      out_ptr = out_ptr + offsets[0];
-      in_ptr = in_ptr + offsets[1];
-      int64_t offset = 0;
-      //#pragma unroll
-      for (size_t i = 0; i < num_indices; i++) {
-        int64_t index = *(int64_t*)(index_ptr[i] + offsets[2]);
-        if (index >= -sizes[i] && index < sizes[i]) {
-          if (index < 0) {
-            index += sizes[i];
-          }
-          offset += index * strides[i];
-        }
-        //        else
-        //        assert(index >= -sizes[i] && index < sizes[i] && "index out of
-        //        bounds");
-      }
-
-      f(out_ptr, in_ptr, offset);
-    };
-
-    __cgh.parallel_for<DPCPP_K(dpcpp_index_kernel, kernel_name)>(
-        DPCPP::range</*dim=*/1>(numel), kfn);
-  };
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  dpcpp_index_kernel_impl<kernel_name, func_t>(iter, index_size, index_stride, f);
 }
+
 } // namespace dpcpp
 } // namespace at

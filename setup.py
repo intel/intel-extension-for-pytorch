@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# USE_SYCL - to use SYCL
+# USE_USM - to use USM
 from __future__ import print_function
 
 from subprocess import check_call
@@ -198,22 +200,35 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
         except:
             return paths
 
-    cmake_args = [
-            '-DCMAKE_BUILD_TYPE=' + build_type,
-            '-DPYTORCH_INCLUDE_DIR=' + convert_cmake_dirs(include_paths()),
-            '-DPYTORCH_LIBRARY_DIR=' + convert_cmake_dirs(library_paths()),
-            '-DPYTHON_EXECUTABLE=' + sys.executable,
-            '-DCMAKE_INSTALL_PREFIX=' + '/'.join([str(ext_dir.parent.absolute()), ext.name]),
-            '-DPYTHON_INCLUDE_DIR=' + distutils.sysconfig.get_python_inc(),
-            '-DLIB_NAME=' + ext.name,
-            '-DPYTHON_EXECUTABLE={}'.format(sys.executable),
-        ]
+    def defines(args, **kwargs):
+        for key, value in sorted(kwargs.items()):
+            if value is not None:
+                args.append('-D{}={}'.format(key, value))
+
+    cmake_args = []
+    build_options = {
+        # The default value cannot be easily obtained in CMakeLists.txt. We set it here.
+        # 'CMAKE_PREFIX_PATH': distutils.sysconfig.get_python_lib()
+        'CMAKE_BUILD_TYPE': build_type,
+        'PYTORCH_INCLUDE_DIR': convert_cmake_dirs(include_paths()),
+        'PYTORCH_LIBRARY_DIR': convert_cmake_dirs(library_paths()),
+        'PYTHON_EXECUTABLE': sys.executable,
+        'CMAKE_INSTALL_PREFIX': '/'.join([str(ext_dir.parent.absolute()), ext.name]),
+        'PYTHON_INCLUDE_DIR': distutils.sysconfig.get_python_inc(),
+        'LIB_NAME': ext.name,
+        'PYTHON_EXECUTABLE': sys.executable,
+    }
+
+    my_env = os.environ.copy()
+    for var, val in my_env.items():
+        if var.startswith(('BUILD_', 'USE_', 'CMAKE_')):
+            build_options[var] = val
 
     cc, cxx = _get_complier()
-    cmake_args += ['-DUSE_SYCL=1',
-                   '-DCMAKE_C_COMPILER=' + cc,
-                   '-DCMAKE_CXX_COMPILER=' + cxx,
-                   ]
+    defines(cmake_args, CMAKE_C_COMPILER=cc)
+    defines(cmake_args, CMAKE_CXX_COMPILER=cxx)
+    defines(cmake_args, **build_options)
+    cmake_args.append('-DUSE_SYCL=1')
 
     command = [self.cmake, ext.project_dir] + cmake_args
     print(' '.join(command))

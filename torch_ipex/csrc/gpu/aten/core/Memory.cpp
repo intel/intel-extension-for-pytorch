@@ -4,6 +4,7 @@
 namespace at {
 namespace dpcpp {
 
+#ifndef USE_USM
 static void memcpyHostToDevice(
     void* dst,
     const void* src,
@@ -91,6 +92,68 @@ static void memsetDevice(
     DPCPP_Q_SYNC_SUBMIT(dpcpp_queue, cgf);
   }
 }
+#else
+static void memcpyHostToDevice(
+    void* dst,
+    const void* src,
+    size_t n_bytes,
+    bool async,
+    DPCPP::queue& dpcpp_queue) {
+  if (n_bytes == 0)
+    return;
+
+  auto e = dpcpp_queue.memcpy(dst, src, n_bytes);
+
+  if (!async) {
+    e.wait();
+  }
+}
+
+static void memcpyDeviceToHost(
+    void* dst,
+    const void* src,
+    size_t n_bytes,
+    bool async,
+    DPCPP::queue& dpcpp_queue) {
+  if (n_bytes == 0)
+    return;
+
+  auto e = dpcpp_queue.memcpy(dst, src, n_bytes);
+
+  if (!async) {
+    e.wait();
+  }
+}
+
+static void memcpyDeviceToDevice(
+    void* dst,
+    const void* src,
+    size_t n_bytes,
+    bool async,
+    DPCPP::queue& dpcpp_queue) {
+  if (n_bytes == 0)
+    return;
+
+  auto e = dpcpp_queue.memcpy(dst, src, n_bytes);
+
+  if (!async) {
+    e.wait();
+  }
+}
+
+static void memsetDevice(
+    void* dst,
+    int value,
+    size_t n_bytes,
+    bool async,
+    DPCPP::queue& dpcpp_queue) {
+  auto e = dpcpp_queue.memset(dst, value, n_bytes);
+  if (!async) {
+    e.wait();
+  }
+}
+
+#endif
 
 void dpcppMemcpy(
     void* dst,

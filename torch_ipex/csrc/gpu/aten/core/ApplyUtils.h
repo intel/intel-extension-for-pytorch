@@ -145,7 +145,11 @@ struct ApplyOp1 {
   inline static void apply(
       const detail::TensorInfo<scalar, IndexType>& a,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_rw_mode>& a_acc,
+#else
+      void *a_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offsets... aOffsets) {
@@ -163,7 +167,11 @@ struct ApplyOp1 {
         remaining_steps - 1,
         const IndexType,
         Offsets...>::
+#ifndef USE_USM
         apply(a, op, a_acc, n, linearIndex + 1, aOffsets..., aOffset);
+#else
+        apply(a, op, a_pointer, n, linearIndex + 1, aOffsets..., aOffset);
+#endif
   }
 };
 
@@ -179,11 +187,19 @@ struct ApplyOp1<Op, scalar, IndexType, ADims, false, 0, Offset> {
   inline static void apply(
       const detail::TensorInfo<scalar, IndexType>& a,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_rw_mode>& a_acc,
+#else
+      void *a_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offset aOffset) {
+#ifndef USE_USM
     auto a_ptr = a_acc.template get_pointer<scalar>();
+#else
+    auto a_ptr = (scalar *)a_pointer;
+#endif
     op(a_ptr[aOffset]);
   }
 };
@@ -200,11 +216,19 @@ struct ApplyOp1<Op, scalar, IndexType, ADims, true, 0, Offset> {
   inline static void apply(
       const detail::TensorInfo<scalar, IndexType>& a,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_rw_mode>& a_acc,
+#else
+      void *a_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offset aOffset) {
+#ifndef USE_USM
     auto a_ptr = a_acc.template get_pointer<scalar>();
+#else
+    auto a_ptr = (scalar *)a_pointer;
+#endif
     op(a_ptr[aOffset], (int64_t)linearIndex);
   }
 };
@@ -220,11 +244,19 @@ struct ApplyOp1<Op, scalar, IndexType, ADims, with_offset, 0, Offsets...> {
   inline static void apply(
       const detail::TensorInfo<scalar, IndexType>& a,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_rw_mode>& a_acc,
+#else
+      void *a_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offsets... aOffsets) {
+#ifndef USE_USM
     auto a_ptr = a_acc.template get_pointer<scalar>();
+#else
+    auto a_ptr = (scalar *)a_pointer;
+#endif
     op(n, a_ptr[aOffsets]...);
   }
 };
@@ -245,7 +277,11 @@ void kernelPointwiseApply1(
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
+#ifndef USE_USM
     auto a_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, a.data);
+#else
+    void *a_pointer = a.data;
+#endif
     cgh.parallel_for<PointwiseApply1<Op, scalar, IndexType, ADims, step>>(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(tileSize), DPCPP::range<1>(tileSize)),
@@ -256,7 +292,11 @@ void kernelPointwiseApply1(
             ApplyOp1<Op, scalar, IndexType, ADims, with_offset, step>::apply(
                 a,
                 op,
+#ifndef USE_USM
                 a_acc,
+#else
+                a_pointer,
+#endif
                 DPCPP::min(step, static_cast<int>(totalElements - linearIndex)),
                 linearIndex);
           }
@@ -282,8 +322,13 @@ struct ApplyOp2 {
       const detail::TensorInfo<scalar1, IndexType>& a,
       const detail::TensorInfo<scalar2, IndexType>& b,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_discard_w_mode>& a_acc,
       const DPCPPAccessor<dpcpp_r_mode>& b_acc,
+#else
+      void *a_pointer,
+      void *b_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offsets... aOffsets,
@@ -311,8 +356,13 @@ struct ApplyOp2 {
             a,
             b,
             op,
+#ifndef USE_USM
             a_acc,
             b_acc,
+#else
+            a_pointer,
+            b_pointer,
+#endif
             n,
             linearIndex + 1,
             aOffsets...,
@@ -346,14 +396,24 @@ struct ApplyOp2<
       const detail::TensorInfo<scalar1, IndexType>& a,
       const detail::TensorInfo<scalar2, IndexType>& b,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_discard_w_mode>& a_acc,
       const DPCPPAccessor<dpcpp_r_mode>& b_acc,
+#else
+      void *a_pointer,
+      void *b_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offset aOffset,
       Offset bOffset) {
+#ifndef USE_USM
     auto a_ptr = a_acc.template get_pointer<scalar1>();
     auto b_ptr = b_acc.template get_pointer<scalar2>();
+#else
+    auto a_ptr = (scalar1 *)a_pointer;
+    auto b_ptr = (scalar2 *)b_pointer;
+#endif
     op(a_ptr[aOffset], b_ptr[bOffset]);
   }
 };
@@ -382,14 +442,24 @@ struct ApplyOp2<
       const detail::TensorInfo<scalar1, IndexType>& a,
       const detail::TensorInfo<scalar2, IndexType>& b,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_discard_w_mode>& a_acc,
       const DPCPPAccessor<dpcpp_r_mode>& b_acc,
+#else
+      void *a_pointer,
+      void *b_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offset aOffset,
       Offset bOffset) {
+#ifndef USE_USM
     auto a_ptr = a_acc.template get_pointer<scalar1>();
     auto b_ptr = b_acc.template get_pointer<scalar2>();
+#else
+    auto a_ptr = (scalar1 *)a_pointer;
+    auto b_ptr = (scalar2 *)b_pointer;
+#endif
     op(a_ptr[aOffset], b_ptr[bOffset], (int64_t)linearIndex);
   }
 };
@@ -417,14 +487,24 @@ struct ApplyOp2<
       const detail::TensorInfo<scalar1, IndexType>& a,
       const detail::TensorInfo<scalar2, IndexType>& b,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_discard_w_mode>& a_acc,
       const DPCPPAccessor<dpcpp_r_mode>& b_acc,
+#else
+      void *a_pointer,
+      void *b_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offsets... aOffsets,
       Offsets... bOffsets) {
+#ifndef USE_USM
     auto a_ptr = a_acc.template get_pointer<scalar1>();
     auto b_ptr = b_acc.template get_pointer<scalar2>();
+#else
+    auto a_ptr = (scalar1 *)a_pointer;
+    auto b_ptr = (scalar2 *)b_pointer;
+#endif
     op(n, a_ptr[aOffsets]..., b_ptr[bOffsets]...);
   }
 };
@@ -449,8 +529,13 @@ void kernelPointwiseApply2(
 
   // 1. Initialize temp buffer
   auto cgf = DPCPP_Q_CGF(cgh) {
+#ifndef USE_USM
     auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input.data);
     auto out_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output.data);
+#else
+    void *in_ptr = input.data;
+    void *out_ptr = output.data;
+#endif
     cgh.parallel_for<
         PointwiseApply2<Op, scalar1, scalar2, IndexType, ADims, BDims, step>>(
         DPCPP::nd_range<1>(
@@ -472,8 +557,13 @@ void kernelPointwiseApply2(
                     output,
                     input,
                     op,
+#ifndef USE_USM
                     out_acc,
                     in_acc,
+#else
+                    out_ptr,
+                    in_ptr,
+#endif
                     DPCPP::min(
                         step, static_cast<int>(totalElements - linearIndex)),
                     linearIndex);
@@ -502,9 +592,15 @@ struct ApplyOp3 {
       const detail::TensorInfo<scalar2, IndexType>& b,
       const detail::TensorInfo<scalar3, IndexType>& c,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_discard_w_mode>& a_acc,
       const DPCPPAccessor<dpcpp_r_mode>& b_acc,
       const DPCPPAccessor<dpcpp_r_mode>& c_acc,
+#else
+      void *a_pointer,
+      void *b_pointer,
+      void *c_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offsets... aOffsets,
@@ -540,9 +636,15 @@ struct ApplyOp3 {
             b,
             c,
             op,
+#ifndef USE_USM
             a_acc,
             b_acc,
             c_acc,
+#else
+            a_pointer,
+            b_pointer,
+            c_pointer,
+#endif
             n,
             linearIndex + 1,
             aOffsets...,
@@ -584,17 +686,29 @@ struct ApplyOp3<
       const detail::TensorInfo<scalar2, IndexType>& b,
       const detail::TensorInfo<scalar3, IndexType>& c,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_discard_w_mode>& a_acc,
       const DPCPPAccessor<dpcpp_r_mode>& b_acc,
       const DPCPPAccessor<dpcpp_r_mode>& c_acc,
+#else
+      void *a_pointer,
+      void *b_pointer,
+      void *c_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offset aOffset,
       Offset bOffset,
       Offset cOffset) {
+#ifndef USE_USM
     auto a_ptr = a_acc.template get_pointer<scalar1>();
     auto b_ptr = b_acc.template get_pointer<scalar2>();
     auto c_ptr = c_acc.template get_pointer<scalar3>();
+#else
+    auto a_ptr = (scalar1*)a_pointer;
+    auto b_ptr = (scalar2*)b_pointer;
+    auto c_ptr = (scalar3*)c_pointer;
+#endif
     op(a_ptr[aOffset], b_ptr[bOffset], c_ptr[cOffset]);
   }
 };
@@ -625,17 +739,29 @@ struct ApplyOp3<
       const detail::TensorInfo<scalar2, IndexType>& b,
       const detail::TensorInfo<scalar3, IndexType>& c,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_discard_w_mode>& a_acc,
       const DPCPPAccessor<dpcpp_r_mode>& b_acc,
       const DPCPPAccessor<dpcpp_r_mode>& c_acc,
+#else
+      void *a_pointer,
+      void *b_pointer,
+      void *c_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offsets... aOffsets,
       Offsets... bOffsets,
       Offsets... cOffsets) {
+#ifndef USE_USM
     auto a_ptr = a_acc.template get_pointer<scalar1>();
     auto b_ptr = b_acc.template get_pointer<scalar2>();
     auto c_ptr = c_acc.template get_pointer<scalar3>();
+#else
+    auto a_ptr = (scalar1*)a_pointer;
+    auto b_ptr = (scalar2*)b_pointer;
+    auto c_ptr = (scalar3*)c_pointer;
+#endif
     op(n, a_ptr[aOffsets]..., b_ptr[bOffsets]..., c_ptr[cOffsets]...);
   }
 };
@@ -661,9 +787,15 @@ void kernelPointwiseApply3(
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
+#ifndef USE_USM
     auto in1_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input1.data);
     auto in2_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input2.data);
     auto out_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output.data);
+#else
+    void *in1_ptr = input1.data;
+    void *in2_ptr = input2.data;
+    void *out_ptr = output.data;
+#endif
     cgh.parallel_for<PointwiseApply3<
         Op,
         scalar1,
@@ -695,9 +827,15 @@ void kernelPointwiseApply3(
                     input1,
                     input2,
                     op,
+#ifndef USE_USM
                     out_acc,
                     in1_acc,
                     in2_acc,
+#else
+                    out_ptr,
+                    in1_ptr,
+                    in2_ptr,
+#endif
                     DPCPP::min(
                         step, static_cast<int>(totalElements - linearIndex)),
                     linearIndex);
@@ -729,10 +867,17 @@ struct ApplyOp4 {
       const detail::TensorInfo<scalar3, IndexType>& c,
       const detail::TensorInfo<scalar3, IndexType>& d,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_discard_w_mode>& a_acc,
       const DPCPPAccessor<dpcpp_r_mode>& b_acc,
       const DPCPPAccessor<dpcpp_r_mode>& c_acc,
       const DPCPPAccessor<dpcpp_r_mode>& d_acc,
+#else
+      void *a_pointer,
+      void *b_pointer,
+      void *c_pointer,
+      void *d_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offsets... aOffsets,
@@ -776,10 +921,17 @@ struct ApplyOp4 {
             c,
             d,
             op,
+#ifndef USE_USM
             a_acc,
             b_acc,
             c_acc,
             d_acc,
+#else
+            a_pointer,
+            b_pointer,
+            c_pointer,
+            d_pointer,
+#endif
             n,
             linearIndex + 1,
             aOffsets...,
@@ -824,20 +976,34 @@ struct ApplyOp4<
       const detail::TensorInfo<scalar3, IndexType>& c,
       const detail::TensorInfo<scalar3, IndexType>& d,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_discard_w_mode>& a_acc,
       const DPCPPAccessor<dpcpp_r_mode>& b_acc,
       const DPCPPAccessor<dpcpp_r_mode>& c_acc,
       const DPCPPAccessor<dpcpp_r_mode>& d_acc,
+#else
+      void *a_pointer,
+      void *b_pointer,
+      void *c_pointer,
+      void *d_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offset aOffset,
       Offset bOffset,
       Offset cOffset,
       Offset dOffset) {
+#ifndef USE_USM
     auto a_ptr = a_acc.template get_pointer<scalar1>();
     auto b_ptr = b_acc.template get_pointer<scalar2>();
     auto c_ptr = c_acc.template get_pointer<scalar3>();
     auto d_ptr = d_acc.template get_pointer<scalar4>();
+#else
+    auto a_ptr = (scalar1*)a_pointer;
+    auto b_ptr = (scalar2*)b_pointer;
+    auto c_ptr = (scalar3*)c_pointer;
+    auto d_ptr = (scalar4*)d_pointer;
+#endif
     op(a_ptr[aOffset], b_ptr[bOffset], c_ptr[cOffset], d_ptr[dOffset]);
   }
 };
@@ -873,20 +1039,34 @@ struct ApplyOp4<
       const detail::TensorInfo<scalar3, IndexType>& c,
       const detail::TensorInfo<scalar3, IndexType>& d,
       const Op& op,
+#ifndef USE_USM
       const DPCPPAccessor<dpcpp_discard_w_mode>& a_acc,
       const DPCPPAccessor<dpcpp_r_mode>& b_acc,
       const DPCPPAccessor<dpcpp_r_mode>& c_acc,
       const DPCPPAccessor<dpcpp_r_mode>& d_acc,
+#else
+      void *a_pointer,
+      void *b_pointer,
+      void *c_pointer,
+      void *d_pointer,
+#endif
       int n,
       IndexType linearIndex,
       Offsets... aOffsets,
       Offsets... bOffsets,
       Offsets... cOffsets,
       Offsets... dOffsets) {
+#ifndef USE_USM
     auto a_ptr = a_acc.template get_pointer<scalar1>();
     auto b_ptr = b_acc.template get_pointer<scalar2>();
     auto c_ptr = c_acc.template get_pointer<scalar3>();
     auto d_ptr = d_acc.template get_pointer<scalar4>();
+#else
+    auto a_ptr = (scalar1*)a_pointer;
+    auto b_ptr = (scalar2*)b_pointer;
+    auto c_ptr = (scalar3*)c_pointer;
+    auto d_ptr = (scalar4*)d_pointer;
+#endif
     op(n,
        a_ptr[aOffsets]...,
        b_ptr[bOffsets]...,
@@ -933,10 +1113,17 @@ void kernelPointwiseApply4(
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
+#ifndef USE_USM
     auto in1_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input1.data);
     auto in2_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input2.data);
     auto in3_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input3.data);
     auto out_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output.data);
+#else
+    void *in1_ptr = input1.data;
+    void *in2_ptr = input2.data;
+    void *in3_ptr = input3.data;
+    void *out_ptr = output.data;
+#endif
     cgh.parallel_for<PointwiseApply4<
         Op,
         scalar1,
@@ -973,10 +1160,17 @@ void kernelPointwiseApply4(
                     input2,
                     input3,
                     op,
+#ifndef USE_USM
                     out_acc,
                     in1_acc,
                     in2_acc,
                     in3_acc,
+#else
+                    out_ptr,
+                    in1_ptr,
+                    in2_ptr,
+                    in3_ptr,
+#endif
                     DPCPP::min(
                         step, static_cast<int>(totalElements - linearIndex)),
                     linearIndex);

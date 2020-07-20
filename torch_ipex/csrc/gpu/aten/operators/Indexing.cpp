@@ -108,23 +108,18 @@ void indexSelect(
 
   auto n_work_item_iter = (slice_size + wgroup_size - 1) / wgroup_size;
 
-  auto src_data = src.data_ptr<scalar_t>();
-  auto dst_data = dst.data_ptr<scalar_t>();
-  auto idx_data = indices.data_ptr<int64_t>();
-
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, src_data);
-    auto dst_acc =
-        DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data);
-    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data);
+    auto src_data = get_buffer<dpcpp_r_mode>(__cgh, src.data_ptr<scalar_t>());
+    auto dst_data = get_buffer<dpcpp_discard_w_mode>(__cgh, dst.data_ptr<scalar_t>());
+    auto idx_data = get_buffer<dpcpp_r_mode>(__cgh, indices.data_ptr<int64_t>());
 
     __cgh.parallel_for_work_group<DPCPP_K(index_select_ker, scalar_t)>(
         DPCPP::range</*dim=*/1>(num_slices),
         DPCPP::range</*dim=*/1>(wgroup_size),
         [=](DPCPP::group<1> group_id) {
-          auto src_ptr = src_acc.template get_pointer<scalar_t>();
-          auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
-          auto idx_ptr = idx_acc.template get_pointer<long>();
+          auto src_ptr = get_pointer(src_data);
+          auto dst_ptr = get_pointer(dst_data);
+          auto idx_ptr = get_pointer(idx_data);
 
           auto dst_slice_id = group_id.get_id()[0];
 
@@ -913,9 +908,8 @@ void index(
             iter,
             index_size,
             index_stride,
-            // This lambda function only works in dpcpp kernel.
-            [](dpcpp_global_ptr_pt<char> out_data,
-               dpcpp_global_ptr_pt<char> in_data,
+            [](char *out_data,
+               char *in_data,
                int64_t offset) {
               *(dtype*)out_data = *(dtype*)(in_data + offset);
             });
@@ -937,9 +931,8 @@ void index_put(
           iter,
           index_size,
           index_stride,
-          // This lambda function only works in dpcpp kernel.
-          [](dpcpp_global_ptr_pt<char> out_data,
-             dpcpp_global_ptr_pt<char> in_data,
+          [](char *out_data,
+             char *in_data,
              int64_t offset) {
             dpcpp_global_ptr_pt<scalar_t> out_ptr =
                 (dpcpp_global_ptr_pt<scalar_t>)(out_data + offset);
@@ -954,9 +947,8 @@ void index_put(
           iter,
           index_size,
           index_stride,
-          // This lambda function only works in dpcpp kernel.
-          [](dpcpp_global_ptr_pt<char> out_data,
-             dpcpp_global_ptr_pt<char> in_data,
+          [](char *out_data,
+             char *in_data,
              int64_t offset) {
             *(dtype*)(out_data + offset) = *(dtype*)in_data;
           });

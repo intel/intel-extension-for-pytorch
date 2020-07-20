@@ -8,12 +8,16 @@
 #include <c10/core/ScalarType.h>
 
 #include <utils/Numerics.h>
+#include <iostream>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
 #include "Loops.h"
+#ifndef USE_USM
 #include "Reduce.h"
+#else
+#include "ReduceUSM.h"
+#endif
 
-#include <iostream>
 
 using namespace at::dpcpp;
 using namespace at::native;

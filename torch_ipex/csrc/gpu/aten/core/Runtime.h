@@ -74,7 +74,7 @@ static inline mkldnn::memory dpcpp_onednn_memory(
 #ifdef USE_USM
   {
     return mkldnn::memory(md, engine, ptr);
-  {
+  }
 #else
   {
   #if defined(USE_DPCPP)

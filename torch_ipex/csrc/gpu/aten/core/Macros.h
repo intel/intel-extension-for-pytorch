@@ -29,3 +29,4 @@
 #endif
 
 #define DPCPP_SUCCESS 0
+#define DPCPP_FAILURE 1
