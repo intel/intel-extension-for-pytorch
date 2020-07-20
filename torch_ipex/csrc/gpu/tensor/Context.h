@@ -5,6 +5,7 @@
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
 #include <core/Allocator.h>
+#include <core/CachingAllocator.h>
 #include <dnnl.hpp>
 
 
@@ -132,7 +133,7 @@ public:
     auto tag_ctx = new DPCPPTensorContext(_ctx);
     at::DataPtr tag_dptr(tag_ctx->data(),
                          tag_ctx,
-                         DPCPPAllocator_get()->raw_deleter(),
+                         getDPCPPDeviceAllocator()->raw_deleter(),
                          t.device().type());
 
     // release raw data to avoid auto-free after data_ptr dtor
@@ -147,7 +148,7 @@ public:
     // t->data == ctx->data. raw data is released and reclaim in new data_ptr
     // t->data != ctx->data. old raw data is released and should be deleted by us
     if (cur_raw_data != tag_raw_data)
-      DPCPPAllocator_get()->raw_deleter()(cur_ctx);
+      getDPCPPDeviceAllocator()->raw_deleter()(cur_ctx);
   }
 };
 
