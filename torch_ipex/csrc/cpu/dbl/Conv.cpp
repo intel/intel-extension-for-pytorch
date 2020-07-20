@@ -33,7 +33,8 @@ dil::tensor convolution_impl(
     at::IntArrayRef stride,
     at::IntArrayRef dilation,
     int64_t groups,
-    const dil::attr_t& attr) {
+    const dil::attr_t& attr,
+    const dil::scale_t& dst_scales) {
   std::vector<int64_t> kernel_size(x.ndims());
   // mkldnn conv2d weights could have been re-ordered to 5d by
   // mkldnn_reorder_conv2d_weight
@@ -50,6 +51,11 @@ dil::tensor convolution_impl(
   const dil::dims x_dims = x.get_dims();
   std::vector<int64_t> input_size{x_dims.cbegin(), x_dims.cend()};
   std::vector<int64_t> output_sizes = calc_conv_output_size(input_size, kernel_size, padding, stride, dilation);
+
+  dil::lowp_kind alowp_kind = dil::u8s8;
+  if (dil::data_type::s8 == x.get_data_type()) {
+    alowp_kind = dil::s8s8;
+  }
 
   dil::tensor y;
   if (b.has_value()) {
@@ -66,8 +72,11 @@ dil::tensor convolution_impl(
       groups,
       dil::scale_t(),
       dil::scale_t(),
-      dil::scale_t(),
-      attr);
+      dst_scales,
+      attr,
+      dil::algorithm::convolution_direct,
+      dil::prop_kind::forward,
+      alowp_kind);
   } else {
     dil::convolution_forward::compute(
       x,
@@ -81,8 +90,11 @@ dil::tensor convolution_impl(
       groups,
       dil::scale_t(),
       dil::scale_t(),
-      dil::scale_t(),
-      attr);
+      dst_scales,
+      attr,
+      dil::algorithm::convolution_direct,
+      dil::prop_kind::forward,
+      alowp_kind);
   }
   return y;
 }
@@ -96,7 +108,8 @@ void convolution_inplace_impl(
     at::IntArrayRef stride,
     at::IntArrayRef dilation,
     int64_t groups,
-    const dil::attr_t& attr) {
+    const dil::attr_t& attr,
+    const dil::scale_t& dst_scales) {
   std::vector<int64_t> kernel_size(x.ndims());
   // mkldnn conv2d weights could have been re-ordered to 5d by
   // mkldnn_reorder_conv2d_weight
@@ -114,6 +127,11 @@ void convolution_inplace_impl(
   std::vector<int64_t> input_size{x_dims.cbegin(), x_dims.cend()};
   std::vector<int64_t> output_sizes = calc_conv_output_size(input_size, kernel_size, padding, stride, dilation);
 
+  dil::lowp_kind alowp_kind = dil::u8s8;
+  if (dil::data_type::s8 == x.get_data_type()) {
+    alowp_kind = dil::s8s8;
+  }
+
   if (b.has_value()) {
     dil::convolution_forward::compute(
       x,
@@ -128,8 +146,11 @@ void convolution_inplace_impl(
       groups,
       dil::scale_t(),
       dil::scale_t(),
-      dil::scale_t(),
-      attr);
+      dst_scales,
+      attr,
+      dil::algorithm::convolution_direct,
+      dil::prop_kind::forward,
+      alowp_kind);
   } else {
     dil::convolution_forward::compute(
       x,
@@ -143,8 +164,11 @@ void convolution_inplace_impl(
       groups,
       dil::scale_t(),
       dil::scale_t(),
-      dil::scale_t(),
-      attr);
+      dst_scales,
+      attr,
+      dil::algorithm::convolution_direct,
+      dil::prop_kind::forward,
+      alowp_kind);
   }
 }
 
@@ -196,6 +220,11 @@ void prepack_conv_weights(
     }
 
     dil::tensor packed_weight {packed_desc};
+    
+    // int8 to int8
+    if (dil_weight.has_scale()) {
+      packed_weight.set_scale(dil_weight.get_scale());
+    }
     packed_weight.feed_from(dil_weight);
     dbl::comm::equip_dil_buffer(weight, packed_weight);
   }

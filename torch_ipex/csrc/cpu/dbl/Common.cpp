@@ -45,6 +45,9 @@ dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
       result.copy_workspace(dil_buffer);
     }
 
+    if (dil_buffer.has_scale()) {
+      result.set_scale(dil_buffer.get_scale());
+    }
     // TODO(xpz): copy scales and zero_points of qtensor (what if slicing?)
 
     return result;
@@ -87,29 +90,56 @@ void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor) {
   reorder_to_dtype(tensor, at::kBFloat16);
 }
 
-void reorder_to_int8_for_mix_prec(const at::Tensor& tensor) {
+std::vector<float> get_int8_scale(bool uint8_used) {
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    return std::get<0>(get_indictor_scales(uint8_used));
+  } else {
+    return {};
+  }
+}
+
+void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, bool is_weight) {
   if (!check_auto_mix_int8_fp32())
     return;
 
   auto tensor_dtype = tensor.scalar_type();
-  TORCH_CHECK(!(tensor_dtype == at::kByte || tensor_dtype == at::kChar), "Please disable auto mix-precision if you want to enable int8/uint8 manually");
+  TORCH_CHECK(!(tensor_dtype == at::kQInt8 || tensor_dtype == at::kQUInt8), "Please disable auto mix-precision if you want to enable int8/uint8 manually");
   if (tensor_dtype != at::kFloat)
     return;
 
-  reorder_to_dtype(tensor, at::kByte);
+  // always convert fp32 to kQInt8
+  reorder_to_dtype(tensor, at::kQInt8, is_weight);
 }
 
-void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type) {
+void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, bool is_weight) {
   auto src = try_gen_dil_tensor(tensor);
-  if (check_auto_mix_int8_fp32()) {
+  if (check_auto_mix_int8_fp32()) { 
+    // always get scales 
+    std::vector<float> scales, zero_points;
+    if (!check_int8_calibration() && !is_weight) {
+        std::tie(scales, zero_points) = get_indictor_scales(false);
+    }
+
     auto src_dil_type = src.get_data_type();
     if (src_dil_type == dil::data_type::s8 || src_dil_type == dil::data_type::u8) {
       return;
     }
 
-    std::tie(std::vector<float>scale, std::vector<float> zero_point) = get_indictor_scales(false);
+    if (!check_int8_calibration() && is_weight) {
+      // compute weight scales for per_channel
+      for (auto i=0; i< tensor.size(0); i++) {
+        scales.push_back(float(127.0) / tensor[i].abs().max().item<float>());
+        zero_points.push_back(128);
+      }
+    }
+
     auto dst_desc = src.get_desc().to_type(get_dil_data_type(dst_scalar_type));
-    reorder_to_desc(tensor, dst_desc, scale);
+    // src may bf16 or fp32 tensor with block format
+    // there has issue for conv weight prepack if given a block format weigt
+    if (!src.is_public_format()) {
+      dst_desc = dst_desc.to_default_format();
+    }
+    reorder_to_desc(tensor, dst_desc, scales);
   } else {
     if (get_at_data_type(src.get_data_type()) == dst_scalar_type) {
       // The data type of DIL tensor is same as the dst data type. DO NOTHING
@@ -129,13 +159,18 @@ void equip_dil_buffer_nosync_shape(const at::Tensor& tensor, dil::tensor dil_buf
   cpu::ShadeDataContext *new_shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
   new_shade_data_context->data_type = cpu::SHADE_DATA_TYPE::DIL;
 
-  // CRUCIAL CHECK
-  TORCH_CHECK(dil_buffer.is_dense(true), "dil storage must be dense");
+  //dil_buffer.get_desc().print_desc();
+  // TORCH_CHECK(dil_buffer.is_dense(true), "dil storage must be dense");
+  
   new_shade_data_context->dil_tensor = dil_buffer;
 
   void *tensor_data = nullptr;
   if (dil_buffer.get_data_type() != get_dil_data_type(tensor.scalar_type())) {
-    new_shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_BF16_FP32;
+    if (dil_buffer.get_data_type() == dil::data_type::bf16) {
+      new_shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_BF16_FP32;
+    } else {
+      new_shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_INT8_FP32;
+    }
   } else if (dil_buffer.is_public_format()) {
     tensor_data = dil_buffer.get_data_handle();
     new_shade_data_context->cpu_raw_data = tensor_data;
@@ -185,6 +220,11 @@ at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
     // If the user enables auto-mix-precision, then the aten tensor should always be float.
     // And even the dil tensor is plain format, it also cannot be shared with cpu buffer.
     shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_BF16_FP32;
+    at_data_type = at::kFloat;
+  } else if (check_auto_mix_int8_fp32() && (dil_tensor_type == dil::data_type::s8 || dil_tensor_type == dil::data_type::u8)) {
+    // If the user enables auto-mix-precision, then the aten tensor should always be float.
+    // And even the dil tensor is plain format, it also cannot be shared with cpu buffer.
+    shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_INT8_FP32;
     at_data_type = at::kFloat;
   } else {
     if (shade_data_context->dil_tensor->is_public_format()) {
@@ -248,8 +288,8 @@ void reorder_to_public(const at::Tensor& tensor, bool remain_dtype) {
   bool is_public_dtype = !cpu::ShadeDataContext::isTensorMixPrecision(tensor);
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
-      is_public_dtype && (aten_dtype == at::kFloat || aten_dtype == at::kBFloat16) ||
-      !is_public_dtype && aten_dtype == at::kFloat)
+      is_public_dtype && (aten_dtype == at::kFloat || aten_dtype == at::kBFloat16 || aten_dtype == at::kByte ||
+      aten_dtype == at::kChar) || !is_public_dtype && aten_dtype == at::kFloat)
 
   bool should_reorder_format = !is_public_format;
   bool should_reorder_dtype = !is_public_dtype && !remain_dtype;
@@ -265,6 +305,10 @@ void reorder_to_public(const at::Tensor& tensor, bool remain_dtype) {
 
   if (should_reorder_dtype) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.storage().unsafeGetStorageImpl()->data_ptr().get() == nullptr);
+    // for int8, acbd is public format,, but need convert to default format abcd.
+    if (!dil_buffer.get_desc().is_default()) {
+      dst_desc = dst_desc.to_default_format();
+    }
     dst_desc = dst_desc.to_type(get_dil_data_type(aten_dtype));
   }
 
@@ -272,13 +316,16 @@ void reorder_to_public(const at::Tensor& tensor, bool remain_dtype) {
 }
 
 // Reorder *Storage* to expected_desc
-void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc) {
+void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc, const std::vector<float> scale) {
   auto& mutex = cpu::ShadeDataContext::getMutex(tensor);
-  std::lock_guard<std::mutex> lock(mutex);
+  std::lock_guard<std::mutex> lock(mutex); 
   auto src = try_gen_dil_storage(tensor);
   if (src.get_desc() == expected_desc)
     return;
   dil::tensor dst {expected_desc};
+  if(check_auto_mix_int8_fp32() && !check_int8_calibration() && scale.size() > 0) {
+    dst.set_scale(scale);
+  }
   dst.feed_from(src);
 
   // If a max pool output is converting from bf16 back to fp32,

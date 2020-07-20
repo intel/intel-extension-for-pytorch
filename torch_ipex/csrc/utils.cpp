@@ -123,7 +123,8 @@ void insert_or_updata_observer(const at::Tensor& self) {
   int64_t channel_axis = 0; // not used now
   // now only support min_max observer for activation
   std::vector<float> mins = {self.min().item<float>()};
-  std::vector<float> maxs = {self.max().item<float>()};
+  // only need max value for dnnl
+  std::vector<float> maxs = {self.abs().max().item<float>()};
   AutoOptConfig::singleton().insert_or_updata_observer(input_sizes, channel_axis, mins, maxs);
 }
 
