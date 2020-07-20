@@ -54,27 +54,34 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   if (check_auto_mix_int8_fp32()) {
     if (check_int8_calibration()) {
       insert_or_updata_observer(input);
+    } else {
+      dbl::comm::reorder_to_int8_for_mix_prec(input);
+      dbl::comm::reorder_to_int8_for_mix_prec(weight, true);
     }
+  } else {
+    dbl::comm::reorder_to_bf16_for_mix_prec(input);
+    dbl::comm::reorder_to_bf16_for_mix_prec(weight, true);
   }
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(input);
   dil_input = dbl::comm::try_gen_dil_tensor(input);
-
   if (bias.defined()) {
     CHECK_DNNL_OP_PRE_COND(bias);
-    dbl::comm::reorder_to_bf16_for_mix_prec(bias, true);
+    if (!check_auto_mix_int8_fp32()) {
+      dbl::comm::reorder_to_bf16_for_mix_prec(bias, true);
+    }
     dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(weight, true);
   // In the case of the auto mix precision, do not prepack
   // the weight during the training
   if (!(check_auto_mix_bf16_fp32() && check_train())) {
     dbl::conv::prepack_conv_weights(input, dil_input,
       weight, stride, padding, dilation, groups);
   }
+  
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
+  auto output_scale =dbl::comm::get_int8_scale(/* uint8_used=false */);
   dil::tensor dil_output = dbl::conv::convolution_impl(
     dil_input,
     dil_weight,
@@ -82,15 +89,17 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     padding,
     stride,
     dilation,
-    groups);
+    groups,
+    dil::attr_t(),
+    output_scale);
 
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
-  if (check_auto_mix_int8_fp32()) {
-    if (check_int8_calibration()) {
-      insert_or_updata_observer(aten_output);
-    }
+
+  if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
+    insert_or_updata_observer(aten_output);
   }
-  return aten_ouput;
+
+  return aten_output;
 }
 
 at::Tensor dil_convolution_backward_input(
