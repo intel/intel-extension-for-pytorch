@@ -13,7 +13,7 @@ def script_(obj, optimize=None, _frames_up=0, _rcb=None):
     jit_m = orig_script(obj, optimize=optimize, _frames_up=_frames_up+1, _rcb=_rcb)
     torch.jit.script = script_
 
-    mix_state = core.get_mix_bf16_fp32();
+    mix_state = core.get_mix_bf16_fp32()
     # Disable mix precision in model fusion, since mixed precision cannot
     # bring any benefits for inference, but will lead to loss of accuracy
     core.disable_mix_bf16_fp32()
