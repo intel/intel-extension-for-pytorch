@@ -92,7 +92,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     groups,
     dil::attr_t(),
     output_scale);
-
+ 
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
@@ -1233,8 +1233,15 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(
 at::Tensor AtenIpexCPUDev::dil_relu(const at::Tensor& input) {
   DEBUG("AtenIpexCPUDev::dil_relu\n");
   CHECK_DNNL_OP_PRE_COND(input);
-
-  dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
+  if (check_auto_mix_int8_fp32()) {
+    if (check_int8_calibration()) {
+      insert_or_updata_observer(input);
+    } else {
+      dbl::comm::reorder_to_int8_for_mix_prec(input);
+    }
+  } else {
+    dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  }
 
   const dil::tensor& x = dbl::comm::try_gen_dil_tensor(input);
   dil::tensor y;
@@ -1247,7 +1254,15 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
   DEBUG("AtenIpexCPUDev::dil_relu_\n");
   CHECK_DNNL_OP_PRE_COND(input);
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
+  if (check_auto_mix_int8_fp32()) {
+    if (check_int8_calibration()) {
+      insert_or_updata_observer(input);
+    } else {
+      dbl::comm::reorder_to_int8_for_mix_prec(input);
+    }
+  } else {
+    dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  }
 
   auto dil_self = dbl::comm::try_gen_dil_tensor(input);
   dil::eltwise_forward::compute(
