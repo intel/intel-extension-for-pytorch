@@ -153,32 +153,27 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
       {MKLDNN_ARG_DST, output_usr_memory},
   };
 
-  if ((bool)(flag & normalization_flags::use_scale_shift)) {
-    auto weight_bias =
-        at::empty(2 * feature_num, weight.options().dtype(ScalarType::Float));
-    auto weight_bias_memory = dpcpp_onednn_memory(
-        batch_norm_forward_pd.weights_desc(), engine, weight_bias.data_ptr());
-    Tensor _weight = weight.to(ScalarType::Float);
-    Tensor _bias = bias.to(ScalarType::Float);
+  // local memory freed before kernel finished
+  auto weight_bias =
+      at::empty(2 * feature_num, weight.options().dtype(ScalarType::Float));
+  auto weight_bias_memory = dpcpp_onednn_memory(
+      batch_norm_forward_pd.weights_desc(), engine, weight_bias.data_ptr());
+  Tensor _weight = weight.to(ScalarType::Float);
+  Tensor _bias = bias.to(ScalarType::Float);
 
-    if (mkldnn_use_scaleshift) {
-      dpcppMemcpyAsync(
-          weight_bias.data_ptr(),
-          _weight.data_ptr(),
+  dpcppMemcpyAsync(
+      weight_bias.data_ptr(),
+      _weight.data_ptr(),
+      feature_num * sizeof(float),
+      DeviceToDevice);
+  dpcppMemcpyAsync(
+      static_cast<uint8_t*>(weight_bias.data_ptr()) +
           feature_num * sizeof(float),
-          DeviceToDevice);
-      dpcppMemcpyAsync(
-          static_cast<uint8_t*>(weight_bias.data_ptr()) +
-              feature_num * sizeof(float),
-          _bias.data_ptr(),
-          feature_num * sizeof(float),
-          DeviceToDevice);
-    }
+      _bias.data_ptr(),
+      feature_num * sizeof(float),
+      DeviceToDevice);
 
-    args.insert({MKLDNN_ARG_SCALE_SHIFT, weight_bias_memory});
-  } else {
-    // TODO: Add warning
-  }
+  args.insert({MKLDNN_ARG_SCALE_SHIFT, weight_bias_memory});
 
   Tensor save_mean = at::empty({feature_num}, input.options());
   Tensor save_var = at::empty({feature_num}, input.options());
