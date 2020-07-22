@@ -27,7 +27,7 @@ dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor) {
 
 dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
   auto dil_buffer = cpu::ShadeDataContext::getDilStorage(tensor);
-  if (dil_buffer.is_public_format()) {
+  if (dil_buffer.is_public_format() && dil_buffer.get_data_type() == dil::data_type::f32) {
     auto size = tensor.sizes().vec();
     auto stride = tensor.strides().vec();
     auto data_type = dil_buffer.get_data_type();
@@ -52,9 +52,9 @@ dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
 
     return result;
   } else {
-    // When dil storage is blocked format, tensor itself should own the whole
-    // storage and should not to be sliced by pytorch at all, because that does
-    // not make any sense for pytorch to slice a blocked dil tensor
+    // When dil storage is blocked format or low precision data , tensor itself
+    // should own the whole storage and should not to be sliced by pytorch at all,
+    // because that does not make any sense for pytorch to slice a blocked dil tensor
     // So we directly return the dil buffer here.
     TORCH_CHECK(check_tensor_own_whole_storage(tensor),
         "Blocked tensor should own the whole storage. Should not reach here.");
@@ -135,7 +135,7 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, 
 
     auto dst_desc = src.get_desc().to_type(get_dil_data_type(dst_scalar_type));
     // src may bf16 or fp32 tensor with block format
-    // there has issue for conv weight prepack if given a block format weigt
+    // there has issue for conv weight prepack if given a block format weight
     if (!src.is_public_format()) {
       dst_desc = dst_desc.to_default_format();
     }
@@ -198,7 +198,7 @@ void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer) {
   equip_dil_buffer_nosync_shape(tensor, dil_buffer);
 
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)tensor.unsafeGetTensorImpl();
-  if (dil_buffer.is_public_format()) {
+  if (dil_buffer.is_public_format() && dil_buffer.get_data_type() == dil::data_type::f32) {
     ipex_tensor_impl->set_strided(dil_buffer.get_dims(), dil_buffer.get_strides(), ipex_tensor_impl->storage_offset());
   } else {
     // ??? TORCH_INTERNAL_ASSERT_DEBUG_ONLY(sizes.size() != 1 || sizes[0] != 0);
@@ -263,7 +263,8 @@ at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& opti
 
 void sync_shape_from_dil_to_aten(const at::Tensor& ipex_tensor, const dil::tensor &dil_tensor) {
   dil::dims sizes = dil_tensor.get_dims();
-  if (dil_tensor.is_public_format()) {
+  // noly share the date when dil tensor is fp32 and public format
+  if (dil_tensor.is_public_format() && dil_tensor.get_data_type() == dil::data_type::f32) {
     dil::dims strides = dil_tensor.get_strides();
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipex_tensor.device().type() == at::DeviceType::DPCPP);
     auto* _tensor_impl = (IPEXTensorImpl *)ipex_tensor.unsafeGetTensorImpl();
