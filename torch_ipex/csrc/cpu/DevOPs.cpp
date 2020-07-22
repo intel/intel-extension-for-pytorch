@@ -348,8 +348,8 @@ at::Tensor& dil_mul_common(
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(other);
 
-  IPEX_CHECK(self.sizes().equals(other.sizes()),
-      "dil mul not support broadcast yet");
+  // IPEX_CHECK(self.sizes().equals(other.sizes()),
+  //     "dil mul not support broadcast yet");
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
   dbl::comm::reorder_to_bf16_for_mix_prec(other);

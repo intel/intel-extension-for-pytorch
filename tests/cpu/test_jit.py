@@ -166,6 +166,28 @@ class ConvSumInDiffBlock(nn.Module):
             y += x
         return y
 
+class ConvSwishOutplace(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, image_size):
+        super(ConvSwishOutplace, self).__init__()
+        self.conv2d = nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+
+    def forward(self, x):
+        a = self.conv2d(x)
+        b = torch.sigmoid(a)
+        d = torch.mul(a, b)
+        return d
+
+class ConvSwishInplace(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, image_size):
+        super(ConvSwishInplace, self).__init__()
+        self.conv2d = nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+
+    def forward(self, x):
+        a = self.conv2d(x)
+        b = torch.sigmoid(a)
+        a.mul_(b)
+        return a
+
 class Tester(TestCase):
 
     def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None):
@@ -258,6 +280,39 @@ class Tester(TestCase):
             self.assertTrue(all(n.kind() != kind_not_in_graph for n in script_graph.nodes()))
             self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
+    def test_conv2d_swish(self):
+        in_channels = 3
+        out_channels = 64
+        kernel_size = 3
+        image_size = 64
+        conv2d_swish_outplace = ConvSwishOutplace(in_channels, out_channels, kernel_size, image_size).to(ipex.DEVICE)
+        conv2d_swish_inplace = ConvSwishInplace(in_channels, out_channels, kernel_size, image_size).to(ipex.DEVICE)
+
+        input = torch.rand(32, 3, 64, 64).to(ipex.DEVICE)
+        res_conv2d_swish_outplace = conv2d_swish_outplace(input)
+        res_conv2d_swish_inplace = conv2d_swish_inplace(input)
+        self.assertEqual(res_conv2d_swish_outplace, res_conv2d_swish_outplace)
+
+        with torch.no_grad():
+            # For conv2d + swish(inplace)
+            traced_conv2d_swish_inplace = torch.jit.trace(conv2d_swish_inplace, input)
+            traced_conv2d_swish_inplace.eval()
+            res_traced_conv2d_swish_inplace = traced_conv2d_swish_inplace(input)
+            self.assertEqual(res_traced_conv2d_swish_inplace, res_conv2d_swish_inplace)
+
+            kind_in_graph="ipex::conv2d_swish_inplace"
+            trace_graph = traced_conv2d_swish_inplace.graph_for(input)
+            self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+
+            # For conv2d + swish(inplace)
+            traced_conv2d_swish_outplace = torch.jit.trace(conv2d_swish_outplace, input)
+            traced_conv2d_swish_outplace.eval()
+            res_traced_conv2d_swish_outplace = traced_conv2d_swish_outplace(input)
+            self.assertEqual(res_traced_conv2d_swish_outplace, res_conv2d_swish_outplace)
+
+            kind_in_graph="ipex::conv2d_swish_outplace"
+            trace_graph = traced_conv2d_swish_outplace.graph_for(input)
+            self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
     def test_output_conv_bn_2d(self):
         self._test_output(

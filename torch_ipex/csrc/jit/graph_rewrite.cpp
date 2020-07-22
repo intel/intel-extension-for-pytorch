@@ -69,6 +69,30 @@ void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
         %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
         return (%r) )";
 
+  std::string conv2d_swish_outplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
+        %r = ipex::conv2d_swish_outplace(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        return (%r) )";
+
+  std::string conv2d_swish_inplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
+        %r = ipex::conv2d_swish_inplace(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        return (%r) )";
+
+  std::string conv2d_sigmoid_mul_outplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
+        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        %s = aten::sigmoid(%r)
+        %t = aten::mul(%r, %s)
+        return (%t) )";
+
+  std::string conv2d_sigmoid_mul_inplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
+        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        %s = aten::sigmoid(%r)
+        %t = aten::mul_(%r, %s)
+        return (%t) )";
+
   std::string conv1d = R"(
       graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
           %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
@@ -99,6 +123,7 @@ void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
         calc_value_map["cudnn_enabled"].toBool() &&
         (calc_value_map["output_padding"].toIntList()[0] == 0);
   };
+
   auto filter_conv2d = [](const Match& match,
                           const std::unordered_map<std::string, Value*>& vmap) {
     auto calc_value_map = getConvParams(match, vmap);
@@ -108,13 +133,15 @@ void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
         calc_value_map["dilation"].toIntList().size() != 2) {
       return false;
     }
-    return !calc_value_map["transposed"].toBool() &&
-        !calc_value_map["benchmark"].toBool() &&
-        !calc_value_map["deterministic"].toBool() &&
-        calc_value_map["cudnn_enabled"].toBool() &&
-        (calc_value_map["output_padding"].toIntList()[0] == 0) &&
-        (calc_value_map["output_padding"].toIntList()[1] == 0);
+    auto b1 = calc_value_map["transposed"].toBool();
+    auto b2 = calc_value_map["benchmark"].toBool();
+    auto b3 = calc_value_map["deterministic"].toBool();
+    auto b4 = calc_value_map["cudnn_enabled"].toBool();
+    auto b5 = (calc_value_map["output_padding"].toIntList()[0] == 0);
+    auto b6 = (calc_value_map["output_padding"].toIntList()[1] == 0);
+    return !b1 && !b2 && !b3 && b4 && b5 && b6;
   };
+
   auto filter_conv3d = [](const Match& match,
                           const std::unordered_map<std::string, Value*>& vmap) {
     auto calc_value_map = getConvParams(match, vmap);
@@ -142,6 +169,13 @@ void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
   SubgraphRewriter rewriter_conv3d;
   rewriter_conv3d.RegisterRewritePattern(convolution, conv3d);
   rewriter_conv3d.runOnGraph(graph, filter_conv3d);
+  // Fuse conv2d + swish
+  SubgraphRewriter rewriter_conv_swish_outplace;
+  rewriter_conv_swish_outplace.RegisterRewritePattern(conv2d_sigmoid_mul_outplace, conv2d_swish_outplace);
+  rewriter_conv_swish_outplace.runOnGraph(graph);
+  SubgraphRewriter rewriter_conv_swish_inplace;
+  rewriter_conv_swish_inplace.RegisterRewritePattern(conv2d_sigmoid_mul_inplace, conv2d_swish_inplace);
+  rewriter_conv_swish_inplace.runOnGraph(graph);
 }
 
 } // namespace graph_rewrite

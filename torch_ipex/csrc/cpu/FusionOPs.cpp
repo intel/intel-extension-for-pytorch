@@ -22,6 +22,110 @@ namespace cpu {
 
 using namespace dbl::comm;
 
+at::Tensor dil_convolution_swish_common(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups,
+    bool is_inplace) {
+  dil::tensor dil_input;
+  dil::tensor dil_weight;
+  c10::optional<dil::tensor> dil_bias{c10::nullopt};
+
+  auto input_contiguous = input.contiguous();
+  auto weight_contiguous = weight.contiguous();
+
+  reorder_to_bf16_for_mix_prec(input_contiguous);
+  dil_input = try_gen_dil_tensor(input_contiguous);
+
+  if (bias.defined()) {
+    auto bias_contiguous = bias.contiguous();
+
+    reorder_to_bf16_for_mix_prec(bias_contiguous);
+    dil_bias = try_gen_dil_tensor(bias_contiguous);
+  }
+
+  reorder_to_bf16_for_mix_prec(weight_contiguous);
+  dbl::conv::prepack_conv_weights(
+    input_contiguous,
+    dil_input,
+    weight_contiguous,
+    stride,
+    padding,
+    dilation,
+    groups);
+  dil_weight = try_gen_dil_tensor(weight_contiguous);
+
+  auto op_attr = dil::attr_t::fuse_swish();
+  dil::tensor dil_output;
+  if (is_inplace) {
+    dbl::conv::convolution_inplace_impl(
+      dil_input,
+      dil_weight,
+      dil_bias,
+      dil_output,
+      padding,
+      stride,
+      dilation,
+      groups,
+      op_attr);
+  } else {
+    dil_output = dbl::conv::convolution_impl(
+      dil_input,
+      dil_weight,
+      dil_bias,
+      padding,
+      stride,
+      dilation,
+      groups,
+      op_attr);
+  }
+  return gen_aten_tensor_by(std::move(dil_output));
+}
+
+at::Tensor AtenIpexJITDev::dil_convolution_swish_outplace(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups) {
+  return dil_convolution_swish_common(
+    input,
+    weight,
+    bias,
+    stride,
+    padding,
+    dilation,
+    groups,
+    false // false: outplace, true:inplace
+  );
+}
+
+at::Tensor AtenIpexJITDev::dil_convolution_swish_inplace(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups) {
+  return dil_convolution_swish_common(
+    input,
+    weight,
+    bias,
+    stride,
+    padding,
+    dilation,
+    groups,
+    true // false: outplace, true:inplace
+  );
+}
+
 at::Tensor AtenIpexJITDev::dil_convolution_relu(
     const at::Tensor& input,
     const at::Tensor& weight,

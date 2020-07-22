@@ -32,6 +32,16 @@ struct attr_t : public dnnl::primitive_attr {
     return attr;
   }
 
+  static attr_t fuse_swish(float alpha = 1.0) {
+    attr_t attr;
+    post_ops po;
+    float scale = 1.0;
+    float beta = 0.f;
+    po.append_eltwise(scale, algorithm::eltwise_swish, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
   static attr_t fuse_relu(float scale = 1.0, float alpha = 0.f,
                           float beta = 0.f) {
     attr_t attr;

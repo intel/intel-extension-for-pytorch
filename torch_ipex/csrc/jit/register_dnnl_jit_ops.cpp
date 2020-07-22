@@ -48,6 +48,52 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
+      "ipex::conv2d_swish_outplace(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
+      [] (const Node* node) ->Operation {
+        if (torch_ipex::check_auto_dnnl()) {
+          return [] (Stack& stack) {
+            auto result = AtenIpexJITDev::dil_convolution_swish_outplace(
+                (std::move(peek(stack, 0, 7))).toTensor(),
+                (std::move(peek(stack, 1, 7))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 2, 7))),
+                (std::move(peek(stack, 3, 7))).toIntVector(),
+                (std::move(peek(stack, 4, 7))).toIntVector(),
+                (std::move(peek(stack, 5, 7))).toIntVector(),
+                (std::move(peek(stack, 6, 7))).toInt());
+            drop(stack, 7);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        } else {
+          TORCH_CHECK(false, "PyTorch native path not support convolution+swish(outplace) fusion now for 2d case");
+        }
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
+      "ipex::conv2d_swish_inplace(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
+      [] (const Node* node) ->Operation {
+        if (torch_ipex::check_auto_dnnl()) {
+          return [] (Stack& stack) {
+            auto result = AtenIpexJITDev::dil_convolution_swish_inplace(
+                (std::move(peek(stack, 0, 7))).toTensor(),
+                (std::move(peek(stack, 1, 7))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 2, 7))),
+                (std::move(peek(stack, 3, 7))).toIntVector(),
+                (std::move(peek(stack, 4, 7))).toIntVector(),
+                (std::move(peek(stack, 5, 7))).toIntVector(),
+                (std::move(peek(stack, 6, 7))).toInt());
+            drop(stack, 7);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        } else {
+          TORCH_CHECK(false, "PyTorch native path not support convolution+swish(inplace) fusion now for 2d case");
+        }
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
       "ipex::conv3d_relu(Tensor input, Tensor weight, Tensor? bias=None, int[3] stride=1, int[3] padding=0, int[3] dilation=1, int groups=1) -> Tensor",
       [] (const Node* node) ->Operation {
         if (torch_ipex::check_auto_dnnl()) {
