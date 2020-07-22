@@ -92,7 +92,8 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     groups,
     dil::attr_t(),
     output_scale);
- 
+
+  dil::dims strides = dil_output.get_strides();
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
@@ -995,8 +996,16 @@ at::Tensor AtenIpexCPUDev::dil_max_pooling(
     bool ceil_mode) {
   DEBUG("AtenIpexCPUDev::dil_max_pooling\n");
   CHECK_DNNL_OP_PRE_COND(input);
-
-  dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
+  
+  if (check_auto_mix_int8_fp32()) {
+    if (check_int8_calibration()) {
+      insert_or_updata_observer(input);
+    } else {
+      dbl::comm::reorder_to_int8_for_mix_prec(input);
+    }
+  } else {
+    dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
+  }
 
   return dbl::pool::_dil_pooling(
       input.is_contiguous() ? input : input.contiguous(),
@@ -1021,7 +1030,15 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool2d(
   IPEX_CHECK(!divisor_override.has_value(),
            "dil_avg_pooling operator does not support divisor");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
+  if (check_auto_mix_int8_fp32()) {
+    if (check_int8_calibration()) {
+      insert_or_updata_observer(input);
+    } else {
+      dbl::comm::reorder_to_int8_for_mix_prec(input);
+    }
+  } else {
+    dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
+  }
 
   return dbl::pool::_dil_pooling(
       input.is_contiguous() ? input : input.contiguous(),
@@ -1066,7 +1083,15 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
   DEBUG("AtenIpexCPUDev::dil_adaptive_avg_pool2d\n");
   CHECK_DNNL_OP_PRE_COND(input);
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
+  if (check_auto_mix_int8_fp32()) {
+    if (check_int8_calibration()) {
+      insert_or_updata_observer(input);
+    } else {
+      dbl::comm::reorder_to_int8_for_mix_prec(input);
+    }
+  } else {
+    dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
+  }
 
   auto output_size_vec =
       dbl::comm::expand_param_if_needed(output_size, "output_size", input.dim() - 2);
