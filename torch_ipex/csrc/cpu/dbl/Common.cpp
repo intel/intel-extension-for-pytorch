@@ -212,29 +212,39 @@ void sync_shape_from_dil_to_aten(const at::Tensor& ipex_tensor, const dil::tenso
   }
 }
 
-void reorder_to_public(const at::Tensor& tensor) {
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cpu::ShadeDataContext::isDilTensor(tensor));
-  auto& dil_buffer = cpu::ShadeDataContext::getDilStorage(tensor);
-  auto dst_desc = dil_buffer.get_desc();
-  auto aten_tensor_scalar_type = tensor.scalar_type();
-  auto *shade_data_context = (cpu::ShadeDataContext*)tensor.unsafeGetTensorImpl()->storage().data_ptr().get_context();
-  if (!dil_buffer.is_public_format()) {
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.storage().unsafeGetStorageImpl()->data_ptr().get_deleter() == &(cpu::ShadeDataContext::freeShadeDataContext));
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data == nullptr);
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun == nullptr);
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_scalar_type == at::kFloat || aten_tensor_scalar_type == at::kBFloat16);
-    dst_desc = dst_desc.to_default_format();
-  } else if (cpu::ShadeDataContext::isTensorMixPrecision(tensor)) {
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.storage().unsafeGetStorageImpl()->data_ptr().get() == nullptr);
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data == nullptr);
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun == nullptr);
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_scalar_type == at::kFloat);
-  } else {
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_raw_data == shade_data_context->dil_tensor->get_data_handle());
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->cpu_del_fun != nullptr);
+void reorder_to_public(const at::Tensor& tensor, bool remain_dtype) {
+  if (!cpu::ShadeDataContext::isDilTensor(tensor)) {
+    // non DIL tensor is a public tensor by nature
     return;
   }
-  dst_desc = dst_desc.to_type(get_dil_data_type(aten_tensor_scalar_type));
+
+  auto& dil_buffer = cpu::ShadeDataContext::getDilStorage(tensor);
+  auto dst_desc = dil_buffer.get_desc();
+  auto aten_dtype = tensor.scalar_type();
+  bool is_public_format = dil_buffer.is_public_format();
+  bool is_public_dtype = !cpu::ShadeDataContext::isTensorMixPrecision(tensor);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+      is_public_dtype && (aten_dtype == at::kFloat || aten_dtype == at::kBFloat16) ||
+      !is_public_dtype && aten_dtype == at::kFloat)
+
+  bool should_reorder_format = !is_public_format;
+  bool should_reorder_dtype = !is_public_dtype && !remain_dtype;
+
+  if (!should_reorder_format && !should_reorder_dtype) {
+    return;
+  }
+
+  if (should_reorder_format) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.storage().unsafeGetStorageImpl()->data_ptr().get_deleter() == &(cpu::ShadeDataContext::freeShadeDataContext));
+    dst_desc = dst_desc.to_default_format();
+  }
+
+  if (should_reorder_dtype) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.storage().unsafeGetStorageImpl()->data_ptr().get() == nullptr);
+    dst_desc = dst_desc.to_type(get_dil_data_type(aten_dtype));
+  }
+
   reorder_to_desc(tensor, dst_desc);
 }
 

@@ -25,7 +25,7 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dtype);
  *
  * @param[in] tensor The DNNL tensor of the input ipex tensor to be reordered to public format
  */
-void reorder_to_public(const at::Tensor& tensor);
+void reorder_to_public(const at::Tensor &tensor, bool remain_dtype = false);
 
 /**
  * Reorder the input tensor to the expected descriptor.

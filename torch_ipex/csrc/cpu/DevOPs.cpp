@@ -1363,24 +1363,6 @@ at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::
   return dbl::comm::gen_aten_tensor_by(std::move(dst));
 }
 
-at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, int64_t dim1) {
-  DEBUG("AtenIpexCPUDev::dil_transpose\n");
-  CHECK_DNNL_OP_PRE_COND(self);
-
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-
-  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
-  IPEX_CHECK(x.ndims() > 0, "DNNL transpose cannot generate DNNL tensor for the input aten Tensor. input tensor dim: ", self.dim());
-  dil::tensor y;
-  std::vector<int> axes(x.ndims());
-  std::iota(axes.begin(), axes.end(), 0);
-  dim0 = at::maybe_wrap_dim(dim0, self.dim());
-  dim1 = at::maybe_wrap_dim(dim1, self.dim());
-  std::swap(axes[dim0], axes[dim1]);
-  y.transpose_from(x, axes);
-  return dbl::comm::gen_aten_tensor_by(std::move(y));
-}
-
 inline void check_cat_no_zero_dim(at::TensorList tensors) {
   for (size_t i = 0; i < tensors.size(); ++i) {
     auto& t = tensors[i];
@@ -1477,6 +1459,48 @@ at::Tensor dil_as_strided(const at::Tensor& self, at::IntArrayRef size, at::IntA
   return result;
 }
 
+at::Tensor& propagate_transposed_names(
+    at::Tensor& result,
+    const at::Tensor& other,
+    int64_t dim0,
+    int64_t dim1) {
+  // Port from aten/src/ATen/native/TensorShape.cp
+  if (other.has_names()) {
+    auto names = other.names().vec();
+    std::swap(names[dim0], names[dim1]);
+    at::namedinference::propagate_names_if_nonempty(result, names);
+  }
+  return result;
+}
+
+at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, int64_t dim1) {
+  DEBUG("AtenIpexCPUDev::dil_transpose\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+
+  auto ndims = self.dim();
+  dim0 = at::maybe_wrap_dim(dim0, ndims);
+  dim1 = at::maybe_wrap_dim(dim1, ndims);
+  if (dim0 == dim1) {
+    return self;
+  }
+
+  // TODO: support transposing a blocked tensor
+  // Even if DIL support transposing a blocked tensor, we have no place to 
+  // store a different desc for transposed view when storage are sharing.
+  dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
+
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
+  IPEX_CHECK(x.ndims() > 0, "DNNL transpose cannot generate DNNL tensor for the input aten Tensor. input tensor dim: ", self.dim());
+
+  auto trans_desc = x.get_desc().transpose(dim0, dim1);
+  auto sizes = trans_desc.get_dims();
+  auto strides = trans_desc.get_strides();
+  auto result = dil_as_strided(self, sizes, strides, self.storage_offset());
+  propagate_transposed_names(result, self, dim0, dim1);
+  return result;
+}
 
 at::Tensor AtenIpexCPUDev::dil_slice(const at::Tensor & self, int64_t dim, int64_t start, int64_t end, int64_t step) {
   DEBUG("AtenIpexCPUDev::dil_slice\n");

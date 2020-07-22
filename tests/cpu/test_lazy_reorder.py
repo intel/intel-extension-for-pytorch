@@ -1061,14 +1061,17 @@ class TestTensorShape(TestCase):
             rand_seed = int(get_rand_seed())
             print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
             torch.manual_seed(rand_seed)
-            x = torch.randn(3, 4, 5, dtype=torch.float32) * 10
+            x = torch.randn(3, 4, 5, 6, dtype=torch.float32)
             x_dpcpp = x.clone().to(device=device)
             for dim1 in range(x.ndim):
                 for dim2 in range(x.ndim):
+                    ref = x.transpose(dim1, dim2)
                     self.assertEqual(
-                        x.transpose(dim1, dim2),
-                        x_dpcpp.transpose(dim1, dim2),
-                )
+                        ref, x_dpcpp.transpose(dim1, dim2))
+
+                    x_dpcpp_blocked = convert_blocked(x_dpcpp)
+                    self.assertEqual(
+                        ref, x_dpcpp_blocked.transpose(dim1, dim2))
 
     def test_view(self):
         with AutoDNNL(True):

@@ -122,11 +122,8 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   }
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(data_ctx != nullptr);
-  cpu::ShadeDataContext *shade_data_context = (cpu::ShadeDataContext*)data_ctx;
-  // Branch 2.1: Dense + Dil Tensor
-  if (cpu::ShadeDataContext::isDilTensor(ipexTensor)) {
-    cpu::dbl::comm::reorder_to_public(ipexTensor);
-  }
+  // Branch 2.1: Dense + Maybe a Dil Tensor
+  cpu::dbl::comm::reorder_to_public(ipexTensor);
 
   // Branch 2.2: Dense + CPU Tensor
   return shallowFallbackToCPUTensorImpl(ipexTensor);

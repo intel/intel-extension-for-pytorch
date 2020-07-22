@@ -76,6 +76,18 @@ class tensor : public memory {
       }
     }
 
+    /// Returns strides vector
+    inline dims get_strides() const {
+      const auto& strides = blocking_strides();
+      if (!is_grouped()) {
+        return dims(strides, strides + data.ndims);
+      } else {
+        auto ret = dims(strides + 1, strides + data.ndims);
+        ret[0] = std::min(strides[0], strides[1]);
+        return ret;
+      }
+    }
+
     /// Returns descriptor data type
     inline data_type get_data_type() const {
       return static_cast<data_type>(data.data_type);
@@ -375,17 +387,6 @@ class tensor : public memory {
       DIL_ENFORCE(is_blocking_desc(),
                     "Cannot get blocking desc on a non-blocking desc");
       return const_cast<dnnl_memory_desc_t&>(data).format_desc.blocking.strides;
-    }
-
-    inline dims get_strides() const {
-      const auto& strides = blocking_strides();
-      if (!is_grouped()) {
-        return dims(strides, strides + data.ndims);
-      } else {
-        auto ret = dims(strides + 1, strides + data.ndims);
-        ret[0] = std::min(strides[0], strides[1]);
-        return ret;
-      }
     }
 
     void set_g(dim groups) {

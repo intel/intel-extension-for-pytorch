@@ -8727,10 +8727,7 @@ class TestTorchDeviceType(TestCase):
 
         # Noncontig input
         x = torch.randn((2, 3, 4), dtype=dtype, device=device).transpose(2, 0)
-        if ipex.get_auto_optimization():
-            self.assertTrue(x.is_contiguous())
-        else:
-            self.assertFalse(x.is_contiguous())
+        self.assertFalse(x.is_contiguous())
         result = torch.diagflat(x)
         expected = torch.diag(x.contiguous().view(-1))
         self.assertEqual(result, expected)
@@ -9778,12 +9775,8 @@ class TestTorchDeviceType(TestCase):
             y = torch.randn(5, 3, device=device).transpose(-1, -2)
             actual = torch.cdist(x, y, p=1, compute_mode=cm)
             expected = brute_cdist(x, y, p=1)
-            if ipex.get_auto_optimization():
-                self.assertTrue(x.is_contiguous())
-                self.assertTrue(y.is_contiguous())
-            else:
-                self.assertFalse(x.is_contiguous())
-                self.assertFalse(y.is_contiguous())
+            self.assertFalse(x.is_contiguous())
+            self.assertFalse(y.is_contiguous())
             self.assertTrue(torch.allclose(expected, actual))
 
             x = torch.randn(7, 5, device=device)
@@ -9808,12 +9801,8 @@ class TestTorchDeviceType(TestCase):
             y = torch.randn(4, 3, 2, 5, 3, device=device).transpose(-1, -2)
             actual = torch.cdist(x, y, p=1, compute_mode=cm)
             expected = brute_cdist(x, y, p=1)
-            if ipex.get_auto_optimization():
-                self.assertTrue(x.is_contiguous())
-                self.assertTrue(y.is_contiguous())
-            else:
-                self.assertFalse(x.is_contiguous())
-                self.assertFalse(y.is_contiguous())
+            self.assertFalse(x.is_contiguous())
+            self.assertFalse(y.is_contiguous())
             self.assertTrue(torch.allclose(expected, actual))
 
             x = torch.randn(7, 2, 7, 5, device=device)
@@ -9821,20 +9810,14 @@ class TestTorchDeviceType(TestCase):
             actual = torch.cdist(x, y, p=1, compute_mode=cm)
             expected = brute_cdist(x, y, p=1)
             self.assertTrue(x.is_contiguous())
-            if ipex.get_auto_optimization():
-                self.assertTrue(y.is_contiguous())
-            else:
-                self.assertFalse(y.is_contiguous())
+            self.assertFalse(y.is_contiguous())
             self.assertTrue(torch.allclose(expected, actual))
 
             x = torch.randn(4, 5, 7, device=device).transpose(-1, -2)
             y = torch.randn(4, 3, 5, device=device)
             actual = torch.cdist(x, y, p=1, compute_mode=cm)
             expected = brute_cdist(x, y, p=1)
-            if ipex.get_auto_optimization():
-                self.assertTrue(x.is_contiguous())
-            else:
-                self.assertFalse(x.is_contiguous())
+            self.assertFalse(x.is_contiguous())
             self.assertTrue(y.is_contiguous())
             self.assertTrue(torch.allclose(expected, actual))
 
