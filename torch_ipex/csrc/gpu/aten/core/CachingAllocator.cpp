@@ -2,6 +2,7 @@
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
 #include <c10/core/Allocator.h>
+#include <tensor/Context.h>
 
 #include <optional>
 #include <algorithm>
@@ -811,7 +812,8 @@ struct DPCPPCachingAllocator : public Allocator {
       auto& dpcpp_queue = getCurrentDPCPPStream(curDevID).dpcpp_queue();
       caching_allocator.malloc(&r, size, &dpcpp_queue);
     }
-    return {r, r, &dpcpp_raw_delete, Device(DeviceType::DPCPP, curDevID)};
+    auto ctx = new at::AtenIpexTypeDPCPP::DPCPPTensorContext(r);
+    return {r, ctx, &dpcpp_raw_delete, Device(DeviceType::DPCPP, curDevID)};
   }
   DeleterFnPtr raw_deleter() const override {
     return &dpcpp_raw_delete;
@@ -891,7 +893,10 @@ void* dpcpp_raw_alloc_with_queue(size_t nbytes, DPCPP::queue &queue) {
 }
 
 void dpcpp_raw_delete(void* ptr) {
-  caching_allocator.free(ptr);
+  auto ctx = (at::AtenIpexTypeDPCPP::DPCPPTensorContext*)ptr;
+  auto data = ctx->data();
+  caching_allocator.free(data);
+  delete ctx;
 }
 
 }} // namespace aten::dpcpp
