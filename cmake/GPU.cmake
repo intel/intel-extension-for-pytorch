@@ -161,4 +161,4 @@ endif()
 target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
 
 install(TARGETS ${LIB_NAME}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+        LIBRARY DESTINATION lib)
