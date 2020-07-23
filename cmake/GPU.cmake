@@ -72,6 +72,10 @@ set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -fno-omit-fram
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-math-errno")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
+#link option
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
+set(CMAKE_SKIP_RPATH TRUE)
+
 # ---[ Main build
 
 # includes
@@ -117,7 +121,7 @@ add_library(torch_ipex SHARED ${DPCPP_SRCS} ${DPCPP_GPU_ATEN_GENERATED}/ATen/ate
 
 # pytorch library
 if(DEFINED PYTORCH_LIBRARY_DIR)
-  link_directories(${PYTORCH_LIBRARY_DIR})
+  target_link_directories(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR})
   target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libtorch_cpu.so)
   target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libtorch_python.so)
   target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libc10.so)
@@ -137,13 +141,6 @@ else()
   message(FATAL_ERROR "Cannot find oneDNN")
 endif()
 
-find_package(MKLDPCPP QUIET)
-if (MKLDPCPP_FOUND)
-  # add_dependencies(torch_ipex onemkl)
-else()
-  message(WARNING "Cannot find oneMKL.")
-endif()
-
 include(cmake/DPCPP.cmake)
 if(USE_COMPUTECPP)
   include_directories(SYSTEM ${ComputeCpp_INCLUDE_DIRS} ${OpenCL_INCLUDE_DIRS})
@@ -156,6 +153,15 @@ elseif(USE_DPCPP)
   message(STATUS "DPCPP found. Compiling with SYCL support")
 else()
   message(FATAL_ERROR "ComputeCpp or DPCPP NOT found. Compiling without SYCL support")
+endif()
+
+find_package(MKLDPCPP QUIET)
+if (MKLDPCPP_FOUND)
+  target_link_libraries(torch_ipex PUBLIC ${ONEMKL_SHARED_LIBS})
+  include_directories(${ONEMKL_INCLUDE_DIR})
+  add_definitions(-DUSE_ONEMKL)
+else()
+  message(WARNING "Cannot find oneMKL.")
 endif()
 
 target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})

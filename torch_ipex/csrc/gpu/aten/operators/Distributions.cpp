@@ -11,7 +11,7 @@
 #include "Random.h"
 #include "Loops.h"
 
-#ifdef USE_MKL_DPCPP
+#ifdef USE_ONEMKL
 #include <mkl_sycl.hpp>
 #include <mkl.h>
 #endif
@@ -516,7 +516,7 @@ Tensor multinomial(
 
 Tensor& exponential_(Tensor& self, double lambda_, Generator* gen_) {
   auto gen = get_generator_or_default<DPCPPGenerator>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
-#ifdef USE_MKL_DPCPP
+#ifdef USE_ONEMKL
   if (lambda_ > 0) {
     AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
       scalar_t displ = static_cast<scalar_t>(0.0);

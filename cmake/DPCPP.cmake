@@ -101,8 +101,6 @@ if(INTEL_SYCL_VERSION)
 
     include_directories(${SYCL_INCLUDE_DIR})
 
-    list(APPEND EXTRA_SHARED_LIBS ${SYCL_LIBRARY})
-    list(APPEND EXTRA_SHARED_LIBS ${OpenCL_LIBRARY})
 
     #add pstl lib
     # Try to find PSTL header from DPC++
@@ -123,8 +121,8 @@ if(INTEL_SYCL_VERSION)
     find_path(TBB_INCLUDE_DIRS
             NAMES tbb
             PATHS
-                ${DPCPP_ROOT}/tbb/latest
-                $ENV{DPCPP_ROOT}/tbb/latest
+                ${INTELONEAPIROOT}/tbb/latest
+                $ENV{INTELONEAPIROOT}/tbb/latest
             PATH_SUFFIXES
                 include
             NO_DEFAULT_PATH)
@@ -140,8 +138,8 @@ if(INTEL_SYCL_VERSION)
             find_library(TBB_LIBRARY
                     NAMES tbb
                     HINTS
-                        ${DPCPP_ROOT}/tbb/latest
-                        $ENV{DPCPP_ROOT}/tbb/latest
+                        ${INTELONEAPIROOT}/tbb/latest
+                        $ENV{INTELONEAPIROOT}/tbb/latest
                     PATH_SUFFIXES
                         lib/intel64/gcc4.8
                     NO_DEFAULT_PATH)
