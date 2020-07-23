@@ -116,7 +116,7 @@ dil::tensor reorder_dil_tensor_to_dtype(const dil::tensor &dil_tensor, dil::data
 
 std::vector<float> get_int8_scale(bool uint8_used) {
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    return std::get<0>(get_indictor_scales(uint8_used));
+    return {get_indictor_scale(uint8_used)};
   } else {
     return {};
   }
@@ -139,9 +139,9 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, 
   auto src = try_gen_dil_tensor(tensor);
   if (check_auto_mix_int8_fp32()) { 
     // always get scales 
-    std::vector<float> scales, zero_points;
+    std::vector<float> scales;
     if (!check_int8_calibration() && !is_weight) {
-        std::tie(scales, zero_points) = get_indictor_scales(false);
+      scales = {get_indictor_scale(false)};
     }
 
     auto src_dil_type = src.get_data_type();
@@ -153,7 +153,6 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, 
       // compute weight scales for per_channel
       for (auto i=0; i< tensor.size(0); i++) {
         scales.push_back(float(127.0) / tensor[i].abs().max().item<float>());
-        zero_points.push_back(128);
       }
     }
 
