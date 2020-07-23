@@ -22,7 +22,7 @@ bool check_auto_mix_bf16_fp32();
 bool check_auto_mix_int8_fp32();
 bool check_int8_calibration();
 void insert_or_updata_observer(const at::Tensor& tensor);
-std::tuple<std::vector<float>, std::vector<float>> get_indictor_scales(bool uint8_used);
+float get_indictor_scale(bool uint8_used);
 bool check_tensor_own_whole_storage(const at::Tensor& tensor);
 bool check_tensor_own_shade_context(const at::Tensor& tensor);
 bool check_aten_dil_shape_info(const at::Tensor& ipex_tensor, const dil::tensor &dil_tensor);

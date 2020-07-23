@@ -119,17 +119,12 @@ bool check_int8_calibration() {
 }
 
 void insert_or_updata_observer(const at::Tensor& self) {
-  std::vector<int64_t> input_sizes = self.sizes().vec();
-  int64_t channel_axis = 0; // not used now
-  // now only support min_max observer for activation
-  std::vector<float> mins = {self.min().item<float>()};
-  // only need max value for dnnl
-  std::vector<float> maxs = {self.abs().max().item<float>()};
-  AutoOptConfig::singleton().insert_or_updata_observer(input_sizes, channel_axis, mins, maxs);
+  float max_value = self.abs().max().item<float>();
+  AutoOptConfig::singleton().insert_or_updata_observer(max_value);
 }
 
-std::tuple<std::vector<float>, std::vector<float>> get_indictor_scales(bool uint8_used) {
-  return AutoOptConfig::singleton().get_indictor_scales(uint8_used);
+float get_indictor_scale(bool uint8_used) {
+  return AutoOptConfig::singleton().get_indictor_scale(uint8_used);
 }
 
 bool check_tensor_own_whole_storage(const at::Tensor& tensor) {
