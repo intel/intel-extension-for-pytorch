@@ -10,6 +10,8 @@
 #include "torch_ipex/csrc/ipex_tensor_impl.h"
 #include "torch_ipex/csrc/utils.h"
 #include "torch_ipex/csrc/auto_opt_config.h"
+#include <mutex>
+std::mutex mutex_reorder_to_desc;
 
 namespace torch_ipex {
 namespace cpu {
@@ -240,7 +242,10 @@ void reorder_to_public(const at::Tensor& tensor) {
 
 // Reorder *Storage* to expected_desc
 void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc) {
+  std::lock_guard<std::mutex> lock(mutex_reorder_to_desc);
   auto src = try_gen_dil_storage(tensor);
+  if (src.get_desc() == expected_desc)
+    return;
   dil::tensor dst {expected_desc};
   dst.feed_from(src);
 
