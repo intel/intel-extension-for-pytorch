@@ -17,6 +17,7 @@
 #include "dbl/Deconv.h"
 #include "dbl/Pool.h"
 #include "dbl/DNNLChecker.h"
+#include "dbl/Linear.h"
 #include "ShadeDataContext.h"
 
 #include "dil/dil.hpp"
@@ -77,7 +78,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
 
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
-  auto output_scale =dbl::comm::get_int8_scale(/* uint8_used=false */);
+  auto output_scale = dbl::comm::get_int8_scale(/* uint8_used=false */);
   dil::tensor dil_output = dbl::conv::convolution_impl(
     dil_input,
     dil_weight,
@@ -700,31 +701,47 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   IPEX_CHECK(self.dim() >= 2,
       "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+  if (check_auto_mix_int8_fp32()) {
+    if (check_int8_calibration()) {
+      insert_or_updata_observer(self);
+    } else {
+      dbl::comm::reorder_to_int8_for_mix_prec(self);
+      dbl::comm::reorder_to_int8_for_mix_prec(weight, true);
+    }
+  } else {
+    dbl::comm::reorder_to_bf16_for_mix_prec(self);
+    dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+  }
 
   // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
   auto self_reshaped = self.dim() > 2 ? dil_reshape(self, {-1, self.size(self.dim() - 1)}) : self;
   const dil::tensor x = dbl::comm::try_gen_dil_tensor(self_reshaped);
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
 
-  dil::tensor y;
+  c10::optional<dil::tensor> b{c10::nullopt};
+  
   if (bias.defined()) {
     dbl::comm::reorder_to_bf16_for_mix_prec(bias);
-    const dil::tensor b = dbl::comm::try_gen_dil_tensor(bias);
-    dil::inner_product_forward::compute(x, w, b, y);
-  } else {
-    dil::inner_product_forward::compute(x, w, y);
+    b = dbl::comm::try_gen_dil_tensor(bias);
   }
+
+  auto output_scale =dbl::comm::get_int8_scale(/*  uint8_used=false */);
+  dil::tensor y = dbl::linear::linear_impl(x, w, b, output_scale);
 
   auto input_size = self.sizes();
   std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
   output_size.push_back(weight.size(0));
 
-  if (self.dim() > 2) {
-    return dbl::comm::gen_aten_tensor_by(std::move(y)).reshape(output_size);
+  auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
+
+  if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
+    insert_or_updata_observer(aten_output);
   }
-  return dbl::comm::gen_aten_tensor_by(std::move(y));
+ 
+  if (self.dim() > 2) {
+    return aten_output.reshape(output_size);
+  }
+  return aten_output;
 }
 
 at::Tensor AtenIpexCPUDev::dil_linear_backward_input(
