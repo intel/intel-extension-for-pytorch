@@ -909,7 +909,15 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
   IPEX_CHECK(weight.defined() && bias.defined(),
              "mkldnn_batch_norm: currently mkldnn only support affine model");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
+  if (check_auto_mix_int8_fp32()) {
+    if (check_int8_calibration()) {
+      insert_or_updata_observer(input);
+    } else {
+      dbl::comm::reorder_to_int8_for_mix_prec(input);
+    }
+  } else {
+    dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
+  }
 
   dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
@@ -944,10 +952,19 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
       dil::batch_normalization_forward_inference::compute(
           x, w, b, y, eps);
     }
-    return std::make_tuple(
-        dbl::comm::gen_aten_tensor_by(std::move(y)),
-        at::Tensor(),
-        at::Tensor());
+
+    
+    if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+      auto output_scale = dbl::comm::get_int8_scale(/* uint8_used=false */);
+      y.set_scale(output_scale);
+    }
+    auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
+
+    if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
+      insert_or_updata_observer(aten_output);
+    }
+
+    return std::make_tuple(aten_output, at::Tensor(), at::Tensor());
   }
 }
 
