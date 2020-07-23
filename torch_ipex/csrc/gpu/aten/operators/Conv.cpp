@@ -252,7 +252,7 @@ at::Tensor convolution(
   if (input_usr_memory.get_desc() != expected_input_md) {
     input_ = at::AtenIpexTypeDPCPP::empty(
         {expected_input_md.get_size()}, input.options(), c10::nullopt);
-    input_memory = memory(expected_input_md, engine, input_.data_ptr());
+    input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
     DPCPP_ONEDNN_EXEC(reorder(input_usr_memory, input_memory),
         strm, input_usr_memory, input_memory);
   }
@@ -270,7 +270,7 @@ at::Tensor convolution(
     } else {
       weight_ = at::AtenIpexTypeDPCPP::empty(
           {expected_weight_md.get_size()}, weight.options(), c10::nullopt);
-      weight_memory = memory(expected_weight_md, engine, weight_.data_ptr());
+      weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_.data_ptr());
     }
 
     DPCPP_ONEDNN_EXEC(reorder(weight_usr_memory, weight_memory),
@@ -292,7 +292,7 @@ at::Tensor convolution(
   if (output_usr_memory.get_desc() != expected_output_md) {
     output_ = at::AtenIpexTypeDPCPP::empty(
         {expected_output_md.get_size()}, output.options(), c10::nullopt);
-    output_memory = memory(expected_output_md, engine, output_.data_ptr());
+    output_memory = dpcpp_onednn_memory(expected_output_md, engine, output_.data_ptr());
     if (attr.with_sum()) {
       DPCPP_ONEDNN_EXEC(reorder(output_usr_memory, output_memory),
           strm, output_usr_memory, output_memory);
