@@ -13,6 +13,7 @@
 #include "torch_ipex/csrc/utils.h"
 #include "dbl/Common.h"
 #include "dbl/Conv.h"
+#include "dbl/Linear.h"
 #include "ShadeDataContext.h"
 
 #include "dil/dil.hpp"
@@ -292,23 +293,14 @@ at::Tensor AtenIpexJITDev::dil_linear_fuse_relu(
   const dil::tensor x = try_gen_dil_tensor(self_reshaped);
   const dil::tensor w = try_gen_dil_tensor(weight_contiguous);
 
-  dil::tensor y;
+  c10::optional<dil::tensor> b{c10::nullopt};
   if (bias.defined()) {
     auto bias_contiguous = bias.is_contiguous() ? bias : bias.contiguous();
     reorder_to_bf16_for_mix_prec(bias_contiguous);
-    const dil::tensor b = try_gen_dil_tensor(bias_contiguous);
-    dil::inner_product_forward::compute(x, w, b, y,
-                                        /*src_scales=*/dil::scale_t(),
-                                        /*weight_scales=*/dil::scale_t(),
-                                        /*dst_scales=*/dil::scale_t(),
-                                        /*attr*/dil::attr_t::fuse_relu());
-  } else {
-    dil::inner_product_forward::compute(x, w, y,
-                                        /*src_scales=*/dil::scale_t(),
-                                        /*weight_scales=*/dil::scale_t(),
-                                        /*dst_scales=*/dil::scale_t(),
-                                        /*attr*/dil::attr_t::fuse_relu());
+    b = try_gen_dil_tensor(bias_contiguous);
   }
+
+  dil::tensor y = dbl::linear::linear_impl(x, w, b, /* dst_scale */ dil::scale_t(), dil::attr_t::fuse_relu());
 
   auto input_size = self.sizes();
   std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
