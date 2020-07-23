@@ -121,7 +121,7 @@ add_library(torch_ipex SHARED ${DPCPP_SRCS} ${DPCPP_GPU_ATEN_GENERATED}/ATen/ate
 
 # pytorch library
 if(DEFINED PYTORCH_LIBRARY_DIR)
-  target_link_directories(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR})
+  link_directories(${PYTORCH_LIBRARY_DIR})
   target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libtorch_cpu.so)
   target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libtorch_python.so)
   target_link_libraries(torch_ipex PUBLIC ${PYTORCH_LIBRARY_DIR}/libc10.so)
