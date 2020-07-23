@@ -3,9 +3,7 @@ import torch.nn as nn
 from torch.nn.functional import relu_
 from torch.nn.functional import relu
 import torch_ipex
-from memory_profiler import profile
 
-@profile
 def test_lazy_reorder():
     cpu_device = torch.device("cpu")
     dpcpp_device = torch.device("dpcpp")
