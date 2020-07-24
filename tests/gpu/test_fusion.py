@@ -5,6 +5,10 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 import pytest
 
+
+torch._C._jit_set_profiling_mode(False)
+torch._C._jit_set_profiling_executor(False)
+
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("dpcpp")
 
@@ -16,8 +20,8 @@ class Conv2dRelu(torch.nn.Module):
 
     def forward(self, x, a):
         # return F.relu(self.conv(x), inplace=True)
-        # return F.relu(self.conv(x) + a, inplace=True)
-        return self.conv(x) + a
+        return F.relu(self.conv(x) + a, inplace=True)
+        # return self.conv(x) + a
 
 
 class TestNNMethod(TestCase):

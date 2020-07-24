@@ -115,7 +115,7 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
-      "dpcpp::conv2d_sum(Tensor(a!) accumu, *, Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1, Scalar alpha=1) -> Tensor(a!)",
+      "dpcpp::conv2d_sum(Tensor input, Tensor weight, Tensor? bias, int[2] stride, int[2] padding, int[2] dilation, int groups, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
       [] (const Node* node) ->Operation {
         return [] (Stack& stack) {
           auto output = (std::move(peek(stack, 7, 9))).toTensor();
@@ -138,7 +138,7 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
-      "dpcpp::conv2d_sum_relu(Tensor(a!) accumu, *, Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1, Scalar alpha=1) -> Tensor(a!)",
+      "dpcpp::conv2d_sum_relu(Tensor input, Tensor weight, Tensor? bias, int[2] stride, int[2] padding, int[2] dilation, int groups, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
       [] (const Node* node) ->Operation {
         return [] (Stack& stack) {
           auto output = (std::move(peek(stack, 7, 9))).toTensor();
