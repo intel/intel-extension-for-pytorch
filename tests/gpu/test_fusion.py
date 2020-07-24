@@ -25,7 +25,6 @@ class Conv2dRelu(torch.nn.Module):
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skip(reason='le-5 blocked')
     def test_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)
@@ -46,7 +45,7 @@ class TestNNMethod(TestCase):
         # print(modelJit.graph)
         with torch.no_grad():
             # print(modelJit.graph_for(x, a2))
-            print("fusion:", modelJit(x, a3).cpu())
             y_dpcpp = modelJit(x, a3)
+            print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
