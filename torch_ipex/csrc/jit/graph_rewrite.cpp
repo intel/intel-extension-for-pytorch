@@ -93,6 +93,17 @@ void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
         %t = aten::mul_(%r, %s)
         return (%t) )";
 
+  std::string conv2d_sigmoid_fusion = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
+        %r = ipex::conv2d_sigmoid(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        return (%r) )";
+
+  std::string conv2d_sigmoid = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
+        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        %s = aten::sigmoid(%r)
+        return (%s) )";
+
   std::string conv1d = R"(
       graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
           %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
@@ -176,6 +187,9 @@ void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
   SubgraphRewriter rewriter_conv_swish_inplace;
   rewriter_conv_swish_inplace.RegisterRewritePattern(conv2d_sigmoid_mul_inplace, conv2d_swish_inplace);
   rewriter_conv_swish_inplace.runOnGraph(graph);
+  SubgraphRewriter rewriter_conv_sigmoid;
+  rewriter_conv_sigmoid.RegisterRewritePattern(conv2d_sigmoid, conv2d_sigmoid_fusion);
+  rewriter_conv_sigmoid.runOnGraph(graph);
 }
 
 } // namespace graph_rewrite

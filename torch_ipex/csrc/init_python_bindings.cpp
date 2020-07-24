@@ -133,7 +133,7 @@ using namespace torch::jit;
 void InitIpexBindings(py::module m) {
   InitIpexModuleBindings(m);
   // jit fusion pass
-  RegisterPass pass([](std::shared_ptr<Graph>& g) {
+  RegisterPreFusionPass pass([](std::shared_ptr<Graph>& g) {
     if (AutoOptConfig::singleton().get_jit_fuse()) {
       torch::jit::FusionPass(g);
     }
