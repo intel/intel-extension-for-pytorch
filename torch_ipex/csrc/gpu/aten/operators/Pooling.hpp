@@ -51,12 +51,12 @@ void dpcppMemoryCopyType(scalar1* dst, const scalar2* src, size_t n_elements) {
     dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, src);
-    auto out_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, dst);
+    auto in_data = get_buffer<dpcpp_discard_w_mode>(cgh, src);
+    auto out_data = get_buffer<dpcpp_r_mode>(cgh, dst);
     cgh.parallel_for<DPCPP_K(memory_copy, scalar1, scalar2)>(
       DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-        auto in_ptr = in_acc.template get_pointer<scalar2>();
-        auto out_ptr = out_acc.template get_pointer<scalar1>();
+        auto in_ptr = get_pointer(in_data);
+        auto out_ptr = get_pointer(out_data);
         auto id = itemId.get_id(0);
         for (auto i = id; i < n_elements; i += itemId.get_range()[0])
           out_ptr[i] = (scalar1)in_ptr[i];

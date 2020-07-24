@@ -91,10 +91,11 @@ class DPCPPAccessor {
   Accessor accessor_;
 };
 
-template <typename buffer_data_type>
-cl::sycl::buffer<buffer_data_type, 1> make_buffer(void* virtual_ptr) {
+template <typename out_data_type, typename in_data_type>
+cl::sycl::buffer<out_data_type, 1> make_buffer(in_data_type virtual_ptr) {
   //get the uint8_t sycl buffer from the vptr.
-  auto raw_buf = at::dpcpp::dpcppGetBufferMap().template get_buffer<uint8_t>(virtual_ptr);
+  auto raw_buf = at::dpcpp::dpcppGetBufferMap().
+      template get_buffer<uint8_t>((void*)virtual_ptr);
   auto offset = at::dpcpp::dpcppGetBufferMap().get_offset(virtual_ptr);
   assert(offset >= 0 && "the sycl buffer offset must >= 0");
   auto range = cl::sycl::range<1>(raw_buf.get_size() - offset);
@@ -103,9 +104,10 @@ cl::sycl::buffer<buffer_data_type, 1> make_buffer(void* virtual_ptr) {
                                           range);
 
   //reinterpret the buffer to the required type.
-  range = cl::sycl::range<1>(buf.get_size()/sizeof(buffer_data_type));
-  return buf.template reinterpret<buffer_data_type, 1>(range);
+  range = cl::sycl::range<1>(buf.get_size()/sizeof(out_data_type));
+  return buf.template reinterpret<out_data_type, 1>(range);
 }
+
 #ifdef USE_USM
 template <DPCPP::access::mode acc_mode, typename in_data_type, typename out_data_type = in_data_type>
 out_data_type* get_buffer(DPCPP::handler& cgh, in_data_type* virtual_ptr) {

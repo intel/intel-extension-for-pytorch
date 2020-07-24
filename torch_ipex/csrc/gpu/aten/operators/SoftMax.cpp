@@ -95,8 +95,8 @@ void SpatialSoftMaxForward(
   size_t global_size = outer_size * local_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input);
-    auto out_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, output);
+    auto in_data = get_buffer<dpcpp_r_mode>(cgh, input);
+    auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, output);
     auto local_acc_max = local_accessor_t(local_size, cgh);
     auto local_acc_sum = local_accessor_t(local_size, cgh);
     cgh.parallel_for<SpatialSoftmaxForwardKernelName<
@@ -110,9 +110,8 @@ void SpatialSoftMaxForward(
           auto data_offset =
               dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(
                   group_id, outer_info);
-          auto in_ptr = in_acc.template get_pointer<scalar_t>() + data_offset;
-          auto out_ptr =
-              out_acc.template get_pointer<outscalar_t>() + data_offset;
+          auto in_ptr = get_pointer(in_data) + data_offset;
+          auto out_ptr = get_pointer(out_data)+ data_offset;
           // get max
           auto max_input = in_ptr[0];
           for (uint32_t i = local_id; i < dim_size; i += local_size) {
