@@ -1,6 +1,5 @@
 #include <ATen/ATen.h>
 #include <ATen/Functions.h>
-#include <ATen/Dispatch.h>
 #include <ATen/native/Activation.h>
 
 #include <core/TensorImplUtils.h>
@@ -9,6 +8,7 @@
 #include <core/DPCPP.h>
 
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 #include "Eltwise.hpp"
 #include "Loops.h"
@@ -42,7 +42,7 @@ static void threshold_kernel(
     TensorIterator& iter,
     Scalar threshold_scalar,
     Scalar value_scalar) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       iter.dtype(),
@@ -533,7 +533,7 @@ Tensor rrelu_with_noise(const Tensor & self, const Tensor & noise, Scalar lower,
   Tensor output = at::empty_like(self_);
   auto lower_ = lower.toDouble();
   auto upper_ = upper.toDouble();
-  AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateOutput", [&]() {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateOutput", [&]() {
     impl::RReLU_updateOutput<scalar_t>(
       self,
       output,
@@ -550,7 +550,7 @@ Tensor rrelu_with_noise(const Tensor & self, const Tensor & noise, Scalar lower,
 Tensor & rrelu_with_noise_(Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, Generator * generator){
   auto lower_ = lower.toDouble();
   auto upper_ = upper.toDouble();
-  AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateOutput", [&]() {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateOutput", [&]() {
     impl::RReLU_updateOutput<scalar_t>(
       self,
       self,
@@ -567,7 +567,7 @@ Tensor & rrelu_with_noise_(Tensor & self, const Tensor & noise, Scalar lower, Sc
 Tensor & rrelu_with_noise_out(Tensor & out, const Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, Generator * generator){
   auto lower_ = lower.toDouble();
   auto upper_ = upper.toDouble();
-  AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateOutput", [&]() {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateOutput", [&]() {
     impl::RReLU_updateOutput<scalar_t>(
       self,
       out,
@@ -585,7 +585,7 @@ Tensor rrelu_with_noise_backward(const Tensor & grad_output, const Tensor & self
   Tensor grad_input = at::empty_like(grad_output);
   auto lower_ = lower.toDouble();
   auto upper_ = upper.toDouble();
-  AT_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateGradInput", [&]() {
+  IPEX_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateGradInput", [&]() {
     impl::RReLU_updateGradInput<scalar_t>(
       grad_output,
       self,
@@ -620,7 +620,7 @@ Tensor prelu(const Tensor& self, const Tensor& weight_) {
 
   // case1: shared weight for all channels
   if (weight_num == 1) {
-    AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, input.scalar_type(), "prelu", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, input.scalar_type(), "prelu", [&] {
       impl::prelu_kernel_share_weights<scalar_t>(result, input, weight);
     });
   }
@@ -641,7 +641,7 @@ Tensor prelu(const Tensor& self, const Tensor& weight_) {
       "Mismatch of parameter numbers and input channel size. Found parameter numbers = ", weight_num,
       " and channel size = ", channel_size, ".");
 
-    AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, input.scalar_type(), "prelu", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, input.scalar_type(), "prelu", [&] {
       impl::prelu_kernel_multi_weights<scalar_t>(
         result,
         input,
@@ -674,7 +674,7 @@ std::tuple<Tensor, Tensor> prelu_backward(const Tensor& grad_out_, const Tensor&
 
   // case1: shared parameter for all channels
   if (weight_num == 1) {
-    AT_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, input.scalar_type(), "prelu_backward", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, input.scalar_type(), "prelu_backward", [&] {
       impl::prelu_backward_kernel_share_weights<scalar_t>(input, weight, grad_out, input_grad, weight_grad_collector);
     });
     //fix me: fill_() returns RuntimeError when input weight_grad_collector.sum() is without '.item()'
@@ -697,7 +697,7 @@ std::tuple<Tensor, Tensor> prelu_backward(const Tensor& grad_out_, const Tensor&
       "Mismatch of parameter numbers and input channel size. Found parameter numbers = ", weight_num,
       " and channel size = ", channel_size, ".");
 
-    AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, input.scalar_type(), "prelu_backward", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, input.scalar_type(), "prelu_backward", [&] {
       impl::prelu_backward_kernel_multi_weights<scalar_t>(
         input,
         weight,
@@ -729,7 +729,7 @@ Tensor hardshrink(const Tensor& self, Scalar lambd_) {
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
@@ -757,7 +757,7 @@ Tensor hardshrink_backward(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, self.scalar_type(), "hardshrink_backward", [&] {
         auto lambd = lambd_.to<scalar_t>();
         dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardShrinkBackward)>(
@@ -771,7 +771,7 @@ Tensor hardshrink_backward(
 Tensor gelu(const Tensor & self){
   auto self_ = self.contiguous();
   Tensor Y = at::empty_like(self_);
-  AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self_.scalar_type(), "GeluKernelImpl", [&](){
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self_.scalar_type(), "GeluKernelImpl", [&](){
     impl::GeluKernelImpl<scalar_t>(self_, Y);
   });
   return Y;
@@ -780,7 +780,7 @@ Tensor gelu(const Tensor & self){
 Tensor gelu_backward(const Tensor & grad, const Tensor & self){
   auto self_ = self.contiguous();
   Tensor dX = at::empty_like(self_);
-  AT_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, self_.scalar_type(), "GeluBackwardKernelImpl", [&](){
+  IPEX_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, self_.scalar_type(), "GeluBackwardKernelImpl", [&](){
     impl::GeluBackwardKernelImpl<scalar_t>(grad, self_, dX);
   });
   return dX;

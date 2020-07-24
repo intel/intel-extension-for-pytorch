@@ -4,6 +4,7 @@
 #include <core/Memory.h>
 #include <core/NumericLimits.h>
 #include <utils/AccumulateType.h>
+#include <utils/ATDispatch.h>
 #include <utils/Atomics.h>
 
 using namespace at::dpcpp;
@@ -277,7 +278,7 @@ void fractional_max_pool2d_out_template(
     input_ = input_.reshape({1, input.size(0), input.size(1), input.size(2)});
   }
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       input.scalar_type(), "fractional_max_pool2d_out_frame", [&] {
         fractional_max_pool2d_out_frame<scalar_t>(
             output_.data_ptr<scalar_t>(),

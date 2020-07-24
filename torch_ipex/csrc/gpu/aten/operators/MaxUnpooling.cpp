@@ -6,6 +6,7 @@
 #include <core/NumericLimits.h>
 #include <utils/Atomics.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 using namespace at::dpcpp;
 
@@ -270,7 +271,7 @@ Tensor& max_unpooling2d_forward_template(
   output.zero_();
 
   auto count = self.numel();
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -357,7 +358,7 @@ Tensor& max_unpooling2d_backward_template(
 
   int count = self.numel();
 
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "max_unpooling2d_backward_kernel",
@@ -511,7 +512,7 @@ Tensor& max_unpooling3d_forward_template(
 
   int totalZ = inputTime * inputSlices * batchSize;
   int offsetZ = 0;
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -599,7 +600,7 @@ Tensor& max_unpooling3d_backward_template(
   int totalZ = inputTime * inputSlices * batchSize;
   int offsetZ = 0;
 
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "max_unpooling3d_backward_kernel",

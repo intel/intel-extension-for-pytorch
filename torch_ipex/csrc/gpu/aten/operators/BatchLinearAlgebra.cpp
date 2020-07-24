@@ -1,11 +1,11 @@
 #include <ATen/Context.h>
-#include <ATen/Dispatch.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/LinearAlgebraUtils.h>
 
 #include <core/ApplyUtils.h>
 #include <core/Context.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 using namespace at::dpcpp;
 
@@ -71,7 +71,7 @@ Tensor& triu_tril_dpcpp_template(
     const char* name) {
   int64_t N = self.numel();
 
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::Bool,
       self.scalar_type(),

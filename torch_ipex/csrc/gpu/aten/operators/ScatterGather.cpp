@@ -6,7 +6,7 @@
 #include <core/detail/TensorInfo.h>
 
 #include <utils/General.h>
-
+#include <utils/ATDispatch.h>
 #include "ScatterGather.h"
 
 using namespace at::dpcpp::detail;
@@ -451,7 +451,7 @@ Tensor& scatter_(
     int64_t dim,
     const Tensor& index,
     const Tensor& src) {
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Bool, self.scalar_type(), "Scatter", [&]() {
         impl::Scatter<scalar_t>(self, dim, index, src);
       });
@@ -459,7 +459,7 @@ Tensor& scatter_(
 }
 
 Tensor& scatter_(Tensor& self, int64_t dim, const Tensor& index, Scalar value) {
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Bool, self.scalar_type(), "ScatterFill", [&]() {
         impl::ScatterFill<scalar_t>(self, dim, index, value);
       });
@@ -471,7 +471,7 @@ Tensor& scatter_add_(
     int64_t dim,
     const Tensor& index,
     const Tensor& src) {
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Bool, self.scalar_type(), "ScatterAdd", [&]() {
         impl::ScatterAdd<scalar_t>(self, dim, index, src);
       });
@@ -485,7 +485,7 @@ Tensor& gather_out(
     const Tensor& index,
     bool sparse_grad) {
   out.resize_(index.sizes());
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Bool, self.scalar_type(), "Gather", [&]() {
         impl::Gather<scalar_t>(out, self, dim, index);
       });

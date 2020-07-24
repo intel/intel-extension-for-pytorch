@@ -2,7 +2,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/TensorTransformations.h>
 #include <utils/AccumulateType.h>
-
+#include <utils/ATDispatch.h>
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
@@ -88,7 +88,7 @@ Tensor roll_dpcpp(const Tensor& self, IntArrayRef shifts, IntArrayRef dims) {
     start += size;
 
   auto total_dims = in_tensor.dim();
-  AT_DISPATCH_FLOATING_TYPES(in_tensor.scalar_type(), "roll_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(in_tensor.scalar_type(), "roll_dpcpp", [&] {
     roll_dpcpp_kernel<scalar_t>(
         in_tensor,
         out_tensor,

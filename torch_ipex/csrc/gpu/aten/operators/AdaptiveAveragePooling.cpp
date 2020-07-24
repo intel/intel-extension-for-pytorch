@@ -4,7 +4,7 @@
 #include <ATen/native/Pool.h>
 #include <core/Runtime.h>
 #include <vector>
-
+#include <utils/ATDispatch.h>
 #include "Pooling.hpp"
 
 using namespace mkldnn;
@@ -52,7 +52,7 @@ void adaptive_avg_pool2d_out_template(
 
   output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols});
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       input_.scalar_type(),
@@ -122,7 +122,7 @@ void adaptive_avg_pool2d_backward_out_template(
   auto alg_kind = algorithm::pooling_avg_exclude_padding;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       input.scalar_type(),

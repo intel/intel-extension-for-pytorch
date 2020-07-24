@@ -2,6 +2,7 @@
 
 #include <utils/MathReduce.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -12,7 +13,7 @@ std::tuple<Tensor&, Tensor&> _min_out(
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Bool, min.scalar_type(), "_min_out", [&] {
         std::pair<scalar_t, int64_t> init = std::make_pair<scalar_t, int64_t>(
             Numerics<scalar_t>::upper_bound(), 0);
@@ -58,7 +59,7 @@ std::tuple<Tensor&, Tensor&> _max_out(
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Bool, max.scalar_type(), "_max_out", [&] {
         std::pair<scalar_t, int64_t> init = std::make_pair<scalar_t, int64_t>(
             Numerics<scalar_t>::lower_bound(), 0);

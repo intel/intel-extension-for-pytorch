@@ -1,5 +1,4 @@
 #include <ATen/Context.h>
-#include <ATen/Dispatch.h>
 #include <ATen/WrapDimUtils.h>
 #include <ATen/core/DimVector.h>
 #include <ATen/native/ReduceOps.h>
@@ -8,6 +7,7 @@
 #include <c10/core/ScalarType.h>
 
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 #include <iostream>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
@@ -558,13 +558,13 @@ static void std_var_kernel(
     TensorIterator& iter,
     bool unbiased,
     bool take_sqrt) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "std", [&]() {
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(iter.dtype(), "std", [&]() {
     std_var_kernel_impl<scalar_t>(iter, unbiased, take_sqrt);
   });
 }
 
 static void sum_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
@@ -573,12 +573,12 @@ static void sum_kernel(TensorIterator& iter) {
 }
 
 static void prod_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES(
+  IPEX_DISPATCH_ALL_TYPES(
       iter.dtype(), "prod", [&]() { prod_kernel_impl<scalar_t>(iter); });
 }
 
 static void mean_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
@@ -587,13 +587,13 @@ static void mean_kernel(TensorIterator& iter) {
 }
 
 static void min_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Bool, iter.dtype(), "min", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND(at::ScalarType::Bool, iter.dtype(), "min", [&]() {
     min_kernel_impl<scalar_t>(iter);
   });
 }
 
 static void max_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
@@ -608,7 +608,7 @@ static void norm_kernel(TensorIterator& iter, Scalar p) {
     // type promotion that does cast and reduction in a single kernel
     return norm_kernel_impl<at::Half, float, float>(iter, p);
   }
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),

@@ -1,9 +1,10 @@
-#include <ATen/Dispatch.h>
 #include <ATen/native/Fill.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <core/ApplyUtils.h>
 #include <core/detail/IndexUtils.h>
+
+#include <utils/ATDispatch.h>
 
 #include "Loops.h"
 
@@ -25,7 +26,7 @@ struct TensorFillOp {
 };
 
 void fill_kernel_dpcpp(TensorIterator& iter, Scalar value) {
-  AT_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       kHalf, kBFloat16, kBool, iter.dtype(), "fill_dpcpp", [&] {
         at::dpcpp::DPCPP_tensor_apply1<scalar_t>(
             iter.tensor(0), TensorFillOp<scalar_t>(value.to<scalar_t>()));

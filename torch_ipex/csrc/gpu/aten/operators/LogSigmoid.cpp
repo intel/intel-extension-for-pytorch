@@ -3,6 +3,7 @@
 
 #include <core/DPCPP.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 #include "Loops.h"
 
@@ -22,7 +23,7 @@ std::tuple<Tensor&, Tensor&> log_sigmoid_forward_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       iter.dtype(),
@@ -67,7 +68,7 @@ Tensor& log_sigmoid_backward_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "log_sigmoid_backward", [&]() {
         dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPPOpLogSigmoidBackward)>(
             iter, [=](scalar_t grad_output, scalar_t x) -> scalar_t {

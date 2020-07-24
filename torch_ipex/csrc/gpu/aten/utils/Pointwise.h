@@ -7,6 +7,7 @@
 #include <core/DPCPP.h>
 #include <core/TensorImplUtils.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
 
@@ -123,7 +124,7 @@
   }                                                \
                                                    \
   Tensor& op(Tensor& out, const Tensor& self) {    \
-    AT_DISPATCH_##types(                           \
+    IPEX_DISPATCH_##types(                           \
         at::ScalarType::Half,                      \
         at::ScalarType::BFloat16,                  \
         self.scalar_type(),                        \
@@ -172,7 +173,7 @@
                                                                      \
   Tensor& op(POINTWISE_ARGS_DECL_##arg_num COMMA_##callable_args_num \
                  SCALAR_ARGS_DECL_##callable_args_num) {             \
-    AT_DISPATCH_##types(                                             \
+    IPEX_DISPATCH_##types(                                             \
         POINTWISE_ARG_FOR_TYPE_##arg_num.scalar_type(), #op, [&]() { \
           impl::op<scalar_t>(                                        \
               POINTWISE_ARGS_##arg_num COMMA_##callable_args_num     \
@@ -191,7 +192,7 @@
                                                                      \
   Tensor& op(POINTWISE_ARGS_DECL_##arg_num COMMA_##callable_args_num \
                  SCALAR_ARGS_DECL_##callable_args_num) {             \
-    AT_DISPATCH_##types(                                             \
+    IPEX_DISPATCH_##types(                                             \
         at::ScalarType::Half,                                        \
         at::ScalarType::BFloat16,                                    \
         POINTWISE_ARG_FOR_TYPE_##arg_num.scalar_type(),              \

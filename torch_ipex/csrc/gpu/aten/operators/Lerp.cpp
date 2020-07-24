@@ -1,8 +1,8 @@
-#include <ATen/Dispatch.h>
 #include <ATen/ExpandUtils.h>
 #include <ATen/NativeFunctions.h>
 #include <core/ApplyUtils.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 using namespace at::dpcpp;
 
@@ -71,7 +71,7 @@ Tensor& lerp_out(
   std::tie(b_self, b_end, b_weight) =
       expand_outplace(self, end, weight, "lerp_out");
   out.resize_as_(b_self);
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_out", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_out", [&] {
     impl::lerp<scalar_t>(out, b_self, b_end, b_weight);
   });
   return out;
@@ -85,7 +85,7 @@ Tensor& lerp_out(
   Tensor b_self, b_end;
   std::tie(b_self, b_end) = expand_outplace(self, end, "lerp_out");
   out.resize_as_(b_self);
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_out", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_out", [&] {
     impl::lerp<scalar_t>(out, b_self, b_end, weight.to<scalar_t>());
   });
   return out;
@@ -104,7 +104,7 @@ Tensor& lerp_(Tensor& self, const Tensor& end, const Tensor& weight) {
   TORCH_CHECK(
       weight.dim() <= std::max(self.dim(), end.dim()),
       "weight should be of dimension max(self.dim(), end.dim()) or lesser");
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_", [&] {
     impl::lerp<scalar_t>(self, b_self, b_end, b_weight);
   });
   return self;
@@ -119,7 +119,7 @@ Tensor& lerp_(Tensor& self, const Tensor& end, Scalar weight) {
       self.sizes(),
       " doesn't match the broadcast shape ",
       b_self.sizes());
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lerp_", [&] {
     impl::lerp<scalar_t>(self, b_self, b_end, weight.to<scalar_t>());
   });
   return self;

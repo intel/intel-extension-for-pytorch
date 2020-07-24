@@ -5,6 +5,7 @@
 #include <core/DPCPPTensorUtils.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
+#include <utils/ATDispatch.h>
 
 using namespace at::dpcpp;
 
@@ -122,7 +123,7 @@ Tensor embedding_dense_backward_dpcpp(
 
   int64_t stride = grad_weight.stride(0); // 3
 
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       grad_.scalar_type(),
       "embedding_backward",

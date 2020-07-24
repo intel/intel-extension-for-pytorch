@@ -75,7 +75,7 @@ Tensor& cross_out(
     out.resize_as_(input);
   }
 
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, input.scalar_type(), "cross", [&]() {
         impl::cross<scalar_t>(out, input, other, dim);
       });

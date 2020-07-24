@@ -5,7 +5,7 @@
 
 #include <core/Runtime.h>
 #include <utils/Math.h>
-
+#include <utils/ATDispatch.h>
 #include "Pooling.hpp"
 
 using namespace mkldnn;
@@ -102,7 +102,7 @@ void max_pool2d_with_indices_out_template(
   auto alg_kind = algorithm::pooling_max;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       input.scalar_type(),
@@ -232,7 +232,7 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       outputHeight_for_shape_check,
       outputWidth_for_shape_check);
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       input.scalar_type(),

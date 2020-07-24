@@ -4,7 +4,7 @@
 #include <ATen/native/Pool.h>
 #include <core/Runtime.h>
 #include <vector>
-
+#include <utils/ATDispatch.h>
 #include "Pooling.hpp"
 
 using namespace dnnl;
@@ -68,7 +68,7 @@ void adaptive_max_pool2d_out_template(
   output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
   indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       input_.scalar_type(),
@@ -140,7 +140,7 @@ Tensor& adaptive_max_pool2d_backward_out_template(
   auto alg_kind = algorithm::pooling_max;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       input.scalar_type(),

@@ -5,6 +5,7 @@
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 using namespace at::dpcpp;
 
@@ -324,7 +325,7 @@ void pdist_forward(Tensor& result, const Tensor& self, double p) {
   const double n2 = n - .5;
   const double n2_squared_minus_1 = n2 * n2 - 1;
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -369,7 +370,7 @@ void pdist_backward(
 
   Tensor buffer =
       at::empty({n - 1, result.size(0), result.size(1)}, result.options());
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, self.scalar_type(), "pdist_backward", [&] {
         if (p == 1.0) {
           pdist_backward_kernel_impl<scalar_t, dists<scalar_t>::one, 0>(

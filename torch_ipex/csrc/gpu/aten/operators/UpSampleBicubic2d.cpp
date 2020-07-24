@@ -1,9 +1,9 @@
 #include <ATen/ATen.h>
-#include <ATen/Dispatch.h>
 #include <ATen/NativeFunctions.h>
 
 #include <core/DPCPP.h>
 #include <core/Memory.h>
+#include <utils/ATDispatch.h>
 
 #include "UpSample.h"
 
@@ -87,7 +87,7 @@ static void upsample_bicubic2d_out_frame(
                         in_ptr, n, c, input_width, input_height, in_x + 2, in_y - 1 + k),
                     t_x);
             }
-	        
+          
             out_ptr[n * output_height * output_width * channels +
                     c * output_height * output_width + 
                     output_y * output_width + output_x] = static_cast<scalar_t>(cubic_interp1d(
@@ -181,10 +181,10 @@ static void upsample_bicubic2d_backward_out_frame(
                     in_ptr,
                     n,
                     c,
-		                input_width,
+                    input_width,
                     input_height,
                     input_x - 1 + j,
-		                input_y - 1 + i,
+                    input_y - 1 + i,
                     out_value * y_coeffs[i] * x_coeffs[j]);
               }
             }
@@ -231,7 +231,7 @@ static void upsample_bicubic2d_out_template(
   output.resize_({nbatch, channels, output_height, output_width});
   output.zero_();
 
-  AT_DISPATCH_FLOATING_TYPES(input.scalar_type(), "upsample_bicubic2d", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES(input.scalar_type(), "upsample_bicubic2d", [&] {
     auto* idata = input.data_ptr<scalar_t>();
     auto* odata = output.data_ptr<scalar_t>();
     auto onum = output.numel();
@@ -290,7 +290,7 @@ static void upsample_bicubic2d_backward_out_template(
   grad_input.zero_();
 
   #if defined(USE_DPCPP)
-  AT_DISPATCH_FLOATING_TYPES(
+  IPEX_DISPATCH_FLOATING_TYPES(
       grad_output.scalar_type(), "upsample_bicubic2d_backward", [&] {
         scalar_t* idata = grad_input.data_ptr<scalar_t>();
         scalar_t* odata = grad_output.data_ptr<scalar_t>();
@@ -309,7 +309,7 @@ static void upsample_bicubic2d_backward_out_template(
             align_corners);
       });
 
-  #else 
+  #else
   if (grad_output.scalar_type() == at::ScalarType::Float){
     float_t* idata = grad_input.data_ptr<float_t>();
     float_t* odata = grad_output.data_ptr<float_t>();

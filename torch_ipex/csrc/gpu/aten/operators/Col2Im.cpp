@@ -8,6 +8,7 @@
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
+#include <utils/ATDispatch.h>
 
 #include <mkldnn.hpp>
 
@@ -96,7 +97,7 @@ static void col2im_out_template(
   output.resize_({batch_size, n_output_plane, output_height, output_width});
   output.zero_();
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       input.scalar_type(), "col2im_out_dpcpp", [&] {
         Tensor input_n = Tensor();
         Tensor output_n = Tensor();

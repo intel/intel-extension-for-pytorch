@@ -5,6 +5,8 @@
 #include <core/Runtime.h>
 #include <vector>
 
+#include <utils/ATDispatch.h>
+
 #include "Pooling.hpp"
 
 using namespace dnnl;
@@ -126,7 +128,7 @@ void max_pool3d_with_indices_out_template(
   auto alg_kind = algorithm::pooling_max;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       input.scalar_type(), "max_pool3d_with_indices", [&] {
         scalar_t* input_data = input.data_ptr<scalar_t>();
         scalar_t* output_data = output.data_ptr<scalar_t>();
@@ -271,7 +273,7 @@ Tensor& max_pool3d_with_indices_backward_out_template(
       gradOutputHeight,
       gradOutputWidth);
 
-  AT_DISPATCH_FLOATING_TYPES(
+  IPEX_DISPATCH_FLOATING_TYPES(
       input.scalar_type(), "max_pool3d_with_indices_backward", [&] {
         /* get raw pointers */
         scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();

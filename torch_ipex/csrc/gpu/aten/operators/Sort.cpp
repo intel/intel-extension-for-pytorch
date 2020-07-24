@@ -4,6 +4,7 @@
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 #include "Sort.h"
 
@@ -45,7 +46,7 @@ std::tuple<Tensor&, Tensor&> sort_out(
 
     // Sort using our in-place k/v kernel that supports arbitrary
     // layout
-    AT_DISPATCH_ALL_TYPES_AND2(
+    IPEX_DISPATCH_ALL_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         sorted.scalar_type(),

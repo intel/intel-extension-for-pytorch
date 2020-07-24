@@ -4,7 +4,7 @@
 #include <ATen/native/Pool.h>
 #include <core/Runtime.h>
 #include <vector>
-
+#include <utils/ATDispatch.h>
 #include "Pooling.hpp"
 
 using namespace mkldnn;
@@ -73,7 +73,7 @@ void adaptive_avg_pool3d_out_template(
     output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
   }
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       input_.scalar_type(), "adaptive_avg_pool3d", [&] {
         auto input_data = input_.data_ptr<scalar_t>();
         auto output_data = output.data_ptr<scalar_t>();
@@ -139,7 +139,7 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
   auto alg_kind = algorithm::pooling_avg_exclude_padding;
   auto prop_kind = prop_kind::forward_training;
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       input.scalar_type(), "adaptive_avg_pool3d_backward", [&] {
         /* get raw pointers */
         scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();

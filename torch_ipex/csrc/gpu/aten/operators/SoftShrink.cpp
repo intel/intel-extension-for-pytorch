@@ -1,9 +1,9 @@
-#include <ATen/Dispatch.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <core/Context.h>
 #include <core/DPCPP.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 #include "Loops.h"
 
@@ -15,7 +15,7 @@ namespace impl {
 
 DPCPP_DEF_K1(softshrink_forward);
 static void softshrink_forward(TensorIterator& iter, Scalar lambd) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       iter.dtype(),
@@ -37,7 +37,7 @@ static void softshrink_forward(TensorIterator& iter, Scalar lambd) {
 
 DPCPP_DEF_K1(softshrink_backward);
 static void softshrink_backward(TensorIterator& iter, Scalar lambd) {
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "softshrink_backward", [&]() {
         auto lambd_data = lambd.to<scalar_t>();
         dpcpp_kernel_for_tensor_iter<DPCPP_K(softshrink_backward)>(

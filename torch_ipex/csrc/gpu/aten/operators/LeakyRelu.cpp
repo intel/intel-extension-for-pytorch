@@ -2,6 +2,8 @@
 #include <ATen/Context.h>
 
 #include <core/DPCPP.h>
+#include <utils/ATDispatch.h>
+
 #include "Loops.h"
 
 namespace at {
@@ -17,7 +19,7 @@ Tensor& leaky_relu_out(Tensor& out, const Tensor& self, Scalar negative_slope) {
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
@@ -51,7 +53,7 @@ Tensor& leaky_relu_backward_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "LeakyReLU_backward", [&]() {
         auto negval = negative_slope.to<scalar_t>();
 

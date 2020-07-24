@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 #include <utils/AccumulateType.h>
-
+#include <utils/ATDispatch.h>
 #include <core/Context.h>
 #include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
@@ -244,7 +244,7 @@ Tensor host_softmax(
       "** dpcpp dim must be non-negative and less than input dimensions");
 
   if (input.numel() > 0) {
-    AT_DISPATCH_FLOATING_TYPES_AND2(
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::BFloat16,
         at::ScalarType::Half,
         input.scalar_type(),
@@ -295,7 +295,7 @@ Tensor host_softmax_backward(
   auto output = output_.contiguous();
   if (output.dim() == 0)
     output = output.view(1);
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       grad.scalar_type(),
       "host_softmax_backward",

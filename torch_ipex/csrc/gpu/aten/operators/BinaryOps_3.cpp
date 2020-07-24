@@ -1,5 +1,4 @@
 #include <ATen/Context.h>
-#include <ATen/Dispatch.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 
@@ -73,7 +72,7 @@ Tensor& bitwise_and_out(
     Tensor& result,
     const Tensor& self,
     const Tensor& other) {
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Bool, self.scalar_type(), "__and___out", [&]() {
         impl::__and___out<scalar_t>(result, self, other);
       });
@@ -84,7 +83,7 @@ Tensor& bitwise_or_out(
     Tensor& result,
     const Tensor& self,
     const Tensor& other) {
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Bool, self.scalar_type(), "__or___out", [&]() {
         impl::__or___out<scalar_t>(result, self, other);
       });

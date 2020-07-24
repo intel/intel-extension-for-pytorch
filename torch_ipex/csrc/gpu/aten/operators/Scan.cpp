@@ -5,6 +5,7 @@
 #include <utils/General.h>
 #include <utils/MathReduce.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 using namespace at::detail;
 using namespace at::dpcpp;
@@ -208,7 +209,7 @@ typename std::enable_if<IS_HALF(scalar_t), void>::type scanDim(
 } // namespace impl
 
 Tensor& _cumsum_out(Tensor& out, const Tensor& self, int64_t dim) {
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, self.scalar_type(), "cumsum", [&]() {
         impl::scanDim<scalar_t>(
             out,
@@ -226,7 +227,7 @@ Tensor _cumsum(const Tensor& self, int64_t dim) {
 }
 
 Tensor& _cumprod_out(Tensor& out, const Tensor& self, int64_t dim) {
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, self.scalar_type(), "cumprod", [&]() {
         impl::scanDim<scalar_t>(
             out,

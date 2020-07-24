@@ -7,7 +7,7 @@
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <utils/Numerics.h>
-
+#include <utils/ATDispatch.h>
 #include "SortingCommon.h"
 #include "SortingRadixSelect.h"
 
@@ -238,7 +238,7 @@ void kthvalue_template(
 } // namespace impl
 
 Tensor median(const Tensor& self) {
-  return AT_DISPATCH_ALL_TYPES_AND(
+  return IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, self.scalar_type(), "median", [&] {
         return impl::median_template<scalar_t>(self);
       });
@@ -251,7 +251,7 @@ std::tuple<Tensor&, Tensor&> kthvalue_out(
     int64_t k,
     int64_t dim,
     bool keepdim) {
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, self.scalar_type(), "kthvalue", [&] {
         impl::kthvalue_template<scalar_t>(
             values, indices, self, k, dim, keepdim);

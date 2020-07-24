@@ -6,7 +6,7 @@
 #include <core/detail/TensorInfo.h>
 #include <utils/MathReduce.h>
 #include <utils/Numerics.h>
-
+#include <utils/ATDispatch.h>
 #include <ATen/aten_ipex_type_dpcpp.h>
 #include "ScanKernel.h"
 #include "Sort.h"
@@ -709,7 +709,7 @@ std::tuple<at::Tensor&, at::Tensor&> topk_out(
     bool largest,
     bool sorted) {
   auto dim_ = maybe_wrap_dim(dim, TensorImpl_Unwrap(self));
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),

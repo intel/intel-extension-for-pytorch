@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Context.h>
 #include <utils/Numerics.h>
-
+#include <utils/ATDispatch.h>
 #include <core/DPCPP.h>
 #include "Loops.h"
 
@@ -25,7 +25,7 @@ Tensor& elu_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
@@ -67,7 +67,7 @@ Tensor& elu_backward_out(
   iter.add_input(output);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "elu_backward", [&]() {
         auto negcoef = alpha.to<scalar_t>() * scale.to<scalar_t>();
         auto poscoef = scale.to<scalar_t>();

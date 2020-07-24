@@ -4,7 +4,7 @@
 
 #include <core/DPCPP.h>
 #include <utils/Numerics.h>
-
+#include <utils/ATDispatch.h>
 #include "Loops.h"
 
 using namespace at::dpcpp;
@@ -27,7 +27,7 @@ Tensor& softplus_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       iter.dtype(),
@@ -71,7 +71,7 @@ Tensor& softplus_backward_out(
   iter.add_input(output);
   iter.build();
 
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "softplus_backward", [&]() {
         auto b = beta.to<scalar_t>();
         auto t = threshold.to<scalar_t>();

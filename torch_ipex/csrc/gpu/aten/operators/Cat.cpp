@@ -4,6 +4,7 @@
 #include <core/DPCPPUtils.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
+#include <utils/ATDispatch.h>
 
 using namespace at::dpcpp;
 
@@ -296,7 +297,7 @@ static void cat(
       dpcpp::detail::canUse32BitIndexMath(result) &&
       allContiguous &&
       all32BitIndexable) {
-    AT_DISPATCH_ALL_TYPES_AND3(
+    IPEX_DISPATCH_ALL_TYPES_AND3(
         at::ScalarType::Half, at::ScalarType::Bool, at::ScalarType::BFloat16,
         result.scalar_type(), "cat_dpcpp", [&]() {
       parallel_cat<scalar_t>(result, inputs, dimension, nDims);

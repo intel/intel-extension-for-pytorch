@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/Dispatch.h>
 #include <ATen/Functions.h>
 #include <ATen/TensorUtils.h>
 #include <ATen/core/Reduction.h>
@@ -13,6 +12,7 @@
 #include <core/TensorImplUtils.h>
 
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
 
@@ -1229,7 +1229,7 @@ Tensor& binary_cross_entropy_out(
     const Tensor& target,
     const Tensor& weight,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -1258,7 +1258,7 @@ Tensor& binary_cross_entropy_backward_out(
     const Tensor& target,
     const Tensor& weight,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "bce_loss_backward_out",
@@ -1285,7 +1285,7 @@ Tensor& mse_loss_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -1307,7 +1307,7 @@ Tensor& mse_loss_backward_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "mse_loss_backward_out",
@@ -1333,7 +1333,7 @@ Tensor& l1_loss_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -1355,7 +1355,7 @@ Tensor& l1_loss_backward_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "l1_loss_backward_out",
@@ -1381,7 +1381,7 @@ Tensor& smooth_l1_loss_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -1408,7 +1408,7 @@ Tensor& smooth_l1_loss_backward_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "smooth_l1_loss_backward_out",
@@ -1434,7 +1434,7 @@ Tensor& soft_margin_loss_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -1461,7 +1461,7 @@ Tensor& soft_margin_loss_backward_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "soft_margin_loss_backward_out",
@@ -1490,7 +1490,7 @@ Tensor& multi_margin_loss_out(
     Scalar margin,
     const Tensor& weights,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -1523,7 +1523,7 @@ Tensor& multi_margin_loss_backward_out(
     Scalar margin,
     const Tensor& weights,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "multi_margin_loss_backward_out",
@@ -1560,7 +1560,7 @@ Tensor& multilabel_margin_loss_out(
     const Tensor& target,
     int64_t reduction) {
   Tensor is_target = at::empty({0}, self.options());
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -1587,7 +1587,7 @@ std::tuple<Tensor&, Tensor&> multilabel_margin_loss_forward_out(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -1616,7 +1616,7 @@ Tensor& multilabel_margin_loss_backward_out(
     const Tensor& target,
     int64_t reduction,
     const Tensor& is_target) {
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "multilabel_margin_loss_backward_out",

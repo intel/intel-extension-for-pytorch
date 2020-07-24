@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/Dispatch.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <core/DPCPP.h>
@@ -82,8 +81,8 @@ Tensor& sign_(Tensor& self) {
 
 Tensor& real_out(Tensor& out, const Tensor& self) {
   // TODO: support complex type
-  // AT_DISPATCH_ALL_TYPES_AND_COMPLEX(iter.dtype(), "real", [&]() {
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "real", [&]() {
+  // IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX(iter.dtype(), "real", [&]() {
+  IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "real", [&]() {
     out.resize_as_(self);
     DPCPP_tensor_apply2<scalar_t, scalar_t>(
         out, self, TensorRealOp<scalar_t>());
@@ -94,8 +93,8 @@ Tensor& real_out(Tensor& out, const Tensor& self) {
 
 Tensor& conj_out(Tensor& out, const Tensor& self) {
   // TODO: support complex type
-  // AT_DISPATCH_ALL_TYPES_AND_COMPLEX(iter.dtype(), "conj", [&]() {
-  AT_DISPATCH_ALL_TYPES(self.scalar_type(), "conj", [&]() {
+  // IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX(iter.dtype(), "conj", [&]() {
+  IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "conj", [&]() {
     out.resize_as_(self);
     DPCPP_tensor_apply2<scalar_t, scalar_t>(
         out, self, TensorConjOp<scalar_t>());

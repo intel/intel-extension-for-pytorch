@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/Dispatch.h>
 #include <ATen/Functions.h>
 #include <ATen/TensorUtils.h>
 
@@ -7,6 +6,7 @@
 #include <core/DPCPPUtils.h>
 
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
 
@@ -86,7 +86,7 @@ void GatedLinearUnit_updateGradInput(
 
 // namespace AtenIpexTypeDPCPP
 Tensor& glu_out(Tensor& out, const Tensor& self, int64_t dim) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "glu_out", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "glu_out", [&] {
     impl::GatedLinearUnit_updateOutput<scalar_t>(out, self, dim);
   });
   return out;
@@ -102,7 +102,7 @@ Tensor& glu_backward_out(
     const Tensor& grad_output,
     const Tensor& self,
     int64_t dim) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       self.scalar_type(), "glu_backward_out", [&] {
         impl::GatedLinearUnit_updateGradInput<scalar_t>(
             grad_input, grad_output, self, dim);

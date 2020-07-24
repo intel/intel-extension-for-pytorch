@@ -3,7 +3,7 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <core/DPCPP.h>
-
+#include <utils/ATDispatch.h>
 #include "Loops.h"
 
 namespace at {
@@ -23,7 +23,7 @@ Tensor& hardtanh_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       iter.dtype(),
@@ -73,7 +73,7 @@ Tensor& hardtanh_backward_out(
   iter.add_input(self);
   iter.build();
 
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "hardtanh_backward", [&]() {
         auto min_ = min_val.to<scalar_t>();
         auto max_ = max_val.to<scalar_t>();

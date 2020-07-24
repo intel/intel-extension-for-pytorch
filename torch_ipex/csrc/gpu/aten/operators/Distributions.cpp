@@ -7,6 +7,7 @@
 #include <core/Generator.h>
 #include <core/Memory.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 #include "Random.h"
 #include "Loops.h"
@@ -363,7 +364,7 @@ Tensor& bernoulli_(Tensor& self, const Tensor& p_, Generator* _generator) {
       _generator, getDefaultDPCPPGenerator());
   std::lock_guard<std::mutex> lock(gen->mutex_);
   // Call dpcpp kernel to generate bernoulli distribution
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       p_.scalar_type(),
@@ -379,7 +380,7 @@ Tensor& bernoulli_(Tensor& self, double p, Generator* _generator) {
       _generator, getDefaultDPCPPGenerator());
   std::lock_guard<std::mutex> lock(gen->mutex_);
   // Call dpcpp kernel to generate bernoulli distribution
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -435,7 +436,7 @@ Tensor& multinomial_out(
     // Prefix sum along rows
     Tensor prefix_sum = norm_dist.cumsum(1);
 
-    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "multinomial", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "multinomial", [&] {
       impl::sample_multinomial_with_replacement<scalar_t>(
           rng_engine_inputs,
           num_samples,
@@ -468,7 +469,7 @@ Tensor& multinomial_out(
         rng_engine_inputs = gen->philox_engine_inputs(1);
       }
 
-      AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "multinomial", [&] {
+      IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "multinomial", [&] {
         // The kernel can only draw one sample before we have to
         // recalculate our distribution
         impl::sample_multinomial_without_replacement<scalar_t>(
@@ -518,7 +519,7 @@ Tensor& exponential_(Tensor& self, double lambda_, Generator* gen_) {
   auto gen = get_generator_or_default<DPCPPGenerator>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
 #ifdef USE_ONEMKL
   if (lambda_ > 0) {
-    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
       scalar_t displ = static_cast<scalar_t>(0.0);
       scalar_t scale = static_cast<scalar_t>(std::abs(1/lambda_));
       auto &sycl_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
@@ -537,7 +538,7 @@ Tensor& exponential_(Tensor& self, double lambda_, Generator* gen_) {
 #endif
   {
     auto iter = TensorIterator::nullary_op(self);
-    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
+    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
       using accscalar_t = acc_type<scalar_t>;
       auto lambda = static_cast<accscalar_t>(lambda_);
 

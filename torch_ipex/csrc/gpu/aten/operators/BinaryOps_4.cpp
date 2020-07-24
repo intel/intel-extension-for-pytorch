@@ -1,5 +1,4 @@
 #include <ATen/Context.h>
-#include <ATen/Dispatch.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 
@@ -26,7 +25,7 @@ Tensor& tanh_backward_out(
   iter.add_input(output);
   iter.build();
 
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "tanh_backward_out", [&]() {
         dpcpp_kernel_for_tensor_iter<DPCPP_K(tanh_backward)>(
             iter, [](scalar_t output, scalar_t z) -> scalar_t {
@@ -45,7 +44,7 @@ Tensor tanh_backward(const Tensor& grad_output, const Tensor& output) {
 DPCPP_DEF_K1(atan2);
 Tensor& atan2_out(Tensor& result, const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_op(result, self, other);
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       iter.dtype(),

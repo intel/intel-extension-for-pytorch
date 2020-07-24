@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/Dispatch.h>
 #include <ATen/Functions.h>
 #include <ATen/TensorUtils.h>
 #include <tuple>
@@ -7,6 +6,7 @@
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
+#include <utils/ATDispatch.h>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
 
@@ -130,7 +130,7 @@ Tensor conv_tbc(
     const Tensor& bias,
     int64_t pad) {
   Tensor out = at::empty({}, self.options());
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       self.scalar_type(), "conv_tbc", [&] {
           impl::ConvolutionTBC_updateOutput<scalar_t>(
               out, self, weight, bias, pad);
@@ -147,7 +147,7 @@ std::tuple<Tensor, Tensor, Tensor>conv_tbc_backward(
   Tensor dInput = at::empty({}, input.options());
   Tensor dWeight = at::empty({}, weight.options());
   Tensor dBias = at::empty({}, bias.options());
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       input.scalar_type(), "conv_tbc_backward", [&] {
           impl::ConvolutionTBC_updateGradInput<scalar_t>(
               dInput, dWeight, dBias, self, input, weight, bias, pad);

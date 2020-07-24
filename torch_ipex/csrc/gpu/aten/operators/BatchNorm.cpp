@@ -5,6 +5,7 @@
 #include <core/Memory.h>
 #include <core/Runtime.h>
 #include <utils/Math.h>
+#include <utils/ATDispatch.h>
 #include <tensor/Context.h>
 #include <ATen/ipex_type_dpcpp_customized.h>
 
@@ -240,7 +241,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm(
        << input.scalar_type();
     TORCH_CHECK(0, ss.str());
   } else
-    return AT_DISPATCH_FLOATING_TYPES_AND2(
+    return IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         input.scalar_type(),

@@ -3,6 +3,7 @@
 #include <core/DPCPP.h>
 #include <core/detail/IndexUtils.h>
 #include <utils/Atomics.h>
+#include <utils/ATDispatch.h>
 #include "Loops.h"
 
 using namespace at::dpcpp;
@@ -195,7 +196,7 @@ Tensor bincount_template(
 } // namespace impl
 
 Tensor bincount(const Tensor& self, const Tensor& weights, int64_t minlength) {
-  return AT_DISPATCH_INTEGRAL_TYPES(self.scalar_type(), "bincount_dpcpp", [&] {
+  return IPEX_DISPATCH_INTEGRAL_TYPES(self.scalar_type(), "bincount_dpcpp", [&] {
     const auto scalar = weights.scalar_type();
     if (scalar == ScalarType::Undefined || scalar == ScalarType::Float)
       return impl::bincount_template<scalar_t, float>(self, weights, minlength);

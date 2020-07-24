@@ -13,6 +13,7 @@
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/TensorInfo.h>
+#include <utils/ATDispatch.h>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
 #include <operators/Reduce.h>
@@ -837,7 +838,7 @@ std::tuple<Tensor&, Tensor&> nll_loss_forward_out(
     const Tensor& weight,
     int64_t reduction,
     int64_t ignore_index) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -865,7 +866,7 @@ std::tuple<at::Tensor, at::Tensor> nll_loss_forward(
   auto output = at::empty({0}, self.options());
   auto total_weight = at::empty({0}, self.options());
 
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -893,7 +894,7 @@ Tensor& nll_loss_backward_out(
     int64_t reduction,
     int64_t ignore_index,
     const Tensor& total_weight) {
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "ClassNLLCriterion_updateGradInput",
@@ -921,7 +922,7 @@ Tensor nll_loss_backward(
     const Tensor& total_weight) {
   auto grad_input = at::zeros_like(self, c10::MemoryFormat::Contiguous);
 
-  AT_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "ClassNLLCriterion_updateGradInput",
@@ -975,7 +976,7 @@ Tensor& nll_loss2d_backward_out(
       grad_output,
       target);
 
-    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_backward", [&](){
+    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_backward", [&](){
       impl::spatial_class_nll_criterion_update_grad_input_no_reduce_kernel<scalar_t>(
           target,
           grad_output,
@@ -984,7 +985,7 @@ Tensor& nll_loss2d_backward_out(
           ignore_index);
     });
   } else {
-    AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_backward", [&](){
+    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_backward", [&](){
       impl::spatial_class_nll_criterion_update_grad_input_kernel<scalar_t>(
         grad_input,
         grad_output,
@@ -1052,7 +1053,7 @@ std::tuple<Tensor&,Tensor&> nll_loss2d_forward_out(
     if (reduction == at::Reduction::None) {
       output.resize_({batch_size, H, W});
 
-      AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_forward", [&](){
+      IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_forward", [&](){
         impl::spatial_class_nll_criterion_update_output_no_reduce_kernel<scalar_t>(
           self,
           target,
@@ -1063,23 +1064,7 @@ std::tuple<Tensor&,Tensor&> nll_loss2d_forward_out(
     } else {
       output.fill_(0);
       total_weight.fill_(0);
-
-#if defined(USE_DPCPP)
-      AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_forward", [&](){
-#else
-//        computecpp only supports 32bit atomic ops
-#define AT_DISPATCH_FLOAT(TYPE, NAME, ...)                                   \
-  [&] {                                                                      \
-    const auto& the_type = TYPE;                                             \
-    at::ScalarType _st = ::detail::scalar_type(the_type);                    \
-    switch (_st) {                                                           \
-      AT_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)        \
-      default:                                                               \
-        AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \
-    }                                                                        \
-  }()
-      AT_DISPATCH_FLOAT(self.scalar_type(), "nll_loss2d_dpcpp_forward", [&](){
-#endif
+      IPEX_DISPATCH_ATOMIC_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_forward", [&](){
         using accscalar_t = acc_type<scalar_t>;
         impl::spatial_class_nll_criterion_update_output_kernel<scalar_t, accscalar_t>(
           output,

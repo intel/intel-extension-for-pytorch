@@ -1,5 +1,5 @@
 #include <ATen/ATen.h>
-
+#include <utils/ATDispatch.h>
 #include "Loops.h"
 
 using namespace at::dpcpp;
@@ -10,13 +10,13 @@ namespace impl {
 
 DPCPP_DEF_K1(logical_xor);
 static void logical_xor_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       kBool, kHalf, iter.dtype(1), "logical_xor_dpcpp", [&]() {
         using self_t = scalar_t;
-        AT_DISPATCH_ALL_TYPES_AND2(
+        IPEX_DISPATCH_ALL_TYPES_AND2(
             kBool, kHalf, iter.dtype(2), "logical_xor_dpcpp", [&]() {
               using other_t = scalar_t;
-              AT_DISPATCH_ALL_TYPES_AND2(
+              IPEX_DISPATCH_ALL_TYPES_AND2(
                   kBool, kHalf, iter.dtype(0), "logical_xor_dpcpp", [&]() {
                     dpcpp_kernel_for_tensor_iter<DPCPP_K(
                         logical_xor, self_t, other_t)>(

@@ -4,6 +4,7 @@
 #include <core/detail/IndexUtils.h>
 #include <utils/Atomics.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 using namespace at::dpcpp;
 
@@ -135,7 +136,7 @@ void reflection_pad1d_out_template(
 
   Tensor input = input_.contiguous();
 
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       input.scalar_type(), "reflection_pad1d_out_template", [&] {
         reflection_pad1d_out_kernel<scalar_t>(
             input.data_ptr<scalar_t>(),
@@ -227,25 +228,8 @@ void reflection_pad1d_backward_out_template(
       output_w,
       ", Got: ",
       grad_output.size(dim_w));
-
-#if defined(USE_DPCPP)
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-#else
-//        computecpp only supports 32bit atomic ops
-#define AT_DISPATCH_FLOAT_AND_HALF(TYPE, NAME, ...)                     \
-  [&] {                                                                 \
-    const auto& the_type = TYPE;                                        \
-    at::ScalarType _st = ::detail::scalar_type(the_type);               \
-    switch (_st) {                                                      \
-      AT_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)   \
-      AT_PRIVATE_CASE_TYPE(at::ScalarType::Half, at::Half, __VA_ARGS__) \
-      default:                                                          \
-        AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");  \
-    }                                                                   \
-  }()
-  AT_DISPATCH_FLOAT_AND_HALF(
-#endif
-      grad_input.scalar_type(), "reflection_pad1d_backward_out_template", [&] {
+      IPEX_DISPATCH_ATOMIC_FLOATING_TYPES(grad_input.scalar_type(),
+        "reflection_pad1d_backward_out_template", [&] {
         reflection_pad1d_backward_out_kernel<scalar_t>(
             grad_input.data_ptr<scalar_t>(),
             grad_output.data_ptr<scalar_t>(),

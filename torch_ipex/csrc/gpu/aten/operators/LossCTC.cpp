@@ -9,6 +9,7 @@
 #include <utils/ATDispatch.h>
 #include <utils/Atomics.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 using namespace at::dpcpp;
 
@@ -1162,7 +1163,7 @@ std::tuple<Tensor, Tensor> _ctc_loss(
     int64_t blank,
     bool zero_infinity) {
   (void)zero_infinity; // only used for backward
-  return AT_DISPATCH_FLOATING_TYPES_AND2(
+  return IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       log_probs.scalar_type(),
@@ -1188,7 +1189,7 @@ Tensor _ctc_loss_backward(
     const Tensor& log_alpha,
     int64_t blank,
     bool zero_infinity) {
-  return AT_DISPATCH_ALL_ATOMIC_TYPES(
+  return IPEX_DISPATCH_ATOMIC_FLOATING_TYPES(
       log_probs.scalar_type(), "ctc_loss_backward", [&] {
         if (targets.scalar_type() == kLong) {
           return impl::ctc_loss_backward_template<scalar_t, kLong>(

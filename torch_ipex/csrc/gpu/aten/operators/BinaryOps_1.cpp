@@ -1,5 +1,4 @@
 #include <ATen/Context.h>
-#include <ATen/Dispatch.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 
@@ -20,7 +19,7 @@ namespace impl {
 class SyclOpAdd {};
 
 static void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),

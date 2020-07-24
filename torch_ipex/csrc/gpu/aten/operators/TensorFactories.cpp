@@ -9,6 +9,7 @@
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 using namespace at::dpcpp;
 using namespace at::native;
@@ -242,7 +243,7 @@ Tensor triu_indices_dpcpp(
       rectangle_size = std::min<int64_t>(row, -offset) * col;
     }
 
-    AT_DISPATCH_ALL_TYPES_AND(
+    IPEX_DISPATCH_ALL_TYPES_AND(
         at::ScalarType::Half, tensor.scalar_type(), "triu_indices_cuda", [&] {
           triu_indices_dpcpp_kernel<scalar_t>(
               tensor.data_ptr<scalar_t>(),
@@ -280,7 +281,7 @@ Tensor tril_indices_dpcpp(
       rectangle_size = (row - rectangle_row_offset) * col;
     }
 
-    AT_DISPATCH_ALL_TYPES_AND(
+    IPEX_DISPATCH_ALL_TYPES_AND(
         at::ScalarType::Half, tensor.scalar_type(), "tril_indices_dpcpp", [&] {
           tril_indices_dpcpp_kernel<scalar_t>(
               tensor.data_ptr<scalar_t>(),

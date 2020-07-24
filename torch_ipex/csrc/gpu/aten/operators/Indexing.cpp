@@ -11,24 +11,14 @@
 #include <utils/Atomics.h>
 #include <utils/MathReduce.h>
 #include <utils/Numerics.h>
+#include <utils/ATDispatch.h>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
 #include "IndexingUtils.h"
 #include "Loops.h"
 #include "ParttenScan.h"
 
-#define AT_DISPATCH_ALL_ATOMIC_TYPES(TYPE, NAME, ...)                        \
-  [&] {                                                                      \
-    const auto& the_type = TYPE;                                             \
-    /* don't use TYPE again in case it is an expensive or side-effect op  */ \
-    at::ScalarType _st = ::detail::scalar_type(the_type);                    \
-    switch (_st) {                                                           \
-      AT_PRIVATE_CASE_TYPE(at::ScalarType::Int, int32_t, __VA_ARGS__)        \
-      AT_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)        \
-      default:                                                               \
-        TORCH_CHECK(0, #NAME, " not implemented for '", toString(_st), "'"); \
-    }                                                                        \
-  }()
+
 
 using namespace at::dpcpp;
 
@@ -896,7 +886,7 @@ void index(
     TensorIterator& iter,
     IntArrayRef index_size,
     IntArrayRef index_stride) {
-  AT_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       at::ScalarType::Bool,
@@ -923,7 +913,7 @@ void index_put(
     IntArrayRef index_stride,
     bool accumulate) {
   if (accumulate) {
-    AT_DISPATCH_ALL_ATOMIC_TYPES(iter.dtype(), "index_put", [&] {
+    IPEX_DISPATCH_ATOMIC_ALL_TYPES(iter.dtype(), "index_put", [&] {
       dpcpp_index_kernel<DPCPP_K(
           index_put_kernel,
           scalar_t,
@@ -941,7 +931,7 @@ void index_put(
           });
     });
   } else {
-    AT_DISPATCH_ALL_TYPES_AND3(
+    IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       at::ScalarType::Bool,
@@ -1013,7 +1003,7 @@ Tensor& index_select_out(
     const Tensor& self,
     int64_t dim,
     const Tensor& index) {
-  AT_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
@@ -1029,7 +1019,7 @@ Tensor index_select(const Tensor& self, int64_t dim, const Tensor& index) {
 }
 
 Tensor& nonzero_out(Tensor& out, const Tensor& self) {
-  AT_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
@@ -1049,7 +1039,7 @@ Tensor& index_add_(
     int64_t dim,
     const Tensor& index,
     const Tensor& source) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -1063,7 +1053,7 @@ Tensor& index_fill_(
     int64_t dim,
     const Tensor& index,
     Scalar value) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -1087,7 +1077,7 @@ Tensor& index_fill_(
 }
 
 Tensor& diag_out(Tensor& out, const Tensor& self, int64_t diagonal) {
-  AT_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
@@ -1113,7 +1103,7 @@ Tensor trace(const Tensor& self) {
 Tensor& masked_fill_(Tensor& self, const Tensor& mask_, Scalar value) {
   Tensor mask;
   std::tie(mask) = expand_inplace(self, mask_, "masked_fill_");
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       self.scalar_type(),
@@ -1136,7 +1126,7 @@ Tensor& masked_scatter_(
     Tensor& self,
     const Tensor& mask,
     const Tensor& source) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       self.scalar_type(),
@@ -1148,7 +1138,7 @@ Tensor& masked_scatter_(
 Tensor& masked_select_out(Tensor& out, const Tensor& self, const Tensor& mask) {
   Tensor b_self, b_mask;
   std::tie(b_self, b_mask) = expand_outplace(self, mask, "masked_select_out");
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       self.scalar_type(),
@@ -1197,7 +1187,7 @@ Tensor& put_(
   }
 
   if (accumulate) {
-    AT_DISPATCH_ALL_ATOMIC_TYPES(self.scalar_type(), "put_", [&] {
+    IPEX_DISPATCH_ATOMIC_ALL_TYPES(self.scalar_type(), "put_", [&] {
       impl::put<
           scalar_t,
           DPCPP_K(dpcpp_put_kernel, scalar_t, /*accumulate=*/bool)>(
@@ -1214,7 +1204,7 @@ Tensor& put_(
           });
     });
   } else {
-    AT_DISPATCH_ALL_TYPES_AND3(
+    IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       at::ScalarType::Bool,
@@ -1273,7 +1263,7 @@ Tensor& _index_put_impl_(
 }
 
 Tensor& take_out(Tensor& out, const Tensor& self, const Tensor& index) {
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       self.scalar_type(),

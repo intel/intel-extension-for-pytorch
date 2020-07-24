@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 #include <utils/AccumulateType.h>
-
+#include <utils/ATDispatch.h>
 #include <core/Context.h>
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
@@ -27,7 +27,7 @@ void sigmoid(Tensor& output, const Tensor& self) {
 }
 
 Tensor& _sigmoid_out(Tensor& output, const Tensor& self) {
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
@@ -55,7 +55,7 @@ Tensor& sigmoid_backward_out(
     const Tensor& output) {
   TORCH_CHECK(output.numel() == grad_output.numel(), "different elements ...");
   grad_input.resize_as_(output);
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16,
       output.scalar_type(),
       "sigmoid_backward_out",

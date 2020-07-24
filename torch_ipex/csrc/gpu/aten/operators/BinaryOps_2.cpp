@@ -1,5 +1,4 @@
 #include <ATen/Context.h>
-#include <ATen/Dispatch.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 
@@ -19,7 +18,7 @@ class SyclOpMul {};
 class SyclOpDiv {};
 
 static void mul_kernel_dpcpp(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       at::ScalarType::Bool,
@@ -33,12 +32,12 @@ static void mul_kernel_dpcpp(TensorIterator& iter) {
 
 static void div_kernel_dpcpp(TensorIterator& iter) {
   if (isIntegralType(iter.dtype(), false)) {
-    AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "div", [&] {
+    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "div", [&] {
       dpcpp_kernel_for_tensor_iter<SyclOpDiv>(
           iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
     });
   } else {
-    AT_DISPATCH_FLOATING_TYPES_AND2(
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::BFloat16,
         at::ScalarType::Half,
         iter.dtype(),

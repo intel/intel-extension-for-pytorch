@@ -1,9 +1,10 @@
 #include <ATen/ATen.h>
-#include <ATen/Dispatch.h>
 #include <ATen/ExpandUtils.h>
 #include <torch/csrc/autograd/record_function.h>
 
 #include <core/TensorImplUtils.h>
+
+#include <utils/ATDispatch.h>
 
 #include <core/Runtime.h>
 #include <dnnl.hpp>
@@ -180,7 +181,7 @@ Tensor& addmm_(
   TORCH_CHECK(self.size(0) ==  m1.size(0) && self.size(1) == m2.size(1),
               "size mismatch input ", self.sizes(), " m1 ", m1.sizes(), " m2 ", m2.sizes());
 
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
     at::ScalarType::Half,
     at::ScalarType::BFloat16,
     self.scalar_type(),
@@ -203,7 +204,7 @@ Tensor addmm(
   TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
 
   auto result = at::empty({0}, input.options());
-  AT_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND2(
     at::ScalarType::Half,
     at::ScalarType::BFloat16,
     result.scalar_type(),
@@ -220,7 +221,7 @@ Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
   TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(mat2.dim() == 2, "expected 2D tensor");
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
     at::ScalarType::Half,
     at::ScalarType::BFloat16,
     self.scalar_type(),
@@ -254,7 +255,7 @@ Tensor& baddbmm_(
               "size mismatch input ", self.sizes(),
               " batch1 ", batch1.sizes(), " batch2 ", batch2.sizes());
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
     at::ScalarType::Half,
     at::ScalarType::BFloat16,
     self.scalar_type(),
@@ -277,7 +278,7 @@ Tensor& baddbmm_out(
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
     at::ScalarType::Half,
     at::ScalarType::BFloat16,
     input.scalar_type(),
@@ -305,7 +306,7 @@ Tensor& bmm_out(Tensor& result, const Tensor& self, const Tensor& batch2) {
   TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
 
-  AT_DISPATCH_FLOATING_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
     at::ScalarType::Half,
     at::ScalarType::BFloat16,
     self.scalar_type(),
@@ -333,7 +334,7 @@ Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & b
     TORCH_CHECK(weight.dim() == 2, "expected 2D tensor");
 
     auto result = at::empty({0}, input.options());
-    AT_DISPATCH_ALL_TYPES_AND2(
+    IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       result.scalar_type(),

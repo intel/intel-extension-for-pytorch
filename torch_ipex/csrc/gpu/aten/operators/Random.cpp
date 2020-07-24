@@ -6,6 +6,7 @@
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include "Random.h"
+#include <utils/ATDispatch.h>
 
 using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
@@ -103,7 +104,7 @@ void normal(Tensor& self, double mean, double stdv, Generator* _generator) {
 } // namespace impl
 
 Tensor& normal_(Tensor& self, double mean, double std, Generator* generator) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "normal_", [&]() {
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "normal_", [&]() {
     using accreal = typename std::conditional<
         std::is_same<scalar_t, at::Half>::value,
         float,
@@ -114,7 +115,7 @@ Tensor& normal_(Tensor& self, double mean, double std, Generator* generator) {
 }
 
 Tensor& uniform_(Tensor& self, double from, double to, Generator* generator) {
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "uniform_", [&]() {
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "uniform_", [&]() {
     impl::uniform<scalar_t>(self, generator, from, to);
   });
   return self;

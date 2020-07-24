@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-#include <ATen/Dispatch.h>
 
 #include <ATen/native/TensorIterator.h>
 
@@ -8,6 +7,8 @@
 #include <core/Guard.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
+
+#include <utils/ATDispatch.h>
 
 using namespace at;
 using namespace at::dpcpp;
@@ -118,10 +119,10 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
         numel * iter.element_size(0),
         DeviceToDevice);
   } else {
-    AT_DISPATCH_ALL_TYPES_AND3(
+    IPEX_DISPATCH_ALL_TYPES_AND3(
         kHalf, kBFloat16, kBool, iter.dtype(0), "copy_", [&] {
           using dst_t = scalar_t;
-          AT_DISPATCH_ALL_TYPES_AND3(
+          IPEX_DISPATCH_ALL_TYPES_AND3(
               kHalf, kBFloat16, kBool, iter.dtype(1), "copy_", [&] {
                 CopyOp<dst_t, scalar_t>::apply(iter.tensor(0), iter.tensor(1));
               });
