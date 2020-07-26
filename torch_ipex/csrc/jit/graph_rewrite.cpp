@@ -52,31 +52,10 @@ std::unordered_map<std::string, c10::IValue> getConvParams(
   return calc_values;
 }
 
-void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
-  ConstantPropagation(graph);
-  std::string convolution = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool):
-        %r = aten::_convolution(%a, %w, %b, %stride, %padding, %dilation,
-            %transposed, %output_padding, %groups, %benchmark, %deterministic, %cudnn_enabled)
-        return (%r) )";
-
-  std::string conv2d = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
-          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool):
-        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
-        return (%r) )";
-
-  std::string conv2d_swish_outplace = R"(
+void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph) {
+  std::string conv2d_swish_fusion = R"(
       graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
-        %r = ipex::conv2d_swish_outplace(%a, %w, %b, %stride, %padding, %dilation, %groups)
-        return (%r) )";
-
-  std::string conv2d_swish_inplace = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
-        %r = ipex::conv2d_swish_inplace(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        %r = ipex::conv2d_swish(%a, %w, %b, %stride, %padding, %dilation, %groups)
         return (%r) )";
 
   std::string conv2d_sigmoid_mul_outplace = R"(
@@ -98,11 +77,88 @@ void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
         %r = ipex::conv2d_sigmoid(%a, %w, %b, %stride, %padding, %dilation, %groups)
         return (%r) )";
 
-  std::string conv2d_sigmoid = R"(
+  std::string conv2d_sigmoid_outplace = R"(
       graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
         %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
         %s = aten::sigmoid(%r)
         return (%s) )";
+
+  std::string conv2d_sigmoid_inplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
+        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        %s = aten::sigmoid_(%r)
+        return (%s) )";
+
+  std::string conv2d_hardtanh_fusion = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %min:float, %max:float):
+        %r = ipex::conv2d_clamp(%a, %w, %b, %stride, %padding, %dilation, %groups, %min, %max)
+        return (%r) )";
+
+  std::string conv2d_hardtanh_inplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %min, %max):
+        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        %s = aten::hardtanh_(%r, %min, %max)
+        return (%s) )";
+
+  std::string conv2d_hardtanh_outplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %min, %max):
+        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        %s = aten::hardtanh(%r, %min, %max)
+        return (%s) )";
+
+  // Fuse conv2d + swish
+  SubgraphRewriter rewriter_conv_swish_outplace;
+  rewriter_conv_swish_outplace.RegisterRewritePattern(
+    conv2d_sigmoid_mul_outplace,
+    conv2d_swish_fusion);
+  rewriter_conv_swish_outplace.runOnGraph(graph);
+  SubgraphRewriter rewriter_conv_swish_inplace;
+  rewriter_conv_swish_inplace.RegisterRewritePattern(
+    conv2d_sigmoid_mul_inplace,
+    conv2d_swish_fusion);
+  rewriter_conv_swish_inplace.runOnGraph(graph);
+
+  // Fuse conv2d + sigmoid
+  SubgraphRewriter rewriter_conv_sigmoid_outplace;
+  rewriter_conv_sigmoid_outplace.RegisterRewritePattern(
+    conv2d_sigmoid_outplace,
+    conv2d_sigmoid_fusion);
+  rewriter_conv_sigmoid_outplace.runOnGraph(graph);
+  SubgraphRewriter rewriter_conv_sigmoid_inplace;
+  rewriter_conv_sigmoid_inplace.RegisterRewritePattern(
+    conv2d_sigmoid_inplace,
+    conv2d_sigmoid_fusion);
+  rewriter_conv_sigmoid_inplace.runOnGraph(graph);
+
+  // Fuse conv2d + hardtanh
+  SubgraphRewriter rewriter_conv_hardtanh_outplace;
+  rewriter_conv_hardtanh_outplace.RegisterRewritePattern(
+    conv2d_hardtanh_outplace,
+    conv2d_hardtanh_fusion);
+  rewriter_conv_hardtanh_outplace.runOnGraph(graph);
+  SubgraphRewriter rewriter_conv_hardtanh_inplace;
+  rewriter_conv_hardtanh_inplace.RegisterRewritePattern(
+    conv2d_hardtanh_inplace,
+    conv2d_hardtanh_fusion);
+  rewriter_conv_hardtanh_inplace.runOnGraph(graph);
+}
+
+void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
+  ConstantPropagation(graph);
+  std::string convolution = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
+          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
+          %deterministic:bool, %cudnn_enabled:bool):
+        %r = aten::_convolution(%a, %w, %b, %stride, %padding, %dilation,
+            %transposed, %output_padding, %groups, %benchmark, %deterministic, %cudnn_enabled)
+        return (%r) )";
+
+  std::string conv2d = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
+          %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
+          %deterministic:bool, %cudnn_enabled:bool):
+        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        return (%r) )";
 
   std::string conv1d = R"(
       graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
@@ -180,16 +236,6 @@ void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
   SubgraphRewriter rewriter_conv3d;
   rewriter_conv3d.RegisterRewritePattern(convolution, conv3d);
   rewriter_conv3d.runOnGraph(graph, filter_conv3d);
-  // Fuse conv2d + swish
-  SubgraphRewriter rewriter_conv_swish_outplace;
-  rewriter_conv_swish_outplace.RegisterRewritePattern(conv2d_sigmoid_mul_outplace, conv2d_swish_outplace);
-  rewriter_conv_swish_outplace.runOnGraph(graph);
-  SubgraphRewriter rewriter_conv_swish_inplace;
-  rewriter_conv_swish_inplace.RegisterRewritePattern(conv2d_sigmoid_mul_inplace, conv2d_swish_inplace);
-  rewriter_conv_swish_inplace.runOnGraph(graph);
-  SubgraphRewriter rewriter_conv_sigmoid;
-  rewriter_conv_sigmoid.RegisterRewritePattern(conv2d_sigmoid, conv2d_sigmoid_fusion);
-  rewriter_conv_sigmoid.runOnGraph(graph);
 }
 
 } // namespace graph_rewrite

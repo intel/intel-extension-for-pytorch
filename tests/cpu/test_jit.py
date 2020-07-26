@@ -172,10 +172,11 @@ class ConvSwishOutplace(nn.Module):
         self.conv2d = nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
 
     def forward(self, x):
-        a = self.conv2d(x)
-        b = torch.sigmoid(a)
-        d = torch.mul(a, b)
-        return d
+        a1 = self.conv2d(x)
+        b1 = torch.sigmoid(a1)
+        c1 = torch.mul(a1, b1)
+
+        return c1
 
 class ConvSwishInplace(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, image_size):
@@ -185,8 +186,42 @@ class ConvSwishInplace(nn.Module):
     def forward(self, x):
         a = self.conv2d(x)
         b = torch.sigmoid(a)
-        a.mul_(b)
-        return a
+        res = a.mul_(b)
+        return res
+
+class ConvSigmoidOutplace(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, image_size):
+        super(ConvSigmoidOutplace, self).__init__()
+        self.conv2d = nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+
+    def forward(self, x):
+        a = self.conv2d(x)
+        b = torch.sigmoid(a)
+        c = torch.add(b, b)
+        return c
+
+class ConvSigmoidInplace(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, image_size):
+        super(ConvSigmoidInplace, self).__init__()
+        self.conv2d = nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+
+    def forward(self, x):
+        a = self.conv2d(x)
+        b = torch.sigmoid_(a)
+        c = torch.add(b, b)
+        return c
+
+class ConvHardtanh(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, image_size, inplace=False):
+        super(ConvHardtanh, self).__init__()
+        self.conv2d = nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+        self.hardtanh = nn.Hardtanh(inplace=inplace)
+
+    def forward(self, x):
+        a = self.conv2d(x)
+        b = self.hardtanh(a)
+        c = torch.add(b, b)
+        return c
 
 class Tester(TestCase):
 
@@ -281,38 +316,35 @@ class Tester(TestCase):
             self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
     def test_conv2d_swish(self):
-        in_channels = 3
+        batch_size = 32
         out_channels = 64
+        in_channels = 3
         kernel_size = 3
         image_size = 64
-        conv2d_swish_outplace = ConvSwishOutplace(in_channels, out_channels, kernel_size, image_size).to(ipex.DEVICE)
-        conv2d_swish_inplace = ConvSwishInplace(in_channels, out_channels, kernel_size, image_size).to(ipex.DEVICE)
-
-        input = torch.rand(32, 3, 64, 64).to(ipex.DEVICE)
-        res_conv2d_swish_outplace = conv2d_swish_outplace(input)
-        res_conv2d_swish_inplace = conv2d_swish_inplace(input)
-        self.assertEqual(res_conv2d_swish_outplace, res_conv2d_swish_outplace)
-
-        with torch.no_grad():
-            # For conv2d + swish(inplace)
-            traced_conv2d_swish_inplace = torch.jit.trace(conv2d_swish_inplace, input)
-            traced_conv2d_swish_inplace.eval()
-            res_traced_conv2d_swish_inplace = traced_conv2d_swish_inplace(input)
-            self.assertEqual(res_traced_conv2d_swish_inplace, res_conv2d_swish_inplace)
-
-            kind_in_graph="ipex::conv2d_swish_inplace"
-            trace_graph = traced_conv2d_swish_inplace.graph_for(input)
-            self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
-
-            # For conv2d + swish(inplace)
-            traced_conv2d_swish_outplace = torch.jit.trace(conv2d_swish_outplace, input)
-            traced_conv2d_swish_outplace.eval()
-            res_traced_conv2d_swish_outplace = traced_conv2d_swish_outplace(input)
-            self.assertEqual(res_traced_conv2d_swish_outplace, res_conv2d_swish_outplace)
-
-            kind_in_graph="ipex::conv2d_swish_outplace"
-            trace_graph = traced_conv2d_swish_outplace.graph_for(input)
-            self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
+        self._test_output(
+            ConvSwishOutplace(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_swish")
+        self._test_output(
+            ConvSwishInplace(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_swish")
+        self._test_output(
+            ConvSigmoidOutplace(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_sigmoid")
+        self._test_output(
+            ConvSigmoidInplace(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_sigmoid")
+        self._test_output(
+            ConvHardtanh(in_channels, out_channels, kernel_size, image_size, True),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_clamp")
+        self._test_output(
+            ConvHardtanh(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_clamp")
 
     def test_output_conv_bn_2d(self):
         self._test_output(

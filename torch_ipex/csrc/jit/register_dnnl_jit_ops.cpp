@@ -52,7 +52,7 @@ RegisterOperators op({
       [] (const Node* node) ->Operation {
         if (torch_ipex::check_auto_dnnl()) {
           return [] (Stack& stack) {
-            auto result = AtenIpexJITDev::dil_convolution_swish_outplace(
+            auto result = AtenIpexJITDev::dil_convolution_sigmoid(
                 (std::move(peek(stack, 0, 7))).toTensor(),
                 (std::move(peek(stack, 1, 7))).toTensor(),
                 toOptionalTensor(std::move(peek(stack, 2, 7))),
@@ -71,34 +71,37 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
-      "ipex::conv2d_swish_outplace(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
+      "ipex::conv2d_clamp(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1, float lower_bound=-1.0, float upper_bound=1.0) -> Tensor",
       [] (const Node* node) ->Operation {
         if (torch_ipex::check_auto_dnnl()) {
           return [] (Stack& stack) {
-            auto result = AtenIpexJITDev::dil_convolution_swish_outplace(
-                (std::move(peek(stack, 0, 7))).toTensor(),
-                (std::move(peek(stack, 1, 7))).toTensor(),
-                toOptionalTensor(std::move(peek(stack, 2, 7))),
-                (std::move(peek(stack, 3, 7))).toIntVector(),
-                (std::move(peek(stack, 4, 7))).toIntVector(),
-                (std::move(peek(stack, 5, 7))).toIntVector(),
-                (std::move(peek(stack, 6, 7))).toInt());
-            drop(stack, 7);
+            // std::cout << ((std::move(peek(stack, 8, 9))).tagKind()) << std::endl;
+            auto result = AtenIpexJITDev::dil_convolution_clamp(
+                (std::move(peek(stack, 0, 9))).toTensor(),
+                (std::move(peek(stack, 1, 9))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 2, 9))),
+                (std::move(peek(stack, 3, 9))).toIntVector(),
+                (std::move(peek(stack, 4, 9))).toIntVector(),
+                (std::move(peek(stack, 5, 9))).toIntVector(),
+                (std::move(peek(stack, 6, 9))).toInt(),
+                (std::move(peek(stack, 7, 9))).toDouble(),
+                (std::move(peek(stack, 8, 9))).toDouble());
+            drop(stack, 9);
             pack(stack, std::move(result));
             return 0;
           };
         } else {
-          TORCH_CHECK(false, "PyTorch native path not support convolution+swish(outplace) fusion now for 2d case");
+          TORCH_CHECK(false, "PyTorch native path not support conv2d_sigmoid fusion now for 2d case");
         }
       },
       aliasAnalysisFromSchema()
       ),
     Operator(
-      "ipex::conv2d_swish_inplace(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
+      "ipex::conv2d_swish(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
       [] (const Node* node) ->Operation {
         if (torch_ipex::check_auto_dnnl()) {
           return [] (Stack& stack) {
-            auto result = AtenIpexJITDev::dil_convolution_swish_inplace(
+            auto result = AtenIpexJITDev::dil_convolution_swish(
                 (std::move(peek(stack, 0, 7))).toTensor(),
                 (std::move(peek(stack, 1, 7))).toTensor(),
                 toOptionalTensor(std::move(peek(stack, 2, 7))),
@@ -111,7 +114,7 @@ RegisterOperators op({
             return 0;
           };
         } else {
-          TORCH_CHECK(false, "PyTorch native path not support convolution+swish(inplace) fusion now for 2d case");
+          TORCH_CHECK(false, "PyTorch native path not support convolution+swish fusion now for 2d case");
         }
       },
       aliasAnalysisFromSchema()
