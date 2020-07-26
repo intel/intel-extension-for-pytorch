@@ -223,6 +223,19 @@ class ConvHardtanh(nn.Module):
         c = torch.add(b, b)
         return c
 
+class ConvElu(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, image_size, inplace=False):
+        super(ConvElu, self).__init__()
+        self.conv2d = nn.Conv2d(in_channels, out_channels, kernel_size, image_size)
+        self.elu = nn.ELU(inplace=inplace)
+
+    def forward(self, x):
+        a = self.conv2d(x)
+        b = self.elu(a)
+        c = torch.add(b, b)
+        return c
+
+
 class Tester(TestCase):
 
     def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None):
@@ -315,7 +328,7 @@ class Tester(TestCase):
             self.assertTrue(all(n.kind() != kind_not_in_graph for n in script_graph.nodes()))
             self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
-    def test_conv2d_swish(self):
+    def test_conv2d_fusion(self):
         batch_size = 32
         out_channels = 64
         in_channels = 3
@@ -345,6 +358,14 @@ class Tester(TestCase):
             ConvHardtanh(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_clamp")
+        self._test_output(
+            ConvElu(in_channels, out_channels, kernel_size, image_size, True),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_elu")
+        self._test_output(
+            ConvElu(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_elu")
 
     def test_output_conv_bn_2d(self):
         self._test_output(

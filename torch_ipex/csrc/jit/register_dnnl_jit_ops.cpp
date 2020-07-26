@@ -120,6 +120,32 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
+      "ipex::conv2d_elu(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1, float alpha=1.0, int scale=1, int input_scale=1) -> Tensor",
+      [] (const Node* node) ->Operation {
+        if (torch_ipex::check_auto_dnnl()) {
+          return [] (Stack& stack) {
+            auto result = AtenIpexJITDev::dil_convolution_elu(
+                (std::move(peek(stack, 0, 10))).toTensor(),
+                (std::move(peek(stack, 1, 10))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 2, 10))),
+                (std::move(peek(stack, 3, 10))).toIntVector(),
+                (std::move(peek(stack, 4, 10))).toIntVector(),
+                (std::move(peek(stack, 5, 10))).toIntVector(),
+                (std::move(peek(stack, 6, 10))).toInt(),
+                (std::move(peek(stack, 7, 10))).toDouble(),
+                (std::move(peek(stack, 8, 10))).toInt(),
+                (std::move(peek(stack, 9, 10))).toInt());
+            drop(stack, 10);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        } else {
+          TORCH_CHECK(false, "PyTorch native path not support convolution+elu fusion now for 2d case");
+        }
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
       "ipex::conv3d_relu(Tensor input, Tensor weight, Tensor? bias=None, int[3] stride=1, int[3] padding=0, int[3] dilation=1, int groups=1) -> Tensor",
       [] (const Node* node) ->Operation {
         if (torch_ipex::check_auto_dnnl()) {

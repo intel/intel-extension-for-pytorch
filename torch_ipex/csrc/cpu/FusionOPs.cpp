@@ -205,6 +205,28 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
     dil::attr_t::fuse_relu());
 }
 
+at::Tensor AtenIpexJITDev::dil_convolution_elu(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups,
+    float alpha,
+    int scale,
+    int input_scale) {
+  return dil_convolution_outplace_fusion(
+    input,
+    weight,
+    bias,
+    stride,
+    padding,
+    dilation,
+    groups,
+    dil::attr_t::fuse_elu((float)scale, alpha, (float)input_scale));
+}
+
 at::Tensor& AtenIpexJITDev::dil_convolution_sum(
     const at::Tensor& input,
     const at::Tensor& weight,

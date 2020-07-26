@@ -106,6 +106,34 @@ void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph) {
         %s = aten::hardtanh(%r, %min, %max)
         return (%s) )";
 
+  std::string conv2d_elu_fusion = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %alpha:float, %scale:int, %input_scale:int):
+        %r = ipex::conv2d_elu(%a, %w, %b, %stride, %padding, %dilation, %groups, %alpha, %scale, %input_scale)
+        return (%r) )";
+
+  std::string conv2d_elu_inplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %alpha:float, %scale:int, %input_scale:int):
+        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        %s = aten::elu_(%r, %alpha, %scale, %input_scale)
+        return (%s) )";
+
+  std::string conv2d_elu_outplace = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %alpha:float, %scale:int, %input_scale:int):
+        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        %s = aten::elu(%r, %alpha, %scale, %input_scale)
+        return (%s) )";
+
+  auto filter_conv2d_elu = [] (
+      const Match& match,
+      const std::unordered_map<std::string, Value*>& vmap) {
+    const auto& match_vmap = match.values_map;
+    auto scale_value = getIValue("scale", match_vmap, vmap).value();
+    auto input_scale_value = getIValue("input_scale", match_vmap, vmap).value();
+    bool no_scale = scale_value.isDouble() ? (scale_value.toDouble() == 1.0) : (scale_value.toInt() == 1);
+    bool no_input_scale = input_scale_value.isDouble() ? (input_scale_value.toDouble() == 1.0) : (input_scale_value.toInt() == 1);
+    return no_scale && no_input_scale;
+  };
+
   // Fuse conv2d + swish
   SubgraphRewriter rewriter_conv_swish_outplace;
   rewriter_conv_swish_outplace.RegisterRewritePattern(
@@ -141,6 +169,18 @@ void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph) {
     conv2d_hardtanh_inplace,
     conv2d_hardtanh_fusion);
   rewriter_conv_hardtanh_inplace.runOnGraph(graph);
+
+  // Fuse conv2d + elu
+  SubgraphRewriter rewriter_conv_elu_outplace;
+  rewriter_conv_elu_outplace.RegisterRewritePattern(
+    conv2d_elu_outplace,
+    conv2d_elu_fusion);
+  rewriter_conv_elu_outplace.runOnGraph(graph, filter_conv2d_elu);
+  SubgraphRewriter rewriter_conv_elu_inplace;
+  rewriter_conv_elu_inplace.RegisterRewritePattern(
+    conv2d_elu_inplace,
+    conv2d_elu_fusion);
+  rewriter_conv_elu_inplace.runOnGraph(graph, filter_conv2d_elu);
 }
 
 void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
