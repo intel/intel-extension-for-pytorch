@@ -338,34 +338,74 @@ class Tester(TestCase):
             ConvSwishOutplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_swish")
+        self._test_output_bf16(
+            ConvSwishOutplace(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_swish",
+            prec=0.02)
         self._test_output(
             ConvSwishInplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_swish")
+        self._test_output_bf16(
+            ConvSwishInplace(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_swish",
+            prec=0.02)
         self._test_output(
             ConvSigmoidOutplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_sigmoid")
+        self._test_output_bf16(
+            ConvSigmoidOutplace(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_sigmoid",
+            prec=0.02)
         self._test_output(
             ConvSigmoidInplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_sigmoid")
+        self._test_output_bf16(
+            ConvSigmoidInplace(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_sigmoid",
+            prec=0.02)
         self._test_output(
             ConvHardtanh(in_channels, out_channels, kernel_size, image_size, True),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_clamp")
+        self._test_output_bf16(
+            ConvHardtanh(in_channels, out_channels, kernel_size, image_size, True),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_clamp",
+            prec=0.02)
         self._test_output(
             ConvHardtanh(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_clamp")
+        self._test_output_bf16(
+            ConvHardtanh(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_clamp",
+            prec=0.02)
         self._test_output(
             ConvElu(in_channels, out_channels, kernel_size, image_size, True),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_elu")
+        self._test_output_bf16(
+            ConvElu(in_channels, out_channels, kernel_size, image_size, True),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_elu",
+            prec=0.02)
         self._test_output(
             ConvElu(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_elu")
+        self._test_output_bf16(
+            ConvElu(in_channels, out_channels, kernel_size, image_size),
+            torch.randn(batch_size, in_channels, image_size, image_size),
+            kind_in_graph="ipex::conv2d_elu",
+            prec=0.02)
 
     def test_output_conv_bn_2d(self):
         self._test_output(
