@@ -43,9 +43,9 @@ void gatherKthValue(
       dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input.data);
-    auto kth_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, kthValue.data);
-    auto indices_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, indices.data);
+    auto in_data = get_buffer<dpcpp_r_mode>(cgh, input.data);
+    auto kth_data = get_buffer<dpcpp_w_mode>(cgh, kthValue.data);
+    auto indices_data = get_buffer<dpcpp_w_mode>(cgh, indices.data);
 
     auto smem = dpcpp_local_acc_t<int>(32, cgh);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
@@ -62,12 +62,9 @@ void gatherKthValue(
           dpcpp::detail::IndexToOffset<int64_t, index_t, Dim>::get(
               slice, indices);
 
-      scalar_t* inputSliceStart =
-          in_acc.template get_pointer<scalar_t>() + sliceStartIndex;
-      scalar_t* kthValueSliceStart =
-          kth_acc.template get_pointer<scalar_t>() + kthValueSliceStartIndex;
-      int64_t* indicesSliceStart =
-          indices_acc.template get_pointer<int64_t>() + indicesSliceStartIndex;
+      scalar_t* inputSliceStart = get_pointer(in_data) + sliceStartIndex;
+      scalar_t* kthValueSliceStart = get_pointer(kth_data) + kthValueSliceStartIndex;
+      int64_t* indicesSliceStart = get_pointer(indices_data) + indicesSliceStartIndex;
 
       // Find the k-th highest element in our input
       scalar_t kValue = ScalarConvert<int, scalar_t>::to(0);
