@@ -103,15 +103,16 @@ void indexSelect(
     auto dst_data = get_buffer<dpcpp_discard_w_mode>(__cgh, dst.data_ptr<scalar_t>());
     auto idx_data = get_buffer<dpcpp_r_mode>(__cgh, indices.data_ptr<int64_t>());
 
-    __cgh.parallel_for_work_group<DPCPP_K(index_select_ker, scalar_t)>(
-        DPCPP::range</*dim=*/1>(num_slices),
-        DPCPP::range</*dim=*/1>(wgroup_size),
-        [=](DPCPP::group<1> group_id) {
+    __cgh.parallel_for<DPCPP_K(index_select_ker, scalar_t)>(
+      DPCPP::nd_range</*dim=*/1>(
+        DPCPP::range</*dim=*/1>(num_slices*wgroup_size),
+        DPCPP::range</*dim=*/1>(wgroup_size)),
+        [=](DPCPP::nd_item<1> item_id) {
           auto src_ptr = get_pointer(src_data);
           auto dst_ptr = get_pointer(dst_data);
           auto idx_ptr = get_pointer(idx_data);
 
-          auto dst_slice_id = group_id.get_id()[0];
+          auto dst_slice_id = item_id.get_group(0);
 
           auto slice_off = IndexToOffset<int64_t, unsigned int>::get(
               dst_slice_id, indices_info);
@@ -122,27 +123,25 @@ void indexSelect(
           auto g_dst_ptr =
               dst_ptr + dst_slice_id * dst_info.strides[dst_select_dim];
 
-          group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
-            auto ii_ = item_id.get_logical_local_id()[0];
-            auto src_offset_ =
-                IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
-            auto dst_offset_ =
-                IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
+          auto ii_ = item_id.get_local_id(0);
+          auto src_offset_ =
+              IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
+          auto dst_offset_ =
+              IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
 
-            g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
+          g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
 
-            for (int iter = 1; iter < n_work_item_iter; iter++) {
-              auto __inner_idx = iter * wgroup_size + ii_;
-              if (__inner_idx < slice_size) {
-                src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
-                    __inner_idx, src_info);
-                dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
-                    __inner_idx, dst_info);
+          for (int iter = 1; iter < n_work_item_iter; iter++) {
+            auto __inner_idx = iter * wgroup_size + ii_;
+            if (__inner_idx < slice_size) {
+              src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
+                  __inner_idx, src_info);
+              dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
+                  __inner_idx, dst_info);
 
-                g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
-              }
+              g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
             }
-          });
+          }
         });
   };
 
@@ -342,15 +341,16 @@ void indexAdd(
         DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data);
     auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data);
 
-    __cgh.parallel_for_work_group<DPCPP_K(index_add_ker, scalar_t)>(
-        DPCPP::range</*dim=*/1>(numIndices),
-        DPCPP::range</*dim=*/1>(wgroup_size),
-        [=](DPCPP::group<1> group_id) {
+    __cgh.parallel_for<DPCPP_K(index_add_ker, scalar_t)>(
+      DPCPP::nd_range</*dim=*/1>(
+        DPCPP::range</*dim=*/1>(numIndices*wgroup_size),
+        DPCPP::range</*dim=*/1>(wgroup_size)),
+        [=](DPCPP::nd_item<1> item_id) {
           auto src_ptr = src_acc.template get_pointer<scalar_t>();
           auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
           auto idx_ptr = idx_acc.template get_pointer<long>();
 
-          auto dst_slice_id = group_id.get_id()[0];
+          auto dst_slice_id = item_id.get_group(0);
           // auto slice_off = IndexToOffset<int64_t, unsigned
           // int>::get(dst_slice_id, indices_info);
           auto g_idx_ptr = idx_ptr;
@@ -359,29 +359,27 @@ void indexAdd(
           auto g_src_ptr =
               src_ptr + dst_slice_id * src_info.strides[src_add_dim];
 
-          group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
-            auto ii_ = item_id.get_logical_local_id()[0];
-            auto dst_offset_ =
-                IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
-            auto src_offset_ =
-                IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
-            g_dst_ptr[dst_offset_] += g_src_ptr[src_offset_];
+          auto ii_ = item_id.get_local_id(0);
+          auto dst_offset_ =
+              IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
+          auto src_offset_ =
+              IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
+          g_dst_ptr[dst_offset_] += g_src_ptr[src_offset_];
 
-            for (int iter = 1; iter < n_work_item_iter; iter++) {
-              auto idx_offset_ =
-                  IndexToOffset<int64_t, unsigned int>::get(iter, indices_info);
-              auto __inner_idx = g_idx_ptr[idx_offset_] * wgroup_size + ii_;
-              auto __src_idx = idx_offset_ * wgroup_size + ii_;
+          for (int iter = 1; iter < n_work_item_iter; iter++) {
+            auto idx_offset_ =
+                IndexToOffset<int64_t, unsigned int>::get(iter, indices_info);
+            auto __inner_idx = g_idx_ptr[idx_offset_] * wgroup_size + ii_;
+            auto __src_idx = idx_offset_ * wgroup_size + ii_;
 
-              if (__src_idx < srcTotalSize) {
-                dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
-                    __inner_idx, dst_info);
-                src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
-                    __src_idx, src_info);
-                g_dst_ptr[dst_offset_] += g_src_ptr[src_offset_];
-              }
+            if (__src_idx < srcTotalSize) {
+              dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
+                  __inner_idx, dst_info);
+              src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
+                  __src_idx, src_info);
+              g_dst_ptr[dst_offset_] += g_src_ptr[src_offset_];
             }
-          });
+          }
         });
   };
 
@@ -449,39 +447,38 @@ void indexFill(
         DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data);
     auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data);
 
-    __cgh.parallel_for_work_group<DPCPP_K(index_fill_ker, scalar_t)>(
-        DPCPP::range</*dim=*/1>(numIndices),
-        DPCPP::range</*dim=*/1>(wgroup_size),
-        [=](DPCPP::group<1> group_id) {
+    __cgh.parallel_for<DPCPP_K(index_fill_ker, scalar_t)>(
+      DPCPP::nd_range</*dim=*/1>(
+        DPCPP::range</*dim=*/1>(numIndices*wgroup_size),
+        DPCPP::range</*dim=*/1>(wgroup_size)),
+        [=](DPCPP::nd_item<1> item_id) {
           auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
           auto idx_ptr = idx_acc.template get_pointer<long>();
 
-          auto dst_slice_id = group_id.get_id()[0];
+          auto dst_slice_id = item_id.get_group(0);
           // auto slice_off = IndexToOffset<int64_t, unsigned
           // int>::get(dst_slice_id, indices_info);
           auto g_idx_ptr = idx_ptr;
           auto g_dst_ptr = dst_ptr +
               g_idx_ptr[dst_slice_id] * dst_info.strides[dst_fill_dim];
 
-          group_id.parallel_for_work_item([=](DPCPP::h_item<1> item_id) {
-            auto ii_ = item_id.get_logical_local_id()[0];
-            auto dst_offset_ =
-                IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
-            g_dst_ptr[dst_offset_] = val;
+          auto ii_ = item_id.get_local_id(0);
+          auto dst_offset_ =
+              IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
+          g_dst_ptr[dst_offset_] = val;
 
-            for (int iter = 1; iter < n_work_item_iter; iter++) {
-              auto idx_offset_ =
-                  IndexToOffset<int64_t, unsigned int>::get(iter, indices_info);
-              auto __inner_idx = g_idx_ptr[idx_offset_] * wgroup_size + ii_;
+          for (int iter = 1; iter < n_work_item_iter; iter++) {
+            auto idx_offset_ =
+                IndexToOffset<int64_t, unsigned int>::get(iter, indices_info);
+            auto __inner_idx = g_idx_ptr[idx_offset_] * wgroup_size + ii_;
 
-              if (__inner_idx < dstTotalSize) {
-                dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
-                    __inner_idx, dst_info);
+            if (__inner_idx < dstTotalSize) {
+              dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
+                  __inner_idx, dst_info);
 
-                g_dst_ptr[dst_offset_] = val;
-              }
+              g_dst_ptr[dst_offset_] = val;
             }
-          });
+            }
         });
   };
 
