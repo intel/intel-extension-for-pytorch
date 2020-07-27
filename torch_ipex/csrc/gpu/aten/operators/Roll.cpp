@@ -38,15 +38,15 @@ void roll_dpcpp_kernel(
   parallel_for_setup(N, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<read_mode>(cgh, in_tensor.data_ptr<scalar_t>());
-    auto out_acc =
-        DPCPPAccessor<write_mode>(cgh, out_tensor.data_ptr<scalar_t>());
+    auto in_data = get_buffer<read_mode>(cgh, in_tensor.data_ptr<scalar_t>());
+    auto out_data =
+        get_buffer<write_mode>(cgh, out_tensor.data_ptr<scalar_t>());
     cgh.parallel_for<roll_dpcpp_ker<scalar_t>>(
         DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
         [=](DPCPP::nd_item<1> item) {
           int64_t linear_index = item.get_global_id(0);
-          auto in_ptr = in_acc.template get_pointer<scalar_t>();
-          auto out_ptr = out_acc.template get_pointer<scalar_t>();
+          auto in_ptr = get_pointer(in_data);
+          auto out_ptr = get_pointer(out_data);
           if (linear_index < N) {
             // roll dim idx is the index of linear_index along the rolling
             // dimension.
