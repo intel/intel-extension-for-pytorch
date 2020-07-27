@@ -7,6 +7,7 @@
 #include "dil/dil.hpp"
 
 #include "torch_ipex/csrc/utils.h"
+#include <mutex>
 
 namespace torch_ipex {
 namespace cpu {
@@ -43,6 +44,7 @@ struct ShadeDataContext {
   c10::optional<dil::tensor> dil_tensor; ///< DNNL memory buffer for lazy reorder
   void              *cpu_raw_data; ///< The raw memory buffer of storage
   c10::DeleterFnPtr  cpu_del_fun;  ///< Delete function to release cpu_raw_data
+  std::mutex mutex;
 
   SHADE_DATA_TYPE    data_type;    ///< Memory buffer type
   MIX_PREC_TYPE      mix_prec_type; ///< Record if the aten tensor is mix-precision
@@ -137,6 +139,14 @@ struct ShadeDataContext {
     ShadeDataContext *shade_data_context = (ShadeDataContext*)raw_context;
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context->dil_tensor.has_value());
     return *(shade_data_context->dil_tensor);
+  }
+
+  static inline std::mutex& getMutex(const at::Tensor &tensor) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
+    void *storage_context = tensor.storage().data_ptr().get_context();
+    ShadeDataContext *shade_data_context = (ShadeDataContext*)storage_context;
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(shade_data_context != nullptr);
+    return shade_data_context->mutex;
   }
 
   /**
