@@ -290,9 +290,15 @@ at::Tensor convolution(
   auto output_memory = output_usr_memory;
   Tensor output_;
   if (output_usr_memory.get_desc() != expected_output_md) {
-    output_ = at::AtenIpexTypeDPCPP::empty(
-        {expected_output_md.get_size()}, output.options(), c10::nullopt);
-    output_memory = dpcpp_onednn_memory(expected_output_md, engine, output_.data_ptr());
+    if (lazy_reorder_enabled()) {
+      output_ = empty_opaque_tensor(
+          expected_output_md, input.options(), c10::nullopt);
+    } else {
+      output_ = at::AtenIpexTypeDPCPP::empty(
+          {expected_output_md.get_size()}, output.options(), c10::nullopt);
+    }
+    output_memory =
+        dpcpp_onednn_memory(expected_output_md, engine, output_.data_ptr());
     if (attr.with_sum()) {
       DPCPP_ONEDNN_EXEC(reorder(output_usr_memory, output_memory),
           strm, output_usr_memory, output_memory);
@@ -318,6 +324,9 @@ at::Tensor convolution(
   if (!lazy_reorder_enabled() && output_memory != output_usr_memory) {
     DPCPP_ONEDNN_EXEC(reorder(output_memory, output_usr_memory),
         strm, output_memory, output_usr_memory);
+  } else if (lazy_reorder_enabled() && output_memory != output_usr_memory) {
+    auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(output_);
+    DPCPPTensorContext::set_tensor_ctx(output, std::move(blk_ctx));
   }
 
   return output;
