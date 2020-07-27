@@ -137,10 +137,10 @@ void triu_indices_dpcpp_kernel(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tensor);
+    auto data = get_buffer<dpcpp_w_mode>(cgh, tensor);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto tensor_ptr = acc.template get_pointer<scalar_t>();
+      auto tensor_ptr = get_pointer(data);
       int64_t r, c;
       for (int64_t linearIndex = item.get_global_id(0);
            linearIndex < totalElements;
@@ -185,10 +185,10 @@ void tril_indices_dpcpp_kernel(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc = DPCPPAccessor<dpcpp_w_mode>(cgh, tensor);
+    auto data = get_buffer<dpcpp_w_mode>(cgh, tensor);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto tensor_ptr = acc.template get_pointer<scalar_t>();
+      auto tensor_ptr = get_pointer(data);
       int64_t r, c;
       for (int64_t linearIndex = item.get_global_id(0);
            linearIndex < totalElements;
