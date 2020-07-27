@@ -723,35 +723,29 @@ void MultiMarginCriterion_updateOutput(
   auto weights_contiguous =
       (weights.defined()) ? weights.contiguous() : weights;
 
-  scalar_t* input_data = input_contiguous.data_ptr<scalar_t>();
-  int64_t* target_data = target_contiguous.data_ptr<int64_t>();
-  scalar_t* output_data = output.data_ptr<scalar_t>();
-  scalar_t* weights_data =
-      weights.defined() ? weights_contiguous.data_ptr<scalar_t>() : NULL;
   bool has_weights = weights.defined() ? true : false;
 
   auto queue = dpcppGetCurrentQueue();
   int64_t local_size =
       queue.get_device()
           .template get_info<DPCPP::info::device::max_work_group_size>();
-  DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto input_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input_data);
-    auto target_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target_data);
-    auto output_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, output_data);
-    auto weights_acc = has_weights
-        ? DPCPPAccessor<dpcpp_r_mode>(cgh, weights_data)
-        : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
-    auto local_output_acc = dpcpp_local_acc_t<scalar_t>(local_size, cgh);
+    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input_contiguous.data_ptr<scalar_t>());
+    auto target_data = get_buffer<dpcpp_r_mode>(cgh, target_contiguous.data_ptr<int64_t>());
+    auto output_data = get_buffer<dpcpp_w_mode>(cgh, output.data_ptr<scalar_t>());
+    auto weights_data = has_weights
+        ? get_buffer<dpcpp_r_mode>(cgh, weights_contiguous.data_ptr<scalar_t>())
+        : input_data; // use the input_data handler as dummy weights
+    auto local_output_data = dpcpp_local_acc_t<scalar_t>(local_size, cgh);
 
     if (reduction == Reduction::None && output.dim() > 0) {
       auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-        auto input_ptr = input_acc.template get_pointer<scalar_t>();
-        auto target_ptr = target_acc.template get_pointer<int64_t>();
-        auto output_ptr = output_acc.template get_pointer<scalar_t>();
+        auto input_ptr = get_pointer(input_data);
+        auto target_ptr = get_pointer(target_data);
+        auto output_ptr = get_pointer(output_data);
         auto weights_ptr =
-            has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
+            has_weights ? get_pointer(weights_data) : NULL;
         auto local_item_id = item_id.get_id(0);
         for (int i = local_item_id; i < nframe; i += local_size) {
           scalar_t sum = 0;
@@ -776,13 +770,13 @@ void MultiMarginCriterion_updateOutput(
           DPCPP::range<1>(local_size), kfn);
     } else {
       auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
-        auto input_ptr = input_acc.template get_pointer<scalar_t>();
-        auto target_ptr = target_acc.template get_pointer<int64_t>();
-        auto output_ptr = output_acc.template get_pointer<scalar_t>();
+        auto input_ptr = get_pointer(input_data);
+        auto target_ptr = get_pointer(target_data);
+        auto output_ptr = get_pointer(output_data);
         auto weights_ptr =
-            has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
+            has_weights ? get_pointer(weights_data) : NULL;
         auto local_item_id = item_id.get_local_id(0);
-        local_output_acc[local_item_id] = 0.0;
+        local_output_data[local_item_id] = 0.0;
         for (int i = local_item_id; i < nframe; i += local_size) {
           scalar_t sum = 0;
           auto target_idx = target_ptr[i];
@@ -801,18 +795,18 @@ void MultiMarginCriterion_updateOutput(
           sum /= dim;
           if (reduction == Reduction::Mean)
             sum /= nframe;
-          local_output_acc[local_item_id] += sum;
+          local_output_data[local_item_id] += sum;
         }
 
         // reduce
         for (int64_t i = (local_size >> 1); i > 0; i >>= 1) {
           item_id.barrier(dpcpp_global_and_local_fence);
           if (local_item_id < i)
-            local_output_acc[local_item_id] +=
-                local_output_acc[local_item_id + i];
+            local_output_data[local_item_id] +=
+                local_output_data[local_item_id + i];
         }
         item_id.barrier(dpcpp_global_and_local_fence);
-        output_ptr[0] = local_output_acc[0];
+        output_ptr[0] = local_output_data[0];
       };
       cgh.parallel_for<MultiMarginCriterionUpdateOutputKernel2<scalar_t>>(
           DPCPP::nd_range<1>(
@@ -866,12 +860,6 @@ void MultiMarginCriterion_updateGradInput(
   auto weights_contiguous =
       (weights.defined()) ? weights.contiguous() : weights;
 
-  scalar_t* grad_input_data = grad_input.data_ptr<scalar_t>();
-  scalar_t* grad_output_data = grad_output.data_ptr<scalar_t>();
-  scalar_t* input_data = input_contiguous.data_ptr<scalar_t>();
-  int64_t* target_data = target_contiguous.data_ptr<int64_t>();
-  scalar_t* weights_data =
-      weights.defined() ? weights_contiguous.data_ptr<scalar_t>() : NULL;
   bool has_weights = weights.defined() ? true : false;
   scalar_t g = (reduction == Reduction::Mean)
       ? static_cast<scalar_t>(1. / (nframe * dim))
@@ -881,24 +869,23 @@ void MultiMarginCriterion_updateGradInput(
   int64_t local_size =
       queue.get_device()
           .template get_info<DPCPP::info::device::max_work_group_size>();
-  DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto grad_input_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, grad_input_data);
-    auto grad_output_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, grad_output_data);
-    auto input_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input_data);
-    auto target_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target_data);
-    auto weights_acc = has_weights
-        ? DPCPPAccessor<dpcpp_r_mode>(cgh, weights_data)
-        : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
+    auto grad_input_data = get_buffer<dpcpp_w_mode>(cgh, grad_input.data_ptr<scalar_t>());
+    auto grad_output_data = get_buffer<dpcpp_r_mode>(cgh, grad_output.data_ptr<scalar_t>());
+    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input_contiguous.data_ptr<scalar_t>());
+    auto target_data = get_buffer<dpcpp_r_mode>(cgh, target_contiguous.data_ptr<int64_t>());
+    auto weights_data = has_weights
+        ? get_buffer<dpcpp_r_mode>(cgh, weights_contiguous.data_ptr<scalar_t>())
+        : input_data; // use the input_data handler as dummy weights
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto grad_input_ptr = grad_input_acc.template get_pointer<scalar_t>();
-      auto grad_output_ptr = grad_output_acc.template get_pointer<scalar_t>();
-      auto input_ptr = input_acc.template get_pointer<scalar_t>();
-      auto target_ptr = target_acc.template get_pointer<int64_t>();
+      auto grad_input_ptr = get_pointer(grad_input_data);
+      auto grad_output_ptr = get_pointer(grad_output_data);
+      auto input_ptr = get_pointer(input_data);
+      auto target_ptr = get_pointer(target_data);
       auto weights_ptr =
-          has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
+          has_weights ? get_pointer(weights_data) : NULL;
       auto local_item_id = item_id.get_id(0);
 
       for (int i = local_item_id; i < nframe; i += local_size) {
@@ -989,29 +976,24 @@ void MultilabelMarginCriterion_updateOutput(
     output.resize_({nframe});
   }
 
-  scalar_t* input_data = input_contiguous.data_ptr<scalar_t>();
-  int64_t* target_data = target_contiguous.data_ptr<int64_t>();
-  scalar_t* output_data = output.data_ptr<scalar_t>();
-  scalar_t* is_target_data = is_target.data_ptr<scalar_t>();
-
   auto queue = dpcppGetCurrentQueue();
   int64_t local_size =
       queue.get_device()
           .template get_info<DPCPP::info::device::max_work_group_size>();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto input_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input_data);
-    auto target_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target_data);
-    auto output_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, output_data);
-    auto is_target_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, is_target_data);
-    auto local_output_acc = dpcpp_local_acc_t<scalar_t>(local_size, cgh);
+    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input_contiguous.data_ptr<scalar_t>());
+    auto target_data = get_buffer<dpcpp_r_mode>(cgh, target_contiguous.data_ptr<int64_t>());
+    auto output_data = get_buffer<dpcpp_w_mode>(cgh, output.data_ptr<scalar_t>());
+    auto is_target_data = get_buffer<dpcpp_rw_mode>(cgh, is_target.data_ptr<scalar_t>());
+    auto local_output_data = dpcpp_local_acc_t<scalar_t>(local_size, cgh);
 
     if (reduction == Reduction::None && output.dim() > 0) {
       auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-        auto input_ptr = input_acc.template get_pointer<scalar_t>();
-        auto target_ptr = target_acc.template get_pointer<int64_t>();
-        auto output_ptr = output_acc.template get_pointer<scalar_t>();
-        auto is_target_ptr = is_target_acc.template get_pointer<scalar_t>();
+        auto input_ptr = get_pointer(input_data);
+        auto target_ptr = get_pointer(target_data);
+        auto output_ptr = get_pointer(output_data);
+        auto is_target_ptr = get_pointer(is_target_data);
         auto local_item_id = item_id.get_id(0);
         for (int i = local_item_id; i < nframe; i += local_size) {
           scalar_t sum = 0;
@@ -1043,12 +1025,12 @@ void MultilabelMarginCriterion_updateOutput(
           DPCPP::range<1>(local_size), kfn);
     } else {
       auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
-        auto input_ptr = input_acc.template get_pointer<scalar_t>();
-        auto target_ptr = target_acc.template get_pointer<int64_t>();
-        auto output_ptr = output_acc.template get_pointer<scalar_t>();
-        auto is_target_ptr = is_target_acc.template get_pointer<scalar_t>();
+        auto input_ptr = get_pointer(input_data);
+        auto target_ptr = get_pointer(target_data);
+        auto output_ptr = get_pointer(output_data);
+        auto is_target_ptr = get_pointer(is_target_data);
         auto local_item_id = item_id.get_local_id(0);
-        local_output_acc[local_item_id] = 0.0;
+        local_output_data[local_item_id] = 0.0;
         for (int i = local_item_id; i < nframe; i += local_size) {
           scalar_t sum = 0;
           for (int64_t ddt = 0; ddt < dim; ddt++) {
@@ -1074,18 +1056,18 @@ void MultilabelMarginCriterion_updateOutput(
           sum /= dim;
           if (reduction == Reduction::Mean)
             sum /= nframe;
-          local_output_acc[local_item_id] += sum;
+          local_output_data[local_item_id] += sum;
         }
 
         // reduce
         for (int64_t i = (local_size >> 1); i > 0; i >>= 1) {
           item_id.barrier(dpcpp_global_and_local_fence);
           if (local_item_id < i)
-            local_output_acc[local_item_id] +=
-                local_output_acc[local_item_id + i];
+            local_output_data[local_item_id] +=
+                local_output_data[local_item_id + i];
         }
         item_id.barrier(dpcpp_global_and_local_fence);
-        output_ptr[0] = local_output_acc[0];
+        output_ptr[0] = local_output_data[0];
       };
       cgh.parallel_for<MultilabelMarginCriterionUpdateOutputKernel2<scalar_t>>(
           DPCPP::nd_range<1>(
@@ -1163,11 +1145,6 @@ void MultilabelMarginCriterion_updateGradInput(
       is_target_cont_arg,
       " is out of range");
 
-  scalar_t* grad_input_data = grad_input.data_ptr<scalar_t>();
-  scalar_t* grad_output_data = grad_output.data_ptr<scalar_t>();
-  scalar_t* input_data = input_contiguous.data_ptr<scalar_t>();
-  int64_t* target_data = target_contiguous.data_ptr<int64_t>();
-  scalar_t* is_target_data = is_target_contiguous.data_ptr<scalar_t>();
   scalar_t g = static_cast<scalar_t>(
       reduction == Reduction::Mean ? 1. / (nframe * dim) : 1. / dim);
 
@@ -1177,18 +1154,18 @@ void MultilabelMarginCriterion_updateGradInput(
           .template get_info<DPCPP::info::device::max_work_group_size>();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto grad_input_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, grad_input_data);
-    auto grad_output_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, grad_output_data);
-    auto input_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input_data);
-    auto target_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, target_data);
-    auto is_target_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, is_target_data);
+    auto grad_input_data = get_buffer<dpcpp_w_mode>(cgh,  grad_input.data_ptr<scalar_t>());
+    auto grad_output_data = get_buffer<dpcpp_r_mode>(cgh, grad_output.data_ptr<scalar_t>());
+    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input_contiguous.data_ptr<scalar_t>());
+    auto target_data = get_buffer<dpcpp_r_mode>(cgh, target_contiguous.data_ptr<int64_t>());
+    auto is_target_data = get_buffer<dpcpp_r_mode>(cgh, is_target_contiguous.data_ptr<scalar_t>());
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto grad_input_ptr = grad_input_acc.template get_pointer<scalar_t>();
-      auto grad_output_ptr = grad_output_acc.template get_pointer<scalar_t>();
-      auto input_ptr = input_acc.template get_pointer<scalar_t>();
-      auto target_ptr = target_acc.template get_pointer<int64_t>();
-      auto is_target_ptr = is_target_acc.template get_pointer<scalar_t>();
+      auto grad_input_ptr = get_pointer(grad_input_data);
+      auto grad_output_ptr = get_pointer(grad_output_data);
+      auto input_ptr = get_pointer(input_data);
+      auto target_ptr = get_pointer(target_data);
+      auto is_target_ptr = get_pointer(is_target_data);
       auto local_item_id = item_id.get_id(0);
 
       for (int i = local_item_id; i < nframe; i += local_size) {
