@@ -36,13 +36,13 @@ void max_unpooling2d_forward_kernel(
   int64_t total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto output_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, output);
-    auto input_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input);
-    auto indices_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, indices);
+    auto output_data = get_buffer<dpcpp_w_mode>(cgh, output);
+    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input);
+    auto indices_data = get_buffer<dpcpp_r_mode>(cgh, indices);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto output_ptr = output_acc.template get_pointer<scalar_t>();
-      auto input_ptr = input_acc.template get_pointer<scalar_t>();
-      auto indices_ptr = indices_acc.template get_pointer<int64_t>();
+      auto output_ptr = get_pointer(output_data);
+      auto input_ptr = get_pointer(input_data);
+      auto indices_ptr = get_pointer(indices_data);
       for (int linearIndex = item.get_global_id(0);
            linearIndex < numInputElements;
            linearIndex += item.get_global_range()[0]) {
@@ -84,13 +84,13 @@ void max_unpooling3d_forward_kernel(
   int64_t num_groups_1 = CeilDiv(iH, (int64_t)8);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto output_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, output);
-    auto input_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input);
-    auto indices_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, indices);
+    auto output_data = get_buffer<dpcpp_w_mode>(cgh, output);
+    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input);
+    auto indices_data = get_buffer<dpcpp_r_mode>(cgh, indices);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
-      auto output_ptr = output_acc.template get_pointer<scalar_t>();
-      auto input_ptr = input_acc.template get_pointer<scalar_t>();
-      auto indices_ptr = indices_acc.template get_pointer<int64_t>();
+      auto output_ptr = get_pointer(output_data);
+      auto input_ptr = get_pointer(input_data);
+      auto indices_ptr = get_pointer(indices_data);
 
       int64_t iColumn = item.get_global_id(0);
       int64_t iRow = item.get_global_id(1);
@@ -136,13 +136,13 @@ void max_unpooling2d_backward_kernel(
   int64_t total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto output_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, output);
-    auto input_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input);
-    auto indices_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, indices);
+    auto output_data = get_buffer<dpcpp_w_mode>(cgh, output);
+    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input);
+    auto indices_data = get_buffer<dpcpp_r_mode>(cgh, indices);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto output_ptr = output_acc.template get_pointer<scalar_t>();
-      auto input_ptr = input_acc.template get_pointer<scalar_t>();
-      auto indices_ptr = indices_acc.template get_pointer<int64_t>();
+      auto output_ptr = get_pointer(output_data);
+      auto input_ptr = get_pointer(input_data);
+      auto indices_ptr = get_pointer(indices_data);
       for (int linearIndex = item.get_global_id(0);
            linearIndex < numInputElements;
            linearIndex += item.get_global_range()[0]) {
@@ -184,13 +184,13 @@ void max_unpooling3d_backward_kernel(
   int64_t num_groups_1 = CeilDiv(iH, (int64_t)8);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto gradInput_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, gradInput);
-    auto gradOutput_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, gradOutput);
-    auto indices_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, indices);
+    auto gradInput_data = get_buffer<dpcpp_w_mode>(cgh, gradInput);
+    auto gradOutput_data = get_buffer<dpcpp_r_mode>(cgh, gradOutput);
+    auto indices_data = get_buffer<dpcpp_r_mode>(cgh, indices);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
-      auto gradInput_ptr = gradInput_acc.template get_pointer<scalar_t>();
-      auto gradOutput_ptr = gradOutput_acc.template get_pointer<scalar_t>();
-      auto indices_ptr = indices_acc.template get_pointer<int64_t>();
+      auto gradInput_ptr = get_pointer(gradInput_data);
+      auto gradOutput_ptr = get_pointer(gradOutput_data);
+      auto indices_ptr = get_pointer(indices_data);
 
       int64_t iColumn = item.get_global_id(0);
       int64_t iRow = item.get_global_id(1);
