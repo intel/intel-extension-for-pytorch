@@ -73,12 +73,11 @@ Tensor& linspace_dpcpp_out(
       LinspaceOp<scalar_t> linspace_method(scalar_start, step);
       auto dpcpp_queue = dpcppGetCurrentQueue();
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto acc =
-            DPCPPAccessor<dpcpp_discard_w_mode>(cgh, r.data_ptr<scalar_t>());
+        auto r_data =
+            get_buffer<dpcpp_discard_w_mode>(cgh, r.data_ptr<scalar_t>());
         // kernel function per work-item
         auto kfn = DPCPP_Q_KFN() {
-          dpcpp_global_ptr_pt<scalar_t> ptr =
-              acc.template get_pointer<scalar_t>();
+          auto ptr = get_pointer(r_data);
           dpcpp_tabulate(ptr, ptr + steps, linspace_method);
         };
         // kick off kernel
@@ -124,12 +123,11 @@ Tensor& logspace_dpcpp_out(
       LogspaceOp<scalar_t> logspace_method(scalar_start, step, scalar_base);
       auto dpcpp_queue = dpcppGetCurrentQueue();
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto acc =
-            DPCPPAccessor<dpcpp_discard_w_mode>(cgh, r.data_ptr<scalar_t>());
+        auto r_data =
+            get_buffer<dpcpp_discard_w_mode>(cgh, r.data_ptr<scalar_t>());
         // kernel function per work-item
         auto kfn = DPCPP_Q_KFN() {
-          dpcpp_global_ptr_pt<scalar_t> ptr =
-              acc.template get_pointer<scalar_t>();
+          auto ptr = get_pointer(r_data);
           dpcpp_tabulate(ptr, ptr + steps, logspace_method);
         };
         // kick off kernel
@@ -179,12 +177,11 @@ Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
 
         // command group functions
         auto cgf = DPCPP_Q_CGF(cgh) {
-          auto acc = DPCPPAccessor<dpcpp_r_mode>(cgh, r.data_ptr<scalar_t>());
+          auto r_data = get_buffer<dpcpp_r_mode>(cgh, r.data_ptr<scalar_t>());
 
           // kernel function per work-item
           auto kfn = DPCPP_Q_KFN() {
-            dpcpp_global_ptr_pt<scalar_t> ptr =
-                acc.template get_pointer<scalar_t>();
+            auto ptr = get_pointer(r_data);
             dpcpp_tabulate(ptr, ptr + size, linspace_method);
           };
           // kick off kernel
