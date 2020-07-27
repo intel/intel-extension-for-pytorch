@@ -46,13 +46,13 @@ void fillSliceWithIndex(
   int64_t local_size =
       queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto out_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, out.data);
+    auto out_data = get_buffer<dpcpp_w_mode>(cgh, out.data);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       IndexType local_id = item_id.get_local_id(0);
       IndexType slice = item_id.get_group_linear_id();
       const uint64_t offset =
           IndexToOffset<int64_t, IndexType, Dim>::get(slice, out);
-      int64_t* base = out_acc.template get_pointer<int64_t>() + offset;
+      int64_t* base = get_pointer(out_data) + offset;
 
       for (IndexType i = local_id; i < sliceSize;
            i += item_id.get_local_range(0)) {
