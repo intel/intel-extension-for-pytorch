@@ -160,8 +160,8 @@ template <
     template <typename, typename, typename> class Epilogue>
 void SpatialSoftMaxBackward(
     scalar_t* gradInput,
-    scalar_t* output,
-    scalar_t* gradOutput,
+    outscalar_t* output,
+    outscalar_t* gradOutput,
     dpcpp::detail::TensorInfo<scalar_t, uint64_t> outer_info,
     size_t outer_size,
     size_t dim_size,
@@ -177,9 +177,9 @@ void SpatialSoftMaxBackward(
   size_t global_size = outer_size * local_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto gradInput_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, gradInput);
-    auto output_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, output);
-    auto gradOutput_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, gradOutput);
+    auto gradInput_data = get_buffer<dpcpp_discard_w_mode>(cgh, gradInput);
+    auto output_data = get_buffer<dpcpp_r_mode>(cgh, output);
+    auto gradOutput_data = get_buffer<dpcpp_r_mode>(cgh, gradOutput);
     auto local_acc_sum = local_accessor_t(local_size, cgh);
     cgh.parallel_for<SpatialSoftmaxBackwardKernelName<
         scalar_t,
@@ -192,12 +192,9 @@ void SpatialSoftMaxBackward(
           auto data_offset =
               dpcpp::detail::IndexToOffset<outscalar_t, uint64_t>::get(
                   group_id, outer_info);
-          auto gradInput_ptr =
-              gradInput_acc.template get_pointer<scalar_t>() + data_offset;
-          auto output_ptr =
-              output_acc.template get_pointer<outscalar_t>() + data_offset;
-          auto gradOutput_ptr =
-              gradOutput_acc.template get_pointer<outscalar_t>() + data_offset;
+          auto gradInput_ptr = get_pointer(gradInput_data) + data_offset;
+          auto output_ptr = get_pointer(output_data) + data_offset;
+          auto gradOutput_ptr = get_pointer(gradOutput_data) + data_offset;
 
           auto thread_sum = static_cast<accscalar_t>(0);
           for (size_t i = local_id; i < dim_size; i += local_size) {
