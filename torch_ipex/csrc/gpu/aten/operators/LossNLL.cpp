@@ -89,8 +89,6 @@ void ClassNLLCriterion_updateOutput(
     bool has_weights = weights.defined()
         ? true
         : false; // dpcpp kernel can not accept host pointer
-    scalar_t* dummy_buffer =
-        (scalar_t*)getDPCPPDeviceAllocator()->allocate(sizeof(scalar_t)).get();
 
     auto output_stride_0 = output.stride(0);
     auto input_stride_0 = input.stride(0);
@@ -102,7 +100,7 @@ void ClassNLLCriterion_updateOutput(
           get_buffer<dpcpp_r_mode>(cgh, target.data_ptr<int64_t>());
       auto weights_data = has_weights
           ? get_buffer<dpcpp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>())
-          : get_buffer<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
+          : input_data; // use the input as the dummy data.
       auto output_data =
           get_buffer<dpcpp_w_mode>(cgh, output.data_ptr<scalar_t>());
       auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
@@ -153,14 +151,12 @@ void ClassNLLCriterion_updateOutput(
 
   if (input_cont.dim() == 1 || input_cont.dim() == 0) {
     int64_t local_size = 1;
-    scalar_t* dummy_buffer =
-        (scalar_t*)getDPCPPDeviceAllocator()->allocate(sizeof(scalar_t)).get();
 
     auto cgf = DPCPP_Q_CGF(cgh) {
       auto input_data = get_buffer<dpcpp_r_mode>(cgh, _input_data);
       auto weights_data = has_weights
           ? get_buffer<dpcpp_r_mode>(cgh, _weights_data)
-          : get_buffer<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
+          : input_data; // use the input as the dummy data.
       auto target_data = get_buffer<dpcpp_r_mode>(cgh, _target_data);
       auto total_weight_data = get_buffer<dpcpp_w_mode>(cgh, _total_weight_data);
       auto output_data = get_buffer<dpcpp_w_mode>(cgh, _output_data);
@@ -193,14 +189,12 @@ void ClassNLLCriterion_updateOutput(
     int64_t local_size =
         queue.get_device()
             .template get_info<DPCPP::info::device::max_work_group_size>();
-    scalar_t* dummy_buffer =
-        (scalar_t*)getDPCPPDeviceAllocator()->allocate(sizeof(scalar_t)).get();
 
     auto cgf = DPCPP_Q_CGF(cgh) {
       auto input_data = get_buffer<dpcpp_r_mode>(cgh, _input_data);
       auto weights_data = has_weights
           ? get_buffer<dpcpp_r_mode>(cgh, _weights_data)
-          : get_buffer<dpcpp_r_mode>(cgh, dummy_buffer); // Dummy weight
+          : input_data; // use the input as the dummy data.
       auto target_data = get_buffer<dpcpp_r_mode>(cgh, _target_data);
       auto total_weight_data = get_buffer<dpcpp_r_mode>(cgh, _total_weight_data);
       auto output_data = get_buffer<dpcpp_r_mode>(cgh, _output_data);
@@ -310,21 +304,20 @@ void ClassNLLCriterion_updateGradInput(
     auto gradInput_stride_1 = gradInput.stride(1);
     auto gradOutput_stride_0 = gradOutput.stride(0);
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto target_acc =
-          DPCPPAccessor<dpcpp_r_mode>(cgh, target.data_ptr<int64_t>());
-      auto gradOutput_acc =
-          DPCPPAccessor<dpcpp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
-      auto weights_acc = has_weights
-          ? DPCPPAccessor<dpcpp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>())
-          : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
-      auto gradInput_acc =
-          DPCPPAccessor<dpcpp_w_mode>(cgh, gradInput.data_ptr<scalar_t>());
+      auto target_data =
+          get_buffer<dpcpp_r_mode>(cgh, target.data_ptr<int64_t>());
+      auto gradOutput_data =
+          get_buffer<dpcpp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
+      auto weights_data = has_weights
+          ? get_buffer<dpcpp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>())
+          : gradOutput_data; // Use gradOutput handler as dummy weights
+      auto gradInput_data =
+          get_buffer<dpcpp_w_mode>(cgh, gradInput.data_ptr<scalar_t>());
       auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
-        auto target_ptr = target_acc.template get_pointer<int64_t>();
-        auto gradOutput_ptr = gradOutput_acc.template get_pointer<scalar_t>();
-        auto weights_ptr =
-            has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
-        auto gradInput_ptr = gradInput_acc.template get_pointer<scalar_t>();
+        auto target_ptr = get_pointer(target_data);
+        auto gradOutput_ptr = get_pointer(gradOutput_data);
+        auto weights_ptr = has_weights ? get_pointer(weights_data) : NULL;
+        auto gradInput_ptr = get_pointer(gradInput_data);
 
         auto local_id = item_id.get_local_id(0);
         auto group_id = item_id.get_group(0);
@@ -365,28 +358,25 @@ void ClassNLLCriterion_updateGradInput(
 
   auto queue = dpcppGetCurrentQueue();
   if (input.dim() == 1) {
-    DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto gradOutput_acc =
-          DPCPPAccessor<dpcpp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
-      auto weights_acc = has_weights
-          ? DPCPPAccessor<dpcpp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>())
-          : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
-      auto gradInput_acc =
-          DPCPPAccessor<dpcpp_w_mode>(cgh, gradInput.data_ptr<scalar_t>());
-      auto target_acc =
-          DPCPPAccessor<dpcpp_r_mode>(cgh, target_cont.data_ptr<int64_t>());
-      auto total_weight_acc =
-          DPCPPAccessor<dpcpp_r_mode>(cgh, total_weight.data_ptr<scalar_t>());
+      auto gradOutput_data =
+          get_buffer<dpcpp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
+      auto weights_data = has_weights
+          ? get_buffer<dpcpp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>())
+          : gradOutput_data; // Use gradOutput handler as dummy weights
+      auto gradInput_data =
+          get_buffer<dpcpp_w_mode>(cgh, gradInput.data_ptr<scalar_t>());
+      auto target_data =
+          get_buffer<dpcpp_r_mode>(cgh, target_cont.data_ptr<int64_t>());
+      auto total_weight_data =
+          get_buffer<dpcpp_r_mode>(cgh, total_weight.data_ptr<scalar_t>());
       auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-        auto gradOutput_ptr = gradOutput_acc.template get_pointer<scalar_t>();
-        auto weights_ptr =
-            has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
-        auto gradInput_ptr = gradInput_acc.template get_pointer<scalar_t>();
-        auto target_ptr = target_acc.template get_pointer<int64_t>();
-        auto total_weight_ptr =
-            total_weight_acc.template get_pointer<scalar_t>();
+        auto gradOutput_ptr = get_pointer(gradOutput_data);
+        auto weights_ptr = has_weights ? get_pointer(weights_data) : NULL;
+        auto gradInput_ptr = get_pointer(gradInput_data);
+        auto target_ptr = get_pointer(target_data);
+        auto total_weight_ptr = get_pointer(total_weight_data);
 
         if (*total_weight_ptr <= 0)
           return;
@@ -409,27 +399,24 @@ void ClassNLLCriterion_updateGradInput(
     int nframe = input.size(0);
     int ndim = input.size(1);
     int64_t local_size = 32;
-    DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
     auto cgf = DPCPP_Q_CGF(cgh) {
-      auto gradOutput_acc =
-          DPCPPAccessor<dpcpp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
-      auto weights_acc = has_weights
-          ? DPCPPAccessor<dpcpp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>())
-          : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer); // dummy weights
-      auto gradInput_acc =
-          DPCPPAccessor<dpcpp_w_mode>(cgh, gradInput.data_ptr<scalar_t>());
-      auto target_acc =
-          DPCPPAccessor<dpcpp_r_mode>(cgh, target_cont.data_ptr<int64_t>());
-      auto total_weight_acc =
-          DPCPPAccessor<dpcpp_r_mode>(cgh, total_weight.data_ptr<scalar_t>());
+      auto gradOutput_data =
+          get_buffer<dpcpp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
+      auto weights_data = has_weights
+          ? get_buffer<dpcpp_r_mode>(cgh, weights_cont.data_ptr<scalar_t>())
+          : gradOutput_data; // use the gradOutput handler as dummy weights
+      auto gradInput_data =
+          get_buffer<dpcpp_w_mode>(cgh, gradInput.data_ptr<scalar_t>());
+      auto target_data =
+          get_buffer<dpcpp_r_mode>(cgh, target_cont.data_ptr<int64_t>());
+      auto total_weight_data =
+          get_buffer<dpcpp_r_mode>(cgh, total_weight.data_ptr<scalar_t>());
       auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-        auto gradOutput_ptr = gradOutput_acc.template get_pointer<scalar_t>();
-        auto weights_ptr =
-            has_weights ? weights_acc.template get_pointer<scalar_t>() : NULL;
-        auto gradInput_ptr = gradInput_acc.template get_pointer<scalar_t>();
-        auto target_ptr = target_acc.template get_pointer<int64_t>();
-        auto total_weight_ptr =
-            total_weight_acc.template get_pointer<scalar_t>();
+        auto gradOutput_ptr = get_pointer(gradOutput_data);
+        auto weights_ptr = has_weights ? get_pointer(weights_data) : NULL;
+        auto gradInput_ptr = get_pointer(gradInput_data);
+        auto target_ptr = get_pointer(target_data);
+        auto total_weight_ptr = get_pointer(total_weight_data);
 
         auto local_item_id = item_id.get_id(0);
 
@@ -519,20 +506,17 @@ void spatial_class_nll_criterion_update_output_no_reduce_kernel(
 
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
-  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
-
   auto cgf = DPCPP_Q_CGF(cgh) {
-    out_accessor_t out_acc = out_accessor_t(cgh, output.data_ptr());
-    in_accessor_t self_acc = in_accessor_t(cgh, self.data_ptr());
-    in_accessor_t target_acc = in_accessor_t(cgh, target.data_ptr());
-    in_accessor_t weight_acc = in_accessor_t(cgh, weight.data_ptr());
+    auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, output.data_ptr<scalar_t>());
+    auto self_data = get_buffer<dpcpp_r_mode>(cgh, self.data_ptr<scalar_t>());
+    auto target_data = get_buffer<dpcpp_r_mode>(cgh, target.data_ptr<long>());
+    auto weight_data = get_buffer<dpcpp_r_mode>(cgh, weight.data_ptr<scalar_t>());
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto out_ptr = out_acc.template get_pointer<scalar_t>();
-      auto self_ptr = self_acc.template get_pointer<scalar_t>();
-      auto target_ptr = target_acc.template get_pointer<long>();
-      auto weight_ptr = weight_acc.template get_pointer<scalar_t>();
+      auto out_ptr = get_pointer(out_data);
+      auto self_ptr = get_pointer(self_data);
+      auto target_ptr = get_pointer(target_data);
+      auto weight_ptr = get_pointer(weight_data);
 
       auto index = item_id.get_linear_id();
       auto target_offset = dpcpp::detail::IndexToOffset<long, uint64_t>::get(index, target_info);
@@ -588,26 +572,23 @@ void spatial_class_nll_criterion_update_output_kernel(
     dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(weight);
   weight_info.collapseDims();
 
-  using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
-  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
-
   auto cgf = DPCPP_Q_CGF(cgh) {
-    out_accessor_t out_acc = out_accessor_t(cgh, output.data_ptr());
-    out_accessor_t total_weight_acc = out_accessor_t(cgh, total_weight.data_ptr());
-    in_accessor_t self_acc = in_accessor_t(cgh, self.data_ptr());
-    in_accessor_t target_acc = in_accessor_t(cgh, target.data_ptr());
-    in_accessor_t weight_acc = in_accessor_t(cgh, weight.data_ptr());
+    auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, output.data_ptr<scalar_t>());
+    auto total_weight_data = get_buffer<dpcpp_discard_w_mode>(cgh, total_weight.data_ptr<scalar_t>());
+    auto self_data = get_buffer<dpcpp_r_mode>(cgh, self.data_ptr<scalar_t>());
+    auto target_data = get_buffer<dpcpp_r_mode>(cgh, target.data_ptr<long>());
+    auto weight_data = get_buffer<dpcpp_r_mode>(cgh, weight.data_ptr<scalar_t>());
     DPCPP::accessor<accscalar_t, 1, dpcpp_rw_mode, DPCPP::access::target::local>
       partial_sums(wgroup_size, cgh);
     DPCPP::accessor<accscalar_t, 1, dpcpp_rw_mode, DPCPP::access::target::local>
       partial_weight(wgroup_size, cgh);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
-      auto out_ptr = out_acc.template get_pointer<scalar_t>();
-      auto total_weight_ptr = total_weight_acc.template get_pointer<scalar_t>();
-      auto self_ptr = self_acc.template get_pointer<scalar_t>();
-      auto target_ptr = target_acc.template get_pointer<long>();
-      auto weight_ptr = weight_acc.template get_pointer<scalar_t>();
+      auto out_ptr = get_pointer(out_data);
+      auto total_weight_ptr = get_pointer(total_weight_data);
+      auto self_ptr = get_pointer(self_data);
+      auto target_ptr = get_pointer(target_data);
+      auto weight_ptr = get_pointer(weight_data);
 
       auto local_idx = item_id.get_local_linear_id();
       auto global_idx = item_id.get_global_linear_id();
@@ -646,8 +627,8 @@ void spatial_class_nll_criterion_update_output_kernel(
       });
 
       if (local_idx == 0) {
-        atomicAdd(total_weight_ptr, ScalarConvert<accscalar_t, scalar_t>::to(partial_weight[0]));
-        atomicAdd(out_ptr, ScalarConvert<accscalar_t, scalar_t>::to(partial_sums[0]));
+        atomicAdd((dpcpp_global_ptr_pt<scalar_t>)total_weight_ptr, ScalarConvert<accscalar_t, scalar_t>::to(partial_weight[0]));
+        atomicAdd((dpcpp_global_ptr_pt<scalar_t>)out_ptr, ScalarConvert<accscalar_t, scalar_t>::to(partial_sums[0]));
       }
     };
 
@@ -661,12 +642,12 @@ void spatial_class_nll_criterion_update_output_kernel(
 
   if (reduction == at::Reduction::Mean) {
     auto cgf = DPCPP_Q_CGF(cgh) {
-      out_accessor_t out_acc = out_accessor_t(cgh, output.data_ptr());
-      in_accessor_t total_weight_acc = in_accessor_t(cgh, total_weight.data_ptr());
+      auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, output.data_ptr<scalar_t>());
+      auto total_weight_data = get_buffer<dpcpp_r_mode>(cgh, total_weight.data_ptr<scalar_t>());
 
       auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-        auto out_ptr = out_acc.template get_pointer<scalar_t>();
-        auto total_weight_ptr = total_weight_acc.template get_pointer<scalar_t>();
+        auto out_ptr = get_pointer(out_data);
+        auto total_weight_ptr = get_pointer(total_weight_data);
         if (total_weight_ptr[0] != 0) {
           out_ptr[0] = Numerics<scalar_t>::div(out_ptr[0], total_weight_ptr[0]);
         }
@@ -709,20 +690,17 @@ void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
 
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
-  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
-
   auto cgf = DPCPP_Q_CGF(cgh) {
-    out_accessor_t grad_input_acc = out_accessor_t(cgh, grad_input.data_ptr());
-    in_accessor_t grad_output_acc = in_accessor_t(cgh, grad_output.data_ptr());
-    in_accessor_t target_acc = in_accessor_t(cgh, target.data_ptr());
-    in_accessor_t weight_acc = in_accessor_t(cgh, weight.data_ptr());
+    auto grad_input_data = get_buffer<dpcpp_discard_w_mode>(cgh, grad_input.data_ptr<scalar_t>());
+    auto grad_output_data = get_buffer<dpcpp_r_mode>(cgh, grad_output.data_ptr<scalar_t>());
+    auto target_data = get_buffer<dpcpp_r_mode>(cgh, target.data_ptr<long>());
+    auto weight_data = get_buffer<dpcpp_r_mode>(cgh, weight.data_ptr<scalar_t>());
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto grad_input_ptr = grad_input_acc.template get_pointer<scalar_t>();
-      auto grad_output_ptr = grad_output_acc.template get_pointer<scalar_t>();
-      auto target_ptr = target_acc.template get_pointer<long>();
-      auto weight_ptr = weight_acc.template get_pointer<scalar_t>();
+      auto grad_input_ptr = get_pointer(grad_input_data);
+      auto grad_output_ptr = get_pointer(grad_output_data);
+      auto target_ptr = get_pointer(target_data);
+      auto weight_ptr = get_pointer(weight_data);
 
       auto index = item_id.get_linear_id();
       auto target_offset = dpcpp::detail::IndexToOffset<long, uint64_t>::get(index, target_info);
@@ -776,23 +754,20 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
 
   auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
-  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
-
   auto cgf = DPCPP_Q_CGF(cgh) {
-    out_accessor_t grad_input_acc = out_accessor_t(cgh, grad_input.data_ptr());
-    in_accessor_t grad_output_acc = in_accessor_t(cgh, grad_output.data_ptr());
-    in_accessor_t target_acc = in_accessor_t(cgh, target.data_ptr());
-    in_accessor_t weight_acc = in_accessor_t(cgh, weight.data_ptr());
-    in_accessor_t total_weight_acc = in_accessor_t(cgh, total_weight.data_ptr());
+    auto grad_input_data = get_buffer<dpcpp_discard_w_mode>(cgh, grad_input.data_ptr<scalar_t>());
+    auto grad_output_data = get_buffer<dpcpp_r_mode>(cgh, grad_output.data_ptr<scalar_t>());
+    auto target_data = get_buffer<dpcpp_r_mode>(cgh, target.data_ptr<long>());
+    auto weight_data = get_buffer<dpcpp_r_mode>(cgh, weight.data_ptr<scalar_t>());
+    auto total_weight_data = get_buffer<dpcpp_r_mode>(cgh, total_weight.data_ptr<scalar_t>());
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto total_weight_ptr = total_weight_acc.template get_pointer<scalar_t>();
+      auto total_weight_ptr = get_pointer(total_weight_data);
       scalar_t total_weight = total_weight_ptr[0];
       if (total_weight <= 0)
         return;
 
-      auto target_ptr = target_acc.template get_pointer<long>();
+      auto target_ptr = get_pointer(target_data);
 
       auto index = item_id.get_linear_id();
       auto target_offset = dpcpp::detail::IndexToOffset<long, uint64_t>::get(index, target_info);
@@ -800,9 +775,9 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
       int64_t cur_target = target_ptr[target_offset];
       if (cur_target != ignore_index) {
 //        CUDA_KERNEL_ASSERT(t >= 0 && t < n_classes);
-        auto grad_input_ptr = grad_input_acc.template get_pointer<scalar_t>();
-        auto grad_output_ptr = grad_output_acc.template get_pointer<scalar_t>();
-        auto weight_ptr = weight_acc.template get_pointer<scalar_t>();
+        auto grad_input_ptr = get_pointer(grad_input_data);
+        auto grad_output_ptr = get_pointer(grad_output_data);
+        auto weight_ptr = get_pointer(weight_data);
         auto weight_offset = dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
         scalar_t weight = weight_ptr[weight_offset];
 
