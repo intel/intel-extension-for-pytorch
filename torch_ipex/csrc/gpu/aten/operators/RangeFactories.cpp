@@ -266,12 +266,11 @@ Tensor& arange_dpcpp_out(
         // command group functions
         auto cgf = DPCPP_Q_CGF(cgh) {
           auto acc =
-              DPCPPAccessor<dpcpp_r_mode>(cgh, result.data_ptr<scalar_t>());
+              get_buffer<dpcpp_r_mode>(cgh, result.data_ptr<scalar_t>());
 
           // kernel function per work-item
           auto kfn = DPCPP_Q_KFN() {
-            dpcpp_global_ptr_pt<scalar_t> ptr =
-                acc.template get_pointer<scalar_t>();
+            auto ptr = get_pointer(acc);
             dpcpp_tabulate(ptr, ptr + size, linspace_method);
           };
           // kick off kernel

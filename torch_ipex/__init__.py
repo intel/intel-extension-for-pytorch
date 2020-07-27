@@ -93,3 +93,6 @@ def library_paths():
         lib_path,
     ]
     return paths
+
+def _usm_pstl_is_enabled():
+    return torch_ipex._usm_pstl_is_enabled()

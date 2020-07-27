@@ -26,6 +26,12 @@ PYBIND11_MODULE(torch_ipex, m) {
           return at::AtenIpexTypeDPCPP::linear_relu(input, weight, bias);
         },
         "fused linear with relu opt. on Intel device");
-
+#if defined(_PSTL_BACKEND_SYCL) && defined(USE_USM)
+  m.def("_usm_pstl_is_enabled", 
+        []() {return true;});
+#else
+  m.def("_usm_pstl_is_enabled", 
+        []() {return false;});
+#endif
   printf("loading _torch_ipex.so --\n");
 }
