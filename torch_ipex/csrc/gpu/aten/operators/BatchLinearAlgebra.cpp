@@ -29,12 +29,12 @@ void triu_tril_dpcpp_kernel(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto result_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, result);
-    auto src_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, src);
+    auto result_data = get_buffer<dpcpp_w_mode>(cgh, result);
+    auto src_data = get_buffer<dpcpp_w_mode>(cgh, src);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto result_ptr = result_acc.template get_pointer<scalar_t>();
-      auto src_ptr = src_acc.template get_pointer<scalar_t>();
+      auto result_ptr = get_pointer(result_data);
+      auto src_ptr = get_pointer(src_data);
 
       for (size_t linearIndex = item.get_global_id(0); linearIndex < (size_t)N;
            linearIndex += item.get_global_range()[0]) {
