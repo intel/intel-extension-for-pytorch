@@ -40,12 +40,12 @@ static void im2col_kernel(
   auto total_threads = channels * output_width * output_height;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, data_im);
-    auto out_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, data_col);
+    auto in_data = get_buffer<dpcpp_r_mode>(cgh, data_im);
+    auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, data_col);
     cgh.parallel_for<im2col_dpcpp_kernel<T>>(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-          auto in_ptr = in_acc.template get_pointer<T>();
-          auto out_ptr = out_acc.template get_pointer<T>();
+          auto in_ptr = get_pointer(in_data);
+          auto out_ptr = get_pointer(out_data);
           auto id = itemId.get_id(0);
 
           int64_t w_out = id % width_col;
@@ -96,12 +96,12 @@ static void col2im_kernel(
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto total_threads = channels * width * height;
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, data_col);
-    auto out_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, data_im);
+    auto in_data = get_buffer<dpcpp_r_mode>(cgh, data_col);
+    auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, data_im);
     cgh.parallel_for<col2im_dpcpp_kernel<T>>(
         DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-          auto in_ptr = in_acc.template get_pointer<T>();
-          auto out_ptr = out_acc.template get_pointer<T>();
+          auto in_ptr = get_pointer(in_data);
+          auto out_ptr = get_pointer(out_data);
           auto id = itemId.get_id(0);
 
           T val = static_cast<T>(0);
