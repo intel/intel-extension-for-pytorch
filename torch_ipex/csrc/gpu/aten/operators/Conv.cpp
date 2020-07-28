@@ -181,7 +181,7 @@ at::Tensor convolution(
   primitive_attr pattr;
   post_ops po;
   if (attr.with_sum()) {
-    po.append_sum(attr.alpha_);
+    po.append_sum(attr.scale_);
   }
 
   if (attr.with_relu()) {
@@ -1195,9 +1195,9 @@ Tensor convolution_sum(
     IntArrayRef output_padding_,
     int64_t groups_,
     Tensor& accumu,
+    Scalar scale,
     Scalar alpha,
-    Scalar beta,
-    Scalar scale) {
+    Scalar beta) {
   conv_attr_t attr(
       scale.to<float>(),
       alpha.to<float>(),
@@ -1228,9 +1228,9 @@ Tensor convolution_sum_relu(
     IntArrayRef output_padding_,
     int64_t groups_,
     Tensor& accumu,
+    Scalar scale,
     Scalar alpha,
-    Scalar beta,
-    Scalar scale) {
+    Scalar beta) {
   conv_attr_t attr(
       scale.to<float>(),
       alpha.to<float>(),
@@ -1260,9 +1260,9 @@ Tensor convolution_relu(
     bool transposed_,
     IntArrayRef output_padding_,
     int64_t groups_,
+    Scalar scale,
     Scalar alpha,
-    Scalar beta,
-    Scalar scale) {
+    Scalar beta) {
   conv_attr_t attr(
       scale.to<float>(),
       alpha.to<float>(),
