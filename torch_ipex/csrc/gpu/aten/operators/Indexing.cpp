@@ -18,7 +18,12 @@
 #include "Loops.h"
 #include "ParttenScan.h"
 
-
+#ifdef _PSTL_BACKEND_SYCL
+#include <dpstd/algorithm>
+#include <dpstd/execution>
+#include <dpstd/numeric>
+#include <dpstd/iterator>
+#endif
 
 using namespace at::dpcpp;
 
@@ -163,6 +168,57 @@ struct NonZeroOp {
   }
 };
 
+#ifdef _PSTL_BACKEND_SYCL
+template <typename Iterator>
+class strided_range
+{
+public:
+  typedef typename std::iterator_traits<Iterator>::difference_type difference_type;
+
+  struct stride_functor
+  {
+    typedef typename std::iterator_traits<Iterator>::reference reference;
+    difference_type stride;
+    Iterator base;
+
+    stride_functor(difference_type stride, Iterator begin)
+      : stride(stride), base(begin) {}
+
+    reference operator()(const difference_type& i) const
+    {
+      return base[stride * i];
+    }
+  };
+
+  typedef typename dpstd::counting_iterator<difference_type>                   CountingIterator;
+  typedef typename dpstd::transform_iterator<stride_functor, CountingIterator> TransformIterator;
+
+  // type of the strided_range iterator
+  typedef TransformIterator iterator;
+
+  // construct strided_range for the range [first,last)
+  strided_range(Iterator first, Iterator last, difference_type stride)
+    : first(first), last(last), stride(stride) {}
+
+  iterator begin(void) const
+  {
+    return TransformIterator(CountingIterator(0),
+                             stride_functor(stride, first));
+  }
+
+  iterator end(void) const
+  {
+    return begin() + ((last - first) + (stride - 1)) / stride;
+  }
+
+protected:
+  Iterator first;
+  Iterator last;
+  difference_type stride;
+};
+#endif
+
+
 template <typename scalar_t>
 void nonzero(Tensor& tensor, const Tensor& self_) {
   auto self = self_.contiguous();
@@ -171,16 +227,49 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
   int64_t N = self.numel();
 
   // First to resize out tensor to full elements row
-
-  int64_t to_sizes[2] = {N, num_dim};
-  TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 2, to_sizes, nullptr);
-  tensor = tensor.contiguous();
+  tensor = tensor.resize_({N, num_dim}).contiguous();
 
   // Prepare input tensor strides for calculating result index
   if (N > 0) {
+#if defined(USE_USM) && defined(_PSTL_BACKEND_SYCL)
+    auto dpcpp_queue = dpcppGetCurrentQueue();
+    auto policy = dpstd::execution::make_device_policy(dpcpp_queue);
+    auto tensor_begin = tensor.data_ptr<long>();
+    auto self_begin = self.data_ptr<scalar_t>();
+    strided_range<decltype(tensor_begin)> strided_tensor(tensor_begin, tensor_begin + N*num_dim, num_dim);
+    dpstd::counting_iterator<int64_t> idxfirst(0);
+    auto start = dpstd::make_zip_iterator(idxfirst, self_begin);
+    auto dend =
+      std::copy_if(policy, start, start + N,
+        dpstd::make_transform_iterator(strided_tensor.begin(), [](auto& x) {return std::forward_as_tuple(x, std::ignore);}),
+        [](auto h){
+          using std::get;
+          return NonZeroOp<scalar_t>{}(get<1>(h));
+        });
+
+    auto num_nonzeros = std::distance(strided_tensor.begin(), dend.base());
+
+    if (num_nonzeros > 0 && num_dim > 0) {
+      int64_t div = 1;
+      for (int dim = num_dim - 1; dim >= 0; dim--) {
+        strided_range<decltype(tensor_begin)> stride_dim(tensor_begin + dim,
+                                                         tensor_begin + N * num_dim, num_dim);
+        auto dim_size = self.size(dim);
+        std::transform(policy,
+                       strided_tensor.begin(),
+                       strided_tensor.begin() + num_nonzeros,
+                       stride_dim.begin(),
+                       [=](long linear_id) {
+                         return (linear_id / div) % dim_size;
+                       });
+        div *= dim_size;
+      }
+    }
+  tensor.resize_({num_nonzeros, num_dim});
+#else
     if (canUse32BitIndexMath(self)) {
       TensorInfo<scalar_t, uint32_t> input =
-          getTensorInfo<scalar_t, uint32_t>(self);
+        getTensorInfo<scalar_t, uint32_t>(self);
       auto idx_fuc = idx_functor<uint32_t>(input);
       input.collapseDims();
 
@@ -189,19 +278,19 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
 
       auto queue = dpcppGetCurrentQueue();
       auto num_nonzeros = pattern_scan(
-          queue,
-          input,
-          output,
-          static_cast<uint32_t>(N),
-          NonZeroOp<scalar_t>{},
-          idx_fuc);
+        queue,
+        input,
+        output,
+        static_cast<uint32_t>(N),
+        NonZeroOp<scalar_t>{},
+        idx_fuc);
 
       // Resize the output tensor to the real size
       int64_t real_sizes[2] = {(int64_t)num_nonzeros, (int64_t)num_dim};
       TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 2, real_sizes, nullptr);
     } else {
       TensorInfo<scalar_t, uint64_t> input =
-          getTensorInfo<scalar_t, uint64_t>(self);
+        getTensorInfo<scalar_t, uint64_t>(self);
       auto idx_fuc = idx_functor<uint64_t>(input);
       input.collapseDims();
 
@@ -210,17 +299,19 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
 
       auto queue = dpcppGetCurrentQueue();
       auto num_nonzeros = pattern_scan(
-          queue,
-          input,
-          output,
-          static_cast<uint64_t>(N),
-          NonZeroOp<scalar_t>{},
-          idx_fuc);
+        queue,
+        input,
+        output,
+        static_cast<uint64_t>(N),
+        NonZeroOp<scalar_t>{},
+        idx_fuc);
 
       // Resize the output tensor to the real size
       int64_t real_sizes[2] = {(int64_t)num_nonzeros, (int64_t)num_dim};
       TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 2, real_sizes, nullptr);
     }
+#endif
+
   }
 }
 
@@ -331,24 +422,20 @@ void indexAdd(
 
   auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;
 
-  auto src_data = src.data_ptr();
-  auto dst_data = dst.data_ptr();
-  auto idx_data = indices.data_ptr();
-
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, src_data);
-    auto dst_acc =
-        DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data);
-    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data);
+    auto src_data = get_buffer<dpcpp_r_mode>(__cgh, src.data_ptr<scalar_t>());
+    auto dst_data =
+        get_buffer<dpcpp_discard_w_mode>(__cgh, dst.data_ptr<scalar_t>());
+    auto idx_data = get_buffer<dpcpp_r_mode>(__cgh, indices.data_ptr<long>());
 
     __cgh.parallel_for<DPCPP_K(index_add_ker, scalar_t)>(
       DPCPP::nd_range</*dim=*/1>(
         DPCPP::range</*dim=*/1>(numIndices*wgroup_size),
         DPCPP::range</*dim=*/1>(wgroup_size)),
         [=](DPCPP::nd_item<1> item_id) {
-          auto src_ptr = src_acc.template get_pointer<scalar_t>();
-          auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
-          auto idx_ptr = idx_acc.template get_pointer<long>();
+          auto src_ptr = get_pointer(src_data);
+          auto dst_ptr = get_pointer(dst_data);
+          auto idx_ptr = get_pointer(idx_data);
 
           auto dst_slice_id = item_id.get_group(0);
           // auto slice_off = IndexToOffset<int64_t, unsigned
@@ -439,21 +526,18 @@ void indexFill(
 
   auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;
 
-  auto dst_data = dst.data_ptr();
-  auto idx_data = indices.data_ptr();
-
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto dst_acc =
-        DPCPPAccessor<dpcpp_discard_w_mode>(__cgh, dst_data);
-    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(__cgh, idx_data);
+    auto dst_data =
+        get_buffer<dpcpp_discard_w_mode>(__cgh, dst.data_ptr<scalar_t>());
+    auto idx_data = get_buffer<dpcpp_r_mode>(__cgh, indices.data_ptr<long>());
 
     __cgh.parallel_for<DPCPP_K(index_fill_ker, scalar_t)>(
       DPCPP::nd_range</*dim=*/1>(
         DPCPP::range</*dim=*/1>(numIndices*wgroup_size),
         DPCPP::range</*dim=*/1>(wgroup_size)),
         [=](DPCPP::nd_item<1> item_id) {
-          auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
-          auto idx_ptr = idx_acc.template get_pointer<long>();
+          auto dst_ptr = get_pointer(dst_data);
+          auto idx_ptr = get_pointer(idx_data);
 
           auto dst_slice_id = item_id.get_group(0);
           // auto slice_off = IndexToOffset<int64_t, unsigned
@@ -510,12 +594,12 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
       auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto in_acc = DPCPPAccessor<read_mode>(cgh, src.data_ptr<scalar_t>());
-        auto out_acc = DPCPPAccessor<write_mode>(cgh, dst.data_ptr<scalar_t>());
+        auto in_data = get_buffer<read_mode>(cgh, src.data_ptr<scalar_t>());
+        auto out_data = get_buffer<write_mode>(cgh, dst.data_ptr<scalar_t>());
         auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
           size_t id = item_id.get_id(0);
-          auto in_ptr = in_acc.template get_pointer<scalar_t>();
-          auto out_ptr = out_acc.template get_pointer<scalar_t>();
+          auto in_ptr = get_pointer(in_data);
+          auto out_ptr = get_pointer(out_data);
           const int64_t bOffset = start + (stride0 + stride1) * id;
           out_ptr[strideSelf * id] = in_ptr[bOffset];
         };
@@ -540,12 +624,12 @@ void Diag(Tensor& dst, const Tensor& src, int64_t k) {
       auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
       auto cgf = DPCPP_Q_CGF(cgh) {
-        auto in_acc = DPCPPAccessor<read_mode>(cgh, src.data_ptr<scalar_t>());
-        auto out_acc = DPCPPAccessor<write_mode>(cgh, dst.data_ptr<scalar_t>());
+        auto in_data = get_buffer<read_mode>(cgh, src.data_ptr<scalar_t>());
+        auto out_data = get_buffer<write_mode>(cgh, dst.data_ptr<scalar_t>());
         auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
           size_t id = item_id.get_id(0);
-          auto in_ptr = in_acc.template get_pointer<scalar_t>();
-          auto out_ptr = out_acc.template get_pointer<scalar_t>();
+          auto in_ptr = get_pointer(in_data);
+          auto out_ptr = get_pointer(out_data);
           const int64_t aOffset = start + (stride0 + stride1) * id;
           out_ptr[aOffset] = in_ptr[strideSrc * id];
         };
@@ -617,9 +701,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   // Use a prefix sum to determine the output locations of the masked elements
   Tensor maskPrefixSum = at::empty(mask.sizes(), mask.options().dtype(kLong));
 
-  auto maskLong_data = maskLong.data_ptr();
   auto maskLong_size = maskLong.numel() * (maskLong.dtype().itemsize());
-  auto maskPrefixSum_data = maskPrefixSum.data_ptr();
   auto maskPrefixSum_size =
       maskPrefixSum.numel() * (maskPrefixSum.dtype().itemsize());
   int64_t size = maskLong.numel();
@@ -630,15 +712,13 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
 
   // command group functions
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_maskLong = DPCPPAccessor<dpcpp_r_mode>(cgh, maskLong_data);
-    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, maskPrefixSum_data);
+    auto acc_maskLong_data = get_buffer<dpcpp_r_mode>(cgh, maskLong.data_ptr<int64_t>());
+    auto acc_maskPrefixSum_data = get_buffer<dpcpp_discard_w_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
 
     // kernel function per work-item
     auto kfn = DPCPP_Q_KFN() {
-      dpcpp_global_ptr_cpt<int64_t> maskLong_ptr =
-          acc_maskLong.template get_pointer<int64_t>();
-      dpcpp_global_ptr_pt<int64_t> maskPrefixSum_ptr =
-          acc_maskPrefixSum.template get_pointer<int64_t>();
+      auto maskLong_ptr = get_pointer(acc_maskLong_data);
+      auto maskPrefixSum_ptr = get_pointer(acc_maskPrefixSum_data);
       dpcpp_exclusive_scan(
           maskLong_ptr,
           maskLong_ptr + size,
@@ -658,25 +738,21 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
   // command group function
   // copy src to tensor according to mask
   auto cgfMaskedScatter = DPCPP_Q_CGF(cgh) {
-    auto acc_src =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, contigSrc.data_ptr<scalar_t>());
-    auto acc_mask = DPCPPAccessor<dpcpp_r_mode>(cgh, mask.data_ptr<bool>());
-    auto acc_maskPrefixSum =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
-    auto acc_tensor =
-        DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tensor.data_ptr<scalar_t>());
+    auto acc_src_data =
+        get_buffer<dpcpp_r_mode>(cgh, contigSrc.data_ptr<scalar_t>());
+    auto acc_mask_data = get_buffer<dpcpp_r_mode>(cgh, mask.data_ptr<bool>());
+    auto acc_maskPrefixSum_data =
+        get_buffer<dpcpp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
+    auto acc_tensor_data =
+        get_buffer<dpcpp_discard_w_mode>(cgh, tensor.data_ptr<scalar_t>());
 
     // kernel function
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       int64_t linear_index = item.get_global_linear_id();
-      dpcpp_global_ptr_pt<scalar_t> src_ptr =
-          acc_src.template get_pointer<scalar_t>();
-      dpcpp_global_ptr_pt<bool> mask_ptr =
-          acc_mask.template get_pointer<bool>();
-      dpcpp_global_ptr_pt<int64_t> maskPrefix_ptr =
-          acc_maskPrefixSum.template get_pointer<int64_t>();
-      dpcpp_global_ptr_pt<scalar_t> tensor_ptr =
-          acc_tensor.template get_pointer<scalar_t>();
+      auto src_ptr = get_pointer(acc_src_data);
+      auto mask_ptr = get_pointer(acc_mask_data);
+      auto maskPrefix_ptr = get_pointer(acc_maskPrefixSum_data);
+      auto tensor_ptr = get_pointer(acc_tensor_data);
       if (linear_index < size) {
         if (mask_ptr[linear_index]) {
           tensor_ptr[linear_index] = src_ptr[maskPrefix_ptr[linear_index]];
@@ -722,9 +798,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
   // Use a prefix sum to determine the output locations of the masked elements
   Tensor maskPrefixSum = at::empty(mask.sizes(), mask.options().dtype(kLong));
 
-  auto maskLong_data = maskLong.data_ptr();
   auto maskLong_size = maskLong.numel() * (maskLong.dtype().itemsize());
-  auto maskPrefixSum_data = maskPrefixSum.data_ptr();
   auto maskPrefixSum_size =
       maskPrefixSum.numel() * (maskPrefixSum.dtype().itemsize());
   int64_t size = maskLong.numel();
@@ -735,17 +809,15 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
 
   // command group functions
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_maskLong =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, maskLong_data);
-    auto acc_maskPrefixSum = DPCPPAccessor<dpcpp_discard_w_mode>(
-        cgh, maskPrefixSum_data);
+    auto acc_maskLong_data =
+        get_buffer<dpcpp_r_mode>(cgh, maskLong.data_ptr<int64_t>());
+    auto acc_maskPrefixSum_data = get_buffer<dpcpp_discard_w_mode>(
+        cgh, maskPrefixSum.data_ptr<int64_t>());
 
     // kernel function per work-item
     auto kfn = DPCPP_Q_KFN() {
-      dpcpp_global_ptr_cpt<int64_t> maskLong_ptr =
-          acc_maskLong.template get_pointer<int64_t>();
-      dpcpp_global_ptr_pt<int64_t> maskPrefixSum_ptr =
-          acc_maskPrefixSum.template get_pointer<int64_t>();
+      auto maskLong_ptr = get_pointer(acc_maskLong_data);
+      auto maskPrefixSum_ptr = get_pointer(acc_maskPrefixSum_data);
       dpcpp_inclusive_scan(
           maskLong_ptr,
           maskLong_ptr + size,
@@ -769,25 +841,21 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
 
   // command group function
   auto cgfMaskedSelect = DPCPP_Q_CGF(cgh) {
-    auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
-    auto acc_mask = DPCPPAccessor<dpcpp_r_mode>(cgh, mask.data_ptr<bool>());
-    auto acc_maskPrefixSum =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
-    auto acc_tensor = DPCPPAccessor<dpcpp_discard_w_mode>(
+    auto acc_src_data = get_buffer<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
+    auto acc_mask_data = get_buffer<dpcpp_r_mode>(cgh, mask.data_ptr<bool>());
+    auto acc_maskPrefixSum_data =
+        get_buffer<dpcpp_r_mode>(cgh, maskPrefixSum.data_ptr<int64_t>());
+    auto acc_tensor_data = get_buffer<dpcpp_discard_w_mode>(
         cgh, tensorContig.data_ptr<scalar_t>());
 
     // kernel function per work-item
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       int64_t linear_index = item.get_global_linear_id();
 
-      dpcpp_global_ptr_pt<scalar_t> src_ptr =
-          acc_src.template get_pointer<scalar_t>();
-      dpcpp_global_ptr_pt<bool> mask_ptr =
-          acc_mask.template get_pointer<bool>();
-      dpcpp_global_ptr_pt<int64_t> maskPrefix_ptr =
-          acc_maskPrefixSum.template get_pointer<int64_t>();
-      dpcpp_global_ptr_pt<scalar_t> tensor_ptr =
-          acc_tensor.template get_pointer<scalar_t>();
+      auto src_ptr = get_pointer(acc_src_data);
+      auto mask_ptr = get_pointer(acc_mask_data);
+      auto maskPrefix_ptr = get_pointer(acc_maskPrefixSum_data);
+      auto tensor_ptr = get_pointer(acc_tensor_data);
 
       if (linear_index < size) {
         // The mask tensor maybe not contiguos.
@@ -838,20 +906,17 @@ void put(Tensor& self, const Tensor& index, const Tensor& source, Func f) {
       getTensorInfo<scalar_t, uint64_t>(source);
   source_info.collapseDims();
 
-  using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
-  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
-
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    out_accessor_t out_acc = out_accessor_t(__cgh, self.data_ptr());
-    in_accessor_t indices_acc = in_accessor_t(__cgh, index.data_ptr());
-    in_accessor_t source_acc = in_accessor_t(__cgh, source.data_ptr());
+    auto out_data = get_buffer<dpcpp_discard_w_mode>(__cgh, self.data_ptr<scalar_t>());
+    auto indices_data = get_buffer<dpcpp_r_mode>(__cgh, index.data_ptr<long>());
+    auto source_data = get_buffer<dpcpp_r_mode>(__cgh, source.data_ptr<scalar_t>());
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto out_ptr = out_acc.template get_pointer<char>();
-      auto indices_ptr = indices_acc.template get_pointer<long>();
-      auto source_ptr = source_acc.template get_pointer<char>();
+      auto out_ptr = (char*)get_pointer(out_data);
+      auto indices_ptr = get_pointer(indices_data);
+      auto source_ptr = (char*)get_pointer(source_data);
 
       auto linear_idx = item_id.get_id(0);
       auto idx_offset =
@@ -966,20 +1031,16 @@ void Take(Tensor& dst, const Tensor& src, const Tensor& index) {
     return;
   }
 
-  auto src_data = src.data_ptr<scalar_t>();
-  auto dst_data = dst.data_ptr<scalar_t>();
-  auto idx_data = index.data_ptr<int64_t>();
-
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data);
-    auto dst_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dst_data);
-    auto idx_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, idx_data);
+    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
+    auto dst_data = get_buffer<dpcpp_discard_w_mode>(cgh, dst.data_ptr<scalar_t>());
+    auto idx_data = get_buffer<dpcpp_r_mode>(cgh, index.data_ptr<int64_t>());
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item) {
-      auto src_ptr = src_acc.template get_pointer<scalar_t>();
-      auto dst_ptr = dst_acc.template get_pointer<scalar_t>();
-      auto idx_ptr = idx_acc.template get_pointer<int64_t>();
+      auto src_ptr = get_pointer(src_data);
+      auto dst_ptr = get_pointer(dst_data);
+      auto idx_ptr = get_pointer(idx_data);
 
       auto idx = item.get_linear_id();
       auto offset = idx_ptr[idx];
@@ -1191,8 +1252,8 @@ Tensor& put_(
           self,
           index,
           source,
-          [](dpcpp_global_ptr_pt<char> out_data,
-             dpcpp_global_ptr_pt<char> in_data,
+          [](char* out_data,
+             char* in_data,
              uint64_t offset) {
             dpcpp_global_ptr_pt<scalar_t> out_ptr =
                 (dpcpp_global_ptr_pt<scalar_t>)(out_data + offset);
@@ -1213,8 +1274,8 @@ Tensor& put_(
             self,
             index,
             source,
-            [](dpcpp_global_ptr_pt<char> out_data,
-               dpcpp_global_ptr_pt<char> in_data,
+            [](char* out_data,
+               char* in_data,
                uint64_t offset) {
               *(dtype*)(out_data + offset) = *(dtype*)in_data;
             });
