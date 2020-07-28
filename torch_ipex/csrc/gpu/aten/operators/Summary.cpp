@@ -54,18 +54,15 @@ void kernelHistogram1D(
     Op getOp) {
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = DPCPPAccessor<dpcpp_rw_mode>;
-  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
-
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    out_accessor_t out_acc = out_accessor_t(__cgh, a.data);
-    in_accessor_t in_acc = in_accessor_t(__cgh, b.data);
-    in_accessor_t weight_acc = in_accessor_t(__cgh, c.data);
+    auto out_data = get_buffer<dpcpp_rw_mode>(__cgh, a.data);
+    auto in_data = get_buffer<dpcpp_r_mode>(__cgh, b.data);
+    auto weight_data = get_buffer<dpcpp_r_mode>(__cgh, c.data);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto out_ptr = out_acc.template get_pointer<output_t>();
-      auto in_ptr = in_acc.template get_pointer<input_t>();
-      auto weight_ptr = weight_acc.template get_pointer<output_t>();
+      auto out_ptr = get_pointer(out_data);
+      auto in_ptr = get_pointer(in_data);
+      auto weight_ptr = get_pointer(weight_data);
 
       auto linearIndex = item_id.get_id(0);
       // Convert `linearIndex` into an offset of `b`
@@ -79,7 +76,7 @@ void kernelHistogram1D(
         const IndexType aOffset =
             dpcpp::detail::IndexToOffset<output_t, IndexType, ADims>::get(
                 bin, a);
-        atomicAdd(&out_ptr[aOffset], getOp(weight_ptr, linearIndex));
+        atomicAdd((dpcpp_global_ptr_pt<output_t>)&out_ptr[aOffset], getOp(weight_ptr, linearIndex));
       }
     };
 
@@ -131,7 +128,7 @@ bool dpcpp_tensor_histogram(
   if (HasWeights) {
     auto cInfo = dpcpp::detail::getTensorInfo<output_t, IndexType>(c);
     const auto getWeightsOp =
-        [cInfo](dpcpp_global_ptr_pt<output_t> cPtr, IndexType cIndex) {
+        [cInfo](output_t* cPtr, IndexType cIndex) {
           const IndexType cOffset =
               dpcpp::detail::IndexToOffset<output_t, IndexType, 1>::get(
                   cIndex, cInfo);
@@ -142,7 +139,7 @@ bool dpcpp_tensor_histogram(
     dpcpp::detail::TensorInfo<output_t, IndexType> cInfo;
     // set the dummy cinfo with the ptr to the output
     cInfo.data = aInfo.data;
-    static const auto getDummyOp = [](dpcpp_global_ptr_pt<output_t>,
+    static const auto getDummyOp = [](output_t*,
                                       IndexType) {
       return static_cast<output_t>(1);
     };
