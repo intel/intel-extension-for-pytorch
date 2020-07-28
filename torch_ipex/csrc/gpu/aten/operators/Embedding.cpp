@@ -41,7 +41,7 @@ static inline void embedding_backward_dpcpp_kernel(
     int64_t rng, GRange, tileSize;
 
     // KER1: calc indices count for each
-    auto idx_acc = DPCPPAccessor<read_mode>(cgh, indices_data);
+    auto idx_data = get_buffer<read_mode>(cgh, indices_data);
 
     if (scale_grad_by_freq) {
       auto idx_cnt_acc = idx_cnt.get_access<write_mode>(cgh);
@@ -55,7 +55,7 @@ static inline void embedding_backward_dpcpp_kernel(
               DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
           [=](DPCPP::nd_item<1> item) {
             int64_t gid = item.get_global_linear_id();
-            auto idx_ptr = idx_acc.template get_pointer<int64_t>();
+            auto idx_ptr = get_pointer(idx_data);
             if (gid < num_indices)
               idx_cnt_ptr[idx_ptr[gid]].fetch_add(static_cast<uint32_t>(1));
           });
@@ -63,8 +63,8 @@ static inline void embedding_backward_dpcpp_kernel(
 
     // KER2: calc gradient weight
     auto idx_cnt_acc = idx_cnt.get_access<read_mode>(cgh);
-    auto g_acc = DPCPPAccessor<read_mode>(cgh, grad_data);
-    auto gw_acc = DPCPPAccessor<rw_mode, scalar_t>(cgh, grad_weight_data);
+    auto g_data = get_buffer<read_mode>(cgh, grad_data);
+    auto gw_data = get_buffer<rw_mode>(cgh, grad_weight_data);
 
     parallel_for_setup(stride, tileSize, rng, GRange);
     cgh.parallel_for<embedding_dense_backeward_dpcpp_ker<scalar_t>>(
@@ -72,9 +72,9 @@ static inline void embedding_backward_dpcpp_kernel(
         [=](DPCPP::nd_item<1> item) {
           int64_t gid = item.get_global_linear_id();
           if (gid < stride) {
-            auto idx_ptr = idx_acc.template get_pointer<int64_t>();
-            auto g_ptr = g_acc.template get_pointer<scalar_t>();
-            auto gw_ptr = gw_acc.template get_pointer<scalar_t>();
+            auto idx_ptr = get_pointer(idx_data);
+            auto g_ptr = get_pointer(g_data);
+            auto gw_ptr = get_pointer(gw_data);
             for (int nidx = 0; nidx < num_indices; nidx++) {
               auto idx = idx_ptr[nidx] /* - TH_INDEX_BASE*/;
               // TODO: remove branch to optimize performance ?
