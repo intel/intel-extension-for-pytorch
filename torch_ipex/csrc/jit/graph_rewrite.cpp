@@ -107,18 +107,18 @@ void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph) {
         return (%s) )";
 
   std::string conv2d_elu_fusion = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %alpha:float, %scale:int, %input_scale:int):
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %alpha:float, %scale, %input_scale):
         %r = ipex::conv2d_elu(%a, %w, %b, %stride, %padding, %dilation, %groups, %alpha, %scale, %input_scale)
         return (%r) )";
 
   std::string conv2d_elu_inplace = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %alpha:float, %scale:int, %input_scale:int):
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %alpha:float, %scale, %input_scale):
         %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
         %s = aten::elu_(%r, %alpha, %scale, %input_scale)
         return (%s) )";
 
   std::string conv2d_elu_outplace = R"(
-      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %alpha:float, %scale:int, %input_scale:int):
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int, %alpha:float, %scale, %input_scale):
         %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
         %s = aten::elu(%r, %alpha, %scale, %input_scale)
         return (%s) )";
@@ -127,11 +127,9 @@ void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph) {
       const Match& match,
       const std::unordered_map<std::string, Value*>& vmap) {
     const auto& match_vmap = match.values_map;
-    auto scale_value = getIValue("scale", match_vmap, vmap).value();
     auto input_scale_value = getIValue("input_scale", match_vmap, vmap).value();
-    bool no_scale = scale_value.isDouble() ? (scale_value.toDouble() == 1.0) : (scale_value.toInt() == 1);
     bool no_input_scale = input_scale_value.isDouble() ? (input_scale_value.toDouble() == 1.0) : (input_scale_value.toInt() == 1);
-    return no_scale && no_input_scale;
+    return no_input_scale;
   };
 
   // Fuse conv2d + swish

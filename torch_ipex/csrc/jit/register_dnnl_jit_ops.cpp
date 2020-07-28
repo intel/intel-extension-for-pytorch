@@ -120,7 +120,7 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
-      "ipex::conv2d_elu(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1, float alpha=1.0, int scale=1, int input_scale=1) -> Tensor",
+      "ipex::conv2d_elu(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1, float alpha=1.0, Scalar scale=1.0, Scalar input_scale=1.0) -> Tensor",
       [] (const Node* node) ->Operation {
         if (torch_ipex::check_auto_dnnl()) {
           return [] (Stack& stack) {
@@ -133,8 +133,8 @@ RegisterOperators op({
                 (std::move(peek(stack, 5, 10))).toIntVector(),
                 (std::move(peek(stack, 6, 10))).toInt(),
                 (std::move(peek(stack, 7, 10))).toDouble(),
-                (std::move(peek(stack, 8, 10))).toInt(),
-                (std::move(peek(stack, 9, 10))).toInt());
+                (std::move(peek(stack, 8, 10))).toScalar(),
+                (std::move(peek(stack, 9, 10))).toScalar());
             drop(stack, 10);
             pack(stack, std::move(result));
             return 0;

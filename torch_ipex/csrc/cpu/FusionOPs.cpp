@@ -214,8 +214,10 @@ at::Tensor AtenIpexJITDev::dil_convolution_elu(
     at::IntArrayRef dilation,
     int64_t groups,
     float alpha,
-    int scale,
-    int input_scale) {
+    at::Scalar scale,
+    at::Scalar input_scale) {
+  auto scale_value = scale.to<float>();
+  auto input_scale_value = input_scale.to<float>();
   return dil_convolution_outplace_fusion(
     input,
     weight,
@@ -224,7 +226,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_elu(
     padding,
     dilation,
     groups,
-    dil::attr_t::fuse_elu((float)scale, alpha, (float)input_scale));
+    dil::attr_t::fuse_elu(scale_value, alpha, input_scale_value));
 }
 
 at::Tensor& AtenIpexJITDev::dil_convolution_sum(
