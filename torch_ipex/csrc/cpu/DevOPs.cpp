@@ -1550,6 +1550,9 @@ at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, int64_t dim, int6
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
 
+  // We do not support `select` a DIL tensor with blocked format
+  dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
+
   // Port from aten/src/ATen/native/TensorShape.cpp
   int64_t ndim = self.dim();
   if (ndim == 0) {

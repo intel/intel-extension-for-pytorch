@@ -1146,6 +1146,19 @@ class TestTensorShape(TestCase):
             x_dpcpp_view_clone = x_dpcpp_view.clone()
             self.assertEqual(x_cpu_view_clone, x_dpcpp_view_clone)
 
+    def test_select(self):
+        with AutoDNNL(True):
+            x_cpu = torch.randn((2, 4, 4, 4))
+            x_dpcpp = x_cpu.to(device=device)
+            x_dpcpp = convert_blocked(x_dpcpp)
+
+            x_cpu_view = x_cpu[0]
+            x_dpcpp_view = x_dpcpp[0]
+
+            x_cpu_view_clone = x_cpu_view.clone()
+            x_dpcpp_view_clone = x_dpcpp_view.clone()
+            self.assertEqual(x_cpu_view_clone, x_dpcpp_view_clone)
+
 class TestSoftMax(TestCase):
     def test_softmax(self):
         with AutoDNNL(True):
