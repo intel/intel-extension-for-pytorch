@@ -1441,9 +1441,15 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& s
 }
 
 
-at::Tensor dil_as_strided(const at::Tensor& self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset_) {
-  DEBUG("AtenIpexCPUDev::dil_as_strided\n");
-  CHECK_DNNL_OP_PRE_COND(self);
+at::Tensor dil_as_strided(
+    const at::Tensor& self,
+    at::IntArrayRef size,
+    at::IntArrayRef stride,
+    c10::optional<int64_t> storage_offset_) {
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+      dbl::comm::try_gen_dil_tensor(self).is_public_format(),
+      "Cannot set sizes and strides for DIL tensor with non-public format");
 
   // share storage
   auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
@@ -1589,6 +1595,10 @@ at::Tensor alias_with_sizes_and_strides(
     const at::Tensor& self,
     const c10::IntArrayRef sizes,
     const c10::IntArrayRef strides) {
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+      dbl::comm::try_gen_dil_tensor(self).is_public_format(),
+      "Cannot set sizes and strides for DIL tensor with non-public format");
 
   // share storage
   auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
