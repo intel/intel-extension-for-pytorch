@@ -28,20 +28,18 @@ typename std::enable_if<!IS_HALF(scalar_t), void>::type scanThrust(
     Tensor& dst,
     Tensor& src,
     BinaryFunction binary_op) {
-  auto src_data = src.data_ptr<scalar_t>();
   auto src_size = src.nbytes();
-  auto dst_data = dst.data_ptr<scalar_t>();
   auto dst_size = dst.nbytes();
   ptrdiff_t size = src.numel();
 
   auto& queue = getCurrentDPCPPStream().dpcpp_queue();
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data);
-    auto acc_dst = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dst_data);
+    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
+    auto dst_data = get_buffer<dpcpp_discard_w_mode>(cgh, dst.data_ptr<scalar_t>());
     // (TODO) single_task need replaced due to low efficiency
     cgh.single_task<scanthrust_dpcpp_ker<scalar_t, BinaryFunction>>([=]() {
-      auto ptr_dst = acc_dst.template get_pointer<scalar_t>();
-      auto ptr_src = acc_src.template get_pointer<scalar_t>();
+      auto ptr_dst = get_pointer(dst_data);
+      auto ptr_src = get_pointer(src_data);
       dpcpp_inclusive_scan(ptr_src, ptr_src + size, ptr_dst, binary_op);
     });
   };
@@ -57,9 +55,7 @@ void scanOuterDim(
     scalar_t init,
     BinaryOp binary_op) {
   auto totalElements = tgt.numel();
-  auto tgt_data = tgt.data_ptr<scalar_t>();
   auto tgt_size = tgt.nbytes();
-  auto src_data = src.data_ptr<scalar_t>();
   auto src_size = src.nbytes();
   int64_t n = src.size(dimension);
   int64_t stride = src.stride(dimension);
@@ -70,12 +66,12 @@ void scanOuterDim(
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data);
-    auto tgt_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tgt_data);
+    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
+    auto tgt_data = get_buffer<dpcpp_discard_w_mode>(cgh, tgt.data_ptr<scalar_t>());
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto src_ptr = src_acc.template get_pointer<scalar_t>();
-      auto tgt_ptr = tgt_acc.template get_pointer<scalar_t>();
+      auto src_ptr = get_pointer(src_data);
+      auto tgt_ptr = get_pointer(tgt_data);
       for (int64_t linearIndex = item.get_global_id(0);
            linearIndex < totalElements;
            linearIndex += item.get_global_range()[0]) {
@@ -108,9 +104,7 @@ void scanInnermostDim(
   auto& queue = getCurrentDPCPPStream().dpcpp_queue();
 
   auto totalElements = tgt.numel();
-  auto tgt_data = tgt.data_ptr<scalar_t>();
   auto tgt_size = tgt.nbytes();
-  auto src_data = src.data_ptr<scalar_t>();
   auto src_size = src.nbytes();
   auto dimension = tgt.dim() - 1;
   int64_t n = src.size(dimension);
@@ -121,12 +115,12 @@ void scanInnermostDim(
   parallel_for_setup(totalElements, tileSize, rng, GRange);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, src_data);
-    auto tgt_acc = DPCPPAccessor<dpcpp_discard_w_mode>(cgh, tgt_data);
+    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src.data_ptr<scalar_t>());
+    auto tgt_data = get_buffer<dpcpp_discard_w_mode>(cgh, tgt.data_ptr<scalar_t>());
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto src_ptr = src_acc.template get_pointer<scalar_t>();
-      auto tgt_ptr = tgt_acc.template get_pointer<scalar_t>();
+      auto src_ptr = get_pointer(src_data);
+      auto tgt_ptr = get_pointer(tgt_data);
 
       for (int64_t linearIndex = item.get_global_id(0);
            linearIndex < totalElements;
