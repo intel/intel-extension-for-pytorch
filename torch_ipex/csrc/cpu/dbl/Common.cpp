@@ -243,6 +243,12 @@ void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected
   auto src = try_gen_dil_storage(tensor);
   dil::tensor dst {expected_desc};
   dst.feed_from(src);
+
+  // If a max pool output is converting from bf16 back to fp32,
+  // its workspace has also to be copied onto the new tensor
+  if (src.has_workspace()) {
+    dst.copy_workspace(src);
+  }
   equip_dil_buffer_nosync_shape(tensor, dst);
 }
 
