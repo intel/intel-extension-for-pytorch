@@ -1130,6 +1130,22 @@ class TestTensorShape(TestCase):
                 self.assertTrue(ipex.core.get_dil_tensor_sizes(res_fp32_view), [5120, 1, 128])
                 self.assertEqual(list(tmp_res.size()), [2, 4, 1, 128])
 
+    def test_view_blocked(self):
+        with AutoDNNL(True):
+            old_shape = (1, 4, 4, 4)
+            new_shape = (4, 16)
+
+            x_cpu = torch.randn(old_shape)
+            x_dpcpp = x_cpu.to(device=device)
+            x_dpcpp = convert_blocked(x_dpcpp)
+
+            x_cpu_view = x_cpu.view(new_shape)
+            x_dpcpp_view = x_dpcpp.view(new_shape)
+
+            x_cpu_view_clone = x_cpu_view.clone()
+            x_dpcpp_view_clone = x_dpcpp_view.clone()
+            self.assertEqual(x_cpu_view_clone, x_dpcpp_view_clone)
+
 class TestSoftMax(TestCase):
     def test_softmax(self):
         with AutoDNNL(True):

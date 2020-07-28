@@ -1607,6 +1607,9 @@ at::Tensor AtenIpexCPUDev::dil_view(const at::Tensor & self, at::IntArrayRef siz
   DEBUG("AtenIpexCPUDev::dil_view\n");
   CHECK_DNNL_OP_PRE_COND(self);
 
+  // We do not support reshaping (viewing) a DIL tensor with blocked format
+  dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
+
   // Port from aten/src/ATen/native/TensorShape.cpp
   auto inferred_size = at::infer_size(size, self.numel());
   auto stride = at::detail::computeStride(self.sizes(),
