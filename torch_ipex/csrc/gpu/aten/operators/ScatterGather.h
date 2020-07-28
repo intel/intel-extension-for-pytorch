@@ -107,18 +107,15 @@ void THDPCPPTensor_gatherKernel(
     const IndexType totalElements) {
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
-  using out_accessor_t = DPCPPAccessor<dpcpp_discard_w_mode>;
-  using in_accessor_t = DPCPPAccessor<dpcpp_r_mode>;
-
   auto cgf = DPCPP_Q_CGF(__cgh) {
-    out_accessor_t tensor_acc = out_accessor_t(__cgh, tensor.data);
-    in_accessor_t src_acc = in_accessor_t(__cgh, src.data);
-    in_accessor_t index_acc = in_accessor_t(__cgh, index.data);
+    auto tensor_data = get_buffer<dpcpp_discard_w_mode>(__cgh, tensor.data);
+    auto src_data = get_buffer<dpcpp_r_mode>(__cgh, src.data);
+    auto index_data = get_buffer<dpcpp_r_mode>(__cgh, index.data);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto tensor_data = tensor_acc.template get_pointer<Real>();
-      auto src_data = src_acc.template get_pointer<Real>();
-      auto index_data = index_acc.template get_pointer<int64_t>();
+      auto tensor_ptr = get_pointer(tensor_data);
+      auto src_ptr = get_pointer(src_data);
+      auto index_ptr = get_pointer(index_data);
 
       auto linear_idx = item_id.get_id(0);
 
@@ -136,12 +133,12 @@ void THDPCPPTensor_gatherKernel(
           src,
           &srcOffset);
 
-      int64_t indexValue = index_data[indexOffset];
+      int64_t indexValue = index_ptr[indexOffset];
       if (indexValue >= 0 &&
           static_cast<IndexType>(indexValue) < src.sizes[dim]) {
         srcOffset += indexValue * src.strides[dim];
 
-        tensor_data[tensorOffset] = src_data[srcOffset];
+        tensor_ptr[tensorOffset] = src_ptr[srcOffset];
       }
       //      else
       //        add warning
@@ -168,13 +165,13 @@ void THSyclTensor_scatterKernel(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_out = DPCPPAccessor<dpcpp_w_mode>(cgh, tensor.data);
-    auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, src.data);
-    auto acc_index = DPCPPAccessor<dpcpp_r_mode>(cgh, index.data);
+    auto out_data = get_buffer<dpcpp_w_mode>(cgh, tensor.data);
+    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src.data);
+    auto index_data = get_buffer<dpcpp_r_mode>(cgh, index.data);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto tensor_ptr = acc_out.template get_pointer<Real>();
-      auto src_ptr = acc_src.template get_pointer<Real>();
-      auto index_ptr = acc_index.template get_pointer<int64_t>();
+      auto tensor_ptr = get_pointer(out_data);
+      auto src_ptr = get_pointer(src_data);
+      auto index_ptr = get_pointer(index_data);
       for (IndexType linearIndex = (IndexType)item.get_global_id(0);
            linearIndex < totalElements;
            linearIndex += (IndexType)item.get_global_range()[0]) {
@@ -224,13 +221,13 @@ void THSyclTensor_scatterAddKernel(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_out = DPCPPAccessor<dpcpp_w_mode>(cgh, tensor.data);
-    auto acc_src = DPCPPAccessor<dpcpp_r_mode>(cgh, src.data);
-    auto acc_index = DPCPPAccessor<dpcpp_r_mode>(cgh, index.data);
+    auto out_data = get_buffer<dpcpp_w_mode>(cgh, tensor.data);
+    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src.data);
+    auto index_data = get_buffer<dpcpp_r_mode>(cgh, index.data);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto tensor_ptr = acc_out.template get_pointer<Real>();
-      auto src_ptr = acc_src.template get_pointer<Real>();
-      auto index_ptr = acc_index.template get_pointer<int64_t>();
+      auto tensor_ptr = get_pointer(out_data);
+      auto src_ptr = get_pointer(src_data);
+      auto index_ptr = get_pointer(index_data);
 
       for (IndexType linearIndex = (IndexType)item.get_global_id(0);
            linearIndex < totalElements;
@@ -253,7 +250,7 @@ void THSyclTensor_scatterAddKernel(
         // assert(indexValue >= 0 && indexValue < src.sizes[dim]);
         tensorOffset += indexValue * tensor.strides[dim];
 
-        atomicAdd(&tensor_ptr[tensorOffset], src_ptr[srcOffset]);
+        atomicAdd((dpcpp_global_ptr_pt<Real>)&tensor_ptr[tensorOffset], src_ptr[srcOffset]);
       }
     };
 
@@ -280,11 +277,11 @@ void THSyclTensor_scatterFillKernel(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_out = DPCPPAccessor<dpcpp_w_mode>(cgh, tensor.data);
-    auto acc_index = DPCPPAccessor<dpcpp_r_mode>(cgh, index.data);
+    auto out_data = get_buffer<dpcpp_w_mode>(cgh, tensor.data);
+    auto index_data = get_buffer<dpcpp_r_mode>(cgh, index.data);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto tensor_ptr = acc_out.template get_pointer<Real>();
-      auto index_ptr = acc_index.template get_pointer<int64_t>();
+      auto tensor_ptr = get_pointer(out_data);
+      auto index_ptr = get_pointer(index_data);
       for (IndexType linearIndex = (IndexType)item.get_global_id(0);
            linearIndex < totalElements;
            linearIndex += (IndexType)item.get_global_range()[0]) {
