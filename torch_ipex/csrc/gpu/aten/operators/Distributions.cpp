@@ -38,15 +38,15 @@ void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
   auto size = ret.numel() * sizeof(scalar_t);
   // First fill self with random number within range [0.0 - 1.0]
   auto cgf_1 = DPCPP_Q_CGF(cgh) {
-    auto acc = DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size)
-                   .get_access();
+    auto data = get_buffer<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>());
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
     auto num_work_items = DPCPP::nd_range<1>(
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
     cgh.parallel_for<DPCPP_K(bernoulli_scalar_sycl_random_filler, scalar_t)>(
         num_work_items, [=](cl::sycl::nd_item<1> item) {
-          FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
+          auto ptr = get_pointer(data);
+          RandomEngine<scalar_t> uniform_rnd_filler(ptr, range, seed, 0.0f, 1.0f);
           uniform_rnd_filler(item);
         });
   };
@@ -58,13 +58,13 @@ void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
   auto cgf_2 = DPCPP_Q_CGF(cgh) {
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
-    auto out_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>());
+    auto out_data = get_buffer<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>());
     cgh.parallel_for<DPCPP_K(bernoulli_scalar_dpcpp_ker, scalar_t)>(
         DPCPP::nd_range<1>(
             DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size)),
         [=](DPCPP::nd_item<1> item) {
           int64_t id = item.get_global_linear_id();
-          auto out_ptr = out_acc.template get_pointer<scalar_t>();
+          auto out_ptr = get_pointer(out_data);
           if (id < range) {
             out_ptr[id] = out_ptr[id] < p_ ? 1.0f : 0.0f;
           }
@@ -78,19 +78,18 @@ void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
 template <typename scalar_t>
 void bernoulli_tensor_kernel(Tensor& ret, const Tensor& p, uint64_t seed) {
   auto& queue = getCurrentDPCPPStream().dpcpp_queue();
-  auto size = ret.numel() * sizeof(scalar_t);
 
   // First fill self with random number within range [0.0 - 1.0]
   auto cgf1 = DPCPP_Q_CGF(cgh) {
-    auto acc = DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>(), size)
-                   .get_access();
+    auto data = get_buffer<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>());
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
     auto num_work_items = DPCPP::nd_range<1>(
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
     cgh.parallel_for<DPCPP_K(bernoulli_tensor_sycl_random_filler, scalar_t)>(
         num_work_items, [=](cl::sycl::nd_item<1> item) {
-          FloatRandomFiller uniform_rnd_filler(acc, range, seed, 0.0f, 1.0f);
+          auto ptr = get_pointer(data);
+          RandomEngine<scalar_t> uniform_rnd_filler(ptr, range, seed, 0.0f, 1.0f);
           uniform_rnd_filler(item);
         });
   };
@@ -99,16 +98,16 @@ void bernoulli_tensor_kernel(Tensor& ret, const Tensor& p, uint64_t seed) {
 
   // Generate final bernoulli distributions
   auto cgf2 = DPCPP_Q_CGF(cgh) {
-    auto in_acc =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, p.data_ptr<scalar_t>());
-    auto out_acc =
-        DPCPPAccessor<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>());
+    auto in_data =
+        get_buffer<dpcpp_r_mode>(cgh, p.data_ptr<scalar_t>());
+    auto out_data =
+        get_buffer<dpcpp_w_mode>(cgh, ret.data_ptr<scalar_t>());
     int64_t tile_size, range, global_range;
     parallel_for_setup(ret.numel(), tile_size, range, global_range);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       int64_t id = item.get_global_linear_id();
-      auto in_ptr = in_acc.template get_pointer<scalar_t>();
-      auto out_ptr = out_acc.template get_pointer<scalar_t>();
+      auto in_ptr = get_pointer(in_data);
+      auto out_ptr = get_pointer(out_data);
       if (id < range) {
         out_ptr[id] = out_ptr[id] < in_ptr[id] ? 1.0f : 0.0f;
       }
@@ -181,18 +180,17 @@ void sample_multinomial_with_replacement(
       local_range(1, work_group_size);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto result_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, result.data_ptr());
-    auto norm_dist_prefix_sum_acc =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, norm_dist_prefix_sum.data_ptr());
-    auto norm_dist_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, norm_dist.data_ptr());
+    auto result_data = get_buffer<dpcpp_rw_mode>(cgh, result.data_ptr<long>());
+    auto norm_dist_prefix_sum_data =
+        get_buffer<dpcpp_r_mode>(cgh, norm_dist_prefix_sum.data_ptr<scalar_t>());
+    auto norm_dist_data = get_buffer<dpcpp_r_mode>(cgh, norm_dist.data_ptr<scalar_t>());
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
       size_t dist_id = item_id.get_group(0);
       size_t sample_id = item_id.get_local_id(1);
       size_t global_linear_id = item_id.get_global_linear_id();
-      long* result_data = result_acc.template get_pointer<long>();
-      scalar_t* norm_dist_prefix_sum_data =
-          norm_dist_prefix_sum_acc.template get_pointer<scalar_t>();
-      scalar_t* norm_dist_data = norm_dist_acc.template get_pointer<scalar_t>();
+      long* result_data = get_pointer(result_data);
+      scalar_t* norm_dist_prefix_sum_data = get_pointer(norm_dist_prefix_sum_data);
+      scalar_t* norm_dist_data = get_pointer(norm_dist_data);
 
       RandomState<Philox4_32_10> state(
           seeds.first, global_linear_id, seeds.second);
@@ -243,17 +241,16 @@ void sample_multinomial_without_replacement(
   DPCPP::range<1> range(distributions);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto result_acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, result.data_ptr());
-    auto norm_dist_prefix_sum_acc =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, norm_dist_prefix_sum.data_ptr());
-    auto norm_dist_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, norm_dist.data_ptr());
+    auto result_data = get_buffer<dpcpp_rw_mode>(cgh, result.data_ptr<long>());
+    auto norm_dist_prefix_sum_data =
+        get_buffer<dpcpp_r_mode>(cgh, norm_dist_prefix_sum.data_ptr<scalar_t>());
+    auto norm_dist_data = get_buffer<dpcpp_r_mode>(cgh, norm_dist.data_ptr<scalar_t>());
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
       size_t dist_id = item_id.get_id(0);
       size_t linear_id = item_id.get_linear_id();
-      long* result_data = result_acc.template get_pointer<long>();
-      scalar_t* norm_dist_prefix_sum_data =
-          norm_dist_prefix_sum_acc.template get_pointer<scalar_t>();
-      scalar_t* norm_dist_data = norm_dist_acc.template get_pointer<scalar_t>();
+      long* result_ptr = get_pointer(result_data);
+      scalar_t* norm_dist_prefix_sum_ptr = get_pointer(norm_dist_prefix_sum_data);
+      scalar_t* norm_dist_ptr = get_pointer(norm_dist_data);
 
       RandomState<Philox4_32_10> state(seeds.first, linear_id, seeds.second);
       float rand = state.uniform();
@@ -261,17 +258,17 @@ void sample_multinomial_without_replacement(
 
       // Find the bucket that a uniform sample lies in
       int choice = binary_search_for_multinomial<scalar_t>(
-          norm_dist_prefix_sum_data + dist_id * categories,
-          norm_dist_data + dist_id * categories,
+          norm_dist_prefix_sum_ptr + dist_id * categories,
+          norm_dist_ptr + dist_id * categories,
           categories,
           r);
 
       // Torch indices are 1-based
-      result_data[dist_id * num_samples + sample] = choice;
+      result_ptr[dist_id * num_samples + sample] = choice;
 
       // Without replacement, so update the original probability so it
       // is not considered a second time
-      norm_dist_data[dist_id * categories + choice] =
+      norm_dist_ptr[dist_id * categories + choice] =
           ScalarConvert<int, scalar_t>::to(0);
     };
 
@@ -292,15 +289,13 @@ void distribution_elementwise_grid_stride_kernel(at::TensorIterator& iter,
                                                  const transform_t transform_func) {
 
   auto &sycl_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
-  void* out_data = (void*)iter.data_ptr(0);
 
-  using out_accessor_t = dpcpp::DPCPPAccessor<dpcpp_discard_w_mode>;
   auto offset_calc = at::dpcpp::make_offset_calculator<1>(iter);
   auto cgf = DPCPP_Q_CGF(cgh) {
-    out_accessor_t out_acc = out_accessor_t (cgh, out_data);
+    auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, (char*)iter.data_ptr(0));
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id)  {
       size_t sample_id = item_id.get_id(0);
-      auto out_ptr = out_acc.template get_pointer<char>();
+      auto out_ptr = get_pointer(out_data);
       RandomState<Philox4_32_10> state(seeds.first, sample_id, seeds.second);
       dist_func(&state);
       float rand = state.uniform();

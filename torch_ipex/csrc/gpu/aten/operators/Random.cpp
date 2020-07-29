@@ -27,10 +27,7 @@ void uniform(Tensor& self, Generator* _generator, double a, double b) {
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto self_data_size = self.nbytes();
-    void* self_data_ptr = self.data_ptr<scalar_t>();
-
-    auto acc = DPCPPAccessor<dpcpp_w_mode>(cgh, self_data_ptr, self_data_size)
-                   .get_access();
+    auto data = get_buffer<dpcpp_w_mode>(cgh, self.data_ptr<scalar_t>());
 
     int64_t tile_size, range, global_range;
     parallel_for_setup(self.numel(), tile_size, range, global_range);
@@ -40,18 +37,9 @@ void uniform(Tensor& self, Generator* _generator, double a, double b) {
 
     cgh.parallel_for<DPCPP_K(uniform_random_filler, scalar_t)>(
         num_work_items, [=](cl::sycl::nd_item<1> item) {
-          if (std::is_same<scalar_t, float>::value) {
-            FloatRandomFiller uniform_rnd_filler(
-                acc, range, current_seed, a, b);
-            uniform_rnd_filler(item);
-          } else if (std::is_same<scalar_t, at::Half>::value) {
-            HalfRandomFiller uniform_rnd_filler(acc, range, current_seed, a, b);
-            uniform_rnd_filler(item);
-          } else {
-            DoubleRandomFiller uniform_rnd_filler(
-                acc, range, current_seed, a, b);
-            uniform_rnd_filler(item);
-          }
+          auto ptr = get_pointer(data);
+          RandomEngine<scalar_t> uniform_rnd_filler(ptr, range, current_seed, a, b);
+          uniform_rnd_filler(item);
         });
   };
 
@@ -76,10 +64,8 @@ void normal(Tensor& self, double mean, double stdv, Generator* _generator) {
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto self_data_size = self.nbytes();
-    void* self_data_ptr = self.data_ptr<scalar_t>();
 
-    auto acc = DPCPPAccessor<dpcpp_rw_mode>(cgh, self_data_ptr, self_data_size)
-                   .get_access();
+    auto data = get_buffer<dpcpp_rw_mode>(cgh, self.data_ptr<scalar_t>());
     int64_t tile_size, range, global_range;
 
     bool recompute = ((self.numel() % 2) != 0);
@@ -91,8 +77,9 @@ void normal(Tensor& self, double mean, double stdv, Generator* _generator) {
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
     cgh.parallel_for<DPCPP_K(normal_random_filler, accreal, scalar_t)>(
         num_work_items, [=](cl::sycl::nd_item<1> item) {
-          NormalRandomFiller<accreal> normal_rnd_filler(
-              acc, compute_num, stdv, mean);
+          auto ptr = get_pointer(data);
+          NormalRandomFiller<scalar_t, accreal> normal_rnd_filler(
+            ptr, compute_num, stdv, mean);
           normal_rnd_filler(item);
         });
   };

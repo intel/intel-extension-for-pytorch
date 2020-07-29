@@ -5,16 +5,6 @@
 
 using namespace DPCPP;
 using namespace at::dpcpp;
-using ACC_1D_RW_G = accessor<
-    buffer_data_type_t,
-    1,
-    access::mode::read_write,
-    DPCPP::access::target::global_buffer>;
-using ACC_1D_W_G = accessor<
-    buffer_data_type_t,
-    1,
-    access::mode::write,
-    DPCPP::access::target::global_buffer>;
 
 #define RANDOM_NUM (200000)
 #define NUM_PER_RND (624)
@@ -32,20 +22,20 @@ using ACC_1D_W_G = accessor<
 static const double DOUBLE_DIVISOR = 18446744073709551616.0;
 static const float FLOAT_DIVISOR = 4294967296.0f;
 
-template <typename META_TYPE>
+template <typename scalar_t>
 class MTRandomEngine {
- public:
+public:
   MTRandomEngine(
-      ACC_1D_W_G ptr,
+      scalar_t* ptr,
       int64_t ele_num,
       uint64_t seed,
-      META_TYPE min,
-      META_TYPE max)
-      : m_ptr(ptr) {
+      scalar_t min,
+      scalar_t max) {
+    m_ptr = ptr;
     m_ele_num = ele_num;
     m_seed = seed;
-    m_real_min = static_cast<META_TYPE>(min);
-    m_real_max = static_cast<META_TYPE>(max);
+    m_real_min = static_cast<scalar_t>(min);
+    m_real_max = static_cast<scalar_t>(max);
   }
 
   // mersenne_twister_engine
@@ -76,155 +66,26 @@ class MTRandomEngine {
     }
   }
 
+
  protected:
-  ACC_1D_W_G m_ptr;
+  scalar_t* m_ptr;
   int64_t m_ele_num;
   uint64_t m_seed;
-  META_TYPE m_real_min;
-  META_TYPE m_real_max;
-};
-
-class HalfRandomFiller : public MTRandomEngine<unsigned short> {
- public:
-  HalfRandomFiller(
-      ACC_1D_W_G ptr,
-      int64_t ele_num,
-      uint64_t seed,
-      float min,
-      float max)
-      : MTRandomEngine<unsigned short>(ptr, ele_num, seed, min, max) {}
-
-  void operator()(nd_item<1> item) {
-    unsigned short* real_ptr =
-        SyclConvertToActualTypePtr(unsigned short, m_ptr);
-    uint32_t mt[NUM_PER_RND];
-
-    int g_id = item.get_global_linear_id();
-    generate_random_numbers(g_id, 0, mt);
-
-    for (int i = 0; i < NUM_PER_RND; i++) {
-      int idx = i + g_id * NUM_PER_RND;
-
-      if (idx >= m_ele_num)
-        return;
-      uint32_t y = mt[i];
-
-      float tmp = m_real_min +
-          ((float)y + 1.0f) / FLOAT_DIVISOR * (m_real_max - m_real_min);
-      real_ptr[idx] = static_cast<unsigned short>(static_cast<at::Half>(tmp));
-    }
-  }
-};
-
-class FloatRandomFiller : public MTRandomEngine<float> {
- public:
-  FloatRandomFiller(
-      ACC_1D_W_G ptr,
-      int64_t ele_num,
-      uint64_t seed,
-      float min,
-      float max)
-      : MTRandomEngine<float>(ptr, ele_num, seed, min, max) {}
-
-  void operator()(nd_item<1> item) {
-    float* real_ptr = SyclConvertToActualTypePtr(float, m_ptr);
-    uint32_t mt[NUM_PER_RND];
-
-    int g_id = item.get_global_linear_id();
-    generate_random_numbers(g_id, 0, mt);
-
-    for (int i = 0; i < NUM_PER_RND; i++) {
-      int idx = i + g_id * NUM_PER_RND;
-
-      if (idx >= m_ele_num)
-        return;
-      uint32_t y = mt[i];
-      real_ptr[idx] = m_real_min +
-          ((float)y + 1.0f) / FLOAT_DIVISOR * (m_real_max - m_real_min);
-    }
-  }
-};
-
-class DoubleRandomFiller : public MTRandomEngine<double> {
- public:
-  DoubleRandomFiller(
-      ACC_1D_W_G ptr,
-      int64_t ele_num,
-      uint64_t seed,
-      double min,
-      double max)
-      : MTRandomEngine<double>(ptr, ele_num, seed, min, max) {}
-
-  void operator()(nd_item<1> item) {
-    double* real_ptr = SyclConvertToActualTypePtr(double, m_ptr);
-    uint32_t mt_hi[NUM_PER_RND];
-    uint32_t mt_lo[NUM_PER_RND];
-
-    int g_id = item.get_global_linear_id();
-    generate_random_numbers(g_id, 0, mt_hi);
-    generate_random_numbers(g_id, 50, mt_lo);
-
-    for (int i = 0; i < NUM_PER_RND; i++) {
-      int idx = i + g_id * NUM_PER_RND;
-      if (idx >= m_ele_num)
-        return;
-      uint64_t y = (((uint64_t)mt_hi[i]) << 32) | mt_lo[i];
-      real_ptr[idx] = m_real_min +
-          ((double)y + 1.0) / DOUBLE_DIVISOR * (m_real_max - m_real_min);
-    }
-  }
-};
-
-template <typename META_TYPE>
-class NormalRandomFiller {
- public:
-  NormalRandomFiller(
-      ACC_1D_RW_G ptr,
-      int64_t compute_num,
-      double stdv,
-      double mean)
-      : m_ptr(ptr) {
-    m_compute_num = compute_num;
-    m_stdv = stdv;
-    m_mean = mean;
-  }
-
-  void operator()(nd_item<1> item) {
-    META_TYPE* real_ptr = SyclConvertToActualTypePtr(META_TYPE, m_ptr);
-    int g_id = item.get_global_linear_id();
-
-    if (g_id < m_compute_num) {
-      const META_TYPE u1 = 1 - real_ptr[g_id]; // [0, 1) -> (0, 1] for log.
-      const META_TYPE u2 = real_ptr[g_id + m_compute_num];
-
-      const META_TYPE radius = DPCPP::sqrt(-2 * DPCPP::log(u1));
-      const META_TYPE theta = 2.0f * M_PI * u2;
-
-      real_ptr[g_id] = radius * DPCPP::cos(theta) * m_stdv + m_mean;
-      real_ptr[g_id + m_compute_num] =
-          radius * DPCPP::sin(theta) * m_stdv + m_mean;
-    }
-  }
-
- private:
-  ACC_1D_RW_G m_ptr;
-  double m_stdv;
-  double m_mean;
-  int64_t m_compute_num;
+  scalar_t m_real_min;
+  scalar_t m_real_max;
 };
 
 using Philox4_32_10 = at::Philox4_32_10;
-
 template <typename scalar_t, typename engine_t = Philox4_32_10>
 class RandomState final {
- public:
+public:
   template <
-      typename = std::enable_if<std::is_same<Philox4_32_10, engine_t>::value>>
+    typename = std::enable_if<std::is_same<Philox4_32_10, engine_t>::value>>
   RandomState(
-      uint64_t seed = 67280421310721,
-      uint64_t subsequence = 0,
-      uint64_t offset = 0)
-      : engine(seed, subsequence, offset){};
+    uint64_t seed = 67280421310721,
+    uint64_t subsequence = 0,
+    uint64_t offset = 0)
+    : engine(seed, subsequence, offset){};
 
   RandomState() = delete;
   RandomState(const RandomState&) = delete;
@@ -238,6 +99,163 @@ class RandomState final {
     return ((float)y + 1.0f) / FLOAT_DIVISOR;
   }
 
- private:
+private:
   engine_t engine;
+};
+
+template <typename scalar_t>
+class RandomEngine : public MTRandomEngine<scalar_t> {
+public:
+  RandomEngine(
+    scalar_t* ptr,
+    int64_t ele_num,
+    uint64_t seed,
+    scalar_t min,
+    scalar_t max)
+    : MTRandomEngine<scalar_t>(ptr, ele_num, seed, min, max){
+  };
+
+  void operator()(nd_item<1> item) {
+#ifdef __SYCL_DEVICE_ONLY__
+    assert(0 && "not implemented random engine type");
+#else
+    throw std::runtime_error("not implemented random engine type");
+#endif
+  }
+};
+
+template <>
+class RandomEngine<at::Half> : public MTRandomEngine<at::Half>  {
+public:
+  RandomEngine(
+    at::Half* ptr,
+    int64_t ele_num,
+    uint64_t seed,
+    at::Half min,
+    at::Half max)
+    : MTRandomEngine<at::Half>(ptr, ele_num, seed, min, max){
+  };
+
+  void operator()(nd_item<1> item) {
+    uint32_t mt[NUM_PER_RND];
+
+    int g_id = item.get_global_linear_id();
+    generate_random_numbers(g_id, 0, mt);
+
+    for (int i = 0; i < NUM_PER_RND; i++) {
+      int idx = i + g_id * NUM_PER_RND;
+
+      if (idx >= m_ele_num)
+        return;
+      uint32_t y = mt[i];
+
+      float tmp = m_real_min +
+                  ((float)y + 1.0f) / FLOAT_DIVISOR * (m_real_max - m_real_min);
+      m_ptr[idx] = static_cast<unsigned short>(static_cast<at::Half>(tmp));
+    }
+  }
+};
+
+template <>
+class RandomEngine<float> : public MTRandomEngine<float> {
+public:
+  RandomEngine(
+    float* ptr,
+    int64_t ele_num,
+    uint64_t seed,
+    float min,
+    float max)
+    : MTRandomEngine<float>(ptr, ele_num, seed, min, max){
+  };
+
+  void operator()(nd_item<1> item) {
+    uint32_t mt[NUM_PER_RND];
+
+    int g_id = item.get_global_linear_id();
+    generate_random_numbers(g_id, 0, mt);
+
+    for (int i = 0; i < NUM_PER_RND; i++) {
+      int idx = i + g_id * NUM_PER_RND;
+
+      if (idx >= m_ele_num)
+        return;
+      uint32_t y = mt[i];
+      m_ptr[idx] = m_real_min +
+                   ((float)y + 1.0f) / FLOAT_DIVISOR * (m_real_max - m_real_min);
+    }
+  }
+};
+
+template <>
+class RandomEngine<double> : public MTRandomEngine<double> {
+public:
+  RandomEngine(
+    double* ptr,
+    int64_t ele_num,
+    uint64_t seed,
+    double min,
+    double max)
+    : MTRandomEngine<double>(ptr, ele_num, seed, min, max){
+  };
+
+  void operator()(nd_item<1> item) {
+    uint32_t mt_hi[NUM_PER_RND];
+    uint32_t mt_lo[NUM_PER_RND];
+
+    int g_id = item.get_global_linear_id();
+    generate_random_numbers(g_id, 0, mt_hi);
+    generate_random_numbers(g_id, 50, mt_lo);
+
+    for (int i = 0; i < NUM_PER_RND; i++) {
+      int idx = i + g_id * NUM_PER_RND;
+      if (idx >= m_ele_num)
+        return;
+      uint64_t y = (((uint64_t)mt_hi[i]) << 32) | mt_lo[i];
+      m_ptr[idx] = m_real_min +
+                   ((double)y + 1.0) / DOUBLE_DIVISOR * (m_real_max - m_real_min);
+    }
+  }
+};
+//
+//
+//template <>
+//class MTRandomEngine<c10::BFloat16, 1> : public MTRandomEngine<c10::BFloat16, 0> {
+//
+//};
+
+template <typename scalar_t, typename accumulate_t>
+class NormalRandomFiller {
+ public:
+  NormalRandomFiller(
+      scalar_t* ptr,
+      int64_t compute_num,
+      double stdv,
+      double mean)
+      : m_ptr(ptr) {
+    m_compute_num = compute_num;
+    m_stdv = stdv;
+    m_mean = mean;
+  }
+
+  void operator()(nd_item<1> item) {
+    int g_id = item.get_global_linear_id();
+
+    if (g_id < m_compute_num) {
+      const accumulate_t u1 = 1 - m_ptr[g_id]; // [0, 1) -> (0, 1] for log.
+      const accumulate_t u2 = m_ptr[g_id + m_compute_num];
+
+      const accumulate_t radius = DPCPP::sqrt(-2 * DPCPP::log(u1));
+      const accumulate_t theta = 2.0f * M_PI * u2;
+
+      m_ptr[g_id] = radius * DPCPP::cos(theta) * m_stdv + m_mean;
+      m_ptr[g_id + m_compute_num] =
+          radius * DPCPP::sin(theta) * m_stdv + m_mean;
+    }
+  }
+
+ private:
+  scalar_t* m_ptr;
+  accumulate_t m_stdv;
+  accumulate_t m_mean;
+  int64_t m_compute_num;
 };
