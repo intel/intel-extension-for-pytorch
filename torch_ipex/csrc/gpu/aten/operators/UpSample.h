@@ -116,7 +116,7 @@ static inline scalar_t area_pixel_compute_source_index(
 
 template <typename scalar_t>
 static scalar_t upsample_get_value_bounded(
-    const dpcpp_global_ptr_pt<scalar_t>& data,
+    const scalar_t* data,
     int batch,
     int channel,
     int width,
@@ -131,7 +131,7 @@ static scalar_t upsample_get_value_bounded(
 
 template <typename scalar_t>
 static void upsample_increment_value_bounded(
-    const dpcpp_global_ptr_pt<scalar_t>& data,
+    const scalar_t* data,
     int batch,
     int channel,
     int width,
@@ -141,7 +141,7 @@ static void upsample_increment_value_bounded(
     scalar_t value) {
   int64_t access_x = max(min(x, width - 1), static_cast<int>(0));
   int64_t access_y = max(min(y, height - 1), static_cast<int>(0));
-  atomicAdd(
+  atomicAdd((dpcpp_global_ptr_pt<scalar_t>)
       &data[batch * height * width * channel + channel * height * width +
             access_y * width + access_x],
       value);
