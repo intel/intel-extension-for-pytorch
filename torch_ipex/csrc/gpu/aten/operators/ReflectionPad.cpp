@@ -54,11 +54,11 @@ void reflection_pad1d_out_kernel(
   int work_group_num = CeilDiv(output_w, (int64_t)256);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto input_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, input);
-    auto output_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, output);
+    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input);
+    auto output_data = get_buffer<dpcpp_w_mode>(cgh, output);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
-      auto input_ptr = input_acc.template get_pointer<scalar_t>();
-      auto output_ptr = output_acc.template get_pointer<scalar_t>();
+      auto input_ptr = get_pointer(input_data);
+      auto output_ptr = get_pointer(output_data);
       auto output_x = item.get_global_id(0);
 
       if (output_x < output_w) {
@@ -165,11 +165,11 @@ void reflection_pad1d_backward_out_kernel(
   int work_group_num = CeilDiv(output_w, (int64_t)256);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto grad_input_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, grad_input);
-    auto grad_output_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, grad_output);
+    auto grad_input_data = get_buffer<dpcpp_w_mode>(cgh, grad_input);
+    auto grad_output_data = get_buffer<dpcpp_r_mode>(cgh, grad_output);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<3> item) {
-      auto grad_input_ptr = grad_input_acc.template get_pointer<scalar_t>();
-      auto grad_output_ptr = grad_output_acc.template get_pointer<scalar_t>();
+      auto grad_input_ptr = get_pointer(grad_input_data);
+      auto grad_output_ptr = get_pointer(grad_output_data);
       auto output_x = item.get_global_id(0);
 
       if (output_x < output_w) {
@@ -177,7 +177,7 @@ void reflection_pad1d_backward_out_kernel(
         auto index_pair =
             get_index_mapping1d(input_w, output_w, output_x, pad_l, item);
         atomicAdd(
-            &grad_input_ptr[index_pair.first],
+            (dpcpp_global_ptr_pt<scalar_t>)&grad_input_ptr[index_pair.first],
             grad_output_ptr[index_pair.second]);
       }
     };
