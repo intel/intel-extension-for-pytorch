@@ -1,0 +1,43 @@
+Intel® Extension for PyTorch* Third Party Programs File
+
+This file contains the list of third party software ("third party programs")
+contained in the Intel software and their required notices and/or license
+terms. This third party software, even if included with the distribution of
+the Intel software, may be governed by separate license terms, including
+without limitation, third party license terms, other Intel software license
+terms, and open source software license terms. These separate license terms
+govern your use of the third party programs as set forth in in the
+"THIRD-PARTY-PROGRAMS.txt" file.
+
+Third party programs and their corresponding required notices and/or license
+terms are listed below.
+-------------------------------------------------------------
+1. computecpp-sdk
+   Copyright 2016 Codeplay Software Ltd
+   Apache License 2.0
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use these files except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   For your convenience, a copy of the License has been included in this
+   repository.
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+   The files samples/gaussian_blur/stb_image.h and stb_image_write.h are
+   in the Public Domain. Originally authored by Sean Barrett.
+   https://github.com/nothings/stb
+
+   The file samples/smart_pointer/stack_allocator.hpp is (c) Charles Salvia
+   and is available under the MIT License.
+   https://github.com/charles-salvia/charles
+
+-------------------------------------------------------------
+Other names and brands may be claimed as the property of others
