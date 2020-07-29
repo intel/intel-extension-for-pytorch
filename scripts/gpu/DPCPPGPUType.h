@@ -416,6 +416,7 @@ struct TORCH_API SYCLType final {
   static Tensor & reflection_pad1d_out(Tensor & out, const Tensor & self, IntArrayRef padding); // aten::reflection_pad1d.out(Tensor self, int[2] padding, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor _fft_with_size(const Tensor & self, int64_t signal_ndim, bool complex_input, bool complex_output, bool inverse, IntArrayRef checked_signal_sizes, bool normalized, bool onesided, IntArrayRef output_sizes); // aten::_fft_with_size(Tensor self, int signal_ndim, bool complex_input, bool complex_output, bool inverse, int[] checked_signal_sizes, bool normalized, bool onesided, int[] output_sizes) -> Tensor
 
+  static std::tuple<Tensor,Tensor,Tensor> _lu_with_info(const Tensor & self, bool pivot, bool check_errors); // aten::_lu_with_info(Tensor self, bool pivot=True, bool check_errors=True) -> (Tensor, Tensor, Tensor)
 };
   static Tensor isnan(const Tensor & self); // aten::isnan(Tensor self) -> Tensor
   static bool equal(const Tensor & self, const Tensor & other); // aten::equal(Tensor self, Tensor other) -> bool

@@ -7,6 +7,11 @@
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
 
+#ifdef USE_ONEMKL
+#include <mkl_sycl.hpp>
+#include <mkl.h>
+#endif
+
 using namespace at::dpcpp;
 
 DPCPP_DEF_K2(triuTrilSycl, typename scalar_t, typename IndexType, bool upper);
@@ -132,6 +137,44 @@ Tensor& triu_dpcpp_(Tensor& self, int64_t k) {
   return triu_dpcpp_out(self, self, k);
 }
 
+template<typename scalar_t>
+static void apply_lu_dpcpp_(
+    Tensor& self_,
+    Tensor& pivots_,
+    Tensor& infos_) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+
+  auto batch_size = native::batchCount(self_);
+  auto m_ = self_.size(-2);
+  auto n_ = self_.size(-1);
+  Tensor self = self_.view({batch_size, m_, n_});
+  Tensor pivots = pivots_.view({batch_size, m_});
+  Tensor infos = infos_.view({batch_size});
+
+  std::vector<std::int64_t> m(batch_size, m_);
+  std::vector<std::int64_t> n(batch_size, n_);
+  std::vector<std::int64_t> lda(batch_size, m_);
+  std::vector< DPCPP::buffer<scalar_t,1>> A_buf;
+  std::vector< DPCPP::buffer<int64_t,1>> ipiv_buf;
+  std::vector< DPCPP::buffer<int64_t,1>> info_buf;
+
+  for (std::int64_t i = 0; i < batch_size; i++)
+  {
+    auto a = make_buffer<scalar_t>(self[i].data_ptr());
+    A_buf.emplace_back(a);
+    auto ipiv = make_buffer<int64_t>(pivots[i].data_ptr());
+    ipiv_buf.emplace_back(ipiv);
+    auto info = make_buffer<int64_t>(infos[i].data_ptr());
+    info_buf.emplace_back(info);
+  }
+  mkl::lapack::getrf_batch(dpcpp_queue, m, n, A_buf, lda, ipiv_buf, info_buf);
+#else
+  AT_ERROR("lu: oneMKL library not found in compilation");
+#endif
+}
+
+
 } // namespace impl
 
 Tensor& triu_out(Tensor& out, const Tensor& self, int64_t diagonal) {
@@ -150,6 +193,37 @@ Tensor& tril_(Tensor& self, int64_t diagonal) {
 
 Tensor& triu_(Tensor& self, int64_t diagonal) {
   return at::AtenIpexTypeDPCPP::triu_out(self, self, diagonal);
+}
+
+std::tuple<Tensor,Tensor,Tensor> _lu_with_info(const Tensor & self, bool pivot, bool check_errors) {
+  TORCH_CHECK(pivot, "lu without pivoting is not implemented on the DPCPP");
+  TORCH_CHECK(self.dim() >= 2,
+              "expected tensor with 2 or more dimensions, got size: ", self.sizes(),
+              " instead");
+  native::squareCheckInputs(self);
+  auto req_size = self.sizes().vec();
+  req_size.pop_back();
+  auto pivots_tensor = at::empty(req_size, self.options().dtype(kLong));
+  req_size.pop_back();
+  auto infos_tensor = at::zeros(req_size, self.options().dtype(kLong));
+
+  Tensor self_working_copy;
+  if (self.numel() == 0) {
+    self_working_copy = at::empty_like(self);
+  } else {
+    self_working_copy = native::cloneBatchedColumnMajor(self);
+    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lu_dpcpp", [&]{
+      impl::apply_lu_dpcpp_<scalar_t>(self_working_copy, pivots_tensor, infos_tensor);
+    });
+  }
+  if (check_errors) {
+    if (self.dim() > 2) {
+      native::batchCheckErrors(infos_tensor, "lu");
+    } else {
+      native::singleCheckErrors(infos_tensor.item<int64_t>(), "lu");
+    }
+  }
+  return std::make_tuple(self_working_copy, pivots_tensor, infos_tensor);
 }
 
 } // namespace AtenIpexTypeDPCPP
