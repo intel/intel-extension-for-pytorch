@@ -99,6 +99,10 @@ _FN_BLKFMT_SUPPORTED = set([
     'add_',
     'add',
     'add_out',
+    'avg_pool2d',
+    'avg_pool2d_out',
+    'max_pool2d_with_indices',
+    'max_pool2d_with_indices_out',
 ])
 
 _FN_BLACKLIST_REGEX = [

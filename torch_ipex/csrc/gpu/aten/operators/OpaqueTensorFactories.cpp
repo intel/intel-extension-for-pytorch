@@ -55,12 +55,7 @@ Tensor to_plain_if_needed(const Tensor& tensor) {
   if (!need_to_plain(tensor))
     return tensor;
 
-  auto _tensor = at::AtenIpexTypeDPCPP::empty(
-      tensor.sizes(), tensor.options(), c10::nullopt);
-  if (DPCPPTensorConvertor::convert(_tensor, tensor))
-    return _tensor;
-  else
-    return tensor;
+  return DPCPPTensorConvertor::to_plain(tensor);
 }
 
 Tensor to_plain_if_needed_(const Tensor& tensor) {

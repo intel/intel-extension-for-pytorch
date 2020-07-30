@@ -82,14 +82,10 @@ void adaptive_max_pool3d_out_template(
 
   IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       input_.scalar_type(), "adaptive_max_pool3d", [&] {
-        scalar_t* input_data = input_.data_ptr<scalar_t>();
-        scalar_t* output_data = output.data_ptr<scalar_t>();
-        int64_t* indices_data = indices.data_ptr<int64_t>();
-
         max_pool_out_frame<scalar_t>(
-            input_data,
-            output_data,
-            indices_data,
+            input,
+            output,
+            indices,
             nbatch,
             nblock,
             inputDepth,

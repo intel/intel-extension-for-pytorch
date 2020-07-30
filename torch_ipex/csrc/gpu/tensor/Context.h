@@ -4,6 +4,7 @@
 
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
+#include <core/Memory.h>
 #include <core/Allocator.h>
 #include <core/CachingAllocator.h>
 #include <dnnl.hpp>
@@ -197,9 +198,40 @@ public:
 
     auto ctx = *(static_cast<DPCPPTensorContext*>(
         from.unsafeGetTensorImpl()->storage().data_ptr().get_context()));
-    auto to = at::AtenIpexTypeDPCPP::empty(
-        ctx.dims(), from.options(), c10::nullopt);
+
+    // case-1. int32 opaque tensor in plain fmt
+    if (from.scalar_type() == at::ScalarType::Long) {
+      mem_desc_t opaque_md = {ctx.meta().data};
+      // FIXME: to decide AB or BA plain format
+      mem_desc_t plain_md = {ctx.dims(), ctx.dtype(), ctx.get_plain_tag()};
+      if (opaque_md == plain_md) {
+        Tensor to = at::empty(ctx.dims(), from.options(), c10::nullopt);
+        dpcppMemoryCopyType(
+            to.data_ptr<int64_t>(),
+            (int32_t*)from.data_ptr(),
+            from.numel());
+        return to;
+      }
+    }
+
+    auto options = from.options();
+    if (from.scalar_type() == at::ScalarType::Long)
+      options = options.dtype(kInt);
+
+    auto to = at::AtenIpexTypeDPCPP::empty(ctx.dims(), options, c10::nullopt);
     convert(to, from);
+
+    // case-2. int32 opaque tensor in block fmt
+    // 1. convert to plain 2. copy to int64
+    if (from.scalar_type() == at::ScalarType::Long) {
+      Tensor to_ = at::empty(ctx.dims(), from.options(), c10::nullopt);
+      dpcppMemoryCopyType(
+          to_.data_ptr<int64_t>(),
+          to.data_ptr<int32_t>(),
+          to.numel());
+      to = to_;
+    }
+
     return to;
   }
 

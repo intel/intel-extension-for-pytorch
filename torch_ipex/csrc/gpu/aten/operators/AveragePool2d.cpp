@@ -96,12 +96,9 @@ void avg_pool2d_out_template(
       input.scalar_type(),
       "avg_pool2d_out_frame",
       [&] {
-        scalar_t* input_data = input.data_ptr<scalar_t>();
-        scalar_t* output_data = output.data_ptr<scalar_t>();
-
         avg_pool_out_frame<scalar_t>(
-            input_data,
-            output_data,
+            input,
+            output,
             nbatch,
             nInputPlane,
             0,

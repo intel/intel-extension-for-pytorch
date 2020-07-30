@@ -1,7 +1,13 @@
 #pragma once
 
 #include <core/Runtime.h>
+#include <core/Memory.h>
+#include <tensor/Context.h>
+#include <ATen/ipex_type_dpcpp_customized.h>
+#include <utils/Env.h>
+
 #include <dnnl.hpp>
+
 
 using namespace mkldnn;
 using namespace at::dpcpp;
@@ -43,35 +49,10 @@ class scalar_t_to_dnnl {
   };
 };
 
-
-template <typename scalar1, typename scalar2>
-void dpcppMemoryCopyType(scalar1* dst, const scalar2* src, size_t n_elements) {
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  auto total_threads =
-    dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_data = get_buffer<dpcpp_discard_w_mode>(cgh, src);
-    auto out_data = get_buffer<dpcpp_r_mode>(cgh, dst);
-    cgh.parallel_for<DPCPP_K(memory_copy, scalar1, scalar2)>(
-      DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId) {
-        auto in_ptr = get_pointer(in_data);
-        auto out_ptr = get_pointer(out_data);
-        auto id = itemId.get_id(0);
-        for (auto i = id; i < n_elements; i += itemId.get_range()[0])
-          out_ptr[i] = (scalar1)in_ptr[i];
-      });
-  };
-
-  // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
-}
-
-
 template <typename scalar_t>
 static void avg_pool_out_frame(
-    scalar_t* input_data,
-    scalar_t* output_data,
+    const Tensor& input,
+    Tensor& output,
     int64_t nbatch,
     int64_t nInputPlane,
     int64_t inputDepth,
@@ -129,56 +110,68 @@ static void avg_pool_out_frame(
   auto input_md = memory::desc({input_tz}, data_t, format);
   auto output_md = memory::desc({output_tz}, data_t, format);
 
-  auto input_usr_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_t, format}, engine, input_data);
+  if (lazy_reorder_enabled()) {
+    auto input_ctx =
+        at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
+    input_md = input_ctx.is_plain() ?
+        memory::desc({input_tz}, data_t, format) :
+        input_ctx.meta();
+  }
 
-  auto output_usr_memory = dpcpp_onednn_memory(
-      {{output_tz}, data_t, format}, engine, output_data);
+  auto pooling_forward_desc =
+      pooling_forward::desc(prop_kind,
+                            alg_kind,
+                            input_md,
+                            output_md,
+                            stride,
+                            kernel,
+                            padding,
+                            padding);
 
-  std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
-  pooling_forward_desc.reset(new pooling_forward::desc(
-      prop_kind,
-      alg_kind,
-      input_md,
-      output_md,
-      stride,
-      kernel,
-      padding,
-      padding));
+  auto pooling_forward_pd =
+      pooling_forward::primitive_desc(pooling_forward_desc, engine);
 
-  std::shared_ptr<pooling_forward::primitive_desc> pooling_forward_pd;
-  pooling_forward_pd.reset(
-      new pooling_forward::primitive_desc(*pooling_forward_desc, engine));
+  memory input_usr_memory, output_usr_memory;
+  if (!lazy_reorder_enabled()) {
+    input_usr_memory = dpcpp_onednn_memory(
+        input_md, engine, input.data_ptr());
 
-  // auto input_d = pooling_forward_pd->src_desc();
+    output_usr_memory = dpcpp_onednn_memory(
+        output_md, engine, output.data_ptr());
+  } else {
+    input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
+
+    auto expected_output_md = pooling_forward_pd.dst_desc();
+    if (expected_output_md != output_md) {
+      // reallocate memory due to padding needed by oneDNN in some blk fmt
+      output = empty_opaque_tensor(
+          expected_output_md, input.options(), c10::nullopt);
+      output_usr_memory = dpcpp_onednn_memory(
+          expected_output_md, engine, output.data_ptr());
+    } else {
+      output_usr_memory = dpcpp_onednn_memory(
+          output_md, engine, output.data_ptr());
+    }
+  }
+
+  auto expected_input_md = pooling_forward_pd.src_desc();
   auto input_memory = input_usr_memory;
+  Tensor input_;
+  if (lazy_reorder_enabled()) {
+    if (input_usr_memory.get_desc() != expected_input_md) {
+      input_ = at::AtenIpexTypeDPCPP::empty(
+          {expected_input_md.get_size()}, input.options(), c10::nullopt);
+      input_memory = dpcpp_onednn_memory(
+          expected_input_md, engine, input_.data_ptr());
+      DPCPP_ONEDNN_EXEC(reorder(input_usr_memory, input_memory),
+          strm, input_usr_memory, input_memory);
+    }
+  }
 
-  // Currently, SYCL path doesn't support internal format.
-  // input has the same format with input_usr.
-  // if (input_usr_memory.get_desc() != input_d) {
-  //   input_memory = memory(input_d, engine);
-  //   DPCPP_ONEDNN_EXEC(reorder(input_usr_memory, input_memory),
-  //       strm, input_usr_memory, input_memory);
-  // }
-
-  // auto output_d = pooling_forward_pd->dst_desc();
   auto output_memory = output_usr_memory;
-
-  // output has the same format with output_usr.
-  // if (output_usr_memory.get_desc() != output_d) {
-  //   output_memory = memory(output_d, engine);
-  // }
-
-  std::shared_ptr<pooling_forward> pool_forward;
-  pool_forward.reset(new pooling_forward(*pooling_forward_pd));
-  DPCPP_ONEDNN_EXEC(*pool_forward, strm,
+  auto pool_forward = pooling_forward(pooling_forward_pd);
+  DPCPP_ONEDNN_EXEC(pool_forward, strm,
     {{MKLDNN_ARG_SRC, input_memory}, {MKLDNN_ARG_DST, output_memory}});
-
-  // reorder output
-  // if (output_memory != output_usr_memory) {
-  //   DPCPP_ONEDNN_EXEC(reorder(output_memory, output_usr_memory),
-  //       strm, output_memory, output_usr_memory);
-  // }
 }
 
 template <typename scalar_t>
@@ -309,9 +302,9 @@ static void avg_pool_backward_out_frame(
 
 template <typename scalar_t>
 static void max_pool_out_frame(
-    scalar_t* input_data,
-    scalar_t* output_data,
-    int64_t* indices_data,
+    const Tensor& input,
+    Tensor& output,
+    Tensor& indices,
     int64_t nbatch,
     int64_t nInputPlane,
     int64_t inputDepth,
@@ -363,89 +356,106 @@ static void max_pool_out_frame(
     padding = {padD, padH, padW};
   }
 
-  // Currently, MKLDNN GPU doens't support format_any in pooling
+  auto format_any = memory::format_tag::any;
   auto input_md = memory::desc({input_tz}, data_t, format);
-  auto output_md = memory::desc({output_tz}, data_t, format);
+  auto indices_md = memory::desc({output_tz}, data_t, format);
+  auto output_md = memory::desc({output_tz}, data_t, format_any);
 
-  auto input_usr_memory = dpcpp_onednn_memory(input_md, engine, input_data);
+  if (lazy_reorder_enabled()) {
+    auto input_ctx =
+        at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
+    input_md = input_ctx.is_plain() ?
+        memory::desc({input_tz}, data_t, format) :
+        input_ctx.meta();
+  }
 
-  auto output_usr_memory = dpcpp_onednn_memory(output_md, engine, output_data);
+  auto pooling_forward_desc =
+      pooling_forward::desc(prop_kind,
+                            alg_kind,
+                            input_md,
+                            output_md,
+                            stride,
+                            kernel,
+                            padding,
+                            padding);
 
-  std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
-  pooling_forward_desc.reset(new pooling_forward::desc(
-      prop_kind,
-      alg_kind,
-      input_md,
-      output_md,
-      stride,
-      kernel,
-      padding,
-      padding));
+  auto pooling_forward_pd =
+      pooling_forward::primitive_desc(pooling_forward_desc, engine);
 
-  std::shared_ptr<pooling_forward::primitive_desc> pooling_forward_pd;
-  pooling_forward_pd.reset(
-      new pooling_forward::primitive_desc(*pooling_forward_desc, engine));
+  auto expected_input_md = pooling_forward_pd.src_desc();
+  auto expected_output_md = pooling_forward_pd.dst_desc();
 
-  // auto expected_input_md = pooling_forward_pd->src_desc();
+  memory input_usr_memory, output_usr_memory;
+  if (!lazy_reorder_enabled()) {
+    input_usr_memory = dpcpp_onednn_memory(
+        input_md, engine, input.data_ptr());
+
+    output_usr_memory = dpcpp_onednn_memory(
+        {{output_tz}, data_t, format}, engine, output.data_ptr());
+  } else {
+    input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
+    auto plain_output_md = memory::desc({output_tz}, data_t, format);
+
+    if (expected_output_md != plain_output_md) {
+      // reallocate memory due to padding needed by oneDNN in some blk fmt
+      output = empty_opaque_tensor(
+          expected_output_md, input.options(), c10::nullopt);
+      output_usr_memory = dpcpp_onednn_memory(
+          expected_output_md, engine, output.data_ptr());
+    } else {
+      output_usr_memory = dpcpp_onednn_memory(
+          {{output_tz}, data_t, format_any}, engine, output.data_ptr());
+    }
+  }
+
   auto input_memory = input_usr_memory;
+  Tensor input_;
+  if (lazy_reorder_enabled()) {
+    if (input_usr_memory.get_desc() != expected_input_md) {
+      input_ = at::AtenIpexTypeDPCPP::empty(
+          {expected_input_md.get_size()}, input.options(), c10::nullopt);
+      input_memory = dpcpp_onednn_memory(
+          expected_input_md, engine, input_.data_ptr());
+      DPCPP_ONEDNN_EXEC(reorder(input_usr_memory, input_memory),
+          strm, input_usr_memory, input_memory);
+    }
+  }
 
-  // Currently, SYCL path doesn't support internal format.
-  // input has the same format with input_usr.
-  // if (input_md != expected_input_md) {
-  //   input_memory = memory(expected_input_md, engine);
-  //   DPCPP_ONEDNN_EXEC(reorder(input_usr_memory, input_memory),
-  //       strm, input_usr_memory, input_memory);
-  // }
+  Tensor indices_;
+  memory indices_usr_memory;
+  if (!lazy_reorder_enabled()) {
+    indices_ = at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
+    indices_usr_memory = dpcpp_onednn_memory(
+        indices_md, engine, indices_.data_ptr());
+  } else {
+    auto expected_indices_md = pooling_forward_pd.workspace_desc();
+    indices_ = empty_opaque_tensor(expected_indices_md,
+        at::TensorOptions(kDPCPP).dtype(kInt), c10::nullopt);
+    indices_usr_memory = dpcpp_onednn_memory(
+        expected_indices_md, engine, indices_.data_ptr());
+  }
+  auto indices_memory = indices_usr_memory;
 
-  // auto expected_output_md = pooling_forward_pd->dst_desc();
   auto output_memory = output_usr_memory;
 
-  // output has the same format with output_usr.
-  // if (output_md != expected_output_md) {
-  //   output_memory = memory(expected_output_md, engine);
-  // }
-
-  auto indices_md = pooling_forward_pd->workspace_desc();
-
-  auto indices_usr =
-      at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
-  auto indices_usr_memory = dpcpp_onednn_memory(
-      {{output_tz}, data_t, format}, engine, indices_usr.data_ptr());
-  memory indices_memory = indices_usr_memory;
-
-  std::shared_ptr<pooling_forward> pool_forward;
-  pool_forward.reset(new pooling_forward(*pooling_forward_pd));
-
-  // indices has the same format with indices_usr.
-  // if (indices_usr_memory.get_desc() != indices_md) {
-  //   indices_memory = memory(indices_md, engine);
-  // }
-
-  DPCPP_ONEDNN_EXEC(*pool_forward, strm,
+  auto pool_forward = pooling_forward(pooling_forward_pd);
+  DPCPP_ONEDNN_EXEC(pool_forward, strm,
       {{MKLDNN_ARG_SRC, input_memory},
        {MKLDNN_ARG_DST, output_memory},
        {MKLDNN_ARG_WORKSPACE, indices_memory}});
 
-  // reorder output
-  // if (output_memory != output_usr_memory) {
-  //   DPCPP_ONEDNN_EXEC(reorder(output_memory, output_usr_memory),
-  //       strm, output_memory, output_usr_memory);
-  // }
-
-  // reorder workgroup
-
-  // if (indices_usr_memory.get_desc() != indices_md) {
-  //   DPCPP_ONEDNN_EXEC(reorder(indices_memory, indices_usr_memory),
-  //       strm, indices_memory, indices_usr_memory);
-  // }
-
-  // DPCPP_ONEDNN_EXEC(reorder(indices_memory, indices_usr_memory),
-  //         strm, indices_memory, indices_usr_memory);
-
-  dpcppMemoryCopyType(
-      (int64_t*)indices_data,
-      indices_usr.data_ptr<int32_t>(),
-      indices_usr.numel());
+  if (!lazy_reorder_enabled()) {
+    dpcppMemoryCopyType(
+        indices.data_ptr<int64_t>(),
+        indices_.data_ptr<int32_t>(),
+        indices_.numel());
+  } else {
+    // reorder if materialized
+    auto indices_internal_ctx =
+        DPCPPTensorContext::release_tensor_ctx(indices_);
+    DPCPPTensorContext::set_tensor_ctx(
+        indices, std::move(indices_internal_ctx));
+  }
 }
 
 template <typename scalar_t>

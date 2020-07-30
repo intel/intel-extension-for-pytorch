@@ -58,11 +58,9 @@ void adaptive_avg_pool2d_out_template(
       input_.scalar_type(),
       "adaptive_avg_pool2d",
       [&] {
-        auto input_data = input_.data_ptr<scalar_t>();
-        auto output_data = output.data_ptr<scalar_t>();
         avg_pool_out_frame<scalar_t>(
-            input_data,
-            output_data,
+            input,
+            output,
             batchSize,
             nInputPlane,
             0,
