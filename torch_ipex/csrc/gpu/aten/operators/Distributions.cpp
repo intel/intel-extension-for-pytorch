@@ -555,5 +555,31 @@ Tensor& exponential_(Tensor& self, double lambda_, Generator* gen_) {
   return self;
 }
 
+Tensor& log_normal_(Tensor& self, double mean_, double std_, Generator* gen_) {
+#ifdef USE_ONEMKL
+  TORCH_CHECK(std_ > 0.0, "log_normal_ expects std > 0.0, but found std=", std_);
+  TORCH_CHECK(self.is_contiguous(), "the self is not contiguous");
+  auto gen = get_generator_or_default<DPCPPGenerator>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
+
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "log_normal_", [&] {
+    auto mean = static_cast<scalar_t>(mean_);
+    auto std = static_cast<scalar_t>(std_);
+    scalar_t displ = static_cast<scalar_t>(0.0);
+    scalar_t scale = static_cast<scalar_t>(1.0);
+    auto &dpcpp_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+    mkl::rng::philox4x32x10 engine(dpcpp_queue, gen->seed());
+    mkl::rng::lognormal<scalar_t, mkl::rng::lognormal_method::box_muller2> distribution(mean, std, displ, scale);
+    auto dpcpp_buffer = make_buffer<scalar_t>(self.data_ptr());
+    mkl::rng::generate(distribution, engine, self.numel(), dpcpp_buffer);
+  });
+
+  return self;
+#else
+  AT_ERROR("log_normal: oneMKL library not found in compilation");
+#endif
+
+}
+
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
