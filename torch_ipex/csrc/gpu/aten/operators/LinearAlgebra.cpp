@@ -103,6 +103,90 @@ Tensor cholesky_inverse(const Tensor & self, bool upper) {
   return AtenIpexTypeDPCPP::cholesky_inverse_out(out, self, upper);
 }
 
+std::tuple<Tensor&, Tensor&> geqrf_out(Tensor &ra, Tensor &tau, const Tensor &a) {
+#ifdef USE_ONEMKL
+  TORCH_CHECK(a.dim() == 2, "input must be 2-d matrix. input shape=", a.sizes());
+  TORCH_CHECK(a.numel() != 0, "input must not be empty");
+  auto m = a.size(0); // rows of matrix
+  auto n = a.size(1); // columns of matrix
+
+  ra = native::cloneBatchedColumnMajor(a);
+  tau.resize_(std::min(m, n));
+
+  IPEX_DISPATCH_FLOATING_TYPES(a.scalar_type(), "geqrf_out", [&] {
+    auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+
+    // create work bufer
+    std::int64_t lwork;
+    mkl::lapack::geqrf_get_lwork<scalar_t>(dpcpp_queue.get_device(), m, n, m, lwork);
+    Tensor work = at::empty({lwork}, a.options());
+
+    Tensor info = at::empty({1}, ra.options().dtype(kLong));
+
+    auto a_ = make_buffer<scalar_t>(ra.data_ptr());
+    auto tau_ = make_buffer<scalar_t>(tau.data_ptr());
+    auto work_ = make_buffer<scalar_t>(work.data_ptr());
+    auto info_ = make_buffer<int64_t>(info.data_ptr());
+    mkl::lapack::geqrf(dpcpp_queue, m, n, a_, m, tau_, work_, lwork, info_);
+    native::singleCheckErrors(info.item<int64_t>(), "geqrf_out");
+  });
+
+  return std::tuple<Tensor&, Tensor&>(ra, tau);
+#else
+  AT_ERROR("geqrf: oneMKL library not found in compilation");
+#endif
+}
+
+std::tuple<Tensor,Tensor> geqrf(const Tensor &a) {
+  TORCH_CHECK(a.dim() == 2, "input must be 2-d matrix. input shape=", a.sizes());
+  TORCH_CHECK(a.numel() != 0, "input must not be empty");
+  auto m = a.size(0); // rows of matrix
+  auto n = a.size(1); // columns of matrix
+  Tensor ra;
+  Tensor rtau = at::empty({std::min(m, n)}, a.options());
+  AtenIpexTypeDPCPP::geqrf_out(ra, rtau, a);
+  return std::tuple<Tensor, Tensor>(ra, rtau);
+}
+
+Tensor& ger_out(Tensor & out, const Tensor & self, const Tensor & vec2) {
+#ifdef USE_ONEMKL
+  TORCH_CHECK(self.dim() == 1, "input must be 1-d vector. input shape=", self.sizes());
+  TORCH_CHECK(vec2.dim() == 1, "vec2 must be 1-d vector. vec2 shape=", vec2.sizes());
+
+  int64_t n = self.size(0); // rows of matrix
+  int64_t m = vec2.size(0); // columns of matrix
+  if (m == 0 || n == 0)
+    return out;
+  int64_t input_stride = self.stride(0);
+  int64_t vec2_stride = vec2.stride(0);
+
+  out.resize_({n, m}).zero_();
+  TORCH_CHECK(out.is_contiguous(), "the out is not contiguous");
+
+  IPEX_DISPATCH_FLOATING_TYPES(out.scalar_type(), "ger_out", [&] {
+    auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+    auto x = make_buffer<scalar_t>(self.data_ptr());
+    auto y = make_buffer<scalar_t>(vec2.data_ptr());
+    auto a = make_buffer<scalar_t>(out.data_ptr());
+    // The BLAS API is column major. To save the transpose and element move, we switch the two input.
+    // The ger documents https://spec.oneapi.com/versions/0.6.0/oneMKL/GUID-BD2E87B3-5FA7-4E0C-88E2-1982AB0773A2.html
+    mkl::blas::ger(dpcpp_queue, m, n, (float)1.0, y, vec2_stride, x, input_stride, a, m);
+  });
+
+  return out;
+#else
+  AT_ERROR("ger: oneMKL library not found in compilation");
+#endif
+}
+
+Tensor ger(const Tensor & self, const Tensor & vec2) {
+  TORCH_CHECK(self.dim() == 1, "input must be 1-d vector. input shape=", self.sizes());
+  TORCH_CHECK(vec2.dim() == 1, "vec2 must be 1-d vector. vec2 shape=", vec2.sizes());
+  auto n = self.size(0); // rows of matrix
+  auto m = vec2.size(0); // columns of matrix
+  Tensor out = at::zeros({n, m}, self.options());
+  return AtenIpexTypeDPCPP::ger_out(out, self, vec2);
+}
 
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
