@@ -700,7 +700,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   output_size.push_back(weight.size(0));
 
   if (self.dim() > 2) {
-    return dbl::comm::gen_aten_tensor_by(std::move(y)).reshape(output_size);
+    return at::_unsafe_view(dbl::comm::gen_aten_tensor_by(std::move(y)), output_size);
   }
   return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
