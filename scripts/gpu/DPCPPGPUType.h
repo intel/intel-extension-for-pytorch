@@ -418,6 +418,9 @@ struct TORCH_API SYCLType final {
 
   static std::tuple<Tensor,Tensor,Tensor> _lu_with_info(const Tensor & self, bool pivot, bool check_errors); // aten::_lu_with_info(Tensor self, bool pivot=True, bool check_errors=True) -> (Tensor, Tensor, Tensor)
   static Tensor& log_normal_(Tensor& self, double mean_, double std_, Generator* gen_); // aten::log_normal_(Tensor(a!) self, float mean=0, float std=1, *, Generator? generator=None) -> Tensor(a!)
+  static Tensor cholesky_inverse(const Tensor & self, bool upper); // aten::cholesky_inverse(Tensor self, bool upper=False) -> Tensor
+  static Tensor & cholesky_inverse_out(Tensor & out, const Tensor & self, bool upper); // aten::cholesky_inverse.out(Tensor self, bool upper=False, *, Tensor(a!) out) -> Tensor(a!)
+
 };
   static Tensor isnan(const Tensor & self); // aten::isnan(Tensor self) -> Tensor
   static bool equal(const Tensor & self, const Tensor & other); // aten::equal(Tensor self, Tensor other) -> bool
