@@ -108,7 +108,7 @@ _FN_BLKFMT_SUPPORTED = set([
 _FN_BLACKLIST_REGEX = [
     # ATEN functions
     r'[^(]*cudnn',
-    # XLA/TPU functions
+    # IPEX functions
 ]
 
 _FN_OUT = {
@@ -250,7 +250,7 @@ namespace at {{
 }}  // namespace at
 """
 
-_XLA_FUNCTIONS = {}
+_IPEX_FUNCTIONS = {}
 
 _CTOR_FUNCTIONS = {
     'empty': '.device(at::DeviceType::CPU)',
@@ -330,7 +330,7 @@ class TensorFetcher(object):
     code = ''
     code += '  std::vector<at::Tensor> {} = {{{}}};\n'.format(
         self.tvar_name, ', '.join(self.tensors))
-    code += ('  auto {} = bridge::XlaCreateTensorList({});\n').format(
+    code += ('  auto {} = bridge::IpexCreateTensorList({});\n').format(
         self.var_name, self.tvar_name)
     return code
 
@@ -340,7 +340,7 @@ class TensorFetcher(object):
       ivar_name = '{}_update_indices'.format(self.var_name)
       code += '  std::vector<size_t> {} = {{{}}};\n'.format(
           ivar_name, ', '.join(str(x) for x in self.writeable))
-      code += '  bridge::XlaUpdateTensors({}, {}, {});\n'.format(
+      code += '  bridge::IpexUpdateTensors({}, {}, {});\n'.format(
           self.tvar_name, self.var_name, ivar_name)
     return code
 
@@ -604,7 +604,7 @@ def get_return_value(rtype, rname, param, var, ref_param, fnopts):
   crtype = type_core(rtype)
   if type_is_const(rtype) or type_is_refptr(rtype, '&'):
     # If the return type is a const or a reference, return the matching
-    # parameter. In these cases we operated on XLA tensors data (the ATEN one),
+    # parameter. In these cases we operated on IPEX tensors data (the ATEN one),
     # but the returned references are the input parameters.
     assert param
     return param_name(param)
@@ -614,7 +614,7 @@ def get_return_value(rtype, rname, param, var, ref_param, fnopts):
     # If instead the return type is a value Tensor, we create a new one by
     # wrapping the proper local variable which has been created by calling
     # into the CPU tensor implementation.
-    return 'bridge::CreateXlaTensor({}, bridge::GetXlaDevice({}))'.format(
+    return 'bridge::CreateIpexTensor({}, bridge::GetIpexDevice({}))'.format(
         rname, get_optional(fnopts, 'device_param', param_name(ref_param)))
 
 
@@ -663,20 +663,16 @@ def get_return_type_str(t, orig_sig):
 
 
 def generate_entry_debug_code(t, fname, params, fname_ns='aten'):
-  # Emits debug code for a given intercepted ATEN type function. For now we use
-  # a counter which will show up in the metrics reports.
+  # Emits debug code for a given intercepted ATEN type function.
   code = ''
-  code += '  XLA_COUNTER("{}::{}", 1);\n'.format(fname_ns, fname)
-  # VLOG info. Use the following to see debug output:
-  #  export TF_CPP_VMODULE=aten_xla_type_default=3
-  code += '  TF_VLOG(3) << "XLA {} :"'.format(fname)
+  code += '  TORCH_WARN("{}::{}"'.format(fname_ns, fname)
   for p in params:
     ptype = param_type(p)
     cptype = type_core(ptype)
     pname = param_name(p)
     if cptype == 'Tensor':
-      code += ' << " {}=" << {}.toString()'.format(pname, pname)
-  code += ';\n'
+      code += ', " {}=", {}.toString'.format(pname, pname)
+  code += ');\n'
   return code
 
 
@@ -694,7 +690,7 @@ def generate_return_stmt(t, rtype_str, fname, rname, params, param_vars,
     retstr = get_tuple_return(rtype, rtype_str, rname, params, param_vars,
                               ref_param, fnopts)
   elif ctype == 'std::vector':
-    retstr = 'bridge::CreateXlaTensors({}, bridge::GetXlaDevice({}))'.format(
+    retstr = 'bridge::CreateIpexTensors({}, bridge::GetIpexDevice({}))'.format(
         rname, get_optional(fnopts, 'device_param', param_name(ref_param)))
   elif ctype == 'Tensor':
     retstr = get_return_value(rtype, rname, params[0], param_vars[0], ref_param,
@@ -715,14 +711,14 @@ def generate_result_assignment(t, rname):
   return 'auto&& {} = '.format(rname)
 
 
-def get_handling_function(ctx, fname, xla_ref_param, param_vars):
-  function = _XLA_FUNCTIONS.get(fname, None) or ctx.get_function(fname)
+def get_handling_function(ctx, fname, ipex_ref_param, param_vars):
+  function = _IPEX_FUNCTIONS.get(fname, None) or ctx.get_function(fname)
   if function:
     code = '{}({})'.format(function, ', '.join(param_vars))
   else:
     other_params = list(param_vars)
-    # other_params.remove(xla_ref_param)
-    # code = '{}.{}({})'.format(xla_ref_param, fname, ', '.join(other_params))
+    # other_params.remove(ipex_ref_param)
+    # code = '{}.{}({})'.format(ipex_ref_param, fname, ', '.join(other_params))
     code = '{}({})'.format('AtenIpexTypeDPCPP::' + fname, ', '.join(other_params))
   return code
 
@@ -758,7 +754,7 @@ def create_call(fname, param_vars):
 def generate_shape_checks(param_vars, shape_check_indices, fname):
   code = ''
   for i, j in shape_check_indices:
-    code += ('  XLA_CHECK({}.sizes() == {}.sizes()) << "Operand shapes must be '
+    code += ('  TORCH_CHECK({}.sizes() == {}.sizes()) << "Operand shapes must be '
              'identical for {}, mismatch for arguments {} and {}";\n').format(
                  param_vars[i], param_vars[j], fname, i + 1, j + 1)
   return code
@@ -793,7 +789,7 @@ def generate_aten_out(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
     num_outputs = len(tuple_type_list(rtype))
 
   code = '{} {{\n'.format(sig)
-  # code += generate_entry_debug_code(tree, fname, params, fname_ns='xla')
+  # code += generate_entry_debug_code(tree, fname, params, fname_ns='ipex')
 
   param_vars = get_param_names(params)
   if fnopts.outfn_template is not None:
@@ -828,13 +824,13 @@ def generate_aten_out(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
   return code
 
 
-def generate_aten_to_xla(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
+def generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
   ref_param = get_reference_param(params, fnopts=fnopts)
 
   code = '{} {{\n'.format(sig)
   # code += generate_entry_debug_code(tree, fname, params)
-  xla_ref_param = param_name(ref_param) if ref_param else None
-  tfetcher = TensorFetcher('xlatens')
+  ipex_ref_param = param_name(ref_param) if ref_param else None
+  tfetcher = TensorFetcher('ipextens')
   param_vars = []
   for p in params:
     ptype = param_type(p)
@@ -862,7 +858,7 @@ def generate_aten_to_xla(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
       param_vars.append(pname)
     # if cptype == 'TensorList':
     #   xname = 'l_{}'.format(pname)
-    #   code += ('  auto {} = bridge::XlaCreateTensorList({});\n').format(
+    #   code += ('  auto {} = bridge::IpexCreateTensorList({});\n').format(
     #       xname, pname)
     #   param_vars.append(xname)
     # elif cptype == 'TensorOptions':
@@ -879,14 +875,14 @@ def generate_aten_to_xla(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts):
     #   param_vars.append(xname)
 
     if p == ref_param and not get_optional(fnopts, 'ref_param'):
-      xla_ref_param = param_vars[-1]
+      ipex_ref_param = param_vars[-1]
   # code += tfetcher.generate_fetches()
   # result_assign = generate_result_assignment(tree, _RESULT_NAME)
   # code += '  {}{};\n'.format(
-  #     result_assign, get_handling_function(ctx, fname, xla_ref_param,
+  #     result_assign, get_handling_function(ctx, fname, ipex_ref_param,
   #                                          param_vars))
   code += '  return {};\n'.format(
-      get_handling_function(ctx, fname, xla_ref_param, param_vars))
+      get_handling_function(ctx, fname, ipex_ref_param, param_vars))
   # code += tfetcher.generate_updates()
   # if result_assign:
   #   code += ('  static_cast<void>({}); // Avoid warnings in case not '
@@ -924,9 +920,9 @@ def get_ipex_wrapper(fndef, ctx):
     # elif rfnopts is not None:
     #   code = generate_aten_remap(ctx, fname, sig, params, rfnopts)
     # else:
-    #   code = generate_aten_to_xla(ctx, tree, rwxtree, fname, sig, rwsig, params,
+    #   code = generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params,
     #                               fnopts)
-    code = generate_aten_to_xla(ctx, tree, rwxtree, fname, sig, rwsig, params,
+    code = generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params,
                                 fnopts)
   else:
     code = None
@@ -999,7 +995,7 @@ def parse_local_overrides(path):
 
   overrides = {}
   for fndef in functions:
-    # Discard static XLA type functions which are not ATEN.
+    # Discard static IPEX type functions which are not ATEN.
     is_tensor, fndef = is_tensor_api(fndef)
     if is_tensor:
       xtree = _XPARSER.parse(fndef)

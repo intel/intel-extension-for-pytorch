@@ -246,7 +246,7 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
 ipex_git_sha, torch_git_sha = get_git_head_sha(base_dir)
 version = get_build_version(ipex_git_sha)
 
-# Generate version info (torch_xla.__version__)
+# Generate version info (torch_ipex.__version__)
 create_version_files(base_dir, version, ipex_git_sha, torch_git_sha)
 
 # Constant known variables used throughout this file
