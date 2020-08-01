@@ -119,7 +119,7 @@ void mkldnnGemmImpl(
 
 #if defined(USE_COMPUTECPP)
   if (!result_.is_same(result))
-    result_.copy_(result_);
+    result_.copy_(result);
 #endif
 }
 
