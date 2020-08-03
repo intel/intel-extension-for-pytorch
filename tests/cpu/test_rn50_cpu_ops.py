@@ -56,6 +56,7 @@ from functools import reduce
 
 import torch
 import intel_pytorch_extension as ipex
+from common_ipex_conf import AutoMixPrecision, AutoDNNL
 
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -324,6 +325,54 @@ class TestOP(TestCase):
         a2 = torch.tensor([1.1, 0.1], device=device)
         self.assertEqual(a1 * a2, torch.tensor([0.11, 0.01], device=device))
         self.assertEqual(a1.mul(a2), a1 * a2)
+
+        with AutoDNNL(True):
+            a1 = torch.randn((1, 1, 3, 2), device=device)
+            a2 = torch.randn((3, 2), device=device)
+            res1 = torch.mul(a1, a2)
+            self.assertTrue(ipex.core.is_dil_tensor(res1))
+            with AutoDNNL(False):
+                a1 = a1.to(device='cpu')
+                a2 = a2.to(device='cpu')
+                res2 = torch.mul(a1, a2)
+                self.assertEqual(res1.to('cpu'), res2)
+
+        with AutoDNNL(True):
+            a1_ipex = torch.randn((1, 2, 4, 6), device=device)
+            a2_ipex = torch.randn((1, 4, 6), device=device)
+            a1_cpu = a1_ipex.to('cpu')
+            a2_cpu = a2_ipex.to('cpu')
+            a1_ipex.mul_(a2_ipex)
+            a1_cpu.mul_(a2_cpu)
+            self.assertEqual(a1_ipex.to('cpu'), a1_cpu)
+
+        with AutoDNNL(True):
+            a1 = torch.randn((1, 2, 3, 2), device=device)
+            a2 = torch.randn((1, 3, 2), device=device)
+            res1 = torch.mul(a1, a2)
+            self.assertTrue(ipex.core.is_dil_tensor(res1))
+            with AutoDNNL(False):
+                a1 = a1.to(device='cpu')
+                a2 = a2.to(device='cpu')
+                res2 = torch.mul(a1, a2)
+                self.assertEqual(res1.to('cpu'), res2)
+
+        with AutoDNNL(True):
+            a1 = torch.randn((1, 2, 3, 2), device=device)
+            a2 = torch.randn((1, 2), device=device)
+            res1 = torch.mul(a1, a2)
+            self.assertTrue(ipex.core.is_dil_tensor(res1))
+            with AutoDNNL(False):
+                a1 = a1.to(device='cpu')
+                a2 = a2.to(device='cpu')
+                res2 = torch.mul(a1, a2)
+                self.assertEqual(res1.to('cpu'), res2)
+
+        with AutoDNNL(True):
+            a1 = torch.randn((1, 2, 3, 2), device=device)
+            a2 = torch.randn((2), device=device)
+            res1 = torch.mul(a1, a2)
+            self.assertTrue(ipex.core.is_dil_tensor(res1))
 
     def test_div(self):
         a1 = torch.tensor([4.2, 6.2], device=device)

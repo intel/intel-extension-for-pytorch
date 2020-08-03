@@ -340,6 +340,28 @@ at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other,
   return dil_add_common</*inplace=*/true>(self, self, other, alpha);
 }
 
+dil::tensor reshape_tensor_for_broadcast(dil::tensor& src1, dil::tensor& src2) {
+  auto diff_ndims = src1.ndims() - src2.ndims();
+  auto right = diff_ndims > 0 ? src2 : src1;
+  auto& left = diff_ndims > 0 ? src1 : src2;
+
+  diff_ndims = diff_ndims > 0 ? diff_ndims : -diff_ndims;
+
+  dil::dims reshape_dims;
+  for (int i = 0; i < diff_ndims; i++) {
+    reshape_dims.push_back(1);
+  }
+  for (int i = 0; i < right.ndims(); i++) {
+    reshape_dims.push_back(right.get_dim(i));
+  }
+  for (int i = left.ndims() - 1; i >= 0; i--) {
+    IPEX_CHECK(reshape_dims[i] == left.get_dim(i) || reshape_dims[i] == 1,
+               "dil mul not support the shape for broadcast");
+  }
+  right.reshape(reshape_dims);
+  return right;
+}
+
 template<bool inplace>
 at::Tensor& dil_mul_common(
     at::Tensor& result,
@@ -358,7 +380,13 @@ at::Tensor& dil_mul_common(
   auto y = dbl::comm::try_gen_dil_tensor(other);
   auto z = inplace ? x : dil::tensor();
 
-  dil::binary::compute(x, y, z, dil::algorithm::binary_mul);
+  auto diff_ndims = x.ndims() - y.ndims();
+  if (diff_ndims != 0) {
+    auto right = reshape_tensor_for_broadcast(x, y);
+    dil::binary::compute(diff_ndims > 0 ? x : y, right, z, dil::algorithm::binary_mul);
+  } else {
+    dil::binary::compute(x, y, z, dil::algorithm::binary_mul);
+  }
 
   if (!inplace) {
     dbl::comm::equip_dil_buffer(result, z);
