@@ -11,6 +11,13 @@
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
 
+#ifdef _PSTL_BACKEND_SYCL
+#include <dpstd/algorithm>
+#include <dpstd/execution>
+#include <dpstd/numeric>
+#include <dpstd/iterator>
+#endif
+
 using namespace at::dpcpp;
 
 namespace at {
@@ -44,11 +51,11 @@ void krn_partials_per_segment(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_ret = DPCPPAccessor<dpcpp_w_mode>(cgh, ret);
-    auto acc_offsets = DPCPPAccessor<dpcpp_r_mode>(cgh, segment_offsets);
+    auto ret_data = get_buffer<dpcpp_w_mode>(cgh, ret);
+    auto offsets_data = get_buffer<dpcpp_r_mode>(cgh, segment_offsets);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto ret_ptr = acc_ret.template get_pointer<int64_t>();
-      auto offsets_ptr = acc_offsets.template get_pointer<int64_t>();
+      auto ret_ptr = get_pointer(ret_data);
+      auto offsets_ptr = get_pointer(offsets_data);
       int64_t id = item.get_global_id(0);
       if (id < num_of_segments) {
         const int64_t idx_start = offsets_ptr[id];
@@ -80,21 +87,18 @@ void krn_partial_segment_offset(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_ret = DPCPPAccessor<dpcpp_w_mode>(cgh, ret);
-    auto acc_partials_per_segment =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, partials_per_segment);
-    auto acc_partials_per_segment_offset =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, partials_per_segment_offset);
-    auto acc_segment_offsets =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, segment_offsets);
+    auto ret_data = get_buffer<dpcpp_w_mode>(cgh, ret);
+    auto partials_per_segment_data =
+        get_buffer<dpcpp_r_mode>(cgh, partials_per_segment);
+    auto partials_per_segment_offset_data =
+        get_buffer<dpcpp_r_mode>(cgh, partials_per_segment_offset);
+    auto segment_offsets_data =
+        get_buffer<dpcpp_r_mode>(cgh, segment_offsets);
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto ret_ptr = acc_ret.template get_pointer<int64_t>();
-      auto partials_per_segment_ptr =
-          acc_partials_per_segment.template get_pointer<int64_t>();
-      auto partials_per_segment_offset_ptr =
-          acc_partials_per_segment_offset.template get_pointer<int64_t>();
-      auto segment_offsets_ptr =
-          acc_segment_offsets.template get_pointer<int64_t>();
+      auto ret_ptr = get_pointer<int64_t>(ret_data);
+      auto partials_per_segment_ptr = get_pointer(partials_per_segment_data);
+      auto partials_per_segment_offset_ptr = get_pointer(partials_per_segment_offset_data);
+      auto segment_offsets_ptr = get_pointer(segment_offsets_data);
 
       int64_t id = item.get_global_id(0);
       if (id < num_of_segments) {
@@ -152,36 +156,32 @@ void compute_grad_weight_bags(
   int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));
   auto num_groups = CeilDiv(num_of_segments * stride_warped, group_size);
   auto total_items = num_groups * group_size;
-  DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_grad_weight_per_segment =
-        DPCPPAccessor<dpcpp_w_mode>(cgh, grad_weight_per_segment);
-    auto acc_indices = DPCPPAccessor<dpcpp_r_mode>(cgh, indices);
-    auto acc_gradOutput = DPCPPAccessor<dpcpp_r_mode>(cgh, gradOutput);
-    auto acc_offset2bag = DPCPPAccessor<dpcpp_r_mode>(cgh, offset2bag);
-    auto acc_count = DPCPPAccessor<dpcpp_r_mode>(cgh, count);
-    auto acc_bag_size = DPCPPAccessor<dpcpp_r_mode>(cgh, bag_size);
-    auto acc_per_sample_weights = per_sample_weight_defined
-        ? DPCPPAccessor<dpcpp_r_mode>(cgh, per_sample_weights)
-        : DPCPPAccessor<dpcpp_r_mode>(cgh, dummy_buffer);
-    auto acc_segment_offsets =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, segment_offsets);
+    auto grad_weight_per_segment_data =
+        get_buffer<dpcpp_w_mode>(cgh, grad_weight_per_segment);
+    auto indices_data = get_buffer<dpcpp_r_mode>(cgh, indices);
+    auto gradOutput_data = get_buffer<dpcpp_r_mode>(cgh, gradOutput);
+    auto offset2bag_data = get_buffer<dpcpp_r_mode>(cgh, offset2bag);
+    auto count_data = get_buffer<dpcpp_r_mode>(cgh, count);
+    auto bag_size_data = get_buffer<dpcpp_r_mode>(cgh, bag_size);
+    auto per_sample_weights_data = per_sample_weight_defined
+        ? get_buffer<dpcpp_r_mode>(cgh, per_sample_weights)
+        : get_buffer<dpcpp_r_mode>(cgh, gradOutput); // ise the gradOutput handler as the dummy buffer.
+    auto segment_offsets_data =
+        get_buffer<dpcpp_r_mode>(cgh, segment_offsets);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto grad_weight_per_segment_ptr =
-          acc_grad_weight_per_segment
-              .template get_pointer<acc_type<scalar_t>>();
-      auto indices_ptr = acc_indices.template get_pointer<int64_t>();
-      auto gradOutput_ptr = acc_gradOutput.template get_pointer<scalar_t>();
-      auto offset2bag_ptr = acc_offset2bag.template get_pointer<int64_t>();
-      auto count_ptr = acc_count.template get_pointer<int64_t>();
-      auto bag_size_ptr = acc_bag_size.template get_pointer<int64_t>();
+      auto grad_weight_per_segment_ptr = get_pointer(grad_weight_per_segment_data);
+      auto indices_ptr = get_pointer(indices_data);
+      auto gradOutput_ptr = get_pointer(gradOutput_data);
+      auto offset2bag_ptr = get_pointer(offset2bag_data);
+      auto count_ptr = get_pointer(count_data);
+      auto bag_size_ptr = get_pointer(bag_size_data);
       auto per_sample_weights_ptr = per_sample_weight_defined
-          ? acc_per_sample_weights.template get_pointer<scalar_t>()
+          ? get_pointer(per_sample_weights_data)
           : NULL;
-      auto segment_offsets_ptr =
-          acc_segment_offsets.template get_pointer<int64_t>();
+      auto segment_offsets_ptr = get_pointer(segment_offsets_data);
 
       const int gid = item.get_global_id(0);
       const int id = gid / stride_warped;
@@ -247,25 +247,22 @@ void compute_grad_weight(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_grad_weight_per_segment =
-        DPCPPAccessor<dpcpp_w_mode>(cgh, grad_weight_per_segment);
-    auto acc_indices = DPCPPAccessor<dpcpp_r_mode>(cgh, indices);
-    auto acc_sort = DPCPPAccessor<dpcpp_r_mode>(cgh, sort);
-    auto acc_gradOutput = DPCPPAccessor<dpcpp_r_mode>(cgh, gradOutput);
-    auto acc_count = DPCPPAccessor<dpcpp_r_mode>(cgh, count);
-    auto acc_segment_offsets =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, segment_offsets);
+    auto grad_weight_per_segment_data =
+        get_buffer<dpcpp_w_mode>(cgh, grad_weight_per_segment);
+    auto indices_data = get_buffer<dpcpp_r_mode>(cgh, indices);
+    auto sort_data = get_buffer<dpcpp_r_mode>(cgh, sort);
+    auto gradOutput_data = get_buffer<dpcpp_r_mode>(cgh, gradOutput);
+    auto count_data = get_buffer<dpcpp_r_mode>(cgh, count);
+    auto segment_offsets_data =
+        get_buffer<dpcpp_r_mode>(cgh, segment_offsets);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto grad_weight_per_segment_ptr =
-          acc_grad_weight_per_segment
-              .template get_pointer<acc_type<scalar_t>>();
-      auto indices_ptr = acc_indices.template get_pointer<int64_t>();
-      auto sort_ptr = acc_sort.template get_pointer<int64_t>();
-      auto gradOutput_ptr = acc_gradOutput.template get_pointer<scalar_t>();
-      auto count_ptr = acc_count.template get_pointer<int64_t>();
-      auto segment_offsets_ptr =
-          acc_segment_offsets.template get_pointer<int64_t>();
+      auto grad_weight_per_segment_ptr = get_pointer(grad_weight_per_segment_data);
+      auto indices_ptr = get_pointer(indices_data);
+      auto sort_ptr = get_pointer(sort_data);
+      auto gradOutput_ptr = get_pointer(gradOutput_data);
+      auto count_ptr = get_pointer(count_data);
+      auto segment_offsets_ptr = get_pointer(segment_offsets_data);
 
       const int gid = item.get_global_id(0);
       const int id = gid / stride_warped;
@@ -319,25 +316,21 @@ void sum_and_scatter(
   auto total_items = num_groups * group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto acc_gradWeight = DPCPPAccessor<dpcpp_w_mode>(cgh, gradWeight);
-    auto acc_input = DPCPPAccessor<dpcpp_r_mode>(cgh, input);
-    auto acc_segment_offsets =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, segment_offsets);
-    auto acc_grad_weight_per_segment =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, grad_weight_per_segment);
-    auto acc_segment_sizes_offsets =
-        DPCPPAccessor<dpcpp_r_mode>(cgh, segment_sizes_offsets);
+    auto gradWeight_data = get_buffer<dpcpp_w_mode>(cgh, gradWeight);
+    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input);
+    auto segment_offsets_data =
+        get_buffer<dpcpp_r_mode>(cgh, segment_offsets);
+    auto grad_weight_per_segment_data =
+        get_buffer<dpcpp_r_mode>(cgh, grad_weight_per_segment);
+    auto segment_sizes_offsets_data =
+        get_buffer<dpcpp_r_mode>(cgh, segment_sizes_offsets);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
-      auto gradWeight_ptr = acc_gradWeight.template get_pointer<scalar_t>();
-      auto input_ptr = acc_input.template get_pointer<int64_t>();
-      auto segment_offsets_ptr =
-          acc_segment_offsets.template get_pointer<int64_t>();
-      auto grad_weight_per_segment_ptr =
-          acc_grad_weight_per_segment
-              .template get_pointer<acc_type<scalar_t>>();
-      auto segment_sizes_offsets_ptr =
-          acc_segment_sizes_offsets.template get_pointer<int64_t>();
+      auto gradWeight_ptr = get_pointer(gradWeight_data);
+      auto input_ptr = get_pointer(input_data);
+      auto segment_offsets_ptr = get_pointer(segment_offsets_data);
+      auto grad_weight_per_segment_ptr = get_pointer(grad_weight_per_segment_data);
+      auto segment_sizes_offsets_ptr = get_pointer(segment_sizes_offsets_data);
 
       const int gid = item.get_global_id(0);
       const int id = gid / stride_warped;
@@ -401,10 +394,28 @@ Tensor embedding_bag_backward_dpcpp_kernel(
 
   // The total number of partial-segments is the sum of
   // `partials_per_segment_offset`
+#ifdef _PSTL_BACKEND_SYCL
+#ifdef USE_USM
+  auto partials_per_segment_offsets_begin = partials_per_segment_offset.data_ptr<int64_t>();
+  auto partials_per_segment_begin = partials_per_segment.data_ptr<int64_t>();
+#else
+  auto partials_per_segment_offsets_begin = dpstd::begin(make_buffer<int64_t>(partials_per_segment_offset.data_ptr()));
+  auto partials_per_segment_begin = dpstd::begin(make_buffer<int64_t>(partials_per_segment.data_ptr()));
+#endif
+  auto dpcpp_queue = dpcppGetCurrentQueue();
+  auto policy = dpstd::execution::make_device_policy(dpcpp_queue);
+  std::exclusive_scan(policy,
+      partials_per_segment_begin,
+      partials_per_segment_begin + num_segments,
+      partials_per_segment_offsets_begin,
+      0, std::plus<int64_t>{});
+  auto num_of_partial_segments = partials_per_segment_offset[num_segments - 1].item<int64_t>() + partials_per_segment[num_segments -1].item<int64_t>();
+#else
   auto num_of_partial_segments = exclusive_scan(
       partials_per_segment_offset.data_ptr<int64_t>(),
       partials_per_segment.data_ptr<int64_t>(),
       num_segments);
+#endif
 
   auto partial_segment_offset =
       at::empty({num_of_partial_segments}, sorted_indices.options());
@@ -740,14 +751,14 @@ void EmbeddingBag_accGradParametersKernel_max(
   int64_t kernel_range = 1024 * 64;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto max_indices_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, max_indices);
-    auto gradOutput_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, gradOutput);
-    auto gradWeight_acc = DPCPPAccessor<dpcpp_w_mode>(cgh, gradWeight);
+    auto max_indices_data = get_buffer<dpcpp_r_mode>(cgh, max_indices);
+    auto gradOutput_data = get_buffer<dpcpp_r_mode>(cgh, gradOutput);
+    auto gradWeight_data = get_buffer<dpcpp_w_mode>(cgh, gradWeight);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item) {
-      auto max_indices_ptr = max_indices_acc.template get_pointer<int64_t>();
-      auto gradOutput_ptr = gradOutput_acc.template get_pointer<scalar_t>();
-      auto gradWeight_ptr = gradWeight_acc.template get_pointer<scalar_t>();
+      auto max_indices_ptr = get_pointer(max_indices_data);
+      auto gradOutput_ptr = get_pointer(gradOutput_data);
+      auto gradWeight_ptr = get_pointer(gradWeight_data);
 
       int64_t chunkOffset = item.get_group()[0] * item.get_local_range()[1] +
           item.get_local_id()[1];
@@ -763,7 +774,7 @@ void EmbeddingBag_accGradParametersKernel_max(
           if (word_idx >= 0) {
             // If bag is empty, we have max_indices[idx] set to -1 in forward.
             atomicAdd(
-                &(gradWeight_ptr[word_idx * stride + featureDim]),
+              (dpcpp_global_ptr_pt<scalar_t>)&(gradWeight_ptr[word_idx * stride + featureDim]),
                 gradOutput_ptr[bag * stride + featureDim]);
           }
         }
