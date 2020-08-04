@@ -249,6 +249,10 @@ struct TORCH_API SYCLType final {
   static Tensor var(const Tensor & self, IntArrayRef dim, bool unbiased, bool keepdim); // aten::var.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> Tensor
   static Tensor var(const Tensor & self, bool unbiased); // aten::var(Tensor self, bool unbiased=True) -> Tensor
   static Tensor _var(const Tensor & self, bool unbiased); // aten::_var(Tensor self, bool unbiased=True) -> Tensor
+  static Tensor std(const Tensor & self, bool unbiased); // aten::std(Tensor self, bool unbiased=True) -> Tensor
+  static Tensor std(const Tensor & self, IntArrayRef dim, bool unbiased, bool keepdim); // aten::std.dim(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False) -> Tensor
+  static Tensor _std(const Tensor & self, bool unbiased); // aten::_std(Tensor self, bool unbiased=True) -> Tensor
+  static Tensor & std_out(Tensor & out, const Tensor & self, IntArrayRef dim, bool unbiased, bool keepdim); // aten::std.out(Tensor self, int[1] dim, bool unbiased=True, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor & addmm_(Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha); // aten::addmm_(Tensor(a!) self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1) -> Tensor(a!)
   static Tensor addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha); // aten::addmm(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1) -> Tensor
   static Tensor _cat(TensorList tensors, int64_t dim); // aten::_cat(Tensor[] tensors, int dim=0) -> Tensor
@@ -410,6 +414,7 @@ struct TORCH_API SYCLType final {
   static Tensor reflection_pad1d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef padding); // aten::reflection_pad1d_backward(Tensor grad_output, Tensor self, int[2] padding) -> Tensor
   static Tensor & reflection_pad1d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef padding); // aten::reflection_pad1d_backward.grad_input(Tensor grad_output, Tensor self, int[2] padding, *, Tensor(a!) grad_input) -> Tensor(a!)
   static Tensor & reflection_pad1d_out(Tensor & out, const Tensor & self, IntArrayRef padding); // aten::reflection_pad1d.out(Tensor self, int[2] padding, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor _fft_with_size(const Tensor & self, int64_t signal_ndim, bool complex_input, bool complex_output, bool inverse, IntArrayRef checked_signal_sizes, bool normalized, bool onesided, IntArrayRef output_sizes); // aten::_fft_with_size(Tensor self, int signal_ndim, bool complex_input, bool complex_output, bool inverse, int[] checked_signal_sizes, bool normalized, bool onesided, int[] output_sizes) -> Tensor
 
 };
   static Tensor isnan(const Tensor & self); // aten::isnan(Tensor self) -> Tensor

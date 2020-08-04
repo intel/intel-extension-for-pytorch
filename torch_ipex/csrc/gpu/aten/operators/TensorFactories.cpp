@@ -8,8 +8,8 @@
 #include <ATen/aten_ipex_type_dpcpp.h>
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
-#include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
+#include <utils/Numerics.h>
 
 using namespace at::dpcpp;
 using namespace at::native;
@@ -380,6 +380,43 @@ Tensor _var(const Tensor& self, bool unbiased) {
   Tensor result = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::std_var_out(
       result, self, IntArrayRef{}, unbiased, false, false);
+}
+
+Tensor std(const Tensor& self, bool unbiased) {
+  TORCH_CHECK(
+      self.layout() == Layout::Strided,
+      "std only supports strided layout, got: ",
+      self.layout());
+  TORCH_CHECK(
+      at::isFloatingType(self.scalar_type()) ||
+          at::isComplexType(self.scalar_type()),
+      "std only supports floating-point dtypes");
+  auto trivial_return =
+      _allreduce_return_trivial(self, std::numeric_limits<double>::quiet_NaN());
+  return trivial_return.has_value() ? trivial_return.value()
+                                    : at::_std(self, unbiased);
+}
+
+Tensor std(const Tensor& self, IntArrayRef dim, bool unbiased, bool keepdim) {
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::std_var_out(
+      result, self, dim, unbiased, keepdim, true);
+}
+
+Tensor& std_out(
+    Tensor& out,
+    const Tensor& self,
+    IntArrayRef dim,
+    bool unbiased,
+    bool keepdim) {
+  return at::AtenIpexTypeDPCPP::std_var_out(
+      out, self, dim, unbiased, keepdim, true);
+}
+
+Tensor _std(const Tensor& self, bool unbiased) {
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeDPCPP::std_var_out(
+      result, self, IntArrayRef{}, unbiased, false, true);
 }
 
 std::tuple<Tensor, Tensor> var_mean(
