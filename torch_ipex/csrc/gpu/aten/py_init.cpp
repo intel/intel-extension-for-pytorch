@@ -33,5 +33,14 @@ PYBIND11_MODULE(torch_ipex, m) {
   m.def("_usm_pstl_is_enabled", 
         []() {return false;});
 #endif
+
+#if defined(USE_ONEMKL)
+  m.def("_onemkl_is_enabled",
+	[]() {return true;});
+#else
+  m.def("_onemkl_is_enabled",
+        []() {return false;});
+#endif
+
   printf("loading _torch_ipex.so --\n");
 }
