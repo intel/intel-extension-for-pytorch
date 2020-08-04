@@ -180,14 +180,20 @@ Tensor& addmm_(
   TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(self.size(0) ==  m1.size(0) && self.size(1) == m2.size(1),
               "size mismatch input ", self.sizes(), " m1 ", m1.sizes(), " m2 ", m2.sizes());
-
+ 
   IPEX_DISPATCH_ALL_TYPES_AND2(
     at::ScalarType::Half,
     at::ScalarType::BFloat16,
     self.scalar_type(),
     "addmm",
     [&]() {
-      impl::gemm_broadcast<scalar_t>(self, m1, m2, beta.to<scalar_t>(), alpha.to<scalar_t>(), self);
+      impl::gemm_broadcast<scalar_t>(
+      self,
+      m1,
+      m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+      beta.to<scalar_t>(),
+      alpha.to<scalar_t>(),
+      self.scalar_type() == m1.scalar_type() ? self : self.to(m1.scalar_type()) );
     });
 
   return self;
@@ -210,7 +216,13 @@ Tensor addmm(
     result.scalar_type(),
     "addmm",
     [&]() {
-      impl::gemm_broadcast<scalar_t>(result, m1, m2, beta.to<scalar_t>(), alpha.to<scalar_t>(), input);
+      impl::gemm_broadcast<scalar_t>(
+      result,
+      m1,
+      m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+      beta.to<scalar_t>(),
+      alpha.to<scalar_t>(),
+      input.scalar_type() == m1.scalar_type() ? input : input.to(m1.scalar_type()));
     });
 
   return result;
@@ -227,7 +239,12 @@ Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
     self.scalar_type(),
     "mm_out",
     [&]() {
-      impl::gemm_broadcast<scalar_t>(result, self, mat2, 0, 1);
+      impl::gemm_broadcast<scalar_t>(
+      result,
+      self.scalar_type() == result.scalar_type() ? self : self.to(result.scalar_type()),
+      mat2.scalar_type() == result.scalar_type() ? mat2 : mat2.to(result.scalar_type()),
+      0,
+      1);
     });
 
   return result;

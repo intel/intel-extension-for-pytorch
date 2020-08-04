@@ -102,6 +102,7 @@ at::Tensor convolution(
   int32_t pw = padding[1];
 
   auto data_t = dt_to_dnnl(input.scalar_type());
+  auto weight_t = dt_to_dnnl(weight.scalar_type());
   auto format_any = memory::format_tag::any;
   auto format_nchw = memory::format_tag::nchw;
   auto format_weight =
@@ -150,8 +151,8 @@ at::Tensor convolution(
   }
 
   auto input_md = memory::desc({input_tz}, data_t, format_any);
-  auto weight_md = memory::desc({weight_tz}, data_t, format_any);
-  auto bias_md = memory::desc({bias_tz}, data_t, format_any);
+  auto weight_md = memory::desc({weight_tz}, weight_t, format_any);
+  auto bias_md = memory::desc({bias_tz}, weight_t, format_any);
   auto output_md = memory::desc({output_tz}, data_t, format_any);
 
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
@@ -200,7 +201,7 @@ at::Tensor convolution(
         {{input_tz}, data_t, format_nchw}, engine, input.data_ptr());
 
     weight_usr_memory = dpcpp_onednn_memory(
-        {{weight_tz}, data_t, format_weight}, engine, weight.data_ptr());
+        {{weight_tz}, weight_t, format_weight}, engine, weight.data_ptr());
 
     output_usr_memory = dpcpp_onednn_memory(
         {{output_tz}, data_t, format_nchw}, engine, output.data_ptr());
@@ -217,7 +218,7 @@ at::Tensor convolution(
         at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(weight);
     weight_usr_memory = weight_ctx.is_plain() ?
         dpcpp_onednn_memory(
-            {{weight_tz}, data_t, format_nchw}, engine, weight.data_ptr()) :
+            {{weight_tz}, weight_t, format_nchw}, engine, weight.data_ptr()) :
         dpcpp_onednn_memory(
             {weight_ctx.meta()}, engine, weight.data_ptr());
 
@@ -312,9 +313,9 @@ at::Tensor convolution(
   memory bias_usr_memory;
   if (bias.defined()) {
     bias_usr_memory = dpcpp_onednn_memory(
-        {{bias_tz}, data_t, format_x}, engine, bias.data_ptr());
+        {{bias_tz}, weight_t, format_x}, engine, bias.data_ptr());
   } else {
-    bias_usr_memory = memory({{}, data_t, format_x}, engine);
+    bias_usr_memory = memory({{}, weight_t, format_x}, engine);
   }
 
   conv_forward.reset(new convolution_forward(*conv_forward_pd));
@@ -370,7 +371,10 @@ Tensor dpcpp_convolution_backward_input(
   int32_t ph = padding[0];
   int32_t pw = padding[1];
 
+  // align data type with bf16
+  auto data_grad = dt_to_dnnl(grad_output.scalar_type());
   auto data_t = memory::data_type::f32;
+  auto weight_t = dt_to_dnnl(weight.scalar_type());
   auto format_any = memory::format_tag::any;
   auto format_nchw = memory::format_tag::nchw;
   auto format_weight =
@@ -417,10 +421,10 @@ Tensor dpcpp_convolution_backward_input(
     _padding = {pd, ph, pw};
   }
 
-  auto input_md = memory::desc({input_tz}, data_t, format_any);
+  auto input_md = memory::desc({input_tz}, data_grad, format_any);
   auto weight_md = memory::desc({weight_tz}, data_t, format_any);
   auto bias_md = memory::desc({bias_tz}, data_t, format_any);
-  auto output_md = memory::desc({output_tz}, data_t, format_any);
+  auto output_md = memory::desc({output_tz}, data_grad, format_any);
 
   // need to re-create conv_forward_pd to feed conv_backward_data_pd
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
@@ -467,13 +471,13 @@ Tensor dpcpp_convolution_backward_input(
       *conv_backward_data_desc, engine, *conv_forward_pd));
 
   auto grad_output_usr_memory = dpcpp_onednn_memory(
-      {{output_tz}, data_t, format_nchw}, engine, grad_output.data_ptr());
+      {{output_tz}, data_grad, format_nchw}, engine, grad_output.data_ptr());
 
   auto weight_usr_memory = dpcpp_onednn_memory(
       {{weight_tz}, data_t, format_weight}, engine, weight.data_ptr());
 
   auto grad_input_usr_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_t, format_nchw}, engine, grad_input.data_ptr());
+      {{input_tz}, data_grad, format_nchw}, engine, grad_input.data_ptr());
 
   auto expected_grad_output_md = conv_backward_data_pd->diff_dst_desc();
   auto grad_output_memory = grad_output_usr_memory;
@@ -522,11 +526,11 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     IntArrayRef dilation,
     int64_t groups,
     bool bias_defined) {
-  auto grad_weight = at::empty(weight_size, grad_output.options());
+  auto grad_weight = at::empty(weight_size, grad_output.options()).to(ScalarType::Float);
 
   Tensor grad_bias;
   if (bias_defined) {
-    grad_bias = at::empty({grad_output.size(1)}, grad_output.options());
+    grad_bias = at::empty({grad_output.size(1)}, grad_output.options()).to(ScalarType::Float);
   }
 
   Device curDevice = Device(kDPCPP, current_device());
@@ -553,6 +557,8 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   int32_t ph = padding[0];
   int32_t pw = padding[1];
 
+  // align data type with bf16
+  auto data_grad = dt_to_dnnl(grad_output.scalar_type());
   auto data_t = memory::data_type::f32;
   auto format_any = memory::format_tag::any;
   auto format_nchw = memory::format_tag::nchw;
@@ -601,10 +607,10 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     _padding = {pd, ph, pw};
   }
 
-  memory::desc input_md({input_tz}, data_t, format_any);
+  memory::desc input_md({input_tz}, data_grad, format_any);
   memory::desc weight_md({weight_tz}, data_t, format_any);
   memory::desc bias_md({bias_tz}, data_t, format_any);
-  memory::desc output_md({output_tz}, data_t, format_any);
+  memory::desc output_md({output_tz}, data_grad, format_any);
 
   // need to re-create conv_forward_pd to feed conv_backward_weight_pd
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
@@ -667,10 +673,10 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
           *conv_backward_weight_desc, engine, *conv_forward_pd));
 
   auto input_usr_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_t, format_nchw}, engine, input.data_ptr());
+      {{input_tz}, data_grad, format_nchw}, engine, input.data_ptr());
 
   auto grad_output_usr_memory = dpcpp_onednn_memory(
-      {{output_tz}, data_t, format_nchw}, engine, grad_output.data_ptr());
+      {{output_tz}, data_grad, format_nchw}, engine, grad_output.data_ptr());
 
   auto grad_weight_usr_memory = dpcpp_onednn_memory(
       {{weight_tz}, data_t, format_weight}, engine, grad_weight.data_ptr());

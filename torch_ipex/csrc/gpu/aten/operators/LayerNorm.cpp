@@ -59,8 +59,8 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
       {MKLDNN_ARG_DST, output_usr_memory},
   };
 
-  Tensor mean = at::empty({n * ih * ic}, input.options());
-  Tensor rstd = at::empty({n * ih * ic}, input.options());
+  Tensor mean = at::empty({n * ih * ic}, input.options()).to(ScalarType::Float);
+  Tensor rstd = at::empty({n * ih * ic}, input.options()).to(ScalarType::Float);
   if (training) {
     auto mean_memory = dpcpp_onednn_memory(
         lnorm_fwd_pd.mean_desc(), engine, mean.data_ptr());
@@ -133,7 +133,7 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
   ih = input.size(2);
   iw = 1 /*input.size(3)*/;
 
-  auto data_t = memory::data_type::f32;
+  auto data_t = dt_to_dnnl(input.scalar_type());
   auto format_nchw = memory::format_tag::abc;
 
   memory::dims input_tz = {n, ic, ih};

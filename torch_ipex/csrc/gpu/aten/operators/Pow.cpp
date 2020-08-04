@@ -135,7 +135,10 @@ void tpow(Tensor& self_, scalar_t value, const Tensor& src) {
 } // namespace impl
 
 Tensor& pow_out(Tensor& out, const Tensor& self, Scalar exponent) {
-  IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "pow", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+    at::ScalarType::BFloat16,
+    at::ScalarType::Half,
+    self.scalar_type(), "pow", [&]() {
     impl::pow<scalar_t>(out, self, exponent.to<scalar_t>());
   });
   return out;
@@ -143,28 +146,40 @@ Tensor& pow_out(Tensor& out, const Tensor& self, Scalar exponent) {
 
 Tensor pow(const Tensor& self, Scalar exponent) {
   auto result = at::empty({0}, self.options());
-  IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "pow", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+    at::ScalarType::BFloat16,
+    at::ScalarType::Half,
+    self.scalar_type(), "pow", [&]() {
     impl::pow<scalar_t>(result, self, exponent.to<scalar_t>());
   });
   return result;
 }
 
 Tensor& pow_(Tensor& self, Scalar exponent) {
-  IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "pow", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+    at::ScalarType::BFloat16,
+    at::ScalarType::Half,
+    self.scalar_type(), "pow", [&]() {
     impl::pow<scalar_t>(self, self, exponent.to<scalar_t>());
   });
   return self;
 }
 
 Tensor& pow_(Tensor& self, const Tensor& exponent) {
-  IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "cpow", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+    at::ScalarType::BFloat16,
+    at::ScalarType::Half,
+    self.scalar_type(), "cpow", [&]() {
     impl::cpow<scalar_t>(self, self, exponent);
   });
   return self;
 }
 
 Tensor& pow_out(Tensor& out, const Tensor& self, const Tensor& exponent) {
-  IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "cpow", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+    at::ScalarType::BFloat16,
+    at::ScalarType::Half,
+    self.scalar_type(), "cpow", [&]() {
     impl::cpow<scalar_t>(out, self, exponent);
   });
   return out;
@@ -172,14 +187,20 @@ Tensor& pow_out(Tensor& out, const Tensor& self, const Tensor& exponent) {
 
 Tensor pow(const Tensor& self, const Tensor& exponent) {
   auto result = at::empty({0}, self.options());
-  IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "cpow", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+    at::ScalarType::BFloat16,
+    at::ScalarType::Half,
+    self.scalar_type(), "cpow", [&]() {
     impl::cpow<scalar_t>(result, self, exponent);
   });
   return result;
 }
 
 Tensor& pow_out(Tensor& out, Scalar self, const Tensor& exponent) {
-  IPEX_DISPATCH_ALL_TYPES(out.scalar_type(), "tpow", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+    at::ScalarType::BFloat16,
+    at::ScalarType::Half,
+    out.scalar_type(), "tpow", [&]() {
     impl::tpow<scalar_t>(out, self.to<scalar_t>(), exponent);
   });
   return out;
@@ -187,7 +208,10 @@ Tensor& pow_out(Tensor& out, Scalar self, const Tensor& exponent) {
 
 Tensor pow(Scalar self, const Tensor& exponent) {
   auto result = at::empty({0}, exponent.options());
-  IPEX_DISPATCH_ALL_TYPES(exponent.scalar_type(), "tpow", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+    at::ScalarType::BFloat16,
+    at::ScalarType::Half,
+    exponent.scalar_type(), "tpow", [&]() {
     impl::tpow<scalar_t>(result, self.to<scalar_t>(), exponent);
   });
   return result;

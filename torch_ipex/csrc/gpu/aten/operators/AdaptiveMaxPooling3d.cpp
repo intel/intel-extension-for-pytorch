@@ -80,7 +80,8 @@ void adaptive_max_pool3d_out_template(
     indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
   }
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half, at::ScalarType::BFloat16,
       input_.scalar_type(), "adaptive_max_pool3d", [&] {
         max_pool_out_frame<scalar_t>(
             input,
@@ -149,7 +150,8 @@ Tensor& adaptive_max_pool3d_backward_out_template(
   auto alg_kind = algorithm::pooling_max;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  IPEX_DISPATCH_FLOATING_TYPES(
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
       input.scalar_type(), "adaptive_max_pool3d_backward", [&] {
         /* get raw pointers */
         scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();

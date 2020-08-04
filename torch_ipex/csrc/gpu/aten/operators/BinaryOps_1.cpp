@@ -97,8 +97,8 @@ Tensor& add_out(
 
   auto iter = TensorIterator::binary_op(
       result,
-      self,
-      other,
+      self.scalar_type() == result.scalar_type() ? self : self.to(result.scalar_type()),
+      other.scalar_type() == result.scalar_type() ? other : other.to(result.scalar_type()),
       /*check_mem_overlap=*/true);
   impl::alpha_check(iter, alpha);
   impl::add_kernel_dpcpp(iter, alpha);

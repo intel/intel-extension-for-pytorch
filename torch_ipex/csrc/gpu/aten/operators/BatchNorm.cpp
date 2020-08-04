@@ -176,8 +176,8 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
 
   args.insert({MKLDNN_ARG_SCALE_SHIFT, weight_bias_memory});
 
-  Tensor save_mean = at::empty({feature_num}, input.options());
-  Tensor save_var = at::empty({feature_num}, input.options());
+  Tensor save_mean = at::empty({feature_num}, input.options()).to(ScalarType::Float);
+  Tensor save_var = at::empty({feature_num}, input.options()).to(ScalarType::Float);
 
   void* mean_data = nullptr;
   void* var_data = nullptr;

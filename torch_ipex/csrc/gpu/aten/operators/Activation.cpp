@@ -54,7 +54,8 @@ static void threshold_kernel(
         for (int i = 0; i < iter.ntensors(); i++) {
           all_contiguous = all_contiguous && iter.tensor(i).is_contiguous();
         }
-        if (threshold == 0 && value == 0 && all_contiguous
+
+        if (threshold == 0 && value == 0 && all_contiguous && iter.dtype() != ScalarType::BFloat16
             /*is_contiguous<scalar_t>(iter.get_strides().data())*/) {
           dpcpp_threshold_kernel<scalar_t>(iter);
         } else {
