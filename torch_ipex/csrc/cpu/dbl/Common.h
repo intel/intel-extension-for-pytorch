@@ -18,9 +18,9 @@ namespace comm {
  */
 void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor, bool not_reorder_for_training = false);
 
-std::vector<float> get_int8_scale(bool uint8_used = false);
+std::tuple<std::vector<float>, bool> get_int8_scales(const at::Tensor& tensor, bool uint8_used);
 
-void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, bool is_weight = false);
+void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> scales, bool uint8_used = false);
 
 /**
  * Reorder the input tensor to the specified scalar type.
@@ -29,7 +29,7 @@ void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, bool is_weight = fal
  * @param[in] dst_scalar_type The scalar type which the shade buffer of the ipex tensor will be reordered to. It should
  *                            be at::kBFloat16 or at::kFloat
  */
-void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dtype, bool is_weight = false);
+void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dtype, std::vector<float> sclaes = {});
 
 /**
  * Reorder (outplace) the dil input tensor to the specified dil data type.
@@ -52,7 +52,7 @@ void reorder_to_public(const at::Tensor &tensor, bool remain_dtype = false);
  * @param[in] tensor        The tensor to be reordered to the spcified oneDNN descriptor
  * @param[in] expected_desc The dil buffer of the input tensor will be reordered to expected_desc
  */
-void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc, const std::vector<float> scale = {});
+void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc, const std::vector<float> scales = {});
 
 /**
  * Replace the whole original storage with a dil storage `dil_buffer`

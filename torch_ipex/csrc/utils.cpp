@@ -128,13 +128,20 @@ bool check_int8_calibration() {
   return AutoOptConfig::singleton().get_int8_calibration();
 }
 
-void insert_or_updata_observer(const at::Tensor& self) {
-  float max_value = self.abs().max().item<float>();
-  AutoOptConfig::singleton().insert_or_updata_observer(max_value);
+void insert_or_updata_observer(const at::Tensor& self, const at::Tensor& output, std::string op_name) {
+  std::vector<float> max_values;
+  auto value = self.abs().max().item<float>();
+  max_values.push_back(value);
+  if (output.defined()) {
+    max_values.push_back(output.abs().max().item<float>());
+  } else {
+    max_values.push_back(value);
+  }
+  AutoOptConfig::singleton().insert_or_updata_observer(op_name, max_values);
 }
 
-float get_indictor_scale(bool uint8_used) {
-  return AutoOptConfig::singleton().get_indictor_scale(uint8_used);
+std::tuple<std::vector<float>, bool> get_indicator_scales(std::vector<bool> uint8_used) {
+  return AutoOptConfig::singleton().get_indicator_scales(uint8_used);
 }
 
 bool check_tensor_own_whole_storage(const at::Tensor& tensor) {

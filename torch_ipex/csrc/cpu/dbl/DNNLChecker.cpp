@@ -30,8 +30,7 @@ bool dnnl_support_the_memory_layout_of(const std::vector<at::Tensor> &tensor_vec
 }
 
 bool dnnl_support_the_memory_layout_of(const at::Tensor& tensor) {
-  return tensor.is_contiguous() &&
-         tensor.layout() == at::Layout::Strided;
+  return tensor.layout() == at::Layout::Strided;
 }
 
 bool dnnl_support_the_data_type_of(const std::vector<at::Tensor> &tensor_vec) {

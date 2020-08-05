@@ -139,11 +139,11 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_int8_calibration", []() { return AutoOptConfig::singleton().get_int8_calibration(); });
   m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
   m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
-  m.def("add_indictors", []() { AutoOptConfig::singleton().add_indictors(); });
+  m.def("add_indicators", []() { AutoOptConfig::singleton().add_indicators(); });
   m.def("print_observer", []() { AutoOptConfig::singleton().print_observer(); });
-  m.def("print_indictor", []() { AutoOptConfig::singleton().print_indictor(); });
-
-}
+  m.def("print_indicator", []() { AutoOptConfig::singleton().print_indicator(); });
+  m.def("save_indicators_file", [](const std::string& s) { AutoOptConfig::singleton().save_indicators_file(s); } );
+  m.def("load_indicators_file", [](const std::string& s) { AutoOptConfig::singleton().load_indicators_file(s); } );}
 
 }  // namespace
 using namespace torch::jit;

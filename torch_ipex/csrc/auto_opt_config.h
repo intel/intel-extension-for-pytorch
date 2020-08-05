@@ -59,65 +59,105 @@ public:
     return calibration_step_;
   }
 
-  inline void insert_or_updata_observer(float max_value) {
+  inline void insert_or_updata_observer(std::string op_name, std::vector<float> max_values) {
     num_ops_id++;
     if (observers_.size() < num_ops_id) {
-      Observer new_observer = {num_ops_id - 1, max_value};
+      //Operator op = {num_ops_id - 1, op_n};
+      Observer new_observer = {num_ops_id - 1, op_name, max_values};
       observers_.push_back(new_observer);
     } else {
-      observers_[num_ops_id -1].max_value = std::max(observers_[num_ops_id -1].max_value, max_value);
+      for (auto i = 0; i < max_values.size(); i++)
+        observers_[num_ops_id -1].max_values[i] = std::max(observers_[num_ops_id -1].max_values[i], max_values[i]);
     }
   }
 
   inline void print_observer() {
-    std::cout<<"print observer data"<<std::endl;
     for (auto i = 0; i< observers_.size(); i++) {
-      std::cout<<observers_[i].max_value<<std::endl;
+      for (auto j = 0; j < observers_[i].max_values.size(); j++)
+        std::cout<<observers_[i].max_values[j]<<std::endl;
     }
   }
 
-  inline void print_indictor() {
-    std::cout<<"print indictor"<<std::endl;
+  inline void print_indicator() {
     for (auto i = 0; i< indicators_.size(); i++) {
-      std::cout<<indicators_[i].scale<<std::endl;
-      std::cout<<indicators_[i].zero_point<<std::endl;
+      auto scales = indicators_[i].get_indicator_scales();
+      for (auto j = 0; j< scales.size(); j++)
+          std::cout<<scales[j]<<std::endl;
     }
   }
 
-  inline void add_indictors() {
+  inline void add_indicators() {
     num_ops_id = 0;
     // default used is s8
     for (auto i = 0; i < observers_.size(); i++) {
-      float scale, zero_point;
-      scale = 127.0 / observers_[i].max_value;
-      // zero_points not used now, zero_points = 0 for u8 and 128 for s8.
-      zero_point = 128;
-      Indicator new_indicator = {observers_[i].id, scale, zero_point, /* uint8_used*/false};
+      std::vector<float> scales;
+      std::vector<bool> uint8_used;
+      for (auto j = 0; j < observers_[i].max_values.size(); j++) {
+        scales.push_back(127.0 / observers_[i].max_values[j]);
+        uint8_used.push_back(false);
+      }
+        // zero_points not used now, zero_points = 0 for u8 and 128 for s8.
+        //zero_point = 128;
+      Indicator new_indicator(observers_[i].Id, observers_[i].Name, scales, uint8_used, true);
       indicators_.push_back(new_indicator);
     }
+    observers_.clear();
   }
 
-  inline float get_indictor_scale(bool uint8_used) {
+  inline std::tuple<std::vector<float>, bool> get_indicator_scales(std::vector<bool> uint8_used) {
     if (num_ops_id > indicators_.size() - 1) num_ops_id = 0;
 
-    if (!indicators_[num_ops_id].uint8_used && uint8_used) {
-      // update zero_point and scales
-      indicators_[num_ops_id].zero_point = 0;
-      indicators_[num_ops_id].scale /= 127.0;
-      indicators_[num_ops_id].scale *= 255.0;
-      indicators_[num_ops_id].uint8_used = true;
-    } else if (indicators_[num_ops_id].uint8_used && !uint8_used) {
-      // update zero_point and scales
-      indicators_[num_ops_id].zero_point = 128;
-      indicators_[num_ops_id].scale /= 255;
-      indicators_[num_ops_id].scale *= 127;
+    auto indicator_uint8_used = indicators_[num_ops_id].get_indicator_uint8_status();
+    std::vector<float> indicator_scales;
+    bool quantized_status;
+    indicator_scales = indicators_[num_ops_id].get_indicator_scales();
+    quantized_status = indicators_[num_ops_id].get_indicator_quantized_status();
+    bool scale_update = false;
+    for (auto i = 0; i < uint8_used.size(); i++) {
+      if (!indicator_uint8_used[i] && uint8_used[i]) {
+        // update zero_point and scales
+        indicator_scales[i] /= 127.0;
+        indicator_scales[i] *= 255.0;
+        scale_update = true;
+      } else if (indicator_uint8_used[i] && !uint8_used[i]) {
+        // update zero_point and scales
+        indicator_scales[i] /= 255;
+        indicator_scales[i] *= 127;
+        scale_update = true;
+      }
+    }
+    if (scale_update) {
+      indicators_[num_ops_id].set_indicator_scales(indicator_scales);
+      indicators_[num_ops_id].set_indicator_uint8_status(uint8_used);
     }
     num_ops_id++;
-    return indicators_[num_ops_id - 1].scale;
+    return std::make_tuple(indicator_scales, quantized_status);
+  }
+
+  void save_indicators_file(const std::string& file_name) {
+    std::ofstream out(file_name);
+    auto indicators_number = indicators_.size();
+    out << indicators_number << "\n"<<std::endl;;
+    for (auto i = 0; i < indicators_number; i++) {
+      out << indicators_[i];
+    }
+    out.close();
+  }
+
+  void load_indicators_file(const std::string& file_name) {
+    std::ifstream in(file_name);
+    int64_t indicators_number;
+    in >> indicators_number;
+    Indicator temp;
+    indicators_.clear();
+    for (auto i = 0; i < indicators_number; i++) {
+      in >> temp;
+      indicators_.push_back(temp);
+    }
+    in.close();
   }
 
   inline void calibration_reset() {
-    //calibration_reseted = true;
     num_ops_id = 0;
   }
 
@@ -136,8 +176,8 @@ private:
   // int8
   bool mix_int8_fp32_;
   int64_t num_ops_id; // id number of call int8 path
+  // the flag for one iteration of calibration step whether end or not 
   bool calibration_step_;
-  // the flag for one iteration of calibration step whether end or not
   std::vector<Observer> observers_;
   std::vector<Indicator> indicators_;
 };
