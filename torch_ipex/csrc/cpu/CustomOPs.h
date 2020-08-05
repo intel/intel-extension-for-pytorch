@@ -112,7 +112,7 @@ class NewMaxPool2dOp : public torch::autograd::Function<NewMaxPool2dOp> {
 
         try {
           if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
-            at::Tensor output = torch_ipex::cpu::AtenIpexCPUDev::dil_max_pooling(input.is_contiguous() ? input : input.contiguous(), kernel_size, stride,
+            at::Tensor output = torch_ipex::cpu::AtenIpexCPUDev::dil_max_pooling(input, kernel_size, stride,
                 padding, dilation, ceil_mode);
             ctx->save_for_backward({input, output});
             return output;
@@ -274,7 +274,7 @@ class NewApaptiveAvgPoolingOp : public torch::autograd::Function<NewApaptiveAvgP
 
         try{
           if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
-            return torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(input.is_contiguous() ? input : input.contiguous(), output_size);
+            return torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(input, output_size);
           } 
         } catch (std::exception& e) {
 #if defined(_DEBUG)

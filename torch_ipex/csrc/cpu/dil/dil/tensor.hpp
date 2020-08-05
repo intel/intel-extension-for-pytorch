@@ -124,7 +124,7 @@ class tensor : public memory {
     inline size_t get_item_size() const {
       return utils::data_type_size(get_data_type());
     }
-    
+
     inline bool is_dense(bool with_padding = false) const {
       if (utils::one_of(format_kind(), dnnl_format_kind_any, dnnl_format_kind_undef))
         return false;

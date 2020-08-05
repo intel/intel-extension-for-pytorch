@@ -52,12 +52,18 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   CHECK_DNNL_OP_PRE_COND(input);
   CHECK_DNNL_OP_PRE_COND(weight);
 
-  if (check_auto_mix_int8_fp32()) {
-    if (check_int8_calibration()) {
-      insert_or_updata_observer(input);
+  std::vector<float> output_scale = {};
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    std::vector<float> scales;
+    bool quantized;
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /* uint8_used for output*/false);
+    if (quantized) {
+      output_scale.push_back(scales[1]);
+      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
+      dbl::comm::reorder_to_int8_for_mix_prec(weight, {});
     } else {
-      dbl::comm::reorder_to_int8_for_mix_prec(input);
-      dbl::comm::reorder_to_int8_for_mix_prec(weight, true);
+      dbl::comm::reorder_to_dtype(input, at::kFloat);
+      dbl::comm::reorder_to_dtype(weight, at::kFloat);
     }
   } else {
     dbl::comm::reorder_to_bf16_for_mix_prec(input);
@@ -78,7 +84,6 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
 
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
-  auto output_scale = dbl::comm::get_int8_scale(/* uint8_used=false */);
   dil::tensor dil_output = dbl::conv::convolution_impl(
     dil_input,
     dil_weight,
@@ -90,11 +95,10 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     dil::attr_t(),
     output_scale);
 
-  dil::dims strides = dil_output.get_strides();
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer(aten_output);
+    insert_or_updata_observer(input, aten_output, "Convolution");
   }
 
   return aten_output;
@@ -254,7 +258,8 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
         if (transposed) {
           return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined() && !bias.is_contiguous() ? bias.contiguous() : bias, padding, output_padding, stride, dilation, groups);
         } else {
-          return AtenIpexCPUDev::dil_convolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined() && !bias.is_contiguous() ? bias.contiguous() : bias, stride, padding, dilation, groups);
+          // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
+          return AtenIpexCPUDev::dil_convolution(input, weight, bias, stride, padding, dilation, groups);
         }
       }
     }
@@ -329,8 +334,14 @@ at::Tensor& dil_add_common(
   IPEX_CHECK(self.sizes().equals(other.sizes()),
       "dil add not support broadcast yet");
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(other);
+  if (check_auto_mix_int8_fp32()) {
+    // for accuracy, reorder int8 to fp32 
+    dbl::comm::reorder_to_dtype(self, at::kFloat);
+    dbl::comm::reorder_to_dtype(other, at::kFloat);
+  } else {
+    dbl::comm::reorder_to_bf16_for_mix_prec(self);
+    dbl::comm::reorder_to_bf16_for_mix_prec(other);
+  }
 
   auto x = dbl::comm::try_gen_dil_tensor(self);
   auto y = dbl::comm::try_gen_dil_tensor(other);
@@ -701,12 +712,19 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   IPEX_CHECK(self.dim() >= 2,
       "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
 
-  if (check_auto_mix_int8_fp32()) {
-    if (check_int8_calibration()) {
-      insert_or_updata_observer(self);
+  std::vector<float> output_scale = {};
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    std::vector<float> scales;
+    bool quantized;
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales(self, /*  uint8_used for output*/false);
+    ///quantized = false;
+    if (quantized) {
+      output_scale.push_back(scales[1]);
+      dbl::comm::reorder_to_int8_for_mix_prec(self, {scales[0]});
+      dbl::comm::reorder_to_int8_for_mix_prec(weight, {});
     } else {
-      dbl::comm::reorder_to_int8_for_mix_prec(self);
-      dbl::comm::reorder_to_int8_for_mix_prec(weight, true);
+      dbl::comm::reorder_to_dtype(self, at::kFloat);
+      dbl::comm::reorder_to_dtype(weight, at::kFloat);
     }
   } else {
     dbl::comm::reorder_to_bf16_for_mix_prec(self);
@@ -714,6 +732,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   }
 
   // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
+  std::cout<<"print linear self dim: "<<self.dim()<<std::endl;
   auto self_reshaped = self.dim() > 2 ? dil_reshape(self, {-1, self.size(self.dim() - 1)}) : self;
   const dil::tensor x = dbl::comm::try_gen_dil_tensor(self_reshaped);
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
@@ -721,11 +740,12 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   c10::optional<dil::tensor> b{c10::nullopt};
   
   if (bias.defined()) {
-    dbl::comm::reorder_to_bf16_for_mix_prec(bias);
+    if (!check_auto_mix_int8_fp32()) {
+      dbl::comm::reorder_to_bf16_for_mix_prec(bias);
+    }
     b = dbl::comm::try_gen_dil_tensor(bias);
   }
 
-  auto output_scale =dbl::comm::get_int8_scale(/*  uint8_used=false */);
   dil::tensor y = dbl::linear::linear_impl(x, w, b, output_scale);
 
   auto input_size = self.sizes();
@@ -735,7 +755,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer(aten_output);
+    insert_or_updata_observer(self, aten_output, "Linear");
   }
  
   if (self.dim() > 2) {
@@ -884,10 +904,19 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
              "mkldnn_batch_norm: currently mkldnn only support affine model");
 
   if (check_auto_mix_int8_fp32()) {
-    if (check_int8_calibration()) {
-      insert_or_updata_observer(input);
+    IPEX_CHECK(!train, "mkldnn_bacth_norm: mkldnn only support inference model for int8");
+  }
+  std::vector<float> output_scale = {};
+  bool quantized = false;
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    std::vector<float> scales;
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /*  uint8_used for output*/false);
+    quantized = false;
+    if (quantized) {
+      output_scale.push_back(scales[1]);
+      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
     } else {
-      dbl::comm::reorder_to_int8_for_mix_prec(input);
+      dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
   } else {
     dbl::comm::reorder_to_bf16_for_mix_prec(input);
@@ -928,14 +957,13 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
     }
 
     
-    if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-      auto output_scale = dbl::comm::get_int8_scale(/* uint8_used=false */);
+    if (check_auto_mix_int8_fp32() && !check_int8_calibration() && quantized) {
       y.set_scale(output_scale);
     }
     auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
 
     if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-      insert_or_updata_observer(aten_output);
+      insert_or_updata_observer(input, aten_output, "BatchNorm");
     }
 
     return std::make_tuple(aten_output, at::Tensor(), at::Tensor());
@@ -988,18 +1016,25 @@ at::Tensor AtenIpexCPUDev::dil_max_pooling(
   DEBUG("AtenIpexCPUDev::dil_max_pooling\n");
   CHECK_DNNL_OP_PRE_COND(input);
 
-  if (check_auto_mix_int8_fp32()) {
-    if (check_int8_calibration()) {
-      insert_or_updata_observer(input);
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    std::vector<float> scales;
+    bool quantized;
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /*  uint8_used for output*/false);
+    //quantized = false;
+    if (quantized) {
+      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
     } else {
-      dbl::comm::reorder_to_int8_for_mix_prec(input);
+      dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
   } else {
     dbl::comm::reorder_to_bf16_for_mix_prec(input);
   }
 
+  if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
+    insert_or_updata_observer(input, at::Tensor(), "MaxPooling");
+  }
   return dbl::pool::_dil_pooling(
-      input.is_contiguous() ? input : input.contiguous(),
+      input,
       kernel_size,
       stride,
       padding,
@@ -1021,14 +1056,22 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool2d(
   IPEX_CHECK(!divisor_override.has_value(),
            "dil_avg_pooling operator does not support divisor");
 
-  if (check_auto_mix_int8_fp32()) {
-    if (check_int8_calibration()) {
-      insert_or_updata_observer(input);
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    std::vector<float> scales;
+    bool quantized;
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /*  uint8_used for output*/false);
+    quantized = false;
+    if (quantized) {
+      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
     } else {
-      dbl::comm::reorder_to_int8_for_mix_prec(input);
+      dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
   } else {
     dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  }
+
+  if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
+    insert_or_updata_observer(input, at::Tensor(), "AvgPool2d");
   }
 
   return dbl::pool::_dil_pooling(
@@ -1074,11 +1117,15 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
   DEBUG("AtenIpexCPUDev::dil_adaptive_avg_pool2d\n");
   CHECK_DNNL_OP_PRE_COND(input);
 
-  if (check_auto_mix_int8_fp32()) {
-    if (check_int8_calibration()) {
-      insert_or_updata_observer(input);
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    std::vector<float> scales;
+    bool quantized;
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /*  uint8_used for output*/false);
+    //quantized = false;
+    if (quantized) {
+      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
     } else {
-      dbl::comm::reorder_to_int8_for_mix_prec(input);
+      dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
   } else {
     dbl::comm::reorder_to_bf16_for_mix_prec(input);
@@ -1104,8 +1151,11 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
     dilation.push_back(1);
   }
 
+  if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
+    insert_or_updata_observer(input, at::Tensor(), "AdaptiveAvgPool2d");
+  }
   return dbl::pool::_dil_pooling(
-      input.is_contiguous() ? input : input.contiguous(),
+      input,
       kernel_size,
       /*stride*/ kernel_size,
       /*padding*/ padding,
@@ -1248,11 +1298,15 @@ at::Tensor AtenIpexCPUDev::dil_relu(const at::Tensor& input) {
   DEBUG("AtenIpexCPUDev::dil_relu\n");
   CHECK_DNNL_OP_PRE_COND(input);
 
-  if (check_auto_mix_int8_fp32()) {
-    if (check_int8_calibration()) {
-      insert_or_updata_observer(input);
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    std::vector<float> scales;
+    bool quantized;
+    std::tie(scales, quantized)= dbl::comm::get_int8_scales(input, /*  uint8_used for output*/true);
+    //quantized = false;
+    if (quantized) {
+      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
     } else {
-      dbl::comm::reorder_to_int8_for_mix_prec(input);
+      dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
   } else {
     dbl::comm::reorder_to_bf16_for_mix_prec(input);
@@ -1262,6 +1316,11 @@ at::Tensor AtenIpexCPUDev::dil_relu(const at::Tensor& input) {
   dil::tensor y;
   dil::eltwise_forward::compute(
       x, y, dil::algorithm::eltwise_relu, dil::prop_kind::forward_training, /*alpha*/ 0.0);
+
+  if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
+    insert_or_updata_observer(input, at::Tensor(), "Relu");
+  }
+
   return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
@@ -1269,14 +1328,22 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
   DEBUG("AtenIpexCPUDev::dil_relu_\n");
   CHECK_DNNL_OP_PRE_COND(input);
 
-  if (check_auto_mix_int8_fp32()) {
-    if (check_int8_calibration()) {
-      insert_or_updata_observer(input);
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    std::vector<float> scales;
+    bool quantized;
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /*   uint8_used for output*/true);
+    //quantized = false;
+    if (quantized) {
+      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
     } else {
-      dbl::comm::reorder_to_int8_for_mix_prec(input);
+      dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
   } else {
     dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  }
+
+  if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
+    insert_or_updata_observer(input, at::Tensor(), "Relu_");
   }
 
   auto dil_self = dbl::comm::try_gen_dil_tensor(input);
@@ -1286,7 +1353,7 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
     dil::algorithm::eltwise_relu,
     dil::prop_kind::forward_training,
     /*alpha*/ 0.0);
-
+ 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_self.is_public_format() || check_tensor_own_whole_storage(input));
   dbl::comm::sync_shape_from_dil_to_aten(input, dil_self);
   return input;
@@ -1401,6 +1468,7 @@ at::Tensor AtenIpexCPUDev::dil_reshape(const at::Tensor& self, at::IntArrayRef s
   DEBUG("AtenIpexCPUDev::dil_reshape\n");
   CHECK_DNNL_OP_PRE_COND(self);
 
+  std::cout<<"runing dil_reshape"<<std::endl;
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
 
   auto inferred_size = at::infer_size(size, self.numel());
@@ -1425,6 +1493,7 @@ at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::
   DEBUG("AtenIpexCPUDev::dil_clone\n");
   CHECK_DNNL_OP_PRE_COND(self);
 
+  std::cout<<"clone"<<std::endl;
   auto memory_format =
       optional_memory_format.value_or(at::MemoryFormat::Preserve);
 
@@ -1494,6 +1563,7 @@ at::Tensor& AtenIpexCPUDev::dil_cat_out(at::Tensor& result, at::TensorList tenso
 
 at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_cat\n");
+  std::cout<<"cat"<<std::endl;
   check_cat_no_zero_dim(tensors);
   dim = at::legacy_cat_wrap_dim(dim, tensors);
   std::vector<dil::tensor> x;
@@ -1513,6 +1583,7 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
 std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& self, at::IntArrayRef split_sizes, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_split_with_sizes\n");
   CHECK_DNNL_OP_PRE_COND(self);
+  std::cout<<"split with_size"<<std::endl;
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
 
@@ -1543,6 +1614,7 @@ at::Tensor dil_as_strided(
     at::IntArrayRef stride,
     c10::optional<int64_t> storage_offset_) {
 
+    std::cout<<"dil_as_stride"<<std::endl; 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
       dbl::comm::try_gen_dil_tensor(self).is_public_format(),
       "Cannot set sizes and strides for DIL tensor with non-public format");
@@ -1577,6 +1649,7 @@ at::Tensor& propagate_transposed_names(
 
 at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, int64_t dim1) {
   DEBUG("AtenIpexCPUDev::dil_transpose\n");
+  std::cout<<"dil_transpo"<<std::endl;
   CHECK_DNNL_OP_PRE_COND(self);
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
@@ -1692,6 +1765,7 @@ at::Tensor alias_with_sizes_and_strides(
     const c10::IntArrayRef sizes,
     const c10::IntArrayRef strides) {
 
+    std::cout<<"alias_with_sizes_and_strides"<<std::endl;
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
       dbl::comm::try_gen_dil_tensor(self).is_public_format(),
       "Cannot set sizes and strides for DIL tensor with non-public format");
@@ -1716,6 +1790,7 @@ at::Tensor AtenIpexCPUDev::dil_view(const at::Tensor & self, at::IntArrayRef siz
   DEBUG("AtenIpexCPUDev::dil_view\n");
   CHECK_DNNL_OP_PRE_COND(self);
 
+  std::cout<<"runing dil_view"<<std::endl;
   // We do not support reshaping (viewing) a DIL tensor with blocked format
   dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
 
