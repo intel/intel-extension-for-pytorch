@@ -1,4 +1,6 @@
 #include <c10/core/Allocator.h>
+#include <c10/dpcpp/DPCPPCachingAllocator.h>
+#include <c10/core/Allocator.h>
 #include <core/DPCPPUtils.h>
 #include <core/Exception.h>
 #include <core/Memory.h>
@@ -40,6 +42,11 @@ static inline void NaiveAllocatorDeleter(void* ptr) {
 }
 
 struct DPCPPDefaultAllocator : public at::Allocator {
+
+  DPCPPDefaultAllocator() {
+    SetAllocator(at::DeviceType::DPCPP, this);
+  }
+
   at::DataPtr allocate(size_t size) const override {
     at::DeviceIndex device;
     AT_DPCPP_CHECK(dpcppGetDevice(&device));

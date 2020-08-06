@@ -58,14 +58,14 @@ IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(min_out, TensorMinOp)
 
 Tensor min(const Tensor& self, const Tensor& other) {
   auto out = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::min_out(out, self, other);
+  return at::AtenIpexTypeDPCPP::min_out(out, self, other.expand_as(self));
 }
 
 IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(max_out, TensorMaxOp)
 
 Tensor max(const Tensor& self, const Tensor& other) {
   auto out = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::max_out(out, self, other);
+  return at::AtenIpexTypeDPCPP::max_out(out, self, other.expand_as(self));
 }
 
 Tensor& bitwise_and_out(

@@ -9,6 +9,8 @@
 #include <core/Runtime.h>
 #include <dnnl.hpp>
 
+#include "qutil.h"
+
 using namespace dnnl;
 using namespace at::dpcpp;
 
@@ -61,27 +63,23 @@ void mkldnnGemmImpl(
   }
   TORCH_CHECK(k == m2.size(-2), "size mismatch, m1: ", m1.sizes(), " m2: ", m2.sizes());
 
-  memory::data_type data_t;
-  if (std::is_same<scalar_t, at::Half>::value) {
-    data_t = memory::data_type::f16;
-  } else if (std::is_same<scalar_t, at::BFloat16>::value) {
-    data_t = memory::data_type::bf16;
-  } else {
-    data_t = memory::data_type::f32;
-  }
+  auto m1_dt = dt_to_dnnl(m1.scalar_type());
+  auto m2_dt = dt_to_dnnl(m2.scalar_type());
+  auto result_dt = dt_to_dnnl(result.scalar_type());
+
   memory::desc m1_md;
   memory::desc m2_md;
   memory::desc r_md;
   if (dims == 2) {
-    m1_md = memory::desc({m, k}, data_t, {m1.stride(0), m1.stride(1)});
-    m2_md = memory::desc({k, n}, data_t, {m2.stride(0), m2.stride(1)});
-    r_md = memory::desc({m, n}, data_t, {result.stride(0), result.stride(1)});
+    m1_md = memory::desc({m, k}, m1_dt, {m1.stride(0), m1.stride(1)});
+    m2_md = memory::desc({k, n}, m2_dt, {m2.stride(0), m2.stride(1)});
+    r_md = memory::desc({m, n}, result_dt, {result.stride(0), result.stride(1)});
   } else {
-    m1_md = memory::desc({mb, m, k}, data_t,
+    m1_md = memory::desc({mb, m, k}, m1_dt,
       {m1.stride(0), m1.stride(1), m1.stride(2)});
-    m2_md = memory::desc({mb, k, n}, data_t,
+    m2_md = memory::desc({mb, k, n}, m2_dt,
       {m2.stride(0), m2.stride(1), m2.stride(2)});
-    r_md = memory::desc({mb, m, n}, data_t,
+    r_md = memory::desc({mb, m, n}, result_dt,
       {result.stride(0), result.stride(1), result.stride(2)});
   }
 
@@ -94,6 +92,31 @@ void mkldnnGemmImpl(
   if (with_relu)
     po.append_eltwise(1.f, dnnl::algorithm::eltwise_relu, 0.f, 0.f);;
   attr.set_post_ops(po);
+
+  std::vector<float> weight_scales;
+  if(m2.is_quantized()){
+    if (m2.qscheme() == kPerTensorAffine) {
+      weight_scales.push_back(static_cast<float>(m2.q_scale()));
+    } else {
+      for (int i = 0; i < m2.size(1); i++) {
+        weight_scales.push_back(m2.q_per_channel_scales()[i].item<float>());
+      }
+    }
+  }
+
+  if(m1.is_quantized()){
+    auto in_scale = m1.q_scale();
+    auto out_scale = result.is_quantized()? result.q_scale() : 1.f;
+    std::vector<float> matmul_scale;
+    for(int i=0; i<weight_scales.size(); i++){
+      matmul_scale.push_back(1.f / (out_scale / (in_scale * weight_scales[i])));
+    }
+    int mask_ac = 0;
+    int mask_matmul = weight_scales.size() > 1? 1 << 1 : 0;
+    attr.set_output_scales(mask_matmul, matmul_scale);
+    attr.set_zero_points(DNNL_ARG_DST, mask_ac,
+		    {static_cast<int>(result.is_quantized()? result.q_zero_point() : 0)}); 
+  }
 
   at::Device curDevice = at::Device(at::kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
@@ -148,10 +171,24 @@ void gemm_broadcast(Tensor& result,
                     bool with_relu = false) {
   std::vector<int64_t> result_shape;
   auto dim = m1.dim();
-  if (dim == 2) {
-    result_shape = std::vector<int64_t>{m1.size(0), m2.size(1)};
+  Tensor m2_unpack;
+  if(m1.is_quantized()){
+    auto& pack_ptr =
+            cpp_custom_type_hack::cast<PackedLinearWeightQDPCPP>(m2);
+    m2_unpack = pack_ptr.weight;
+    
+    TORCH_CHECK(m2_unpack.dim() == 2, "expected 2D tensor");
+
+    if(m2_unpack.sizes()[1] == m1.sizes()[1]){
+      m2_unpack.transpose_(0,1);
+    }
   } else {
-    result_shape = std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(2)};
+    m2_unpack = m2;
+  }
+  if (dim == 2) {
+    result_shape = std::vector<int64_t>{m1.size(0), m2_unpack.size(1)};
+  } else {
+    result_shape = std::vector<int64_t>{m1.size(0), m1.size(1), m2_unpack.size(2)};
   }
   if (bias.defined() && beta) {
     TORCH_CHECK(check_broadcast(bias, result_shape),
@@ -164,7 +201,7 @@ void gemm_broadcast(Tensor& result,
     result.resize_(result_shape);
   }
 
-  mkldnnGemmImpl<scalar_t>(result, beta, alpha, m1, m2, with_relu);
+  mkldnnGemmImpl<scalar_t>(result, beta, alpha, m1, m2_unpack, with_relu);
 }
 } // namespace impl
 
@@ -205,25 +242,55 @@ Tensor addmm(
     const Tensor& m2,
     Scalar beta,
     Scalar alpha) {
-  checkBackend("addmm", {input, m1, m2}, Backend::DPCPP);
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
-  TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
 
-  auto result = at::empty({0}, input.options());
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-    at::ScalarType::Half,
-    at::ScalarType::BFloat16,
-    result.scalar_type(),
-    "addmm",
-    [&]() {
-      impl::gemm_broadcast<scalar_t>(
-      result,
-      m1,
-      m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
-      beta.to<scalar_t>(),
-      alpha.to<scalar_t>(),
-      input.scalar_type() == m1.scalar_type() ? input : input.to(m1.scalar_type()));
-    });
+  if(m1.is_quantized()){
+    checkBackend("addmm", m1, Backend::QuantizedDPCPP);
+  } else {
+    checkBackend("addmm", {input, m1, m2}, Backend::DPCPP);
+    TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
+  }
+
+  Tensor result;
+  if(input.is_quantized()){
+    result = _empty_affine_quantized({0},
+              device(kDPCPP).dtype(input.scalar_type()),
+              1.f,
+              static_cast<int>(0),
+              MemoryFormat::Contiguous);
+  } else {
+    result = at::empty({0}, input.options());
+  }
+  
+  if(m1.is_quantized()){
+    IPEX_DISPATCH_QINT_TYPES(
+      m1.scalar_type(),
+      "q_addmm",
+      [&]() {
+        impl::gemm_broadcast(
+        result,
+	m1,
+	m2,
+	beta.to<float>(),
+	alpha.to<float>(),
+	input);
+      });
+  } else {
+    IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      result.scalar_type(),
+      "addmm",
+      [&]() {
+        impl::gemm_broadcast<scalar_t>(
+        result,
+        m1,
+        m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+        beta.to<scalar_t>(),
+        alpha.to<scalar_t>(),
+        input.scalar_type() == m1.scalar_type() ? input : input.to(m1.scalar_type()));
+      });
+  }
 
   return result;
 }

@@ -99,6 +99,12 @@ static inline memory::data_type dt_to_dnnl(const ScalarType scalar_type) {
     return memory::data_type::f16;
   } else if (scalar_type == ScalarType::BFloat16) {
     return memory::data_type::bf16;
+  } else if (scalar_type == ScalarType::QInt8) {
+    return memory::data_type::s8;
+  } else if (scalar_type == ScalarType::QUInt8) {
+    return memory::data_type::u8;
+  } else if (scalar_type == ScalarType::QInt32) {
+    return memory::data_type::s32;
   } else {
     return memory::data_type::f32;
   }

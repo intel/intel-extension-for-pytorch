@@ -12,7 +12,7 @@ typedef struct DPCPPDescBuff {
   char str[DPCPP_DESC_BUFF_LEN];
 } DPCPPDescBuff;
 
-TensorImpl* TensorImpl_new();
+TensorImpl* TensorImpl_new(bool is_quantized);
 at::Tensor TensorImpl_wrap(TensorImpl* tensor);
 at::TensorImpl* TensorImpl_Unwrap(const at::Tensor& tensor);
 int TensorImpl_nDimension(const at::TensorImpl* self);

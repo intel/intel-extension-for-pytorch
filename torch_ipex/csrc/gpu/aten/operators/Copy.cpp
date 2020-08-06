@@ -1,12 +1,17 @@
 #include <ATen/ATen.h>
 
 #include <ATen/native/TensorIterator.h>
+#include <ATen/core/TensorBody.h>
+#include <ATen/quantized/Quantizer.h>
+#include <ATen/quantized/QTensorImpl.h>
 
 #include <core/ApplyUtils.h>
 #include <core/Exception.h>
 #include <core/Guard.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
+#include <c10/core/ScalarType.h>
+#include <ATen/native/Resize.h>
 
 #include <utils/ATDispatch.h>
 
@@ -119,19 +124,55 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
         numel * iter.element_size(0),
         DeviceToDevice);
   } else {
-    IPEX_DISPATCH_ALL_TYPES_AND3(
-        kHalf, kBFloat16, kBool, iter.dtype(0), "copy_", [&] {
-          using dst_t = scalar_t;
-          IPEX_DISPATCH_ALL_TYPES_AND3(
-              kHalf, kBFloat16, kBool, iter.dtype(1), "copy_", [&] {
-                CopyOp<dst_t, scalar_t>::apply(iter.tensor(0), iter.tensor(1));
-              });
-        });
+    ScalarType dtype = iter.dtype(0);
+    if(!isQIntType(dtype)){
+      IPEX_DISPATCH_ALL_TYPES_AND3(
+          kHalf, kBFloat16, kBool, iter.dtype(0), "copy_", [&] {
+            using dst_t = scalar_t;
+            IPEX_DISPATCH_ALL_TYPES_AND3(
+                kHalf, kBFloat16, kBool, iter.dtype(1), "copy_", [&] {
+                  CopyOp<dst_t, scalar_t>::apply(iter.tensor(0), iter.tensor(1));
+                });
+          });
+    } else {
+      IPEX_DISPATCH_QINT_TYPES(iter.dtype(0), "copy_", [&] {
+        using dst_t = scalar_t;
+          CopyOp<dst_t, scalar_t>::apply(iter.tensor(0), iter.tensor(1));
+      });
+    }
   }
 
   if (src_device != dst_device) {
     // FixMe
   }
+}
+
+Tensor as_strided_quantized_dpcpp(const Tensor& self, IntArrayRef size, IntArrayRef stride) {
+  auto storage_offset = self.storage_offset();
+  auto quantizer = at::get_qtensorimpl(self)->quantizer();
+  auto result = detail::make_tensor<QTensorImpl>(
+      Storage(self.storage()), self.key_set(), quantizer);
+  native::setStrided(result, size, stride, storage_offset);
+  return result;
+}
+
+Tensor expand_as_quantized_dpcpp(const Tensor& self, const Tensor& other) {
+  auto size = other.sizes();
+  TORCH_CHECK(size.size() >= (size_t)self.dim(),
+           "expand(", self.toString(), "{", self.sizes(), "}, size=", size,
+           "): the number of sizes provided (", size.size(), ") ",
+           "must be greater or equal to the number of dimensions in the tensor (",
+           self.dim(), ")");
+
+  std::vector<int64_t> expandedSizes;
+  std::vector<int64_t> expandedStrides;
+  std::tie(expandedSizes, expandedStrides) = inferExpandGeometry(self.sizes(), self.strides(), size);
+
+  auto result = as_strided_quantized_dpcpp(self, expandedSizes, expandedStrides);
+#ifdef BUILD_NAMEDTENSOR
+  namedinference::propagate_names_for_expand(result, self);
+#endif
+  return result;
 }
 
 void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
@@ -154,7 +195,11 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
     // the src device for GPU-GPU copies.
     if (iter.device_type(0) == kDPCPP) {
       dst_contig = dst.is_contiguous() ? dst : at::empty_like(dst);
-      src_contig = iter.tensor(1).to(iter.dtype(0)).expand_as(dst).contiguous();
+      if(dst.is_quantized()){
+        src_contig = expand_as_quantized_dpcpp(iter.tensor(1).to(iter.dtype(0)), dst).contiguous();
+      } else {
+        src_contig = iter.tensor(1).to(iter.dtype(0)).expand_as(dst).contiguous();
+      }
     } else {
       bool same_type = iter.dtype(0) == iter.dtype(1);
       dst_contig = (dst.is_contiguous() && same_type) ? dst : at::empty_like(dst, iter.dtype(1));
@@ -218,6 +263,16 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
 
 Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   // TODO: valid check
+  if (self.is_quantized() && src.is_quantized()) {
+    if(self.device() != src.device()){
+      self = _empty_affine_quantized(self.sizes(),
+               self.options(),
+               1.f,
+               static_cast<int>(0),
+               MemoryFormat::Contiguous);
+    }
+    self.set_quantizer_(src.quantizer());
+  }
 
   BUILD_TENSOR_ITER(self, src, iter);
 

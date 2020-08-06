@@ -124,6 +124,7 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   if (ipexTensor.device().is_cpu()) {
     TORCH_INTERNAL_ASSERT(! (ipexTensor.type_set().has(at::TensorTypeId::DPCPPTensorId)));
     TORCH_INTERNAL_ASSERT(! (ipexTensor.type_set().has(at::TensorTypeId::SparseDPCPPTensorId)));
+    TORCH_INTERNAL_ASSERT(! (ipexTensor.type_set().has(at::TensorTypeId::QuantizedDPCPPTensorId)));
     return ipexTensor;
   }
 
@@ -131,6 +132,7 @@ at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor) {
   TORCH_INTERNAL_ASSERT(
     ipexTensor.type_set().has(at::TensorTypeId::DPCPPTensorId) ||
     ipexTensor.type_set().has(at::TensorTypeId::SparseDPCPPTensorId));
+    ipexTensor.type_set().has(at::TensorTypeId::QuantizedDPCPPTensorId));
 
   // Brnach 1: Sparse Tensor
   if (ipexTensor.is_sparse()) {
@@ -193,6 +195,7 @@ at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor) {
   if (ipexTensor.device().is_cpu()) {
     TORCH_INTERNAL_ASSERT(! (ipexTensor.type_set().has(at::TensorTypeId::DPCPPTensorId)));
     TORCH_INTERNAL_ASSERT(! (ipexTensor.type_set().has(at::TensorTypeId::SparseDPCPPTensorId)));
+    TORCH_INTERNAL_ASSERT(! (ipexTensor.type_set().has(at::TensorTypeId::QuantizedDPCPPTensorId)));
     return ipexTensor;
   }
 
@@ -255,7 +258,8 @@ at::Tensor upgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     allocator,
     /*resizeable=*/true);
   memcpy(storage_impl->data(), cpuTensor.unsafeGetTensorImpl()->data(), data_size);
-  auto&& _tensor = at::detail::make_tensor<IPEXTensorImpl>(storage_impl, at::TensorTypeId::DPCPPTensorId);
+  auto&& _tensor = at::detail::make_tensor<IPEXTensorImpl>(storage_impl, cpuTensor.is_quantized()
+		  ? at::TensorTypeId::QuantizedDPCPPTensorId : at::TensorTypeId::DPCPPTensorId);
   auto _tensor_sizes = cpuTensor.sizes();
   if (_tensor_sizes.size() != 1 || _tensor_sizes[0] != 0) {
     _tensor.unsafeGetTensorImpl()->set_sizes_contiguous(_tensor_sizes);
@@ -327,7 +331,8 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     // [NOTE]: If the deleter of DPCPP::CPU is different form CPU deleter, we need to call
     //         compare_exchange_deleter of DataPtr to update deleter
     cpu_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
-    auto _tensor =  at::detail::make_tensor<IPEXTensorImpl>(cpuTensor.storage(), at::TensorTypeId::DPCPPTensorId);
+    auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(cpuTensor.storage(), cpuTensor.is_quantized()
+		    ? at::TensorTypeId::QuantizedDPCPPTensorId : at::TensorTypeId::DPCPPTensorId);
     TORCH_INTERNAL_ASSERT(_tensor.device().type() == at::DeviceType::DPCPP);
     IPEXTensorImpl* ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
     ipex_impl->copy_meta_info(cpu_tensor_impl);
@@ -358,7 +363,8 @@ at::Tensor shallowUpgradeToDPCPPTensorA(const at::Tensor& ipexTensor, const at::
   TORCH_INTERNAL_ASSERT(cpuTensor.storage().device_type() == at::DeviceType::DPCPP);
   TORCH_INTERNAL_ASSERT(ipexTensor.storage().data() == cpuTensor.storage().data());
 
-  auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(at::Storage(ipexTensor.storage()), at::TensorTypeId::DPCPPTensorId);
+  auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(at::Storage(ipexTensor.storage()), cpuTensor.is_quantized()
+		  ? at::TensorTypeId::QuantizedDPCPPTensorId : at::TensorTypeId::DPCPPTensorId);
   TORCH_INTERNAL_ASSERT(_tensor.device().type() == at::DeviceType::DPCPP);
   IPEXTensorImpl* ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
   ipex_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());

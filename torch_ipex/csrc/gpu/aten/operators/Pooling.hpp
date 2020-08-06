@@ -47,6 +47,27 @@ class scalar_t_to_dnnl {
   static memory::data_type to() {
     TORCH_CHECK(0, " mkldnn not support for double");
   };
+
+  template <
+      typename scalar_t,
+      std::enable_if_t<std::is_same<scalar_t, qint8>::value, int> = 0>
+  static memory::data_type to() {
+    return memory::data_type::s8;
+  };
+
+  template <
+      typename scalar_t,
+      std::enable_if_t<std::is_same<scalar_t, quint8>::value, int> = 0>
+  static memory::data_type to() {
+    return memory::data_type::u8;
+  };
+
+  template <
+      typename scalar_t,
+      std::enable_if_t<std::is_same<scalar_t, qint32>::value, int> = 0>
+  static memory::data_type to() {
+    return memory::data_type::s32;
+  };
 };
 
 template <typename scalar_t>
@@ -77,7 +98,8 @@ static void avg_pool_out_frame(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto data_t = scalar_t_to_dnnl::to<scalar_t>();
-  if (data_t == memory::data_type::f16) {
+  if (data_t == memory::data_type::f16 || data_t == memory::data_type::s8
+	|| data_t == memory::data_type::u8 || data_t == memory::data_type::s32) {
     prop_kind = dnnl::prop_kind::forward_inference;
   }
 
@@ -329,7 +351,8 @@ static void max_pool_out_frame(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto data_t = scalar_t_to_dnnl::to<scalar_t>();
-  if (data_t == memory::data_type::f16) {
+  if (data_t == memory::data_type::f16 || data_t == memory::data_type::s8
+	|| data_t == memory::data_type::u8 || data_t == memory::data_type::s32) {
     prop_kind = dnnl::prop_kind::forward_inference;
   }
 

@@ -1289,7 +1289,10 @@ template <
     typename Op,
     bool with_offset = false>
 inline void DPCPP_tensor_apply2(at::Tensor dst, at::Tensor src, const Op& op) {
-  checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::DPCPP);
+  if(src.is_quantized())
+      checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::QuantizedDPCPP);
+  else
+      checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::DPCPP);
   int64_t totalElements = dst.numel();
 
   TORCH_CHECK(

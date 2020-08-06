@@ -17,6 +17,9 @@ Tensor as_strided(
     IntArrayRef size,
     at::IntArrayRef stride,
     c10::optional<int64_t> storage_offset) {
+  if(self.is_quantized()){
+    return at::native::as_strided_qtensorimpl(self, size, stride, storage_offset);
+  }
   return at::native::as_strided_tensorimpl(self, size, stride, storage_offset);
 }
 

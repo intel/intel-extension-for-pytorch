@@ -4,12 +4,16 @@
 #include <ATen/native/ReduceOpsUtils.h>
 #include <ATen/native/TensorFactories.h>
 #include <c10/util/Exception.h>
+#include <ATen/quantized/Quantizer.h>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
 #include <utils/ATDispatch.h>
 #include <utils/Numerics.h>
+
+DPCPP_DEF_K1(intrepr);
+DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
 
 using namespace at::dpcpp;
 using namespace at::native;
@@ -302,7 +306,8 @@ Tensor empty(
     IntArrayRef size,
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
-  TORCH_INTERNAL_ASSERT(options.backend() == at::Backend::DPCPP);
+  TORCH_INTERNAL_ASSERT(options.backend() == at::Backend::DPCPP
+	|| options.backend() == at::Backend::QuantizedDPCPP);
   // TORCH_INTERNAL_ASSERT(!options.is_variable()); // is_variable should have
   // been
   // "unpacked"
@@ -316,9 +321,8 @@ Tensor empty(
       allocator->allocate(nelements * dtype.itemsize()),
       allocator,
       /*resizeable=*/true);
-
   auto tensor = detail::make_tensor<TensorImpl>(
-      storage_impl, c10::DispatchKey::DPCPPTensorId);
+      storage_impl, options.computeDispatchKey());
   // Default TensorImpl has size [0]
   if (size.size() != 1 || size[0] != 0) {
     tensor.unsafeGetTensorImpl()->set_sizes_contiguous(size);
@@ -457,3 +461,4 @@ std::tuple<Tensor, Tensor> var_mean(const Tensor& self, bool unbiased) {
 
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
+

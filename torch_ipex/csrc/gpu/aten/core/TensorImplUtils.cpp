@@ -9,11 +9,11 @@ using namespace at::dpcpp::detail;
 namespace at {
 namespace dpcpp {
 
-TensorImpl* TensorImpl_new(caffe2::TypeMeta type_meta) {
+TensorImpl* TensorImpl_new(caffe2::TypeMeta type_meta, bool is_quantized) {
   return c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
              c10::intrusive_ptr<at::StorageImpl>::reclaim(
                  StorageImpl_new(type_meta)),
-             c10::DispatchKey::DPCPPTensorId)
+             is_quantized? c10::DispatchKey::QuantizedDPCPPTensorId : c10::DispatchKey::DPCPPTensorId)
       .release();
 }
 

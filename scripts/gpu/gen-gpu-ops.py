@@ -1004,23 +1004,35 @@ def parse_local_overrides(path):
   return overrides
 
 
-def generate_registrations(fgens, overrides):
+def generate_registrations(fgens, overrides, overrides_qint):
   code = 'void RegisterAtenTypeFunctions() {\n'
   code += '  static auto dispatch = torch::RegisterOperators()\n'
   overridden = set()
   for fgen in fgens:
+    override_fn = ''
+    override_fn_qint = ''
     mapsig_key = get_mapsig_key(fgen.mapsig)
     if mapsig_key in overrides:
       override_fn = 'AtenIpexTypeDefault::{}'.format(fgen.func)
       overridden.add(mapsig_key)
     else:
       override_fn = fgen.xfunc if fgen.code else None
-    if override_fn:
+    if mapsig_key in overrides_qint:
+      override_fn_qint = 'AtenIpexTypeDefault::{}'.format(fgen.func)
+      overridden.add(mapsig_key)    
+    if override_fn != '':
       code += (
           '  .op(torch::RegisterOperators::options().schema("{}")\n      '
           '.impl_unboxedOnlyKernel<{}, &{}>(c10::DispatchKey::DPCPPTensorId)\n'
           '      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))\n'.format(
               fgen.aten_sig, fgen.funsig, override_fn, override_fn,
+              fgen.aten_sig))
+    if override_fn_qint != '':
+      code += (
+          '  .op(torch::RegisterOperators::options().schema("{}")\n      '
+          '.impl_unboxedOnlyKernel<{}, &{}>(c10::DispatchKey::QuantizedDPCPPTensorId)\n'
+          '      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))\n'.format(
+              fgen.aten_sig, fgen.funsig, override_fn_qint, override_fn_qint,
               fgen.aten_sig))
   return code + ';\n}\n', overridden
 
@@ -1089,6 +1101,7 @@ def generate(args):
   assert len(errors) == 0
 
   overrides = parse_local_overrides(args.ipextype)
+  overrides_qint = parse_local_overrides(args.ipextype_qint)
   print(
       '{} function overrides in {}'.format(len(overrides), args.ipextype),
       file=sys.stderr)
@@ -1111,7 +1124,7 @@ def generate(args):
   functions = generate_functions(fgens)
   hfunctions = generate_class_functions(fgens)
   hnfunctions = generate_namespace_functions(fgens)
-  regs, overridden = generate_registrations(fgens, overrides)
+  regs, overridden = generate_registrations(fgens, overrides, overrides_qint)
   # assert check_overrides(overrides, overridden)
   # Create output files ...
   print(
@@ -1133,6 +1146,11 @@ if __name__ == '__main__':
       'ipextype',
       type=str,
       metavar='IPEX_TYPE_FILE',
+      help='The path to the IPEX ATEN overrides file')
+  arg_parser.add_argument(
+      'ipextype_qint',
+      type=str,
+      metavar='IPEX_TYPE_FILE_INT8',
       help='The path to the IPEX ATEN overrides file')
   arg_parser.add_argument(
       'typedef',

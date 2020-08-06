@@ -90,35 +90,64 @@ void avg_pool2d_out_template(
                                     : algorithm::pooling_avg_exclude_padding;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      input.scalar_type(),
-      "avg_pool2d_out_frame",
-      [&] {
-        avg_pool_out_frame<scalar_t>(
-            input,
-            output,
-            nbatch,
-            nInputPlane,
-            0,
-            inputHeight,
-            inputWidth,
-            0,
-            outputHeight,
-            outputWidth,
-            0,
-            kH,
-            kW,
-            0,
-            dH,
-            dW,
-            0,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-      });
+  if(!input.is_quantized()){
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        input.scalar_type(),
+        "avg_pool2d_out_frame",
+        [&] {
+          avg_pool_out_frame<scalar_t>(
+              input,
+              output,
+              nbatch,
+              nInputPlane,
+              0,
+              inputHeight,
+              inputWidth,
+              0,
+              outputHeight,
+              outputWidth,
+              0,
+              kH,
+              kW,
+              0,
+              dH,
+              dW,
+              0,
+              padH,
+              padW,
+              alg_kind,
+              prop_kind);
+        });
+  } else {
+    IPEX_DISPATCH_QINT_TYPES(
+        input.scalar_type(), "q_avg_pool2d_out_frame", [&] {
+	  avg_pool_out_frame<scalar_t>(
+              input,
+              output,
+              nbatch,
+              nInputPlane,
+              0,
+              inputHeight,
+              inputWidth,
+              0,
+              outputHeight,
+              outputWidth,
+              0,
+              kH,
+              kW,
+              0,
+              dH,
+              dW,
+              0,
+              padH,
+              padW,
+              alg_kind,
+              prop_kind);
+        });
+  
+  }
 }
 
 Tensor& avg_pool2d_backward_out_template(
@@ -266,7 +295,18 @@ Tensor avg_pool2d(
     bool ceil_mode,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
-  Tensor output = at::empty({0}, input.options());
+
+  Tensor output;
+  if(input.is_quantized()){
+    output = _empty_affine_quantized({0},
+         input.options(),
+         input.q_scale(),
+         input.q_zero_point(),
+         MemoryFormat::Contiguous);
+  } else {
+    output = at::empty({0}, input.options());
+  }
+
   return at::AtenIpexTypeDPCPP::avg_pool2d_out(
       output,
       input,

@@ -32,6 +32,7 @@ def gpu_gen_and_should_copy(install_dir):
                          'gen-gpu-decl.py', \
                          '--gpu_decl=./', \
                          'DPCPPGPUType.h', \
+                         'QUANTIZEDDPCPPGPUType.h', \
                          'DedicateType.h', \
                          'DispatchStubOverride.h', \
                          'RegistrationDeclarations.h']
@@ -43,6 +44,7 @@ def gpu_gen_and_should_copy(install_dir):
                         'gen-gpu-ops.py', \
                         '--output_folder=./', \
                         'DPCPPGPUType.h', \
+                        'QUANTIZEDDPCPPGPUType.h', \
                         'RegistrationDeclarations_DPCPP.h', \
                         'Functions_DPCPP.h']
     if subprocess.call(generate_code_cmd, cwd=cwd) != 0:

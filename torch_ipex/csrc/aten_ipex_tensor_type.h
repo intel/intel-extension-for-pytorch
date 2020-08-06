@@ -10,6 +10,10 @@ static inline at::TensorTypeId DPCPPTensorId() {
   return at::TensorTypeId::DPCPPTensorId;
 }
 
+static inline at::TensorTypeId QuantizedDPCPPTensorId() {
+  return at::TensorTypeId::QuantizedDPCPPTensorId;
+}
+
 }}
 
 #endif

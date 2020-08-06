@@ -27,7 +27,7 @@ void TensorImpl_copy(TensorImpl* dst, TensorImpl* src) {
 
 template <typename scalar_t>
 TensorImpl* TensorImpl_newClone(TensorImpl* self) {
-  TensorImpl* tensor = TensorImpl_new();
+  TensorImpl* tensor = TensorImpl_new(self->is_quantized());
   TensorImpl_resizeAs(tensor, self);
   auto dst_ = TensorImpl_wrap(tensor);
   auto src_ = TensorImpl_wrap(self);

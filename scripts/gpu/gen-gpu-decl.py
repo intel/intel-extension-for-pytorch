@@ -132,6 +132,11 @@ def generate(args):
       '{} function dpcpp type in {}'.format(len(specific), args.ipextype),
       file=sys.stderr)
 
+  specific_qint = parse_override_keys(args.ipextype_qint)
+  print(
+      '{} function dpcpp type in {}'.format(len(specific_qint), args.ipextype_qint),
+      file=sys.stderr)
+
   dedicated = parse_override_keys(args.dedicatedtype)
   print(
       '{} function dedicated overrides in {}'.format(len(dedicated), args.dedicatedtype),
@@ -148,6 +153,11 @@ def generate(args):
       m = re.search(r"{}".format(override), fndef)
       if m:
         ordecls += '{}\n'.format(fndef)
+    for override in specific_qint:
+      if override not in specific and override not in dedicated and override not in dispatchstub:
+        m = re.search(r"{}".format(override), fndef)
+        if m:
+          ordecls += '{}\n'.format(fndef)
     for override in dedicated:
       m = re.search(r"{}".format(override), fndef)
       if m:
@@ -167,6 +177,11 @@ if __name__ == '__main__':
   arg_parser.add_argument('--gpu_decl', type=str)
   arg_parser.add_argument(
       'ipextype',
+      type=str,
+      metavar='IPEX_TYPE_FILE',
+      help='The path to the IPEX ATEN overrides file')
+  arg_parser.add_argument(
+      'ipextype_qint',
       type=str,
       metavar='IPEX_TYPE_FILE',
       help='The path to the IPEX ATEN overrides file')

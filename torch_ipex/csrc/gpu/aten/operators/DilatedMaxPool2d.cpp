@@ -101,37 +101,66 @@ void max_pool2d_with_indices_out_template(
 
   auto alg_kind = algorithm::pooling_max;
   auto prop_kind = dnnl::prop_kind::forward_training;
-
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      input.scalar_type(),
-      "max_pool2d_with_indices",
-      [&] {
-        max_pool_out_frame<scalar_t>(
-            input,
-            output,
-            indices,
-            nbatch,
-            nInputPlane,
-            0,
-            inputHeight,
-            inputWidth,
-            0,
-            outputHeight,
-            outputWidth,
-            0,
-            kH,
-            kW,
-            0,
-            dH,
-            dW,
-            0,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-      });
+  
+  if(!input.is_quantized()){
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        input.scalar_type(),
+        "max_pool2d_with_indices",
+        [&] {
+          max_pool_out_frame<scalar_t>(
+              input,
+              output,
+              indices,
+              nbatch,
+              nInputPlane,
+              0,
+              inputHeight,
+              inputWidth,
+              0,
+              outputHeight,
+              outputWidth,
+              0,
+              kH,
+              kW,
+              0,
+              dH,
+              dW,
+              0,
+              padH,
+              padW,
+              alg_kind,
+              prop_kind);
+        });
+  } else {
+    IPEX_DISPATCH_QINT_TYPES(
+        input.scalar_type(), "q_max_pool2d_with_indices", [&] {
+          max_pool_out_frame<scalar_t>(
+              input,
+              output,
+              indices,
+              nbatch,
+              nInputPlane,
+              0,
+              inputHeight,
+              inputWidth,
+              0,
+              outputHeight,
+              outputWidth,
+              0,
+              kH,
+              kW,
+              0,
+              dH,
+              dW,
+              0,
+              padH,
+              padW,
+              alg_kind,
+              prop_kind);
+        });
+  }
 }
 
 Tensor& max_pool2d_with_indices_backward_out_template(
@@ -296,8 +325,18 @@ std::tuple<Tensor, Tensor> max_pool2d_with_indices(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  Tensor output = at::empty({0}, input.options());
-  Tensor indices = at::empty({0}, input.options().dtype(kLong));
+  Tensor output, indices;
+  if(input.is_quantized()) {
+    output = _empty_affine_quantized({0},
+                input.options(),
+                input.q_scale(),
+                input.q_zero_point(),
+                MemoryFormat::Contiguous); //Relu fusion?
+  } else {
+    output = at::empty({0}, input.options());
+  }
+  indices = at::empty({0}, input.options().dtype(kLong));
+
   return at::AtenIpexTypeDPCPP::max_pool2d_with_indices_out(
       output,
       indices,
