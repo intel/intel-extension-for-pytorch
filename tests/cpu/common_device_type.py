@@ -271,7 +271,10 @@ class DPCPPTestBase(DeviceTypeTestBase):
         if not hasattr(test, 'dtypes'):
             return None
         dtypes_vec = test.dtypes.get(cls.device_type, test.dtypes.get('all', None))
-        dtypes_res = [item for item in dtypes_vec if (item != torch.float16 and item != torch.half)]
+        try:
+            dtypes_res = [item for item in dtypes_vec if (item != torch.float16 and item != torch.half)]
+        except: # dtypes_vec == None
+            dtypes_res = []
         return dtypes_res
 
     @classmethod
@@ -421,6 +424,14 @@ class skipCUDAIf(skipIf):
         super(skipCUDAIf, self).__init__(dep, reason, device_type='cuda')
 
 
+# Only runs on cuda, and only run when there is enough GPU RAM
+def largeCUDATensorTest(size):
+    if isinstance(size, str):
+        assert size.endswith("GB") or size.endswith("gb"), "only bytes or GB supported"
+        size = 1024 ** 3 * int(size[:-2])
+    valid = torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory >= size
+    return unittest.skipIf(not valid, "No CUDA or Has CUDA but GPU RAM is not large enough")
+
 class onlyOn(object):
 
     def __init__(self, device_type):
@@ -559,6 +570,9 @@ def skipCUDAIfNoMagma(fn):
 def skipCUDAIfRocm(fn):
     return skipCUDAIf(TEST_WITH_ROCM, "test doesn't currently work on the ROCm stack")(fn)
 
+# Skips a test on CUDA when not using ROCm.
+def skipCUDAIfNotRocm(fn):
+    return skipCUDAIf(not TEST_WITH_ROCM, "test doesn't currently work on the CUDA stack")(fn)
 
 # Skips a test on CUDA if cuDNN is unavailable or its version is lower than requested.
 def skipCUDAIfCudnnVersionLessThan(version=0):

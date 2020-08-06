@@ -255,8 +255,12 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
 std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_backward_overrideable(const at::Tensor & grad_output, const at::Tensor & input, const at::Tensor & weight, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups, std::array<bool,3> output_mask) {
   DEBUG("AtenIpexCPUDev::convolution_backward_overrideable\n");
   // NOTE: DO NOT always call contiguous. It may break lazy-reorder. Because contiguous will call reorder instantly.
+  std::vector<at::Tensor> dnnl_input_tensors;
+  dnnl_input_tensors.push_back(input);
+  dnnl_input_tensors.push_back(weight);
+  dnnl_input_tensors.push_back(grad_output);
   if (check_auto_dnnl()) {
-    if (transposed) {
+    if (transposed || !dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
       IPEX_CHECK(false, "deconvolution backward not support for dnnl path now");
     } else {
       return AtenIpexCPUDev::dil_convolution_backward(
@@ -270,7 +274,7 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
         output_mask);
     }
   } else {
-    if (transposed) {
+    if (transposed || !dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
       IPEX_CHECK(false, "deconvolution backward not support for native path now");
     } else {
       return AtenIpexCPUDev::mkldnn_convolution_backward(input, grad_output, weight, padding, stride, dilation, groups, output_mask);
