@@ -125,7 +125,7 @@ void quantize_tensor_per_channel_affine_kernel(
                       qtensor.size(3)})
       : qtensor.dim() == 2 ? memory::dims({qtensor.size(0), qtensor.size(1)})
                            : memory::dims({qtensor.size(0)});
-  memory::data_type r_dt = dt_to_dnnl(rtensor.type().scalarType());
+  memory::data_type r_dt = dt_to_dnnl(rtensor.scalar_type());
   memory::format_tag r_fmt = qtensor.dim() == 4
       ? memory::format_tag::nchw
       : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
@@ -133,7 +133,7 @@ void quantize_tensor_per_channel_affine_kernel(
   memory r_m = dpcpp_onednn_memory(r_md, r_eng, rtensor.data_ptr());
 
   memory::dims q_dims = r_dims;
-  memory::data_type q_dt = dt_to_dnnl(qtensor.type().scalarType());
+  memory::data_type q_dt = dt_to_dnnl(qtensor.scalar_type());
   memory::format_tag q_fmt = r_fmt;
   engine q_eng = r_eng;
   memory::desc q_md = memory::desc(q_dims, q_dt, q_fmt);
@@ -174,7 +174,7 @@ void quantize_tensor_per_tensor_affine_dpcpp_kernel(
                       rtensor.size(3)})
       : rtensor.dim() == 2 ? memory::dims({rtensor.size(0), rtensor.size(1)})
                            : memory::dims({rtensor.size(0)});
-  memory::data_type r_dt = dt_to_dnnl(rtensor.type().scalarType());
+  memory::data_type r_dt = dt_to_dnnl(rtensor.scalar_type());
   memory::format_tag r_fmt = rtensor.dim() == 4
       ? memory::format_tag::nchw
       : rtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
@@ -182,7 +182,7 @@ void quantize_tensor_per_tensor_affine_dpcpp_kernel(
   memory r_m = dpcpp_onednn_memory(r_md, r_eng, rtensor.data_ptr());
 
   memory::dims q_dims = r_dims;
-  memory::data_type q_dt = dt_to_dnnl(qtensor.type().scalarType());
+  memory::data_type q_dt = dt_to_dnnl(qtensor.scalar_type());
   memory::format_tag q_fmt = r_fmt;
   engine q_eng = r_eng;
   memory::desc q_md = memory::desc(q_dims, q_dt, q_fmt);
