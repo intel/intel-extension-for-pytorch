@@ -1,13 +1,30 @@
 #pragma once
 
-enum {ENV_VERBOSE = 0, ENV_FORCE_SYNC, ENV_LAZY_REORDER, ENV_WEIGHT_OPT};
+enum DPCPP_ENV {
+  ENV_VERBOSE = 0,
+  ENV_FORCE_SYNC,
+  ENV_DISABLE_PROFILING,
+  ENV_LAZY_REORDER,
+  ENV_WEIGHT_CACHE };
 
 int dpcpp_env(int env);
+
+static inline int dpcpp_verbose() {
+  return dpcpp_env(ENV_VERBOSE);
+}
+
+static inline int dpcpp_force_sync() {
+  return dpcpp_env(ENV_FORCE_SYNC);
+}
+
+static inline bool dpcpp_profiling() {
+  return !dpcpp_env(ENV_DISABLE_PROFILING);
+}
 
 static inline int lazy_reorder_enabled() {
   return dpcpp_env(ENV_LAZY_REORDER);
 }
 
-static inline int weight_opt_enabled() {
-  return dpcpp_env(ENV_WEIGHT_OPT);
+static inline int weight_cache_enabled() {
+  return dpcpp_env(ENV_WEIGHT_CACHE);
 }

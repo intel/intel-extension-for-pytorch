@@ -26,11 +26,6 @@ float DPCPPEventStubImpl::elapsed() {
   return us;
 }
 
-void dpcpp_log(std::string name, cl::sycl::event& dpcpp_event) {
-  auto stub = std::make_shared<DPCPPEventStubImpl>(dpcpp_event);
-  mark_dpcpp(name, stub);
-}
-
 struct RegisterDPCPPMethods {
   RegisterDPCPPMethods() {
     static DPCPPProvfilerStubsImpl methods;

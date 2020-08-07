@@ -251,7 +251,7 @@ at::Tensor convolution(
   Tensor weight_;
   if (weight_usr_memory.get_desc() != expected_weight_md) {
     Tensor weight_opt;
-    if (weight_opt_enabled()) {
+    if (weight_cache_enabled()) {
       weight_opt = empty_opaque_tensor(
           expected_weight_md, weight.options(), c10::nullopt);
       weight_memory = dpcpp_onednn_memory(
@@ -266,7 +266,7 @@ at::Tensor convolution(
     DPCPP_ONEDNN_EXEC(reorder(weight_usr_memory, weight_memory),
         strm, weight_usr_memory, weight_memory);
 
-    if (weight_opt_enabled()) {
+    if (weight_cache_enabled()) {
       strm.wait();
       // FIXME: thread safty
       auto weight_opt_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::

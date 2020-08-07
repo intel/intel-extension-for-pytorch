@@ -5,6 +5,7 @@
 #include <core/Exception.h>
 #include <core/Guard.h>
 #include <core/Stream.h>
+#include <utils/Env.h>
 
 #include <array>
 #include <atomic>
@@ -34,7 +35,7 @@ class DPCPPStreamImpl {
       DPCPP::async_handler asyncHandler = dpcppAsyncHandler)
       : /* queue_(dpcppGetRawDevice(di), asyncHandler),*/
         queue_([&]() -> DPCPP::queue {
-              return dpcpp_verbose() ?
+              return dpcpp_profiling() ?
                   DPCPP::queue(at::dpcpp::getGlobalContext(),
                    dpcppGetDeviceSelector(di),
                    asyncHandler,

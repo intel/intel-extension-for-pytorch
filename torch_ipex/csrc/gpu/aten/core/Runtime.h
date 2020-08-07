@@ -13,54 +13,44 @@
 
 using namespace mkldnn;
 
+#define DPCPP_ONEDNN_FORCE_SYNC(stream)               \
+  {                                                   \
+      static auto force_sync = dpcpp_force_sync();    \
+      if (force_sync) {                               \
+          (stream).wait();                            \
+      }                                               \
+  }
 
 #ifdef USE_COMPUTECPP
-#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                                   \
-  {                                                                            \
-    auto verbose = dpcpp_verbose();                                            \
-    auto force_sync = dpcpp_force_sync();                                      \
-    IPEX_TIMER(t, verbose, __func__);                                          \
-    if (force_sync) {                                                          \
-      (prim).execute((stream), ##__VA_ARGS__);                                 \
-      if (verbose)                                                             \
-        t.now("submit");                                                       \
-      (stream).wait();                                                         \
-      if (verbose)                                                             \
-        t.now("wait");                                                         \
-    } else {                                                                   \
-      (prim).execute((stream), ##__VA_ARGS__);                                 \
-      if (verbose)                                                             \
-        t.now("submit");                                                       \
-    }                                                                          \
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)          \
+  {                                                   \
+    static auto verbose = dpcpp_verbose();            \
+    (prim).execute((stream), ##__VA_ARGS__);          \
+    if (verbose) {                                    \
+      IPEX_TIMER(t, verbose, __func__);               \
+      t.now("oneDNN execute");                        \
+      DPCPP_ONEDNN_FORCE_SYNC(stream);                \
+      t.now("oneDNN stream wait");                    \
+    } else {                                          \
+      DPCPP_ONEDNN_FORCE_SYNC(stream);                \
+    }                                                 \
   }
 #elif defined(USE_DPCPP)
-#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                                   \
-  {                                                                            \
-    DPCPP::event e;                                                            \
-    auto verbose = dpcpp_verbose();                                            \
-    auto force_sync = dpcpp_force_sync();                                      \
-    IPEX_TIMER(t, verbose, __func__);                                          \
-    if (force_sync) {                                                          \
-      if (verbose) {                                                           \
-        e = (prim).execute_sycl((stream), ##__VA_ARGS__);                      \
-        t.now("submit");                                                       \
-      } else {                                                                 \
-        (prim).execute((stream), ##__VA_ARGS__);                               \
-      }                                                                        \
-      (stream).wait();                                                         \
-      if (verbose)                                                             \
-        t.now("wait");                                                         \
-    } else {                                                                   \
-      if (verbose) {                                                           \
-        e = (prim).execute_sycl((stream), ##__VA_ARGS__);                      \
-        t.now("submit");                                                       \
-      } else {                                                                 \
-        (prim).execute((stream), ##__VA_ARGS__);                               \
-      }                                                                        \
-    }                                                                          \
-    if (verbose) {                                                             \
-      dpcpp_log("dpcpp_kernel", e);                                            \
-    }                                                                          \
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                  \
+  {                                                           \
+    static auto verbose = dpcpp_verbose();                    \
+    if (verbose) {                                            \
+      IPEX_TIMER(t, verbose, __func__);                       \
+      auto e = (prim).execute_sycl((stream), ##__VA_ARGS__);  \
+      t.now("oneDNN execute_sycl");                           \
+      DPCPP_ONEDNN_FORCE_SYNC(stream);                        \
+      t.now("oneDNN stream wait");                            \
+      dpcpp_log("dpcpp_kernel", e);                           \
+    } else {                                                  \
+      auto e = (prim).execute_sycl((stream), ##__VA_ARGS__);  \
+      dpcpp_log("dpcpp_kernel", e);                           \
+      DPCPP_ONEDNN_FORCE_SYNC(stream);                        \
+    }                                                         \
   }
 #else
 #error("Unsupported compiler!!!")

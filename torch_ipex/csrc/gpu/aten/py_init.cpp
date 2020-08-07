@@ -11,9 +11,6 @@
 namespace py = pybind11;
 
 PYBIND11_MODULE(torch_ipex, m) {
-  // TODO:
-  printf("loading torch_ipex.so ++\n");
-
   m.doc() = "PyTorch Extension for Intel dGPU";
 
   at::RegisterAtenTypeFunctions();
@@ -27,20 +24,18 @@ PYBIND11_MODULE(torch_ipex, m) {
         },
         "fused linear with relu opt. on Intel device");
 #if defined(_PSTL_BACKEND_SYCL) && defined(USE_USM)
-  m.def("_usm_pstl_is_enabled", 
+  m.def("_usm_pstl_is_enabled",
         []() {return true;});
 #else
-  m.def("_usm_pstl_is_enabled", 
+  m.def("_usm_pstl_is_enabled",
         []() {return false;});
 #endif
 
 #if defined(USE_ONEMKL)
   m.def("_onemkl_is_enabled",
-	[]() {return true;});
+        []() {return true;});
 #else
   m.def("_onemkl_is_enabled",
         []() {return false;});
 #endif
-
-  printf("loading _torch_ipex.so --\n");
 }

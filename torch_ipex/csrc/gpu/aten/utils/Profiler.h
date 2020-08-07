@@ -30,12 +30,9 @@ struct DPCPPProvfilerStubsImpl : public DPCPPStubs {
   }
 };
 
-void dpcpp_log(std::string name, cl::sycl::event& dpcpp_event);
-
-inline int dpcpp_verbose() {
-  return dpcpp_env(ENV_VERBOSE);
-}
-
-inline int dpcpp_force_sync() {
-  return dpcpp_env(ENV_FORCE_SYNC);
+static inline void dpcpp_log(std::string name, cl::sycl::event& dpcpp_event) {
+  if (dpcpp_profiling() && profilerEnabled()) {
+    auto stub = std::make_shared<DPCPPEventStubImpl>(dpcpp_event);
+    mark_dpcpp(std::move(name), std::move(stub));
+  }
 }

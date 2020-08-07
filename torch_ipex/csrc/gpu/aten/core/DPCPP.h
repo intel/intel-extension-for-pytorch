@@ -3,11 +3,11 @@
 #include <CL/sycl.hpp>
 #include <utils/Profiler.h>
 #include <utils/Timer.h>
+#include <utils/Env.h>
 
 #if defined(USE_COMPUTECPP)
 #include <SYCL/event.h>
 #endif
-
 
 // alias for dpcpp namespace
 namespace DPCPP = cl::sycl;
@@ -24,42 +24,51 @@ namespace DPCPP = cl::sycl;
 
 #define DPCPP_Q_KFN(...) [=](__VA_ARGS__)
 #define DPCPP_Q_CGF(h) [&](DPCPP::handler & h)
-#define DPCPP_Q_SUBMIT(sync_mode, q, cgf, ...)                                 \
-  {                                                                            \
-    DPCPP::event e;                                                            \
-    auto verbose = dpcpp_verbose();                                            \
-    auto force_sync = dpcpp_force_sync();                                      \
-    {                                                                          \
-      IPEX_TIMER(t, verbose, __func__);                                        \
-      if (sync_mode || force_sync) {                                           \
-        if (verbose) {                                                         \
-          e = (q).submit((cgf), ##__VA_ARGS__);                                \
-          t.now("submit");                                                     \
-        } else {                                                               \
-          (q).submit((cgf), ##__VA_ARGS__);                                    \
-        }                                                                      \
-        (q).wait();                                                            \
-        if (verbose)                                                           \
-          t.now("wait");                                                       \
-      } else {                                                                 \
-        if (verbose) {                                                         \
-          e = (q).submit((cgf), ##__VA_ARGS__);                                \
-          t.now("submit");                                                     \
-        } else {                                                               \
-          (q).submit((cgf), ##__VA_ARGS__);                                    \
-        }                                                                      \
-      }                                                                        \
-    }                                                                          \
-    if (verbose) {                                                             \
-      dpcpp_log("dpcpp_kernel", e);                                            \
-    }                                                                          \
-  }
 
-#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)           \
-    DPCPP_Q_SUBMIT(true, q, cgf, ##__VA_ARGS__)
+#define DPCPP_Q_FORCE_SYNC(q)                           \
+    {                                                   \
+        static auto force_sync = dpcpp_force_sync();    \
+        if (force_sync) {                               \
+            (q).wait_and_throw();                       \
+        }                                               \
+    }
 
-#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)          \
-    DPCPP_Q_SUBMIT(false, q, cgf, ##__VA_ARGS__)
+#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)               \
+    {                                                   \
+        static auto verbose = dpcpp_verbose();          \
+        if (verbose) {                                  \
+            IPEX_TIMER(t, verbose, __func__);           \
+            auto e = (q).submit((cgf), ##__VA_ARGS__);  \
+            t.now("submit");                            \
+            e.wait_and_throw();                         \
+            t.now("event wait");                        \
+            DPCPP_Q_FORCE_SYNC(q);                      \
+            t.now("queue wait");                        \
+            dpcpp_log("dpcpp_kernel", e);               \
+        } else {                                        \
+            auto e = (q).submit((cgf), ##__VA_ARGS__);  \
+            dpcpp_log("dpcpp_kernel", e);               \
+            e.wait_and_throw();                         \
+            DPCPP_Q_FORCE_SYNC(q);                      \
+        }                                               \
+    }
+
+#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)                \
+    {                                                   \
+        static auto verbose = dpcpp_verbose();          \
+        if (verbose) {                                  \
+            IPEX_TIMER(t, verbose, __func__);           \
+            auto e = (q).submit((cgf), ##__VA_ARGS__);  \
+            t.now("submit");                            \
+            DPCPP_Q_FORCE_SYNC(q);                      \
+            t.now("queue wait");                        \
+            dpcpp_log("dpcpp_kernel", e);               \
+        } else {                                        \
+            auto e = (q).submit((cgf), ##__VA_ARGS__);  \
+            dpcpp_log("dpcpp_kernel", e);               \
+            DPCPP_Q_FORCE_SYNC(q);                      \
+        }                                               \
+    }
 
 // the descriptor as entity attribute
 #define DPCPP_HOST // for host only

@@ -9,21 +9,21 @@ using namespace std::chrono;
 struct ipex_timer {
   ipex_timer(int verbose_level, std::string tag) :
       vlevel_(verbose_level) {
-    if (verbose_level >= 2) {
+    if (verbose_level >= 1) {
       start_ = high_resolution_clock::now();
       tag_ = tag;
     }
   }
 
   void now(std::string sstamp) {
-    if (vlevel_ >= 2) {
+    if (vlevel_ >= 1) {
       stamp_.push_back(high_resolution_clock::now());
       sstamp_.push_back(sstamp);
     }
   }
 
   ~ipex_timer() {
-    if (vlevel_ >= 2) {
+    if (vlevel_ >= 1) {
       auto pre = start_;
       std::cout << "<" << tag_ << ">";
       for (int i = 0; i < stamp_.size(); i++) {
