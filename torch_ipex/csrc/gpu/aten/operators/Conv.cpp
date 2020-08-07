@@ -59,9 +59,11 @@ at::Tensor convolution(
 
   auto src_data_t = dt_to_dnnl(input.scalar_type());
   auto wei_data_t = dt_to_dnnl(weight.scalar_type());
-  auto bias_data_t = input.is_quantized() ? dnnl::memory::data_type::s32 : dt_to_dnnl(bias.scalar_type());
+  auto bias_data_t = input.is_quantized() ?
+      dnnl::memory::data_type::s32 : dt_to_dnnl(bias.scalar_type());
   auto usr_bias_data_t = dnnl::memory::data_type::f32;
-  auto dst_data_t = dt_to_dnnl(output.scalar_type());
+  auto dst_data_t = output.defined() ?
+      dt_to_dnnl(output.scalar_type()) : src_data_t;
 
   auto format_any = memory::format_tag::any;
   auto format_nchw = memory::format_tag::nchw;
