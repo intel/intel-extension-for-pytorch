@@ -259,7 +259,8 @@ Tensor addmm(
               static_cast<int>(0),
               MemoryFormat::Contiguous);
   } else {
-    result = at::empty({0}, input.options());
+    // align with bf16 input
+    result = at::empty({0}, m1.options());
   }
   
   if(m1.is_quantized()){
