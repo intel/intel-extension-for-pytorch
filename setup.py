@@ -1,6 +1,12 @@
 #!/usr/bin/env python
-# USE_SYCL - to use SYCL
-# USE_USM - to use USM
+
+##################################################
+# Build options:
+#
+# USE_USM - to use USM, instead of SYCL buffer
+#
+#################################################
+
 from __future__ import print_function
 
 from subprocess import check_call
@@ -228,14 +234,12 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
     defines(cmake_args, CMAKE_C_COMPILER=cc)
     defines(cmake_args, CMAKE_CXX_COMPILER=cxx)
     defines(cmake_args, **build_options)
-    cmake_args.append('-DUSE_SYCL=1')
 
     command = [self.cmake, ext.project_dir] + cmake_args
     print(' '.join(command))
 
     env = os.environ.copy()
     check_call(command, cwd=ext.build_dir, env=env)
-
 
     build_args = ['-j', str(multiprocessing.cpu_count()), 'install']
 

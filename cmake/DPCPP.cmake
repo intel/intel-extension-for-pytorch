@@ -17,12 +17,13 @@
 # Manage SYCL-related compiler flags
 #===============================================================================
 
+if(DPCPP_cmake_included)
+    return()
+endif()
+set(DPCPP_cmake_included true)
+
 cmake_minimum_required(VERSION 3.4.3)
 
-#if(SYCL_cmake_included)
-#    return()
-#endif()
-#set(SYCL_cmake_included true)
 include(FindPackageHandleStandardArgs)
 
 set(sycl_root_hint)
@@ -54,7 +55,10 @@ find_file(INTEL_SYCL_VERSION
         lib/clang/8.0.0/include/CL/sycl
     NO_DEFAULT_PATH)
 
+set(USE_DPCPP FALSE)
+set(USE_COMPUTECPP FALSE)
 if(INTEL_SYCL_VERSION)
+    set(USE_DPCPP TRUE)
     get_filename_component(SYCL_INCLUDE_DIR
             "${INTEL_SYCL_VERSION}/../../.." ABSOLUTE)
 
@@ -83,13 +87,6 @@ if(INTEL_SYCL_VERSION)
     endif()
     set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
 
-    set(USE_DPCPP true)
-    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_DPCPP" PARENT_SCOPE)
-    add_definitions(-DUSE_DPCPP)
-    if(USE_USM)
-        add_definitions(-DUSE_USM)
-    endif()
-
     message(STATUS "Intel SYCL include: ${SYCL_INCLUDE_DIR}")
     message(STATUS "Intel SYCL library: ${SYCL_LIBRARY}")
     message(STATUS "OpenCL include: ${OpenCL_INCLUDE_DIR}")
@@ -98,9 +95,7 @@ if(INTEL_SYCL_VERSION)
     if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${OpenCL_INCLUDE_DIR})
         include_directories(${OpenCL_INCLUDE_DIR})
     endif()
-
     include_directories(${SYCL_INCLUDE_DIR})
-
 
     #add pstl lib
     # Try to find PSTL header from DPC++
@@ -114,8 +109,7 @@ if(INTEL_SYCL_VERSION)
 
     find_package_handle_standard_args(PSTL
             FOUND_VAR PSTL_FOUND
-            REQUIRED_VARS PSTL_INCLUDE_DIRS
-            )
+            REQUIRED_VARS PSTL_INCLUDE_DIRS)
 
     #add tbb lib
     find_path(TBB_INCLUDE_DIRS
@@ -129,8 +123,7 @@ if(INTEL_SYCL_VERSION)
 
     find_package_handle_standard_args(TBB
             FOUND_VAR TBB_FOUND
-            REQUIRED_VARS TBB_INCLUDE_DIRS
-            )
+            REQUIRED_VARS TBB_INCLUDE_DIRS)
     if(${TBB_FOUND})
         if(${PSTL_FOUND})
             add_definitions(-D_PSTL_BACKEND_SYCL)
@@ -146,7 +139,6 @@ if(INTEL_SYCL_VERSION)
             if(NOT TBB_LIBRARY)
                 message(FATAL_ERROR "TBB library not found")
             endif()
-
             list(APPEND EXTRA_SHARED_LIBS ${TBB_LIBRARY})
 
             if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${PSTL_INCLUDE_DIRS})
@@ -181,9 +173,7 @@ else()
         message(FATAL_ERROR "SYCL not found")
     endif()
 
-    set(USE_COMPUTECPP true)
-    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_COMPUTECPP" PARENT_SCOPE)
-    add_definitions(-DUSE_COMPUTECPP)
+    set(USE_COMPUTECPP TRUE)
     include_directories(SYSTEM ${ComputeCpp_INCLUDE_DIRS})
     list(APPEND EXTRA_SHARED_LIBS ${COMPUTECPP_RUNTIME_LIBRARY})
 
