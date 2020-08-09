@@ -1,5 +1,4 @@
 #include <c10/core/Allocator.h>
-#include <c10/dpcpp/DPCPPCachingAllocator.h>
 #include <c10/core/Allocator.h>
 #include <core/DPCPPUtils.h>
 #include <core/Exception.h>
