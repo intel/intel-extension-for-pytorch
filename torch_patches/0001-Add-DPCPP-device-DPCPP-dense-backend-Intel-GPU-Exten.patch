@@ -1,7 +1,7 @@
 From 321b4e5a4ba7617b41dda048abc6985ac49c175b Mon Sep 17 00:00:00 2001
 From: fengyuan <feng1.yuan@intel.com>
 Date: Fri, 6 Dec 2019 10:31:03 +0800
-Subject: [PATCH 1/5] Add DPCPP device/DPCPP (dense) backend (Intel GPU
+Subject: [PATCH 1/7] Add DPCPP device/DPCPP (dense) backend (Intel GPU
  Extension for PyTorch)
 
 Signed-off-by: fengyuan <feng1.yuan@intel.com>

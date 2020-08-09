@@ -1,0 +1,64 @@
+From 6632916d446ed7ce5b9c7b02e1ef901a05d239d2 Mon Sep 17 00:00:00 2001
+From: Gu Jinghui <jinghui.gu@intel.com>
+Date: Sun, 9 Aug 2020 18:15:03 +0800
+Subject: [PATCH 7/7] [REVERTME] Workaround for oneDNN symmetric INT8 impl
+
+Asymmetric zero point is the default INT8 impl in PyTorch,
+while oneDNN only support symmetric for now.
+---
+ torch/nn/quantized/modules/conv.py               | 4 ++++
+ torch/nn/quantized/modules/functional_modules.py | 5 +++++
+ torch/quantization/observer.py                   | 5 +++--
+ 3 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/torch/nn/quantized/modules/conv.py b/torch/nn/quantized/modules/conv.py
+index bfca7d5358..e3aae748e2 100644
+--- a/torch/nn/quantized/modules/conv.py
++++ b/torch/nn/quantized/modules/conv.py
+@@ -243,6 +243,10 @@ class Conv2d(_ConvNd):
+             # inherit from Conv2d instead
+             if type(mod) == nni.ConvReLU2d:
+                 activation_post_process = mod[1].activation_post_process
++                #Add workaroud for oneDNN Symmetric INT8, will remove it when Asymmetric is ready.
++                if activation_post_process.qscheme == torch.per_tensor_symmetric \
++                    or activation_post_process.qscheme == torch.per_channel_symmetric:
++                    activation_post_process.dtype = torch.quint8
+                 mod = mod[0]
+             else:
+                 activation_post_process = mod.activation_post_process
+diff --git a/torch/nn/quantized/modules/functional_modules.py b/torch/nn/quantized/modules/functional_modules.py
+index da246d0859..c92ca1e94e 100644
+--- a/torch/nn/quantized/modules/functional_modules.py
++++ b/torch/nn/quantized/modules/functional_modules.py
+@@ -76,6 +76,11 @@ class FloatFunctional(torch.nn.Module):
+         # type: (Tensor, Tensor) -> Tensor
+         r = torch.add(x, y)
+         r = torch.nn.functional.relu(r)
++        #Add workaroud for oneDNN Symmetric INT8, will remove it when Asymmetric is ready.
++        if type(self.activation_post_process) != torch.nn.modules.linear.Identity \
++            and (self.activation_post_process.qscheme == torch.per_tensor_symmetric \
++            or self.activation_post_process.qscheme == torch.per_channel_symmetric):
++            self.activation_post_process.dtype = torch.quint8
+         r = self.activation_post_process(r)
+         return r
+ 
+diff --git a/torch/quantization/observer.py b/torch/quantization/observer.py
+index ddd20af23f..dec28e157c 100644
+--- a/torch/quantization/observer.py
++++ b/torch/quantization/observer.py
+@@ -232,9 +232,10 @@ class _ObserverBase(ObserverBase):
+         else:
+             if self.qscheme == torch.per_tensor_symmetric or self.qscheme == torch.per_channel_symmetric:
+                 max_val = max(-min_val, max_val)
+-                scale = max_val / ((qmax - qmin) / 2)
++                #This is a workaroud for oneDNN Symmetric INT8, will be removed when Asymmetric is ready.
++                scale = max_val / ((qmax - qmin) / 2) if self.dtype == torch.qint8 else (max_val / (qmax - qmin))
+                 scale = max(scale, self.eps)
+-                zero_point = 0 if self.dtype == torch.qint8 else 128
++                zero_point = 0
+             else:
+                 scale = (max_val - min_val) / float(qmax - qmin)
+                 scale = max(scale, self.eps)
+-- 
+2.17.1
+
