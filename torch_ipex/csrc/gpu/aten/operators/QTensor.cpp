@@ -57,7 +57,7 @@ Tensor new_qtensor(
   auto memory_format =
       options.memory_format_opt().value_or(MemoryFormat::Contiguous);
 
-  at::Allocator* allocator = GetAllocator(options.device().type());
+  at::Allocator* allocator = at::dpcpp::getDPCPPDeviceAllocator();
 
   at::DispatchKey tensorDispatchKey = options.computeDispatchKey();
   native::check_size_nonnegative(sizes);

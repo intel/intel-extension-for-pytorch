@@ -41,11 +41,6 @@ static inline void NaiveAllocatorDeleter(void* ptr) {
 }
 
 struct DPCPPDefaultAllocator : public at::Allocator {
-
-  DPCPPDefaultAllocator() {
-    SetAllocator(at::DeviceType::DPCPP, this);
-  }
-
   at::DataPtr allocate(size_t size) const override {
     at::DeviceIndex device;
     AT_DPCPP_CHECK(dpcppGetDevice(&device));
