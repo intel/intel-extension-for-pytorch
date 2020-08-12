@@ -258,9 +258,11 @@ Tensor addmm(
               1.f,
               static_cast<int>(0),
               MemoryFormat::Contiguous);
-  } else {
+  } else if (m1.scalar_type() == at::ScalarType::BFloat16){
     // align with bf16 input
     result = at::empty({0}, m1.options());
+  } else {
+    result = at::empty({0}, input.options());
   }
   
   if(m1.is_quantized()){
