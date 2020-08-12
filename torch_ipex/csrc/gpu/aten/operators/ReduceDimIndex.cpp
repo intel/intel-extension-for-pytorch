@@ -13,7 +13,9 @@ std::tuple<Tensor&, Tensor&> _min_out(
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
       at::ScalarType::Bool, min.scalar_type(), "_min_out", [&] {
         std::pair<scalar_t, int64_t> init = std::make_pair<scalar_t, int64_t>(
             Numerics<scalar_t>::upper_bound(), 0);
@@ -59,7 +61,9 @@ std::tuple<Tensor&, Tensor&> _max_out(
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
       at::ScalarType::Bool, max.scalar_type(), "_max_out", [&] {
         std::pair<scalar_t, int64_t> init = std::make_pair<scalar_t, int64_t>(
             Numerics<scalar_t>::lower_bound(), 0);
