@@ -104,8 +104,8 @@ include_directories(${DPCPP_GPU_ONEDNN})
 # generate c10 dispatch registration
 add_custom_command(OUTPUT
           ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp
-          ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.h
-          ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_dpcpp.h
+        COMMAND
+          mkdir -p ${DPCPP_GPU_ATEN_GENERATED} && mkdir -p ${DPCPP_GPU_ATEN_GENERATED}/ATen
         COMMAND
           "${PYTHON_EXECUTABLE}" ${PROJECT_SOURCE_DIR}/scripts/gpu/dispatch_gen.py --install_dir ${DPCPP_GPU_ATEN_GENERATED}/ATen/
         DEPENDS

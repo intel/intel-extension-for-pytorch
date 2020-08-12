@@ -5,8 +5,8 @@
 ### layer_norm, the Op provides common rountine for all backends.
 ### native_layer_norm, the Op is specific among backends.
 ###
-### 1. Create SYCLType.h from DPCPP-GPU development repo.
-### 2. Use SYCLType.h and RegistrationDeclarations.h to abstract registrations for DPCPP:GPU.
+### 1. Create DPCPPType.h from DPCPP-GPU development repo.
+### 2. Use DPCPPType.h and RegistrationDeclarations.h to abstract registrations for DPCPP:GPU.
 
 ### STEP1
 `python gen-gpu-decl.py --gpu_decl=./ DPCPPGPUType.h DedicateType.h DispatchStubOverride.h RegistrationDeclarations.h`

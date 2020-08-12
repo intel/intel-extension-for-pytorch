@@ -56,9 +56,9 @@ def gpu_gen_and_should_copy(install_dir):
     source_files = [os.path.join(os.path.abspath(install_dir), os.path.splitext(file)[0]) for file in files_name]
 
     for gen_file, source_file in zip(generated_files, source_files):
-        if file_exists(source_file):
-            if compare(gen_file, source_file):
-                continue
+        # if file_exists(source_file):
+        #     if compare(gen_file, source_file):
+        #         continue
         subprocess.call(['cp', gen_file, source_file], cwd=cwd)
 
 

@@ -30,7 +30,7 @@ struct Quantizer;
 // to frontend
 using ConstQuantizerPtr = const c10::intrusive_ptr<Quantizer>&;
 
-struct TORCH_API SYCLType final {
+struct TORCH_API DPCPPType final {
 
   static Tensor empty(IntArrayRef size, const TensorOptions & options, c10::optional<MemoryFormat> memory_format); // aten::empty.memory_format(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
 

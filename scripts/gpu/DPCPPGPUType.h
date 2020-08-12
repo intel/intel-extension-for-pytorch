@@ -30,7 +30,7 @@ struct Quantizer;
 // to frontend
 using ConstQuantizerPtr = const c10::intrusive_ptr<Quantizer>&;
 
-struct TORCH_API SYCLType final {
+struct TORCH_API DPCPPType final {
   // static std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>> _sycl_rnn(const Tensor & self, const Tensor & hx_, const Tensor & cx_, TensorList params, bool has_biases, int64_t num_layers_, double dropout_p, bool train, bool bidirectional, bool batch_first);
   // static std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>> _sycl_rnn_backward(const Tensor & self, const Tensor & hx_, const Tensor & cx_, const Tensor & output, const Tensor & hy_, const Tensor & cy_, TensorList workspace, const Tensor & grad_output, const Tensor & grad_hy, const Tensor & grad_cy, TensorList params, bool has_biases, int64_t num_layers_, double dropout_p, bool train, bool bidirectional, bool batch_first);
   static Tensor & arange_out(Tensor & out, Scalar start, Scalar end, Scalar step);  // aten::arange.start_out(Scalar start, Scalar end, Scalar step=1, *, Tensor(a!) out) -> Tensor(a!)
