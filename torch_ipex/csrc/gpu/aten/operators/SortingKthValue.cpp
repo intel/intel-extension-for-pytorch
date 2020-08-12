@@ -190,9 +190,6 @@ void kthvalue_template(
     bool keepdim) {
   int64_t dim = maybe_wrap_dim(dim_, self.dim());
   int64_t slicesize = self.size(dim);
-  // FIXME: This seems bogus, I only do this because it was the old behaviour.
-  //        The reductions are fine, as long as the axis being reduced along
-  //        isn't of 0 elements (and the output has elements).
   TORCH_CHECK(
       self.numel() > 0,
       "cannot perform reduction function kthvalue",

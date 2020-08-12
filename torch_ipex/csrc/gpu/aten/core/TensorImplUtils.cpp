@@ -98,7 +98,6 @@ TensorImpl* TensorImpl_resizeImpl(
     return self;
   }
 
-  // NB: We don't need to hold device guard when calling from TH
   OptionalDPCPPGuard guard;
   if (device_guard) {
     guard.set_index(self->storage().device().index());
@@ -107,10 +106,7 @@ TensorImpl* TensorImpl_resizeImpl(
   int64_t storage_size = 1;
   if (stride) {
     self->set_sizes_and_strides(size, *stride);
-    // NB: storage size can be different from numel
     for (size_t dim = 0; dim < size.size(); ++dim) {
-      // FIXME:  Don't rely on storage_size being negative because thi
-      // may not be true for some edge cases.
       if (size[dim] == 0) {
         storage_size = 0;
         break;
@@ -182,14 +178,6 @@ void TensorImpl_resizeNd(
 }
 
 at::StorageImpl* TensorImpl_getStoragePtr(const at::TensorImpl* tensor) {
-  // Within PyTorch, the invariant is that storage_ is always
-  // initialized; we never have tensors that don't have any storage.
-  // However, for Caffe2, this is not true, because they have permitted
-  // tensors to be allocated without specifying what scalar type
-  // they should be, only to be filled when GetMutableData is called
-  // for the first time (providing the necessary type).  It is an ERROR to
-  // invoke any PyTorch operations on such a half-constructed storage,
-  // and this check tests for that case.
   TORCH_CHECK(
       tensor->storage(),
       "Cannot use PyTorch operations on a half-constructed "
@@ -198,18 +186,12 @@ at::StorageImpl* TensorImpl_getStoragePtr(const at::TensorImpl* tensor) {
   return tensor->storage().unsafeGetStorageImpl();
 }
 
-// NB: Steals ownership of storage
 void TensorImpl_stealAndSetStoragePtr(
     at::TensorImpl* tensor,
     at::StorageImpl* storage) {
-  // Caffe2 might have tensors whose storages are null, but we
-  // don't allow it in PyTorch.
   TORCH_INTERNAL_ASSERT(storage);
-  // Caffe2 also has uninitialized dtype states, which we disallow here
   TORCH_INTERNAL_ASSERT(tensor->storage().dtype() == storage->dtype());
 
-  // We used to allow this, but this breaks device caching.
-  // Let's put an actual error message for this one.
   TORCH_CHECK(
       tensor->storage().device() == storage->device(),
       "Attempted to set the storage of a tensor on device \"",
@@ -378,7 +360,6 @@ int64_t TensorImpl_nElement(const at::TensorImpl* self) {
   }
 }
 
-// NB: It is INVALID to call this on an UndefinedTensor
 void TensorImpl_retain(at::TensorImpl* self) {
   at::raw::intrusive_ptr::incref(self);
 }
@@ -443,14 +424,6 @@ bool TensorImpl_all32BitIndexable(at::TensorImpl** inputs, int numInputs) {
   return true;
 }
 
-/* Due to the resize semantics of ops with `out=` keywords, if       */ \
-/* the output `tensor` has the same shape as the output of the       */ \
-/* reduction operation, then any noncontiguities in the output       */ \
-/* `tensor` should be preserved. This needs to be special cased b/c  */ \
-/* otherwise, when keepdim=False, the implementations of reduction   */ \
-/* ops resize `tensor` to the reduced size with keepdim=True, and    */ \
-/* then later squeeze `tensor` to the correct output size, breaking  */ \
-/* the contiguity guarantees of the resize semantics.                */ \
 void TensorImpl_preserveReduceDimSemantics(TensorImpl *tensor,
                                           int in_dims, int64_t dimension, int keepdim) {
   int out_dims = TensorImpl_nDimensionLegacyAll(tensor);
@@ -466,10 +439,6 @@ struct SizeAndStride {
   int64_t stride;
 };
 
-/*
- A comparator that will sort SizeAndStride structs by stride,
- in ascending order.
- */
 int compareSizeAndStride(const void* a, const void* b) {
   const SizeAndStride* aS = (const SizeAndStride*)a;
   const SizeAndStride* bS = (const SizeAndStride*)b;
@@ -482,17 +451,7 @@ int compareSizeAndStride(const void* a, const void* b) {
 }
 } // namespace
 
-/* Returns false if there is no possibility that the tensor    */
-/* has "overlapping" indices and true otherwise.               */
-/* "Overlapping" indices are two+ valid indices that specify   */
-/* the same offset within the tensor.                          */
-/* The function does this by checking for a sufficient but not */
-/* necessary condition of no overlap. In particular, that      */
-/* that there exists an ordering of the tensor's dimensions    */
-/* that is nicely "nested," with each dimension contained      */
-/* within the next one.                                        */
 bool TensorImpl_maybeOverlappingIndices(const at::TensorImpl* t) {
-  /* Extract size/stride arrays; only consider size >1 dims. */
   SizeAndStride info[MAX_DPCPPTORCH_DIMS];
 
   int dims = TensorImpl_nDimensionLegacyAll(t);
@@ -512,12 +471,10 @@ bool TensorImpl_maybeOverlappingIndices(const at::TensorImpl* t) {
     }
   }
 
-  /* Short-circuits if tensor is a single element.             */
   if (nonSize1Dims == 0) {
     return false;
   }
 
-  /* Ascending order (innermost dimension in sorted view is at [0]) */
   qsort(info, nonSize1Dims, sizeof(SizeAndStride), compareSizeAndStride);
 
   for (int i = 0; i < (nonSize1Dims - 1); ++i) {

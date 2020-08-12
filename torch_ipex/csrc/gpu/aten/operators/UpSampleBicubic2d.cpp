@@ -40,7 +40,6 @@ static void upsample_bicubic2d_out_frame(
       int global_id = item.get_global_linear_id();
 
       if (global_id < output_height * output_width) {
-        // Special case: input and output are the same size, just copy
         const int output_x = global_id % output_width;
         const int output_y = global_id / output_width;
         if (input_height == output_height && input_width == output_width) {
@@ -55,7 +54,6 @@ static void upsample_bicubic2d_out_frame(
           return;
         }
 
-        // Bicubic interpolation
         const scalar_t height_scale = area_pixel_compute_scale<scalar_t>(
             input_height, output_height, align_corners);
         const scalar_t width_scale = area_pixel_compute_scale<scalar_t>(

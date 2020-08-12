@@ -224,14 +224,6 @@ static void cat(
     TensorList inputs,
     int numInputs,
     int dimension) {
-  // previously, size [0] tensors were the only possible empty tensors; thus, it
-  // wasn't possible
-  // to cat empty tensors unless all the other tensors were 1-dimensional, so we
-  // allowed these tensors
-  // to be "skipped".  We maintain this behavior for backwards compatibility,
-  // but only for this specific
-  // size (i.e. other empty sizes are not skipped).
-  // FIXME: warn if this is the case
   int i, j;
   int64_t offset;
   bool hasSkippedInput = false;
@@ -260,7 +252,6 @@ static void cat(
 
   std::vector<int64_t> size(nDims);
 
-  // Compute size of the result in the cat dimension
   int64_t cat_dim_size = 0;
   for (int i = 0; i < numInputs; i++) {
     Tensor tensor = inputs[i];
@@ -271,7 +262,6 @@ static void cat(
     cat_dim_size += tensor.size(dimension);
   }
 
-  // Compute the size of the result
   for (int dim = 0; dim < nDims; dim++) {
     int64_t result_dim_size = notSkippedTensor.size(dim);
     if (dim == dimension) {

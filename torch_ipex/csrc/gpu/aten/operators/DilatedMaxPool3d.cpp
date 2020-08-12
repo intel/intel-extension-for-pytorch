@@ -26,7 +26,6 @@ void max_pool3d_with_indices_out_template(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  // #20866, #22032: Guarantee this for the official C++ API?
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
       "max_pool3d: kernel_size must either be a single int, or a tuple "
@@ -166,7 +165,6 @@ Tensor& max_pool3d_with_indices_backward_out_template(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  // #20866, #22032: Guarantee this for the official C++ API?
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
       "max_pool3d: kernel_size must either be a single int, or a tuple of "
@@ -179,8 +177,6 @@ Tensor& max_pool3d_with_indices_backward_out_template(
       ? kD
       : safe_downcast<int, int64_t>(kernel_size[2]);
 
-  // NB: stride default is not expressible as an integer constant, so we accept
-  // empty stride for this case
   TORCH_CHECK(
       stride.empty() || stride.size() == 1 || stride.size() == 3,
       "max_pool3d: stride must either be omitted, a single int, or a tuple of "

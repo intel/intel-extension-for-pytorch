@@ -248,8 +248,6 @@ inline void SortKeyValueInplace(Tensor& key, Tensor& value, int dim, bool dir) {
   // size.
   int64_t ceilPowerOf2 = nextHighestPowerOf2(keySliceSize);
 
-  // FIXME: We'd have to find some other trick with Thrust to perform a
-  // vectorized (key, value) sort by slice segment
   if (ceilPowerOf2 > 2048) {
     TORCH_CHECK(
         false, "sortKeyValueInplace only works for sizes <= 2048 at present");

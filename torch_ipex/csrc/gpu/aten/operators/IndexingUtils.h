@@ -24,8 +24,6 @@ namespace dpcpp {
 static std::vector<Tensor> expandTensors(
     const Tensor& self,
     TensorList indices) {
-  // If indices come in as ByteTensor or BoolTensor (masks), expand them into
-  // the equivalent indexing by LongTensors
   std::vector<Tensor> result;
   for (const auto& index : indices) {
     if (index.scalar_type() == kByte || index.scalar_type() == kBool) {
@@ -34,16 +32,12 @@ static std::vector<Tensor> expandTensors(
             "indexing with dtype torch.uint8 is now deprecated,"
             " please use a dtype torch.bool instead.");
       }
-      // The sizes of the ByteTensor mask or bool tensor must match the sizes of
-      // the
-      // corresponding dimensions in self
       for (int64_t j = 0; j < index.dim(); j++) {
         int64_t srcIdx = result.size() + j;
         if (index.size(j) != self.size(srcIdx)) {
           invalid_mask(self, srcIdx, index, j);
         }
       }
-      // Replace with nonzeros
       auto nonzero = index.nonzero();
       for (int64_t j = 0; j < index.dim(); j++) {
         result.emplace_back(nonzero.select(1, j));
@@ -68,7 +62,6 @@ static void checkIndexTensorTypes(TensorList indices) {
 }
 
 static bool hasContiguousSubspace(TensorList tl) {
-  // true if all the non-null tensors are adjacent
   auto isDefined = [](const Tensor& tensor) { return tensor.defined(); };
   auto isNull = [](const Tensor& tensor) { return !tensor.defined(); };
   auto start = std::find_if(tl.begin(), tl.end(), isDefined);
@@ -77,12 +70,6 @@ static bool hasContiguousSubspace(TensorList tl) {
   return it == stop.base();
 }
 
-// Transposes the tensor and indices together so that all the non-null indices
-// index the first k dimensions of the tensor. Returns the transposed tensor
-// and the reordered indices. For example:
-// transposeToFront(tensor, {nullptr, a, nullptr, b})
-// returns
-// tensor.permute([1, 3, 0, 2]), {a, b, nullptr, nullptr}
 static std::tuple<Tensor, std::vector<Tensor>> transposeToFront(
     Tensor self,
     TensorList indices) {
@@ -185,10 +172,6 @@ static Tensor restride_src(
   return src.as_strided(shape, strides);
 }
 
-// Add dimensions of size 1 to an index tensor so that it can be broadcast to
-// the result
-// shape and iterated over element-wise like the result tensor and the restrided
-// src.
 static Tensor reshape_indexer(
     const Tensor& index,
     int64_t dims_before,
@@ -220,11 +203,6 @@ AdvancedIndex::AdvancedIndex(const Tensor& src, TensorList indices_list) {
     }
   }
 
-  // Check if the indexed subspace contains a dim of size 0, but the replacement
-  // shape does not. This implies that an index is out of bounds, because there
-  // is no number that's a valid index for an empty tensor. Normally, out of
-  // bounds is handled in the indexing kernel, but this case fails earlier in
-  // restride_src with an unhelpful error message.
   if (std::find(indexed_sizes.begin(), indexed_sizes.end(), 0) !=
           indexed_sizes.end() &&
       std::find(replacement_shape.begin(), replacement_shape.end(), 0) ==
@@ -242,9 +220,7 @@ AdvancedIndex::AdvancedIndex(const Tensor& src, TensorList indices_list) {
     }
   }
 
-  // For DPCPP tensors, force all index tensors to have the same striding to
-  // simplify the DPCPP kernel.
-  if (indices.size() >= 2 /* && this->src.device().type() == kCUDA */) {
+  if (indices.size() >= 2) {
     if (!all_strides_match(indices)) {
       for (size_t i = 0; i < indices.size(); i++) {
         indices[i] = indices[i].contiguous();
@@ -255,10 +231,8 @@ AdvancedIndex::AdvancedIndex(const Tensor& src, TensorList indices_list) {
 
 static AdvancedIndex make_info(Tensor self, TensorList orig) {
   checkIndexTensorTypes(orig);
-  // first expand BoolTensor (masks) or ByteTensor (masks) into 1 or more
   // LongTensors
   auto indices = expandTensors(self, orig);
-  // next broadcast all index tensors together
   try {
     indices = expand_outplace(indices);
   } catch (std::exception& e) {
@@ -268,16 +242,12 @@ static AdvancedIndex make_info(Tensor self, TensorList orig) {
         " with shapes ",
         shapes_as_str(indices));
   }
-  // add missing null Tensors so that it matches self.dim()
   while (indices.size() < (size_t)self.dim()) {
     indices.emplace_back();
   }
-  // if the non-null indices are not all adjacent, transpose self and indices
-  // together so that they're adjacent at the front
   if (!hasContiguousSubspace(indices)) {
     std::tie(self, indices) = transposeToFront(self, indices);
   }
-  // Ensure indices are on the same device as self
   for (size_t i = 0; i < indices.size(); i++) {
     if (indices[i].defined() && indices[i].device() != self.device()) {
       indices[i] = indices[i].to(self.device());

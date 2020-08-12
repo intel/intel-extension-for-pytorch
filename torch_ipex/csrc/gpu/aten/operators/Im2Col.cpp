@@ -145,7 +145,6 @@ static void im2col_backward_out_template(
       input_size.size() == 2,
       "It is expected input_size equals to 2, but got size ",
       input_size.size());
-  // col2im_out_cpu checks size of kernel_size, dilation, padding and stride
   at::AtenIpexTypeDPCPP::col2im_out(
       grad_input,
       grad_output,

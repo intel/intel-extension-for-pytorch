@@ -49,7 +49,6 @@ struct DPCPPGuardImpl final : public c10::impl::DeviceGuardImplInterface {
   Stream getStream(Device d) const noexcept override {
     return getCurrentDPCPPStream().unwrap();
   }
-  // NB: These do NOT set the current device
   Stream exchangeStream(Stream s) const noexcept override {
     DPCPPStream cs(s);
     auto old_stream = getCurrentDPCPPStream(s.device().index());

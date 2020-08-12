@@ -683,8 +683,6 @@ void Topk(
   // Sort the results if the user wants them sorted, since our
   // selection routine does not ensure sorting
   if (sorted) {
-    // FIXME: the k/v inplace sort along slice only works for size <=
-    // 2048 at the moment
     if (k <= 2048) {
       // This avoids any memory allocations and performs all sorting
       // work inplace along the slice

@@ -85,7 +85,6 @@ static void col2im_out_template(
 
   bool batched_input = true;
   if (input.dim() == 2) {
-    // Force batch
     batched_input = false;
     input.resize_({1, input.size(0), input.size(1)});
   }
@@ -146,7 +145,6 @@ void col2im_backward_out_template(
     IntArrayRef dilation,
     IntArrayRef padding,
     IntArrayRef stride) {
-  // im2col_out_cpu checks size of kernel_size, dilation, padding and stride
   at::AtenIpexTypeDPCPP::im2col_out(
       grad_input, grad_output, kernel_size, dilation, padding, stride);
 }

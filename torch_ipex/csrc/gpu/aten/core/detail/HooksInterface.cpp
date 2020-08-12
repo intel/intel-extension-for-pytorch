@@ -11,7 +11,6 @@ namespace detail {
 
 static DPCPPHooksInterface *dpcpp_hooks = nullptr;
 
-// See getCUDAHooks for some more commentary
 const DPCPPHooksInterface &getDPCPPHooks() {
   static std::once_flag once;
   std::call_once(once, [] {

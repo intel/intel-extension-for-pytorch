@@ -21,7 +21,6 @@
 #define AT_DPCPP_IMPORT AT_DPCPP_EXPORT
 #endif // _WIN32
 
-// This one is being used by libc10_cuda.so
 #ifdef AT_DPCPP_BUILD_MAIN_LIB
 #define AT_DPCPP_API AT_DPCPP_EXPORT
 #else

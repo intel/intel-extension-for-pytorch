@@ -99,14 +99,6 @@ void kernelHistogram1D(
       totalElements,                                               \
       WEIGHTS_OP);
 
-/*
-  Calculate the frequency of the input values.
-
-  `a` contains the final output or the histogram.
-  Input `b` is assumed to be 1-D non-negative int array.
-  `c` optionally contains the weight vector.
-  See `help torch.bincount` for details on the math.
- */
 template <typename output_t, typename input_t, bool HasWeights>
 bool dpcpp_tensor_histogram(
     at::Tensor a, /* output */
@@ -149,7 +141,6 @@ bool dpcpp_tensor_histogram(
   return true;
 }
 
-///////////////// bincount /////////////////
 template <typename input_t, typename weights_t>
 Tensor bincount_template(
     const Tensor& self,

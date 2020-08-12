@@ -21,8 +21,6 @@ void GatedLinearUnit_updateOutput(
     Tensor& output,
     const Tensor& input,
     int64_t dim) {
-  // this can't pass anyway because a 0-dimensional tensor has "size" 1, which
-  // can't be evenly halved, but give a nicer error message here.
   auto wrap_dim = maybe_wrap_dim(dim, input.dim());
   const int64_t nln = input.size(wrap_dim);
   TORCH_CHECK(
@@ -31,12 +29,10 @@ void GatedLinearUnit_updateOutput(
       wrap_dim,
       " is size ",
       nln);
-  // size output to half of input
   const int64_t inputSize = nln / 2;
   auto newSizes = input.sizes().vec();
   newSizes[wrap_dim] = inputSize;
   output.resize_(newSizes);
-  // half tensor
   Tensor firstHalf = input.narrow(wrap_dim, 0, inputSize);
   Tensor secondHalf = input.narrow(wrap_dim, inputSize, inputSize);
   // output = output + firstHalf * sigmoid(secondHalf)
@@ -63,7 +59,6 @@ void GatedLinearUnit_updateGradInput(
 
   grad_input.resize_as_(input);
   const int64_t inputSize = nln / 2;
-  // half tensor
   Tensor firstHalf = input.narrow(wrap_dim, 0, inputSize);
   Tensor secondHalf = input.narrow(wrap_dim, inputSize, inputSize);
   Tensor gradInputfirstHalf = grad_input.narrow(wrap_dim, 0, inputSize);

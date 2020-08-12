@@ -196,7 +196,6 @@ static void pdist_kernel_impl(
       const size_t k = item_id.get_group_linear_id();
       const size_t stride = item_id.get_local_range().size();
 
-      // The -1 accounts for floating point truncation issues
       int64_t i = static_cast<int64_t>(
           (n2 - device_sqrt<double>(n2_squared_minus_1 - 2 * k)));
       int64_t j = k - n * i + i * (i + 1) / 2 + i + 1;

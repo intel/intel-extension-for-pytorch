@@ -38,24 +38,15 @@ void ConvolutionTBC_updateOutput(
   auto olen = input_size[0] - kw + 1 + pad * 2;
   auto real_pad = (olen - ilen + kw - 1) / 2;
 
-  // Make sure shapes are correct.
-  // Input = (time, batch, in_channels)
-  // Weight = (kernel_width, in_channels, out_channels)
-  //Bias = (out_channels)
   TORCH_CHECK(inputPlanes == weight_size[1], "Input dim 2 (input channels) is not == dim 1 in the weight tensor");
   TORCH_CHECK(weight_size[2] == bias.sizes()[0], "Bias size must equal dim 2 in the weight tensor (output channels).");
 
-  // input * weight + bias -> output_features
   output.resize_({olen, input_size[1], weight_size[2]});
   output.copy_(bias.expand(output.sizes()));
   for (auto k = 0; k < kw; k++) {
       auto iShift = std::max(0, static_cast<int>(k - real_pad));
       auto oShift = std::max(0, static_cast<int>(real_pad - k));
       auto t = std::min(ilen + real_pad - k, olen) - oShift;
-      // Note: gemm assumes column-major matrices
-      // input      is l*m (row-major)
-      // weight   is m*r (row-major)
-      // output   is l*r (row-major)
       if (t > 0) {
           auto W = weight[k];
           auto I = input.narrow(0, iShift, t).view({t * batchSize, inputPlanes});
@@ -92,7 +83,6 @@ void ConvolutionTBC_updateGradInput(
       auto iShift = std::max(0, static_cast<int>(k - real_pad));
       auto oShift = std::max(0, static_cast<int>(real_pad - k));
       auto t = std::min(ilen + real_pad - k, olen) - oShift;
-      // dOutput * T(weight) -> dInput
       if (t > 0) {
           auto dO = dOutput.narrow(0, oShift, t).view({t * batchSize, outputPlanes});
           auto dI = dInput.narrow(0, iShift, t).view({t * batchSize, inputPlanes});
@@ -106,7 +96,6 @@ void ConvolutionTBC_updateGradInput(
       auto iShift = std::max(0, static_cast<int>(k - real_pad));
       auto oShift = std::max(0, static_cast<int>(real_pad - k));
       auto t = std::min(ilen + real_pad - k, olen) - oShift;
-      // T(input) * dOutput -> dWeight
       if (t > 0) {
           auto dW = dWeight[k];
           auto dO = dOutput.narrow(0, oShift, t).view({t * batchSize, outputPlanes});

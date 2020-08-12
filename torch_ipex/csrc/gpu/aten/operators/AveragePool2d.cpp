@@ -159,7 +159,7 @@ Tensor& avg_pool2d_backward_out_template(
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad) {
-  // #20866, #22032: Guarantee this for the official C++ API?
+  
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 2,
       "avg_pool2d: kernel_size must either be a single int, or a tuple "
@@ -191,7 +191,7 @@ Tensor& avg_pool2d_backward_out_template(
 
   /* sizes */
   const int64_t nbatch = input.size(-4);
-  const int64_t nInputPlane = input.size(-3); // number of channels (or colors)
+  const int64_t nInputPlane = input.size(-3);
   const int64_t inputHeight = input.size(-2);
   const int64_t inputWidth = input.size(-1);
   const int64_t outputWidth =

@@ -95,7 +95,6 @@ static bool maybe_enable_p2p_access(Device dst_device, Device src_device) {
   return false;
 }
 
-// device-to-device copy, does type conversion
 void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   auto numel = iter.numel();
   if (numel == 0) {

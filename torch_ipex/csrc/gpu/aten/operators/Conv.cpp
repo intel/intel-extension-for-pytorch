@@ -432,7 +432,6 @@ Tensor dpcpp_convolution_backward_input(
   auto bias_md = memory::desc({bias_tz}, data_t, format_any);
   auto output_md = memory::desc({output_tz}, data_grad, format_any);
 
-  // need to re-create conv_forward_pd to feed conv_backward_data_pd
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
   if (bias_defined) {
     conv_forward_desc.reset(new convolution_forward::desc(
@@ -618,7 +617,6 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   memory::desc bias_md({bias_tz}, data_t, format_any);
   memory::desc output_md({output_tz}, data_grad, format_any);
 
-  // need to re-create conv_forward_pd to feed conv_backward_weight_pd
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
   if (bias_defined) {
     conv_forward_desc.reset(new convolution_forward::desc(
@@ -891,20 +889,7 @@ auto ConvParams::view1d_as_2d() -> void {
 auto ConvParams::use_cpu_depthwise3x3_winograd(
     const at::Tensor& input,
     const at::Tensor& weight) const -> bool {
-#ifdef __ARM_NEON__
-  // Currently only 3x3 depthwise convolutions on tensors of float are
-  // supported.
-  return (input.ndimension() == 4) && (input.size(1) == groups) &&
-      (weight.ndimension() == 4) && (weight.size(0) % input.size(1) == 0) &&
-      (weight.size(2) == 3) && (weight.size(3) == 3) &&
-      (input.device().type() == c10::DeviceType::CPU) &&
-      (input.scalar_type() == at::kFloat) && input.is_contiguous() &&
-      (weight.device().type() == c10::DeviceType::CPU) &&
-      (weight.scalar_type() == at::kFloat) && weight.is_contiguous() &&
-      !is_strided() && !is_dilated() && !transposed;
-#else
   return false;
-#endif
 }
 
 auto ConvParams::is_depthwise(const at::Tensor& input, const at::Tensor& weight)
@@ -925,8 +910,6 @@ static void check_shape_forward(
   int64_t k = input.ndimension();
   int64_t weight_dim = weight.ndimension();
   std::vector<int64_t> weight_sizes(weight_dim);
-  // mkldnn conv2d weights could have been re-ordered to 5d by
-  // mkldnn_reorder_conv2d_weight
   if ((weight_dim == k + 1) && input_is_mkldnn) {
     weight_sizes[0] = weight.size(0) * weight.size(1);
     std::copy_n(weight.sizes().cbegin() + 2, k - 1, weight_sizes.begin() + 1);
@@ -1012,7 +995,6 @@ static void check_shape_forward(
 
     for (int i = 2; i < k; ++i) {
       input_shape.push_back(input.size(i) + 2 * padding[i - 2]);
-      // log new kernel size considering dilation
       kernel_shape.push_back(dilation[i - 2] * (weight_sizes[i] - 1) + 1);
       if (input_shape.back() < kernel_shape.back()) {
         kernel_size_correct = false;
@@ -1024,7 +1006,6 @@ static void check_shape_forward(
         "Inconsistent shape between Input and Kernel");
 
     if (!kernel_size_correct) {
-      // If kernel size is incorrect
       std::ostringstream input_ss;
       std::ostringstream kernel_ss;
       std::ostringstream output_ss;
@@ -1045,7 +1026,7 @@ static void check_shape_forward(
           kernel_ss.str(),
           "). Kernel size can't be greater than actual input size");
     }
-  } else { // transposed
+  } else {
     TORCH_CHECK(
         input.size(1) == weight_sizes[0],
         "Given transposed=",

@@ -2,9 +2,6 @@
 
 #include <ATen/Generator.h>
 
-// TODO: No need to have this whole header, we can just put it all in
-// the cpp file
-
 namespace at { namespace dpcpp { namespace detail {
 
 // The real implementation of DPCPPHooksInterface

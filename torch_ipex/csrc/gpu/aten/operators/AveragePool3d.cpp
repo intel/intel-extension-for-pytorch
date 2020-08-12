@@ -28,7 +28,6 @@ void avg_pool3d_out_template(
   //
   //  checkAllSameGPU("avg_pool3d_out_sycl", {output_arg, input_arg});
 
-  // #20866, #22032: Guarantee this for the official C++ API?
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
       "avg_pool3d: kernel_size must either be a single int, or a tuple of "
@@ -161,7 +160,6 @@ Tensor& avg_pool3d_backward_out_template(
   //  checkAllSameGPU("avg_pool3d_backward_out_sycl",
   //                  {gradInput_arg, gradOutput_arg, input_arg});
 
-  // #20866, #22032: Guarantee this for the official C++ API?
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
       "avg_pool3d: kernel_size must either be a single int, or a tuple of "
@@ -209,6 +207,7 @@ Tensor& avg_pool3d_backward_out_template(
   gradInput.zero_();
   TORCH_CHECK(gradInput.is_contiguous(), "gradInput must be contiguous");
 
+  /* sizes */
   const int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
   const int64_t nblock = input.size(-4);
   const int64_t idepth = input.size(-3);
@@ -219,7 +218,6 @@ Tensor& avg_pool3d_backward_out_template(
   const int64_t oheight = gradOutput.size(-2);
   const int64_t owidth = gradOutput.size(-1);
 
-  /* XXX shape check behavior from TH */
   const int64_t odepth_for_shape_check =
       pooling_output_shape<int64_t>(idepth, kD, padD, dD, 1, ceil_mode);
   const int64_t oheight_for_shape_check =
@@ -251,7 +249,6 @@ Tensor& avg_pool3d_backward_out_template(
   Tensor work_grad_output = gradOutput.contiguous();
 
   if (input.ndimension() == 5) {
-    // Collapse batch and feature dimensions.
     work_grad_input =
         work_grad_input.reshape({nbatch * nblock, idepth, iheight, iwidth});
     work_grad_output =

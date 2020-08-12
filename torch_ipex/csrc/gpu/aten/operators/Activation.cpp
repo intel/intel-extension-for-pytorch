@@ -265,9 +265,7 @@ static void RReLU_updateGradInput(
   }
 }
 
-// -----------------------------------
-// prelu forward
-// -----------------------------------
+/* prelu forward */
 template <typename scalar_t>
 class prelu_dpcpp_kernel_share_weights{};
 
@@ -329,9 +327,8 @@ void inline prelu_kernel_multi_weights(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-// -----------------------------------
-// prelu backward
-// -----------------------------------
+
+/* prelu backward */
 template <typename scalar_t>
 class prelu_backward_dpcpp_kernel_share_weights{};
 
@@ -610,21 +607,20 @@ Tensor prelu(const Tensor& self, const Tensor& weight_) {
   Tensor result = at::empty_like(input);
   auto strides = input.strides();
 
-  // case1: shared weight for all channels
   if (weight_num == 1) {
     IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, input.scalar_type(), "prelu", [&] {
       impl::prelu_kernel_share_weights<scalar_t>(result, input, weight);
     });
   }
-  else { // case2: multiple weights, one for each channel
+  else {
     int64_t input_ndim = input.dim();
     TORCH_CHECK(input_ndim > 0, "Not allow zero-dim input tensor.");
 
-    int64_t channel_size = 1; // channel_size default to 1
+    int64_t channel_size = 1;
     int64_t input_dim0_size = 1, input_stride0 = 1, input_stride1 = 1;
 
     if (input_ndim > 1) {
-      channel_size = input.size(1); // channel is the 2nd dim of input
+      channel_size = input.size(1);
       input_dim0_size = input.size(0);
       input_stride0 = strides[0];
       input_stride1 = strides[1];
@@ -664,7 +660,6 @@ std::tuple<Tensor, Tensor> prelu_backward(const Tensor& grad_out_, const Tensor&
   Tensor weight_grad = at::empty_like(weight);
   Tensor weight_grad_collector = at::empty_like(input);
 
-  // case1: shared parameter for all channels
   if (weight_num == 1) {
     IPEX_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, input.scalar_type(), "prelu_backward", [&] {
       impl::prelu_backward_kernel_share_weights<scalar_t>(input, weight, grad_out, input_grad, weight_grad_collector);
@@ -672,15 +667,15 @@ std::tuple<Tensor, Tensor> prelu_backward(const Tensor& grad_out_, const Tensor&
     //fix me: fill_() returns RuntimeError when input weight_grad_collector.sum() is without '.item()'
     weight_grad.fill_(weight_grad_collector.sum().item());
   }
-  else { // case2: multiple parameters, one for each channel
+  else {
     int64_t input_ndim = input.dim();
     TORCH_CHECK(input_ndim > 0, "Not allow zero-dim input tensor.");
 
-    int64_t channel_size = 1; // channel_size default to 1
+    int64_t channel_size = 1;
     int64_t input_dim0_size = 1, input_stride0 = 1, input_stride1 = 1;
 
     if (input_ndim > 1) {
-      channel_size = input.size(1); // channel is the 2nd dim of input
+      channel_size = input.size(1);
       input_dim0_size = input.size(0);
       input_stride0 = strides[0];
       input_stride1 = strides[1];
@@ -702,6 +697,7 @@ std::tuple<Tensor, Tensor> prelu_backward(const Tensor& grad_out_, const Tensor&
         input_stride1);
     });
     // update weight_grad
+
     std::vector<int64_t> reduce_dims;
     reduce_dims.push_back(0);
     if (dims > 2) {

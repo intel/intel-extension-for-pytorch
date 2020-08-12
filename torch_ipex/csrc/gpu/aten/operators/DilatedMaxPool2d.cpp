@@ -25,7 +25,6 @@ void max_pool2d_with_indices_out_template(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  // #20866, #22032: Guarantee this for the official C++ API?
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 2,
       "max_pool2d: kernel_size must either be a single int, or a tuple "
@@ -35,8 +34,6 @@ void max_pool2d_with_indices_out_template(
       ? kH
       : safe_downcast<int, int64_t>(kernel_size[1]);
 
-  // NB: stride default is not expressible as an integer constant, so we accept
-  // empty stride for this case
   TORCH_CHECK(
       stride.size() == 0 || stride.size() == 1 || stride.size() == 2,
       "max_pool2d: stride must either be omitted, a single int, or a "
@@ -96,7 +93,6 @@ void max_pool2d_with_indices_out_template(
   /* get contiguous input */
   Tensor input = input_.contiguous();
   output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
-  /* indices will contain the locations for each output point */
   indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
 
   auto alg_kind = algorithm::pooling_max;
@@ -173,7 +169,6 @@ Tensor& max_pool2d_with_indices_backward_out_template(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  // #20866, #22032: Guarantee this for the official C++ API?
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 2,
       "max_pool2d: kernel_size must either be a single int, or a tuple "
@@ -183,8 +178,6 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       ? kH
       : safe_downcast<int, int64_t>(kernel_size[1]);
 
-  // NB: stride default is not expressible as an integer constant, so we accept
-  // empty stride for this case
   TORCH_CHECK(
       stride.size() == 0 || stride.size() == 1 || stride.size() == 2,
       "max_pool2d: stride must either be omitted, a single int, or a "
@@ -229,7 +222,6 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   const int64_t outputHeight = gradOutput.size(-2);
   const int64_t outputWidth = gradOutput.size(-1);
 
-  /* XXX preserve the existing shape check behavior */
   const int64_t outputHeight_for_shape_check = pooling_output_shape<int64_t>(
       inputHeight, kH, padH, dH, dilationH, ceil_mode);
   const int64_t outputWidth_for_shape_check = pooling_output_shape<int64_t>(

@@ -639,7 +639,6 @@ void MultiMarginCriterion_updateOutput(
       "inconsistent target size, got: ",
       target.sizes());
 
-  // produce a scalar output for 1d input
   if (reduction == Reduction::None && target.dim() > 0) {
     output.resize_({nframe});
   } else {

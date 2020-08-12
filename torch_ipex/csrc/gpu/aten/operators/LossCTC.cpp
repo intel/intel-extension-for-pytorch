@@ -72,10 +72,6 @@ std::tuple<DPCPP::range<2>, DPCPP::range<2>> get_work_range(
   return std::make_tuple(global_range, local_range);
 }
 
-// this kernel is a relatively straightforward implementation of the alpha
-// calculation in the forward backward algorithm (section 4.1).
-// A (minor) twist is that we are using log-calculations to enhance numerical
-// stability (log_probs and log_alpha).
 // In total it would be more efficient to compute the beta in the same kernel
 // (e.g. cudnn does this). While the beta are not
 // needed for the loss itself (just the grad), we can return log_alpha+log_beta
@@ -276,11 +272,7 @@ void ctc_loss_log_alpha_kernel(
 
       // compute the loss (eq (8))
       if (intra_batch_id == 0) {
-        // the likelihood is the the sum of the last two alphas, eq (8), the
-        // loss is the negative log likelihood
         if (target_length == 0) {
-          // if the target is empty then there is no preceding BLANK state and
-          // hence there is no path to merge
           neg_log_likelihood_ptr[b] = -static_cast<scalar_t>(
               log_alpha_ptr
                   [la_batch_offset +
@@ -734,7 +726,6 @@ void ctc_loss_backward_collect_kernel(
       int64_t lb_batch_offset = b * lb_batch_stride;
       int64_t tg_batch_offset = tg_batch_offsets_ptr[b];
 
-      // collected[b, t, target'[s]] "log+=" log_alpha[t, s]+log_beta[t, s]
       for (int s = 0; s < 2 * max_target_length + 1; s++) {
         if (s < 2 * target_length + 1) { // if target_length == 0, s == 0
           int64_t current_target_prime = get_target_prime(
@@ -860,8 +851,6 @@ std::tuple<Tensor, Tensor> ctc_loss_template(
     IntArrayRef input_lengths,
     IntArrayRef target_lengths,
     int64_t BLANK) {
-  // log_probs: input_len x batch_size x num_labels
-  // targets [int64]: batch_size x target_length OR sum(target_lengths)
   CheckedFrom c = "ctc_loss_sycl";
   using target_t =
       typename std::conditional<target_scalar_type == kInt, int, int64_t>::type;
@@ -892,7 +881,7 @@ std::tuple<Tensor, Tensor> ctc_loss_template(
   auto tg_batch_offsets =
       at::empty({batch_size}, at::device(at::kCPU).dtype(at::kLong));
   auto tg_batch_offsets_ptr = tg_batch_offsets.data_ptr<int64_t>();
-  if (targets.dim() == 1) { // concatenated targets
+  if (targets.dim() == 1) {
     int64_t pos = 0;
     for (int64_t i = 0; i < batch_size; i++) {
       tg_batch_offsets_ptr[i] = pos;
@@ -902,8 +891,7 @@ std::tuple<Tensor, Tensor> ctc_loss_template(
     }
     tg_target_stride = targets.stride(0);
     checkSize(c, targets_arg, 0, pos);
-  } else { // batch x max_target_length
-    // dim is 2
+  } else {
     int64_t tg_batch_stride = targets.stride(0);
     for (int64_t i = 0; i < batch_size; i++) {
       tg_batch_offsets_ptr[i] = i * tg_batch_stride;
@@ -1004,8 +992,7 @@ Tensor ctc_loss_backward_template(
         max_target_length = target_lengths[i];
     }
     tg_target_stride = targets.stride(0);
-  } else { // batch x max_target_length
-    // dim is 2
+  } else {
     int64_t tg_batch_stride = targets.stride(0);
     for (int64_t i = 0; i < batch_size; i++) {
       tg_batch_offsets_ptr[i] = i * tg_batch_stride;
@@ -1146,7 +1133,7 @@ std::tuple<Tensor, Tensor> _ctc_loss(
     IntArrayRef target_lengths,
     int64_t blank,
     bool zero_infinity) {
-  (void)zero_infinity; // only used for backward
+  (void)zero_infinity;
   return IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,

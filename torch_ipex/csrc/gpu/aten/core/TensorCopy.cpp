@@ -59,11 +59,6 @@ void TensorImpl_freeCopyTo(TensorImpl* self, TensorImpl* dst) {
 template <typename scalar_t>
 void TensorImpl_copyIgnoringOverlaps(TensorImpl* dst, TensorImpl* src) {
   TORCH_CHECK(0, "not implemented TensorImpl_copyIgnoringOverlaps\n");
-// Called when we are copying into an overlapping index `dst`, but
-// we don't care which writer wins. Hacky but it works.
-// This is itself invoked by pointwiseApply2 / TensorImpl_copy in
-// case that there are write overlaps.
-// FIXME: really, overlapping writes should be illegal/an error in Torch
 #if 0
  THDPCPP_pointwiseApply2<scalar_t, scalar_t>(
     dst, src,

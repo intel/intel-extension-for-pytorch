@@ -18,47 +18,17 @@
 #include <vector>
 
 
-// C10_DEFINE_REGISTRY(FreeCudaMemoryCallbacksRegistry, FreeMemoryCallback);
-
 namespace at {
 namespace dpcpp {
 
-//
-// Caching allocator for dpcpp device memory allocations.
-//
-// - Allocations are associated with a queue. Once freed, blocks can be
-//   re-allocated on the same queue, but not on any other queue.
-// - The allocator attempts to find the smallest cached block that will fit the
-//   requested size. If the block is larger than the requested size, it may be
-//   split. If no block is found, the allocator will delegate to dpcppMalloc.
-// - If the dpcppMalloc fails, the allocator will free all cached blocks that
-//   are not split and retry the allocation.
-// - Large (>1MB) and small allocations are stored in separate pools.
-//   Small requests are packed into 2MB buffers. Large requests will use the
-//   smallest available free block or allocate a new block using dpcppMalloc.
-//   To reduce fragmentation, requests between 1MB and 10MB will allocate and
-//   split a 20MB block, if no free block of sufficient size is available.
-//
-// With this allocator, allocations and frees should logically be considered
-// "usages" of the memory segment associated with queues, just like kernel
-// launches. The programmer must insert the proper synchronization if memory
-// segments are used from multiple queues.
-//
-// The library provides a recordQueue() function to help insert the correct
-// synchronization when allocations are used on multiple streams. This will
-// ensure that the block is not reused before each recorded queue completes
-// work.
-//
-
-
 using queue_set = std::unordered_set<at::dpcpp::DPCPPStream>;
 
-constexpr size_t kMinBlockSize = 512;       // all sizes are rounded to at least 512 bytes
-constexpr size_t kSmallSize = 1048576;      // largest "small" allocation is 1 MiB
-constexpr size_t kSmallBuffer = 2097152;    // "small" allocations are packed in 2 MiB blocks
-constexpr size_t kLargeBuffer = 20971520;   // "large" allocations may be packed in 20 MiB blocks
-constexpr size_t kMinLargeAlloc = 10485760; // allocations between 1 and 10 MiB may use kLargeBuffer
-constexpr size_t kRoundLarge = 2097152;     // round up large allocs to 2 MiB
+constexpr size_t kMinBlockSize = 512;
+constexpr size_t kSmallSize = 1048576;
+constexpr size_t kSmallBuffer = 2097152;
+constexpr size_t kLargeBuffer = 20971520;
+constexpr size_t kMinLargeAlloc = 10485760;
+constexpr size_t kRoundLarge = 2097152;
 
 typedef std::bitset<static_cast<size_t>(at::dpcpp::CAStatType::NUM_TYPES)> CAStatTypes;
 
@@ -98,22 +68,21 @@ typedef bool (*Comparison)(const CABlock*, const CABlock*);
 typedef std::set<CABlock*, Comparison> CABlockPool;
 
 struct CABlock {
-  at::DeviceIndex   device;      // gpu
-  DPCPP::queue* queuePtr;    // allocation queue
-  queue_set     queue_uses;  // queues on which the block was used
-  size_t        size;        // block size in bytes
-  CABlockPool*  pool;        // owning memory pool
-  void*         ptr;         // memory address
-  bool          allocated;   // in-use flag
-  CABlock*      prev;        // prev block if split from a larger allocation
-  CABlock*      next;        // next block if split from a larger allocation
-  int           event_count; // number of outstanding DPCPP events
+  at::DeviceIndex   device;
+  DPCPP::queue* queuePtr;
+  queue_set     queue_uses;
+  size_t        size;
+  CABlockPool*  pool;
+  void*         ptr;
+  bool          allocated;
+  CABlock*      prev;
+  CABlock*      next;
+  int           event_count;
 
   CABlock(at::DeviceIndex device,  DPCPP::queue *pQueue, size_t size, CABlockPool* pool, void* ptr) :
     device(device), queuePtr(pQueue), queue_uses(), size(size), pool(pool),
     ptr(ptr), allocated(false), prev(nullptr), next(nullptr), event_count(0) { }
 
-  // constructor for search key
   CABlock(at::DeviceIndex device, DPCPP::queue *pQueue, size_t size) :
     device(device), queuePtr(pQueue), queue_uses(), size(size), pool(nullptr),
     ptr(nullptr), allocated(0), prev(nullptr), next(nullptr), event_count(0) { }
@@ -162,25 +131,18 @@ class CachingAllocator {
 
  private:
 
-  // lock around all operations
   mutable std::recursive_mutex mutex;
 
-  // lock around calls to dpcppFree
   mutable std::mutex dpcpp_free_mutex;
 
-  // device statistics
   std::vector<at::dpcpp::CADeviceStats> device_stats;
 
-  // unallocated cached blocks larger than 1 MB
   CABlockPool large_blocks;
 
-  // unallocated cached blocks 1 MB or smaller
   CABlockPool small_blocks;
 
-  // allocated blocks by device pointer
   std::unordered_map<void*, CABlock*> allocated_blocks;
 
-  // outstanding dpcpp events
   std::deque<std::pair<DPCPP::event, CABlock*>> dpcpp_events;
 
  public:
@@ -193,10 +155,7 @@ class CachingAllocator {
     return &dpcpp_free_mutex;
   }
 
-  // All public methods (except the above) acquire the allocator mutex.
-  // Thus, do not call a public method from another public method.
 
-  /** allocates a block which is safe to use from the provided stream */
   void malloc(void** devPtr, size_t size, DPCPP::queue *queuePtr)
   {
     std::lock_guard<std::recursive_mutex> lock(mutex);
@@ -204,7 +163,6 @@ class CachingAllocator {
     DeviceIndex curDevID;
 		AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
 
-    // process outstanding dpcppEvents
     process_events();
 
     size = round_size(size);
@@ -251,27 +209,10 @@ class CachingAllocator {
         update_stat_array(stats.segment, 1, stat_types);
         update_stat_array(stats.reserved_bytes, alloc_size, stat_types);
       } else {
-				// TODO: Call DPCPP Runtime API to verify no available memory
         auto dpcppDev = dpcppGetRawDevice(curDevID);
         size_t device_total = dpcppDev.get_info<DPCPP::info::device::global_mem_size>();
         stats.num_ooms += 1;
         
-        // "total capacity": total global memory on GPU
-        // "already allocated": memory allocated by the program using the
-        //                      caching allocator
-        // "cached": memory held by the allocator but not used by the program
-        //
-        // The "allocated" amount  does not include memory allocated outside
-        // of the caching allocator, such as memory allocated by other programs
-        // or memory held by the driver.
-        //
-        // The sum of "allocated" + "free" + "cached" may be less than the
-        // total capacity due to memory held by the driver and usage by other
-        // programs.
-        //
-        // Note that at this point dpcpp_malloc_with_retry has already returned all
-        // possible "cached" memory to the driver. The only remaining "cached"
-        // memory is split from a larger block that is partially in-use.
         AT_ERROR("DPCPP out of memory. Tried to allocate ", format_size(alloc_size),
           " (GPU ", curDevID, "; ",
           format_size(device_total), " total capacity; ",
@@ -302,16 +243,12 @@ class CachingAllocator {
       pool.insert(remaining);
 
       if (already_split) {
-        // An already-split inactive block is being shrunk by size bytes.
         update_stat_array(stats.inactive_split_bytes, -block->size, stat_types);
       } else {
-        // A new split inactive block is being created from a previously unsplit block,
-        // size remaining->size bytes.
         update_stat_array(stats.inactive_split_bytes, remaining->size, stat_types);
         update_stat_array(stats.inactive_split, 1, stat_types);
       }
     } else if (already_split) {
-      // An already-split block is becoming active
       update_stat_array(stats.inactive_split_bytes, -block->size, stat_types);
       update_stat_array(stats.inactive_split, -1, stat_types);
     }
@@ -379,35 +316,25 @@ class CachingAllocator {
   }
 
   void recordQueue(const at::DataPtr& ptr, at::dpcpp::DPCPPStream stream) {
-    // Empty tensor's storage().data() might be a null ptr. As there is no
-    // blocks associated with those tensors, it is fine to do nothing here.
     if (!ptr.get()) {
       return;
     }
 
-    // If a tensor is not allocated by this instance, simply skip
-    // This usually happens when DPCPP tensors are shared across processes,
-    // we have implemented reference counting based sharing mechanism to
-    // guarantee tensors won't be accidentally freed by one process while
-    // they are still being used in another
     if (ptr.get_deleter() != &dpcpp_raw_delete)
       return;
 
     std::lock_guard<std::recursive_mutex> lock(mutex);
 
     CABlock* block = find_allocated_block(ptr.get());
-    // block must not be null reaching here
     TORCH_INTERNAL_ASSERT(block != nullptr, "No allocated block can be found");
 		auto &queue = stream.dpcpp_queue();
     if (&queue == block->queuePtr) {
-      // ignore uses on the allocation stream, since those don't require any
-      // special synchronization
       return;
     }
     block->queue_uses.insert(stream);
   }
 
-  /** returns cached blocks to the system allocator **/
+  /* returns cached blocks to the system allocator */
   void emptyCache() {
     std::lock_guard<std::recursive_mutex> lock(mutex);
     synchronize_and_free_events(nullopt);
@@ -415,20 +342,17 @@ class CachingAllocator {
     free_blocks(small_blocks, small_blocks.begin(), small_blocks.end());
   }
 
-  /** Retrieves info (total size + largest block) of the memory cache **/
   void cacheInfo(at::DeviceIndex di, size_t* total, size_t* largest) {
     std::lock_guard<std::recursive_mutex> lock(mutex);
     cache_info_aux(large_blocks, di, total, largest);
     cache_info_aux(small_blocks, di, total, largest);
   }
 
-  /** Returns a copy of the memory allocator stats for the device **/
   at::dpcpp::CADeviceStats getStatsForDevice(at::DeviceIndex di) {
     std::lock_guard<std::recursive_mutex> lock(mutex);
     return get_stats_for_device(di);
   }
 
-  /** Resets the historical accumulation stats for the device **/
   void resetAccumulatedStats(at::DeviceIndex di) {
     std::lock_guard<std::recursive_mutex> lock(mutex);
     CADeviceStats& stats = get_stats_for_device(di);
@@ -448,7 +372,6 @@ class CachingAllocator {
     stats.num_ooms = 0;
   }
 
-  /** Resets the historical peak stats for the device **/
   void resetPeakStats(at::DeviceIndex di) {
     std::lock_guard<std::recursive_mutex> lock(mutex);
     CADeviceStats& stats = get_stats_for_device(di);
@@ -465,7 +388,6 @@ class CachingAllocator {
     }
   }
 
-  /** Dump a complete snapshot of the memory held by the allocator. Potentially VERY expensive. **/
   std::vector<at::dpcpp::CASegmentInfo> snapshot() const {
     std::lock_guard<std::recursive_mutex> lock(mutex);
 
@@ -515,8 +437,6 @@ class CachingAllocator {
 
  private:
 
-  // All private methods do not acquire the allocator mutex.
-
   at::dpcpp::CADeviceStats& get_stats_for_device(at::DeviceIndex device) {
     TORCH_CHECK(device >= 0);
     if ((size_t) device >= device_stats.size()) {
@@ -535,7 +455,6 @@ class CachingAllocator {
     return blocks;
   }
 
-  /** moves a block into a pool of cached free blocks */
   void free_block(CABlock* block)
   {
     AT_ASSERT(!block->allocated && block->event_count == 0);
@@ -572,7 +491,6 @@ class CachingAllocator {
     update_stat_array(stats.active_bytes, -original_block_size, stat_types);
   }
 
-  /** combine previously split blocks. returns the size of the subsumed block, or 0 on failure. */
   size_t try_merge_blocks(CABlock* dst, CABlock* src, CABlockPool& pool)
   {
     if (!src || src->allocated || src->event_count > 0) {
@@ -651,11 +569,8 @@ class CachingAllocator {
 
   int dpcpp_malloc_with_retry(DeviceIndex di, void** devPtr, size_t size)
   {
-    // Try USM malloc. If USM malloc fails, frees all non-split cached blocks
-    // and retries.
-		auto syclDev = at::dpcpp::dpcppGetRawDevice(di);
-		*devPtr = DPCPP::malloc_device(size, syclDev, at::dpcpp::getGlobalContext());
-
+    auto syclDev = at::dpcpp::dpcppGetRawDevice(di);
+    *devPtr = DPCPP::malloc_device(size, syclDev, at::dpcpp::getGlobalContext());
 
     if (*devPtr == NULL) {
       CADeviceStats& stats = get_stats_for_device(di);
@@ -672,11 +587,8 @@ class CachingAllocator {
 
   void free_cached_blocks(DeviceIndex di)
   {
-    // First ensure that all blocks that can't currently be allocated due to
-    // outstanding events are returned to the pool.
     synchronize_and_free_events(di);
 
-    // Free all non-split cached blocks on device
     CABlock lower_bound(di, nullptr, 0);
     CABlock upper_bound(di + 1, nullptr, 0);
 
@@ -692,7 +604,6 @@ class CachingAllocator {
 
   void free_blocks(CABlockPool& blocks, CABlockPool::iterator it, CABlockPool::iterator end)
   {
-    // Frees all non-split blocks between `it` and `end`
     while (it != end) {
       CABlock* block = *it;
       if (!block->prev && !block->next) {
@@ -716,8 +627,6 @@ class CachingAllocator {
   }
 
   void synchronize_and_free_events(optional<DeviceIndex> di) {
-    // Synchronize on outstanding events and then free associated blocks.
-    // Limited to blocks on the given device if specified.
 
     auto remaining_events = decltype(dpcpp_events)();
 
@@ -751,7 +660,6 @@ class CachingAllocator {
     queue_set queues(std::move(block->queue_uses));
     AT_ASSERT(block->queue_uses.empty());
     for (auto it = queues.begin(); it != queues.end(); ++it) {
-      // TODO: following dummy kernel should be replaced by barrier
       auto cgf = DPCPP_Q_CGF(cgh) {
         cgh.single_task<DPCPP_K(CA_dummy_kernel)>([=]() {});
       };
@@ -763,11 +671,6 @@ class CachingAllocator {
 
   void process_events()
   {
-    // Process outstanding cudaEvents. Events that are completed are removed
-    // from the queue, and the 'event_count' for the corresponding allocation
-    // is decremented. Stops at the first event which has not been completed.
-    // Since events on different devices or streams may occur out of order,
-    // the processing of some events may be delayed.
     while (!dpcpp_events.empty()) {
       auto& e = dpcpp_events.front();
       auto event = e.first;
@@ -786,7 +689,6 @@ class CachingAllocator {
     }
   }
 
-  // Accumulates sizes of all memory blocks for given device in given pool
   void cache_info_aux(CABlockPool& blocks, DeviceIndex di, size_t* total, size_t* largest)
   {
     CABlock search_key(di, 0, 0);
@@ -899,5 +801,5 @@ void dpcpp_raw_delete(void* ptr) {
   delete ctx;
 }
 
-}} // namespace aten::dpcpp
-
+} // namespace dpcpp
+} // namespace at

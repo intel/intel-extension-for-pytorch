@@ -27,46 +27,31 @@ enum struct CAStatType : uint64_t {
   AGGREGATE = 0,
   SMALL_POOL = 1,
   LARGE_POOL = 2,
-  NUM_TYPES = 3  // remember to update this whenever a new stat type is added
+  NUM_TYPES = 3  
 };
 
 typedef std::array<CAStat, static_cast<size_t>(CAStatType::NUM_TYPES)> CAStatArray;
 
-// Struct containing memory allocator summary statistics for a device.
 struct CADeviceStats {
-  // COUNT: allocations requested by client code
   CAStatArray allocation;
-  // COUNT: number of allocated segments from dpcpp_malloc().
   CAStatArray segment;
-  // COUNT: number of active memory blocks (allocated or used by stream)
   CAStatArray active;
-  // COUNT: number of inactive, split memory blocks (unallocated but can't be released via dpcpp_free)
   CAStatArray inactive_split;
-
-  // SUM: bytes requested by client code
   CAStatArray allocated_bytes;
-  // SUM: bytes reserved by this memory allocator (both free and used)
   CAStatArray reserved_bytes;
-  // SUM: bytes within active memory blocks
   CAStatArray active_bytes;
-  // SUM: bytes within inactive, split memory blocks
   CAStatArray inactive_split_bytes;
-
-  // COUNT: total number of failed calls to CUDA malloc necessitating cache flushes.
+  
   int64_t num_alloc_retries = 0;
-
-  // COUNT: total number of OOMs (i.e. failed calls to CUDA after cache flush)
   int64_t num_ooms = 0;
 };
 
-// Struct containing info of an allocation block (i.e. a fractional part of a cudaMalloc)..
 struct CABlockInfo {
   int64_t size = 0;
   bool allocated = false;
   bool active = false;
 };
 
-// Struct containing info of a memory segment (i.e. one contiguous dpcppMalloc).
 struct CASegmentInfo {
   int64_t device = 0;
   int64_t address = 0;

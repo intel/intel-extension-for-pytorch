@@ -650,16 +650,6 @@ void compute_counts(int64_t* counts, int64_t* indice, int64_t indice_length) {
     acc_co[acc_in[i]]++;
 }
 
-// counts_uniq stores the index of the NEXT unique element
-// of the (sorted) indices vector.
-//
-// For example:
-// indices: [0, 0, 0, 1, 3, 3, 4]
-// counts: [3, 1, 0, 2, 1, 0]
-// counts_uniq: [0, 3, 4, 6, 7]
-//
-// The unique indices can be found at index 0, 3, 4, 6.
-
 int64_t compute_counts_uniq(
     int64_t* counts_uniq,
     int64_t* indice,
@@ -811,9 +801,6 @@ Tensor embedding_bag_backward_dpcpp_max(
   return grad_weight;
 }
 
-// Assumes all input tensors are contiguous.
-// See NOTE [ embedding_bag Native Functions ] in native_functions.yaml for
-// details
 std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
     const Tensor& weight,
     const Tensor& indices,

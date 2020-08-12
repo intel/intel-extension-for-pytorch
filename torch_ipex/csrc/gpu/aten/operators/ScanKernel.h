@@ -89,8 +89,6 @@ DPCPP_DEVICE void exclusivePrefixScan(
     T* carry,
     BinaryFunction binop,
     const DPCPP::nd_item<1>& item_id) {
-  // FIXME: crappy implementation
-  // We kill write-after-read dependencies separately below, hence the `false`
   inclusivePrefixScan<T, BinaryFunction>(smem, in, out, binop, item_id);
 
   *out -= in;

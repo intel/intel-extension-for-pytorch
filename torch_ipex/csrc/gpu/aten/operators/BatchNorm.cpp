@@ -263,8 +263,6 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     const Tensor& grad_output_,
     const Tensor& input_,
     const Tensor& weight_,
-    // Unused: but we require them to be passed so that double backwards
-    // has access
     const Tensor& running_mean_,
     const Tensor& running_var_,
     const Tensor& save_mean_,

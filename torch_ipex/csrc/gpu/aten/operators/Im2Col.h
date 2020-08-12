@@ -120,7 +120,6 @@ static void col2im_kernel(
               : (h_im - kernel_extent_h) / stride_h + 1;
           const int64_t h_col_end = ::min(h_im / stride_h + 1, output_height);
 
-          // TODO: use LCM of stride and dilation to avoid unnecessary loops
           for (int64_t h_col = h_col_start; h_col < h_col_end; h_col += 1) {
             for (int64_t w_col = w_col_start; w_col < w_col_end; w_col += 1) {
               int64_t h_k = (h_im - h_col * stride_h);

@@ -122,13 +122,10 @@ void _mkl_dft(
 
   auto istrides = input.strides();
   auto ostrides = output.strides();
-  // batch dim stride, i.e., dist between each data
   int64_t idist = complex_input ? istrides[0] >> 1 : istrides[0];
   int64_t odist = complex_output ? ostrides[0] >> 1 : ostrides[0];
   desc.set_value(mkl::dft::config_param::FWD_DISTANCE, idist);
   desc.set_value(mkl::dft::config_param::BWD_DISTANCE, odist);
-  // signal strides
-  // first val is offset, set to zero (ignored)
   std::vector<int64_t> mkl_istrides(1 + signal_ndim, 0),
       mkl_ostrides(1 + signal_ndim, 0);
   for (int64_t i = 1; i <= signal_ndim; i++) {
@@ -137,13 +134,10 @@ void _mkl_dft(
   }
   desc.set_value(mkl::dft::config_param::INPUT_STRIDES, mkl_istrides.data());
   desc.set_value(mkl::dft::config_param::OUTPUT_STRIDES, mkl_ostrides.data());
-  // if conjugate domain of real is involved, set standard CCE storage type
-  // this will become default in MKL in future
   if (!complex_input || !complex_output) {
     desc.set_value(
         mkl::dft::config_param::CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
   }
-  // rescale if needed by normalized flag or inverse transform
   if (normalized || inverse) {
     auto signal_numel = at::prod_intlist(checked_signal_sizes);
     double double_scale;

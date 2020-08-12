@@ -90,7 +90,6 @@ static TensorIterator make_reduction(
     bool keepdim,
     ScalarType in_dtype,
     ScalarType out_dtype) {
-  // check that result type and dtype match if provided
   TORCH_CHECK(
       !result.defined() || result.scalar_type() == out_dtype,
       name,
@@ -119,10 +118,6 @@ static TensorIterator make_reduction(
     IntArrayRef dim,
     bool keepdim,
     ScalarType out_dtype) {
-  // special case for type promotion in mixed precision, improves computational
-  // efficiency.
-  // not generalize this to common mismatched input/output types to avoid cross
-  // product of templated kernel launches.
   const bool gpu_f16_to_f32 =
       (self.is_cuda() && self.scalar_type() == kHalf && out_dtype == kFloat);
   auto in_dtype = gpu_f16_to_f32 ? self.scalar_type() : out_dtype;
@@ -137,7 +132,6 @@ static TensorIterator make_reduction(
     IntArrayRef dim,
     bool keepdim,
     ScalarType dtype) {
-  // check that result type and dtype match if provided
   for (const Tensor* t : {&result1, &result2}) {
     const Tensor& result = *t;
     TORCH_CHECK(
@@ -163,11 +157,6 @@ static TensorIterator make_reduction(
   namedinference::propagate_names_for_reduction(result2, self, dim, keepdim);
 #endif
 
-  // special case for type promotion in mixed precision, improves computational
-  // efficiency.
-  // We don't generalize this to common mismatched input/output types to avoid
-  // cross
-  // product of templated kernel launches.
   if (self.scalar_type() == dtype ||
       (self.is_cuda() && self.scalar_type() == kHalf && dtype == kFloat)) {
     return TensorIterator::reduce_op(viewed_result1, viewed_result2, self);
@@ -218,15 +207,13 @@ struct WelfordOps {
   using acc_t = WelfordData<acc_scalar_t, index_t, combine_t>;
   inline DPCPP_DEVICE acc_t reduce(acc_t acc, scalar_t data) const {
     acc_scalar_t delta = data - acc.mean;
-    // using acc.nf(combine_t) here, as acc.n(index_t) would still be converted
-    // accumulation in reduce is done through index_T
     acc_scalar_t new_mean = acc.mean + delta / (acc.nf + 1);
     acc_scalar_t new_delta = data - new_mean;
     return {
         new_mean,
         acc.m2 + delta * new_delta,
         acc.n + 1,
-        combine_t(acc.n + 1), // accumulate for combine_t uses index_t
+        combine_t(acc.n + 1),
     };
   }
   inline DPCPP_DEVICE acc_t combine(acc_t a, acc_t b) const {
@@ -241,9 +228,6 @@ struct WelfordOps {
     acc_scalar_t nb_over_n = b.nf / new_count;
     return {a.mean + delta * nb_over_n,
             a.m2 + b.m2 + delta * delta * a.nf * nb_over_n,
-            // setting acc.n as -1 since acc.n might not be able to represent
-            // the count
-            // correctly within its range, setting it to -1 to avoid confusion
             -1,
             new_count};
   }
@@ -444,8 +428,6 @@ struct AbsMaxOps {
 
 template <typename scalar_t>
 void std_var_kernel_impl(TensorIterator& iter, bool unbiased, bool take_sqrt) {
-  // reducing unrolling factor to 2 for welford kernel
-  // This is necessary to lower register usage that leads to register spills.
   dpcpp_reduce_kernel<scalar_t, scalar_t, 2>(
       iter,
       WelfordOps<
@@ -462,8 +444,6 @@ void std_var_kernel_impl<at::Half>(
     TensorIterator& iter,
     bool unbiased,
     bool take_sqrt) {
-  // reducing unrolling factor to 2 for welford kernel
-  // This is necessary to lower register usage that leads to register spills.
   dpcpp_reduce_kernel<at::Half, at::Half, 2>(
       iter,
       WelfordOps<
@@ -605,7 +585,6 @@ static void norm_kernel(TensorIterator& iter, Scalar p) {
   if (iter.dtype() == kHalf) {
     return norm_kernel_impl<at::Half, float>(iter, p);
   } else if (iter.dtype(1) == kHalf && iter.dtype() == kFloat) {
-    // type promotion that does cast and reduction in a single kernel
     return norm_kernel_impl<at::Half, float, float>(iter, p);
   }
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -976,7 +955,6 @@ Tensor& renorm_out(
   TORCH_CHECK(p.toFloat() > 0, "non-positive-norm not supported");
   TORCH_CHECK(self.dim() > 1, "need at least 2 dimensions, got ", self.dim());
 
-  // Calculate the p-norm of the input.
   auto norm_vec_sz = self.size(dim);
   Tensor norm = at::empty(norm_vec_sz, self.options().dtype(kFloat));
   at::AtenIpexTypeDPCPP::norm_out(
@@ -987,7 +965,6 @@ Tensor& renorm_out(
       false,
       c10::nullopt);
 
-  // Compare the norm and maxnorm value.
   auto iter = TensorIterator();
   iter.add_output(norm);
   iter.add_input(norm);
@@ -1000,7 +977,6 @@ Tensor& renorm_out(
     return 1;
   });
 
-  // Broadcast mul
   std::vector<int64_t> sizes_;
   sizes_.push_back(norm_vec_sz);
   size_t tailing_dims = self.dim() - (dim + 1);
@@ -1036,7 +1012,6 @@ Tensor& std_var_out(
       at::isFloatingType(self.scalar_type()) ||
           at::isComplexType(self.scalar_type()),
       "std and var only support floating-point dtypes");
-  // complex data type support has not been verified
   if (at::isComplexType(self.scalar_type())) {
     ScalarType dtype = c10::toValueType(get_dtype(result, self, {}, true));
     Tensor real_in = at::real(self).to(dtype);
@@ -1092,7 +1067,6 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
       " and ",
       toString(result2.scalar_type()),
       ".");
-  // complex data type support has not been verified
   if (at::isComplexType(self.scalar_type())) {
     ScalarType dtype = c10::toValueType(get_dtype(result1, self, {}, true));
     Tensor real_in = at::real(self).to(dtype);

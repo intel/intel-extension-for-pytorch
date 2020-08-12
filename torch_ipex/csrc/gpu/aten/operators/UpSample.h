@@ -98,18 +98,6 @@ static inline scalar_t area_pixel_compute_source_index(
     return scale * dst_index;
   } else {
     scalar_t src_idx = scale * (dst_index + 0.5) - 0.5;
-    // [Note] Follow Opencv resize logic:
-    // We allow negative src_idx here and later will use
-    //   dx = src_idx - floorf(src_idx)
-    // to compute the "distance"(which affects weights).
-    // For linear modes, weight distribution doesn't matter
-    // for negative indices as they use 2 pixels to interpolate.
-    // For example, [-1, 0], they both use pixel 0 value so it
-    // doesn't affect if we bound the src_idx to 0 or not.
-    // TODO: Our current linear mode impls use unbound indices
-    // where we should and then remove this cubic flag.
-    // This matters in cubic mode, as we might need [-1, 0, 1, 2]
-    // to interpolate and the weights can be affected.
     return (!cubic && src_idx < 0) ? scalar_t(0) : src_idx;
   }
 }
@@ -147,8 +135,6 @@ static void upsample_increment_value_bounded(
       value);
 }
 
-// Based on
-// https://en.wikipedia.org/wiki/Bicubic_interpolation#Bicubic_convolution_algorithm
 template <typename scalar_t>
 static inline scalar_t cubic_convolution1(scalar_t x, scalar_t A) {
   return ((A + 2) * x - (A + 3)) * x * x + 1;
@@ -169,7 +155,6 @@ static inline void get_cubic_upsample_coefficients(
   coeffs[0] = cubic_convolution2<scalar_t>(x1 + 1.0, A);
   coeffs[1] = cubic_convolution1<scalar_t>(x1, A);
 
-  // opposite coefficients
   scalar_t x2 = 1.0 - t;
   coeffs[2] = cubic_convolution1<scalar_t>(x2, A);
   coeffs[3] = cubic_convolution2<scalar_t>(x2 + 1.0, A);

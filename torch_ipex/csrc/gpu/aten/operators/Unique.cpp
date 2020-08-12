@@ -204,23 +204,13 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
   const bool return_inverse,
   const bool return_counts
 ) {
-  /**
-    * The idea for implementing this is basically the same as unique.
-    * For unique_dim, we are taking the unique with respect to a index
-    * tensor, but during the processes, we override the compare and equal
-    * operator by checking the data underlying it instead. After the
-    * algorithm, we would use index_select to map the resulting indicies
-    * to the result on the actual data.
-    */
 #if defined(_PSTL_BACKEND_SYCL) && defined(USE_USM)
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto policy = dpstd::execution::make_device_policy<Unique_Dpcpp_Kernel<scalar_t>>(dpcpp_queue);
 
   auto sizes = self.sizes().vec();
-  // check how many zero dimensions exist
   auto num_zero_dims = std::count(sizes.begin(), sizes.end(), 0);
 
-  // tensor is not well formed as it has 0 sized dimensions
   if (self.size(dim) == 0){
     TORCH_CHECK(
         num_zero_dims == 1,
@@ -311,8 +301,6 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
 std::tuple<Tensor, Tensor>
 _unique(const Tensor& self, const bool sorted, const bool return_inverse) {
   return IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "unique", [&] {
-    // The current implementation of unique always sort due to the
-    // lack of hashtable implementation in thrust
     Tensor output, inverse;
     std::tie(output, inverse, std::ignore) = impl::unique_template<scalar_t>(self, false, return_inverse, false);
     return std::make_tuple(output, inverse);
@@ -322,8 +310,6 @@ _unique(const Tensor& self, const bool sorted, const bool return_inverse) {
 std::tuple<Tensor, Tensor, Tensor>
 _unique2(const Tensor& self, const bool sorted, const bool return_inverse, const bool return_counts) {
   return IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "unique", [&] {
-    // The current implementation of unique always sort due to the
-    // lack of hashtable implementation in thrust
     return impl::unique_template<scalar_t>(self, false, return_inverse, return_counts);
   });
 }
@@ -346,8 +332,6 @@ std::tuple<Tensor, Tensor, Tensor>
 unique_consecutive(const Tensor& self, const bool return_inverse, const bool return_counts, c10::optional<int64_t> dim) {
   if (!dim.has_value()) {
     return IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "unique", [&] {
-      // The current implementation of unique always sort due to the
-      // lack of hashtable implementation in thrust
       return impl::unique_template<scalar_t>(self, true, return_inverse, return_counts);
     });
   }

@@ -54,7 +54,6 @@ Tensor& eye_out_dpcpp(Tensor& result, int64_t n) {
   return eye_out_dpcpp(result, n, /*m=*/-1);
 }
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ triangle ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 namespace triangle_dpcpp {
 // To find the max integer that does not exceed the root of an int64_t variable,
