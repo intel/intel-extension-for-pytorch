@@ -111,11 +111,12 @@ void dequantize_tensor_per_channel_affine_dpcpp(
   std::vector<float> scls;
   std::vector<int> zps;
   for (int i = 0; i < scales.numel(); i++) {
-    scls.push_back(1 / static_cast<float>(scales.data_ptr<double>()[i]));
+    scls.push_back(scales[i].item().to<float>());
   }
-  zps.push_back(static_cast<int>(
-      zero_points.data_ptr<long>()[0])); // oneDNN only support single
-                                         // zero_point by currently.
+  zps.push_back(
+      zero_points[0]
+          .item()
+          .to<float>()); // oneDNN only support single zero_point by currently.
   attr.set_output_scales(mask_0, {scls});
   attr.set_zero_points(DNNL_ARG_SRC, mask_1, {zps});
   reorder reorder_p = reorder(q_m, r_m, attr);

@@ -145,11 +145,12 @@ void quantize_tensor_per_channel_affine_kernel(
   std::vector<float> scls;
   std::vector<int> zps;
   for (int i = 0; i < scales.numel(); i++) {
-    scls.push_back(static_cast<float>(scales.data_ptr<double>()[i]));
+    scls.push_back(1.0f / scales[i].item().to<float>());
   }
-  zps.push_back(static_cast<int>(
-      zero_points.data_ptr<long>()[0])); // oneDNN only support single
-                                         // zero_point by currently.
+  zps.push_back(
+      zero_points[0]
+          .item()
+          .to<float>()); // oneDNN only support single zero_point by currently.
 
   attr.set_output_scales(mask_0, {scls});
   attr.set_zero_points(DNNL_ARG_DST, mask_1, {zps});
