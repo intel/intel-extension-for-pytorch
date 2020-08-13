@@ -136,7 +136,11 @@ Tensor dequantize_tensor_per_channel_affine(
 }
 
 Tensor dequantize(const Tensor& self) {
-  return at::get_qtensorimpl(self)->quantizer()->dequantize(self);
+  if (!self.is_quantized()) {
+    return self;
+  }
+  auto qtensor = static_cast<QTensorImpl*>(self.unsafeGetTensorImpl());
+  return qtensor->quantizer()->dequantize(self);
 }
 
 } // namespace AtenIpexTypeDPCPP
@@ -145,10 +149,6 @@ Tensor dequantize(const Tensor& self) {
 namespace at {
 
 Tensor PerTensorAffineQuantizer::dequantize(Tensor qtensor) {
-  if (!qtensor.is_quantized()) {
-    return qtensor;
-  }
-
   Tensor rtensor =
       at::empty(qtensor.sizes(), qtensor.options().dtype(at::kFloat));
   qtensor = qtensor.contiguous();
@@ -160,10 +160,6 @@ Tensor PerTensorAffineQuantizer::dequantize(Tensor qtensor) {
 }
 
 Tensor PerChannelAffineQuantizer::dequantize(Tensor qtensor) {
-  if (!qtensor.is_quantized()) {
-    return qtensor;
-  }
-
   Tensor rtensor =
       at::empty(qtensor.sizes(), qtensor.options().dtype(at::kFloat));
   qtensor = qtensor.contiguous();
