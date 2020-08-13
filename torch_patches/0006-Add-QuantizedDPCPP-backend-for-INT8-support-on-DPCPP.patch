@@ -1,6 +1,6 @@
-From a5c2d415aee102765c1265900bb53a73913199a8 Mon Sep 17 00:00:00 2001
+From 3acdba313b81ee18b776ecc9256e573647f89dab Mon Sep 17 00:00:00 2001
 From: Gu Jinghui <jinghui.gu@intel.com>
-Date: Sun, 9 Aug 2020 18:14:09 +0800
+Date: Fri, 14 Aug 2020 00:51:25 +0800
 Subject: [PATCH 6/7] Add QuantizedDPCPP backend for INT8 support on DPCPP
  device
 
@@ -13,8 +13,7 @@ Subject: [PATCH 6/7] Add QuantizedDPCPP backend for INT8 support on DPCPP
  c10/core/TensorOptions.h                 |  9 +++++++--
  setup.py                                 |  1 +
  torch/csrc/utils/tensor_layouts.cpp      |  1 +
- torch/quantization/stubs.py              |  5 ++++-
- 9 files changed, 33 insertions(+), 7 deletions(-)
+ 8 files changed, 29 insertions(+), 6 deletions(-)
 
 diff --git a/aten/src/ATen/preprocess_declarations.py b/aten/src/ATen/preprocess_declarations.py
 index b7d56125f4..85ad08fe60 100644
@@ -188,19 +187,6 @@ index e42a7baf27..55404ea733 100644
  
    PyObject *sparse_coo_layout = THPLayout_New(at::Layout::Sparse, "torch.sparse_coo");
    Py_INCREF(sparse_coo_layout);
-diff --git a/torch/quantization/stubs.py b/torch/quantization/stubs.py
-index 7018ef1b83..b32367fed7 100644
---- a/torch/quantization/stubs.py
-+++ b/torch/quantization/stubs.py
-@@ -51,4 +51,7 @@ class QuantWrapper(nn.Module):
-     def forward(self, X):
-         X = self.quant(X)
-         X = self.module(X)
--        return self.dequant(X)
-+        if X.is_quantized:
-+          return self.dequant(X)
-+        else:
-+          return X
 -- 
 2.17.1
 

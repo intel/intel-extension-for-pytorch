@@ -1,7 +1,7 @@
-From 6632916d446ed7ce5b9c7b02e1ef901a05d239d2 Mon Sep 17 00:00:00 2001
+From 05ac4c1c4fc407da8cd464918a677c2834fb811c Mon Sep 17 00:00:00 2001
 From: Gu Jinghui <jinghui.gu@intel.com>
 Date: Sun, 9 Aug 2020 18:15:03 +0800
-Subject: [PATCH 7/7] [REVERTME] Workaround for oneDNN symmetric INT8 impl
+Subject: [PATCH 7/7] Workaround for oneDNN symmetric INT8 impl
 
 Asymmetric zero point is the default INT8 impl in PyTorch,
 while oneDNN only support symmetric for now.
