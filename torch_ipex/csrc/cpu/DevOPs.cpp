@@ -1666,6 +1666,11 @@ at::Tensor AtenIpexCPUDev::dil_view(const at::Tensor & self, at::IntArrayRef siz
   return alias_with_sizes_and_strides(self, inferred_size, stride_value);
 }
 
+at::Tensor AtenIpexCPUDev::dil__unsafe_view(const at::Tensor & self, at::IntArrayRef size) {
+  DEBUG("AtenIpexCPUDev::dil__unsafe_view\n");
+  return dil_view(self, size);
+}
+
 at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, at::Dimname dim, int64_t index) {
   return dil_select(self, at::dimname_to_position(self, dim), index);
 }

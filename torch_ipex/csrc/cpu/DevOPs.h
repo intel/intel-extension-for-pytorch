@@ -79,6 +79,7 @@ class AtenIpexCPUDev {
   static at::Tensor dil_select(const at::Tensor & self, int64_t dim, int64_t index);
   static at::Tensor dil_select(const at::Tensor & self, at::Dimname dim, int64_t index);
   static at::Tensor dil_view(const at::Tensor & self, at::IntArrayRef size);
+  static at::Tensor dil__unsafe_view(const at::Tensor & self, at::IntArrayRef size);
 };
 
 }  // namespace cpu
