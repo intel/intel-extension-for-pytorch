@@ -10,6 +10,7 @@
 #include <utils/Atomics.h>
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
+#include <torch/torch.h>
 
 #ifdef _PSTL_BACKEND_SYCL
 #include <dpstd/algorithm>
@@ -134,6 +135,7 @@ int64_t exclusive_scan(int64_t* out, int64_t* in, int64_t num_of_segments) {
   return acc_out[num_of_segments - 1] + acc_in[num_of_segments - 1];
 }
 
+#ifndef USE_USM
 template <typename scalar_t>
 void compute_grad_weight_bags(
     int64_t* indices,
@@ -394,28 +396,10 @@ Tensor embedding_bag_backward_dpcpp_kernel(
 
   // The total number of partial-segments is the sum of
   // `partials_per_segment_offset`
-#ifdef _PSTL_BACKEND_SYCL
-#ifdef USE_USM
-  auto partials_per_segment_offsets_begin = partials_per_segment_offset.data_ptr<int64_t>();
-  auto partials_per_segment_begin = partials_per_segment.data_ptr<int64_t>();
-#else
-  auto partials_per_segment_offsets_begin = dpstd::begin(make_buffer<int64_t>(partials_per_segment_offset.data_ptr()));
-  auto partials_per_segment_begin = dpstd::begin(make_buffer<int64_t>(partials_per_segment.data_ptr()));
-#endif
-  auto dpcpp_queue = dpcppGetCurrentQueue();
-  auto policy = dpstd::execution::make_device_policy(dpcpp_queue);
-  std::exclusive_scan(policy,
-      partials_per_segment_begin,
-      partials_per_segment_begin + num_segments,
-      partials_per_segment_offsets_begin,
-      0, std::plus<int64_t>{});
-  auto num_of_partial_segments = partials_per_segment_offset[num_segments - 1].item<int64_t>() + partials_per_segment[num_segments -1].item<int64_t>();
-#else
   auto num_of_partial_segments = exclusive_scan(
       partials_per_segment_offset.data_ptr<int64_t>(),
       partials_per_segment.data_ptr<int64_t>(),
       num_segments);
-#endif
 
   auto partial_segment_offset =
       at::empty({num_of_partial_segments}, sorted_indices.options());
@@ -493,6 +477,374 @@ Tensor embedding_bag_backward_dpcpp_kernel(
 
   return grad_weight;
 }
+#else
+template <typename scalar_t>
+void compute_grad_weight_bags(
+    const Tensor& indices,
+    const Tensor& gradOutput,
+    const Tensor& offset2bag,
+    const Tensor& count,
+    int64_t numel,
+    int64_t stride,
+    int mode_mean,
+    const Tensor& bag_size,
+    const Tensor& per_sample_weights,
+    const Tensor& segment_offsets,
+    int64_t num_of_segments,
+    const Tensor& grad_weight_per_segment) {
+  auto queue = dpcppGetCurrentQueue();
+
+  int64_t work_group_size = dpcppMaxWorkGroupSize(queue);
+  int64_t stride_warped = CeilDiv(stride, work_group_size) * work_group_size;
+  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));
+  auto num_groups = CeilDiv(num_of_segments * stride_warped, group_size);
+  auto total_items = num_groups * group_size;
+
+  bool per_sample_weight_defined = per_sample_weights.defined();
+  bool count_defined = count.defined();
+  int64_t per_sample_weights_stride = per_sample_weights.defined() ? per_sample_weights.stride(0) : 0;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto grad_weight_per_segment_data = get_buffer<dpcpp_w_mode>(cgh, grad_weight_per_segment.data_ptr<acc_type<scalar_t>>());
+    auto indices_data = get_buffer<dpcpp_r_mode>(cgh, indices.data_ptr<int64_t>());
+    auto gradOutput_data = get_buffer<dpcpp_r_mode>(cgh, gradOutput.data_ptr<scalar_t>());
+    auto offset2bag_data = get_buffer<dpcpp_r_mode>(cgh, offset2bag.data_ptr<int64_t>());
+    auto count_data = count_defined
+        ? get_buffer<dpcpp_r_mode>(cgh, count.data_ptr<int64_t>())
+        : offset2bag_data; // use the offset2bag_data handler as the dummy buffer.
+    auto bag_size_data = get_buffer<dpcpp_r_mode>(cgh, bag_size.data_ptr<int64_t>());
+    auto per_sample_weights_data = per_sample_weight_defined
+        ? get_buffer<dpcpp_r_mode>(cgh, per_sample_weights.data_ptr<scalar_t>())
+        : gradOutput_data; // ise the gradOutput_data handler as the dummy buffer.
+    auto segment_offsets_data = get_buffer<dpcpp_r_mode>(cgh, segment_offsets.data_ptr<int64_t>());
+
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+      auto grad_weight_per_segment_ptr = get_pointer(grad_weight_per_segment_data);
+      auto indices_ptr = get_pointer(indices_data);
+      auto gradOutput_ptr = get_pointer(gradOutput_data);
+      auto offset2bag_ptr = get_pointer(offset2bag_data);
+      auto count_ptr = count_defined
+          ? get_pointer(count_data)
+          : NULL;
+      auto bag_size_ptr = get_pointer(bag_size_data);
+      auto per_sample_weights_ptr = per_sample_weight_defined
+          ? get_pointer(per_sample_weights_data)
+          : NULL;
+      auto segment_offsets_ptr = get_pointer(segment_offsets_data);
+
+      const int gid = item.get_global_linear_id();
+      const int id = gid / stride_warped;
+      const int startFeature = gid % stride_warped;
+      if (startFeature >= stride) {
+        return;
+      }
+      if (id >= num_of_segments) {
+        return;
+      }
+
+      const int idx_begin = segment_offsets_ptr[id];
+      const int idx_end = (id == num_of_segments - 1) ? numel : segment_offsets_ptr[id + 1];
+
+      acc_type<scalar_t> weight = 0;
+      for (int idx = idx_begin; idx < idx_end; ++idx) {
+        const int orig_row = indices_ptr[idx];
+        const int seq_number = offset2bag_ptr[orig_row];
+        const int grad_output_row = seq_number * stride;
+
+        acc_type<scalar_t> scale = count_ptr ? 1.0 / count_ptr[idx] : 1.0;
+        if (per_sample_weight_defined) {
+          scale *= per_sample_weights_ptr[idx * per_sample_weights_stride];
+        }
+
+        acc_type<scalar_t> gradient = gradOutput_ptr[grad_output_row + startFeature];
+        if (mode_mean) {
+          gradient /= bag_size_ptr[seq_number];
+        }
+        weight += gradient * scale;
+      }
+      grad_weight_per_segment_ptr[id * stride + startFeature] = weight;
+    };
+
+    // kick off kernel
+    cgh.parallel_for<DPCPP_K(compute_grad_weight_bags_dpcpp, scalar_t)>(
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        kfn);
+  };
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+}
+
+template <typename scalar_t>
+void compute_grad_weight(
+    const Tensor& indices,
+    const Tensor& grad_output,
+    const Tensor& count,
+    ptrdiff_t numel,
+    int64_t stride,
+    const Tensor& segment_offsets,
+    int64_t num_of_segments,
+    const Tensor& grad_weight_per_segment) {
+  auto queue = dpcppGetCurrentQueue();
+
+  int64_t work_group_size = dpcppMaxWorkGroupSize(queue);
+  int64_t stride_warped = CeilDiv(stride, work_group_size) * work_group_size;
+  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));
+  auto num_groups = CeilDiv(num_of_segments * stride_warped, group_size);
+  auto total_items = num_groups * group_size;
+
+  bool count_defined = count.defined();
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto grad_weight_per_segment_data = get_buffer<dpcpp_w_mode>(cgh, grad_weight_per_segment.data_ptr<acc_type<scalar_t>>());
+    auto indices_data = get_buffer<dpcpp_r_mode>(cgh, indices.data_ptr<int64_t>());
+    auto grad_output_data = get_buffer<dpcpp_r_mode>(cgh, grad_output.data_ptr<scalar_t>());
+    auto count_data = count_defined
+        ? get_buffer<dpcpp_r_mode>(cgh, count.data_ptr<int64_t>())
+        : indices_data; // use the indices_data handler as the dummy buffer.
+    auto segment_offsets_data = get_buffer<dpcpp_r_mode>(cgh, segment_offsets.data_ptr<int64_t>());
+
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+      auto grad_weight_per_segment_ptr = get_pointer(grad_weight_per_segment_data);
+      auto indices_ptr = get_pointer(indices_data);
+      auto grad_output_ptr = get_pointer(grad_output_data);
+      auto count_ptr = count_defined
+          ? get_pointer(count_data)
+          : NULL;
+      auto segment_offsets_ptr = get_pointer(segment_offsets_data);
+
+      const int gid = item.get_global_linear_id();
+      const int id = gid / stride_warped;
+      const int startFeature = gid % stride_warped;
+      if (startFeature >= stride) {
+        return;
+      }
+      if (id >= num_of_segments) {
+        return;
+      }
+      const int idx_begin = segment_offsets_ptr[id];
+      const int idx_end = (id == num_of_segments - 1) ? numel : segment_offsets_ptr[id + 1];
+
+      acc_type<scalar_t> weight = 0;
+      for (int idx = idx_begin; idx < idx_end; idx++) {
+        const int64_t target_row = indices_ptr[idx];
+        const acc_type<scalar_t> scale = count_ptr ? 1.0 / count_ptr[idx] : 1.0;
+        weight += grad_output_ptr[target_row * stride + startFeature] * scale;
+      }
+      grad_weight_per_segment_ptr[id * stride + startFeature] = weight;
+    };
+
+    // kick off kernel
+    cgh.parallel_for<DPCPP_K(compute_grad_weight_dpcpp, scalar_t)>(
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        kfn);
+  };
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+}
+
+template <typename scalar_t>
+void sum_and_scatter(
+    const Tensor& input,
+    const Tensor& grad_weight,
+    int64_t stride,
+    const Tensor& segment_offsets,
+    int64_t num_of_segments,
+    const Tensor& grad_weight_per_segment,
+    const Tensor& segment_sizes_offsets,
+    int64_t num_of_partial_segments,
+    const int64_t padding_idx) {
+  auto queue = dpcppGetCurrentQueue();
+
+  int64_t work_group_size = dpcppMaxWorkGroupSize(queue);
+  int64_t stride_warped = CeilDiv(stride, work_group_size) * work_group_size;
+  int64_t group_size = std::min(stride_warped, dpcppMaxWorkGroupSize(queue));
+  auto num_groups = CeilDiv(num_of_segments * stride_warped, group_size);
+  auto total_items = num_groups * group_size;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto grad_weight_data = get_buffer<dpcpp_w_mode>(cgh, grad_weight.data_ptr<scalar_t>());
+    auto input_data = get_buffer<dpcpp_r_mode>(cgh, input.data_ptr<int64_t>());
+    auto segment_offsets_data = get_buffer<dpcpp_r_mode>(cgh, segment_offsets.data_ptr<int64_t>());
+    auto grad_weight_per_segment_data = get_buffer<dpcpp_r_mode>(cgh, grad_weight_per_segment.data_ptr<acc_type<scalar_t>>());
+    auto segment_sizes_offsets_data = get_buffer<dpcpp_r_mode>(cgh, segment_sizes_offsets.data_ptr<int64_t>());
+
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
+      auto grad_weight_ptr = get_pointer(grad_weight_data);
+      auto input_ptr = get_pointer(input_data);
+      auto segment_offsets_ptr = get_pointer(segment_offsets_data);
+      auto grad_weight_per_segment_ptr = get_pointer(grad_weight_per_segment_data);
+      auto segment_sizes_offsets_ptr = get_pointer(segment_sizes_offsets_data);
+
+      const int gid = item.get_global_linear_id();
+      const int id = gid / stride_warped;
+      const int startFeature = gid % stride_warped;
+      if (startFeature >= stride) {
+        return;
+      }
+      if (id >= num_of_segments) {
+        return;
+      }
+
+      const int idx_begin = segment_sizes_offsets_ptr[id];
+      const int idx_end = (id == num_of_segments - 1)
+          ? num_of_partial_segments
+          : segment_sizes_offsets_ptr[id + 1];
+      acc_type<scalar_t> weight = 0;
+      for (int idx = idx_begin; idx < idx_end; idx++) {
+        weight += grad_weight_per_segment_ptr[idx * stride + startFeature];
+      }
+
+      int64_t target_row = input_ptr[segment_offsets_ptr[id]];
+      if (target_row != padding_idx) {
+        grad_weight_ptr[target_row * stride + startFeature] = weight;
+      }
+    };
+
+    // kick off kernel
+    cgh.parallel_for<DPCPP_K(sum_and_scatter_dpcpp, scalar_t)>(
+        DPCPP::nd_range<1>(
+            DPCPP::range<1>(total_items), DPCPP::range<1>(group_size)),
+        kfn);
+  };
+  DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
+}
+
+Tensor embedding_bag_backward_dpcpp_kernel(
+  const Tensor& grad,
+  const Tensor& orig_indices,
+  const Tensor& sorted_indices,
+  const Tensor& count,
+  int64_t num_weights,
+  int padding_idx,
+  bool scale_grad_by_freq,
+  bool mode_mean,
+  const Tensor& offset2bag,
+  const Tensor& bag_size,
+  const Tensor& per_sample_weights) {
+#ifndef _PSTL_BACKEND_SYCL
+  throw std::runtime_error("no PSTL found when compile. USM embedding not supported");
+#else
+  auto dpcpp_queue = dpcppGetCurrentQueue();
+  auto policy = dpstd::execution::make_device_policy(dpcpp_queue);
+  const int64_t numel = sorted_indices.numel();
+  auto grad_weight = at::zeros({num_weights, grad.size(-1)}, grad.options());
+  const int64_t stride = grad_weight.stride(0);
+
+  auto segment_offsets = at::empty({numel}, orig_indices.options());
+  int64_t num_of_segments;
+  {
+    // sorted:          2 5 5 5 7 7 8 9 9
+    // dummy:           1 1 0 0 1 0 1 1 0
+    // segment_offsets: 0 1 - - 4 - 6 7 -
+    auto sorted_indices_begin = sorted_indices.data_ptr<int64_t>();
+    auto dummy = at::empty_like(sorted_indices).fill_(1);
+    auto dummy_begin = dummy.data_ptr<int64_t>();
+    std::adjacent_difference(policy, sorted_indices_begin, sorted_indices_begin + numel, dummy_begin,
+      [](auto lhs, auto rhs) -> bool {
+        if (lhs!= rhs) {
+          return true;
+        }
+        return false;
+      });
+    auto count_begin = dpstd::counting_iterator<int64_t>(0);
+    auto copy_begin = dpstd::make_zip_iterator(count_begin, dummy_begin);
+    auto segment_offsets_begin = segment_offsets.data_ptr<int64_t>();
+    auto ends = std::copy_if(policy, copy_begin, copy_begin + numel,
+        dpstd::make_transform_iterator(segment_offsets_begin, [](auto& x) {return std::forward_as_tuple(x, std::ignore);}),
+        [](auto h){
+          using std::get;
+          return get<1>(h) != 0;
+        });
+    num_of_segments = std::distance(segment_offsets_begin, ends.base());
+  }
+
+  auto partials_per_segment = at::empty({num_of_segments}, orig_indices.options());
+
+  krn_partials_per_segment(
+    partials_per_segment.data_ptr<int64_t>(),
+    segment_offsets.data_ptr<int64_t>(),
+    num_of_segments,
+    numel);
+
+  // In order to compute `partial_segment_offset`, which is the start index
+  // of each partial-segment in `sorted_indices`, we need to compute the
+  // start position of each _segment_ in `partial_segment_offset`.
+  // Unit: index in `partial_segment_offset`
+  auto partials_per_segment_offset = at::empty({num_of_segments}, orig_indices.options());
+  std::exclusive_scan(
+          policy,
+          partials_per_segment.data_ptr<int64_t>(),
+          partials_per_segment.data_ptr<int64_t>()+num_of_segments,
+          partials_per_segment_offset.data_ptr<int64_t>(),
+          0);
+
+  // The total number of partial-segments is the sum of `partials_per_segment_offset`
+  const int num_of_partial_segments = partials_per_segment[num_of_segments-1].item<int64_t>() +
+          partials_per_segment_offset[num_of_segments-1].item<int64_t>();
+
+  auto partial_segment_offset = at::empty({num_of_partial_segments}, orig_indices.options());
+  krn_partial_segment_offset(
+    partial_segment_offset.data_ptr<int64_t>(),
+    partials_per_segment.data_ptr<int64_t>(),
+    partials_per_segment_offset.data_ptr<int64_t>(),
+    segment_offsets.data_ptr<int64_t>(),
+    num_of_segments);
+
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+    at::ScalarType::BFloat16,
+    grad.scalar_type(),
+    "embedding_bag_backward_dpcpp_compute_grad_weight",
+    [&] {
+      TensorOptions op;
+      if (grad.dtype() == at::kHalf) {
+        op = grad.options().dtype(at::kFloat);
+      } else {
+        op = grad.options();
+      }
+      auto grad_weight_per_segment = at::empty({num_of_partial_segments, stride}, op);
+      // Compute the sum of each partial-segment and handle bags
+      if (offset2bag.defined()) {
+        compute_grad_weight_bags<scalar_t>(
+          orig_indices,
+          grad,
+          offset2bag,
+          count,
+          numel,
+          stride,
+          mode_mean,
+          bag_size,
+          per_sample_weights,
+          partial_segment_offset,
+          num_of_partial_segments,
+          grad_weight_per_segment);
+      } else {
+        compute_grad_weight<scalar_t>(
+          orig_indices,
+          grad,
+          count,
+          numel,
+          stride,
+          partial_segment_offset,
+          num_of_partial_segments,
+          grad_weight_per_segment);
+      }
+
+      sum_and_scatter<scalar_t>(
+        sorted_indices,
+        grad_weight,
+        stride,
+        segment_offsets,
+        num_of_segments,
+        grad_weight_per_segment,
+        partials_per_segment_offset,
+        num_of_partial_segments,
+        padding_idx);
+    });
+
+  return grad_weight;
+#endif
+}
+#endif
 
 // This kernel assumes that all input tensors except `weight` and
 // per_sample_weights are contiguous.
@@ -650,6 +1002,19 @@ void compute_counts(int64_t* counts, int64_t* indice, int64_t indice_length) {
     acc_co[acc_in[i]]++;
 }
 
+// counts_uniq stores the index of the NEXT unique element
+// of the (sorted) indices vector.
+//
+// For example:
+// indices: [0, 0, 0, 1, 3, 3, 4]
+//         [0, 1, 2, 3, 4, 5]
+// counts: [3, 1, 0, 2, 1, 0]
+// counts_uniq: [0, 3, 4, 6, 7]
+// [(0, 0, 0,) (1,) (3, 3,) (4)]
+//  0           3    4       6  7
+//
+// The unique indices can be found at index 0, 3, 4, 6.
+
 int64_t compute_counts_uniq(
     int64_t* counts_uniq,
     int64_t* indice,
@@ -675,16 +1040,144 @@ int64_t compute_counts_uniq(
   return o;
 }
 
+#ifdef USE_USM
 Tensor embedding_bag_backward_dpcpp_sum_avg(
     const Tensor& grad,
-    const Tensor& indices_,
-    const Tensor& offsets_,
-    const Tensor& offset2bag__,
+    const Tensor& indices,
+    const Tensor& offsets,
+    const Tensor& offset2bag,
     const Tensor& bag_size,
     int64_t num_weights,
     bool scale_grad_by_freq,
     int64_t mode,
-    const Tensor& per_sample_weights__) {
+    const Tensor& per_sample_weights) {
+#ifndef _PSTL_BACKEND_SYCL
+  throw std::runtime_error("no PSTL found when compile. USM embedding not supported");
+#else
+  auto grad_weight = at::zeros({num_weights, grad.size(1)}, grad.options());
+
+  ptrdiff_t numel = indices.numel();
+
+  if (numel == 0) {
+    // all empty bags
+    return at::zeros({num_weights, grad.size(1)}, grad.options());
+  }
+
+  int64_t stride = grad_weight.stride(0);
+
+  auto sorted_indices = at::empty_like(indices);
+//  auto orig_indices = at::empty_like(indices);
+  auto orig_indices = torch::arange({numel}, indices.options()); // this is workaround
+
+  auto dpcpp_queue = dpcppGetCurrentQueue();
+  auto policy = dpstd::execution::make_device_policy(dpcpp_queue);
+  // directly
+  {
+    sorted_indices.copy_(indices);
+
+//    auto count_begin = dpstd::counting_iterator<int64_t>(0);
+    auto orig_begin = orig_indices.data_ptr<int64_t>();
+//    johnlu add this
+//    std::copy(policy, count_begin, count_begin + numel, orig_begin);
+
+    auto sorted_begin = sorted_indices.data_ptr<int64_t>();
+    auto zipped_begin = dpstd::make_zip_iterator(sorted_begin, orig_begin);
+    std::sort(policy, zipped_begin, zipped_begin + numel,
+        [](auto lhs, auto rhs){
+          using std::get;
+          return get<0>(lhs) < get<0>(rhs);
+        });
+  }
+
+  Tensor count;
+  if (scale_grad_by_freq) {
+    count = at::empty_like(indices);
+    count.fill_(1);
+
+    // Compute an increasing sequence per unique item in sortedIndices:
+    // sorted: 2 5 5 5 7 7 8 9 9
+    //  count: 1 1 2 3 1 2 1 1 2
+    auto sorted_begin = sorted_indices.data_ptr<int64_t>();
+    auto count_begin = count.data_ptr<int64_t>();
+    dpstd::inclusive_scan_by_segment(policy, sorted_begin, sorted_begin + numel,
+                                  count_begin,
+                                  count_begin);
+
+    // Take the maximum of each count per unique key in reverse:
+    // sorted: 2 5 5 5 7 7 8 9 9
+    //  count: 1 3 3 3 2 2 1 2 2
+    // this is a workaround
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      auto sorted_indices_data = get_buffer<dpcpp_r_mode>(cgh, sorted_indices.data_ptr<int64_t>());
+      auto count_data = get_buffer<dpcpp_w_mode>(cgh, count.data_ptr<int64_t>());
+      auto kfn = DPCPP_Q_KFN() {
+        auto sorted_indices_ptr = get_pointer(sorted_indices_data);
+        auto count_ptr = get_pointer(count_data);
+        for (size_t i = 0; i < numel - 1; i++) {
+          size_t index = numel - (i + 1) - 1;
+          if (sorted_indices_ptr[index] != sorted_indices_ptr[i + 1])
+            count_ptr[index] = std::max(count_ptr[index], count_ptr[index + 1]);
+        }
+      };
+      // kick off kernel
+      cgh.single_task<class dummy_workaround_kernel>(kfn);
+    };
+
+    // submit to DPCPP queue
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+
+//    error JIRA: https://jira.devtools.intel.com/projects/ONEDPL/issues/ONEDPL-82
+//    auto reversed_sort = sorted_indices.flip(0).contiguous();
+//    auto reversed_count = count.flip(0).contiguous();
+//    auto revers_sorted_begin = reversed_sort.data_ptr<int64_t>();
+//    auto revers_count_begin = reversed_count.data_ptr<int64_t>();
+//    dpstd::inclusive_scan_by_segment(
+//        policy, revers_sorted_begin,
+//        revers_sorted_begin + numel,
+//        revers_count_begin,
+//        revers_count_begin,
+//        std::equal_to<int64_t>(), dpstd::maximum<int64_t>());
+//
+//    sorted_indices = reversed_sort.flip(0).contiguous();
+//    count = reversed_count.flip(0).contiguous();
+
+//    error JIRA: https://jira.devtools.intel.com/projects/ONEDPL/issues/ONEDPL-81
+//    auto revers_sorted_begin = std::make_reverse_iterator(sorted_begin + numel);
+//    auto revers_count_begin = std::make_reverse_iterator(count_begin + numel);
+//    johnlu to do add this
+//    dpstd::inclusive_scan_by_segment(
+//        policy, revers_sorted_begin,
+//        revers_sorted_begin + numel,
+//        revers_count_begin,
+//        revers_count_begin,
+//        std::equal_to<int64_t>(), dpstd::maximum<int64_t>());
+  }
+
+  return embedding_bag_backward_dpcpp_kernel(
+      grad,
+      indices,
+      sorted_indices,
+      count,
+      num_weights,
+      /* padding_idx= */ -1,
+      scale_grad_by_freq,
+      mode == MODE_MEAN,
+      offset2bag,
+      bag_size,
+      per_sample_weights);
+#endif
+}
+#else
+Tensor embedding_bag_backward_dpcpp_sum_avg(
+  const Tensor& grad,
+  const Tensor& indices_,
+  const Tensor& offsets_,
+  const Tensor& offset2bag__,
+  const Tensor& bag_size,
+  int64_t num_weights,
+  bool scale_grad_by_freq,
+  int64_t mode,
+  const Tensor& per_sample_weights__) {
   Tensor& offset2bag_ = const_cast<Tensor&>(offset2bag__);
 
   auto ind_sort_ = indices_.sort();
@@ -727,6 +1220,7 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
       per_sample_weights__.defined() ? per_sample_weights
                                      : per_sample_weights__);
 }
+#endif
 
 template <typename scalar_t>
 void EmbeddingBag_accGradParametersKernel_max(
