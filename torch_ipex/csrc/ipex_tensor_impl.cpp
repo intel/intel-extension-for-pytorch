@@ -80,7 +80,7 @@ void IPEXTensorImpl::copy_auto_grad(c10::TensorImpl *src_impl) {
   this->grad() = src_impl->grad();
 }
 
-void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl) {
+void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl, bool keep_dtype) {
   // Port from copy_tensor_metadata of TensorImpl.cpp and bypass some fields: storage_, device_opt_, type_set_ and reserved_.
   // NOTE: All these fields is specifically ignored except reserved_. Because there is no public interface to access it. Tthe
   //       field may impact performance. Tensor resize will check the flag. "If tensor is reserved then don't claim its memeory
@@ -94,7 +94,8 @@ void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl) {
   this->sizes_ = src_impl->sizes();
   this->strides_ = src_impl->strides();
   this->storage_offset_ = src_impl->storage_offset();
-  this->data_type_ = src_impl->dtype();
+  if (!keep_dtype)
+    this->data_type_ = src_impl->dtype();
   this->is_contiguous_ = src_impl->is_contiguous();
   this->is_channels_last_contiguous_ = src_impl->is_contiguous(at::MemoryFormat::ChannelsLast);
   this->is_channels_last_ = src_impl->is_strides_like_channels_last();

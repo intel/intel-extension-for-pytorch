@@ -19,7 +19,7 @@ class IPEXTensorImpl : public c10::TensorImpl {
   }
 
   void copy_auto_grad(c10::TensorImpl *);
-  void copy_meta_info(const c10::TensorImpl *);
+  void copy_meta_info(const c10::TensorImpl *, bool keep_dtype = false);
   void keep_source_data_tensor(at::Tensor);
   void set_storage_data_ptr(c10::DataPtr);
   void set_dpcpp_tensor_id();

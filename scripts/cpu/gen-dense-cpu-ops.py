@@ -71,6 +71,7 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::select.int(Tensor(a) self, int dim, int index) -> Tensor(a)',
     'aten::select.Dimname(Tensor(a) self, Dimname dim, int index) -> Tensor(a)',
     'aten::view(Tensor(a) self, int[] size) -> Tensor(a)',
+    'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
     #'aten::native_layer_norm(Tensor input, Tensor? weight, Tensor? bias, int M, int N, float eps) -> (Tensor, Tensor, Tensor)',
     #'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)'
 ]
@@ -483,10 +484,11 @@ class DenseOPCodeGen(object):
         func_defs = []
         for cpp_sig, _, cpp_func_sig_str, aten_func_sig_str in self._sigs:
             cpp_func_str_h, cpp_func_str_cpp = self.gen_func_signature(cpp_func_sig_str)
+
             # Gen declaration code for head file
             func_dec = self.gen_head_dec_code(cpp_func_str_h)
 
-            func_reg = _REG_PATTERN.format(aten_func_sig_str, self.get_func_dec(cpp_sig), "AtenIpexCPUDefault::" + cpp_sig.def_name)
+            func_reg = _REG_PATTERN.format(aten_func_sig_str, self.get_func_dec(cpp_sig), _IPEX_OP_FUNC_NS + "::" + cpp_sig.def_name)
 
             # Gen definition code for cpp file
             code = '{} {{\n'.format(cpp_func_str_cpp)
