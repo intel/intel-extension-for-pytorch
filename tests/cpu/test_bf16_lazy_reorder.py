@@ -510,6 +510,31 @@ class TestPool(TestCase):
                     self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
                     self.assertEqual(res_auto_mix, res_man_bf16.float())
 
+class TestIndexSelect(TestCase):
+    def test_index_select(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x_auto_mix = torch.randn(3, 4, 5, dtype=torch.float32, device=device) * 10
+
+        indices = torch.tensor([0, 2]).to(device=device)
+        index_select_x_auto_mix = copy.deepcopy(x_auto_mix).to(device=device)
+        index_select_x_man_mix = copy.deepcopy(x_auto_mix).to(device=device).to(torch.bfloat16)
+
+        with AutoDNNL(True), AutoMixPrecision(False):
+            res_man_bf16 = index_select_x_man_mix + index_select_x_man_mix
+            self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
+            res_idx_select_man = torch.index_select(res_man_bf16, 0, indices)
+            self.assertEqual(res_idx_select_man.dtype, torch.bfloat16)
+
+            with AutoMixPrecision(True):
+                res_auto_mix = index_select_x_auto_mix + index_select_x_auto_mix
+                self.assertEqual(res_auto_mix.dtype, torch.float)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
+                res_idx_select_auto = torch.index_select(res_auto_mix, 0, indices)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_idx_select_auto))
+                self.assertEqual(res_idx_select_auto, res_idx_select_man.float())
+
 class TestSoftMax(TestCase):
     def test_softmax(self):
         rand_seed = int(get_rand_seed())

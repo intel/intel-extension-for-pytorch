@@ -1832,12 +1832,11 @@ at::Tensor AtenIpexCPUDev::dil_index_select(
       y.feed_from(std::move(index_result_dil_storage));
 
       // Generate new aten tensor
-      auto res = dbl::comm::gen_aten_tensor_by(std::move(index_result_dil_storage));
+      auto res = dbl::comm::gen_aten_tensor_by(std::move(y));
       IPEXTensorImpl* res_ipex_impl = (IPEXTensorImpl *)res.unsafeGetTensorImpl();
       cur_ipex_impl->copy_meta_info(_ipex_result.unsafeGetTensorImpl());
       return res;
     } // TODO: We need add more LP here
-
   }
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.layout() == c10::kStrided);
