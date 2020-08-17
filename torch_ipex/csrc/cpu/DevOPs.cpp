@@ -1514,7 +1514,6 @@ at::Tensor AtenIpexCPUDev::dil_sigmoid_backward(
 at::Tensor AtenIpexCPUDev::dil_reshape(const at::Tensor& self, at::IntArrayRef size) {
   DEBUG("AtenIpexCPUDev::dil_reshape\n");
   CHECK_DNNL_OP_PRE_COND(self);
-
   dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
 
   auto inferred_size = at::infer_size(size, self.numel());
@@ -1539,7 +1538,6 @@ at::Tensor AtenIpexCPUDev::dil_clone(const at::Tensor& self, c10::optional<c10::
   DEBUG("AtenIpexCPUDev::dil_clone\n");
   CHECK_DNNL_OP_PRE_COND(self);
 
-  std::cout<<"clone"<<std::endl;
   auto memory_format =
       optional_memory_format.value_or(at::MemoryFormat::Preserve);
 
@@ -1609,7 +1607,6 @@ at::Tensor& AtenIpexCPUDev::dil_cat_out(at::Tensor& result, at::TensorList tenso
 
 at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_cat\n");
-  std::cout<<"cat"<<std::endl;
   check_cat_no_zero_dim(tensors);
   dim = at::legacy_cat_wrap_dim(dim, tensors);
   std::vector<dil::tensor> x;
@@ -1631,7 +1628,6 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
 std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& self, at::IntArrayRef split_sizes, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_split_with_sizes\n");
   CHECK_DNNL_OP_PRE_COND(self);
-  std::cout<<"split with_size"<<std::endl;
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
 
@@ -1662,7 +1658,6 @@ at::Tensor dil_as_strided(
     at::IntArrayRef stride,
     c10::optional<int64_t> storage_offset_) {
 
-    std::cout<<"dil_as_stride"<<std::endl; 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
       self.scalar_type() != at::kFloat || dbl::comm::try_gen_dil_tensor(self).is_public_format(),
       "Cannot set sizes and strides for DIL tensor with non-public format");
@@ -1697,7 +1692,6 @@ at::Tensor& propagate_transposed_names(
 
 at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, int64_t dim1) {
   DEBUG("AtenIpexCPUDev::dil_transpose\n");
-  std::cout<<"dil_transpo"<<std::endl;
   CHECK_DNNL_OP_PRE_COND(self);
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
@@ -1813,7 +1807,6 @@ at::Tensor alias_with_sizes_and_strides(
     const c10::IntArrayRef sizes,
     const c10::IntArrayRef strides) {
 
-    std::cout<<"alias_with_sizes_and_strides"<<std::endl;
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
       dbl::comm::try_gen_dil_tensor(self).is_public_format(),
       "Cannot set sizes and strides for DIL tensor with non-public format");
@@ -1838,7 +1831,6 @@ at::Tensor AtenIpexCPUDev::dil_view(const at::Tensor & self, at::IntArrayRef siz
   DEBUG("AtenIpexCPUDev::dil_view\n");
   CHECK_DNNL_OP_PRE_COND(self);
 
-  std::cout<<"runing dil_view"<<std::endl;
   // We do not support reshaping (viewing) a DIL tensor with blocked format
   dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
 
