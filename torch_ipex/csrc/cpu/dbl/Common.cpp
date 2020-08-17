@@ -39,9 +39,6 @@ dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
         dil_buffer.get_item_size() * tensor.storage_offset());
 
     // return a new tensor wrapper that may be part of the dil storage
-    std::cout<<size<<std::endl;
-    std::cout<<stride<<std::endl;
-    //std::cout<<data_type<<std::endl;
     auto groups = dil_buffer.get_groups(); // copy group info
     auto desc = dil::tensor::desc({size, data_type, stride}, groups);
     dil::tensor result {desc, data_ptr};
@@ -69,7 +66,6 @@ dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
 }
 
 dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
-    std::cout<<"runnong try_gen_dil_tensor"<<std::endl;
   if (cpu::ShadeDataContext::isDilTensor(input)) {
     return dil_tensor_from_dil_buffer(input);
   } else {
@@ -115,13 +111,17 @@ void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> s
   TORCH_CHECK(!(tensor_dtype == at::kQInt8 || tensor_dtype == at::kQUInt8), "Please disable auto mix-precision if you want to enable int8/uint8 manually");
   if (tensor_dtype != at::kFloat)
     return;
+ 
+  auto src_type = try_gen_dil_storage(tensor).get_data_type();
+  if (!uint8_used && (src_type == dil::data_type::u8 || src_type == dil::data_type::s8))
+    return;
 
   auto dst_scalar_type = uint8_used ? at::kQUInt8 : at::kQInt8;
   reorder_to_dtype(tensor, dst_scalar_type, scales);
 }
 
 void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, std::vector<float> scales) {
-  auto src = try_gen_dil_tensor(tensor);
+  auto src = try_gen_dil_storage(tensor);
   if (get_at_data_type(src.get_data_type()) == dst_scalar_type) {
     // The data type of DIL tensor is same as the dst data type. DO NOTHING
     return;
