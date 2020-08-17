@@ -9,7 +9,14 @@ namespace cpu {
 namespace dbl {
 namespace comm {
 
-void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor);
+/**
+ * Reorder the input tensor to bf16 for mix precision
+ * If the input tensor is a parameter tensor and we are doing the training, 
+ * do not reorder the tensor
+ * @param[in] tensor       The input tensor
+ * @param[in] is_parameter Set to true if the input tensor is weight or bias
+ */
+void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor, bool is_parameter = false);
 
 /**
  * Reorder the input tensor to the specified scalar type.
@@ -19,6 +26,14 @@ void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor);
  *                            be at::kBFloat16 or at::kFloat
  */
 void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dtype);
+
+/**
+ * Reorder (outplace) the dil input tensor to the specified dil data type.
+ *
+ * @param[in] dil_tensor The dil tensor to be reordered to the spcified dil data type
+ * @param[in] dtype      The dil data type which the dil tensor will be reordered to.
+ */
+dil::tensor dil_reorder_to_dtype(const dil::tensor &dil_tensor, dil::data_type dtype);
 
 /**
  * Reorder the DNNL tensor to the public format if the input tensor contains DNNL tensor.

@@ -8,7 +8,7 @@ import _torch_ipex as core
 
 DEVICE = 'dpcpp'
 
-def enable_auto_optimization(mixed_dtype = None):
+def enable_auto_optimization(mixed_dtype = None, train = False):
     r""" Enable auto-mixed-precision to improve performance.
 
     The auto-mixed-precision auto reorders the tensor to the specified low precision data type.
@@ -23,16 +23,23 @@ def enable_auto_optimization(mixed_dtype = None):
     """
     if mixed_dtype != None:
         core.enable_auto_dnnl()
-    enable_auto_mix_precision(mixed_dtype)
+    enable_auto_mix_precision(mixed_dtype, train)
 
 def get_auto_optimization():
     return get_auto_mix_precision
 
-def enable_auto_mix_precision(mixed_dtype = torch.bfloat16):
+def get_train():
+    return core.get_train()
+
+def enable_auto_mix_precision(mixed_dtype = torch.bfloat16, train = False):
     if mixed_dtype == torch.bfloat16:
         core.enable_mix_bf16_fp32()
     else:
         core.disable_mix_bf16_fp32()
+    if train:
+        core.enable_train()
+    else:
+        core.disable_train()
 
 def get_auto_mix_precision():
     if core.get_mix_bf16_fp32():

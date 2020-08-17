@@ -41,8 +41,8 @@ class TestConv(TestCase):
 
         _conv = torch.nn.Conv2d(1, 1, (3, 3))
 
-        bn_man_bf16 =copy.deepcopy(_conv).to(device=device).to(torch.bfloat16)
-        bn_auto_mix =copy.deepcopy(_conv).to(device=device)
+        conv_man_bf16 =copy.deepcopy(_conv).to(device=device).to(torch.bfloat16)
+        conv_auto_mix =copy.deepcopy(_conv).to(device=device)
 
         _in_cpu = torch.rand((1, 1, 7, 7))
         in_auto_mix = _in_cpu.to(device=device)
@@ -51,16 +51,45 @@ class TestConv(TestCase):
         res_cpu_fp32 = _conv(_in_cpu)
 
         with AutoDNNL(True), AutoMixPrecision(False):
-            res_man_bf16 = bn_man_bf16(in_man_bf16)
+            res_man_bf16 = conv_man_bf16(in_man_bf16)
             self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
             self.assertEqual(res_cpu_fp32.bfloat16().float(), res_man_bf16, 1e-2)
 
             with AutoMixPrecision(True):
                 self.assertEqual(in_auto_mix.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(in_auto_mix))
-                res_auto_bf16 = bn_auto_mix(in_auto_mix)
+                res_auto_bf16 = conv_auto_mix(in_auto_mix)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_bf16))
-                self.assertEqual(res_man_bf16.float(), res_auto_bf16.float(), 1e-2)
+                self.assertEqual(res_man_bf16.float(), res_auto_bf16.float())
+
+    def test_Conv2d_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        with torch.backends.mkldnn.flags(enabled=False):
+            input = torch.rand((1, 1, 7, 7))
+            for bias in [True, False]:
+                _conv = torch.nn.Conv2d(1, 1, (3, 3), bias=bias)
+                conv_man_bf16 =copy.deepcopy(_conv).to(device=device).to(torch.bfloat16)
+                conv_auto_mix =copy.deepcopy(_conv).to(device=device)
+                _in_cpu = input.clone().requires_grad_()
+                in_auto_mix = input.clone().to(device=device).requires_grad_()
+                in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+                out_cpu = _conv(_in_cpu).sum()
+                out_cpu.backward()
+                with AutoDNNL(True), AutoMixPrecision(False, train=True):
+                    out_man_bf16 = conv_man_bf16(in_man_bf16).sum()
+                    out_man_bf16.backward()
+                    self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+                    self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 1e-2)
+
+                    with AutoMixPrecision(True, train=True):
+                        self.assertEqual(in_auto_mix.dtype, torch.float)
+                        self.assertFalse(ipex.core.is_bf16_dil_tensor(in_auto_mix))
+                        out_auto_bf16 = conv_auto_mix(in_auto_mix).sum()
+                        out_auto_bf16.backward()
+                        self.assertTrue(ipex.core.is_bf16_dil_tensor(in_auto_mix.grad))
+                        self.assertEqual(in_man_bf16.grad.float(), in_auto_mix.grad.float())
 
 class TestDeconv(TestCase):
     def test_Deconv2d_with_cpu(self):
@@ -70,8 +99,8 @@ class TestDeconv(TestCase):
 
         _deconv = torch.nn.ConvTranspose2d(2, 3, (3, 3))
 
-        bn_man_bf16 =copy.deepcopy(_deconv).to(device=device).to(torch.bfloat16)
-        bn_auto_mix =copy.deepcopy(_deconv).to(device=device)
+        deconv_man_bf16 =copy.deepcopy(_deconv).to(device=device).to(torch.bfloat16)
+        deconv_auto_mix =copy.deepcopy(_deconv).to(device=device)
 
         _in_cpu = torch.rand((1, 2, 7, 7))
         in_auto_mix = _in_cpu.to(device=device)
@@ -80,14 +109,14 @@ class TestDeconv(TestCase):
         res_cpu_fp32 = _deconv(_in_cpu)
 
         with AutoDNNL(True), AutoMixPrecision(False):
-            res_man_bf16 = bn_man_bf16(in_man_bf16)
+            res_man_bf16 = deconv_man_bf16(in_man_bf16)
             self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
             self.assertEqual(res_cpu_fp32.bfloat16().float(), res_man_bf16, 1e-2)
 
             with AutoMixPrecision(True):
                 self.assertEqual(in_auto_mix.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(in_auto_mix))
-                res_auto_bf16 = bn_auto_mix(in_auto_mix)
+                res_auto_bf16 = deconv_auto_mix(in_auto_mix)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_bf16))
                 self.assertEqual(res_man_bf16.float(), res_auto_bf16.float(), 1e-2)
 
@@ -119,6 +148,27 @@ class TestBatchNorm(TestCase):
 
                 self.assertEqual(res_bf16.float(), res_auto_mix)
 
+    # TODO
+    # For data driven ops like bn, pooling, activation, only test manual bf16 for the moment,
+    # since these ops will keep the input data type as it is
+    # during training when enabling auto mix precision
+    def test_batch_norm2d_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input = torch.randn(64, 3, 35, 45) * 10
+        _bn = torch.nn.BatchNorm2d(3)
+        # Mean / Variance / ScaleShift cannot be bf16
+        bn_man_bf16 =copy.deepcopy(_bn).to(device=device)
+        _in_cpu = input.clone().requires_grad_()
+        in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+        out_cpu = _bn(_in_cpu).sum()
+        out_cpu.backward()
+        with AutoDNNL(True), AutoMixPrecision(False, train=True):
+            out_man_bf16 = bn_man_bf16(in_man_bf16).sum()
+            out_man_bf16.backward()
+            self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+            self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 1e-2)
 
     def test_batch_norm3d(self):
         rand_seed = int(get_rand_seed())
@@ -145,6 +195,24 @@ class TestBatchNorm(TestCase):
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix))
 
                 self.assertEqual(res_man_bf16.float(), res_auto_mix)
+
+    def test_batch_norm3d_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input = torch.randn(4, 3, 30, 30, 30) * 10
+        _bn = torch.nn.BatchNorm3d(3)
+        # Mean / Variance / ScaleShift cannot be bf16
+        bn_man_bf16 = copy.deepcopy(_bn).to(device=device)
+        _in_cpu = input.clone().requires_grad_()
+        in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+        out_cpu = _bn(_in_cpu).sum()
+        out_cpu.backward()
+        with AutoDNNL(True), AutoMixPrecision(False, train=True):
+            out_man_bf16 = bn_man_bf16(in_man_bf16).sum()
+            out_man_bf16.backward()
+            self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+            self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 1e-2)
 
 class TestRelu(TestCase):
     def test_relu(self):
@@ -192,6 +260,21 @@ class TestRelu(TestCase):
                 zero_base = torch.zeros_like(res)
                 self.assertEqual(res, zero_base, 1e-2)
 
+    def test_relu_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input = torch.randn(4, 5) * 10
+        _in_cpu = input.clone().requires_grad_()
+        in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+        out_cpu = torch.relu(_in_cpu).sum()
+        out_cpu.backward()
+        with AutoDNNL(True), AutoMixPrecision(False, train=True):
+            out_man_bf16 = torch.relu(in_man_bf16).sum()
+            out_man_bf16.backward()
+            self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+            self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 1e-2)
+
 class TestGelu(TestCase):
     def test_gelu(self):
         rand_seed = int(get_rand_seed())
@@ -215,6 +298,21 @@ class TestGelu(TestCase):
                 res[torch.isnan(res)] = 0
                 zero_base = torch.zeros_like(res)
                 self.assertEqual(res, zero_base)
+
+    def test_gelu_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input = torch.randn(4, 5) * 10
+        _in_cpu = input.clone().requires_grad_()
+        in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+        out_cpu = F.gelu(_in_cpu).sum()
+        out_cpu.backward()
+        with AutoDNNL(True), AutoMixPrecision(False, train=True):
+            out_man_bf16 = F.gelu(in_man_bf16).sum()
+            out_man_bf16.backward()
+            self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+            self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 1e-2)
 
 class TestShape(TestCase):
     def _check_tensor_shape(self, t1, t2):
@@ -367,8 +465,11 @@ class TestBinOPs(TestCase):
     #             self.assertEqual(x_auto_mix_b.dtype, torch.float)
     #             self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_b))
     #             res_auto_mix = x_auto_mix_a + x_auto_mix_b
-    #             self.assertEqual(res_auto_mix.dtype, torch.float)
-    #             self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
+    #             # TODO
+    #             # For add, only reorder the second tensor to the data type of the first tensor.
+    #             # In this case, the res_auto_mix won't be bf16 dil tensor
+    #             # self.assertEqual(res_auto_mix.dtype, torch.float)
+    #             # self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
 
     def test_mul(self):
         rand_seed = int(get_rand_seed())
@@ -392,8 +493,11 @@ class TestBinOPs(TestCase):
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_b))
                 res_auto_mix = x_auto_mix_a * x_auto_mix_b
                 self.assertEqual(res_auto_mix.dtype, torch.float)
-                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
-                self.assertEqual(res_auto_mix, res_man_bf16.float())
+                # TODO
+                # For mul, only reorder the second tensor to the data type of the first tensor.
+                # In this case, the res_auto_mix won't be bf16 dil tensor
+                # self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
+                # self.assertEqual(res_auto_mix, res_man_bf16.float())
 
     def test_mul_(self):
         rand_seed = int(get_rand_seed())
@@ -420,8 +524,11 @@ class TestBinOPs(TestCase):
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_b))
                 x_auto_mix_a *= x_auto_mix_b
                 self.assertEqual(x_auto_mix_a.dtype, torch.float)
-                self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_a))
-                self.assertEqual(x_auto_mix_a, x_man_bf16_a.float())
+                # TODO
+                # For mul_, only reorder the second tensor to the data type of the first tensor.
+                # In this case, the res_auto_mix won't be bf16 dil tensor
+                # self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_a))
+                # self.assertEqual(x_auto_mix_a, x_man_bf16_a.float())
 
 class TestLinear(TestCase):
     def test_linear(self):
@@ -448,6 +555,36 @@ class TestLinear(TestCase):
                     self.assertEqual(res_auto_mix.dtype, torch.float)
                     self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
                     self.assertEqual(res_auto_mix, res_man_bf16.float())
+
+    def test_linear_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        in_features = torch.randint(3, 10, (1,)).item()
+        out_features = torch.randint(3, 100, (1,)).item()
+        input = torch.randn(3, in_features) * 10
+        for bias in [True, False]:
+            _linear = torch.nn.Linear(in_features, out_features, bias=bias)
+            linear_man_bf16 =copy.deepcopy(_linear).to(device=device).to(torch.bfloat16)
+            linear_auto_mix =copy.deepcopy(_linear).to(device=device)
+            _in_cpu = input.clone().requires_grad_()
+            in_auto_mix = input.clone().to(device=device).requires_grad_()
+            in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+            out_cpu = _linear(_in_cpu).sum()
+            out_cpu.backward()
+            with AutoDNNL(True), AutoMixPrecision(False, train=True):
+                out_man_bf16 = linear_man_bf16(in_man_bf16).sum()
+                out_man_bf16.backward()
+                self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+                self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 2e-2)
+
+                with AutoMixPrecision(True, train=True):
+                    self.assertEqual(in_auto_mix.dtype, torch.float)
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(in_auto_mix))
+                    out_auto_bf16 = linear_auto_mix(in_auto_mix).sum()
+                    out_auto_bf16.backward()
+                    self.assertTrue(ipex.core.is_bf16_dil_tensor(in_auto_mix.grad))
+                    self.assertEqual(in_man_bf16.grad.float(), in_auto_mix.grad.float())
 
 class TestPool(TestCase):
     def test_avg_pool2d(self):
@@ -480,6 +617,30 @@ class TestPool(TestCase):
                     self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
                     self.assertEqual(res_auto_mix, res_man_bf16.float())
 
+    def test_avg_pool2d_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+        input = torch.randn(N, C, 64, 64) * 10
+        for count_include_pad in [True, False]:
+            _in_cpu = input.clone().requires_grad_()
+            in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+            avg_pool2d = torch.nn.AvgPool2d(
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                count_include_pad=count_include_pad)
+            avg_pool2d_man_bf16 =copy.deepcopy(avg_pool2d).to(device=device).to(torch.bfloat16)
+            out_cpu = avg_pool2d(_in_cpu).sum()
+            out_cpu.backward()
+            with AutoDNNL(True), AutoMixPrecision(False, train=True):
+                out_man_bf16 = avg_pool2d_man_bf16(in_man_bf16).sum()
+                out_man_bf16.backward()
+                self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+                self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 1e-2)
+
     def test_avg_pool3d(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
@@ -509,6 +670,172 @@ class TestPool(TestCase):
                     self.assertEqual(res_auto_mix.dtype, torch.float)
                     self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
                     self.assertEqual(res_auto_mix, res_man_bf16.float())
+
+    def test_avg_pool3d_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+        input = torch.randn(N, C, 64, 64, 64) * 10
+        for count_include_pad in [True, False]:
+            _in_cpu = input.clone().requires_grad_()
+            in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+            avg_pool3d = torch.nn.AvgPool3d(
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                count_include_pad=count_include_pad)
+            avg_pool3d_man_bf16 =copy.deepcopy(avg_pool3d).to(device=device).to(torch.bfloat16)
+            out_cpu = avg_pool3d(_in_cpu).sum()
+            out_cpu.backward()
+            with AutoDNNL(True), AutoMixPrecision(False, train=True):
+                out_man_bf16 = avg_pool3d_man_bf16(in_man_bf16).sum()
+                out_man_bf16.backward()
+                self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+                self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 1e-2)
+
+    def test_adaptive_avg_pool2d(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+
+        _in_cpu = torch.randn(N, C, 224, 224, dtype=torch.float32) * 10
+        in_auto_mix = _in_cpu.to(device=device)
+
+        adaptive_avg_pool2d = torch.nn.AdaptiveAvgPool2d(7)
+        adaptive_avg_pool2d_auto_mix = copy.deepcopy(adaptive_avg_pool2d).to(device=device)
+        out_cpu = adaptive_avg_pool2d(_in_cpu)
+        with AutoDNNL(True), AutoMixPrecision(True):
+            res_auto_mix = adaptive_avg_pool2d_auto_mix(in_auto_mix)
+            self.assertEqual(res_auto_mix.dtype, torch.float)
+            self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
+            self.assertEqual(res_auto_mix.float(), out_cpu, 1e-2)
+
+    def test_adaptive_avg_pool2d_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input =  torch.randn(10, 3, 224, 224, dtype=torch.float32) * 100
+        _in_cpu = input.clone().requires_grad_()
+        in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+        adaptive_avg_pool2d = torch.nn.AdaptiveAvgPool2d(7)
+        adaptive_avg_pool2d_man_bf16 = copy.deepcopy(adaptive_avg_pool2d).to(device=device).to(torch.bfloat16)
+        out_cpu = adaptive_avg_pool2d(_in_cpu).sum()
+        out_cpu.backward()
+        with AutoDNNL(True), AutoMixPrecision(False, train=True):
+            out_man_bf16 = adaptive_avg_pool2d_man_bf16(in_man_bf16).sum()
+            out_man_bf16.backward()
+            self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+            self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 1e-2)
+
+    def test_max_pool2d(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+
+        for stride in [1, 2, 3]:
+            for H, W in [(64, 64), (35, 39), (16, 19), [7, 8]]:
+                x_auto_mix = torch.randn(N, C, H, W, dtype=torch.float32, device=device) * 10
+                x_man_bf16 = x_auto_mix.to(torch.bfloat16)
+
+                for ceil_mode in [False, True]:
+                    max_pool2d = torch.nn.MaxPool2d(
+                        kernel_size=3 if not ceil_mode else 7,
+                        stride=stride,
+                        padding=1,
+                        ceil_mode=ceil_mode)
+
+                    max_pool2d_auto_mix = copy.deepcopy(max_pool2d).to(device=device)
+                    max_pool2d_man_bf16 = copy.deepcopy(max_pool2d).to(device=device).to(torch.bfloat16)
+
+                with AutoDNNL(True), AutoMixPrecision(False):
+                    res_man_bf16 = max_pool2d_man_bf16(x_man_bf16)
+                    self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
+
+                    with AutoMixPrecision(True):
+                        res_auto_mix = max_pool2d_auto_mix(x_auto_mix)
+                        self.assertEqual(res_auto_mix.dtype, torch.float)
+                        self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
+                        self.assertEqual(res_auto_mix, res_man_bf16.float())
+
+    def test_max_pool2d_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input = torch.randn(10, 3, 64, 64, dtype=torch.float32) * 10
+        for ceil_mode in [True]:
+            _in_cpu = input.clone().requires_grad_()
+            in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+            max_pool2d = torch.nn.MaxPool2d(
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                ceil_mode=ceil_mode)
+            max_pool2d_man_bf16 = copy.deepcopy(max_pool2d).to(device=device).to(torch.bfloat16)
+            out_cpu = max_pool2d(_in_cpu).sum()
+            out_cpu.backward()
+            with AutoDNNL(True), AutoMixPrecision(False, train=True):
+                out_man_bf16 = max_pool2d_man_bf16(in_man_bf16).sum()
+                out_man_bf16.backward()
+                self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+
+    def test_max_pool3d(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+
+        for stride in [1, 2, 3]:
+            for D, H, W in [(64, 64, 64), (35, 39, 35), (16, 19, 20), [7, 8, 9]]:
+                x_auto_mix = torch.randn(N, C, D, H, W, dtype=torch.float32, device=device) * 10
+                x_man_bf16 = x_auto_mix.to(torch.bfloat16)
+
+                for ceil_mode in [False, True]:
+                    max_pool3d = torch.nn.MaxPool3d(
+                        kernel_size=3 if not ceil_mode else 7,
+                        stride=stride,
+                        padding=1,
+                        ceil_mode=ceil_mode)
+
+                    max_pool3d_auto_mix = copy.deepcopy(max_pool3d).to(device=device)
+                    max_pool3d_man_bf16 = copy.deepcopy(max_pool3d).to(device=device).to(torch.bfloat16)
+
+                with AutoDNNL(True), AutoMixPrecision(False):
+                    res_man_bf16 = max_pool3d_man_bf16(x_man_bf16)
+                    self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
+
+                    with AutoMixPrecision(True):
+                        res_auto_mix = max_pool3d_auto_mix(x_auto_mix)
+                        self.assertEqual(res_auto_mix.dtype, torch.float)
+                        self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
+                        self.assertEqual(res_auto_mix, res_man_bf16.float())
+
+    def test_max_pool3d_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input = torch.randn(10, 3, 64, 64, dtype=torch.float32) * 10
+        for ceil_mode in [False, True]:
+            _in_cpu = input.clone().requires_grad_()
+            in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+            max_pool3d = torch.nn.MaxPool3d(
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                ceil_mode=ceil_mode)
+            max_pool3d_man_bf16 = copy.deepcopy(max_pool3d).to(device=device).to(torch.bfloat16)
+            out_cpu = max_pool3d(_in_cpu).sum()
+            out_cpu.backward()
+            with AutoDNNL(True), AutoMixPrecision(False, train=True):
+                out_man_bf16 = max_pool3d_man_bf16(in_man_bf16).sum()
+                out_man_bf16.backward()
+                self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
 
 class TestIndexSelect(TestCase):
     def test_index_select(self):
@@ -559,6 +886,24 @@ class TestSoftMax(TestCase):
                     self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
                     self.assertEqual(res_auto_mix, res_man_bf16.float())
 
+    def test_softmax_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input = torch.randn(3, 4, 5, dtype=torch.float32) * 10
+        for dim in range(input.ndim):
+            _in_cpu = input.clone().requires_grad_()
+            in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+            softmax = torch.nn.Softmax(dim=dim)
+            softmax_man_bf16 = copy.deepcopy(softmax).to(device=device).to(torch.bfloat16)
+            out_cpu = softmax(_in_cpu).sum()
+            out_cpu.backward()
+            with AutoDNNL(True), AutoMixPrecision(False, train=True):
+                out_man_bf16 = softmax_man_bf16(in_man_bf16).sum()
+                out_man_bf16.backward()
+                self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+                self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 1e-2)
+
 class TestSigmoid(TestCase):
     def test_sigmoid(self):
         rand_seed = int(get_rand_seed())
@@ -590,6 +935,21 @@ class TestSigmoid(TestCase):
                 self.assertEqual(x_auto_mix.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix))
                 self.assertEqual(x_auto_mix, x_man_bf16.float())
+
+    def test_sigmoid_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input = torch.randn(4, 5, dtype=torch.float32) * 10
+        _in_cpu = input.clone().requires_grad_()
+        in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+        out_cpu = torch.sigmoid(_in_cpu).sum()
+        out_cpu.backward()
+        with AutoDNNL(True), AutoMixPrecision(False, train=True):
+            out_man_bf16 = torch.sigmoid(in_man_bf16).sum()
+            out_man_bf16.backward()
+            self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+            self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 1e-2)
 
 class TestLinearAlgebraOps(TestCase):
     def _gen_mm_tensor(self, seed, batches = None):

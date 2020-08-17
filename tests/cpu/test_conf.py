@@ -35,6 +35,13 @@ class TestOptConf(TestCase):
         ipex.disable_mix_bf16_fp32()
         self.assertFalse(ipex.get_mix_bf16_fp32())
 
+    def test_mix_bf16_fp32_train(self):
+        self.assertFalse(ipex.get_train())
+        ipex.enable_train()
+        self.assertTrue(ipex.get_train())
+        ipex.disable_train()
+        self.assertFalse(ipex.get_train())
+
     def test_jit_fuse(self):
         self.assertTrue(ipex.get_jit_opt())
         ipex.disable_jit_opt()

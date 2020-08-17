@@ -116,6 +116,10 @@ bool check_auto_mix_bf16_fp32() {
   return AutoOptConfig::singleton().get_mix_bf16_fp32();
 }
 
+bool check_train() {
+  return AutoOptConfig::singleton().get_train();
+}
+
 bool check_tensor_own_whole_storage(const at::Tensor& tensor) {
   if (!(tensor.defined()))
     return false;
