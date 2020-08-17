@@ -25,6 +25,15 @@ dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor) {
   return {tensor.sizes().vec(), get_dil_data_type(cur_type), tensor.strides().vec(), tensor.data_ptr()};
 }
 
+dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor, dil::dnnl_deleter_ptr deleter_fn) {
+  IPEX_CHECK(tensor.layout() == at::Layout::Strided,
+      "dil_tensor_from_cpu_buffer expects dense tensor input");
+  IPEX_CHECK(tensor.sizes().size() <= 6,
+      "dil_tensor_from_cpu_buffer only support rank <= 6");
+  auto cur_type = tensor.scalar_type();
+  return {tensor.sizes().vec(), get_dil_data_type(cur_type), tensor.strides().vec(), tensor.data_ptr(), deleter_fn};
+}
+
 dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
   auto dil_buffer = cpu::ShadeDataContext::getDilStorage(tensor);
   if (dil_buffer.is_public_format()) {
@@ -129,9 +138,9 @@ void equip_dil_buffer_nosync_shape(const at::Tensor& tensor, dil::tensor dil_buf
 
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)tensor.unsafeGetTensorImpl();
   ipex_tensor_impl->storage().set_data_ptr(std::move(shade_data_ptr));
- 
+
   // After equip_dil_buffer(), whole storage should be managed by dil tensor,
-  // and thus storage metadata should be overwritten by dil tensor 
+  // and thus storage metadata should be overwritten by dil tensor
   // Note: Storage::set_numel() might be removed later
   ipex_tensor_impl->storage().set_numel(dil_buffer.get_nelems());
 }

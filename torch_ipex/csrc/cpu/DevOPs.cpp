@@ -12,6 +12,7 @@
 #include "torch_ipex/csrc/aten_ipex_bridge.h"
 #include "torch_ipex/csrc/ipex_tensor_impl.h"
 #include "torch_ipex/csrc/utils.h"
+#include "bf16/DevOPs.hpp"
 #include "dbl/Common.h"
 #include "dbl/Conv.h"
 #include "dbl/Deconv.h"
@@ -1525,7 +1526,7 @@ at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, 
   }
 
   // TODO: support transposing a blocked tensor
-  // Even if DIL support transposing a blocked tensor, we have no place to 
+  // Even if DIL support transposing a blocked tensor, we have no place to
   // store a different desc for transposed view when storage are sharing.
   dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
 
@@ -1797,46 +1798,9 @@ at::Tensor AtenIpexCPUDev::dil_index_select(
   if (ShadeDataContext::isDilTensor(self) && ShadeDataContext::isTensorMixPrecision(self)) {
     dil::tensor& self_dil_storage = ShadeDataContext::getDilStorage(self);
     if (self_dil_storage.get_data_type() == dil::data_type::bf16) {
-      dbl::comm::reorder_to_public(self, true/*keep data type*/);
-
-      c10::DataPtr shade_data_ptr(
-        self_dil_storage.get_data_handle(),
-        nullptr,
-        &(c10::detail::deleteNothing),
-        at::DeviceType::CPU);
-      auto storage_impl = c10::make_intrusive<at::StorageImpl>(
-        at::scalarTypeToTypeMeta(at::kBFloat16),
-        self_dil_storage.get_nelems(),
-        std::move(shade_data_ptr),
-        nullptr,
-        /*resizeable=*/false);
-      auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::CPUTensorId);
-      IPEXTensorImpl* cur_ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
-      cur_ipex_impl->copy_meta_info(self.unsafeGetTensorImpl(), true);
-      auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
-      auto&& _ipex_result = at::index_select(_tensor, dim, _ipex_index);
-
-      // auto *_ipex_result_tensor_impl = _ipex_result.unsafeGetTensorImpl();
-      // auto _ipex_result_tensor_storage = _ipex_result_tensor_impl->storage().unsafeGetStorageImpl();
-      // cpu::ShadeDataContext *shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
-      // shade_data_context->cpu_raw_data = _ipex_result_tensor_storage.data_ptr().get();
-      // shade_data_context->cpu_del_fun = _ipex_result_tensor_storage.data_ptr().get_deleter();
-      // shade_data_context->dil_tensor = index_result_dil_storage;
-      // // Avoid release data by ipex_result;
-      // _ipex_result_tensor_storage.data_ptr().release_context();
-
-      dil::tensor&& index_result_dil_storage = dbl::comm::try_gen_dil_tensor(_ipex_result);
-      dil::tensor y(index_result_dil_storage.get_desc());
-      // TODO: it is very tricky here. Because we want to avoid copy from cpu buffer and generate
-      // a pure dil tensor. Then we need ideep or DNNL to expose an interface to set data deleter.
-      y.feed_from(std::move(index_result_dil_storage));
-
-      // Generate new aten tensor
-      auto res = dbl::comm::gen_aten_tensor_by(std::move(y));
-      IPEXTensorImpl* res_ipex_impl = (IPEXTensorImpl *)res.unsafeGetTensorImpl();
-      cur_ipex_impl->copy_meta_info(_ipex_result.unsafeGetTensorImpl());
-      return res;
-    } // TODO: We need add more LP here
+      return bf16::index_select(self, dim, index);
+    }
+    // TODO: We need add more LP here
   }
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.layout() == c10::kStrided);

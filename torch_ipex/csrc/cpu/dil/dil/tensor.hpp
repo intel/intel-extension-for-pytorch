@@ -6,6 +6,8 @@
 
 namespace dil {
 
+using dnnl_deleter_ptr = void (*)(void*);
+
 class tensor : public memory {
  public:
   using dim_t = dnnl_dim_t;
@@ -459,10 +461,22 @@ class tensor : public memory {
     init(adims, adata_type, ahandle, aengine);
   }
 
+  // no format_tag, buffer, with deleter
+  tensor(const dims &adims, data_type adata_type, void *ahandle,
+         dnnl_deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
+    init(adims, adata_type, ahandle, deleter_fn, aengine);
+  }
+
   // no format_tb, strides, buffer
   tensor(const dims &adims, data_type adata_type, const dims &astrides,
          void *ahandle, const engine &aengine = engine::cpu_engine()) {
     init(adims, adata_type, astrides, ahandle, aengine);
+  }
+
+  // no format_tb, strides, buffer, with deleter
+  tensor(const dims &adims, data_type adata_type, const dims &astrides, void *ahandle,
+         dnnl_deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
+    init(adims, adata_type, astrides, ahandle, deleter_fn, aengine);
   }
 
   // no format_tag, no buffer
@@ -475,6 +489,16 @@ class tensor : public memory {
   void init(const desc &adesc, void *ahandle,
               const engine &aengine = engine::cpu_engine()) {
     buffer_.reset();
+    scale_.reset();
+    zero_point_.reset();
+    eng_ = aengine;
+    reset_internal(adesc, aengine, ahandle);
+  }
+
+  /// Function that refill tensor with new description. Specifiy extra buffer.
+  void init(const desc &adesc, void *ahandle, dnnl_deleter_ptr deleter_fn,
+              const engine &aengine = engine::cpu_engine()) {
+    buffer_.reset(ahandle, deleter_fn);
     scale_.reset();
     zero_point_.reset();
     eng_ = aengine;
@@ -501,6 +525,11 @@ class tensor : public memory {
     init({adims, adata_type, astrides}, ahandle, aengine);
   }
 
+  void init(const dims &adims, data_type adata_type, const dims &astrides,
+            void *ahandle, dnnl_deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
+    init({adims, adata_type, astrides}, ahandle, deleter_fn, aengine);
+  }
+
   // format_tag, no buffer
   void init(const dims &adims, data_type adata_type, format_tag aformat_tag,
               const engine &aengine = engine::cpu_engine()) {
@@ -511,6 +540,12 @@ class tensor : public memory {
   void init(const dims &adims, data_type adata_type, void *ahandle,
               const engine &aengine = engine::cpu_engine()) {
     init({adims, adata_type, get_default_format(adims)}, ahandle, aengine);
+  }
+
+  // no format_tag, buffer
+  void init(const dims &adims, data_type adata_type, void *ahandle,
+            dnnl_deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
+    init({adims, adata_type, get_default_format(adims)}, ahandle, deleter_fn, aengine);
   }
 
   // no format_tag, no buffer
@@ -683,8 +718,8 @@ class tensor : public memory {
 
     // DNNL and Framework have different ways in describing weight dimensions.
     // This difference is reflected in two cases: grouped conv & deconv.
-    // This function would be better called `make_compatible_weights`. 
-    // 
+    // This function would be better called `make_compatible_weights`.
+    //
     //                                   fwk dims          dnnl dims
     // groups <= 1:
     //                    conv weight:   o, i, ...         no action
