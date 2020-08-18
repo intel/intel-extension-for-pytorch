@@ -66,7 +66,7 @@ inline void add_ker(float *inout, float *in, int len) {
     auto in1 = _mm512_loadu_ps(in + i);
     auto in2 = _mm512_loadu_ps(in + i + 16);
     out1 = _mm512_add_ps(out1, in1);
-    out2 = _mm512_add_ps(out1, in2);
+    out2 = _mm512_add_ps(out2, in2);
     _mm512_storeu_ps(inout + i, out1);
     _mm512_storeu_ps(inout + i + 16, out2);
   }
