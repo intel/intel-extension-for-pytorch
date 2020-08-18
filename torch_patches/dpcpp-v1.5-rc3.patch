@@ -751,3 +751,41 @@ index e6b851a..3fa1a88 100644
      default: AT_ERROR("Unimplemented backend ", backend);
    }
  }
+diff --git a/torch/lib/c10d/ProcessGroupGloo.cpp b/torch/lib/c10d/ProcessGroupGloo.cpp
+index 64565e2..f145f7b 100644
+--- a/torch/lib/c10d/ProcessGroupGloo.cpp
++++ b/torch/lib/c10d/ProcessGroupGloo.cpp
+@@ -725,6 +725,7 @@ std::shared_ptr<ProcessGroup::Work> ProcessGroupGloo::broadcast(
+   const auto& device = inputs[0].device();
+   switch (device.type()) {
+     case at::kCPU:
++    case at::kDPCPP:
+ #ifdef USE_CUDA
+     case at::kCUDA:
+ #endif
+@@ -736,7 +737,7 @@ std::shared_ptr<ProcessGroup::Work> ProcessGroupGloo::broadcast(
+   std::shared_ptr<AsyncBroadcastWork> work;
+   auto tag = nextTag();
+   auto context = getContext(tag);
+-  if (device.type() == at::kCPU) {
++  if (device.type() == at::kCPU || device.type() == at::kDPCPP) {
+     work = std::make_shared<AsyncBroadcastWork>(
+         std::move(context), inputs, opts.rootRank, opts.rootTensor, tag);
+ #ifdef USE_CUDA
+@@ -1248,6 +1249,7 @@ std::shared_ptr<ProcessGroup::Work> ProcessGroupGloo::allreduce(
+   const auto& device = inputs[0].device();
+   switch (device.type()) {
+     case at::kCPU:
++    case at::kDPCPP:
+ #ifdef USE_CUDA
+     case at::kCUDA:
+ #endif
+@@ -1266,7 +1268,7 @@ std::shared_ptr<ProcessGroup::Work> ProcessGroupGloo::allreduce(
+   std::shared_ptr<AsyncWork> work;
+   auto tag = nextTag();
+   auto context = getContext(tag);
+-  if (device.type() == at::kCPU) {
++  if (device.type() == at::kCPU || device.type() == at::kDPCPP) {
+     if (layout == c10::kStrided) {
+       work = std::make_shared<AsyncAllreduceWork>(
+           std::move(context), inputs, opts.reduceOp, tag);
