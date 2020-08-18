@@ -6,8 +6,6 @@
 
 namespace dil {
 
-using dnnl_deleter_ptr = void (*)(void*);
-
 class tensor : public memory {
  public:
   using dim_t = dnnl_dim_t;
@@ -463,7 +461,7 @@ class tensor : public memory {
 
   // no format_tag, buffer, with deleter
   tensor(const dims &adims, data_type adata_type, void *ahandle,
-         dnnl_deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
+         deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
     init(adims, adata_type, ahandle, deleter_fn, aengine);
   }
 
@@ -475,7 +473,7 @@ class tensor : public memory {
 
   // no format_tb, strides, buffer, with deleter
   tensor(const dims &adims, data_type adata_type, const dims &astrides, void *ahandle,
-         dnnl_deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
+         deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
     init(adims, adata_type, astrides, ahandle, deleter_fn, aengine);
   }
 
@@ -496,7 +494,7 @@ class tensor : public memory {
   }
 
   /// Function that refill tensor with new description. Specifiy extra buffer.
-  void init(const desc &adesc, void *ahandle, dnnl_deleter_ptr deleter_fn,
+  void init(const desc &adesc, void *ahandle, deleter_ptr deleter_fn,
               const engine &aengine = engine::cpu_engine()) {
     buffer_.reset(ahandle, deleter_fn);
     scale_.reset();
@@ -526,7 +524,7 @@ class tensor : public memory {
   }
 
   void init(const dims &adims, data_type adata_type, const dims &astrides,
-            void *ahandle, dnnl_deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
+            void *ahandle, deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
     init({adims, adata_type, astrides}, ahandle, deleter_fn, aengine);
   }
 
@@ -544,7 +542,7 @@ class tensor : public memory {
 
   // no format_tag, buffer
   void init(const dims &adims, data_type adata_type, void *ahandle,
-            dnnl_deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
+            deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
     init({adims, adata_type, get_default_format(adims)}, ahandle, deleter_fn, aengine);
   }
 

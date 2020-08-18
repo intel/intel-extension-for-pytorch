@@ -25,7 +25,7 @@ dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor) {
   return {tensor.sizes().vec(), get_dil_data_type(cur_type), tensor.strides().vec(), tensor.data_ptr()};
 }
 
-dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor, dil::dnnl_deleter_ptr deleter_fn) {
+dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor, dil::deleter_ptr deleter_fn) {
   IPEX_CHECK(tensor.layout() == at::Layout::Strided,
       "dil_tensor_from_cpu_buffer expects dense tensor input");
   IPEX_CHECK(tensor.sizes().size() <= 6,
