@@ -491,6 +491,10 @@ class DenseOPCodeGen(object):
             # Gen definition code for cpp file
             code = '{} {{\n'.format(cpp_func_str_cpp)
 
+            code += '#if defined(_DEBUG)\n'
+            code += '  printf("{}::{}\\n");\n'.format(_IPEX_OP_FUNC_NS, cpp_sig.def_name)
+            code += '#endif\n'
+
             if is_conv_overrideable_func(cpp_sig.def_name):
                 code += '  return AtenIpexCPUDev::dil_{}({});\n'.format(cpp_sig.def_name, ', '.join([param.name for param in cpp_sig.input_params]))
             else:

@@ -24,8 +24,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-//#define DBG
-#if defined(DBG)
+#if defined(_DEBUG)
 #define DEBUG(fmt) printf(fmt);
 #else
 #define DEBUG(fmt)
@@ -1525,7 +1524,7 @@ at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, 
   }
 
   // TODO: support transposing a blocked tensor
-  // Even if DIL support transposing a blocked tensor, we have no place to 
+  // Even if DIL support transposing a blocked tensor, we have no place to
   // store a different desc for transposed view when storage are sharing.
   dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
 
