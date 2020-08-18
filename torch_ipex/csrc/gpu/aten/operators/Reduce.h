@@ -78,13 +78,13 @@ struct ReduceConfig {
   DPCPP::range<2> get_local_size() const {
     int sg_size =
         DPCPP_SUB_GROUP_SIZE; // to be replaced with real sub_group_size;
-    return DPCPP::range<2>(sg_size, work_group_size / sg_size);
+		return DPCPP::range<2>(work_group_size / sg_size, sg_size);
   }
 
   DPCPP::range<2> get_global_size() const {
     return DPCPP::range<2>(
-        div_up(num_outputs, step_output) * DPCPP_SUB_GROUP_SIZE,
-        wg_per_output * work_group_size / DPCPP_SUB_GROUP_SIZE);
+        wg_per_output * work_group_size / DPCPP_SUB_GROUP_SIZE,
+        div_up(num_outputs, step_output) * DPCPP_SUB_GROUP_SIZE);
   }
 
   bool should_sg_reduce() const {
@@ -101,38 +101,38 @@ struct ReduceConfig {
 
   bool should_store(int output_idx, const DPCPP::nd_item<2>& item_id) const {
     return output_idx < num_outputs &&
-        (!should_sg_reduce() || item_id.get_local_id(0) == 0) &&
-        (!should_wg_reduce() || item_id.get_local_id(1) == 0);
+        (!should_sg_reduce() || item_id.get_local_id(1) == 0) &&
+        (!should_wg_reduce() || item_id.get_local_id(0) == 0);
   }
 
   int input_idx(const DPCPP::nd_item<2>& item_id) const {
-    int lane = item_id.get_local_id(0);
-    int sg = item_id.get_local_id(1);
-    int wg2 = item_id.get_group(1);
+    int lane = item_id.get_local_id(1);
+    int sg = item_id.get_local_id(0);
+    int wg2 = item_id.get_group(0);
     return (
         lane * input_mult[LANE] + sg * input_mult[SUB_GROUP] +
         wg2 * input_mult[WORK_GROUP]);
   }
 
   int output_idx(const DPCPP::nd_item<2>& item_id) const {
-    int lane = item_id.get_local_id(0);
-    int sg = item_id.get_local_id(1);
-    int wg1 = item_id.get_group(0);
+    int lane = item_id.get_local_id(1);
+    int sg = item_id.get_local_id(0);
+    int wg1 = item_id.get_group(1);
     return (
         lane * output_mult[LANE] + sg * output_mult[SUB_GROUP] +
         wg1 * step_output);
   }
 
   int shared_memory_offset(int offset, const DPCPP::nd_item<2>& item_id) const {
-    int lane = item_id.get_local_id(0);
-    int sg = item_id.get_local_id(1);
-    return lane + (sg + offset) * item_id.get_local_range(0);
+    int lane = item_id.get_local_id(1);
+    int sg = item_id.get_local_id(0);
+    return lane + (sg + offset) * item_id.get_local_range(1);
   }
 
   int staging_memory_offset(int wg2, const DPCPP::nd_item<2>& item_id) const {
-    int offset = wg2 + item_id.get_group(0) * item_id.get_group_range(1);
+    int offset = wg2 + item_id.get_group(1) * item_id.get_group_range(0);
     if (!should_sg_reduce()) {
-      offset = item_id.get_local_id(0) + offset * item_id.get_local_range(0);
+      offset = item_id.get_local_id(1) + offset * item_id.get_local_range(1);
     }
     return offset;
   }
@@ -151,7 +151,7 @@ struct ReduceConfig {
 
     auto size = (int64_t)element_size_bytes * num_outputs * wg_per_output;
     if (!should_sg_reduce()) {
-      size *= get_local_size()[0];
+      size *= get_local_size()[1];
     }
     return size;
   }
@@ -160,7 +160,7 @@ struct ReduceConfig {
     if (!should_global_reduce()) {
       return 0;
     }
-    return sizeof(int) * get_global_size()[0] / DPCPP_SUB_GROUP_SIZE;
+    return sizeof(int) * get_global_size()[1] / DPCPP_SUB_GROUP_SIZE;
   }
 
   int values_per_thread() const {
@@ -374,12 +374,12 @@ struct ReduceOp {
       const dpcpp_local_ptr_pt<arg_t>& local_ptr,
       const DPCPP::nd_item<2>& item_id) const {
     local_ptr[config.shared_memory_offset(0, item_id)] = value;
-    int num_sg = (item_id.get_local_range(0) * item_id.get_local_range(1)) /
+    int num_sg = (item_id.get_local_range(1) * item_id.get_local_range(0)) /
         DPCPP_SUB_GROUP_SIZE;
     for (int64_t offset = num_sg / 2; offset > 0; offset >>= 1) {
       item_id.barrier(dpcpp_global_and_local_fence);
-      if (static_cast<int64_t>(item_id.get_local_id(1)) < offset &&
-          ((static_cast<int64_t>(item_id.get_local_id(1)) + offset) < num_sg)) {
+      if (static_cast<int64_t>(item_id.get_local_id(0)) < offset &&
+          ((static_cast<int64_t>(item_id.get_local_id(0)) + offset) < num_sg)) {
         arg_t other = local_ptr[config.shared_memory_offset(offset, item_id)];
         value = ops.combine(value, other);
         local_ptr[config.shared_memory_offset(0, item_id)] = value;
@@ -395,12 +395,12 @@ struct ReduceOp {
     item_id.barrier(dpcpp_global_and_local_fence);
     if (item_id.get_local_linear_id() == 0) {
       dpcpp_multi_ptr<int, dpcpp_global_space> sema_multi_ptr(smem);
-      DPCPP::atomic<int> at_var(sema_multi_ptr + item_id.get_group(0));
+      DPCPP::atomic<int> at_var(sema_multi_ptr + item_id.get_group(1));
       int prev_blocks_finished = at_var.fetch_add(1);
 
       last_wg_done_ptr[0] =
           (prev_blocks_finished ==
-           static_cast<int>(item_id.get_group_range(1) - 1));
+           static_cast<int>(item_id.get_group_range(0) - 1));
     }
     item_id.barrier(dpcpp_global_and_local_fence);
     bool is_last_block_done = last_wg_done_ptr[0];
@@ -470,7 +470,7 @@ struct ReduceOp {
         config.should_store(config.output_idx(item_id), item_id);
     if (should_store) {
       index_t offset =
-          config.staging_memory_offset(item_id.get_group(1), item_id);
+          config.staging_memory_offset(item_id.get_group(0), item_id);
       reduce_buffer[offset] = value;
     }
 
@@ -481,9 +481,9 @@ struct ReduceOp {
     if (is_last_block_done) {
       value = arg_t{};
       if (config.should_sg_reduce()) {
-        index_t input_offset = item_id.get_local_id(0) +
-            item_id.get_local_id(1) * item_id.get_local_range(0);
-        index_t step = item_id.get_local_range(0) * item_id.get_local_range(1);
+        index_t input_offset = item_id.get_local_id(1) +
+            item_id.get_local_id(0) * item_id.get_local_range(1);
+        index_t step = item_id.get_local_range(1) * item_id.get_local_range(0);
         for (; input_offset < static_cast<index_t>(config.wg_per_output);
              input_offset += step) {
           index_t idx = config.staging_memory_offset(input_offset, item_id);
@@ -491,8 +491,8 @@ struct ReduceOp {
           value = ops.combine(value, next);
         }
       } else {
-        index_t input_offset = item_id.get_local_id(1);
-        index_t step = item_id.get_local_range(1);
+        index_t input_offset = item_id.get_local_id(0);
+        index_t step = item_id.get_local_range(0);
         for (; input_offset < static_cast<index_t>(config.wg_per_output);
              input_offset += step) {
           index_t idx = config.staging_memory_offset(input_offset, item_id);
@@ -538,7 +538,7 @@ struct ReduceOp {
       value = work_group_reduce(value, local_ptr, item_id);
     }
     if (config.should_sg_reduce() &&
-        (!should_wg_reduce || item_id.get_local_id(1) == 0)) {
+        (!should_wg_reduce || item_id.get_local_id(0) == 0)) {
       value = sub_group_reduce(value);
     }
 
