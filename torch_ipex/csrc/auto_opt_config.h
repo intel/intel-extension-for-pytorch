@@ -31,6 +31,7 @@ public:
   inline bool get_mix_bf16_fp32() {
     return mix_bf16_fp32_;
   }
+  
   inline bool set_train(bool value) {
     train_ = value;
   }

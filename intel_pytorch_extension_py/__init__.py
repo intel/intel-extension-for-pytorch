@@ -36,10 +36,7 @@ def enable_auto_mix_precision(mixed_dtype = torch.bfloat16, train = False):
         core.enable_mix_bf16_fp32()
     else:
         core.disable_mix_bf16_fp32()
-    if train:
-        core.enable_train()
-    else:
-        core.disable_train()
+    core.set_execution_mode(train=train)
 
 def get_auto_mix_precision():
     if core.get_mix_bf16_fp32():

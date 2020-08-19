@@ -37,9 +37,9 @@ class TestOptConf(TestCase):
 
     def test_mix_bf16_fp32_train(self):
         self.assertFalse(ipex.get_train())
-        ipex.enable_train()
+        ipex.set_execution_mode(train=True)
         self.assertTrue(ipex.get_train())
-        ipex.disable_train()
+        ipex.set_execution_mode(train=False)
         self.assertFalse(ipex.get_train())
 
     def test_jit_fuse(self):

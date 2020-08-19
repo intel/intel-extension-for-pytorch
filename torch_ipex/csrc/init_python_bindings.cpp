@@ -125,8 +125,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("enable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(true); });
   m.def("disable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
   m.def("get_jit_opt", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
-  m.def("enable_train", []() { return AutoOptConfig::singleton().set_train(true); });
-  m.def("disable_train", []() { return AutoOptConfig::singleton().set_train(false); });
+  m.def("set_execution_mode", [](bool train) { AutoOptConfig::singleton().set_train(train); }, py::arg("train"));
   m.def("get_train", []() { return AutoOptConfig::singleton().get_train(); });
 }
 

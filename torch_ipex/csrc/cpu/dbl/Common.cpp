@@ -84,10 +84,8 @@ dil::tensor try_gen_dil_storage(const at::Tensor &input) {
   }
 }
 
-void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor, bool is_parameter) {
-  // In the case of the auto mix precision, for parameters like weight and bias, 
-  // do not reorder them to bf16 during the training
-  if (!check_auto_mix_bf16_fp32() || (check_auto_mix_bf16_fp32() && is_parameter && check_train()))
+void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor, bool not_reorder_for_training) {
+  if (!check_auto_mix_bf16_fp32() || (check_auto_mix_bf16_fp32() && check_train() && not_reorder_for_training))
     return;
 
   auto tensor_dtype = tensor.scalar_type();
@@ -98,7 +96,7 @@ void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor, bool is_parameter) {
   reorder_to_dtype(tensor, at::kBFloat16);
 }
 
-dil::tensor dil_reorder_to_dtype(const dil::tensor &dil_tensor, dil::data_type dtype) {
+dil::tensor reorder_dil_tensor_to_dtype(const dil::tensor &dil_tensor, dil::data_type dtype) {
   if (!check_auto_mix_bf16_fp32() || dil_tensor.get_data_type() == dtype)
     return dil_tensor;
   auto expected_desc = dil_tensor.get_desc().to_type(dtype);
