@@ -57,6 +57,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     std::vector<float> scales;
     bool quantized;
     std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /* uint8_used for output*/false);
+    //quantized = false;
     if (quantized) {
       output_scale.push_back(scales[1]);
       dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
@@ -717,7 +718,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
     std::vector<float> scales;
     bool quantized;
     std::tie(scales, quantized) = dbl::comm::get_int8_scales(self, /*  uint8_used for output*/false);
-    ///quantized = false;
+    //quantized = false;
     if (quantized) {
       output_scale.push_back(scales[1]);
       dbl::comm::reorder_to_int8_for_mix_prec(self, {scales[0]});
@@ -905,15 +906,18 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
   if (check_auto_mix_int8_fp32()) {
     IPEX_CHECK(!train, "mkldnn_bacth_norm: mkldnn only support inference model for int8");
   }
-  std::vector<float> output_scale = {};
+  std::vector<float> input_scales = {};
+  std::vector<float> output_scales = {};
   bool quantized = false;
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
     std::vector<float> scales;
     std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /*  uint8_used for output*/false);
-    quantized = false;
+    //quantized = false;
     if (quantized) {
-      output_scale.push_back(scales[1]);
-      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
+      input_scales.push_back(scales[0]);
+      output_scales.push_back(scales[1]);
+      dbl::comm::reorder_to_int8_for_mix_prec(input, input_scales);
+      //std::cout<<"print scale "<<scales[0]<<" "<<input.abs().max()<<std::endl; 
     } else {
       dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
@@ -949,18 +953,15 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
       dil::tensor m = dbl::comm::try_gen_dil_tensor(running_mean);
       dil::tensor v = dbl::comm::try_gen_dil_tensor(running_var);
       dil::batch_normalization_forward_inference::compute(
-          x, m, v, w, b, y, eps);
+          x, m, v, w, b, y, eps, input_scales, output_scales);
     } else {
       dil::batch_normalization_forward_inference::compute(
-          x, w, b, y, eps);
+          x, w, b, y, eps, input_scales, output_scales);
     }
-
-    
-    if (check_auto_mix_int8_fp32() && !check_int8_calibration() && quantized) {
-      y.set_scale(output_scale);
-    }
+ 
     auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
 
+    //dbl::comm::reorder_to_dtype(aten_output, at::kFloat);
     if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
       insert_or_updata_observer(input, aten_output, "BatchNorm");
     }
@@ -1059,7 +1060,7 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool2d(
     std::vector<float> scales;
     bool quantized;
     std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /*  uint8_used for output*/false);
-    quantized = false;
+    //quantized = false;
     if (quantized) {
       dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
     } else {
