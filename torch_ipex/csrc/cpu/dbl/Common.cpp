@@ -141,7 +141,16 @@ void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> s
     return;
 
   auto dst_scalar_type = uint8_used ? at::kQUInt8 : at::kQInt8;
-  reorder_to_dtype(tensor, dst_scalar_type, scales);
+
+  auto inner_scales = scales;
+  if (scales.empty()) {
+    // compute weight scales for per_channel
+    for (auto i = 0; i < tensor.size(0); i++) {
+      inner_scales.push_back(float(127.0) / tensor[i].abs().max().item<float>());
+    }
+  }
+ 
+  reorder_to_dtype(tensor, dst_scalar_type, inner_scales);
 }
 
 void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, std::vector<float> scales) {
@@ -150,15 +159,6 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, 
     // The data type of DIL tensor is same as the dst data type. DO NOTHING
     return;
   }
-
-  auto inner_scales = scales;
-  if (check_auto_mix_int8_fp32() && !check_int8_calibration() && scales.empty()) {
-    // compute weight scales for per_channel
-    for (auto i = 0; i < tensor.size(0); i++) {
-      inner_scales.push_back(float(127.0) / tensor[i].abs().max().item<float>());
-    }
-  }
- 
   auto dst_desc = src.get_desc().to_type(get_dil_data_type(dst_scalar_type));
  // src may bf16 or fp32 tensor with block format,
  // there has issue for conv weight prepack if given a block format weight
@@ -166,7 +166,7 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, 
     dst_desc = dst_desc.to_default_format();
   }
 
-  reorder_to_desc(tensor, dst_desc, inner_scales);
+  reorder_to_desc(tensor, dst_desc, scales);
 }
 
 void equip_dil_buffer_nosync_shape(const at::Tensor& tensor, dil::tensor dil_buffer) {
