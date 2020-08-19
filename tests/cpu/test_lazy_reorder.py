@@ -1318,5 +1318,43 @@ class TestSplit(TestCase):
                 y2.backward()
                 self.assertEqual(x1.grad, x2.grad)
 
+class ConvRelu(nn.Module):
+    def __init__(self):
+        super(ConvRelu, self).__init__()
+        self.conv = torch.nn.Conv2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2), dilation=(3, 1))
+
+    def forward(self, x):
+        return F.relu(self.conv(x), inplace=True)
+
+class TestSave(TestCase):
+    def test_save_and_load_tensor(self):
+        ipex.core.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x = torch.tensor([0, 1, 2, 3, 4])
+        x_dpcpp = x.clone().to(device=device)
+        torch.save(x, 'tensor.pt')
+        torch.save(x_dpcpp, 'tensor_dpcpp.pt')
+        self.assertEqual(torch.load('tensor.pt'), torch.load('tensor_dpcpp.pt'))
+
+    def test_save_and_load_model(self):
+        ipex.core.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input = torch.randn(20, 16, 50, 100)
+        model = ConvRelu()
+        model_dpcpp = copy.deepcopy(model).to(device=device)
+        torch.save(model.state_dict(), 'model.pth')
+        torch.save(model_dpcpp.state_dict(), 'model_dpcpp.pth')
+        state_dict1 = torch.load('model.pth')
+        state_dict2 = torch.load('model_dpcpp.pth')
+        model1 = ConvRelu()
+        model2 = ConvRelu()
+        model1.load_state_dict(state_dict1)
+        model2.load_state_dict(state_dict2)
+        self.assertEqual(model1(input), model2(input))
+
 if __name__ == '__main__':
     test = unittest.main()

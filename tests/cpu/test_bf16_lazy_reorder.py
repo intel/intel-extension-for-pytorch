@@ -704,5 +704,51 @@ class TestLinearAlgebraOps(TestCase):
                         self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
                         self.assertEqual(res_auto_mix, res_man_bf16.float())
 
+class ConvRelu(nn.Module):
+    def __init__(self):
+        super(ConvRelu, self).__init__()
+        self.conv = torch.nn.Conv2d(16, 33, (3, 5), stride=(2, 1), padding=(4, 2), dilation=(3, 1))
+
+    def forward(self, x):
+        return F.relu(self.conv(x), inplace=True)
+
+class TestSave(TestCase):
+    def test_save_and_load(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        input = torch.randn(20, 16, 50, 100)
+        input_dpcpp = input.clone().to(device=device)
+        model = ConvRelu()
+        model_dpcpp = copy.deepcopy(model).to(device=device)
+        model_bf16 = copy.deepcopy(model).to(device=device).to(torch.bfloat16)
+
+        #test save and load model
+        torch.save(model.state_dict(), 'model.pth')
+        torch.save(model_bf16.state_dict(), 'model_dpcpp.pth')
+        state_dict1 = torch.load('model.pth')
+        state_dict2 = torch.load('model_dpcpp.pth')
+        model1 = ConvRelu()
+        model2 = ConvRelu()
+        model1.load_state_dict(state_dict1)
+        model2.load_state_dict(state_dict2)
+        self.assertEqual(model1(input), model2(input), 0.01)
+
+        #test save and load tensor
+        x = torch.tensor([0, 1, 2, 3, 4])
+        x_dpcpp = x.clone().to(device=device).to(torch.bfloat16)
+        self.assertEqual(x_dpcpp.dtype, torch.bfloat16)
+        torch.save(x, 'tensor.pt')
+        torch.save(x_dpcpp, 'tensor_dpcpp.pt')
+        self.assertEqual(torch.load('tensor.pt'), torch.load('tensor_dpcpp.pt'))
+
+        with AutoDNNL(True), AutoMixPrecision(True):
+            output_dpcpp = model_dpcpp(input_dpcpp)
+            torch.save(output_dpcpp.clone().to('cpu'), 'tensor.pt')
+            self.assertTrue(ipex.core.is_bf16_dil_tensor(output_dpcpp))
+            torch.save(output_dpcpp, 'tensor_dpcpp.pt')
+            self.assertEqual(torch.load('tensor.pt'), torch.load('tensor_dpcpp.pt'))
+
+
 if __name__ == '__main__':
     test = unittest.main()
