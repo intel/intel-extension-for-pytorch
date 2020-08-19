@@ -3,12 +3,14 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 import torch_ipex
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("dpcpp")
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()")    
     def test_conv(self, dtype=torch.float):
         # functionality
         x_cpu = torch.ones([1, 2, 3, 3], device=cpu_device)

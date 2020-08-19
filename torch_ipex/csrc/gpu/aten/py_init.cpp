@@ -38,4 +38,12 @@ PYBIND11_MODULE(torch_ipex, m) {
   m.def("_onemkl_is_enabled",
         []() {return false;});
 #endif
+
+#if defined(BUILD_DOUBLE_KERNEL)
+  m.def("_double_kernel_disabled",
+        []() {return false;});
+#else
+  m.def("_double_kernel_disabled",
+        []() {return true;});
+#endif
 }

@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
-##################################################
+##############################################################
 # Build options:
 #
-# USE_USM - to use USM, instead of SYCL buffer
+# USE_USM               - to use USM, instead of SYCL buffer
+# BUILD_INTERNAL_DEBUG  - to build internal debug code path
+# BUILD_DOUBLE_KERNEL   - to build double data type kernel
 #
-#################################################
+##############################################################
 
 from __future__ import print_function
 

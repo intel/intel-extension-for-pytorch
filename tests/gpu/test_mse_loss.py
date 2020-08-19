@@ -2,12 +2,14 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 import torch_ipex
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("dpcpp")
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()")    
     def test_mse_loss(self, dtype=torch.float):
 
         print('none')

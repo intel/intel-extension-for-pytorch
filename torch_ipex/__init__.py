@@ -97,5 +97,8 @@ def library_paths():
 def _usm_pstl_is_enabled():
     return torch_ipex._usm_pstl_is_enabled()
 
+def _double_kernel_disabled():
+    return torch_ipex._double_kernel_disabled()
+
 def _onemkl_is_enabled():
     return torch_ipex._onemkl_is_enabled()

@@ -1,12 +1,14 @@
 import torch
 import torch_ipex
 from torch.testing._internal.common_utils import TestCase
+import pytest
 
 dpcpp_device = torch.device("dpcpp")
 cpu_device = torch.device("cpu")
 
 
 class  TestTorchMethod(TestCase):
+    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()")    
     def test_conv_tbc(self, dtype=torch.float):
 
         input_cpu = torch.randn(3, 4, 5)

@@ -136,6 +136,13 @@ endif()
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
 
+if(BUILD_INTERNAL_DEBUG)
+    add_definitions(-DBUILD_INTERNAL_DEBUG)
+endif()
+if(BUILD_DOUBLE_KERNEL)
+    add_definitions(-DBUILD_DOUBLE_KERNEL)
+endif()
+
 include(cmake/DPCPP.cmake)
 if(USE_COMPUTECPP)
   add_definitions(-DUSE_COMPUTECPP)

@@ -2,6 +2,7 @@ import torch
 import torch_ipex
 
 from torch.testing._internal.common_utils import TestCase
+import pytest
 
 class  TestTorchMethod(TestCase):
     def test_dequantize_per_channel(self, dtype=torch.float):
@@ -37,7 +38,7 @@ class  TestTorchMethod(TestCase):
         dst_gpu = torch.dequantize(dst_gpu_q)
         
         self.assertEqual(dst, dst_gpu)
-
+    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()")
     def test_dequantize_FP32_input(self, dtype=torch.float):
         src=torch.randn(1,3,2,2)
         src_gpu = src.to("dpcpp")

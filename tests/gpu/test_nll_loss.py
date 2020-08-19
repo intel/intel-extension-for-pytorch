@@ -5,11 +5,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch_ipex
 from torch.testing._internal.common_utils import TestCase
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("dpcpp")
  
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()")
     def test_nll_loss(self, dtype=torch.float):
         # input is of size N x C = 3 x 5
         input = torch.randn(3, 5)

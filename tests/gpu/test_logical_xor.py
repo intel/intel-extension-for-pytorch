@@ -1,12 +1,14 @@
 import torch
 import torch_ipex
 from torch.testing._internal.common_utils import TestCase
+import pytest
 
 cpu_device = torch.device('cpu')
 dpcpp_device = torch.device('dpcpp')
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()")     
     def test_logical_xor(self, dtype=torch.float):
         input1 = torch.tensor(
             [0, 1, 10, 0], device=torch.device("cpu"), dtype=torch.int8)
