@@ -27,7 +27,6 @@ def compare(file1, file2):
 
 def gpu_gen_and_should_copy(install_dir):
     cwd = os.path.dirname(os.path.abspath(__file__))
-    print("johnlu", cwd)
     generate_code_cmd = ['python', \
                          'gen-gpu-decl.py', \
                          '--gpu_decl=./', \

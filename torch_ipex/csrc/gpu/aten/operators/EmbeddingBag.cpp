@@ -1077,7 +1077,6 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
 
 //    auto count_begin = dpstd::counting_iterator<int64_t>(0);
     auto orig_begin = orig_indices.data_ptr<int64_t>();
-//    johnlu add this
 //    std::copy(policy, count_begin, count_begin + numel, orig_begin);
 
     auto sorted_begin = sorted_indices.data_ptr<int64_t>();
@@ -1144,7 +1143,6 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
 //    error JIRA: https://jira.devtools.intel.com/projects/ONEDPL/issues/ONEDPL-81
 //    auto revers_sorted_begin = std::make_reverse_iterator(sorted_begin + numel);
 //    auto revers_count_begin = std::make_reverse_iterator(count_begin + numel);
-//    johnlu to do add this
 //    dpstd::inclusive_scan_by_segment(
 //        policy, revers_sorted_begin,
 //        revers_sorted_begin + numel,
