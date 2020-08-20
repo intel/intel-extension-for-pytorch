@@ -76,6 +76,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
       weight, stride, padding, dilation, groups);
  
   if (bias.defined()) {
+      std::cout<<"convolution has bias"<<std::endl;
     CHECK_DNNL_OP_PRE_COND(bias);
     if (!check_auto_mix_int8_fp32()) {
       dbl::comm::reorder_to_bf16_for_mix_prec(bias);

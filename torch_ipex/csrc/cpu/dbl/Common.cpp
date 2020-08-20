@@ -122,7 +122,7 @@ void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> s
   if (scales.empty()) {
     // compute weight scales for per_channel
     for (auto i = 0; i < tensor.size(0); i++) {
-      inner_scales.push_back(float(127.0) / tensor[i].abs().max().item<float>());
+      inner_scales.push_back(float(127.5) / tensor[i].abs().max().item<float>());
     }
   }
  

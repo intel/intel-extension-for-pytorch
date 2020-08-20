@@ -86,7 +86,7 @@ public:
       std::vector<float> scales;
       std::vector<bool> uint8_used;
       for (auto j = 0; j < observers_[i].max_values.size(); j++) {
-        scales.push_back(127.0 / observers_[i].max_values[j]);
+        scales.push_back(127.5 / observers_[i].max_values[j]);
         uint8_used.push_back(false);
       }
         // zero_points not used now, zero_points = 0 for u8 and 128 for s8.
@@ -109,13 +109,13 @@ public:
     for (auto i = 0; i < uint8_used.size(); i++) {
       if (!indicator_uint8_used[i] && uint8_used[i]) {
         // update zero_point and scales
-        indicator_scales[i] /= 127.0;
-        indicator_scales[i] *= 255.0;
+        indicator_scales[i] /= 127.5;
+        indicator_scales[i] *= 255.5;
         scale_update = true;
       } else if (indicator_uint8_used[i] && !uint8_used[i]) {
         // update zero_point and scales
-        indicator_scales[i] /= 255;
-        indicator_scales[i] *= 127;
+        indicator_scales[i] /= 255.5;
+        indicator_scales[i] *= 127.5;
         scale_update = true;
       }
     }

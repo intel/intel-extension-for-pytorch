@@ -94,6 +94,13 @@ struct batch_normalization_forward_inference
         float* var_ptr = static_cast<float *>(variance.get_data_handle());
         float* expected_mean_ptr = static_cast<float *>(expected_mean.get_data_handle());
         float* expected_var_ptr = static_cast<float *>(expected_var.get_data_handle());
+    #ifdef _OPENMP
+    #if (_OPENMP >= 201307)
+    # pragma omp parallel for simd
+    #else
+    # pragma omp parallel for schedule(static)
+    #endif
+    #endif
         for (int c = 0; c < channel_count; c++) {
           float scale_temp = scale_ptr[c] / std::sqrt(var_ptr[c] + epsilon);
           scale_shift_buf[c] = scale_temp * dst_scales[0] / src_scales[0];
