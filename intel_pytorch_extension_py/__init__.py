@@ -47,23 +47,64 @@ def get_auto_mix_precision():
     else:
         return None
 
-def enable_calibration():
-    if core.get_mix_int8_fp32():
-        core.enable_int8_calibration()
-    else:
-        raise ValueError("please first run enable_auto_mix_precision(torch.int8) before calibration")
-
-def calibration_restet():
+def calibration_reset():
     if core.get_int8_calibration():
         core.calibration_reset()
     else:
         raise ValueError("please first run enable_calibration before calibration reset")
 
-def convert_step(file):
-    if core.get_mix_int8_fp32():
+class _DecoratorContextManager:
+    """Allow a context manager to be used as a decorator, copy form pytorch FW"""
+
+    def __call__(self, func):
+        if inspect.isgeneratorfunction(func):
+            return self._wrap_generator(func)
+
+        @functools.wraps(func)
+        def decorate_context(*args, **kwargs):
+            with self:
+                return func(*args, **kwargs)
+        return decorate_context
+
+    def _wrap_generator(self, func):
+        """Wrap each generator invocation with the context manager"""
+        @functools.wraps(func)
+        def generator_context(*args, **kwargs):
+            gen = func(*args, **kwargs)
+            while True:
+                try:
+                    with self:
+                        x = next(gen)
+                    yield x
+                except StopIteration:
+                    break
+        return generator_context
+
+class int8_calibration(_DecoratorContextManager):
+    def __init__(self, file_name):
+        self.configure_file = file_name
+
+    def __enter__(self):
+        if not core.get_mix_int8_fp32():
+            raise ValueError("please first run enable_auto_mix_precision(torch.int8) before int8 calibration")
+        core.enable_int8_calibration()
+
+    def __exit__(self, *args):
         core.disable_int8_calibration()
-        core.add_indictors()
-        #core.save_config(file)
-    else:
-        raise ValueError("please first run enable_auto_mix_precision(torch.int8) before convert")
+        core.add_indicators()
+        core.save_indicators_file(self.configure_file)
+        return False
+
+class int8_validate(_DecoratorContextManager):
+    def __init__(self, file_name):
+        self.configure_file = file_name
+
+    def __enter__(self):
+        if not core.get_mix_int8_fp32():
+            raise ValueError("please first run enable_auto_mix_precision(torch.int8) before int8 validation")
+        core.disable_int8_calibration()
+        core.load_indicators_file(self.configure_file)
+
+    def __exit__(self, *args):
+        return False
 
