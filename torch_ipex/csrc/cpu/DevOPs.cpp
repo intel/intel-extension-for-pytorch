@@ -73,6 +73,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
 
   dil_input = dbl::comm::try_gen_dil_tensor(input);
   if (bias.defined()) {
+      std::cout<<"convolution has bias"<<std::endl;
     CHECK_DNNL_OP_PRE_COND(bias);
     if (!check_auto_mix_int8_fp32()) {
       dbl::comm::reorder_to_bf16_for_mix_prec(bias, true);
