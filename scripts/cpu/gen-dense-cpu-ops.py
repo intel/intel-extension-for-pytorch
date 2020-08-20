@@ -72,6 +72,7 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::select.Dimname(Tensor(a) self, Dimname dim, int index) -> Tensor(a)',
     'aten::view(Tensor(a) self, int[] size) -> Tensor(a)',
     'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
+    'aten::_unsafe_view(Tensor self, int[] size) -> Tensor',
     #'aten::native_layer_norm(Tensor input, Tensor? weight, Tensor? bias, int M, int N, float eps) -> (Tensor, Tensor, Tensor)',
     #'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)'
 ]
@@ -492,6 +493,10 @@ class DenseOPCodeGen(object):
 
             # Gen definition code for cpp file
             code = '{} {{\n'.format(cpp_func_str_cpp)
+
+            code += '#if defined(_DEBUG)\n'
+            code += '  printf("{}::{}\\n");\n'.format(_IPEX_OP_FUNC_NS, cpp_sig.def_name)
+            code += '#endif\n'
 
             if is_conv_overrideable_func(cpp_sig.def_name):
                 code += '  return AtenIpexCPUDev::dil_{}({});\n'.format(cpp_sig.def_name, ', '.join([param.name for param in cpp_sig.input_params]))

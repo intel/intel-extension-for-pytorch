@@ -25,8 +25,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-//#define DBG
-#if defined(DBG)
+#if defined(_DEBUG)
 #define DEBUG(fmt) printf(fmt);
 #else
 #define DEBUG(fmt)
@@ -1666,6 +1665,11 @@ at::Tensor AtenIpexCPUDev::dil_view(const at::Tensor & self, at::IntArrayRef siz
     " spans across two contiguous subspaces). Use .reshape(...) instead.");
   auto stride_value = *stride;
   return alias_with_sizes_and_strides(self, inferred_size, stride_value);
+}
+
+at::Tensor AtenIpexCPUDev::dil__unsafe_view(const at::Tensor & self, at::IntArrayRef size) {
+  DEBUG("AtenIpexCPUDev::dil__unsafe_view\n");
+  return dil_view(self, size);
 }
 
 at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, at::Dimname dim, int64_t index) {
