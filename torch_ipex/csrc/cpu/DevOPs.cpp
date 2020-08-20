@@ -1796,6 +1796,8 @@ at::Tensor AtenIpexCPUDev::dil_index_select(
     const at::Tensor & self,
     int64_t dim,
     const at::Tensor & index) {
+  torch_ipex::reset_ipex_func_status();
+
   IPEX_CHECK(
     self.device().type() == c10::DeviceType::DPCPP,
     "IPEX index select only work on DPCPP tensor");
@@ -1807,13 +1809,8 @@ at::Tensor AtenIpexCPUDev::dil_index_select(
     // TODO: We need add more LP here
   }
 
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(index.layout() == c10::kStrided);
-  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
-  auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
-  auto&& _ipex_result = at::index_select(_ipex_self, dim, _ipex_index);
-  static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+  torch_ipex::set_ipex_func_status(torch_ipex::IPEXFuncStatus::IPEX_FALLBACK);
+  return at::Tensor();
 }
 
 }  // namespace cpu

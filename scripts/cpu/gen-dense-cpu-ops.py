@@ -77,6 +77,10 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     #'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)'
 ]
 
+_FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG = [
+    'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
+]
+
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
 _SHALLOW_FALLBACK_TO_CPU_TENSOR = 'shallowFallbackToCPUTensor'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR = 'shallowUpgradeToDPCPPTensor'
@@ -187,6 +191,13 @@ class DenseOPCodeGen(object):
     def is_dnnl_func(self, simple_aten_sig):
         stripped_str = simple_aten_sig.replace(' ', '')
         for item in _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG:
+            if stripped_str == item.replace(' ', ''):
+                return True
+        return False
+
+    def is_ipex_func(self, simple_aten_sig):
+        stripped_str = simple_aten_sig.replace(' ', '')
+        for item in _FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG:
             if stripped_str == item.replace(' ', ''):
                 return True
         return False
@@ -307,18 +318,28 @@ class DenseOPCodeGen(object):
         fname = cpp_sig.def_name
         if fname.endswith('_'):
             assert len(dnnl_tensor_param_vars) > 0
-            code += '      if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors))\n'
+            code += '      if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors)) {\n'
             code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(list(param_vars)))
+            code += '      }\n' # Check support tensors
         else:
             param_seq_str_vec = []
             for param_var in param_vars:
                 param_seq_str = param_var
                 param_seq_str_vec.append(param_seq_str)
-            code += '      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))\n'
-            code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))
+            code += '      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {\n'
 
-        code += '    }\n'
+            if self.is_ipex_func(aten_func_sig_str):
+                code += '        auto _result = AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))
+                code += '        if (is_ipex_func_success()) {\n'
+                code += '          return _result;\n'
+                code += '        } else {\n'
+                code += '          reset_ipex_func_status();\n'
+                code += '        }\n'
+            else:
+                code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))
 
+            code += '      }\n' # Check support tensors
+        code += '    }\n' # Check auto dnnl
         code += '  } catch (std::exception& e) {\n'
         code += '#if defined(_DEBUG)\n'
         code += '    TORCH_WARN(e.what());\n'

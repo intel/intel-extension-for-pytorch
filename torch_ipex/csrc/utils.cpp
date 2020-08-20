@@ -7,6 +7,8 @@
 
 namespace torch_ipex {
 
+thread_local IPEXFuncStatus g_current_ipex_func_stat = IPEXFuncStatus::IPEX_SUCCESS;
+
 bool check_device_by_tensor(const at::Tensor& tensor, DPCPPSubDev sub_dev) {
   auto dev_idx = tensor.get_device();
   if (sub_dev == DPCPPSubDev::CPU) {
@@ -140,4 +142,20 @@ bool check_aten_dil_shape_info(const at::Tensor& ipex_tensor, const dil::tensor 
   }
 }
 
-} // namespace torch_ipex
+IPEXFuncStatus get_ipex_func_status() {
+  return g_current_ipex_func_stat;
+}
+
+void set_ipex_func_status(IPEXFuncStatus ipex_fun_stat) {
+  g_current_ipex_func_stat = ipex_fun_stat;
+}
+
+void reset_ipex_func_status() {
+  set_ipex_func_status(IPEXFuncStatus::IPEX_SUCCESS);
+}
+
+bool is_ipex_func_success() {
+  return g_current_ipex_func_stat == IPEXFuncStatus::IPEX_SUCCESS;
+}
+
+}  // namespace torch_ipex
