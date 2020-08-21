@@ -74,21 +74,14 @@ embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indices,
 
   at::Tensor offsets_ = offsets.contiguous();
   if (embedding_bag_fast_path_sum(weight, per_sample_weights, mode)) {
-    at::Tensor bag_size;
-    at::Tensor offset2bag;
-    if (weight.requires_grad()) {
-      // in MODE_SUM, only initialize bag_size if we need gradients
-      bag_size = at::native::full(offsets_.sizes(), 0, indices.options());
-      offset2bag = at::empty({0}, offsets_.options());
-    }
-
     at::Tensor output;
+    at::Tensor dummy = at::empty({0}, offsets_.options());
     if(is_bfloat16_tensor(weight)) {
        output = _embedding_bag_index_add_select_fast<at::BFloat16>(indices, weight, offsets_, include_last_offset);
     } else {
        output = _embedding_bag_index_add_select_fast<float>(indices, weight, offsets_, include_last_offset);
     }
-    return std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>(output, offset2bag, bag_size, bag_size);
+    return std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>(output, dummy, dummy, dummy);
   }
 
    //May need full support for Bfloat16
