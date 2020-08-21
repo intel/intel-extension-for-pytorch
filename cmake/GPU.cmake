@@ -102,14 +102,10 @@ include_directories(${DPCPP_GPU_ATEN_GENERATED})
 include_directories(${DPCPP_GPU_ONEDNN})
 
 # generate c10 dispatch registration
-add_custom_command(OUTPUT
-          ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp
-        COMMAND
-          mkdir -p ${DPCPP_GPU_ATEN_GENERATED} && mkdir -p ${DPCPP_GPU_ATEN_GENERATED}/ATen
-        COMMAND
-          "${PYTHON_EXECUTABLE}" ${PROJECT_SOURCE_DIR}/scripts/gpu/dispatch_gen.py --install_dir ${DPCPP_GPU_ATEN_GENERATED}/ATen/
-        DEPENDS
-          ${PROJECT_SOURCE_DIR}/scripts/gpu/DPCPPGPUType.h)
+add_custom_command(OUTPUT ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp
+        COMMAND mkdir -p ${DPCPP_GPU_ATEN_GENERATED} && mkdir -p ${DPCPP_GPU_ATEN_GENERATED}/ATen
+        COMMAND "${PYTHON_EXECUTABLE}" ${PROJECT_SOURCE_DIR}/scripts/gpu/dispatch_gen.py --install_dir ${DPCPP_GPU_ATEN_GENERATED}/ATen/
+        DEPENDS ${PROJECT_SOURCE_DIR}/scripts/gpu/DPCPPGPUType.h)
 
 # sources
 set(DPCPP_SRCS)
@@ -117,11 +113,8 @@ set(DPCPP_JIT_SRCS)
 set(DPCPP_ATEN_SRCS)
 add_subdirectory(torch_ipex/csrc/gpu/aten)
 list(APPEND DPCPP_SRCS ${DPCPP_ATEN_SRCS})
-
 add_subdirectory(torch_ipex/csrc/gpu/jit)
-list(APPEND DPCPP_SRCS ${DPCPP_JIT_SRCS})
-
-add_library(torch_ipex SHARED ${DPCPP_SRCS} ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp)
+add_library(torch_ipex SHARED ${DPCPP_SRCS} ${DPCPP_JIT_SRCS} ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp)
 
 # pytorch library
 if(DEFINED PYTORCH_LIBRARY_DIR)
@@ -137,28 +130,47 @@ set_target_properties(torch_ipex PROPERTIES PREFIX "")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
 
 if(BUILD_INTERNAL_DEBUG)
-    add_definitions(-DBUILD_INTERNAL_DEBUG)
+  target_compile_definitions(torch_ipex PRIVATE -DBUILD_INTERNAL_DEBUG)
 endif()
+
 if(BUILD_DOUBLE_KERNEL)
-    add_definitions(-DBUILD_DOUBLE_KERNEL)
+  target_compile_definitions(torch_ipex PRIVATE -DBUILD_DOUBLE_KERNEL)
 endif()
 
 include(cmake/DPCPP.cmake)
 if(USE_COMPUTECPP)
-  add_definitions(-DUSE_COMPUTECPP)
+  target_compile_definitions(torch_ipex PRIVATE -DUSE_COMPUTECPP)
   include_directories(SYSTEM ${ComputeCpp_INCLUDE_DIRS} ${OpenCL_INCLUDE_DIRS})
   target_link_libraries(torch_ipex PUBLIC ${COMPUTECPP_RUNTIME_LIBRARY})
   add_sycl_to_target(TARGET torch_ipex SOURCES ${DPCPP_SRCS})
   message(STATUS "ComputeCpp found. Compiling with SYCL support")
+
 elseif(USE_DPCPP)
-  add_definitions(-DUSE_DPCPP)
-  set_source_files_properties(${DPCPP_SRCS} COMPILE_FLAGS "-fsycl -D__STRICT_ANSI__ -fsycl-unnamed-lambda")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl -fsycl-device-code-split=per_source")
+  target_compile_definitions(torch_ipex PRIVATE -DUSE_DPCPP)
+  # Suppress the compiler warning about undefined CL_TARGET_OPENCL_VERSION
+  target_compile_definitions(torch_ipex PRIVATE -DCL_TARGET_OPENCL_VERSION=220)
+  if(USE_PSTL)
+    target_compile_definitions(torch_ipex PRIVATE -D_PSTL_BACKEND_SYCL)
+  endif()
+
+  set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl")
+  set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -D__STRICT_ANSI__")
+  set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl-unnamed-lambda")
+  set_source_files_properties(${DPCPP_SRCS} COMPILE_FLAGS "${IPEX_COMPILE_FLAGS}")
+
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl")
+  if(BUILD_BY_PER_KERNEL)
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
+  else()
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
+  endif()
   message(STATUS "DPCPP found. Compiling with SYCL support")
   if(USE_USM)
-    add_definitions(-DUSE_USM)
+    target_compile_definitions(torch_ipex PRIVATE -DUSE_USM)
     message(STATUS "USM is enabled as device memory management!")
   endif()
+
 else()
   message(FATAL_ERROR "ComputeCpp or DPCPP NOT found. Compiling without SYCL support")
 endif()
@@ -177,7 +189,7 @@ find_package(MKLDPCPP QUIET)
 if (MKLDPCPP_FOUND)
   target_link_libraries(torch_ipex PUBLIC ${ONEMKL_SHARED_LIBS})
   include_directories(${ONEMKL_INCLUDE_DIR})
-  add_definitions(-DUSE_ONEMKL)
+  target_compile_definitions(torch_ipex PRIVATE -DUSE_ONEMKL)
 else()
   message(WARNING "Cannot find oneMKL.")
 endif()

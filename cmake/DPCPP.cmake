@@ -59,16 +59,11 @@ set(USE_DPCPP FALSE)
 set(USE_COMPUTECPP FALSE)
 if(INTEL_SYCL_VERSION)
     set(USE_DPCPP TRUE)
-    get_filename_component(SYCL_INCLUDE_DIR
-            "${INTEL_SYCL_VERSION}/../../.." ABSOLUTE)
-
-    # Suppress the compiler warning about undefined CL_TARGET_OPENCL_VERSION
-    add_definitions(-DCL_TARGET_OPENCL_VERSION=220)
+    get_filename_component(SYCL_INCLUDE_DIR "${INTEL_SYCL_VERSION}/../../.." ABSOLUTE)
 
     find_library(SYCL_LIBRARY
         NAMES "sycl"
-        HINTS
-            ${sycl_root_hints}
+        HINTS ${sycl_root_hints}
         PATH_SUFFIXES lib
         NO_DEFAULT_PATH)
     if(NOT SYCL_LIBRARY)
@@ -78,8 +73,7 @@ if(INTEL_SYCL_VERSION)
     # Find the OpenCL library from the SYCL distribution
     find_library(OpenCL_LIBRARY
         NAMES "OpenCL"
-        HINTS
-            ${sycl_root_hints}
+        HINTS ${sycl_root_hints}
         PATH_SUFFIXES lib
         NO_DEFAULT_PATH)
     if(NOT OpenCL_LIBRARY)
@@ -97,68 +91,58 @@ if(INTEL_SYCL_VERSION)
     endif()
     include_directories(${SYCL_INCLUDE_DIR})
 
-    #add pstl lib
-    # Try to find PSTL header from DPC++
-    find_path(PSTL_INCLUDE_DIRS
-            NAMES dpstd
-            PATHS
-            ${sycl_root_hints}
-            PATH_SUFFIXES
-            include
-            NO_DEFAULT_PATH)
-
-    find_package_handle_standard_args(PSTL
-            FOUND_VAR PSTL_FOUND
-            REQUIRED_VARS PSTL_INCLUDE_DIRS)
-
     #add tbb lib
     find_path(TBB_INCLUDE_DIRS
             NAMES tbb
-            PATHS
-                ${INTELONEAPIROOT}/tbb/latest
-                $ENV{INTELONEAPIROOT}/tbb/latest
-            PATH_SUFFIXES
-                include
+            PATHS ${INTELONEAPIROOT}/tbb/latest $ENV{INTELONEAPIROOT}/tbb/latest
+            PATH_SUFFIXES include
             NO_DEFAULT_PATH)
 
     find_package_handle_standard_args(TBB
             FOUND_VAR TBB_FOUND
             REQUIRED_VARS TBB_INCLUDE_DIRS)
-    if(${TBB_FOUND})
-        if(${PSTL_FOUND})
-            add_definitions(-D_PSTL_BACKEND_SYCL)
-
-            find_library(TBB_LIBRARY
-                    NAMES tbb
-                    HINTS
-                        ${INTELONEAPIROOT}/tbb/latest
-                        $ENV{INTELONEAPIROOT}/tbb/latest
-                    PATH_SUFFIXES
-                        lib/intel64/gcc4.8
-                    NO_DEFAULT_PATH)
-            if(NOT TBB_LIBRARY)
-                message(FATAL_ERROR "TBB library not found")
-            endif()
-            list(APPEND EXTRA_SHARED_LIBS ${TBB_LIBRARY})
-
-            if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${PSTL_INCLUDE_DIRS})
-                include_directories(${PSTL_INCLUDE_DIRS})
-            endif()
-
-            if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${TBB_INCLUDE_DIRS})
-                include_directories(${TBB_INCLUDE_DIRS})
-            endif()
-
-            MESSAGE(STATUS "TBB directors " ${TBB_INCLUDE_DIRS})
-            MESSAGE(STATUS "PSTL directors " ${PSTL_INCLUDE_DIRS})
-        else()
-            MESSAGE(WARNING "PSTL not found. No PSTL")
-        endif()
-    set(TBB_FOUND)
-    else()
-        MESSAGE(WARNING "TBB not found. No PSTL")
+    if(NOT ${TBB_FOUND})
+        message(WARNING "TBB not found. No PSTL")
+        return()
     endif()
 
+    #add pstl lib
+    # Try to find PSTL header from DPC++
+    find_path(PSTL_INCLUDE_DIRS
+            NAMES dpstd
+            PATHS ${sycl_root_hints}
+            PATH_SUFFIXES include
+            NO_DEFAULT_PATH)
+
+    find_package_handle_standard_args(PSTL
+            FOUND_VAR PSTL_FOUND
+            REQUIRED_VARS PSTL_INCLUDE_DIRS)
+    if(${PSTL_FOUND})
+      set(USE_PSTL TRUE)
+      find_library(TBB_LIBRARY
+              NAMES tbb
+              HINTS ${INTELONEAPIROOT}/tbb/latest $ENV{INTELONEAPIROOT}/tbb/latest
+              PATH_SUFFIXES lib/intel64/gcc4.8
+              NO_DEFAULT_PATH)
+      if(NOT TBB_LIBRARY)
+          message(FATAL_ERROR "TBB library not found")
+      endif()
+      list(APPEND EXTRA_SHARED_LIBS ${TBB_LIBRARY})
+
+      if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${PSTL_INCLUDE_DIRS})
+          include_directories(${PSTL_INCLUDE_DIRS})
+      endif()
+
+      if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${TBB_INCLUDE_DIRS})
+          include_directories(${TBB_INCLUDE_DIRS})
+      endif()
+
+      message(STATUS "TBB directors " ${TBB_INCLUDE_DIRS})
+      message(STATUS "PSTL directors " ${PSTL_INCLUDE_DIRS})
+    else()
+      message(WARNING "PSTL not found. No PSTL")
+    endif()
+    set(TBB_FOUND)
 else()
     # ComputeCpp-specific flags
     # 1. Ignore the warning about undefined symbols in SYCL kernels - comes from
