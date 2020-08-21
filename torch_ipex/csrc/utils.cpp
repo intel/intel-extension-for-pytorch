@@ -77,6 +77,8 @@ dil::data_type get_dil_data_type(at::ScalarType at_dt) {
     return dil::data_type::bf16;
   } else if (at_dt == at::ScalarType::Float) {
     return dil::data_type::f32;
+  } else if (at_dt == at::kInt) {
+    return dil::data_type::s32;
   }  else if (at_dt == at::ScalarType::QInt8) {
     return dil::data_type::s8;
   }  else if (at_dt == at::ScalarType::QUInt8) {
@@ -94,6 +96,8 @@ at::ScalarType get_at_data_type(dil::data_type dil_dt) {
     return at::ScalarType::BFloat16;
   } else if (dil_dt == dil::data_type::f32) {
     return at::ScalarType::Float;
+  } else if (dil_dt == dil::data_type::s32) {
+    return at::kInt;
   }  else if (dil_dt == dil::data_type::s8) {
     return at::ScalarType::QInt8;
   }  else if (dil_dt == dil::data_type::u8) {

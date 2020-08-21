@@ -455,7 +455,7 @@ at::Tensor& AtenIpexCPUDev::dil_bmm_out(at::Tensor &result, const at::Tensor& ba
   CHECK_DNNL_OP_PRE_COND(batch2);
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch1.dim() == 3 && batch2.dim() == 3);
-  dil::dims inferred_size{batch1.size(0), batch1.size(1), batch2.size(2)};
+  dil::dims inferred_size{dil_size(batch1, 0), dil_size(batch1, 1), dil_size(batch2, 2)};
 
   dbl::comm::reorder_to_bf16_for_mix_prec(batch1);
   dbl::comm::reorder_to_bf16_for_mix_prec(batch2);
@@ -481,7 +481,7 @@ at::Tensor& AtenIpexCPUDev::dil_mm_out(at::Tensor& result, const at::Tensor& sel
   DEBUG("AtenIpexCPUDev::dil_mm_out\n");
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.dim() == 2 && mat2.dim() == 2);
-  dil::dims inferred_size{self.size(0), mat2.size(1)};
+  dil::dims inferred_size{dil_size(self, 0), dil_size(mat2, 1)};
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self);
   dbl::comm::reorder_to_bf16_for_mix_prec(mat2);
@@ -509,7 +509,7 @@ at::Tensor& dil_baddbmm_common(
   CHECK_DNNL_OP_PRE_COND(batch2);
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch1.dim() == 3 && batch2.dim() == 3);
-  dil::dims inferred_size{batch1.size(0), batch1.size(1), batch2.size(2)};
+  dil::dims inferred_size{AtenIpexCPUDev::dil_size(batch1, 0), AtenIpexCPUDev::dil_size(batch1, 1), AtenIpexCPUDev::dil_size(batch2, 2)};
   IPEX_CHECK(self.sizes().equals(inferred_size),
       "dil baddbmm not support broadcast yet");
 
@@ -577,7 +577,7 @@ at::Tensor& dil_addmm_common(
   CHECK_DNNL_OP_PRE_COND(mat2);
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(mat1.dim() == 2 && mat2.dim() == 2);
-  dil::dims inferred_size{mat1.size(0), mat2.size(1)};
+  dil::dims inferred_size{AtenIpexCPUDev::dil_size(mat1, 0), AtenIpexCPUDev::dil_size(mat2, 1)};
   IPEX_CHECK(self.sizes().equals(inferred_size),
       "dil addmm not support broadcast yet");
 
@@ -639,7 +639,7 @@ at::Tensor& dil_addbmm_common(
   CHECK_DNNL_OP_PRE_COND(batch2);
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(batch1.dim() == 3 && batch2.dim() == 3);
-  dil::dims inferred_size{batch1.size(1), batch2.size(2)};
+  dil::dims inferred_size{AtenIpexCPUDev::dil_size(batch1, 1), AtenIpexCPUDev::dil_size(batch2, 2)};
   IPEX_CHECK(self.sizes().equals(inferred_size),
       "dil addbmm not support broadcast yet");
 
@@ -714,7 +714,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   dbl::comm::reorder_to_bf16_for_mix_prec(weight);
 
   // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
-  auto self_reshaped = self.dim() > 2 ? dil_reshape(self, {-1, self.size(self.dim() - 1)}) : self;
+  auto self_reshaped = self.dim() > 2 ? dil_reshape(self, {-1, dil_size(self, self.dim() - 1)}) : self;
   const dil::tensor x = dbl::comm::try_gen_dil_tensor(self_reshaped);
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
 
@@ -727,14 +727,14 @@ at::Tensor AtenIpexCPUDev::dil_linear(
     dil::inner_product_forward::compute(x, w, y);
   }
 
-  auto input_size = self.sizes();
-  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(weight.size(0));
-
+  auto result = dbl::comm::gen_aten_tensor_by(std::move(y));
   if (self.dim() > 2) {
-    return at::_unsafe_view(dbl::comm::gen_aten_tensor_by(std::move(y)), output_size);
+    auto input_size = self.sizes();
+    std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
+    output_size.push_back(dil_size(weight, 0));
+    return dil_view(result, output_size);
   }
-  return dbl::comm::gen_aten_tensor_by(std::move(y));
+  return result;
 }
 
 at::Tensor AtenIpexCPUDev::dil_linear_backward_input(
@@ -747,13 +747,13 @@ at::Tensor AtenIpexCPUDev::dil_linear_backward_input(
   dbl::comm::reorder_to_bf16_for_mix_prec(weight);
 
   auto grad_output_reshaped = grad_output.dim() > 2 ?
-    dil_reshape(grad_output, {-1, grad_output.size(grad_output.dim() - 1)}) : grad_output;
+    dil_reshape(grad_output, {-1, dil_size(grad_output, grad_output.dim() - 1)}) : grad_output;
   dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_reshaped);
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
 
   std::vector<int64_t> input_reshaped_size;
-  input_reshaped_size.push_back(grad_output_reshaped.size(0));
-  input_reshaped_size.push_back(weight.size(1));
+  input_reshaped_size.push_back(dil_size(grad_output_reshaped, 0));
+  input_reshaped_size.push_back(dil_size(weight, 1));
 
   dil::tensor gradx;
   dil::inner_product_backward_data::compute(
@@ -777,8 +777,8 @@ std::tuple<at::Tensor, at::Tensor> AtenIpexCPUDev::dil_linear_backward_weights(
   dbl::comm::reorder_to_bf16_for_mix_prec(weight);
 
   auto grad_output_reshaped = grad_output.dim() > 2 ?
-    dil_reshape(grad_output, {-1, grad_output.size(grad_output.dim() - 1)}) : grad_output;
-  auto input_reshaped = input.dim() > 2 ? dil_reshape(input, {-1, input.size(input.dim() - 1)}) : input;
+    dil_reshape(grad_output, {-1, dil_size(grad_output, grad_output.dim() - 1)}) : grad_output;
+  auto input_reshaped = input.dim() > 2 ? dil_reshape(input, {-1, dil_size(input, input.dim() - 1)}) : input;
 
   dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_reshaped);
   dil::tensor x = dbl::comm::try_gen_dil_tensor(input_reshaped);
@@ -1040,7 +1040,7 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
       dbl::comm::expand_param_if_needed(output_size, "output_size", input.dim() - 2);
   std::vector<int64_t> kernel_size(input.dim() - 2);
   for (int64_t i = 2; i < input.dim(); ++i) {
-    auto s1 = input.size(i);
+    auto s1 = dil_size(input, i);
     auto s2 = output_size_vec[i - 2];
     IPEX_CHECK(s2 != 0, "output size can not be zero");
     IPEX_CHECK(
@@ -1168,7 +1168,7 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(
   auto output_size_vec = grad_output.sizes();
   std::vector<int64_t> kernel_size(input.dim() - 2);
   for (size_t i = 2; i < input.dim(); ++i) {
-    auto s1 = input.size(i);
+    auto s1 = dil_size(input, i);
     auto s2 = output_size_vec[i];
     IPEX_CHECK(s2 != 0, "output size can not be zero");
     IPEX_CHECK(
@@ -1480,7 +1480,7 @@ at::Tensor dil_as_strided(
     c10::optional<int64_t> storage_offset_) {
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
-      dbl::comm::try_gen_dil_tensor(self).is_public_format(),
+      self.scalar_type() != at::kFloat || dbl::comm::try_gen_dil_tensor(self).is_public_format(),
       "Cannot set sizes and strides for DIL tensor with non-public format");
 
   // share storage
@@ -1597,7 +1597,7 @@ at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, int64_t dim, int6
     AT_INDEX_ERROR("select() cannot be applied to a 0-dim tensor.");
   }
   dim = at::maybe_wrap_dim(dim, ndim);
-  auto size = self.size(dim);
+  auto size = dil_size(self, dim);
   if (index < -size || index >= size) {
     if (self.has_names() && self.names()[dim] != at::Dimname::wildcard()) {
       AT_INDEX_ERROR("select(): index ", index, " out of range for tensor of size ",
@@ -1680,7 +1680,7 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split(const at::Tensor& self, int64_
   DEBUG("AtenIpexCPUDev::dil_split\n");
   CHECK_DNNL_OP_PRE_COND(self);
   dim = at::maybe_wrap_dim(dim, self.dim());
-  int64_t dim_size = self.size(dim);
+  int64_t dim_size = dil_size(self, dim);
   int64_t num_splits = 1;
   if (split_size != 0) {
     // ensuring num_splits is at least 1 makes consistent the case where split_size > dim_size
@@ -1731,11 +1731,11 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_
   const dil::tensor scale = dbl::comm::try_gen_dil_tensor(gamma);
   const dil::tensor shift = dbl::comm::try_gen_dil_tensor(beta);
   int64_t i = 0;
-  auto j = X.size(0);
+  auto j = dil_size(X, 0);
   std::vector<int64_t> input_size;
   while(j <= M) {
-    input_size.push_back(X.size(i++));
-    j *= X.size(i);
+    input_size.push_back(dil_size(X, i++));
+    j *= dil_size(X, i);
   }
   input_size.push_back(N);
   auto src = x.reshape(input_size);
@@ -1772,11 +1772,11 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_
   dil::tensor r = dbl::comm::try_gen_dil_tensor(rstd);
   dil::tensor g = dbl::comm::try_gen_dil_tensor(gamma);
   int64_t i = 0;
-  auto j = X.size(0);
+  auto j = dil_size(X, 0);
   std::vector<int64_t> input_size;
   while(j <= M) {
-    input_size.push_back(X.size(i++));
-    j *= X.size(i);
+    input_size.push_back(dil_size(X, i++));
+    j *= dil_size(X, i);
   }
   input_size.push_back(N);
   auto src = x.reshape(input_size);
