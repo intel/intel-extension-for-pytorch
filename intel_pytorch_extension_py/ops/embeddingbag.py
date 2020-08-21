@@ -3,7 +3,6 @@ from torch import nn
 from torch.nn import functional as F
 from torch.autograd import Function
 import _torch_ipex as core
-import itertools
 
 
 '''
@@ -113,10 +112,7 @@ class _EmbeddingBag(nn.Module):
                               missing_keys, unexpected_keys, error_msgs):
 
         if self.eval_mode:
-            local_name_params = itertools.chain(self._parameters.items())
-            local_state = {k: v for k, v in local_name_params}
- 
-            for name, param in local_state.items():
+            for name, param in self._parameters.items():
                 key = prefix + name
                 if key in state_dict:
                     input_param = state_dict[key]
@@ -138,7 +134,7 @@ class _EmbeddingBag(nn.Module):
                     if key.startswith(prefix):
                         input_name = key[len(prefix):]
                         input_name = input_name.split('.', 1)[0]  # get the name of param/buffer/child
-                        if input_name not in self._modules and input_name not in local_state:
+                        if input_name not in self._modules and input_name not in self._parameters:
                             unexpected_keys.append(key)
         else:
             super(_EmbeddingBag, self)._load_from_state_dict(
