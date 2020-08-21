@@ -8,7 +8,6 @@ dpcpp_device = torch.device('dpcpp')
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()")     
     def test_logical_xor(self, dtype=torch.float):
         input1 = torch.tensor(
             [0, 1, 10, 0], device=torch.device("cpu"), dtype=torch.int8)
@@ -16,8 +15,11 @@ class TestTorchMethod(TestCase):
             [4, 0, 1, 0], device=torch.device("cpu"), dtype=torch.int8)
 
         # TODO: check for diferent dtype
-        array1 = [input1, input1.double()]  # , input1.double()]
-        array2 = [input2, input2.double()]  # , input2]
+        array1 = [input1, input1.half(), input1.bool()]
+        array2 = [input2, input2.half(), input2.bool()]
+        if not torch_ipex._double_kernel_disabled():
+            array1.append(input1.double())
+            array2.append(input2.double())
 
         for i in range(len(array1)):
             print("Testing logical_xor on", array1[i], "and", array2[i])

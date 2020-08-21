@@ -11,7 +11,6 @@ cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("dpcpp")
  
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()")
     def test_nll_loss(self, dtype=torch.float):
         # input is of size N x C = 3 x 5
         input = torch.randn(3, 5)

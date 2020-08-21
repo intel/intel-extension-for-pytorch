@@ -9,7 +9,6 @@ dpcpp_device = torch.device('dpcpp')
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()")    
     def test_loss_ctc(self, dtype=torch.float):
         def print_detial_dif(a, b, rtol=1e-05, atol=1e-08):
             print(a)

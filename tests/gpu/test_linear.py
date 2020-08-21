@@ -9,7 +9,6 @@ cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("dpcpp")
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()")    
     def test_linear(self, dtype=torch.float):
         #cpu
         linear = nn.Linear(4, 2)

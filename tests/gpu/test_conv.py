@@ -10,7 +10,6 @@ dpcpp_device = torch.device("dpcpp")
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()")    
     def test_conv(self, dtype=torch.float):
         # functionality
         x_cpu = torch.ones([1, 2, 3, 3], device=cpu_device)
@@ -60,15 +59,17 @@ class TestNNMethod(TestCase):
 
         y_dpcpp_2.backward(grad_dpcpp)
 
-        print("ref: ")
-        print(y_dpcpp_2)
-        print("ref backward: ")
-        print(x_dpcpp_2)
+        if not torch_ipex._double_kernel_disabled():
+            print("ref: ")
+            print(y_dpcpp_2)
+            print("ref backward: ")
+            print(x_dpcpp_2)
 
-        print("real: ")
-        print(y_dpcpp_2.to(cpu_device))
-        print("real backward: ")
-        print(x_dpcpp_2.to(cpu_device))
+            print("real: ")
+            print(y_dpcpp_2.to(cpu_device))
+            print("real backward: ")
+            print(x_dpcpp_2.to(cpu_device))
+
         self.assertEqual(x_cpu_2, x_dpcpp_2)
         self.assertEqual(grad, grad_dpcpp.to(cpu_device))
         self.assertEqual(y_cpu_2, y_dpcpp_2.to(cpu_device))

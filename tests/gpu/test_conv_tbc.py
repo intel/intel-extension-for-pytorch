@@ -8,7 +8,6 @@ cpu_device = torch.device("cpu")
 
 
 class  TestTorchMethod(TestCase):
-    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()")    
     def test_conv_tbc(self, dtype=torch.float):
 
         input_cpu = torch.randn(3, 4, 5)
@@ -32,9 +31,11 @@ class  TestTorchMethod(TestCase):
         print("sycl")
         input_sycl.requires_grad = True
         output_sycl = m(input_sycl, weight_sycl, bias_sycl)
-        print("output: ", output_sycl.cpu())
+        if not torch_ipex._double_kernel_disabled():
+            print("output: ", output_sycl.cpu())
         output_sycl.backward(torch.ones_like(output_sycl).to("dpcpp"))
-        print("input.grad: ", input_sycl.grad)
+        if not torch_ipex._double_kernel_disabled():
+            print("input.grad: ", input_sycl.grad)
         # input_sycl.grad.zero_()
         self.assertEqual(output_cpu, output_sycl.cpu())
         self.assertEqual(input_cpu.grad, input_sycl.grad.cpu())

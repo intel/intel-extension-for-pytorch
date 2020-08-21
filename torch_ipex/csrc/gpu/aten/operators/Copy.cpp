@@ -125,10 +125,10 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   } else {
     ScalarType dtype = iter.dtype(0);
     if(!isQIntType(dtype)){
-      IPEX_DISPATCH_ALL_TYPES_AND3(
+      IPEX_DISPATCH_ALL_TYPES_ALWAYS_AND3(
           kHalf, kBFloat16, kBool, iter.dtype(0), "copy_", [&] {
             using dst_t = scalar_t;
-            IPEX_DISPATCH_ALL_TYPES_AND3(
+            IPEX_DISPATCH_ALL_TYPES_ALWAYS_AND3(
                 kHalf, kBFloat16, kBool, iter.dtype(1), "copy_", [&] {
                   CopyOp<dst_t, scalar_t>::apply(iter.tensor(0), iter.tensor(1));
                 });

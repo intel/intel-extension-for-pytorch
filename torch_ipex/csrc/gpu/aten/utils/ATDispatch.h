@@ -32,6 +32,17 @@
     }                                                                             \
   }()
 
+// Some kernels must support full data types, for example, fill and copy.
+// This dispatch macro helps to keep all data types support in any build config.
+#define IPEX_DISPATCH_ALL_TYPES_ALWAYS_AND(SCALARTYPE, TYPE, NAME, ...)        \
+  AT_DISPATCH_ALL_TYPES_AND(SCALARTYPE, TYPE, NAME, __VA_ARGS__)
+
+#define IPEX_DISPATCH_ALL_TYPES_ALWAYS_AND2(SCALARTYPE1, SCALARTYPE2, TYPE, NAME, ...)   \
+  AT_DISPATCH_ALL_TYPES_AND2(SCALARTYPE1, SCALARTYPE2, TYPE, NAME, __VA_ARGS__)
+
+#define IPEX_DISPATCH_ALL_TYPES_ALWAYS_AND3(SCALARTYPE1, SCALARTYPE2, SCALARTYPE3, TYPE, NAME, ...)    \
+  AT_DISPATCH_ALL_TYPES_AND3(SCALARTYPE1, SCALARTYPE2, SCALARTYPE3, TYPE, NAME, __VA_ARGS__)
+
 // Redefine DISPATCH macro for debug usage only
 // For example, remove useless data type support for multiple kernels to reduce JIT time
 

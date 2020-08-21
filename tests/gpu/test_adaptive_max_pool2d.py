@@ -9,7 +9,6 @@ dpcpp_device = torch.device("dpcpp")
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skipif("torch_ipex._double_kernel_disabled()") 
     def test_adaptive_max_pool2d(self, dtype=torch.float):
         x_cpu = torch.randn([1, 1, 8, 8], device=cpu_device)
         grad_cpu = torch.randn([1, 1, 2, 2], device=cpu_device)
