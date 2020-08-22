@@ -3,7 +3,7 @@
 #include <iostream>
 
 /*
- * All available runtime options for IPEX
+ * All available launch options for IPEX
  * IPEX_VERBOSE:            Default = 0, Set verbose level in IPEX
  * IPEX_FORCE_SYNC:         Default = 0, Set 1 to enforce blocked/sync execution mode
  * IPEX_DISABLE_PROFILING:  Default = 0, Set 1 to disable IPEX event profiling
@@ -24,8 +24,8 @@
 int dpcpp_env(int env_type) {
   static auto _header = []() -> bool {
     std::cout << std::endl
-      << "/**********************************************************" << std::endl
-      << " ** The values of all available runtime options for IPEX **" << std::endl;
+      << "/*********************************************************" << std::endl
+      << " ** The values of all available launch options for IPEX **" << std::endl;
     return true;
   } ();
 
@@ -38,7 +38,7 @@ int dpcpp_env(int env_type) {
   } env;
 
   static auto _footer = []() -> bool {
-    std::cout << " **********************************************************/" << std::endl;
+    std::cout << " *********************************************************/" << std::endl;
     return true;
   } ();
 

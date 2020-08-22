@@ -17,12 +17,8 @@ void mkldnn_inner_product(
     data_type* input,
     data_type* weight,
     data_type* bias) {
-#ifndef DNNL_CPU_ONLY
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
-#else
-  auto engine = CpuEngine::Instance().get_engine();
-#endif
 
   int32_t n = M;
   int32_t ic = K;
@@ -55,8 +51,6 @@ void mkldnn_inner_product(
   auto ip_forward_pd =
       inner_product_forward::primitive_desc(*ipFwd_desc, engine);
 
-// #if AT_SYCL_ENABLED()
-#if 1
   auto input_usr_memory = memory({{{input_tz}, data_t, format_nc}, engine});
   sycl_set_mkldnn_buffer(input, input_usr_memory);
 
@@ -66,20 +60,12 @@ void mkldnn_inner_product(
   auto output_usr_memory = memory({{{output_tz}, data_t, format_nc}, engine});
   sycl_set_mkldnn_buffer(output, output_usr_memory);
 
-#else
-
-#endif
-
   auto strm = GpuStreamManager::Instance().get_stream();
   std::shared_ptr<inner_product_forward> ip_forward;
   std::shared_ptr<memory> bias_usr_memory;
   if (use_bias) {
-// #if AT_SYCL_ENABLED()
-#if 1
     bias_usr_memory.reset(new memory({{{bias_tz}, data_t, format_x}, engine}));
     sycl_set_mkldnn_buffer(bias, *bias_usr_memory);
-#else
-#endif
   } else {
     bias_usr_memory.reset(new memory({{{}, data_t, format_x}, engine}));
   }

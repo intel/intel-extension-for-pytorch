@@ -59,11 +59,11 @@ using namespace mkldnn;
 namespace at {
 namespace dpcpp {
 
-static inline mkldnn::memory dpcpp_onednn_memory(
-    mkldnn::memory::desc md, mkldnn::engine& engine, void* ptr) {
+static inline dnnl::memory dpcpp_onednn_memory(
+    dnnl::memory::desc md, dnnl::engine& engine, void* ptr) {
 #ifdef USE_USM
   {
-    return mkldnn::memory(md, engine, ptr);
+    return dnnl::memory(md, engine, ptr);
   }
 #else
   {
@@ -76,7 +76,7 @@ static inline mkldnn::memory dpcpp_onednn_memory(
     }
     auto buffer = dpcppGetBufferMap().get_buffer(ptr);
   #endif
-    return mkldnn::memory(md, engine, buffer);
+    return dnnl::memory(md, engine, buffer);
   }
 #endif
 }
@@ -84,36 +84,36 @@ static inline mkldnn::memory dpcpp_onednn_memory(
 //
 // convert ScalarType to MKL-DNN's memory type
 //
-static inline memory::data_type dt_to_dnnl(const ScalarType scalar_type) {
+static inline dnnl::memory::data_type dt_to_dnnl(const ScalarType scalar_type) {
   if (scalar_type == ScalarType::Half) {
-    return memory::data_type::f16;
+    return dnnl::memory::data_type::f16;
   } else if (scalar_type == ScalarType::BFloat16) {
-    return memory::data_type::bf16;
+    return dnnl::memory::data_type::bf16;
   } else if (scalar_type == ScalarType::QInt8) {
-    return memory::data_type::s8;
+    return dnnl::memory::data_type::s8;
   } else if (scalar_type == ScalarType::QUInt8) {
-    return memory::data_type::u8;
+    return dnnl::memory::data_type::u8;
   } else if (scalar_type == ScalarType::QInt32) {
-    return memory::data_type::s32;
+    return dnnl::memory::data_type::s32;
   } else {
-    return memory::data_type::f32;
+    return dnnl::memory::data_type::f32;
   }
 }
 
-static inline memory::format_tag get_dnnl_default_format(int ndims) {
+static inline dnnl::memory::format_tag get_dnnl_default_format(int ndims) {
   switch (ndims) {
     case 1:
-      return memory::format_tag::a;
+      return dnnl::memory::format_tag::a;
     case 2:
-      return memory::format_tag::ab;
+      return dnnl::memory::format_tag::ab;
     case 3:
-      return memory::format_tag::abc;
+      return dnnl::memory::format_tag::abc;
     case 4:
-      return memory::format_tag::abcd;
+      return dnnl::memory::format_tag::abcd;
     case 5:
-      return memory::format_tag::abcde;
+      return dnnl::memory::format_tag::abcde;
     default:
-      return memory::format_tag::any;
+      return dnnl::memory::format_tag::any;
   }
 }
 
@@ -149,25 +149,49 @@ struct GpuEngineManager {
   std::vector<engine> _gpu_engines;
 };
 
-// Stream singleton
+// GpuStreamManager singleton
 struct GpuStreamManager {
   static GpuStreamManager& Instance() {
     static thread_local GpuStreamManager myInstance;
     return myInstance;
-  };
-  stream get_stream(int device_index = 0) {
-    int device_count = (int)at::dpcpp::device_count();
-    TORCH_INTERNAL_ASSERT(device_count > 0 && device_index < device_count);
-    return mkldnn::stream(
-        GpuEngineManager::Instance().get_engine({kDPCPP, current_device()}),
+  }
+
+#ifdef USE_PERSIST_STREAM
+  dnnl::stream& get_stream(int device_index = 0) {
+    TORCH_INTERNAL_ASSERT(device_index < at::dpcpp::device_count());
+    return *stream_pool.at(device_index);
+  }
+#else
+  dnnl::stream get_stream(int device_index = 0) {
+    TORCH_INTERNAL_ASSERT(device_index < at::dpcpp::device_count());
+    return dnnl::stream(
+        GpuEngineManager::Instance().get_engine({kDPCPP, device_index}),
         getDefaultDPCPPStream(device_index).dpcpp_queue());
   }
+#endif
+
   GpuStreamManager(GpuStreamManager const&) = delete;
   GpuStreamManager& operator=(GpuStreamManager const&) = delete;
 
  protected:
-  GpuStreamManager(){};
-  ~GpuStreamManager(){};
+  GpuStreamManager() {
+#ifdef USE_PERSIST_STREAM
+    int deviceCount = at::dpcpp::device_count();
+    TORCH_INTERNAL_ASSERT(deviceCount > 0);
+    for (int dev = 0; dev < deviceCount; dev++) {
+      stream_pool.push_back(std::make_shared<dnnl::stream>(
+          GpuEngineManager::Instance().get_engine({kDPCPP, dev}),
+          getDefaultDPCPPStream(dev).dpcpp_queue()));
+    }
+#endif
+  }
+  ~GpuStreamManager() {}
+
+ private:
+#ifdef USE_PERSIST_STREAM
+  std::vector<std::shared_ptr<dnnl::stream>> stream_pool;
+#endif
 };
+
 } // namespace dpcpp
 } // namespace at

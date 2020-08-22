@@ -129,6 +129,10 @@ endif()
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
 
+if(USE_PERSIST_STREAM)
+  target_compile_definitions(torch_ipex PRIVATE -DUSE_PERSIST_STREAM)
+endif()
+
 if(BUILD_INTERNAL_DEBUG)
   target_compile_definitions(torch_ipex PRIVATE -DBUILD_INTERNAL_DEBUG)
 endif()
