@@ -44,7 +44,7 @@ void bernoulli_scalar_kernel(Tensor& ret, double p_, uint64_t seed) {
     auto num_work_items = DPCPP::nd_range<1>(
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
     cgh.parallel_for<DPCPP_K(bernoulli_scalar_sycl_random_filler, scalar_t)>(
-        num_work_items, [=](cl::sycl::nd_item<1> item) {
+        num_work_items, [=](DPCPP::nd_item<1> item) {
           auto ptr = get_pointer(data);
           RandomEngine<scalar_t> uniform_rnd_filler(ptr, range, seed, 0.0f, 1.0f);
           uniform_rnd_filler(item);
@@ -87,7 +87,7 @@ void bernoulli_tensor_kernel(Tensor& ret, const Tensor& p, uint64_t seed) {
     auto num_work_items = DPCPP::nd_range<1>(
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
     cgh.parallel_for<DPCPP_K(bernoulli_tensor_sycl_random_filler, scalar_t)>(
-        num_work_items, [=](cl::sycl::nd_item<1> item) {
+        num_work_items, [=](DPCPP::nd_item<1> item) {
           auto ptr = get_pointer(data);
           RandomEngine<scalar_t> uniform_rnd_filler(ptr, range, seed, 0.0f, 1.0f);
           uniform_rnd_filler(item);
@@ -540,7 +540,7 @@ Tensor& exponential_(Tensor& self, double lambda_, Generator* gen_) {
       // define lambda for exponential transformation
       auto exponential_func = [lambda] (accscalar_t rand) {
         accscalar_t sample;
-        sample = cl::sycl::log(rand);
+        sample = DPCPP::log(rand);
         return static_cast<scalar_t>(static_cast<accscalar_t>(-1.0) / lambda * sample);
       };
       impl::distribution_nullary_kernel<scalar_t, accscalar_t>(iter,

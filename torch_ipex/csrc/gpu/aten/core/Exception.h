@@ -1,5 +1,5 @@
 #pragma once
-#include <CL/sycl.hpp>
+#include <core/DPCPP.h>
 
 #include <c10/util/Exception.h>
 #include <core/Macros.h>

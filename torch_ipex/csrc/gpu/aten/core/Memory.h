@@ -1,6 +1,5 @@
 #pragma once
 
-#include <CL/sycl.hpp>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
@@ -92,19 +91,19 @@ class DPCPPAccessor {
 };
 
 template <typename out_data_type, typename in_data_type>
-cl::sycl::buffer<out_data_type, 1> make_buffer(in_data_type virtual_ptr) {
+DPCPP::buffer<out_data_type, 1> make_buffer(in_data_type virtual_ptr) {
   //get the uint8_t sycl buffer from the vptr.
   auto raw_buf = at::dpcpp::dpcppGetBufferMap().
       template get_buffer<uint8_t>((void*)virtual_ptr);
   auto offset = at::dpcpp::dpcppGetBufferMap().get_offset(virtual_ptr);
   assert(offset >= 0 && "the sycl buffer offset must >= 0");
-  auto range = cl::sycl::range<1>(raw_buf.get_size() - offset);
-  auto buf = cl::sycl::buffer<uint8_t, 1>(raw_buf,
-                                          cl::sycl::id<1>{static_cast<size_t>(offset)},
+  auto range = DPCPP::range<1>(raw_buf.get_size() - offset);
+  auto buf = DPCPP::buffer<uint8_t, 1>(raw_buf,
+                                          DPCPP::id<1>{static_cast<size_t>(offset)},
                                           range);
 
   //reinterpret the buffer to the required type.
-  range = cl::sycl::range<1>(buf.get_size()/sizeof(out_data_type));
+  range = DPCPP::range<1>(buf.get_size()/sizeof(out_data_type));
   return buf.template reinterpret<out_data_type, 1>(range);
 }
 

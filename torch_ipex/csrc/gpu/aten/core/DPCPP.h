@@ -268,7 +268,7 @@ DPCPP_HOST using dpcpp_host_acc_t =
 #define DPCPP_KER_STRING(var, str) static const DPCPP_CONSTANT char var[] = str;
 
 #if defined(USE_DPCPP)
-#define DPCPP_PRINTF cl::sycl::intel::experimental::printf
+#define DPCPP_PRINTF DPCPP::intel::experimental::printf
 #else
 #define DPCPP_PRINTF printf
 #endif

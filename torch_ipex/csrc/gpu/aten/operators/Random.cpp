@@ -36,7 +36,7 @@ void uniform(Tensor& self, Generator* _generator, double a, double b) {
     auto current_seed = gen->current_seed();
 
     cgh.parallel_for<DPCPP_K(uniform_random_filler, scalar_t)>(
-        num_work_items, [=](cl::sycl::nd_item<1> item) {
+        num_work_items, [=](DPCPP::nd_item<1> item) {
           auto ptr = get_pointer(data);
           RandomEngine<scalar_t> uniform_rnd_filler(ptr, range, current_seed, a, b);
           uniform_rnd_filler(item);
@@ -76,7 +76,7 @@ void normal(Tensor& self, double mean, double stdv, Generator* _generator) {
     auto num_work_items = DPCPP::nd_range<1>(
         DPCPP::range<1>(global_range), DPCPP::range<1>(tile_size));
     cgh.parallel_for<DPCPP_K(normal_random_filler, accreal, scalar_t)>(
-        num_work_items, [=](cl::sycl::nd_item<1> item) {
+        num_work_items, [=](DPCPP::nd_item<1> item) {
           auto ptr = get_pointer(data);
           NormalRandomFiller<scalar_t, accreal> normal_rnd_filler(
             ptr, compute_num, stdv, mean);

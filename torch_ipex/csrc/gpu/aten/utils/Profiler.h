@@ -5,7 +5,6 @@
 #include <utils/Env.h>
 #include <CL/sycl.hpp>
 #include <sstream>
-#include <chrono>
 #include <iostream>
 
 using namespace torch::autograd::profiler;

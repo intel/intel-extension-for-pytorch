@@ -27,7 +27,7 @@ static void initGlobalDevicePoolState() {
   auto plaform_list = DPCPP::platform::get_platforms();
   DeviceIndex devIndex = 0;
   for (const auto& platform : plaform_list) {
-    auto plat_name = platform.get_info<cl::sycl::info::platform::name>();
+    auto plat_name = platform.get_info<DPCPP::info::platform::name>();
     if (plat_name.compare(getPreferredPlatform()) != 0)
       continue;
     auto device_list = platform.get_devices();
@@ -101,13 +101,13 @@ DPCPPDeviceSelector dpcppGetDeviceSelector(DeviceIndex device_index) {
 #define MAX_DPCPP_MEM_PER_DEVICE 17179869184 // 16*1024*1024*1024 -- 16GB
 // Global buffer map pool state
 static std::once_flag init_buffer_map_flag;
-static std::vector<cl::sycl::codeplay::PointerMapper*> gBufferMapPoolPtr;
+static std::vector<DPCPP::codeplay::PointerMapper*> gBufferMapPoolPtr;
 static void initBufferMapPoolStates() {
   int device_count;
   AT_DPCPP_CHECK(dpcppGetDeviceCount(&device_count));
   gBufferMapPoolPtr.resize(device_count);
   for (int i = 0; i < device_count; i++) {
-    gBufferMapPoolPtr[i] = new cl::sycl::codeplay::PointerMapper(
+    gBufferMapPoolPtr[i] = new DPCPP::codeplay::PointerMapper(
         4096 + i * MAX_DPCPP_MEM_PER_DEVICE);
   }
 }
@@ -116,7 +116,7 @@ static void initBufferMapPoolCallOnce() {
   std::call_once(init_buffer_map_flag, initBufferMapPoolStates);
 }
 
-cl::sycl::codeplay::PointerMapper& dpcppGetBufferMap() {
+DPCPP::codeplay::PointerMapper& dpcppGetBufferMap() {
 #ifndef USE_USM
   initBufferMapPoolCallOnce();
   DeviceIndex device_id;
@@ -171,8 +171,8 @@ std::string getPreferredPlatform() {
   // platform Following code logic based upon the assumption: gpu_selector will
   // select gpu device with priority considering platform: 1) level_zero 2)
   // opencl JIRA CMPLRLLVM-19937 is tracking this.
-  cl::sycl::device dev{cl::sycl::gpu_selector{}};
-  return dev.get_platform().get_info<cl::sycl::info::platform::name>();
+  DPCPP::device dev{DPCPP::gpu_selector{}};
+  return dev.get_platform().get_info<DPCPP::info::platform::name>();
 }
 
 void parallel_for_setup(

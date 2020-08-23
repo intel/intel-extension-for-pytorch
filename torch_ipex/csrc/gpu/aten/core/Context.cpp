@@ -1,4 +1,3 @@
-#include <CL/sycl.hpp>
 #include <core/Allocator.h>
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
