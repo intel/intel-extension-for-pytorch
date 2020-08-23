@@ -1268,9 +1268,6 @@ inline void DPCPP_tensor_apply1(at::Tensor a, const Op& op) {
 #undef HANDLE_A_CASE
 
   if (oldA.defined()) {
-    // Ignore overlaps when copying back; if we use copy
-    // instead, it will recursively try and invoke ourselves to make
-    // old_dst contiguous
     TORCH_CHECK(0, "not implemented THDPCPPTensor_copyIgnoringOverlaps\n");
     // at::native::legacy::dpcpp::_th_copy_ignoring_overlaps_(oldA, a);
   }
@@ -1391,9 +1388,6 @@ inline void DPCPP_tensor_apply2(at::Tensor dst, at::Tensor src, const Op& op) {
 #undef HANDLE_A_CASE
 
   if (old_dst.defined()) {
-    // Ignore overlaps when copying back; if we use copy
-    // instead, it will recursively try and invoke ourselves to make
-    // old_dst contiguous
     TORCH_CHECK(0, "not implemented THDPCPPTensor_copyIgnoringOverlaps\n");
     // at::native::legacy::dpcpp::_th_copy_ignoring_overlaps_(old_dst, dst);
   }
@@ -1549,15 +1543,11 @@ inline void DPCPP_tensor_apply3(
 #undef HANDLE_A_CASE
 
   if (old_dst.defined()) {
-    // Ignore overlaps when copying back; if we use copy
-    // instead, it will recursively try and invoke ourselves to make
-    // old_dst contiguous
     TORCH_CHECK(0, "not implemented THDPCPPTensor_copyIgnoringOverlaps\n");
     // at::native::legacy::dpcpp::_th_copy_ignoring_overlaps_(old_dst, dst);
   }
 }
 
-/* Provides default step = 1 to CUDA_tensor_apply3. */
 template <typename scalar1, typename scalar2, typename scalar3, typename Op>
 inline void DPCPP_tensor_apply3(
     const at::Tensor& a,
@@ -1752,15 +1742,11 @@ inline void DPCPP_tensor_apply4(
 #undef HANDLE_A_CASE
 
   if (old_dst.defined()) {
-    // Ignore overlaps when copying back; if we use THCTensor_copy
-    // instead, it will recursively try and invoke ourselves to make
-    // old_dst contiguous.
     TORCH_CHECK(0, "not implemented THDPCPPTensor_copyIgnoringOverlaps\n");
     // at::native::legacy::dpcpp::_th_copy_ignoring_overlaps_(old_dst, dst);
   }
 }
 
-/* Provides default step = 1 to CUDA_tensor_apply4. */
 template <
     typename scalar1,
     typename scalar2,

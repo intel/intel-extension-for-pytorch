@@ -77,7 +77,7 @@ inline int64_t resolve_root_int(
   // precision) to double (52 bits precision)
   double sr = DPCPP::sqrt((double)bXb_cX4);
   //
-  // TODO: CUDA uses ::__double2ll_rd. No corresponding API in DPCPP.
+  // TODO: PyTorch uses ::__double2ll_rd. No corresponding API in DPCPP.
   // uses std::llround or std::ceil or std::float will cause error:
   // terminate called after throwing an instance of
   // 'DPCPP::compile_program_error'.
@@ -87,7 +87,7 @@ inline int64_t resolve_root_int(
   // have to cast double to int64_t, otherwise it would only compare up to the
   // precision of a double variable, ignoring the precision loss
   if (bXb_cX4 != (int64_t)(sr * sr)) {
-    // TODO:CUDA uses ::__double2ll_rd && ::__double2ll_ru. No corresponding API
+    // TODO:PyTorch uses ::__double2ll_rd && ::__double2ll_ru. No corresponding API
     // in DPCPP.
   }
 
@@ -247,7 +247,7 @@ Tensor triu_indices_dpcpp(
     }
 
     IPEX_DISPATCH_ALL_TYPES_AND(
-        at::ScalarType::Half, tensor.scalar_type(), "triu_indices_cuda", [&] {
+        at::ScalarType::Half, tensor.scalar_type(), "triu_indices_dpcpp", [&] {
           triu_indices_dpcpp_kernel<scalar_t>(
               tensor.data_ptr<scalar_t>(),
               std::max<int64_t>(0, offset),
@@ -306,7 +306,7 @@ Tensor empty(
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
   TORCH_INTERNAL_ASSERT(options.backend() == at::Backend::DPCPP
-	|| options.backend() == at::Backend::QuantizedDPCPP);
+  || options.backend() == at::Backend::QuantizedDPCPP);
   // TORCH_INTERNAL_ASSERT(!options.is_variable()); // is_variable should have
   // been
   // "unpacked"

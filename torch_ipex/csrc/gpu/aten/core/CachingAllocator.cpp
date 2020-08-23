@@ -161,7 +161,7 @@ class CachingAllocator {
     std::lock_guard<std::recursive_mutex> lock(mutex);
 
     DeviceIndex curDevID;
-		AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+    AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
 
     process_events();
 
@@ -187,18 +187,6 @@ class CachingAllocator {
     };
 
     CABlock* block = find_free_block();
-#if 0
-    if (block == nullptr) {
-      bool freed_memory = false;
-      for (const auto& name : FreeCudaMemoryCallbacksRegistry()->Keys()) {
-        freed_memory |=
-            FreeCudaMemoryCallbacksRegistry()->Create(name)->Execute();
-      }
-      if (freed_memory) {
-        block = find_free_block();
-      }
-    }
-#endif
     if (block == nullptr) {
       void* ptr;
       size_t alloc_size = get_allocation_size(size);
@@ -212,7 +200,7 @@ class CachingAllocator {
         auto dpcppDev = dpcppGetRawDevice(curDevID);
         size_t device_total = dpcppDev.get_info<DPCPP::info::device::global_mem_size>();
         stats.num_ooms += 1;
-        
+
         AT_ERROR("DPCPP out of memory. Tried to allocate ", format_size(alloc_size),
           " (GPU ", curDevID, "; ",
           format_size(device_total), " total capacity; ",
@@ -280,7 +268,7 @@ class CachingAllocator {
     allocated_blocks.erase(it);
     block->allocated = false;
 
-		CADeviceStats& stats = get_stats_for_device(block->device);
+    CADeviceStats& stats = get_stats_for_device(block->device);
     CAStatTypes stat_types;
     stat_types[static_cast<size_t>(CAStatType::AGGREGATE)] = true;
     stat_types[static_cast<size_t>(get_stat_type_for_pool(*(block->pool)))] = true;
@@ -327,7 +315,7 @@ class CachingAllocator {
 
     CABlock* block = find_allocated_block(ptr.get());
     TORCH_INTERNAL_ASSERT(block != nullptr, "No allocated block can be found");
-		auto &queue = stream.dpcpp_queue();
+    auto &queue = stream.dpcpp_queue();
     if (&queue == block->queuePtr) {
       return;
     }
@@ -576,7 +564,7 @@ class CachingAllocator {
       CADeviceStats& stats = get_stats_for_device(di);
       stats.num_alloc_retries += 1;
       free_cached_blocks(di);
-			*devPtr = DPCPP::malloc_device(size, syclDev, at::dpcpp::getGlobalContext());
+      *devPtr = DPCPP::malloc_device(size, syclDev, at::dpcpp::getGlobalContext());
       if (*devPtr == NULL) {
         return DPCPP_FAILURE;
       }
@@ -637,7 +625,7 @@ class CachingAllocator {
         remaining_events.push_back(e);
         continue;
       }
-			event.wait();
+      event.wait();
       block->event_count--;
       if (block->event_count == 0) {
         free_block(block);

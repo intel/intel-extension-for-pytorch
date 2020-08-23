@@ -169,13 +169,7 @@ struct OffsetInfo<T, IndexType, 1> {
 
 // Dims=-1 is used when the dimension is unknown at compile time.
 //
-// Unfortunately, pre-computation does not work here, because of a bug in nvcc
-// (tested on CUDA 8.0): if a kernel argument contains an array that is
-// dynamically accessed, the whole array is first copied into the local memory.
-// (That is, every kernel thread makes its own copy of the argument, even if it
-// is never updated.)  Pre-computation makes it worse because now we have more
-// data to copy.
-//
+// Unfortunately, pre-computation does not work here.
 // So let's fall back to vanilla division approach.
 
 template <typename T, typename IndexType>

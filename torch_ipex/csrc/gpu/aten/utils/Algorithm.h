@@ -5,7 +5,7 @@
 #include <utils/General.h>
 #include <utils/Numerics.h>
 
-// alternative for cuda thrust::tabulate
+// alternative for thrust::tabulate
 template <typename ForwardIterator, typename UnaryOp>
 static inline void dpcpp_tabulate(
     ForwardIterator begin,
@@ -16,7 +16,7 @@ static inline void dpcpp_tabulate(
   }
 }
 
-// alternative for cuda thrust::inclusive_scan
+// alternative for thrust::inclusive_scan
 template <
     typename InputIterator,
     typename OutputIterator,
@@ -35,7 +35,7 @@ static inline void dpcpp_inclusive_scan(
   }
 }
 
-// alternative for cuda thrust::exclusive_scan
+// alternative for thrust::exclusive_scan
 template <
     typename InputIterator,
     typename OutputIterator,

@@ -72,18 +72,6 @@ std::tuple<DPCPP::range<2>, DPCPP::range<2>> get_work_range(
   return std::make_tuple(global_range, local_range);
 }
 
-// In total it would be more efficient to compute the beta in the same kernel
-// (e.g. cudnn does this). While the beta are not
-// needed for the loss itself (just the grad), we can return log_alpha+log_beta
-// (so same space as currently) and the overhead
-// is small and the use-case for loss without grad is relatively limited.
-// We parallelize by batch and target sequence. Empirically, it is faster to
-// loop over the input (log probs) sequence  and do
-// target in parallel, even if it means more frequent __syncthreads.
-// In contrast to the cuDNN implementation, we allow large target lengths. For
-// this we need that all previous `s` have been
-// computed when we start a new block_s. This is why we have our own for loop
-// here.
 template <typename scalar_t, typename target_t>
 void ctc_loss_log_alpha_kernel(
     Tensor& log_alpha,

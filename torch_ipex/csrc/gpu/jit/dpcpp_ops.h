@@ -24,7 +24,7 @@ at::Tensor conv2d_relu(
 
 at::Tensor batch_norm(
     const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean,
-    const at::Tensor& running_var, bool train, double momentum, double eps, bool use_cuda);
+    const at::Tensor& running_var, bool train, double momentum, double eps, bool use_dnn);
 
 at::Tensor fold_weight(
     const at::Tensor& weight, const at::Tensor& bn_weight, const at::Tensor& running_var, float eps);

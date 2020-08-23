@@ -429,7 +429,7 @@ struct ReduceOp {
       arg_t,
       typename std::enable_if<!can_acc>::type* = nullptr) const {
     // TODO: Replace following assert with dpcpp counterparts.
-    // assert(false); // can't use TORCH_INTERNAL_ASSERT in Cuda.
+    // assert(false);
     return arg_t{};
   }
 

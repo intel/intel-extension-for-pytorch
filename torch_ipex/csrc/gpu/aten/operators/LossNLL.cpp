@@ -774,7 +774,6 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
 
       int64_t cur_target = target_ptr[target_offset];
       if (cur_target != ignore_index) {
-//        CUDA_KERNEL_ASSERT(t >= 0 && t < n_classes);
         auto grad_input_ptr = get_pointer(grad_input_data);
         auto grad_output_ptr = get_pointer(grad_output_data);
         auto weight_ptr = get_pointer(weight_data);

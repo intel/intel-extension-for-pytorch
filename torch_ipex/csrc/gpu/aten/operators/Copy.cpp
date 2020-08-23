@@ -247,11 +247,9 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   dpcppMemcpyAsync(dst, src, nbytes, kind);
 
   if (non_blocking) {
-    // here do the cuda copy synchronisation.
+    // here do the dpcpp copy synchronisation.
     // we use a very simple version for the singleton sycl queue.
     // TODO: enhance this for the multi-queue.
-    // void* ptr = (dst_device == kCPU ? dst : src);
-    // AT_CUDA_CHECK(THCCachingHostAllocator_recordEvent(ptr, stream));
   } else {
     auto& queue = getCurrentDPCPPStream().dpcpp_queue();
     queue.wait_and_throw();

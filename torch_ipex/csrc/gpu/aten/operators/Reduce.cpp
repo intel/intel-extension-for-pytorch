@@ -118,10 +118,18 @@ static TensorIterator make_reduction(
     IntArrayRef dim,
     bool keepdim,
     ScalarType out_dtype) {
-  const bool gpu_f16_to_f32 =
-      (self.is_cuda() && self.scalar_type() == kHalf && out_dtype == kFloat);
+  /* FIXME:
+   * According to below comments, this check is only for mixed precision enabling,
+   * which can handle the case while in_dtype == kHalf and out_dtype == kFloat.
+   * When IPEX has this feature, we can enable below check, as well.
+  // special case for type promotion in mixed precision, improves computational efficiency.
+  // not generalize this to common mismatched input/output types to avoid cross
+  // product of templated kernel launches.
+  const bool gpu_f16_to_f32 = (self.scalar_type() == kHalf && out_dtype == kFloat);
   auto in_dtype = gpu_f16_to_f32 ? self.scalar_type() : out_dtype;
   return make_reduction(name, result, self, dim, keepdim, in_dtype, out_dtype);
+  */
+  return make_reduction(name, result, self, dim, keepdim, out_dtype, out_dtype);
 }
 
 static TensorIterator make_reduction(
@@ -157,10 +165,16 @@ static TensorIterator make_reduction(
   namedinference::propagate_names_for_reduction(result2, self, dim, keepdim);
 #endif
 
-  if (self.scalar_type() == dtype ||
-      (self.is_cuda() && self.scalar_type() == kHalf && dtype == kFloat)) {
+  /* FIXME:
+   * This check is only for mixed precision enabling,
+   * which can handle the case while in_dtype == kHalf and out_dtype == kFloat.
+   * When IPEX has this feature, we can enable below check, as well.
+  */
+  if (self.scalar_type() == dtype
+      /*|| (self.scalar_type() == kHalf && dtype == kFloat)*/) {
     return TensorIterator::reduce_op(viewed_result1, viewed_result2, self);
   }
+
   return TensorIterator::reduce_op(
       viewed_result1, viewed_result2, self.to(dtype));
 }

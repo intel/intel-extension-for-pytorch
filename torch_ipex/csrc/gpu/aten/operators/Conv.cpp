@@ -30,8 +30,8 @@ at::Tensor convolution(
 
   if (!lazy_reorder_enabled() && !output.defined())
     output = at::empty(output_size, input.is_quantized()
-	      ? (attr.with_relu() ? device(kDPCPP).dtype(kQUInt8)
-	      : device(kDPCPP).dtype(kQInt8)) : input.options());
+        ? (attr.with_relu() ? device(kDPCPP).dtype(kQUInt8)
+        : device(kDPCPP).dtype(kQInt8)) : input.options());
 
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
@@ -791,7 +791,6 @@ struct ConvParams {
   int groups;
   bool benchmark;
   bool deterministic;
-  bool cudnn_enabled;
 
   bool is_strided() const;
   bool is_dilated() const;
@@ -815,8 +814,7 @@ std::ostream& operator<<(std::ostream& out, const ConvParams& params) {
       << "  transposed = " << params.transposed
       << "  output_padding = " << IntArrayRef{params.output_padding}
       << "  groups = " << params.groups << "  benchmark = " << params.benchmark
-      << "  deterministic = " << params.deterministic
-      << "  cudnn_enabled = " << params.cudnn_enabled << "}";
+      << "  deterministic = " << params.deterministic << "}";
   return out;
 }
 
@@ -894,7 +892,7 @@ auto ConvParams::use_cpu_depthwise3x3_winograd(
 
 auto ConvParams::is_depthwise(const at::Tensor& input, const at::Tensor& weight)
     const -> bool {
-  return input.is_cuda() && !transposed && input.ndimension() == 4 &&
+  return !transposed && input.ndimension() == 4 &&
       input.size(1) == groups &&
       groups > 1 && // no point if there is only a single group
       weight.size(0) % input.size(1) ==
@@ -1120,22 +1118,7 @@ Tensor _convolution_out(
     weight = view4d(weight);
   }
 
-  Tensor output_;
-  if (params.is_depthwise(input, weight)) {
-    auto kernel_size = weight.sizes().slice(2);
-    auto stride = params.stride;
-    auto padding = params.padding;
-    auto dilation = params.dilation;
-    output_ = at::thnn_conv_depthwise2d(
-        input.contiguous(),
-        weight,
-        kernel_size,
-        bias,
-        stride,
-        padding,
-        dilation);
-  } else {
-    output_ = convolution(
+  Tensor output_ = convolution(
         output,
         input,
         weight,
@@ -1145,7 +1128,6 @@ Tensor _convolution_out(
         params.dilation,
         params.groups,
         attr);
-  }
 
   if (k == 3) {
     output_ = view3d(output_);

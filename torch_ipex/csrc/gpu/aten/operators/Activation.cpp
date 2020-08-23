@@ -126,8 +126,8 @@ static void RReLU_updateOutput(
     std::pair<uint64_t, uint64_t> seeds;
     {
       // See Note [Acquire lock when using random generators]
-      // this philox_engine_inputs('1') is aligned with Distribution.cpp, 
-      // yet cuda uses '((n - 1) / (BLOCK_SIZE * grid.x) + 1) * curand4_engine_calls'
+      // this philox_engine_inputs('1') is aligned with Distribution.cpp,
+      // yet they use '((n - 1) / (BLOCK_SIZE * grid.x) + 1) * curand4_engine_calls'
       // in the same place.
       std::lock_guard<std::mutex> lock(gen->mutex_);
       seeds = gen->philox_engine_inputs(1);

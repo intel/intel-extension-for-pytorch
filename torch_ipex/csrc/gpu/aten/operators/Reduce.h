@@ -78,7 +78,7 @@ struct ReduceConfig {
   DPCPP::range<2> get_local_size() const {
     int sg_size =
         DPCPP_SUB_GROUP_SIZE; // to be replaced with real sub_group_size;
-		return DPCPP::range<2>(work_group_size / sg_size, sg_size);
+    return DPCPP::range<2>(work_group_size / sg_size, sg_size);
   }
 
   DPCPP::range<2> get_global_size() const {
@@ -425,7 +425,7 @@ struct ReduceOp {
       arg_t,
       typename std::enable_if<!can_acc>::type* = nullptr) const {
     // TODO: Replace following assert with dpcpp counterparts.
-    // assert(false); // can't use TORCH_INTERNAL_ASSERT in Cuda.
+    // assert(false);
     return arg_t{};
   }
 
