@@ -308,6 +308,9 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   // Fuse conv with eltwise operator
   graph_rewrite::FuseConvolutionWithEltwise(graph);
 
+  // Fuse operators as shuffle
+  graph_rewrite::FuseShuffle(graph);
+
   // Pattern based fusion was lack of alias analysis
   // ??? It may either be too conservative or too aggressive ???
   // getSubgraphRewriter().runOnGraph(graph);

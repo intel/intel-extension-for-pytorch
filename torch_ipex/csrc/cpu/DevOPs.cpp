@@ -6,6 +6,8 @@
 #include <ATen/NamedTensorUtils.h>
 #include <c10/util/Exception.h>
 #include <c10/util/Logging.h>
+#include <torch/csrc/autograd/function.h>
+#include <torch/csrc/autograd/record_function.h>
 
 #include <limits>
 
@@ -2019,6 +2021,20 @@ at::Tensor AtenIpexCPUDev::dil_index_select(
 
   torch_ipex::set_ipex_func_status(torch_ipex::IPEXFuncStatus::IPEX_FALLBACK);
   return at::Tensor();
+}
+
+at::Tensor AtenIpexCPUDev::dil_shuffle(const at::Tensor & self, at::IntArrayRef view_shape, int64_t dim0, int64_t dim1) {
+  DEBUG("AtenIpexCPUDev::dil_shuffle\n");
+  RECORD_FUNCTION("AtenIpexCPUDev::dil_shuffle", std::vector<c10::IValue>(), -1);
+  // NOTE: We do NOT add sanity checks here. Because PyTorch does not has shuffle operator. This dil operator is for fusion and the fusion logic
+  // has more sanity checks. We found that there are some models use view + transpose + view to implement shuffle semantic. So IPEX will fuse these
+  // operators a single shuffle.
+  dil::tensor&& x = dbl::comm::try_gen_dil_tensor(self);
+  dil::tensor y;
+  auto group_dim = dim0 < dim1 ? dim0 : dim1;
+  auto groups = view_shape[group_dim];
+  dil::channel_shuffle_forward::compute(std::move(x), y, groups, group_dim);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
 }  // namespace cpu

@@ -4,8 +4,8 @@
 #include <torch/csrc/jit/runtime/custom_operator.h>
 
 #include "torch_ipex/csrc/utils.h"
-#include "cpu/FusionOPs.h"
-
+#include "torch_ipex/csrc/cpu/FusionOPs.h"
+#include "torch_ipex/csrc/cpu/DevOPs.h"
 
 namespace torch {
 namespace jit {
@@ -24,6 +24,26 @@ at::Tensor toOptionalTensor(const IValue& v) {
 using namespace torch_ipex::cpu;
 
 RegisterOperators op({
+    Operator(
+      "ipex::shuffle_2d(Tensor input, int[5] view_shape, int trans_dim0, int trans_dim1) -> Tensor",
+      [] (const Node* node) ->Operation {
+        if (torch_ipex::check_auto_dnnl()) {
+          return [] (Stack& stack) {
+            auto result = AtenIpexCPUDev::dil_shuffle(
+                (std::move(peek(stack, 0, 4))).toTensor(),
+                (std::move(peek(stack, 1, 4))).toIntVector(),
+                (std::move(peek(stack, 2, 4))).toInt(),
+                (std::move(peek(stack, 3, 4))).toInt());
+            drop(stack, 4);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        } else {
+          TORCH_CHECK(false, "PyTorch native path not support shuffle fusion for 2d case");
+        }
+      },
+      aliasAnalysisFromSchema()
+      ),
     Operator(
       "ipex::conv2d_relu(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
       [] (const Node* node) ->Operation {

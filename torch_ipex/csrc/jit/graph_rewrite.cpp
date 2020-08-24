@@ -52,6 +52,96 @@ std::unordered_map<std::string, c10::IValue> getConvParams(
   return calc_values;
 }
 
+void FuseShuffle(std::shared_ptr<Graph>& graph) {
+  std::string shuffle = R"(
+      graph(%input, %view_shape:int[], %trans_dim0:int, %trans_dim1:int, %mem_format:int, %flattern_shape:int[]):
+        %r = aten::view(%input, %view_shape)
+        %r = aten::transpose(%r, %trans_dim0, %trans_dim1)
+        %r = aten::contiguous(%r, %mem_format)
+        %r = aten::view(%r, %flattern_shape)
+        return (%r) )";
+
+  std::string shuffle_2d_fusion = R"(
+      graph(%input, %view_shape:int[], %trans_dim0:int, %trans_dim1:int, %mem_format:int, %flattern_shape:int[]):
+        %r = ipex::shuffle_2d(%input, %view_shape, %trans_dim0, %trans_dim1)
+        return (%r) )";
+
+  auto filter_shuffle_2d_fusion = [] (
+      const Match& match,
+      const std::unordered_map<std::string, Value*>& vmap) {
+    const auto& match_vmap = match.values_map;
+    auto input_ = getIValue("input", match_vmap, vmap).value();
+    if (!(input_.isTensor())) {
+      return false;
+    }
+    auto view_shape_ = getIValue("view_shape", match_vmap, vmap).value();
+    if (!(view_shape_.isIntList())) {
+      return false;
+    }
+    auto trans_dim0_ = getIValue("trans_dim0", match_vmap, vmap).value();
+    if (!(trans_dim0_.isInt())) {
+      return false;
+    }
+    auto trans_dim1_ = getIValue("trans_dim1", match_vmap, vmap).value();
+    if (!(trans_dim1_.isInt())) {
+      return false;
+    }
+    auto flattern_shape_ = getIValue("flattern_shape", match_vmap, vmap).value();
+    if (!(flattern_shape_.isInt())) {
+      return false;
+    }
+
+    auto trans_dim0_val = trans_dim0_.toInt();
+    auto trans_dim1_val = trans_dim1_.toInt();
+    auto dim0_val = trans_dim0_val < trans_dim1_val ? trans_dim0_val : trans_dim1_val;
+    auto dim1_val = trans_dim0_val > trans_dim1_val ? trans_dim0_val : trans_dim1_val;
+    // If the tranpose if not for groups. ex. [n, c1, c2, h, w] => [n, c2, c1, h, w]
+    if ((dim1_val - dim0_val) != 1) {
+      return false;
+    }
+
+    auto input_val = input_.toTensor();
+    auto view_shape_val = view_shape_.toIntVector();
+    auto flattern_shape_val = flattern_shape_.toIntVector();
+    // ex. [n, c, h, w] => [n, groups, c // groups, h, w]
+    if ((input_val.ndimension() - view_shape_val.size()) != -1) {
+      return false;
+    }
+
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dim0_val >= 0);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dim1_val >= 0);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dim0_val + 1 < input_val.ndimension());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dim1_val + 1 < input_val.ndimension());
+    if (view_shape_val[dim0_val] * view_shape_val[dim1_val] != input_val.size(dim0_val)) {
+      return false;
+    }
+
+    if (flattern_shape_val.size() != input_val.ndimension()) {
+      return false;
+    }
+
+    for (int i = 0; i < flattern_shape_val.size(); i++) {
+      if (flattern_shape_val[i] != input_val.size(i)) {
+        // [n, c, h, w] => view [n, groups, c // groups, h, w] => tranpose [n, c // groups, groups, h, w]
+        // => view [n, -1, h, w]
+        //    or
+        //    view [n, c, h, w]
+        if ((flattern_shape_val[i] != -1) || (i != dim0_val)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
+  SubgraphRewriter rewriter_shuffle_2d;
+  rewriter_shuffle_2d.RegisterRewritePattern(
+    shuffle,
+    shuffle_2d_fusion);
+  rewriter_shuffle_2d.runOnGraph(graph);
+}
+
 void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph) {
   std::string conv2d_swish_fusion = R"(
       graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
