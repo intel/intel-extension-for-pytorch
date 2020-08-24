@@ -9,7 +9,7 @@
 #include <utils/ParamUtils.h>
 
 #include "Conv.h"
-#include "qutil.h"
+#include "QUtil.h"
 
 using namespace mkldnn;
 using namespace at::dpcpp;

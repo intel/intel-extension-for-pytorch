@@ -9,7 +9,7 @@
 #include <core/Runtime.h>
 #include <dnnl.hpp>
 
-#include "qutil.h"
+#include "QUtil.h"
 
 using namespace dnnl;
 using namespace at::dpcpp;
@@ -115,7 +115,7 @@ void mkldnnGemmImpl(
     int mask_matmul = weight_scales.size() > 1? 1 << 1 : 0;
     attr.set_output_scales(mask_matmul, matmul_scale);
     attr.set_zero_points(DNNL_ARG_DST, mask_ac,
-		    {static_cast<int>(result.is_quantized()? result.q_zero_point() : 0)}); 
+        {static_cast<int>(result.is_quantized()? result.q_zero_point() : 0)});
   }
 
   at::Device curDevice = at::Device(at::kDPCPP, current_device());
@@ -272,11 +272,11 @@ Tensor addmm(
       [&]() {
         impl::gemm_broadcast(
         result,
-	m1,
-	m2,
-	beta.to<float>(),
-	alpha.to<float>(),
-	input);
+  m1,
+  m2,
+  beta.to<float>(),
+  alpha.to<float>(),
+  input);
       });
   } else {
     IPEX_DISPATCH_ALL_TYPES_AND2(
