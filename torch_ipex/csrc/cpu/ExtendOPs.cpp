@@ -526,7 +526,7 @@ at::Tensor AtenIpexTypeExt::max_pool2d(const at::Tensor &input,
                                        at::IntArrayRef dilation,
                                        bool ceil_mode) {
   if (at::GradMode::is_enabled())
-    NewMaxPool2dOp::apply(input, kernel_size, stride, padding, dilation,
+    return NewMaxPool2dOp::apply(input, kernel_size, stride, padding, dilation,
                           ceil_mode);
   auto ret = NewMaxPool2dOp::_forward(input, kernel_size, stride, padding, dilation,
                                   ceil_mode);
