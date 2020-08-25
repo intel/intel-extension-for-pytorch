@@ -44,7 +44,6 @@ void uniform(Tensor& self, Generator* _generator, double a, double b) {
   };
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
-  queue.wait_and_throw();
 }
 
 DPCPP_DEF_K1(normal_random_filler);
@@ -85,7 +84,6 @@ void normal(Tensor& self, double mean, double stdv, Generator* _generator) {
   };
 
   DPCPP_Q_ASYNC_SUBMIT(queue, cgf);
-  queue.wait_and_throw();
 }
 
 } // namespace impl
