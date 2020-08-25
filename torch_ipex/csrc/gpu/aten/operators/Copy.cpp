@@ -244,15 +244,13 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   void* src = iter.data_ptr(1);
   int64_t nbytes = iter.numel() * iter.element_size(0);
 
-  dpcppMemcpyAsync(dst, src, nbytes, kind);
-
   if (non_blocking) {
+    dpcppMemcpyAsync(dst, src, nbytes, kind);
     // here do the dpcpp copy synchronisation.
     // we use a very simple version for the singleton sycl queue.
     // TODO: enhance this for the multi-queue.
   } else {
-    auto& queue = getCurrentDPCPPStream().dpcpp_queue();
-    queue.wait_and_throw();
+    dpcppMemcpy(dst, src, nbytes, kind);
   }
 }
 
