@@ -314,6 +314,9 @@ at::Tensor& dil_add_common(
   IPEX_CHECK(self.sizes().equals(other.sizes()),
       "dil add not support broadcast yet");
 
+  dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
+  dbl::comm::reorder_to_bf16_for_mix_prec(other, true);
+ 
   auto x = dbl::comm::try_gen_dil_tensor(self);
   auto y_ = dbl::comm::try_gen_dil_tensor(other);
   // reorder other to the data type of self
@@ -379,6 +382,9 @@ at::Tensor& dil_mul_common(
 
   // IPEX_CHECK(self.sizes().equals(other.sizes()),
   //     "dil mul not support broadcast yet");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
+  dbl::comm::reorder_to_bf16_for_mix_prec(other, true);
 
   auto x = dbl::comm::try_gen_dil_tensor(self);
   auto y_ = dbl::comm::try_gen_dil_tensor(other);
