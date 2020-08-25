@@ -17,12 +17,14 @@
 #include <vector>
 
 #include "aten_ipex_type.h"
+#include "utils.h"
 #include "auto_opt_config.h"
 
 #include "cpu/dil/dil.hpp"
 #include "cpu/ShadeDataContext.h"
 #include "cpu/ExtendOPs.h"
 #include "cpu/MlpOPs.h"
+#include "quantization/Observer.h"
 
 namespace torch_ipex {
 namespace {
@@ -138,12 +140,43 @@ void InitIpexModuleBindings(py::module m) {
   m.def("disable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(false); });
   m.def("get_int8_calibration", []() { return AutoOptConfig::singleton().get_int8_calibration(); });
   m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
-  m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
   m.def("add_indicators", []() { AutoOptConfig::singleton().add_indicators(); });
   m.def("print_observer", []() { AutoOptConfig::singleton().print_observer(); });
   m.def("print_indicator", []() { AutoOptConfig::singleton().print_indicator(); });
-  m.def("save_indicators_file", [](const std::string& s) { AutoOptConfig::singleton().save_indicators_file(s); } );
-  m.def("load_indicators_file", [](const std::string& s) { AutoOptConfig::singleton().load_indicators_file(s); } );}
+  m.def("get_int8_configures", []() {
+      py::list output_list;
+      auto indicators = AutoOptConfig::singleton().get_indicators();
+      for (auto indicator: indicators) {
+        py::dict d;
+        d["id"] = indicator.get_indicator_id();
+        d["name"] = indicator.get_indicator_name();
+        std::vector<float> scales = indicator.get_indicator_scales();
+        d["input_scale"] = scales[0];
+        d["output_scale"] = scales[1];
+        std::vector<bool> uint8_used= indicator.get_indicator_uint8_status();
+        d["input_uint8_used"] = (bool)uint8_used[0];
+        d["output_uint8_used"] = (bool)uint8_used[1];
+        d["quantized"] = indicator.get_indicator_quantized_status();
+        output_list.append(d);
+      }
+      return output_list; } );
+  m.def("load_indicators_file", [](const py::list& l) {
+      IPEX_CHECK(py::len(l) > 0, "can't load a empty configures, please first do calibration setp"); 
+      std::vector<Indicator> indicators;
+      for (py::handle i : l) {
+        int64_t id = py::cast<std::int64_t>(i["id"]);
+        std::string op_name = py::cast<std::string>(i["name"]);
+        float input_scale = py::cast<float>(i["input_scale"]);
+        float output_scale = py::cast<float>(i["output_scale"]);
+        bool input_uint8_used = py::cast<bool>(i["input_uint8_used"]);
+        bool output_uint8_used = py::cast<bool>(i["output_uint8_used"]);
+        bool quantized  = py::cast<bool>(i["quantized"]);
+        Indicator temp(id, op_name, {input_scale, output_scale},
+          {input_uint8_used, output_uint8_used}, quantized);
+        indicators.push_back(temp);
+      }
+      AutoOptConfig::singleton().set_indicators(indicators); } );
+}
 
 }  // namespace
 using namespace torch::jit;

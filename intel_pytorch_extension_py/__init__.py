@@ -1,4 +1,6 @@
 import os
+import json
+import warnings
 import torch
 from .version import __version__
 from .tensor import *
@@ -7,8 +9,7 @@ from .ops import *
 import _torch_ipex as core
 
 DEVICE = 'dpcpp'
-
-def enable_auto_optimization(mixed_dtype = None, train = False):
+def enable_auto_optimization(mixed_dtype = None, train = False, configure_file = None):
     r""" Enable auto-mixed-precision to improve performance.
 
     The auto-mixed-precision auto reorders the tensor to the specified low precision data type.
@@ -23,7 +24,7 @@ def enable_auto_optimization(mixed_dtype = None, train = False):
     """
     if mixed_dtype != None:
         core.enable_auto_dnnl()
-    enable_auto_mix_precision(mixed_dtype, train)
+    enable_auto_mix_precision(mixed_dtype, train, configure_file)
 
 def get_auto_optimization():
     return get_auto_mix_precision
@@ -31,13 +32,20 @@ def get_auto_optimization():
 def get_train():
     return core.get_train()
 
-def enable_auto_mix_precision(mixed_dtype = torch.bfloat16, train = False):
+def enable_auto_mix_precision(mixed_dtype = torch.bfloat16, train, configure_file = None):
     if mixed_dtype == torch.bfloat16:
         core.enable_mix_bf16_fp32()
         core.disable_mix_int8_fp32()
     elif mixed_dtype == torch.int8 or mixed_dtype == torch.uint8:
         core.enable_mix_int8_fp32()
         core.disable_mix_bf16_fp32()
+        if configure_file != None:
+            core.disable_int8_calibration()
+            f = open(configure_file)
+            configures = json.load(f)
+            core.load_indicators_file(configures)
+        else:
+            warnings.warn("please not forget do calibration before doing validation step")
     else:
         core.disable_mix_int8_fp32()
         core.disable_mix_bf16_fp32()
@@ -96,19 +104,8 @@ class int8_calibration(_DecoratorContextManager):
     def __exit__(self, *args):
         core.disable_int8_calibration()
         core.add_indicators()
-        core.save_indicators_file(self.configure_file)
-        return False
-
-class int8_validate(_DecoratorContextManager):
-    def __init__(self, file_name):
-        self.configure_file = file_name
-
-    def __enter__(self):
-        if not core.get_mix_int8_fp32():
-            raise ValueError("please first run enable_auto_mix_precision(torch.int8) before int8 validation")
-        core.disable_int8_calibration()
-        core.load_indicators_file(self.configure_file)
-
-    def __exit__(self, *args):
+        configures = core.get_int8_configures()
+        with open(self.configure_file, 'w') as fp:
+            json.dump(configures, fp, indent=4)
         return False
 
