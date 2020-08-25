@@ -178,7 +178,7 @@ endif()
 add_dependencies(${PLUGIN_NAME} pybind11)
 
 add_dependencies(${PLUGIN_NAME} dnnl)
-target_link_libraries(${PLUGIN_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/src/libdnnl.a)
+target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl)
 
 add_dependencies(${PLUGIN_NAME} xsmm)
 

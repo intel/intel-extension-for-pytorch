@@ -189,6 +189,7 @@ class IPEXBuild(build_ext, object):
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DCMAKE_INSTALL_PREFIX=' + ext_dir,
             '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + ext_dir,
+            '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + ext_dir,
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
         ]
 
