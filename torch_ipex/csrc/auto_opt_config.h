@@ -1,6 +1,7 @@
 #pragma once
 
-#include "csrc/quantization/Observer.h"
+#include "quantization/Observer.h"
+#include "utils.h"
 
 namespace torch_ipex {
 
@@ -127,27 +128,12 @@ public:
     return std::make_tuple(indicator_scales, quantized_status);
   }
 
-  void save_indicators_file(const std::string& file_name) {
-    std::ofstream out(file_name);
-    auto indicators_number = indicators_.size();
-    out << indicators_number << "\n"<<std::endl;;
-    for (auto i = 0; i < indicators_number; i++) {
-      out << indicators_[i];
-    }
-    out.close();
+  void set_indicators(std::vector<Indicator> indicators) {
+    indicators_ = indicators;
   }
 
-  void load_indicators_file(const std::string& file_name) {
-    std::ifstream in(file_name);
-    int64_t indicators_number;
-    in >> indicators_number;
-    Indicator temp;
-    indicators_.clear();
-    for (auto i = 0; i < indicators_number; i++) {
-      in >> temp;
-      indicators_.push_back(temp);
-    }
-    in.close();
+  std::vector<Indicator> get_indicators() {
+    return indicators_;
   }
 
   inline void calibration_reset() {
