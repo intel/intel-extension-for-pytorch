@@ -414,6 +414,9 @@ at::Tensor AtenIpexCPUDev::dil_mul(const at::Tensor& self, const at::Tensor& oth
 at::Tensor& AtenIpexCPUDev::dil_mul_(at::Tensor& self, const at::Tensor& other) {
   DEBUG("AtenIpexCPUDev::dil_mul_\n");
 
+  IPEX_CHECK(
+    self.ndimension() >= other.ndimension(),
+    "The size of input tensors doesn't match the broadcast shape for dil_mul_");
   return dil_mul_common</*inplace=*/true>(self, self, other);
 }
 
