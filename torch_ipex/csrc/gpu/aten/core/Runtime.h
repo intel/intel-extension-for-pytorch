@@ -45,10 +45,10 @@ using namespace mkldnn;
       t.now("oneDNN execute_sycl");                           \
       DPCPP_ONEDNN_FORCE_SYNC(stream);                        \
       t.now("oneDNN stream wait");                            \
-      dpcpp_log("dpcpp_kernel", e);                           \
+      dpcpp_log("onednn_kernel", e);                           \
     } else {                                                  \
       auto e = (prim).execute_sycl((stream), ##__VA_ARGS__);  \
-      dpcpp_log("dpcpp_kernel", e);                           \
+      dpcpp_log("onednn_kernel", e);                           \
       DPCPP_ONEDNN_FORCE_SYNC(stream);                        \
     }                                                         \
   }

@@ -134,12 +134,16 @@ int dpcppGetDeviceIdFromPtr(DeviceIndex* device_id, void* ptr) {
   if (device_index >= device_count) {
     throw(std::out_of_range("this pointer is invalid"));
   }
-
+#ifndef USE_USM
   if (gBufferMapPoolPtr[device_index]->get_offset(ptr) > 0) {
     *device_id = static_cast<DeviceIndex>(device_index);
   } else {
     throw(std::out_of_range("the pointer is not allocated"));
   }
+#else
+  // FIXME:
+  *device_id = -1;
+#endif
   return DPCPP_SUCCESS;
 }
 

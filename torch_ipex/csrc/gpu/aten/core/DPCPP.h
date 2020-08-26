@@ -33,7 +33,7 @@ namespace DPCPP = cl::sycl;
         }                                               \
     }
 
-#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)               \
+#define DPCPP_Q_SYNC_SUBMIT(q, cgf, ...)                \
     {                                                   \
         static auto verbose = dpcpp_verbose();          \
         if (verbose) {                                  \
@@ -53,7 +53,7 @@ namespace DPCPP = cl::sycl;
         }                                               \
     }
 
-#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)                \
+#define DPCPP_Q_ASYNC_SUBMIT(q, cgf, ...)               \
     {                                                   \
         static auto verbose = dpcpp_verbose();          \
         if (verbose) {                                  \

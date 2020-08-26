@@ -6,60 +6,92 @@
 #include <core/Device.h>
 #include <core/Generator.h>
 #include <core/detail/Hooks.h>
-#include <core/detail/HooksInterface.h>
 #include <utils/General.h>
 
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <iostream>
 
 namespace at {
 namespace dpcpp {
 namespace detail {
 
 void DPCPPHooks::initDPCPP() const {
+  std::cout<< "DPCPP hooks: " << __FUNCTION__ << std::endl;
   // TODO:
-  // global state is removed
-}
-
-Generator *
-DPCPPHooks::getDefaultDPCPPGenerator(DeviceIndex device_index) const {
-  return at::dpcpp::detail::getDefaultDPCPPGenerator(device_index);
-}
-
-Device DPCPPHooks::getDeviceFromPtr(void *data) const {
-  return getDeviceFromPtr(data);
 }
 
 bool DPCPPHooks::hasDPCPP() const {
-  int count;
-  dpcppGetDeviceCount(&count);
+  std::cout<< "DPCPP hooks: " << __FUNCTION__ << std::endl;
   return true;
 }
 
-int64_t DPCPPHooks::current_device() const {
-  c10::DeviceIndex device;
-  dpcppGetDevice(&device);
-  return device;
+bool DPCPPHooks::hasOneMKL() const {
+  std::cout<< "DPCPP hooks: " << __FUNCTION__ << std::endl;
+#ifdef USE_ONEMKL
+  return true;
+#else
+  return false;
+#endif
 }
 
-int DPCPPHooks::getNumGPUs() const {
+bool DPCPPHooks::hasOneDNN() const {
+  std::cout<< "DPCPP hooks: " << __FUNCTION__ << std::endl;
+  return true;
+}
+
+std::string DPCPPHooks::showConfig() const {
+  std::cout<< "DPCPP hooks: " << __FUNCTION__ << std::endl;
+  return "DPCPP backend version: 1.0";
+}
+
+int64_t DPCPPHooks::getCurrentDevice() const {
+  std::cout<< "DPCPP hooks: " << __FUNCTION__ << std::endl;
+  c10::DeviceIndex device_index;
+  dpcppGetDevice(&device_index);
+  return device_index;
+}
+
+int DPCPPHooks::getDeviceCount() const {
+  std::cout<< "DPCPP hooks: " << __FUNCTION__ << std::endl;
   int count;
   dpcppGetDeviceCount(&count);
   return count;
 }
 
-bool DPCPPHooks::compiledWithSyCL() const {
-#ifndef USE_DPCPP
+c10::Device DPCPPHooks::getDeviceFromPtr(void* data) const {
+  std::cout<< "DPCPP hooks: " << __FUNCTION__ << std::endl;
+  return getDeviceFromPtr(data);
+}
+
+bool DPCPPHooks::isPinnedPtr(void* data) const {
+  std::cout<< "DPCPP hooks: " << __FUNCTION__ << std::endl;
+#ifndef USE_USM
+  // Not support pin memory if no USM support
   return false;
 #else
+  // TODO:
   return true;
 #endif
 }
 
-// Sigh, the registry doesn't su[[prt namespace :(
-using at::DPCPPHooksRegistry;
-using at::RegistererDPCPPHooksRegistry;
+c10::Allocator* DPCPPHooks::getPinnedMemoryAllocator() const {
+  std::cout<< "DPCPP hooks: " << __FUNCTION__ << std::endl;
+#ifndef USE_USM
+  // Not support pin memory if no USM support
+  throw std::runtime_error("The pin memory is not supported without USM support.");
+  return nullptr;
+#else
+  // TODO:
+  return nullptr;
+#endif
+}
+
+at::Generator* DPCPPHooks::getDefaultDPCPPGenerator(DeviceIndex device_index = -1) const {
+  std::cout<< "DPCPP hooks: " << __FUNCTION__ << std::endl;
+  return at::dpcpp::detail::getDefaultDPCPPGenerator(device_index);
+}
 
 REGISTER_DPCPP_HOOKS(DPCPPHooks);
 
