@@ -141,7 +141,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_int8_calibration", []() { return AutoOptConfig::singleton().get_int8_calibration(); });
   m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
   m.def("add_indicators", []() { AutoOptConfig::singleton().add_indicators(); });
-  m.def("print_observer", []() { AutoOptConfig::singleton().print_observer(); });
+  //m.def("print_observer", []() { AutoOptConfig::singleton().print_observer(); });
   m.def("print_indicator", []() { AutoOptConfig::singleton().print_indicator(); });
   m.def("get_int8_configures", []() {
       py::list output_list;
@@ -150,6 +150,8 @@ void InitIpexModuleBindings(py::module m) {
         py::dict d;
         d["id"] = indicator.get_indicator_id();
         d["name"] = indicator.get_indicator_name();
+        d["algorithm"] = indicator.get_indicator_algorithm();
+        d["weight_granularity"] = indicator.get_indicator_weight_granularity();
         std::vector<float> scales = indicator.get_indicator_scales();
         d["input_scale"] = scales[0];
         d["output_scale"] = scales[1];
@@ -166,12 +168,14 @@ void InitIpexModuleBindings(py::module m) {
       for (py::handle i : l) {
         int64_t id = py::cast<std::int64_t>(i["id"]);
         std::string op_name = py::cast<std::string>(i["name"]);
+        std::string algorithm = py::cast<std::string>(i["algorithm"]);
+        std::string weight_granularity = py::cast<std::string>(i["weight_granularity"]);
         float input_scale = py::cast<float>(i["input_scale"]);
         float output_scale = py::cast<float>(i["output_scale"]);
         bool input_uint8_used = py::cast<bool>(i["input_uint8_used"]);
         bool output_uint8_used = py::cast<bool>(i["output_uint8_used"]);
         bool quantized  = py::cast<bool>(i["quantized"]);
-        Indicator temp(id, op_name, {input_scale, output_scale},
+        Indicator temp(id, op_name, algorithm, weight_granularity, {input_scale, output_scale},
           {input_uint8_used, output_uint8_used}, quantized);
         indicators.push_back(temp);
       }

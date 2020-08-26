@@ -59,6 +59,16 @@ def get_auto_mix_precision():
     else:
         return None
 
+'''
+def quarry_int8_configure(model, inputs_shape):
+    dummy_input = torch.randn(input_shapes).to(DEVICE)
+    core.enable_mix_int8_fp32()
+    with torch.no_grad():
+        y = model(dummy_input)
+    observer_configures = core.get_int8_observer_configures()
+    return observer_configures
+'''
+
 def calibration_reset():
     if core.get_int8_calibration():
         core.calibration_reset()
@@ -93,13 +103,15 @@ class _DecoratorContextManager:
         return generator_context
 
 class int8_calibration(_DecoratorContextManager):
-    def __init__(self, file_name):
+    def __init__(self, file_name, observer_configure=None):
+        #self.observer_configure = observer_configure
         self.configure_file = file_name
 
     def __enter__(self):
         if not core.get_mix_int8_fp32():
             raise ValueError("please first run enable_auto_mix_precision(torch.int8) before int8 calibration")
         core.enable_int8_calibration()
+        #core.set_int8_observer_configure(self.observer_configure)
 
     def __exit__(self, *args):
         core.disable_int8_calibration()

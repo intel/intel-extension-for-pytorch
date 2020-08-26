@@ -129,15 +129,16 @@ bool check_int8_calibration() {
 }
 
 void insert_or_updata_observer(const at::Tensor& self, const at::Tensor& output, std::string op_name) {
-  std::vector<float> max_values;
-  auto value = self.abs().max().item<float>();
-  max_values.push_back(value);
+  std::vector<float> input_min_max_values, output_min_max_values;
+  input_min_max_values.push_back(self.abs().min().item<float>());
+  input_min_max_values.push_back(self.abs().max().item<float>());
   if (output.defined()) {
-    max_values.push_back(output.abs().max().item<float>());
+    output_min_max_values.push_back(output.abs().min().item<float>());
+    output_min_max_values.push_back(output.abs().max().item<float>());
   } else {
-    max_values.push_back(value);
+    output_min_max_values = input_min_max_values;
   }
-  AutoOptConfig::singleton().insert_or_updata_observer(op_name, max_values);
+  AutoOptConfig::singleton().insert_or_updata_observer(op_name, input_min_max_values, output_min_max_values);
 }
 
 std::tuple<std::vector<float>, bool> get_indicator_scales(std::vector<bool> uint8_used) {
