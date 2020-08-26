@@ -157,6 +157,37 @@ public:
 };
 
 template <>
+class RandomEngine<at::BFloat16> : public MTRandomEngine<at::BFloat16>  {
+public:
+  RandomEngine(
+    at::BFloat16* ptr,
+    int64_t ele_num,
+    uint64_t seed,
+    at::BFloat16 min,
+    at::BFloat16 max)
+    : MTRandomEngine<at::BFloat16>(ptr, ele_num, seed, min, max){
+  };
+
+  void operator()(nd_item<1> item) {
+    uint32_t mt[NUM_PER_RND];
+
+    int g_id = item.get_global_linear_id();
+    generate_random_numbers(g_id, 0, mt);
+
+    for (int i = 0; i < NUM_PER_RND; i++) {
+      int idx = i + g_id * NUM_PER_RND;
+
+      if (idx >= m_ele_num)
+        return;
+      uint32_t y = mt[i];
+
+      float tmp = m_real_min +
+                  ((float)y + 1.0f) / FLOAT_DIVISOR * (m_real_max - m_real_min);
+      m_ptr[idx] = static_cast<unsigned short>(static_cast<at::BFloat16>(tmp));
+    }
+  }
+};
+template <>
 class RandomEngine<float> : public MTRandomEngine<float> {
 public:
   RandomEngine(
