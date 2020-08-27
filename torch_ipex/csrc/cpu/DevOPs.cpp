@@ -265,9 +265,9 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
         } else {
           // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
           auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
-          auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8) ? input : input.contiguous();
+          auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8 || input.is_contiguous()) ? input : input.contiguous();
           auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
-          auto weight_temp = weight_dil_type == dil::data_type::s8 ? weight : weight.contiguous();
+          auto weight_temp = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
           return AtenIpexCPUDev::dil_convolution(input_temp, weight_temp, bias, stride, padding, dilation, groups);
         }
       }
@@ -962,7 +962,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
       input_scales.push_back(scales[0]);
       output_scales.push_back(scales[1]);
       dbl::comm::reorder_to_int8_for_mix_prec(input, input_scales);
-      //std::cout<<"print scale "<<scales[0]<<" "<<input.abs().max()<<std::endl; 
     } else {
       dbl::comm::reorder_to_dtype(input, at::kFloat);
     }

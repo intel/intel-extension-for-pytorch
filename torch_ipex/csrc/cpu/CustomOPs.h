@@ -153,7 +153,8 @@ public:
       if (torch_ipex::check_auto_dnnl() &&
           input.device().type() == c10::DeviceType::DPCPP) {
         auto src_dil_type = torch_ipex::cpu::dbl::comm::try_gen_dil_tensor(input).get_data_type();
-        auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8) ? input : input.contiguous();
+        auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8
+            || input.is_contiguous()) ? input : input.contiguous();
 
         at::Tensor output = torch_ipex::cpu::AtenIpexCPUDev::dil_max_pooling(
             input_temp, kernel_size, stride, padding, dilation, ceil_mode);
@@ -374,7 +375,8 @@ public:
     try {
       if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
         auto src_dil_type = torch_ipex::cpu::dbl::comm::try_gen_dil_tensor(input).get_data_type();
-        auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8) ? input : input.contiguous();
+        auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8
+            || input.is_contiguous()) ? input : input.contiguous();
         return torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(input_temp, output_size);
       }
     } catch (std::exception &e) {
