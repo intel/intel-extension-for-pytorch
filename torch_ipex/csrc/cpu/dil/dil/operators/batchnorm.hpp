@@ -55,8 +55,8 @@ struct batch_normalization_forward_inference
       pd_flags |= batch_normalization_flag::use_global_stats;
 
     // workaround: use src.get_desc() once issue intel/mkl-dnn#588 is resolved
-    //auto src_desc = src._get_unblocked_desc_if_4c_blocked();
-     auto src_desc = src.get_desc();
+    auto src_desc = src._get_unblocked_desc_if_4c_blocked();
+    //auto src_desc = src.get_desc();
 
     bool fuse_norm_relu = (bool) (flags & batch_normalization_flag::fuse_norm_relu);
     attr_t attr = fuse_norm_relu ? attr_t::fuse_relu() : attr_t();
@@ -132,8 +132,8 @@ struct batch_normalization_forward_inference
       }
       super(pd).execute(stream::default_stream(),
                         {{DNNL_ARG_SRC, expected_src},
-                        {DNNL_ARG_SCALE_SHIFT, scale_shift},
-                        {DNNL_ARG_DST, dst}});
+                         {DNNL_ARG_SCALE_SHIFT, scale_shift},
+                         {DNNL_ARG_DST, dst}});
     }
   }
 };

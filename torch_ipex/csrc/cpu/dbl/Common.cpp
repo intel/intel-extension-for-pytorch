@@ -36,13 +36,10 @@ dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor, dil::deleter_pt
 
 dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
   auto dil_buffer = cpu::ShadeDataContext::getDilStorage(tensor);
-  // for low prcision, x.reshape() + linear, has some issue, need return dil_buffer directly
-  //return dil_buffer;
-
-  if (dil_buffer.is_public_format()) {
+  auto data_type = dil_buffer.get_data_type();
+  if (dil_buffer.is_public_format() && !(data_type == dil::data_type::s8 || data_type == dil::data_type::u8)) {
     auto size = tensor.sizes().vec();
     auto stride = tensor.strides().vec();
-    auto data_type = dil_buffer.get_data_type();
     auto data_ptr = static_cast<void *>(
         static_cast<char *>(dil_buffer.get_data_handle()) +
         dil_buffer.get_item_size() * tensor.storage_offset());
@@ -55,10 +52,6 @@ dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
     // copy workspace
     if (dil_buffer.has_workspace()) {
       result.copy_workspace(dil_buffer);
-    }
-
-    if (dil_buffer.has_scale()) {
-      result.set_scale(dil_buffer.get_scale());
     }
     // TODO(xpz): copy scales and zero_points of qtensor (what if slicing?)
 
@@ -160,12 +153,6 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, 
     return;
   }
   auto dst_desc = src.get_desc().to_type(get_dil_data_type(dst_scalar_type));
- // src may bf16 or fp32 tensor with block format,
- // there has issue for conv weight prepack if given a block format weight
-  if (!src.is_public_format()) {
-    dst_desc = dst_desc.to_default_format();
-  }
-
   reorder_to_desc(tensor, dst_desc, scales);
 }
 
