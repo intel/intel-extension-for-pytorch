@@ -444,6 +444,9 @@ Tensor eq(const Tensor& self, const Tensor& other) {
 bool equal(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty_like(self, self.options().dtype(kBool));
 
+  if (!self.sizes().equals(other.sizes()))
+    return false;
+
   at::AtenIpexTypeDPCPP::eq_out(result, self, other);
   Tensor min = at::AtenIpexTypeDPCPP::min(result);
   Scalar min_ = at::AtenIpexTypeDPCPP::_local_scalar_dense(min);

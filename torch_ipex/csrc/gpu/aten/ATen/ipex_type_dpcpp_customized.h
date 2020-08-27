@@ -29,9 +29,19 @@ at::Tensor to_plain_if_needed(const Tensor& tensor);
 
 at::Tensor to_plain_if_needed_(const Tensor& tensor);
 
-TensorList to_plain_if_needed(TensorList tensor);
+at::TensorList to_plain_if_needed(TensorList tensor);
 
-Tensor new_qtensor(IntArrayRef sizes, const TensorOptions& options, QuantizerPtr quantizer);
+at::Tensor new_qtensor(IntArrayRef sizes, const TensorOptions& options, QuantizerPtr quantizer);
+
+at::Tensor q_conv2d_sum_relu(at::Tensor& accumu, const at::Tensor& input, const at::Tensor& packed_weight, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups, double conv_scale, int64_t conv_zero_point, double sum_scale, int64_t sum_zero_point);
+
+at::Tensor quantize_tensor_per_tensor_affine(at::Tensor& qtensor, const at::Tensor& rtensor, double scale, int64_t zero_point);
+
+at::Tensor quantize_tensor_per_channel_affine(at::Tensor& qtensor, const at::Tensor& rtensor, const at::Tensor& scales, const at::Tensor& zero_points, int64_t axis);
+
+at::Tensor dequantize_tensor_per_tensor_affine(at::Tensor& rtensor, const at::Tensor& qtensor, double scale, int64_t zero_point);
+
+at::Tensor dequantize_tensor_per_channel_affine(at::Tensor& rtensor, const at::Tensor& qtensor, const at::Tensor& scales, const at::Tensor& zero_points, int64_t axis);
 
 }
 }

@@ -1,22 +1,13 @@
 #include <ATen/ATen.h>
-#include <ATen/InitialTensorOptions.h>
-#include <ATen/NativeFunctions.h>
-#include <ATen/native/ReduceOpsUtils.h>
-#include <ATen/native/Resize.h>
-#include <ATen/native/TensorFactories.h>
 #include <ATen/quantized/QTensorImpl.h>
-#include <ATen/quantized/Quantizer.h>
-#include <c10/util/Exception.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
 #include <ATen/ipex_type_dpcpp_customized.h>
-#include <core/Context.h>
-#include <core/TensorImplUtils.h>
 #include <utils/ATDispatch.h>
-#include <utils/Numerics.h>
-
+#include <core/Context.h>
 #include <core/Runtime.h>
+#include <core/Quantizer.h>
 #include "Loops.h"
+
 
 DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
 DPCPP_DEF_K1(make_per_channel_quantized_tensor_dpcpp);
@@ -80,39 +71,11 @@ Tensor _make_per_channel_quantized_tensor(
   return dst;
 }
 
-QuantizerPtr make_per_tensor_affine_quantizer(
-    double scale,
-    int64_t zero_point,
-    ScalarType scalar_type) {
-  return c10::make_intrusive<at::PerTensorAffineQuantizer>(
-      scalar_type, scale, zero_point);
-}
-
-QuantizerPtr make_per_channel_affine_quantizer_dpcpp(
+Tensor quantize_tensor_per_channel_affine(
+    Tensor& qtensor,
+    const Tensor& rtensor,
     const Tensor& scales,
     const Tensor& zero_points,
-    int64_t axis,
-    ScalarType scalar_type) {
-  TORCH_CHECK(
-      scales.numel() == zero_points.numel(),
-      "number of elements in scales and zero_points must match");
-  TORCH_CHECK(
-      isFloatingType(scales.scalar_type()),
-      "scale tensor must be floating point");
-  TORCH_CHECK(
-      isIntegralType(zero_points.scalar_type(), false /*includeBool*/),
-      "zero_points tensor must have integral type");
-  Tensor scales_double = scales.to(kDouble).contiguous();
-  Tensor zero_points_int64 = zero_points.to(kLong).contiguous();
-  return c10::make_intrusive<at::PerChannelAffineQuantizer>(
-      scalar_type, scales_double, zero_points_int64, axis);
-}
-
-void quantize_tensor_per_channel_affine_kernel(
-    Tensor rtensor,
-    Tensor qtensor,
-    Tensor scales,
-    Tensor zero_points,
     int64_t axis) {
   auto stream = GpuStreamManager::Instance().get_stream();
   Device curDevice = Device(kDPCPP, current_device());
@@ -157,11 +120,12 @@ void quantize_tensor_per_channel_affine_kernel(
   reorder reorder_p = reorder(r_m, q_m, attr);
 
   DPCPP_ONEDNN_EXEC(reorder_p, stream, r_m, q_m);
+  return qtensor;
 }
 
-void quantize_tensor_per_tensor_affine_dpcpp_kernel(
-    Tensor rtensor,
-    Tensor qtensor,
+Tensor quantize_tensor_per_tensor_affine(
+    Tensor& qtensor,
+    const Tensor& rtensor,
     double scale,
     int64_t zero_point) {
   auto stream = GpuStreamManager::Instance().get_stream();
@@ -196,26 +160,6 @@ void quantize_tensor_per_tensor_affine_dpcpp_kernel(
   reorder reorder_p = reorder(r_m, q_m, attr);
 
   DPCPP_ONEDNN_EXEC(reorder_p, stream, r_m, q_m);
-}
-
-Tensor quantize_tensor_per_tensor_affine_dpcpp(
-    Tensor rtensor,
-    Tensor qtensor,
-    double scale,
-    int64_t zero_point) {
-  quantize_tensor_per_tensor_affine_dpcpp_kernel(
-      rtensor, qtensor, scale, zero_point);
-  return qtensor;
-}
-
-Tensor quantize_tensor_per_channel_affine_dpcpp(
-    Tensor rtensor,
-    Tensor qtensor,
-    Tensor scales,
-    Tensor zero_points,
-    int64_t axis) {
-  quantize_tensor_per_channel_affine_kernel(
-      rtensor, qtensor, scales, zero_points, axis);
   return qtensor;
 }
 
@@ -224,7 +168,8 @@ Tensor quantize_per_tensor(
     double scale,
     int64_t zero_point,
     ScalarType dtype) {
-  auto quantizer = make_per_tensor_affine_quantizer(scale, zero_point, dtype);
+  auto quantizer =
+      at::dpcpp::make_per_tensor_affine_quantizer(scale, zero_point, dtype);
   return quantizer->quantize(self);
 }
 
@@ -235,7 +180,7 @@ Tensor quantize_per_channel(
     int64_t axis,
     ScalarType dtype) {
   auto quantizer =
-      make_per_channel_affine_quantizer_dpcpp(scales, zero_points, axis, dtype);
+      at::dpcpp::make_per_channel_affine_quantizer(scales, zero_points, axis, dtype);
   return quantizer->quantize(self);
 }
 
@@ -258,7 +203,7 @@ Tensor _empty_affine_quantized(
   return AtenIpexTypeDPCPP::new_qtensor(
       size,
       options,
-      make_per_tensor_affine_quantizer(
+      at::dpcpp::make_per_tensor_affine_quantizer(
           scale, zero_point, typeMetaToScalarType(options.dtype())));
 }
 
@@ -285,46 +230,9 @@ Tensor _empty_per_channel_affine_quantized(
   return AtenIpexTypeDPCPP::new_qtensor(
       size,
       options,
-      make_per_channel_affine_quantizer_dpcpp(
+      at::dpcpp::make_per_channel_affine_quantizer(
           scales, zero_points, axis, typeMetaToScalarType(options.dtype())));
 }
 
 } // namespace AtenIpexTypeDPCPP
-} // namespace at
-
-namespace at {
-
-Tensor PerTensorAffineQuantizer::quantize(Tensor rtensor) {
-  TORCH_CHECK(
-      rtensor.scalar_type() == kFloat, "quantize only works on Float Tensor.");
-  Tensor qtensor = AtenIpexTypeDPCPP::new_qtensor(
-      rtensor.sizes(),
-      rtensor.options().dtype(scalar_type_),
-      intrusive_from_this());
-
-  rtensor = rtensor.contiguous();
-
-  AtenIpexTypeDPCPP::quantize_tensor_per_tensor_affine_dpcpp(
-      rtensor, qtensor, scale_, zero_point_);
-
-  return qtensor;
-}
-
-Tensor PerChannelAffineQuantizer::quantize(Tensor rtensor) {
-  TORCH_CHECK(
-      rtensor.scalar_type() == kFloat, "quantize only works on Float Tensor.");
-
-  Tensor qtensor = AtenIpexTypeDPCPP::new_qtensor(
-      rtensor.sizes(),
-      rtensor.options().dtype(scalar_type_),
-      intrusive_from_this());
-
-  rtensor = rtensor.contiguous();
-
-  AtenIpexTypeDPCPP::quantize_tensor_per_channel_affine_dpcpp(
-      rtensor, qtensor, scales_, zero_points_, axis_);
-
-  return qtensor;
-}
-
 } // namespace at

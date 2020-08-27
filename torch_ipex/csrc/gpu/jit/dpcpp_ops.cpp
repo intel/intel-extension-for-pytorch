@@ -3,6 +3,7 @@
 #include <dnnl.hpp>
 
 #include <ATen/aten_ipex_type_dpcpp.h>
+#include <ATen/ipex_type_dpcpp_customized.h>
 
 
 namespace torch {
@@ -39,6 +40,18 @@ at::Tensor conv2d_relu(
                   std::vector<c10::IValue>({input, weight, bias}));
   return at::AtenIpexTypeDPCPP::convolution_relu(
       input, weight, bias, stride, padding, dilation, false, {{0, 0}}, groups);
+}
+
+at::Tensor q_conv2d_sum_relu(at::Tensor& accumu,
+    const at::Tensor& input, const at::Tensor& packed_weight,
+    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
+    int64_t groups, double conv_scale, int64_t conv_zpoint, double sum_scale,
+    int64_t sum_zpoint) {
+  RECORD_FUNCTION("q_conv2d_sum_relu",
+                  std::vector<c10::IValue>({input, packed_weight}));
+  return at::AtenIpexTypeDPCPP::q_conv2d_sum_relu(accumu,
+      input, packed_weight, stride, padding, dilation, groups, conv_scale,
+      conv_zpoint, sum_scale, sum_zpoint);
 }
 
 at::Tensor batch_norm(

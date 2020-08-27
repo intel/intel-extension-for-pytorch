@@ -15,9 +15,9 @@ typedef struct conv_attr {
   static const int64_t kind_with_relu = 0b01;
   static const int64_t kind_with_sum = 0b10;
 
-  conv_attr() : scale_(1.0), alpha_(0.f), beta_(0.f), attr_(0) {}
-  conv_attr(float scale, float alpha, float beta, int64_t attr)
-      : scale_(scale), alpha_(alpha), beta_(beta), attr_(attr) {}
+  conv_attr() : scale_(1.f), alpha_(0.f), beta_(0.f), oscale_(1.f), attr_(0) {}
+  conv_attr(float scale, float alpha, float beta, float oscale, int64_t attr)
+      : scale_(scale), alpha_(alpha), beta_(beta), oscale_(oscale), attr_(attr) {}
 
   bool with_relu() {
     return attr_ & kind_with_relu;
@@ -30,6 +30,7 @@ typedef struct conv_attr {
   float scale_;
   float alpha_;
   float beta_;
+  float oscale_;
   int64_t attr_;
 } conv_attr_t;
 

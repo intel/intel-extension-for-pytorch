@@ -26,9 +26,9 @@ using namespace at::native;
 namespace at {
 namespace AtenIpexTypeDPCPP {
 
-void dequantize_tensor_per_tensor_affine_dpcpp(
-    Tensor qtensor,
-    Tensor rtensor,
+Tensor dequantize_tensor_per_tensor_affine(
+    Tensor& rtensor,
+    const Tensor& qtensor,
     double scale,
     int64_t zero_point) {
   auto stream = GpuStreamManager::Instance().get_stream();
@@ -63,23 +63,14 @@ void dequantize_tensor_per_tensor_affine_dpcpp(
   reorder reorder_p = reorder(q_m, r_m, attr);
 
   DPCPP_ONEDNN_EXEC(reorder_p, stream, q_m, r_m);
-}
-
-Tensor dequantize_tensor_per_tensor_affine(
-    Tensor qtensor,
-    Tensor rtensor,
-    double scale,
-    int64_t zero_point) {
-  dequantize_tensor_per_tensor_affine_dpcpp(
-      qtensor, rtensor, scale, zero_point);
   return rtensor;
 }
 
-void dequantize_tensor_per_channel_affine_dpcpp(
-    Tensor qtensor,
-    Tensor rtensor,
-    Tensor scales,
-    Tensor zero_points,
+Tensor dequantize_tensor_per_channel_affine(
+    Tensor& rtensor,
+    const Tensor& qtensor,
+    const Tensor& scales,
+    const Tensor& zero_points,
     int64_t axis) {
   auto stream = GpuStreamManager::Instance().get_stream();
   Device curDevice = Device(kDPCPP, current_device());
@@ -122,16 +113,6 @@ void dequantize_tensor_per_channel_affine_dpcpp(
   reorder reorder_p = reorder(q_m, r_m, attr);
 
   DPCPP_ONEDNN_EXEC(reorder_p, stream, q_m, r_m);
-}
-
-Tensor dequantize_tensor_per_channel_affine(
-    Tensor qtensor,
-    Tensor rtensor,
-    Tensor scales,
-    Tensor zero_points,
-    int64_t axis) {
-  dequantize_tensor_per_channel_affine_dpcpp(
-      qtensor, rtensor, scales, zero_points, axis);
   return rtensor;
 }
 
@@ -144,30 +125,4 @@ Tensor dequantize(const Tensor& self) {
 }
 
 } // namespace AtenIpexTypeDPCPP
-} // namespace at
-
-namespace at {
-
-Tensor PerTensorAffineQuantizer::dequantize(Tensor qtensor) {
-  Tensor rtensor =
-      at::empty(qtensor.sizes(), qtensor.options().dtype(at::kFloat));
-  qtensor = qtensor.contiguous();
-
-  AtenIpexTypeDPCPP::dequantize_tensor_per_tensor_affine(
-      qtensor, rtensor, scale_, zero_point_);
-
-  return rtensor;
-}
-
-Tensor PerChannelAffineQuantizer::dequantize(Tensor qtensor) {
-  Tensor rtensor =
-      at::empty(qtensor.sizes(), qtensor.options().dtype(at::kFloat));
-  qtensor = qtensor.contiguous();
-
-  AtenIpexTypeDPCPP::dequantize_tensor_per_channel_affine(
-      qtensor, rtensor, scales_, zero_points_, axis_);
-
-  return rtensor;
-}
-
 } // namespace at

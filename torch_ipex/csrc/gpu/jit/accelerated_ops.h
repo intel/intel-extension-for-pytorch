@@ -13,6 +13,7 @@ namespace dpcpp {
   static auto conv2d_sum_sym = Symbol::fromQualString("dpcpp::conv2d_sum");
   static auto conv2d_relu_sum_sym = Symbol::fromQualString("dpcpp::conv2d_relu_sum");
   static auto conv2d_sum_relu_sym = Symbol::fromQualString("dpcpp::conv2d_sum_relu");
+  static auto q_conv2d_sum_relu_sym = Symbol::fromQualString("dpcpp::q_conv2d_sum_relu");
 
   // Fold weights of batch_norm with conv2d's
   static auto fold_weight_sym =

@@ -1,5 +1,8 @@
+#include <ATen/quantized/QTensorImpl.h>
+
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
+#include <core/Quantizer.h>
 #include <tensor/Context.h>
 #include <ATen/ipex_type_dpcpp_customized.h>
 
@@ -141,10 +144,41 @@ at::Tensor convolution(
         _padding));
   }
 
+  std::vector<float> weight_scales;
+  if(weight.is_quantized()){
+    if (weight.qscheme() == kPerTensorAffine) {
+      weight_scales.push_back(static_cast<float>(weight.q_scale()));
+    } else {
+      for (int i = 0; i < oc; i++) {
+        weight_scales.push_back(weight.q_per_channel_scales()[i].item<float>());
+      }
+    }
+  }
+
   primitive_attr pattr;
+  float in_scale;
+  if(input.is_quantized()){
+    auto out_scale = attr.oscale_;
+    in_scale = input.q_scale();
+    std::vector<float> conv_scale;
+    for (int i = 0; i < weight_scales.size(); i++){
+      conv_scale.push_back(1.f / (out_scale / (in_scale * weight_scales[i])));
+    }
+    int mask_ac = 0;
+    int mask_conv = weight_scales.size() > 1 ? 1 << 1 : 0;
+    pattr.set_output_scales(mask_conv, conv_scale);
+    pattr.set_zero_points(
+        DNNL_ARG_DST, mask_ac, {static_cast<int>(output.q_zero_point())});
+  }
+
   post_ops po;
   if (attr.with_sum()) {
-    po.append_sum(attr.scale_);
+    if (input.is_quantized()) {
+      float with_sum_out_scale = attr.scale_;
+      po.append_sum(with_sum_out_scale);
+    } else {
+      po.append_sum(attr.scale_);
+    }
   }
 
   if (attr.with_relu()) {
@@ -152,31 +186,6 @@ at::Tensor convolution(
   }
 
   pattr.set_post_ops(po);
-
-  std::vector<float> weight_scales;
-  if(weight.is_quantized()){
-      if (weight.qscheme() == kPerTensorAffine) {
-             weight_scales.push_back(static_cast<float>(weight.q_scale()));
-      } else {
-          for (int i = 0; i < oc; i++) {
-            weight_scales.push_back(weight.q_per_channel_scales()[i].item<float>());
-          }
-      }
-  }
-
-  float in_scale;
-  if(input.is_quantized()){
-    in_scale = input.q_scale();
-    auto out_scale = attr.scale_;
-    std::vector<float> conv_scale;
-    for(int i=0; i<weight_scales.size(); i++){
-      conv_scale.push_back( 1.f / (out_scale / ( in_scale * weight_scales[i])));
-    }
-    int mask_ac = 0;
-    int mask_conv = weight_scales.size() > 1 ? 1 << 1 : 0;
-    pattr.set_output_scales(mask_conv, conv_scale);
-    pattr.set_zero_points(DNNL_ARG_DST, mask_ac, {static_cast<int>(output.q_zero_point())});
-  }
 
   std::shared_ptr<convolution_forward::primitive_desc> conv_forward_pd;
   conv_forward_pd.reset(new convolution_forward::primitive_desc(
@@ -311,7 +320,7 @@ at::Tensor convolution(
 
       primitive_attr attr;
       std::vector<float> bias_scale;
-      for(int i=0; i<weight_scales.size(); i++){
+      for(int i = 0; i < weight_scales.size(); i++){
         bias_scale.push_back(1.f / (in_scale * weight_scales[i] / 1.f));
       }
       int mask = weight_scales.size() > 1 ? 1 << 0 : 0;
@@ -1180,6 +1189,7 @@ Tensor convolution_sum(
       scale.to<float>(),
       alpha.to<float>(),
       beta.to<float>(),
+      1.f,
       conv_attr_t::kind_with_sum);
   return _convolution_out(
       accumu,
@@ -1213,6 +1223,7 @@ Tensor convolution_sum_relu(
       scale.to<float>(),
       alpha.to<float>(),
       beta.to<float>(),
+      1.f,
       conv_attr_t::kind_with_relu | conv_attr_t::kind_with_sum);
   return _convolution_out(
       accumu,
@@ -1245,6 +1256,7 @@ Tensor convolution_relu(
       scale.to<float>(),
       alpha.to<float>(),
       beta.to<float>(),
+      1.f,
       conv_attr_t::kind_with_relu);
   return _convolution(
       input_r,
