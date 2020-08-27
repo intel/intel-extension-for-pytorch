@@ -32,7 +32,7 @@ def get_auto_optimization():
 def get_train():
     return core.get_train()
 
-def enable_auto_mix_precision(mixed_dtype = torch.bfloat16, train, configure_file = None):
+def enable_auto_mix_precision(mixed_dtype = torch.bfloat16, train = False, configure_file = None):
     if mixed_dtype == torch.bfloat16:
         core.enable_mix_bf16_fp32()
         core.disable_mix_int8_fp32()

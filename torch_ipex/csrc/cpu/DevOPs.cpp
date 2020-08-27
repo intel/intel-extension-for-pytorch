@@ -794,16 +794,12 @@ at::Tensor AtenIpexCPUDev::dil_linear(
 
   dil::tensor y = dbl::linear::linear_impl(x, w, b, output_scale);
 
-  auto input_size = self.sizes();
-  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(weight.size(0));
-
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
     insert_or_updata_observer(self, aten_output, "Linear");
   }
-
+ 
   if (self.dim() > 2) {
     auto input_size = self.sizes();
     std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
@@ -1358,7 +1354,7 @@ at::Tensor AtenIpexCPUDev::dil_relu(const at::Tensor& input) {
       dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
   } else {
-    dbl::comm::reorder_to_bf16_for_mix_prec(input);
+    dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
   }
 
   const dil::tensor& x = dbl::comm::try_gen_dil_tensor(input);
@@ -1388,7 +1384,7 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
       dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
   } else {
-    dbl::comm::reorder_to_bf16_for_mix_prec(input);
+    dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
   }
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
