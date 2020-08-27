@@ -1,4 +1,6 @@
 #include <core/Memory.h>
+#include <utils/Profiler.h>
+#include <core/CachingHostAllocator.h>
 #include <core/Stream.h>
 
 namespace at {
@@ -106,7 +108,12 @@ static void memcpyHostToDevice(
 
   if (!async) {
     e.wait();
+  } else {
+    dpcpp_recordEventInCachingHostAllocator(const_cast<void*>(src), e);
   }
+
+  dpcpp_log("dpcpp_kernel", e);
+  DPCPP_Q_FORCE_SYNC(dpcpp_queue);
 }
 
 static void memcpyDeviceToHost(
@@ -122,7 +129,12 @@ static void memcpyDeviceToHost(
 
   if (!async) {
     e.wait();
+  } else {
+    dpcpp_recordEventInCachingHostAllocator(const_cast<void*>(dst), e);
   }
+
+  dpcpp_log("dpcpp_kernel", e);
+  DPCPP_Q_FORCE_SYNC(dpcpp_queue);
 }
 
 static void memcpyDeviceToDevice(
@@ -139,6 +151,9 @@ static void memcpyDeviceToDevice(
   if (!async) {
     e.wait();
   }
+
+  dpcpp_log("dpcpp_kernel", e);
+  DPCPP_Q_FORCE_SYNC(dpcpp_queue);
 }
 
 static void memsetDevice(
@@ -151,6 +166,9 @@ static void memsetDevice(
   if (!async) {
     e.wait();
   }
+
+  dpcpp_log("dpcpp_kernel", e);
+  DPCPP_Q_FORCE_SYNC(dpcpp_queue);
 }
 
 #endif

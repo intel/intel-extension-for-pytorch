@@ -97,6 +97,16 @@ DPCPPDeviceSelector dpcppGetDeviceSelector(DeviceIndex device_index) {
   return gDevPool.dev_sels[device_index];
 }
 
+DeviceIndex dpcppGetDeviceIndex(DPCPP::device device) {
+  initDevicePoolCallOnce();
+  std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
+  auto it = std::find(gDevPool.devices.begin(), gDevPool.devices.end(), device);
+  if (it != gDevPool.devices.end()) {
+    return std::distance(gDevPool.devices.begin(), it);
+  }
+  return -1;
+}
+
 /************************dpcpp memory buffer map pool****************/
 #define MAX_DPCPP_MEM_PER_DEVICE 17179869184 // 16*1024*1024*1024 -- 16GB
 // Global buffer map pool state
@@ -128,21 +138,21 @@ DPCPP::codeplay::PointerMapper& dpcppGetBufferMap() {
 }
 
 int dpcppGetDeviceIdFromPtr(DeviceIndex* device_id, void* ptr) {
+#ifndef USE_USM
   int device_index = reinterpret_cast<uint64_t>(ptr) / MAX_DPCPP_MEM_PER_DEVICE;
   int device_count;
   dpcppGetDeviceCount(&device_count);
   if (device_index >= device_count) {
     throw(std::out_of_range("this pointer is invalid"));
   }
-#ifndef USE_USM
   if (gBufferMapPoolPtr[device_index]->get_offset(ptr) > 0) {
     *device_id = static_cast<DeviceIndex>(device_index);
   } else {
     throw(std::out_of_range("the pointer is not allocated"));
   }
 #else
-  // FIXME:
-  *device_id = -1;
+  auto raw_device = DPCPP::get_pointer_device(ptr, at::dpcpp::getGlobalContext());
+  *device_id = dpcppGetDeviceIndex(raw_device);
 #endif
   return DPCPP_SUCCESS;
 }
