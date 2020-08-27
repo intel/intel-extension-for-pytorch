@@ -1,6 +1,8 @@
 #pragma once
 
 #include "DevOPs.h"
+#include "dbl/Common.h"
+#include "dil/dil.hpp"
 #include "torch_ipex/csrc/aten_ipex_bridge.h"
 #include "torch_ipex/csrc/utils.h"
 #include <ATen/Tensor.h>
@@ -150,9 +152,11 @@ public:
     try {
       if (torch_ipex::check_auto_dnnl() &&
           input.device().type() == c10::DeviceType::DPCPP) {
+        auto src_dil_type = torch_ipex::cpu::dbl::comm::try_gen_dil_tensor(input).get_data_type();
+        auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8) ? input : input.contiguous();
+
         at::Tensor output = torch_ipex::cpu::AtenIpexCPUDev::dil_max_pooling(
-            input.is_contiguous() ? input : input.contiguous(), kernel_size,
-            stride, padding, dilation, ceil_mode);
+            input_temp, kernel_size, stride, padding, dilation, ceil_mode);
         return std::tuple<at::Tensor, at::Tensor>(output, output);
       }
     } catch (std::exception &e) {
@@ -368,10 +372,10 @@ class NewApaptiveAvgPoolingOp
 public:
   static at::Tensor _forward(at::Tensor input, at::IntArrayRef output_size) {
     try {
-      if (torch_ipex::check_auto_dnnl() &&
-          input.device().type() == c10::DeviceType::DPCPP) {
-        return torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(
-            input.is_contiguous() ? input : input.contiguous(), output_size);
+      if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
+        auto src_dil_type = torch_ipex::cpu::dbl::comm::try_gen_dil_tensor(input).get_data_type();
+        auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8) ? input : input.contiguous();
+        return torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(input_temp, output_size);
       }
     } catch (std::exception &e) {
 #if defined(_DEBUG)
