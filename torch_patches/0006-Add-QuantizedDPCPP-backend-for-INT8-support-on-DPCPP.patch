@@ -1,7 +1,7 @@
 From 3acdba313b81ee18b776ecc9256e573647f89dab Mon Sep 17 00:00:00 2001
 From: Gu Jinghui <jinghui.gu@intel.com>
 Date: Fri, 14 Aug 2020 00:51:25 +0800
-Subject: [PATCH 6/7] Add QuantizedDPCPP backend for INT8 support on DPCPP
+Subject: [PATCH 6/9] Add QuantizedDPCPP backend for INT8 support on DPCPP
  device
 
 ---

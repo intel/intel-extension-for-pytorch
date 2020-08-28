@@ -1,7 +1,7 @@
 From 86ed76d0427b445127648c6763bbe03dffa39553 Mon Sep 17 00:00:00 2001
 From: Zekun Chen <zekun.chen@intel.com>
 Date: Mon, 25 May 2020 17:04:54 +0800
-Subject: [PATCH 4/7] Do NOT define __assert_fail in DPCPP build
+Subject: [PATCH 4/9] Do NOT define __assert_fail in DPCPP build
 
 To Avoid the signature conflict in DPCPP headers
 ---

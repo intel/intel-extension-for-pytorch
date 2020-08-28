@@ -1,0 +1,333 @@
+From 0fcce8bd878a5a6281b491fb58a21d880139fcd0 Mon Sep 17 00:00:00 2001
+From: Gu Jinghui <jinghui.gu@intel.com>
+Date: Wed, 26 Aug 2020 23:10:22 +0800
+Subject: [PATCH 9/9] Implement DPCPPHookInterface to support DPCPP backend
+ hooks
+
+Signed-off-by: Gu Jinghui <jinghui.gu@intel.com>
+---
+ aten/src/ATen/Context.h                      | 55 ++++++++++---
+ aten/src/ATen/Version.cpp                    |  4 +
+ aten/src/ATen/detail/DPCPPHooksInterface.cpp | 29 +++++++
+ aten/src/ATen/detail/DPCPPHooksInterface.h   | 83 ++++++++++++++++++++
+ aten/src/ATen/native/Memory.cpp              | 17 +++-
+ aten/src/ATen/native/TensorFactories.cpp     |  7 +-
+ 6 files changed, 182 insertions(+), 13 deletions(-)
+ create mode 100644 aten/src/ATen/detail/DPCPPHooksInterface.cpp
+ create mode 100644 aten/src/ATen/detail/DPCPPHooksInterface.h
+
+diff --git a/aten/src/ATen/Context.h b/aten/src/ATen/Context.h
+index 5337e2d5c4..0c815b567a 100644
+--- a/aten/src/ATen/Context.h
++++ b/aten/src/ATen/Context.h
+@@ -9,6 +9,7 @@
+ #include <ATen/core/LegacyTypeDispatch.h>
+ #include <ATen/detail/CUDAHooksInterface.h>
+ #include <ATen/detail/HIPHooksInterface.h>
++#include <ATen/detail/DPCPPHooksInterface.h>
+ #include <c10/util/Exception.h>
+ #include <c10/core/impl/DeviceGuardImplInterface.h>
+ #include <c10/core/QEngine.h>
+@@ -27,29 +28,35 @@ class CAFFE2_API Context {
+ 
+   Generator & defaultGenerator(Device device) {
+     DeviceType device_type = device.type();
+-    initCUDAIfNeeded(device_type);
+-    initHIPIfNeeded(device_type);
++    initDeviceIfNeeded(device_type);
+     if (device_type == at::kCPU) {
+       return *at::detail::getDefaultCPUGenerator();
+     } else if (device_type == at::kCUDA) {
+       return *at::detail::getCUDAHooks().getDefaultCUDAGenerator(device.index());
++    } else if (device_type == at::kDPCPP) {
++      return *at::detail::getDPCPPHooks().getDefaultDPCPPGenerator(device.index());
+     } else {
+       AT_ERROR(DeviceTypeName(device_type), " device type not enabled.");
+     }
+   }
+   Device getDeviceFromPtr(void* data, DeviceType device_type) {
+-    initCUDAIfNeeded(device_type);
+-    initHIPIfNeeded(device_type);
++    initDeviceIfNeeded(device_type);
+     if (device_type == at::kCPU) {
+       return DeviceType::CPU;
+     } else if (device_type == at::kCUDA) {
+       return at::detail::getCUDAHooks().getDeviceFromPtr(data);
++    } else if (device_type == at::kDPCPP) {
++      return at::detail::getDPCPPHooks().getDeviceFromPtr(data);
+     } else {
+       AT_ERROR(DeviceTypeName(device_type), " device type not enabled.");
+     }
+   }
+   bool isPinnedPtr(void* data) {
+-    return detail::getCUDAHooks().isPinnedPtr(data);
++    deviceExclusiveCheck();
++    if (hasCUDA()) {
++      return detail::getCUDAHooks().isPinnedPtr(data);
++    }
++    return detail::getDPCPPHooks().isPinnedPtr(data);
+   }
+   bool hasOpenMP() const;
+   bool hasMKL() const;
+@@ -64,6 +71,28 @@ class CAFFE2_API Context {
+   bool hasHIP() const {
+     return detail::getHIPHooks().hasHIP();
+   }
++  bool hasDPCPP() const {
++    return detail::getDPCPPHooks().hasDPCPP();
++  }
++  void deviceExclusiveCheck() {
++    int count = 0;
++    if (hasCUDA()) {
++      count++;
++    }
++    if (hasHIP()) {
++      count++;
++    }
++    if (hasDPCPP()) {
++      count++;
++    }
++    if (count > 1) {
++      throw std::runtime_error(
++          "Enabling CUDA, HIP and DPCPP at same time in ATen is not supported,"
++          "as HIP masqueradesto be CUDA (e.g., when you say CUDA, on a HIP build of ATen,"
++          "this actually means HIP, while DPCPP cannot work with two others."
++          "Rebuild PyTorch with one or the other disabled.");
++    }
++  }
+   bool hasXLA() const {
+     return c10::impl::hasDeviceGuardImpl(at::DeviceType::XLA);
+   }
+@@ -112,13 +141,10 @@ class CAFFE2_API Context {
+   bool isXNNPACKAvailable() const;
+ 
+  private:
+-  void initCUDAIfNeeded(DeviceType p) {
++  void initDeviceIfNeeded(DeviceType p) {
+     if (p == DeviceType::CUDA) {
+       lazyInitCUDA();
+-    }
+-  }
+-  void initHIPIfNeeded(DeviceType p) {
+-    if (p == DeviceType::HIP) {
++    } else if (p == DeviceType::HIP) {
+       lazyInitHIP();
+     }
+   }
+@@ -169,10 +195,19 @@ static inline bool hasHIP() {
+   return globalContext().hasHIP();
+ }
+ 
++static inline bool hasDPCPP() {
++  return globalContext().hasDPCPP();
++}
++
+ static inline bool hasXLA() {
+   return globalContext().hasXLA();
+ }
+ 
++
++static void deviceExclusiveCheck() {
++  globalContext().deviceExclusiveCheck();
++}
++
+ // Despite its name, this function returns the number of *CUDA* GPUs.
+ static inline size_t getNumGPUs() {
+   // WARNING: DO NOT ADD LOGIC TO HANDLE OTHER DEVICE TYPES TO THIS
+diff --git a/aten/src/ATen/Version.cpp b/aten/src/ATen/Version.cpp
+index 0fcf38470a..c482877b41 100644
+--- a/aten/src/ATen/Version.cpp
++++ b/aten/src/ATen/Version.cpp
+@@ -171,6 +171,10 @@ std::string show_config() {
+     ss << detail::getCUDAHooks().showConfig();
+   }
+ 
++  if (hasDPCPP()) {
++    ss << detail::getDPCPPHooks().showConfig();
++  }
++
+   ss << "  - Build settings: ";
+   for (const std::pair<std::string, std::string>& pair : caffe2::GetBuildOptions()) {
+     if (!pair.second.empty()) {
+diff --git a/aten/src/ATen/detail/DPCPPHooksInterface.cpp b/aten/src/ATen/detail/DPCPPHooksInterface.cpp
+new file mode 100644
+index 0000000000..8f88ce2ce3
+--- /dev/null
++++ b/aten/src/ATen/detail/DPCPPHooksInterface.cpp
+@@ -0,0 +1,29 @@
++#include <ATen/detail/DPCPPHooksInterface.h>
++
++#include <c10/util/Exception.h>
++
++#include <cstddef>
++#include <memory>
++#include <mutex>
++
++namespace at {
++namespace detail {
++
++static DPCPPHooksInterface *dpcpp_hooks = nullptr;
++
++const DPCPPHooksInterface &getDPCPPHooks() {
++  static std::once_flag once;
++  std::call_once(once, [] {
++    dpcpp_hooks =
++        DPCPPHooksRegistry()->Create("DPCPPHooks", DPCPPHooksArgs{}).release();
++    if (!dpcpp_hooks) {
++      dpcpp_hooks = new DPCPPHooksInterface();
++    }
++  });
++  return *dpcpp_hooks;
++}
++} // namespace detail
++
++C10_DEFINE_REGISTRY(DPCPPHooksRegistry, DPCPPHooksInterface, DPCPPHooksArgs)
++
++} // namespace at
+diff --git a/aten/src/ATen/detail/DPCPPHooksInterface.h b/aten/src/ATen/detail/DPCPPHooksInterface.h
+new file mode 100644
+index 0000000000..5171946eb2
+--- /dev/null
++++ b/aten/src/ATen/detail/DPCPPHooksInterface.h
+@@ -0,0 +1,83 @@
++#pragma once
++
++#include <ATen/core/Generator.h>
++#include <c10/core/Allocator.h>
++#include <c10/util/Exception.h>
++
++#include <c10/util/Registry.h>
++
++#include <cstddef>
++#include <functional>
++#include <memory>
++
++namespace at {
++class Context;
++}
++
++namespace at {
++
++constexpr const char* DPCPP_HELP =
++  "PyTorch splits its backend into two shared libraries: a CPU library "
++  "and a DPCPP library; this error has occurred because you are trying "
++  "to use some DPCPP functionality, but the DPCPP library has not been "
++  "loaded by the dynamic linker for some reason.  The DPCPP library MUST "
++  "be loaded, EVEN IF you don't directly use any symbols from the DPCPP library!";
++
++struct CAFFE2_API DPCPPHooksInterface {
++  virtual ~DPCPPHooksInterface() {}
++
++  virtual void initDPCPP() const {
++    TORCH_CHECK(false, "Cannot initialize DPCPP without DPCPP library.", DPCPP_HELP);
++  }
++
++  virtual bool hasDPCPP() const {
++    return false;
++  }
++
++  virtual bool hasOneMKL() const {
++    return false;
++  }
++
++  virtual bool hasOneDNN() const {
++    return false;
++  }
++
++  virtual std::string showConfig() const {
++    TORCH_CHECK(false, "Cannot query detailed DPCPP version without DPCPP library. ", DPCPP_HELP);
++  }
++
++  virtual int64_t getCurrentDevice() const {
++    return -1;
++  }
++
++  virtual int getDeviceCount() const {
++    return 0;
++  }
++
++  virtual Device getDeviceFromPtr(void* data) const {
++    TORCH_CHECK(false, "Cannot get device of pointer on DPCPP without DPCPP library.", DPCPP_HELP);
++  }
++
++  virtual bool isPinnedPtr(void* data) const {
++    return false;
++  }
++
++  virtual Allocator* getPinnedMemoryAllocator() const {
++    TORCH_CHECK(false, "Pinned Memory requires DPCPP library support", DPCPP_HELP);
++  }
++
++  virtual Generator* getDefaultDPCPPGenerator(DeviceIndex device_index = -1) const {
++    TORCH_CHECK(false, "Cannot get default DPCPP generator without DPCPP library.", DPCPP_HELP);
++  }
++};
++
++struct CAFFE2_API DPCPPHooksArgs {};
++
++C10_DECLARE_REGISTRY(DPCPPHooksRegistry, DPCPPHooksInterface, DPCPPHooksArgs);
++#define REGISTER_DPCPP_HOOKS(clsname) \
++  C10_REGISTER_CLASS(DPCPPHooksRegistry, clsname, clsname)
++
++namespace detail {
++CAFFE2_API const DPCPPHooksInterface& getDPCPPHooks();
++} // namespace detail
++} // namespace at
+diff --git a/aten/src/ATen/native/Memory.cpp b/aten/src/ATen/native/Memory.cpp
+index a69c7c62a9..d2939426cc 100644
+--- a/aten/src/ATen/native/Memory.cpp
++++ b/aten/src/ATen/native/Memory.cpp
+@@ -10,17 +10,30 @@ namespace at {
+ namespace native {
+ 
+ bool is_pinned(const Tensor& self) {
+-  return detail::getCUDAHooks().isPinnedPtr(self.storage().data());
++  deviceExclusiveCheck();
++  if (hasCUDA()) {
++    return detail::getCUDAHooks().isPinnedPtr(self.storage().data());
++  }
++  return detail::getDPCPPHooks().isPinnedPtr(self.storage().data());
+ }
+ 
+ Tensor pin_memory(const Tensor& self) {
+   if (self.options().backend() != Backend::CPU) {
+     AT_ERROR("cannot pin '", self.toString(), "' only dense CPU tensors can be pinned");
+   }
++
++  deviceExclusiveCheck();
+   if (self.is_pinned()) {
+     return self;
+   }
+-  auto* allocator = detail::getCUDAHooks().getPinnedMemoryAllocator();
++
++  c10::Allocator* allocator;
++  if (hasCUDA()) {
++    allocator = detail::getCUDAHooks().getPinnedMemoryAllocator();
++  } else if (hasDPCPP()) {
++    allocator = detail::getDPCPPHooks().getPinnedMemoryAllocator();
++  }
++
+   auto storage = Storage(
+       self.dtype(),
+       detail::computeStorageSize(self.sizes(), self.strides()),
+diff --git a/aten/src/ATen/native/TensorFactories.cpp b/aten/src/ATen/native/TensorFactories.cpp
+index fa6df666c7..4437a3e939 100644
+--- a/aten/src/ATen/native/TensorFactories.cpp
++++ b/aten/src/ATen/native/TensorFactories.cpp
+@@ -112,7 +112,12 @@ Tensor empty_cpu(IntArrayRef size, const TensorOptions& options_, c10::optional<
+ 
+   c10::Allocator* allocator;
+   if (options.pinned_memory()) {
+-    allocator = detail::getCUDAHooks().getPinnedMemoryAllocator();
++    deviceExclusiveCheck();
++    if (hasCUDA()) {
++      allocator = detail::getCUDAHooks().getPinnedMemoryAllocator();
++    } else if (hasDPCPP()) {
++      allocator = detail::getDPCPPHooks().getPinnedMemoryAllocator();
++    }
+   } else {
+     allocator = at::getCPUAllocator();
+   }
+-- 
+2.17.1
+
