@@ -12,20 +12,20 @@ index a7354047ca..3bf11a646f 100644
        return kCUDA;
      } else {
 diff --git a/aten/src/ATen/core/VariableFallbackKernel.cpp b/aten/src/ATen/core/VariableFallbackKernel.cpp
-index 11d03495c6..3cb40c8cb7 100644
+index 9ceeea6c08..d4ab40ae02 100644
 --- a/aten/src/ATen/core/VariableFallbackKernel.cpp
 +++ b/aten/src/ATen/core/VariableFallbackKernel.cpp
-@@ -32,9 +32,9 @@ void variable_fallback_kernel(const OperatorHandle& op, Stack* stack) {
-     Dispatcher::singleton().callBoxed(op, stack);
- }
+@@ -27,9 +27,9 @@ using c10::KernelFunction;
  
--static auto registry = Dispatcher::singleton().registerBackendFallbackKernel(
+ namespace {
+ 
+-static auto registry = c10::Dispatcher::singleton().registerBackendFallbackKernel(
 -    DispatchKey::VariableTensorId,
--    KernelFunction::makeFromBoxedFunction<&variable_fallback_kernel>()
+-    KernelFunction::makeFallthrough()
 -);
-+// static auto registry = Dispatcher::singleton().registerBackendFallbackKernel(
-+//     DispatchKey::VariableTensorId,
-+//     KernelFunction::makeFromBoxedFunction<&variable_fallback_kernel>()
++// static auto registry = c10::Dispatcher::singleton().registerBackendFallbackKernel(
++//    DispatchKey::VariableTensorId,
++//    KernelFunction::makeFallthrough()
 +// );
  
  }
@@ -422,7 +422,7 @@ index 9a4c9b3eb9..6d0240564a 100644
      return DeviceType::CPU;
    } else if (tid == DispatchKey::SparseCUDATensorId) {
 diff --git a/tools/autograd/templates/python_variable_methods.cpp b/tools/autograd/templates/python_variable_methods.cpp
-index 2a9dc9d6d0..94103921d2 100644
+index e3e98648c1..287a5cc7bb 100644
 --- a/tools/autograd/templates/python_variable_methods.cpp
 +++ b/tools/autograd/templates/python_variable_methods.cpp
 @@ -369,6 +369,20 @@ static PyObject * THPVariable_cpu(PyObject* self, PyObject* args, PyObject* kwar
@@ -446,7 +446,7 @@ index 2a9dc9d6d0..94103921d2 100644
  static Tensor dispatch_nonzero(const Tensor & self) {
    pybind11::gil_scoped_release no_gil;
    OptionalDeviceGuard device_guard(device_of(self));
-@@ -871,6 +885,7 @@ PyMethodDef variable_methods[] = {
+@@ -873,6 +887,7 @@ PyMethodDef variable_methods[] = {
    {"copy_", (PyCFunction)(void(*)(void))THPVariable_copy_, METH_VARARGS | METH_KEYWORDS, NULL},
    {"cpu", (PyCFunction)(void(*)(void))THPVariable_cpu, METH_VARARGS | METH_KEYWORDS, NULL},
    {"cuda", (PyCFunction)(void(*)(void))THPVariable_cuda, METH_VARARGS | METH_KEYWORDS, NULL},
