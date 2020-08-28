@@ -127,7 +127,7 @@ at::Tensor q_conv2d_sum_relu(
   if (pack_ptr.bias.has_value())
     bias = pack_ptr.bias.value();
 
-  conv_attr_t attr = {accumu.q_scale() / conv_scale, 0.f, 0.f,
+  conv_attr_t attr = {accumu.q_scale() / sum_scale, 0.f, 0.f,
       sum_scale, conv_attr_t::kind_with_relu | conv_attr_t::kind_with_sum};
 
   convolution(
