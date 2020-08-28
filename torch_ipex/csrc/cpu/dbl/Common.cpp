@@ -110,13 +110,16 @@ dil::tensor reorder_dil_tensor_to_dtype(const dil::tensor &dil_tensor, dil::data
   return dst;
 }
 
-std::tuple<std::vector<float>, bool> get_int8_scales(const at::Tensor& input, bool uint8_used) {
+std::tuple<std::vector<std::vector<float>>, bool> get_int8_scales(const at::TensorList& inputs, bool uint8_used) {
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    auto src_dil_type = try_gen_dil_tensor(input).get_data_type();
-    bool input_uint8_used = (src_dil_type == dil::data_type::u8);
-    return get_indicator_scales({input_uint8_used, uint8_used});
+    std::vector<bool> inputs_uint8_used;
+    for (auto i = 0; i < inputs.size(); i++) {
+      auto src_dil_type = try_gen_dil_tensor(inputs[i]).get_data_type();
+      inputs_uint8_used.push_back(src_dil_type == dil::data_type::u8);
+    }
+    return get_indicator_scales(inputs_uint8_used, {uint8_used});
   } else {
-    return std::make_tuple(std::vector<float>(), false);
+    return std::make_tuple(std::vector<std::vector<float>>(), false);
   }
 }
 

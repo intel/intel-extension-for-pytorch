@@ -54,13 +54,13 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
 
   std::vector<float> output_scale = {};
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<float> scales;
+    std::vector<std::vector<float>> scales;
     bool quantized;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /* uint8_used for output*/false);
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /* uint8_used for output*/false);
     //quantized = false;
     if (quantized) {
-      output_scale.push_back(scales[1]);
-      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
+      output_scale.push_back(scales[1][0]);
+      dbl::comm::reorder_to_int8_for_mix_prec(input, scales[0]);
       dbl::comm::reorder_to_int8_for_mix_prec(weight, {});
     } else {
       dbl::comm::reorder_to_dtype(input, at::kFloat);
@@ -103,7 +103,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer(input, aten_output, "Convolution");
+    insert_or_updata_observer({input}, {aten_output}, "Convolution");
   }
 
   return aten_output;
@@ -761,13 +761,13 @@ at::Tensor AtenIpexCPUDev::dil_linear(
 
   std::vector<float> output_scale = {};
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<float> scales;
+    std::vector<std::vector<float>> scales;
     bool quantized;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales(self, /*  uint8_used for output*/false);
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales({self}, /*  uint8_used for output*/false);
     //quantized = false;
     if (quantized) {
-      output_scale.push_back(scales[1]);
-      dbl::comm::reorder_to_int8_for_mix_prec(self, {scales[0]});
+      output_scale.push_back(scales[1][0]);
+      dbl::comm::reorder_to_int8_for_mix_prec(self, scales[0]);
       dbl::comm::reorder_to_int8_for_mix_prec(weight, {});
     } else {
       dbl::comm::reorder_to_dtype(self, at::kFloat);
@@ -797,7 +797,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer(self, aten_output, "Linear");
+    insert_or_updata_observer({self}, {aten_output}, "Linear");
   }
  
   if (self.dim() > 2) {
@@ -955,12 +955,12 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
   std::vector<float> output_scales = {};
   bool quantized = false;
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<float> scales;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /*  uint8_used for output*/false);
+    std::vector<std::vector<float>> scales;
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/false);
     //quantized = false;
     if (quantized) {
-      input_scales.push_back(scales[0]);
-      output_scales.push_back(scales[1]);
+      input_scales = scales[0];
+      output_scales = scales[1];
       dbl::comm::reorder_to_int8_for_mix_prec(input, input_scales);
     } else {
       dbl::comm::reorder_to_dtype(input, at::kFloat);
@@ -1005,9 +1005,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
  
     auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
 
-    //dbl::comm::reorder_to_dtype(aten_output, at::kFloat);
     if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-      insert_or_updata_observer(input, aten_output, "BatchNorm");
+      insert_or_updata_observer({input}, {aten_output}, "BatchNorm");
     }
 
     return std::make_tuple(aten_output, at::Tensor(), at::Tensor());
@@ -1060,12 +1059,12 @@ at::Tensor AtenIpexCPUDev::dil_max_pooling(
   DEBUG("AtenIpexCPUDev::dil_max_pooling\n");
   CHECK_DNNL_OP_PRE_COND(input);
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<float> scales;
+    std::vector<std::vector<float>> scales;
     bool quantized;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /*  uint8_used for output*/false);
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/false);
     //quantized = false;
     if (quantized) {
-      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
+      dbl::comm::reorder_to_int8_for_mix_prec(input, scales[0]);
     } else {
       dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
@@ -1074,7 +1073,7 @@ at::Tensor AtenIpexCPUDev::dil_max_pooling(
   }
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer(input, at::Tensor(), "MaxPooling");
+    insert_or_updata_observer({input}, {input}, "MaxPooling");
   }
   return dbl::pool::_dil_pooling(
       input,
@@ -1100,12 +1099,12 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool2d(
            "dil_avg_pooling operator does not support divisor");
 
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<float> scales;
+    std::vector<std::vector<float>> scales;
     bool quantized;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /*  uint8_used for output*/false);
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/false);
     //quantized = false;
     if (quantized) {
-      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
+      dbl::comm::reorder_to_int8_for_mix_prec(input, scales[0]);
     } else {
       dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
@@ -1114,7 +1113,7 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool2d(
   }
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer(input, at::Tensor(), "AvgPool2d");
+    insert_or_updata_observer({input}, {input}, "AvgPool2d");
   }
 
   return dbl::pool::_dil_pooling(
@@ -1161,12 +1160,12 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
   CHECK_DNNL_OP_PRE_COND(input);
 
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<float> scales;
+    std::vector<std::vector<float>> scales;
     bool quantized;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /*  uint8_used for output*/false);
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/false);
     //quantized = false;
     if (quantized) {
-      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
+      dbl::comm::reorder_to_int8_for_mix_prec(input, scales[0]);
     } else {
       dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
@@ -1195,7 +1194,7 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
   }
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer(input, at::Tensor(), "AdaptiveAvgPool2d");
+    insert_or_updata_observer({input}, {input}, "AdaptiveAvgPool2d");
   }
   return dbl::pool::_dil_pooling(
       input,
@@ -1343,12 +1342,12 @@ at::Tensor AtenIpexCPUDev::dil_relu(const at::Tensor& input) {
   DEBUG("AtenIpexCPUDev::dil_relu\n");
   CHECK_DNNL_OP_PRE_COND(input);
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<float> scales;
+    std::vector<std::vector<float>> scales;
     bool quantized;
-    std::tie(scales, quantized)= dbl::comm::get_int8_scales(input, /*  uint8_used for output*/true);
+    std::tie(scales, quantized)= dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/true);
     //quantized = false;
     if (quantized) {
-      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
+      dbl::comm::reorder_to_int8_for_mix_prec(input, scales[0]);
     } else {
       dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
@@ -1362,7 +1361,7 @@ at::Tensor AtenIpexCPUDev::dil_relu(const at::Tensor& input) {
       x, y, dil::algorithm::eltwise_relu, dil::prop_kind::forward_training, /*alpha*/ 0.0);
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer(input, at::Tensor(), "Relu");
+    insert_or_updata_observer({input}, {input}, "Relu");
   }
 
   return dbl::comm::gen_aten_tensor_by(std::move(y));
@@ -1373,12 +1372,12 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
   CHECK_DNNL_OP_PRE_COND(input);
 
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<float> scales;
+    std::vector<std::vector<float>> scales;
     bool quantized;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales(input, /*   uint8_used for output*/true);
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /*   uint8_used for output*/true);
     //quantized = false;
     if (quantized) {
-      dbl::comm::reorder_to_int8_for_mix_prec(input, {scales[0]});
+      dbl::comm::reorder_to_int8_for_mix_prec(input, scales[0]);
     } else {
       dbl::comm::reorder_to_dtype(input, at::kFloat);
     }
@@ -1387,7 +1386,7 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
   }
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer(input, at::Tensor(), "Relu_");
+    insert_or_updata_observer({input}, {input}, "Relu_");
   }
 
   auto dil_self = dbl::comm::try_gen_dil_tensor(input);

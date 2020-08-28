@@ -128,21 +128,19 @@ bool check_int8_calibration() {
   return AutoOptConfig::singleton().get_int8_calibration();
 }
 
-void insert_or_updata_observer(const at::Tensor& self, const at::Tensor& output, std::string op_name) {
-  std::vector<float> input_min_max_values, output_min_max_values;
-  input_min_max_values.push_back(self.abs().min().item<float>());
-  input_min_max_values.push_back(self.abs().max().item<float>());
-  if (output.defined()) {
-    output_min_max_values.push_back(output.abs().min().item<float>());
-    output_min_max_values.push_back(output.abs().max().item<float>());
-  } else {
-    output_min_max_values = input_min_max_values;
+void insert_or_updata_observer(const at::TensorList& inputs, const at::TensorList& outputs, std::string op_name) {
+  std::vector<std::vector<float>> inputs_min_max_values, outputs_min_max_values;
+  for (auto i = 0; i < inputs.size(); i++) {
+    inputs_min_max_values.push_back({inputs[i].abs().min().item<float>(), inputs[i].abs().max().item<float>()});
   }
-  AutoOptConfig::singleton().insert_or_updata_observer(op_name, input_min_max_values, output_min_max_values);
+  for (auto j = 0; j < outputs.size(); j++) {
+    outputs_min_max_values.push_back({outputs[j].abs().min().item<float>(), outputs[j].abs().max().item<float>()});
+  }
+  AutoOptConfig::singleton().insert_or_updata_observer(op_name, inputs_min_max_values, outputs_min_max_values);
 }
 
-std::tuple<std::vector<float>, bool> get_indicator_scales(std::vector<bool> uint8_used) {
-  return AutoOptConfig::singleton().get_indicator_scales(uint8_used);
+std::tuple<std::vector<std::vector<float>>, bool> get_indicator_scales(std::vector<bool> i_uint8_used, std::vector<bool> o_uint8_used) {
+  return AutoOptConfig::singleton().get_indicator_scales(i_uint8_used, o_uint8_used);
 }
 
 bool check_tensor_own_whole_storage(const at::Tensor& tensor) {
