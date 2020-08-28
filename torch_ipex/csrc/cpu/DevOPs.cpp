@@ -557,6 +557,18 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
+at::Tensor AtenIpexCPUDev::dil_linear_prepack_weight(const at::Tensor& weight){
+  auto dil_weight = dbl::comm::try_gen_dil_tensor(weight);
+  auto packed_desc = dil::inner_product_forward::expected_weights_desc(
+    weight.sizes().vec(),
+    {},
+    dil_weight.get_data_type());
+  dil::tensor packed_weight {packed_desc};
+  packed_weight.feed_from(dil_weight);
+  auto ret = dbl::comm::gen_aten_tensor_by(std::move(packed_weight));
+  return ret;
+}
+
 at::Tensor AtenIpexCPUDev::dil_linear_fuse_relu(
     const at::Tensor& self,
     const at::Tensor& weight,

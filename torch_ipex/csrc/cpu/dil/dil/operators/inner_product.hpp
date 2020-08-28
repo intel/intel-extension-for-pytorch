@@ -51,6 +51,7 @@ struct inner_product_forward : public dnnl::inner_product_forward {
     x_dims[0] = src_dims.empty() ? 1 : src_dims[0];
     auto y_dims = {x_dims[0], weights_dims[0]};
     auto ndims = weights_dims.size();
+    x_dtype = dtype;
     auto y_dtype = (dtype != data_type::s8) ? dtype : data_type::s32;
 
     DIL_ENFORCE(x_dims.size() == weights_dims.size(),
@@ -247,7 +248,7 @@ struct inner_product_backward_data : public dnnl::inner_product_backward_data {
     }
 
     auto diff_dst_desc = diff_dst.get_desc().to_format_any();
-    auto weights_desc = weights_.get_desc();
+    auto weights_desc = weights_.get_desc().to_format_any();
     auto diff_src_desc =
         tensor::desc(diff_src_dims, diff_dst.get_data_type(), tag::any);
 

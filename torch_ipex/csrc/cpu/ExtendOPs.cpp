@@ -453,6 +453,10 @@ at::Tensor AtenIpexTypeExt::linear(const at::Tensor& input, const at::Tensor& we
     return cpu::AtenIpexCPUDev::dil_linear(input, weight, bias);
 }
 
+at::Tensor AtenIpexTypeExt::linear_prepack_weight(const at::Tensor& weight) {
+    return cpu::AtenIpexCPUDev::dil_linear_prepack_weight(weight);
+}
+
 at::Tensor AtenIpexTypeExt::linear_fuse_relu(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
     RECORD_FUNCTION("linear_fuse_relu", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
     return cpu::AtenIpexCPUDev::dil_linear_fuse_relu(input, weight, bias);
