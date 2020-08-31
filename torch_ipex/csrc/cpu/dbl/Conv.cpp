@@ -56,6 +56,10 @@ dil::tensor convolution_impl(
   if (dil::data_type::s8 == x.get_data_type()) {
     alowp_kind = dil::s8s8;
   }
+  dil::prop_kind aprop_kind = dil::prop_kind::forward;
+  if (dil::data_type::s8 == x.get_data_type() || dil::data_type::u8 == x.get_data_type()) {
+    aprop_kind = dil::prop_kind::forward_inference;
+  }
 
   dil::tensor y;
   if (b.has_value()) {
@@ -75,7 +79,7 @@ dil::tensor convolution_impl(
       dst_scales,
       attr,
       dil::algorithm::convolution_direct,
-      dil::prop_kind::forward,
+      aprop_kind,
       alowp_kind);
   } else {
     dil::convolution_forward::compute(
@@ -93,7 +97,7 @@ dil::tensor convolution_impl(
       dst_scales,
       attr,
       dil::algorithm::convolution_direct,
-      dil::prop_kind::forward,
+      aprop_kind,
       alowp_kind);
   }
   return y;
@@ -131,6 +135,10 @@ void convolution_inplace_impl(
   if (dil::data_type::s8 == x.get_data_type()) {
     alowp_kind = dil::s8s8;
   }
+  dil::prop_kind aprop_kind = dil::prop_kind::forward;
+  if (dil::data_type::s8 == x.get_data_type() || dil::data_type::u8 == x.get_data_type()) {
+    aprop_kind = dil::prop_kind::forward_inference;
+  }
 
   if (b.has_value()) {
     dil::convolution_forward::compute(
@@ -149,7 +157,7 @@ void convolution_inplace_impl(
       dst_scales,
       attr,
       dil::algorithm::convolution_direct,
-      dil::prop_kind::forward,
+      aprop_kind,
       alowp_kind);
   } else {
     dil::convolution_forward::compute(
@@ -167,7 +175,7 @@ void convolution_inplace_impl(
       dst_scales,
       attr,
       dil::algorithm::convolution_direct,
-      dil::prop_kind::forward,
+      aprop_kind,
       alowp_kind);
   }
 }

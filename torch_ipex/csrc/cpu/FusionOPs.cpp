@@ -31,24 +31,46 @@ at::Tensor dil_convolution_outplace_fusion(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     int64_t groups,
-    const dil::attr_t& op_attr) {
+    const dil::attr_t& op_attr,
+    const std::string& op_name = "Convolution_Relu") {
   dil::tensor dil_input;
   dil::tensor dil_weight;
   c10::optional<dil::tensor> dil_bias{c10::nullopt};
+  // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
+  auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
+  auto input_contiguous = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8
+                           || input.is_contiguous()) ? input : input.contiguous();
+  auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
+  auto weight_contiguous = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
 
-  auto input_contiguous = input.is_contiguous() ? input : input.contiguous();
-  auto weight_contiguous = weight.is_contiguous() ? weight : weight.contiguous();
-
-  reorder_to_bf16_for_mix_prec(input_contiguous);
-  dil_input = try_gen_dil_tensor(input_contiguous);
-
-  if (bias.defined()) {
-    auto bias_contiguous = bias.is_contiguous() ? bias : bias.contiguous();
-    reorder_to_bf16_for_mix_prec(bias_contiguous);
-    dil_bias = try_gen_dil_tensor(bias_contiguous);
+  std::vector<float> output_scale = {};
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    std::vector<std::vector<float>> scales;
+    bool quantized;
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /* uint8_used for output*/false);
+    //quantized = false;
+    if (quantized) {
+      output_scale.push_back(scales[1][0]);
+      dbl::comm::reorder_to_int8_for_mix_prec(input_contiguous, scales[0]);
+      dbl::comm::reorder_to_int8_for_mix_prec(weight_contiguous, {});
+    } else {
+      dbl::comm::reorder_to_dtype(input, at::kFloat);
+      dbl::comm::reorder_to_dtype(weight, at::kFloat);
+    }
+  } else {
+    dbl::comm::reorder_to_bf16_for_mix_prec(input_contiguous);
+    dbl::comm::reorder_to_bf16_for_mix_prec(weight_contiguous);
   }
 
-  reorder_to_bf16_for_mix_prec(weight_contiguous);
+  dil_input = try_gen_dil_tensor(input_contiguous);
+  if (bias.defined()) {
+    auto bias_contiguous = bias.is_contiguous() ? bias : bias.contiguous(); 
+    if (!check_auto_mix_int8_fp32()) {
+      dbl::comm::reorder_to_bf16_for_mix_prec(bias_contiguous);
+    }
+    dil_bias = dbl::comm::try_gen_dil_tensor(bias_contiguous);
+  }
+
   dbl::conv::prepack_conv_weights(
     input_contiguous,
     dil_input,
@@ -67,9 +89,14 @@ at::Tensor dil_convolution_outplace_fusion(
     stride,
     dilation,
     groups,
-    op_attr);
+    op_attr,
+    output_scale);
 
-  return gen_aten_tensor_by(std::move(dil_output));
+  auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
+  if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
+    insert_or_updata_observer({input_contiguous}, {aten_output}, op_name);
+  }
+  return aten_output;
 }
 
 static at::Tensor& dil_convolution_inplace_fusion(
@@ -81,28 +108,55 @@ static at::Tensor& dil_convolution_inplace_fusion(
     at::IntArrayRef padding,
     at::IntArrayRef dilation,
     int64_t groups,
-    const dil::attr_t& attr) {
+    const dil::attr_t& attr,
+    const std::string& op_name) {
   dil::tensor dil_input;
   dil::tensor dil_weight;
   dil::tensor dil_output;
   c10::optional<dil::tensor> dil_bias{c10::nullopt};
 
-  auto input_contiguous =  input.is_contiguous() ? input : input.contiguous();
-  auto weight_contiguous = weight.is_contiguous() ? weight : weight.contiguous();
-  auto output_contiguous = accumu.is_contiguous() ? accumu : accumu.contiguous();
+  // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
+  auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
+  auto input_contiguous = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8
+                           || input.is_contiguous()) ? input : input.contiguous();
+  auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
+  auto weight_contiguous = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
+  auto ouput_dil_type = dbl::comm::try_gen_dil_tensor(accumu).get_data_type();
+  auto output_contiguous = (ouput_dil_type == dil::data_type::s8 || accumu.is_contiguous()) ? accumu : accumu.contiguous();
 
-  reorder_to_bf16_for_mix_prec(input_contiguous);
-  reorder_to_bf16_for_mix_prec(output_contiguous);
+  std::vector<float> output_scale = {};
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    std::vector<std::vector<float>> scales;
+    bool quantized;
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /* uint8_used for output*/false);
+    //quantized = false;
+    if (quantized) {
+      output_scale.push_back(scales[1][0]);
+      dbl::comm::reorder_to_int8_for_mix_prec(input_contiguous, scales[0]);
+      dbl::comm::reorder_to_int8_for_mix_prec(weight_contiguous, {});
+    } else {
+      dbl::comm::reorder_to_dtype(input_contiguous, at::kFloat);
+      dbl::comm::reorder_to_dtype(weight_contiguous, at::kFloat);
+      // ouput may a int8 tensor, should reorder to fp32
+      dbl::comm::reorder_to_dtype(output_contiguous, at::kFloat);
+    }
+  } else {
+    dbl::comm::reorder_to_bf16_for_mix_prec(input_contiguous);
+    dbl::comm::reorder_to_bf16_for_mix_prec(weight_contiguous);
+    dbl::comm::reorder_to_bf16_for_mix_prec(output_contiguous);
+  }
+
   dil_input = try_gen_dil_tensor(input_contiguous);
   dil_output = try_gen_dil_tensor(output_contiguous);
 
   if (bias.defined()) {
-    auto bias_contiguous = bias.is_contiguous() ? bias : bias.contiguous();
-    reorder_to_bf16_for_mix_prec(bias_contiguous);
-    dil_bias = try_gen_dil_tensor(bias_contiguous);
+    auto bias_contiguous = bias.is_contiguous() ? bias : bias.contiguous(); 
+    if (!check_auto_mix_int8_fp32()) {
+      dbl::comm::reorder_to_bf16_for_mix_prec(bias_contiguous);
+    }
+    dil_bias = dbl::comm::try_gen_dil_tensor(bias_contiguous);
   }
 
-  reorder_to_bf16_for_mix_prec(weight_contiguous);
   dbl::conv::prepack_conv_weights(
     input_contiguous,
     dil_input,
@@ -122,9 +176,14 @@ static at::Tensor& dil_convolution_inplace_fusion(
     stride,
     dilation,
     groups,
-    attr);
+    attr,
+    output_scale);
 
-  sync_shape_from_dil_to_aten(accumu, dil_output);
+
+  dbl::comm::equip_dil_buffer(accumu, dil_output);
+  if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
+    insert_or_updata_observer({input_contiguous}, {accumu}, op_name);
+  }
   return accumu;
 }
 
@@ -203,7 +262,8 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
     padding,
     dilation,
     groups,
-    dil::attr_t::fuse_relu());
+    dil::attr_t::fuse_relu(),
+    "Convolution_Relu");
 }
 
 at::Tensor AtenIpexJITDev::dil_convolution_elu(
@@ -250,7 +310,8 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum(
     padding,
     dilation,
     groups,
-    dil::attr_t::fuse_sum(scale));
+    dil::attr_t::fuse_sum(scale),
+    "Convolution_Sum");
 }
 
 at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
@@ -273,7 +334,8 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
     padding,
     dilation,
     groups,
-    dil::attr_t::residual(scale));
+    dil::attr_t::residual(scale),
+    "Convolution_Sum_Relu");
 }
 
 at::Tensor AtenIpexJITDev::dil_linear_fuse_relu(
