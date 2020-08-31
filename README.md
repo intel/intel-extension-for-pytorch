@@ -4,48 +4,24 @@
 
 ## Pre-requirements:
 
-### **HW proxy:** Intel Gen9 Graphics, Intel DG1 Graphics
-
-### **OS:** Ubuntu-18.04
-
-### **Python:** 3.6.x
+| **HW proxy** | **OS** | **GPU User Mode Driver** | Python |
+| ------ | ------ | ------ | ------ |
+| **Gen9** | Ubuntu-18.04 | [20.30.17454](https://github.com/intel/compute-runtime/releases/tag/20.30.17454) | 3.6.x |
+| **DG1** | Ubuntu-20.04 | [agama-dg1-29/engineering build](http://10.239.87.81/zhenjie/agama/agama-dg1-29/) and replace IGC with [**igc3436**](http://10.239.87.81/zhenjie/igc3436/) | 3.6.x |
 
 ### **Dependence:**
 ```bash
+# Install python dependences
 python3 -m pip install -r requirements.txt
-```
-
-### **UMD Component Installation:**
-```bash
-sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-gmmlib_20.1.1_amd64.deb
-sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-igc-core_1.0.4053_amd64.deb
-sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-igc-opencl_1.0.4053_amd64.deb
-sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-opencl_20.21.16886_amd64.deb
-sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-ocloc_20.21.16886_amd64.deb
-sudo wget https://github.com/intel/compute-runtime/releases/download/20.21.16886/intel-level-zero-gpu_0.8.16886_amd64.deb
-sudo dpkg -i *.deb
-```
-
-### **Intel OpenCL SDK Installation (Only for ComputeCpp):**
-Download from http://registrationcenter-download.intel.com/akdlm/irc_nas/vcp/12526/intel_sdk_for_opencl_2017_7.0.0.2568_x64.gz
-```bash
-tar xzf intel_sdk_for_opencl_2017_7.0.0.2568_x64.gz
-cd intel_sdk_for_opencl_2017_7.0.0.2568_x64/
-sudo ./install.sh
-```
-
-### **Add ubuntu user to video and render group:**
-```bash
+# Add ubuntu user to video and render group
 sudo usermod -a -G video $USER
 sudo usermod -a -G render $USER
-sudo shutdown -r 0
+sudo reboot
 ```
-**Note:**
-<br>please update $USER to your ubuntu username.
 
 ## **Compiler Version and Setting:**
 
-### **DPC++ compiler:** **0420** nightly build (**Contact:** [Kurkov, Vasiliy A](vasiliy.a.kurkov@intel.com) or [Maslov, Oleg](oleg.maslov@intel.com))
+### **DPC++ compiler:** **Xmain 0716** nightly build (**Contact:** [Kurkov, Vasiliy A](vasiliy.a.kurkov@intel.com) or [Maslov, Oleg](oleg.maslov@intel.com))
 - Environment Variables Setting for DPC++:
 ```bash
 export DPCPP_ROOT=/${PATH_TO_Your_Compiler}/linux_prod/compiler/linux
@@ -53,20 +29,6 @@ export LD_LIBRARY_PATH=${DPCPP_ROOT}/lib:${DPCPP_ROOT}/compiler/lib/intel64_lin:
 export INTELOCLSDKROOT=${DPCPP_ROOT}
 export PATH=${DPCPP_ROOT}/bin:$PATH
 ```
-
-### **ComputeCpp compiler:** CE 1.1.3 Device Compiler - clang version 6.0.0  (based on LLVM 6.0.0svn)
-Please download from https://developer.codeplay.com/products/computecpp/ce/download and install.
-- Environment Variables Setting for ComputeCpp:
-```bash
-export INTELOCLSDKROOT=/${PATH_TO_Your_Intel_OpenCL_SDK}
-export COMPUTECPP_DIR=/${PATH_TO_Your_ComputeCpp} 
-export CXX=${ COMPUTECPP_DIR}/bin/compute++
-export LD_LIBRARY_PATH=${COMPUTECPP_DIR}/lib/:${LD_LIBRARY_PATH}
-export PATH=${COMPUTECPP_DIR}/bin:$PATH
-```
-**Note:**
-<br>Please update ${PATH_TO_Your_Intel_OpenCL_SDK} to where you install Intel OpenCL SDK. It is /opt/intel/opencl by default.
-<br>Please update ${PATH_TO_Your_ComputeCpp} to where you install ComputeCpp compiler. 
 
 ### **Validation:**
 Finally, compile and execute the following program and check the result. It is optional.
@@ -106,10 +68,9 @@ int main() {
 
 - Compile Command:
 
-| Compiler | Command |
-| ------ | ------ |
-| DPC++ | `$ clang++ -I $DPCPP_ROOT/include/sycl device_enum.cpp -L $DPCPP_ROOT/lib -fsycl -o device_enum` |
-| ComputeCpp | `$ compute++ -I $COMPUTECPP_DIR/include device_enum.cpp -L $COMPUTECPP_DIR/lib -lComputeCpp -o device_enum` | 
+```bash
+$ clang++ -I $DPCPP_ROOT/include/sycl device_enum.cpp -L $DPCPP_ROOT/lib -fsycl -o device_enum
+```
 
 - Expected result:
 ```bash
@@ -141,25 +102,15 @@ git submodule update --init --recursive
 
 ## Build and Install PyTorch:
 ```bash
-export USE_CUDNN=0 USE_FBGEMM=0 USE_NNPACK=0 BUILD_CAFFE2_OPS=0
 cd pytorch
 git am <PATH_To_intel-pytorch-extension>/torch_patches/*
 python3 setup.py install --user
 ```
 **Note:**
 <br>You can choose your favorite compiler for building PyTorch, which could be the same or different from the one for building Intel PyTorch Extension.
-<br>We recommend using **GCC** compiler for building PyTorch (unset $CXX if already set for ComputeCpp before). 
+<br>We recommend using **GCC** compiler for building PyTorch. 
 
 ## Build and Install Intel GPU Extension for PyTorch:
-
-### Downgrade to gcc5 (only for ***ComputeCpp***, not needed for DPC++)
-```bash
-sudo apt install gcc-5 g++-5
-sudo mv /usr/include/c++/7 /usr/include/c++/7_bak
-sudo ln -s /usr/include/c++/5 /usr/include/c++/7
-sudo mv /usr/lib/gcc/x86_64-linux-gnu/7 /usr/lib/gcc/x86_64-linux-gnu/7_bak
-sudo ln -s /usr/lib/gcc/x86_64-linux-gnu/5 /usr/lib/gcc/x86_64-linux-gnu/7
-```
 
 ### Build intel-pytorch-extension
 ```bash
@@ -176,29 +127,6 @@ Please download pre-optimized models for this Extension through below command:
 ```bash
 git clone ssh://git@gitlab.devtools.intel.com:29418/intel-pytorch-extension/gpu-optimized-models.git
 ```
-
-***On Gen9*** :
-
-| Model          | Verified Workload                         |
-|----------------|-------------------------------------------|
-| ResNet50       | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
-| Bert           | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
-| MobileNet V1   | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
-| NCF            | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
-| DLRM           | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
-| GNMT           | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
-| Transformer LT | Inference: FP32/BFP16/FP16 <br> Training: FP32 |
-
-***On DG1*** :
-
-| Model          | Verified Workload                         |
-|----------------|-------------------------------------------|
-| ResNet50       | Inference: FP32/BFP16/FP16 |
-| Bert           | Inference: FP32/BFP16 |
-| MobileNet V1   | Inference: FP32/BFP16/FP16 |
-| NCF            | Inference: FP32/BFP16/FP16 |
-| DLRM           | Inference: FP32/BFP16/FP16 |
-| GNMT           | Inference: FP32/BFP16/FP16 |
 
 ## Known issues:
 *  Tensor.new() is not supported on DPCPP device. The alternative solution is Tensor.to("cpu").new().to("dpcpp").
@@ -223,11 +151,3 @@ Please compile device_enum in above section “Validation” section.
 - If no GPU device is enumerated by clinfo:
 No solid solution so far. Try to reboot your machine and see whether it disappeared.
 
-### 4. Downgrade to gcc5 for ComputeCpp build:
-In ComputeCpp build, gcc5 is required while gcc7.5 is the default Ubuntu18.04 compiler. Without downgrading to gcc5, you will get following compile error:
-```bash
-/usr/lib/gcc/x86_64-linux-gnu/7.5.0/../../../../include/c++/7.5.0/tuple:1452:14: error: no matching conversion for functional-style cast from '__global double' to '__result_type'
-      (aka 'tuple<__global double>')
-      return __result_type(std::forward<_Elements>(__args)...);
-```
-While this is not TRUE for DPC++ build. Please use gcc7.5 for DPC++ environment.
