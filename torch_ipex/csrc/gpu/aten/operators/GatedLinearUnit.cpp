@@ -33,6 +33,7 @@ void GatedLinearUnit_updateOutput(
   auto newSizes = input.sizes().vec();
   newSizes[wrap_dim] = inputSize;
   output.resize_(newSizes);
+  output.zero_();
   Tensor firstHalf = input.narrow(wrap_dim, 0, inputSize);
   Tensor secondHalf = input.narrow(wrap_dim, inputSize, inputSize);
   // output = output + firstHalf * sigmoid(secondHalf)

@@ -78,13 +78,16 @@ static inline void embedding_backward_dpcpp_kernel(
             for (int nidx = 0; nidx < num_indices; nidx++) {
               auto idx = idx_ptr[nidx] /* - TH_INDEX_BASE*/;
               // TODO: remove branch to optimize performance ?
-              if (scale_grad_by_freq) {
-                gw_ptr[gid + idx * stride] += static_cast<scalar_t>(
-                    g_ptr[gid + nidx * stride] * 1.0 /
-                    (scalar_t)idx_cnt_acc[idx]);
-              } else {
-                gw_ptr[gid + idx * stride] +=
-                    static_cast<scalar_t>(g_ptr[gid + nidx * stride]);
+              if (idx != padding_idx) {
+                // TODO: remove branch to optimize performance ?
+                if (scale_grad_by_freq) {
+                  gw_ptr[gid + idx * stride] += static_cast<scalar_t>(
+                      g_ptr[gid + nidx * stride] * 1.0 /
+                      (scalar_t)idx_cnt_acc[idx]);
+                } else {
+                  gw_ptr[gid + idx * stride] +=
+                      static_cast<scalar_t>(g_ptr[gid + nidx * stride]);
+                }
               }
             }
           }
