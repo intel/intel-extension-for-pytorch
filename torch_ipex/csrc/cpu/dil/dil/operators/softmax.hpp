@@ -33,11 +33,15 @@ struct softmax_backward : public dnnl::softmax_backward {
                       int softmax_axis,
                       const engine& aengine = engine::cpu_engine()) {
 
+    auto dst_desc = dst.get_desc();
+    // align data type of diff_dst with dst
+    auto diff_dst_desc = diff_dst.get_desc().to_type(dst_desc.get_data_type());
+
     auto forward_hints = softmax_forward::primitive_desc(
-        {prop_kind::forward_inference, dst.get_desc(), softmax_axis}, aengine);
+        {prop_kind::forward_inference, dst_desc, softmax_axis}, aengine);
 
     auto pd =
-        primitive_desc({diff_dst.get_desc(), dst.get_desc(), softmax_axis},
+        primitive_desc({diff_dst_desc, dst_desc, softmax_axis},
                        aengine, forward_hints);
     auto expected_dst = dst.reorder_if_differ_in(pd.dst_desc());
     auto expected_diff_dst = diff_dst.reorder_if_differ_in(pd.diff_dst_desc());
