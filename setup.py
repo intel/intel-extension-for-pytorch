@@ -7,7 +7,7 @@
 # USE_PERSIST_STREAM    - to use persistent oneDNN stream
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option
 # BUILD_INTERNAL_DEBUG  - to build internal debug code path
-# BUILD_DOUBLE_KERNEL   - to build double data type kernel
+# BUILD_DOUBLE_KERNEL   - to build double data type kernel (if BUILD_INTERNAL_DEBUG==ON)
 #
 ##############################################################
 
