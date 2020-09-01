@@ -61,7 +61,8 @@ void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected
  */
 void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer);
 
-dil::tensor try_gen_dil_tensor(const at::Tensor &input);
+dil::tensor try_gen_dil_tensor(const at::Tensor& input);
+dil::tensor try_gen_dil_storage(const at::Tensor& input);
 at::Tensor gen_aten_tensor_by(dil::tensor&& tensor);
 dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor);
 dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor, dil::deleter_ptr deleter_fn);

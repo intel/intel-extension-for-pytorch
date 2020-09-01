@@ -53,9 +53,9 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   CHECK_DNNL_OP_PRE_COND(weight);
 
   std::vector<float> output_scale = {};
+  bool quantized = false;
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
     std::vector<std::vector<float>> scales;
-    bool quantized;
     std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /* uint8_used for output*/false);
     //quantized = false;
     if (quantized) {
@@ -72,14 +72,6 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   }
 
   dil_input = dbl::comm::try_gen_dil_tensor(input);
-  if (bias.defined()) {
-    CHECK_DNNL_OP_PRE_COND(bias);
-    if (!check_auto_mix_int8_fp32()) {
-      dbl::comm::reorder_to_bf16_for_mix_prec(bias, true);
-    }
-    dil_bias = dbl::comm::try_gen_dil_tensor(bias);
-  }
-
   // In the case of the auto mix precision, do not prepack
   // the weight during the training
   if (!(check_auto_mix_bf16_fp32() && check_train())) {
@@ -88,6 +80,27 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   }
   
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
+
+  if (bias.defined()) {
+    CHECK_DNNL_OP_PRE_COND(bias);
+    if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+      if (quantized) {
+        auto src = dbl::comm::try_gen_dil_storage(bias);
+        auto src_type = src.get_data_type();
+        if (src_type != dil::data_type::s32) {
+          auto dst_desc = src.get_desc().to_type(dil::data_type::s32);
+          auto bias_scales = dil_weight.get_scale();
+          for (auto &scale : bias_scales) { scale *= dil_input.get_scale()[0];  }
+          dbl::comm::reorder_to_desc(bias, dst_desc, bias_scales);
+        }
+      } else {
+        dbl::comm::reorder_to_dtype(bias, at::kFloat);
+      }
+    } else {
+      dbl::comm::reorder_to_bf16_for_mix_prec(bias, true);
+    }
+    dil_bias = dbl::comm::try_gen_dil_tensor(bias);
+  }
 
   dil::tensor dil_output = dbl::conv::convolution_impl(
     dil_input,
@@ -760,9 +773,9 @@ at::Tensor AtenIpexCPUDev::dil_linear(
       "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
 
   std::vector<float> output_scale = {};
+  bool quantized = false;
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
     std::vector<std::vector<float>> scales;
-    bool quantized;
     std::tie(scales, quantized) = dbl::comm::get_int8_scales({self}, /*  uint8_used for output*/false);
     //quantized = false;
     if (quantized) {
@@ -784,9 +797,21 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
 
   c10::optional<dil::tensor> b{c10::nullopt};
-  
   if (bias.defined()) {
-    if (!check_auto_mix_int8_fp32()) {
+    if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+      if (quantized) {
+        auto src = dbl::comm::try_gen_dil_storage(bias);
+        auto src_type = src.get_data_type();
+        if (src_type != dil::data_type::s32) {
+          auto dst_desc = src.get_desc().to_type(dil::data_type::s32);
+          auto bias_scales = w.get_scale();
+          for (auto &scale : bias_scales) { scale *= x.get_scale()[0];  }
+          dbl::comm::reorder_to_desc(bias, dst_desc, bias_scales);
+        }
+      } else {
+        dbl::comm::reorder_to_dtype(bias, at::kFloat);
+      }
+    } else {
       dbl::comm::reorder_to_bf16_for_mix_prec(bias, true);
     }
     b = dbl::comm::try_gen_dil_tensor(bias);
