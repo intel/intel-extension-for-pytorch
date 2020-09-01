@@ -5,6 +5,7 @@
 #
 # USE_USM               - to use USM, instead of SYCL buffer
 # USE_PERSIST_STREAM    - to use persistent oneDNN stream
+# USE_GEN12HP_ONEDNN    - to use oneDNN Gen12HP branch
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option
 # BUILD_INTERNAL_DEBUG  - to build internal debug code path
 # BUILD_DOUBLE_KERNEL   - to build double data type kernel (if BUILD_INTERNAL_DEBUG==ON)

@@ -1,3 +1,6 @@
 [submodule "third_party/oneDNN"]
 	path = third_party/oneDNN
 	url = ssh://git@gitlab.devtools.intel.com:29418/ipl/dl/mkl-dnn.git
+[submodule "third_party/gen12hp"]
+	path = third_party/gen12hp
+	url = ssh://git@gitlab.devtools.intel.com:29418/ipl/dl/mkl-dnn.git
