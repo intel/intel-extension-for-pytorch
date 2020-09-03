@@ -1,8 +1,9 @@
 #include <core/Allocator.h>
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
+#if defined(USE_USM)
 #include <core/CachingAllocator.h>
-
+#endif
 namespace at {
 namespace dpcpp {
 

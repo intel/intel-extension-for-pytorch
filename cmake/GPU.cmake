@@ -4,6 +4,10 @@ if(GPU_cmake_included)
 endif()
 set(GPU_cmake_included true)
 
+if(NOT USE_COMPUTECPP AND NOT USE_DPCPP)
+  message(FATAL_ERROR "ComputeCpp or DPCPP NOT found. Can not continue!")
+endif()
+
 # ---[ Build flags
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 14)
@@ -81,25 +85,10 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
 set(CMAKE_SKIP_RPATH TRUE)
 
 # ---[ Main build
-
-# includes
-if(DEFINED PYTORCH_INCLUDE_DIR)
-  include_directories(${PYTORCH_INCLUDE_DIR})
-else()
-  message(FATAL_ERROR, "Cannot find installed PyTorch directory")
-endif()
-
-set(DPCPP_GPU_ROOT "${TORCH_IPEX_C_SOURCE_DIR}/gpu")
+set(IPEX_C_SOURCE_DIR "${PROJECT_SOURCE_DIR}/torch_ipex/csrc")
+set(DPCPP_GPU_ROOT "${IPEX_C_SOURCE_DIR}/gpu")
 set(DPCPP_GPU_ATEN_SRC_ROOT "${DPCPP_GPU_ROOT}/aten")
 set(DPCPP_GPU_ATEN_GENERATED "${DPCPP_GPU_ROOT}/aten/generated")
-set(DPCPP_GPU_ONEDNN "${DPCPP_GPU_ROOT}/oneDNN")
-
-include_directories(${PYTHON_INCLUDE_DIR})
-include_directories(${TORCH_IPEX_C_SOURCE_DIR})
-include_directories(${DPCPP_GPU_ROOT})
-include_directories(${DPCPP_GPU_ATEN_SRC_ROOT})
-include_directories(${DPCPP_GPU_ATEN_GENERATED})
-include_directories(${DPCPP_GPU_ONEDNN})
 
 # generate c10 dispatch registration
 add_custom_command(OUTPUT ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp
@@ -115,6 +104,20 @@ add_subdirectory(torch_ipex/csrc/gpu/aten)
 list(APPEND DPCPP_SRCS ${DPCPP_ATEN_SRCS})
 add_subdirectory(torch_ipex/csrc/gpu/jit)
 add_library(torch_ipex SHARED ${DPCPP_SRCS} ${DPCPP_JIT_SRCS} ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp)
+set_target_properties(torch_ipex PROPERTIES PREFIX "")
+set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
+
+# includes
+if(DEFINED PYTORCH_INCLUDE_DIR)
+  include_directories(${PYTORCH_INCLUDE_DIR})
+else()
+  message(FATAL_ERROR, "Cannot find installed PyTorch directory")
+endif()
+include_directories(${PYTHON_INCLUDE_DIR})
+include_directories(${IPEX_C_SOURCE_DIR})
+include_directories(${DPCPP_GPU_ROOT})
+include_directories(${DPCPP_GPU_ATEN_SRC_ROOT})
+include_directories(${DPCPP_GPU_ATEN_GENERATED})
 
 # pytorch library
 if(DEFINED PYTORCH_LIBRARY_DIR)
@@ -126,35 +129,24 @@ else()
   message(FATAL_ERROR, "Cannot find PyTorch library directory")
 endif()
 
-set_target_properties(torch_ipex PROPERTIES PREFIX "")
-set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
-
 if(USE_PERSIST_STREAM)
-  target_compile_definitions(torch_ipex PRIVATE -DUSE_PERSIST_STREAM)
+  add_definitions(-DUSE_PERSIST_STREAM)
 endif()
 
 if(BUILD_INTERNAL_DEBUG)
-  target_compile_definitions(torch_ipex PRIVATE -DBUILD_INTERNAL_DEBUG)
+  add_definitions(-DBUILD_INTERNAL_DEBUG)
 endif()
 
 if(BUILD_DOUBLE_KERNEL)
-  target_compile_definitions(torch_ipex PRIVATE -DBUILD_DOUBLE_KERNEL)
+  add_definitions(-DBUILD_DOUBLE_KERNEL)
 endif()
 
-include(cmake/DPCPP.cmake)
-if(USE_COMPUTECPP)
-  target_compile_definitions(torch_ipex PRIVATE -DUSE_COMPUTECPP)
-  include_directories(SYSTEM ${ComputeCpp_INCLUDE_DIRS} ${OpenCL_INCLUDE_DIRS})
-  target_link_libraries(torch_ipex PUBLIC ${COMPUTECPP_RUNTIME_LIBRARY})
-  add_sycl_to_target(TARGET torch_ipex SOURCES ${DPCPP_SRCS})
-  message(STATUS "ComputeCpp found. Compiling with SYCL support")
-
-elseif(USE_DPCPP)
-  target_compile_definitions(torch_ipex PRIVATE -DUSE_DPCPP)
+if(USE_DPCPP)
+  add_definitions(-DUSE_DPCPP)
   # Suppress the compiler warning about undefined CL_TARGET_OPENCL_VERSION
-  target_compile_definitions(torch_ipex PRIVATE -DCL_TARGET_OPENCL_VERSION=220)
+  add_definitions(-DCL_TARGET_OPENCL_VERSION=220)
   if(USE_PSTL)
-    target_compile_definitions(torch_ipex PRIVATE -D_PSTL_BACKEND_SYCL)
+    add_definitions(-D_PSTL_BACKEND_SYCL)
   endif()
 
   set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl")
@@ -170,35 +162,40 @@ elseif(USE_DPCPP)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
   endif()
   message(STATUS "DPCPP found. Compiling with SYCL support")
+
   if(USE_USM)
-    target_compile_definitions(torch_ipex PRIVATE -DUSE_USM)
+    add_definitions(-DUSE_USM)
     message(STATUS "USM is enabled as device memory management!")
   endif()
 
-else()
-  message(FATAL_ERROR "ComputeCpp or DPCPP NOT found. Compiling without SYCL support")
+  find_package(MKLDPCPP QUIET)
+  if (MKLDPCPP_FOUND)
+    target_link_libraries(torch_ipex PUBLIC ${ONEMKL_SHARED_LIBS})
+    include_directories(${ONEMKL_INCLUDE_DIR})
+    add_definitions(-DUSE_ONEMKL)
+  else()
+    message(WARNING "Cannot find oneMKL.")
+  endif()
 endif()
 
-set(ONEDNN_USE_SYCL TRUE)
+set(ONEDNN_USE_SYCL ON)
 find_package(oneDNN QUIET)
 if(ONEDNN_FOUND)
-  target_link_libraries(torch_ipex PUBLIC dnnl)
+  target_link_libraries(torch_ipex PUBLIC ${ONEDNN_LIBRARIES})
   include_directories(BEFORE SYSTEM ${ONEDNN_INCLUDE_DIR})
   add_dependencies(torch_ipex dnnl)
 else()
   message(FATAL_ERROR "Cannot find oneDNN")
 endif()
 
-find_package(MKLDPCPP QUIET)
-if (MKLDPCPP_FOUND)
-  target_link_libraries(torch_ipex PUBLIC ${ONEMKL_SHARED_LIBS})
-  include_directories(${ONEMKL_INCLUDE_DIR})
-  target_compile_definitions(torch_ipex PRIVATE -DUSE_ONEMKL)
-else()
-  message(WARNING "Cannot find oneMKL.")
-endif()
-
 target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
 
-install(TARGETS ${LIB_NAME}
-        LIBRARY DESTINATION lib)
+if(USE_COMPUTECPP)
+  add_definitions(-DUSE_COMPUTECPP)
+  include_directories(SYSTEM ${ComputeCpp_INCLUDE_DIRS} ${OpenCL_INCLUDE_DIRS})
+  target_link_libraries(torch_ipex PUBLIC ${COMPUTECPP_RUNTIME_LIBRARY})
+  add_sycl_to_target(TARGET torch_ipex SOURCES ${DPCPP_SRCS})
+  message(STATUS "ComputeCpp found. Compiling with SYCL support")
+endif()
+
+install(TARGETS ${LIB_NAME} LIBRARY DESTINATION lib)

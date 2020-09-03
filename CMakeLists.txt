@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
-project(torch_ipex)
+project(torch_ipex VERSION "0.1.2")
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules)
 
@@ -7,8 +7,7 @@ set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(TORCH_IPEX_C_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/torch_ipex/csrc")
-
+# set compilation env first
 include(cmake/DPCPP.cmake)
 
 # The options to build torch_ipex
@@ -24,7 +23,6 @@ include(cmake/GPU.cmake)
 
 function (print_configuration_summary)
   get_directory_property(CMAKE_COMPILE_DEFINITIONS DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_DEFINITIONS)
-  get_target_property(IPEX_COMPILE_DEFINITIONS torch_ipex COMPILE_DEFINITIONS)
 
     message(STATUS "")
     message(STATUS "******** Summary ********")
@@ -34,23 +32,55 @@ function (print_configuration_summary)
     message(STATUS "  System                : ${CMAKE_SYSTEM_NAME}")
     message(STATUS "  Target name           : ${LIB_NAME}")
     message(STATUS "  Install path          : ${CMAKE_INSTALL_PREFIX}")
+    message(STATUS "  Build type            : ${CMAKE_BUILD_TYPE}")
+    message(STATUS "  C++ compiler          : ${CMAKE_CXX_COMPILER}")
+    message(STATUS "  C++ compiler id       : ${CMAKE_CXX_COMPILER_ID}")
+    message(STATUS "  C++ compiler version  : ${CMAKE_CXX_COMPILER_VERSION}")
+    message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")
+    message(STATUS "  Compile flags         : ${IPEX_COMPILE_FLAGS}")
+    message(STATUS "  Compile definitions   : ${CMAKE_COMPILE_DEFINITIONS}")
+    message(STATUS "  Linker options        : ${CMAKE_SHARED_LINKER_FLAGS}")
+
     message(STATUS "  USE_COMPUTECPP        : ${USE_COMPUTECPP}")
+  if (USE_COMPUTECPP)
+    message(STATUS "  ComputeCpp include    : ${ComputeCpp_INCLUDE_DIRS}")
+    message(STATUS "  ComputeCpp library    : ${COMPUTECPP_RUNTIME_LIBRARY}")
+    message(STATUS "  OpenCL include        : ${OpenCL_INCLUDE_DIRS}")
+    message(STATUS "  OpenCL library        : ${OpenCL_LIBRARIES}")
+  endif(USE_COMPUTECPP)
+
     message(STATUS "  USE_DPCPP             : ${USE_DPCPP}")
   if (USE_DPCPP)
+    message(STATUS "  Intel SYCL include    : ${SYCL_INCLUDE_DIR}")
+    message(STATUS "  Intel SYCL library    : ${SYCL_LIBRARY}")
+    message(STATUS "  OpenCL include        : ${OpenCL_INCLUDE_DIR}")
+    message(STATUS "  OpenCL library        : ${OpenCL_LIBRARY}")
+    message(STATUS "  LevelZero include     : ${LevelZero_INCLUDE_DIRS}")
+    message(STATUS "  LevelZero library     : ${LevelZero_LIBRARIES}")
+
+    message(STATUS "  USE_ONEMKL            : ${MKLDPCPP_FOUND}")
+  if (MKLDPCPP_FOUND)
+    message(STATUS "  ONEMKL include        : ${ONEMKL_INCLUDE_DIR}")
+  endif(MKLDPCPP_FOUND)
+
+    message(STATUS "  USE_PSTL              : ${USE_PSTL}")
+  if (USE_PSTL)
+    message(STATUS "  PSTL include          : ${PSTL_INCLUDE_DIRS}")
+  endif(USE_PSTL)
+
     message(STATUS "  USE_USM               : ${USE_USM}")
-    message(STATUS "  USE_PERSIST_STREAM    : ${USE_PERSIST_STREAM}")
     message(STATUS "  BUILD_BY_PER_KERNEL   : ${BUILD_BY_PER_KERNEL}")
-  endif()
+  endif(USE_DPCPP)
+
     message(STATUS "  BUILD_INTERNAL_DEBUG  : ${BUILD_INTERNAL_DEBUG}")
   if (BUILD_INTERNAL_DEBUG)
     message(STATUS "  BUILD_DOUBLE_KERNEL   : ${BUILD_DOUBLE_KERNEL}")
-  endif()
+  endif(BUILD_INTERNAL_DEBUG)
+
+    message(STATUS "  USE_PERSIST_STREAM    : ${USE_PERSIST_STREAM}")
     message(STATUS "  ONEDNN_USE_SYCL       : ${ONEDNN_USE_SYCL}")
     message(STATUS "  USE_GEN12HP_ONEDNN    : ${USE_GEN12HP_ONEDNN}")
-    message(STATUS "  CXX flags             : ${CMAKE_CXX_FLAGS}")
-    message(STATUS "  Compile flags         : ${IPEX_COMPILE_FLAGS}")
-    message(STATUS "  Compile definitions   : ${CMAKE_COMPILE_DEFINITIONS} ${IPEX_COMPILE_DEFINITIONS}")
-    message(STATUS "  Linker options        : ${CMAKE_SHARED_LINKER_FLAGS}")
+    message(STATUS "")
 endfunction()
 
 print_configuration_summary()

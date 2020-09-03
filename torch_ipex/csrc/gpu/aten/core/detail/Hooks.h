@@ -1,3 +1,7 @@
+#ifndef DPCPP_HOOK_IMPL_H
+#define DPCPP_HOOK_IMPL_H
+
+#ifdef USE_USM
 #include <ATen/detail/DPCPPHooksInterface.h>
 #include <ATen/Generator.h>
 
@@ -20,3 +24,6 @@ struct DPCPPHooks : public at::DPCPPHooksInterface {
 };
 
 }}} // at::dpcpp::detail
+
+#endif
+#endif // DPCPP_HOOK_IMPL_H

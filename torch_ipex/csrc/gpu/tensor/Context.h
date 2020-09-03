@@ -6,7 +6,6 @@
 #include <core/Runtime.h>
 #include <core/Memory.h>
 #include <core/Allocator.h>
-#include <core/CachingAllocator.h>
 #include <dnnl.hpp>
 
 
