@@ -29,7 +29,7 @@ at::Tensor to_plain_if_needed(const Tensor& tensor);
 
 at::Tensor to_plain_if_needed_(const Tensor& tensor);
 
-at::TensorList to_plain_if_needed(TensorList tensor);
+std::vector<at::Tensor> to_plain_if_needed(TensorList tensor);
 
 at::Tensor new_qtensor(IntArrayRef sizes, const TensorOptions& options, QuantizerPtr quantizer);
 
