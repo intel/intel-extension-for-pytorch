@@ -26,7 +26,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-#if defined(_DEBUG)
+#if defined(IPEX_DISP_OP)
 #define DEBUG(fmt) printf(fmt);
 #else
 #define DEBUG(fmt)
@@ -78,7 +78,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     dbl::conv::prepack_conv_weights(input, dil_input,
       weight, stride, padding, dilation, groups);
   }
-  
+
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
   if (bias.defined()) {
@@ -360,7 +360,7 @@ at::Tensor& dil_add_common(
   IPEX_CHECK(self.sizes().equals(other.sizes()),
       "dil add not support broadcast yet");
   if (check_auto_mix_int8_fp32()) {
-    // for accuracy, reorder int8 to fp32 
+    // for accuracy, reorder int8 to fp32
     dbl::comm::reorder_to_dtype(self, at::kFloat);
     dbl::comm::reorder_to_dtype(other, at::kFloat);
   } else {
@@ -824,7 +824,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
     insert_or_updata_observer({self}, {aten_output}, "Linear");
   }
- 
+
   if (self.dim() > 2) {
     auto input_size = self.sizes();
     std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
@@ -1027,7 +1027,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
       dil::batch_normalization_forward_inference::compute(
           x, w, b, y, eps, input_scales, output_scales);
     }
- 
+
     auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
 
     if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
@@ -1421,7 +1421,7 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
     dil::algorithm::eltwise_relu,
     dil::prop_kind::forward_training,
     /*alpha*/ 0.0);
- 
+
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_self.is_public_format() || check_tensor_own_whole_storage(input));
   dbl::comm::sync_shape_from_dil_to_aten(input, dil_self);
   return input;

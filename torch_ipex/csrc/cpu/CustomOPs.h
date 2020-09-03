@@ -9,6 +9,7 @@
 #include <c10/util/Optional.h>
 #include <torch/csrc/autograd/custom_function.h>
 #include <torch/csrc/autograd/function.h>
+#include <torch/csrc/autograd/record_function.h>
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
 
@@ -16,6 +17,9 @@ class NewLinearOp : public torch::autograd::Function<NewLinearOp> {
 public:
   static at::Tensor _forward(at::Tensor input, at::Tensor weight,
                              at::Tensor bias = at::Tensor()) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXLinearOp::_forward", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
           input.device().type() == c10::DeviceType::DPCPP) {
@@ -48,6 +52,9 @@ public:
   static at::Tensor forward(torch::autograd::AutogradContext *ctx,
                             at::Tensor input, at::Tensor weight,
                             at::Tensor bias = at::Tensor()) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXLinearOp::forward", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
     ctx->save_for_backward({input, weight, bias});
     return _forward(input, weight, bias);
   }
@@ -55,6 +62,9 @@ public:
   static torch::autograd::tensor_list
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXLinearOp::backward", std::vector<c10::IValue>({}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];
     at::Tensor weight = saved[1];
@@ -149,6 +159,9 @@ public:
   _forward(at::Tensor input, at::IntArrayRef kernel_size,
            at::IntArrayRef stride, at::IntArrayRef padding,
            at::IntArrayRef dilation, bool ceil_mode) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXMaxPool2dOp::_forward", std::vector<c10::IValue>({input}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
           input.device().type() == c10::DeviceType::DPCPP) {
@@ -187,6 +200,9 @@ public:
                             at::Tensor input, at::IntArrayRef kernel_size,
                             at::IntArrayRef stride, at::IntArrayRef padding,
                             at::IntArrayRef dilation, bool ceil_mode) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXMaxPool2dOp::forward", std::vector<c10::IValue>({input}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
     ctx->saved_data["kernel_size"] = kernel_size;
     ctx->saved_data["stride"] = stride;
     ctx->saved_data["padding"] = padding;
@@ -203,6 +219,9 @@ public:
   static torch::autograd::tensor_list
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXMaxPool2dOp::backward", std::vector<c10::IValue>({}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];
     at::Tensor indices = saved[1];
@@ -263,6 +282,9 @@ public:
   _forward(at::Tensor input, at::IntArrayRef kernel_size,
            at::IntArrayRef stride, at::IntArrayRef padding,
            at::IntArrayRef dilation, bool ceil_mode) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXMaxPool3dOp::_forward", std::vector<c10::IValue>({input}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
           input.device().type() == c10::DeviceType::DPCPP) {
@@ -298,6 +320,9 @@ public:
                             at::Tensor input, at::IntArrayRef kernel_size,
                             at::IntArrayRef stride, at::IntArrayRef padding,
                             at::IntArrayRef dilation, bool ceil_mode) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXMaxPool3dOp::forward", std::vector<c10::IValue>({input}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
     ctx->saved_data["kernel_size"] = kernel_size;
     ctx->saved_data["stride"] = stride;
     ctx->saved_data["padding"] = padding;
@@ -314,6 +339,9 @@ public:
   static torch::autograd::tensor_list
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXMaxPool3dOp::backward", std::vector<c10::IValue>({}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];
     at::Tensor indices = saved[1];
@@ -372,6 +400,9 @@ class NewApaptiveAvgPoolingOp
     : public torch::autograd::Function<NewApaptiveAvgPoolingOp> {
 public:
   static at::Tensor _forward(at::Tensor input, at::IntArrayRef output_size) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::_forward", std::vector<c10::IValue>({input}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
     try {
       if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
         auto src_dil_type = torch_ipex::cpu::dbl::comm::try_gen_dil_tensor(input).get_data_type();
@@ -397,6 +428,9 @@ public:
 
   static at::Tensor forward(torch::autograd::AutogradContext *ctx,
                             at::Tensor input, at::IntArrayRef output_size) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::forward", std::vector<c10::IValue>({input}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
     ctx->save_for_backward({input});
     return _forward(input, output_size);
   }
@@ -404,6 +438,9 @@ public:
   static torch::autograd::tensor_list
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::backward", std::vector<c10::IValue>({}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];
 

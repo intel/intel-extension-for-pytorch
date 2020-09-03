@@ -193,6 +193,12 @@ class IPEXBuild(build_ext, object):
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
         ]
 
+    if _check_env_flag("IPEX_DISP_OP"):
+      cmake_args += ['-DIPEX_DISP_OP=1']
+
+    if _check_env_flag("IPEX_PROFILE_OP"):
+      cmake_args += ['-DIPEX_PROFILE_OP=1']
+
     if _check_env_flag("USE_SYCL"):
       cmake_args += ['-DUSE_SYCL=1']
 

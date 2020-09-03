@@ -517,16 +517,19 @@ class DenseOPCodeGen(object):
             # Gen definition code for cpp file
             code = '{} {{\n'.format(cpp_func_str_cpp)
 
-            # Gen profile info
-            code += '#if defined(_DEBUG)\n'
+            # Gen OP Name
+            code += '#if defined(IPEX_DISP_OP)\n'
             code += '  printf("{}::{}\\n");\n'.format(_IPEX_OP_FUNC_NS, cpp_sig.def_name)
             code += '#endif\n'
+
+            # Gen profile info
             profiler_inputs = []
             for param in cpp_sig.input_params:
                 if param.core_type in ['Tensor', 'Scalar']:
                     profiler_inputs.append(param.name)
+            code += '#if defined(IPEX_PROFILE_OP)\n'
             code += '  RECORD_FUNCTION("{ns}::{name}", std::vector<c10::IValue>({{{input_names}}}), torch::autograd::Node::peek_at_next_sequence_nr());\n'.format(ns=_IPEX_OP_FUNC_NS, name=cpp_sig.def_name, input_names=', '.join(profiler_inputs))
-
+            code += '#endif\n'
 
             if is_conv_overrideable_func(cpp_sig.def_name):
                 code += '  return AtenIpexCPUDev::dil_{}({});\n'.format(cpp_sig.def_name, ', '.join([param.name for param in cpp_sig.input_params]))
