@@ -580,7 +580,9 @@ static void mean_kernel(TensorIterator& iter) {
       at::ScalarType::BFloat16,
       iter.dtype(),
       "mean",
-      [&]() { mean_kernel_impl<scalar_t>(iter); });
+      [&]() {
+        using accscalar_t = acc_type<scalar_t>;
+        mean_kernel_impl<scalar_t, accscalar_t>(iter); });
 }
 
 static void min_kernel(TensorIterator& iter) {
