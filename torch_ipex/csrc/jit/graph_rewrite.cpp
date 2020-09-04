@@ -55,11 +55,11 @@ std::unordered_map<std::string, c10::IValue> getConvParams(
 void FuseShuffle(std::shared_ptr<Graph>& graph) {
   std::string shuffle = R"(
       graph(%input, %view_shape:int[], %trans_dim0:int, %trans_dim1:int, %mem_format:int, %flattern_shape:int[]):
-        %r = aten::view(%input, %view_shape)
-        %r = aten::transpose(%r, %trans_dim0, %trans_dim1)
-        %r = aten::contiguous(%r, %mem_format)
-        %r = aten::view(%r, %flattern_shape)
-        return (%r) )";
+        %r1 = aten::view(%input, %view_shape)
+        %r2 = aten::transpose(%r1, %trans_dim0, %trans_dim1)
+        %r3 = aten::contiguous(%r2, %mem_format)
+        %r4 = aten::view(%r3, %flattern_shape)
+        return (%r4) )";
 
   std::string shuffle_2d_fusion = R"(
       graph(%input, %view_shape:int[], %trans_dim0:int, %trans_dim1:int, %mem_format:int, %flattern_shape:int[]):

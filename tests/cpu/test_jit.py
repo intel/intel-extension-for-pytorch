@@ -235,6 +235,22 @@ class ConvElu(nn.Module):
         c = torch.add(b, b)
         return c
 
+class ChannelShuffle(nn.Module):
+    def __init__(self, batchsize, num_channels, height, width, groups):
+        super(ChannelShuffle, self).__init__()
+        self.batchsize = batchsize
+        self.num_channels = num_channels
+        self.height = height
+        self.width = width
+        self.groups = groups
+
+    def forward(self, x):
+        channels_per_group = self.num_channels // self.groups
+        x = x.view(self.batchsize, self.groups, channels_per_group, self.height, self.width)
+        x = torch.transpose(x, 1, 2).contiguous()
+        x = x.view(self.batchsize, -1, self.height, self.width)
+        return x
+
 
 class Tester(TestCase):
 
@@ -526,6 +542,13 @@ class Tester(TestCase):
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex::linear_relu")
+
+
+    def test_channel_shuffle(self):
+        self._test_output(
+            ChannelShuffle(10, 16, 50, 50, 4),
+            torch.rand(10, 16, 50, 50),
+            kind_in_graph="ipex::shuffle_2d")
 
 
     def test_jit_function(self):
