@@ -89,18 +89,6 @@ index c61291b..9644b28 100644
  if (USE_CUDA)
      list(APPEND TORCH_PYTHON_SRCS
        ${TORCH_SRC_DIR}/csrc/cuda/Module.cpp
-diff --git a/torch/__init__.py b/torch/__init__.py
-index ac3ffc6..3777e0b 100644
---- a/torch/__init__.py
-+++ b/torch/__init__.py
-@@ -23,6 +23,7 @@ from ._utils_internal import get_file_path, prepare_multiprocessing_environment,
-     USE_RTLD_GLOBAL_WITH_LIBTORCH
- from .version import __version__
- from ._six import string_classes as _string_classes
-+from . import itt
- 
- __all__ = [
-     'typename', 'is_tensor', 'is_storage', 'set_default_tensor_type',
 diff --git a/torch/autograd/profiler.py b/torch/autograd/profiler.py
 index 718b7c5..daa36b8 100644
 --- a/torch/autograd/profiler.py
