@@ -998,7 +998,11 @@ class TestLayerNorm(TestCase):
             input = torch.randn(2, 5, 10, 10, dtype=torch.float32)
             input_dpcpp=input.to(device=device)
             m = torch.nn.LayerNorm([10, 10])
-            self.assertEqual(m(input), m(input_dpcpp))
+            m_dpcpp = copy.deepcopy(m).to(device=device)
+            output = m(input)
+            output_dpcpp = m_dpcpp(input_dpcpp)
+            self.assertTrue(ipex.core.is_dil_tensor(output_dpcpp))
+            self.assertEqual(output, output_dpcpp)
 
     def test_layer_norm_backward(self):
         with AutoDNNL(True):

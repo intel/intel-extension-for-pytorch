@@ -1937,6 +1937,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_
     double eps) {
   DEBUG("AtenIpexCPUDev::dil_native_layer_norm\n");
   CHECK_DNNL_OP_PRE_COND(X);
+  //It's a temporary solution to fall back to fp32 since bf16 layer_norm is not ready for dnnl path now.
+  dbl::comm::reorder_to_dtype(X, at::kFloat);
   dil::tensor x = dbl::comm::try_gen_dil_tensor(X);
   const dil::tensor scale = dbl::comm::try_gen_dil_tensor(gamma);
   const dil::tensor shift = dbl::comm::try_gen_dil_tensor(beta);
@@ -1976,6 +1978,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_
   DEBUG("AtenIpexCPUDev::dil_native_layer_norm_backward\n");
   CHECK_DNNL_OP_PRE_COND(dY);
   CHECK_DNNL_OP_PRE_COND(X);
+  //it's a temporary solution to fall back to fp32 since bf16 layer_norm is not ready for dnnl path now.
+  dbl::comm::reorder_to_dtype(dY, at::kFloat);
+  dbl::comm::reorder_to_dtype(X, at::kFloat);
   dil::tensor dy = dbl::comm::try_gen_dil_tensor(dY);
   dil::tensor x = dbl::comm::try_gen_dil_tensor(X);
   dil::tensor m = dbl::comm::try_gen_dil_tensor(mean);

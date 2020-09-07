@@ -73,8 +73,8 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::view(Tensor(a) self, int[] size) -> Tensor(a)',
     'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
     'aten::_unsafe_view(Tensor self, int[] size) -> Tensor',
-    #'aten::native_layer_norm(Tensor input, Tensor? weight, Tensor? bias, int M, int N, float eps) -> (Tensor, Tensor, Tensor)',
-    #'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)'
+    'aten::native_layer_norm(Tensor input, Tensor? weight, Tensor? bias, int M, int N, float eps) -> (Tensor, Tensor, Tensor)',
+    'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)'
 ]
 
 _FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG = [
