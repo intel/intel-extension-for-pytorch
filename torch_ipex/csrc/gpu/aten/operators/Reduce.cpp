@@ -577,7 +577,7 @@ static void mean_kernel(TensorIterator& iter) {
       at::ScalarType::BFloat16,
       iter.dtype(),
       "mean",
-      [&]() { mean_kernel_impl<scalar_t>(iter); });
+      [&]() { mean_kernel_impl<scalar_t, float>(iter); });
 }
 
 static void min_kernel(TensorIterator& iter) {

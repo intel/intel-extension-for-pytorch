@@ -39,6 +39,10 @@ class LinearReLU(Module):
         )
 
 
+def mul_add(input, other, accumu, alpha=1.0):
+    return torch_ipex.mul_add(input, other, accumu, alpha)
+
+
 class ReLUDummy(Module):
     __constants__ = ['inplace']
 
