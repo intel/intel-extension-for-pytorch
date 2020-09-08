@@ -79,6 +79,55 @@ def _gen_op(seed, op, is_bn=False, is_forward=True):
     
     return op_cpu, op_auto_mix_inference, op_auto_mix_train, op_man_bf16, op_auto_mix_train_bf16
 
+class CascadedConvBnSumRelu(nn.Module):
+    def __init__(self, in_channels, mid_channels, out_channels, **kwargs):
+        super(CascadedConvBnSumRelu, self).__init__()
+        self.conv = torch.nn.Conv2d(in_channels, mid_channels, bias=False, **kwargs)
+        self.conv1 = torch.nn.Conv2d(
+            mid_channels, out_channels, bias=False, padding=1, **kwargs)
+        self.conv2 = torch.nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
+        self.bn = torch.nn.BatchNorm2d(mid_channels, eps=0.001)
+        self.bn1 = torch.nn.BatchNorm2d(out_channels, eps=0.001)
+        self.bn2 = torch.nn.BatchNorm2d(out_channels, eps=0.001)
+
+    def forward(self, x):
+        a = self.conv(x)
+        a = self.bn(a)
+        a = F.relu(a, inplace=True)
+        a = self.conv1(a)
+        a = self.bn1(a)
+        b = self.conv2(x)
+        b = self.bn2(b)
+        return F.relu(a.add_(b), inplace=True)
+
+def apply(m, fn, args):
+    for sub_module in m.children():
+        apply(sub_module, fn, args)
+    fn(m, args)
+
+class TestTo(TestCase):
+    def test_to(self):
+        rand_seed = int(get_rand_seed())
+        torch.manual_seed(rand_seed)
+
+        m = CascadedConvBnSumRelu(3, 64, 32, kernel_size=3, stride=1)
+        m_cpu = copy.deepcopy(m).to("cpu")
+        m_data_type = copy.deepcopy(m).to(torch.bfloat16)
+        m_auto_mix = copy.deepcopy(m).to(device)
+        m_auto_mix_data_type = copy.deepcopy(m).to(device=device, dtype=torch.bfloat16)
+
+        def check_param(t, is_param):
+            for param in t.parameters():
+                if is_param:
+                    self.assertTrue(ipex.core.is_parameter_tensor(param.data))
+                else:
+                    self.assertFalse(ipex.core.is_parameter_tensor(param.data))
+
+        apply(m_cpu, check_param, False)
+        apply(m_data_type, check_param, False)
+        apply(m_auto_mix, check_param, True)
+        apply(m_auto_mix_data_type, check_param, True)
+
 class TestConv(TestCase):
     def test_Conv2d_with_cpu(self):
         rand_seed = int(get_rand_seed())

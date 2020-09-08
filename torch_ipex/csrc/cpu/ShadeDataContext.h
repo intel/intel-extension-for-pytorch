@@ -16,6 +16,8 @@ enum SHADE_DATA_TYPE {CPU_RAW, DIL};
 
 enum MIX_PREC_TYPE {NONE, MIX_BF16_FP32, MIX_INT8_FP32};
 
+enum SHADE_TENSOR_TAG{PARAM, OTHER};
+
 #define SANITY_CHECK_SHADE_DATA_CONTEXT(THIS) \
   { \
     if (THIS->data_type == SHADE_DATA_TYPE::DIL) { \
@@ -52,12 +54,14 @@ struct ShadeDataContext {
 
   SHADE_DATA_TYPE    data_type;    ///< Memory buffer type
   MIX_PREC_TYPE      mix_prec_type; ///< Record if the aten tensor is mix-precision
+  SHADE_TENSOR_TAG   shade_tensor_tag; ///< Record if the tensor is a PARAMETER (in mix-precision, never reorder a PARAMETER to bf16)
 
   ShadeDataContext() : dil_tensor(),
                        cpu_raw_data(nullptr),
                        cpu_del_fun(nullptr),
                        data_type(SHADE_DATA_TYPE::CPU_RAW),
-                       mix_prec_type(MIX_PREC_TYPE::NONE) {}
+                       mix_prec_type(MIX_PREC_TYPE::NONE),
+                       shade_tensor_tag(SHADE_TENSOR_TAG::OTHER) {}
 
   ~ShadeDataContext() {
     SANITY_CHECK_SHADE_DATA_CONTEXT(this);
@@ -214,6 +218,49 @@ struct ShadeDataContext {
     }
 
     return res;
+  }
+
+  /**
+   * Check if the input aten tensor is a parameter.
+   *
+   * @param tensor input aten tensor
+   */
+  static inline bool isParameterTensor(const at::Tensor &tensor) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
+
+    if (tensor.device().type() != c10::DeviceType::DPCPP) {
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.device().type() == c10::DeviceType::CPU);
+      return false;
+    }
+
+    void *storage_context = tensor.storage().data_ptr().get_context();
+    ShadeDataContext *shade_data_context = (ShadeDataContext*)storage_context;
+    auto shade_tensor_tag = shade_data_context->shade_tensor_tag;
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY((shade_tensor_tag == SHADE_TENSOR_TAG::OTHER) || (shade_tensor_tag == SHADE_TENSOR_TAG::PARAM));
+
+    SANITY_CHECK_SHADE_DATA_CONTEXT(shade_data_context);
+
+    return shade_tensor_tag == SHADE_TENSOR_TAG::PARAM;
+  }
+
+  /**
+   * Set the shade_tensor_tag of the input aten tensor to PARAM.
+   *
+   * @param tensor input aten tensor
+   */
+  static inline void setParameterTensor(const at::Tensor &tensor) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
+    
+    // TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.device().type() == c10::DeviceType::DPCPP);
+    // TODO: if device is cpu, this function should not be called
+    if (tensor.device().type() != c10::DeviceType::DPCPP) {
+      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.device().type() == c10::DeviceType::CPU);
+      return;
+    }
+
+    void *storage_context = tensor.storage().data_ptr().get_context();
+    ShadeDataContext *shade_data_context = (ShadeDataContext*)storage_context;
+    shade_data_context->shade_tensor_tag = SHADE_TENSOR_TAG::PARAM;
   }
 
 };

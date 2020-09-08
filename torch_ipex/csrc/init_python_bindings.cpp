@@ -40,6 +40,14 @@ void setAutoDNNL(bool val) {
   AutoOptConfig::singleton().set_auto_dnnl(val);
 }
 
+void setParameterTensor(const at::Tensor &tensor) {
+  cpu::ShadeDataContext::setParameterTensor(tensor);
+}
+
+bool isParameterTensor(const at::Tensor &tensor) {
+  return cpu::ShadeDataContext::isParameterTensor(tensor);
+}
+
 /// **** Only for unit test ****
 bool isDilTensor(const at::Tensor &tensor) {
   return cpu::ShadeDataContext::isDilTensor(tensor);
@@ -125,6 +133,8 @@ void InitIpexModuleBindings(py::module m) {
   m.def("is_fp32_dil_tensor", &isFP32DilTensor);
   m.def("get_dil_tensor_sizes", &getDilStorageSizes);
   m.def("get_dil_tensor_strides", &getDilStorageStrides);
+  m.def("set_parameter_tensor", &setParameterTensor);
+  m.def("is_parameter_tensor", &isParameterTensor);
   m.def("enable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(true); });
   m.def("disable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
   m.def("get_jit_opt", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
