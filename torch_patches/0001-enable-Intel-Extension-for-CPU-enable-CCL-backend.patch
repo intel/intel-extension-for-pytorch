@@ -1,6 +1,6 @@
-From cc2f261746b8d47c5d69e2e515068bb23e16cedc Mon Sep 17 00:00:00 2001
+From 4bf7a0f9318eb5bf8f7f9c0696c492633efeb11d Mon Sep 17 00:00:00 2001
 From: hongzhen <hongzhen.liu@intel.com>
-Date: Fri, 19 Jun 2020 13:24:19 +0800
+Date: Tue, 8 Sep 2020 13:31:11 +0800
 Subject: [PATCH] enable Intel Extension for CPU, enable CCL backend
 
 Signed-off-by: hongzhen <hongzhen.liu@intel.com>
@@ -29,6 +29,7 @@ Signed-off-by: hongzhen <hongzhen.liu@intel.com>
  docs/source/distributed.rst                   |  26 +-
  setup.py                                      |   1 +
  torch/csrc/distributed/c10d/init.cpp          |  53 +++
+ torch/csrc/jit/runtime/graph_executor.cpp     |   2 +-
  torch/csrc/utils/tensor_layouts.cpp           |   1 +
  torch/csrc/utils/tensor_new.cpp               |   4 +
  torch/distributed/distributed_c10d.py         | 236 ++++++++++-
@@ -36,12 +37,12 @@ Signed-off-by: hongzhen <hongzhen.liu@intel.com>
  torch/lib/c10d/ProcessGroupMPI.cpp            | 200 +++++++++
  torch/lib/c10d/ProcessGroupMPI.hpp            |  12 +
  torch/lib/c10d/Types.hpp                      |   4 +
- 31 files changed, 1268 insertions(+), 31 deletions(-)
+ 32 files changed, 1269 insertions(+), 32 deletions(-)
  create mode 100644 aten/src/ATen/cpu/vec256/vec256_bfloat16.h
  create mode 100644 aten/src/ATen/native/cpu/AtomicAddFloat.h
 
 diff --git a/aten/src/ATen/SparseTensorImpl.cpp b/aten/src/ATen/SparseTensorImpl.cpp
-index a7354047..3bf11a6 100644
+index a735404..3bf11a6 100644
 --- a/aten/src/ATen/SparseTensorImpl.cpp
 +++ b/aten/src/ATen/SparseTensorImpl.cpp
 @@ -9,6 +9,8 @@ namespace {
@@ -1353,6 +1354,19 @@ index dce5201..3b2e4fe 100644
                "send",
                &::c10d::ProcessGroup::send,
                py::call_guard<py::gil_scoped_release>())
+diff --git a/torch/csrc/jit/runtime/graph_executor.cpp b/torch/csrc/jit/runtime/graph_executor.cpp
+index 2b9759c..1f2c414 100644
+--- a/torch/csrc/jit/runtime/graph_executor.cpp
++++ b/torch/csrc/jit/runtime/graph_executor.cpp
+@@ -729,7 +729,7 @@ void runNondiffOptimization(
+   // Fuse the dequant - op - quant patterns into quantized ops
+   QuantFusion(graph);
+ 
+-  FuseGraph(graph, strict_fuser_check);
++  // FuseGraph(graph, strict_fuser_check);
+ 
+   // Run custom post-fusion passes
+   for (const auto& pass : getCustomPostFusionPasses()) {
 diff --git a/torch/csrc/utils/tensor_layouts.cpp b/torch/csrc/utils/tensor_layouts.cpp
 index 6fcd84f..e42a7ba 100644
 --- a/torch/csrc/utils/tensor_layouts.cpp
