@@ -17,6 +17,7 @@
 #include "cpu/ExtendOPs.h"
 #include "cpu/MlpOPs.h"
 #include "cpu/toolkit/sklearn.h"
+#include "cpu/toolkit/thread.h"
 
 namespace torch_ipex {
 namespace {
@@ -139,6 +140,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_dil_tensor_strides", &getDilTensorStrides);
 
   m.def("roc_auc_score", &toolkit::roc_auc_score);
+  m.def("thread_bind", &toolkit::thread_bind);
 }
 
 }  // namespace

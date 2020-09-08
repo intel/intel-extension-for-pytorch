@@ -156,6 +156,8 @@ ExternalProject_Add(xsmm
 set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS})
 pybind11_add_module(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 target_link_libraries(${PLUGIN_NAME} PRIVATE ${DPCPP_THIRD_PARTY_ROOT}/xsmm/lib/libxsmm.a)
+link_directories($ENV{CONDA_PREFIX}/lib)
+target_link_libraries(${PLUGIN_NAME} PUBLIC $ENV{CONDA_PREFIX}/lib/libiomp5.so)
 
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
