@@ -22,6 +22,9 @@ at::Tensor conv2d_relu(
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
     int64_t groups);
 
+at::Tensor mul_add(const at::Tensor& self,
+    const at::Tensor& other, const at::Tensor& accumu, at::Scalar alpha);
+
 at::Tensor batch_norm(
     const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean,
     const at::Tensor& running_var, bool train, double momentum, double eps, bool use_dnn);
