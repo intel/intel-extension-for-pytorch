@@ -19,12 +19,12 @@ class TestNNMethod(TestCase):
         print("output: ", output_cpu)
         output_cpu.backward(torch.ones_like(output_cpu))
         print("input.grad: ", input_cpu.grad)
-        input_cpu.grad.zero_()
-
+        
         print("dpcpp")
         input_dpcpp.requires_grad = True
         output_dpcpp = m(input_dpcpp)
         print("output: ", output_dpcpp.cpu())
         output_dpcpp.backward(torch.ones_like(output_dpcpp).to("dpcpp"))
         print("input.grad: ", input_dpcpp.grad.cpu())
-        input_dpcpp.grad.zero_()
+        self.assertEqual(output_cpu, output_dpcpp)
+        self.assertEqual(input_cpu.grad, input_dpcpp.grad)

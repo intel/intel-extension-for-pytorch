@@ -30,15 +30,12 @@ void GatedLinearUnit_updateOutput(
       " is size ",
       nln);
   const int64_t inputSize = nln / 2;
-  auto newSizes = input.sizes().vec();
-  newSizes[wrap_dim] = inputSize;
-  output.resize_(newSizes);
   Tensor firstHalf = input.narrow(wrap_dim, 0, inputSize);
   Tensor secondHalf = input.narrow(wrap_dim, inputSize, inputSize);
   // output = output + firstHalf * sigmoid(secondHalf)
   Tensor sigNum = at::empty_like(secondHalf);
   at::sigmoid_out(sigNum, secondHalf);
-  output.addcmul_(firstHalf, sigNum);
+  output = at::mul(firstHalf, sigNum);
 }
 
 template <typename scalar_t>

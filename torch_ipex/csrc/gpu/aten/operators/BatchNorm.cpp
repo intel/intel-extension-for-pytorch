@@ -26,12 +26,10 @@ void get_dnnl_format(
 
   if (input_ndim == 2) {
     dnnl_format = memory::format_tag::nc;
-    input_tz = {input.size(0), input.size(1)};
+    input_tz = {/*n*/ input.size(0), /*c*/ input.size(1)};
   } else if (input_ndim == 3) {
-    /* Map the rank3 batch norm to rank4 batch norm*/
-    dnnl_format = memory::format_tag::nchw;
-    input_tz = {
-        /*n*/ input.size(0), /*c*/ input.size(1), /*h*/ input.size(2), /*w*/ 1};
+    dnnl_format = memory::format_tag::ncw;
+    input_tz = {/*n*/ input.size(0), /*c*/ input.size(1), /*w*/ input.size(2)};
   } else if (input_ndim == 4) {
     dnnl_format = memory::format_tag::nchw;
     input_tz = {/*n*/ input.size(0),

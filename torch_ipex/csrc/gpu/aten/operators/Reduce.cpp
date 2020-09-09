@@ -7,6 +7,7 @@
 #include <c10/core/ScalarType.h>
 
 #include <utils/Numerics.h>
+#include <utils/AccumulateType.h>
 #include <utils/ATDispatch.h>
 #include <iostream>
 
@@ -563,7 +564,9 @@ static void sum_kernel(TensorIterator& iter) {
       at::ScalarType::BFloat16,
       iter.dtype(),
       "sum",
-      [&]() { sum_kernel_impl<scalar_t>(iter); });
+      [&]() {
+        using accscalar_t = acc_type<scalar_t>;
+        sum_kernel_impl<scalar_t, accscalar_t>(iter); });
 }
 
 static void prod_kernel(TensorIterator& iter) {
@@ -577,7 +580,9 @@ static void mean_kernel(TensorIterator& iter) {
       at::ScalarType::BFloat16,
       iter.dtype(),
       "mean",
-      [&]() { mean_kernel_impl<scalar_t, float>(iter); });
+      [&]() {
+        using accscalar_t = acc_type<scalar_t>;
+        mean_kernel_impl<scalar_t, accscalar_t>(iter); });
 }
 
 static void min_kernel(TensorIterator& iter) {
