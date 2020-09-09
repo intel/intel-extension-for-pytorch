@@ -17,6 +17,7 @@ namespace at {
 namespace dpcpp {
 namespace detail {
 
+#ifdef USE_USM
 void DPCPPHooks::initDPCPP() const {
   // TODO:
 }
@@ -70,6 +71,7 @@ at::Generator* DPCPPHooks::getDefaultDPCPPGenerator(DeviceIndex device_index = -
 }
 
 REGISTER_DPCPP_HOOKS(DPCPPHooks);
+#endif
 
 } // detail
 } // dpcpp

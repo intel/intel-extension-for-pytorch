@@ -839,8 +839,11 @@ def generate_aten_to_ipex(ctx, tree, rwxtree, fname, sig, rwsig, params, fnopts)
     if not is_blkfmt_supported(fname):
       if cptype == 'TensorList':
         _pname = "_{}".format(pname)
+        pname_vec = "{}_vec".format(pname)
         code += ('  auto {} = AtenIpexTypeDPCPP::to_plain_if_needed({});\n').format(
-            _pname, pname)
+            pname_vec, pname)
+        code += ('  auto {} = at::TensorList({});\n').format(
+            _pname, pname_vec)
         param_vars.append(_pname)
       elif cptype == 'Tensor':
         if not type_is_const(ptype):

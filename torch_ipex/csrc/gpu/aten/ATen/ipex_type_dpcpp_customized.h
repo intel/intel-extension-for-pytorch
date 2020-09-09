@@ -23,13 +23,15 @@ std::tuple<Tensor&,Tensor&> std_var_mean_out(const char* fname, Tensor &result1,
 
 at::Tensor linear_relu(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias);
 
+at::Tensor mul_add(const Tensor& self, const Tensor& other, const Tensor& accumu, Scalar alpha);
+
 at::Tensor empty_opaque_tensor(DPCPPTensorContext::Meta meta, const TensorOptions& options, c10::optional<MemoryFormat> optional_memory_format);
 
 at::Tensor to_plain_if_needed(const Tensor& tensor);
 
 at::Tensor to_plain_if_needed_(const Tensor& tensor);
 
-at::TensorList to_plain_if_needed(TensorList tensor);
+std::vector<at::Tensor> to_plain_if_needed(TensorList tensor);
 
 at::Tensor new_qtensor(IntArrayRef sizes, const TensorOptions& options, QuantizerPtr quantizer);
 

@@ -1,3 +1,5 @@
+#if defined(USE_USM)
+
 #include <core/CachingAllocator.h>
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
@@ -791,3 +793,5 @@ void dpcpp_raw_delete(void* ptr) {
 
 } // namespace dpcpp
 } // namespace at
+
+#endif

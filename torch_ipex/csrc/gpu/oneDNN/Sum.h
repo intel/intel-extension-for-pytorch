@@ -36,6 +36,7 @@ static inline Tensor sum(Tensor& output,
   inputs_desc.push_back(tar_desc);
 
   std::vector<memory> inputs_mem;
+  std::vector<Tensor> _curs;
   inputs_mem.push_back(dpcpp_onednn_memory(tar_desc, engine, tar.data_ptr()));
   for (int i = 1; i < inputs.size(); i++) {
     auto cur = inputs.at(i);
@@ -46,10 +47,13 @@ static inline Tensor sum(Tensor& output,
                      get_onednn_strides(cur)) :
         cur_ctx.meta();
 
+    Tensor _cur;
     auto cur_usr_mem = dpcpp_onednn_memory(cur_desc, engine, cur.data_ptr());
     auto cur_mem = cur_usr_mem;
     if (cur_desc != tar_desc) {
-      cur_mem = memory(tar_desc, engine);
+      _cur = empty_opaque_tensor(tar_desc, cur.options(), c10::nullopt);
+      _curs.push_back(_cur);
+      cur_mem = memory(tar_desc, engine, _cur.data_ptr());
       DPCPP_ONEDNN_EXEC(reorder(cur_usr_mem, cur_mem),
           strm, cur_usr_mem, cur_mem);
     }

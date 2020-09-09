@@ -70,15 +70,15 @@ Tensor to_plain_if_needed_(const Tensor& tensor) {
   return tensor;
 }
 
-TensorList to_plain_if_needed(TensorList tensors) {
+std::vector<Tensor> to_plain_if_needed(TensorList tensors) {
   if (!lazy_reorder_enabled())
-    return tensors;
+    return tensors.vec();
 
   std::vector<Tensor> _tensors;
   for(auto tensor : tensors) {
     _tensors.push_back(to_plain_if_needed(tensor));
   }
-  return {_tensors};
+  return _tensors;
 }
 
 } // namespace AtenIpexTypeDPCPP

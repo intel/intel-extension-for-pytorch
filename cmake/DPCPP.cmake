@@ -55,10 +55,11 @@ find_file(INTEL_SYCL_VERSION
         lib/clang/8.0.0/include/CL/sycl
     NO_DEFAULT_PATH)
 
-set(USE_DPCPP FALSE)
-set(USE_COMPUTECPP FALSE)
+set(USE_PSTL OFF)
+set(USE_DPCPP OFF)
+set(USE_COMPUTECPP OFF)
 if(INTEL_SYCL_VERSION)
-    set(USE_DPCPP TRUE)
+    set(USE_DPCPP ON)
     get_filename_component(SYCL_INCLUDE_DIR "${INTEL_SYCL_VERSION}/../../.." ABSOLUTE)
 
     find_library(SYCL_LIBRARY
@@ -81,17 +82,29 @@ if(INTEL_SYCL_VERSION)
     endif()
     set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
 
-    message(STATUS "Intel SYCL include: ${SYCL_INCLUDE_DIR}")
-    message(STATUS "Intel SYCL library: ${SYCL_LIBRARY}")
-    message(STATUS "OpenCL include: ${OpenCL_INCLUDE_DIR}")
-    message(STATUS "OpenCL library: ${OpenCL_LIBRARY}")
-
     if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${OpenCL_INCLUDE_DIR})
         include_directories(${OpenCL_INCLUDE_DIR})
     endif()
     include_directories(${SYCL_INCLUDE_DIR})
 
-    #add tbb lib
+    #find LevelZero
+    find_path(LevelZero_INCLUDE_DIR
+        NAMES level_zero/ze_api.h
+        PATH_SUFFIXES include)
+
+    find_library(LevelZero_LIBRARY
+        NAMES level_zero
+        PATHS
+        PATH_SUFFIXES lib/x64 lib lib64)
+
+    if (NOT LevelZero_LIBRARY)
+      message(STATUS "LevelZero library not found")
+    else()
+      set(LevelZero_LIBRARIES ${LevelZero_LIBRARY})
+      set(LevelZero_INCLUDE_DIRS ${LevelZero_INCLUDE_DIR})
+    endif()
+
+    #TODO: remove TBB
     find_path(TBB_INCLUDE_DIRS
             NAMES tbb
             PATHS ${INTELONEAPIROOT}/tbb/latest $ENV{INTELONEAPIROOT}/tbb/latest
@@ -118,7 +131,7 @@ if(INTEL_SYCL_VERSION)
             FOUND_VAR PSTL_FOUND
             REQUIRED_VARS PSTL_INCLUDE_DIRS)
     if(${PSTL_FOUND})
-      set(USE_PSTL TRUE)
+      set(USE_PSTL ON)
       find_library(TBB_LIBRARY
               NAMES tbb
               HINTS ${INTELONEAPIROOT}/tbb/latest $ENV{INTELONEAPIROOT}/tbb/latest
@@ -138,7 +151,6 @@ if(INTEL_SYCL_VERSION)
       endif()
 
       message(STATUS "TBB directors " ${TBB_INCLUDE_DIRS})
-      message(STATUS "PSTL directors " ${PSTL_INCLUDE_DIRS})
     else()
       message(WARNING "PSTL not found. No PSTL")
     endif()
@@ -158,7 +170,7 @@ else()
         message(FATAL_ERROR "SYCL not found")
     endif()
 
-    set(USE_COMPUTECPP TRUE)
+    set(USE_COMPUTECPP ON)
     include_directories(SYSTEM ${ComputeCpp_INCLUDE_DIRS})
     list(APPEND EXTRA_SHARED_LIBS ${COMPUTECPP_RUNTIME_LIBRARY})
 

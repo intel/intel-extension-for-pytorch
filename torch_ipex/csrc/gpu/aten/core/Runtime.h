@@ -178,7 +178,7 @@ struct GpuStreamManager {
 #ifdef USE_PERSIST_STREAM
     int deviceCount = at::dpcpp::device_count();
     TORCH_INTERNAL_ASSERT(deviceCount > 0);
-    for (int dev = 0; dev < deviceCount; dev++) {
+    for (DeviceIndex dev = 0; dev < deviceCount; dev++) {
       stream_pool.push_back(std::make_shared<dnnl::stream>(
           GpuEngineManager::Instance().get_engine({kDPCPP, dev}),
           getDefaultDPCPPStream(dev).dpcpp_queue()));

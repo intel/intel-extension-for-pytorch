@@ -125,10 +125,10 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   } else {
     ScalarType dtype = iter.dtype(0);
     if(!isQIntType(dtype)){
-      IPEX_DISPATCH_ALL_TYPES_ALWAYS_AND3(
+      IPEX_DISPATCH_ALL_TYPES_AND3(
           kHalf, kBFloat16, kBool, iter.dtype(0), "copy_", [&] {
             using dst_t = scalar_t;
-            IPEX_DISPATCH_ALL_TYPES_ALWAYS_AND3(
+            IPEX_DISPATCH_ALL_TYPES_AND3(
                 kHalf, kBFloat16, kBool, iter.dtype(1), "copy_", [&] {
                   CopyOp<dst_t, scalar_t>::apply(iter.tensor(0), iter.tensor(1));
                 });
@@ -245,12 +245,16 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   int64_t nbytes = iter.numel() * iter.element_size(0);
 
   if (non_blocking) {
-    dpcppMemcpyAsync(dst, src, nbytes, kind);
     // here do the dpcpp copy synchronisation.
     // we use a very simple version for the singleton sycl queue.
     // TODO: enhance this for the multi-queue.
+    dpcppMemcpyAsync(dst, src, nbytes, kind);
   } else {
     dpcppMemcpy(dst, src, nbytes, kind);
+    // FIXME: Without queue wait, resource exhaustion occurs due to never release kernel events.
+    // Need to confirm with compiler team the root cause here.
+    auto& queue = getCurrentDPCPPStream().dpcpp_queue();
+    queue.wait();
   }
 }
 

@@ -23,6 +23,16 @@ PYBIND11_MODULE(torch_ipex, m) {
           return at::AtenIpexTypeDPCPP::linear_relu(input, weight, bias);
         },
         "fused linear with relu opt. on Intel device");
+
+  m.def("mul_add",
+      [](const at::Tensor & self,
+        const at::Tensor & other,
+        const at::Tensor & accumu,
+        float alpha) {
+        return at::AtenIpexTypeDPCPP::mul_add(self, other, accumu, alpha);
+      },
+      "fused mul with add opt. on Intel device");
+
 #if defined(_PSTL_BACKEND_SYCL) && defined(USE_USM)
   m.def("_usm_pstl_is_enabled",
         []() {return true;});
