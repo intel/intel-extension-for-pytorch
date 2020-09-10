@@ -161,7 +161,7 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
-      "dpcpp::mul_add(Tensor self, Tensor other, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
+      "dpcpp::mul_add(Tensor self, Tensor other, Tensor accumu, Scalar alpha) -> Tensor",
       [] (const Node* node) ->Operation {
         return [] (Stack& stack) {
           auto result = torch::jit::dpcpp::mul_add(
