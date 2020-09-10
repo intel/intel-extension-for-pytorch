@@ -77,6 +77,7 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::unbind.Dimname(Tensor(a) self, Dimname dim) -> Tensor(a)[]',
     'aten::view(Tensor(a) self, int[] size) -> Tensor(a)',
     'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
+    'aten::index.Tensor(Tensor self, Tensor?[] indices) -> Tensor',
     'aten::_unsafe_view(Tensor self, int[] size) -> Tensor',
     'aten::native_layer_norm(Tensor input, Tensor? weight, Tensor? bias, int M, int N, float eps) -> (Tensor, Tensor, Tensor)',
     'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)',
@@ -86,9 +87,9 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
 
 _FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
+    'aten::index.Tensor(Tensor self, Tensor?[] indices) -> Tensor',
     # 'aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)',
     'aten::_pack_padded_sequence(Tensor input, Tensor lengths, bool batch_first) -> (Tensor, Tensor)'
-
 ]
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'

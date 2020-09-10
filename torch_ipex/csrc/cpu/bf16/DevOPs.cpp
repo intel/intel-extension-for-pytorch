@@ -18,6 +18,13 @@ at::Tensor index_select(const at::Tensor & self, int64_t dim, const at::Tensor &
   return bf16::gen_mix_prec_tensor(_ipex_result);
 }
 
+at::Tensor index(const at::Tensor & self, at::TensorList indices) {
+  auto&& _tensor = bf16::gen_consistent_tensor(self);
+  auto&& _ipex_indices = bridge::shallowFallbackToCPUTensorList(indices);
+  auto&& _ipex_result = at::index(_tensor, _ipex_indices);
+  return bf16::gen_mix_prec_tensor(_ipex_result);
+}
+
 }  // namespace bf16
 }  // namespace cpu
 }  // namespace torch_ipex

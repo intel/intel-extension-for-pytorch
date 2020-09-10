@@ -2365,6 +2365,25 @@ at::Tensor AtenIpexCPUDev::dil_index_select(
   return at::Tensor();
 }
 
+at::Tensor AtenIpexCPUDev::dil_index(const at::Tensor & self, at::TensorList indices) {
+  DEBUG("AtenIpexCPUDev::dil_index\n");
+  torch_ipex::reset_ipex_func_status();
+
+  IPEX_CHECK(
+    self.device().type() == c10::DeviceType::DPCPP,
+    "IPEX index only work on DPCPP tensor");
+  if (ShadeDataContext::isDilTensor(self) && ShadeDataContext::isTensorMixPrecision(self)) {
+    dil::tensor& self_dil_storage = ShadeDataContext::getDilStorage(self);
+    if (self_dil_storage.get_data_type() == dil::data_type::bf16) {
+      return bf16::index(self, indices);
+    }
+    // TODO: We need add more LP here
+  }
+
+  torch_ipex::set_ipex_func_status(torch_ipex::IPEXFuncStatus::IPEX_FALLBACK);
+  return at::Tensor();
+}
+
 at::Tensor AtenIpexCPUDev::dil_shuffle(const at::Tensor & self, at::IntArrayRef view_shape, int64_t dim0, int64_t dim1) {
   DEBUG("AtenIpexCPUDev::dil_shuffle\n");
 #if defined(IPEX_PROFILE_OP)
