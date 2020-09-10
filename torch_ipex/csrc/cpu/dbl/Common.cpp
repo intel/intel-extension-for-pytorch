@@ -37,7 +37,9 @@ dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor, dil::deleter_pt
 dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
   auto dil_buffer = cpu::ShadeDataContext::getDilStorage(tensor);
   auto data_type = dil_buffer.get_data_type();
-  if (dil_buffer.is_public_format() && !(data_type == dil::data_type::s8 || data_type == dil::data_type::u8)) {
+  if (dil_buffer.is_public_format() &&
+      dil_buffer.get_groups() <= 1 &&
+      !(data_type == dil::data_type::s8 || data_type == dil::data_type::u8)) {
     auto size = tensor.sizes().vec();
     auto stride = tensor.strides().vec();
     auto data_ptr = static_cast<void *>(
@@ -45,9 +47,7 @@ dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
         dil_buffer.get_item_size() * tensor.storage_offset());
 
     // return a new tensor wrapper that may be part of the dil storage
-    auto groups = dil_buffer.get_groups(); // copy group info
-    auto desc = dil::tensor::desc({size, data_type, stride}, groups);
-    dil::tensor result {desc, data_ptr};
+    dil::tensor result {size, data_type, stride, data_ptr};
 
     // copy workspace
     if (dil_buffer.has_workspace()) {
