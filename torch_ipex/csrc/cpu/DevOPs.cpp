@@ -4,6 +4,8 @@
 #include <ATen/CPUGenerator.h>
 #include <ATen/InferSize.h>
 #include <ATen/NamedTensorUtils.h>
+#include <ATen/ExpandUtils.h>
+#include <ATen/WrapDimUtils.h>
 #include <c10/util/Exception.h>
 #include <c10/util/Logging.h>
 #include <torch/csrc/autograd/function.h>
@@ -1912,12 +1914,13 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& s
 }
 
 
-at::Tensor dil_as_strided(
+at::Tensor AtenIpexCPUDev::dil_as_strided(
     const at::Tensor& self,
     at::IntArrayRef size,
     at::IntArrayRef stride,
     c10::optional<int64_t> storage_offset_) {
 
+  DEBUG("AtenIpexCPUDev::dil_as_strided\n");
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
       self.scalar_type() != at::kFloat || dbl::comm::try_gen_dil_tensor(self).is_public_format(),
       "Cannot set sizes and strides for DIL tensor with non-public format");
@@ -2324,6 +2327,56 @@ at::Tensor& AtenIpexCPUDev::dil_copy_(
     // TODO: We need add more LP here
   torch_ipex::set_ipex_func_status(torch_ipex::IPEXFuncStatus::IPEX_FALLBACK);
   return self;
+}
+
+at::Tensor AtenIpexCPUDev::dil_permute(const at::Tensor& self, at::IntArrayRef dims) {
+  DEBUG("AtenIpexCPUDev::dil_permute\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  // We do not support reshaping (viewing) a DIL tensor with blocked format
+  dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
+
+  // Port from aten/src/ATen/native/TensorShape.cpp
+  auto nDims = self.dim();
+  IPEX_CHECK(dims.size() == (size_t)nDims,
+           "number of dims don't match in permute");
+  auto oldSizes = self.sizes();
+  auto oldStrides = self.strides();
+  std::vector<int64_t> newSizes(nDims);
+  std::vector<int64_t> newStrides(nDims);
+  std::vector<bool> seen(nDims);
+  for (int64_t i = 0; i < nDims; i++) {
+    auto dim = at::maybe_wrap_dim(dims[i], nDims);
+    IPEX_CHECK(!seen[dim],
+             "repeated dim in permute");
+    seen[dim] = true;
+    newSizes[i] = oldSizes[dim];
+    newStrides[i] = oldStrides[dim];
+  }
+  return self.as_strided(newSizes, newStrides);
+}
+
+at::Tensor AtenIpexCPUDev::dil_expand(const at::Tensor& self, at::IntArrayRef size, bool implicit) {
+  DEBUG("AtenIpexCPUDev::dil_expand\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  // We do not support reshaping (viewing) a DIL tensor with blocked format
+  dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
+
+  // Port from aten/src/ATen/native/TensorShape.cpp
+  IPEX_CHECK(size.size() >= (size_t)self.dim(),
+           "expand(", self.toString(), "{", self.sizes(), "}, size=", size,
+           "): the number of sizes provided (", size.size(), ") ",
+           "must be greater or equal to the number of dimensions in the tensor (",
+           self.dim(), ")");
+
+  std::vector<int64_t> expandedSizes;
+  std::vector<int64_t> expandedStrides;
+  std::tie(expandedSizes, expandedStrides) = at::inferExpandGeometry(self.sizes(), self.strides(), size);
+
+  auto result = self.as_strided(expandedSizes, expandedStrides);
+  at::namedinference::propagate_names_for_expand(result, self);
+  return result;
 }
 
 }  // namespace cpu

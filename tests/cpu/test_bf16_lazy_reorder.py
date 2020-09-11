@@ -2075,5 +2075,66 @@ class TestFallbackOP(TestCase):
                 self.assertTrue(str(unpacked.device) == ipex.DEVICE)
                 self.assertTrue(str(lengths_out.device) == 'cpu')
 
+class TestPermute(TestCase):
+    def test_permute(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x_auto_mix = torch.randn(3, 4, 5, dtype=torch.float32, device=device) * 10
+        permute_x_auto_mix = copy.deepcopy(x_auto_mix).to(device=device)
+        permute_x_man_mix = copy.deepcopy(x_auto_mix).to(device=device).to(torch.bfloat16)
+
+        with AutoDNNL(True), AutoMixPrecision(False):
+            res_man_bf16 = permute_x_man_mix + permute_x_man_mix
+            self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
+            res_permute_man = res_man_bf16.permute(0, 2, 1)
+            self.assertEqual(res_permute_man.dtype, torch.bfloat16)
+            sum_permute_man = res_permute_man + res_permute_man
+            self.assertEqual(sum_permute_man.dtype, torch.bfloat16)
+
+            with AutoMixPrecision(True):
+                res_auto_mix = permute_x_auto_mix + permute_x_auto_mix
+                self.assertEqual(res_auto_mix.dtype, torch.float)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
+                res_permute_auto = res_auto_mix.permute(0, 2, 1)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_permute_auto))
+                self.assertEqual(res_permute_auto.dtype, torch.float)
+                self.assertEqual(res_permute_auto, res_permute_man.float())
+                sum_permute_auto = res_permute_auto  + res_permute_auto
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(sum_permute_auto))
+                self.assertEqual(sum_permute_auto.dtype, torch.float)
+                self.assertEqual(sum_permute_auto, sum_permute_man.float())
+
+class TestExpand(TestCase):
+    def test_expand(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x_auto_mix = torch.randn(3, 4, 5, dtype=torch.float32, device=device) * 10
+        expand_x_auto_mix = copy.deepcopy(x_auto_mix).to(device=device)
+        expand_x_man_mix = copy.deepcopy(x_auto_mix).to(device=device).to(torch.bfloat16)
+
+        with AutoDNNL(True), AutoMixPrecision(False):
+            res_man_bf16 = expand_x_man_mix + expand_x_man_mix
+            self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
+            res_expand_man = res_man_bf16.expand(2, 3, 4, 5)
+            self.assertEqual(res_expand_man.dtype, torch.bfloat16)
+            sum_expand_man = res_expand_man + res_expand_man
+            self.assertEqual(sum_expand_man.dtype, torch.bfloat16)
+
+            with AutoMixPrecision(True):
+                res_auto_mix = expand_x_auto_mix + expand_x_auto_mix
+                self.assertEqual(res_auto_mix.dtype, torch.float)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
+                res_expand_auto = res_auto_mix.expand(2, 3, 4, 5)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_expand_auto))
+                self.assertEqual(res_expand_auto.dtype, torch.float)
+                self.assertEqual(res_expand_auto, res_expand_man.float())
+                sum_expand_auto = res_expand_auto + res_expand_auto
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(sum_expand_auto))
+                self.assertEqual(sum_expand_auto.dtype, torch.float)
+                self.assertEqual(sum_expand_auto, sum_expand_man.float())
+
+
 if __name__ == '__main__':
     test = unittest.main()

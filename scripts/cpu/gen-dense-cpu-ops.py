@@ -77,6 +77,10 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)',
     # 'aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)',
     'aten::_pack_padded_sequence(Tensor input, Tensor lengths, bool batch_first) -> (Tensor, Tensor)'
+    'aten::permute(Tensor(a) self, int[] dims) -> Tensor(a)',
+    'aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> Tensor(a)',
+    'aten::expand(Tensor(a) self, int[] size, *, bool implicit=False) -> Tensor(a)',
+
 ]
 
 _FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG = [
