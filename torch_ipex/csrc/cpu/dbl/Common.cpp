@@ -296,8 +296,7 @@ void reorder_to_public(const at::Tensor& tensor, bool remain_dtype) {
   bool is_public_format = dil_buffer.is_public_format();
   bool is_public_dtype = !cpu::ShadeDataContext::isTensorMixPrecision(tensor);
 
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
-      is_public_dtype && (aten_dtype == at::kFloat || aten_dtype == at::kBFloat16) || !is_public_dtype && aten_dtype == at::kFloat)
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(is_public_dtype || (!is_public_dtype && aten_dtype == at::kFloat));
 
   bool should_reorder_format = !is_public_format;
   bool should_reorder_dtype = !is_public_dtype && !remain_dtype;

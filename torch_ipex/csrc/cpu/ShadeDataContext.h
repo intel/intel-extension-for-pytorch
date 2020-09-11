@@ -201,12 +201,11 @@ struct ShadeDataContext {
   static inline bool isTensorMixPrecision(const at::Tensor &tensor) {
     auto dil_tensor_type = getDilStorage(tensor).get_data_type();
     auto aten_tensor_type = tensor.scalar_type();
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(aten_tensor_type == at::kFloat || aten_tensor_type == at::kBFloat16
-        || aten_tensor_type == at::kByte || aten_tensor_type == at::kChar);
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dil_tensor_type == dil::data_type::bf16 || dil_tensor_type == dil::data_type::f32
+    if (aten_tensor_type != at::kFloat) {
+      return false;
+    }
+    auto res = (dil_tensor_type == dil::data_type::bf16 
         || dil_tensor_type == dil::data_type::u8 || dil_tensor_type == dil::data_type::s8);
-    auto res = (dil_tensor_type == dil::data_type::bf16 || dil_tensor_type == dil::data_type::u8
-        || dil_tensor_type == dil::data_type::s8) && aten_tensor_type == at::kFloat ;
 
     // Check mix_precision
     void *raw_context = tensor.storage().data_ptr().get_context();

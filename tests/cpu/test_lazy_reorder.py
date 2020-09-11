@@ -153,6 +153,7 @@ class TestDeonv(TestCase):
 
 class TestBinaryOp(TestCase):
     def test_add(self):
+        # rand_seed = 1599794793172034560: AssertionError: tensor(1.5259e-05) not less than or equal to 1e-05
         ipex.core.enable_auto_dnnl()
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
