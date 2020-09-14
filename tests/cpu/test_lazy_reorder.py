@@ -105,8 +105,8 @@ class TestConv(TestCase):
         res_dpcpp = self._seq_conf(device, rand_seed)
         self.assertEqual(res_cpu, res_dpcpp.to('cpu'))
 
-class TestDeonv(TestCase):
-    def test_Deonv2d_with_cpu(self):
+class TestDeconv(TestCase):
+    def test_Deconv2d_with_cpu(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -150,6 +150,41 @@ class TestDeonv(TestCase):
         ipex.core.enable_auto_dnnl()
         res_dpcpp = self._seq_conf(device, rand_seed)
         self.assertEqual(res_cpu, res_dpcpp.to('cpu'))
+    
+    def test_Deconv2d_backward(self):
+        rand_seed = int(get_rand_seed())
+
+        # rand_seed = 1600072517315694592 # weight.grad AssertionError: tensor(1.9073e-05) not less than or equal to 1e-05
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        
+        ipex.core.enable_auto_dnnl()
+        
+        input = torch.rand(2, 10, 8, 8)
+        for bias in [False, True]:
+        # for bias in [False]:
+            input_cpu = input.clone().requires_grad_()
+            input_dpcpp = input.clone().to(device=device).requires_grad_()
+            conv_cpu = nn.ConvTranspose2d(10, 10,
+                                            kernel_size=4, stride=2, bias=bias)
+            conv_dpcpp = copy.deepcopy(conv_cpu).to(device=device)
+            out_cpu = conv_cpu(input_cpu).sum()
+            out_dpcpp = conv_dpcpp(input_dpcpp).sum()
+            out_cpu.backward()
+            out_dpcpp.backward()
+
+            self.assertEqual(input_cpu.grad, input_dpcpp.grad)
+
+
+            # print(conv_cpu.weight.grad[1][2][0])
+            # print(conv_dpcpp.weight.grad[1][2][0])
+            # print(bias)
+            # TODO threshold
+            self.assertEqual(conv_cpu.weight.grad, conv_dpcpp.weight.grad, 2e-5)
+            if bias:
+                self.assertEqual(conv_cpu.bias.grad, conv_dpcpp.bias.grad)
+            
+            
 
 class TestBinaryOp(TestCase):
     def test_add(self):

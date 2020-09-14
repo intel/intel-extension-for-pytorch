@@ -215,6 +215,38 @@ class TestDeconv(TestCase):
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_bf16))
                 self.assertEqual(res_man_bf16.float(), res_auto_bf16.float(), 1e-2)
 
+    def test_Deconv2d_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        
+        input = torch.rand(2, 10, 8, 8)
+        # for bias in [True, False]:
+        for bias in [False]:
+            _deconv = torch.nn.ConvTranspose2d(10, 10,
+                                            kernel_size=4, stride=2, bias=bias)
+            deconv_man_bf16 =copy.deepcopy(_deconv).to(device=device).to(torch.bfloat16)
+            deconv_auto_mix =copy.deepcopy(_deconv).to(device=device)
+            _in_cpu = input.clone().requires_grad_()
+            in_auto_mix = input.clone().to(device=device).requires_grad_()
+            in_man_bf16 = input.clone().to(device=device).to(torch.bfloat16).requires_grad_()
+            out_cpu = _deconv(_in_cpu).sum()
+            out_cpu.backward()
+            with AutoDNNL(True), AutoMixPrecision(False, train=True):
+                out_man_bf16 = deconv_man_bf16(in_man_bf16).sum()
+                out_man_bf16.backward()
+                self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
+                self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 1e-2)
+
+                with AutoMixPrecision(True, train=True):
+                    self.assertEqual(in_auto_mix.dtype, torch.float)
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(in_auto_mix))
+                    out_auto_bf16 = deconv_auto_mix(in_auto_mix).sum()
+                    out_auto_bf16.backward()
+                    self.assertTrue(ipex.core.is_bf16_dil_tensor(in_auto_mix.grad))
+                    self.assertEqual(in_man_bf16.grad.float(), in_auto_mix.grad.float())
+
+
 class TestBatchNorm(TestCase):
     def test_batch_norm2d(self):
         rand_seed = int(get_rand_seed())
