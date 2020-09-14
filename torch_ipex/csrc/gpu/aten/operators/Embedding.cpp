@@ -16,6 +16,8 @@ namespace impl {
 template <typename T>
 class embedding_dense_backeward_dpcpp_ker {};
 template <typename T>
+class embedding_dense_backeward_dpcpp_ker_scale {};
+template <typename T>
 class embedding_dense_backeward_dpcpp_idx_cnt_ker {};
 
 template <typename scalar_t>
@@ -34,19 +36,21 @@ static inline void embedding_backward_dpcpp_kernel(
   static const auto rw_mode = DPCPP::access::mode::discard_read_write;
   static const auto gbuffer_target = DPCPP::access::target::global_buffer;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  auto row_num_weights = numel_weights / stride;
-  DPCPP::buffer<uint32_t, 1> idx_cnt(DPCPP::range<1>{(size_t)row_num_weights});
+  
+  if (scale_grad_by_freq) {
+    auto row_num_weights = numel_weights / stride;
+    DPCPP::buffer<int64_t, 1> idx_cnt(DPCPP::range<1>{(size_t)row_num_weights});
+    
+    auto cgf_fill = DPCPP_Q_CGF(cgh) {
+      auto idx_cnt_acc = idx_cnt.get_access<rw_mode>(cgh);
+      cgh.template fill(idx_cnt_acc, static_cast<int64_t>(0));
+    };
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_fill);
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    int64_t rng, GRange, tileSize;
-
-    // KER1: calc indices count for each
-    auto idx_data = get_buffer<read_mode>(cgh, indices_data);
-
-    if (scale_grad_by_freq) {
-      auto idx_cnt_acc = idx_cnt.get_access<write_mode>(cgh);
-      cgh.template fill(idx_cnt_acc, static_cast<uint32_t>(0));
-      DPCPP::accessor<uint32_t, 1, atomic_rw_mode, gbuffer_target> idx_cnt_ptr(
+    auto cgf_scale = DPCPP_Q_CGF(cgh) {
+      int64_t rng, GRange, tileSize;
+      auto idx_data = get_buffer<read_mode>(cgh, indices_data);
+      DPCPP::accessor<int64_t, 1, atomic_rw_mode, gbuffer_target> idx_cnt_ptr(
           idx_cnt, cgh, DPCPP::range<1>(row_num_weights), 0);
 
       parallel_for_setup(num_indices, tileSize, rng, GRange);
@@ -56,13 +60,48 @@ static inline void embedding_backward_dpcpp_kernel(
           [=](DPCPP::nd_item<1> item) {
             int64_t gid = item.get_global_linear_id();
             auto idx_ptr = get_pointer(idx_data);
-            if (gid < num_indices)
+            if (gid < num_indices) {
               idx_cnt_ptr[idx_ptr[gid]].fetch_add(static_cast<uint32_t>(1));
+            }
           });
-    }
+    };
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf_scale);
 
-    // KER2: calc gradient weight
-    auto idx_cnt_acc = idx_cnt.get_access<read_mode>(cgh);
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      int64_t rng, GRange, tileSize;
+      auto idx_cnt_acc = idx_cnt.get_access<read_mode>(cgh);
+      auto idx_data = get_buffer<read_mode>(cgh, indices_data);
+      auto g_data = get_buffer<read_mode>(cgh, grad_data);
+      auto gw_data = get_buffer<rw_mode>(cgh, grad_weight_data);
+
+      parallel_for_setup(stride, tileSize, rng, GRange);
+      cgh.parallel_for<embedding_dense_backeward_dpcpp_ker_scale<scalar_t>>(
+          DPCPP::nd_range<1>(DPCPP::range<1>(GRange), DPCPP::range<1>(tileSize)),
+          [=](DPCPP::nd_item<1> item) {
+            int64_t gid = item.get_global_linear_id();
+            if (gid < stride) {
+              auto idx_ptr = get_pointer(idx_data);
+              auto g_ptr = get_pointer(g_data);
+              auto gw_ptr = get_pointer(gw_data);
+              for (int nidx = 0; nidx < num_indices; nidx++) {
+                auto idx = idx_ptr[nidx];
+                // TODO: remove branch to optimize performance ?
+                if (idx != padding_idx) {
+                    gw_ptr[gid + idx * stride] += static_cast<scalar_t>(
+                        g_ptr[gid + nidx * stride] * 1.0 /
+                        (scalar_t)idx_cnt_acc[idx]);
+                }
+              }
+            }
+          });
+    };
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+
+  } else {
+
+    auto cgf = DPCPP_Q_CGF(cgh) {
+    int64_t rng, GRange, tileSize;
+    auto idx_data = get_buffer<read_mode>(cgh, indices_data);
     auto g_data = get_buffer<read_mode>(cgh, grad_data);
     auto gw_data = get_buffer<rw_mode>(cgh, grad_weight_data);
 
@@ -76,34 +115,18 @@ static inline void embedding_backward_dpcpp_kernel(
             auto g_ptr = get_pointer(g_data);
             auto gw_ptr = get_pointer(gw_data);
             for (int nidx = 0; nidx < num_indices; nidx++) {
-              auto idx = idx_ptr[nidx] /* - TH_INDEX_BASE*/;
+              auto idx = idx_ptr[nidx];
               // TODO: remove branch to optimize performance ?
               if (idx != padding_idx) {
-                // TODO: remove branch to optimize performance ?
-                if (scale_grad_by_freq) {
-                  gw_ptr[gid + idx * stride] += static_cast<scalar_t>(
-                      g_ptr[gid + nidx * stride] * 1.0 /
-                      (scalar_t)idx_cnt_acc[idx]);
-                } else {
                   gw_ptr[gid + idx * stride] +=
                       static_cast<scalar_t>(g_ptr[gid + nidx * stride]);
-                }
               }
             }
           }
         });
-  };
-
-  // launch kernel
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
-
-  // auto idx_cnt_host_acc = idx_cnt.get_access<read_mode>();
-  // printf("idx_cnt [1]-%d [2]-%d [3]-%d [4]-%d [5]-%d [6]-%d [7]-%d [8]-%d
-  // [9]-%d [10]-%d\n",
-  //     idx_cnt_host_acc[0], idx_cnt_host_acc[1], idx_cnt_host_acc[2],
-  //     idx_cnt_host_acc[3], idx_cnt_host_acc[4], idx_cnt_host_acc[5],
-  //     idx_cnt_host_acc[6], idx_cnt_host_acc[7], idx_cnt_host_acc[8],
-  //     idx_cnt_host_acc[9]);
+    };
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+  }
 }
 
 Tensor embedding_dense_backward_dpcpp(
