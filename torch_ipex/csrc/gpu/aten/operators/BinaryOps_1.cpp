@@ -79,7 +79,6 @@ Tensor& add_out(
     const Tensor& _other,
     Scalar alpha) {
   Tensor self, other;
-#if ENABLE_ONEDNN_SUM
   if (1.0 == alpha.to<float>() &&
       _self.defined() &&
       _other.defined() &&
@@ -91,13 +90,10 @@ Tensor& add_out(
     oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
     return result;
   } else {
-#endif
     result = to_plain_if_needed(result);
     self = to_plain_if_needed(_self);
     other = to_plain_if_needed(_other);
-#if ENABLE_ONEDNN_SUM
   }
-#endif
 
   auto iter = TensorIterator::binary_op(
       result,

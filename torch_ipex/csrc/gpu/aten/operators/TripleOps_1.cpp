@@ -21,7 +21,7 @@ static void mul_add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.dtype(),
-      "mul_add_",
+      "mul_add",
       [&]() {
         auto alpha = alpha_scalar.to<scalar_t>();
         dpcpp_kernel_for_tensor_iter<SyclOpMulAdd>(
@@ -30,37 +30,93 @@ static void mul_add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
             });
       });
 }
+
+// Basic checking for all input tensors.
+static inline void dim_check(
+    const Tensor& self,
+    const Tensor& other,
+    const Tensor& accumu) {
+  int64_t self_ndims = self.ndimension();
+  int64_t other_ndims = other.ndimension();
+  int64_t accumu_ndims = accumu.ndimension();
+
+  TORCH_CHECK(
+      self_ndims == other_ndims || other_ndims == accumu_ndims,
+      "The dimensions of three inputs tensor not equal is not supported. ");
 }
+
+static bool opaque_check(
+    const Tensor& self,
+    const Tensor& other,
+    const Tensor& accumu) {
+  auto self_ctx =
+      at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(self);
+  auto other_ctx =
+      at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(other);
+  auto accumu_ctx =
+      at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(accumu);
+  int64_t self_padded_numel =
+      DPCPPTensorContext(nullptr, self_ctx.meta()).padded_size();
+  int64_t other_padded_numel =
+      DPCPPTensorContext(nullptr, other_ctx.meta()).padded_size();
+  int64_t accumu_padded_numel =
+      DPCPPTensorContext(nullptr, accumu_ctx.meta()).padded_size();
+
+  if (self_ctx.is_plain() && other_ctx.is_plain() && accumu_ctx.is_plain())
+    return false;
+
+  if ((self_padded_numel != 0 && self_padded_numel != self.numel()) ||
+      (other_padded_numel != 0 && other_padded_numel != other.numel()) ||
+      (accumu_padded_numel != 0 && accumu_padded_numel != accumu.numel()))
+    return false;
+
+  return true;
+}
+
+} // impl
 
 Tensor mul_add(
     const Tensor& self,
     const Tensor& other,
     const Tensor& accumu,
     Scalar alpha) {
-  Tensor _self, _other, _accumu;
-  Tensor result = at::empty({0}, accumu.options());
-  // TODO: support to propagate block fmt
-#if 0
-  if ((!DPCPPTensorContext::is_plain(self) ||
-      !DPCPPTensorContext::is_plain(other) ||
-      !DPCPPTensorContext::is_plain(accumu)) &&
-      (self_ctx.padded_size() == self.numel() &&
-       other_ctx.padded_size() == other.numel() &&
-       bias_ctx.padded_size() == accumu.numel())
-     ) {
-    // reorder blocked format for plain format
-    // self
-    // other
-    // bias
+  impl::dim_check(self, other, accumu);
+  Tensor _self, _other, _accumu, result;
+  if (impl::opaque_check(self, other, accumu)) {
+    std::vector<Tensor> inputs = {self, other, accumu};
+    std::vector<Tensor> _inputs;
 
+    Tensor tar;
+    for (int i = 0; i < inputs.size(); ++i) {
+      if (DPCPPTensorConvertor::is_opaque_tensor(inputs[i])) {
+        tar = inputs[i];
+        break;
+      }
+    }
+
+    auto tar_ctx = *(static_cast<DPCPPTensorContext*>(
+        tar.unsafeGetTensorImpl()->storage().data_ptr().get_context()));
+
+    for (int i = 0; i < inputs.size(); ++i) {
+      if (!tar.is_same(inputs[i])) {
+        auto cur = empty_opaque_tensor(
+            tar_ctx.meta(), inputs[i].options(), c10::nullopt);
+        AtenIpexTypeDPCPP::DPCPPTensorConvertor::convert(cur, inputs[i]);
+        _inputs.push_back(cur);
+      } else {
+        _inputs.push_back(tar);
+      }
+    }
+    _self = _inputs.at(0);
+    _other = _inputs.at(1);
+    _accumu = _inputs.at(2);
+    result = empty_opaque_tensor(tar_ctx.meta(), tar.options(), c10::nullopt);
   } else {
-#endif
     _self = to_plain_if_needed(self);
     _other = to_plain_if_needed(other);
     _accumu = to_plain_if_needed(accumu);
-#if 0
+    result = at::empty_like(self);
   }
-#endif
 
   auto iter = TensorIterator();
   iter.set_check_mem_overlap(true);

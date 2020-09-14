@@ -161,6 +161,23 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
+      "dpcpp::mul_add(Tensor self, Tensor other, Tensor accumu, Scalar alpha) -> Tensor",
+      [] (const Node* node) ->Operation {
+        return [] (Stack& stack) {
+          auto result = torch::jit::dpcpp::mul_add(
+              (std::move(peek(stack, 0, 4))).toTensor(),
+              (std::move(peek(stack, 1, 4))).toTensor(),
+              (std::move(peek(stack, 2, 4))).toTensor(),
+              (std::move(peek(stack, 3, 4))).toScalar()
+          );
+          drop(stack, 4);
+          pack(stack, std::move(result));
+          return 0;
+        };
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
       "dpcpp::q_conv2d_sum_relu(Tensor input, Tensor packed_weight, int[2] stride, int[2] padding, int[2] dilation, int groups, float conv_scale, int conv_zpoint, Tensor(a!) accumu, *, float sum_scale, int sum_zpoint) -> Tensor(a!)",
       [] (const Node* node) ->Operation {
         return [] (Stack& stack) {

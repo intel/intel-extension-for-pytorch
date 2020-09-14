@@ -42,6 +42,11 @@ at::Tensor conv2d_relu(
       input, weight, bias, stride, padding, dilation, false, {{0, 0}}, groups);
 }
 
+at::Tensor mul_add(const at::Tensor& self,
+    const at::Tensor& other, const at::Tensor& accumu, at::Scalar alpha) {
+  return at::AtenIpexTypeDPCPP::mul_add(self, other, accumu, alpha);
+}
+
 at::Tensor q_conv2d_sum_relu(at::Tensor& accumu,
     const at::Tensor& input, const at::Tensor& packed_weight,
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
