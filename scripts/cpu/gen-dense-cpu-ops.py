@@ -74,11 +74,13 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
     'aten::_unsafe_view(Tensor self, int[] size) -> Tensor',
     'aten::native_layer_norm(Tensor input, Tensor? weight, Tensor? bias, int M, int N, float eps) -> (Tensor, Tensor, Tensor)',
-    'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)'
+    'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)',
+    'aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)',
 ]
 
 _FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
+    'aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)',
 ]
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
@@ -321,7 +323,10 @@ class DenseOPCodeGen(object):
         if fname.endswith('_'):
             assert len(dnnl_tensor_param_vars) > 0
             code += '      if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors)) {\n'
-            code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(list(param_vars)))
+            if self.is_ipex_func(aten_func_sig_str):
+                code += self.gen_ipex_func_code(fname, param_vars)
+            else:
+                code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(list(param_vars)))
             code += '      }\n' # Check support tensors
         else:
             param_seq_str_vec = []
@@ -331,12 +336,7 @@ class DenseOPCodeGen(object):
             code += '      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {\n'
 
             if self.is_ipex_func(aten_func_sig_str):
-                code += '        auto _result = AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))
-                code += '        if (is_ipex_func_success()) {\n'
-                code += '          return _result;\n'
-                code += '        } else {\n'
-                code += '          reset_ipex_func_status();\n'
-                code += '        }\n'
+                code += self.gen_ipex_func_code(fname, param_seq_str_vec)
             else:
                 code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))
 
@@ -349,6 +349,16 @@ class DenseOPCodeGen(object):
         code += '  }\n\n'
 
 
+        return code
+
+    def gen_ipex_func_code(self, fname, param_vars):
+        code = ''
+        code += '        auto _result = AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_vars))
+        code += '        if (is_ipex_func_success()) {\n'
+        code += '          return _result;\n'
+        code += '        } else {\n'
+        code += '          reset_ipex_func_status();\n'
+        code += '        }\n'
         return code
 
     def gen_fallback_prepare_code(self, cpp_sig):

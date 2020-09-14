@@ -12,6 +12,9 @@ namespace bf16 {
 
 at::Tensor gen_consistent_tensor(const at::Tensor & self) {
   // Reorder dil buffer to public because aten tensor does not support blocked format
+  if (!ShadeDataContext::isDilTensor(self)){
+    return bridge::shallowFallbackToCPUTensor(self);
+  }
   dbl::comm::reorder_to_public(self, /*keep data type*/true);
 
   dil::tensor& self_dil_storage = ShadeDataContext::getDilStorage(self);

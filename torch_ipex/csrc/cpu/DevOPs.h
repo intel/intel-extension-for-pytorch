@@ -82,6 +82,8 @@ class AtenIpexCPUDev {
   static at::Tensor dil_index_select(const at::Tensor & self, int64_t dim, const at::Tensor & index);
   static at::Tensor dil__unsafe_view(const at::Tensor & self, at::IntArrayRef size);
   static at::Tensor dil_shuffle(const at::Tensor & self, at::IntArrayRef view_shape, int64_t dim0, int64_t dim1);
+  static at::Tensor& dil_copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
+
 };
 
 }  // namespace cpu
