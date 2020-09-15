@@ -27,7 +27,6 @@ class AtenIpexTypeExt {
   static at::Tensor adaptive_avg_pool2d(at::Tensor const& input, at::IntArrayRef output_size);
   static at::Tensor max_pool2d(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode);
   static at::Tensor max_pool3d(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode);
-  static at::Tensor reshape(const at::Tensor& input, at::IntArrayRef size);
 };
 
 }  // namespace torch_ipex

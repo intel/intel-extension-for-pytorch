@@ -547,12 +547,6 @@ at::Tensor AtenIpexTypeExt::max_pool3d(const at::Tensor &input,
   return std::get<0>(ret);
 }
 
-at::Tensor AtenIpexTypeExt::reshape(const at::Tensor &input,
-                                    at::IntArrayRef size) {
-  return cpu::AtenIpexCPUDev::dil_reshape(
-      input.is_contiguous() ? input : input.contiguous(), size);
-}
-
 } // namespace torch_ipex
 
 namespace {

@@ -119,10 +119,6 @@ void InitIpexModuleBindings(py::module m) {
           return AtenIpexTypeExt::embedding_bag_backward(grad, indices, offsets, offset2bag, bag_size, maximum_indices, num_weights, scale_grad_by_freq, mode, sparse, per_sample_weights);
         });
 
-  m.def("reshape",
-        [](const at::Tensor& input, at::IntArrayRef size) {
-          return AtenIpexTypeExt::reshape(input, size);
-        });
   m.def("mlp_forward", &AtenIpexTypeMLPExt::forward);
   m.def("mlp_backward", &AtenIpexTypeMLPExt::backward);
   m.def("mlp_create_handle", &AtenIpexTypeMLPExt::create_handle);
