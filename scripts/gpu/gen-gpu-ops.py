@@ -101,6 +101,7 @@ _FN_BLKFMT_SUPPORTED = set([
     'add_out',
     'avg_pool2d',
     'avg_pool2d_out',
+    '_adaptive_avg_pool2d',
     'max_pool2d_with_indices',
     'max_pool2d_with_indices_out',
 ])
