@@ -425,9 +425,9 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
   dnnl_input_tensors.push_back(grad_output);
   if (check_auto_dnnl()) {
     if (!dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
-      // TODO fallback
-      IPEX_CHECK(false, "convolution backward fallback not support for dnnl path now");
+      IPEX_CHECK(false, "convolution backward fallback not supported when dnnl check fails in dnnl path");
     } else if (transposed) {
+      // TODO: do we need output padding here???
       return AtenIpexCPUDev::dil_deconvolution_backward(
         input.is_contiguous() ? input : input.contiguous(),
         grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
@@ -450,11 +450,9 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
     }
   } else {
     if (!dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
-      // TODO
-      IPEX_CHECK(false, "convolution backward fallback not support for native path now");
+      IPEX_CHECK(false, "convolution backward fallback not supported when dnnl check fails in native path");
     } else if (transposed) {
-      // TODO
-      IPEX_CHECK(false, "deconv backward fallback unimplemented for native path");
+      return AtenIpexCPUDev::cpu_deconvolution_backward(input, grad_output, weight, padding, output_padding, stride, dilation, groups, output_mask);
     } else {
       return AtenIpexCPUDev::mkldnn_convolution_backward(input, grad_output, weight, padding, stride, dilation, groups, output_mask);
     }
@@ -474,6 +472,84 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::mkldnn_convolution_
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_result = at::mkldnn_convolution_backward(_ipex_self.contiguous(), _ipex_grad_output.contiguous(), _ipex_weight.contiguous(), padding, stride, dilation, groups, output_mask);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
+  return std::tuple<at::Tensor,at::Tensor,at::Tensor>(bridge::shallowUpgradeToDPCPPTensor(std::get<0>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<1>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<2>(_ipex_result)));
+}
+
+std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::cpu_deconvolution_backward(const at::Tensor & self, const at::Tensor & grad_output, const at::Tensor & weight, at::IntArrayRef padding, at::IntArrayRef output_padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups, std::array<bool,3> output_mask) {
+  DEBUG("AtenIpexCPUDev::cpu_deconvolution_backward\n");
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_output.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_output.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
+  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
+  auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
+  auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
+
+  auto dim = self.ndimension();
+  auto kernel_size = weight.sizes().slice(2);
+
+  // the case where groups != 1:
+  //    we think the only case possible is that: deconvolution_forward falls into dnnl path and deconvolution_backward falls into here (cpu path), 
+  //    in this case, we should:
+  //        1). slice _ipex_grad_output, _ipex_self and _ipex_weight according to groups;
+  //        2). call at::slow_conv_transpose2d_backward or at::slow_conv_transpose3d_backward on the sliced tensors 
+  //            (since these two functions only support groups = 1) to calculate g_input, g_weight and g_bias
+  //        3). cat g_input, g_weight and g_bias in each group and return
+  //     unimplemented for the moment
+  // 
+  // the case where groups == 1:
+  //    1. the original groups is set to 1 by the user and deconvolution_forward falls into dnnl path while deconvolution_backward falls into cpu path
+  //    2. the original groups is larger than 1 and decovolution_forward and deconvolution_backward both fall into cpu path:
+  //        In cpu path, decovolution_forward will do the following (when groups != 1):
+  //    
+  //        pytorch/aten/src/ATen/native/Convolution.cpp
+  //        std::vector<Tensor> outputs(params.groups);
+  //        input = input.contiguous();
+  //        for (int g = 0; g < params.groups; ++g) {
+  //          auto input_g = subtensor(input, 1, params.groups, g);
+  //          auto weight_g = subtensor(weight, 0, params.groups, g);
+  //          auto bias_g = subtensor(bias, 0, params.groups, g);
+  //          outputs[g] = at::_convolution_nogroup(
+  //              input_g, weight_g, bias_g, params.stride, params.padding, params.dilation, params.transposed, params.output_padding);
+  //        }
+  //        output = at::cat(outputs, 1);
+  //        
+  //        TODO: UT to CHECK the groups value in this case
+  //        In this case, when reaching convolution_backward here, the groups should already be 1 (??? or groups still larger than 1, but grad_ouput, weight and self are the sliced version)
+  //  
+  IPEX_CHECK(groups == 1, "deconvolution backward fallback only support no group deconv");
+  IPEX_CHECK(dim == 4 || dim == 5, "deconvolution backward fallback only support 2d or 3d deconv");
+
+  auto _ipex_result = std::tuple<at::Tensor,at::Tensor,at::Tensor>();
+  if (dim == 4) {
+    _ipex_result = at::slow_conv_transpose2d_backward(
+      _ipex_grad_output.contiguous(), 
+      _ipex_self.contiguous(), 
+      _ipex_weight.contiguous(), 
+      kernel_size, 
+      stride, 
+      padding, 
+      output_padding, 
+      dilation, 
+      empty_like(_ipex_grad_output, at::MemoryFormat::Contiguous), 
+      empty_like(_ipex_grad_output, at::MemoryFormat::Contiguous), 
+      output_mask);
+  } else {
+    _ipex_result = at::slow_conv_transpose3d_backward(
+      _ipex_grad_output.contiguous(), 
+      _ipex_self.contiguous(), 
+      _ipex_weight.contiguous(), 
+      kernel_size, 
+      stride, 
+      padding, 
+      output_padding, 
+      dilation, 
+      empty_like(_ipex_grad_output, at::MemoryFormat::Preserve), 
+      empty_like(_ipex_grad_output, at::MemoryFormat::Preserve), 
+      output_mask);
+  }
   return std::tuple<at::Tensor,at::Tensor,at::Tensor>(bridge::shallowUpgradeToDPCPPTensor(std::get<0>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<1>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<2>(_ipex_result)));
 }
 
