@@ -194,12 +194,15 @@ class TestDeconv(TestCase):
 
         _deconv = torch.nn.ConvTranspose2d(2, 3, (3, 3))
 
-        deconv_man_bf16 =copy.deepcopy(_deconv).to(device=device).to(torch.bfloat16)
-        deconv_auto_mix =copy.deepcopy(_deconv).to(device=device)
+        deconv_man_bf16 = copy.deepcopy(_deconv).to(device=device).to(torch.bfloat16)
+        deconv_auto_mix = copy.deepcopy(_deconv).to(device=device)
+        deconv_auto_mix_train =copy.deepcopy(_deconv).to(device=device)
 
         _in_cpu = torch.rand((1, 2, 7, 7))
         in_auto_mix = _in_cpu.to(device=device)
         in_man_bf16 = in_auto_mix.to(torch.bfloat16)
+
+        in_auto_mix_train = _in_cpu.to(device=device)
 
         res_cpu_fp32 = _deconv(_in_cpu)
 
@@ -215,14 +218,20 @@ class TestDeconv(TestCase):
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_bf16))
                 self.assertEqual(res_man_bf16.float(), res_auto_bf16.float(), 1e-2)
 
+            with AutoMixPrecision(True, train=True):
+                self.assertEqual(in_auto_mix_train.dtype, torch.float)
+                self.assertFalse(ipex.core.is_bf16_dil_tensor(in_auto_mix_train))
+                res_auto_bf16_train = deconv_auto_mix_train(in_auto_mix_train)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_bf16_train))
+                self.assertEqual(res_man_bf16.float(), res_auto_bf16_train.float(), 1e-2)
+
     def test_Deconv2d_backward(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         
         input = torch.rand(2, 10, 8, 8)
-        # for bias in [True, False]:
-        for bias in [False]:
+        for bias in [True, False]:
             _deconv = torch.nn.ConvTranspose2d(10, 10,
                                             kernel_size=4, stride=2, bias=bias)
             deconv_man_bf16 =copy.deepcopy(_deconv).to(device=device).to(torch.bfloat16)
@@ -244,6 +253,8 @@ class TestDeconv(TestCase):
                     out_auto_bf16 = deconv_auto_mix(in_auto_mix).sum()
                     out_auto_bf16.backward()
                     self.assertTrue(ipex.core.is_bf16_dil_tensor(in_auto_mix.grad))
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(deconv_auto_mix.weight))
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(deconv_auto_mix.weight.grad))
                     self.assertEqual(in_man_bf16.grad.float(), in_auto_mix.grad.float())
 
 

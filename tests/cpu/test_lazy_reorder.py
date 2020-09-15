@@ -162,7 +162,6 @@ class TestDeconv(TestCase):
         
         input = torch.rand(2, 10, 8, 8)
         for bias in [False, True]:
-        # for bias in [False]:
             input_cpu = input.clone().requires_grad_()
             input_dpcpp = input.clone().to(device=device).requires_grad_()
             conv_cpu = nn.ConvTranspose2d(10, 10,
@@ -175,10 +174,6 @@ class TestDeconv(TestCase):
 
             self.assertEqual(input_cpu.grad, input_dpcpp.grad)
 
-
-            # print(conv_cpu.weight.grad[1][2][0])
-            # print(conv_dpcpp.weight.grad[1][2][0])
-            # print(bias)
             # TODO threshold
             self.assertEqual(conv_cpu.weight.grad, conv_dpcpp.weight.grad, 2e-5)
             if bias:

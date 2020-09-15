@@ -242,13 +242,15 @@ at::Tensor AtenIpexCPUDev::dil_deconvolution(
 
   if (bias.defined()) {
     CHECK_DNNL_OP_PRE_COND(bias);
-    dbl::comm::reorder_to_bf16_for_mix_prec(bias);
+    dbl::comm::reorder_to_bf16_for_mix_prec(bias, true);
     dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(weight);
-  dbl::deconv::prepack_deconv_weights(
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight, true);
+  if (!(check_auto_mix_bf16_fp32() && check_train())) {
+    dbl::deconv::prepack_deconv_weights(
       input, weight, stride, padding, output_padding, dilation, groups, bias.defined());
+  }
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
   dil::tensor dil_output = dbl::deconv::deconvolution_impl(
@@ -322,7 +324,8 @@ std::tuple<at::Tensor, at::Tensor> dil_deconvolution_backward_weights(
             padding.vec(),
             padding.vec(),
             dilation.vec(),
-            groups);
+            groups,
+            diff_weight_type);
         return std::make_tuple(
             dbl::comm::gen_aten_tensor_by(std::move(dil_grad_weight)),
             dbl::comm::gen_aten_tensor_by(std::move(dil_grad_bias)));
@@ -336,7 +339,8 @@ std::tuple<at::Tensor, at::Tensor> dil_deconvolution_backward_weights(
             padding.vec(),
             padding.vec(),
             dilation.vec(),
-            groups);
+            groups, 
+            diff_weight_type);
         return std::make_tuple(
             dbl::comm::gen_aten_tensor_by(std::move(dil_grad_weight)),
             at::Tensor());
@@ -358,7 +362,7 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_deconvolution_b
     CHECK_DNNL_OP_PRE_COND(weight);
     dbl::comm::reorder_to_bf16_for_mix_prec(input);
     dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
-    dbl::comm::reorder_to_bf16_for_mix_prec(weight);
+    dbl::comm::reorder_to_bf16_for_mix_prec(weight, true);
 
     at::Tensor grad_input, grad_weight, grad_bias;
     if (output_mask[0]) {
