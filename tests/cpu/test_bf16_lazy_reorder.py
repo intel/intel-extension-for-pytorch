@@ -1956,31 +1956,5 @@ class TestSave(TestCase):
             torch.save(output_dpcpp, 'tensor_dpcpp.pt')
             self.assertEqual(torch.load('tensor.pt'), torch.load('tensor_dpcpp.pt'))
 
-class TestCopy_(TestCase):
-    def test_copy_(self):
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        self_auto_mix = torch.randn(3, 4, 5, dtype=torch.float32, device=device) * 10
-        self_man_mix = (torch.randn(3, 4, 5, device=device) * 10).to(torch.bfloat16)
-        src_auto_mix = torch.randn(3, 4, 5, dtype=torch.float32, device=device) * 10
-        copy_src_auto_mix = copy.deepcopy(src_auto_mix).to(device=device)
-        copy_src_man_mix = copy.deepcopy(src_auto_mix).to(device=device).to(torch.bfloat16)
-
-        with AutoDNNL(True), AutoMixPrecision(False):
-            res_man_bf16 = copy_src_man_mix + copy_src_man_mix
-            self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
-            self_man_mix.copy_(res_man_bf16)
-            self.assertEqual(self_man_mix.dtype, torch.bfloat16)
-
-            with AutoMixPrecision(True):
-                res_auto_mix = copy_src_auto_mix + copy_src_auto_mix
-                self.assertEqual(res_auto_mix.dtype, torch.float)
-                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
-                self_auto_mix.copy_(res_auto_mix)
-                self.assertTrue(ipex.core.is_bf16_dil_tensor(self_auto_mix))
-                self.assertEqual(self_auto_mix.dtype, torch.float)
-                self.assertEqual(self_auto_mix, self_man_mix.float())
-
 if __name__ == '__main__':
     test = unittest.main()
