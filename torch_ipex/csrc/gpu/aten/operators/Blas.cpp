@@ -34,10 +34,12 @@ void mkldnnGemmImpl(
     scalar_t alpha,
     const Tensor& m1_,
     const Tensor& m2_,
+    const Tensor& b_,
     bool with_relu) {
   Tensor result = computecpp_workaround(result_);
   Tensor m1 = computecpp_workaround(m1_);
   Tensor m2 = computecpp_workaround(m2_);
+  Tensor b = computecpp_workaround(b_);
 #else
 template <typename scalar_t>
 void mkldnnGemmImpl(
@@ -46,6 +48,7 @@ void mkldnnGemmImpl(
     scalar_t alpha,
     const Tensor& m1,
     const Tensor& m2,
+    const Tensor& b,
     bool with_relu) {
 #endif
   size_t dims = result.dim();
@@ -70,6 +73,7 @@ void mkldnnGemmImpl(
   memory::desc m1_md;
   memory::desc m2_md;
   memory::desc r_md;
+  memory::desc b_md;
   if (dims == 2) {
     m1_md = memory::desc({m, k}, m1_dt, {m1.stride(0), m1.stride(1)});
     m2_md = memory::desc({k, n}, m2_dt, {m2.stride(0), m2.stride(1)});
@@ -87,7 +91,7 @@ void mkldnnGemmImpl(
   post_ops po;
   if (alpha != 1.f)
     attr.set_output_scales(/* mask */ 0, {(float)alpha});
-  if (beta != 0.f)
+  if (beta != 0.f && (beta != 1.f || m1.is_quantized() || m2.is_quantized()))
     po.append_sum(beta);
   if (with_relu)
     po.append_eltwise(1.f, dnnl::algorithm::eltwise_relu, 0.f, 0.f);;
@@ -123,7 +127,21 @@ void mkldnnGemmImpl(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   std::shared_ptr<dnnl::matmul::desc> matmul_desc;
-  matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
+  if (beta == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
+    auto b_dt = dt_to_dnnl(b.scalar_type());
+    if (b.sizes() != result.sizes()) {
+      dnnl::memory::dims b_dims(result.sizes().size() - 1, 1);
+      b_dims.push_back(n);
+      b_md = memory::desc(
+          b_dims, b_dt, result.sizes().size() ==  2 ?
+          dnnl::memory::format_tag::ab : dnnl::memory::format_tag::abc);
+    } else {
+      b_md = r_md;
+    }
+    matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, b_md, r_md));
+  } else {
+    matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
+  }
   std::shared_ptr<dnnl::matmul::primitive_desc> matmul_pd;
   matmul_pd.reset(new dnnl::matmul::primitive_desc(*matmul_desc, attr, engine));
   std::shared_ptr<dnnl::matmul> matmul_p;
@@ -135,10 +153,16 @@ void mkldnnGemmImpl(
 
   auto r_memory = dpcpp_onednn_memory(r_md, engine, result.data_ptr());
 
-
-  DPCPP_ONEDNN_EXEC(*matmul_p, strm,
-    {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
-      {DNNL_ARG_DST, r_memory}});
+  if (beta == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
+    auto b_memory = dpcpp_onednn_memory(b_md, engine, b.data_ptr());
+    DPCPP_ONEDNN_EXEC(*matmul_p, strm,
+      {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
+        {DNNL_ARG_BIAS, b_memory}, {DNNL_ARG_DST, r_memory}});
+  } else {
+    DPCPP_ONEDNN_EXEC(*matmul_p, strm,
+      {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
+        {DNNL_ARG_DST, r_memory}});
+  }
 
 #if defined(USE_COMPUTECPP)
   if (!result_.is_same(result))
@@ -190,10 +214,11 @@ void gemm_broadcast(Tensor& result,
   } else {
     result_shape = std::vector<int64_t>{m1.size(0), m1.size(1), m2_unpack.size(2)};
   }
-  if (bias.defined() && beta) {
+
+  Tensor bc_bias = bias;
+  if (bias.defined() && beta && (beta != 1.f || m1.is_quantized())) {
     TORCH_CHECK(check_broadcast(bias, result_shape),
                 "bias ", bias.sizes(), " cannot broadcast to ", result_shape);
-    Tensor bc_bias;
     std::tie(bc_bias) = expand_size(bias, result_shape, "gemm_broadcast");
     if (!result.is_same(bc_bias))
       result.resize_(bc_bias.sizes()).copy_(bc_bias);
@@ -201,7 +226,7 @@ void gemm_broadcast(Tensor& result,
     result.resize_(result_shape);
   }
 
-  mkldnnGemmImpl<scalar_t>(result, beta, alpha, m1, m2_unpack, with_relu);
+  mkldnnGemmImpl<scalar_t>(result, beta, alpha, m1, m2_unpack, bc_bias, with_relu);
 }
 } // namespace impl
 
@@ -217,7 +242,7 @@ Tensor& addmm_(
   TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(self.size(0) ==  m1.size(0) && self.size(1) == m2.size(1),
               "size mismatch input ", self.sizes(), " m1 ", m1.sizes(), " m2 ", m2.sizes());
- 
+
   IPEX_DISPATCH_ALL_TYPES_AND2(
     at::ScalarType::Half,
     at::ScalarType::BFloat16,
