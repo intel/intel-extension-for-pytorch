@@ -83,7 +83,21 @@ Tensor mul_add(
   impl::dim_check(self, other, accumu);
   Tensor _self, _other, _accumu, result;
   if (impl::opaque_check(self, other, accumu)) {
-    std::vector<Tensor> inputs = {self, other, accumu};
+    std::vector<Tensor> inputs;
+    inputs.push_back(self);
+
+    // align shape
+    if (self.numel() != other.numel())
+      inputs.push_back(other.expand_as(self).contiguous());
+    else
+      inputs.push_back(other);
+
+    if (self.numel() != accumu.numel())
+      inputs.push_back(accumu.expand_as(self).contiguous());
+    else
+      inputs.push_back(accumu);
+
+    // align format
     std::vector<Tensor> _inputs;
 
     Tensor tar;

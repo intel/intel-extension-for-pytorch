@@ -5,9 +5,6 @@ import torch_ipex
 import pytest
 
 
-torch._C._jit_set_profiling_mode(False)
-torch._C._jit_set_profiling_executor(False)
-
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("dpcpp")
 
@@ -21,6 +18,9 @@ class M(torch.nn.Module):
 
 class TestJITMethod(TestCase):
     def test_fusion(self, dtype=torch.float):
+        torch._C._jit_set_profiling_mode(False)
+        torch._C._jit_set_profiling_executor(False)
+
         a = torch.randn((1, 2, 3, 3), dtype=torch.float, device=dpcpp_device)
         b = torch.randn((1, 2, 3, 3), dtype=torch.float, device=dpcpp_device)
         c = torch.randn((1, 2, 3, 3), dtype=torch.float, device=dpcpp_device)
