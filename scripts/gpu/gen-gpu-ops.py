@@ -104,6 +104,9 @@ _FN_BLKFMT_SUPPORTED = set([
     '_adaptive_avg_pool2d',
     'max_pool2d_with_indices',
     'max_pool2d_with_indices_out',
+    'quantize_per_tensor',
+    'quantize_per_channel',
+    'dequantize',
 ])
 
 _FN_BLACKLIST_REGEX = [

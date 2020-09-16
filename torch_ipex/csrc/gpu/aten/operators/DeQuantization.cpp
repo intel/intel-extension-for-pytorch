@@ -46,8 +46,13 @@ Tensor dequantize_tensor_per_tensor_affine(
   memory::format_tag q_fmt = qtensor.dim() == 4
       ? memory::format_tag::nchw
       : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
-  memory::desc q_md = memory::desc(q_dims, q_dt, q_fmt);
-  memory q_m = dpcpp_onednn_memory(q_md, q_eng, qtensor.data_ptr());
+
+  auto q_md = memory::desc(q_dims, q_dt, q_fmt);
+  auto q_ctx =
+      at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(qtensor);
+  auto q_m = q_ctx.is_plain()
+      ? dpcpp_onednn_memory(q_md, q_eng, qtensor.data_ptr())
+      : dpcpp_onednn_memory({q_ctx.meta()}, q_eng, qtensor.data_ptr());
 
   memory::dims r_dims = q_dims;
   memory::data_type r_dt = dt_to_dnnl(rtensor.scalar_type());

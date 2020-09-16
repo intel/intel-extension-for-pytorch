@@ -8,15 +8,15 @@ using namespace mkldnn;
 namespace at {
 namespace dpcpp {
 
-template <typename data_type, bool use_bias>
-void mkldnn_inner_product(
+void inner_product(
     int M,
     int N,
     int K,
-    data_type* output,
-    data_type* input,
-    data_type* weight,
-    data_type* bias) {
+    void* output,
+    void* input,
+    void* weight,
+    Tensor bias,
+    bool use_bias) {
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
@@ -43,38 +43,38 @@ void mkldnn_inner_product(
 
   if (use_bias) {
     ipFwd_desc.reset(new inner_product_forward::desc(
-        prop_kind::forward, input_md, weight_md, bias_md, output_md));
+        prop_kind::forward_inference, input_md, weight_md, bias_md, output_md));
   } else {
     ipFwd_desc.reset(new inner_product_forward::desc(
-        prop_kind::forward, input_md, weight_md, output_md));
+        prop_kind::forward_inference, input_md, weight_md, output_md));
   }
   auto ip_forward_pd =
       inner_product_forward::primitive_desc(*ipFwd_desc, engine);
 
-  auto input_usr_memory = memory({{{input_tz}, data_t, format_nc}, engine});
-  sycl_set_mkldnn_buffer(input, input_usr_memory);
-
-  auto weight_usr_memory = memory({{{weight_tz}, data_t, format_oi}, engine});
-  sycl_set_mkldnn_buffer(weight, weight_usr_memory);
-
-  auto output_usr_memory = memory({{{output_tz}, data_t, format_nc}, engine});
-  sycl_set_mkldnn_buffer(output, output_usr_memory);
+  auto input_usr_memory =
+      dpcpp_onednn_memory({{input_tz}, data_t, format_nc}, engine, input);
+  auto weight_usr_memory =
+      dpcpp_onednn_memory({{weight_tz}, data_t, format_oi}, engine, weight);
+  auto output_usr_memory =
+      dpcpp_onednn_memory({{output_tz}, data_t, format_nc}, engine, output);
 
   auto strm = GpuStreamManager::Instance().get_stream();
   std::shared_ptr<inner_product_forward> ip_forward;
-  std::shared_ptr<memory> bias_usr_memory;
+  memory bias_usr_memory;
   if (use_bias) {
-    bias_usr_memory.reset(new memory({{{bias_tz}, data_t, format_x}, engine}));
-    sycl_set_mkldnn_buffer(bias, *bias_usr_memory);
+    bias_usr_memory = dpcpp_onednn_memory(
+        {{bias_tz}, data_t, format_x}, engine, bias.data_ptr());
   } else {
-    bias_usr_memory.reset(new memory({{{}, data_t, format_x}, engine}));
+    bias_usr_memory = memory({{{}, data_t, format_x}, engine});
   }
 
   ip_forward.reset(new inner_product_forward(ip_forward_pd));
-  DPCPP_ONEDNN_EXEC(*ip_forward, strm,
+  DPCPP_ONEDNN_EXEC(
+      *ip_forward,
+      strm,
       {{MKLDNN_ARG_SRC, input_usr_memory},
        {MKLDNN_ARG_WEIGHTS, weight_usr_memory},
-       {MKLDNN_ARG_BIAS, *bias_usr_memory},
+       {MKLDNN_ARG_BIAS, bias_usr_memory},
        {MKLDNN_ARG_DST, output_usr_memory}});
 }
 } // namespace dpcpp

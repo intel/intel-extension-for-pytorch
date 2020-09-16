@@ -25,11 +25,18 @@ at::Tensor dpcppLinearPrepack(Tensor weight, c10::optional<Tensor> bias) {
   return at::cpp_custom_type_hack::create(std::move(ret_ptr), weight.options());
 }
 
-static auto registry = c10::RegisterOperators().op(
-    "quantized::linear_prepack(Tensor W, Tensor? B=None) -> Tensor W_prepack",
-    c10::RegisterOperators::options()
-        .kernel<decltype(dpcppLinearPrepack), &dpcppLinearPrepack>(
-            DispatchKey::QuantizedDPCPPTensorId));
+static auto registry =
+    c10::RegisterOperators()
+        .op("quantized::linear_prepack(Tensor W, Tensor? B=None) -> Tensor "
+            "W_prepack",
+            c10::RegisterOperators::options()
+                .kernel<decltype(dpcppLinearPrepack), &dpcppLinearPrepack>(
+                    DispatchKey::QuantizedDPCPPTensorId))
+        .op("quantized::linear_prepack(Tensor W, Tensor? B=None) -> Tensor "
+            "W_prepack",
+            c10::RegisterOperators::options()
+                .kernel<decltype(dpcppLinearPrepack), &dpcppLinearPrepack>(
+                    DispatchKey::DPCPPTensorId));
 
 } // namespace AtenIpexTypeDPCPP
 } // namespace at

@@ -2,12 +2,11 @@
 
 #include <ATen/ATen.h>
 
-#include <core/DPCPPUtils.h>
-#include <core/Runtime.h>
-#include <core/Memory.h>
 #include <core/Allocator.h>
+#include <core/DPCPPUtils.h>
+#include <core/Memory.h>
+#include <core/Runtime.h>
 #include <dnnl.hpp>
-
 
 using namespace at::dpcpp;
 
@@ -21,33 +20,41 @@ using data_t = void*;
 namespace at {
 namespace AtenIpexTypeDPCPP {
 
-at::Tensor empty(at::IntArrayRef size,
-                 const at::TensorOptions & options,
-                 c10::optional<at::MemoryFormat> memory_format);
+at::Tensor empty(
+    at::IntArrayRef size,
+    const at::TensorOptions& options,
+    c10::optional<at::MemoryFormat> memory_format);
 
 // creating oneDNN memory object by these ctx data, when reorder is needed.
 struct DPCPPTensorContext {
-public:
+ public:
   using Meta = meta_t;
 
-private:
+ private:
   data_t data_;
   meta_t meta_;
+  std::vector<float> scales_;
+  std::vector<int> zero_points_;
 
-public:
+ public:
   DPCPPTensorContext() = delete;
 
-  DPCPPTensorContext(const DPCPPTensorContext& ctx) :
-      data_(ctx.data()), meta_(ctx.meta()) {}
+  DPCPPTensorContext(const DPCPPTensorContext& ctx)
+      : data_(ctx.data()),
+        meta_(ctx.meta()),
+        scales_(ctx.scales()),
+        zero_points_(ctx.zero_points()) {}
 
   // plain tensor
-  DPCPPTensorContext(data_t data) :
-      data_(data), meta_({}, mem_dtype_t::undef, mem_layout_tag_t::undef) {}
+  DPCPPTensorContext(data_t data)
+      : data_(data),
+        meta_({}, mem_dtype_t::undef, mem_layout_tag_t::undef),
+        scales_({1.f}),
+        zero_points_({0}) {}
 
   // block or plain tensor
-  DPCPPTensorContext(data_t data, const meta_t& meta) :
-      data_(data),
-      meta_(meta) {}
+  DPCPPTensorContext(data_t data, const meta_t& meta)
+      : data_(data), meta_(meta), scales_({1.f}), zero_points_({0}) {}
 
   int64_t padded_size() {
     if (is_plain())
@@ -80,11 +87,10 @@ public:
   }
 
   bool is_plain() {
-    if (meta_.dims().size() == 0 &&
-        meta_.data_type() == mem_dtype_t::undef) {
+    if (meta_.dims().size() == 0 && meta_.data_type() == mem_dtype_t::undef) {
       return true;
-    } else if (meta_.dims().size() != 0 &&
-               meta_.data_type() != mem_dtype_t::undef) {
+    } else if (
+        meta_.dims().size() != 0 && meta_.data_type() != mem_dtype_t::undef) {
       return false;
     } else {
       TORCH_CHECK(1, "fail to check tensor meta ...");
@@ -100,12 +106,34 @@ public:
     meta_ = meta;
   }
 
-  data_t data() const { return data_; }
-  meta_t meta() const { return meta_; }
-  mem_dims_t dims() const { return meta_.dims(); }
-  mem_dtype_t dtype() const { return meta_.data_type(); }
+  void set_scales(std::vector<float> scales) {
+    scales_ = scales;
+  }
 
-public:
+  void set_zero_points(std::vector<int> zero_points) {
+    zero_points_ = zero_points;
+  }
+
+  data_t data() const {
+    return data_;
+  }
+  meta_t meta() const {
+    return meta_;
+  }
+  mem_dims_t dims() const {
+    return meta_.dims();
+  }
+  mem_dtype_t dtype() const {
+    return meta_.data_type();
+  }
+  std::vector<float> scales() const {
+    return scales_;
+  }
+  std::vector<int> zero_points() const {
+    return zero_points_;
+  }
+
+ public:
   static bool is_plain(const at::Tensor& t) {
     if (!t.defined())
       return true;
@@ -114,46 +142,58 @@ public:
   }
 
   static DPCPPTensorContext release_tensor_ctx(const at::Tensor& t) {
-    return *(DPCPPTensorContext*)t.unsafeGetTensorImpl()->
-        storage().unsafeGetStorageImpl()->data_ptr().release_context();
+    return *(DPCPPTensorContext*)t.unsafeGetTensorImpl()
+                ->storage()
+                .unsafeGetStorageImpl()
+                ->data_ptr()
+                .release_context();
   }
 
   static DPCPPTensorContext get_tensor_ctx(const at::Tensor& t) {
-    return *(DPCPPTensorContext*)t.unsafeGetTensorImpl()->
-        storage().unsafeGetStorageImpl()->data_ptr().get_context();
+    return *(DPCPPTensorContext*)t.unsafeGetTensorImpl()
+                ->storage()
+                .unsafeGetStorageImpl()
+                ->data_ptr()
+                .get_context();
   }
 
   // set underlying tensor context to given `const` tensor
-  static void set_tensor_ctx(
-      const at::Tensor& t, DPCPPTensorContext&& _ctx) {
-    data_t cur_raw_data = t.unsafeGetTensorImpl()->
-        storage().unsafeGetStorageImpl()->data_ptr().get();
+  static void set_tensor_ctx(const at::Tensor& t, DPCPPTensorContext&& _ctx) {
+    data_t cur_raw_data = t.unsafeGetTensorImpl()
+                              ->storage()
+                              .unsafeGetStorageImpl()
+                              ->data_ptr()
+                              .get();
     data_t tag_raw_data = _ctx.data();
 
     auto tag_ctx = new DPCPPTensorContext(_ctx);
-    at::DataPtr tag_dptr(tag_ctx->data(),
-                         tag_ctx,
-                         getDPCPPDeviceAllocator()->raw_deleter(),
-                         t.device().type());
+    at::DataPtr tag_dptr(
+        tag_ctx->data(),
+        tag_ctx,
+        getDPCPPDeviceAllocator()->raw_deleter(),
+        t.device().type());
 
     // release raw data to avoid auto-free after data_ptr dtor
-    DPCPPTensorContext* cur_ctx =
-        (DPCPPTensorContext*)t.unsafeGetTensorImpl()->
-        storage().unsafeGetStorageImpl()->data_ptr().release_context();
+    DPCPPTensorContext* cur_ctx = (DPCPPTensorContext*)t.unsafeGetTensorImpl()
+                                      ->storage()
+                                      .unsafeGetStorageImpl()
+                                      ->data_ptr()
+                                      .release_context();
 
     // swap and old data_ptr dtor
-    t.unsafeGetTensorImpl()->
-        storage().unsafeGetStorageImpl()->set_data_ptr(std::move(tag_dptr));
+    t.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->set_data_ptr(
+        std::move(tag_dptr));
 
     // t->data == ctx->data. raw data is released and reclaim in new data_ptr
-    // t->data != ctx->data. old raw data is released and should be deleted by us
+    // t->data != ctx->data. old raw data is released and should be deleted by
+    // us
     if (cur_raw_data != tag_raw_data)
       getDPCPPDeviceAllocator()->raw_deleter()(cur_ctx);
   }
 };
 
 class DPCPPTensorConvertor {
-public:
+ public:
   static bool is_opaque_tensor(const at::Tensor& t) {
     auto ctx = *(static_cast<DPCPPTensorContext*>(
         t.unsafeGetTensorImpl()->storage().data_ptr().get_context()));
@@ -175,8 +215,8 @@ public:
     auto opaque_ctx = from_is_opaque_tensor ? from_ctx : to_ctx;
     mem_desc_t opaque_md = {opaque_ctx.meta().data};
     // FIXME: to decide AB or BA plain format
-    mem_desc_t plain_md =
-        {opaque_ctx.dims(), opaque_ctx.dtype(), opaque_ctx.get_plain_tag()};
+    mem_desc_t plain_md = {
+        opaque_ctx.dims(), opaque_ctx.dtype(), opaque_ctx.get_plain_tag()};
     mem_desc_t from_md = from_is_opaque_tensor ? opaque_md : plain_md;
     mem_desc_t to_md = to_is_opaque_tensor ? opaque_md : plain_md;
 
@@ -193,7 +233,7 @@ public:
 
   static at::Tensor to_plain(const at::Tensor& from) {
     if (!is_opaque_tensor(from))
-       return from;
+      return from;
 
     auto ctx = *(static_cast<DPCPPTensorContext*>(
         from.unsafeGetTensorImpl()->storage().data_ptr().get_context()));
@@ -206,9 +246,7 @@ public:
       if (opaque_md == plain_md) {
         Tensor to = at::empty(ctx.dims(), from.options(), c10::nullopt);
         dpcppMemoryCopyType(
-            to.data_ptr<int64_t>(),
-            (int32_t*)from.data_ptr(),
-            from.numel());
+            to.data_ptr<int64_t>(), (int32_t*)from.data_ptr(), from.numel());
         return to;
       }
     }
@@ -225,9 +263,7 @@ public:
     if (from.scalar_type() == at::ScalarType::Long) {
       Tensor to_ = at::empty(ctx.dims(), from.options(), c10::nullopt);
       dpcppMemoryCopyType(
-          to_.data_ptr<int64_t>(),
-          to.data_ptr<int32_t>(),
-          to.numel());
+          to_.data_ptr<int64_t>(), to.data_ptr<int32_t>(), to.numel());
       to = to_;
     }
 
@@ -236,7 +272,7 @@ public:
 
   static at::Tensor to_plain_(at::Tensor& from) {
     if (!is_opaque_tensor(from))
-       return from;
+      return from;
 
     auto to = to_plain(from);
 

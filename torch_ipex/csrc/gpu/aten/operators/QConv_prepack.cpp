@@ -31,11 +31,16 @@ at::Tensor dpcppConvPrepack(
   return at::cpp_custom_type_hack::create(std::move(ret_ptr), weight.options());
 }
 
-static auto registry = c10::RegisterOperators().op(
-    "quantized::conv2d_prepack",
-    c10::RegisterOperators::options()
-        .kernel<decltype(dpcppConvPrepack), &dpcppConvPrepack>(
-            DispatchKey::QuantizedDPCPPTensorId));
+static auto registry =
+    c10::RegisterOperators()
+        .op("quantized::conv2d_prepack",
+            c10::RegisterOperators::options()
+                .kernel<decltype(dpcppConvPrepack), &dpcppConvPrepack>(
+                    DispatchKey::DPCPPTensorId))
+        .op("quantized::conv2d_prepack",
+            c10::RegisterOperators::options()
+                .kernel<decltype(dpcppConvPrepack), &dpcppConvPrepack>(
+                    DispatchKey::QuantizedDPCPPTensorId));
 
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
