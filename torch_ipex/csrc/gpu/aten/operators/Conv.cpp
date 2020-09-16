@@ -265,17 +265,24 @@ at::Tensor convolution(
   auto input_memory = input_usr_memory;
   Tensor input_;
   if (input_usr_memory.get_desc() != expected_input_md) {
-    input_ = at::AtenIpexTypeDPCPP::empty(
-        {expected_input_md.get_size() / input.itemsize()},
-        input.options(),
-        c10::nullopt);
-    input_memory =
-        dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
-    DPCPP_ONEDNN_EXEC(
-        reorder(input_usr_memory, input_memory),
-        strm,
-        input_usr_memory,
-        input_memory);
+    // avoid reorder in case of, [n][C][1][1][16c] <==> [n][c][1][1]
+    if (input.sizes().size() == 4 &&
+        input.size(2) == 1 && input.size(3) == 1) {
+      input_memory = dpcpp_onednn_memory(
+          expected_input_md, engine, input.data_ptr());
+    } else {
+      input_ = at::AtenIpexTypeDPCPP::empty(
+          {expected_input_md.get_size() / input.itemsize()},
+          input.options(),
+          c10::nullopt);
+      input_memory =
+          dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
+      DPCPP_ONEDNN_EXEC(
+          reorder(input_usr_memory, input_memory),
+          strm,
+          input_usr_memory,
+          input_memory);
+    }
   }
 
   auto expected_weight_md = conv_forward_pd->weights_desc();
