@@ -45,34 +45,6 @@ static inline void dim_check(
       "The dimensions of three inputs tensor not equal is not supported. ");
 }
 
-static bool opaque_check(
-    const Tensor& self,
-    const Tensor& other,
-    const Tensor& accumu) {
-  auto self_ctx =
-      at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(self);
-  auto other_ctx =
-      at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(other);
-  auto accumu_ctx =
-      at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(accumu);
-  int64_t self_padded_numel =
-      DPCPPTensorContext(nullptr, self_ctx.meta()).padded_size();
-  int64_t other_padded_numel =
-      DPCPPTensorContext(nullptr, other_ctx.meta()).padded_size();
-  int64_t accumu_padded_numel =
-      DPCPPTensorContext(nullptr, accumu_ctx.meta()).padded_size();
-
-  if (self_ctx.is_plain() && other_ctx.is_plain() && accumu_ctx.is_plain())
-    return false;
-
-  if ((self_padded_numel != 0 && self_padded_numel != self.numel()) ||
-      (other_padded_numel != 0 && other_padded_numel != other.numel()) ||
-      (accumu_padded_numel != 0 && accumu_padded_numel != accumu.numel()))
-    return false;
-
-  return true;
-}
-
 } // impl
 
 Tensor mul_add(
@@ -82,7 +54,7 @@ Tensor mul_add(
     Scalar alpha) {
   impl::dim_check(self, other, accumu);
   Tensor _self, _other, _accumu, result;
-  if (impl::opaque_check(self, other, accumu)) {
+  if (check_has_opaque_and_no_padding({self, other, accumu})) {
     std::vector<Tensor> inputs;
     inputs.push_back(self);
 
@@ -108,14 +80,18 @@ Tensor mul_add(
       }
     }
 
-    auto tar_ctx = *(static_cast<DPCPPTensorContext*>(
-        tar.unsafeGetTensorImpl()->storage().data_ptr().get_context()));
+    auto tar_ctx = AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(tar);
 
     for (int i = 0; i < inputs.size(); ++i) {
       if (!tar.is_same(inputs[i])) {
-        auto cur = empty_opaque_tensor(
-            tar_ctx.meta(), inputs[i].options(), c10::nullopt);
-        AtenIpexTypeDPCPP::DPCPPTensorConvertor::convert(cur, inputs[i]);
+        Tensor cur = inputs[i];
+        auto cur_ctx =
+            AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(cur);
+        if (cur_ctx.meta() != tar_ctx.meta()) {
+          cur = empty_opaque_tensor(
+              tar_ctx.meta(), inputs[i].options(), c10::nullopt);
+          AtenIpexTypeDPCPP::DPCPPTensorConvertor::convert(cur, inputs[i]);
+        }
         _inputs.push_back(cur);
       } else {
         _inputs.push_back(tar);

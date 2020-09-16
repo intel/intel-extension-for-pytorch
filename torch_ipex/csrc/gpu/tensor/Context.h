@@ -284,3 +284,25 @@ class DPCPPTensorConvertor {
 
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
+
+static bool
+check_has_opaque_and_no_padding(std::vector<at::Tensor> tlist) {
+  std::vector<at::AtenIpexTypeDPCPP::DPCPPTensorContext> ctx_list;
+  for (auto t : tlist)
+    ctx_list.push_back(
+        at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(t));
+
+  bool all_plain = true;
+  for (auto ctx : ctx_list)
+    all_plain = all_plain && ctx.is_plain();
+  if (all_plain) return false;
+
+  for (int i = 0; i < tlist.size(); i++) {
+    int64_t padded_numel = at::AtenIpexTypeDPCPP::DPCPPTensorContext(
+        nullptr, ctx_list.at(i).meta()).padded_size();
+    if (padded_numel != 0 && padded_numel != tlist.at(i).numel())
+      return false;
+  }
+
+  return true;
+}
