@@ -33,7 +33,7 @@ PYBIND11_MODULE(torch_ipex, m) {
       },
       "fused mul with add opt. on Intel device");
 
-#if defined(_PSTL_BACKEND_SYCL) && defined(USE_USM)
+#if defined(USE_PSTL) && defined(USE_USM)
   m.def("_usm_pstl_is_enabled",
         []() {return true;});
 #else

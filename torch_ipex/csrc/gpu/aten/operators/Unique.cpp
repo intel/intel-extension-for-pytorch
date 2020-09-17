@@ -8,11 +8,11 @@
 
 #include <utils/ATDispatch.h>
 
-#ifdef _PSTL_BACKEND_SYCL
-#include <dpstd/algorithm>
-#include <dpstd/execution>
-#include <dpstd/numeric>
-#include <dpstd/iterators.h>
+#ifdef USE_PSTL
+#include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/numeric>
+#include <oneapi/dpl/iterators.h>
 #endif
 using namespace at::dpcpp;
 template <typename scalar_t>
@@ -35,12 +35,12 @@ std::tuple<Tensor, Tensor, int64_t> compute_unique(
   equal_by_key_t equal_by_key,
   not_equal_t not_equal
 ) {
-#ifdef _PSTL_BACKEND_SYCL
+#ifdef USE_PSTL
   // inverse indices
   Tensor inverse_indices;
 #ifndef USE_USM
   auto data_buff = make_buffer<scalar_t>(data);
-  auto data_begin = dpstd::begin(data_buff);
+  auto data_begin = oneapi::dpl::begin(data_buff);
 #else
   auto data_begin = data;
 #endif
@@ -52,7 +52,7 @@ std::tuple<Tensor, Tensor, int64_t> compute_unique(
     int64_t *sorted_indices_ptr = sorted_indices.data_ptr<int64_t>();
 #ifndef USE_USM
     auto sorted_indices_buff = make_buffer<int64_t>(sorted_indices_ptr);
-    auto sorted_indices_begin = dpstd::begin(sorted_indices_buff);
+    auto sorted_indices_begin = oneapi::dpl::begin(sorted_indices_buff);
 #else
     auto sorted_indices_begin = sorted_indices_ptr;
 #endif
@@ -61,7 +61,7 @@ std::tuple<Tensor, Tensor, int64_t> compute_unique(
     int64_t* inv_loc_ptr = inv_loc.data_ptr<int64_t>();
 #ifndef USE_USM
     auto inv_loc_buff = make_buffer<int64_t>(inv_loc_ptr);
-    auto inv_loc_begin = dpstd::begin(inv_loc_buff);
+    auto inv_loc_begin = oneapi::dpl::begin(inv_loc_buff);
 #else
     auto inv_loc_begin = inv_loc_ptr;
 #endif
@@ -69,7 +69,7 @@ std::tuple<Tensor, Tensor, int64_t> compute_unique(
     inv_loc[0] = 0;
     std::inclusive_scan(policy, inv_loc_begin, inv_loc_begin + num_inp, inv_loc_begin);
 
-    auto zipped_begin = dpstd::make_zip_iterator(sorted_indices_begin, inv_loc_begin);
+    auto zipped_begin = oneapi::dpl::make_zip_iterator(sorted_indices_begin, inv_loc_begin);
     std::stable_sort(
       policy, zipped_begin, zipped_begin + num_inp, 
       [](auto lhs, auto rhs) {
@@ -90,21 +90,20 @@ std::tuple<Tensor, Tensor, int64_t> compute_unique(
     int64_t *range_ptr = range.data_ptr<int64_t>();
 #ifndef USE_USM
     auto range_buff = make_buffer<int64_t>(range_ptr);
-    auto range_begin = dpstd::begin(range_buff);
+    auto range_begin = oneapi::dpl::begin(range_buff);
 #else
-    //auto range_begin = dpstd::begin(range_ptr);
     auto range_begin = range_ptr;
 #endif
-    auto zipped_begin = dpstd::make_zip_iterator(data_begin, range_begin);
+    auto zipped_begin = oneapi::dpl::make_zip_iterator(data_begin, range_begin);
     num_out = std::unique(policy, zipped_begin, zipped_begin + num_inp, equal_by_key) - zipped_begin;
     range[num_out] = num_inp;
     counts.resize_(num_out);
     int64_t* counts_ptr = counts.data_ptr<int64_t>();
 #ifndef USE_USM
     auto counts_buff = make_buffer<int64_t>(counts_ptr);
-    auto counts_begin = dpstd::begin(counts_buff);
+    auto counts_begin = oneapi::dpl::begin(counts_buff);
 #else
-    //auto counts_begin = dpstd::begin(counts_ptr);
+    //auto counts_begin = oneapi::dpl::begin(counts_ptr);
     auto counts_begin = counts_ptr;
 #endif
     std::adjacent_difference(policy, range_begin + 1, range_begin + num_out + 1, counts_begin);
@@ -121,9 +120,9 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
   const bool return_inverse,
   const bool return_counts
 ) {
-#ifdef _PSTL_BACKEND_SYCL
+#ifdef USE_PSTL
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  auto policy = dpstd::execution::make_device_policy<Unique_Dpcpp_Kernel<scalar_t>>(dpcpp_queue);
+  auto policy = oneapi::dpl::execution::make_device_policy<Unique_Dpcpp_Kernel<scalar_t>>(dpcpp_queue);
 
   auto options = self.options().dtype(kLong);
   Tensor output = self.clone().reshape(-1);
@@ -131,7 +130,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
   scalar_t* output_data = output.data_ptr<scalar_t>();
 #ifndef USE_USM
   auto output_buff = make_buffer<scalar_t>(output_data);
-  auto output_begin = dpstd::begin(output_buff);
+  auto output_begin = oneapi::dpl::begin(output_buff);
 #else
   auto output_begin = output_data;
 #endif
@@ -146,11 +145,11 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
       int64_t *sorted_indices_ptr = sorted_indices.data_ptr<int64_t>();
 #ifndef USE_USM
       auto sorted_indices_buff = make_buffer<int64_t>(sorted_indices_ptr);
-      auto sorted_indices_begin = dpstd::begin(sorted_indices_buff);
+      auto sorted_indices_begin = oneapi::dpl::begin(sorted_indices_buff);
 #else
       auto sorted_indices_begin = sorted_indices_ptr;
 #endif
-      auto zipped_begin = dpstd::make_zip_iterator(output_begin, sorted_indices_begin);
+      auto zipped_begin = oneapi::dpl::make_zip_iterator(output_begin, sorted_indices_begin);
       std::stable_sort(
         policy, zipped_begin, zipped_begin + num_inp, 
         [](auto lhs, auto rhs) {
@@ -204,9 +203,9 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
   const bool return_inverse,
   const bool return_counts
 ) {
-#if defined(_PSTL_BACKEND_SYCL) && defined(USE_USM)
+#if defined(USE_PSTL) && defined(USE_USM)
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  auto policy = dpstd::execution::make_device_policy<Unique_Dpcpp_Kernel<scalar_t>>(dpcpp_queue);
+  auto policy = oneapi::dpl::execution::make_device_policy<Unique_Dpcpp_Kernel<scalar_t>>(dpcpp_queue);
 
   auto sizes = self.sizes().vec();
   auto num_zero_dims = std::count(sizes.begin(), sizes.end(), 0);

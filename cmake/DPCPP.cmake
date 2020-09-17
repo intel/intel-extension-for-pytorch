@@ -70,91 +70,41 @@ if(INTEL_SYCL_VERSION)
     if(NOT SYCL_LIBRARY)
         message(FATAL_ERROR "SYCL library not found")
     endif()
+    include_directories(${SYCL_INCLUDE_DIR})
+    include_directories(${SYCL_INCLUDE_DIR}/../)
 
     # Find the OpenCL library from the SYCL distribution
     find_library(OpenCL_LIBRARY
-        NAMES "OpenCL"
-        HINTS ${sycl_root_hints}
-        PATH_SUFFIXES lib
-        NO_DEFAULT_PATH)
+            NAMES "OpenCL"
+            HINTS ${sycl_root_hints}
+            PATH_SUFFIXES lib
+            NO_DEFAULT_PATH)
     if(NOT OpenCL_LIBRARY)
-        message(FATAL_ERROR "OpenCL library not found")
+        message(WARNING "OpenCL library not found")
     endif()
     set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
 
     if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${OpenCL_INCLUDE_DIR})
         include_directories(${OpenCL_INCLUDE_DIR})
     endif()
-    include_directories(${SYCL_INCLUDE_DIR})
 
     #find LevelZero
     find_path(LevelZero_INCLUDE_DIR
-        NAMES level_zero/ze_api.h
-        PATH_SUFFIXES include)
+            NAMES level_zero/ze_api.h
+            PATH_SUFFIXES include)
 
     find_library(LevelZero_LIBRARY
-        NAMES level_zero
-        PATHS
-        PATH_SUFFIXES lib/x64 lib lib64)
+            NAMES level_zero
+            PATHS
+            PATH_SUFFIXES lib/x64 lib lib64)
 
     if (NOT LevelZero_LIBRARY)
-      message(STATUS "LevelZero library not found")
+        message(WARNING "LevelZero library not found")
     else()
-      set(LevelZero_LIBRARIES ${LevelZero_LIBRARY})
-      set(LevelZero_INCLUDE_DIRS ${LevelZero_INCLUDE_DIR})
+        set(LevelZero_LIBRARIES ${LevelZero_LIBRARY})
+        set(LevelZero_INCLUDE_DIRS ${LevelZero_INCLUDE_DIR})
     endif()
 
-    #TODO: remove TBB
-    find_path(TBB_INCLUDE_DIRS
-            NAMES tbb
-            PATHS ${INTELONEAPIROOT}/tbb/latest $ENV{INTELONEAPIROOT}/tbb/latest
-            PATH_SUFFIXES include
-            NO_DEFAULT_PATH)
-
-    find_package_handle_standard_args(TBB
-            FOUND_VAR TBB_FOUND
-            REQUIRED_VARS TBB_INCLUDE_DIRS)
-    if(NOT ${TBB_FOUND})
-        message(WARNING "TBB not found. No PSTL")
-        return()
-    endif()
-
-    #add pstl lib
-    # Try to find PSTL header from DPC++
-    find_path(PSTL_INCLUDE_DIRS
-            NAMES dpstd
-            PATHS ${sycl_root_hints}
-            PATH_SUFFIXES include
-            NO_DEFAULT_PATH)
-
-    find_package_handle_standard_args(PSTL
-            FOUND_VAR PSTL_FOUND
-            REQUIRED_VARS PSTL_INCLUDE_DIRS)
-    if(${PSTL_FOUND})
-      set(USE_PSTL ON)
-      find_library(TBB_LIBRARY
-              NAMES tbb
-              HINTS ${INTELONEAPIROOT}/tbb/latest $ENV{INTELONEAPIROOT}/tbb/latest
-              PATH_SUFFIXES lib/intel64/gcc4.8
-              NO_DEFAULT_PATH)
-      if(NOT TBB_LIBRARY)
-          message(FATAL_ERROR "TBB library not found")
-      endif()
-      list(APPEND EXTRA_SHARED_LIBS ${TBB_LIBRARY})
-
-      if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${PSTL_INCLUDE_DIRS})
-          include_directories(${PSTL_INCLUDE_DIRS})
-      endif()
-
-      if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${TBB_INCLUDE_DIRS})
-          include_directories(${TBB_INCLUDE_DIRS})
-      endif()
-
-      message(STATUS "TBB directors " ${TBB_INCLUDE_DIRS})
-    else()
-      message(WARNING "PSTL not found. No PSTL")
-    endif()
-    set(TBB_FOUND)
 else()
     # ComputeCpp-specific flags
     # 1. Ignore the warning about undefined symbols in SYCL kernels - comes from

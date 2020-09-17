@@ -18,11 +18,11 @@
 #include "Loops.h"
 #include "ParttenScan.h"
 
-#ifdef _PSTL_BACKEND_SYCL
-#include <dpstd/algorithm>
-#include <dpstd/execution>
-#include <dpstd/numeric>
-#include <dpstd/iterator>
+#ifdef USE_PSTL
+#include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/numeric>
+#include <oneapi/dpl/iterator>
 #endif
 
 using namespace at::dpcpp;
@@ -168,7 +168,7 @@ struct NonZeroOp {
   }
 };
 
-#ifdef _PSTL_BACKEND_SYCL
+#ifdef USE_PSTL
 template <typename Iterator>
 class strided_range
 {
@@ -190,8 +190,8 @@ public:
     }
   };
 
-  typedef typename dpstd::counting_iterator<difference_type>                   CountingIterator;
-  typedef typename dpstd::transform_iterator<stride_functor, CountingIterator> TransformIterator;
+  typedef typename oneapi::dpl::counting_iterator<difference_type>                   CountingIterator;
+  typedef typename oneapi::dpl::transform_iterator<CountingIterator, stride_functor> TransformIterator;
 
   // type of the strided_range iterator
   typedef TransformIterator iterator;
@@ -231,17 +231,17 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
 
   // Prepare input tensor strides for calculating result index
   if (N > 0) {
-#if defined(USE_USM) && defined(_PSTL_BACKEND_SYCL)
+#if defined(USE_USM) && defined(USE_PSTL)
     auto dpcpp_queue = dpcppGetCurrentQueue();
-    auto policy = dpstd::execution::make_device_policy(dpcpp_queue);
+    auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
     auto tensor_begin = tensor.data_ptr<long>();
     auto self_begin = self.data_ptr<scalar_t>();
     strided_range<decltype(tensor_begin)> strided_tensor(tensor_begin, tensor_begin + N*num_dim, num_dim);
-    dpstd::counting_iterator<int64_t> idxfirst(0);
-    auto start = dpstd::make_zip_iterator(idxfirst, self_begin);
+    oneapi::dpl::counting_iterator<int64_t> idxfirst(0);
+    auto start = oneapi::dpl::make_zip_iterator(idxfirst, self_begin);
     auto dend =
       std::copy_if(policy, start, start + N,
-        dpstd::make_transform_iterator(strided_tensor.begin(), [](auto& x) {return std::forward_as_tuple(x, std::ignore);}),
+        oneapi::dpl::make_transform_iterator(strided_tensor.begin(), [](auto& x) {return std::forward_as_tuple(x, std::ignore);}),
         [](auto h){
           using std::get;
           return NonZeroOp<scalar_t>{}(get<1>(h));

@@ -12,11 +12,11 @@
 #include <utils/ATDispatch.h>
 #include <torch/torch.h>
 
-#ifdef _PSTL_BACKEND_SYCL
-#include <dpstd/algorithm>
-#include <dpstd/execution>
-#include <dpstd/numeric>
-#include <dpstd/iterator>
+#ifdef USE_PSTL
+#include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/numeric>
+#include <oneapi/dpl/iterator>
 #endif
 
 using namespace at::dpcpp;
@@ -721,11 +721,11 @@ Tensor embedding_bag_backward_dpcpp_kernel(
   const Tensor& offset2bag,
   const Tensor& bag_size,
   const Tensor& per_sample_weights) {
-#ifndef _PSTL_BACKEND_SYCL
+#ifndef USE_PSTL
   throw std::runtime_error("no PSTL found when compile. USM embedding not supported");
 #else
   auto dpcpp_queue = dpcppGetCurrentQueue();
-  auto policy = dpstd::execution::make_device_policy(dpcpp_queue);
+  auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
   const int64_t numel = sorted_indices.numel();
   auto grad_weight = at::zeros({num_weights, grad.size(-1)}, grad.options());
   const int64_t stride = grad_weight.stride(0);
@@ -746,11 +746,11 @@ Tensor embedding_bag_backward_dpcpp_kernel(
         }
         return false;
       });
-    auto count_begin = dpstd::counting_iterator<int64_t>(0);
-    auto copy_begin = dpstd::make_zip_iterator(count_begin, dummy_begin);
+    auto count_begin = oneapi::dpl::counting_iterator<int64_t>(0);
+    auto copy_begin = oneapi::dpl::make_zip_iterator(count_begin, dummy_begin);
     auto segment_offsets_begin = segment_offsets.data_ptr<int64_t>();
     auto ends = std::copy_if(policy, copy_begin, copy_begin + numel,
-        dpstd::make_transform_iterator(segment_offsets_begin, [](auto& x) {return std::forward_as_tuple(x, std::ignore);}),
+        oneapi::dpl::make_transform_iterator(segment_offsets_begin, [](auto& x) {return std::forward_as_tuple(x, std::ignore);}),
         [](auto h){
           using std::get;
           return get<1>(h) != 0;
@@ -1051,7 +1051,7 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
     bool scale_grad_by_freq,
     int64_t mode,
     const Tensor& per_sample_weights) {
-#ifndef _PSTL_BACKEND_SYCL
+#ifndef USE_PSTL
   throw std::runtime_error("no PSTL found when compile. USM embedding not supported");
 #else
   auto grad_weight = at::zeros({num_weights, grad.size(1)}, grad.options());
@@ -1066,21 +1066,20 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
   int64_t stride = grad_weight.stride(0);
 
   auto sorted_indices = at::empty_like(indices);
-//  auto orig_indices = at::empty_like(indices);
-  auto orig_indices = torch::arange({numel}, indices.options()); // this is workaround
+  auto orig_indices = at::empty_like(indices);
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
-  auto policy = dpstd::execution::make_device_policy(dpcpp_queue);
+  auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
   // directly
   {
     sorted_indices.copy_(indices);
 
-//    auto count_begin = dpstd::counting_iterator<int64_t>(0);
+    auto count_begin = oneapi::dpl::counting_iterator<int64_t>(0);
     auto orig_begin = orig_indices.data_ptr<int64_t>();
-//    std::copy(policy, count_begin, count_begin + numel, orig_begin);
+    std::copy(policy, count_begin, count_begin + numel, orig_begin);
 
     auto sorted_begin = sorted_indices.data_ptr<int64_t>();
-    auto zipped_begin = dpstd::make_zip_iterator(sorted_begin, orig_begin);
+    auto zipped_begin = oneapi::dpl::make_zip_iterator(sorted_begin, orig_begin);
     std::sort(policy, zipped_begin, zipped_begin + numel,
         [](auto lhs, auto rhs){
           using std::get;
@@ -1098,57 +1097,21 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
     //  count: 1 1 2 3 1 2 1 1 2
     auto sorted_begin = sorted_indices.data_ptr<int64_t>();
     auto count_begin = count.data_ptr<int64_t>();
-    dpstd::inclusive_scan_by_segment(policy, sorted_begin, sorted_begin + numel,
+    oneapi::dpl::inclusive_scan_by_segment(policy, sorted_begin, sorted_begin + numel,
                                   count_begin,
                                   count_begin);
 
     // Take the maximum of each count per unique key in reverse:
     // sorted: 2 5 5 5 7 7 8 9 9
     //  count: 1 3 3 3 2 2 1 2 2
-    // this is a workaround
-    auto cgf = DPCPP_Q_CGF(cgh) {
-      auto sorted_indices_data = get_buffer<dpcpp_r_mode>(cgh, sorted_indices.data_ptr<int64_t>());
-      auto count_data = get_buffer<dpcpp_w_mode>(cgh, count.data_ptr<int64_t>());
-      auto kfn = DPCPP_Q_KFN() {
-        auto sorted_indices_ptr = get_pointer(sorted_indices_data);
-        auto count_ptr = get_pointer(count_data);
-        for (size_t i = 0; i < numel - 1; i++) {
-          size_t index = numel - (i + 1) - 1;
-          if (sorted_indices_ptr[index] != sorted_indices_ptr[i + 1])
-            count_ptr[index] = std::max(count_ptr[index], count_ptr[index + 1]);
-        }
-      };
-      // kick off kernel
-      cgh.single_task<class dummy_workaround_kernel>(kfn);
-    };
-
-    // submit to DPCPP queue
-    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
-
-//    error JIRA: https://jira.devtools.intel.com/projects/ONEDPL/issues/ONEDPL-82
-//    auto reversed_sort = sorted_indices.flip(0).contiguous();
-//    auto reversed_count = count.flip(0).contiguous();
-//    auto revers_sorted_begin = reversed_sort.data_ptr<int64_t>();
-//    auto revers_count_begin = reversed_count.data_ptr<int64_t>();
-//    dpstd::inclusive_scan_by_segment(
-//        policy, revers_sorted_begin,
-//        revers_sorted_begin + numel,
-//        revers_count_begin,
-//        revers_count_begin,
-//        std::equal_to<int64_t>(), dpstd::maximum<int64_t>());
-//
-//    sorted_indices = reversed_sort.flip(0).contiguous();
-//    count = reversed_count.flip(0).contiguous();
-
-//    error JIRA: https://jira.devtools.intel.com/projects/ONEDPL/issues/ONEDPL-81
-//    auto revers_sorted_begin = std::make_reverse_iterator(sorted_begin + numel);
-//    auto revers_count_begin = std::make_reverse_iterator(count_begin + numel);
-//    dpstd::inclusive_scan_by_segment(
-//        policy, revers_sorted_begin,
-//        revers_sorted_begin + numel,
-//        revers_count_begin,
-//        revers_count_begin,
-//        std::equal_to<int64_t>(), dpstd::maximum<int64_t>());
+    auto revers_sorted_begin = std::make_reverse_iterator(sorted_begin + numel);
+    auto revers_count_begin = std::make_reverse_iterator(count_begin + numel);
+    oneapi::dpl::inclusive_scan_by_segment(
+        policy, revers_sorted_begin,
+        revers_sorted_begin + numel,
+        revers_count_begin,
+        revers_count_begin,
+        std::equal_to<int64_t>(), oneapi::dpl::maximum<int64_t>());
   }
 
   return embedding_bag_backward_dpcpp_kernel(
