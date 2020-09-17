@@ -1,7 +1,7 @@
 From 96b9cbd7a5fcf134927236040d2272478e2c040d Mon Sep 17 00:00:00 2001
 From: chengjun <chengjun.lu@intel.com>
 Date: Thu, 11 Jun 2020 18:14:57 +0800
-Subject: [PATCH 3/9] Add third party c10d backend register API to support
+Subject: [PATCH 03/10] Add third party c10d backend register API to support
  oneCCL integraton
 
 ---

@@ -1,7 +1,7 @@
 From 0fcce8bd878a5a6281b491fb58a21d880139fcd0 Mon Sep 17 00:00:00 2001
 From: Gu Jinghui <jinghui.gu@intel.com>
 Date: Wed, 26 Aug 2020 23:10:22 +0800
-Subject: [PATCH 9/9] Implement DPCPPHookInterface to support DPCPP backend
+Subject: [PATCH 09/10] Implement DPCPPHookInterface to support DPCPP backend
  hooks
 
 Signed-off-by: Gu Jinghui <jinghui.gu@intel.com>

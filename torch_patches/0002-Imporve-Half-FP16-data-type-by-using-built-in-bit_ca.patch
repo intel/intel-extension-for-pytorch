@@ -1,7 +1,7 @@
 From d390da9922d27b110eb3024f060a39903e4782b2 Mon Sep 17 00:00:00 2001
 From: "Huang, Zhiyuan" <zhiyuan.huang@intel.com>
 Date: Thu, 4 Jun 2020 18:44:45 -0700
-Subject: [PATCH 2/9] Imporve Half/FP16 data type by using built-in bit_cast
+Subject: [PATCH 02/10] Imporve Half/FP16 data type by using built-in bit_cast
 
 Convert between unsigned short and sycl::half by bit_cast
 ---
