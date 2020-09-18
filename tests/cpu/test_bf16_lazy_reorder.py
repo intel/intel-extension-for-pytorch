@@ -20,6 +20,7 @@ import torch.nn.functional as F
 from torch.autograd import gradcheck
 from torch.autograd.gradcheck import gradgradcheck
 from torch._six import inf, nan
+import torch.nn.utils.rnn as rnn_utils
 
 from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MKL, \
     TEST_LIBROSA, run_tests, download_file, skipIfNoLapack, suppress_warnings, \
@@ -69,14 +70,14 @@ def _gen_op(seed, op, is_bn=False, is_forward=True):
     else:
         op_auto_mix_inference = None
     op_auto_mix_train = copy.deepcopy(op_cpu).to(device=device)
-    
+
     # Mean / Variance / ScaleShift of BN cannot be bf16
     if is_bn:
         op_man_bf16 =copy.deepcopy(op_cpu).to(device=device)
     else:
         op_man_bf16 =copy.deepcopy(op_cpu).to(device=device).to(torch.bfloat16)
     op_auto_mix_train_bf16 = copy.deepcopy(op_cpu).to(device=device)
-    
+
     return op_cpu, op_auto_mix_inference, op_auto_mix_train, op_man_bf16, op_auto_mix_train_bf16
 
 class CascadedConvBnSumRelu(nn.Module):
@@ -161,7 +162,7 @@ class TestConv(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        
+
         input = torch.rand((1, 1, 7, 7))
         for bias in [True, False]:
             _conv = torch.nn.Conv2d(1, 1, (3, 3), bias=bias)
@@ -241,7 +242,7 @@ class TestBatchNorm(TestCase):
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_inference))
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_inference))
                 self.assertEqual(res_bf16.float(), res_auto_mix_inference)
-            
+
             # FW train (input is not bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_train.dtype, torch.float)
@@ -252,7 +253,7 @@ class TestBatchNorm(TestCase):
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(res_auto_mix_train))
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_train))
                 self.assertEqual(ref_cpu, res_auto_mix_train)
-            
+
             # FW train (input is bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_train_bf16.dtype, torch.float)
@@ -268,7 +269,7 @@ class TestBatchNorm(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         x_cpu, _, x_auto_mix, x_man_bf16, x_auto_mix_bf16 = _gen_tensor(rand_seed, (64, 3, 35, 45), is_forward=False)
-        
+
         op_cpu, _, op_auto_mix, op_man_bf16, op_auto_mix_bf16 = _gen_op(rand_seed, torch.nn.BatchNorm2d(3), is_bn=True, is_forward=False)
 
         out_cpu = op_cpu(x_cpu).sum()
@@ -288,7 +289,7 @@ class TestBatchNorm(TestCase):
                 self.assertEqual(x_auto_mix.grad.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix.grad))
                 self.assertEqual(x_cpu.grad, x_auto_mix.grad)
-            
+
              # BW train (input is bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_bf16.dtype, torch.float)
@@ -308,7 +309,7 @@ class TestBatchNorm(TestCase):
 
         op_cpu, op_auto_mix_inference, op_auto_mix_train, op_man_bf16, op_auto_mix_train_bf16 = _gen_op(
             rand_seed, torch.nn.BatchNorm3d(3), is_bn=True)
-        
+
         ref_cpu = op_cpu(x_cpu)
         with AutoDNNL(True), AutoMixPrecision(False):
             res_bf16 = op_man_bf16(x_man_bf16)
@@ -350,9 +351,9 @@ class TestBatchNorm(TestCase):
     def test_batch_norm3d_backward(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        
+
         x_cpu, _, x_auto_mix, x_man_bf16, x_auto_mix_bf16 = _gen_tensor(rand_seed, (4, 3, 30, 30, 30), is_forward=False)
-        
+
         op_cpu, _, op_auto_mix, op_man_bf16, op_auto_mix_bf16 = _gen_op(rand_seed, torch.nn.BatchNorm3d(3), is_bn=True, is_forward=False)
 
         out_cpu = op_cpu(x_cpu).sum()
@@ -372,7 +373,7 @@ class TestBatchNorm(TestCase):
                 self.assertEqual(x_auto_mix.grad.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix.grad))
                 self.assertEqual(x_cpu.grad, x_auto_mix.grad)
-            
+
              # BW train (input is bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_bf16.dtype, torch.float)
@@ -472,7 +473,7 @@ class TestRelu(TestCase):
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
 
         x_cpu, _, x_auto_mix, x_man_bf16, x_auto_mix_bf16 = _gen_tensor(rand_seed, (4, 5), is_forward=False)
-    
+
         op_cpu, _, op_auto_mix, op_man_bf16, op_auto_mix_bf16 = _gen_op(rand_seed, torch.nn.ReLU(), is_bn=False, is_forward=False)
 
         out_cpu = op_cpu(x_cpu).sum()
@@ -492,7 +493,7 @@ class TestRelu(TestCase):
                 self.assertEqual(x_auto_mix.grad.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix.grad))
                 self.assertEqual(x_cpu.grad, x_auto_mix.grad)
-            
+
              # BW train (input is bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_bf16.dtype, torch.float)
@@ -553,7 +554,7 @@ class TestGelu(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         x_cpu, _, x_auto_mix, x_man_bf16, x_auto_mix_bf16 = _gen_tensor(rand_seed, (4, 5), is_forward=False)
-        
+
         op_cpu, _, op_auto_mix, op_man_bf16, op_auto_mix_bf16 = _gen_op(rand_seed, torch.nn.GELU(), is_bn=False, is_forward=False)
 
         out_cpu = op_cpu(x_cpu).sum()
@@ -573,7 +574,7 @@ class TestGelu(TestCase):
                 self.assertEqual(x_auto_mix.grad.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix.grad))
                 self.assertEqual(x_cpu.grad, x_auto_mix.grad, 1e-3)
-            
+
              # BW train (input is bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_bf16.dtype, torch.float)
@@ -758,17 +759,17 @@ class TestBinOPs(TestCase):
                 self.assertEqual(x_auto_mix_b_infer.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_b_infer))
                 res_auto_mix_infer = x_auto_mix_a_infer + x_auto_mix_b_infer
-                self.assertEqual(res_auto_mix_infer.dtype, torch.float)           
+                self.assertEqual(res_auto_mix_infer.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_infer))
 
-                self.assertEqual(x_auto_mix_a_infer.dtype, torch.float) 
+                self.assertEqual(x_auto_mix_a_infer.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_a_infer))
 
-                self.assertEqual(x_auto_mix_b_infer.dtype, torch.float) 
+                self.assertEqual(x_auto_mix_b_infer.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_b_infer))
-                
+
                 self.assertEqual(res_auto_mix_infer, res_man_bf16)
-            
+
             # For training: only reorder the second tensor to the data type of the first tensor.
             with AutoMixPrecision(True, train=True):
                 # bf16 + bf16
@@ -777,9 +778,9 @@ class TestBinOPs(TestCase):
                 self.assertEqual(x_auto_mix_bf16_b.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_b))
                 res_auto_mix_bf16 = x_auto_mix_bf16_a + x_auto_mix_bf16_b
-                self.assertEqual(res_auto_mix_bf16.dtype, torch.float)           
+                self.assertEqual(res_auto_mix_bf16.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_bf16))
-                
+
                 self.assertEqual(res_auto_mix_bf16, res_man_bf16)
 
                 # bf16 + fp32
@@ -788,9 +789,9 @@ class TestBinOPs(TestCase):
                 self.assertEqual(x_auto_mix_b.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_b))
                 res_auto_mix_reorder_b = x_auto_mix_bf16_a + x_auto_mix_b
-                self.assertEqual(res_auto_mix_reorder_b.dtype, torch.float)           
+                self.assertEqual(res_auto_mix_reorder_b.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_reorder_b))
-                
+
                 self.assertEqual(res_auto_mix_reorder_b, res_man_bf16)
 
                 # fp32 + bf16
@@ -799,9 +800,9 @@ class TestBinOPs(TestCase):
                 self.assertEqual(x_auto_mix_bf16_b.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_b))
                 res_auto_mix_reorder_a = x_auto_mix_a + x_auto_mix_bf16_b
-                self.assertEqual(res_auto_mix_reorder_a.dtype, torch.float)           
+                self.assertEqual(res_auto_mix_reorder_a.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(res_auto_mix_reorder_a))
-                
+
                 self.assertEqual(res_auto_mix_reorder_a, res_cpu, 2e-3)
 
     def test_mul(self):
@@ -827,17 +828,17 @@ class TestBinOPs(TestCase):
                 self.assertEqual(x_auto_mix_b_infer.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_b_infer))
                 res_auto_mix_infer = x_auto_mix_a_infer * x_auto_mix_b_infer
-                self.assertEqual(res_auto_mix_infer.dtype, torch.float)           
+                self.assertEqual(res_auto_mix_infer.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_infer))
 
-                self.assertEqual(x_auto_mix_a_infer.dtype, torch.float) 
+                self.assertEqual(x_auto_mix_a_infer.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_a_infer))
 
-                self.assertEqual(x_auto_mix_b_infer.dtype, torch.float) 
+                self.assertEqual(x_auto_mix_b_infer.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_b_infer))
-                
+
                 self.assertEqual(res_auto_mix_infer, res_man_bf16)
-            
+
             # For training: only reorder the second tensor to the data type of the first tensor.
             with AutoMixPrecision(True, train=True):
                 # bf16 * bf16
@@ -846,9 +847,9 @@ class TestBinOPs(TestCase):
                 self.assertEqual(x_auto_mix_bf16_b.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_b))
                 res_auto_mix_bf16 = x_auto_mix_bf16_a * x_auto_mix_bf16_b
-                self.assertEqual(res_auto_mix_bf16.dtype, torch.float)           
+                self.assertEqual(res_auto_mix_bf16.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_bf16))
-                
+
                 self.assertEqual(res_auto_mix_bf16, res_man_bf16)
 
                 # bf16 * fp32
@@ -857,9 +858,9 @@ class TestBinOPs(TestCase):
                 self.assertEqual(x_auto_mix_b.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_b))
                 res_auto_mix_reorder_b = x_auto_mix_bf16_a * x_auto_mix_b
-                self.assertEqual(res_auto_mix_reorder_b.dtype, torch.float)           
+                self.assertEqual(res_auto_mix_reorder_b.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_reorder_b))
-                
+
                 self.assertEqual(res_auto_mix_reorder_b, res_man_bf16)
 
                 # fp32 * bf16
@@ -868,14 +869,14 @@ class TestBinOPs(TestCase):
                 self.assertEqual(x_auto_mix_bf16_b.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_b))
                 res_auto_mix_reorder_a = x_auto_mix_a * x_auto_mix_bf16_b
-                self.assertEqual(res_auto_mix_reorder_a.dtype, torch.float)           
+                self.assertEqual(res_auto_mix_reorder_a.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(res_auto_mix_reorder_a))
-                
+
                 self.assertEqual(res_auto_mix_reorder_a, res_cpu, 2e-3)
 
     def test_mul_(self):
         rand_seed = int(get_rand_seed())
-        
+
         # generate a 4D tensor by using this seed
         rand_seed = 1591058395950926848
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
@@ -898,12 +899,12 @@ class TestBinOPs(TestCase):
         x_auto_mix_bf16_a = convert_to_bf16(x_cpu_a)
         x_auto_mix_bf16_a_ = convert_to_bf16(x_cpu_a)
         x_auto_mix_bf16_b = convert_to_bf16(x_cpu_b)
-        
+
         x_cpu_a *= x_cpu_b
         with AutoDNNL(True), AutoMixPrecision(False):
             res_man_bf16 = x_man_bf16_a * x_man_bf16_b
             self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
-            
+
             self.assertEqual(x_man_bf16_a.dtype, torch.bfloat16)
             self.assertEqual(x_man_bf16_b.dtype, torch.bfloat16)
             x_man_bf16_a *= x_man_bf16_b
@@ -919,13 +920,13 @@ class TestBinOPs(TestCase):
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_b_infer))
                 x_auto_mix_a_infer *= x_auto_mix_b_infer
 
-                self.assertEqual(x_auto_mix_a_infer.dtype, torch.float) 
+                self.assertEqual(x_auto_mix_a_infer.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_a_infer))
 
-                self.assertEqual(x_auto_mix_b_infer.dtype, torch.float) 
+                self.assertEqual(x_auto_mix_b_infer.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_b_infer))
-                
-                self.assertEqual(x_auto_mix_a_infer, res_man_bf16)           
+
+                self.assertEqual(x_auto_mix_a_infer, res_man_bf16)
 
             # For training, only reorder the second tensor to the data type of the first tensor.
             with AutoMixPrecision(True, train=True):
@@ -935,9 +936,9 @@ class TestBinOPs(TestCase):
                 self.assertEqual(x_auto_mix_bf16_b.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_b))
                 x_auto_mix_bf16_a *= x_auto_mix_bf16_b
-                self.assertEqual(x_auto_mix_bf16_a.dtype, torch.float)           
+                self.assertEqual(x_auto_mix_bf16_a.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_a))
-                
+
                 self.assertEqual(x_auto_mix_bf16_a, x_man_bf16_a)
 
                 # bf16 * fp32
@@ -946,9 +947,9 @@ class TestBinOPs(TestCase):
                 self.assertEqual(x_auto_mix_b.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_b))
                 x_auto_mix_bf16_a_ *= x_auto_mix_b
-                self.assertEqual(x_auto_mix_bf16_a_.dtype, torch.float)           
+                self.assertEqual(x_auto_mix_bf16_a_.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_a_))
-                
+
                 self.assertEqual(x_auto_mix_bf16_a_, res_man_bf16)
 
                 # fp32 * bf16
@@ -957,9 +958,9 @@ class TestBinOPs(TestCase):
                 self.assertEqual(x_auto_mix_bf16_b.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_b))
                 x_auto_mix_a *= x_auto_mix_bf16_b
-                self.assertEqual(x_auto_mix_a.dtype, torch.float)           
+                self.assertEqual(x_auto_mix_a.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_a))
-                
+
                 self.assertEqual(x_auto_mix_a, x_cpu_a, 2e-3)
 
 class TestLinear(TestCase):
@@ -1028,10 +1029,10 @@ class TestPool(TestCase):
 
         for count_include_pad in [True, False]:
             x_cpu, x_auto_mix_inference, x_auto_mix_train, x_man_bf16, x_auto_mix_train_bf16 = _gen_tensor(
-                rand_seed, 
+                rand_seed,
                 (N, C, 64, 64))
             op_cpu, op_auto_mix_inference, op_auto_mix_train, op_man_bf16, op_auto_mix_train_bf16 = _gen_op(
-                rand_seed, 
+                rand_seed,
                 torch.nn.AvgPool2d(
                     kernel_size=3,
                     stride=2,
@@ -1054,7 +1055,7 @@ class TestPool(TestCase):
                     self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_inference))
                     self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_inference))
                     self.assertEqual(res_bf16.float(), res_auto_mix_inference)
-                
+
                 # FW train (input is not bf16 dil tensor)
                 with AutoMixPrecision(True, train=True):
                     self.assertEqual(x_auto_mix_train.dtype, torch.float)
@@ -1065,7 +1066,7 @@ class TestPool(TestCase):
                     self.assertFalse(ipex.core.is_bf16_dil_tensor(res_auto_mix_train))
                     self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_train))
                     self.assertEqual(ref_cpu, res_auto_mix_train)
-                
+
                 # FW train (input is bf16 dil tensor)
                 with AutoMixPrecision(True, train=True):
                     self.assertEqual(x_auto_mix_train_bf16.dtype, torch.float)
@@ -1083,127 +1084,19 @@ class TestPool(TestCase):
         torch.manual_seed(rand_seed)
         N = torch.randint(3, 10, (1,)).item()
         C = torch.randint(3, 10, (1,)).item()
-        
-        for count_include_pad in [True, False]: 
+
+        for count_include_pad in [True, False]:
             x_cpu, _, x_auto_mix, x_man_bf16, x_auto_mix_bf16 = _gen_tensor(
-                rand_seed, (N, C, 64, 64), 
+                rand_seed, (N, C, 64, 64),
                 is_forward=False)
-            
+
             op_cpu, _, op_auto_mix, op_man_bf16, op_auto_mix_bf16 = _gen_op(
-                rand_seed,             
+                rand_seed,
                 torch.nn.AvgPool2d(
                     kernel_size=3,
                     stride=2,
                     padding=1,
-                    count_include_pad=count_include_pad), 
-                    is_bn=False, 
-                is_forward=False)
-            out_cpu = op_cpu(x_cpu).sum()
-            out_cpu.backward()
-            with AutoDNNL(True), AutoMixPrecision(False, train=True):
-                out_man_bf16 = op_man_bf16(x_man_bf16).sum()
-                out_man_bf16.backward()
-                self.assertEqual(x_man_bf16.grad.dtype, torch.bfloat16)
-                self.assertEqual(x_cpu.grad.bfloat16().float(), x_man_bf16.grad, 1e-2)
-
-                # BW train (input is not bf16 dil tensor)
-                with AutoMixPrecision(True, train=True):
-                    self.assertEqual(x_auto_mix.dtype, torch.float)
-                    self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix))
-                    out_auto_mix = op_auto_mix(x_auto_mix).sum()
-                    out_auto_mix.backward()
-                    self.assertEqual(x_auto_mix.grad.dtype, torch.float)
-                    self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix.grad))
-                    self.assertEqual(x_cpu.grad, x_auto_mix.grad)
-                
-                # BW train (input is bf16 dil tensor)
-                with AutoMixPrecision(True, train=True):
-                    self.assertEqual(x_auto_mix_bf16.dtype, torch.float)
-                    self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16))
-                    out_auto_mix_bf16 = op_auto_mix_bf16(x_auto_mix_bf16).sum()
-                    out_auto_mix_bf16.backward()        
-                    self.assertEqual(x_auto_mix_bf16.grad.dtype, torch.float)
-                    self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16.grad))
-                    self.assertEqual(x_man_bf16.grad.float(), x_auto_mix_bf16.grad)
-
-    def test_avg_pool3d(self):
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        N = torch.randint(3, 10, (1,)).item()
-        C = torch.randint(3, 10, (1,)).item()
-
-        for count_include_pad in [True, False]:
-            x_cpu, x_auto_mix_inference, x_auto_mix_train, x_man_bf16, x_auto_mix_train_bf16 = _gen_tensor(
-                rand_seed, 
-                (N, C, 64, 64, 64))
-            op_cpu, op_auto_mix_inference, op_auto_mix_train, op_man_bf16, op_auto_mix_train_bf16 = _gen_op(
-                rand_seed, 
-                torch.nn.AvgPool3d(
-                    kernel_size=3,
-                    stride=2,
-                    padding=1,
                     count_include_pad=count_include_pad),
-                is_bn=False)
-
-            ref_cpu = op_cpu(x_cpu)
-            with AutoDNNL(True), AutoMixPrecision(False):
-                res_bf16 = op_man_bf16(x_man_bf16)
-                self.assertEqual(res_bf16.dtype, torch.bfloat16)
-
-                # FW inference
-                with AutoMixPrecision(True, train=False):
-                    self.assertEqual(x_auto_mix_inference.dtype, torch.float)
-                    self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_inference))
-                    res_auto_mix_inference = op_auto_mix_inference(x_auto_mix_inference)
-                    self.assertEqual(res_auto_mix_inference.dtype, torch.float)
-                    self.assertEqual(x_auto_mix_inference.dtype, torch.float)
-                    self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_inference))
-                    self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_inference))
-                    self.assertEqual(res_bf16.float(), res_auto_mix_inference)
-                
-                # FW train (input is not bf16 dil tensor)
-                with AutoMixPrecision(True, train=True):
-                    self.assertEqual(x_auto_mix_train.dtype, torch.float)
-                    self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_train))
-                    res_auto_mix_train = op_auto_mix_train(x_auto_mix_train)
-                    self.assertEqual(res_auto_mix_train.dtype, torch.float)
-                    self.assertEqual(x_auto_mix_train.dtype, torch.float)
-                    self.assertFalse(ipex.core.is_bf16_dil_tensor(res_auto_mix_train))
-                    self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_train))
-                    self.assertEqual(ref_cpu, res_auto_mix_train)
-                
-                # FW train (input is bf16 dil tensor)
-                with AutoMixPrecision(True, train=True):
-                    self.assertEqual(x_auto_mix_train_bf16.dtype, torch.float)
-                    self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_train_bf16))
-                    res_auto_mix_train_bf16 = op_auto_mix_train_bf16(x_auto_mix_train_bf16)
-                    self.assertEqual(res_auto_mix_train_bf16.dtype, torch.float)
-                    self.assertEqual(x_auto_mix_train_bf16.dtype, torch.float)
-                    self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_train_bf16))
-                    self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_train_bf16))
-                    self.assertEqual(res_bf16.float(), res_auto_mix_train_bf16, 1e-3)
-
-    def test_avg_pool3d_backward(self):
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        N = torch.randint(3, 10, (1,)).item()
-        C = torch.randint(3, 10, (1,)).item()
-        
-        for count_include_pad in [True, False]:
-            
-            x_cpu, _, x_auto_mix, x_man_bf16, x_auto_mix_bf16 = _gen_tensor(
-                rand_seed, (N, C, 64, 64, 64), 
-                is_forward=False)
-            
-            op_cpu, _, op_auto_mix, op_man_bf16, op_auto_mix_bf16 = _gen_op(
-                rand_seed,             
-                torch.nn.AvgPool3d(
-                    kernel_size=3,
-                    stride=2,
-                    padding=1,
-                    count_include_pad=count_include_pad), 
                     is_bn=False,
                 is_forward=False)
             out_cpu = op_cpu(x_cpu).sum()
@@ -1223,13 +1116,121 @@ class TestPool(TestCase):
                     self.assertEqual(x_auto_mix.grad.dtype, torch.float)
                     self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix.grad))
                     self.assertEqual(x_cpu.grad, x_auto_mix.grad)
-                
+
                 # BW train (input is bf16 dil tensor)
                 with AutoMixPrecision(True, train=True):
                     self.assertEqual(x_auto_mix_bf16.dtype, torch.float)
                     self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16))
                     out_auto_mix_bf16 = op_auto_mix_bf16(x_auto_mix_bf16).sum()
-                    out_auto_mix_bf16.backward()        
+                    out_auto_mix_bf16.backward()
+                    self.assertEqual(x_auto_mix_bf16.grad.dtype, torch.float)
+                    self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16.grad))
+                    self.assertEqual(x_man_bf16.grad.float(), x_auto_mix_bf16.grad)
+
+    def test_avg_pool3d(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+
+        for count_include_pad in [True, False]:
+            x_cpu, x_auto_mix_inference, x_auto_mix_train, x_man_bf16, x_auto_mix_train_bf16 = _gen_tensor(
+                rand_seed,
+                (N, C, 64, 64, 64))
+            op_cpu, op_auto_mix_inference, op_auto_mix_train, op_man_bf16, op_auto_mix_train_bf16 = _gen_op(
+                rand_seed,
+                torch.nn.AvgPool3d(
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                    count_include_pad=count_include_pad),
+                is_bn=False)
+
+            ref_cpu = op_cpu(x_cpu)
+            with AutoDNNL(True), AutoMixPrecision(False):
+                res_bf16 = op_man_bf16(x_man_bf16)
+                self.assertEqual(res_bf16.dtype, torch.bfloat16)
+
+                # FW inference
+                with AutoMixPrecision(True, train=False):
+                    self.assertEqual(x_auto_mix_inference.dtype, torch.float)
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_inference))
+                    res_auto_mix_inference = op_auto_mix_inference(x_auto_mix_inference)
+                    self.assertEqual(res_auto_mix_inference.dtype, torch.float)
+                    self.assertEqual(x_auto_mix_inference.dtype, torch.float)
+                    self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_inference))
+                    self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_inference))
+                    self.assertEqual(res_bf16.float(), res_auto_mix_inference)
+
+                # FW train (input is not bf16 dil tensor)
+                with AutoMixPrecision(True, train=True):
+                    self.assertEqual(x_auto_mix_train.dtype, torch.float)
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_train))
+                    res_auto_mix_train = op_auto_mix_train(x_auto_mix_train)
+                    self.assertEqual(res_auto_mix_train.dtype, torch.float)
+                    self.assertEqual(x_auto_mix_train.dtype, torch.float)
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(res_auto_mix_train))
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_train))
+                    self.assertEqual(ref_cpu, res_auto_mix_train)
+
+                # FW train (input is bf16 dil tensor)
+                with AutoMixPrecision(True, train=True):
+                    self.assertEqual(x_auto_mix_train_bf16.dtype, torch.float)
+                    self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_train_bf16))
+                    res_auto_mix_train_bf16 = op_auto_mix_train_bf16(x_auto_mix_train_bf16)
+                    self.assertEqual(res_auto_mix_train_bf16.dtype, torch.float)
+                    self.assertEqual(x_auto_mix_train_bf16.dtype, torch.float)
+                    self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_train_bf16))
+                    self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_train_bf16))
+                    self.assertEqual(res_bf16.float(), res_auto_mix_train_bf16, 1e-3)
+
+    def test_avg_pool3d_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+
+        for count_include_pad in [True, False]:
+
+            x_cpu, _, x_auto_mix, x_man_bf16, x_auto_mix_bf16 = _gen_tensor(
+                rand_seed, (N, C, 64, 64, 64),
+                is_forward=False)
+
+            op_cpu, _, op_auto_mix, op_man_bf16, op_auto_mix_bf16 = _gen_op(
+                rand_seed,
+                torch.nn.AvgPool3d(
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                    count_include_pad=count_include_pad),
+                    is_bn=False,
+                is_forward=False)
+            out_cpu = op_cpu(x_cpu).sum()
+            out_cpu.backward()
+            with AutoDNNL(True), AutoMixPrecision(False, train=True):
+                out_man_bf16 = op_man_bf16(x_man_bf16).sum()
+                out_man_bf16.backward()
+                self.assertEqual(x_man_bf16.grad.dtype, torch.bfloat16)
+                self.assertEqual(x_cpu.grad.bfloat16().float(), x_man_bf16.grad, 1e-2)
+
+                # BW train (input is not bf16 dil tensor)
+                with AutoMixPrecision(True, train=True):
+                    self.assertEqual(x_auto_mix.dtype, torch.float)
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix))
+                    out_auto_mix = op_auto_mix(x_auto_mix).sum()
+                    out_auto_mix.backward()
+                    self.assertEqual(x_auto_mix.grad.dtype, torch.float)
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix.grad))
+                    self.assertEqual(x_cpu.grad, x_auto_mix.grad)
+
+                # BW train (input is bf16 dil tensor)
+                with AutoMixPrecision(True, train=True):
+                    self.assertEqual(x_auto_mix_bf16.dtype, torch.float)
+                    self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16))
+                    out_auto_mix_bf16 = op_auto_mix_bf16(x_auto_mix_bf16).sum()
+                    out_auto_mix_bf16.backward()
 
 
                     self.assertEqual(x_auto_mix_bf16.grad.dtype, torch.float)
@@ -1261,7 +1262,7 @@ class TestPool(TestCase):
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_inference))
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_inference))
                 self.assertEqual(res_bf16.float(), res_auto_mix_inference)
-            
+
             # FW train (input is not bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_train.dtype, torch.float)
@@ -1272,7 +1273,7 @@ class TestPool(TestCase):
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(res_auto_mix_train))
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_train))
                 self.assertEqual(ref_cpu, res_auto_mix_train)
-    
+
             # FW train (input is bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_train_bf16.dtype, torch.float)
@@ -1290,9 +1291,9 @@ class TestPool(TestCase):
         torch.manual_seed(rand_seed)
         N = torch.randint(3, 10, (1,)).item()
         C = torch.randint(3, 10, (1,)).item()
-            
+
         x_cpu, _, x_auto_mix, x_man_bf16, x_auto_mix_bf16 = _gen_tensor(rand_seed, (N, C, 224, 224), is_forward=False)
-        
+
         op_cpu, _, op_auto_mix, op_man_bf16, op_auto_mix_bf16 = _gen_op(rand_seed, torch.nn.AdaptiveAvgPool2d(7), is_bn=False, is_forward=False)
         out_cpu = op_cpu(x_cpu).sum()
         out_cpu.backward()
@@ -1311,13 +1312,13 @@ class TestPool(TestCase):
                 self.assertEqual(x_auto_mix.grad.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix.grad))
                 self.assertEqual(x_cpu.grad, x_auto_mix.grad)
-            
+
             # BW train (input is bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_bf16.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16))
                 out_auto_mix_bf16 = op_auto_mix_bf16(x_auto_mix_bf16).sum()
-                out_auto_mix_bf16.backward()        
+                out_auto_mix_bf16.backward()
 
                 self.assertEqual(x_auto_mix_bf16.grad.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16.grad))
@@ -1334,10 +1335,10 @@ class TestPool(TestCase):
             for H, W in [(64, 64), (35, 39), (16, 19), [7, 8]]:
                 for ceil_mode in [False, True]:
                     x_cpu, x_auto_mix_inference, x_auto_mix_train, x_man_bf16, x_auto_mix_train_bf16 = _gen_tensor(
-                        rand_seed, 
+                        rand_seed,
                         (N, C, H, W))
                     op_cpu, op_auto_mix_inference, op_auto_mix_train, op_man_bf16, op_auto_mix_train_bf16 = _gen_op(
-                        rand_seed, 
+                        rand_seed,
                         torch.nn.MaxPool2d(
                             kernel_size=3 if not ceil_mode else 7,
                             stride=stride,
@@ -1395,7 +1396,7 @@ class TestPool(TestCase):
                 for ceil_mode in [False, True]:
                     x_cpu, _, x_auto_mix, x_man_bf16, x_auto_mix_bf16 = _gen_tensor(rand_seed, (N, C, H, W), is_forward=False)
                     op_cpu, _, op_auto_mix, op_man_bf16, op_auto_mix_bf16 = _gen_op(
-                        rand_seed, 
+                        rand_seed,
                         torch.nn.MaxPool2d(
                             kernel_size=3 if not ceil_mode else 7,
                             stride=stride,
@@ -1410,7 +1411,7 @@ class TestPool(TestCase):
                         out_man_bf16 = op_man_bf16(x_man_bf16).sum()
                         out_man_bf16.backward()
                         self.assertEqual(x_man_bf16.grad.dtype, torch.bfloat16)
-                        
+
                         # BW train (input is not bf16 dil tensor)
                         with AutoMixPrecision(True, train=True):
                             self.assertEqual(x_auto_mix.dtype, torch.float)
@@ -1420,18 +1421,18 @@ class TestPool(TestCase):
                             self.assertEqual(x_auto_mix.grad.dtype, torch.float)
                             self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix.grad))
                             self.assertEqual(x_cpu.grad, x_auto_mix.grad)
-                        
+
                         # BW train (input is bf16 dil tensor)
                         with AutoMixPrecision(True, train=True):
                             self.assertEqual(x_auto_mix_bf16.dtype, torch.float)
                             self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16))
                             out_auto_mix_bf16 = op_auto_mix_bf16(x_auto_mix_bf16).sum()
-                            out_auto_mix_bf16.backward()        
+                            out_auto_mix_bf16.backward()
 
                             self.assertEqual(x_auto_mix_bf16.grad.dtype, torch.float)
                             self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16.grad))
                             self.assertEqual(x_man_bf16.grad.float(), x_auto_mix_bf16.grad)
-                        
+
     def test_max_pool3d(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
@@ -1444,7 +1445,7 @@ class TestPool(TestCase):
                 for ceil_mode in [False, True]:
                     x_cpu, x_auto_mix_inference, x_auto_mix_train, x_man_bf16, x_auto_mix_train_bf16 = _gen_tensor(rand_seed, (N, C, D, H, W))
                     op_cpu, op_auto_mix_inference, op_auto_mix_train, op_man_bf16, op_auto_mix_train_bf16 = _gen_op(
-                        rand_seed, 
+                        rand_seed,
                         torch.nn.MaxPool3d(
                             kernel_size=3 if not ceil_mode else 7,
                             stride=stride,
@@ -1501,7 +1502,7 @@ class TestPool(TestCase):
                 for ceil_mode in [False, True]:
                     x_cpu, _, x_auto_mix, x_man_bf16, x_auto_mix_bf16 = _gen_tensor(rand_seed, (N, C, D, H, W), is_forward=False)
                     op_cpu, _, op_auto_mix, op_man_bf16, op_auto_mix_bf16 = _gen_op(
-                        rand_seed, 
+                        rand_seed,
                         torch.nn.MaxPool3d(
                             kernel_size=3 if not ceil_mode else 7,
                             stride=stride,
@@ -1526,13 +1527,13 @@ class TestPool(TestCase):
                             self.assertEqual(x_auto_mix.grad.dtype, torch.float)
                             self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix.grad))
                             self.assertEqual(x_cpu.grad, x_auto_mix.grad)
-                        
+
                         # BW train (input is bf16 dil tensor)
                         with AutoMixPrecision(True, train=True):
                             self.assertEqual(x_auto_mix_bf16.dtype, torch.float)
                             self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16))
                             out_auto_mix_bf16 = op_auto_mix_bf16(x_auto_mix_bf16).sum()
-                            out_auto_mix_bf16.backward()        
+                            out_auto_mix_bf16.backward()
 
                             self.assertEqual(x_auto_mix_bf16.grad.dtype, torch.float)
                             self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16.grad))
@@ -1567,7 +1568,7 @@ class TestSoftMax(TestCase):
     def test_softmax(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        ndim = 3        
+        ndim = 3
         for dim in range(ndim):
             x_cpu, x_auto_mix_inference, x_auto_mix_train, x_man_bf16, x_auto_mix_train_bf16 = _gen_tensor(rand_seed, (3, 4, 5))
 
@@ -1614,11 +1615,11 @@ class TestSoftMax(TestCase):
     def test_softmax_backward(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        
+
         ndim = 3
         for dim in range(ndim):
             x_cpu, _, x_auto_mix, x_man_bf16, x_auto_mix_bf16 = _gen_tensor(rand_seed, (3, 4, 5), is_forward=False)
-            
+
             op_cpu, _, op_auto_mix, op_man_bf16, op_auto_mix_bf16 = _gen_op(rand_seed, torch.nn.Softmax(dim=dim), is_bn=False, is_forward=False)
 
             out_cpu = op_cpu(x_cpu).sum()
@@ -1638,7 +1639,7 @@ class TestSoftMax(TestCase):
                     self.assertEqual(x_auto_mix.grad.dtype, torch.float)
                     self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix.grad))
                     self.assertEqual(x_cpu.grad, x_auto_mix.grad)
-                
+
                 # BW train (input is bf16 dil tensor)
                 with AutoMixPrecision(True, train=True):
                     self.assertEqual(x_auto_mix_bf16.dtype, torch.float)
@@ -1675,7 +1676,7 @@ class TestSigmoid(TestCase):
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_inference))
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_inference))
                 self.assertEqual(res_bf16.float(), res_auto_mix_inference)
-            
+
             # FW train (input is not bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_train.dtype, torch.float)
@@ -1686,7 +1687,7 @@ class TestSigmoid(TestCase):
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(res_auto_mix_train))
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_train))
                 self.assertEqual(ref_cpu, res_auto_mix_train)
-            
+
             # FW train (input is bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_train_bf16.dtype, torch.float)
@@ -1716,7 +1717,7 @@ class TestSigmoid(TestCase):
                 self.assertEqual(x_auto_mix_inference.dtype, torch.float)
                 self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_inference))
                 self.assertEqual(x_man_bf16.float(), x_auto_mix_inference)
-            
+
             # FW train (input is not bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_train.dtype, torch.float)
@@ -1725,7 +1726,7 @@ class TestSigmoid(TestCase):
                 self.assertEqual(x_auto_mix_train.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_train))
                 self.assertEqual(x_cpu, x_auto_mix_train)
-            
+
             # FW train (input is bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_train_bf16.dtype, torch.float)
@@ -1738,11 +1739,11 @@ class TestSigmoid(TestCase):
     def test_sigmoid_backward(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        
+
         x_cpu, _, x_auto_mix, x_man_bf16, x_auto_mix_bf16 = _gen_tensor(rand_seed, (4, 5), is_forward=False)
-        
+
         op_cpu, _, op_auto_mix, op_man_bf16, op_auto_mix_bf16 = _gen_op(rand_seed, torch.nn.Sigmoid(), is_bn=False, is_forward=False)
-        
+
         out_cpu = op_cpu(x_cpu).sum()
         out_cpu.backward()
         with AutoDNNL(True), AutoMixPrecision(False, train=True):
@@ -1760,7 +1761,7 @@ class TestSigmoid(TestCase):
                 self.assertEqual(x_auto_mix.grad.dtype, torch.float)
                 self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix.grad))
                 self.assertEqual(x_cpu.grad, x_auto_mix.grad)
-            
+
              # BW train (input is bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
                 self.assertEqual(x_auto_mix_bf16.dtype, torch.float)
@@ -1956,6 +1957,20 @@ class TestSave(TestCase):
             torch.save(output_dpcpp, 'tensor_dpcpp.pt')
             self.assertEqual(torch.load('tensor.pt'), torch.load('tensor_dpcpp.pt'))
 
+class TestFallbackOP(TestCase):
+    def test__pack_padded_sequence(self):
+        seqs = [torch.FloatTensor(random.randint(1, 6)).to(ipex.DEVICE) for _ in range(5)]
+        seqs = [s.random_(-128, 128) for s in seqs]
+        ordered = sorted(seqs, key=len, reverse=True)
+        lengths = list(map(len, ordered))
+        padded_tensor = rnn_utils.pad_sequence(ordered)
+        with AutoDNNL(True):
+            for enforce_sorted in [True, False]:
+                packed = rnn_utils.pack_padded_sequence(padded_tensor, lengths, enforce_sorted=enforce_sorted)
+                masked = packed.float()
+                unpacked, lengths_out = rnn_utils.pad_packed_sequence(masked)
+                self.assertTrue(str(unpacked.device) == ipex.DEVICE)
+                self.assertTrue(str(lengths_out.device) == 'cpu')
 
 if __name__ == '__main__':
     test = unittest.main()

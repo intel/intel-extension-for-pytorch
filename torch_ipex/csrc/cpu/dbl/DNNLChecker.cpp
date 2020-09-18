@@ -45,7 +45,7 @@ bool dnnl_support_the_data_type_of(const std::vector<at::Tensor> &tensor_vec) {
 
 bool dnnl_support_the_dimension_of(const std::vector<at::Tensor> &tensor_vec) {
   for (auto it = tensor_vec.begin(); it != tensor_vec.end(); ++it) {
-    if (it->dim() <= 0) {
+    if (it->dim() <= 0 && !is_scalar_tensor(*it)) {
       return false;
     }
   }
@@ -62,9 +62,16 @@ bool dnnl_tensor_has_data(const std::vector<at::Tensor> &tensor_vec) {
 }
 
 bool all_is_dpcpp(const std::vector<at::Tensor> &tensor_vec) {
-  for (auto it = tensor_vec.begin(); it != tensor_vec.end(); ++it)
-    if (!it->device().is_dpcpp())
-      return false;
+  for (auto it = tensor_vec.begin(); it != tensor_vec.end(); ++it) {
+    if (!it->device().is_dpcpp()) {
+      // Not DPCPP device
+      if (is_scalar_tensor(*it) || !it->defined() || it->numel() == 0) {
+        // If the tensor is scalar tensor or the tensor does not contains any elements, do nothing
+      } else {
+        return false;
+      }
+    }
+  }
 
   return true;
 }

@@ -2012,7 +2012,7 @@ at::Tensor AtenIpexCPUDev::dil_index_select(
     int64_t dim,
     const at::Tensor & index) {
   torch_ipex::reset_ipex_func_status();
-
+  DEBUG("AtenIpexCPUDev::dil_index_select\n");
   IPEX_CHECK(
     self.device().type() == c10::DeviceType::DPCPP,
     "IPEX index select only work on DPCPP tensor");
@@ -2030,7 +2030,9 @@ at::Tensor AtenIpexCPUDev::dil_index_select(
 
 at::Tensor AtenIpexCPUDev::dil_shuffle(const at::Tensor & self, at::IntArrayRef view_shape, int64_t dim0, int64_t dim1) {
   DEBUG("AtenIpexCPUDev::dil_shuffle\n");
-  RECORD_FUNCTION("AtenIpexCPUDev::dil_shuffle", std::vector<c10::IValue>(), -1);
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("AtenIpexCPUDev::dil_shuffle", std::vector<c10::IValue>({self}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
   // NOTE: We do NOT add sanity checks here. Because PyTorch does not has shuffle operator. This dil operator is for fusion and the fusion logic
   // has more sanity checks. We found that there are some models use view + transpose + view to implement shuffle semantic. So IPEX will fuse these
   // operators a single shuffle.
@@ -2040,6 +2042,25 @@ at::Tensor AtenIpexCPUDev::dil_shuffle(const at::Tensor & self, at::IntArrayRef 
   auto groups = view_shape[group_dim];
   dil::channel_shuffle_forward::compute(std::move(x), y, groups, group_dim);
   return dbl::comm::gen_aten_tensor_by(std::move(y));
+}
+
+std::tuple<at::Tensor,at::Tensor> AtenIpexCPUDev::dil__pack_padded_sequence(const at::Tensor & input, const at::Tensor & lengths, bool batch_first) {
+  DEBUG("AtenIpexCPUDev::dil__pack_padded_sequence\n");
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("AtenIpexCPUDev::dil__pack_padded_sequence", std::vector<c10::IValue>({input, lengths}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
+  torch_ipex::reset_ipex_func_status();
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(lengths.layout() == c10::kStrided);
+  auto&& _ipex_input = bridge::shallowFallbackToCPUTensor(input);
+  auto&& _ipex_lengths = bridge::shallowFallbackToCPUTensor(lengths);
+  auto&& _ipex_result = at::_pack_padded_sequence(_ipex_input, _ipex_lengths, batch_first);
+
+  // PyTorch requires the device of batch_size tensor is CPU, so IPEX does not covert the batch_size tensor(std::get<1>(_ipex_result)) to DPCPP
+  return std::tuple<at::Tensor,at::Tensor>(
+    bridge::shallowUpgradeToDPCPPTensor(std::get<0>(_ipex_result)),
+    std::get<1>(_ipex_result));
 }
 
 }  // namespace cpu

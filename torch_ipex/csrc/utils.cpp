@@ -189,4 +189,13 @@ bool is_ipex_func_success() {
   return g_current_ipex_func_stat == IPEXFuncStatus::IPEX_SUCCESS;
 }
 
+bool is_scalar_tensor(const at::Tensor& tensor) {
+  auto strides = tensor.strides();
+  for (int i = 0; i < strides.size(); i++) {
+    if (strides[i] != 0) return false;
+  }
+
+  return tensor.numel() == 1;
+}
+
 }  // namespace torch_ipex

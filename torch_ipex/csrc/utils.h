@@ -32,6 +32,8 @@ bool check_tensor_own_whole_storage(const at::Tensor& tensor);
 bool check_tensor_own_shade_context(const at::Tensor& tensor);
 bool check_aten_dil_shape_info(const at::Tensor& ipex_tensor, const dil::tensor &dil_tensor);
 
+bool is_scalar_tensor(const at::Tensor& tensor);
+
 dil::data_type get_dil_data_type(at::ScalarType);
 at::ScalarType get_at_data_type(dil::data_type);
 
