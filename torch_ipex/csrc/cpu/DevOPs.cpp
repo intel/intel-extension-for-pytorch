@@ -422,44 +422,49 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
 
 std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_backward_overrideable(const at::Tensor & grad_output, const at::Tensor & input, const at::Tensor & weight, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups, std::array<bool,3> output_mask) {
   DEBUG("AtenIpexCPUDev::convolution_backward_overrideable\n");
-  // NOTE: DO NOT always call contiguous. It may break lazy-reorder. Because contiguous will call reorder instantly.
-  std::vector<at::Tensor> dnnl_input_tensors;
-  dnnl_input_tensors.push_back(input);
-  dnnl_input_tensors.push_back(weight);
-  dnnl_input_tensors.push_back(grad_output);
-  if (check_auto_dnnl()) {
-    if (!dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
-      IPEX_CHECK(false, "convolution backward fallback not supported when dnnl check fails in dnnl path");
-    } else if (transposed) {
-      // TODO: do we need output padding here???
-      return AtenIpexCPUDev::dil_deconvolution_backward(
-        input.is_contiguous() ? input : input.contiguous(),
-        grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
-        weight.is_contiguous() ? weight : weight.contiguous(),
-        padding,
-        stride,
-        dilation,
-        groups,
-        output_mask);
-    } else {
-      return AtenIpexCPUDev::dil_convolution_backward(
-        input.is_contiguous() ? input : input.contiguous(),
-        grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
-        weight.is_contiguous() ? weight : weight.contiguous(),
-        padding,
-        stride,
-        dilation,
-        groups,
-        output_mask);
+  try {
+    if (check_auto_dnnl()) {
+      // NOTE: DO NOT always call contiguous. It may break lazy-reorder. Because contiguous will call reorder instantly.
+      std::vector<at::Tensor> dnnl_input_tensors;
+      dnnl_input_tensors.push_back(input);
+      dnnl_input_tensors.push_back(weight);
+      dnnl_input_tensors.push_back(grad_output);
+      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
+        if (transposed) {
+          // TODO: do we need output padding here???
+          return AtenIpexCPUDev::dil_deconvolution_backward(
+            input.is_contiguous() ? input : input.contiguous(),
+            grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
+            weight.is_contiguous() ? weight : weight.contiguous(),
+            padding,
+            stride,
+            dilation,
+            groups,
+            output_mask);
+        } else {
+          return AtenIpexCPUDev::dil_convolution_backward(
+            input.is_contiguous() ? input : input.contiguous(),
+            grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
+            weight.is_contiguous() ? weight : weight.contiguous(),
+            padding,
+            stride,
+            dilation,
+            groups,
+            output_mask);
+        }
+      }
     }
+  } catch (std::exception& e) {
+#if defined(_DEBUG)
+    TORCH_WARN(e.what());
+#endif 
+  }
+
+  if (transposed) {
+    return AtenIpexCPUDev::cpu_deconvolution_backward(input, grad_output, weight, padding, output_padding, stride, dilation, groups, output_mask);
   } else {
-    if (!dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
-      IPEX_CHECK(false, "convolution backward fallback not supported when dnnl check fails in native path");
-    } else if (transposed) {
-      return AtenIpexCPUDev::cpu_deconvolution_backward(input, grad_output, weight, padding, output_padding, stride, dilation, groups, output_mask);
-    } else {
-      return AtenIpexCPUDev::mkldnn_convolution_backward(input, grad_output, weight, padding, stride, dilation, groups, output_mask);
-    }
+    // TODO should fallback to cpu (maybe thnn 2d or thnn 3d conv bw) rather than mkldnn
+    return AtenIpexCPUDev::mkldnn_convolution_backward(input, grad_output, weight, padding, stride, dilation, groups, output_mask);
   }
 }
 
