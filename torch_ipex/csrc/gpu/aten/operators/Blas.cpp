@@ -136,7 +136,12 @@ void mkldnnGemmImpl(
           b_dims, b_dt, result.sizes().size() ==  2 ?
           dnnl::memory::format_tag::ab : dnnl::memory::format_tag::abc);
     } else {
-      b_md = r_md;
+      if (dims == 2) {
+        b_md = memory::desc({m, n}, b_dt, {b.stride(0), b.stride(1)});
+      } else {
+        b_md = memory::desc({mb, m, n}, b_dt,
+          {b.stride(0), b.stride(1), b.stride(2)});
+      }
     }
     matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, b_md, r_md));
   } else {
