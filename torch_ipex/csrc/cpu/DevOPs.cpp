@@ -274,7 +274,8 @@ at::Tensor dil_deconvolution_backward_input(
     at::IntArrayRef input_size, 
     const at::Tensor& grad_output, 
     const at::Tensor& weight,
-    at::IntArrayRef padding, 
+    at::IntArrayRef padding,
+    std::vector<int64_t> padding_r,
     at::IntArrayRef stride, 
     at::IntArrayRef dilation, 
     int64_t groups, 
@@ -292,7 +293,7 @@ at::Tensor dil_deconvolution_backward_input(
           dil_grad_input,
           stride.vec(),
           padding.vec(),
-          padding.vec(),
+          padding_r,
           dilation.vec(),
           groups);
       return dbl::comm::gen_aten_tensor_by(std::move(dil_grad_input));
@@ -302,7 +303,8 @@ std::tuple<at::Tensor, at::Tensor> dil_deconvolution_backward_weights(
     const at::Tensor& weight, 
     const at::Tensor& grad_output, 
     const at::Tensor& input,
-    at::IntArrayRef padding, 
+    at::IntArrayRef padding,
+    std::vector<int64_t> padding_r,
     at::IntArrayRef stride, 
     at::IntArrayRef dilation, 
     int64_t groups, 
@@ -326,7 +328,7 @@ std::tuple<at::Tensor, at::Tensor> dil_deconvolution_backward_weights(
             dil_grad_bias,
             stride.vec(),
             padding.vec(),
-            padding.vec(),
+            padding_r,
             dilation.vec(),
             groups,
             diff_weight_type);
@@ -341,7 +343,7 @@ std::tuple<at::Tensor, at::Tensor> dil_deconvolution_backward_weights(
             dil_grad_weight,
             stride.vec(),
             padding.vec(),
-            padding.vec(),
+            padding_r,
             dilation.vec(),
             groups, 
             diff_weight_type);
@@ -356,6 +358,7 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_deconvolution_b
   const at::Tensor& grad_output_t, 
   const at::Tensor& weight, 
   at::IntArrayRef padding, 
+  std::vector<int64_t> padding_r,
   at::IntArrayRef stride, 
   at::IntArrayRef dilation, 
   int64_t groups, 
@@ -371,11 +374,11 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_deconvolution_b
     at::Tensor grad_input, grad_weight, grad_bias;
     if (output_mask[0]) {
       grad_input = dil_deconvolution_backward_input(
-        input.sizes(), grad_output, weight, padding, stride, dilation, groups, output_mask[2]);
+        input.sizes(), grad_output, weight, padding, padding_r, stride, dilation, groups, output_mask[2]);
     }
     if (output_mask[1] || output_mask[2]) {
       std::tie(grad_weight, grad_bias) = dil_deconvolution_backward_weights(
-        weight, grad_output, input, padding, stride, dilation, groups, output_mask[2]);
+        weight, grad_output, input, padding, padding_r, stride, dilation, groups, output_mask[2]);
     }
     return std::make_tuple(grad_input, grad_weight, grad_bias);
 }
@@ -431,12 +434,15 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
       dnnl_input_tensors.push_back(grad_output);
       if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
         if (transposed) {
+          // adjust padding_r in deconvolution
+          std::vector<int64_t> padding_r = dbl::deconv::calc_padding_r_adjusted(input.dim(), padding, output_padding);
           // TODO: do we need output padding here???
           return AtenIpexCPUDev::dil_deconvolution_backward(
             input.is_contiguous() ? input : input.contiguous(),
             grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
             weight.is_contiguous() ? weight : weight.contiguous(),
             padding,
+            padding_r,
             stride,
             dilation,
             groups,
