@@ -2063,5 +2063,31 @@ std::tuple<at::Tensor,at::Tensor> AtenIpexCPUDev::dil__pack_padded_sequence(cons
     std::get<1>(_ipex_result));
 }
 
+at::Tensor& AtenIpexCPUDev::dil_copy_(
+    at::Tensor & self,
+    const at::Tensor & src,
+    bool non_blocking) {
+  DEBUG("AtenIpexCPUDev::dil_copy_\n");
+  torch_ipex::reset_ipex_func_status();
+
+  IPEX_CHECK(
+    self.device().type() == c10::DeviceType::DPCPP &&
+    src.device().type() == c10::DeviceType::DPCPP,
+    "IPEX copy only work on DPCPP tensor");
+  if (ShadeDataContext::isDilTensor(src) &&ShadeDataContext::isTensorMixPrecision(src)){
+    IPEX_CHECK(check_tensor_own_whole_storage(self),  "IPEX copy only works while self tensor own the whole storage");
+    auto dil_src = dbl::comm::try_gen_dil_tensor(src);
+    IPEX_CHECK(dil_src.get_data_type() == dil::data_type::bf16)
+    auto new_buffer_desc = dil_src.get_desc();
+    dil::tensor dil_buffer{new_buffer_desc};
+    dil_src.reorder_to(dil_buffer);
+    dbl::comm::equip_dil_buffer(self, dil_buffer);
+    return self;
+  }
+    // TODO: We need add more LP here
+  torch_ipex::set_ipex_func_status(torch_ipex::IPEXFuncStatus::IPEX_FALLBACK);
+  return self;
+}
+
 }  // namespace cpu
 }  // namespace torch_ipex

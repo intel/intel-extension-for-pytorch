@@ -13,7 +13,7 @@ namespace bf16 {
 
 at::Tensor index_select(const at::Tensor & self, int64_t dim, const at::Tensor & index) {
   auto&& _tensor = bf16::gen_consistent_tensor(self);
-  auto&& _ipex_index = bridge::shallowFallbackToCPUTensor(index);
+  auto&& _ipex_index = bf16::gen_consistent_tensor(index);
   auto&& _ipex_result = at::index_select(_tensor, dim, _ipex_index);
   return bf16::gen_mix_prec_tensor(_ipex_result);
 }

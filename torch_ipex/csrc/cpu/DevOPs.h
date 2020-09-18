@@ -83,6 +83,8 @@ class AtenIpexCPUDev {
   static at::Tensor dil__unsafe_view(const at::Tensor & self, at::IntArrayRef size);
   static at::Tensor dil_shuffle(const at::Tensor & self, at::IntArrayRef view_shape, int64_t dim0, int64_t dim1);
   static std::tuple<at::Tensor,at::Tensor> dil__pack_padded_sequence(const at::Tensor & input, const at::Tensor & lengths, bool batch_first);
+  static at::Tensor& dil_copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
+
 };
 
 }  // namespace cpu
