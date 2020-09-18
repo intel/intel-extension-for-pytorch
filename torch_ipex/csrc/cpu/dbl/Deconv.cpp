@@ -28,11 +28,29 @@ std::vector<int64_t> calc_deconv_input_size(
   return input_size;
 }
 
+// TODO (may need more explanation here)
+// for deconv, PyTorch has a parameter named output_padding while mkldnn does not 
+// have this concept. We should adjust the padding_r to take output_padding into 
+// consideration
+std::vector<int64_t> calc_padding_r_adjusted(
+    const int64_t input_dims,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding) {
+    const int64_t dims = input_dims - 2;
+    auto padding_vec = dbl::comm::expand_param_if_needed(padding, "padding", dims);
+    std::vector<int64_t> padding_vec_r = padding_vec;
+    for (size_t i = 2; i < input_dims; ++i) {
+        padding_vec_r[i-2] = padding[i-2] - output_padding[i-2];
+    }
+    return padding_vec_r;
+}
+
 dil::tensor deconvolution_impl(
     const dil::tensor& x,
     const dil::tensor& w,
     const c10::optional<dil::tensor>& b,
     at::IntArrayRef padding,
+    std::vector<int64_t> padding_r,
     at::IntArrayRef output_padding,
     at::IntArrayRef stride,
     at::IntArrayRef dilation,
@@ -52,7 +70,7 @@ dil::tensor deconvolution_impl(
       y,
       {stride.begin(), stride.end()},
       {padding.begin(), padding.end()},
-      {padding.begin(), padding.end()},
+      {padding_r.begin(), padding_r.end()},
       {dilation.begin(), dilation.end()}, 
       groups,
       attr);
@@ -64,7 +82,7 @@ dil::tensor deconvolution_impl(
       y,
       {stride.begin(), stride.end()},
       {padding.begin(), padding.end()},
-      {padding.begin(), padding.end()},
+      {padding_r.begin(), padding_r.end()},
       {dilation.begin(), dilation.end()}, 
       groups,
       attr);
@@ -77,6 +95,7 @@ void prepack_deconv_weights(
     const at::Tensor& weight,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
+    std::vector<int64_t> padding_r, 
     at::IntArrayRef output_padding,
     at::IntArrayRef dilation,
     int64_t groups,
@@ -102,7 +121,7 @@ void prepack_deconv_weights(
         dil_weight.get_data_type(),
         stride.vec(),
         padding.vec(),
-        padding.vec(),
+        padding_r,
         dilation.vec(),
         groups,
         dil::algorithm::deconvolution_direct,

@@ -247,9 +247,12 @@ at::Tensor AtenIpexCPUDev::dil_deconvolution(
   }
 
   dbl::comm::reorder_to_bf16_for_mix_prec(weight, true);
+
+  std::vector<int64_t> padding_r = dbl::deconv::calc_padding_r_adjusted(input.dim(), padding, output_padding);
+
   if (!(check_auto_mix_bf16_fp32() && check_train())) {
     dbl::deconv::prepack_deconv_weights(
-      input, weight, stride, padding, output_padding, dilation, groups, bias.defined());
+      input, weight, stride, padding, padding_r, output_padding, dilation, groups, bias.defined());
   }
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
@@ -258,6 +261,7 @@ at::Tensor AtenIpexCPUDev::dil_deconvolution(
     dil_weight,
     dil_bias,
     padding,
+    padding_r,
     output_padding,
     stride,
     dilation,
