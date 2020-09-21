@@ -37,8 +37,8 @@ public:
   inline bool get_mix_bf16_fp32() {
     return mix_bf16_fp32_;
   }
-  
-  inline bool set_train(bool value) {
+
+  inline void set_train(bool value) {
     train_ = value;
   }
   inline bool get_train() {
@@ -109,7 +109,7 @@ public:
     }
   }
   */
- 
+
   inline void add_indicators() {
     num_ops_id = 0;
     // default used is s8
@@ -192,7 +192,7 @@ public:
   }
 
 private:
-  AutoOptConfig() : auto_dnnl_(true), mix_bf16_fp32_(false), num_ops_id(0), mix_int8_fp32_(false),
+  AutoOptConfig() : auto_dnnl_(true), mix_bf16_fp32_(false), mix_int8_fp32_(false), num_ops_id(0),
     calibration_step_(false), observers_{}, indicators_{}, jit_fuse_(true), train_(false) {}
   ~AutoOptConfig() = default;
   AutoOptConfig(const AutoOptConfig&) = default;
@@ -206,7 +206,7 @@ private:
   // int8
   bool mix_int8_fp32_;
   int64_t num_ops_id; // id number of call int8 path
-  // the flag for one iteration of calibration step whether end or not 
+  // the flag for one iteration of calibration step whether end or not
   bool calibration_step_;
   std::vector<Observer> observers_;
   std::vector<Indicator> indicators_;
