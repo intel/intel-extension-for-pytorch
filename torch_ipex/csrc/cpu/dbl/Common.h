@@ -71,6 +71,7 @@ void sync_shape_from_dil_to_aten(const at::Tensor& ipex_tensor, const dil::tenso
 std::vector<int64_t> expand_param_if_needed(
     at::IntArrayRef list_param, const char *param_name, int64_t expected_dim);
 
+at::Tensor subtensor(at::Tensor& tensor, int dim, int groups, int g);
 }  // namespace comm
 }  // namespace dbl
 }  // namespace cpu

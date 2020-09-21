@@ -15,7 +15,6 @@ std::vector<int64_t> calc_deconv_input_size(
     at::IntArrayRef output_size,
     at::IntArrayRef kernel_size,
     at::IntArrayRef padding,
-    std::vector<int64_t> padding_r, 
     at::IntArrayRef output_padding,
     at::IntArrayRef stride,
     at::IntArrayRef dilation,
