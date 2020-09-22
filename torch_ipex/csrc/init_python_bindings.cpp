@@ -147,8 +147,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_int8_calibration", []() { return AutoOptConfig::singleton().get_int8_calibration(); });
   m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
   m.def("add_indicators", []() { AutoOptConfig::singleton().add_indicators(); });
-  //m.def("print_observer", []() { AutoOptConfig::singleton().print_observer(); });
-  // m.def("print_indicator", []() { AutoOptConfig::singleton().print_indicator(); });
   m.def("get_int8_configures", []() {
       py::list output_list;
       auto indicators = AutoOptConfig::singleton().get_indicators();

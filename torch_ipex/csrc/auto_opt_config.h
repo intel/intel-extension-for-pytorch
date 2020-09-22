@@ -64,8 +64,12 @@ public:
     std::vector<std::vector<float>> i_min_max_values, std::vector<std::vector<float>> o_min_max_values) {
     num_ops_id++;
     if (observers_.size() < num_ops_id) {
-      // this path is that user not set int8 op's configure, using default configures
-      Observer new_observer = {num_ops_id - 1, op_name, i_min_max_values, o_min_max_values};
+      // this path is that user not set int8 op's configure, using default configures if user not set it.
+      std::string observer_algorithm = "min_max";
+      if (!indicators_.empty()) {
+        observer_algorithm = indicators_[num_ops_id - 1].get_indicator_algorithm();
+      }
+      Observer new_observer = {num_ops_id - 1, op_name, i_min_max_values, o_min_max_values, observer_algorithm};
       observers_.push_back(new_observer);
     } else {
       // user has set configure or have run one interation
@@ -94,24 +98,9 @@ public:
     }
   }
 
-  /*
-  inline void print_observer() {
-    for (auto i = 0; i< observers_.size(); i++) {
-      for (auto j = 0; j < observers_[i].max_values.size(); j++)
-        std::cout<<observers_[i].max_values[j]<<std::endl;
-    }
-  }
-  inline void print_indicator() {
-    for (auto i = 0; i< indicators_.size(); i++) {
-      auto scales = indicators_[i].get_indicator_scales();
-      for (auto j = 0; j< scales.size(); j++)
-          std::cout<<scales[j]<<std::endl;
-    }
-  }
-  */
-
   inline void add_indicators() {
     num_ops_id = 0;
+    indicators_.clear();
     // default used is s8
     for (auto i = 0; i < observers_.size(); i++) {
       std::vector<float> inputs_scale, outputs_scale;
