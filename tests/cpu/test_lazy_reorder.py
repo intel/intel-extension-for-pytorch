@@ -10,6 +10,7 @@ import unittest
 from functools import reduce
 import copy
 import sys
+import itertools
 import torch
 import intel_pytorch_extension as ipex
 
@@ -106,27 +107,123 @@ class TestConv(TestCase):
         self.assertEqual(res_cpu, res_dpcpp.to('cpu'))
 
 class TestDeconv(TestCase):
-    def test_Deconv2d_with_cpu(self):
+    def _deconv_params_list(self):
+        params_dict = {
+            "input_height": [8],
+            "input_width": [8],
+            "input_depth": [8],
+            "input_channel_per_group": [10],
+            "output_channel_per_group": [10],
+            "kernel_size": [3, 4],
+            "bias": [False, True],
+            "stride": [2], # [1, 2]
+            "padding": [1, 2],
+            "output_padding": [2],
+            "groups": [1, 2],
+            "dilation": [1, 3, 4],
+        }
+
+        params_list = []
+
+        for key, value in params_dict.items():
+            params_list.append(value)
+        return params_list
+
+    def _test_deconv(self, dims):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        deconv_cpu = torch.nn.ConvTranspose2d(2, 3, (3, 3))
-        deconv_dpcpp = torch.nn.ConvTranspose2d(2, 3, (3, 3)).to(device=device)
 
-        deconv_dpcpp.weight.data = deconv_cpu.weight.data.to(device=device)
-        deconv_dpcpp.bias.data = deconv_cpu.bias.data.to(device=device)
+        params_list = self._deconv_params_list()
 
-        input_cpu = torch.rand((1, 2, 7, 7))
-        input_dpcpp = input_cpu.to(device=device)
+        for input_width, input_height, input_depth, input_channel_per_group, output_channel_per_group, kernel_size, bias, stride, padding, output_padding, groups, dilation in itertools.product(*params_list):
+            if (output_padding < stride or output_padding < dilation) \
+                    and ((input_height - 1) * stride - 2 * padding + dilation * (kernel_size -1 ) + output_padding + 1 > 0) \
+                    and ((input_width - 1) * stride - 2 * padding + dilation * (kernel_size -1 ) + output_padding + 1 > 0) \
+                    and ((input_depth - 1) * stride - 2 * padding + dilation * (kernel_size -1 ) + output_padding + 1 > 0):
+                
+                # mkldnn does not support the case where: 
+                # padding - output_padding + stride <= 0
+                # while PyTorch supports this case, will fallback in this case
+                # input_width = 8
+                # input_height = 8
+                # input_channel_per_group = 10
+                # output_channel_per_group = 10
+                # kernel_size = 4
+                # bias = False
+                # stride = 1
+                # padding = 1
+                # output_padding = 2
+                # groups = 1
+                # dilation = 3
 
-        ipex.core.enable_auto_dnnl()
-        out_dpcpp = deconv_dpcpp(input_dpcpp)
+                ic = input_channel_per_group * groups
+                oc = output_channel_per_group * groups
 
-        ipex.core.disable_auto_dnnl()
-        out_dpcpp_cpu = out_dpcpp.to('cpu')
-        out_cpu = deconv_cpu(input_cpu)
-        self.assertEqual(out_dpcpp.size(), out_cpu.size())
-        self.assertEqual(out_cpu, out_dpcpp_cpu)
+                if dims == 2:
+                    module = torch.nn.ConvTranspose2d(ic, oc, kernel_size=kernel_size, stride=stride, padding=padding, output_padding=output_padding, groups=groups, bias=bias, dilation=dilation)
+                    x = torch.rand((2, ic, input_height, input_width))
+                elif dims == 3:
+                    module = torch.nn.ConvTranspose3d(ic, oc, kernel_size=kernel_size, stride=stride, padding=padding, output_padding=output_padding, groups=groups, bias=bias, dilation=dilation)
+                    x = torch.rand((2, ic, input_depth, input_height, input_width))
+
+                module_dpcpp = copy.deepcopy(module).to(device=device)
+                module_fallback = copy.deepcopy(module).to(device=device)
+                module_fallback_ = copy.deepcopy(module).to(device=device)
+
+                x_aten = x.clone().requires_grad_()
+                x_dpcpp = x.clone().to(device=device).requires_grad_()
+                x_fallback = x.clone().to(device=device).requires_grad_()
+                x_fallback_ = x.clone().to(device=device).requires_grad_()
+
+                y_aten = module(x_aten)
+                y_aten.sum().backward()
+
+                # test dnnl
+                with AutoDNNL(True):
+                    y_dpcpp = module_dpcpp(x_dpcpp)
+                    y_dpcpp.sum().backward()
+                    
+                    self.assertEqual(
+                        y_aten, y_dpcpp)
+                    self.assertEqual(
+                        module.weight.grad, module_dpcpp.weight.grad, 1e-3)
+                    self.assertEqual(x_aten.grad, x_dpcpp.grad)
+                    if bias:
+                        self.assertEqual(module.bias.grad, module_dpcpp.bias.grad)
+
+                # test fallback
+                with AutoDNNL(False):
+                    y_fallback = module_fallback(x_fallback)
+                    y_fallback.sum().backward()
+
+                    self.assertEqual(
+                        y_aten, y_fallback)
+                    self.assertEqual(
+                        module.weight.grad, module_fallback.weight.grad)
+                    self.assertEqual(x_aten.grad, x_fallback.grad)
+                    if bias:
+                        self.assertEqual(module.bias.grad, module_fallback.bias.grad)
+
+                # test fw: dnnl, bw: cpu
+                with AutoDNNL(True):
+                    y_fallback_ = module_fallback_(x_fallback_)
+                with AutoDNNL(False):
+                    y_fallback_.sum().backward()
+
+                self.assertEqual(
+                    y_aten, y_fallback_)
+                self.assertEqual(
+                    module.weight.grad, module_fallback_.weight.grad)
+                self.assertEqual(x_aten.grad, x_fallback_.grad)
+                if bias:
+                    self.assertEqual(module.bias.grad, module_fallback_.bias.grad)
+    
+    def test_deconv2d(self):
+        self._test_deconv(dims=2)
+    
+    def test_deconv3d(self):
+        self._test_deconv(dims=3)
 
     def _seq_conf(self, device, rand_seed):
         torch.manual_seed(rand_seed)
@@ -150,36 +247,6 @@ class TestDeconv(TestCase):
         ipex.core.enable_auto_dnnl()
         res_dpcpp = self._seq_conf(device, rand_seed)
         self.assertEqual(res_cpu, res_dpcpp.to('cpu'))
-    
-    def test_Deconv2d_backward(self):
-        rand_seed = int(get_rand_seed())
-
-        # rand_seed = 1600072517315694592 # weight.grad AssertionError: tensor(1.9073e-05) not less than or equal to 1e-05
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        
-        ipex.core.enable_auto_dnnl()
-        
-        input = torch.rand(2, 10, 8, 8)
-        for bias in [False, True]:
-            input_cpu = input.clone().requires_grad_()
-            input_dpcpp = input.clone().to(device=device).requires_grad_()
-            conv_cpu = nn.ConvTranspose2d(10, 10,
-                                            kernel_size=4, stride=2, bias=bias)
-            conv_dpcpp = copy.deepcopy(conv_cpu).to(device=device)
-            out_cpu = conv_cpu(input_cpu).sum()
-            out_dpcpp = conv_dpcpp(input_dpcpp).sum()
-            out_cpu.backward()
-            out_dpcpp.backward()
-
-            self.assertEqual(input_cpu.grad, input_dpcpp.grad)
-
-            # TODO threshold
-            self.assertEqual(conv_cpu.weight.grad, conv_dpcpp.weight.grad, 2e-5)
-            if bias:
-                self.assertEqual(conv_cpu.bias.grad, conv_dpcpp.bias.grad)
-            
-            
 
 class TestBinaryOp(TestCase):
     def test_add(self):

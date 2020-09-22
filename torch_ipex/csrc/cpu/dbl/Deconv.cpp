@@ -28,10 +28,27 @@ std::vector<int64_t> calc_deconv_input_size(
   return input_size;
 }
 
-// TODO (may need more explanation here)
-// for deconv, PyTorch has a parameter named output_padding while mkldnn does not 
-// have this concept. We should adjust the padding_r to take output_padding into 
-// consideration
+/*
+For deconv, PyTorch has a parameter named output_padding while onednn does not 
+have this concept. We should adjust the padding_r to take output_padding into consideration
+
+PyTorch: 
+  https://pytorch.org/docs/stable/generated/torch.nn.ConvTranspose2d.html
+  (1) H_out = (H_in - 1) * stride[0] - 2 * padding[0] + dilation_pytorch[0] * (kernel_size[0] - 1) + output_padding[0] + 1
+
+onednn: 
+  third_party/mkl-dnn/src/common/deconvolution.cpp:
+  (2) (H_out - (1 + (kernel_size - 1) * (dil_onednn + 1)) + pad_l + pad_r) / stride + 1 == H_in;
+
+Equation (2) is equivalent to:
+  (3) H_out = (H_in - 1) * stride[0] - pad_l - pad_r + (dil_onednn + 1) * (kernel_size[0] - 1 ) + 1
+
+Since dil_onednn = dilation_pytorch - 1, if we compare equation (1) with equation (3), we have:
+  pad_l + pad_r = 2 * padding - output_padding
+
+We fix pad_l = padding, thus we should change pad_r to be:
+  pad_r = padding - output_padding
+*/
 std::vector<int64_t> calc_padding_r_adjusted(
     const int64_t input_dims,
     at::IntArrayRef padding,
