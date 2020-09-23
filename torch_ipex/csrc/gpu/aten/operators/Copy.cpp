@@ -5,7 +5,6 @@
 #include <ATen/quantized/Quantizer.h>
 #include <ATen/quantized/QTensorImpl.h>
 
-#include <core/ApplyUtils.h>
 #include <core/Exception.h>
 #include <core/Guard.h>
 #include <core/Memory.h>
@@ -14,6 +13,7 @@
 #include <ATen/native/Resize.h>
 
 #include <utils/ATDispatch.h>
+#include "Loops.h"
 
 using namespace at;
 using namespace at::dpcpp;
@@ -22,29 +22,6 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-template <typename T>
-struct inter_copy_type {
-  using type = T;
-};
-
-template <>
-struct inter_copy_type<uint8_t> {
-  using type = int64_t;
-};
-
-template <typename T>
-using inter_copy_type_t = typename inter_copy_type<T>::type;
-
-template <typename dst_T, typename src_T>
-class copy_functor {
- public:
-  copy_functor() {}
-  void operator()(dst_T& dst_val, const src_T& src_val) const {
-    dst_val =
-        static_cast<dst_T>(static_cast<inter_copy_type_t<dst_T>>(src_val));
-  }
-};
-
 #define BUILD_TENSOR_ITER(dst, src, iter) \
   auto iter = TensorIterator();           \
   iter.add_output(dst);                   \
@@ -52,14 +29,6 @@ class copy_functor {
   iter.dont_resize_outputs();             \
   iter.dont_compute_common_dtype();       \
   iter.build();
-
-// Copy operator for the pointerwise apply kernel
-template <typename dst_T, typename src_T>
-struct CopyOp {
-  static void apply(Tensor& dst, const Tensor& src) {
-    DPCPP_tensor_apply2<dst_T, src_T>(dst, src, copy_functor<dst_T, src_T>());
-  }
-};
 
 static bool copy_requires_temporaries(TensorIterator& iter, bool p2p_enabled) {
   Device dst_device = iter.device(0);
@@ -95,6 +64,10 @@ static bool maybe_enable_p2p_access(Device dst_device, Device src_device) {
   return false;
 }
 
+
+DPCPP_DEF_K1(SyclOpElwCopy1);
+DPCPP_DEF_K1(SyclOpElwCopy2);
+
 void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   auto numel = iter.numel();
   if (numel == 0) {
@@ -126,17 +99,23 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
     ScalarType dtype = iter.dtype(0);
     if(!isQIntType(dtype)){
       IPEX_DISPATCH_ALL_TYPES_AND3(
-          kHalf, kBFloat16, kBool, iter.dtype(0), "copy_", [&] {
-            using dst_t = scalar_t;
+          kHalf, kBFloat16, kBool, iter.dtype(1), "copy_", [&] {
+            using src_t = scalar_t;
             IPEX_DISPATCH_ALL_TYPES_AND3(
-                kHalf, kBFloat16, kBool, iter.dtype(1), "copy_", [&] {
-                  CopyOp<dst_t, scalar_t>::apply(iter.tensor(0), iter.tensor(1));
-                });
-          });
+                kHalf, kBFloat16, kBool, iter.dtype(0), "copy_", [&] {
+                  dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpElwCopy1, scalar_t, src_t)>(
+                      iter, [=](src_t src_val) -> scalar_t {
+                          return static_cast<scalar_t>(src_val);
+                  });
+            });
+      });
     } else {
-      IPEX_DISPATCH_QINT_TYPES(iter.dtype(0), "copy_", [&] {
-        using dst_t = scalar_t;
-          CopyOp<dst_t, scalar_t>::apply(iter.tensor(0), iter.tensor(1));
+      IPEX_DISPATCH_QINT_TYPES(iter.dtype(1), "copy_", [&] {
+        using src_t = scalar_t;
+          dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpElwCopy2, scalar_t, src_t)>(
+              iter, [=](src_t src_val) -> scalar_t {
+                  return static_cast<scalar_t>(src_val);
+               });
       });
     }
   }
