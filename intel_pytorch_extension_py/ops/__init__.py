@@ -6,3 +6,6 @@ from .mlp import *
 from .jit import *
 from .save import *
 from .to import *
+from .roi_align import ROIAlign
+from .roi_align import roi_align
+from .nms import nms
