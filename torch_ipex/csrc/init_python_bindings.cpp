@@ -24,6 +24,7 @@
 #include "cpu/ShadeDataContext.h"
 #include "cpu/ExtendOPs.h"
 #include "cpu/MlpOPs.h"
+#include "cpu/ExternalOPs.h"
 #include "quantization/Observer.h"
 
 namespace torch_ipex {
@@ -189,6 +190,11 @@ void InitIpexModuleBindings(py::module m) {
         indicators.push_back(temp);
       }
       AutoOptConfig::singleton().set_indicators(indicators); } );
+
+  // external OPs
+  m.def("roi_align_forward", &IpexExternal::ROIAlign_forward);
+  m.def("roi_align_backward", &IpexExternal::ROIAlign_backward);
+  m.def("nms", &IpexExternal::nms);
 }
 
 }  // namespace
