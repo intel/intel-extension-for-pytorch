@@ -95,8 +95,10 @@ static inline dnnl::memory::data_type dt_to_dnnl(const ScalarType scalar_type) {
     return dnnl::memory::data_type::u8;
   } else if (scalar_type == ScalarType::QInt32) {
     return dnnl::memory::data_type::s32;
-  } else {
+  } else if (scalar_type == ScalarType::Float) {
     return dnnl::memory::data_type::f32;
+  } else {
+    AT_ERROR("This data type is not supported in oneDNN so far: (", c10::toString(scalar_type), ")!");
   }
 }
 

@@ -139,19 +139,17 @@ void mkldnnGemmImpl(
   std::shared_ptr<dnnl::matmul::desc> matmul_desc;
 #ifdef USE_GEN12HP_ONEDNN
   if (beta == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
-    auto b_dt = dt_to_dnnl(b.scalar_type());
+    auto b_dt = b.defined() ? dt_to_dnnl(b.scalar_type()) : dnnl::memory::data_type::f32;
     if (b.sizes() != result.sizes()) {
       dnnl::memory::dims b_dims(result.sizes().size() - 1, 1);
       b_dims.push_back(n);
-      b_md = memory::desc(
-          b_dims, b_dt, result.sizes().size() ==  2 ?
-          dnnl::memory::format_tag::ab : dnnl::memory::format_tag::abc);
+      b_md = memory::desc(b_dims, b_dt, result.sizes().size() == 2
+          ? dnnl::memory::format_tag::ab : dnnl::memory::format_tag::abc);
     } else {
       if (dims == 2) {
         b_md = memory::desc({m, n}, b_dt, {b.stride(0), b.stride(1)});
       } else {
-        b_md = memory::desc({mb, m, n}, b_dt,
-          {b.stride(0), b.stride(1), b.stride(2)});
+        b_md = memory::desc({mb, m, n}, b_dt, {b.stride(0), b.stride(1), b.stride(2)});
       }
     }
     matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, b_md, r_md));
@@ -168,9 +166,7 @@ void mkldnnGemmImpl(
   matmul_p.reset(new dnnl::matmul(*matmul_pd));
 
   auto m1_memory = dpcpp_onednn_memory(m1_md, engine, m1.data_ptr());
-
   auto m2_memory = dpcpp_onednn_memory(m2_md, engine, m2.data_ptr());
-
   auto r_memory = dpcpp_onednn_memory(r_md, engine, result.data_ptr());
 
 #ifdef USE_GEN12HP_ONEDNN
@@ -223,8 +219,7 @@ void gemm_broadcast(Tensor& result,
   auto dim = m1.dim();
   Tensor m2_unpack;
   if(m1.is_quantized()){
-    auto& pack_ptr =
-            cpp_custom_type_hack::cast<PackedLinearWeightQDPCPP>(m2);
+    auto& pack_ptr = cpp_custom_type_hack::cast<PackedLinearWeightQDPCPP>(m2);
     m2_unpack = pack_ptr.weight;
 
     TORCH_CHECK(m2_unpack.dim() == 2, "expected 2D tensor");
