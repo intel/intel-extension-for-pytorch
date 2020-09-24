@@ -260,7 +260,10 @@ Tensor& addmm_(
       m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
       beta.to<scalar_t>(),
       alpha.to<scalar_t>(),
-      self.scalar_type() == m1.scalar_type() ? self : self.to(m1.scalar_type()) );
+      // bias convert to fp32 for accuracy when self is fp16 or bf16
+      self.scalar_type() == ScalarType::Half ||
+              self.scalar_type() == ScalarType::BFloat16
+          ? self.to(ScalarType::Float) : self);
     });
 
   return self;
@@ -321,7 +324,10 @@ Tensor addmm(
         m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
         beta.to<scalar_t>(),
         alpha.to<scalar_t>(),
-        input.scalar_type() == m1.scalar_type() ? input : input.to(m1.scalar_type()));
+        // bias convert to fp32 for accuracy when input is fp16 or bf16
+        input.scalar_type() == ScalarType::Half ||
+                input.scalar_type() == ScalarType::BFloat16
+            ? input.to(ScalarType::Float) : input);
       });
   }
 
