@@ -40,6 +40,28 @@ namespace cpu {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.defined());                                \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.layout() == c10::kStrided)
 
+dil::tensor reshape_tensor_for_broadcast(dil::tensor& src1, dil::tensor& src2) {
+  auto diff_ndims = src1.ndims() - src2.ndims();
+  auto right = diff_ndims > 0 ? src2 : src1;
+  auto& left = diff_ndims > 0 ? src1 : src2;
+
+  diff_ndims = diff_ndims > 0 ? diff_ndims : -diff_ndims;
+
+  dil::dims reshape_dims;
+  for (int i = 0; i < diff_ndims; i++) {
+    reshape_dims.push_back(1);
+  }
+  for (int i = 0; i < right.ndims(); i++) {
+    reshape_dims.push_back(right.get_dim(i));
+  }
+  for (int i = left.ndims() - 1; i >= 0; i--) {
+    IPEX_CHECK(reshape_dims[i] == left.get_dim(i) || reshape_dims[i] == 1,
+               "dil binary not support the shape for broadcast");
+  }
+  right.reshape(reshape_dims);
+  return right;
+}
+
 at::Tensor AtenIpexCPUDev::dil_convolution(
     const at::Tensor & input,
     const at::Tensor & weight,
@@ -591,13 +613,62 @@ template<bool inplace>
 at::Tensor& dil_add_common(
     at::Tensor& result,
     const at::Tensor& self,
+    const at::Tensor& other) {
+  CHECK_DNNL_OP_PRE_COND(self);
+  CHECK_DNNL_OP_PRE_COND(other);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
+  dbl::comm::reorder_to_bf16_for_mix_prec(other, true);
+
+  auto x = dbl::comm::try_gen_dil_tensor(self);
+  auto y_ = dbl::comm::try_gen_dil_tensor(other);
+  // reorder other to the data type of self
+  auto y = dbl::comm::reorder_dil_tensor_to_dtype(y_, x.get_data_type());
+  auto z = inplace ? x : dil::tensor();
+
+  auto diff_ndims = x.ndims() - y.ndims();
+  if (diff_ndims != 0) {
+    auto right = reshape_tensor_for_broadcast(x, y);
+    dil::binary::compute(diff_ndims > 0 ? x : y, right, z, dil::algorithm::binary_add);
+  } else {
+    dil::binary::compute(x, y, z, dil::algorithm::binary_add);
+  }
+
+  if (!inplace) {
+    dbl::comm::equip_dil_buffer(result, z);
+  }
+  return result;
+}
+
+template<bool inplace>
+at::Tensor& dil_sum_common(
+    at::Tensor& result,
+    const at::Tensor& self,
     const at::Tensor& other,
     at::Scalar alpha) {
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(other);
 
-  IPEX_CHECK(self.sizes().equals(other.sizes()),
-      "dil add not support broadcast yet");
+  // IPEX_CHECK(self.sizes().equals(other.sizes()),
+  //     "dil add not support broadcast yet");
+  if (!self.sizes().equals(other.sizes())){
+    // Fall back to bf16 aten::add in broadcast path
+    IPEX_CHECK(ShadeDataContext::isDilTensor(self) &&ShadeDataContext::isTensorMixPrecision(self));
+    IPEX_CHECK(ShadeDataContext::isDilTensor(other) &&ShadeDataContext::isTensorMixPrecision(other));
+    IPEX_CHECK(ShadeDataContext::isDilTensor(result) &&ShadeDataContext::isTensorMixPrecision(result));
+    dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
+    dbl::comm::reorder_to_bf16_for_mix_prec(other, true);
+    auto x = dbl::comm::try_gen_dil_tensor(self);
+    auto y_ = dbl::comm::try_gen_dil_tensor(other);
+  // reorder other to the data type of self
+    auto y = dbl::comm::reorder_dil_tensor_to_dtype(y_, x.get_data_type());
+    dbl::comm::equip_dil_buffer(other, y);
+    if (inplace){
+      return bf16::add_out(result, self, other, alpha);
+    }
+    result =  bf16::add(self, other, alpha);
+    return result;
+  }
   if (check_auto_mix_int8_fp32()) {
     // for accuracy, reorder int8 to fp32
     dbl::comm::reorder_to_dtype(self, at::kFloat);
@@ -623,43 +694,23 @@ at::Tensor& dil_add_common(
 
 at::Tensor& AtenIpexCPUDev::dil_add_out(at::Tensor& result, const at::Tensor& self, const at::Tensor& other, at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_add_out\n");
-
-  return dil_add_common</*inplace=*/false>(result, self, other, alpha);
+  // if (alpha.to<float>() == 1.0) return dil_add_common</*inplace=*/false>(result, self, other);
+  return dil_sum_common</*inplace=*/false>(result, self, other, alpha);
 }
 
 at::Tensor AtenIpexCPUDev::dil_add(const at::Tensor& self, const at::Tensor& other, at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_add\n");
 
   auto result = dbl::comm::empty_dil_tensor({0}, self.options());
-  return dil_add_common</*inplace=*/false>(result, self, other, alpha);
+  // if (alpha.to<float>() == 1.0) return dil_add_common</*inplace=*/false>(result, self, other);
+  return dil_sum_common</*inplace=*/false>(result, self, other, alpha);
 }
 
 at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other, at::Scalar alpha) {
   DEBUG("AtenIpexCPUDev::dil_add_\n");
 
-  return dil_add_common</*inplace=*/true>(self, self, other, alpha);
-}
-
-dil::tensor reshape_tensor_for_broadcast(dil::tensor& src1, dil::tensor& src2) {
-  auto diff_ndims = src1.ndims() - src2.ndims();
-  auto right = diff_ndims > 0 ? src2 : src1;
-  auto& left = diff_ndims > 0 ? src1 : src2;
-
-  diff_ndims = diff_ndims > 0 ? diff_ndims : -diff_ndims;
-
-  dil::dims reshape_dims;
-  for (int i = 0; i < diff_ndims; i++) {
-    reshape_dims.push_back(1);
-  }
-  for (int i = 0; i < right.ndims(); i++) {
-    reshape_dims.push_back(right.get_dim(i));
-  }
-  for (int i = left.ndims() - 1; i >= 0; i--) {
-    IPEX_CHECK(reshape_dims[i] == left.get_dim(i) || reshape_dims[i] == 1,
-               "dil mul not support the shape for broadcast");
-  }
-  right.reshape(reshape_dims);
-  return right;
+  // if (alpha.to<float>() == 1.0) return dil_add_common</*inplace=*/false>(self, self, other);
+  return dil_sum_common</*inplace=*/true>(self, self, other, alpha);
 }
 
 template<bool inplace>
@@ -2321,7 +2372,8 @@ at::Tensor& AtenIpexCPUDev::dil_copy_(
     auto new_buffer_desc = dil_src.get_desc();
     dil::tensor dil_buffer{new_buffer_desc};
     dil_src.reorder_to(dil_buffer);
-    dbl::comm::equip_dil_buffer(self, dil_buffer);
+    dbl::comm::equip_dil_buffer(self, dil_buffer, false);
+
     return self;
   }
     // TODO: We need add more LP here
@@ -2377,6 +2429,77 @@ at::Tensor AtenIpexCPUDev::dil_expand(const at::Tensor& self, at::IntArrayRef si
   auto result = self.as_strided(expandedSizes, expandedStrides);
   at::namedinference::propagate_names_for_expand(result, self);
   return result;
+}
+
+at::Tensor AtenIpexCPUDev::dil_div(
+    const at::Tensor & self,
+    const at::Tensor & other){
+  DEBUG("AtenIpexCPUDev::dil_div\n");
+  torch_ipex::reset_ipex_func_status();
+  
+  IPEX_CHECK(self.device().type() == c10::DeviceType::DPCPP, "IPEX div only work when self is DPCPP tensor");
+  IPEX_CHECK(other.device().type() == c10::DeviceType::DPCPP || 
+	     other.unsafeGetTensorImpl()->is_wrapped_number(),
+   "IPEX div only work when other is DPCPP tensor or is wrapped number");
+  if (ShadeDataContext::isDilTensor(self) && ShadeDataContext::isTensorMixPrecision(self)) {
+    if (ShadeDataContext::getDilStorage(self).get_data_type() == dil::data_type::bf16 ) {
+      return bf16::div(self, other);
+    }
+    // TODO: We need add more LP here
+  }
+  torch_ipex::set_ipex_func_status(torch_ipex::IPEXFuncStatus::IPEX_FALLBACK);
+  return at::Tensor();
+}
+
+at::Tensor AtenIpexCPUDev::dil_div(
+    const at::Tensor & self,
+    at::Scalar & other){
+  auto tensor = at::scalar_to_tensor(other);
+  DEBUG("AtenIpexCPUDev::dil_div_Scalar\n");
+  auto impl = tensor.unsafeGetTensorImpl();
+  impl->set_wrapped_number(true);
+  impl->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
+  return dil_div(self, tensor);
+}
+  
+at::Tensor& AtenIpexCPUDev::dil_div_(
+    at::Tensor & self,
+    const at::Tensor & other){
+  DEBUG("AtenIpexCPUDev::dil_div_\n");
+  return AtenIpexCPUDev::dil_div_out(self, self, other);
+}
+    
+at::Tensor& AtenIpexCPUDev::dil_div_(
+    at::Tensor & self,
+    at::Scalar & other){
+ //TODO: handle scalar senario 
+}
+
+at::Tensor& AtenIpexCPUDev::dil_div_out(
+    at::Tensor & out,
+    const at::Tensor & self,
+    const at::Tensor & other) {
+  DEBUG("AtenIpexCPUDev::dil_div_out\n");
+  torch_ipex::reset_ipex_func_status();
+  
+  IPEX_CHECK(
+    out.device().type() == c10::DeviceType::DPCPP && 
+    self.device().type() == c10::DeviceType::DPCPP && 
+    other.device().type() == c10::DeviceType::DPCPP,
+    "IPEX div_out only work on DPCPP tensor");
+  if (ShadeDataContext::isDilTensor(out) && ShadeDataContext::isTensorMixPrecision(out) &&
+       ShadeDataContext::isDilTensor(self) && ShadeDataContext::isTensorMixPrecision(self) &&
+       ShadeDataContext::isDilTensor(other) && ShadeDataContext::isTensorMixPrecision(other)) {
+    if (ShadeDataContext::getDilStorage(out).get_data_type() == dil::data_type::bf16 &&
+         ShadeDataContext::getDilStorage(self).get_data_type() == dil::data_type::bf16 &&
+         ShadeDataContext::getDilStorage(other).get_data_type() == dil::data_type::bf16) {
+      return bf16::div_out(out, self, other);
+    }
+    // TODO: We need add more LP here
+  }
+
+  torch_ipex::set_ipex_func_status(torch_ipex::IPEXFuncStatus::IPEX_FALLBACK);
+  return out;
 }
 
 }  // namespace cpu

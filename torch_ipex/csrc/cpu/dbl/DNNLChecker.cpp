@@ -9,8 +9,7 @@ namespace dbl {
 namespace chk {
 
 bool dnnl_support_the_tensors(const std::vector<at::Tensor> &tensor_vec) {
-  return all_is_dpcpp(tensor_vec) &&
-         dnnl_tensor_has_data(tensor_vec) &&
+  return dnnl_tensor_has_data(tensor_vec) &&
          dnnl_support_the_dimension_of(tensor_vec);
 }
 

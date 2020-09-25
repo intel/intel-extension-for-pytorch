@@ -18,6 +18,36 @@ at::Tensor index_select(const at::Tensor & self, int64_t dim, const at::Tensor &
   return bf16::gen_mix_prec_tensor(_ipex_result);
 }
 
+at::Tensor div(const at::Tensor & self, const at::Tensor & other) {
+  auto&& _ipex_self = bf16::gen_consistent_tensor(self);
+  auto&& _ipex_other = bf16::gen_consistent_tensor(other);
+  auto&& _ipex_result = at::div(_ipex_self, _ipex_other);
+  return bf16::gen_mix_prec_tensor(_ipex_result);
+}
+
+at::Tensor& div_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other) {
+  auto&& _ipex_out = bf16::gen_consistent_tensor(out);
+  auto&& _ipex_self = bf16::gen_consistent_tensor(self);
+  auto&& _ipex_other = bf16::gen_consistent_tensor(other);
+  at::div_out(_ipex_out, _ipex_self, _ipex_other);
+  return out;
+}
+
+at::Tensor add(const at::Tensor & self, const at::Tensor & other, at::Scalar alpha) {
+  auto&& _ipex_self = bf16::gen_consistent_tensor(self);
+  auto&& _ipex_other = bf16::gen_consistent_tensor(other);
+  auto&& _ipex_result = at::add(_ipex_self, _ipex_other);
+  return bf16::gen_mix_prec_tensor(_ipex_result);
+}
+
+at::Tensor& add_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other, at::Scalar alpha) {
+  auto&& _ipex_out = bf16::gen_consistent_tensor(out);
+  auto&& _ipex_self = bf16::gen_consistent_tensor(self);
+  auto&& _ipex_other = bf16::gen_consistent_tensor(other);
+  at::add_out(_ipex_out, _ipex_self, _ipex_other);
+  return out;
+}
+
 }  // namespace bf16
 }  // namespace cpu
 }  // namespace torch_ipex

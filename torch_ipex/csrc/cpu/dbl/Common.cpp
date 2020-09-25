@@ -203,9 +203,9 @@ void equip_dil_buffer_nosync_shape(const at::Tensor& tensor, dil::tensor dil_buf
   ipex_tensor_impl->storage().set_numel(dil_buffer.get_nelems());
 }
 
-void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer) {
+void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer, bool sync_shape) {
   equip_dil_buffer_nosync_shape(tensor, dil_buffer);
-
+  if (!sync_shape) return;
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)tensor.unsafeGetTensorImpl();
   if (dil_buffer.is_public_format()) {
     ipex_tensor_impl->set_strided(dil_buffer.get_dims(), dil_buffer.get_strides(), ipex_tensor_impl->storage_offset());

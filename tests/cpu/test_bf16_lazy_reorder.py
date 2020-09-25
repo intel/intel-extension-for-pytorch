@@ -1065,6 +1065,86 @@ class TestBinOPs(TestCase):
 
                 self.assertEqual(x_auto_mix_a, x_cpu_a, 2e-3)
 
+    def test_div(self):
+        rand_seed = int(get_rand_seed())
+        rand_seed = 1591058395950926848
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        _, _, _, _, _, _, x_man_bf16_a, x_man_bf16_b, x_auto_mix_bf16_a, x_auto_mix_bf16_b = self._gen_binary_tensors(rand_seed)
+        with AutoDNNL(True), AutoMixPrecision(False):
+            self.assertEqual(x_man_bf16_a.dtype, torch.bfloat16)
+            self.assertEqual(x_man_bf16_b.dtype, torch.bfloat16)
+            res_man_bf16 = x_man_bf16_a / x_man_bf16_b
+            self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
+
+            with AutoMixPrecision(True):
+                self.assertEqual(x_auto_mix_bf16_a.dtype, torch.float)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_a))
+                self.assertEqual(x_auto_mix_bf16_b.dtype, torch.float)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_b))
+                res_auto_mix_bf16 = x_auto_mix_bf16_a / x_auto_mix_bf16_b
+                self.assertEqual(res_auto_mix_bf16.dtype, torch.float)           
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_bf16))
+                self.assertEqual(res_auto_mix_bf16, res_man_bf16)
+
+
+    def test_div_(self):
+        rand_seed = int(get_rand_seed())
+        rand_seed = 1591058395950926848
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        _, _, _, _, _, _, x_man_bf16_a, x_man_bf16_b, x_auto_mix_bf16_a, x_auto_mix_bf16_b = self._gen_binary_tensors(rand_seed)
+        with AutoDNNL(True), AutoMixPrecision(False):
+            self.assertEqual(x_man_bf16_a.dtype, torch.bfloat16)
+            self.assertEqual(x_man_bf16_b.dtype, torch.bfloat16)
+            x_man_bf16_a /= x_man_bf16_b
+            self.assertEqual(x_man_bf16_a.dtype, torch.bfloat16)
+
+            with AutoMixPrecision(True):
+                self.assertEqual(x_auto_mix_bf16_a.dtype, torch.float)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_a))
+                self.assertEqual(x_auto_mix_bf16_b.dtype, torch.float)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_b))
+                x_auto_mix_bf16_a /= x_auto_mix_bf16_b
+                self.assertEqual(x_auto_mix_bf16_a.dtype, torch.float)           
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_a))
+                self.assertEqual(x_auto_mix_bf16_a, x_man_bf16_a)
+
+
+    def test_div_scalar(self):
+        rand_seed = int(get_rand_seed())
+        rand_seed = 1591058395950926848
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        _, _, _, _, _, _, x_man_bf16_a, _, x_auto_mix_bf16_a, _ = self._gen_binary_tensors(rand_seed)
+        with AutoDNNL(True), AutoMixPrecision(False):
+            self.assertEqual(x_man_bf16_a.dtype, torch.bfloat16)
+            res_man_bf16 = x_man_bf16_a / 3.3
+            self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
+
+            with AutoMixPrecision(True):
+                self.assertEqual(x_auto_mix_bf16_a.dtype, torch.float)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_a))
+                res_auto_mix_bf16 = x_auto_mix_bf16_a / 3.3
+                self.assertEqual(res_auto_mix_bf16.dtype, torch.float)           
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix_bf16))
+                self.assertEqual(res_auto_mix_bf16, res_man_bf16)
+
+    def test_div__scalar(self):
+        rand_seed = int(get_rand_seed())
+        rand_seed = 1591058395950926848
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        _, _, _, _, _, _, x_man_bf16_a, _, x_auto_mix_bf16_a, _ = self._gen_binary_tensors(rand_seed)
+        with AutoDNNL(True), AutoMixPrecision(False):
+            self.assertEqual(x_man_bf16_a.dtype, torch.bfloat16)
+            x_man_bf16_a = x_man_bf16_a / 3.3
+            self.assertEqual(x_man_bf16_a.dtype, torch.bfloat16)
+
+            with AutoMixPrecision(True):
+                self.assertEqual(x_auto_mix_bf16_a.dtype, torch.float)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_a))
+                x_auto_mix_bf16_a = x_auto_mix_bf16_a / 3.3
+                self.assertEqual(x_auto_mix_bf16_a.dtype, torch.float)           
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16_a))
+                self.assertEqual(x_auto_mix_bf16_a, x_man_bf16_a)
+
 class TestLinear(TestCase):
     def test_linear(self):
         rand_seed = int(get_rand_seed())
@@ -2135,6 +2215,32 @@ class TestExpand(TestCase):
                 self.assertEqual(sum_expand_auto.dtype, torch.float)
                 self.assertEqual(sum_expand_auto, sum_expand_man.float())
 
+
+class TestCopy_(TestCase):
+    def test_copy_(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        self_auto_mix = torch.randn(3, 4, 5, dtype=torch.float32, device=device) * 10
+        self_man_mix = (torch.randn(3, 4, 5, device=device) * 10).to(torch.bfloat16)
+        src_auto_mix = torch.randn(3, 4, 5, dtype=torch.float32, device=device) * 10
+        copy_src_auto_mix = copy.deepcopy(src_auto_mix).to(device=device)
+        copy_src_man_mix = copy.deepcopy(src_auto_mix).to(device=device).to(torch.bfloat16)
+
+        with AutoDNNL(True), AutoMixPrecision(False):
+            res_man_bf16 = copy_src_man_mix + copy_src_man_mix
+            self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
+            self_man_mix.copy_(res_man_bf16)
+            self.assertEqual(self_man_mix.dtype, torch.bfloat16)
+
+            with AutoMixPrecision(True):
+                res_auto_mix = copy_src_auto_mix + copy_src_auto_mix
+                self.assertEqual(res_auto_mix.dtype, torch.float)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_mix))
+                self_auto_mix.copy_(res_auto_mix)
+                self.assertTrue(ipex.core.is_bf16_dil_tensor(self_auto_mix))
+                self.assertEqual(self_auto_mix.dtype, torch.float)
+                self.assertEqual(self_auto_mix, self_man_mix.float())
 
 if __name__ == '__main__':
     test = unittest.main()

@@ -87,6 +87,11 @@ class AtenIpexCPUDev {
   static at::Tensor dil_as_strided(const at::Tensor& self, at::IntArrayRef size, at::IntArrayRef stride, c10::optional<int64_t> storage_offset_);
   static at::Tensor dil_permute(const at::Tensor& self, at::IntArrayRef dims);
   static at::Tensor dil_expand(const at::Tensor& self, at::IntArrayRef size, bool implicit);
+  static at::Tensor dil_div(const at::Tensor & self, const at::Tensor & other);
+  static at::Tensor dil_div( const at::Tensor & self, at::Scalar & other);
+  static at::Tensor& dil_div_(at::Tensor & self, const at::Tensor & other);
+  static at::Tensor& dil_div_(at::Tensor & self, at::Scalar & other);
+  static at::Tensor& dil_div_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & other);
 };
 
 }  // namespace cpu

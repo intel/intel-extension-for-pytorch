@@ -59,7 +59,7 @@ void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected
  * @param[in] tensor            The input tensor
  * @param[in] dil_tensor_buffer The dil tensor buffer
  */
-void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer);
+void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer, bool sync_shape=true);
 
 dil::tensor try_gen_dil_tensor(const at::Tensor& input);
 dil::tensor try_gen_dil_storage(const at::Tensor& input);
