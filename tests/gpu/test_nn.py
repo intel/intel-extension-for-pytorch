@@ -69,10 +69,8 @@ if TEST_NUMPY:
     import numpy as np
 
 from torch.testing import TEST_DPCPP
-TEST_DPCPP = True
 import torch_ipex
 
-# print(' ********** TEST_DPCPP ********** ', TEST_DPCPP)
 NO_HALF_TENSORTYPES = [torch.float,
                        torch.double]
 
