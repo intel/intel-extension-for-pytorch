@@ -476,5 +476,40 @@ Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & b
   return at::relu(output);
 }
 
+Tensor addmv(
+    const Tensor & self, 
+    const Tensor & mat, 
+    const Tensor & vec, 
+    at::Scalar beta, 
+    at::Scalar alpha) {
+  TORCH_CHECK(self.dim() == 1, "expected 1D tensor");
+  TORCH_CHECK(mat.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(vec.dim() == 1, "expected 1D tensor");
+  TORCH_CHECK(mat.size(1) ==  vec.size(0));
+
+  Tensor vec_v = vec.view({vec.size(0), 1});
+  Tensor self_v = self.view({self.size(0), 1});
+  Tensor result = at::AtenIpexTypeDPCPP::addmm(self_v, mat, vec_v, beta, alpha);
+  return result.view({mat.size(0)});
+}
+
+Tensor& addmv_(
+    Tensor & self, 
+    const Tensor & mat, 
+    const Tensor & vec, 
+    at::Scalar beta, 
+    at::Scalar alpha) {
+  TORCH_CHECK(self.dim() == 1, "expected 1D tensor");
+  TORCH_CHECK(mat.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(vec.dim() == 1, "expected 1D tensor");
+  TORCH_CHECK(mat.size(1) ==  vec.size(0));
+
+  Tensor vec_v = vec.view({vec.size(0), 1});
+  Tensor self_v = self.view({self.size(0), 1});
+  self_v = at::AtenIpexTypeDPCPP::addmm_(self_v, mat, vec_v, beta, alpha);
+  self = self_v.view({mat.size(0)});
+  return self;
+}
+
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
