@@ -3,7 +3,7 @@
 # test all other UT
 # readlink -f $0
 
-pytest -v example
+pytest -v example/test_*
 
 # test all nn UT
 cat test_nn_passed_lists.txt | while read line

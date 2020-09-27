@@ -68,8 +68,12 @@ if TEST_SCIPY:
 if TEST_NUMPY:
     import numpy as np
 
-from torch.testing import TEST_DPCPP
-import torch_ipex
+try:
+    import torch_ipex
+    from common.common_nn import TEST_DPCPP
+except ImportError:
+    print("Import IPEX failed")
+
 
 NO_HALF_TENSORTYPES = [torch.float,
                        torch.double]

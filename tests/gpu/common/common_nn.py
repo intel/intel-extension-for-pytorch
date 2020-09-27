@@ -22,6 +22,7 @@ from torch.autograd.gradcheck import get_numerical_jacobian, iter_tensors
 from torch.autograd import Variable
 import torch.backends.cudnn
 
+TEST_DPCPP = True
 
 # tarfile module tries to obtain a file object name in python 3.3
 if sys.version_info[:2] == (3, 3):

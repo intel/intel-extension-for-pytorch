@@ -6,7 +6,7 @@ import os
 import torch
 from common.common_utils import TestCase, TEST_WITH_ROCM, TEST_MKL, \
     skipCUDANonDefaultStreamIf
-
+from common.common_nn import TEST_DPCPP
 # Note: Generic Device-Type Testing
 #
 # [WRITING TESTS]
@@ -276,7 +276,7 @@ class CUDATestBase(DeviceTypeTestBase):
 device_type_test_bases.append(CPUTestBase)
 if torch.cuda.is_available():
     device_type_test_bases.append(CUDATestBase)
-if torch.testing.TEST_DPCPP:
+if TEST_DPCPP:
     device_type_test_bases.append(DPCPPTestBase)
 
 PYTORCH_CUDA_MEMCHECK = os.getenv('PYTORCH_CUDA_MEMCHECK', '0') == '1'
