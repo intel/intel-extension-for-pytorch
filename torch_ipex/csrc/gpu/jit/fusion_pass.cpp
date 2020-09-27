@@ -354,7 +354,7 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
 }
 
 void InitFusionPass() {
-  RegisterPass pass_3([](std::shared_ptr<Graph>& g) {
+  RegisterPreFusionPass pass_3([](std::shared_ptr<Graph>& g) {
     torch::jit::FusionPass(g);
   });
 }
