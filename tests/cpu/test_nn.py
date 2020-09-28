@@ -1415,7 +1415,6 @@ class TestNN(NNTestCase):
         with self.assertRaisesRegex(RuntimeError, "modified by an inplace operation"):
             pgm.backward(torch.randn(10, 20))
 
-    @unittest.expectedFailure
     def test_overwrite_module_params_on_conversion(self):
         # Test that if the conversion function passed to `module._apply()`
         # changes the TensorImpl type of `module`'s parameters, the `module`'s
@@ -1455,7 +1454,7 @@ class TestNN(NNTestCase):
             # Test that if `torch.__future__.get_overwrite_module_params_on_conversion() == True`,
             # `float_module.double()` doesn't preserve previous references to
             # `float_module`'s parameters or gradients.
-            m = nn.Linear(20, 10).float()
+            m = nn.Linear(20, 10).float().to('dpcpp')
             m.weight.grad = torch.randn(10, 20).float()
             weight_ref = m.weight
             weight_grad_ref = m.weight.grad
@@ -1469,7 +1468,7 @@ class TestNN(NNTestCase):
             # Test that if `torch.__future__.get_overwrite_module_params_on_conversion() == True`,
             # applying an in-place operation to a module would bump the module's
             # original parameters' version counter.
-            m = nn.Linear(20, 10)
+            m = nn.Linear(20, 10).to('dpcpp')
             pvm = m.weight.mul(m.weight)
             weight_ref = m.weight
             m_weight_version_saved = weight_ref._version
@@ -1482,7 +1481,7 @@ class TestNN(NNTestCase):
             # Test that if `torch.__future__.get_overwrite_module_params_on_conversion() == True`,
             # applying an in-place operation to a module would bump the module's
             # original parameters' gradients' version counter.
-            m = nn.Linear(20, 10)
+            m = nn.Linear(20, 10).to('dpcpp')
             m.weight.grad = torch.randn(10, 20).requires_grad_()
             pgm = m.weight.grad.mul(m.weight.grad)
             weight_grad_ref = m.weight.grad
@@ -1504,7 +1503,7 @@ class TestNN(NNTestCase):
             # Test that if `torch.__future__.get_overwrite_module_params_on_conversion() == True`,
             # applying an out-of-place operation to a module doesn't bump
             # the module's original parameters' gradients' version counter.
-            m = nn.Linear(20, 10)
+            m = nn.Linear(20, 10).to('dpcpp')
             m.weight.grad = torch.randn(10, 20).requires_grad_()
             weight_grad_ref = m.weight.grad
             m_weight_grad_version_saved = weight_grad_ref._version
