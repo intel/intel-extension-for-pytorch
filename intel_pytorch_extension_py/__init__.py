@@ -18,9 +18,9 @@ class AmpConf(object):
         # for int8 path, if user give a exited configure file, load it.
         if self.configure_file != None and self.dtype != torch.bfloat16:
             if os.path.exists(self.configure_file) and os.stat(self.configure_file).st_size != 0:
-                f = open(self.configure_file)
-                configures = json.load(f)
-                core.load_indicators_file(configures)
+                with open(self.configure_file, 'r') as f:
+                    configures = json.load(f)
+                    core.load_indicators_file(configures)
             else:
                 assert False, 'Can not load a empty file or none existed file, plese first do calibartion step'
 
