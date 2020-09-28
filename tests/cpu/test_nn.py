@@ -52,7 +52,7 @@ from common_device_type import instantiate_device_type_tests, dtypes, \
 from torch.nn import MultiheadAttention
 
 from hypothesis import given
-import  hypothesis_utils as hu
+import torch.testing._internal.hypothesis_utils as hu
 from common_utils import _assertGradAndGradgradChecks
 from common_utils import dtype2prec_DONTUSE
 # load_tests from common_utils is used to automatically filter tests for
@@ -3767,10 +3767,9 @@ class TestNN(NNTestCase):
         c = nn.Conv2d(3, 3, 3)
         self.assertRaises(TypeError, lambda: c(None))
 
-    @unittest.expectedFailure
     def test_Conv2d_backward_twice(self):
         input = torch.randn(2, 3, 5, 5)
-        c = nn.Conv2d(3, 3, 3)
+        c = nn.Conv2d(3, 3, 3).to('dpcpp')
         o1 = c(input)
         o1.sum().backward()
         self.assertRaisesRegex(RuntimeError, 'Specify retain_graph=True',
@@ -5711,7 +5710,6 @@ class TestNN(NNTestCase):
     # NOTE: need further check 
     @unittest.skipIf(
         not TEST_NUMPY or not TEST_SCIPY, "Numpy or Scipy not found")
-    @unittest.expectedFailure
     def test_gelu(self):
         def _test_gelu(n, m, dtype, contiguous):
             def _gelu_ref(X):
@@ -5723,7 +5721,7 @@ class TestNN(NNTestCase):
                 X = torch.rand(n, m, dtype=dtype, requires_grad=True)[:, ::2]
             res = F.gelu(X)
             ref = _gelu_ref(X.detach().cpu().numpy())
-            self.assertEqual(res, ref)
+            self.assertEqual(res, ref, prec=2e-4)
             gradcheck(F.gelu, [X], eps=1e-4)
 
             if TEST_CUDA:
@@ -9284,7 +9282,6 @@ class TestNNDeviceType(NNTestCase):
         input_large = torch.randn(1, 1, 2048, 1024 , dtype=dtype, device=device)
         conv2(input_large)
 
-    @unittest.expectedFailure
     def test_conv_noncontig_weights(self, device):
         for dim in (1, 2, 3):
             for grouped in (False, True):

@@ -1027,7 +1027,7 @@ index a6a9fca462..d42a05fd4a 100644
  }
  
 diff --git a/torch/csrc/utils/tensor_layouts.cpp b/torch/csrc/utils/tensor_layouts.cpp
-index 6fcd84f3db..89625bb0b9 100644
+index 6fcd84f3db..8930e938e1 100644
 --- a/torch/csrc/utils/tensor_layouts.cpp
 +++ b/torch/csrc/utils/tensor_layouts.cpp
 @@ -23,6 +23,7 @@ void initializeLayouts() {
@@ -1042,7 +1042,7 @@ index 6fcd84f3db..89625bb0b9 100644
    }
    registerLayoutObject((THPLayout*)sparse_coo_layout, at::Backend::SparseCPU);
    registerLayoutObject((THPLayout*)sparse_coo_layout, at::Backend::SparseCUDA);
-+  registerLayoutObject((THPLayout*)sparse_coo_layout, at::Backend::SparseDPCPP)
++  registerLayoutObject((THPLayout*)sparse_coo_layout, at::Backend::SparseDPCPP);
  
    PyObject *mkldnn_layout = THPLayout_New(at::Layout::Mkldnn, "torch._mkldnn");
    Py_INCREF(mkldnn_layout);
