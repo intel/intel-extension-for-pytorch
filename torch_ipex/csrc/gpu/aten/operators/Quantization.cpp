@@ -211,6 +211,9 @@ Tensor quantize_per_tensor(
     double scale,
     int64_t zero_point,
     ScalarType dtype) {
+  if(self.is_quantized()){
+    return self;
+  }
   auto quantizer =
       at::dpcpp::make_per_tensor_affine_quantizer(scale, zero_point, dtype);
   return quantizer->quantize(self);
