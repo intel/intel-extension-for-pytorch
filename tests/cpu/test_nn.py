@@ -55,8 +55,6 @@ from hypothesis import given
 import  hypothesis_utils as hu
 from common_utils import _assertGradAndGradgradChecks
 from common_utils import dtype2prec_DONTUSE
-import global_settings
-global_settings.do_override = True
 # load_tests from common_utils is used to automatically filter tests for
 # sharding on sandcastle. This line silences flake warnings
 
@@ -10764,7 +10762,6 @@ class TestNNDeviceType(NNTestCase):
             m(input)
 
 instantiate_device_type_tests(TestNNDeviceType, globals())
-global_settings.do_override = False
 
 if __name__ == '__main__':
     run_tests()
