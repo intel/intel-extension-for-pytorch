@@ -42,7 +42,7 @@ at::Tensor q_conv2d(
           weight.sizes(),
           padding.vec(),
           stride.vec(),
-          {1, 1},
+          dilation.vec(),
           groups),
       device(kDPCPP).dtype(kQInt8),
       output_scale,
@@ -55,7 +55,7 @@ at::Tensor q_conv2d(
       bias,
       padding.vec(),
       stride.vec(),
-      {1, 1},
+      dilation.vec(),
       groups,
       attr);
 
@@ -87,7 +87,7 @@ at::Tensor q_conv2d_relu(
           weight.sizes(),
           padding.vec(),
           stride.vec(),
-          {1, 1},
+          dilation.vec(),
           groups),
       device(kDPCPP).dtype(kQUInt8),
       output_scale,
@@ -100,7 +100,7 @@ at::Tensor q_conv2d_relu(
       bias,
       padding.vec(),
       stride.vec(),
-      {1, 1},
+      dilation.vec(),
       groups,
       attr);
 
@@ -137,7 +137,7 @@ at::Tensor q_conv2d_sum_relu(
       bias,
       padding.vec(),
       stride.vec(),
-      {1, 1},
+      dilation.vec(),
       groups,
       attr);
 

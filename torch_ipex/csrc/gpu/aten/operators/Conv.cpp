@@ -20,6 +20,13 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
+memory::dims dilation_sub(IntArrayRef dilation) {
+  memory::dims ret;
+  for (auto i = 0; i < dilation.size(); i++)
+    ret.push_back(dilation[i] - 1);
+  return ret;
+}
+
 at::Tensor convolution(
     at::Tensor& output,
     const at::Tensor& input,
@@ -88,6 +95,7 @@ at::Tensor convolution(
   memory::dims output_tz = {n, oc, oh, ow};
   memory::dims _stride = {sh, sw};
   memory::dims _padding = {ph, pw};
+  memory::dims _dilation = dilation_sub(dilation);
 
   if (input.ndimension() == 5) {
     int32_t id = input.size(2);
@@ -128,28 +136,16 @@ at::Tensor convolution(
   auto output_md = memory::desc({output_tz}, dst_data_t, format_any);
 
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
-  if (bias.defined()) {
+  if (bias.defined())
     conv_forward_desc.reset(new convolution_forward::desc(
-        prop_kind::forward,
-        algorithm::convolution_direct,
-        input_md,
-        weight_md,
-        bias_md,
-        output_md,
-        _stride,
-        _padding,
-        _padding));
-  } else {
+        prop_kind::forward, algorithm::convolution_direct,
+        input_md, weight_md, bias_md, output_md,
+        _stride, _dilation, _padding, _padding));
+  else
     conv_forward_desc.reset(new convolution_forward::desc(
-        prop_kind::forward,
-        algorithm::convolution_direct,
-        input_md,
-        weight_md,
-        output_md,
-        _stride,
-        _padding,
-        _padding));
-  }
+        prop_kind::forward, algorithm::convolution_direct,
+        input_md, weight_md, output_md,
+        _stride, _dilation, _padding, _padding));
 
   std::vector<float> weight_scales;
   if (input.is_quantized()) {
@@ -497,6 +493,7 @@ Tensor dpcpp_convolution_backward_input(
   memory::dims output_tz = {n, oc, oh, ow};
   memory::dims _stride = {sh, sw};
   memory::dims _padding = {ph, pw};
+  memory::dims _dilation = dilation_sub(dilation);
 
   if (grad_input.ndimension() == 5) {
     int32_t id = grad_input.size(2);
@@ -537,28 +534,16 @@ Tensor dpcpp_convolution_backward_input(
   auto output_md = memory::desc({output_tz}, data_grad, format_any);
 
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
-  if (bias_defined) {
+  if (bias_defined)
     conv_forward_desc.reset(new convolution_forward::desc(
-        prop_kind::forward,
-        algorithm::convolution_direct,
-        input_md,
-        weight_md,
-        bias_md,
-        output_md,
-        _stride,
-        _padding,
-        _padding));
-  } else {
+        prop_kind::forward, algorithm::convolution_direct,
+        input_md, weight_md, bias_md, output_md,
+        _stride, _dilation, _padding, _padding));
+  else
     conv_forward_desc.reset(new convolution_forward::desc(
-        prop_kind::forward,
-        algorithm::convolution_direct,
-        input_md,
-        weight_md,
-        output_md,
-        _stride,
-        _padding,
-        _padding));
-  }
+        prop_kind::forward, algorithm::convolution_direct,
+        input_md, weight_md, output_md,
+        _stride, _dilation, _padding, _padding));
 
   std::shared_ptr<convolution_forward::primitive_desc> conv_forward_pd;
   conv_forward_pd.reset(
@@ -567,12 +552,8 @@ Tensor dpcpp_convolution_backward_input(
   std::shared_ptr<convolution_backward_data::desc> conv_backward_data_desc;
   conv_backward_data_desc.reset(new convolution_backward_data::desc(
       algorithm::convolution_direct,
-      input_md,
-      weight_md,
-      output_md,
-      _stride,
-      _padding,
-      _padding));
+      input_md, weight_md, output_md,
+      _stride, _dilation, _padding, _padding));
 
   std::shared_ptr<convolution_backward_data::primitive_desc>
       conv_backward_data_pd;
@@ -695,6 +676,7 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   memory::dims output_tz = {n, oc, oh, ow};
   memory::dims _stride = {sh, sw};
   memory::dims _padding = {ph, pw};
+  memory::dims _dilation = dilation_sub(dilation);
 
   if (input.ndimension() == 5) {
     int32_t id = input.size(2);
@@ -729,34 +711,22 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     _padding = {pd, ph, pw};
   }
 
-  memory::desc input_md({input_tz}, data_grad, format_any);
-  memory::desc weight_md({weight_tz}, data_t, format_any);
-  memory::desc bias_md({bias_tz}, data_t, format_any);
-  memory::desc output_md({output_tz}, data_grad, format_any);
+  auto input_md = memory::desc({input_tz}, data_grad, format_any);
+  auto weight_md = memory::desc({weight_tz}, data_t, format_any);
+  auto bias_md = memory::desc({bias_tz}, data_t, format_any);
+  auto output_md = memory::desc({output_tz}, data_grad, format_any);
 
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
-  if (bias_defined) {
+  if (bias_defined)
     conv_forward_desc.reset(new convolution_forward::desc(
-        prop_kind::forward,
-        algorithm::convolution_direct,
-        input_md,
-        weight_md,
-        bias_md,
-        output_md,
-        _stride,
-        _padding,
-        _padding));
-  } else {
+        prop_kind::forward, algorithm::convolution_direct,
+        input_md, weight_md, bias_md, output_md,
+        _stride, _dilation, _padding, _padding));
+  else
     conv_forward_desc.reset(new convolution_forward::desc(
-        prop_kind::forward,
-        algorithm::convolution_direct,
-        input_md,
-        weight_md,
-        output_md,
-        _stride,
-        _padding,
-        _padding));
-  }
+        prop_kind::forward, algorithm::convolution_direct,
+        input_md, weight_md, output_md,
+        _stride, _dilation, _padding, _padding));
 
   std::shared_ptr<convolution_forward::primitive_desc> conv_forward_pd;
   conv_forward_pd.reset(
@@ -764,28 +734,18 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
 
   std::shared_ptr<mkldnn::convolution_backward_weights::desc>
       conv_backward_weight_desc;
-  if (bias_defined) {
+  if (bias_defined)
     conv_backward_weight_desc.reset(
         new mkldnn::convolution_backward_weights::desc(
             algorithm::convolution_direct,
-            input_md,
-            weight_md,
-            bias_md,
-            output_md,
-            _stride,
-            _padding,
-            _padding));
-  } else {
+            input_md, weight_md, bias_md, output_md,
+            _stride, _dilation, _padding, _padding));
+  else
     conv_backward_weight_desc.reset(
         new mkldnn::convolution_backward_weights::desc(
             algorithm::convolution_direct,
-            input_md,
-            weight_md,
-            output_md,
-            _stride,
-            _padding,
-            _padding));
-  }
+            input_md, weight_md, output_md,
+            _stride, _dilation, _padding, _padding));
 
   std::shared_ptr<mkldnn::convolution_backward_weights::primitive_desc>
       conv_backward_weight_pd;
@@ -893,7 +853,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> dpcpp_convolution_backward(
     // FIXME: we should route to at variable op to insert bp info, even though
     // it is backward op
     // It exists double backward case
-    // std::tie(grad_weight, grad_bias) = at::convolution_backward_weights(
+    // std::tie/grad_weight, grad_bias) = at::convolution_backward_weights(
     //   weight.sizes(), grad_output, input, padding, stride, dilation, groups,
     //   output_mask[2]);
     std::tie(grad_weight, grad_bias) = convolution_backward_weights(
@@ -1426,6 +1386,7 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
   Tensor grad_output_ = grad_output.contiguous();
 
   Tensor grad_input, grad_weight, grad_bias;
+
   if (output_mask[0]) {
     grad_input = dpcpp_convolution_backward_input(
         input.sizes(),
