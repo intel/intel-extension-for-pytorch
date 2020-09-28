@@ -44,6 +44,8 @@ at::Tensor conv2d_relu(
 
 at::Tensor mul_add(const at::Tensor& self,
     const at::Tensor& other, const at::Tensor& accumu, at::Scalar alpha) {
+  RECORD_FUNCTION("mul_add",
+                  std::vector<c10::IValue>({self, other, accumu}));
   return at::AtenIpexTypeDPCPP::mul_add(self, other, accumu, alpha);
 }
 
