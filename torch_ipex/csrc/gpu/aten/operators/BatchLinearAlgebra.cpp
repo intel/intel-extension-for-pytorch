@@ -35,7 +35,7 @@ void triu_tril_dpcpp_kernel(
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto result_data = get_buffer<dpcpp_w_mode>(cgh, result);
-    auto src_data = get_buffer<dpcpp_w_mode>(cgh, src);
+    auto src_data = get_buffer<dpcpp_r_mode>(cgh, src);
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item) {
       auto result_ptr = get_pointer(result_data);
