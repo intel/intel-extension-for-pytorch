@@ -314,10 +314,11 @@ RegisterOperators op({
       [] (const Node* node) ->Operation {
         if (torch_ipex::check_auto_dnnl()) {
           return [] (Stack& stack) {
-            auto result = AtenIpexJITDev::dil_linear_fuse_relu(
+            auto result = AtenIpexJITDev::dil_linear_fuse_eltwise(
                 (std::move(peek(stack, 0, 3))).toTensor(),
                 (std::move(peek(stack, 1, 3))).toTensor(),
-                toOptionalTensor(std::move(peek(stack, 2, 3)))
+                toOptionalTensor(std::move(peek(stack, 2, 3))),
+                dil::attr_t::fuse_relu()
             );
             drop(stack, 3);
             pack(stack, std::move(result));
@@ -325,6 +326,27 @@ RegisterOperators op({
           };
         } else {
           TORCH_CHECK(false, "PyTorch native path not support linear relu fusion now");
+        }
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
+      "ipex::linear_gelu(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor",
+      [] (const Node* node) ->Operation {
+        if (torch_ipex::check_auto_dnnl()) {
+          return [] (Stack& stack) {
+            auto result = AtenIpexJITDev::dil_linear_fuse_eltwise(
+                (std::move(peek(stack, 0, 3))).toTensor(),
+                (std::move(peek(stack, 1, 3))).toTensor(),
+                toOptionalTensor(std::move(peek(stack, 2, 3))),
+                dil::attr_t::fuse_gelu()
+            );
+            drop(stack, 3);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        } else {
+          TORCH_CHECK(false, "PyTorch native path not support linear gelu fusion now");
         }
       },
       aliasAnalysisFromSchema()

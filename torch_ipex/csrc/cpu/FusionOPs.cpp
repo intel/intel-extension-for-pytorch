@@ -386,12 +386,13 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
     "Convolution_Sum_Relu");
 }
 
-at::Tensor AtenIpexJITDev::dil_linear_fuse_relu(
+at::Tensor AtenIpexJITDev::dil_linear_fuse_eltwise(
     const at::Tensor& self,
     const at::Tensor& weight,
-    const at::Tensor& bias) {
+    const at::Tensor& bias,
+    const dil::attr_t& attr) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_linear_fuse_relu", std::vector<c10::IValue>({self, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexJITDev::dil_linear_fuse_eltwise", std::vector<c10::IValue>({self, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
   IPEX_CHECK(self.dim() >= 2,
       "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
@@ -413,7 +414,7 @@ at::Tensor AtenIpexJITDev::dil_linear_fuse_relu(
     b = try_gen_dil_tensor(bias_contiguous);
   }
 
-  dil::tensor y = dbl::linear::linear_impl(x, w, b, /* dst_scale */ dil::scale_t(), dil::attr_t::fuse_relu());
+  dil::tensor y = dbl::linear::linear_impl(x, w, b, /* dst_scale */ dil::scale_t(), attr);
 
   auto input_size = self.sizes();
   std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);

@@ -18,6 +18,7 @@ namespace ipex {
   // static auto conv3d_relu_sum = Symbol::fromQualString("ipex::conv3d_relu_sum");
   static auto conv2d_sum_relu = Symbol::fromQualString("ipex::conv2d_sum_relu");
   static auto linear_relu = Symbol::fromQualString("ipex::linear_relu");
+  static auto linear_gelu = Symbol::fromQualString("ipex::linear_gelu");
 
   // 3d ops
   static auto conv3d_relu = Symbol::fromQualString("ipex::conv3d_relu");
@@ -48,7 +49,7 @@ class AtenIpexJITDev {
 
   static at::Tensor& dil_convolution_sum_relu( const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups, at::Tensor& accumu, at::Scalar alpha);
 
-  static at::Tensor dil_linear_fuse_relu(const at::Tensor& self, const at::Tensor& weight, const at::Tensor& bias);
+  static at::Tensor dil_linear_fuse_eltwise(const at::Tensor& self, const at::Tensor& weight, const at::Tensor& bias, const dil::attr_t& attr);
 
 };
 

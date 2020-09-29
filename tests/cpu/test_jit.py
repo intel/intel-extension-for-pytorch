@@ -149,6 +149,16 @@ class LinearRelu(nn.Module):
 
     def forward(self, x):
         return F.relu(self.linear(x), inplace=True)
+ 
+class LinearGelu(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearGelu, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        return F.gelu(self.linear(x))
 
 class ConvSumInDiffBlock(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
@@ -542,6 +552,27 @@ class Tester(TestCase):
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex::linear_relu")
+
+
+    def test_output_linear_gelu(self):
+        self._test_output(
+            LinearGelu(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex::linear_gelu")
+        self._test_output_bf16(
+            LinearGelu(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="ipex::linear_gelu",
+            prec=5e-3)
+        self._test_output(
+            LinearGelu(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex::linear_gelu")
+        self._test_output_bf16(
+            LinearGelu(3, 32, bias=False),
+            torch.rand(32, 3),
+            kind_in_graph="ipex::linear_gelu",
+            prec=5e-3)
 
 
     def test_channel_shuffle(self):
