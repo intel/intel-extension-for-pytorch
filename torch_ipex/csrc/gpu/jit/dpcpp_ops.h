@@ -22,6 +22,11 @@ at::Tensor conv2d_relu(
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
     int64_t groups);
 
+at::Tensor conv2d_sigmoid(
+    const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias,
+    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
+    int64_t groups);
+
 at::Tensor mul_add(const at::Tensor& self,
     const at::Tensor& other, const at::Tensor& accumu, at::Scalar alpha);
 

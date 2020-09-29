@@ -338,6 +338,7 @@ OpFuser::RuleTab OpFuser::dpcppRules = {
   {{dpcpp::conv2d_sum_sym, Symbol::fromQualString("aten::relu_")}, dpcpp::conv2d_sum_relu_sym},
   {{aten::conv2d, aten::add}, dpcpp::conv2d_sum_sym},
   {{aten::conv2d, aten::add_}, dpcpp::conv2d_sum_sym},
+  {{aten::conv2d, Symbol::fromQualString("aten::sigmoid")}, dpcpp::conv2d_sigmoid_sym},
   {{aten::mul, aten::add_}, dpcpp::mul_add_sym},
   {{Symbol::fromQualString("quantized::conv2d"), Symbol::fromQualString("quantized::add_relu")}, dpcpp::q_conv2d_sum_relu_sym},
 };

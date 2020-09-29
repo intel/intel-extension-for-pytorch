@@ -14,6 +14,7 @@ constexpr int weight_output_channels_dim = 0;
 typedef struct conv_attr {
   static const int64_t kind_with_relu = 0b01;
   static const int64_t kind_with_sum = 0b10;
+  static const int64_t kind_with_sigmoid = 0b100;
 
   conv_attr() : scale_(1.f), alpha_(0.f), beta_(0.f), oscale_(1.f), attr_(0) {}
   conv_attr(float scale, float alpha, float beta, float oscale, int64_t attr)
@@ -25,6 +26,10 @@ typedef struct conv_attr {
 
   bool with_sum() {
     return attr_ & kind_with_sum;
+  }
+
+  bool with_sigmoid() {
+    return attr_ & kind_with_sigmoid;
   }
 
   float scale_;

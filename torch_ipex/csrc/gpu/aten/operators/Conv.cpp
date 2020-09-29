@@ -195,6 +195,8 @@ at::Tensor convolution(
 
   if (attr.with_relu()) {
     po.append_eltwise(1.0, algorithm::eltwise_relu, attr.alpha_, attr.beta_);
+  } else if (attr.with_sigmoid()) {
+    po.append_eltwise(1.0, algorithm::eltwise_logistic, attr.alpha_, attr.beta_);
   }
   pattr.set_post_ops(po);
 
@@ -1336,6 +1338,38 @@ Tensor convolution_relu(
       beta.to<float>(),
       1.f,
       conv_attr_t::kind_with_relu);
+  return _convolution(
+      input_r,
+      weight_r,
+      bias_r,
+      stride_,
+      padding_,
+      dilation_,
+      transposed_,
+      output_padding_,
+      groups_,
+      attr);
+}
+
+Tensor convolution_sigmoid(
+    const Tensor& input_r,
+    const Tensor& weight_r,
+    const Tensor& bias_r,
+    IntArrayRef stride_,
+    IntArrayRef padding_,
+    IntArrayRef dilation_,
+    bool transposed_,
+    IntArrayRef output_padding_,
+    int64_t groups_,
+    Scalar scale,
+    Scalar alpha,
+    Scalar beta) {
+  conv_attr_t attr(
+      scale.to<float>(),
+      alpha.to<float>(),
+      beta.to<float>(),
+      1.f,
+      conv_attr_t::kind_with_sigmoid);
   return _convolution(
       input_r,
       weight_r,
