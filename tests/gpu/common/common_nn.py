@@ -4398,9 +4398,11 @@ class ModuleTest(TestBase):
         test_case._zero_grad_input(input)
         with freeze_rng_state():
             output = test_case._forward(module, input)
-            grad_output = output.new(output.shape).normal_()
+            # grad_output = output.new(output.shape).normal_() # We may fail here because dpcppTensor doesn't have a op named new.
+            grad_output = torch.empty_like(output).normal_()
             output = output.clone()
-            d_input = deepcopy(test_case._backward(module, input, output, grad_output))
+            a = test_case._backward(module, input, output, grad_output)
+            d_input = deepcopy(test_case._backward(module, input, output, grad_output).cpu()) # dpcppTensor cannot call self storage()
             d_param = deepcopy(test_case._get_parameters(module)[1])
 
         nc_input = self.noncontiguize(input)
@@ -4409,12 +4411,12 @@ class ModuleTest(TestBase):
             i = input if contig_i else nc_input
             # Some ops, e.g., nn.Flatten, return gradient that shares
             # storage with the grad_output. Hence we copy here.
-            go = deepcopy(grad_output if contig_g else nc_grad_output)
+            go = deepcopy(grad_output.cpu() if contig_g else nc_grad_output.cpu()) # dpcppTensor cannot call self storage()
             test_case._zero_grad_parameters(module)
             test_case._zero_grad_input(i)
             with freeze_rng_state():
                 out = test_case._forward(module, i)
-                grad = test_case._backward(module, i, out, go)
+                grad = test_case._backward(module, i, out, go.to('dpcpp')) # dpcppTensor cannot call self storage()
 
                 test_case.assertEqual(out, output)
                 test_case.assertEqual(grad, d_input, 1e-4)
@@ -4532,12 +4534,12 @@ class ModuleTest(TestBase):
             
             test_case.assertEqual(cpu_output, gpu_output, self.precision)
 
-            if gpu_input.type() != torch.half:
+            if gpu_input.type() != 'torch.dpcpp.HalfTensor':
                 # Run backwards on CPU and GPU and compare results
                 for _ in range(5):
                     cpu_gradOutput = cpu_output.clone().normal_()
-                    # gpu_gradOutput = cpu_gradOutput.type('torch.cuda.FloatTensor')
-                    gpu_gradOutput = cpu_gradOutput.to("dpcpp")
+                    # gpu_gradOutput = cpu_gradOutput.type('torch.dpcpp.FloatTensor') # invalid type: 'torch.dpcpp.FloatTensor'
+                    gpu_gradOutput = cpu_gradOutput.to(device='dpcpp', dtype=torch.float32)
                     cpu_gradInput = test_case._backward(cpu_module, cpu_input, cpu_output, cpu_gradOutput)
                     gpu_gradInput = test_case._backward(gpu_module, gpu_input, gpu_output, gpu_gradOutput)
                     test_case.assertEqual(cpu_gradInput, gpu_gradInput, self.precision)

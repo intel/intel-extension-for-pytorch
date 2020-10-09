@@ -451,8 +451,11 @@ def to_dpcpp(obj, type_map=None):
         t = type_map.get(obj.type(), obj.type())
         with torch.no_grad():
             res = obj.clone().type(t)
-            res.requires_grad = obj.requires_grad
-            res = res.to("dpcpp")
+            # res.requires_grad = obj.requires_grad
+            if obj.dtype != torch.int64:
+                res = res.to(device='dpcpp', dtype=torch.float32).requires_grad_() # That makes the dpcpp tensor to be leaf
+            else:
+                res = res.to(device='dpcpp', dtype=torch.int64) # NLLLoss target needs Long dtype
         return res
     elif torch.is_storage(obj):
         return obj.new().resize_(obj.size()).copy_(obj)

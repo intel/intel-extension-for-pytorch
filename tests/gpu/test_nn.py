@@ -8223,8 +8223,6 @@ class TestNN(NNTestCase):
     def run_conv_double_back_test(self, kern, stride, padding, chan_in, chan_out, batch_size,
                                   inp_size, dilation, no_weight, groups=1, device_str="cpu",
                                   use_bias=True, dtype=torch.float):
-        # import pdb 
-        # pdb.set_trace()
         device = torch.device(device_str)
 
         x = torch.randn(batch_size, chan_in, inp_size, inp_size, device=device,
@@ -8464,12 +8462,10 @@ class TestNN(NNTestCase):
                                 "\ninp_size: " + str(inp_size) +
                                 "\ndilation: " + str(dilation))
 
-    # @unittest.skipIf(not TEST_DPCPP, "DPCPP unavailable")
-    @unittest.skipIf(True, "Hang on in convolution_backward_weights, we use benchdnn to test it")
+    @unittest.skipIf(True, "oneDNN primitive convolution unsupport datatype double")
     @repeat_test_for_types(DOUBLE_TENSORTYPES)
     def test_conv_double_backward_dpcpp(self, dtype=torch.double):
         # Double backward only runs with DoubleTensor due to precison reason
-        print("In test_conv_double_backward_dpcpp")
         batch_size = 1
         for kern, inp_size, dilations in [(3, 5, [1, 2]), (4, 9, [1])]:
             # print("kern = ", kern)
@@ -10607,7 +10603,7 @@ class TestNNDeviceType(NNTestCase):
     def test_device_mask_dpcpp(self, device):
         for enforce_sorted in [True, False]:
             tensor_type = torch.FloatTensor
-            dpcpp_type_str = 'torch.FloatTensor'
+            dpcpp_type_str = 'torch.dpcpp.FloatTensor'
             padded, lengths = self._padded_sequence(tensor_type)
             packed = rnn_utils.pack_padded_sequence(
                 padded, lengths, enforce_sorted=enforce_sorted)
