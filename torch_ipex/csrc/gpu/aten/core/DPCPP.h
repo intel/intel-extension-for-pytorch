@@ -268,7 +268,11 @@ DPCPP_HOST using dpcpp_host_acc_t =
 #define DPCPP_KER_STRING(var, str) static const DPCPP_CONSTANT char var[] = str;
 
 #if defined(USE_DPCPP)
-#define DPCPP_PRINTF DPCPP::intel::experimental::printf
+  #if (__SYCL_COMPILER_VERSION >= 20200930)
+    #define DPCPP_PRINTF DPCPP::ONEAPI::experimental::printf
+  #else
+    #define DPCPP_PRINTF DPCPP::intel::experimental::printf
+  #endif
 #else
 #define DPCPP_PRINTF printf
 #endif
