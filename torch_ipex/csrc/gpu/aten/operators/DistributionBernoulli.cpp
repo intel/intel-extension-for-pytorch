@@ -1,7 +1,3 @@
-//
-// Created by johnlu on 2020/9/2.
-//
-
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 

@@ -1,7 +1,3 @@
-//
-// Created by johnlu on 2020/8/25.
-//
-
 #ifndef TORCH_IPEX_DISTRIBUTIONS_H
 #define TORCH_IPEX_DISTRIBUTIONS_H
 
