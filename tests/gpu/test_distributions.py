@@ -199,11 +199,7 @@ class TestDistributions(TestCase):
             self.assertAlmostEqual(log_prob, expected, places=3)
 
         self._check_log_prob(Exponential(rate), ref_log_prob)
-<<<<<<< HEAD
     '''
-=======
-
->>>>>>> 6a9c9091940efc9bf87c83e1839fe13013f98ca1
     def test_multinomial_1d(self):
         total_count = 10
         p = torch.tensor([0.1, 0.2, 0.3], requires_grad=True, device=sycl_device)
@@ -213,11 +209,6 @@ class TestDistributions(TestCase):
         #self._gradcheck_log_prob(lambda p: Multinomial(total_count, p), [p])
         #self._gradcheck_log_prob(lambda p: Multinomial(total_count, None, p.log()), [p])
         self.assertRaises(NotImplementedError, Multinomial(10, p).rsample)
-<<<<<<< HEAD
-
-=======
-    '''
->>>>>>> 6a9c9091940efc9bf87c83e1839fe13013f98ca1
     #@pytest.mark.skipIf(not TEST_NUMPY, "NumPy not found")
     def test_multinomial_1d_log_prob(self):
         total_count = 10
@@ -233,10 +224,6 @@ class TestDistributions(TestCase):
         log_prob = dist.log_prob(x)
         expected = torch.tensor(scipy.stats.multinomial.logpmf(x.numpy(), n=total_count, p=dist.probs.detach().numpy()))
         self.assertEqual(log_prob, expected)
-<<<<<<< HEAD
-=======
-    '''
->>>>>>> 6a9c9091940efc9bf87c83e1839fe13013f98ca1
     
     def test_multinomial_2d(self):
         total_count = 10
