@@ -4401,8 +4401,7 @@ class ModuleTest(TestBase):
             # grad_output = output.new(output.shape).normal_() # We may fail here because dpcppTensor doesn't have a op named new.
             grad_output = torch.empty_like(output).normal_()
             output = output.clone()
-            a = test_case._backward(module, input, output, grad_output)
-            d_input = deepcopy(test_case._backward(module, input, output, grad_output).cpu()) # dpcppTensor cannot call self storage()
+            d_input = deepcopy(test_case._backward(module, input, output, grad_output).cpu()).to('dpcpp') # dpcppTensor cannot call self storage(), so there is a workaround
             d_param = deepcopy(test_case._get_parameters(module)[1])
 
         nc_input = self.noncontiguize(input)
@@ -4411,12 +4410,12 @@ class ModuleTest(TestBase):
             i = input if contig_i else nc_input
             # Some ops, e.g., nn.Flatten, return gradient that shares
             # storage with the grad_output. Hence we copy here.
-            go = deepcopy(grad_output.cpu() if contig_g else nc_grad_output.cpu()) # dpcppTensor cannot call self storage()
+            go = deepcopy(grad_output.cpu() if contig_g else nc_grad_output.cpu()).to('dpcpp') # dpcppTensor cannot call self storage(), so there is a workaround
             test_case._zero_grad_parameters(module)
             test_case._zero_grad_input(i)
             with freeze_rng_state():
                 out = test_case._forward(module, i)
-                grad = test_case._backward(module, i, out, go.to('dpcpp')) # dpcppTensor cannot call self storage()
+                grad = test_case._backward(module, i, out, go)
 
                 test_case.assertEqual(out, output)
                 test_case.assertEqual(grad, d_input, 1e-4)
