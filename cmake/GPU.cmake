@@ -169,6 +169,11 @@ if(USE_DPCPP)
     message(STATUS "USM is enabled as device memory management!")
   endif()
 
+  if (USE_MULTI_CONTEXT)
+    add_definitions(-DUSE_MULTI_CONTEXT)
+    message(STATUS "multi context is enabled!")
+  endif()
+
   if (USE_ONEMKL)
     find_package(MKLDPCPP QUIET)
     if (MKLDPCPP_FOUND)
