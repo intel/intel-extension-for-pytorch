@@ -11,6 +11,8 @@ sys.path.append("..")
 from common_utils import TestCase
 
 ipex_device = ipex.DEVICE
+ref_device = 'cpu'
+
 def get_rand_seed():
     return int(time.time() * 1000000000)
 
@@ -33,14 +35,24 @@ class Test_Conv_IPEX_Op(TestCase):
         rand_seed = int(get_rand_seed())
         print("******{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
+        conv_op_input_ref = torch.rand((1, 1, 10, 10))
+        conv_op_ref = torch.nn.Conv2d(1, 1, (7, 7))
+        conv_op_output_ref = conv_op_ref(conv_op_input_ref)
+        add_src_ref = torch.rand((1, 1, 4, 4))
+        conv_op_output_ref += add_src_ref
+        conv_op_output_ref.relu_()
+
         ipex.core.enable_auto_dnnl()
-        conv_op_input = torch.rand((1, 1, 10, 10)).to(device=ipex_device)
-        conv_op = torch.nn.Conv2d(1, 1, (7, 7)).to(device=ipex_device)
+        conv_op_input = conv_op_input_ref.to(device=ipex_device)
+        conv_op = conv_op_ref.to(device=ipex_device)
         conv_op_output = conv_op(conv_op_input)
-        add_src = torch.rand((1, 1, 4, 4)).to(device=ipex_device)
+        add_src = add_src_ref.to(device=ipex_device)
         conv_op_output += add_src
         conv_op_output.relu_()
         ipex.core.disable_auto_dnnl()
+
+        self.assertEqual(conv_op_output_ref.size(), conv_op_output.size())
+        self.assertEqual(conv_op_output_ref, conv_op_output)
 
     def test_conv_add_bn_110(self):    ##2 reorder
         ipex.core.enable_auto_dnnl()
