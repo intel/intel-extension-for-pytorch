@@ -451,11 +451,7 @@ def to_dpcpp(obj, type_map=None):
         t = type_map.get(obj.type(), obj.type())
         with torch.no_grad():
             res = obj.clone().type(t)
-            # res.requires_grad = obj.requires_grad
-            if obj.dtype != torch.int64:
-                res = res.to(device='dpcpp', dtype=torch.float32).requires_grad_() # That makes the dpcpp tensor to be leaf
-            else:
-                res = res.to(device='dpcpp', dtype=torch.int64) # NLLLoss target needs Long dtype
+            res = res.to(device='dpcpp', dtype=torch.float32).requires_grad_() # That makes the dpcpp tensor to be leaf
         return res
     elif torch.is_storage(obj):
         return obj.new().resize_(obj.size()).copy_(obj)
@@ -466,6 +462,22 @@ def to_dpcpp(obj, type_map=None):
     else:
         return deepcopy(obj)
 
+def to_dpcpp_in_criterion(cpuTensor, isTarget):
+    if isinstance(cpuTensor, torch.Tensor):
+        assert cpuTensor.is_leaf
+        res = cpuTensor.detach().clone()
+        res = res.to(device='dpcpp')
+        if not isTarget:
+            res.requires_grad=True
+        return res
+    elif torch.is_storage(cpuTensor):
+        return cpuTensor.new().resize_(cpuTensor.size()).copy_(cpuTensor)
+    elif isinstance(cpuTensor, list):
+        return [to_dpcpp_in_criterion(o, isTarget) for o in cpuTensor]
+    elif isinstance(cpuTensor, tuple):
+        return tuple(to_dpcpp_in_criterion(o, isTarget) for o in cpuTensor)
+    else:
+        return deepcopy(cpuTensor)
 
 def get_function_arglist(func):
     if sys.version_info > (3,):
