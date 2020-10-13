@@ -4401,8 +4401,20 @@ class ModuleTest(TestBase):
             # grad_output = output.new(output.shape).normal_() # We may fail here because dpcppTensor doesn't have a op named new.
             grad_output = torch.empty_like(output).normal_()
             output = output.clone()
-            d_input = deepcopy(test_case._backward(module, input, output, grad_output).cpu()).to('dpcpp') # dpcppTensor cannot call self storage(), so there is a workaround
-            d_param = deepcopy(test_case._get_parameters(module)[1])
+            d_grad = test_case._backward(module, input, output, grad_output) # dpcppTensor cannot call self storage(), so there is a workaround
+            d_grad_copy = deepcopy(d_grad.cpu() if d_grad != None else d_grad) # d_grad may sometime be None, for example, Embedding backward grad
+            d_input = d_grad_copy.to('dpcpp') if d_grad_copy != None else d_grad_copy
+            d_param_temp = test_case._get_parameters(module)[1]
+            
+            if isinstance(d_param_temp, list): # dpcppTensor cannot call self storage(), so there is a workaround
+                for i in range(len(d_param_temp)):
+                    d_param_temp[i] = d_param_temp[i].cpu()
+            
+            d_param = deepcopy(d_param_temp)
+            
+            if isinstance(d_param, list): # dpcppTensor cannot call self storage(), so there is a workaround
+                for i in range(len(d_param)):
+                    d_param[i] = d_param[i].to('dpcpp')
 
         nc_input = self.noncontiguize(input)
         nc_grad_output = self.noncontiguize(grad_output)
