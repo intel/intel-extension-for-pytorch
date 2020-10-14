@@ -5176,20 +5176,20 @@ class TestNN(NNTestCase):
     @unittest.skipIf(not TEST_DPCPP, 'DPCPP not available')
     def test_dpcpp_weight_tying(self):
         rnns = [
-            nn.LSTM(10, 20, batch_first=True, bidirectional=True),
-            nn.GRU(10, 20, batch_first=True, bidirectional=True),
-            nn.RNN(10, 20, batch_first=True, bidirectional=True)
+            nn.LSTM(10, 20, batch_first=True, bidirectional=True).float(),
+            nn.GRU(10, 20, batch_first=True, bidirectional=True).float(),
+            nn.RNN(10, 20, batch_first=True, bidirectional=True).float(),
         ]
         for rnn in rnns:
             rnn.bias_ih_l0_reverse = rnn.bias_ih_l0
             rnn.to("dpcpp")
-            input = torch.randn(5, 4, 10, requires_grad=True).to("dpcpp")
-            hx = torch.randn(2, 5, 20, requires_grad=True).to("dpcpp")
+            input = torch.randn(5, 4, 10, requires_grad=True, dtype=torch.float32).to("dpcpp")
+            hx = torch.randn(2, 5, 20, requires_grad=True, dtype=torch.float32).to("dpcpp")
             all_vars = [input, hx] + list(rnn.parameters())
             opt = torch.optim.SGD(rnn.parameters(), lr=0.1)
             opt.zero_grad()
             if isinstance(rnn, nn.LSTM):
-                cx = torch.randn(2, 5, 20, requires_grad=True).to("dpcpp")
+                cx = torch.randn(2, 5, 20, requires_grad=True, dtype=torch.float32).to("dpcpp")
                 all_vars[2:2] = [cx]
                 hx = (hx, cx)
 
@@ -5954,8 +5954,9 @@ class TestNN(NNTestCase):
         batch = 6
 
         # runs on CPU to acquire expected output
-        m = nn.LSTM(input_size, hidden_size, num_layers)
-        input = torch.randn(seq_length, batch, input_size)
+        # the UT sets default dtype to double, while dnnl mm needs float, so we generate model and input here to float
+        m = nn.LSTM(input_size, hidden_size, num_layers).float()
+        input = torch.randn(seq_length, batch, input_size, dtype=torch.float32)
         expected_output = m(input)
 
         # adds weight normalization
@@ -6003,8 +6004,8 @@ class TestNN(NNTestCase):
         hidden_size = 6
         num_layers = 2
 
-        m = nn.LSTM(input_size, hidden_size, num_layers)
-        inp = torch.randn(3, 2, 10)
+        m = nn.LSTM(input_size, hidden_size, num_layers).float() # manually generate float input and model, because default dtype is double, which is unsupported by dnnl
+        inp = torch.randn(3, 2, 10, dtype=torch.float32)
         out_expected = m(inp)
         # deletes an attribute of original LSTM
         weight_orig = m.weight_hh_l0
@@ -6068,6 +6069,7 @@ class TestNN(NNTestCase):
     def test_RNN_dropout_dpcpp(self):
         # checking the assumption that dpcpp sticks dropout in between
         # RNN layers
+        torch.set_default_dtype(torch.float) # dnnl matmul, unsupported fp64 input, so we set default dtype to float32 and recover in the bottom of the case
         for p in (0, 0.276, 0.731, 1):
             for train in (True, False):
                 for dpcpp in (True, False):
@@ -6106,6 +6108,7 @@ class TestNN(NNTestCase):
                     self.assertEqual(hy[1].data.min(), hy[1].data.max())
                     self.assertEqual(hy.data[0][0][0], 10)
                     self.assertEqual(hy.data[1][0][0], output_val)
+        torch.set_default_dtype(torch.double)
 
     @unittest.skipIf(not (TEST_CUDNN and (TEST_CUDNN_VERSION if TEST_CUDNN_VERSION else 0) >= 5103), "needs cudnn >= 5.1")
     def test_RNN_dropout_state(self):
@@ -10303,6 +10306,8 @@ class TestNNDeviceType(NNTestCase):
             if bias:
                 conv1.bias = nn.Parameter(bias_c)
             out2 = conv1(input_c)
+            print('out1 dtype = ', out1.dtype)
+            print('out2 dtype = ', out2.dtype)
             self.assertEqual(out1, out2)
 
     @largeCUDATensorTest('12GB')
@@ -10437,7 +10442,7 @@ class TestNNDeviceType(NNTestCase):
                 grads2 = [input.grad.data] + [p.grad.data for p in rnn.parameters()]
                 self.assertEqual(grads, grads2)
 
-    @dtypesIfDPCPP(torch.float, torch.double)
+    @dtypesIfDPCPP(torch.float) # dnnl mm unsupport double, we cancel double UT
     @dtypesIfCUDA(torch.half, torch.float, torch.double)
     @dtypes(torch.double)
     def test_rnn_retain_variables(self, device, dtype):
@@ -10459,7 +10464,7 @@ class TestNNDeviceType(NNTestCase):
     @onlyDPCPP
     def test_upsamplingNearest1d_launch_config_dpcpp(self, device):
         m = nn.Upsample(scale_factor=2)
-        inp_ref = torch.rand(2**25, 1, 1)
+        inp_ref = torch.rand(2**25, 1, 1, dtype=torch.float32) # dnnl resampling unsupport double
         out_ref = m(inp_ref)
         inp = inp_ref.to(device)
         out = m(inp)
@@ -10476,8 +10481,8 @@ class TestNNDeviceType(NNTestCase):
 
     @onlyDPCPP
     def test_upsamplingNearest2d_launch_config_dpcpp(self, device):
-        m = nn.Upsample(scale_factor=2)
-        inp_ref = torch.rand(2**25, 1, 1, 1)
+        m = nn.Upsample(scale_factor=2).float()
+        inp_ref = torch.rand(2**25, 1, 1, 1, dtype=torch.float32) # dnnl resampling unsupport double
         out_ref = m(inp_ref)
         inp = inp_ref.to(device)
         out = m(inp)
@@ -10741,6 +10746,7 @@ class TestNNDeviceType(NNTestCase):
             self.assertEqual(out_y, out_x.to(device), test)
 
     @onlyOnDPCPPAndCUDA
+    @unittest.skipIf(True, 'mkldnn unsupport double and dpcppTensor has no storage() method')
     def test_AvgPool3d_backward_after_cat_dim1_device(self, device):
         # x has to have batch_size 1 to test contiguous checks
         x = torch.randn(1, 3, 4, 4, 4, device=device, requires_grad=True)
@@ -11166,7 +11172,7 @@ class TestNNDeviceType(NNTestCase):
         self.assertEqual(dtype, out[0].dtype)
 
     @dtypesIfCUDA(*ALL_TENSORTYPES2)
-    @dtypesIfDPCPP(*ALL_TENSORTYPES_DPCPP)
+    @dtypesIfDPCPP(torch.float, torch.half, torch.bfloat16)
     @dtypes(torch.float)
     def test_Conv2d_naive_groups(self, device, dtype):
         # Check that grouped convolutions matches two half convolutions
@@ -11526,7 +11532,7 @@ class TestNNDeviceType(NNTestCase):
         self.assertEqual(out.size(), x.size())
 
     @dtypesIfCUDA(torch.half, torch.float, torch.double)
-    @dtypesIfDPCPP(torch.float, torch.bfloat16, torch.double)
+    @dtypesIfDPCPP(torch.float, torch.bfloat16) # dnnl unsupport double, we cancel the double case
     @dtypes(torch.float)
     def test_variable_sequence(self, device, dtype):
         def pad(var, length):

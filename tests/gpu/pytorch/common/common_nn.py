@@ -15,7 +15,7 @@ import torch.cuda
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.functional import _Reduction
-from common.common_utils import TestCase, to_gpu, to_dpcpp, freeze_rng_state, is_iterable, \
+from common.common_utils import TestCase, to_gpu, to_dpcpp, to_dpcpp_in_criterion, freeze_rng_state, is_iterable, \
     TEST_WITH_ROCM, _assertGradAndGradgradChecks
 from common.common_cuda import TEST_CUDA
 from torch.autograd.gradcheck import get_numerical_jacobian, iter_tensors
@@ -4428,7 +4428,12 @@ class ModuleTest(TestBase):
             with freeze_rng_state():
                 out = test_case._forward(module, i)
                 grad = test_case._backward(module, i, out, go)
-
+                print('***************** out device = ', out.device)
+                print('***************** out dtype = ', out.dtype)
+                print('***************** output device = ', output.device)
+                print('***************** output dtype = ', output.dtype)
+                print('\n\n***************** out = ', out)
+                print('***************** output = ', output, '\n\n')
                 test_case.assertEqual(out, output)
                 test_case.assertEqual(grad, d_input, 1e-4)
                 test_case.assertEqual(test_case._get_parameters(module)[1], d_param)
@@ -4521,13 +4526,11 @@ class ModuleTest(TestBase):
             raise unittest.SkipTest('Excluded from dpcpp tests')
         try:
             cpu_input = self._get_input()
+            print('****************************** In test dpcpp, cpu input dtype = ', cpu_input.dtype)
             gpu_input = to_dpcpp(cpu_input)
-
-            # print('cpu_input.dtype = ', cpu_input.dtype)
-            # print('gpu_input.dtype = ', gpu_input.dtype)
-            
+            print('****************************** In test dpcpp, gpu input dtype = ', gpu_input.dtype)
             cpu_module = self.constructor(*self.constructor_args)
-            gpu_module = self.constructor(*self.constructor_args).float().to("dpcpp")
+            gpu_module = self.constructor(*self.constructor_args).float().to('dpcpp')
             cpu_param = test_case._get_parameters(cpu_module)
             gpu_param = test_case._get_parameters(gpu_module)
             for cpu_p, gpu_p in zip(cpu_param[0], gpu_param[0]):
@@ -4539,10 +4542,6 @@ class ModuleTest(TestBase):
             test_case._zero_grad_parameters(gpu_module)
             cpu_output = test_case._forward(cpu_module, cpu_input)
             gpu_output = test_case._forward(gpu_module, gpu_input)
-            
-            # print('cpu_output.dtype = ', cpu_output.dtype)
-            # print('gpu_output.dtype = ', gpu_output.dtype)
-            
             test_case.assertEqual(cpu_output, gpu_output, self.precision)
 
             if gpu_input.type() != 'torch.dpcpp.HalfTensor':
@@ -4641,7 +4640,7 @@ class CriterionTest(TestBase):
             print("In CriterionTest, reference_fn has generated expected output=", expected_out.cpu())
             print("In CriterionTest, out=", out)
             test_case.assertEqual(out, expected_out)
-
+        print('***********************************, check forward only = ', self.check_forward_only)
         if self.check_forward_only:
             return
 
@@ -4681,7 +4680,7 @@ class CriterionTest(TestBase):
         try:
             cpu_input = self._get_input()
             type_map = {
-                'torch.DoubleTensor': torch.cuda.FloatTensor,
+                'torch.DoubleTensor': torch.dpcpp.FloatTensor,
             }
             gpu_input = to_dpcpp(cpu_input, type_map=type_map)
 
@@ -4971,77 +4970,58 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
         try:
             cpu_input = self._get_input()
             cpu_target = self._get_target()
+
             cpu_module = self.constructor(*self.constructor_args)
             gpu_module = self.constructor(*self.constructor_args)
-            # if isinstance(cpu_input, torch.Tensor):
-            #     print('initial cpu_input = ', cpu_input.dtype)
-            # else:
-            #     print('initial cpu_input = ', cpu_input[0].dtype)
-            # print('initial cpu_target = ', cpu_target.dtype)
-            # print('initial cpu_input = ', cpu_input)
-            # print('initial cpu_target = ', cpu_target)
-            # print('dtype = ', dtype)
-            # Convert input, target and module parameters to dtype
+
             if dtype is not None:
                 cpu_input = convert_dtype(cpu_input, dtype, True)
                 # NLLLoss requires target to be LongTensor
                 if not isinstance(cpu_target, torch.LongTensor) and self.convert_target:
                     cpu_target = convert_dtype(cpu_target, dtype)
-                cpu_module.type(dtype)
-                gpu_module.type(dtype)
-            # print('after covnert cpu_input = ', cpu_input.dtype)
-            # print('after convert cpu_target = ', cpu_target.dtype)
-            # print('after convert cpu_input = ', cpu_input)
-            # print('after convert cpu_input = ', cpu_target)
+            cpu_module.type(dtype)
+            gpu_module.type(dtype)
+
             # GPU setup
-            gpu_input = to_dpcpp(cpu_input)
-            # print('gpu_input = ', gpu_input.cpu())
-            gpu_target = to_dpcpp(cpu_target)
-            # print('gpu_target = ', gpu_target.cpu())
-            gpu_module.to("dpcpp")
-            # print('gpu_module dtype = ', gpu_module.weight)
-            # torch.HalfTensor doesn't support most operations, converting back to default
-            
+            gpu_input = to_dpcpp_in_criterion(cpu_input, False)
+            gpu_target = to_dpcpp_in_criterion(cpu_target, True)
+            gpu_module.to('dpcpp')
+
+            # recover double for cpu_input
             cpu_input = convert_dtype(cpu_input, torch.float64, True)
             # NLLLoss requires target to be LongTensor
             if not isinstance(cpu_target, torch.LongTensor) and self.convert_target:
                 cpu_target = convert_dtype(cpu_target, torch.float64)
             cpu_module.type(torch.float64)
-            
-            # if isinstance(cpu_input, torch.Tensor) and isinstance(gpu_input, torch.Tensor):
-            #     print('cpu_input dtype = ', cpu_input.dtype)
-            #     print('gpu_input dtype = ', gpu_input.dtype)
-            # else:
-            #     print('cpu_input dtype = ', cpu_input[0].dtype)
-            #     print('gpu_input dtype = ', gpu_input[0].dtype)
-            # print('cpu_input shape = ', cpu_input.shape)
-            # print('gpu_input shape = ', gpu_input.shape)
-            # print('cpu_target shape = ', cpu_target.shape)
-            # print('gpu_target shape = ', gpu_target.shape)
-            # print('last cpu_input = ', cpu_input)
-            # print('last gpu_input = ', gpu_input.cpu())
-            # print('last cpu_target = ', cpu_target)
-            # print('last gpu_target = ', gpu_target.cpu())
+
+            if not isinstance(cpu_input, tuple):
+                print('************************************************ cpu input dtype = ', cpu_input.dtype)
+                print('************************************************ cpu target dtype = ', cpu_target.dtype)
+                print('************************************************ cpu input requires grad = ', cpu_input.requires_grad)
+                print('************************************************ cpu target requires grad = ', cpu_target.requires_grad)
+
+                print('************************************************ gpu input dtype = ', gpu_input.dtype)
+                print('************************************************ gpu target dtype = ', gpu_target.dtype)
+                print('************************************************ gpu input requires grad = ', gpu_input.requires_grad)
+                print('************************************************ gpu target requires grad = ', gpu_target.requires_grad)
 
             cpu_output = test_case._forward_criterion(cpu_module, cpu_input, cpu_target, extra_args=extra_args)
-
             gpu_output = test_case._forward_criterion(gpu_module, gpu_input, gpu_target, extra_args=extra_args)
 
             # dtype can be None, so set precision in this way instead of a precision map
-            # print('cpu_output dtype = ', cpu_output.dtype)
-            # print('gpu_output dtype = ', gpu_output.dtype)
             prec = 4e-4 if dtype not in {torch.half, torch.bfloat16} else self._get_bfloat16_prec()
             if prec == 0:
                 prec = 1e-1 # dtype = BF16 & FP16
             # print('finally prec = ', prec)
+            print('************************************************ output cpu - output dpcpp = ', cpu_output - gpu_output.cpu().to(cpu_output.dtype))
+            print('************************************************ prec = ', prec)
             test_case.assertEqual(cpu_output, gpu_output, prec)
-            # test_case.assertEqual(cpu_output, gpu_output, 1e-1 if dtype in {torch.half, torch.bfloat16} else 4e-4)
 
             if dtype != torch.half:
                 cpu_gradInput = test_case._backward_criterion(cpu_module, cpu_input, cpu_target, extra_args=extra_args)
                 gpu_gradInput = test_case._backward_criterion(gpu_module, gpu_input, gpu_target, extra_args=extra_args)
-                # test_case.assertEqual(cpu_gradInput.to(dtype=dtype), gpu_gradInput, 1e-1 if dtype in {torch.half, torch.bfloat16} else 4e-4)
-                test_case.assertEqual(cpu_gradInput.to(dtype=dtype), gpu_gradInput, prec)
+                
+                test_case.assertEqual(cpu_gradInput, gpu_gradInput, prec)
         except NotImplementedError:
             pass
     def _get_target(self):
