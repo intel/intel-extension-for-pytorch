@@ -152,6 +152,7 @@ if(USE_DPCPP)
   set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl")
   set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -D__STRICT_ANSI__")
   set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl-unnamed-lambda")
+  set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fno-sycl-early-optimizations")
   set_source_files_properties(${DPCPP_SRCS} COMPILE_FLAGS "${IPEX_COMPILE_FLAGS}")
 
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl")

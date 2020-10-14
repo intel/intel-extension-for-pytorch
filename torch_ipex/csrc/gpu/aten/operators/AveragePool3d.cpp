@@ -117,7 +117,7 @@ void avg_pool3d_out_template(
                                     : algorithm::pooling_avg_exclude_padding;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF( // Why avg_pool3d_frame no bfloat16 datatype?
       input.scalar_type(), "avg_pool3d_frame", [&] {
         avg_pool_out_frame<scalar_t>(
             input,

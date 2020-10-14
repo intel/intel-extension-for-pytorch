@@ -586,7 +586,7 @@ static void mean_kernel(TensorIterator& iter) {
 }
 
 static void min_kernel(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND(at::ScalarType::Bool, iter.dtype(), "min", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND(at::ScalarType::Bool, iter.dtype(), "min", [&]() { // Why min no support bfloat16 and half? Bool here?
     min_kernel_impl<scalar_t>(iter);
   });
 }

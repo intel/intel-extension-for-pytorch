@@ -91,7 +91,7 @@ void avg_pool2d_out_template(
   auto prop_kind = dnnl::prop_kind::forward_training;
 
   if(!input.is_quantized()){
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+    IPEX_DISPATCH_FLOATING_TYPES_AND2( // Why 2d has half and bf16, and 3d has no half and bf16
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         input.scalar_type(),
