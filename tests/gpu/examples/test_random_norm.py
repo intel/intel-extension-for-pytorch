@@ -9,6 +9,7 @@ dpcpp_device = torch.device("dpcpp")
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skip(reason='Random Data Generate, temporarily cannot guarantee the difference of std and mean in the raneg of precision, when we enable test_torch.py, we will reconsider this issue.')
     def test_random_norm(self, dtype=torch.float):
         x_cpu = torch.tensor([1.111, 2.222, 3.333, 4.444, 5.555, 6.666], device=cpu_device, dtype=dtype)
         x_dpcpp = torch.tensor([1.111, 2.222, 3.333, 4.444, 5.555, 6.666], device=dpcpp_device, dtype=dtype)
