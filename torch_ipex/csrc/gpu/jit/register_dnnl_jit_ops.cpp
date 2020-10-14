@@ -59,6 +59,25 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
+      "dpcpp::conv2d_sigmoid(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
+      [] (const Node* node) ->Operation {
+        return [] (Stack& stack) {
+          auto result = torch::jit::dpcpp::conv2d_sigmoid(
+              (std::move(peek(stack, 0, 7))).toTensor(),
+              (std::move(peek(stack, 1, 7))).toTensor(),
+              toOptionalTensor(std::move(peek(stack, 2, 7))),
+              (std::move(peek(stack, 3, 7))).toIntVector(),
+              (std::move(peek(stack, 4, 7))).toIntVector(),
+              (std::move(peek(stack, 5, 7))).toIntVector(),
+              (std::move(peek(stack, 6, 7))).toInt());
+          drop(stack, 7);
+          pack(stack, std::move(result));
+          return 0;
+        };
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
       "dpcpp::batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool training, float momentum, float eps, bool cudnn_enabled) -> Tensor",
       [] (const Node* node) ->Operation {
         return [] (Stack& stack) {

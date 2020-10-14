@@ -8,68 +8,255 @@ import pytest
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("dpcpp")
 
-
 class TestNNMethod(TestCase):
-    def test_conv(self, dtype=torch.float):
-        # functionality
-        x_cpu = torch.ones([1, 2, 3, 3], device=cpu_device)
-        x_dpcpp = torch.ones([1, 2, 3, 3], device=dpcpp_device)
-        self.assertEqual(x_cpu, x_dpcpp.to(cpu_device))
+  def test_conv2d(self, dtype=torch.float):
+    x_cpu = torch.randn([1, 64, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True)
+    grad_cpu = torch.ones([1, 64, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True)
+    conv_cpu = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False)
+    y_cpu = conv_cpu(x_cpu)
+    y_cpu.backward(grad_cpu)
+    
+    x_dpcpp = x_cpu.to(dpcpp_device)
+    grad_dpcpp = grad_cpu.to(dpcpp_device)
+    conv_dpcpp = conv_cpu.to(dpcpp_device)
+    y_dpcpp = conv_dpcpp(x_dpcpp)
+    y_dpcpp.backward(grad_dpcpp)
 
-        conv1 = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
+    if not torch_ipex._double_kernel_disabled():
+      print("ref: ")
+      print(y_cpu)
+      print("ref backward: ")
+      print(x_cpu)
 
-        grad_cpu = torch.ones([1, 2, 3, 3], device=cpu_device)
-        grad_dpcpp = torch.ones([1, 2, 3, 3], device=dpcpp_device)
-        self.assertEqual(grad_cpu, grad_dpcpp.to(cpu_device))
+      print("real: ")
+      print(y_dpcpp.cpu())
+      print("real backward: ")
+      print(x_dpcpp.cpu())
 
-        x_cpu.requires_grad_(True)
-        y_cpu = conv1(x_cpu)
-        conv1.zero_grad()
-        output_cpu = y_cpu.backward(grad_cpu)
-        print("ref: ")
-        print(y_cpu)
-        print("ref grad: ")
-        print(x_cpu.grad[0])
+    self.assertEqual(x_cpu,       x_dpcpp.cpu())
+    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(y_cpu,       y_dpcpp.cpu())
 
-        x_dpcpp.requires_grad_(True)
-        conv1.to(dpcpp_device)
-        y_dpcpp = conv1(x_dpcpp)
-        conv1.zero_grad()
-        output_dpcpp = y_dpcpp.backward(grad_dpcpp)
-        print("real: ")
-        print(y_dpcpp.to(cpu_device))
-        print("real grad: ")
-        print(x_dpcpp.grad[0].to(cpu_device))
+  def test_conv2d_with_bias(self, dtype=torch.float):
+    x_cpu = torch.randn([1, 64, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True)
+    grad_cpu = torch.ones([1, 64, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True)
+    conv_cpu = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=True)
+    y_cpu = conv_cpu(x_cpu)
+    y_cpu.backward(grad_cpu)
+    
+    x_dpcpp = x_cpu.to(dpcpp_device)
+    grad_dpcpp = grad_cpu.to(dpcpp_device)
+    conv_dpcpp = conv_cpu.to(dpcpp_device)
+    y_dpcpp = conv_dpcpp(x_dpcpp)
+    y_dpcpp.backward(grad_dpcpp)
 
-        self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
-        self.assertEqual(x_cpu.grad[0], x_dpcpp.grad[0].to(cpu_device))
+    if not torch_ipex._double_kernel_disabled():
+      print("ref: ")
+      print(y_cpu)
+      print("ref backward: ")
+      print(x_cpu)
 
-        x_cpu_2 = torch.randn([1, 2, 2, 1, 1], device=cpu_device,
-                              dtype=dtype, requires_grad=True)
-        grad = torch.ones([1, 2, 2, 1, 1], device=cpu_device,
-                          dtype=dtype, requires_grad=True)
-        conv3 = nn.Conv3d(2, 2, kernel_size=3, stride=1, padding=1, bias=True)
-        y_cpu_2 = conv3(x_cpu_2)
-        y_cpu_2.backward(grad)
+      print("real: ")
+      print(y_dpcpp.cpu())
+      print("real backward: ")
+      print(x_dpcpp.cpu())
 
-        conv3.to(dpcpp_device)
-        x_dpcpp_2 = x_cpu_2.to(dpcpp_device)
-        y_dpcpp_2 = conv3(x_dpcpp_2)
-        grad_dpcpp = grad.to(dpcpp_device)
+    self.assertEqual(x_cpu,       x_dpcpp.cpu())
+    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(y_cpu,       y_dpcpp.cpu())
 
-        y_dpcpp_2.backward(grad_dpcpp)
+  def test_conv2d_dilated(self, dtype=torch.float):
+    x_cpu = torch.randn([1, 64, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True)
+    grad_cpu = torch.ones([1, 64, 254, 254], dtype=dtype, device=cpu_device, requires_grad=True)
+    conv_cpu = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, dilation=2, bias=False)
+    y_cpu = conv_cpu(x_cpu)
+    y_cpu.backward(grad_cpu)
+    
+    x_dpcpp = x_cpu.to(dpcpp_device)
+    grad_dpcpp = grad_cpu.to(dpcpp_device)
+    conv_dpcpp = conv_cpu.to(dpcpp_device)
+    y_dpcpp = conv_dpcpp(x_dpcpp)
+    y_dpcpp.backward(grad_dpcpp)
 
-        if not torch_ipex._double_kernel_disabled():
-            print("ref: ")
-            print(y_dpcpp_2)
-            print("ref backward: ")
-            print(x_dpcpp_2)
+    if not torch_ipex._double_kernel_disabled():
+      print("ref: ")
+      print(y_cpu)
+      print("ref backward: ")
+      print(x_cpu)
 
-            print("real: ")
-            print(y_dpcpp_2.to(cpu_device))
-            print("real backward: ")
-            print(x_dpcpp_2.to(cpu_device))
+      print("real: ")
+      print(y_dpcpp.cpu())
+      print("real backward: ")
+      print(x_dpcpp.cpu())
 
-        self.assertEqual(x_cpu_2, x_dpcpp_2)
-        self.assertEqual(grad, grad_dpcpp.to(cpu_device))
-        self.assertEqual(y_cpu_2, y_dpcpp_2.to(cpu_device))
+    self.assertEqual(x_cpu,       x_dpcpp.cpu())
+    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(y_cpu,       y_dpcpp.cpu())
+
+  def test_conv2d_dilated_with_bias(self, dtype=torch.float):
+    x_cpu = torch.randn([1, 64, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True)
+    grad_cpu = torch.ones([1, 64, 254, 254], dtype=dtype, device=cpu_device, requires_grad=True)
+    conv_cpu = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, dilation=2, bias=True)
+    y_cpu = conv_cpu(x_cpu)
+    y_cpu.backward(grad_cpu)
+    
+    x_dpcpp = x_cpu.to(dpcpp_device)
+    grad_dpcpp = grad_cpu.to(dpcpp_device)
+    conv_dpcpp = conv_cpu.to(dpcpp_device)
+    y_dpcpp = conv_dpcpp(x_dpcpp)
+    y_dpcpp.backward(grad_dpcpp)
+
+    if not torch_ipex._double_kernel_disabled():
+      print("ref: ")
+      print(y_cpu)
+      print("ref backward: ")
+      print(x_cpu)
+
+      print("real: ")
+      print(y_dpcpp.cpu())
+      print("real backward: ")
+      print(x_dpcpp.cpu())
+
+    self.assertEqual(x_cpu,       x_dpcpp.cpu())
+    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(y_cpu,       y_dpcpp.cpu())
+
+  def test_conv3d(self, dtype=torch.float):
+    x_cpu = torch.randn([2, 16, 10, 128, 128], dtype=dtype, device=cpu_device, requires_grad=True)
+    grad_cpu = torch.ones([2, 32, 10, 128, 128], dtype=dtype, device=cpu_device, requires_grad=True)
+    conv_cpu = nn.Conv3d(16, 32, kernel_size=3, stride=1, padding=1, bias=False)
+    y_cpu = conv_cpu(x_cpu)
+    y_cpu.backward(grad_cpu)
+    
+    x_dpcpp = x_cpu.to(dpcpp_device)
+    grad_dpcpp = grad_cpu.to(dpcpp_device)
+    conv_dpcpp = conv_cpu.to(dpcpp_device)
+    y_dpcpp = conv_dpcpp(x_dpcpp)
+    y_dpcpp.backward(grad_dpcpp)
+
+    if not torch_ipex._double_kernel_disabled():
+      print("ref: ")
+      print(y_cpu)
+      print("ref backward: ")
+      print(x_cpu)
+
+      print("real: ")
+      print(y_dpcpp.cpu())
+      print("real backward: ")
+      print(x_dpcpp.cpu())
+
+    self.assertEqual(x_cpu,       x_dpcpp.cpu())
+    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(y_cpu,       y_dpcpp.cpu())
+
+  def test_conv3d_with_bias(self, dtype=torch.float):
+    x_cpu = torch.randn([2, 16, 10, 128, 128], dtype=dtype, device=cpu_device, requires_grad=True)
+    grad_cpu = torch.ones([2, 32, 10, 128, 128], dtype=dtype, device=cpu_device, requires_grad=True)
+    conv_cpu = nn.Conv3d(16, 32, kernel_size=3, stride=1, padding=1, bias=True)
+    y_cpu = conv_cpu(x_cpu)
+    y_cpu.backward(grad_cpu)
+    
+    x_dpcpp = x_cpu.to(dpcpp_device)
+    grad_dpcpp = grad_cpu.to(dpcpp_device)
+    conv_dpcpp = conv_cpu.to(dpcpp_device)
+    y_dpcpp = conv_dpcpp(x_dpcpp)
+    y_dpcpp.backward(grad_dpcpp)
+
+    if not torch_ipex._double_kernel_disabled():
+      print("ref: ")
+      print(y_cpu)
+      print("ref backward: ")
+      print(x_cpu)
+
+      print("real: ")
+      print(y_dpcpp.cpu())
+      print("real backward: ")
+      print(x_dpcpp.cpu())
+
+    self.assertEqual(x_cpu,       x_dpcpp.cpu())
+    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(y_cpu,       y_dpcpp.cpu())
+
+  def test_conv3d_dilated(self, dtype=torch.float):
+    x_cpu = torch.randn([2, 16, 10, 128, 128], dtype=dtype, device=cpu_device, requires_grad=True)
+    grad_cpu = torch.ones([2, 32, 6, 124, 124], dtype=dtype, device=cpu_device, requires_grad=True)
+    conv_cpu = nn.Conv3d(16, 32, kernel_size=3, stride=1, padding=1, dilation=3, bias=False)
+    y_cpu = conv_cpu(x_cpu)
+    y_cpu.backward(grad_cpu)
+    
+    x_dpcpp = x_cpu.to(dpcpp_device)
+    grad_dpcpp = grad_cpu.to(dpcpp_device)
+    conv_dpcpp = conv_cpu.to(dpcpp_device)
+    y_dpcpp = conv_dpcpp(x_dpcpp)
+    y_dpcpp.backward(grad_dpcpp)
+
+    if not torch_ipex._double_kernel_disabled():
+      print("ref: ")
+      print(y_cpu)
+      print("ref backward: ")
+      print(x_cpu)
+
+      print("real: ")
+      print(y_dpcpp.cpu())
+      print("real backward: ")
+      print(x_dpcpp.cpu())
+
+    self.assertEqual(x_cpu,       x_dpcpp.cpu())
+    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(y_cpu,       y_dpcpp.cpu())
+
+  def test_conv3d_dilated_with_bias(self, dtype=torch.float):
+    x_cpu = torch.randn([2, 16, 10, 128, 128], dtype=dtype, device=cpu_device, requires_grad=True)
+    grad_cpu = torch.ones([2, 32, 6, 124, 124], dtype=dtype, device=cpu_device, requires_grad=True)
+    conv_cpu = nn.Conv3d(16, 32, kernel_size=3, stride=1, padding=1, dilation=3, bias=True)
+    y_cpu = conv_cpu(x_cpu)
+    y_cpu.backward(grad_cpu)
+    
+    x_dpcpp = x_cpu.to(dpcpp_device)
+    grad_dpcpp = grad_cpu.to(dpcpp_device)
+    conv_dpcpp = conv_cpu.to(dpcpp_device)
+    y_dpcpp = conv_dpcpp(x_dpcpp)
+    y_dpcpp.backward(grad_dpcpp)
+
+    if not torch_ipex._double_kernel_disabled():
+      print("ref: ")
+      print(y_cpu)
+      print("ref backward: ")
+      print(x_cpu)
+
+      print("real: ")
+      print(y_dpcpp.cpu())
+      print("real backward: ")
+      print(x_dpcpp.cpu())
+
+    self.assertEqual(x_cpu,       x_dpcpp.cpu())
+    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(y_cpu,       y_dpcpp.cpu())
+
+  def test_conv_with_nosquare_kernel_size(self, dtype=torch.float):
+    x_cpu = torch.randn([20, 16, 50, 100], dtype=dtype, device=cpu_device, requires_grad=True)
+    grad_cpu = torch.ones([20, 33, 26, 100], dtype=dtype, device=cpu_device, requires_grad=True)
+    conv_cpu = nn.Conv2d(16, 33, kernel_size=(3, 5), stride=(2, 1), padding=(4, 2), dilation=(3, 1), bias=True)
+    y_cpu = conv_cpu(x_cpu)
+    y_cpu.backward(grad_cpu)
+    
+    x_dpcpp = x_cpu.to(dpcpp_device)
+    grad_dpcpp = grad_cpu.to(dpcpp_device)
+    conv_dpcpp = conv_cpu.to(dpcpp_device)
+    y_dpcpp = conv_dpcpp(x_dpcpp)
+    y_dpcpp.backward(grad_dpcpp)
+
+    if not torch_ipex._double_kernel_disabled():
+      print("ref: ")
+      print(y_cpu)
+      print("ref backward: ")
+      print(x_cpu)
+
+      print("real: ")
+      print(y_dpcpp.cpu())
+      print("real backward: ")
+      print(x_dpcpp.cpu())
+
+    self.assertEqual(x_cpu,       x_dpcpp.cpu())
+    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(y_cpu,       y_dpcpp.cpu())

@@ -110,6 +110,7 @@ static void avg_pool_out_frame(
   memory::dims kernel;
   memory::dims stride;
   memory::dims padding;
+  memory::format_tag format_any = memory::format_tag::any;
 
   if (inputDepth == 0) {
     format = memory::format_tag::nchw;
@@ -130,7 +131,7 @@ static void avg_pool_out_frame(
   }
 
   auto input_md = memory::desc({input_tz}, data_t, format);
-  auto output_md = memory::desc({output_tz}, data_t, format);
+  auto output_md = memory::desc({output_tz}, data_t, format_any);
 
   if (lazy_reorder_enabled()) {
     auto input_ctx =
@@ -152,29 +153,31 @@ static void avg_pool_out_frame(
   auto pooling_forward_pd =
       pooling_forward::primitive_desc(pooling_forward_desc, engine);
 
+  auto expected_input_md = pooling_forward_pd.src_desc();
+  auto expected_output_md = pooling_forward_pd.dst_desc();
+
   memory input_usr_memory, output_usr_memory;
   if (!lazy_reorder_enabled()) {
     input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
 
-    output_usr_memory =
-        dpcpp_onednn_memory(output_md, engine, output.data_ptr());
+    output_usr_memory = dpcpp_onednn_memory(
+        {{output_tz}, data_t, format}, engine, output.data_ptr());
   } else {
     input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
+    auto plain_output_md = memory::desc({output_tz}, data_t, format);
 
-    auto expected_output_md = pooling_forward_pd.dst_desc();
-    if (expected_output_md != output_md) {
+    if (expected_output_md != plain_output_md) {
       // reallocate memory due to padding needed by oneDNN in some blk fmt
       output = empty_opaque_tensor(
           expected_output_md, input.options(), c10::nullopt);
       output_usr_memory =
           dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
     } else {
-      output_usr_memory =
-          dpcpp_onednn_memory(output_md, engine, output.data_ptr());
+      output_usr_memory = dpcpp_onednn_memory(
+          {{output_tz}, data_t, format_any}, engine, output.data_ptr());
     }
   }
 
-  auto expected_input_md = pooling_forward_pd.src_desc();
   auto input_memory = input_usr_memory;
   Tensor input_;
   if (lazy_reorder_enabled()) {

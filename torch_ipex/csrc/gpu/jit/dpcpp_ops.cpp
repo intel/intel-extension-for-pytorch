@@ -42,8 +42,20 @@ at::Tensor conv2d_relu(
       input, weight, bias, stride, padding, dilation, false, {{0, 0}}, groups);
 }
 
+at::Tensor conv2d_sigmoid(
+    const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias,
+    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
+    int64_t groups) {
+  RECORD_FUNCTION("conv2d_sigmoid",
+                  std::vector<c10::IValue>({input, weight, bias}));
+  return at::AtenIpexTypeDPCPP::convolution_sigmoid(
+      input, weight, bias, stride, padding, dilation, false, {{0, 0}}, groups);
+}
+
 at::Tensor mul_add(const at::Tensor& self,
     const at::Tensor& other, const at::Tensor& accumu, at::Scalar alpha) {
+  RECORD_FUNCTION("mul_add",
+                  std::vector<c10::IValue>({self, other, accumu}));
   return at::AtenIpexTypeDPCPP::mul_add(self, other, accumu, alpha);
 }
 
