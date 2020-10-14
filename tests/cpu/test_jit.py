@@ -95,6 +95,30 @@ class ConvBatchNorm_Fixed(nn.Module):
     def forward(self, x):
         return self.bn(self.conv(x))
 
+class BatchNormConv_Fixed(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(BatchNormConv_Fixed, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.bn = bn_module[dim](in_channels, eps=0.001)
+
+    def forward(self, x):
+        return self.conv(self.bn(x))
+
+class ConvReshapeBatchNorm(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, dest_shape, **kwargs):
+        super(ConvReshapeBatchNorm, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.dest_shape = dest_shape
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.bn = bn_module[dim](dest_shape[1], eps=0.001)
+
+    def forward(self, x):
+        conv_output = self.conv(x)
+        return self.bn(torch.reshape(conv_output, self.dest_shape)) 
+        
 class ConvRelu_Fixed(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(ConvRelu_Fixed, self).__init__()
@@ -104,6 +128,17 @@ class ConvRelu_Fixed(nn.Module):
 
     def forward(self, x):
         return F.relu(self.conv(x), inplace=True)
+
+class ConvReshapeRelu(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, dest_shape, **kwargs):
+        super(ConvReshapeRelu, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.dest_shape = dest_shape
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+
+    def forward(self, x):
+        return F.relu(torch.reshape(self.conv(x), self.dest_shape), inplace=True)
 
 class ConvSum(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
@@ -446,6 +481,26 @@ class Tester(TestCase):
             kind_not_in_graph="aten::batch_norm",
             prec=0.02)
 
+    def test_output_bn_conv_2d(self):
+        self._test_output(
+            BatchNormConv_Fixed(2, 3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 64, 64),
+            kind_in_graph="aten::batch_norm",
+            kind_not_in_graph=None,)
+
+    def test_output_conv_reshape_bn_2d(self):
+        self._test_output(
+            ConvReshapeBatchNorm(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),
+            torch.randn(32, 3, 64, 64),
+            kind_in_graph="aten::batch_norm",
+            kind_not_in_graph=None,)
+
+    def test_output_conv_reshape_relu(self):
+        self._test_output(
+            ConvReshapeRelu(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),
+            torch.randn(32, 3, 64, 64),
+            kind_in_graph="aten::conv2d1",
+            kind_not_in_graph="ipex::conv2d_relu",)
 
     def test_output_conv_bn_3d(self):
         self._test_output(
