@@ -15,6 +15,8 @@ class AmpConf(object):
         self.dtype = mixed_dtype
         self.configure_file = configure_file
 
+        if self.dtype != torch.bfloat16:
+            core.clear_indicators()
         # for int8 path, if user give a exited configure file, load it.
         if self.configure_file != None and self.dtype != torch.bfloat16:
             if os.path.exists(self.configure_file) and os.stat(self.configure_file).st_size != 0:

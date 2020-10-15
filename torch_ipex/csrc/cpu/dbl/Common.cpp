@@ -230,8 +230,8 @@ at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
     // And even the dil tensor is plain format, it also cannot be shared with cpu buffer.
     shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_BF16_FP32;
     at_data_type = at::kFloat;
-  } else if (check_auto_mix_int8_fp32() && (dil_tensor_type == dil::data_type::s8 || dil_tensor_type == dil::data_type::u8)) {
-    // If the user enables auto-mix-precision, then the aten tensor should always be float.
+  } else if ((dil_tensor_type == dil::data_type::s8 || dil_tensor_type == dil::data_type::u8)) {
+    // If the dil_tensor is int8 or unint8, then the aten tensor should always be float.
     // And even the dil tensor is plain format, it also cannot be shared with cpu buffer.
     shade_data_context->mix_prec_type = cpu::MIX_PREC_TYPE::MIX_INT8_FP32;
     at_data_type = at::kFloat;

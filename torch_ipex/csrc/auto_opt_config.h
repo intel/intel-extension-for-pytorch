@@ -98,6 +98,10 @@ public:
     }
   }
 
+  inline void clear_indicators() {
+    indicators_.clear();
+  }
+
   inline void add_indicators() {
     num_ops_id = 0;
     indicators_.clear();

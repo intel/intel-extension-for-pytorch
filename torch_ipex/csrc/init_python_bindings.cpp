@@ -147,9 +147,12 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_int8_calibration", []() { return AutoOptConfig::singleton().get_int8_calibration(); });
   m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
   m.def("add_indicators", []() { AutoOptConfig::singleton().add_indicators(); });
+  // clear indicators for case having many scopes which have different structure
+  m.def("clear_indicators", []() { AutoOptConfig::singleton().clear_indicators(); }); 
   m.def("get_int8_configures", []() {
       py::list output_list;
       auto indicators = AutoOptConfig::singleton().get_indicators();
+      IPEX_CHECK(indicators.size() > 0, "can't load a empty indicators, please first do calibration step");
       for (auto indicator: indicators) {
         py::dict d;
         d["id"] = indicator.get_indicator_id();
@@ -169,7 +172,7 @@ void InitIpexModuleBindings(py::module m) {
       }
       return output_list; } );
   m.def("load_indicators_file", [](const py::list& l) {
-      IPEX_CHECK(py::len(l) > 0, "can't load a empty configures, please first do calibration setp"); 
+      IPEX_CHECK(py::len(l) > 0, "can't load a empty configures, please first do calibration step");
       std::vector<Indicator> indicators;
       for (py::handle i : l) {
         int64_t id = py::cast<std::int64_t>(i["id"]);
