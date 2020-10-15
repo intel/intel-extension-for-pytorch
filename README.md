@@ -6,8 +6,8 @@
 
 | **HW proxy** | **OS** | **GPU User Mode Driver** | Python |
 | ------ | ------ | ------ | ------ |
-| **Gen9** | Ubuntu-18.04 | [20.30.17454](https://github.com/intel/compute-runtime/releases/tag/20.30.17454) | 3.6.x |
-| **DG1** | Ubuntu-20.04 | [agama-dg1-29/engineering build](http://10.239.87.81/zhenjie/agama/agama-dg1-29/) and replace IGC with [**igc3436**](http://10.239.87.81/zhenjie/igc3436/) | 3.6.x |
+| **Gen9** | Ubuntu-18.04 | [compute runtime 20.40.18075](https://github.com/intel/compute-runtime/releases/tag/20.40.18075) + [level zero](https://github.com/oneapi-src/level-zero/releases/tag/v1.0) | 3.6 + |
+| **DG1** | Ubuntu-20.04 | [agama-dg1-29/engineering build](http://10.239.87.81/zhenjie/agama/agama-dg1-29/) and replace IGC with [**igc3436**](http://10.239.87.81/zhenjie/igc3436/) | 3.6 + |
 
 ### **Dependence:**
 ```bash
@@ -115,6 +115,11 @@ $ clang++ -I $DPCPP_ROOT/include/sycl device_enum.cpp -L $DPCPP_ROOT/lib -fsycl 
 |Intel(R) CPU Runtime for OpenCL(TM) Applications
 |       |__|Devices:
 |          |Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz(NonGPU)
+----------------------------------------------------------------
+|Platform:
+|Intel(R) Level-Zero
+|       |__|Devices:
+|          |Intel(R) Gen9(GPU)
 ----------------------------------------------------------------
 |Platform:
 |Intel(R) OpenCL HD Graphics
