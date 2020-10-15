@@ -8,7 +8,7 @@ class  TestNNMethod(TestCase):
 
         relu_ = torch.nn.functional.relu_
         relu = torch.nn.functional.relu
-        x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]]);
+        x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]])
         x_dpcpp = x_cpu.to("dpcpp")
 
         relu_(x_cpu)
@@ -33,7 +33,7 @@ class  TestNNMethod(TestCase):
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
         RReLU = torch.nn.RReLU(0.1,0.3)
-        x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]]);
+        x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]])
         x_dpcpp = x_cpu.to("dpcpp")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
@@ -51,7 +51,7 @@ class  TestNNMethod(TestCase):
         #self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
         GELU = torch.nn.GELU()
-        x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]]);
+        x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]])
         x_dpcpp = x_cpu.to("dpcpp")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
@@ -71,7 +71,7 @@ class  TestNNMethod(TestCase):
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
         PReLU = torch.nn.PReLU()
-        x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]]);
+        x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]])
         x_dpcpp = x_cpu.to("dpcpp")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
