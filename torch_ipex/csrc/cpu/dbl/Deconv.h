@@ -20,11 +20,17 @@ std::vector<int64_t> calc_deconv_input_size(
     at::IntArrayRef dilation,
     int64_t groups);
 
+std::vector<int64_t> calc_padding_r_adjusted(
+    const int64_t input_dims,
+    at::IntArrayRef padding,
+    at::IntArrayRef output_padding);
+
 dil::tensor deconvolution_impl(
     const dil::tensor& x,
     const dil::tensor& w,
     const c10::optional<dil::tensor>& b,
     at::IntArrayRef padding,
+    std::vector<int64_t>  padding_r,
     at::IntArrayRef output_padding,
     at::IntArrayRef stride,
     at::IntArrayRef dilation,
@@ -36,6 +42,7 @@ void prepack_deconv_weights(
     const at::Tensor& weight,
     at::IntArrayRef stride,
     at::IntArrayRef padding,
+    std::vector<int64_t>  padding_r,
     at::IntArrayRef output_padding,
     at::IntArrayRef dilation,
     int64_t groups,

@@ -242,13 +242,18 @@ at::Tensor AtenIpexCPUDev::dil_deconvolution(
 
   if (bias.defined()) {
     CHECK_DNNL_OP_PRE_COND(bias);
-    dbl::comm::reorder_to_bf16_for_mix_prec(bias);
+    dbl::comm::reorder_to_bf16_for_mix_prec(bias, true);
     dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
 
-  dbl::comm::reorder_to_bf16_for_mix_prec(weight);;
-  dbl::deconv::prepack_deconv_weights(
-      input, weight, stride, padding, output_padding, dilation, groups, bias.defined());
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight, true);
+
+  std::vector<int64_t> padding_r = dbl::deconv::calc_padding_r_adjusted(input.dim(), padding, output_padding);
+
+  if (!(check_auto_mix_bf16_fp32() && check_train())) {
+    dbl::deconv::prepack_deconv_weights(
+      input, weight, stride, padding, padding_r, output_padding, dilation, groups, bias.defined());
+  }
   dil_weight = dbl::comm::try_gen_dil_tensor(weight);
 
   dil::tensor dil_output = dbl::deconv::deconvolution_impl(
@@ -256,12 +261,128 @@ at::Tensor AtenIpexCPUDev::dil_deconvolution(
     dil_weight,
     dil_bias,
     padding,
+    padding_r,
     output_padding,
     stride,
     dilation,
     groups);
 
   return dbl::comm::gen_aten_tensor_by(std::move(dil_output));
+}
+
+at::Tensor dil_deconvolution_backward_input(
+    at::IntArrayRef input_size, 
+    const at::Tensor& grad_output, 
+    const at::Tensor& weight,
+    at::IntArrayRef padding,
+    std::vector<int64_t> padding_r,
+    at::IntArrayRef stride, 
+    at::IntArrayRef dilation, 
+    int64_t groups, 
+    bool bias_defined) {
+      // for training case, grad_output can be cpu tensor or MKLDNN tensor,
+      // but weight and bias always cpu tensor
+      auto dil_grad_output = dbl::comm::try_gen_dil_tensor(grad_output);
+      auto dil_weight = dbl::comm::try_gen_dil_tensor(weight);
+
+      dil::tensor dil_grad_input;
+      dil::convolution_transpose_backward_data::compute(
+          dil_grad_output,
+          dil_weight,
+          input_size.vec(),
+          dil_grad_input,
+          stride.vec(),
+          padding.vec(),
+          padding_r,
+          dilation.vec(),
+          groups);
+      return dbl::comm::gen_aten_tensor_by(std::move(dil_grad_input));
+}
+
+std::tuple<at::Tensor, at::Tensor> dil_deconvolution_backward_weights(
+    const at::Tensor& weight, 
+    const at::Tensor& grad_output, 
+    const at::Tensor& input,
+    at::IntArrayRef padding,
+    std::vector<int64_t> padding_r,
+    at::IntArrayRef stride, 
+    at::IntArrayRef dilation, 
+    int64_t groups, 
+    bool bias_defined) { 
+      // for training case, grad_output and input can be cpu tensor or MKLDNN tensor,
+      // but weight and bias always cpu tensor
+      const dil::tensor dil_grad_output = dbl::comm::try_gen_dil_tensor(grad_output);
+      const dil::tensor dil_input = dbl::comm::try_gen_dil_tensor(input);
+
+      dil::tensor dil_grad_weight, dil_grad_bias;
+      dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
+      auto diff_weight_type = w.get_data_type();
+      auto weight_size = weight.sizes();
+
+      if (bias_defined) {
+        dil::convolution_transpose_backward_weights::compute(
+            dil_input,
+            dil_grad_output,
+            weight_size.vec(),
+            dil_grad_weight,
+            dil_grad_bias,
+            stride.vec(),
+            padding.vec(),
+            padding_r,
+            dilation.vec(),
+            groups,
+            diff_weight_type);
+        return std::make_tuple(
+            dbl::comm::gen_aten_tensor_by(std::move(dil_grad_weight)),
+            dbl::comm::gen_aten_tensor_by(std::move(dil_grad_bias)));
+      } else {
+        dil::convolution_transpose_backward_weights::compute(
+            dil_input,
+            dil_grad_output,
+            weight_size.vec(),
+            dil_grad_weight,
+            stride.vec(),
+            padding.vec(),
+            padding_r,
+            dilation.vec(),
+            groups, 
+            diff_weight_type);
+        return std::make_tuple(
+            dbl::comm::gen_aten_tensor_by(std::move(dil_grad_weight)),
+            at::Tensor());
+      }
+}
+
+std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_deconvolution_backward(
+  const at::Tensor& input, 
+  const at::Tensor& grad_output, 
+  const at::Tensor& weight, 
+  at::IntArrayRef padding, 
+  at::IntArrayRef output_padding,
+  at::IntArrayRef stride, 
+  at::IntArrayRef dilation, 
+  int64_t groups, 
+  std::array<bool,3> output_mask) {
+    DEBUG("AtenIpexCPUDev::dil_deconvolution_backward\n");
+    CHECK_DNNL_OP_PRE_COND(input);
+    CHECK_DNNL_OP_PRE_COND(weight);
+    dbl::comm::reorder_to_bf16_for_mix_prec(input);
+    dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+    dbl::comm::reorder_to_bf16_for_mix_prec(weight, true);
+
+    // adjust padding_r in deconvolution
+    std::vector<int64_t> padding_r = dbl::deconv::calc_padding_r_adjusted(input.dim(), padding, output_padding);
+
+    at::Tensor grad_input, grad_weight, grad_bias;
+    if (output_mask[0]) {
+      grad_input = dil_deconvolution_backward_input(
+        input.sizes(), grad_output, weight, padding, padding_r, stride, dilation, groups, output_mask[2]);
+    }
+    if (output_mask[1] || output_mask[2]) {
+      std::tie(grad_weight, grad_bias) = dil_deconvolution_backward_weights(
+        weight, grad_output, input, padding, padding_r, stride, dilation, groups, output_mask[2]);
+    }
+    return std::make_tuple(grad_input, grad_weight, grad_bias);
 }
 
 at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
@@ -306,31 +427,49 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
 
 std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_backward_overrideable(const at::Tensor & grad_output, const at::Tensor & input, const at::Tensor & weight, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups, std::array<bool,3> output_mask) {
   DEBUG("AtenIpexCPUDev::convolution_backward_overrideable\n");
-  // NOTE: DO NOT always call contiguous. It may break lazy-reorder. Because contiguous will call reorder instantly.
-  std::vector<at::Tensor> dnnl_input_tensors;
-  dnnl_input_tensors.push_back(input);
-  dnnl_input_tensors.push_back(weight);
-  dnnl_input_tensors.push_back(grad_output);
-  if (check_auto_dnnl()) {
-    if (transposed || !dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
-      IPEX_CHECK(false, "deconvolution backward not support for dnnl path now");
-    } else {
-      return AtenIpexCPUDev::dil_convolution_backward(
-        input.is_contiguous() ? input : input.contiguous(),
-        grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
-        weight.is_contiguous() ? weight : weight.contiguous(),
-        padding,
-        stride,
-        dilation,
-        groups,
-        output_mask);
+  try {
+    if (check_auto_dnnl()) {
+      // NOTE: DO NOT always call contiguous. It may break lazy-reorder. Because contiguous will call reorder instantly.
+      std::vector<at::Tensor> dnnl_input_tensors;
+      dnnl_input_tensors.push_back(input);
+      dnnl_input_tensors.push_back(weight);
+      dnnl_input_tensors.push_back(grad_output);
+      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
+        if (transposed) {
+          return AtenIpexCPUDev::dil_deconvolution_backward(
+            input.is_contiguous() ? input : input.contiguous(),
+            grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
+            weight.is_contiguous() ? weight : weight.contiguous(),
+            padding,
+            output_padding,
+            stride,
+            dilation,
+            groups,
+            output_mask);
+        } else {
+          return AtenIpexCPUDev::dil_convolution_backward(
+            input.is_contiguous() ? input : input.contiguous(),
+            grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
+            weight.is_contiguous() ? weight : weight.contiguous(),
+            padding,
+            stride,
+            dilation,
+            groups,
+            output_mask);
+        }
+      }
     }
+  } catch (std::exception& e) {
+#if defined(_DEBUG)
+    TORCH_WARN(e.what());
+#endif 
+  }
+
+  if (transposed) {
+    return AtenIpexCPUDev::cpu_deconvolution_backward(input, grad_output, weight, padding, output_padding, stride, dilation, groups, output_mask);
   } else {
-    if (transposed || !dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
-      IPEX_CHECK(false, "deconvolution backward not support for native path now");
-    } else {
-      return AtenIpexCPUDev::mkldnn_convolution_backward(input, grad_output, weight, padding, stride, dilation, groups, output_mask);
-    }
+    // TODO should fallback to cpu (maybe thnn 2d or thnn 3d conv bw) rather than mkldnn
+    return AtenIpexCPUDev::mkldnn_convolution_backward(input, grad_output, weight, padding, stride, dilation, groups, output_mask);
   }
 }
 
@@ -348,6 +487,102 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::mkldnn_convolution_
   auto&& _ipex_result = at::mkldnn_convolution_backward(_ipex_self.contiguous(), _ipex_grad_output.contiguous(), _ipex_weight.contiguous(), padding, stride, dilation, groups, output_mask);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return std::tuple<at::Tensor,at::Tensor,at::Tensor>(bridge::shallowUpgradeToDPCPPTensor(std::get<0>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<1>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<2>(_ipex_result)));
+}
+
+std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::cpu_deconvolution_backward(const at::Tensor & self, const at::Tensor & grad_output, const at::Tensor & weight, at::IntArrayRef padding, at::IntArrayRef output_padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups, std::array<bool,3> output_mask) {
+  DEBUG("AtenIpexCPUDev::cpu_deconvolution_backward\n");
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_output.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.defined());
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(self.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_output.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
+  auto&& _ipex_self = bridge::shallowFallbackToCPUTensor(self);
+  auto&& _ipex_grad_output = bridge::shallowFallbackToCPUTensor(grad_output);
+  auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
+
+  /*
+    when groups != 1, we should:
+        1). slice _ipex_grad_output ,_ipex_weight and _ipex_self according to groups,;
+        2). call at::slow_conv_transpose2d_backward or at::slow_conv_transpose3d_backward on the sliced tensors 
+            (since these two functions only support groups = 1) to calculate g_input, g_weight and g_bias
+        3). cat g_input, g_weight and g_bias in each group and return
+
+      In cpu path, decovolution_forward will do the following:
+  
+      aten/src/ATen/native/Convolution.cpp:
+      
+        std::vector<Tensor> outputs(params.groups);
+        input = input.contiguous();
+        for (int g = 0; g < params.groups; ++g) {
+          auto input_g = subtensor(input, 1, params.groups, g);
+          auto weight_g = subtensor(weight, 0, params.groups, g);
+          auto bias_g = subtensor(bias, 0, params.groups, g);
+          outputs[g] = at::_convolution_nogroup(
+              input_g, weight_g, bias_g, params.stride, params.padding, params.dilation, params.transposed, params.output_padding);
+        }
+        output = at::cat(outputs, 1);
+
+      Example:
+        groups: 2
+        input: [2, 10, 8, 8]
+        kernel: [10, 50, 3, 3]
+
+        conv bw weight: [10, 25, 3, 3]
+        conv bw input: [2, 10, 8, 8]
+        conv bw grad_output: [2, 50, 14, 14]
+  */
+
+  auto dim = self.ndimension();
+  auto kernel_size = weight.sizes().slice(2);
+
+  IPEX_CHECK(dim == 4 || dim == 5, "deconvolution backward fallback only support 2d or 3d deconv");
+
+  at::Tensor g_input_concat, g_weight_concat, g_bias_concat;
+  
+  std::vector<at::Tensor> g_input(groups), g_weight(groups), g_bias(groups);
+  
+  _ipex_self = _ipex_self.is_contiguous() ? _ipex_self : _ipex_self.contiguous();
+  _ipex_grad_output = _ipex_grad_output.is_contiguous() ? _ipex_grad_output : _ipex_grad_output.contiguous();
+  _ipex_weight = _ipex_weight.is_contiguous() ? _ipex_weight : _ipex_weight.contiguous();
+  for (int g = 0; g < groups; ++g) {
+    auto _ipex_self_g = dbl::comm::subtensor(_ipex_self, 1, groups, g);
+    auto _ipex_grad_output_g = dbl::comm::subtensor(_ipex_grad_output, 1, groups, g);
+    auto _ipex_weight_g = dbl::comm::subtensor(_ipex_weight, 0, groups, g);
+    
+    if (dim == 4) {
+      std::tie(g_input[g], g_weight[g], g_bias[g]) = at::slow_conv_transpose2d_backward(
+        _ipex_grad_output_g, 
+        _ipex_self_g, 
+        _ipex_weight_g, 
+        kernel_size, 
+        stride, 
+        padding, 
+        output_padding, 
+        dilation, 
+        empty_like(_ipex_grad_output_g, at::MemoryFormat::Contiguous), 
+        empty_like(_ipex_grad_output_g, at::MemoryFormat::Contiguous), 
+        output_mask);
+    } else {
+      std::tie(g_input[g], g_weight[g], g_bias[g]) = at::slow_conv_transpose3d_backward(
+        _ipex_grad_output_g,
+        _ipex_self_g,
+        _ipex_weight_g, 
+        kernel_size, 
+        stride, 
+        padding, 
+        output_padding, 
+        dilation, 
+        empty_like(_ipex_grad_output_g, at::MemoryFormat::Preserve), 
+        empty_like(_ipex_grad_output_g, at::MemoryFormat::Preserve), 
+        output_mask);
+    }
+  }
+  g_input_concat = at::cat(g_input, 1);
+  g_weight_concat = at::cat(g_weight, 0);
+  g_bias_concat = output_mask[2] ? at::cat(g_bias, 0) : at::Tensor();
+
+  return std::tuple<at::Tensor,at::Tensor,at::Tensor>(bridge::shallowUpgradeToDPCPPTensor(g_input_concat), bridge::shallowUpgradeToDPCPPTensor(g_weight_concat), bridge::shallowUpgradeToDPCPPTensor(g_bias_concat));
 }
 
 template<bool inplace>

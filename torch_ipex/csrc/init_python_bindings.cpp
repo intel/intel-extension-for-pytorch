@@ -119,10 +119,6 @@ void InitIpexModuleBindings(py::module m) {
           return AtenIpexTypeExt::embedding_bag_backward(grad, indices, offsets, offset2bag, bag_size, maximum_indices, num_weights, scale_grad_by_freq, mode, sparse, per_sample_weights);
         });
 
-  m.def("reshape",
-        [](const at::Tensor& input, at::IntArrayRef size) {
-          return AtenIpexTypeExt::reshape(input, size);
-        });
   m.def("mlp_forward", &AtenIpexTypeMLPExt::forward);
   m.def("mlp_backward", &AtenIpexTypeMLPExt::backward);
   m.def("mlp_create_handle", &AtenIpexTypeMLPExt::create_handle);
@@ -151,8 +147,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_int8_calibration", []() { return AutoOptConfig::singleton().get_int8_calibration(); });
   m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
   m.def("add_indicators", []() { AutoOptConfig::singleton().add_indicators(); });
-  //m.def("print_observer", []() { AutoOptConfig::singleton().print_observer(); });
-  // m.def("print_indicator", []() { AutoOptConfig::singleton().print_indicator(); });
   m.def("get_int8_configures", []() {
       py::list output_list;
       auto indicators = AutoOptConfig::singleton().get_indicators();

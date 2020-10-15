@@ -356,6 +356,15 @@ std::vector<int64_t> expand_param_if_needed(
   }
 }
 
+// port from aten/src/ATen/native/Convolution.cpp
+at::Tensor subtensor(at::Tensor& tensor, int dim, int groups, int g) {
+  if (!tensor.defined()) {
+    return at::Tensor();
+  }
+  int64_t n = tensor.sizes()[dim] / groups;
+  return tensor.narrow(dim, n * g, n).contiguous();
+}
+
 }  // namespace comm
 }  // namespace dbl
 }  // namespace cpu

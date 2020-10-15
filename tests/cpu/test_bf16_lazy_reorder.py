@@ -10,6 +10,7 @@ import unittest
 from functools import reduce
 import copy
 import sys
+import itertools
 import torch
 import intel_pytorch_extension as ipex
 
@@ -188,33 +189,134 @@ class TestConv(TestCase):
                     self.assertEqual(in_man_bf16.grad.float(), in_auto_mix.grad.float())
 
 class TestDeconv(TestCase):
-    def test_Deconv2d_with_cpu(self):
+    def _deconv_params_list(self):
+        params_dict = {
+            "input_height": [8],
+            "input_width": [8],
+            "input_depth": [8],
+            "input_channel_per_group": [10],
+            "output_channel_per_group": [10],
+            "kernel_size": [3, 4],
+            "bias": [False, True],
+            "stride": [2], # [1, 2]
+            "padding": [1, 2],
+            "output_padding": [2],
+            "groups": [1, 2],
+            "dilation": [1, 3, 4],
+        }
+
+        params_list = []
+
+        for key, value in params_dict.items():
+            params_list.append(value)
+        return params_list
+
+    def _test_deconv(self, dims):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
 
-        _deconv = torch.nn.ConvTranspose2d(2, 3, (3, 3))
+        params_list = self._deconv_params_list()
 
-        deconv_man_bf16 =copy.deepcopy(_deconv).to(device=device).to(torch.bfloat16)
-        deconv_auto_mix =copy.deepcopy(_deconv).to(device=device)
+        for input_width, input_height, input_depth, input_channel_per_group, output_channel_per_group, kernel_size, bias, stride, padding, output_padding, groups, dilation in itertools.product(*params_list):
+            if (output_padding < stride or output_padding < dilation) \
+                    and ((input_height - 1) * stride - 2 * padding + dilation * (kernel_size -1 ) + output_padding + 1 > 0) \
+                    and ((input_width - 1) * stride - 2 * padding + dilation * (kernel_size -1 ) + output_padding + 1 > 0) \
+                    and ((input_depth - 1) * stride - 2 * padding + dilation * (kernel_size -1 ) + output_padding + 1 > 0):
 
-        _in_cpu = torch.rand((1, 2, 7, 7))
-        in_auto_mix = _in_cpu.to(device=device)
-        in_man_bf16 = in_auto_mix.to(torch.bfloat16)
+                ic = input_channel_per_group * groups
+                oc = output_channel_per_group * groups
 
-        res_cpu_fp32 = _deconv(_in_cpu)
+                if dims == 2:
+                    module = torch.nn.ConvTranspose2d(ic, oc, kernel_size=kernel_size, stride=stride, padding=padding, output_padding=output_padding, groups=groups, bias=bias, dilation=dilation)
+                    x = torch.rand((2, ic, input_height, input_width))
+                elif dims == 3:
+                    module = torch.nn.ConvTranspose3d(ic, oc, kernel_size=kernel_size, stride=stride, padding=padding, output_padding=output_padding, groups=groups, bias=bias, dilation=dilation)
+                    x = torch.rand((2, ic, input_depth, input_height, input_width))
 
-        with AutoDNNL(True), AutoMixPrecision(False):
-            res_man_bf16 = deconv_man_bf16(in_man_bf16)
-            self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
-            self.assertEqual(res_cpu_fp32.bfloat16().float(), res_man_bf16, 1e-2)
+                module_auto_mix_infer = copy.deepcopy(module).to(device=device)
+                module_auto_mix_train = copy.deepcopy(module).to(device=device)
 
-            with AutoMixPrecision(True):
-                self.assertEqual(in_auto_mix.dtype, torch.float)
-                self.assertFalse(ipex.core.is_bf16_dil_tensor(in_auto_mix))
-                res_auto_bf16 = deconv_auto_mix(in_auto_mix)
-                self.assertTrue(ipex.core.is_bf16_dil_tensor(res_auto_bf16))
-                self.assertEqual(res_man_bf16.float(), res_auto_bf16.float(), 1e-2)
+                x_aten = x.clone().requires_grad_()
+                x_auto_mix_infer = x.clone().to(device=device).requires_grad_()
+                x_auto_mix_train = x.clone().to(device=device).requires_grad_()
+                
+                y_aten = module(x_aten)
+                y_aten.sum().backward()
+
+                with AutoDNNL(True), AutoMixPrecision(True, train=False):
+                    self.assertEqual(x_auto_mix_infer.dtype, torch.float)
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_infer))
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(module_auto_mix_infer.weight))
+                    if bias:
+                        self.assertFalse(ipex.core.is_bf16_dil_tensor(module_auto_mix_infer.bias))
+                    
+                    y_auto_mix_infer = module_auto_mix_infer(x_auto_mix_infer)
+                    y_auto_mix_infer.sum().backward()
+
+                    if padding - output_padding + stride > 0: 
+                        self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_infer.grad))
+                        self.assertTrue(ipex.core.is_bf16_dil_tensor(module_auto_mix_infer.weight))
+                        if bias:
+                            self.assertTrue(ipex.core.is_bf16_dil_tensor(module_auto_mix_infer.bias))
+
+                        self.assertEqual(
+                            y_aten, y_auto_mix_infer, 1e-2)
+
+                    # mkldnn does not support the case where: 
+                    # padding - output_padding + stride <= 0
+                    # while PyTorch supports this case, will fallback in this case
+                    else:
+                        # threshold because input has been reordered to bf16??
+                        self.assertEqual(
+                            y_aten, y_auto_mix_infer, 4e-3)
+
+                with AutoDNNL(True), AutoMixPrecision(True, train=True):
+                    self.assertEqual(x_auto_mix_train.dtype, torch.float)
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(x_auto_mix_train))
+                    self.assertFalse(ipex.core.is_bf16_dil_tensor(module_auto_mix_train.weight))
+                    if bias:
+                        self.assertFalse(ipex.core.is_bf16_dil_tensor(module_auto_mix_train.bias))
+                    
+                    y_auto_mix_train = module_auto_mix_train(x_auto_mix_train)
+                    y_auto_mix_train.sum().backward()
+
+                    if padding - output_padding + stride > 0:
+                        self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_train.grad))
+                        self.assertFalse(ipex.core.is_bf16_dil_tensor(module_auto_mix_train.weight))
+                        self.assertFalse(ipex.core.is_bf16_dil_tensor(module_auto_mix_train.weight.grad))
+                        if bias:
+                            self.assertFalse(ipex.core.is_bf16_dil_tensor(module_auto_mix_train.bias))
+                            self.assertFalse(ipex.core.is_bf16_dil_tensor(module_auto_mix_train.bias.grad))
+
+                        self.assertEqual(
+                            y_aten, y_auto_mix_train, 1e-2)
+                        self.assertEqual(
+                            module.weight.grad, module_auto_mix_train.weight.grad, 5e-1)
+                        self.assertEqual(
+                            x_aten.grad, x_auto_mix_train.grad, 1e-2)
+                        if bias:
+                            self.assertEqual(module.bias.grad, module_auto_mix_train.bias.grad)
+                    
+                    # mkldnn does not support the case where: 
+                    # padding - output_padding + stride <= 0
+                    # while PyTorch supports this case, will fallback in this case
+                    else:
+                        # threshold because input has been reordered to bf16??
+                        self.assertEqual(
+                            y_aten, y_auto_mix_train, 3e-3)
+                        self.assertEqual(
+                            module.weight.grad, module_auto_mix_train.weight.grad, 2e-1)
+                        self.assertEqual(
+                            x_aten.grad, x_auto_mix_train.grad)
+                        if bias:
+                            self.assertEqual(module.bias.grad, module_auto_mix_train.bias.grad)
+
+    def test_deconv2d(self):
+        self._test_deconv(dims=2)
+
+    def test_deconv3d(self):
+        self._test_deconv(dims=3)
 
 class TestBatchNorm(TestCase):
     def test_batch_norm2d(self):
@@ -991,6 +1093,7 @@ class TestLinear(TestCase):
 
     def test_linear_backward(self):
         rand_seed = int(get_rand_seed())
+        # rand_seed = 1600407821102260224 # self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 2e-2) AssertionError: tensor(0.0312) not less than or equal to 0.02 
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
         in_features = torch.randint(3, 10, (1,)).item()
