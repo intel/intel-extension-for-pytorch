@@ -1,4 +1,5 @@
 #include <ATen/core/op_registration/op_registration.h>
+#include <ATen/native/quantized/cpu/packed_params.h>
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
 
@@ -10,33 +11,26 @@ using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
 
-namespace caffe2 {
-
-CAFFE_KNOWN_TYPE(at::AtenIpexTypeQuantizedXPU::PackedLinearWeightQDPCPP);
+c10::intrusive_ptr<LinearPackedParamsBase> at::AtenIpexTypeQuantizedXPU::PackedLinearWeightQDPCPP::prepack(
+        at::Tensor weight,
+        c10::optional<at::Tensor> bias) {
+  c10::intrusive_ptr<LinearPackedParamsBase> ret_ptr = c10::make_intrusive<PackedLinearWeightQDPCPP>(
+      at::AtenIpexTypeQuantizedXPU::PackedLinearWeightQDPCPP{weight, bias});
+  return ret_ptr;
 }
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
-at::Tensor dpcppLinearPrepack(Tensor weight, c10::optional<Tensor> bias) {
-  // This is just align with FBGEMM INT8 and Pytorch Python API!
-  auto ret_ptr = std::make_unique<PackedLinearWeightQDPCPP>(
-      PackedLinearWeightQDPCPP{weight, bias});
-  return at::cpp_custom_type_hack::create(std::move(ret_ptr), weight.options());
+c10::intrusive_ptr<LinearPackedParamsBase> dpcppLinearPrepack(Tensor weight, c10::optional<Tensor> bias) {
+  // This is just align with Pytorch Python API!
+  auto ret_ptr = PackedLinearWeightQDPCPP::prepack(weight, bias);
+  return ret_ptr;
 }
 
-//static auto registry =
-//    c10::RegisterOperators()
-//        .op("quantized::linear_prepack(Tensor W, Tensor? B=None) -> Tensor "
-//            "W_prepack",
-//            c10::RegisterOperators::options()
-//                .kernel<decltype(dpcppLinearPrepack), &dpcppLinearPrepack>(
-//                    DispatchKey::QuantizedXPU))
-//        .op("quantized::linear_prepack(Tensor W, Tensor? B=None) -> Tensor "
-//            "W_prepack",
-//            c10::RegisterOperators::options()
-//                .kernel<decltype(dpcppLinearPrepack), &dpcppLinearPrepack>(
-//                    DispatchKey::XPU));
+TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
+  m.impl("linear_prepack", dpcppLinearPrepack);
+}
 
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

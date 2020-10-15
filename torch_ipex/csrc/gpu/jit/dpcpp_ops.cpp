@@ -61,14 +61,13 @@ at::Tensor mul_add(const at::Tensor& self,
 }
 
 at::Tensor q_conv2d_sum_relu(at::Tensor& accumu,
-    const at::Tensor& input, const at::Tensor& packed_weight,
-    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
-    int64_t groups, double conv_scale, int64_t conv_zpoint, double sum_scale,
+    const at::Tensor& input, const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double conv_scale, int64_t conv_zpoint, double sum_scale,
     int64_t sum_zpoint) {
   RECORD_FUNCTION("q_conv2d_sum_relu",
                   std::vector<c10::IValue>({input, packed_weight}));
   return at::AtenIpexTypeXPU::q_conv2d_sum_relu(accumu,
-      input, packed_weight, stride, padding, dilation, groups, conv_scale,
+      input, packed_weight, conv_scale,
       conv_zpoint, sum_scale, sum_zpoint);
 }
 

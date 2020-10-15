@@ -120,4 +120,15 @@ Tensor dequantize(const Tensor& self) {
 }
 
 } // namespace AtenIpexTypeXPU
+
+namespace AtenIpexTypeQuantizedXPU {
+Tensor dequantize(const Tensor& self) {
+  if (!self.is_quantized()) {
+    return self;
+  }
+  auto qtensor = static_cast<QTensorImpl*>(self.unsafeGetTensorImpl());
+  return qtensor->quantizer()->dequantize(self);
+}
+} // namespace AtenIpexTypeQuantizedXPU
+
 } // namespace at

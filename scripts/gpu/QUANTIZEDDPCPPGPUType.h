@@ -36,11 +36,9 @@ struct TORCH_API DPCPPType final {
 
   static Tensor int_repr(const at::Tensor & self); // aten::int_repr(Tensor self) -> Tensor
 
-  static Tensor dequantize(const Tensor & self); // aten::dequantize(Tensor self) -> Tensor
+  static Tensor dequantize(const Tensor & self); // aten::dequantize.self(Tensor self) -> Tensor
 
   static Tensor _empty_affine_quantized(IntArrayRef size, const TensorOptions & options, double scale, int64_t zero_point, c10::optional<MemoryFormat> memory_format); // aten::_empty_affine_quantized(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, float scale=1, int zero_point=0, MemoryFormat? memory_format=contiguous_format) -> Tensor
-
-  static Tensor _empty_per_channel_affine_quantized(IntArrayRef size, const Tensor & scales, const Tensor & zero_points, int64_t axis, const TensorOptions & options, c10::optional<MemoryFormat> memory_format); // aten::_empty_per_channel_affine_quantized(int[] size, *, Tensor scales, Tensor zero_points, int axis, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=contiguous_format) -> Tensor
 
   static Tensor copy_(Tensor & self, const Tensor & src, bool non_blocking); // aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 

@@ -10,37 +10,37 @@ using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
 
-namespace caffe2 {
-
-CAFFE_KNOWN_TYPE(at::AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP);
+c10::intrusive_ptr<ConvPackedParamsBase<2>> at::AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP::prepack(
+        at::Tensor weight,
+        c10::optional<at::Tensor> bias,
+        torch::List<int64_t> stride,
+        torch::List<int64_t> padding,
+        torch::List<int64_t> dilation,
+        int64_t groups) {
+  c10::intrusive_ptr<ConvPackedParamsBase<2>> ret_ptr = c10::make_intrusive<PackedConvWeightQDPCPP>(
+      at::AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP{weight, bias, stride, padding, dilation, groups});
+  return ret_ptr;
 }
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
-at::Tensor dpcppConvPrepack(
+c10::intrusive_ptr<ConvPackedParamsBase<2>> dpcppConvPrepack(
     Tensor weight,
     c10::optional<Tensor> bias,
     torch::List<int64_t> stride,
     torch::List<int64_t> padding,
     torch::List<int64_t> dilation,
     int64_t groups) {
-  // This is just align with FBGEMM INT8 and Pytorch Python API!
-  auto ret_ptr = std::make_unique<PackedConvWeightQDPCPP>(
-      PackedConvWeightQDPCPP{weight, bias});
-  return at::cpp_custom_type_hack::create(std::move(ret_ptr), weight.options());
+  // This is just align with Pytorch Python API!
+  auto ret_ptr = PackedConvWeightQDPCPP::prepack(
+          weight, bias, stride, padding, dilation, groups);
+  return ret_ptr;
 }
 
-//static auto registry =
-//    c10::RegisterOperators()
-//        .op("quantized::conv2d_prepack",
-//            c10::RegisterOperators::options()
-//                .kernel<decltype(dpcppConvPrepack), &dpcppConvPrepack>(
-//                    DispatchKey::XPU))
-//        .op("quantized::conv2d_prepack",
-//            c10::RegisterOperators::options()
-//                .kernel<decltype(dpcppConvPrepack), &dpcppConvPrepack>(
-//                    DispatchKey::QuantizedXPU));
+TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
+  m.impl("conv2d_prepack", TORCH_FN(dpcppConvPrepack));
+}
 
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

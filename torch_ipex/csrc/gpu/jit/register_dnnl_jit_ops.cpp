@@ -1,5 +1,6 @@
 #include <torch/csrc/jit/runtime/operator.h>
 #include <torch/csrc/jit/runtime/custom_operator.h>
+#include <aten/operators/QUtil.h>
 #include "dpcpp_ops.h"
 #include "accelerated_ops.h"
 #include "graph_ext.h"
@@ -188,22 +189,18 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
-      "dpcpp::q_conv2d_sum_relu(Tensor input, Tensor packed_weight, int[2] stride, int[2] padding, int[2] dilation, int groups, float conv_scale, int conv_zpoint, Tensor(a!) accumu, *, float sum_scale, int sum_zpoint) -> Tensor(a!)",
+      "dpcpp::q_conv2d_sum_relu(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float conv_scale, int conv_zpoint, Tensor(a!) accumu, *, float sum_scale, int sum_zpoint) -> Tensor(a!)",
       [] (const Node* node) ->Operation {
         return [] (Stack* stack) {
           auto output = (std::move(peek(stack, 8, 11))).toTensor();
           auto result = torch::jit::dpcpp::q_conv2d_sum_relu(
               output,
               (std::move(peek(stack, 0, 11))).toTensor(),
-              (std::move(peek(stack, 1, 11))).toTensor(),
-              (std::move(peek(stack, 2, 11))).toIntVector(),
-              (std::move(peek(stack, 3, 11))).toIntVector(),
-              (std::move(peek(stack, 4, 11))).toIntVector(),
-              (std::move(peek(stack, 5, 11))).toInt(),
-              (std::move(peek(stack, 6, 11))).toDouble(),
-              (std::move(peek(stack, 7, 11))).toInt(),
-              (std::move(peek(stack, 9, 11))).toDouble(),
-              (std::move(peek(stack, 10, 11))).toInt()
+              (std::move(peek(stack, 1, 11))).toCustomClass<ConvPackedParamsBase<2>>(),
+              (std::move(peek(stack, 2, 11))).toDouble(),
+              (std::move(peek(stack, 3, 11))).toInt(),
+              (std::move(peek(stack, 4, 11))).toDouble(),
+              (std::move(peek(stack, 5, 11))).toInt()
           );
           drop(stack, 11);
           pack(stack, std::move(result));

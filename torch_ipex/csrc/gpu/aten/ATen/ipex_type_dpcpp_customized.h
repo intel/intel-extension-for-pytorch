@@ -3,6 +3,7 @@
 
 #include <ATen/ATen.h>
 #include <tensor/Context.h>
+#include <ATen/native/quantized/cpu/conv_packed_params.h>
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -41,7 +42,7 @@ std::vector<at::Tensor> to_plain_if_needed(TensorList tensor);
 
 at::Tensor new_qtensor(IntArrayRef sizes, const TensorOptions& options, QuantizerPtr quantizer);
 
-at::Tensor q_conv2d_sum_relu(at::Tensor& accumu, const at::Tensor& input, const at::Tensor& packed_weight, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups, double conv_scale, int64_t conv_zero_point, double sum_scale, int64_t sum_zero_point);
+at::Tensor q_conv2d_sum_relu(at::Tensor& accumu, const at::Tensor& input, const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight, double conv_scale, int64_t conv_zero_point, double sum_scale, int64_t sum_zero_point);
 
 at::Tensor quantize_tensor_per_tensor_affine(at::Tensor& qtensor, const at::Tensor& rtensor, double scale, int64_t zero_point);
 

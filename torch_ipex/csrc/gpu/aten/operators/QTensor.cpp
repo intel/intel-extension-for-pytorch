@@ -87,7 +87,7 @@ Tensor new_qtensor(
   auto dtype = options.dtype();
   TORCH_CHECK(
     isQIntType(typeMetaToScalarType(dtype)),
-    "ScalarType is not supported in new_qtensor on dpcpp device.");
+    dtype, " is not supported in new_qtensor on xpu device.");
   int64_t size_bytes = nelements * dtype.itemsize();
   auto storage = c10::make_intrusive<StorageImpl>(
     StorageImpl::use_byte_size_t(),
