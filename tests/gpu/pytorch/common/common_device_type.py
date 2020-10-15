@@ -4,8 +4,7 @@ from functools import wraps
 import unittest
 import os
 import torch
-from common.common_utils import TestCase, TEST_WITH_ROCM, TEST_MKL, \
-    skipCUDANonDefaultStreamIf
+from common.common_utils import TestCase, TEST_WITH_ROCM, TEST_MKL
 from common.common_nn import TEST_DPCPP
 # Note: Generic Device-Type Testing
 #
@@ -236,51 +235,10 @@ class CPUTestBase(DeviceTypeTestBase):
 class DPCPPTestBase(DeviceTypeTestBase):
     device_type = 'dpcpp'
 
-class CUDATestBase(DeviceTypeTestBase):
-    device_type = 'cuda'
-    _do_cuda_memory_leak_check = True
-    _do_cuda_non_default_stream = True
-
-    def has_cudnn(self):
-        return not self.no_cudnn
-
-    @classmethod
-    def get_primary_device(cls):
-        return cls.primary_device
-
-    @classmethod
-    def get_all_devices(cls):
-        primary_device_idx = int(cls.get_primary_device().split(':')[1])
-        num_devices = torch.cuda.device_count()
-
-        prim_device = cls.get_primary_device()
-        cuda_str = 'cuda:{0}'
-        non_primary_devices = [cuda_str.format(idx) for idx in range(num_devices) if idx != primary_device_idx]
-        return [prim_device] + non_primary_devices
-
-    @classmethod
-    def setUpClass(cls):
-        # has_magma shows up after cuda is initialized
-        t = torch.ones(1).cuda()
-        cls.no_magma = not torch.cuda.has_magma
-
-        # Determines if cuDNN is available and its version
-        cls.no_cudnn = not (TEST_WITH_ROCM or torch.backends.cudnn.is_acceptable(t))
-        cls.cudnn_version = None if cls.no_cudnn else torch.backends.cudnn.version()
-
-        # Acquires the current device as the primary (test) device
-        cls.primary_device = 'cuda:{0}'.format(torch.cuda.current_device())
-
-
 # Adds available device-type-specific test base classes
 device_type_test_bases.append(CPUTestBase)
-if torch.cuda.is_available():
-    device_type_test_bases.append(CUDATestBase)
 if TEST_DPCPP:
     device_type_test_bases.append(DPCPPTestBase)
-
-PYTORCH_CUDA_MEMCHECK = os.getenv('PYTORCH_CUDA_MEMCHECK', '0') == '1'
-
 
 # Adds 'instantiated' device-specific test cases to the given scope.
 # The tests in these test cases are derived from the generic tests in
@@ -376,27 +334,11 @@ class skipCPUIf(skipIf):
     def __init__(self, dep, reason):
         super(skipCPUIf, self).__init__(dep, reason, device_type='cpu')
 
-
-# Skips a test on CUDA if the condition is true.
-class skipCUDAIf(skipIf):
-
-    def __init__(self, dep, reason):
-        super(skipCUDAIf, self).__init__(dep, reason, device_type='cuda')
-
 # Skips a test on DPCPP if the condition is true.
 class skipDPCPPIf(skipIf):
 
     def __init__(self, dep, reason):
         super(skipDPCPPIf, self).__init__(dep, reason, device_type='dpcpp')
-
-
-# Only runs on cuda, and only run when there is enough GPU RAM
-def largeCUDATensorTest(size):
-    if isinstance(size, str):
-        assert size.endswith("GB") or size.endswith("gb"), "only bytes or GB supported"
-        size = 1024 ** 3 * int(size[:-2])
-    valid = torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory >= size
-    return unittest.skipIf(not valid, "No CUDA or Has CUDA but GPU RAM is not large enough")
 
 
 class expectedFailure(object):
@@ -461,30 +403,6 @@ class deviceCountAtLeast(object):
 
         return multi_fn
 
-# Only runs the test on the CPU and CUDA (the native device types)
-def onlyOnCPUAndCUDA(fn):
-    @wraps(fn)
-    def only_fn(self, device, *args, **kwargs):
-        if self.device_type != 'cpu' and self.device_type != 'cuda':
-            reason = "Doesn't run on {0}".format(self.device_type)
-            raise unittest.SkipTest(reason)
-
-        return fn(self, device, *args, **kwargs)
-
-    return only_fn
-
-# Only runs the test on the CPU and CUDA (the native device types)
-def onlyOnDPCPPAndCUDA(fn):
-    @wraps(fn)
-    def only_fn(self, device, *args, **kwargs):
-        if self.device_type != 'dpcpp' and self.device_type != 'cuda':
-            reason = "Doesn't run on {0}".format(self.device_type)
-            raise unittest.SkipTest(reason)
-
-        return fn(self, device, *args, **kwargs)
-
-    return only_fn
-
 # Specifies per-dtype precision overrides.
 # Ex.
 #
@@ -546,15 +464,7 @@ class dtypesIfCPU(dtypes):
     def __init__(self, *args):
         super(dtypesIfCPU, self).__init__(*args, device_type='cpu')
 
-
-# Overrides specified dtypes on CUDA.
-class dtypesIfCUDA(dtypes):
-
-    def __init__(self, *args):
-        super(dtypesIfCUDA, self).__init__(*args, device_type='cuda')
-
-
-# Overrides specified dtypes on CUDA.
+# Overrides specified dtypes on DPCPP.
 class dtypesIfDPCPP(dtypes):
 
     def __init__(self, *args):
@@ -564,17 +474,8 @@ class dtypesIfDPCPP(dtypes):
 def onlyCPU(fn):
     return onlyOn('cpu')(fn)
 
-
-def onlyCUDA(fn):
-    return onlyOn('cuda')(fn)
-
 def onlyDPCPP(fn):
     return onlyOn('dpcpp')(fn)
-
-
-def expectedFailureCUDA(fn):
-    return expectedFailure('cuda')(fn)
-
 
 # Skips a test on CPU if LAPACK is not available.
 def skipCPUIfNoLapack(fn):
@@ -584,41 +485,3 @@ def skipCPUIfNoLapack(fn):
 # Skips a test on CPU if MKL is not available.
 def skipCPUIfNoMkl(fn):
     return skipCPUIf(not TEST_MKL, "PyTorch is built without MKL support")(fn)
-
-
-# Skips a test on CUDA if MAGMA is not available.
-def skipCUDAIfNoMagma(fn):
-    return skipCUDAIf('no_magma', "no MAGMA library detected")(skipCUDANonDefaultStreamIf(True)(fn))
-
-
-# Skips a test on CUDA when using ROCm.
-def skipCUDAIfRocm(fn):
-    return skipCUDAIf(TEST_WITH_ROCM, "test doesn't currently work on the ROCm stack")(fn)
-
-# Skips a test on CUDA when not using ROCm.
-def skipCUDAIfNotRocm(fn):
-    return skipCUDAIf(not TEST_WITH_ROCM, "test doesn't currently work on the CUDA stack")(fn)
-
-
-# Skips a test on CUDA if cuDNN is unavailable or its version is lower than requested.
-def skipCUDAIfCudnnVersionLessThan(version=0):
-
-    def dec_fn(fn):
-        @wraps(fn)
-        def wrap_fn(self, device, *args, **kwargs):
-            if self.device_type == 'cuda':
-                if self.no_cudnn:
-                    reason = "cuDNN not available"
-                    raise unittest.SkipTest(reason)
-                if self.cudnn_version is None or self.cudnn_version < version:
-                    reason = "cuDNN version {0} is available but {1} required".format(self.cudnn_version, version)
-                    raise unittest.SkipTest(reason)
-
-            return fn(self, device, *args, **kwargs)
-
-        return wrap_fn
-    return dec_fn
-
-
-def skipCUDAIfNoCudnn(fn):
-    return skipCUDAIfCudnnVersionLessThan(0)(fn)

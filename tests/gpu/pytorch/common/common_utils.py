@@ -386,21 +386,6 @@ def slowTest(fn):
     wrapper.__dict__['slow_test'] = True
     return wrapper
 
-
-def skipCUDAMemoryLeakCheckIf(condition):
-    def dec(fn):
-        if getattr(fn, '_do_cuda_memory_leak_check', True):  # if current True
-            fn._do_cuda_memory_leak_check = not condition
-        return fn
-    return dec
-
-def skipCUDANonDefaultStreamIf(condition):
-    def dec(fn):
-        if getattr(fn, '_do_cuda_non_default_stream', True):  # if current True
-            fn._do_cuda_non_default_stream = not condition
-        return fn
-    return dec
-
 def suppress_warnings(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -414,34 +399,6 @@ def get_cpu_type(type_name):
     module, name = type_name.rsplit('.', 1)
     assert module == 'torch.cuda'
     return getattr(torch, name)
-
-
-def get_gpu_type(type_name):
-    if isinstance(type_name, type):
-        type_name = '{}.{}'.format(type_name.__module__, type_name.__name__)
-    module, name = type_name.rsplit('.', 1)
-    assert module == 'torch'
-    return getattr(torch.cuda, name)
-
-
-def to_gpu(obj, type_map=None):
-    if type_map is None:
-        type_map = {}
-    if isinstance(obj, torch.Tensor):
-        assert obj.is_leaf
-        t = type_map.get(obj.type(), get_gpu_type(obj.type()))
-        with torch.no_grad():
-            res = obj.clone().type(t)
-            res.requires_grad = obj.requires_grad
-        return res
-    elif torch.is_storage(obj):
-        return obj.new().resize_(obj.size()).copy_(obj)
-    elif isinstance(obj, list):
-        return [to_gpu(o, type_map) for o in obj]
-    elif isinstance(obj, tuple):
-        return tuple(to_gpu(o, type_map) for o in obj)
-    else:
-        return deepcopy(obj)
 
 def to_dpcpp(obj, type_map=None):
     if type_map is None:
@@ -499,11 +456,7 @@ def set_rng_seed(seed):
 @contextlib.contextmanager
 def freeze_rng_state():
     rng_state = torch.get_rng_state()
-    if torch.cuda.is_available():
-        cuda_rng_state = torch.cuda.get_rng_state()
     yield
-    if torch.cuda.is_available():
-        torch.cuda.set_rng_state(cuda_rng_state)
     torch.set_rng_state(rng_state)
 
 
@@ -521,66 +474,6 @@ def is_iterable(obj):
         return True
     except TypeError:
         return False
-
-class CudaNonDefaultStream():
-    def __enter__(self):
-        # Before starting CUDA test save currently active streams on all
-        # CUDA devices and set new non default streams to all CUDA devices
-        # to ensure CUDA tests do not use default stream by mistake.
-        beforeDevice = torch.cuda.current_device()
-        self.beforeStreams = []
-        for d in range(torch.cuda.device_count()):
-            self.beforeStreams.append(torch.cuda.current_stream(d))
-            deviceStream = torch.cuda.Stream(device=d)
-            torch._C._cuda_setStream(deviceStream._cdata)
-        torch._C._cuda_setDevice(beforeDevice)
-
-    def __exit__(self, exec_type, exec_value, traceback):
-        # After completing CUDA test load previously active streams on all
-        # CUDA devices.
-        beforeDevice = torch.cuda.current_device()
-        for d in range(torch.cuda.device_count()):
-            torch._C._cuda_setStream(self.beforeStreams[d]._cdata)
-        torch._C._cuda_setDevice(beforeDevice)
-
-class CudaMemoryLeakCheck():
-    def __init__(self, testcase, name=None):
-        self.name = testcase.id() if name is None else name
-        self.testcase = testcase
-
-        # initialize context & RNG to prevent false positive detections
-        # when the test is the first to initialize those
-        from torch.testing._internal.common_cuda import initialize_cuda_context_rng
-        initialize_cuda_context_rng()
-
-    @staticmethod
-    def get_cuda_memory_usage():
-        # we don't need CUDA synchronize because the statistics are not tracked at
-        # actual freeing, but at when marking the block as free.
-        num_devices = torch.cuda.device_count()
-        gc.collect()
-        return tuple(torch.cuda.memory_allocated(i) for i in range(num_devices))
-
-    def __enter__(self):
-        self.befores = self.get_cuda_memory_usage()
-
-    def __exit__(self, exec_type, exec_value, traceback):
-        # Don't check for leaks if an exception was thrown
-        if exec_type is not None:
-            return
-
-        afters = self.get_cuda_memory_usage()
-
-        for i, (before, after) in enumerate(zip(self.befores, afters)):
-            if not TEST_WITH_ROCM:
-                self.testcase.assertEqual(
-                    before, after, '{} leaked {} bytes CUDA memory on device {}'.format(
-                        self.name, after - before, i))
-            else:
-                # TODO: Investigate ROCm memory leaking.
-                if before != after:
-                    warnings.warn('{} leaked {} bytes ROCm memory on device {}'.format(
-                        self.name, after - before, i), RuntimeWarning)
 
 #  "min_satisfying_examples" setting has been deprecated in hypythesis
 #  3.56.0 and removed in hypothesis 4.x
@@ -674,58 +567,12 @@ def check_disabled(test_name):
 class TestCase(expecttest.TestCase):
     precision = 1e-5
     maxDiff = None
-    _do_cuda_memory_leak_check = False
-    _do_cuda_non_default_stream = False
     exact_dtype = False
 
     def __init__(self, method_name='runTest'):
         super(TestCase, self).__init__(method_name)
 
         test_method = getattr(self, method_name)
-        # Wraps the tested method if we should do CUDA memory check.
-        self._do_cuda_memory_leak_check &= getattr(test_method, '_do_cuda_memory_leak_check', True)
-        # FIXME: figure out the flaky -1024 anti-leaks on windows. See #8044
-        if self._do_cuda_memory_leak_check and not IS_WINDOWS:
-            self.wrap_with_cuda_policy(method_name, self.assertLeaksNoCudaTensors)
-
-        # Wraps the tested method if we should enforce non default CUDA stream.
-        self._do_cuda_non_default_stream &= getattr(test_method, '_do_cuda_non_default_stream', True)
-        if self._do_cuda_non_default_stream and not IS_WINDOWS and not TEST_WITH_ROCM:
-            self.wrap_with_cuda_policy(method_name, self.enforceNonDefaultStream)
-
-    def assertLeaksNoCudaTensors(self, name=None):
-        name = self.id() if name is None else name
-        return CudaMemoryLeakCheck(self, name)
-
-    def enforceNonDefaultStream(self):
-        return CudaNonDefaultStream()
-
-    def wrap_with_cuda_policy(self, method_name, policy):
-        test_method = getattr(self, method_name)
-        # the import below may initialize CUDA context, so we do it only if
-        # self._do_cuda_memory_leak_check or self._do_cuda_non_default_stream
-        # is True.
-        from torch.testing._internal.common_cuda import TEST_CUDA
-        fullname = self.id().lower()  # class_name.method_name
-        if TEST_CUDA and ('gpu' in fullname or 'cuda' in fullname):
-            setattr(self, method_name, self.wrap_method_with_cuda_policy(test_method, policy))
-
-    def wrap_method_with_cuda_policy(self, method, policy):
-        # Assumes that `method` is the tested function in `self`.
-        # NOTE: Python Exceptions (e.g., unittest.Skip) keeps objects in scope
-        #       alive, so this cannot be done in setUp and tearDown because
-        #       tearDown is run unconditionally no matter whether the test
-        #       passes or not. For the same reason, we can't wrap the `method`
-        #       call in try-finally and always do the check.
-        @wraps(method)
-        def wrapper(self, *args, **kwargs):
-            with policy():
-                method(*args, **kwargs)
-        return types.MethodType(wrapper, self)
-
-    def wrap_with_cuda_memory_check(self, method):
-        return self.wrap_method_with_cuda_policy(method, self.assertLeaksNoCudaTensors)
-
 
     def setUp(self):
 

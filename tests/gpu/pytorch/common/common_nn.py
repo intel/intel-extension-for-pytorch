@@ -11,13 +11,11 @@ from math import pi
 import pdb
 
 import torch
-import torch.cuda
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.functional import _Reduction
-from common.common_utils import TestCase, to_gpu, to_dpcpp, to_dpcpp_in_criterion, freeze_rng_state, is_iterable, \
+from common.common_utils import TestCase, to_dpcpp, to_dpcpp_in_criterion, freeze_rng_state, is_iterable, \
     TEST_WITH_ROCM, _assertGradAndGradgradChecks
-from common.common_cuda import TEST_CUDA
 from torch.autograd.gradcheck import get_numerical_jacobian, iter_tensors
 from torch.autograd import Variable
 import torch.backends.cudnn
@@ -144,8 +142,7 @@ module_tests = [
     dict(
         module_name='RReLU',
         input_size=(1, 2, 2),
-        test_cuda=False,
-        test_dpcpp=False,
+        test_dpcpp=False, # test_cuda=False
     ),
     dict(
         module_name='RReLU',
@@ -153,8 +150,7 @@ module_tests = [
         cpp_constructor_args='torch::nn::RReLUOptions().lower(0.1).upper(0.9)',
         input_size=(4, 4, 5),
         desc='with_up_down',
-        test_cuda=False,
-        test_dpcpp=False,
+        test_dpcpp=False, # test_cuda=False
     ),
     dict(
         module_name='Hardtanh',
@@ -1189,17 +1185,14 @@ new_module_tests = [
         constructor_args=(10,),
         cpp_constructor_args='torch::nn::BatchNorm1dOptions(10)',
         input_size=(4, 10),
-        cudnn=True,
         check_eval=True,
         desc='affine',
-        test_cuda=(not TEST_WITH_ROCM),
     ),
     dict(
         module_name='BatchNorm1d',
         constructor_args=(5,),
         cpp_constructor_args='torch::nn::BatchNorm1dOptions(5)',
         input_size=(4, 5, 3),
-        cudnn=True,
         check_eval=True,
         desc='3d_input',
     ),
@@ -1208,17 +1201,14 @@ new_module_tests = [
         constructor_args=(10, 1e-3, None),
         cpp_constructor_args='torch::nn::BatchNorm1dOptions(10).eps(1e-3).momentum(c10::nullopt)',
         input_size=(4, 10),
-        cudnn=True,
         check_eval=True,
         desc='affine_simple_average',
-        test_cuda=(not TEST_WITH_ROCM),
     ),
     dict(
         module_name='BatchNorm1d',
         constructor_args=(10, 1e-3, 0.3, False),
         cpp_constructor_args='torch::nn::BatchNorm1dOptions(10).eps(1e-3).momentum(0.3).affine(false)',
         input_size=(4, 10),
-        cudnn=True,
         check_eval=True,
         desc='not_affine',
     ),
@@ -1228,17 +1218,14 @@ new_module_tests = [
         cpp_constructor_args='''torch::nn::BatchNorm1dOptions(10)
                                 .eps(1e-3).momentum(0.3).affine(true).track_running_stats(false)''',
         input_size=(4, 10),
-        cudnn=True,
         check_eval=True,
         desc='not_tracking_stats',
-        test_cuda=(not TEST_WITH_ROCM),
     ),
     dict(
         module_name='BatchNorm1d',
         constructor_args=(5, 1e-3, 0.3, False),
         cpp_constructor_args='torch::nn::BatchNorm1dOptions(5).eps(1e-3).momentum(0.3).affine(false)',
         input_size=(4, 5, 3),
-        cudnn=True,
         check_eval=True,
         desc='3d_input_not_affine',
     ),
@@ -1247,7 +1234,6 @@ new_module_tests = [
         constructor_args=(5, 1e-3, 0.3, False),
         cpp_constructor_args='torch::nn::BatchNorm1dOptions(5).eps(1e-3).momentum(0.3).affine(false)',
         input_size=(0, 5, 9),
-        cudnn=True,
         check_eval=True,
         desc='zero_batch',
     ),
@@ -1256,7 +1242,6 @@ new_module_tests = [
         constructor_args=(3,),
         cpp_constructor_args='torch::nn::BatchNorm2dOptions(3)',
         input_size=(2, 3, 6, 6),
-        cudnn=True,
         check_eval=True,
     ),
     dict(
@@ -1264,7 +1249,6 @@ new_module_tests = [
         constructor_args=(3, 1e-3, None),
         cpp_constructor_args='torch::nn::BatchNorm2dOptions(3).eps(1e-3).momentum(c10::nullopt)',
         input_size=(2, 3, 6, 6),
-        cudnn=True,
         check_eval=True,
         desc='2d_simple_average',
     ),
@@ -1273,7 +1257,6 @@ new_module_tests = [
         constructor_args=(3, 1e-3, 0.8),
         cpp_constructor_args='torch::nn::BatchNorm2dOptions(3).eps(1e-3).momentum(0.8)',
         input_size=(2, 3, 6, 6),
-        cudnn=True,
         check_eval=True,
         desc='momentum',
     ),
@@ -1282,7 +1265,6 @@ new_module_tests = [
         constructor_args=(3, 1e-3, 0.8, False),
         cpp_constructor_args='torch::nn::BatchNorm2dOptions(3).eps(1e-3).momentum(0.8).affine(false)',
         input_size=(2, 3, 6, 6),
-        cudnn=True,
         check_eval=True,
         desc='not_affine',
     ),
@@ -1292,7 +1274,6 @@ new_module_tests = [
         cpp_constructor_args='''torch::nn::BatchNorm2dOptions(3)
                                 .eps(1e-3).momentum(0.8).affine(true).track_running_stats(false)''',
         input_size=(2, 3, 6, 6),
-        cudnn=True,
         check_eval=True,
         desc='not_tracking_stats',
     ),
@@ -1301,7 +1282,6 @@ new_module_tests = [
         constructor_args=(5, 1e-3, 0.3, False),
         cpp_constructor_args='torch::nn::BatchNorm2dOptions(5).eps(1e-3).momentum(0.3).affine(false)',
         input_size=(0, 5, 2, 2),
-        cudnn=True,
         check_eval=True,
         desc='zero_batch',
     ),
@@ -1310,7 +1290,6 @@ new_module_tests = [
         constructor_args=(3,),
         cpp_constructor_args='torch::nn::BatchNorm3dOptions(3)',
         input_size=(2, 3, 4, 4, 4),
-        cudnn=True,
         check_eval=True,
     ),
     dict(
@@ -1318,7 +1297,6 @@ new_module_tests = [
         constructor_args=(3, 1e-3, None),
         cpp_constructor_args='torch::nn::BatchNorm3dOptions(3).eps(1e-3).momentum(c10::nullopt)',
         input_size=(2, 3, 4, 4, 4),
-        cudnn=True,
         check_eval=True,
         desc='3d_simple_average',
     ),
@@ -1327,7 +1305,6 @@ new_module_tests = [
         constructor_args=(3, 1e-3, 0.7),
         cpp_constructor_args='torch::nn::BatchNorm3dOptions(3).eps(1e-3).momentum(0.7)',
         input_size=(2, 3, 4, 4, 4),
-        cudnn=True,
         check_eval=True,
         desc='momentum',
     ),
@@ -1336,7 +1313,6 @@ new_module_tests = [
         constructor_args=(3, 1e-3, 0.7, False),
         cpp_constructor_args='torch::nn::BatchNorm3dOptions(3).eps(1e-3).momentum(0.7).affine(false)',
         input_size=(2, 3, 4, 4, 4),
-        cudnn=True,
         check_eval=True,
         desc='not_affine',
     ),
@@ -1346,7 +1322,6 @@ new_module_tests = [
         cpp_constructor_args='''torch::nn::BatchNorm3dOptions(3)
                                 .eps(1e-3).momentum(0.7).affine(true).track_running_stats(false)''',
         input_size=(2, 3, 4, 4, 4),
-        cudnn=True,
         check_eval=True,
         desc='not_tracking_stats',
     ),
@@ -1355,7 +1330,6 @@ new_module_tests = [
         constructor_args=(5, 1e-3, 0.3, False),
         cpp_constructor_args='torch::nn::BatchNorm3dOptions(5).eps(1e-3).momentum(0.3).affine(false)',
         input_size=(0, 5, 2, 2, 2),
-        cudnn=True,
         check_eval=True,
         desc='zero_batch',
     ),
@@ -1364,7 +1338,6 @@ new_module_tests = [
         constructor_args=(3, 1e-3, 0.3),
         cpp_constructor_args='torch::nn::InstanceNorm1dOptions(3).eps(1e-3).momentum(0.3)',
         input_size=(4, 3, 15),
-        cudnn=True,
         check_eval=True,
     ),
     dict(
@@ -1373,7 +1346,6 @@ new_module_tests = [
         cpp_constructor_args='''torch::nn::InstanceNorm1dOptions(3)
                                 .eps(1e-3).momentum(0.3).affine(false).track_running_stats(true)''',
         input_size=(4, 3, 15),
-        cudnn=True,
         check_eval=True,
         desc='tracking_stats',
     ),
@@ -1382,7 +1354,6 @@ new_module_tests = [
         constructor_args=(3, 1e-3, 0.3),
         cpp_constructor_args='torch::nn::InstanceNorm2dOptions(3).eps(1e-3).momentum(0.3)',
         input_size=(2, 3, 6, 6),
-        cudnn=True,
         check_eval=True,
     ),
     dict(
@@ -1391,7 +1362,6 @@ new_module_tests = [
         cpp_constructor_args='''torch::nn::InstanceNorm2dOptions(3)
                                 .eps(1e-3).momentum(0.3).affine(false).track_running_stats(true)''',
         input_size=(2, 3, 6, 6),
-        cudnn=True,
         check_eval=True,
         desc='tracking_stats',
     ),
@@ -1400,7 +1370,6 @@ new_module_tests = [
         constructor_args=(3, 1e-3, 0.3),
         cpp_constructor_args='torch::nn::InstanceNorm3dOptions(3).eps(1e-3).momentum(0.3)',
         input_size=(2, 3, 4, 4, 4),
-        cudnn=True,
         check_eval=True,
     ),
     dict(
@@ -1409,7 +1378,6 @@ new_module_tests = [
         cpp_constructor_args='''torch::nn::InstanceNorm3dOptions(3)
                                 .eps(1e-3).momentum(0.3).affine(false).track_running_stats(true)''',
         input_size=(2, 3, 4, 4, 4),
-        cudnn=True,
         check_eval=True,
         desc='tracking_stats',
     ),
@@ -1418,7 +1386,6 @@ new_module_tests = [
         constructor_args=([5], 1e-3),
         cpp_constructor_args='torch::nn::LayerNormOptions({5}).eps(1e-3)',
         input_size=(4, 5, 5),
-        cudnn=True,
         check_eval=True,
         desc='1d_elementwise_affine',
     ),
@@ -1427,7 +1394,6 @@ new_module_tests = [
         constructor_args=([5], 1e-3, False),
         cpp_constructor_args='torch::nn::LayerNormOptions({5}).eps(1e-3).elementwise_affine(false)',
         input_size=(4, 5, 5),
-        cudnn=True,
         check_eval=True,
         desc='1d_no_elementwise_affine',
     ),
@@ -1436,7 +1402,6 @@ new_module_tests = [
         constructor_args=([2, 2, 5], 1e-3),
         cpp_constructor_args='torch::nn::LayerNormOptions({2, 2, 5}).eps(1e-3)',
         input_size=(4, 2, 2, 5),
-        cudnn=True,
         check_eval=True,
         desc='3d_elementwise_affine',
     ),
@@ -1445,7 +1410,6 @@ new_module_tests = [
         constructor_args=([2, 2, 5], 1e-3, False),
         cpp_constructor_args='torch::nn::LayerNormOptions({2, 2, 5}).eps(1e-3).elementwise_affine(false)',
         input_size=(4, 2, 2, 5),
-        cudnn=True,
         check_eval=True,
         desc='3d_no_elementwise_affine',
     ),
@@ -1454,7 +1418,6 @@ new_module_tests = [
         constructor_args=([5], 1e-3),
         cpp_constructor_args='torch::nn::LayerNormOptions({5}).eps(1e-3)',
         input_size=(0, 5),
-        cudnn=True,
         check_eval=True,
         desc='1d_empty_elementwise_affine',
     ),
@@ -1463,7 +1426,6 @@ new_module_tests = [
         constructor_args=(3, 6, 1e-3),
         cpp_constructor_args='torch::nn::GroupNormOptions(3, 6).eps(1e-3)',
         input_size=(4, 6, 5),
-        cudnn=True,
         check_eval=True,
         desc='1d_affine',
     ),
@@ -1472,7 +1434,6 @@ new_module_tests = [
         constructor_args=(5, 5, 1e-3, False),
         cpp_constructor_args='torch::nn::GroupNormOptions(5, 5).eps(1e-3).affine(false)',
         input_size=(4, 5, 5),
-        cudnn=True,
         check_eval=True,
         desc='1d_no_affine_IN',  # this setting is equivalent with InstanceNormi
     ),
@@ -1481,7 +1442,6 @@ new_module_tests = [
         constructor_args=(1, 5, 1e-3, False),
         cpp_constructor_args='torch::nn::GroupNormOptions(1, 5).eps(1e-3).affine(false)',
         input_size=(4, 5, 5),
-        cudnn=True,
         check_eval=True,
         desc='1d_no_affine_LN',  # this setting is equivalent with LayerNorm
     ),
@@ -1490,7 +1450,6 @@ new_module_tests = [
         constructor_args=(3, 6, 1e-3),
         cpp_constructor_args='torch::nn::GroupNormOptions(3, 6).eps(1e-3)',
         input_size=(4, 6, 2, 3),
-        cudnn=True,
         check_eval=True,
         desc='2d_affine',
     ),
@@ -1499,7 +1458,6 @@ new_module_tests = [
         constructor_args=(3, 3, 1e-3, False),
         cpp_constructor_args='torch::nn::GroupNormOptions(3, 3).eps(1e-3).affine(false)',
         input_size=(4, 3, 2, 3),
-        cudnn=True,
         check_eval=True,
         desc='2d_no_affine_IN',  # this setting is equivalent with InstanceNorm
     ),
@@ -1508,7 +1466,6 @@ new_module_tests = [
         constructor_args=(1, 3, 1e-3, False),
         cpp_constructor_args='torch::nn::GroupNormOptions(1, 3).eps(1e-3).affine(false)',
         input_size=(4, 3, 2, 3),
-        cudnn=True,
         check_eval=True,
         desc='2d_no_affine_LN',  # this setting is equivalent with LayerNorm
     ),
@@ -1517,14 +1474,12 @@ new_module_tests = [
         constructor_args=(4, 5, 3),
         cpp_constructor_args='torch::nn::Conv1dOptions(4, 5, 3)',
         input_size=(2, 4, 10),
-        cudnn=True,
     ),
     dict(
         module_name='Conv1d',
         constructor_args=(4, 5, 3, 2),
         cpp_constructor_args='torch::nn::Conv1dOptions(4, 5, 3).stride(2)',
         input_size=(2, 4, 10),
-        cudnn=True,
         desc='stride',
     ),
     dict(
@@ -1532,7 +1487,6 @@ new_module_tests = [
         constructor_args=(4, 5, 3, 1, 1),
         cpp_constructor_args='torch::nn::Conv1dOptions(4, 5, 3).stride(1).padding(1)',
         input_size=(2, 4, 10),
-        cudnn=True,
         desc='pad1',
     ),
     dict(
@@ -1540,7 +1494,6 @@ new_module_tests = [
         constructor_args=(4, 5, 5, 1, 2),
         cpp_constructor_args='torch::nn::Conv1dOptions(4, 5, 5).stride(1).padding(2)',
         input_size=(2, 4, 10),
-        cudnn=True,
         desc='pad2',
     ),
     dict(
@@ -1548,7 +1501,6 @@ new_module_tests = [
         constructor_args=(4, 4, 3, 1, 1),
         cpp_constructor_args='torch::nn::Conv1dOptions(4, 4, 3).stride(1).padding(1)',
         input_size=(1, 4, 1),
-        cudnn=True,
         desc='pad1size1',
     ),
     dict(
@@ -1556,7 +1508,6 @@ new_module_tests = [
         constructor_args=(4, 4, 5, 1, 2),
         cpp_constructor_args='torch::nn::Conv1dOptions(4, 4, 5).stride(1).padding(2)',
         input_size=(1, 4, 1),
-        cudnn=True,
         desc='pad2size1',
     ),
     dict(
@@ -1564,9 +1515,7 @@ new_module_tests = [
         constructor_args=(4, 5, 3),
         cpp_constructor_args='torch::nn::Conv1dOptions(4, 5, 3)',
         input_size=(0, 4, 10),
-        cudnn=True,
         desc='zero_batch',
-        test_cuda=(not TEST_WITH_ROCM),
     ),
     dict(
         fullname='Conv1d_dilated',
@@ -1579,13 +1528,11 @@ new_module_tests = [
         constructor=lambda: nn.Conv1d(4, 6, kernel_size=3, groups=2),
         cpp_constructor_args='torch::nn::Conv1dOptions(4, 6, 3).groups(2)',
         input_size=(2, 4, 6),
-        cudnn=True,
     ),
     dict(
         fullname='ConvTranspose1d',
         constructor=lambda: nn.ConvTranspose1d(3, 4, kernel_size=3, stride=(3,), padding=1, output_padding=(1,)),
         cpp_constructor_args='torch::nn::ConvTranspose1dOptions(3, 4, 3).stride(3).padding(1).output_padding(1)',
-        cudnn=True,
         input_size=(1, 3, 7),
     ),
     dict(
@@ -1594,7 +1541,6 @@ new_module_tests = [
         cpp_constructor_args='''torch::nn::ConvTranspose1dOptions(3, 4, 3)
                                 .stride(2).padding(1).output_padding(1).groups(1).bias(false)''',
         input_size=(1, 3, 6),
-        cudnn=True,
         desc='no_bias',
     ),
     dict(
@@ -1603,7 +1549,6 @@ new_module_tests = [
         cpp_constructor_args='''torch::nn::ConvTranspose1dOptions(3, 4, 3)
                                 .stride(2).padding(1).output_padding(1).groups(1).bias(true).dilation(2)''',
         input_size=(1, 3, 6),
-        cudnn=True,
         desc='dilated',
     ),
     dict(
@@ -1611,7 +1556,6 @@ new_module_tests = [
         constructor=lambda: nn.ConvTranspose1d(4, 6, 3, stride=(3,), padding=1, output_padding=(1,), groups=2),
         cpp_constructor_args='''torch::nn::ConvTranspose1dOptions(4, 6, 3)
                                 .stride(3).padding(1).output_padding(1).groups(2)''',
-        cudnn=True,
         input_size=(2, 4, 7),
     ),
     dict(
@@ -1632,7 +1576,6 @@ new_module_tests = [
         constructor_args=(3, 4, (3, 2)),
         cpp_constructor_args='torch::nn::Conv2dOptions(3, 4, {3, 2})',
         input_size=(2, 3, 7, 5),
-        cudnn=True,
         check_with_long_tensor=True,
     ),
     dict(
@@ -1640,7 +1583,6 @@ new_module_tests = [
         constructor_args=(3, 4, (3, 3), (2, 2)),
         cpp_constructor_args='torch::nn::Conv2dOptions(3, 4, {3, 3}).stride({2, 2})',
         input_size=(2, 3, 6, 6),
-        cudnn=True,
         desc='strided',
         check_with_long_tensor=True,
     ),
@@ -1649,7 +1591,6 @@ new_module_tests = [
         constructor_args=(3, 4, (3, 3), (2, 2), (1, 1)),
         cpp_constructor_args='torch::nn::Conv2dOptions(3, 4, {3, 3}).stride({2, 2}).padding({1, 1})',
         input_size=(2, 3, 6, 6),
-        cudnn=True,
         desc='padding',
         check_with_long_tensor=True,
     ),
@@ -1658,7 +1599,6 @@ new_module_tests = [
         constructor_args=(3, 2, (3, 3), (2, 2), (1, 1), (2, 2)),
         cpp_constructor_args='torch::nn::Conv2dOptions(3, 2, {3, 3}).stride({2, 2}).padding({1, 1}).dilation({2, 2})',
         input_size=(2, 3, 8, 8),
-        cudnn=True,
         desc='dilated',
         check_with_long_tensor=True,
     ),
@@ -1668,7 +1608,6 @@ new_module_tests = [
         cpp_constructor_args='''torch::nn::Conv2dOptions(3, 4, {3, 2})
                                 .stride(1).padding(0).dilation(1).groups(1).bias(false)''',
         input_size=(2, 3, 6, 5),
-        cudnn=True,
         desc='no_bias',
         check_with_long_tensor=True,
     ),
@@ -1677,17 +1616,14 @@ new_module_tests = [
         constructor_args=(3, 4, (3, 2)),
         cpp_constructor_args='torch::nn::Conv2dOptions(3, 4, {3, 2})',
         input_size=(0, 3, 7, 5),
-        cudnn=True,
         desc='zero_batch',
         check_with_long_tensor=True,
-        test_cuda=(not TEST_WITH_ROCM),
     ),
     dict(
         fullname='Conv2d_groups',
         constructor=lambda: nn.Conv2d(4, 6, (3, 2), groups=2),
         cpp_constructor_args='torch::nn::Conv2dOptions(4, 6, {3, 2}).groups(2)',
         input_size=(2, 4, 6, 5),
-        cudnn=True,
         check_with_long_tensor=True,
     ),
     dict(
@@ -1702,7 +1638,6 @@ new_module_tests = [
         constructor_args=(3, 4, 3, (3, 2), 1, (1, 1)),
         cpp_constructor_args='''torch::nn::ConvTranspose2dOptions(3, 4, 3)
                                 .stride({3, 2}).padding(1).output_padding({1, 1})''',
-        cudnn=True,
         input_size=(1, 3, 7, 6),
         check_with_long_tensor=True,
     ),
@@ -1717,7 +1652,6 @@ new_module_tests = [
                                 .bias(false)
                                 .dilation({2, 2})''',
         input_size=(1, 3, 6, 7),
-        cudnn=True,
         desc='dilated',
         check_with_long_tensor=True,
     ),
@@ -1727,7 +1661,6 @@ new_module_tests = [
         cpp_constructor_args='''torch::nn::ConvTranspose2dOptions(3, 4, 3)
                                 .stride({2, 3}).padding(1).output_padding({1, 1}).groups(1).bias(false)''',
         input_size=(1, 3, 6, 7),
-        cudnn=True,
         desc='no_bias',
         check_with_long_tensor=True,
     ),
@@ -1736,7 +1669,6 @@ new_module_tests = [
         constructor=lambda: nn.ConvTranspose2d(2, 4, (2, 3), groups=2),
         cpp_constructor_args='torch::nn::ConvTranspose2dOptions(2, 4, {2, 3}).groups(2)',
         input_size=(1, 2, 4, 5),
-        cudnn=True,
         check_with_long_tensor=True,
     ),
     dict(
@@ -1952,7 +1884,6 @@ new_module_tests = [
         constructor_args=(3, 4, (2, 3, 4)),
         cpp_constructor_args='torch::nn::Conv3dOptions(3, 4, {2, 3, 4})',
         input_size=(2, 3, 3, 4, 5),
-        cudnn=True,
         check_with_long_tensor=True,
     ),
     dict(
@@ -1961,7 +1892,6 @@ new_module_tests = [
         cpp_constructor_args='''torch::nn::Conv3dOptions(3, 4, {2, 3, 4})
                                 .stride(1).padding(0).dilation(1).groups(1).bias(false)''',
         input_size=(2, 3, 3, 4, 5),
-        cudnn=True,
         desc='no_bias',
         check_with_long_tensor=True,
     ),
@@ -1970,7 +1900,6 @@ new_module_tests = [
         constructor_args=(3, 4, 2, 2),
         cpp_constructor_args='torch::nn::Conv3dOptions(3, 4, 2).stride(2)',
         input_size=(2, 3, 5, 5, 5),
-        cudnn=True,
         desc='stride',
         check_with_long_tensor=True,
     ),
@@ -1979,7 +1908,6 @@ new_module_tests = [
         constructor_args=(3, 4, 2, 2, 1),
         cpp_constructor_args='torch::nn::Conv3dOptions(3, 4, 2).stride(2).padding(1)',
         input_size=(2, 3, 5, 5, 5),
-        cudnn=True,
         desc='stride_padding',
         check_with_long_tensor=True,
     ),
@@ -1988,17 +1916,14 @@ new_module_tests = [
         constructor_args=(3, 4, (2, 3, 4)),
         cpp_constructor_args='torch::nn::Conv3dOptions(3, 4, {2, 3, 4})',
         input_size=(0, 3, 3, 4, 5),
-        cudnn=True,
         check_with_long_tensor=True,
         desc='zero_batch',
-        test_cuda=(not TEST_WITH_ROCM),
     ),
     dict(
         fullname='Conv3d_groups',
         constructor=lambda: nn.Conv3d(4, 6, kernel_size=3, groups=2),
         cpp_constructor_args='torch::nn::Conv3dOptions(4, 6, 3).groups(2)',
         input_size=(2, 4, 4, 5, 4),
-        cudnn=True,
         check_with_long_tensor=True,
     ),
     dict(
@@ -2017,7 +1942,6 @@ new_module_tests = [
         module_name='ConvTranspose3d',
         constructor_args=(2, 3, (2, 3, 2)),
         cpp_constructor_args='torch::nn::ConvTranspose3dOptions(2, 3, {2, 3, 2})',
-        cudnn=True,
         input_size=(1, 2, 4, 5, 4),
     ),
     dict(
@@ -2025,7 +1949,6 @@ new_module_tests = [
         constructor_args=(2, 3, (2, 3, 2), 1, 0, 0, 1, True, (2, 2, 2)),
         cpp_constructor_args='''torch::nn::ConvTranspose3dOptions(2, 3, {2, 3, 2})
                                 .stride(1).padding(0).output_padding(0).groups(1).bias(true).dilation({2, 2, 2})''',
-        cudnn=True,
         input_size=(1, 2, 4, 5, 4),
         desc='dilated',
     ),
@@ -2850,7 +2773,6 @@ new_module_tests = [
         input_size=(2, 128),
         fullname='softmax_lastdim_dtype',
         pickle=False,
-        test_cuda=False
     ),
     dict(
         constructor=wrap_functional(F.softmax, dim=1),
@@ -2858,7 +2780,6 @@ new_module_tests = [
         input_size=(2, 128, 2, 2),  # trigger special case of spatial CUDA algo
         fullname='softmax_spatial_special',
         pickle=False,
-        test_cuda=(not TEST_WITH_ROCM)
     ),
     dict(
         constructor=wrap_functional(F.softmax, dim=1),
@@ -2873,14 +2794,12 @@ new_module_tests = [
         input_size=(2, 2, 4, 4),  # regular spatial algorithm
         fullname='softmax_spatial_dtype',
         pickle=False,
-        test_cuda=False
     ),
     dict(
         constructor=wrap_functional(F.softmax, dim=0),
         cpp_options_args='F::SoftmaxFuncOptions(0)',
         input_size=(2, 3, 4, 5),
         fullname='softmax_functional_dim0',
-        test_cuda=False,
         pickle=False,
     ),
     dict(
@@ -2888,7 +2807,6 @@ new_module_tests = [
         cpp_options_args='F::SoftmaxFuncOptions(3)',
         input_size=(2, 3, 4, 5),
         fullname='softmax_functional_dim3',
-        test_cuda=False,
         pickle=False,
     ),
     dict(
@@ -2896,7 +2814,6 @@ new_module_tests = [
         cpp_options_args='F::SoftmaxFuncOptions(-1)',
         input_size=(),
         fullname='softmax_functional_scalar',
-        test_cuda=False,
         pickle=False,
     ),
     dict(
@@ -2912,7 +2829,6 @@ new_module_tests = [
         input_size=(2, 128, 2, 2),  # trigger special case of spatial CUDA algo
         fullname='log_softmax_spatial_special',
         pickle=False,
-        test_cuda=(not TEST_WITH_ROCM)
     ),
     dict(
         constructor=wrap_functional(F.log_softmax, dim=1),
@@ -2950,7 +2866,6 @@ new_module_tests = [
         cpp_constructor_args='torch::nn::UnfoldOptions({2, 2}).dilation({1, 1}).padding({0, 0}).stride({1, 1})',
         input_size=(2, 4, 3, 3),
         check_gradgrad=False,
-        test_cuda=True,
     ),
     dict(
         fullname='Fold',
@@ -2958,7 +2873,6 @@ new_module_tests = [
         cpp_constructor_args='torch::nn::FoldOptions({3, 3}, {2, 2}).dilation({1, 1}).padding({0, 0}).stride({1, 1})',
         input_size=(2, 16, 4),
         check_gradgrad=False,
-        test_cuda=True,
     ),
     dict(
         fullname='Unfold_int_input',
@@ -2966,7 +2880,6 @@ new_module_tests = [
         cpp_constructor_args='torch::nn::UnfoldOptions(2).dilation(1).padding(0).stride(1)',
         input_size=(2, 4, 3, 3),
         check_gradgrad=False,
-        test_cuda=True,
     ),
     dict(
         fullname='Fold_int_input',
@@ -2974,7 +2887,6 @@ new_module_tests = [
         cpp_constructor_args='torch::nn::FoldOptions(3, 2).dilation(1).padding(0).stride(1)',
         input_size=(2, 16, 4),
         check_gradgrad=False,
-        test_cuda=True,
     ),
     dict(
         module_name='Threshold',
@@ -3003,7 +2915,6 @@ new_module_tests = [
         cpp_constructor_args='torch::nn::RReLUOptions().lower(0.1).upper(0.9)',
         input_size=(),
         desc='with_up_down_scalar',
-        test_cuda=False,
     ),
     dict(
         module_name='Hardtanh',
@@ -3216,7 +3127,6 @@ for padding_mode, cpp_padding_mode in zip(
                                         .padding_mode({})'''.format(d, cpp_padding_mode),
                 input_size=(2, 3) + (3,) * d,
                 output_size=(2, 4) + (3,) * d,
-                cudnn=True,
                 desc='{}_stride2_pad2'.format(padding_mode),
             ),
         )
@@ -4334,7 +4244,6 @@ class ModuleTest(TestBase):
     def __init__(self, *args, **kwargs):
         super(ModuleTest, self).__init__(*args, **kwargs)
         self.jacobian_input = kwargs.get('jacobian_input', True)
-        self.should_test_cuda = kwargs.get('test_cuda', False)
         self.should_test_dpcpp = kwargs.get('test_dpcpp', False)
         self.should_test_pickle = kwargs.get('pickle', True)
         self.check_gradgrad = kwargs.get('check_gradgrad', True)
@@ -4442,89 +4351,6 @@ class ModuleTest(TestBase):
                 test_case.assertEqual(grad, d_input, 1e-4)
                 test_case.assertEqual(test_case._get_parameters(module)[1], d_param)
 
-    def test_cuda(self, test_case):
-        if not TEST_CUDA or not self.should_test_cuda:
-            raise unittest.SkipTest('Excluded from CUDA tests')
-        try:
-            cpu_input = self._get_input()
-            type_map = {'torch.DoubleTensor': torch.cuda.FloatTensor}
-            gpu_input = to_gpu(cpu_input, type_map=type_map)
-
-            cpu_module = self.constructor(*self.constructor_args)
-            gpu_module = self.constructor(*self.constructor_args).float().cuda()
-            cpu_param = test_case._get_parameters(cpu_module)
-            gpu_param = test_case._get_parameters(gpu_module)
-            for cpu_p, gpu_p in zip(cpu_param[0], gpu_param[0]):
-                gpu_p.data.copy_(cpu_p)
-
-            test_case._zero_grad_input(cpu_input)
-            test_case._zero_grad_input(gpu_input)
-            test_case._zero_grad_parameters(cpu_module)
-            test_case._zero_grad_parameters(gpu_module)
-            cpu_output = test_case._forward(cpu_module, cpu_input)
-            gpu_output = test_case._forward(gpu_module, gpu_input)
-            test_case.assertEqual(cpu_output, gpu_output, self.precision)
-
-            # Run backwards on CPU and GPU and compare results
-            for _ in range(5):
-                cpu_gradOutput = cpu_output.clone().normal_()
-                gpu_gradOutput = cpu_gradOutput.type('torch.cuda.FloatTensor')
-                cpu_gradInput = test_case._backward(cpu_module, cpu_input, cpu_output, cpu_gradOutput)
-                gpu_gradInput = test_case._backward(gpu_module, gpu_input, gpu_output, gpu_gradOutput)
-                test_case.assertEqual(cpu_gradInput, gpu_gradInput, self.precision)
-                for cpu_d_p, gpu_d_p in zip(cpu_param[1], gpu_param[1]):
-                    test_case.assertEqual(cpu_d_p, gpu_d_p, self.precision)
-
-            # Run double-backwards on CPU and GPU and compare results
-            if self.check_gradgrad and not self.FIXME_no_cuda_gradgrad_comparison:
-                cpu_output = cpu_module(cpu_input)
-                gpu_output = gpu_module(gpu_input)
-
-                cpu_gradOutput = torch.randn_like(cpu_output, requires_grad=True)
-                gpu_gradOutput = cpu_gradOutput.type_as(gpu_output).detach()
-                gpu_gradOutput.requires_grad = True
-
-                cpu_gradInputs = torch.autograd.grad(
-                    cpu_output,
-                    (cpu_input,) + tuple(cpu_module.parameters()),
-                    cpu_gradOutput,
-                    create_graph=True)
-                gpu_gradInputs = torch.autograd.grad(
-                    gpu_output,
-                    (gpu_input,) + tuple(gpu_module.parameters()),
-                    gpu_gradOutput,
-                    create_graph=True)
-
-                for cpu_d_i, gpu_d_i in zip(cpu_gradInputs, gpu_gradInputs):
-                    test_case.assertEqual(cpu_d_i, gpu_d_i, self.precision)
-
-                # We mix output into the second backwards computation so that
-                # torch.autograd.grad doesn't complain that some inputs
-                # are unreachable (which can happen if you differentiate
-                # only on the gradient.
-                cpu_gg = torch.autograd.grad(
-                    cpu_output.sum() + sum(map(lambda x: x.sum(), cpu_gradInputs)),
-                    (cpu_input, cpu_gradOutput) + tuple(cpu_module.parameters()),
-                    retain_graph=True)
-                gpu_gg = torch.autograd.grad(
-                    gpu_output.sum() + sum(map(lambda x: x.sum(), gpu_gradInputs)),
-                    (gpu_input, gpu_gradOutput) + tuple(gpu_module.parameters()),
-                    retain_graph=True)
-
-                test_case.assertEqual(cpu_gradInput, gpu_gradInput, self.precision)
-                for cpu_d_p, gpu_d_p in zip(cpu_gg, gpu_gg):
-                    test_case.assertEqual(cpu_d_p, gpu_d_p, self.precision)
-
-            self.test_noncontig(test_case, gpu_module, gpu_input)
-        except NotImplementedError:
-            pass
-        # TODO: remove this after CUDA scatter_ is implemented
-        except AttributeError as e:
-            if len(e.args) == 1 and "'FloatTensor' object has no attribute 'scatter_'" in e.args[0]:
-                pass
-            else:
-                raise
-
     def test_dpcpp(self, test_case): # DUDU
         if not self.should_test_dpcpp:
             raise unittest.SkipTest('Excluded from dpcpp tests')
@@ -4617,7 +4443,6 @@ class CriterionTest(TestBase):
 
     def __init__(self, *args, **kwargs):
         super(CriterionTest, self).__init__(*args, **kwargs)
-        self.should_test_cuda = kwargs.get('test_cuda', True)
         self.should_test_dpcpp = kwargs.get('test_dpcpp', False)
         self.check_forward_only = kwargs.get('check_forward_only', True)
 
@@ -4650,33 +4475,6 @@ class CriterionTest(TestBase):
 
         test_case.check_criterion_jacobian(module, input, target)
         self._do_extra_tests(test_case, module, input, target)
-
-    def test_cuda(self, test_case):
-        if not TEST_CUDA or not self.should_test_cuda:
-            raise unittest.SkipTest('Excluded from CUDA tests')
-        try:
-            cpu_input = self._get_input()
-            type_map = {
-                'torch.DoubleTensor': torch.cuda.FloatTensor,
-            }
-            gpu_input = to_gpu(cpu_input, type_map=type_map)
-
-            cpu_target = self._get_target()
-            gpu_target = to_gpu(cpu_target, type_map=type_map)
-
-            cpu_module = self.constructor(*self.constructor_args)
-            gpu_module = self.constructor(*self.constructor_args).float().cuda()
-
-            cpu_output = test_case._forward_criterion(cpu_module, cpu_input, cpu_target)
-            gpu_output = test_case._forward_criterion(gpu_module, gpu_input, gpu_target)
-            test_case.assertEqual(cpu_output, gpu_output, 4e-4)
-
-            gradOutput = torch.randn(())
-            cpu_gradInput = test_case._backward_criterion(cpu_module, cpu_input, cpu_target, gradOutput)
-            gpu_gradInput = test_case._backward_criterion(gpu_module, gpu_input, gpu_target, gradOutput)
-            test_case.assertEqual(cpu_gradInput, gpu_gradInput, 4e-4)
-        except NotImplementedError:
-            pass
 
     def test_dpcpp(self, test_case):
         if not self.should_test_dpcpp:
@@ -4726,7 +4524,6 @@ class InputVariableMixin(object):
 class NewModuleTest(InputVariableMixin, ModuleTest):
     def __init__(self, *args, **kwargs):
         super(NewModuleTest, self).__init__(*args, **kwargs)
-        self.cudnn = kwargs.get('cudnn', False)
         self.check_inplace = kwargs.get('check_inplace', False)
         self.check_gradgrad = kwargs.get('check_gradgrad', True)
         self.skip_double = kwargs.get('skip_double', False)
@@ -4766,25 +4563,8 @@ class NewModuleTest(InputVariableMixin, ModuleTest):
             output_ip.backward(grad)
             test_case.assertEqual(input.grad, input_ip.grad)
 
-        if isinstance(input, torch.LongTensor) and TEST_CUDA:
-            # check that cuda() moves module parameters to correct GPU device,
-            # and that float() casts parameters correctly
-
-            input = input.cuda()
-            module.float().cuda()
-            module(input)
-            for p in module.parameters():
-                test_case.assertIsInstance(p, torch.cuda.FloatTensor)
-                test_case.assertEqual(p.get_device(), 0)
-
-            if torch.cuda.device_count() > 1:
-                input = input.cuda(1)
-                module.cuda(1)
-                with torch.cuda.device(1):
-                    module(input)
-                for p in module.parameters():
-                    test_case.assertIsInstance(p, torch.cuda.FloatTensor)
-                    test_case.assertEqual(p.get_device(), 1)
+        if isinstance(input, torch.LongTensor):
+            pass
         else:
             # check that float()/double() casters work correctly
 
@@ -4803,69 +4583,6 @@ class NewModuleTest(InputVariableMixin, ModuleTest):
             module(input)
             for p in module.parameters():
                 test_case.assertIsInstance(p, torch.DoubleTensor)
-
-            if TEST_CUDA and self.should_test_cuda:
-                # check that cuda() moves module parameters to correct GPU device,
-                # and that float() casts parameters correctly
-
-                # to GPU0
-                input = input.float().cuda()
-                module.float().cuda()
-                module(input)
-                for p in module.parameters():
-                    test_case.assertIsInstance(p, torch.cuda.FloatTensor)
-                    test_case.assertEqual(p.get_device(), 0)
-
-                # to CPU
-                input = input.cpu()
-                module.cpu()
-                module(input)
-                for p in module.parameters():
-                    test_case.assertIsInstance(p, torch.FloatTensor)
-
-                # back to GPU0
-                input = input.cuda()
-                module.cuda()
-                module(input)
-                for p in module.parameters():
-                    test_case.assertIsInstance(p, torch.cuda.FloatTensor)
-                    test_case.assertEqual(p.get_device(), 0)
-
-                # test that forwards of module runs correctly without cuDNN
-                if self.cudnn:
-                    with torch.backends.cudnn.flags(enabled=False):
-                        module(input)
-                        for p in module.parameters():
-                            test_case.assertIsInstance(p, torch.cuda.FloatTensor)
-                            test_case.assertEqual(p.get_device(), 0)
-
-                if torch.cuda.device_count() >= 2:
-                    # test cross-GPU transfer works
-                    # to GPU1
-                    input = input.cuda(1)
-                    module.cuda(1)
-                    with torch.cuda.device(1):
-                        module(input)
-                    for p in module.parameters():
-                        test_case.assertIsInstance(p, torch.cuda.FloatTensor)
-                        test_case.assertEqual(p.get_device(), 1)
-
-                if not self.skip_double:
-                    # test double()
-                    input = input.double().cuda()
-                    module.double().cuda()
-                    module(input)
-                    for p in module.parameters():
-                        test_case.assertIsInstance(p, torch.cuda.DoubleTensor)
-                        test_case.assertEqual(p.get_device(), 0)
-
-                # test half()
-                input = input.half().cuda()
-                module.half().cuda()
-                module(input)
-                for p in module.parameters():
-                    test_case.assertIsInstance(p, torch.cuda.HalfTensor)
-                    test_case.assertEqual(p.get_device(), 0)
 
     def _get_target(self):
         return self._get_arg('target', False)
@@ -4907,56 +4624,6 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
         # currently compute the gradient w.r.t. target for loss functions.
         gradcheck(apply_fn, inputs)
         gradgradcheck(apply_fn, inputs)
-
-    def test_cuda(self, test_case, dtype=None, extra_args=None):
-        def convert_dtype(obj, dtype, requires_grad=False):
-            if isinstance(obj, torch.Tensor):
-                return obj.detach().to(dtype=dtype).requires_grad_(requires_grad)
-            elif isinstance(obj, torch.Tensor):
-                return obj.to(dtype)
-            elif isinstance(obj, tuple):
-                return tuple(convert_dtype(o, dtype, requires_grad) for o in obj)
-            else:
-                return obj
-
-        if not TEST_CUDA or not self.should_test_cuda:
-            raise unittest.SkipTest('Excluded from CUDA tests')
-        try:
-            cpu_input = self._get_input()
-            cpu_target = self._get_target()
-            cpu_module = self.constructor(*self.constructor_args)
-            gpu_module = self.constructor(*self.constructor_args)
-            # Convert input, target and module parameters to dtype
-            if dtype is not None:
-                cpu_input = convert_dtype(cpu_input, dtype, True)
-                # NLLLoss requires target to be LongTensor
-                if not isinstance(cpu_target, torch.LongTensor) and self.convert_target:
-                    cpu_target = convert_dtype(cpu_target, dtype)
-                cpu_module.type(dtype)
-                gpu_module.type(dtype)
-
-            # GPU setup
-            gpu_input = to_gpu(cpu_input)
-            gpu_target = to_gpu(cpu_target)
-            gpu_module.cuda()
-
-            # torch.HalfTensor doesn't support most operations, converting back to default
-            if dtype in {torch.half, torch.bfloat16}:
-                cpu_input = self._get_input()
-                cpu_target = self._get_target()
-                # Loss modules with weights require consistent input/module weight types
-                cpu_module = self.constructor(*self.constructor_args)
-
-            cpu_output = test_case._forward_criterion(cpu_module, cpu_input, cpu_target, extra_args=extra_args)
-            gpu_output = test_case._forward_criterion(gpu_module, gpu_input, gpu_target, extra_args=extra_args)
-            # dtype can be None, so set precision in this way instead of a precision map
-            test_case.assertEqual(cpu_output, gpu_output, 1e-1 if dtype in {torch.half, torch.bfloat16} else 4e-4)
-
-            cpu_gradInput = test_case._backward_criterion(cpu_module, cpu_input, cpu_target, extra_args=extra_args)
-            gpu_gradInput = test_case._backward_criterion(gpu_module, gpu_input, gpu_target, extra_args=extra_args)
-            test_case.assertEqual(cpu_gradInput, gpu_gradInput, 1e-1 if dtype in {torch.half, torch.bfloat16} else 4e-4)
-        except NotImplementedError:
-            pass
 
     def test_dpcpp(self, test_case, dtype=None, extra_args=None):
         def convert_dtype(obj, dtype, requires_grad=False):
