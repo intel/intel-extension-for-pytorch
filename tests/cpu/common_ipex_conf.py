@@ -4,21 +4,21 @@ import intel_pytorch_extension as ipex
 class AutoMixPrecision(object):
     def __init__(self, enable_or_not = False, train = False):
         self.old_value = ipex.get_auto_mix_precision()
-        self.pre_running_mode = 'training' if ipex.get_train() else 'inference'
+        self.train_old_value = ipex.get_train()
         self.enable_or_not = enable_or_not
-        self.running_mode = 'training' if train else 'inference'
+        self.train = train
 
     def __enter__(self):
         if self.enable_or_not:
-            ipex.enable_auto_mix_precision(ipex.AmpConf(torch.bfloat16), self.running_mode).__enter__()
+            ipex.enable_auto_mix_precision(mixed_dtype=torch.bfloat16, train=self.train)
         else:
-            ipex.enable_auto_mix_precision(ipex.AmpConf(None)).__enter__()
+            ipex.enable_auto_mix_precision(mixed_dtype=None)
 
     def __exit__(self, *args, **kwargs):
         if self.old_value:
-            ipex.enable_auto_mix_precision(ipex.AmpConf(torch.bfloat16), self.pre_running_mode).__enter__()
+            ipex.enable_auto_mix_precision(mixed_dtype=torch.bfloat16, train=self.train_old_value)
         else:
-            ipex.enable_auto_mix_precision(ipex.AmpConf(None)).__enter__()
+            ipex.enable_auto_mix_precision(mixed_dtype=None)
 
 class AutoDNNL(object):
     def __init__(self, enable_or_not = False):
