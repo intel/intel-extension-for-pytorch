@@ -13,7 +13,7 @@ namespace bridge {
 // Convert DPCPP tensor to CPU tensor
 at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor);
 std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList&);
-
+std::vector<at::Tensor> shallowFallbackToCPUTensorVec(const std::vector<at::Tensor> &tensor_vec);
 void attachShadeDataContext(const at::Tensor& tensor);
 
 // Convert CPU tensor to DPCPP tensor

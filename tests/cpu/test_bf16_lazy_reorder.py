@@ -2321,5 +2321,29 @@ class TestFallbackOP(TestCase):
                 self.assertTrue(str(unpacked.device) == ipex.DEVICE)
                 self.assertTrue(str(lengths_out.device) == 'cpu')
 
+class TestRNN(TestCase):
+    def test_lstm(self):
+        model = torch.nn.LSTM(5, 3, 1, bidirectional=False).train()
+        x = torch.randn(11, 2, 5)
+        h = torch.randn(1, 2, 3)
+        c = torch.randn(1, 2, 3)
+        input = x.clone().requires_grad_()
+        h0 = h.clone().requires_grad_()
+        c0 = c.clone().requires_grad_()
+        input_dpcpp = x.clone().to(device=device).requires_grad_()
+        h0_dpcpp = h.clone().to(device=device).requires_grad_()
+        c0_dpcpp = c.clone().to(device=device).requires_grad_()
+        model_dpcpp = copy.deepcopy(model).to(device=device).train()
+        y, h = model(input, (h0, c0))
+        y.sum().backward()
+        with AutoDNNL(True), AutoMixPrecision(False):
+            y_dpcpp, h_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
+            self.assertEqual(y, y_dpcpp)
+            y_dpcpp.sum().backward()
+            print(input.grad)
+            print(input_dpcpp.grad)
+            self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
+
+
 if __name__ == '__main__':
     test = unittest.main()

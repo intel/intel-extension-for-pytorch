@@ -439,6 +439,14 @@ at::Tensor AtenIpexTypeExt::max_pool3d(const at::Tensor &input,
   return std::get<0>(ret);
 }
 
+ std::vector<at::Tensor> AtenIpexTypeExt::lstm(
+    const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases,
+    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
+  if (at::GradMode::is_enabled())
+    return NewLSTMOp::apply(input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+  return NewLSTMOp::_forward(input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+}
+
 } // namespace torch_ipex
 
 namespace {
@@ -474,5 +482,9 @@ static auto dispatch =
               return torch_ipex::AtenIpexTypeExt::embedding_bag(
                   weight, indices, offsets, scale_grad_by_freq, mode, sparse,
                   per_sample_weights, include_last_offset);
+            })
+        .op("torch_ipex::lstm",
+            [](const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
+              return torch_ipex::AtenIpexTypeExt::lstm(input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
             });
 }

@@ -357,6 +357,17 @@ std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& ten
   return dpcpp_tensor_vec;
 }
 
+std::vector<at::Tensor> shallowFallbackToCPUTensorVec(const std::vector<at::Tensor> &tensor_vec) {
+  std::vector<at::Tensor> dpcpp_tensor_vec(tensor_vec.size());
+  for (size_t i = 0; i < tensor_vec.size(); ++i) {
+    const at::Tensor& tensor = tensor_vec[i];
+    if (tensor.defined()) {
+      dpcpp_tensor_vec[i] = shallowFallbackToCPUTensor(tensor);
+    }
+  }
+  return dpcpp_tensor_vec;
+}
+
 std::vector<at::Tensor> shallowUpgradeToDPCPPTensorVec(const std::vector<at::Tensor> &tensor_vec) {
   std::vector<at::Tensor> ret_dpcpp_tensor_vec;
   for (size_t i = 0; i < tensor_vec.size(); i++) {

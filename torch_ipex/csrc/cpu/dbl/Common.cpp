@@ -25,6 +25,14 @@ dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor) {
   return {tensor.sizes().vec(), get_dil_data_type(cur_type), tensor.strides().vec(), tensor.data_ptr()};
 }
 
+dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor, const dil::tensor::desc& desc) {
+  IPEX_CHECK(tensor.layout() == at::Layout::Strided,
+      "dil_tensor_from_cpu_buffer expects dense tensor input");
+  IPEX_CHECK(tensor.sizes().size() <= 6,
+      "dil_tensor_from_cpu_buffer only support rank <= 6");
+  return {desc, tensor.data_ptr()};
+}
+
 dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor, dil::deleter_ptr deleter_fn) {
   IPEX_CHECK(tensor.layout() == at::Layout::Strided,
       "dil_tensor_from_cpu_buffer expects dense tensor input");
@@ -67,11 +75,34 @@ dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
   }
 }
 
+dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor, const dil::tensor::desc& desc) {
+  auto dil_buffer = cpu::ShadeDataContext::getDilStorage(tensor);
+  auto data_ptr = static_cast<void *>(
+      static_cast<char *>(dil_buffer.get_data_handle()) +
+      dil_buffer.get_item_size() * tensor.storage_offset());
+  // return a new tensor wrapper that may be part of the dil storage
+  dil::tensor result {desc, data_ptr};
+  // copy workspace
+  if (dil_buffer.has_workspace()) {
+    result.copy_workspace(dil_buffer);
+  }
+  // TODO(xpz): copy scales and zero_points of qtensor (what if slicing?)
+  return result;
+}
+
 dil::tensor try_gen_dil_tensor(const at::Tensor &input) {
   if (cpu::ShadeDataContext::isDilTensor(input)) {
     return dil_tensor_from_dil_buffer(input);
   } else {
     return dil_tensor_from_cpu_buffer(input);
+  }
+}
+
+dil::tensor try_gen_dil_tensor(const at::Tensor &input, const dil::tensor::desc& desc) {
+  if (cpu::ShadeDataContext::isDilTensor(input)) {
+    return dil_tensor_from_dil_buffer(input, desc);
+  } else {
+    return dil_tensor_from_cpu_buffer(input, desc);
   }
 }
 

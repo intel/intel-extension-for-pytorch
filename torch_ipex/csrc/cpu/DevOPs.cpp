@@ -21,6 +21,7 @@
 #include "dbl/Pool.h"
 #include "dbl/DNNLChecker.h"
 #include "dbl/Linear.h"
+#include "dbl/LSTM.h"
 #include "ShadeDataContext.h"
 
 #include "dil/dil.hpp"
@@ -2485,6 +2486,28 @@ at::Tensor& AtenIpexCPUDev::dil_copy_(
     // TODO: We need add more LP here
   torch_ipex::set_ipex_func_status(torch_ipex::IPEXFuncStatus::IPEX_FALLBACK);
   return self;
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_lstm(
+    const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases,
+    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
+  DEBUG("AtenIpexCPUDev::dil_lstm\n");
+  auto result = dbl::lstm::lstm_impl(input, hx, params, has_biases,
+      dil::rnn_kind::LSTM, num_layers, dropout_p, train, bidirectional, batch_first);
+  auto output = result.first;
+  auto hy = std::get<0>(result.second);
+  auto cy = std::get<1>(result.second);
+
+  return std::make_tuple(output, hy, cy);
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_lstm_backward(
+    const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases,
+    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first,
+    std::vector<at::Tensor> outputs, const at::Tensor& grad_output, const at::Tensor& grad_hy, const at::Tensor& grad_cy) {
+  DEBUG("AtenIpexCPUDev::dil_lstm_backward\n");
+  return dbl::lstm::lstm_backward_impl(input, hx, params, has_biases,
+      dil::rnn_kind::LSTM, num_layers, dropout_p, train, bidirectional, batch_first, outputs, grad_output, grad_hy, grad_cy);
 }
 
 }  // namespace cpu

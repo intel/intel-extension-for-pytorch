@@ -1066,9 +1066,13 @@ class tensor : public memory {
   }
 
   tensor to_dense() const {
-    tensor dense(get_desc().to_default_format());
-    dense.feed_from(*this);
-    return dense;
+    if (!(*this).is_dense(true)) {
+      tensor dense(get_desc().to_default_format());
+      dense.feed_from(*this);
+      return dense;
+    } else {
+      return *this;
+    }
   }
 
  private:
