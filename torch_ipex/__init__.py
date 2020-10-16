@@ -6,7 +6,7 @@ from torch.nn import Module
 from torch.nn import Parameter
 from torch.nn import init
 from .lib import torch_ipex
-
+from .version import __version__
 
 # for now, we don't support bwk propagation
 class LinearReLU(Module):

@@ -6,8 +6,8 @@
 
 | **HW proxy** | **OS** | **GPU User Mode Driver** | Python |
 | ------ | ------ | ------ | ------ |
-| **Gen9** | Ubuntu-18.04 | [20.30.17454](https://github.com/intel/compute-runtime/releases/tag/20.30.17454) | 3.6.x |
-| **DG1** | Ubuntu-20.04 | [agama-dg1-29/engineering build](http://10.239.87.81/zhenjie/agama/agama-dg1-29/) and replace IGC with [**igc3436**](http://10.239.87.81/zhenjie/igc3436/) | 3.6.x |
+| **Gen9** | Ubuntu-18.04 | [compute runtime 20.40.18075](https://github.com/intel/compute-runtime/releases/tag/20.40.18075) + [level zero](https://github.com/oneapi-src/level-zero/releases/tag/v1.0) | 3.6 + |
+| **DG1** | Ubuntu-20.04 | [agama-dg1-29/engineering build](http://10.239.87.81/zhenjie/agama/agama-dg1-29/) and replace IGC with [**igc3436**](http://10.239.87.81/zhenjie/igc3436/) | 3.6 + |
 
 ### **Dependence:**
 ```bash
@@ -16,15 +16,23 @@ python3 -m pip install -r requirements.txt
 # Add ubuntu user to video and render group
 sudo usermod -a -G video $USER
 sudo usermod -a -G render $USER
-sudo reboot
+## logout and relogin
+logout
 ```
 
 ## **Compiler Version and Setting:**
 
-### **DPC++ compiler:** **Xmain 0716** nightly build (**Contact:** [Kurkov, Vasiliy A](vasiliy.a.kurkov@intel.com) or [Maslov, Oleg](oleg.maslov@intel.com))
+### Intel® oneAPI Base Toolkit(Beta) for Linux (version beta09) [https://dynamicinstaller.intel.com/oneapi/toolkits/base-kit/linux/]
+
+### install complier
+
+```bash
+chmod +x ./l_[Toolkit Name]Kit_[version].sh
+bash ./l_[Toolkit Name]Kit_[version].sh -s -a --silent --eula accept
+```
 - Environment Variables Setting for DPC++:
 ```bash
-export DPCPP_ROOT=/${PATH_TO_Your_Compiler}/linux_prod/compiler/linux
+export DPCPP_ROOT=${HOME}/intel/oneapi/compiler/latest/linux
 export LD_LIBRARY_PATH=${DPCPP_ROOT}/lib:${DPCPP_ROOT}/compiler/lib/intel64_lin:${LD_LIBRARY_PATH}
 export INTELOCLSDKROOT=${DPCPP_ROOT}
 export PATH=${DPCPP_ROOT}/bin:$PATH
@@ -36,33 +44,57 @@ Finally, compile and execute the following program and check the result. It is o
 ```c++
 // source file: device_enum.cpp
 #include <CL/sycl.hpp>
-#include <stdlib.h>
 #include <iostream>
+#include <map>
+#include <stdlib.h>
+#include <string>
+#include <vector>
 
-void enumDevices(void) {
+using namespace std;
+
+map<string, vector<string>> enumDevices() {
+  map<string, vector<string>> enummap;
   auto platform_list = cl::sycl::platform::get_platforms();
-  int pidx = 1;
-  for(const auto& platform : platform_list){
-    auto device_list = platform.get_devices();
-    int didx = 1;
-    for(const auto& device : device_list){
-      printf("platform-%d device-%d ...\n", pidx, didx);
-      if (device.is_gpu()) {
-        std::cout << device.get_info<cl::sycl::info::device::name>() << std::endl;
-        std::cout << device.get_info<cl::sycl::info::device::vendor>() << std::endl;
-      } else {
-        printf("Non-GPU device\n");
+  for (const auto &platform : platform_list) {
+    if (platform.is_host() == false) {
+      auto platform_name = platform.get_info<cl::sycl::info::platform::name>();
+      auto devices = platform.get_devices();
+      for (const auto &device : devices) {
+        vector<string> temp;
+        if (device.is_gpu()) {
+          auto name = device.get_info<cl::sycl::info::device::name>();
+          temp.push_back(name);
+        }
+        enummap.insert(pair<string, vector<string>>(platform_name, temp));
       }
-      didx++;
     }
-    pidx++;
   }
+  return enummap;
 }
 
 int main() {
-  enumDevices();
+  auto enummap = enumDevices();
+  cout << "================================================================"
+       << endl;
+  cout << "                   All Available Backend                        "
+       << endl;
+  cout << "================================================================"
+       << endl;
+  for (map<string, vector<string>>::iterator each = enummap.begin();
+       each != enummap.end(); ++each) {
+    cout << "|Platform:" << endl << "|" << (*each).first << endl;
+    cout << "|\t|__|Devices:" << endl;
+    for (vector<string>::iterator itr = (*each).second.begin();
+         itr != (*each).second.end(); ++itr) {
+      cout << "|\t   |" << *itr << endl;
+    };
+    cout << "----------------------------------------------------------------"
+         << endl;
+  }
+
   return 0;
 }
+
 
 ```
 
@@ -72,15 +104,28 @@ int main() {
 $ clang++ -I $DPCPP_ROOT/include/sycl device_enum.cpp -L $DPCPP_ROOT/lib -fsycl -o device_enum
 ```
 
-- Expected result:
+- Expected result like:
 ```bash
 ./device_enum
 
-  platform-1 device-1 ...
-  Non-GPU device
-  platform-2 device-1 ...
-  Intel(R) Gen9 HD Graphics NEO
-  Intel(R) Corporation 
+================================================================
+                   All Available Backend                        
+================================================================
+|Platform:
+|Intel(R) CPU Runtime for OpenCL(TM) Applications
+|       |__|Devices:
+|          |Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz(NonGPU)
+----------------------------------------------------------------
+|Platform:
+|Intel(R) Level-Zero
+|       |__|Devices:
+|          |Intel(R) Gen9(GPU)
+----------------------------------------------------------------
+|Platform:
+|Intel(R) OpenCL HD Graphics
+|       |__|Devices:
+|          |Intel(R) Gen9 HD Graphics NEO(GPU)
+----------------------------------------------------------------
 ```
 
 ## Repo preparation:
