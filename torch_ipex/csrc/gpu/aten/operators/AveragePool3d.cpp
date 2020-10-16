@@ -117,9 +117,14 @@ void avg_pool3d_out_template(
                                     : algorithm::pooling_avg_exclude_padding;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF( // Why avg_pool3d_frame no bfloat16 datatype?
-      input.scalar_type(), "avg_pool3d_frame", [&] {
-        avg_pool_out_frame<scalar_t>(
+  if(!input.is_quantized()){
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        input.scalar_type(),
+        "avg_pool3d_out_frame",
+        [&] {
+          avg_pool_out_frame<scalar_t>(
             input,
             output,
             nbatch,
@@ -141,7 +146,34 @@ void avg_pool3d_out_template(
             padW,
             alg_kind,
             prop_kind);
-      });
+        });
+  } else {
+    IPEX_DISPATCH_QINT_TYPES(
+        input.scalar_type(), "q_avg_pool3d_out_frame", [&] {
+	  avg_pool_out_frame<scalar_t>(
+            input,
+            output,
+            nbatch,
+            nblock,
+            idepth,
+            iheight,
+            iwidth,
+            outputDepth,
+            outputHeight,
+            outputWidth,
+            kD,
+            kH,
+            kW,
+            dD,
+            dH,
+            dW,
+            padD,
+            padH,
+            padW,
+            alg_kind,
+            prop_kind);
+        });
+  }
 }
 
 Tensor& avg_pool3d_backward_out_template(
@@ -259,8 +291,12 @@ Tensor& avg_pool3d_backward_out_template(
                                     : algorithm::pooling_avg_exclude_padding;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  IPEX_DISPATCH_FLOATING_TYPES(
-      input.scalar_type(), "avg_pool3d_backward_out_frame", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      input.scalar_type(), 
+      "avg_pool3d_backward_out_frame", 
+      [&] {
         scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();
         scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();
 

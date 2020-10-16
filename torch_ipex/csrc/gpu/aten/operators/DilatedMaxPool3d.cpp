@@ -127,9 +127,14 @@ void max_pool3d_with_indices_out_template(
   auto alg_kind = algorithm::pooling_max;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
-      input.scalar_type(), "max_pool3d_with_indices", [&] {
-        max_pool_out_frame<scalar_t>(
+  if(!input.is_quantized()){
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        input.scalar_type(),
+        "max_pool3d_with_indices",
+        [&] {
+          max_pool_out_frame<scalar_t>(
             input,
             output,
             indices,
@@ -152,7 +157,35 @@ void max_pool3d_with_indices_out_template(
             padW,
             alg_kind,
             prop_kind);
-      });
+        });
+  } else {
+    IPEX_DISPATCH_QINT_TYPES(
+        input.scalar_type(), "q_max_pool3d_with_indices", [&] {
+          max_pool_out_frame<scalar_t>(
+            input,
+            output,
+            indices,
+            nbatch,
+            nblock,
+            inputDepth,
+            inputHeight,
+            inputWidth,
+            outputDepth,
+            outputHeight,
+            outputWidth,
+            kD,
+            kH,
+            kW,
+            dD,
+            dH,
+            dW,
+            padD,
+            padH,
+            padW,
+            alg_kind,
+            prop_kind);
+        });
+  }
 }
 
 Tensor& max_pool3d_with_indices_backward_out_template(
@@ -265,8 +298,12 @@ Tensor& max_pool3d_with_indices_backward_out_template(
       gradOutputHeight,
       gradOutputWidth);
 
-  IPEX_DISPATCH_FLOATING_TYPES(
-      input.scalar_type(), "max_pool3d_with_indices_backward", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      input.scalar_type(),
+      "max_pool3d_with_indices_backward",
+      [&] {
         /* get raw pointers */
         scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();
         scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();

@@ -91,62 +91,61 @@ void avg_pool2d_out_template(
   auto prop_kind = dnnl::prop_kind::forward_training;
 
   if(!input.is_quantized()){
-    IPEX_DISPATCH_FLOATING_TYPES_AND2( // Why 2d has half and bf16, and 3d has no half and bf16
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
         input.scalar_type(),
         "avg_pool2d_out_frame",
         [&] {
           avg_pool_out_frame<scalar_t>(
-              input,
-              output,
-              nbatch,
-              nInputPlane,
-              0,
-              inputHeight,
-              inputWidth,
-              0,
-              outputHeight,
-              outputWidth,
-              0,
-              kH,
-              kW,
-              0,
-              dH,
-              dW,
-              0,
-              padH,
-              padW,
-              alg_kind,
-              prop_kind);
+            input,
+            output,
+            nbatch,
+            nInputPlane,
+            0,
+            inputHeight,
+            inputWidth,
+            0,
+            outputHeight,
+            outputWidth,
+            0,
+            kH,
+            kW,
+            0,
+            dH,
+            dW,
+            0,
+            padH,
+            padW,
+            alg_kind,
+            prop_kind);
         });
   } else {
     IPEX_DISPATCH_QINT_TYPES(
         input.scalar_type(), "q_avg_pool2d_out_frame", [&] {
-	  avg_pool_out_frame<scalar_t>(
-              input,
-              output,
-              nbatch,
-              nInputPlane,
-              0,
-              inputHeight,
-              inputWidth,
-              0,
-              outputHeight,
-              outputWidth,
-              0,
-              kH,
-              kW,
-              0,
-              dH,
-              dW,
-              0,
-              padH,
-              padW,
-              alg_kind,
-              prop_kind);
+	      avg_pool_out_frame<scalar_t>(
+            input,
+            output,
+            nbatch,
+            nInputPlane,
+            0,
+            inputHeight,
+            inputWidth,
+            0,
+            outputHeight,
+            outputWidth,
+            0,
+            kH,
+            kW,
+            0,
+            dH,
+            dW,
+            0,
+            padH,
+            padW,
+            alg_kind,
+            prop_kind);
         });
-  
   }
 }
 
