@@ -20,6 +20,11 @@ struct eltwise_forward : public dnnl::eltwise_forward {
         utils::one_of(src.get_data_type(), data_type::s8, data_type::u8)) {
       src_in = src_in.dequantize();
     }
+    bool is_inplace = src_in.shares_same_memory_with(dst);
+    bool is_contiguous = src_in.is_dense(true);
+    if (!is_inplace && !is_contiguous) {
+      src_in = src_in.to_dense();
+    }
     auto src_desc = src_in.get_desc();
 
     auto pd = primitive_desc(
@@ -52,7 +57,12 @@ struct eltwise_backward : public dnnl::eltwise_backward {
                       float alpha = 0.0,
                       float beta = 0.0,
                       const engine& aengine = engine::cpu_engine()) {
-  auto src_desc = src.get_desc();
+  auto src_in = src;
+  bool is_contiguous = src_in.is_dense(true);
+  if (!is_contiguous) {
+    src_in = src_in.to_dense();
+  }
+  auto src_desc = src_in.get_desc();
 
   auto forward_hints = eltwise_forward::primitive_desc(
       {prop_kind::forward, aalgorithm, src_desc, alpha, beta}, aengine);
