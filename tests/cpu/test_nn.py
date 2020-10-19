@@ -4257,7 +4257,6 @@ class TestNN(NNTestCase):
             padded = rnn_utils.pad_sequence(sequences)
             self.assertEqual(padded, expected.transpose(0, 1))
 
-    @unittest.expectedFailure
     def test_pack_sequence(self):
         def _compatibility_test(sequences, lengths, batch_first, enforce_sorted=False):
             padded = rnn_utils.pad_sequence(sequences, batch_first)
@@ -4319,7 +4318,6 @@ class TestNN(NNTestCase):
                 _compatibility_test(unsorted_sequences, unsorted_sequences_lengths,
                                     batch_first)
 
-    @unittest.expectedFailure
     def test_pack_padded_sequence(self):
         def generate_test_case(sorted_lengths, should_shuffle):
             def pad(tensor, length):
@@ -7757,7 +7755,6 @@ class TestNN(NNTestCase):
         self.assertEqual(input.grad.dtype, dtype)
         self.assertEqual(input.grad, inputf.grad.to(dtype), prec=0.1)
 
-    @unittest.expectedFailure
     def test_adaptive_log_softmax(self):
         # args validation
         with self.assertRaises(ValueError):
@@ -9733,7 +9730,6 @@ class TestNNDeviceType(NNTestCase):
                 bags.append(embeddings.narrow(0, offset, length).sum(0))
         return torch.stack(bags)
 
-    @unittest.expectedFailure
     def test_EmbeddingBag_per_sample_weights_and_offsets(self, device):
         def test_per_sample_weights(mode, dtype, trainable_scale):
             es = nn.EmbeddingBag(5, 2, mode=mode).to(dtype=dtype, device=device)
@@ -9874,7 +9870,6 @@ class TestNNDeviceType(NNTestCase):
                              dtype2prec_DONTUSE[dtype])
 
     @skipCUDAIf(True, "Temporarily disabled. See t54369166")
-    @unittest.expectedFailure
     def test_EmbeddingBag_per_sample_weights_and_no_offsets(self, device):
         def run_tests(dtype, mode, sparse, trainable_per_sample_weights):
             kwargs = dict(test_per_sample_weights=True, device=device,
@@ -10019,7 +10014,6 @@ class TestNNDeviceType(NNTestCase):
 
     @dtypesIfCUDA(torch.half, torch.float, torch.double)
     @dtypes(torch.float, torch.double)
-    @unittest.expectedFailure
     def test_embedding_bag_device(self, device, dtype):
         self._test_EmbeddingBag(device, 'sum', False, dtype)
         self._test_EmbeddingBag(device, 'mean', False, dtype)
@@ -10395,7 +10389,6 @@ class TestNNDeviceType(NNTestCase):
 
     @dtypesIfCUDA(torch.half, torch.float, torch.double)
     @dtypes(torch.float)
-    @unittest.expectedFailure
     def test_variable_sequence(self, device, dtype):
         def pad(var, length):
             if var.size(0) == length:

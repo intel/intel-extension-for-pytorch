@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DevOPs.h"
+#include "aten/aten.hpp"
 #include "dbl/Common.h"
 #include "dil/dil.hpp"
 #include "torch_ipex/csrc/aten_ipex_bridge.h"
@@ -18,7 +19,9 @@ public:
   static at::Tensor _forward(at::Tensor input, at::Tensor weight,
                              at::Tensor bias = at::Tensor()) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXLinearOp::_forward", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXLinearOp::_forward",
+                    std::vector<c10::IValue>({input, weight, bias}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
@@ -53,8 +56,11 @@ public:
                             at::Tensor input, at::Tensor weight,
                             at::Tensor bias = at::Tensor()) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXLinearOp::forward", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXLinearOp::forward",
+                    std::vector<c10::IValue>({input, weight, bias}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
+    at::AutoNonVariableTypeMode g;
     ctx->save_for_backward({input, weight, bias});
     return _forward(input, weight, bias);
   }
@@ -63,7 +69,8 @@ public:
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXLinearOp::backward", std::vector<c10::IValue>({}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXLinearOp::backward", std::vector<c10::IValue>({}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];
@@ -160,14 +167,21 @@ public:
            at::IntArrayRef stride, at::IntArrayRef padding,
            at::IntArrayRef dilation, bool ceil_mode) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXMaxPool2dOp::_forward", std::vector<c10::IValue>({input}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXMaxPool2dOp::_forward",
+                    std::vector<c10::IValue>({input}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
           input.device().type() == c10::DeviceType::DPCPP) {
-        auto src_dil_type = torch_ipex::cpu::dbl::comm::try_gen_dil_tensor(input).get_data_type();
-        auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8
-            || input.is_contiguous()) ? input : input.contiguous();
+        auto src_dil_type =
+            torch_ipex::cpu::dbl::comm::try_gen_dil_tensor(input)
+                .get_data_type();
+        auto input_temp =
+            (src_dil_type == dil::data_type::u8 ||
+             src_dil_type == dil::data_type::s8 || input.is_contiguous())
+                ? input
+                : input.contiguous();
 
         at::Tensor output = torch_ipex::cpu::AtenIpexCPUDev::dil_max_pooling(
             input_temp, kernel_size, stride, padding, dilation, ceil_mode);
@@ -201,7 +215,9 @@ public:
                             at::IntArrayRef stride, at::IntArrayRef padding,
                             at::IntArrayRef dilation, bool ceil_mode) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXMaxPool2dOp::forward", std::vector<c10::IValue>({input}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXMaxPool2dOp::forward",
+                    std::vector<c10::IValue>({input}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     ctx->saved_data["kernel_size"] = kernel_size;
     ctx->saved_data["stride"] = stride;
@@ -220,7 +236,8 @@ public:
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXMaxPool2dOp::backward", std::vector<c10::IValue>({}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXMaxPool2dOp::backward", std::vector<c10::IValue>({}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];
@@ -283,7 +300,9 @@ public:
            at::IntArrayRef stride, at::IntArrayRef padding,
            at::IntArrayRef dilation, bool ceil_mode) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXMaxPool3dOp::_forward", std::vector<c10::IValue>({input}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXMaxPool3dOp::_forward",
+                    std::vector<c10::IValue>({input}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
@@ -321,7 +340,9 @@ public:
                             at::IntArrayRef stride, at::IntArrayRef padding,
                             at::IntArrayRef dilation, bool ceil_mode) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXMaxPool3dOp::forward", std::vector<c10::IValue>({input}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXMaxPool3dOp::forward",
+                    std::vector<c10::IValue>({input}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     ctx->saved_data["kernel_size"] = kernel_size;
     ctx->saved_data["stride"] = stride;
@@ -340,7 +361,8 @@ public:
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXMaxPool3dOp::backward", std::vector<c10::IValue>({}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXMaxPool3dOp::backward", std::vector<c10::IValue>({}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];
@@ -401,14 +423,23 @@ class NewApaptiveAvgPoolingOp
 public:
   static at::Tensor _forward(at::Tensor input, at::IntArrayRef output_size) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::_forward", std::vector<c10::IValue>({input}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::_forward",
+                    std::vector<c10::IValue>({input}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     try {
-      if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::DPCPP) {
-        auto src_dil_type = torch_ipex::cpu::dbl::comm::try_gen_dil_tensor(input).get_data_type();
-        auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8
-            || input.is_contiguous()) ? input : input.contiguous();
-        return torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(input_temp, output_size);
+      if (torch_ipex::check_auto_dnnl() &&
+          input.device().type() == c10::DeviceType::DPCPP) {
+        auto src_dil_type =
+            torch_ipex::cpu::dbl::comm::try_gen_dil_tensor(input)
+                .get_data_type();
+        auto input_temp =
+            (src_dil_type == dil::data_type::u8 ||
+             src_dil_type == dil::data_type::s8 || input.is_contiguous())
+                ? input
+                : input.contiguous();
+        return torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d(
+            input_temp, output_size);
       }
     } catch (std::exception &e) {
 #if defined(_DEBUG)
@@ -429,7 +460,9 @@ public:
   static at::Tensor forward(torch::autograd::AutogradContext *ctx,
                             at::Tensor input, at::IntArrayRef output_size) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::forward", std::vector<c10::IValue>({input}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::forward",
+                    std::vector<c10::IValue>({input}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     ctx->save_for_backward({input});
     return _forward(input, output_size);
@@ -439,7 +472,9 @@ public:
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::backward", std::vector<c10::IValue>({}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::backward",
+                    std::vector<c10::IValue>({}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];
@@ -476,5 +511,220 @@ public:
       grad_input = at::_adaptive_avg_pool2d_backward(grad_output, input);
     }
     return {grad_input, at::Tensor()};
+  }
+};
+
+class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
+public:
+  static std::vector<at::Tensor>
+  _forward(const at::Tensor &weight, const at::Tensor &indices,
+           const at::Tensor &offsets, bool scale_grad_by_freq, int64_t mode,
+           bool sparse, bool include_last_offset,
+           const at::Tensor per_sample_weights = at::Tensor()) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXEmbeddingBagOp::_forward",
+                    std::vector<c10::IValue>({weight, indices, offsets}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
+    try {
+      if (torch_ipex::check_auto_dnnl() &&
+          torch_ipex::cpu::aten::embedding_bag::embedding_bag_fast_path_sum(
+              weight, per_sample_weights, mode) &&
+          weight.device().type() == c10::DeviceType::DPCPP &&
+          indices.device().type() == c10::DeviceType::DPCPP &&
+          offsets.device().type() == c10::DeviceType::DPCPP) {
+        auto ret = torch_ipex::cpu::aten::embedding_bag::embedding_bag_impl(
+            weight, indices, offsets, scale_grad_by_freq, mode, sparse,
+            per_sample_weights, include_last_offset);
+        return {std::get<0>(ret), std::get<1>(ret), std::get<2>(ret),std::get<3>(ret)};
+      }
+    } catch (std::exception &e) {
+#if defined(_DEBUG)
+      TORCH_WARN(e.what());
+#endif
+    }
+    if (torch_ipex::check_auto_dnnl() &&
+        weight.device().type() == c10::DeviceType::DPCPP &&
+        indices.device().type() == c10::DeviceType::DPCPP &&
+        offsets.device().type() == c10::DeviceType::DPCPP) {
+      auto &&_ipex_weight =
+          torch_ipex::bridge::shallowFallbackToCPUTensor(weight);
+      auto &&_ipex_indices =
+          torch_ipex::bridge::shallowFallbackToCPUTensor(indices);
+      auto &&_ipex_offsets =
+          torch_ipex::bridge::shallowFallbackToCPUTensor(offsets);
+      auto &&_ipex_per_sample_weights =
+          torch_ipex::bridge::shallowFallbackToCPUTensor(per_sample_weights);
+      auto &&_ipex_result = at::embedding_bag(
+          _ipex_weight, _ipex_indices, _ipex_offsets, scale_grad_by_freq, mode,
+          sparse, _ipex_per_sample_weights, include_last_offset);
+      static_cast<void>(_ipex_result); // Avoid warnings in case not used
+      return {
+          torch_ipex::bridge::shallowUpgradeToDPCPPTensor(
+              std::get<0>(_ipex_result)),
+          torch_ipex::bridge::shallowUpgradeToDPCPPTensor(
+              std::get<1>(_ipex_result)),
+          torch_ipex::bridge::shallowUpgradeToDPCPPTensor(
+              std::get<2>(_ipex_result)),
+          torch_ipex::bridge::shallowUpgradeToDPCPPTensor(
+              std::get<3>(_ipex_result))};
+    } else {
+      auto ret =
+          at::embedding_bag(weight, indices, offsets, scale_grad_by_freq, mode,
+                            sparse, per_sample_weights, include_last_offset);
+      return {std::get<0>(ret), std::get<1>(ret), std::get<2>(ret),std::get<3>(ret)};
+    }
+  }
+  static std::vector<at::Tensor>
+  forward(torch::autograd::AutogradContext *ctx, const at::Tensor &weight,
+          const at::Tensor &indices, const at::Tensor &offsets,
+          bool scale_grad_by_freq, int64_t mode, bool sparse,
+          bool include_last_offset,
+          const at::Tensor per_sample_weights = at::Tensor()) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXEmbeddingBagOp::forward",
+                    std::vector<c10::IValue>({weight, indices, offsets}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
+    at::AutoNonVariableTypeMode g;
+    ctx->saved_data["num_weights"] = weight.size(0);
+    ctx->saved_data["scale_grad_by_freq"] = scale_grad_by_freq;
+    ctx->saved_data["mode"] = mode;
+    ctx->saved_data["sparse"] = sparse;
+    ctx->saved_data["include_last_offset"] = include_last_offset;
+    auto ret = _forward(weight, indices, offsets, scale_grad_by_freq, mode,
+                        sparse, include_last_offset, per_sample_weights);
+    ctx->save_for_backward({weight, indices, offsets, per_sample_weights,
+                            ret[1], ret[2],
+                            ret[3]});
+    return ret;
+  }
+  static torch::autograd::tensor_list
+  backward(torch::autograd::AutogradContext *ctx,
+           torch::autograd::tensor_list grad_outputs) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXEmbeddingBagOp::backward", std::vector<c10::IValue>({}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
+    at::AutoNonVariableTypeMode g;
+    auto saved = ctx->get_saved_variables();
+    at::Tensor weight = saved[0];
+    at::Tensor indices = saved[1];
+    at::Tensor offsets = saved[2];
+    at::Tensor per_sample_weights = saved[3];
+    at::Tensor offset2bag = saved[4];
+    at::Tensor bag_size = saved[5];
+    at::Tensor maximum_indices = saved[6];
+
+    int64_t num_weights = ctx->saved_data["num_weights"].toInt();
+    bool scale_grad_by_freq = ctx->saved_data["scale_grad_by_freq"].toBool();
+    int64_t mode = ctx->saved_data["mode"].toInt();
+    bool sparse = ctx->saved_data["sparse"].toBool();
+    bool include_last_offset = ctx->saved_data["include_last_offset"].toBool();
+
+    at::Tensor grad = grad_outputs[0];
+    if (!sparse)
+      grad = grad.contiguous();
+
+    try {
+      if (torch_ipex::check_auto_dnnl() &&
+          (torch_ipex::cpu::aten::embedding_bag::
+               embedding_bag_backward_fast_path_sum(
+                   grad, indices, offset2bag, per_sample_weights,
+                   scale_grad_by_freq, mode)) &&
+          weight.device().type() == c10::DeviceType::DPCPP &&
+          indices.device().type() == c10::DeviceType::DPCPP &&
+          offsets.device().type() == c10::DeviceType::DPCPP) {
+        return {
+            torch_ipex::cpu::aten::embedding_bag::embedding_bag_backward_impl(
+                grad, indices, offsets, offset2bag, bag_size, maximum_indices,
+                num_weights, scale_grad_by_freq, mode, sparse,
+                per_sample_weights),
+            at::Tensor(),
+            at::Tensor(),
+            at::Tensor(),
+            at::Tensor(),
+            at::Tensor(),
+            at::Tensor()};
+      }
+    } catch (std::exception &e) {
+#if defined(_DEBUG)
+      TORCH_WARN(e.what());
+#endif
+    }
+    bool compute_per_sample_weights_grad =
+        per_sample_weights.defined() && per_sample_weights.requires_grad();
+    at::Tensor offset2bag_ =
+        torch_ipex::cpu::aten::embedding_bag::embedding_bag_get_offset2bag(
+            indices, offsets, offset2bag);
+    if (torch_ipex::check_auto_dnnl() &&
+        grad.device().type() == c10::DeviceType::DPCPP &&
+        indices.device().type() == c10::DeviceType::DPCPP &&
+        offsets.device().type() == c10::DeviceType::DPCPP &&
+        (!per_sample_weights.defined() ||
+         per_sample_weights.device().type() == c10::DeviceType::DPCPP)) {
+      auto &&_ipex_grad = torch_ipex::bridge::shallowFallbackToCPUTensor(grad);
+      auto &&_ipex_weight =
+          torch_ipex::bridge::shallowFallbackToCPUTensor(weight);
+      auto &&_ipex_indices =
+          torch_ipex::bridge::shallowFallbackToCPUTensor(indices);
+      auto &&_ipex_offsets =
+          torch_ipex::bridge::shallowFallbackToCPUTensor(offsets);
+      auto &&_ipex_offset2bag_ =
+          torch_ipex::bridge::shallowFallbackToCPUTensor(offset2bag_);
+      auto &&_ipex_bag_size =
+          torch_ipex::bridge::shallowFallbackToCPUTensor(bag_size);
+      auto &&_ipex_maximum_indices =
+          torch_ipex::bridge::shallowFallbackToCPUTensor(maximum_indices);
+      auto &&_ipex_per_sample_weights =
+          torch_ipex::bridge::shallowFallbackToCPUTensor(per_sample_weights);
+      auto &&_ipex_weight_grad =
+          sparse
+              ? at::_embedding_bag_sparse_backward(
+                    _ipex_grad, _ipex_indices, _ipex_offsets, _ipex_offset2bag_,
+                    _ipex_bag_size, num_weights, scale_grad_by_freq, mode,
+                    _ipex_per_sample_weights)
+              : at::_embedding_bag_dense_backward(
+                    _ipex_grad, _ipex_indices, _ipex_offsets, _ipex_offset2bag_,
+                    _ipex_bag_size, _ipex_maximum_indices, num_weights,
+                    scale_grad_by_freq, mode, _ipex_per_sample_weights);
+      auto &&_ipex_per_sample_weights_grad =
+          compute_per_sample_weights_grad
+              ? at::_embedding_bag_per_sample_weights_backward(
+                    _ipex_grad, _ipex_weight, _ipex_indices, _ipex_offsets,
+                    _ipex_offset2bag_, mode)
+              : at::Tensor();
+      auto per_sample_weights_grad =
+          torch_ipex::bridge::shallowUpgradeToDPCPPTensor(
+              _ipex_per_sample_weights_grad);
+      return {
+          torch_ipex::bridge::shallowUpgradeToDPCPPTensor(_ipex_weight_grad),
+          at::Tensor(),
+          at::Tensor(),
+          at::Tensor(),
+          at::Tensor(),
+          at::Tensor(),
+          at::Tensor(),
+          per_sample_weights_grad};
+    } else {
+      auto weight_grad =
+          sparse
+              ? at::_embedding_bag_sparse_backward(
+                    grad, indices, offsets, offset2bag_, bag_size, num_weights,
+                    scale_grad_by_freq, mode, per_sample_weights)
+              : at::_embedding_bag_dense_backward(
+                    grad, indices, offsets, offset2bag_, bag_size,
+                    maximum_indices, num_weights, scale_grad_by_freq, mode,
+                    per_sample_weights);
+      auto per_sample_weights_grad =
+          compute_per_sample_weights_grad
+              ? at::_embedding_bag_per_sample_weights_backward(
+                    grad, grad, indices, offsets, offset2bag_, mode)
+              : at::Tensor();
+      return {weight_grad,  per_sample_weights_grad,
+              at::Tensor(), at::Tensor(),
+              at::Tensor(), at::Tensor(),
+              at::Tensor(), at::Tensor()};
+    }
   }
 };

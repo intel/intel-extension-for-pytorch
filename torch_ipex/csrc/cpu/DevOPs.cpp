@@ -1,5 +1,5 @@
 #include "torch_ipex/csrc/cpu/DevOPs.h"
-
+#include <c10/util/Flags.h>
 #include <ATen/Context.h>
 #include <ATen/CPUGenerator.h>
 #include <ATen/InferSize.h>
@@ -2023,6 +2023,8 @@ at::Tensor AtenIpexCPUDev::dil_slice(const at::Tensor & self, int64_t dim, int64
 
 at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, int64_t dim, int64_t index) {
   DEBUG("AtenIpexCPUDev::dil_select\n");
+  C10_DECLARE_bool(disable_variable_dispatch);
+  TORCH_INTERNAL_ASSERT(at::impl::variable_excluded_from_dispatch());
   CHECK_DNNL_OP_PRE_COND(self);
 
   dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
