@@ -54,6 +54,8 @@ struct TORCH_API DPCPPType final {
   static Tensor & bitwise_and_out(Tensor & out, const Tensor & self, Scalar other); // aten::bitwise_and.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor & bitwise_or_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::bitwise_or.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor & bitwise_or_out(Tensor & out, const Tensor & self, Scalar other); // aten::bitwise_or.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor & bitwise_xor_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::bitwise_xor.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor & bitwise_xor_out(Tensor & out, const Tensor & self, Scalar other); // aten::bitwise_xor.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor clamp(const Tensor & self, c10::optional<Scalar> min, c10::optional<Scalar> max); // aten::clamp(Tensor self, Scalar? min=None, Scalar? max=None) -> Tensor
   static Tensor & clamp_(Tensor & self, c10::optional<Scalar> min, c10::optional<Scalar> max); // aten::clamp_(Tensor(a!) self, Scalar? min=None, Scalar? max=None) -> Tensor(a!)
   static Tensor & clamp_out(Tensor & out, const Tensor & self, c10::optional<Scalar> min, c10::optional<Scalar> max); // aten::clamp.out(Tensor self, Scalar? min=None, Scalar? max=None, *, Tensor(a!) out) -> Tensor(a!)
