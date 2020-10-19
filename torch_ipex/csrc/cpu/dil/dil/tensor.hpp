@@ -1002,6 +1002,12 @@ class tensor : public memory {
     return get_data_handle() == other.get_data_handle();
   }
 
+  tensor to_dense() const {
+    tensor dense(get_desc().to_default_format());
+    dense.feed_from(*this);
+    return dense;
+  }
+
  private:
   void reset_internal(const desc &adesc, const engine &aengine, void *ahandle) {
     dnnl_memory_t result;
