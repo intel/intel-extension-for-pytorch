@@ -653,9 +653,8 @@ at::Tensor& dil_sum_common(
   //     "dil add not support broadcast yet");
   if (!self.sizes().equals(other.sizes())){
     // Fall back to bf16 aten::add in broadcast path
+    // For current design, other will keep same dtype with self, so only check self
     IPEX_CHECK(ShadeDataContext::isDilTensor(self) &&ShadeDataContext::isTensorMixPrecision(self));
-    IPEX_CHECK(ShadeDataContext::isDilTensor(other) &&ShadeDataContext::isTensorMixPrecision(other));
-    IPEX_CHECK(ShadeDataContext::isDilTensor(result) &&ShadeDataContext::isTensorMixPrecision(result));
     dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
     dbl::comm::reorder_to_bf16_for_mix_prec(other, true);
     auto x = dbl::comm::try_gen_dil_tensor(self);

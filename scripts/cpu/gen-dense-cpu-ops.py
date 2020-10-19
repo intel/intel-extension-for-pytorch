@@ -91,8 +91,7 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
 _FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
     # 'aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)',
-    'aten::_pack_padded_sequence(Tensor input, Tensor lengths, bool batch_first) -> (Tensor, Tensor)'
-
+    'aten::_pack_padded_sequence(Tensor input, Tensor lengths, bool batch_first) -> (Tensor, Tensor)',
     'aten::div.Tensor(Tensor self, Tensor other) -> Tensor',
     'aten::div_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)',
     # 'aten::div_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)',
@@ -331,17 +330,10 @@ class DenseOPCodeGen(object):
         code += '  try {\n'
 
         code += '    if (check_auto_dnnl()) {\n'
-
-        if not self.is_ipex_func(aten_func_sig_str):
-            # There are two different kind of DevOPs in IPEX
-            #    1. DNNL Operator
-            #    2. CPU BF16/INT8 Operator in Vanilla PyTorch. IPEX itegrates this kind of operators in IPEX for
-            #       mixture precision.
-            # For the type 2, IPEX does not need to check if DNNL supports these tensors.
-            code += '      std::vector<at::Tensor> dnnl_input_tensors;\n'
-            if len(dnnl_tensor_param_vars) > 0:
-                for dnnl_tensor_param_var in dnnl_tensor_param_vars:
-                    code += '      dnnl_input_tensors.push_back({});\n'.format(dnnl_tensor_param_var)
+        code += '      std::vector<at::Tensor> dnnl_input_tensors;\n'
+        if len(dnnl_tensor_param_vars) > 0:
+            for dnnl_tensor_param_var in dnnl_tensor_param_vars:
+                code += '      dnnl_input_tensors.push_back({});\n'.format(dnnl_tensor_param_var)
 
         fname = cpp_sig.def_name
         if fname.endswith('_'):
@@ -357,13 +349,14 @@ class DenseOPCodeGen(object):
             for param_var in param_vars:
                 param_seq_str = param_var
                 param_seq_str_vec.append(param_seq_str)
+            code += '      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {\n'
 
             if self.is_ipex_func(aten_func_sig_str):
                 code += self.gen_ipex_func_code(fname, param_seq_str_vec)
             else:
-                code += '      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {\n'
                 code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))
-                code += '      }\n' # Check support tensors
+
+            code += '      }\n' # Check support tensors
         code += '    }\n' # Check auto dnnl
         code += '  } catch (std::exception& e) {\n'
         code += '#if defined(_DEBUG)\n'
