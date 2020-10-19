@@ -86,7 +86,7 @@ def enable_auto_optimization(mixed_dtype = None, train = False):
 
 def enable_auto_mix_precision(mixed_dtype = torch.bfloat16, train = False):
     running_mode = 'training' if train else 'inference'
-    auto_mix_precision(AmpConf(mixed_dtype), running_mode).__enter__()
+    AutoMixPrecision(AmpConf(mixed_dtype), running_mode).__enter__()
 
 def get_auto_optimization():
     return get_auto_mix_precision
@@ -94,7 +94,7 @@ def get_auto_optimization():
 def get_train():
     return core.get_train()
 
-class auto_mix_precision(_DecoratorContextManager):
+class AutoMixPrecision(_DecoratorContextManager):
     def __init__(self, conf, running_mode = 'inference'):
         self.pre_mixed_dtype = get_auto_mix_precision()
         self.pre_running_mode = get_train()
