@@ -21,3 +21,4 @@ class TestTorchMethod(TestCase):
         self.assertEqual(src, src_dpcpp.to(cpu_device))
         self.assertEqual(src.std(), src_dpcpp.std().to(cpu_device))
         self.assertEqual(src.std(1), src_dpcpp.std(1).to(cpu_device))
+        self.assertEqual(torch.std(src), torch.std(src_dpcpp).to(cpu_device))
