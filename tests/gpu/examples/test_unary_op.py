@@ -193,3 +193,10 @@ class TetsTorchMethod(TestCase):
         print("sign dpcpp", torch.sign(y_dpcpp_float).to("cpu"))
         self.assertEqual(torch.sign(y_cpu_float),
                          torch.sign(y_dpcpp_float).to("cpu"))
+
+        print("reciprocal cpu", torch.reciprocal(y_cpu_float))
+        print("reciprocal dpcpp", torch.reciprocal(y_dpcpp_float).to("cpu"))
+        self.assertEqual(torch.reciprocal(y_cpu_float),
+                         torch.reciprocal(y_dpcpp_float).to("cpu"))
+
+
