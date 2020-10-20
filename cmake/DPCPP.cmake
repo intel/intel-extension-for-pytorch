@@ -55,7 +55,6 @@ find_file(INTEL_SYCL_VERSION
         lib/clang/8.0.0/include/CL/sycl
     NO_DEFAULT_PATH)
 
-set(USE_PSTL OFF)
 set(USE_DPCPP OFF)
 set(USE_COMPUTECPP OFF)
 if(INTEL_SYCL_VERSION)
