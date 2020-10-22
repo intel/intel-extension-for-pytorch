@@ -20,3 +20,7 @@ class TestTorchMethod(TestCase):
 
         print("y_dpcpp = ", y_dpcpp.to("cpu"))
         self.assertEqual(y, y_dpcpp.cpu())
+        
+        print("x_cpu trace = ", x_cpu.trace())
+        print("x_dpcpp trace = ", x_dpcpp.trace().cpu())
+        self.assertEqual(x_cpu.trace(), x_dpcpp.trace().cpu())

@@ -70,6 +70,7 @@ function (print_configuration_summary)
 
     message(STATUS "  USE_USM               : ${USE_USM}")
     message(STATUS "  BUILD_BY_PER_KERNEL   : ${BUILD_BY_PER_KERNEL}")
+    message(STATUS "  USE_MULTI_CONTEXT     : ${USE_MULTI_CONTEXT}")
   endif(USE_DPCPP)
 
     message(STATUS "  BUILD_INTERNAL_DEBUG  : ${BUILD_INTERNAL_DEBUG}")

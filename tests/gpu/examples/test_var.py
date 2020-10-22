@@ -8,8 +8,7 @@ dpcpp_device = torch.device("dpcpp")
 
 class TestTorchMethod(TestCase):
     def test_var(self, dtype=torch.float):
-        src = torch.randn((3, 4,), dtype=torch.float32,
-                          device=torch.device("cpu"))
+        src = torch.randn((3, 4,), dtype=dtype, device=cpu_device)
         print("cpu src = ", src)
         print("cpu dst = ", src.var())
         print("cpu dst with dim = ", src.var(1))
@@ -21,3 +20,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(src, src_dpcpp.to(cpu_device))
         self.assertEqual(src.var(), src_dpcpp.var().to(cpu_device))
         self.assertEqual(src.var(1), src_dpcpp.var(1).to(cpu_device))
+
+        self.assertEqual(src, src_dpcpp.to(cpu_device))
+        self.assertEqual(torch.var(src), torch.var(src_dpcpp).to(cpu_device))
+        self.assertEqual(torch.var(src, 1), torch.var(src_dpcpp, 1).to(cpu_device))
