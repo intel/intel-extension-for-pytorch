@@ -141,6 +141,10 @@ if(BUILD_DOUBLE_KERNEL)
   add_definitions(-DBUILD_DOUBLE_KERNEL)
 endif()
 
+if (USE_GEN12HP_ONEDNN)
+  add_definitions(-DUSE_GEN12HP_ONEDNN)
+endif()
+
 if(USE_DPCPP)
   add_definitions(-DUSE_DPCPP)
   # Suppress the compiler warning about undefined CL_TARGET_OPENCL_VERSION
