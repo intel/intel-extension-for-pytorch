@@ -1985,6 +1985,7 @@ at::Tensor AtenIpexCPUDev::dil_slice(const at::Tensor & self, int64_t dim, int64
   DEBUG("AtenIpexCPUDev::dil_slice\n");
   CHECK_DNNL_OP_PRE_COND(self);
 
+  // TODO use weight TAG to decide whether to reorder or not
   dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
 
   // Port from aten/src/ATen/native/TensorShape.cpp
@@ -2021,6 +2022,22 @@ at::Tensor AtenIpexCPUDev::dil_slice(const at::Tensor & self, int64_t dim, int64
   auto result = dil_as_strided(self, sizes, strides, storage_offset);
   at::namedinference::propagate_names(result, self);
   return result;
+}
+
+std::vector<at::Tensor> AtenIpexCPUDev::dil_unbind(const at::Tensor &self, int64_t dim) {
+  DEBUG("AtenIpexCPUDev::dil_unbind\n");
+
+  dim = at::maybe_wrap_dim(dim, self.dim());
+  int64_t size = dil_size(self, dim);
+  std::vector<at::Tensor> tensors(size);
+  for (int i = 0; i < size; i++) {
+    tensors[i] = dil_select(self, dim, i);
+  }
+  return tensors;
+}
+
+std::vector<at::Tensor>AtenIpexCPUDev::dil_unbind(const at::Tensor& self, at::Dimname dim) {
+  return dil_unbind(self, at::dimname_to_position(self, dim));
 }
 
 at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, int64_t dim, int64_t index) {
@@ -2119,19 +2136,43 @@ at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, at::Dimname dim, 
 
 std::vector<at::Tensor> AtenIpexCPUDev::dil_split(const at::Tensor& self, int64_t split_size, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_split\n");
+  TORCH_CHECK(self.dim() != 0, "split expects at least a 1-dimensional tensor");
+  TORCH_CHECK(split_size >= 0,  "split expects split_size be non-negative, but got split_size=", split_size);
+  
   CHECK_DNNL_OP_PRE_COND(self);
   dim = at::maybe_wrap_dim(dim, self.dim());
   int64_t dim_size = dil_size(self, dim);
+  TORCH_CHECK(split_size > 0 || self.size(dim) == 0,
+          "split_size can only be 0 if dimension size is 0, "
+          "but got dimension size of ", dim_size);
+  // if split_size is 0 and dimension size is 0, there is 1 split.
   int64_t num_splits = 1;
   if (split_size != 0) {
     // ensuring num_splits is at least 1 makes consistent the case where split_size > dim_size
     // (returns a single split).  We might want to error here, but keep it for BC.
     num_splits = std::max<int64_t>((dim_size + split_size - 1) / split_size, 1);
   }
-  std::vector<int64_t> split_sizes(num_splits, split_size);
+  std::vector<at::Tensor> splits(num_splits);
   int64_t last_split_size = split_size - (split_size * num_splits - dim_size);
-  split_sizes[num_splits-1] = last_split_size;
-  return dil_split_with_sizes(self, split_sizes, dim);
+
+  for (int64_t i = 0; i < num_splits; ++i) {
+    auto length = i < num_splits - 1 ? split_size : last_split_size;
+    splits[i] = _dil_narrow(self, dim, i * split_size, length);
+  }
+  return splits;
+}
+
+// TODO only used for dil_split
+at::Tensor AtenIpexCPUDev::_dil_narrow(const at::Tensor& self, int64_t dim, int64_t start, int64_t length) {
+  // Port from aten/src/ATen/native/TensorShape.cpp
+  TORCH_CHECK(self.dim() > 0, "narrow() cannot be applied to a 0-dim tensor.");
+  auto cur_size = self.size(dim);
+  if (start != cur_size) {  // start being the end is valid, but not a valid dim specification.
+    start = at::maybe_wrap_dim(start, cur_size);
+  }
+  TORCH_CHECK(length >= 0 && start <= cur_size - length,
+           "start (", start, ") + length (", length, ") exceeds dimension size (", cur_size, ").");
+  return dil_slice(self, dim, start, start + length, 1);
 }
 
 at::Tensor AtenIpexCPUDev::dil_gelu(const at::Tensor& input) {

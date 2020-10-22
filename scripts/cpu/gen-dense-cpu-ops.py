@@ -70,6 +70,8 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::slice.Tensor(Tensor(a) self, int dim=0, int start=0, int end=9223372036854775807, int step=1) -> Tensor(a)',
     'aten::select.int(Tensor(a) self, int dim, int index) -> Tensor(a)',
     'aten::select.Dimname(Tensor(a) self, Dimname dim, int index) -> Tensor(a)',
+    'aten::unbind.int(Tensor(a) self, int dim=0) -> Tensor(a)[]',
+    'aten::unbind.Dimname(Tensor(a) self, Dimname dim) -> Tensor(a)[]',
     'aten::view(Tensor(a) self, int[] size) -> Tensor(a)',
     'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
     'aten::_unsafe_view(Tensor self, int[] size) -> Tensor',
