@@ -455,6 +455,9 @@ Tensor dpcpp_convolution_backward_input(
     bool bias_defined) {
   auto grad_input = at::empty(input_size, grad_output.options());
 
+  if (grad_input.numel() == 0) {
+    return grad_input;
+  }
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
@@ -524,7 +527,7 @@ Tensor dpcpp_convolution_backward_input(
 
     input_tz = {n, ic, id, ih, iw};
     weight_tz = (g != 1) ? memory::dims{g, oc / g, ic / g, kd, kh, kw}
-                         : memory::dims{oc, ic, kd, kh, kw};
+                        : memory::dims{oc, ic, kd, kh, kw};
     output_tz = {n, oc, od, oh, ow};
     _stride = {sd, sh, sw};
     _padding = {pd, ph, pw};
@@ -606,8 +609,8 @@ Tensor dpcpp_convolution_backward_input(
       *conv_backward_data,
       strm,
       {{MKLDNN_ARG_DIFF_DST, grad_output_memory},
-       {MKLDNN_ARG_WEIGHTS, weight_memory},
-       {MKLDNN_ARG_DIFF_SRC, grad_input_memory}});
+      {MKLDNN_ARG_WEIGHTS, weight_memory},
+      {MKLDNN_ARG_DIFF_SRC, grad_input_memory}});
 
   if (grad_input_memory != grad_input_usr_memory) {
     DPCPP_ONEDNN_EXEC(
@@ -628,7 +631,7 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     IntArrayRef stride,
     IntArrayRef dilation,
     int64_t groups,
-    bool bias_defined) {
+    bool bias_defined) {  
   auto grad_weight =
       at::empty(weight_size, grad_output.options()).to(ScalarType::Float);
 
@@ -638,6 +641,9 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
                     .to(ScalarType::Float);
   }
 
+  if (input.numel() == 0) {
+    return std::tuple<at::Tensor, at::Tensor>{grad_weight, grad_bias}; 
+  }
   Device curDevice = Device(kDPCPP, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
@@ -707,7 +713,7 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
 
     input_tz = {n, ic, id, ih, iw};
     weight_tz = (g != 1) ? memory::dims{g, oc / g, ic / g, kd, kh, kw}
-                         : memory::dims{oc, ic, kd, kh, kw};
+                        : memory::dims{oc, ic, kd, kh, kw};
     output_tz = {n, oc, od, oh, ow};
     _stride = {sd, sh, sw};
     _padding = {pd, ph, pw};
@@ -807,9 +813,9 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
       *conv_backward_weight,
       strm,
       {{MKLDNN_ARG_DIFF_DST, grad_output_memory},
-       {MKLDNN_ARG_SRC, input_memory},
-       {MKLDNN_ARG_DIFF_WEIGHTS, grad_weight_memory},
-       {MKLDNN_ARG_DIFF_BIAS, grad_bias_memory}});
+      {MKLDNN_ARG_SRC, input_memory},
+      {MKLDNN_ARG_DIFF_WEIGHTS, grad_weight_memory},
+      {MKLDNN_ARG_DIFF_BIAS, grad_bias_memory}});
 
   if (grad_weight_memory != grad_weight_usr_memory) {
     DPCPP_ONEDNN_EXEC(
