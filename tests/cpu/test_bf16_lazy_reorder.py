@@ -812,6 +812,29 @@ class TestShape(TestCase):
             self._check_tensor_shape(x_cpu_slice, x_dpcpp_slice)
             self.assertEqual(x_cpu_slice, x_dpcpp_slice, 0.01)        
 
+    def test_sliced_eltwise_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+
+        input = torch.rand(10, 10, 10)
+        with AutoDNNL(True), AutoMixPrecision(True, train=True):
+            x_cpu = input.clone().requires_grad_()
+            x_cpu_slice = x_cpu[3:7, 3:7, 5]
+
+            x_dpcpp = input.clone().to(device=device).requires_grad_()
+            x_dpcpp_slice = x_dpcpp[3:7, 3:7, 5]
+
+            y_cpu = F.relu(x_cpu_slice)
+            y_dpcpp = F.relu(x_dpcpp_slice)
+
+            y_cpu.sum().backward()
+            y_dpcpp.sum().backward()
+            
+            self._check_tensor_shape(y_cpu, y_dpcpp)
+            self.assertEqual(y_cpu, y_dpcpp)
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+
     def test_linear_with_sliced_bias(self):
         bias = torch.rand(30)
         x_cpu = torch.rand(20, 30)
@@ -826,6 +849,42 @@ class TestShape(TestCase):
             y_dpcpp = F.linear(x_dpcpp, w_dpcpp, b_dpcpp[10:20])
 
         self.assertEqual(y_cpu, y_dpcpp, 0.1)
+
+    def test_chunk_version_counter(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        
+        x_dpcpp = torch.randn(32, 4096).to(device).requires_grad_()
+        
+        with AutoDNNL(True), AutoMixPrecision(True, train=True):
+            x_chunked = x_dpcpp.chunk(4, 1)
+            
+            output = x_chunked[0].sigmoid_()
+            version_counter = output._version
+            
+            output_other = x_chunked[1].sigmoid_()
+            self.assertTrue(output._version == version_counter)
+    
+    def test_unbind(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x_cpu = torch.rand(2, 8, 2)
+        x_dpcpp = copy.deepcopy(x_cpu).to(device=device)
+
+        x_cpu_unbind = torch.unbind(x_cpu)
+        with AutoDNNL(True), AutoMixPrecision(True):
+            self.assertFalse(ipex.core.is_bf16_dil_tensor(x_dpcpp))
+            x_dpcpp_unbind = torch.unbind(x_dpcpp)
+            self.assertTrue(ipex.core.is_bf16_dil_tensor(x_dpcpp))
+            self.assertTrue(ipex.core.is_bf16_dil_tensor(x_dpcpp_unbind[0]))
+            self.assertTrue(ipex.core.is_bf16_dil_tensor(x_dpcpp_unbind[1]))
+            
+            self._check_tensor_shape(x_cpu_unbind[0], x_dpcpp_unbind[0])
+            self._check_tensor_shape(x_cpu_unbind[1], x_dpcpp_unbind[1])
+            self.assertEqual(x_cpu_unbind[0], x_dpcpp_unbind[0], 0.01)
+            self.assertEqual(x_cpu_unbind[1], x_dpcpp_unbind[1], 0.01)
 
 class TestBinOPs(TestCase):
     def _gen_shapes(self):

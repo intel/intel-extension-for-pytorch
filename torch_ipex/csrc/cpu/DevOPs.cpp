@@ -1929,7 +1929,11 @@ at::Tensor dil_as_strided(
 
   auto* _tensor_impl = (IPEXTensorImpl *)result.unsafeGetTensorImpl();
   _tensor_impl->copy_meta_info(self.unsafeGetTensorImpl());
-  // reset version counter for chunk
+  // When a tensor is chunked, the obtained chunked tensors do not share the version counter. 
+  // We have copied the version counter in copy_meta_info and it is a workaround to reset the 
+  // version counter here.
+  // Note that when a tensor is sliced, PyTorch will call as_view which will copy the version 
+  // counter to the sliced tensor. We do not need to handle it here.
   _tensor_impl->set_version_counter(0);
   _tensor_impl->copy_auto_grad(self.unsafeGetTensorImpl());
 
@@ -2134,8 +2138,21 @@ at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, at::Dimname dim, 
   return dil_select(self, at::dimname_to_position(self, dim), index);
 }
 
+at::Tensor _dil_narrow(const at::Tensor& self, int64_t dim, int64_t start, int64_t length) {
+  // Port from aten/src/ATen/native/TensorShape.cpp
+  TORCH_CHECK(self.dim() > 0, "narrow() cannot be applied to a 0-dim tensor.");
+  auto cur_size = self.size(dim);
+  if (start != cur_size) {  // start being the end is valid, but not a valid dim specification.
+    start = at::maybe_wrap_dim(start, cur_size);
+  }
+  TORCH_CHECK(length >= 0 && start <= cur_size - length,
+           "start (", start, ") + length (", length, ") exceeds dimension size (", cur_size, ").");
+  return AtenIpexCPUDev::dil_slice(self, dim, start, start + length, 1);
+}
+
 std::vector<at::Tensor> AtenIpexCPUDev::dil_split(const at::Tensor& self, int64_t split_size, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_split\n");
+  // Port from aten/src/ATen/native/TensorShape.cpp
   TORCH_CHECK(self.dim() != 0, "split expects at least a 1-dimensional tensor");
   TORCH_CHECK(split_size >= 0,  "split expects split_size be non-negative, but got split_size=", split_size);
   
@@ -2160,19 +2177,6 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split(const at::Tensor& self, int64_
     splits[i] = _dil_narrow(self, dim, i * split_size, length);
   }
   return splits;
-}
-
-// TODO only used for dil_split
-at::Tensor AtenIpexCPUDev::_dil_narrow(const at::Tensor& self, int64_t dim, int64_t start, int64_t length) {
-  // Port from aten/src/ATen/native/TensorShape.cpp
-  TORCH_CHECK(self.dim() > 0, "narrow() cannot be applied to a 0-dim tensor.");
-  auto cur_size = self.size(dim);
-  if (start != cur_size) {  // start being the end is valid, but not a valid dim specification.
-    start = at::maybe_wrap_dim(start, cur_size);
-  }
-  TORCH_CHECK(length >= 0 && start <= cur_size - length,
-           "start (", start, ") + length (", length, ") exceeds dimension size (", cur_size, ").");
-  return dil_slice(self, dim, start, start + length, 1);
 }
 
 at::Tensor AtenIpexCPUDev::dil_gelu(const at::Tensor& input) {

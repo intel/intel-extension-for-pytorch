@@ -1422,6 +1422,18 @@ class TestSplit(TestCase):
                 y2.backward()
                 self.assertEqual(x1.grad, x2.grad)
 
+    def test_split_share_memory(self):
+        with AutoDNNL(True):
+            x_dpcpp = torch.FloatTensor([1, 1, 1, 1, -1, -1, -1, -1]).to(device=device)
+            other = torch.FloatTensor([-1, -1, -1, -1]).to(device=device)
+
+            x_target = torch.FloatTensor([0, 0, 0, 0, -1, -1, -1, -1]).to(device=device)
+
+            splited_x = torch.split(x_dpcpp, 4)
+            splited_x[0].add_(other)
+
+            self.assertEqual(x_dpcpp, x_target)
+
 class ConvRelu(nn.Module):
     def __init__(self):
         super(ConvRelu, self).__init__()
