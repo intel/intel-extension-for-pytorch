@@ -1929,6 +1929,8 @@ at::Tensor dil_as_strided(
 
   auto* _tensor_impl = (IPEXTensorImpl *)result.unsafeGetTensorImpl();
   _tensor_impl->copy_meta_info(self.unsafeGetTensorImpl());
+  // reset version counter for chunk
+  _tensor_impl->set_version_counter(0);
   _tensor_impl->copy_auto_grad(self.unsafeGetTensorImpl());
 
   auto storage_offset = storage_offset_.value_or(self.storage_offset());
