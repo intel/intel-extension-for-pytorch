@@ -207,7 +207,7 @@ class TestDistributions(TestCase):
         #self._gradcheck_log_prob(lambda p: Multinomial(total_count, p), [p])
         #self._gradcheck_log_prob(lambda p: Multinomial(total_count, None, p.log()), [p])
         self.assertRaises(NotImplementedError, Multinomial(10, p).rsample)
-    '''
+        
     #@pytest.mark.skipIf(not TEST_NUMPY, "NumPy not found")
     def test_multinomial_1d_log_prob(self):
         total_count = 10
@@ -223,7 +223,7 @@ class TestDistributions(TestCase):
         log_prob = dist.log_prob(x)
         expected = torch.tensor(scipy.stats.multinomial.logpmf(x.numpy(), n=total_count, p=dist.probs.detach().numpy()))
         self.assertEqual(log_prob, expected)
-    '''
+    
     def test_multinomial_2d(self):
         total_count = 10
         probabilities = [[0.1, 0.2, 0.3], [0.5, 0.3, 0.2]]
@@ -325,3 +325,7 @@ class TestDistributions(TestCase):
         #low.grad.zero_()
         #high.grad.zero_()
     '''
+<<<<<<< HEAD
+=======
+
+>>>>>>> 82e27fd05a7f5fdb88755c19e05bdc9db1c6aa88
