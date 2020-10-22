@@ -89,25 +89,29 @@ void normal(Tensor& self, double mean, double stdv, Generator* _generator) {
 } // namespace impl
 
 Tensor& normal_(Tensor& self, double mean, double std, Generator* generator) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "normal_",
-      [&]() {
-        using accreal = typename std::conditional<std::is_same<scalar_t, at::Half>::value ||
-            std::is_same<scalar_t, at::BFloat16>::value, float, scalar_t>::type;
-        impl::normal<scalar_t, accreal>(self, mean, std, generator);
-      });
+  if (self.numel() != 0) {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        self.scalar_type(),
+        "normal_",
+        [&]() {
+          using accreal = typename std::conditional<std::is_same<scalar_t, at::Half>::value ||
+              std::is_same<scalar_t, at::BFloat16>::value, float, scalar_t>::type;
+          impl::normal<scalar_t, accreal>(self, mean, std, generator);
+    });
+  }
   return self;
 }
 
 Tensor& uniform_(Tensor& self, double from, double to, Generator* generator) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-    at::ScalarType::Half, at::ScalarType::BFloat16,
-    self.scalar_type(), "uniform_", [&]() {
-    impl::uniform<scalar_t>(self, generator, from, to);
-  });
+  if (self.numel() != 0) {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half, at::ScalarType::BFloat16,
+      self.scalar_type(), "uniform_", [&]() {
+        impl::uniform<scalar_t>(self, generator, from, to);
+      });
+  }
   return self;
 }
 
