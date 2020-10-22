@@ -155,6 +155,9 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, 
     // The data type of DIL tensor is same as the dst data type. DO NOTHING
     return;
   }
+  // should fallback if not dil tensor and not own whole storage
+  IPEX_CHECK(cpu::ShadeDataContext::isDilTensor(tensor) || check_tensor_own_whole_storage(tensor),  "Reorder only works while tensor owns the whole storage or tensor is a dil tensor");
+
   auto dst_desc = src.get_desc().to_type(get_dil_data_type(dst_scalar_type));
   reorder_to_desc(tensor, dst_desc, scales);
 }
