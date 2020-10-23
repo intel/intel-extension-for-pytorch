@@ -242,7 +242,7 @@ class TestDistributions(TestCase):
 
         # check entropy computation
         self.assertRaises(NotImplementedError, Multinomial(10, p).entropy)
-    '''
+
     def test_normal(self):
         loc = torch.randn(5, 5, requires_grad=True, device=sycl_device)
         scale = torch.randn(5, 5).abs().requires_grad_().to("dpcpp")
@@ -286,7 +286,6 @@ class TestDistributions(TestCase):
             self.assertAlmostEqual(log_prob, math.log(expected), places=3)
 
         self._check_log_prob(Normal(loc, scale), ref_log_prob)
-    '''
     
     def test_uniform(self):
         low = torch.zeros(5, 5, requires_grad=True).to(sycl_device)
@@ -325,7 +324,3 @@ class TestDistributions(TestCase):
         #low.grad.zero_()
         #high.grad.zero_()
     '''
-<<<<<<< HEAD
-=======
-
->>>>>>> 82e27fd05a7f5fdb88755c19e05bdc9db1c6aa88
