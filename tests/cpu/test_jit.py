@@ -106,6 +106,17 @@ class BatchNormConv_Fixed(nn.Module):
     def forward(self, x):
         return self.conv(self.bn(x))
 
+class BatchNorm_Conv_BatchNorm(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(BatchNorm_Conv_BatchNorm, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.bn1 = bn_module[dim](in_channels, eps=0.001)
+        self.bn2 = bn_module[dim](out_channels, eps=0.001)
+    def forward(self, x):
+        return self.bn2(self.conv(self.bn1(x)))
+
 class ConvReshapeBatchNorm(nn.Module):
     def __init__(self, dim, in_channels, out_channels, dest_shape, **kwargs):
         super(ConvReshapeBatchNorm, self).__init__()
@@ -118,7 +129,17 @@ class ConvReshapeBatchNorm(nn.Module):
     def forward(self, x):
         conv_output = self.conv(x)
         return self.bn(torch.reshape(conv_output, self.dest_shape)) 
-        
+
+class Conv_Conv_Concat(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(Conv_Conv_Concat, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv1 = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.conv2 = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+    def forward(self, x):
+        return torch.cat((self.conv1(x),self.conv2(x)))
+
 class ConvRelu_Fixed(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
         super(ConvRelu_Fixed, self).__init__()
@@ -128,6 +149,25 @@ class ConvRelu_Fixed(nn.Module):
 
     def forward(self, x):
         return F.relu(self.conv(x), inplace=True)
+
+class Conv_Relu_Add(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(Conv_Relu_Add, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+    def forward(self, x):
+        return torch.add(F.relu(self.conv(x), inplace=True),self.conv(x))
+
+class Conv_Bn_Relu(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, **kwargs):
+        super(Conv_Bn_Relu, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.bn = bn_module[dim](out_channels, eps=0.001)
+    def forward(self, x):
+        return F.relu(self.bn(self.conv(x)), inplace=True)
 
 class ConvReshapeRelu(nn.Module):
     def __init__(self, dim, in_channels, out_channels, dest_shape, **kwargs):
@@ -151,6 +191,19 @@ class ConvSum(nn.Module):
     def forward(self, x):
         a = self.conv(x)
         b = self.conv1(x)
+        return a+b
+
+class ConvReshapeSum(nn.Module):
+    def __init__(self, dim, in_channels, out_channels, dest_shape, **kwargs):
+        super(ConvReshapeSum, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.dest_shape = dest_shape
+        self.conv1 = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+        self.conv2 = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
+    def forward(self, x):
+        a=torch.reshape(self.conv1(x), self.dest_shape)
+        b=torch.reshape(self.conv2(x), self.dest_shape)
         return a+b
 
 class CascadedConvBnSumRelu(nn.Module):
@@ -194,6 +247,57 @@ class LinearGelu(nn.Module):
 
     def forward(self, x):
         return F.gelu(self.linear(x))
+
+class LinearAdd(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearAdd, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        return torch.add(self.linear(x),self.linear(x))
+
+class Linear_Reshape_Relu(nn.Module):
+    def __init__(self, in_channels, out_channels,dest_shape, **kwargs):
+        super(Linear_Reshape_Relu, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.dest_shape = dest_shape
+    def forward(self, x):
+        return F.relu(torch.reshape(self.linear(x),self.dest_shape), inplace=True)
+
+class LinearSigmoid(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(LinearSigmoid, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+
+    def forward(self, x):
+        return torch.sigmoid(self.linear(x))
+
+class LinearBn(nn.Module):
+    def __init__(self,dim,in_channels, out_channels, **kwargs):
+        super(LinearBn, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.bn = bn_module[dim](1, eps=0.001)
+    def forward(self, x):
+        return self.bn(self.linear(x))
+
+class Linear_Reshape_Bn(nn.Module):
+    def __init__(self,dim,in_channels, out_channels,dest_shape,**kwargs):
+        super(Linear_Reshape_Bn, self).__init__()
+        seed = 2018
+        torch.manual_seed(seed)
+        self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.bn = bn_module[dim](1, eps=0.001)
+        self.dest_shape = dest_shape
+    def forward(self, x):
+        return self.bn(torch.reshape(self.linear(x),self.dest_shape))
 
 class ConvSumInDiffBlock(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
@@ -488,6 +592,13 @@ class Tester(TestCase):
             kind_in_graph="aten::batch_norm",
             kind_not_in_graph=None,)
 
+    def test_output_bn_conv_bn(self):
+        self._test_output(
+            BatchNorm_Conv_BatchNorm(2, 3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 64, 64),
+            kind_in_graph="aten::batch_norm",
+            kind_not_in_graph=None,)
+
     def test_output_conv_reshape_bn_2d(self):
         self._test_output(
             ConvReshapeBatchNorm(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),
@@ -495,12 +606,38 @@ class Tester(TestCase):
             kind_in_graph="aten::batch_norm",
             kind_not_in_graph=None,)
 
+    def test_output_conv_conv_concate(self):
+        self._test_output(
+            Conv_Conv_Concat(2, 3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 64, 64),
+            kind_in_graph="aten::conv2d",
+            kind_not_in_graph=None,)
+
+    def test_output_conv_relu_add(self):
+        self._test_output(
+            Conv_Relu_Add(2, 3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 64, 64),
+            kind_in_graph="ipex::conv2d_relu")
+
+    def test_output_conv_bn_relu(self):
+        self._test_output(
+            Conv_Bn_Relu(2, 3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 64, 64),
+            kind_in_graph="ipex::conv2d_relu")
+
     def test_output_conv_reshape_relu(self):
         self._test_output(
             ConvReshapeRelu(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
-            kind_in_graph="aten::conv2d1",
+            kind_in_graph="aten::conv2d",
             kind_not_in_graph="ipex::conv2d_relu",)
+
+    def test_output_conv_reshape_sum(self):
+        self._test_output(
+            ConvReshapeSum(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),
+            torch.randn(32, 3, 64, 64),
+            kind_in_graph="aten::conv2d",
+            kind_not_in_graph="ipex::conv2d_sum",)
 
     def test_output_conv_bn_3d(self):
         self._test_output(
@@ -515,7 +652,6 @@ class Tester(TestCase):
             kind_not_in_graph="aten::batch_norm",
             prec=0.02)
 
-
     def test_output_conv_relu_2d(self):
         self._test_output(
             ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
@@ -525,7 +661,6 @@ class Tester(TestCase):
             ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
             kind_in_graph="ipex::conv2d_relu")
-
 
     def test_output_conv_relu_3d(self):
         self._test_output(
@@ -607,7 +742,36 @@ class Tester(TestCase):
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex::linear_relu")
+ 
+    def test_output_linear_add(self):
+        self._test_output(
+            LinearAdd(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="torch_ipex::linear")
 
+    def test_output_linear_reshape_relu(self):
+        self._test_output(
+            Linear_Reshape_Relu(3, 32,(64,16),bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="torch_ipex::linear")
+
+    def test_output_linear_sigmoid(self):
+        self._test_output(
+            LinearSigmoid(3, 32, bias=True),
+            torch.rand(32, 3),
+            kind_in_graph="torch_ipex::linear")
+
+    def test_output_linear_bn(self):
+        self._test_output(
+            LinearBn(2 ,32, 32, bias=True),
+            torch.rand(1, 1, 32, 32),
+            kind_in_graph="torch_ipex::linear")
+
+    def test_output_linear_reshape_bn(self):
+        self._test_output(
+            Linear_Reshape_Bn(2 ,32, 32,(1,1,64,16),bias=True),
+            torch.rand(1, 1, 32, 32),
+            kind_in_graph="torch_ipex::linear")
 
     def test_output_linear_gelu(self):
         self._test_output(
