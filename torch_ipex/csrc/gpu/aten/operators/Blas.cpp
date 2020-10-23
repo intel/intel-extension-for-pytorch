@@ -449,6 +449,52 @@ Tensor baddbmm(
   return r;
 }
 
+Tensor& addbmm_out(
+    Tensor& out,
+    const Tensor& self,
+    const Tensor& batch1,
+    const Tensor& batch2,
+    Scalar beta,
+    Scalar alpha) {
+
+  checkBackend("addbmm_out", {out, self, batch1, batch2}, Backend::DPCPP);
+  TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
+  TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
+ 
+  Tensor b1;
+  if (batch1.size(0) > 1) {
+    b1 = batch1.transpose(0, 1).contiguous().view({batch1.size(1), -1});
+  } else {
+    b1 = batch1.view({batch1.size(1), -1});
+  }
+  auto b2 = batch2.view({-1, batch2.size(2)});
+  out = at::AtenIpexTypeDPCPP::addmm(self, b1, b2, beta, alpha);
+ 
+  return out;
+}
+
+Tensor& addbmm_(
+    Tensor& self,
+    const Tensor& batch1,
+    const Tensor& batch2,
+    Scalar beta,
+    Scalar alpha) {
+  at::AtenIpexTypeDPCPP::addbmm_out(self, self, batch1, batch2, beta, alpha); 
+  return self;
+}
+
+Tensor addbmm(
+    const Tensor& self,
+    const Tensor& batch1,
+    const Tensor& batch2,
+    Scalar beta,
+    Scalar alpha) {
+  Tensor out = at::empty({0}, self.options());
+  at::AtenIpexTypeDPCPP::addbmm_out(out, self, batch1, batch2, beta, alpha); 
+  return out;
+}
+
 Tensor& bmm_out(Tensor& result, const Tensor& self, const Tensor& batch2) {
   checkBackend("bmm_out", {result, self, batch2}, Backend::DPCPP);
   TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
