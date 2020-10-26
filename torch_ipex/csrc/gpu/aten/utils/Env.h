@@ -5,7 +5,8 @@ enum DPCPP_ENV {
   ENV_FORCE_SYNC,
   ENV_DISABLE_PROFILING,
   ENV_LAZY_REORDER,
-  ENV_WEIGHT_CACHE };
+  ENV_WEIGHT_CACHE,
+  ENV_TILE_AS_DEVICE };
 
 int dpcpp_env(int env);
 
@@ -27,4 +28,8 @@ static inline int lazy_reorder_enabled() {
 
 static inline int weight_cache_enabled() {
   return dpcpp_env(ENV_WEIGHT_CACHE);
+}
+
+static inline bool tile_as_device() {
+  return (bool)dpcpp_env(ENV_TILE_AS_DEVICE);
 }
