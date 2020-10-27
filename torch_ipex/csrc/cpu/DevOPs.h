@@ -63,6 +63,9 @@ class AtenIpexCPUDev {
   static at::Tensor dil_sigmoid(const at::Tensor& self);
   static at::Tensor& dil_sigmoid_(at::Tensor& self);
   static at::Tensor dil_sigmoid_backward(const at::Tensor& grad_output, const at::Tensor& output);
+  static at::Tensor dil_tanh(const at::Tensor& self);
+  static at::Tensor& dil_tanh_(at::Tensor& self);
+  static at::Tensor dil_tanh_backward(const at::Tensor& grad_output, const at::Tensor& output);
   static at::Tensor dil_reshape(const at::Tensor& self, at::IntArrayRef size);
   static int64_t dil_size(const at::Tensor & self, int64_t dim);
   static at::Tensor dil_clone(const at::Tensor& self, c10::optional<c10::MemoryFormat> optional_memory_format);

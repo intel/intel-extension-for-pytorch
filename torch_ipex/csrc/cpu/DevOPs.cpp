@@ -1771,6 +1771,53 @@ at::Tensor AtenIpexCPUDev::dil_sigmoid_backward(
   return dbl::comm::gen_aten_tensor_by(std::move(gx));
 }
 
+at::Tensor AtenIpexCPUDev::dil_tanh(const at::Tensor& self) {
+  DEBUG("AtenIpexCPUDev::dil_tanh\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
+
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
+  dil::tensor y;
+  dil::eltwise_forward::compute(
+      x, y, dil::algorithm::eltwise_tanh_use_dst_for_bwd, dil::prop_kind::forward);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
+}
+
+at::Tensor& AtenIpexCPUDev::dil_tanh_(at::Tensor& self) {
+  DEBUG("AtenIpexCPUDev::dil_tanh_\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
+
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
+  dil::eltwise_forward::compute(
+      x, x, dil::algorithm::eltwise_tanh_use_dst_for_bwd, dil::prop_kind::forward);
+
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(x.is_public_format() || check_tensor_own_whole_storage(self));
+  dbl::comm::sync_shape_from_dil_to_aten(self, x);
+  return self;
+}
+
+at::Tensor AtenIpexCPUDev::dil_tanh_backward(
+    const at::Tensor& grad_output,
+    const at::Tensor& output) {
+  DEBUG("AtenIpexCPUDev::dil_tanh_backward\n");
+  CHECK_DNNL_OP_PRE_COND(grad_output);
+  CHECK_DNNL_OP_PRE_COND(output);
+
+  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
+  dbl::comm::reorder_to_bf16_for_mix_prec(output, true);
+
+  dil::tensor y = dbl::comm::try_gen_dil_tensor(output);
+  dil::tensor gy = dbl::comm::try_gen_dil_tensor(grad_output_contiguous);
+  dil::tensor gx;
+  dil::eltwise_backward::compute(y, gy, gx,
+      dil::algorithm::eltwise_tanh_use_dst_for_bwd);
+  return dbl::comm::gen_aten_tensor_by(std::move(gx));
+}
+
 at::Tensor AtenIpexCPUDev::dil_reshape(const at::Tensor& self, at::IntArrayRef size) {
   DEBUG("AtenIpexCPUDev::dil_reshape\n");
   CHECK_DNNL_OP_PRE_COND(self);

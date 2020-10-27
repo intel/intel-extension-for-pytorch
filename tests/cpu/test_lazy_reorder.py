@@ -1326,6 +1326,36 @@ class TestSigmoid(TestCase):
             y_dpcpp.sum().backward()
             self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
+class TestTanh(TestCase):
+    def test_tanh(self):
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x_cpu = torch.randn(4, 5, dtype=torch.float32) * 10
+            x_dpcpp = x_cpu.to(device=device)
+            self.assertEqual(torch.tanh(x_cpu), torch.tanh(x_dpcpp))
+            # inplace
+            torch.tanh_(x_cpu)
+            torch.tanh_(x_dpcpp)
+            self.assertEqual(x_cpu, x_dpcpp)
+
+    def test_tanh_backward(self):
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x = torch.randn(4, 5, dtype=torch.float32) * 10
+            x_cpu = x.clone().requires_grad_()
+            x_dpcpp = x.clone().to(device=device).requires_grad_()
+            y_cpu = torch.tanh(x_cpu)
+            y_dpcpp = torch.tanh(x_dpcpp)
+            self.assertEqual(y_cpu, y_dpcpp)
+
+            y_cpu.sum().backward()
+            y_dpcpp.sum().backward()
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+
 class TestDropout(TestCase):
     def test_dropout(self):
         with AutoDNNL(True):
