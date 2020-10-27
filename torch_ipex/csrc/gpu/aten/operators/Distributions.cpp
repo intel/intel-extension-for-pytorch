@@ -524,10 +524,10 @@ Tensor& exponential_(Tensor& self, double lambda_, Generator* gen_) {
         std::lock_guard<std::mutex> lock(gen->mutex_);
         seed = gen->current_seed();
       }
-      mkl::rng::philox4x32x10 engine(sycl_queue, seed);
-      mkl::rng::exponential<scalar_t> distribution(displ, scale);
+      oneapi::mkl::rng::philox4x32x10 engine(sycl_queue, seed);
+      oneapi::mkl::rng::exponential<scalar_t> distribution(displ, scale);
       auto sycl_buffer = make_buffer<scalar_t>(self.data_ptr());
-      mkl::rng::generate(distribution, engine, self.numel(), sycl_buffer);
+      oneapi::mkl::rng::generate(distribution, engine, self.numel(), sycl_buffer);
     });
   } else
 #endif
@@ -561,16 +561,20 @@ Tensor& log_normal_(Tensor& self, double mean_, double std_, Generator* gen_) {
   TORCH_CHECK(self.is_contiguous(), "the self is not contiguous");
   auto gen = get_generator_or_default<DPCPPGenerator>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
 
+  auto &dpcpp_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "log_normal_", [&] {
     auto mean = static_cast<scalar_t>(mean_);
     auto std = static_cast<scalar_t>(std_);
     scalar_t displ = static_cast<scalar_t>(0.0);
     scalar_t scale = static_cast<scalar_t>(1.0);
-    auto &dpcpp_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
-    mkl::rng::philox4x32x10 engine(dpcpp_queue, gen->seed());
-    mkl::rng::lognormal<scalar_t, mkl::rng::lognormal_method::box_muller2> distribution(mean, std, displ, scale);
+    oneapi::mkl::rng::philox4x32x10 engine(dpcpp_queue, gen->seed());
+    oneapi::mkl::rng::lognormal<scalar_t, oneapi::mkl::rng::lognormal_method::box_muller2> distribution(mean, std, displ, scale);
+#ifdef USE_USM
+    oneapi::mkl::rng::generate(distribution, engine, self.numel(), (scalar_t *)self.data_ptr());
+#else
     auto dpcpp_buffer = make_buffer<scalar_t>(self.data_ptr());
-    mkl::rng::generate(distribution, engine, self.numel(), dpcpp_buffer);
+    oneapi::mkl::rng::generate(distribution, engine, self.numel(), dpcpp_buffer);
+#endif
   });
 
   return self;
