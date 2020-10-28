@@ -1423,13 +1423,19 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
     IntArrayRef output_padding,
     int64_t groups,
     std::array<bool, 3> output_mask) {
+
+  Tensor input_ = input;            // oneDNN can revice non-contiguous input if we define the stride in input_md,
+  if (!input.is_contiguous()) {     // for now, we contiguous the input before oneDNN.
+    input_ = input.contiguous();
+  }
+
   Tensor grad_output_ = grad_output.contiguous();
 
   Tensor grad_input, grad_weight, grad_bias;
 
   if (output_mask[0]) {
     grad_input = dpcpp_convolution_backward_input(
-        input.sizes(),
+        input_.sizes(),
         grad_output_,
         weight,
         padding,
@@ -1442,7 +1448,7 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
     std::tie(grad_weight, grad_bias) = convolution_backward_weights(
         weight.sizes(),
         grad_output_,
-        input,
+        input_,
         padding,
         stride,
         dilation,

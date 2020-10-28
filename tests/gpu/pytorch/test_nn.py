@@ -3809,7 +3809,6 @@ class TestNN(NNTestCase):
     # Very similar to test_Conv2d_naive_groups but with special care to handle
     # the number of groups == number of input channels
     @unittest.skipIf(not TEST_DPCPP, 'DPCPP not available')
-    @repeat_test_for_types(ALL_TENSORTYPES2)
     def test_Conv2d_depthwise_naive_groups_dpcpp(self, dtype=torch.float):
         for depth_multiplier in [1, 2]:
             m = nn.Conv2d(2, 2 * depth_multiplier, kernel_size=3, groups=2).to("dpcpp", dtype)
@@ -4746,7 +4745,6 @@ class TestNN(NNTestCase):
             self.assertEqual(output_dpcpp, output_cpu)
 
     @unittest.skipIf(not TEST_DPCPP, 'DPCPP not available')
-    @repeat_test_for_types(NO_HALF_TENSORTYPES)
     def test_dpcpp_rnn_fused(self, dtype=torch.float):
 
         def copy_rnn(rnn1, rnn2):
@@ -4770,8 +4768,6 @@ class TestNN(NNTestCase):
         grad_hy = torch.randn(num_layers, batch, hidden_size, dtype=dtype)
         for module in (nn.GRU, nn.LSTM):
             for bias in (True, False):
-                print('module = ', module)
-                print('bias = ', bias)
                 rnn = module(input_size, hidden_size, num_layers, bias=bias).to(dtype)
                 rnn_dpcpp = module(input_size, hidden_size, num_layers, bias=bias).to("dpcpp", dtype)
                 copy_rnn(rnn, rnn_dpcpp)
@@ -4788,8 +4784,6 @@ class TestNN(NNTestCase):
 
                 inp = input_val.clone().requires_grad_(True)
                 inp_dpcpp = input_val.clone().to("dpcpp").requires_grad_(True)
-                print('inp dtype = ', inp.dtype)
-                print('inp_dpcpp dtype = ', inp_dpcpp.dtype)
                 output1, hy1 = rnn(inp, hx)
                 output2, hy2 = rnn_dpcpp(inp_dpcpp, hx_dpcpp)
                 if is_lstm:
@@ -8658,13 +8652,11 @@ class TestNNDeviceType(NNTestCase):
         with self.assertRaises(ValueError):
             torch.nn.GroupNorm(10, 10)(x).to(device)
     
-    @skipDPCPPIf(True, "torch.randn(0) can not create null pointer on dpcpp")
     def test_GroupNorm_empty(self, device):
         mod = torch.nn.GroupNorm(2, 4).to(device)
         inp = torch.randn(0, 4, 2, 2, device=device)
         self._test_module_empty_input(mod, inp)
 
-    @skipDPCPPIf(True, "torch.randn(0) can not create null pointer on dpcpp")
     def test_BatchNorm_empty(self, device):
         mod = torch.nn.BatchNorm2d(3).to(device)
         inp = torch.randn(0, 3, 2, 2, device=device)
@@ -8675,19 +8667,18 @@ class TestNNDeviceType(NNTestCase):
         self.assertEqual(mod.weight.grad, torch.tensor([0., 0, 0], device=device))
         self.assertEqual(mod.bias.grad, torch.tensor([0., 0, 0], device=device))
 
-    @skipDPCPPIf(True, "torch.randn(0) can not create null pointer on dpcpp")
     def test_group_conv_empty(self, device):
         mod = torch.nn.Conv2d(4, 4, stride=2, kernel_size=3, padding=1, groups=4).to(device)
         inp = torch.randn(0, 4, 4, 4, device=device)
         self._test_module_empty_input(mod, inp, check_size=False)
 
-    @skipDPCPPIf(True, "torch.randn(0) can not create null pointer on dpcpp")
+    @skipDPCPPIf(True, "For now, we wait for owner to port convTranspose to IPEX")
     def test_group_convTranspose_empty(self, device):
         mod = torch.nn.ConvTranspose2d(4, 4, stride=2, kernel_size=3, padding=1, groups=4).to(device)
         inp = torch.randn(0, 4, 4, 4, device=device)
         self._test_module_empty_input(mod, inp, check_size=False)
 
-    @skipDPCPPIf(True, "torch.randn(0) can not create null pointer on dpcpp")
+    @skipDPCPPIf(True, "For now, we wait for owner to port convTranspose to IPEX")
     def test_convTranspose_empty(self, device):
         mod = torch.nn.ConvTranspose2d(4, 4, stride=2, kernel_size=3, padding=1).to(device)
         inp = torch.randn(0, 4, 4, 4, device=device)
@@ -8991,6 +8982,7 @@ class TestNNDeviceType(NNTestCase):
                 y = getattr(F, 'conv_transpose{}d'.format(dim))(x, w, groups=groups)
                 y.sum().backward()
 
+    @skipDPCPPIf(True, "unsupport non-contiguous weights and bias for convolution for now")
     def test_conv_noncontig_weights_and_bias(self, device):
         # need floats to exercise https://github.com/pytorch/pytorch/issues/16018
         for bias in [True, False]:
@@ -9150,8 +9142,7 @@ class TestNNDeviceType(NNTestCase):
                 grads2 = [input.grad.data] + [p.grad.data for p in rnn.parameters()]
                 self.assertEqual(grads, grads2)
 
-    @dtypesIfDPCPP(torch.float) # dnnl mm unsupport double, we cancel double UT
-    @dtypes(torch.double)
+    @dtypesIfDPCPP(torch.float)
     def test_rnn_retain_variables(self, device, dtype):
         self._test_rnn_retain_variables(device, dtype)
 
@@ -9791,6 +9782,7 @@ class TestNNDeviceType(NNTestCase):
             _assertGradAndGradgradChecks(self, F.batch_norm, (input, running_mean, running_var, weight, bias,
                                                               training, 0.1, 0.0001))
 
+    @skipDPCPPIf(True, "batchnorm in oneDNN unsupport double dtype")
     def test_batchnorm_grad(self, device):
         self._test_batchnorm_grad(device)
 
@@ -10425,7 +10417,6 @@ class TestNNDeviceType(NNTestCase):
                                     r'lambda must be greater or equal to 0, but found to be -1\.'):
             m(input)
 
-    @skipDPCPPIf(True, "torch.randn(0) can not create null pointer on dpcpp")
     def test_logsigmoid_out(self, device):
         # this isn't actually documented, but was broken previously:
         # https://github.com/pytorch/pytorch/issues/36499

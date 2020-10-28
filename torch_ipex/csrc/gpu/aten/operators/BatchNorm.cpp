@@ -84,6 +84,14 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
       training ? prop_kind::forward_training : prop_kind::forward_inference;
   normalization_flags flag = normalization_flags::use_scale_shift;
 
+  if (!weight.defined()) {
+    weight = at::ones(input.size(1), input.options());
+  }
+
+  if (!bias.defined()) {
+    bias = at::zeros(input.size(1), input.options());
+  }
+
   if (!weight.defined() || !bias.defined()) {
     flag &= ~normalization_flags::use_scale_shift;
     //        if (mkldnn_use_scaleshift)

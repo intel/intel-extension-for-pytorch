@@ -586,10 +586,13 @@ static void mean_kernel(TensorIterator& iter) {
 }
 
 static void min_kernel(TensorIterator& iter) {
-  // TODO, min reduce needs to support BF16 and FP16.
-  IPEX_DISPATCH_ALL_TYPES_AND(at::ScalarType::Bool, iter.dtype(), "min", [&]() {
-    min_kernel_impl<scalar_t>(iter);
-  });
+  IPEX_DISPATCH_ALL_TYPES_AND3(
+      at::ScalarType::Bool,
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      iter.dtype(),
+      "min",
+      [&]() { min_kernel_impl<scalar_t>(iter); });
 }
 
 static void max_kernel(TensorIterator& iter) {
