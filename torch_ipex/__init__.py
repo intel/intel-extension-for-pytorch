@@ -6,9 +6,16 @@ from torch.nn import Module
 from torch.nn import Parameter
 from torch.nn import init
 from .lib import torch_ipex
-from .version import __version__
+from .version import __version__, __ipex_gitrev__
+
+
+def version():
+    print("ipex gpu version: {}".format(__version__))
+    print("ipex gpu git sha: {}".format(__ipex_gitrev__))
 
 # for now, we don't support bwk propagation
+
+
 class LinearReLU(Module):
     __constants__ = ['in_features', 'out_features']
 
@@ -98,11 +105,14 @@ def library_paths():
     ]
     return paths
 
+
 def _usm_pstl_is_enabled():
     return torch_ipex._usm_pstl_is_enabled()
 
+
 def _double_kernel_disabled():
     return torch_ipex._double_kernel_disabled()
+
 
 def _onemkl_is_enabled():
     return torch_ipex._onemkl_is_enabled()
