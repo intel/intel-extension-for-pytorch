@@ -9333,7 +9333,7 @@ class TestNNDeviceType(NNTestCase):
 
         y.backward(grad)
 
-    @skipDPCPPIf(True, "Can not access null pointer")
+    @skipDPCPPIf(True, "Can not access null pointer, EmnbeddingBag cannot process null input")
     def test_embedding_bag_empty_input(self, device):
         m = 4
         n = 3
@@ -10370,7 +10370,7 @@ class TestNNDeviceType(NNTestCase):
         output.sum().backward()
         self.assertEqual(input.grad.size(), input.size())
 
-    @skipDPCPPIf(True, "Can not accsee null pointer")
+    @skipDPCPPIf(True, "Can not accsee null pointer in randint")
     def test_nll_loss_empty_tensor_reduction_none(self, device):
         self._nll_loss_helper([0, 3], "none", torch.empty([0], device=device), device)
         self._nll_loss_helper([0, 3, 5, 7], "none", torch.empty([0, 5, 7], device=device), device)
@@ -10379,7 +10379,7 @@ class TestNNDeviceType(NNTestCase):
         self._nll_loss_helper([2, 3, 5, 7, 0], "none", torch.empty([2, 5, 7, 0], device=device), device)
 
     @unittest.skipIf(TEST_WITH_UBSAN, "division-by-zero error with UBSAN")
-    @skipDPCPPIf(True, "Can not accsee null pointer")
+    @skipDPCPPIf(True, "Can not create nan tensor")
     def test_nll_loss_empty_tensor_reduction_mean(self, device):
         nan = torch.tensor(float('nan'), device=device)
         self._nll_loss_helper([0, 3], "mean", nan, device)
