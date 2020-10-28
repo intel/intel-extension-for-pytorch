@@ -98,6 +98,11 @@ class TetsTorchMethod(TestCase):
         self.assertEqual(torch.round(y_cpu_float),
                          torch.round(y_dpcpp_float).cpu())
 
+        print("frac cpu", torch.frac(y_cpu_float))
+        print("frac dpcpp", torch.frac(y_dpcpp_float).cpu())
+        self.assertEqual(torch.frac(y_cpu_float),
+                         torch.frac(y_dpcpp_float).cpu())
+
         print("trunc cpu", torch.trunc(y_cpu_float))
         print("trunc dpcpp", torch.trunc(y_dpcpp_float).cpu())
         self.assertEqual(torch.trunc(y_cpu_float),
@@ -188,3 +193,10 @@ class TetsTorchMethod(TestCase):
         print("sign dpcpp", torch.sign(y_dpcpp_float).to("cpu"))
         self.assertEqual(torch.sign(y_cpu_float),
                          torch.sign(y_dpcpp_float).to("cpu"))
+
+        print("reciprocal cpu", torch.reciprocal(y_cpu_float))
+        print("reciprocal dpcpp", torch.reciprocal(y_dpcpp_float).to("cpu"))
+        self.assertEqual(torch.reciprocal(y_cpu_float),
+                         torch.reciprocal(y_dpcpp_float).to("cpu"))
+
+

@@ -102,6 +102,17 @@ class TestTorchMethod(TestCase):
         self.assertEqual(x_cpu_b_1.__ior__(x_cpu_b_2),
                          x_dpcpp_b_1.__ior__(x_dpcpp_b_2).to(cpu_device))
 
+        print("__xor__ y_cpu", y_cpu1_int.__xor__(y_cpu2_int))
+        print("__xor__ y_dpcpp", y_dpcpp1_int.__xor__(
+            y_dpcpp2_int).to(cpu_device))
+        self.assertEqual(y_cpu1_int.__xor__(y_cpu2_int),
+                         y_dpcpp1_int.__xor__(y_dpcpp2_int).to(cpu_device))
+
+        print("__xor__ x_cpu", x_cpu_b_1.__xor__(x_cpu_b_2))
+        print("__xor__ x_dpcpp", x_dpcpp_b_1.__xor__(x_dpcpp_b_2).to(cpu_device))
+        self.assertEqual(x_cpu_b_1.__xor__(x_cpu_b_2),
+                         x_dpcpp_b_1.__xor__(x_dpcpp_b_2).to(cpu_device))
+
         print("remainder scalar y_cpu", torch.remainder(y_cpu1, 1.5))
         print("remainder scalar y_dpcpp", torch.remainder(
             y_dpcpp1, 1.5).to(cpu_device))

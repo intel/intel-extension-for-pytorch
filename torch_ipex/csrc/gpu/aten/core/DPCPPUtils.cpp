@@ -7,6 +7,7 @@
 #include <core/Device.h>
 #include <core/Exception.h>
 #include <core/Stream.h>
+#include <utils/Env.h>
 #include <cmath>
 
 namespace at {
@@ -26,6 +27,8 @@ static void clearDPCPPContextAndDevices() {
 static void initGlobalDevicePoolState() {
   auto plaform_list = DPCPP::platform::get_platforms();
   DeviceIndex devIndex = 0;
+  std::vector<DPCPP::device> root_devices;
+  // Enumerated root devices(GPU cards) from GPU Platform firstly.
   for (const auto& platform : plaform_list) {
     auto plat_name = platform.get_info<DPCPP::info::platform::name>();
     if (plat_name.compare(getPreferredPlatform()) != 0)
@@ -33,10 +36,38 @@ static void initGlobalDevicePoolState() {
     auto device_list = platform.get_devices();
     for (const auto& device : device_list) {
       if (device.is_gpu()) {
-        gDevPool.devices.push_back(device);
-        gDevPool.dev_sels.push_back({device});
+        root_devices.push_back(device);
       }
     }
+  }
+
+  // Check whether TILE_AS_DEVICE is setup. If true, we map device to 
+  // physical tile
+  if (tile_as_device()) {
+    constexpr DPCPP::info::partition_property partition_by_affinity =
+      DPCPP::info::partition_property::partition_by_affinity_domain;
+    constexpr DPCPP::info::partition_affinity_domain next_partitionable =
+      DPCPP::info::partition_affinity_domain::next_partitionable;
+    for (const auto &root_device : root_devices) {
+      std::vector<DPCPP::device> sub_devices;
+      try {
+        sub_devices = root_device.create_sub_devices<partition_by_affinity>(next_partitionable); 
+        gDevPool.devices.insert(gDevPool.devices.end(), 
+                                sub_devices.begin(),
+                                sub_devices.end());
+      } catch (DPCPP::feature_not_supported &e) {
+        TORCH_WARN("Can not split into tile for Device ", 
+          root_device.get_info<DPCPP::info::device::name>());
+        gDevPool.devices.push_back(root_device);
+      }
+    }
+  } else {
+    gDevPool.devices = std::move(root_devices);
+  }
+
+  // Set device selector
+  for (const auto& device : gDevPool.devices) {
+    gDevPool.dev_sels.push_back({device});
   }
   TORCH_CHECK(gDevPool.devices.size() > 0, "DPCPP Device count is zero");
   gDevPool.cur_dev_index = 0;

@@ -91,8 +91,18 @@ void mkldnnGemmImpl(
   post_ops po;
   if (alpha != 1.f)
     attr.set_output_scales(/* mask */ 0, {(float)alpha});
+#ifdef USE_GEN12HP_ONEDNN
+  // Handle difference cases based-on beta value here:
+  // 1. beta == 0, nothing is needed to do
+  // 2. quantization path, no bias fusion support in oneDNN so far
+  // 3. beta == 1, partially support bias fusion in oneDNN
   if (beta != 0.f && (beta != 1.f || m1.is_quantized() || m2.is_quantized()))
     po.append_sum(beta);
+#else
+  if (beta != 0.f)
+    po.append_sum(beta);
+#endif
+
   if (with_relu)
     po.append_eltwise(1.f, dnnl::algorithm::eltwise_relu, 0.f, 0.f);;
   attr.set_post_ops(po);
@@ -127,6 +137,7 @@ void mkldnnGemmImpl(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   std::shared_ptr<dnnl::matmul::desc> matmul_desc;
+#ifdef USE_GEN12HP_ONEDNN
   if (beta == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_dt = dt_to_dnnl(b.scalar_type());
     if (b.sizes() != result.sizes()) {
@@ -147,6 +158,10 @@ void mkldnnGemmImpl(
   } else {
     matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
   }
+#else
+  matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
+#endif
+
   std::shared_ptr<dnnl::matmul::primitive_desc> matmul_pd;
   matmul_pd.reset(new dnnl::matmul::primitive_desc(*matmul_desc, attr, engine));
   std::shared_ptr<dnnl::matmul> matmul_p;
@@ -158,6 +173,7 @@ void mkldnnGemmImpl(
 
   auto r_memory = dpcpp_onednn_memory(r_md, engine, result.data_ptr());
 
+#ifdef USE_GEN12HP_ONEDNN
   if (beta == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_memory = dpcpp_onednn_memory(b_md, engine, b.data_ptr());
     DPCPP_ONEDNN_EXEC(*matmul_p, strm,
@@ -168,6 +184,11 @@ void mkldnnGemmImpl(
       {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
         {DNNL_ARG_DST, r_memory}});
   }
+#else
+  DPCPP_ONEDNN_EXEC(*matmul_p, strm,
+    {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
+      {DNNL_ARG_DST, r_memory}});
+#endif
 
 #if defined(USE_COMPUTECPP)
   if (!result_.is_same(result))
@@ -205,7 +226,7 @@ void gemm_broadcast(Tensor& result,
     auto& pack_ptr =
             cpp_custom_type_hack::cast<PackedLinearWeightQDPCPP>(m2);
     m2_unpack = pack_ptr.weight;
-    
+
     TORCH_CHECK(m2_unpack.dim() == 2, "expected 2D tensor");
 
     if(m2_unpack.sizes()[1] == m1.sizes()[1]){
@@ -221,7 +242,11 @@ void gemm_broadcast(Tensor& result,
   }
 
   Tensor bc_bias = bias;
+#ifdef USE_GEN12HP_ONEDNN
   if (bias.defined() && beta && (beta != 1.f || m1.is_quantized())) {
+#else
+  if (bias.defined() && beta) {
+#endif
     TORCH_CHECK(check_broadcast(bias, result_shape),
                 "bias ", bias.sizes(), " cannot broadcast to ", result_shape);
     std::tie(bc_bias) = expand_size(bias, result_shape, "gemm_broadcast");
@@ -422,6 +447,52 @@ Tensor baddbmm(
   Tensor r = at::empty({0}, input.options());
   at::AtenIpexTypeDPCPP::baddbmm_out(r, input, batch1, batch2, beta, alpha);
   return r;
+}
+
+Tensor& addbmm_out(
+    Tensor& out,
+    const Tensor& self,
+    const Tensor& batch1,
+    const Tensor& batch2,
+    Scalar beta,
+    Scalar alpha) {
+
+  checkBackend("addbmm_out", {out, self, batch1, batch2}, Backend::DPCPP);
+  TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
+  TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
+ 
+  Tensor b1;
+  if (batch1.size(0) > 1) {
+    b1 = batch1.transpose(0, 1).contiguous().view({batch1.size(1), -1});
+  } else {
+    b1 = batch1.view({batch1.size(1), -1});
+  }
+  auto b2 = batch2.view({-1, batch2.size(2)});
+  out = at::AtenIpexTypeDPCPP::addmm(self, b1, b2, beta, alpha);
+ 
+  return out;
+}
+
+Tensor& addbmm_(
+    Tensor& self,
+    const Tensor& batch1,
+    const Tensor& batch2,
+    Scalar beta,
+    Scalar alpha) {
+  at::AtenIpexTypeDPCPP::addbmm_out(self, self, batch1, batch2, beta, alpha); 
+  return self;
+}
+
+Tensor addbmm(
+    const Tensor& self,
+    const Tensor& batch1,
+    const Tensor& batch2,
+    Scalar beta,
+    Scalar alpha) {
+  Tensor out = at::empty({0}, self.options());
+  at::AtenIpexTypeDPCPP::addbmm_out(out, self, batch1, batch2, beta, alpha); 
+  return out;
 }
 
 Tensor& bmm_out(Tensor& result, const Tensor& self, const Tensor& batch2) {
