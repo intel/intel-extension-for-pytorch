@@ -65,6 +65,8 @@ struct RNNParams {
     return batch_sizes.size() != 0;
   }
 
+  // TODO: forward will not use these desc (which can only use f32 data type)
+  // may need to do the same modification for backward
   // mkldnn memory descriptors
   using format = dil::format_tag;
   using desc = dil::tensor::desc;
@@ -159,18 +161,30 @@ at::Tensor mkldnn_rnn_layer(at::Tensor& hy_, at::Tensor& cy_,
 
   // per layer input size
   int64_t input_size = input.size(2);
-  auto x = dbl::comm::try_gen_dil_tensor(input, rnn.src_layer_desc(input_size));
-  auto hx = dbl::comm::try_gen_dil_tensor(hx_, rnn.src_iter_desc());
-  auto w1 = dbl::comm::try_gen_dil_tensor(weight_ih, rnn.weights_layer_desc(input_size));
-  auto w2 = dbl::comm::try_gen_dil_tensor(weight_hh, rnn.weights_iter_desc());
-  auto b = dbl::comm::try_gen_dil_tensor(bias, rnn.bias_desc());
-  auto hy = dbl::comm::try_gen_dil_tensor(hy_, rnn.dst_iter_desc());
+  
+  // TODO: should we do these reorder in DevOPs??
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(hx_);
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight_ih, true);
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight_hh, true);
+  dbl::comm::reorder_to_bf16_for_mix_prec(hy_);
+  // cx, cy and bias should always be fp32 in bf16 inference
+  dbl::comm::reorder_to_dtype(bias, at::kFloat);
+  dbl::comm::reorder_to_dtype(cx_, at::kFloat);
+  dbl::comm::reorder_to_dtype(cy_, at::kFloat);
+
+  auto x = dbl::comm::try_gen_dil_tensor(input, {rnn.seq_length, rnn.mini_batch, input_size}, dil::format_tag::tnc);
+  auto hx = dbl::comm::try_gen_dil_tensor(hx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
+  auto w1 = dbl::comm::try_gen_dil_tensor(weight_ih, {1, 1, input_size, rnn.num_gates, rnn.hidden_size}, dil::format_tag::ldgoi);
+  auto w2 = dbl::comm::try_gen_dil_tensor(weight_hh, {1, 1, rnn.hidden_size, rnn.num_gates, rnn.hidden_size}, dil::format_tag::ldgoi);
+  auto b = dbl::comm::try_gen_dil_tensor(bias, {1, 1, rnn.num_bias_gates, rnn.hidden_size}, dil::format_tag::ldgo);
+  auto hy = dbl::comm::try_gen_dil_tensor(hy_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
 
   dil::tensor y;
   auto _rnn_kind = static_cast<dil::rnn_kind>(rnn.mode);
   if (_rnn_kind == dil::rnn_kind::LSTM) {
-    auto cx = dbl::comm::try_gen_dil_tensor(cx_, rnn.src_iter_desc());
-    auto cy = dbl::comm::try_gen_dil_tensor(cy_, rnn.dst_iter_desc());
+    auto cx = dbl::comm::try_gen_dil_tensor(cx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
+    auto cy = dbl::comm::try_gen_dil_tensor(cy_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
     dil::lstm_forward::compute({output_size.cbegin(), output_size.cend()}, x, hx, cx, w1, w2, b, y, hy, cy, reverse);
   } else if (_rnn_kind == dil::rnn_kind::GRU) {
     dil::gru_forward::compute(x, hx, w1, w2, b, y, hy, reverse);
