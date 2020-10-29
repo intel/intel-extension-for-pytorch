@@ -90,8 +90,7 @@ rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*
 
 *** Memory allocator  ***
 
-"--enable_tcmalloc" and "--enable_jemalloc" can be used to enable different memory allcator. But the corressponding 
-libxxxx.so file should be in /usr/lib or /usr/lib64 or /home/xxx/.local/lib directory.
+"--enable_tcmalloc" and "--enable_jemalloc" can be used to enable different memory allcator. 
 
 """
 
