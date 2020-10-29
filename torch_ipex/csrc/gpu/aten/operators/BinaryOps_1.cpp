@@ -87,7 +87,9 @@ Tensor& add_out(
       !impl::is_wrapped_number(_other) &&
       (!DPCPPTensorContext::is_plain(_self) ||
        !DPCPPTensorContext::is_plain(_other))) {
-    oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
+    // oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
+    oneDNN::bin<dnnl::algorithm::binary_add>(
+        result, _self.contiguous(), _other.contiguous());
     return result;
   } else {
     result = to_plain_if_needed(result);
@@ -116,7 +118,9 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
       !impl::is_wrapped_number(_other) &&
       (!DPCPPTensorContext::is_plain(_self) ||
        !DPCPPTensorContext::is_plain(_other))) {
-    oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
+    // oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
+    oneDNN::bin<dnnl::algorithm::binary_add>(
+        result, _self.contiguous(), _other.contiguous());
     return result;
   } else {
     self = to_plain_if_needed(_self);
