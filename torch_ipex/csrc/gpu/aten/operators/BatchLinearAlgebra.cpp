@@ -168,7 +168,9 @@ static void apply_lu_dpcpp_(
     auto info = make_buffer<int64_t>(infos[i].data_ptr());
     info_buf.emplace_back(info);
   }
-  mkl::lapack::getrf_batch(dpcpp_queue, m, n, A_buf, lda, ipiv_buf, info_buf);
+  //FIXME later: comment it to make build happy. Once USM bug is fixed, would replace this OP implementation for beta09 oneAPI
+  //oneapi::mkl::lapack::getrf_batch(dpcpp_queue, m, n, A_buf, lda, ipiv_buf, info_buf);
+  AT_ERROR("lu: runtime error");
 #else
   AT_ERROR("lu: oneMKL library not found in compilation");
 #endif

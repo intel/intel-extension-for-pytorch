@@ -218,6 +218,10 @@ struct TORCH_API DPCPPType final {
   static Tensor erfinv(const Tensor & self); // aten::erfinv(Tensor self) -> Tensor
   static Tensor & lerp_out(Tensor & out, const Tensor & self, const Tensor & end, Scalar weight); // aten::lerp.Scalar_out(Tensor self, Tensor end, Scalar weight, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor & lerp_out(Tensor & out, const Tensor & self, const Tensor & end, const Tensor & weight); // aten::lerp.Tensor_out(Tensor self, Tensor end, Tensor weight, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor lgamma(const Tensor & self); // aten::lgamma(Tensor self) -> Tensor
+  static Tensor& lgamma_(Tensor & self); //aten::lgamma_(Tensor(a!) self) -> Tensor(a!)
+  static Tensor mvlgamma(const Tensor & self, int64_t p); // aten::mvlgamma(Tensor self, int p) -> Tensor
+  static Tensor & mvlgamma_(Tensor & self, int64_t p); // aten::mvlgamma_(Tensor(a!) self, int p) -> Tensor(a!)
   static Tensor lerp(const Tensor & self, const Tensor & end, Scalar weight); // aten::lerp.Scalar(Tensor self, Tensor end, Scalar weight) -> Tensor
   static Tensor lerp(const Tensor & self, const Tensor & end, const Tensor & weight); // aten::lerp.Tensor(Tensor self, Tensor end, Tensor weight) -> Tensor
   static Tensor sign(const Tensor & self); // aten::sign(Tensor self) -> Tensor
