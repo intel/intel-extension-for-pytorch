@@ -10,30 +10,44 @@ import numpy as np
 from argparse import ArgumentParser, REMAINDER
 
 r"""
-This is a module is lanchuer script which can help you launch your program for training and inference.
-and automaitically to setup  strategy of thread affinity for multi-thread.The function as following:
+This module is a lanchuer script which can help you to launch your program for training and inference.
+Now, single instance inferenc/training, multi-instance inference/training and distributed training 
+with oneCCL backend is enabled.
 
-1. multi-thread setup
-
-   1) KMP_AFFINITY 
-   2) OMP_NUM_THREADS
-
-2. memory allocator enable
-
-   TCMalloc/JeMalloc
-
-3. MPI multi-process launch for oneCCL backend distributed training and the following environment 
-   variable will be setup
-
-   1) CCL_WORKER_AFFINITY 
-   2) I_MPI_PIN_DOMAIN  
-   3) CCL_WORKER_COUNT
-
-4. multi-instance launch and core bind with numactl 
+To get peak performance with Intel Xeon CPU. For multi-thread setup, the launcher can do core bind and
+setup thread affinity automatically. For distributed training, it can also setup the pin-domain and 
+oneCCL worker affinity. Besides, it can also enable different memory allocator and iomp library. 
  
 **How to use this module:**
 
-Distributed Training 
+*** Single instance inference/training *** 
+
+1. Single instance with all socket 
+
+::
+
+   >>> python -m intel_pytorch_extension.launch script.py args
+
+2. Single instance with specific socket
+
+::
+
+   >>> python -m intel_pytorch_extension.launch --socket_id 1 script.py args
+
+*** Multi-instance inference/training *** 
+
+1. Multi-instance 
+
+   you should specify the instance number and core per-instance. by  --nintances and  --ncore_per_instance 
+
+   eg: on CLX8280 with 2 instance
+
+::
+
+   >>> python -m intel_pytorch_extension.launch --nintances 2 --ncore_per_instance 28 script.py args
+
+
+*** Distributed Training ***
 
 spawns up multiple distributed training processes on each of the training nodes. For intel_pytorch_extension, oneCCL 
 is used as the communication backend and MPI used to launch multi-proc. To get the better 
@@ -74,15 +88,11 @@ rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*
 
     >>> python -m intel_pytorch_extension.launch --help
 
-Infrence/multi-instance
+*** Memory allocator  ***
 
-for inference and no-distributed training. in default, only one instance will be run for your program. 
-For multi-instance, you can specify the instance number and cores per instance by "--ninstances" and "--ncore_per_instance" 
-Beside, the numctl is enabled to setup the cores for every instance, and you can disable it by "--disable_numactl". 
-For numactl, you can specify the core_list for all the instance and this utlity will distribute the core resource automatically.
-otherwise, all the physical cores will be used. 
-    eg: on CLX8280 with 2 instance 
-    >>> python -m intel_pytorch_extension.launch --nintances 2 --ncore_per_instance 28 xxx.py xxxxxxx
+"--enable_tcmalloc" and "--enable_jemalloc" can be used to enable different memory allcator. But the corressponding 
+libxxxx.so file should be in /usr/lib or /usr/lib64 or /home/xxx/.local/lib directory.
+
 """
 
 class CPUinfo():
@@ -191,32 +201,34 @@ def set_ccl_worker_affinity(args):
     os.environ["CCL_WORKER_AFFINITY"] = affinity
 
 
-def enable_allocator(args):
+def add_lib_preload(lib_type=None):
     '''
-    Enale TCMalloc/JeMalloc according to allocator_type
-    xxx.so file can be only in /usr/lib  /usr/lib64 or  ~/.local/lib/ directory 
+    Enale TCMalloc/JeMalloc/iomp 
     '''
-    if args.enable_tcmalloc and args.enable_jemalloc:
-        print("Error: Unable to enable tcmalloc and jemalloc at the same time")
-        exit(-1)
-    library_paths = ["/usr/lib/", "/usr/lib64/", "{}/.local/lib/".format(expanduser("~"))]
-    allocator_type = None
+    library_paths = []
+    if "CONDA_PREFIX" in os.environ:
+        library_paths.append(os.environ["CONDA_PREFIX"] + "/lib/")
+    
+    library_paths += ["{}/.local/lib/".format(expanduser("~")), "/usr/local/lib/",
+                     "/usr/local/lib64/", "/usr/lib/", "/usr/lib64/"]
     lib_find = False
-    if args.enable_tcmalloc:
-       allocator_type = "tcmalloc"
-    elif args.enable_jemalloc:
-       allocator_type = "jemalloc"
     for lib_path in library_paths:
-        library_file = lib_path + "lib" + allocator_type + ".so"
+        library_file = lib_path + "lib" + lib_type + ".so"
         matches = glob.glob(library_file)
         if len(matches) > 0:
-            os.environ["LD_PRELOAD"] = matches[0]
+            if "LD_PRELOAD" in os.environ:
+                os.environ["LD_PRELOAD"] = matches[0] + ":" + os.environ["LD_PRELOAD"]
+            else:
+                os.environ["LD_PRELOAD"] = matches[0]
             lib_find = True
             break
+
     if not lib_find:
         # Unable to find the TCMalloc library file
-        print("Warning: Unable to find the {} library file lib{}.so) in /usr/lib or /usr/lib64"
-               "or ~/.local/lib/ so the LD_PRELOAD environment variable will not be set.".format(allocator_type, allocator_type))
+        print("Warning: Unable to find the {} library file lib{}.so in $CONDA_PREFIX/lib or  /.local/lib/" 
+               " or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
+               "~/.local/lib/ so the LD_PRELOAD environment variable will not be set."
+               .format(lib_type, lib_type, expanduser("~")))
     
 def set_multi_thread_and_allcator(args):
 
@@ -229,13 +241,26 @@ def set_multi_thread_and_allcator(args):
     if "KMP_AFFINITY" not in os.environ:
         os.environ["KMP_AFFINITY"] = args.kmp_affinity
     
-    os.environ["DNNL_PRIMITIVE_CACHE_CAPACITY"] = '1024'
+    if "KMP_BLOCKTIME" not in os.environ:
+        os.environ["KMP_BLOCKTIME"] = "1"
+    
+    if "DNNL_PRIMITIVE_CACHE_CAPACITY" not in os.environ:    
+       os.environ["DNNL_PRIMITIVE_CACHE_CAPACITY"] = '1024'
 
-    if args.enable_tcmalloc or args.enable_jemalloc: 
-        enable_allocator(args)
-
+    if args.enable_tcmalloc and args.enable_jemalloc:
+        print("Error: Unable to enable tcmalloc and jemalloc at the same time")
+        exit(-1)
+    if args.enable_tcmalloc: 
+        add_lib_preload(lib_type="tcmalloc")
+    if args.enable_jemalloc:
+        add_lib_preload(lib_type="jemalloc")
+    if args.enable_iomp:
+        add_lib_preload(lib_type="iomp")
  
 def launch(args):
+    '''
+    single-instance / multi-instance launcher  
+    ''' 
     processes = []
     cores = []
  
@@ -284,10 +309,9 @@ def launch(args):
            if args.module:
                cmd.append("-m")
            cmd.append(args.program)
-           cmd.extend(args.program_args)  
+           cmd.extend(args.program_args) 
        process = subprocess.Popen(cmd, env=os.environ)
        processes.append(process)
-
     for process in processes:
         process.wait()
         if process.returncode != 0:
@@ -327,9 +351,18 @@ def mpi_dist_launch(args):
     if "CCL_WORKER_AFFINITY" not in os.environ:
         set_ccl_worker_affinity(args)
 
-    if args.enable_tcmalloc or args.enable_jemalloc:
-        enable_allocator(args)
-        
+    if "CCL_ATL_TRANSPORT" not in os.environ:
+        os.environ["CCL_ATL_TRANSPORT"] = "ofi"
+     
+    if args.enable_tcmalloc:
+        add_lib_preload(lib_type="tcmalloc")
+
+    if args.enable_jemalloc:
+        add_lib_preload(lib_type="jemalloc")
+
+    if args.enable_iomp:
+        add_lib_preload(lib_type="iomp")    
+
     cmd = ['mpiexec.hydra']
     mpi_config = "-l -np {} -ppn {} -genv I_MPI_PIN_DOMAIN={} -genv OMP_NUM_THREADS={} ".format(args.nnodes*args.nproc_per_node,
                   args.nproc_per_node,  mpi_pin_domain, opm_num_threads)
@@ -348,6 +381,7 @@ def mpi_dist_launch(args):
     process.wait()
 
 def add_distributed_training_params(parser):
+
     group = parser.add_argument_group("Distributed Training Parameters With oneCCL backend")
     group.add_argument("--nnodes", type=int, default=1,
                         help="The number of nodes to use for distributed "
@@ -377,6 +411,7 @@ def add_distributed_training_params(parser):
                               "except for -np -ppn -hostfile and -genv I_MPI_PIN_DOMAIN")
 
 def add_memory_allocator_params(parser):
+
     group = parser.add_argument_group("Memory Allocator Parameters") 
         #allocator control
     group.add_argument("--enable_tcmalloc", action='store_true', default=False,
@@ -385,6 +420,7 @@ def add_memory_allocator_params(parser):
                         help="Enable jemalloc allocator")
         
 def add_multi_instance_params(parser):
+
     group = parser.add_argument_group("Multi-instance Parameters")
      #multi-instance control  
     group.add_argument("--ncore_per_instance", default=-1, type=int, help="cores per instance")
@@ -400,12 +436,14 @@ def add_multi_instance_params(parser):
     group.add_argument("--core_list", default=None, type=str,
                         help="specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
  
-def add_kmp_params(parser): 
-    group = parser.add_argument_group("KMP Affinity Parameters") 
+def add_kmp_iomp_params(parser): 
+
+    group = parser.add_argument_group("KMP/IOMP Affinity Parameters") 
     group.add_argument("--kmp_affinity", default="granularity=fine,compact,1,0", type=str,
                         help="KMP_AFFINITY setup, environment variable has higher priority than this args."
                              "defualt value is : granularity=fine,compact,1,0")
-    
+    group.add_argument("--enable_iomp", action='store_true', default=False,
+                        help="enable iomp and libiomp.so will be add to LD_PRELOAD") 
    
 
 def parse_args():
@@ -427,7 +465,7 @@ def parse_args():
                         help="Do not prepend the --program script with \"python\" - just exec "
                              "it directly. Useful when the script is not a Python script.")
     add_memory_allocator_params(parser)
-    add_kmp_params(parser)
+    add_kmp_iomp_params(parser)
      
     add_distributed_training_params(parser)
     add_multi_instance_params(parser)
@@ -443,6 +481,7 @@ def parse_args():
     return parser.parse_args()
 
 def main():
+
     if platform.system() == "Windows":
         raise RuntimeError("Windows platform is not supported!!!")
 
