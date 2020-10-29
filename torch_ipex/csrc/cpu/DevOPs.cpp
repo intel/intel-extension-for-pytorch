@@ -21,7 +21,7 @@
 #include "dbl/Pool.h"
 #include "dbl/DNNLChecker.h"
 #include "dbl/Linear.h"
-#include "dbl/LSTM.h"
+#include "dbl/RNN.h"
 #include "ShadeDataContext.h"
 
 #include "dil/dil.hpp"
@@ -2488,26 +2488,35 @@ at::Tensor& AtenIpexCPUDev::dil_copy_(
   return self;
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_lstm(
-    const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases,
+std::tuple<at::Tensor, at::Tensor, at::Tensor, std::vector<at::Tensor>> AtenIpexCPUDev::dil_lstm(
+    const at::Tensor& input, std::vector<at::Tensor> hidden, std::vector<at::Tensor> params, bool has_biases,
     int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
   DEBUG("AtenIpexCPUDev::dil_lstm\n");
-  auto result = dbl::lstm::lstm_impl(input, hx, params, has_biases,
-      dil::rnn_kind::LSTM, num_layers, dropout_p, train, bidirectional, batch_first);
-  auto output = result.first;
-  auto hy = std::get<0>(result.second);
-  auto cy = std::get<1>(result.second);
+  at::Tensor hx = hidden[0];
+  at::Tensor cx = hidden[1];
+  int64_t hidden_size = hx.size(2);
 
-  return std::make_tuple(output, hy, cy);
+  // mkldnn_output = std::tuple<output, hy, cy, workspace>
+  return dbl::rnn::mkldnn_rnn(
+      input, params, has_biases ? 4 : 2,
+      hx, cx, static_cast<int>(dil::rnn_kind::LSTM), hidden_size, num_layers, batch_first, dropout_p,
+      train, bidirectional, /*batch_sizes*/{});
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_lstm_backward(
-    const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases,
+    const at::Tensor& input, std::vector<at::Tensor> hidden, std::vector<at::Tensor> params, bool has_biases,
     int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first,
-    std::vector<at::Tensor> outputs, const at::Tensor& grad_output, const at::Tensor& grad_hy, const at::Tensor& grad_cy) {
+    std::vector<at::Tensor> outputs, const at::Tensor& grad_output, const at::Tensor& grad_hy, const at::Tensor& grad_cy, std::vector<at::Tensor> layer_output) {
   DEBUG("AtenIpexCPUDev::dil_lstm_backward\n");
-  return dbl::lstm::lstm_backward_impl(input, hx, params, has_biases,
-      dil::rnn_kind::LSTM, num_layers, dropout_p, train, bidirectional, batch_first, outputs, grad_output, grad_hy, grad_cy);
+  at::Tensor hx = hidden[0];
+  at::Tensor cx = hidden[1];
+  int64_t hidden_size = hx.size(2);
+
+  // mkldnn_output = std::tuple<dx, dhx, dcx, dw>
+  return dbl::rnn::mkldnn_rnn_backward(
+      input, params, has_biases ? 4 : 2,
+      hx, cx, static_cast<int>(dil::rnn_kind::LSTM), hidden_size, num_layers, batch_first, dropout_p,
+      train, bidirectional, /*batch_sizes*/{}, outputs, grad_output, grad_hy, grad_cy, layer_output);
 }
 
 }  // namespace cpu

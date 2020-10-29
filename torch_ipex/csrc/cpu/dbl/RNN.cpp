@@ -6,7 +6,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/TensorUtils.h>
 #include <c10/util/Exception.h>
-#include "LSTM.h"
+#include "RNN.h"
 
 #include "Common.h"
 #include "cpu/ShadeDataContext.h"
@@ -14,7 +14,7 @@
 namespace torch_ipex {
 namespace cpu {
 namespace dbl {
-namespace lstm {
+namespace rnn {
 
 struct RNNParams {
   dil::rnn_kind mode;
@@ -172,22 +172,27 @@ at::Tensor mkldnn_rnn_layer(at::Tensor& hy_, at::Tensor& cy_,
   dbl::comm::reorder_to_dtype(bias, at::kFloat);
   dbl::comm::reorder_to_dtype(cx_, at::kFloat);
   dbl::comm::reorder_to_dtype(cy_, at::kFloat);
-
   auto x = dbl::comm::try_gen_dil_tensor(input, {rnn.seq_length, rnn.mini_batch, input_size}, dil::format_tag::tnc);
   auto hx = dbl::comm::try_gen_dil_tensor(hx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
   auto w1 = dbl::comm::try_gen_dil_tensor(weight_ih, {1, 1, input_size, rnn.num_gates, rnn.hidden_size}, dil::format_tag::ldgoi);
   auto w2 = dbl::comm::try_gen_dil_tensor(weight_hh, {1, 1, rnn.hidden_size, rnn.num_gates, rnn.hidden_size}, dil::format_tag::ldgoi);
   auto b = dbl::comm::try_gen_dil_tensor(bias, {1, 1, rnn.num_bias_gates, rnn.hidden_size}, dil::format_tag::ldgo);
   auto hy = dbl::comm::try_gen_dil_tensor(hy_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
+  //auto y = dbl::comm::try_gen_dil_tensor(output, {rnn.seq_length, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::tnc);
 
   dil::tensor y;
+  dil::prop_kind aprop_kind = dil::prop_kind::forward;
+  auto src_type = x.get_data_type();
+  if (dil::data_type::s8 == src_type || dil::data_type::u8 == src_type) {
+    aprop_kind = dil::prop_kind::forward_inference;
+  }
   auto _rnn_kind = static_cast<dil::rnn_kind>(rnn.mode);
   if (_rnn_kind == dil::rnn_kind::LSTM) {
     auto cx = dbl::comm::try_gen_dil_tensor(cx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
     auto cy = dbl::comm::try_gen_dil_tensor(cy_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
-    dil::lstm_forward::compute({output_size.cbegin(), output_size.cend()}, x, hx, cx, w1, w2, b, y, hy, cy, reverse);
+    dil::lstm_forward::compute({output_size.cbegin(), output_size.cend()}, x, hx, cx, w1, w2, b, y, hy, cy, reverse, aprop_kind);
   } else if (_rnn_kind == dil::rnn_kind::GRU) {
-    dil::gru_forward::compute(x, hx, w1, w2, b, y, hy, reverse);
+    dil::lbr_gru_forward::compute(x, hx, w1, w2, b, y, hy, reverse);
   } else {
     TORCH_CHECK(_rnn_kind == dil::rnn_kind::RNN_RELU || _rnn_kind == dil::rnn_kind::RNN_TANH,
                 "mkldnn_rnn: unsuppored rnn mode: ", rnn.mode);
@@ -210,27 +215,42 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
   auto bias = has_bias ? _shuffle_bias(weights[2], weights[3], rnn.mode)
                        : at::zeros({rnn.num_bias_gates * rnn.hidden_size}, weight_ih.options());
 
-  // per layer input size
-  int64_t input_size = input.size(2);
-  auto x = dbl::comm::try_gen_dil_tensor(input, rnn.src_layer_desc(input_size));
-  auto hx = dbl::comm::try_gen_dil_tensor(hx_, rnn.src_iter_desc());
-  auto w1 = dbl::comm::try_gen_dil_tensor(weight_ih, rnn.weights_layer_desc(input_size));
-  auto w2 = dbl::comm::try_gen_dil_tensor(weight_hh, rnn.weights_iter_desc());
-  auto b = dbl::comm::try_gen_dil_tensor(bias, rnn.bias_desc());
-  auto y = dbl::comm::try_gen_dil_tensor(output, rnn.dst_layer_desc());
-  auto hy = dbl::comm::try_gen_dil_tensor(hy_, rnn.dst_iter_desc());
-  auto diff_y = dbl::comm::try_gen_dil_tensor(grad_output, rnn.dst_layer_desc());
-  auto diff_hy = dbl::comm::try_gen_dil_tensor(grad_hy_, rnn.dst_iter_desc());
+  // TODO: should we do these reorder in DevOPs??
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(hx_);
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight_ih, true);
+  dbl::comm::reorder_to_bf16_for_mix_prec(weight_hh, true);
+  dbl::comm::reorder_to_bf16_for_mix_prec(hy_);
+  dbl::comm::reorder_to_bf16_for_mix_prec(output);
+  // cx, cy and bias should always be fp32 in bf16 inference
+  dbl::comm::reorder_to_dtype(bias, at::kFloat);
+  dbl::comm::reorder_to_dtype(cx_, at::kFloat);
+  dbl::comm::reorder_to_dtype(cy_, at::kFloat);
+  dbl::comm::reorder_to_dtype(grad_output, at::kFloat);
+  dbl::comm::reorder_to_dtype(grad_hy_, at::kFloat);
+  dbl::comm::reorder_to_dtype(grad_cy_, at::kFloat);
 
+  // per layer input size
+
+  int64_t input_size = input.size(2);
+  auto x = dbl::comm::try_gen_dil_tensor(input, {rnn.seq_length, rnn.mini_batch, input_size}, dil::format_tag::tnc);
+  auto hx = dbl::comm::try_gen_dil_tensor(hx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
+  auto w1 = dbl::comm::try_gen_dil_tensor(weight_ih, {1, 1, input_size, rnn.num_gates, rnn.hidden_size}, dil::format_tag::ldgoi);
+  auto w2 = dbl::comm::try_gen_dil_tensor(weight_hh, {1, 1, rnn.hidden_size, rnn.num_gates, rnn.hidden_size}, dil::format_tag::ldgoi);
+  auto b = dbl::comm::try_gen_dil_tensor(bias, {1, 1, rnn.num_bias_gates, rnn.hidden_size}, dil::format_tag::ldgo);
+  auto y = dbl::comm::try_gen_dil_tensor(output, {rnn.seq_length, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::tnc);
+  auto hy = dbl::comm::try_gen_dil_tensor(hy_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
+  auto diff_y = dbl::comm::try_gen_dil_tensor(grad_output, {rnn.seq_length, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::tnc);
+  auto diff_hy = dbl::comm::try_gen_dil_tensor(grad_hy_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
   dil::tensor diff_x, diff_hx, diff_cx, diff_w1, diff_w2, diff_b;
   auto _rnn_kind = static_cast<dil::rnn_kind>(rnn.mode);
   if (_rnn_kind == dil::rnn_kind::LSTM) {
-    auto cx = dbl::comm::try_gen_dil_tensor(cx_, rnn.src_iter_desc());
-    auto cy = dbl::comm::try_gen_dil_tensor(cy_, rnn.dst_iter_desc());
-    auto diff_cy = dbl::comm::try_gen_dil_tensor(grad_cy_, rnn.dst_iter_desc());
+    auto cx = dbl::comm::try_gen_dil_tensor(cx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
+    auto cy = dbl::comm::try_gen_dil_tensor(cy_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
+    auto diff_cy = dbl::comm::try_gen_dil_tensor(grad_cy_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
     dil::lstm_backward::compute(x, hx, cx, w1, w2, b, y, hy, cy, diff_y, diff_hy, diff_cy, diff_x, diff_hx, diff_cx, diff_w1, diff_w2, diff_b, reverse);
   } else if (_rnn_kind == dil::rnn_kind::GRU) {
-    dil::gru_backward::compute(x, hx, w1, w2, b, y, hy, diff_y, diff_hy, diff_x, diff_hx, diff_w1, diff_w2, diff_b, reverse);
+    dil::lbr_gru_backward::compute(x, hx, w1, w2, b, y, hy, diff_y, diff_hy, diff_x, diff_hx, diff_w1, diff_w2, diff_b, reverse);
   } else {
     TORCH_CHECK(_rnn_kind == dil::rnn_kind::RNN_RELU || _rnn_kind == dil::rnn_kind::RNN_TANH,
                 "mkldnn_rnn: unsuppored rnn mode: ", rnn.mode);
@@ -243,6 +263,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
   auto diff_weight_ih = dbl::comm::gen_aten_tensor_by(std::move(diff_w1.to_dense()));
   auto diff_weight_hh = dbl::comm::gen_aten_tensor_by(std::move(diff_w2.to_dense()));
   auto diff_bias = dbl::comm::gen_aten_tensor_by(std::move(diff_b));
+
   return std::make_tuple(diff_input, diff_hx_, diff_cx_, diff_weight_ih, diff_weight_hh, diff_bias);
 }
 
@@ -261,7 +282,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
 //TODO: a. training with dropout
 //   b. padded sequence input support
 //
-std::tuple<at::Tensor, at::Tensor, at::Tensor> mkldnn_rnn(
+std::tuple<at::Tensor, at::Tensor, at::Tensor, std::vector<at::Tensor>> mkldnn_rnn(
     const at::Tensor& input_, std::vector<at::Tensor> weight, int64_t weight_stride0,
     const at::Tensor& hx_, const at::Tensor& cx_,
     int64_t mode, int64_t hidden_size,
@@ -293,8 +314,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> mkldnn_rnn(
 
   auto num_directions = fn.num_directions;
   auto layer_input = input;
+  std::vector<at::Tensor> layer_output(num_layers * num_directions);
   for (int64_t layer = 0; layer < num_layers; layer++) {
-    std::vector<at::Tensor> layer_output(num_directions);
     for (int64_t direction = 0; direction < num_directions; direction++) {
       auto index = layer * num_directions + direction;
       auto layer_weights = weights[index];
@@ -303,18 +324,18 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> mkldnn_rnn(
       auto layer_cx = cx.defined() ? cx[index] : at::Tensor();
       auto layer_cy = cx.defined() ? cy[index] : at::empty({0}, input.options());
       auto reverse = (direction > 0);
-      layer_output[direction] = mkldnn_rnn_layer(layer_hy, layer_cy, layer_input, layer_weights, layer_hx, layer_cx, reverse, fn);
+      layer_output[index] = mkldnn_rnn_layer(layer_hy, layer_cy, layer_input, layer_weights, layer_hx, layer_cx, reverse, fn);
     }
-    layer_input = num_directions == 1 ? layer_output[0]
-                                      : at::cat(layer_output, /*output_channels*/-1);
+    layer_input = num_directions == 1 ? layer_output[layer * num_directions]
+                                      : at::cat({layer_output[layer * num_directions], layer_output[layer * num_directions + 1]}, /*output_channels*/-1);
   }
   auto output = layer_input;
 
   if (batch_first && !fn.is_input_packed()) {
-    output.transpose_(0, 1);
+    output = output.transpose(0, 1);
   }
 
-  return std::make_tuple(output, hy, cy);
+  return std::make_tuple(output, hy, cy, layer_output);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> mkldnn_rnn_backward(
@@ -323,7 +344,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     int64_t mode, int64_t hidden_size,
     int64_t num_layers, bool batch_first, double dropout_p,
     bool train, bool bidirectional, at::IntArrayRef batch_sizes,
-    std::vector<at::Tensor> outputs, const at::Tensor& grad_output, const at::Tensor& grad_hy, const at::Tensor& grad_cy) {
+    std::vector<at::Tensor> outputs, const at::Tensor& grad_output_, const at::Tensor& grad_hy, const at::Tensor& grad_cy, std::vector<at::Tensor> layer_outputs) {
   TORCH_CHECK(!train || dropout_p == 0.0, "mkldnn_rnn doesn't support dropout");
   TORCH_CHECK(batch_sizes.size() == 0, "mkldnn_rnn doesn't support packed input");
   if (static_cast<dil::rnn_kind>(mode) != dil::rnn_kind::LSTM) {
@@ -331,110 +352,61 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
   }
 
   RNNParams fn(input_, batch_sizes, mode, hidden_size, num_layers, bidirectional, batch_first, train);
+  auto num_directions = fn.num_directions;
 
   auto input = input_;
+  auto grad_output = grad_output_;
   if (batch_first && !fn.is_input_packed()) {
     input = input.transpose(0, 1);
+    grad_output = grad_output.transpose(0, 1);
   }
   input = input.contiguous();
 
   auto hx = hx_.contiguous();
   auto cx = cx_.defined() ? cx_.contiguous() : at::Tensor();
-
+  auto dhy = grad_hy.contiguous();
+  auto dcy = grad_cy.contiguous();
   at::MatrixRef<at::Tensor> weights{weight, static_cast<size_t>(weight_stride0)};
-
-  auto num_directions = fn.num_directions;
-  auto layer_input = input;
 
   auto output = outputs[0].contiguous();
   auto hy = outputs[1].contiguous();
   auto cy = outputs[2].contiguous();
   at::Tensor grad_input, grad_hx, grad_cx, grad_w1, grad_w2, grad_b;
-  for (int64_t layer = 0; layer < num_layers; layer++) {
-    std::vector<at::Tensor> layer_grad_input(num_directions);
-    std::vector<at::Tensor> layer_grad_hx(num_directions);
-    std::vector<at::Tensor> layer_grad_cx(num_directions);
-    std::vector<at::Tensor> layer_grad_w1(num_directions);
-    std::vector<at::Tensor> layer_grad_w2(num_directions);
-    std::vector<at::Tensor> layer_grad_b(num_directions);
+  std::vector<at::Tensor> layer_grad_input(num_directions);
+  std::vector<at::Tensor> layer_grad_hx(num_directions);
+  std::vector<at::Tensor> layer_grad_cx(num_directions);
+  std::vector<at::Tensor> layer_grad_w1(num_directions);
+  std::vector<at::Tensor> layer_grad_w2(num_directions);
+  std::vector<at::Tensor> layer_grad_b(num_directions);
+  std::vector<at::Tensor> layer_grad_outputs(num_directions);
+  layer_grad_outputs = num_directions == 1 ? std::vector<at::Tensor>{grad_output} : at::chunk(grad_output, 2, -1);
+  for (int64_t layer = num_layers - 1; layer >= 0; layer--) {
+    auto layer_input = layer == 0 ? input : (num_directions == 1 ? layer_outputs[(layer - 1) * num_directions] : at::cat({layer_outputs[(layer - 1) * num_directions].contiguous(), layer_outputs[(layer - 1) * num_directions + 1].contiguous()}, /*output_channels*/-1));
     for (int64_t direction = 0; direction < num_directions; direction++) {
       auto index = layer * num_directions + direction;
       auto layer_weights = weights[index];
       auto layer_hx = hx[index];
-      auto layer_cx = cx.defined() ? cx[index] : at::Tensor();
-      auto reverse = (direction > 0);
-      auto layer_grad_output = grad_output[index];
-      auto layer_grad_hy = grad_hy[index];
-      auto layer_grad_cy = grad_cy[index];
-      auto layer_output = output[index];
       auto layer_hy = hy[index];
-      auto layer_cy = cy[index];
-      std::tie(layer_grad_input[direction], layer_grad_hx[direction], layer_grad_cx[direction], layer_grad_w1[direction], layer_grad_w2[direction], layer_grad_b[direction]) = mkldnn_rnn_layer_backward(layer_input, layer_weights, layer_hx, layer_cx, reverse, fn, layer_output, layer_hy, layer_cy, layer_grad_output, layer_grad_hy, layer_grad_cy);
+      auto layer_cx = cx.defined() ? cx[index] : at::Tensor();
+      auto layer_cy = cx.defined() ? cy[index] : at::empty({0}, input.options());
+      auto reverse = (direction > 0);
+      auto layer_grad_hy = dhy[index];
+      auto layer_grad_cy = dcy[index];
+      auto layer_output = layer_outputs[index];
+      std::tie(layer_grad_input[direction], layer_grad_hx[direction], layer_grad_cx[direction], layer_grad_w1[direction], layer_grad_w2[direction], layer_grad_b[direction]) = mkldnn_rnn_layer_backward(layer_input, layer_weights, layer_hx, layer_cx, reverse, fn, layer_output.contiguous(), layer_hy, layer_cy, layer_grad_outputs[direction].contiguous(), layer_grad_hy, layer_grad_cy);
     }
-    if (num_directions == 1) {
-      grad_input = layer_grad_input[0];
-      grad_hx = layer_grad_hx[0];
-      grad_cx = layer_grad_cx[0];
-      grad_w1 = layer_grad_w1[0];
-      grad_w2 = layer_grad_w2[0];
-      grad_b = layer_grad_b[0];
-    } else {
-      grad_input = at::cat(layer_grad_input, /*output_channels*/-1);
-      grad_hx = at::cat(layer_grad_hx, /*output_channels*/-1);
-      grad_cx = at::cat(layer_grad_cx, /*output_channels*/-1);
-      grad_w1 = at::cat(layer_grad_w1, /*output_channels*/-1);
-      grad_w2 = at::cat(layer_grad_w2, /*output_channels*/-1);
-      grad_b = at::cat(layer_grad_b, /*output_channels*/-1);
-    }
+    grad_input = num_directions == 1? layer_grad_input[0] : layer_grad_input[0] + layer_grad_input[1];
+    layer_grad_outputs = num_directions == 1 ? std::vector<at::Tensor>{grad_input} : at::chunk(grad_input, 2, -1);
   }
-  //if (batch_first && !fn.is_input_packed()) {
-  //  grad_input.transpose_(0, 1);
-  //  grad_hx.transpose_(0, 1);
-  //  grad_cx.transpose_(0, 1);
-  //  grad_w1.transpose_(0, 1);
-  //  grad_w2.transpose_(0, 1);
-  //  grad_b.transpose_(0, 1);
-  //}
+
+  if (batch_first && !fn.is_input_packed()) {
+    grad_input = grad_input.transpose(0, 1);
+  }
+
   return std::make_tuple(grad_input, grad_hx, grad_cx, grad_w1, grad_w2, grad_b);
 }
 
-std::pair<at::Tensor, std::tuple<at::Tensor, at::Tensor>> lstm_impl(
-    const at::Tensor& input, std::vector<at::Tensor> hidden,
-    std::vector<at::Tensor> params, bool has_biases, dil::rnn_kind mode,
-    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
-
-  at::Tensor hx = hidden[0];
-  at::Tensor cx = hidden[1];
-  int64_t hidden_size = hx.size(2);
-
-  // mkldnn_output = std::tuple<output, hy, cy, workspace>
-  auto mkldnn_output = mkldnn_rnn(
-      input, params, has_biases ? 4 : 2,
-      hx, cx, static_cast<int>(mode), hidden_size, num_layers, batch_first, dropout_p,
-      train, bidirectional, /*batch_sizes*/{});
-
-  return {std::get<0>(mkldnn_output),
-          std::make_tuple(std::get<1>(mkldnn_output), std::get<2>(mkldnn_output))};
-}
-
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> lstm_backward_impl(
-    const at::Tensor& input, std::vector<at::Tensor> hidden,
-    std::vector<at::Tensor> params, bool has_biases, dil::rnn_kind mode,
-    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first,
-    std::vector<at::Tensor> outputs, const at::Tensor& grad_output, const at::Tensor& grad_hy, const at::Tensor& grad_cy) {
-
-  at::Tensor hx = hidden[0];
-  at::Tensor cx = hidden[1];
-  int64_t hidden_size = hx.size(2);
-
-  // mkldnn_output = std::tuple<dx, dhx, dcx, dw>
-  return mkldnn_rnn_backward(
-      input, params, has_biases ? 4 : 2,
-      hx, cx, static_cast<int>(mode), hidden_size, num_layers, batch_first, dropout_p,
-      train, bidirectional, /*batch_sizes*/{}, outputs, grad_output, grad_hy, grad_cy);
-}
-
-}  // namespace lstm
+}  // namespace rnn
 }  // namespace dbl
 }  // namespace cpu
 }  // namespace torch_ipex

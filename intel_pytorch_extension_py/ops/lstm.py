@@ -9,7 +9,7 @@ from torch.nn import init
 from typing import List
 
 def lstm(input, hx, _flat_weights, bias:bool, num_layers:int, dropout:float, training:bool, bidirectional:bool, batch_first:bool):
-    if input.device == torch.device('dpcpp'):
+    if input.device == torch.device('dpcpp') and dropout == 0:
         return torch.ops.torch_ipex.lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
     else:
         return _VF.lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
