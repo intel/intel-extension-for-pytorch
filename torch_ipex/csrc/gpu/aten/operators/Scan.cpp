@@ -151,6 +151,7 @@ typename std::enable_if<!IS_HALF(scalar_t), void>::type scanDim(
     scalar_t init,
     BinaryFunction binary_op) {
   int ndim = src_.dim() == 0 ? 1 : src_.dim();
+  dimension = maybe_wrap_dim(dimension, src_.dim());
   TORCH_CHECK(
       dimension >= 0 && dimension < ndim,
       "dimension ",
@@ -181,6 +182,7 @@ typename std::enable_if<IS_HALF(scalar_t), void>::type scanDim(
     scalar_t init,
     BinaryFunction binary_op) {
   int ndim = src_.dim() == 0 ? 1 : src_.dim();
+  dimension = maybe_wrap_dim(dimension, src_.dim());
   TORCH_CHECK(
       dimension >= 0 && dimension < ndim,
       "dimension ",
