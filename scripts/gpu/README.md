@@ -9,10 +9,10 @@
 ### 2. Use DPCPPType.h and RegistrationDeclarations.h to abstract registrations for DPCPP:GPU.
 
 ### STEP1
-`python gen-gpu-decl.py --gpu_decl=./ DPCPPGPUType.h DedicateType.h DispatchStubOverride.h RegistrationDeclarations.h`
+`python gen-gpu-decl.py --gpu_decl=./ DPCPPGPUType.h QUANTIZEDDPCPPGPUType.h DedicateType.h DispatchStubOverride.h RegistrationDeclarations.h`
 
 ### STEP2
-`python gen-gpu-ops.py --output_folder=./ DPCPPGPUType.h RegistrationDeclarations_DPCPP.h Functions_DPCPP.h`
+`python gen-gpu-ops.py --output_folder=./ DPCPPGPUType.h QUANTIZEDDPCPPGPUType.h RegistrationDeclarations_DPCPP.h Functions_DPCPP.h`
 
 ### OUTPUTS
 aten_ipex_type_default.cpp.in // registers
