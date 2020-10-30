@@ -1,7 +1,7 @@
 From 49f70c10c9371158006b55128c1966c4a398762c Mon Sep 17 00:00:00 2001
 From: fengyuan <feng1.yuan@intel.com>
 Date: Thu, 27 Aug 2020 14:17:02 +0800
-Subject: [PATCH 08/10] jit-quant: add DPCPP device for graph fuser
+Subject: [PATCH 08/11] jit-quant: add DPCPP device for graph fuser
 
 Signed-off-by: fengyuan <feng1.yuan@intel.com>
 ---
