@@ -69,8 +69,16 @@ static void initGlobalDevicePoolState() {
   for (const auto& device : gDevPool.devices) {
     gDevPool.dev_sels.push_back({device});
   }
-  TORCH_CHECK(gDevPool.devices.size() > 0, "DPCPP Device count is zero");
-  gDevPool.cur_dev_index = 0;
+  auto device_count = gDevPool.devices.size();
+  TORCH_CHECK(device_count > 0, "DPCPP Device count is zero");
+
+  auto device_index = ipex_dev_index();
+  if (device_index >= 0 && device_index < device_count) {
+    gDevPool.cur_dev_index = device_index;
+  } else {
+    gDevPool.cur_dev_index = 0;
+    TORCH_WARN("IPEX_DEV_INDEX out of range");
+  }
 
   // Note: DPCPPRuntime's destruction happens before the destroy of the
   // global vars except the global vars with dpcpp type. This will make
