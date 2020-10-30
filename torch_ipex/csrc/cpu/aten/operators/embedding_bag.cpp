@@ -72,7 +72,8 @@ embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indices,
   const at::Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse,
   const at::Tensor & per_sample_weights, bool include_last_offset) {
 
-  at::Tensor offsets_ = offsets.contiguous();
+  at::Tensor offsets_ = offsets.is_contiguous() ? offsets : offsets.contiguous();
+  // at::Tensor offsets_ = offsets;
   if (embedding_bag_fast_path_sum(weight, per_sample_weights, mode)) {
     at::Tensor bag_size;
     at::Tensor offset2bag;

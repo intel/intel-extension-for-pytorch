@@ -1054,7 +1054,8 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_(at::Tensor& self, const at::Tensor& batc
 at::Tensor AtenIpexCPUDev::dil_linear(
     const at::Tensor& self,
     const at::Tensor& weight,
-    const at::Tensor& bias) {
+    const at::Tensor& bias,
+    const bool fuse_relu) {
   DEBUG("AtenIpexCPUDev::dil_linear\n");
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(weight);
@@ -1106,7 +1107,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
     b = dbl::comm::try_gen_dil_tensor(bias);
   }
 
-  dil::tensor y = dbl::linear::linear_impl(x, w, b, output_scale);
+  dil::tensor y = fuse_relu ? dbl::linear::linear_impl(x, w, b, output_scale, dil::attr_t::fuse_relu()) : dbl::linear::linear_impl(x, w, b, output_scale);
 
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
 
@@ -2499,6 +2500,15 @@ at::Tensor& AtenIpexCPUDev::dil_div_out(
 
   torch_ipex::set_ipex_func_status(torch_ipex::IPEXFuncStatus::IPEX_FALLBACK);
   return out;
+}
+
+at::Tensor AtenIpexCPUDev::dil_relu_use_dst_for_bwd(const at::Tensor& grad_output, const at::Tensor& output) {
+  const dil::tensor& y = dbl::comm::try_gen_dil_tensor(output);
+  dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output);
+  dil::tensor gradx;
+  dil::eltwise_backward::compute(y, grady, gradx,
+          dil::algorithm::eltwise_relu_use_dst_for_bwd, /*alpha*/ 0.0);
+  return dbl::comm::gen_aten_tensor_by(std::move(gradx));
 }
 
 }  // namespace cpu

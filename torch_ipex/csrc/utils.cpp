@@ -116,6 +116,10 @@ bool check_auto_mix_bf16_fp32() {
   return AutoOptConfig::singleton().get_mix_bf16_fp32();
 }
 
+void set_auto_mix_bf16_fp32(const bool value) {
+  AutoOptConfig::singleton().set_mix_bf16_fp32(value);
+}
+
 bool check_train() {
   return AutoOptConfig::singleton().get_train();
 }

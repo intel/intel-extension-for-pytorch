@@ -320,8 +320,8 @@ void reorder_to_public(const at::Tensor& tensor, bool remain_dtype) {
 
 // Reorder *Storage* to expected_desc
 void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc, const std::vector<float> scales) {
-  auto& mutex = cpu::ShadeDataContext::getMutex(tensor);
-  std::lock_guard<std::mutex> lock(mutex); 
+  // auto& mutex = cpu::ShadeDataContext::getMutex(tensor);
+  // std::lock_guard<std::mutex> lock(mutex); 
   auto src = try_gen_dil_storage(tensor);
   if (src.get_desc() == expected_desc)
     return;

@@ -728,3 +728,97 @@ public:
     }
   }
 };
+
+class NewLinearReluOp : public torch::autograd::Function<NewLinearReluOp> {
+public:
+  static at::Tensor _forward(at::Tensor input, at::Tensor weight, bool fuse_relu, 
+                             at::Tensor bias = at::Tensor()) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXLinearReluOp::_forward",
+                    std::vector<c10::IValue>({input, weight, bias}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
+    try {
+      if (torch_ipex::check_auto_dnnl() &&
+          input.device().type() == c10::DeviceType::DPCPP) {
+        // torch_ipex::set_auto_mix_bf16_fp32(false);
+        auto ret = torch_ipex::cpu::AtenIpexCPUDev::dil_linear(
+            input.is_contiguous() ? input : input.contiguous(),
+            weight.is_contiguous() ? weight : weight.contiguous(),
+            bias.is_contiguous() ? bias : bias.contiguous(),
+            fuse_relu);
+        // torch_ipex::set_auto_mix_bf16_fp32(true);
+        return ret;
+      }
+    } catch (std::exception &e) {
+#if defined(_DEBUG)
+      TORCH_WARN(e.what());
+#endif
+    }
+    TORCH_CHECK(false, "LinearRelu not implemented for fallback path");
+
+  }
+  static at::Tensor forward(torch::autograd::AutogradContext *ctx,
+                            at::Tensor input, at::Tensor weight, bool fuse_relu,
+                            at::Tensor bias = at::Tensor()) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXLinearOp::forward",
+                    std::vector<c10::IValue>({input, weight, bias}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
+    at::AutoNonVariableTypeMode g;
+    // torch_ipex::set_auto_mix_bf16_fp32(false);
+    auto output = _forward(input, weight, fuse_relu, bias);
+    // torch_ipex::set_auto_mix_bf16_fp32(true);
+    ctx->saved_data["fuse_relu"] = fuse_relu;
+    ctx->save_for_backward({input, weight, bias, output});
+    return output;
+  }
+
+  static torch::autograd::tensor_list
+  backward(torch::autograd::AutogradContext *ctx,
+           torch::autograd::tensor_list grad_outputs) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXLinearOp::backward", std::vector<c10::IValue>({}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
+    auto saved = ctx->get_saved_variables();
+    at::Tensor input = saved[0];
+    at::Tensor weight = saved[1];
+    at::Tensor bias = saved[2];
+    at::Tensor output = saved[3];
+
+    at::Tensor grad_output = grad_outputs[0];
+    at::Tensor grad_input, grad_weight;
+    at::Tensor grad_bias = torch::Tensor();
+    bool fuse_relu = ctx->saved_data["fuse_relu"].toBool();
+
+    try {
+      if (torch_ipex::check_auto_dnnl() &&
+          input.device().type() == c10::DeviceType::DPCPP) {
+        if (fuse_relu){
+          grad_output = torch_ipex::cpu::AtenIpexCPUDev::dil_relu_use_dst_for_bwd(grad_output.is_contiguous() ? grad_output
+                                        : grad_output.contiguous(), output);
+        }
+        grad_input = torch_ipex::cpu::AtenIpexCPUDev::dil_linear_backward_input(
+            input.sizes(),
+            grad_output.is_contiguous() ? grad_output
+                                        : grad_output.contiguous(),
+            weight.is_contiguous() ? weight : weight.contiguous());
+        std::tie(grad_weight, grad_bias) =
+            torch_ipex::cpu::AtenIpexCPUDev::dil_linear_backward_weights(
+                grad_output.is_contiguous() ? grad_output
+                                            : grad_output.contiguous(),
+                input.is_contiguous() ? input : input.contiguous(),
+                weight.is_contiguous() ? weight : weight.contiguous(),
+                bias.defined());
+        return {grad_input, grad_weight, at::Tensor(), grad_bias};
+      }
+    } catch (std::exception &e) {
+#if defined(_DEBUG)
+      TORCH_WARN(e.what());
+#endif
+    }
+    TORCH_CHECK(false, "LinearRelu bw not implemented for fallback path");
+  }
+};

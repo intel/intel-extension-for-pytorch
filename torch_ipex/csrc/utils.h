@@ -24,6 +24,7 @@ bool get_device_count(c10::Device dev_type, c10::DeviceIndex *count);
 bool check_auto_dnnl();
 bool check_train();
 bool check_auto_mix_bf16_fp32();
+void set_auto_mix_bf16_fp32(const bool value);
 bool check_auto_mix_int8_fp32();
 bool check_int8_calibration();
 void insert_or_updata_observer(const at::TensorList& inputs, const at::TensorList& ouputs, std::string op_name);
