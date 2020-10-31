@@ -28,6 +28,8 @@ void avg_pool3d_out_template(
   //
   //  checkAllSameGPU("avg_pool3d_out_sycl", {output_arg, input_arg});
 
+  Tensor input_ = input.contiguous();
+
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
       "avg_pool3d: kernel_size must either be a single int, or a tuple of "
@@ -63,15 +65,15 @@ void avg_pool3d_out_template(
       padding.size() == 1 ? padD : safe_downcast<int, int64_t>(padding[2]);
 
   TORCH_CHECK(
-      (input.ndimension() == 4 || input.ndimension() == 5),
-      "non-empty 4D or 5D (batch mode) tensor expected for input");
+      (input_.ndimension() == 4 || input_.ndimension() == 5),
+      "non-empty 4D or 5D (batch mode) tensor expected for input_");
 
   /* sizes */
-  const int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
-  const int64_t nblock = input.size(-4);
-  const int64_t idepth = input.size(-3);
-  const int64_t iheight = input.size(-2);
-  const int64_t iwidth = input.size(-1);
+  const int64_t nbatch = input_.ndimension() == 5 ? input_.size(-5) : 1;
+  const int64_t nblock = input_.size(-4);
+  const int64_t idepth = input_.size(-3);
+  const int64_t iheight = input_.size(-2);
+  const int64_t iwidth = input_.size(-1);
 
   const int64_t outputDepth =
       pooling_output_shape<int64_t>(idepth, kD, padD, dD, 1, ceil_mode);
@@ -81,7 +83,7 @@ void avg_pool3d_out_template(
       pooling_output_shape<int64_t>(iwidth, kW, padW, dW, 1, ceil_mode);
 
   pool3d_shape_check(
-      input,
+      input_,
       nblock,
       kD,
       kH,
@@ -103,7 +105,7 @@ void avg_pool3d_out_template(
       outputWidth,
       /*check_input_size=*/true);
 
-  if (input.ndimension() == 4) {
+  if (input_.ndimension() == 4) {
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
     output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
@@ -111,21 +113,19 @@ void avg_pool3d_out_template(
 
   TORCH_CHECK(output.is_contiguous(), "avg_pool3d: output must be contiguous");
 
-  Tensor work_input = input.contiguous();
-
   auto alg_kind = count_include_pad ? algorithm::pooling_avg_include_padding
                                     : algorithm::pooling_avg_exclude_padding;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
-  if(!input.is_quantized()){
+  if(!input_.is_quantized()){
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
-        input.scalar_type(),
+        input_.scalar_type(),
         "avg_pool3d_out_frame",
         [&] {
           avg_pool_out_frame<scalar_t>(
-            input,
+            input_,
             output,
             nbatch,
             nblock,
@@ -149,9 +149,9 @@ void avg_pool3d_out_template(
         });
   } else {
     IPEX_DISPATCH_QINT_TYPES(
-        input.scalar_type(), "q_avg_pool3d_out_frame", [&] {
+        input_.scalar_type(), "q_avg_pool3d_out_frame", [&] {
 	  avg_pool_out_frame<scalar_t>(
-            input,
+            input_,
             output,
             nbatch,
             nblock,

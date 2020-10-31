@@ -52,7 +52,7 @@ void adaptive_avg_pool2d_out_template(
 
   output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols});
 
-  if(!input.is_quantized()){
+  if(!input_.is_quantized()){
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
@@ -60,7 +60,7 @@ void adaptive_avg_pool2d_out_template(
         "adaptive_avg_pool2d",
         [&] {
           avg_pool_out_frame<scalar_t>(
-              input,
+              input_,
               output,
               batchSize,
               nInputPlane,
@@ -86,7 +86,7 @@ void adaptive_avg_pool2d_out_template(
     IPEX_DISPATCH_QINT_TYPES(
         input_.scalar_type(), "q_adaptive_avg_pool2d", [&] {
           avg_pool_out_frame<scalar_t>(
-              input,
+              input_,
               output,
               batchSize,
               nInputPlane,

@@ -75,7 +75,7 @@ void adaptive_max_pool2d_out_template(
       "adaptive_max_pool2d",
       [&] {
         max_pool_out_frame<scalar_t>(
-            input,
+            input_,
             output,
             indices,
             nbatch,

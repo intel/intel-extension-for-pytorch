@@ -67,13 +67,13 @@ void adaptive_avg_pool3d_out_template(
 
   Tensor input_ = input.contiguous();
 
-  if (input.ndimension() == 4) {
+  if (input_.ndimension() == 4) {
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
     output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
   }
 
-  if(!input.is_quantized()){
+  if(!input_.is_quantized()){
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
@@ -81,7 +81,7 @@ void adaptive_avg_pool3d_out_template(
         "adaptive_avg_pool3d",
         [&] {
           avg_pool_out_frame<scalar_t>(
-            input,
+            input_,
             output,
             nbatch,
             nblock,
@@ -107,7 +107,7 @@ void adaptive_avg_pool3d_out_template(
     IPEX_DISPATCH_QINT_TYPES(
         input_.scalar_type(), "q_adaptive_avg_pool3d", [&] {
           avg_pool_out_frame<scalar_t>(
-            input,
+            input_,
             output,
             nbatch,
             nblock,

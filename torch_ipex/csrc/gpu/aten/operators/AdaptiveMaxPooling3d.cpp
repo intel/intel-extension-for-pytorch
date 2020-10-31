@@ -42,11 +42,11 @@ void adaptive_max_pool3d_out_template(
 
   Tensor input_ = input.contiguous();
 
-  int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
-  int64_t nblock = input.size(-4);
-  int64_t inputDepth = input.size(-3);
-  int64_t inputHeight = input.size(-2);
-  int64_t inputWidth = input.size(-1);
+  int64_t nbatch = input_.ndimension() == 5 ? input_.size(-5) : 1;
+  int64_t nblock = input_.size(-4);
+  int64_t inputDepth = input_.size(-3);
+  int64_t inputHeight = input_.size(-2);
+  int64_t inputWidth = input_.size(-1);
 
   int64_t outputDepth = output_size[0];
   int64_t outputHeight = output_size[1];
@@ -84,7 +84,7 @@ void adaptive_max_pool3d_out_template(
       at::ScalarType::Half, at::ScalarType::BFloat16,
       input_.scalar_type(), "adaptive_max_pool3d", [&] {
         max_pool_out_frame<scalar_t>(
-            input,
+            input_,
             output,
             indices,
             nbatch,
