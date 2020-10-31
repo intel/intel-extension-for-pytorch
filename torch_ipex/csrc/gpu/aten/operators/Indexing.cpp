@@ -231,7 +231,8 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
 
   // Prepare input tensor strides for calculating result index
   if (N > 0) {
-#if defined(USE_USM) && defined(USE_PSTL)
+#if defined(USE_USM)
+#  if defined(USE_PSTL)
     auto dpcpp_queue = dpcppGetCurrentQueue();
     auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
     auto tensor_begin = tensor.data_ptr<long>();
@@ -266,6 +267,9 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
       }
     }
   tensor.resize_({num_nonzeros, num_dim});
+#  else
+    throw std::runtime_error("no PSTL found when compile. USM nonzero not supported");
+#  endif
 #else
     if (canUse32BitIndexMath(self)) {
       TensorInfo<scalar_t, uint32_t> input =

@@ -737,7 +737,7 @@ Tensor embedding_bag_backward_dpcpp_kernel(
     // dummy:           1 1 0 0 1 0 1 1 0
     // segment_offsets: 0 1 - - 4 - 6 7 -
     auto sorted_indices_begin = sorted_indices.data_ptr<int64_t>();
-    auto dummy = at::empty_like(sorted_indices).fill_(1);
+    auto dummy = at::empty_like(sorted_indices);
     auto dummy_begin = dummy.data_ptr<int64_t>();
     std::adjacent_difference(policy, sorted_indices_begin, sorted_indices_begin + numel, dummy_begin,
       [](auto lhs, auto rhs) -> bool {
@@ -746,6 +746,9 @@ Tensor embedding_bag_backward_dpcpp_kernel(
         }
         return false;
       });
+    // For algorithm adjacent difference, for output, its first element is always 
+    // equal to source first element. We need to set it as 1 manually. 
+    dummy[0] = 1;
     auto count_begin = oneapi::dpl::counting_iterator<int64_t>(0);
     auto copy_begin = oneapi::dpl::make_zip_iterator(count_begin, dummy_begin);
     auto segment_offsets_begin = segment_offsets.data_ptr<int64_t>();

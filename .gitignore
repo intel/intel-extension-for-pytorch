@@ -22,12 +22,12 @@
 */**/**/**/*.pyc
 */**/**/**/**/*.pyc
 
+torch_ipex/version.py
 torch_ipex/csrc/version.cpp
 torch_ipex/csrc/aten_ipex_sparse_type_default.*
 torch_ipex/csrc/cpu/SparseOPs.*
 torch_ipex/include/
 torch_ipex/lib/
-torch_ipex/version.py
 # Root level file used in CI to specify certain env configs.
 # E.g., see .circleci/config.yaml
 env

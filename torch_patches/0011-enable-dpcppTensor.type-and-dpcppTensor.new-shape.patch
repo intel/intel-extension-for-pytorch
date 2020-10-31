@@ -1,0 +1,56 @@
+From 89e8ec4afb0dccfde817bcb2b02b2fbdaf9c382e Mon Sep 17 00:00:00 2001
+From: "Chen, Zejun" <zejun.chen@intel.com>
+Date: Thu, 29 Oct 2020 04:13:32 -0700
+Subject: [PATCH 11/11] enable dpcppTensor.type() and dpcppTensor.new(shape)
+
+---
+ torch/csrc/utils/tensor_new.cpp   | 4 ++++
+ torch/csrc/utils/tensor_types.cpp | 2 ++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/torch/csrc/utils/tensor_new.cpp b/torch/csrc/utils/tensor_new.cpp
+index 9807075e07..e99eac6701 100644
+--- a/torch/csrc/utils/tensor_new.cpp
++++ b/torch/csrc/utils/tensor_new.cpp
+@@ -338,19 +338,23 @@ void check_base_legacy_new(c10::DispatchKey dispatch_key, at::Layout expected_la
+     TORCH_CHECK(dispatch_key == c10::DispatchKey::CPUTensorId
+                 || dispatch_key == c10::DispatchKey::CUDATensorId
+                 || dispatch_key == c10::DispatchKey::HIPTensorId
++                || dispatch_key == c10::DispatchKey::DPCPPTensorId
+                 || dispatch_key == c10::XLATensorId(),
+                 "new(): expected DispatchKey: ", c10::DispatchKey::CPUTensorId,
+                 " or ", c10::DispatchKey::CUDATensorId,
+                 " or ", c10::DispatchKey::HIPTensorId,
++                " or ", c10::DispatchKey::DPCPPTensorId,
+                 " or ", c10::DispatchKey::XLATensorId,
+                 " but got: ", dispatch_key);
+   } else if(expected_layout == c10::kSparse) {
+     // NOTE: no sparse XLA
+     TORCH_CHECK(dispatch_key == c10::DispatchKey::SparseCPUTensorId
+                 || dispatch_key == c10::DispatchKey::SparseCUDATensorId
++                || dispatch_key == c10::DispatchKey::SparseDPCPPTensorId
+                 || dispatch_key == c10::DispatchKey::SparseHIPTensorId,
+                 "new(): expected DispatchKey: ", c10::DispatchKey::SparseCPUTensorId,
+                 " or ", c10::DispatchKey::SparseCUDATensorId,
++                " or ", c10::DispatchKey::SparseDPCPPTensorId,
+                 " or ", c10::DispatchKey::SparseHIPTensorId,
+                 " but got: ", dispatch_key);
+   } else {
+diff --git a/torch/csrc/utils/tensor_types.cpp b/torch/csrc/utils/tensor_types.cpp
+index e6b851a3a7..1958e5f237 100644
+--- a/torch/csrc/utils/tensor_types.cpp
++++ b/torch/csrc/utils/tensor_types.cpp
+@@ -19,8 +19,10 @@ static const char* backend_to_string(const at::Backend& backend) {
+   switch (backend) {
+     case at::Backend::CPU: return "torch";
+     case at::Backend::CUDA: return "torch.cuda";
++    case at::Backend::DPCPP: return "torch.dpcpp";
+     case at::Backend::SparseCPU: return "torch.sparse";
+     case at::Backend::SparseCUDA: return "torch.cuda.sparse";
++    case at::Backend::SparseDPCPP: return "torch.dpcpp.sparse";
+     default: AT_ERROR("Unimplemented backend ", backend);
+   }
+ }
+-- 
+2.17.1
+

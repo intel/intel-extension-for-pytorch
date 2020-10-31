@@ -99,8 +99,8 @@ static inline void _fft_fill_with_conjugate_symmetry_(
 
 #ifdef USE_ONEMKL
 template <
-    mkl::dft::precision prec,
-    mkl::dft::domain signal_type,
+    oneapi::mkl::dft::precision prec,
+    oneapi::mkl::dft::domain signal_type,
     typename scalar_t>
 void _mkl_dft(
     Tensor input,
@@ -116,27 +116,27 @@ void _mkl_dft(
   auto& dpcpp_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
   std::vector<int64_t> mkl_signal_sizes(
       checked_signal_sizes.begin(), checked_signal_sizes.end());
-  mkl::dft::descriptor<prec, signal_type> desc(mkl_signal_sizes);
-  desc.set_value(mkl::dft::config_param::PLACEMENT, DFTI_NOT_INPLACE);
-  desc.set_value(mkl::dft::config_param::NUMBER_OF_TRANSFORMS, batch);
+  oneapi::mkl::dft::descriptor<prec, signal_type> desc(mkl_signal_sizes);
+  desc.set_value(oneapi::mkl::dft::config_param::PLACEMENT, DFTI_NOT_INPLACE);
+  desc.set_value(oneapi::mkl::dft::config_param::NUMBER_OF_TRANSFORMS, batch);
 
   auto istrides = input.strides();
   auto ostrides = output.strides();
   int64_t idist = complex_input ? istrides[0] >> 1 : istrides[0];
   int64_t odist = complex_output ? ostrides[0] >> 1 : ostrides[0];
-  desc.set_value(mkl::dft::config_param::FWD_DISTANCE, idist);
-  desc.set_value(mkl::dft::config_param::BWD_DISTANCE, odist);
+  desc.set_value(oneapi::mkl::dft::config_param::FWD_DISTANCE, idist);
+  desc.set_value(oneapi::mkl::dft::config_param::BWD_DISTANCE, odist);
   std::vector<int64_t> mkl_istrides(1 + signal_ndim, 0),
       mkl_ostrides(1 + signal_ndim, 0);
   for (int64_t i = 1; i <= signal_ndim; i++) {
     mkl_istrides[i] = complex_input ? istrides[i] >> 1 : istrides[i];
     mkl_ostrides[i] = complex_output ? ostrides[i] >> 1 : ostrides[i];
   }
-  desc.set_value(mkl::dft::config_param::INPUT_STRIDES, mkl_istrides.data());
-  desc.set_value(mkl::dft::config_param::OUTPUT_STRIDES, mkl_ostrides.data());
+  desc.set_value(oneapi::mkl::dft::config_param::INPUT_STRIDES, mkl_istrides.data());
+  desc.set_value(oneapi::mkl::dft::config_param::OUTPUT_STRIDES, mkl_ostrides.data());
   if (!complex_input || !complex_output) {
     desc.set_value(
-        mkl::dft::config_param::CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
+        oneapi::mkl::dft::config_param::CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
   }
   if (normalized || inverse) {
     auto signal_numel = at::prod_intlist(checked_signal_sizes);
@@ -147,9 +147,9 @@ void _mkl_dft(
       double_scale = 1.0 / static_cast<double>(signal_numel);
     }
     desc.set_value(
-        inverse ? mkl::dft::config_param::BACKWARD_SCALE
-                : mkl::dft::config_param::FORWARD_SCALE,
-        prec == mkl::dft::precision::DOUBLE ? double_scale
+        inverse ? oneapi::mkl::dft::config_param::BACKWARD_SCALE
+                : oneapi::mkl::dft::config_param::FORWARD_SCALE,
+        prec == oneapi::mkl::dft::precision::DOUBLE ? double_scale
                                             : static_cast<float>(double_scale));
   }
 
@@ -212,8 +212,8 @@ Tensor _fft_with_size(
   if (input.scalar_type() == ScalarType::Float) {
     if (complex_type) {
       impl::_mkl_dft<
-          mkl::dft::precision::SINGLE,
-          mkl::dft::domain::COMPLEX,
+          oneapi::mkl::dft::precision::SINGLE,
+          oneapi::mkl::dft::domain::COMPLEX,
           float>(
           input,
           output,
@@ -227,7 +227,7 @@ Tensor _fft_with_size(
           batch);
     } else {
       impl::
-          _mkl_dft<mkl::dft::precision::SINGLE, mkl::dft::domain::REAL, float>(
+          _mkl_dft<oneapi::mkl::dft::precision::SINGLE, oneapi::mkl::dft::domain::REAL, float>(
               input,
               output,
               signal_ndim,
@@ -242,8 +242,8 @@ Tensor _fft_with_size(
   } else if (input.scalar_type() == ScalarType::Double) {
     if (complex_type) {
       impl::_mkl_dft<
-          mkl::dft::precision::DOUBLE,
-          mkl::dft::domain::COMPLEX,
+          oneapi::mkl::dft::precision::DOUBLE,
+          oneapi::mkl::dft::domain::COMPLEX,
           double>(
           input,
           output,
@@ -257,7 +257,7 @@ Tensor _fft_with_size(
           batch);
     } else {
       impl::
-          _mkl_dft<mkl::dft::precision::DOUBLE, mkl::dft::domain::REAL, double>(
+          _mkl_dft<oneapi::mkl::dft::precision::DOUBLE, oneapi::mkl::dft::domain::REAL, double>(
               input,
               output,
               signal_ndim,

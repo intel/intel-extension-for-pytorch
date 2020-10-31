@@ -1,7 +1,7 @@
 From 19ba0b448c0661bf79b416dccadf72ef0d6257c3 Mon Sep 17 00:00:00 2001
 From: xiaolil1 <xiaoli.liu@intel.com>
 Date: Wed, 16 Sep 2020 18:56:23 +0800
-Subject: [PATCH 10/10] Add workaroud for JIT multi-qconfig, will remove it
+Subject: [PATCH 10/11] Add workaroud for JIT multi-qconfig, will remove it
  after oneDNN supporting Asymmetric
 
 ---

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <ATen/ipex_type_dpcpp_customized.h>
-#include <ATen/quantized/Quantizer.h>
+#include <core/Quantizer.h>
 #include <core/Memory.h>
 #include <core/Runtime.h>
 #include <tensor/Context.h>
@@ -168,8 +168,17 @@ static void avg_pool_out_frame(
 
     if (expected_output_md != plain_output_md) {
       // reallocate memory due to padding needed by oneDNN in some blk fmt
-      output = empty_opaque_tensor(
-          expected_output_md, input.options(), c10::nullopt);
+      if (input.is_quantized()) {
+        auto quantizer = at::dpcpp::make_per_tensor_affine_quantizer(
+            input.q_scale(),
+            input.q_zero_point(),
+            typeMetaToScalarType(input.options().dtype()));
+        output =
+            empty_opaque_qtensor(expected_output_md, c10::nullopt, quantizer);
+      } else {
+        output = empty_opaque_tensor(
+            expected_output_md, input.options(), c10::nullopt);
+      }
       output_usr_memory =
           dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
     } else {
@@ -428,7 +437,7 @@ static void max_pool_out_frame(
     if (expected_output_md != plain_output_md) {
       // reallocate memory due to padding needed by oneDNN in some blk fmt
       if (input.is_quantized()) {
-        auto quantizer = make_per_tensor_affine_quantizer(
+        auto quantizer = at::dpcpp::make_per_tensor_affine_quantizer(
             input.q_scale(),
             input.q_zero_point(),
             typeMetaToScalarType(input.options().dtype()));
