@@ -1,0 +1,246 @@
+diff --git a/dlrm_s_pytorch.py b/dlrm_s_pytorch.py
+index 3c5c85f..660f6eb 100644
+--- a/dlrm_s_pytorch.py
++++ b/dlrm_s_pytorch.py
+@@ -93,8 +93,23 @@ import sklearn.metrics
+ 
+ from torch.optim.lr_scheduler import _LRScheduler
+ 
++from torch.utils import ThroughputBenchmark
++
+ exc = getattr(builtins, "IOError", "FileNotFoundError")
+ 
++class Cast(nn.Module):
++     __constants__ = ['to_dtype']
++ 
++     def __init__(self, to_dtype):
++         super(Cast, self).__init__()
++         self.to_dtype = to_dtype
++ 
++     def forward(self, input):
++         return input.to(self.to_dtype)
++ 
++     def extra_repr(self):
++         return 'to(%s)' % self.to_dtype
++
+ class LRPolicyScheduler(_LRScheduler):
+     def __init__(self, optimizer, num_warmup_steps, decay_start_step, num_decay_steps):
+         self.num_warmup_steps = num_warmup_steps
+@@ -141,7 +156,10 @@ class DLRM_Net(nn.Module):
+             m = ln[i + 1]
+ 
+             # construct fully connected operator
+-            LL = nn.Linear(int(n), int(m), bias=True)
++            if args.use_ipex and ipex.core.get_mix_bf16_fp32():
++                LL = ipex.LinearRelu(int(n), int(m), bias=True)
++            else:
++                LL = nn.Linear(int(n), int(m), bias=True)
+ 
+             # initialize the weights
+             # with torch.no_grad():
+@@ -164,7 +182,11 @@ class DLRM_Net(nn.Module):
+ 
+             # construct sigmoid or relu operator
+             if i == sigmoid_layer:
++                if args.use_ipex and ipex.core.get_mix_bf16_fp32():
++                    layers.append(Cast(torch.float32))
+                 layers.append(nn.Sigmoid())
++            elif args.use_ipex and ipex.core.get_mix_bf16_fp32():
++                layers[-1].fuse_relu = True
+             else:
+                 layers.append(nn.ReLU())
+ 
+@@ -301,26 +323,30 @@ class DLRM_Net(nn.Module):
+ 
+     def interact_features(self, x, ly):
+         if self.arch_interaction_op == "dot":
+-            # concatenate dense and sparse features
+-            (batch_size, d) = x.shape
+-            T = torch.cat([x] + ly, dim=1).view((batch_size, -1, d))
+-            # perform a dot product
+-            Z = torch.bmm(T, torch.transpose(T, 1, 2))
+-            # append dense feature with the interactions (into a row vector)
+-            # approach 1: all
+-            # Zflat = Z.view((batch_size, -1))
+-            # approach 2: unique
+-            _, ni, nj = Z.shape
+-            # approach 1: tril_indices
+-            # offset = 0 if self.arch_interaction_itself else -1
+-            # li, lj = torch.tril_indices(ni, nj, offset=offset)
+-            # approach 2: custom
+-            offset = 1 if self.arch_interaction_itself else 0
+-            li = torch.tensor([i for i in range(ni) for j in range(i + offset)])
+-            lj = torch.tensor([j for i in range(nj) for j in range(i + offset)])
+-            Zflat = Z[:, li, lj]
+-            # concatenate dense features and interactions
+-            R = torch.cat([x] + [Zflat], dim=1)
++            if args.use_ipex and args.mix_precision and not args.inference_only:
++                T = [x] + ly
++                R = ipex.interaction(*T)
++            else:
++                # concatenate dense and sparse features
++                (batch_size, d) = x.shape
++                T = torch.cat([x] + ly, dim=1).view((batch_size, -1, d))
++                # perform a dot product
++                Z = torch.bmm(T, torch.transpose(T, 1, 2))
++                # append dense feature with the interactions (into a row vector)
++                # approach 1: all
++                # Zflat = Z.view((batch_size, -1))
++                # approach 2: unique
++                _, ni, nj = Z.shape
++                # approach 1: tril_indices
++                # offset = 0 if self.arch_interaction_itself else -1
++                # li, lj = torch.tril_indices(ni, nj, offset=offset)
++                # approach 2: custom
++                offset = 1 if self.arch_interaction_itself else 0
++                li = torch.tensor([i for i in range(ni) for j in range(i + offset)])
++                lj = torch.tensor([j for i in range(nj) for j in range(i + offset)])
++                Zflat = Z[:, li, lj]
++                # concatenate dense features and interactions
++                R = torch.cat([x] + [Zflat], dim=1)
+         elif self.arch_interaction_op == "cat":
+             # concatenation features (into a row vector)
+             R = torch.cat([x] + ly, dim=1)
+@@ -340,6 +366,8 @@ class DLRM_Net(nn.Module):
+             return self.parallel_forward(dense_x, lS_o, lS_i)
+ 
+     def sequential_forward(self, dense_x, lS_o, lS_i):
++        if args.use_ipex:
++            ipex.core.disable_mix_bf16_fp32()
+         # process dense features (using bottom mlp), resulting in a row vector
+         x = self.apply_mlp(dense_x, self.bot_l)
+         # debug prints
+@@ -572,6 +600,12 @@ if __name__ == "__main__":
+     parser.add_argument("--save-onnx", action="store_true", default=False)
+     # gpu
+     parser.add_argument("--use-gpu", action="store_true", default=False)
++    # ipex
++    parser.add_argument("--use-ipex", action="store_true", default=False)
++    parser.add_argument("--mix-precision", action="store_true", default=False)
++    # share weight benchmark
++    parser.add_argument("--num-instance", type=int, default=26)
++    parser.add_argument("--share-weight", action="store_true", default=False)
+     # debugging and profiling
+     parser.add_argument("--print-freq", type=int, default=1)
+     parser.add_argument("--test-freq", type=int, default=-1)
+@@ -621,6 +655,13 @@ if __name__ == "__main__":
+         device = torch.device("cuda", 0)
+         ngpus = torch.cuda.device_count()  # 1
+         print("Using {} GPU(s)...".format(ngpus))
++    elif args.use_ipex:
++        import intel_pytorch_extension as ipex
++        ipex.core.enable_auto_dnnl()
++        if args.mix_precision:
++            ipex.enable_auto_mix_precision(mixed_dtype=torch.bfloat16, train=not args.inference_only)
++        device = torch.device("dpcpp")
++        print("Runining with IPEX...")       
+     else:
+         device = torch.device("cpu")
+         print("Using CPU...")
+@@ -807,11 +848,13 @@ if __name__ == "__main__":
+             print(param.detach().cpu().numpy())
+         # print(dlrm)
+ 
+-    if use_gpu:
++    if use_gpu or args.use_ipex:
+         # Custom Model-Data Parallel
+         # the mlps are replicated and use data parallelism, while
+         # the embeddings are distributed and use model parallelism
+         dlrm = dlrm.to(device)  # .cuda()
++        if ipex.core.get_mix_bf16_fp32():
++            dlrm.to(torch.bfloat16)
+         if dlrm.ndevices > 1:
+             dlrm.emb_l = dlrm.create_emb(m_spa, ln_emb)
+ 
+@@ -828,7 +871,10 @@ if __name__ == "__main__":
+ 
+     if not args.inference_only:
+         # specify the optimizer algorithm
+-        optimizer = torch.optim.SGD(dlrm.parameters(), lr=args.learning_rate)
++        if args.use_ipex and ipex.core.get_mix_bf16_fp32():
++            optimizer = ipex.SplitSGD(dlrm.parameters(), lr=args.learning_rate)
++        else:
++            optimizer = torch.optim.SGD(dlrm.parameters(), lr=args.learning_rate)
+         lr_scheduler = LRPolicyScheduler(optimizer, args.lr_num_warmup_steps, args.lr_decay_start_step,
+                                          args.lr_num_decay_steps)
+ 
+@@ -839,13 +885,15 @@ if __name__ == "__main__":
+         return time.time()
+ 
+     def dlrm_wrap(X, lS_o, lS_i, use_gpu, device):
+-        if use_gpu:  # .cuda()
++        if use_gpu or args.use_ipex:  # .cuda()
+             # lS_i can be either a list of tensors or a stacked tensor.
+             # Handle each case below:
+             lS_i = [S_i.to(device) for S_i in lS_i] if isinstance(lS_i, list) \
+                 else lS_i.to(device)
+             lS_o = [S_o.to(device) for S_o in lS_o] if isinstance(lS_o, list) \
+                 else lS_o.to(device)
++            if args.use_ipex and args.mix_precision:
++                X = X.to(torch.bfloat16)
+             return dlrm(
+                 X.to(device),
+                 lS_o,
+@@ -856,12 +904,12 @@ if __name__ == "__main__":
+ 
+     def loss_fn_wrap(Z, T, use_gpu, device):
+         if args.loss_function == "mse" or args.loss_function == "bce":
+-            if use_gpu:
++            if use_gpu or args.use_ipex:
+                 return loss_fn(Z, T.to(device))
+             else:
+                 return loss_fn(Z, T)
+         elif args.loss_function == "wbce":
+-            if use_gpu:
++            if use_gpu or args.use_ipex:
+                 loss_ws_ = loss_ws[T.data.view(-1).long()].view_as(T).to(device)
+                 loss_fn_ = loss_fn(Z, T.to(device))
+             else:
+@@ -943,8 +991,47 @@ if __name__ == "__main__":
+                 ld_gL_test, ld_gA_test * 100
+             )
+         )
++        
++    def wrap_input(X, lS_o, lS_i, use_gpu, device):
++        if use_gpu or args.use_ipex:  # .cuda()
++            lS_i = [S_i.to(device) for S_i in lS_i] if isinstance(lS_i, list) \
++                else lS_i.to(device)
++            lS_o = [S_o.to(device) for S_o in lS_o] if isinstance(lS_o, list) \
++                else lS_o.to(device)
++            if args.use_ipex and args.mix_precision:
++                X = X.to(torch.bfloat16)
++        return X.to(device), lS_o, lS_i
+ 
+     print("time/loss/accuracy (if enabled):")
++    if args.inference_only:
++        torch.set_grad_enabled(False)
++
++    if args.share_weight and args.inference_only:
++            for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
++                traced_model = torch.jit.trace(dlrm, wrap_input(X, lS_o, lS_i, use_gpu, device), check_trace=False)
++                # g=traced_model.graph
++                # torch._C._jit_pass_inline(g)
++                # print(g)
++                break
++            bench = ThroughputBenchmark(traced_model)
++            j = 0
++            for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
++                X, lS_o, lS_i = wrap_input(X, lS_o, lS_i, use_gpu, device)
++                bench.add_input(X, lS_o, lS_i)
++                # bench.add_input(wrap_input(X, lS_o, lS_i, use_gpu, device))
++                if j == 1: break
++            if args.use_ipex and args.mix_precision:
++                ipex.core.disable_mix_bf16_fp32()
++                stats = bench.benchmark(
++                    num_calling_threads=args.num_instance,
++                    num_warmup_iters=100 * args.num_instance,
++                    num_iters=1000 * args.num_instance,
++                )
++                print(stats)
++            if args.enable_profiling:
++                print(prof.key_averages().table(sort_by="self_cpu_time_total"))
++            sys.exit()
++
+     with torch.autograd.profiler.profile(args.enable_profiling, use_gpu) as prof:
+         while k < args.nepochs:
+             if k < skip_upto_epoch:
