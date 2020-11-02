@@ -151,7 +151,7 @@ static void RReLU_updateOutput(
 
             if(in_ptr[id]<=0)
               {
-                double rand = state.uniform();
+                double rand = state.uniform<double>();
                 scalar_t r = ScalarConvert<double, scalar_t>::to(rand * (upper-lower) + lower);
                 in_ptr[id] = static_cast<scalar_t>(in_ptr[id]) * r;
                 noise_ptr[id] = r;
@@ -188,7 +188,7 @@ static void RReLU_updateOutput(
 
             if(in_ptr[id]<=0)
               {
-                double rand = state.uniform();
+                double rand = state.uniform<double>();
                 scalar_t r = ScalarConvert<double, scalar_t>::to(rand * (upper-lower) + lower);
                 out_ptr[id] = static_cast<scalar_t>(in_ptr[id]) * r;
                 noise_ptr[id] = r;
