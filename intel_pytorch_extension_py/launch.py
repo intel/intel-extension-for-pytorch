@@ -10,35 +10,35 @@ import numpy as np
 from argparse import ArgumentParser, REMAINDER
 
 r"""
-This module is a lanchuer script which can help you to launch your program for training and inference.
+This is a script for launching PyTorch training and inference on Intel Xeon CPU with optimal configurations.
 Now, single instance inferenc/training, multi-instance inference/training and distributed training 
 with oneCCL backend is enabled.
 
-To get peak performance with Intel Xeon CPU. For multi-thread setup, the launcher can do core bind and
-setup thread affinity automatically. For distributed training, it can also setup the pin-domain and 
-oneCCL worker affinity. Besides, it can also enable different memory allocator and iomp library. 
+To get the peak performance on Intel Xeon CPU, the script optimizes the configuration of thread and memory 
+management. For thread management, the script configures thread affinity and the preload of Intel OMP library. 
+For memory management, it configures NUMA binding and preload optimized memory allocation library (e.g. tcmalloc, jemalloc).
  
 **How to use this module:**
 
 *** Single instance inference/training *** 
 
-1. Single instance with all socket 
+1. Run single-instance inference or training on a single node with all CPU sockets.
 
 ::
 
    >>> python -m intel_pytorch_extension.launch script.py args
 
-2. Single instance with specific socket
+2. Run single-instance inference or training on a single CPU socket.
 
 ::
 
    >>> python -m intel_pytorch_extension.launch --socket_id 1 script.py args
 
-*** Multi-instance inference/training *** 
+*** Multi-instance inference *** 
 
 1. Multi-instance 
 
-   you should specify the instance number and core per-instance. by  --nintances and  --ncore_per_instance 
+   you should specify the instance number and core per-instance by  --nintances and  --ncore_per_instance 
 
    eg: on CLX8280 with 2 instance
 
