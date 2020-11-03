@@ -1,3 +1,16 @@
+diff --git a/dlrm_data_pytorch.py b/dlrm_data_pytorch.py
+index 736b6dd..e6b0bc3 100644
+--- a/dlrm_data_pytorch.py
++++ b/dlrm_data_pytorch.py
+@@ -382,7 +382,7 @@ def ensure_dataset_preprocessed(args, d_path):
+ 
+ def make_criteo_data_and_loaders(args):
+ 
+-    if args.mlperf_logging and args.memory_map and args.data_set == "terabyte":
++    if args.memory_map and args.data_set == "terabyte":
+         # more efficient for larger batches
+         data_directory = path.dirname(args.raw_data_file)
+ 
 diff --git a/dlrm_s_pytorch.py b/dlrm_s_pytorch.py
 index 3c5c85f..660f6eb 100644
 --- a/dlrm_s_pytorch.py
@@ -218,9 +231,6 @@ index 3c5c85f..660f6eb 100644
 +    if args.share_weight and args.inference_only:
 +            for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
 +                traced_model = torch.jit.trace(dlrm, wrap_input(X, lS_o, lS_i, use_gpu, device), check_trace=False)
-+                # g=traced_model.graph
-+                # torch._C._jit_pass_inline(g)
-+                # print(g)
 +                break
 +            bench = ThroughputBenchmark(traced_model)
 +            j = 0
@@ -231,12 +241,12 @@ index 3c5c85f..660f6eb 100644
 +                if j == 1: break
 +            if args.use_ipex and args.mix_precision:
 +                ipex.core.disable_mix_bf16_fp32()
-+                stats = bench.benchmark(
-+                    num_calling_threads=args.num_instance,
-+                    num_warmup_iters=100 * args.num_instance,
-+                    num_iters=1000 * args.num_instance,
-+                )
-+                print(stats)
++            stats = bench.benchmark(
++                num_calling_threads=args.num_instance,
++                num_warmup_iters=100 * args.num_instance,
++                num_iters=1000 * args.num_instance,
++            )
++            print(stats)
 +            if args.enable_profiling:
 +                print(prof.key_averages().table(sort_by="self_cpu_time_total"))
 +            sys.exit()

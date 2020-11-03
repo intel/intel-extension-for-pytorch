@@ -71,7 +71,7 @@
 ```
   git clone https://github.com/facebookresearch/dlrm
   cd dlrm
-  pip install -r requirement.txt
+  pip install -r requirements.txt
   git checkout 52b77f80a24303294a02c86b574529cdc420aac5
   patch -p1 < {path/to/intel-pytorch-extension}/torch_patches/models/dlrm.patch
 ```
@@ -82,7 +82,7 @@
   cd transformers
   git checkout 1a779ad7ecb9e5215b6bd1cfa0153469d37e4274
   patch -p1 < {path/to/intel-pytorch-extension}/torch_patches/models/bert.patch
-  pip install -r ./examples/requirement.txt
+  pip install -r ./examples/requirements.txt
   pip install --editable .
 ```
 
@@ -95,6 +95,7 @@
   git clone https://github.com/pytorch/vision
   cd vision
   # add ResNext-101-32x4d model
+  git checkout 883f1fb01a8ba0e1b1cdc16c16f2e6e0ef87e3bd
   patch -p1 < {path/to/intel-pytorch-extension}/torch_patches/models/vision.patch
   python setup.py install
 ```
@@ -124,7 +125,7 @@ export KMP_SETTINGS=1
   --arch-mlp-bot=13-512-256-128 --arch-mlp-top=1024-1024-512-256-1 \
   --arch-sparse-feature-size=128 --max-ind-range=4000000 \
   --numpy-rand-seed=727 \
-  --print-freq=1024 --print-time --mini-batch-size=2048 --num-batches=4096 
+  --print-freq=1024 --print-time --mini-batch-size=2048 --num-batches=10240 
 ```
 ```
     # run DLRM bf16 trainining
@@ -136,7 +137,7 @@ export KMP_SETTINGS=1
   --arch-mlp-bot=13-512-256-128 --arch-mlp-top=1024-1024-512-256-1 \
   --arch-sparse-feature-size=128 --max-ind-range=4000000 \
   --numpy-rand-seed=727 \
-  --print-freq=1024 --print-time --mini-batch-size=2048 --num-batches=4096 \
+  --print-freq=1024 --print-time --mini-batch-size=2048 --num-batches=10240 \
   --use-ipex --mix-precision 
 ```
 ```
@@ -149,7 +150,7 @@ export KMP_SETTINGS=1
   --arch-mlp-bot=13-512-256-128 --arch-mlp-top=1024-1024-512-256-1 \
   --arch-sparse-feature-size=128 --max-ind-range=4000000 \
   --numpy-rand-seed=727 \
-  --print-freq=1024 --print-time --mini-batch-size=16 --num-batches=4096 \
+  --print-freq=1024 --print-time --mini-batch-size=16  \
   --inference-only --share-weight --num-instance=24
 ```
 ```
@@ -162,7 +163,7 @@ export KMP_SETTINGS=1
   --arch-mlp-bot=13-512-256-128 --arch-mlp-top=1024-1024-512-256-1 \
   --arch-sparse-feature-size=128 --max-ind-range=4000000 \
   --numpy-rand-seed=727 \
-  --print-freq=1024 --print-time --mini-batch-size=16 --num-batches=4096 \
+  --print-freq=1024 --print-time --mini-batch-size=16  \
   --use-ipex --mix-precision --inference-only --share-weight --num-instance=24
 ```
 
@@ -189,25 +190,25 @@ examples/language-modeling/run_language_modeling.py \
 ```
 ```
   # run Bert fp32 inference
-for i in $(seq 0 $LAST_INSTANCE); do
+for i in $(seq 0 23); do
     LOG_i=cpufp32_bs1_ins${i}.txt
     echo "### running on instance $i, numa node 0, core  $i"
     numactl --physcpubind=$i --membind=0  python -u \
     examples/language-modeling/run_language_modeling.py \
     --output_dir=output_$i --per_gpu_eval_batch_size=1 \
-    --model_type=bert_large  --do_eval --eval_data_file=$HOME/wikitext-2-raw/wiki.train.raw \
+    --model_type=bert_large  --do_eval --eval_data_file=$DATASET_PATH/wiki.train.raw \
     --overwrite_output_dir --mlm --seed=42 --max_step=30  2>&1 | tee $LOG_i &
 done
 ```
 ```
   # run Bert bf16 inference
-for i in $(seq 0 $LAST_INSTANCE); do
+for i in $(seq 0 23); do
     LOG_i=cpufp32_bs1_ins${i}.txt
     echo "### running on instance $i, numa node 0, core  $i"
     numactl --physcpubind=$i --membind=0  python -u \
     examples/language-modeling/run_language_modeling.py \
     --output_dir=output_$i --per_gpu_eval_batch_size=1 \
-    --model_type=bert_large  --do_eval --eval_data_file=$HOME/wikitext-2-raw/wiki.train.raw \
+    --model_type=bert_large  --do_eval --eval_data_file=$DATASET_PATH/wiki.train.raw \
     --overwrite_output_dir --mlm --seed=42 --max_step=30 --ipex --dnnl --mix_precision  2>&1 | tee $LOG_i &
 done
 ```
@@ -215,7 +216,7 @@ done
 3. ResNext-101-32x4d
 ```
   cd {path/to/examples}/imagenet/
-  export DATA_PATH={path/to/dataset}
+  export DATASET_PATH={path/to/dataset}
 ```
 
 ```
@@ -224,7 +225,7 @@ done
 ```
 ```
   # run Bert bf16 traininig
-  bash run_training_cpu_ipex.sh resnext101_32x4d $DATA_PATH
+  bash run_training_cpu_ipex.sh resnext101_32x4d $DATASET_PATH dnnl bf16
 ```
 ```
   # run Bert fp32 inference
@@ -232,5 +233,5 @@ done
 ```
 ```
   # run Bert bf16 inference
-  bash run_inference_cpu_latency_ipex.sh resnext101_32x4d $DATA_PATH
+  bash run_inference_cpu_latency_ipex.sh resnext101_32x4d $DATASET_PATH dnnl bf16 jit
 ```
