@@ -10252,7 +10252,7 @@ class TestTorchDeviceType(TestCase):
     @unittest.expectedFailure
     def test_copy_all_dtypes_and_devices(self, device):
         from copy import copy
-        ipex.get_auto_optimization()
+        ipex._get_auto_optimization()
         for dt in torch.testing.get_all_dtypes():
             x = torch.tensor([1, 2, 3, 4], dtype=dt, device=device)
             x_clone = x.clone()
@@ -10268,7 +10268,7 @@ class TestTorchDeviceType(TestCase):
             # copy is a shallow copy, only copies the tensor view,
             # not the data
             self.assertEqual(x, y)
-        ipex.enable_auto_optimization(False)
+        ipex._enable_auto_optimization(False)
 
     def test_resize_all_dtypes_and_devices(self, device):
         shape = (2, 2)
@@ -14517,5 +14517,5 @@ instantiate_device_type_tests(TestDevicePrecision, globals(), except_for='cpu')
 instantiate_device_type_tests(TestTensorDeviceOps, globals(), except_for='cpu')
 
 if __name__ == '__main__':
-    ipex.enable_auto_optimization()
+    ipex._enable_auto_optimization()
     run_tests()

@@ -68,7 +68,12 @@ def get_auto_mix_precision():
     else:
         return None
 
-def enable_auto_optimization(mixed_dtype = None, train = False):
+def _enable_auto_optimization(mixed_dtype = None, train = False):
+    if mixed_dtype != None:
+        core.enable_auto_dnnl()
+    enable_auto_mixed_precision(mixed_dtype, train)
+
+def enable_auto_mixed_precision(mixed_dtype = torch.bfloat16, train = False):
     r""" Enable auto-mixed-precision to improve performance for global scope.
 
     The auto-mixed-precision auto reorders the tensor to the specified low precision data type.
@@ -80,15 +85,10 @@ def enable_auto_optimization(mixed_dtype = None, train = False):
         mixed_dtype(torch.dtype): Auto reorder the input tensors to the specified low precision data type
             and dispatch to oneDNN backend for computation, can be torch.bfloat16 or None.
     """
-    if mixed_dtype != None:
-        core.enable_auto_dnnl()
-    enable_auto_mix_precision(mixed_dtype, train)
-
-def enable_auto_mix_precision(mixed_dtype = torch.bfloat16, train = False):
     running_mode = 'training' if train else 'inference'
     AutoMixPrecision(AmpConf(mixed_dtype), running_mode).__enter__()
 
-def get_auto_optimization():
+def _get_auto_optimization():
     return get_auto_mix_precision
 
 def get_train():
@@ -139,4 +139,3 @@ class AutoMixPrecision(_DecoratorContextManager):
             core.disable_mix_int8_fp32()
             core.disable_mix_bf16_fp32()
         core.set_execution_mode(train = self.pre_running_mode)
-
