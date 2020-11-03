@@ -8,6 +8,7 @@ dpcpp_device = torch.device("dpcpp")
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
     def test_gemv(self, dtype=torch.float):
         mat = torch.randn((3, 2), device=cpu_device)
         vec = torch.randn((2), device=cpu_device)
