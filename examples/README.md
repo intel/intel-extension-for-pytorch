@@ -1,4 +1,4 @@
-# Guide to run DLRM with FP32/BF16 data type
+# Guide to run auto-mix precision(bf16) models with intel extension for pytorch
 
 ## Verified on
 
@@ -79,6 +79,7 @@
 ```
   git clone https://github.com/huggingface/transformers
   git checkout 1a779ad7ecb9e5215b6bd1cfa0153469d37e4274
+  patch -p1 < {path/to/intel-pytorch-extension}/torch_patches/models/bert.patch
   pip install -r ./examples/requirement.txt
   pip install --editable .
 ```

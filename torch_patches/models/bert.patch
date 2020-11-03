@@ -1,0 +1,101 @@
+diff --git a/examples/language-modeling/run_language_modeling.py b/examples/language-modeling/run_language_modeling.py
+index 740cb636..6fdf1393 100644
+--- a/examples/language-modeling/run_language_modeling.py
++++ b/examples/language-modeling/run_language_modeling.py
+@@ -19,7 +19,7 @@ GPT, GPT-2 and CTRL are fine-tuned using a causal language modeling (CLM) loss.
+ using a masked language modeling (MLM) loss. XLNet is fine-tuned using a permutation language modeling (PLM) loss.
+ """
+ 
+-
++import torch
+ import logging
+ import math
+ import os
+@@ -76,7 +76,12 @@ class ModelArguments:
+     cache_dir: Optional[str] = field(
+         default=None, metadata={"help": "Where do you want to store the pretrained models downloaded from s3"}
+     )
+-
++    dnnl: bool = field(
++        default=False, metadata={"help": "use dnnl kernel"}
++    )
++    mix_precision: bool = field(
++        default=False, metadata={"help": "use bf16 dnnl kernel if exist"}
++    )
+ 
+ @dataclass
+ class DataTrainingArguments:
+@@ -148,7 +153,14 @@ def main():
+             "Cannot do evaluation without an evaluation data file. Either supply a file to --eval_data_file "
+             "or remove the --do_eval argument."
+         )
+-
++    if training_args.ipex:
++        import intel_pytorch_extension as ipex
++        if model_args.dnnl:
++            ipex.core.enable_auto_dnnl()
++        else:
++            ipex.core.disable_auto_dnnl()
++        if model_args.mix_precision:
++            ipex.enable_auto_mix_precision(mixed_dtype=torch.bfloat16, train=True)
+     if (
+         os.path.exists(training_args.output_dir)
+         and os.listdir(training_args.output_dir)
+@@ -189,13 +201,18 @@ def main():
+     elif model_args.model_name_or_path:
+         config = AutoConfig.from_pretrained(model_args.model_name_or_path, cache_dir=model_args.cache_dir)
+     else:
+-        config = CONFIG_MAPPING[model_args.model_type]()
++        if model_args.model_type == "bert_large":
++            config = AutoConfig.from_pretrained("bert-large-uncased", cache_dir=model_args.cache_dir)
++        else:
++            config = CONFIG_MAPPING[model_args.model_type]()
+         logger.warning("You are instantiating a new config instance from scratch.")
+ 
+     if model_args.tokenizer_name:
+         tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name, cache_dir=model_args.cache_dir)
+     elif model_args.model_name_or_path:
+         tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, cache_dir=model_args.cache_dir)
++    elif model_args.model_type == "bert_large":
++        tokenizer = AutoTokenizer.from_pretrained("bert-large-uncased", cache_dir=model_args.cache_dir)
+     else:
+         raise ValueError(
+             "You are instantiating a new tokenizer from scratch. This is not supported, but you can do it from another script, save it,"
+diff --git a/src/transformers/training_args.py b/src/transformers/training_args.py
+index 64900136..aae71ac6 100644
+--- a/src/transformers/training_args.py
++++ b/src/transformers/training_args.py
+@@ -234,6 +234,10 @@ class TrainingArguments:
+         default=None, metadata={"help": "An optional descriptor for the run. Notably used for wandb logging."}
+     )
+ 
++    ipex: bool = field(
++        default=False, metadata={"help": "use intel pytorch extension"}
++    )
++
+     @property
+     def train_batch_size(self) -> int:
+         """
+@@ -267,6 +271,9 @@ class TrainingArguments:
+         if self.no_cuda:
+             device = torch.device("cpu")
+             n_gpu = 0
++        elif self.ipex:
++            device = torch.device("dpcpp")
++            n_gpu = 0
+         elif is_torch_tpu_available():
+             device = xm.xla_device()
+             n_gpu = 0
+diff --git a/src/transformers/trainer.py b/src/transformers/trainer.py
+index 1e09e03d..d254d977 100755
+--- a/src/transformers/trainer.py
++++ b/src/transformers/trainer.py
+@@ -1037,6 +1039,8 @@ class Trainer:
+             loss, logits, labels = self.prediction_step(model, inputs, prediction_loss_only)
+             batch_size = inputs[list(inputs.keys())[0]].shape[0]
+             samples_count += batch_size
++            if samples_count == self.args.max_steps * batch_size:
++                break
+             if loss is not None:
+                 eval_losses.append(loss * batch_size)
+             if logits is not None:
