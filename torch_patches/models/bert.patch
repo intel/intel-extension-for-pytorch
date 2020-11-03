@@ -37,7 +37,7 @@ index 740cb636..6fdf1393 100644
 +        else:
 +            ipex.core.disable_auto_dnnl()
 +        if model_args.mix_precision:
-+            ipex.enable_auto_mix_precision(mixed_dtype=torch.bfloat16, train=True)
++            ipex.enable_auto_mixed_precision(mixed_dtype=torch.bfloat16, train=True)
      if (
          os.path.exists(training_args.output_dir)
          and os.listdir(training_args.output_dir)
@@ -81,7 +81,7 @@ index 64900136..aae71ac6 100644
              device = torch.device("cpu")
              n_gpu = 0
 +        elif self.ipex:
-+            device = torch.device("dpcpp")
++            device = torch.device(ipex.DEVICE)
 +            n_gpu = 0
          elif is_torch_tpu_available():
              device = xm.xla_device()

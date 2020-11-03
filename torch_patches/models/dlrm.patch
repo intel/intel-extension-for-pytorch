@@ -131,8 +131,8 @@ index 3c5c85f..660f6eb 100644
 +        import intel_pytorch_extension as ipex
 +        ipex.core.enable_auto_dnnl()
 +        if args.mix_precision:
-+            ipex.enable_auto_mix_precision(mixed_dtype=torch.bfloat16, train=not args.inference_only)
-+        device = torch.device("dpcpp")
++            ipex.enable_auto_mixed_precision(mixed_dtype=torch.bfloat16, train=not args.inference_only)
++        device = torch.device(ipex.DEVICE)
 +        print("Runining with IPEX...")       
      else:
          device = torch.device("cpu")
