@@ -67,7 +67,7 @@ function (print_configuration_summary)
     message(STATUS "  USE_MULTI_CONTEXT     : ${USE_MULTI_CONTEXT}")
     message(STATUS "  USE_ONEMKL            : ${USE_ONEMKL}")
   if (USE_ONEMKL)
-    message(STATUS "  ONEMKL include     : ${ONEMKL_INCLUDE_DIR}")
+    message(STATUS "  ONEMKL include        : ${ONEMKL_INCLUDE_DIR}")
   endif(USE_ONEMKL)
   endif(USE_DPCPP)
 
