@@ -115,7 +115,7 @@ import torch.nn as nn
 
 import intel_pytorch_extension as ipex
 # Automatically mix precision
-ipex.enable_auto_optimization(mixed_dtype = torch.bfloat16)
+ipex.enable_auto_mixed_precision(mixed_dtype = torch.bfloat16)
 
 class Model(nn.Module):
     def __init__(self):
