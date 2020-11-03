@@ -50,6 +50,7 @@ struct TORCH_API DPCPPType final {
   static Tensor & logical_xor_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::logical_xor.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor bmm(const Tensor & self, const Tensor & mat2); // aten::bmm(Tensor self, Tensor mat2) -> Tensor
   static Tensor & bmm_out(Tensor & out, const Tensor & self, const Tensor & mat2); // aten::bmm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor mv(const Tensor & self, const Tensor & vec); // aten::mv(Tensor self, Tensor vec) -> Tensor
   static Tensor & bitwise_and_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::bitwise_and.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor & bitwise_and_out(Tensor & out, const Tensor & self, Scalar other); // aten::bitwise_and.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor & bitwise_or_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::bitwise_or.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
