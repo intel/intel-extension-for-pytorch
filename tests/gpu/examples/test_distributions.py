@@ -44,9 +44,6 @@ from itertools import product
 from random import shuffle
 from collections import namedtuple
 
-# TODO: remove this global setting
-# Distributions tests use double as the default dtype
-torch.set_default_dtype(torch.double)
 
 from torch.distributions.transforms import (AbsTransform, AffineTransform,
                                             CatTransform, ComposeTransform, ExpTransform,
@@ -57,6 +54,9 @@ from torch.distributions.transforms import (AbsTransform, AffineTransform,
                                             identity_transform, StackTransform)
 from torch.distributions.utils import probs_to_logits, lazy_property
 from torch.nn.functional import softmax
+
+# backup default dtype
+dtype_origin = torch.get_default_dtype()
 
 # load_tests from torch.testing._internal.common_utils is used to automatically filter tests for
 # sharding on sandcastle. This line silences flake warnings
@@ -76,7 +76,7 @@ def pairwise(Dist, *params):
     Creates a pair of distributions `Dist` initialized to test each element of
     param with each other.
     """
-    params1 = [torch.tensor([p] * len(p)) for p in params]
+    params1 = [torch.tensor([p] * len(p), dtype=torch.double) for p in params]
     params2 = [p.transpose(0, 1) for p in params1]
     return Dist(*params1), Dist(*params2)
 
@@ -92,17 +92,17 @@ def is_all_nan(tensor):
 Example = namedtuple('Example', ['Dist', 'params'])
 EXAMPLES = [
     Example(Bernoulli, [
-        {'probs': torch.tensor([0.7, 0.2, 0.4], requires_grad=True)},
-        {'probs': torch.tensor([0.3], requires_grad=True)},
+        {'probs': torch.tensor([0.7, 0.2, 0.4], dtype=torch.double, requires_grad=True)},
+        {'probs': torch.tensor([0.3], dtype=torch.double, requires_grad=True)},
         {'probs': 0.3},
-        {'logits': torch.tensor([0.], requires_grad=True)},
+        {'logits': torch.tensor([0.], dtype=torch.double, requires_grad=True)},
     ])
 ]
 
 BAD_EXAMPLES = [
     Example(Bernoulli, [
-        {'probs': torch.tensor([1.1, 0.2, 0.4], requires_grad=True)},
-        {'probs': torch.tensor([-0.5], requires_grad=True)},
+        {'probs': torch.tensor([1.1, 0.2, 0.4], dtype=torch.double, requires_grad=True)},
+        {'probs': torch.tensor([-0.5], dtype=torch.double, requires_grad=True)},
         {'probs': 1.00001},
     ])
 ]
@@ -113,6 +113,7 @@ sycl_device = torch.device("dpcpp")
 class TestDistributions(TestCase):
 
     def _gradcheck_log_prob(self, dist_ctor, ctor_params):
+        torch.set_default_dtype(torch.double)
         # performs gradient checks on log_prob
         distribution = dist_ctor(*ctor_params)
         s = distribution.sample()
@@ -126,8 +127,10 @@ class TestDistributions(TestCase):
             return dist_ctor(*params).log_prob(s)
 
         gradcheck(apply_fn, (s,) + tuple(ctor_params), raise_exception=True)
+        torch.set_default_dtype(dtype_origin)
 
     def _check_log_prob(self, dist, asset_fn):
+        torch.set_default_dtype(torch.double)
         # checks that the log_prob matches a reference function
         s = dist.sample()
         log_probs = dist.log_prob(s)
@@ -135,8 +138,10 @@ class TestDistributions(TestCase):
         s_data_flat = s.view(len(log_probs_data_flat), -1)
         for i, (val, log_prob) in enumerate(zip(s_data_flat, log_probs_data_flat)):
             asset_fn(i, val.squeeze(), log_prob)
+        torch.set_default_dtype(dtype_origin)
 
     def test_bernoulli(self):
+        torch.set_default_dtype(torch.double)
         p = torch.tensor([0.7, 0.2, 0.4], requires_grad=True)
         p_dpcpp = torch.tensor([0.7, 0.2, 0.4], requires_grad=True, device=sycl_device)        
 
@@ -164,14 +169,18 @@ class TestDistributions(TestCase):
         #self.assertEqual(Bernoulli(p_dpcpp).entropy(), torch.tensor([0.6108, 0.5004, 0.6730]), prec=1e-4)
         self.assertEqual(Bernoulli(torch.tensor([0.0])).entropy(), torch.tensor([0.0]))
         self.assertEqual(Bernoulli(s).entropy(), torch.tensor(0.6108), prec=1e-4)
+        torch.set_default_dtype(dtype_origin)
 
     def test_log_normal(self):
+        torch.set_default_dtype(torch.double)
         for device in torch.testing.get_all_device_types():
             a = torch.tensor([10], dtype=torch.float, device=device).log_normal_()
             self.assertEqual(a.dtype, torch.float)
             self.assertEqual(a.size(), torch.Size([1]))
+        torch.set_default_dtype(dtype_origin)
 
     def test_exponential(self):
+        torch.set_default_dtype(torch.double)
         rate = torch.randn(5, 5).abs().requires_grad_()
         rate_1d = torch.randn(1).abs().requires_grad_()
         self.assertEqual(Exponential(rate).sample().size(), (5, 5))
@@ -197,6 +206,7 @@ class TestDistributions(TestCase):
             self.assertAlmostEqual(log_prob, expected, places=3)
 
         self._check_log_prob(Exponential(rate), ref_log_prob)
+        torch.set_default_dtype(dtype_origin)
     '''
     def test_multinomial_1d(self):
         total_count = 10
