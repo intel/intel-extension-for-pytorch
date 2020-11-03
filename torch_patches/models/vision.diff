@@ -1,0 +1,58 @@
+diff --git a/torchvision/models/resnet.py b/torchvision/models/resnet.py
+index 797f459..d594ac8 100644
+--- a/torchvision/models/resnet.py
++++ b/torchvision/models/resnet.py
+@@ -4,7 +4,7 @@ from .utils import load_state_dict_from_url
+ 
+ 
+ __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
+-           'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
++           'resnet152', 'resnext50_32x4d', 'resnext101_32x4d', 'resnext101_32x8d',
+            'wide_resnet50_2', 'wide_resnet101_2']
+ 
+ 
+@@ -34,6 +34,7 @@ def conv1x1(in_planes, out_planes, stride=1):
+ 
+ class BasicBlock(nn.Module):
+     expansion = 1
++    __constants__ = ['downsample']
+ 
+     def __init__(self, inplanes, planes, stride=1, downsample=None, groups=1,
+                  base_width=64, dilation=1, norm_layer=None):
+@@ -73,13 +74,8 @@ class BasicBlock(nn.Module):
+ 
+ 
+ class Bottleneck(nn.Module):
+-    # Bottleneck in torchvision places the stride for downsampling at 3x3 convolution(self.conv2)
+-    # while original implementation places the stride at the first 1x1 convolution(self.conv1)
+-    # according to "Deep residual learning for image recognition"https://arxiv.org/abs/1512.03385.
+-    # This variant is also known as ResNet V1.5 and improves accuracy according to
+-    # https://ngc.nvidia.com/catalog/model-scripts/nvidia:resnet_50_v1_5_for_pytorch.
+-
+     expansion = 4
++    __constants__ = ['downsample']
+ 
+     def __init__(self, inplanes, planes, stride=1, downsample=None, groups=1,
+                  base_width=64, dilation=1, norm_layer=None):
+@@ -303,6 +299,21 @@ def resnext50_32x4d(pretrained=False, progress=True, **kwargs):
+                    pretrained, progress, **kwargs)
+ 
+ 
++
++def resnext101_32x4d(pretrained=False, progress=True, **kwargs):
++    r"""ResNeXt-101 32x4d model from
++    `"Aggregated Residual Transformation for Deep Neural Networks" <https://arxiv.org/pdf/1611.05431.pdf>`_
++
++    Args:
++        pretrained (bool): If True, returns a model pre-trained on ImageNet
++        progress (bool): If True, displays a progress bar of the download to stderr
++    """
++    kwargs['groups'] = 32
++    kwargs['width_per_group'] = 4
++    return _resnet('resnext101_32x4d', Bottleneck, [3, 4, 23, 3],
++                   pretrained, progress, **kwargs)
++
++
+ def resnext101_32x8d(pretrained=False, progress=True, **kwargs):
+     r"""ResNeXt-101 32x8d model from
+     `"Aggregated Residual Transformation for Deep Neural Networks" <https://arxiv.org/pdf/1611.05431.pdf>`_

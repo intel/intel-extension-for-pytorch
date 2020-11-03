@@ -70,6 +70,7 @@
 1. Get DLRM
 ```
   git clone https://github.com/facebookresearch/dlrm
+  cd dlrm
   pip install -r requirement.txt
   git checkout 52b77f80a24303294a02c86b574529cdc420aac5
   patch -p1 < {path/to/intel-pytorch-extension}/torch_patches/models/dlrm.patch
@@ -78,6 +79,7 @@
 2. Get BERT-Large
 ```
   git clone https://github.com/huggingface/transformers
+  cd transformers
   git checkout 1a779ad7ecb9e5215b6bd1cfa0153469d37e4274
   patch -p1 < {path/to/intel-pytorch-extension}/torch_patches/models/bert.patch
   pip install -r ./examples/requirement.txt
@@ -86,7 +88,15 @@
 
 3. Get ResNext-101-32x4d
 ```
-TODO
+  git clone https://github.com/pytorch/examples
+  cd examples
+  git checkout a74badde33f924c2ce5391141b86c40483150d5a
+  patch -p1 < {path/to/intel-pytorch-extension}/torch_patches/models/resnext.patch
+  git clone https://github.com/pytorch/vision
+  cd vision
+  # add ResNext-101-32x4d model
+  patch -p1 < {path/to/intel-pytorch-extension}/torch_patches/models/vision.patch
+  python setup.py install
 ```
 ## Run Models
 0. Enviroment setting
@@ -156,7 +166,7 @@ export KMP_SETTINGS=1
   --use-ipex --mix-precision --inference-only --share-weight --num-instance=24
 ```
 
-2. Get BERT-Large
+2. BERT-Large
 ```
   cd {path/to/bert}
   export DATASET_PATH={patch/to/bert}
@@ -202,7 +212,25 @@ for i in $(seq 0 $LAST_INSTANCE); do
 done
 ```
 
-3. Get ResNext-101-32x4d
+3. ResNext-101-32x4d
 ```
-TODO
+  cd {path/to/examples}/imagenet/
+  export DATA_PATH={path/to/dataset}
+```
+
+```
+  # run ResNext-101 fp32 training
+  bash run_training_cpu.sh resnext101_32x4d 
+```
+```
+  # run Bert bf16 traininig
+  bash run_training_cpu_ipex.sh resnext101_32x4d $DATA_PATH
+```
+```
+  # run Bert fp32 inference
+  bash run_inference_cpu_latency.sh resnext101_32x4d 
+```
+```
+  # run Bert bf16 inference
+  bash run_inference_cpu_latency_ipex.sh resnext101_32x4d $DATA_PATH
 ```
