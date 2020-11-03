@@ -44,8 +44,8 @@
 
   # extension
   git clone https://github.com/intel/intel-extension-for-pytorch.git
-  git checkout 1.1.0-preview
-  git submodule update --init –recursive
+  git checkout 1.1.0_preview
+  git submodule update --init --recursive
 
   # prepare patch to PyTorch
   cp {path/to/intel-pytorch-extension}/torch_patches/dlrm_fp32.patch {path/to/pytorch}/
