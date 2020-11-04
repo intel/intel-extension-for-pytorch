@@ -12,7 +12,7 @@ index 736b6dd..e6b0bc3 100644
          data_directory = path.dirname(args.raw_data_file)
  
 diff --git a/dlrm_s_pytorch.py b/dlrm_s_pytorch.py
-index 3c5c85f..660f6eb 100644
+index 3c5c85f..2e01400 100644
 --- a/dlrm_s_pytorch.py
 +++ b/dlrm_s_pytorch.py
 @@ -93,8 +93,23 @@ import sklearn.metrics
@@ -209,7 +209,7 @@ index 3c5c85f..660f6eb 100644
                  loss_ws_ = loss_ws[T.data.view(-1).long()].view_as(T).to(device)
                  loss_fn_ = loss_fn(Z, T.to(device))
              else:
-@@ -943,8 +991,47 @@ if __name__ == "__main__":
+@@ -943,8 +991,43 @@ if __name__ == "__main__":
                  ld_gL_test, ld_gA_test * 100
              )
          )
@@ -237,8 +237,7 @@ index 3c5c85f..660f6eb 100644
 +            for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
 +                X, lS_o, lS_i = wrap_input(X, lS_o, lS_i, use_gpu, device)
 +                bench.add_input(X, lS_o, lS_i)
-+                # bench.add_input(wrap_input(X, lS_o, lS_i, use_gpu, device))
-+                if j == 1: break
++                if j == 1000: break
 +            if args.use_ipex and args.mix_precision:
 +                ipex.core.disable_mix_bf16_fp32()
 +            stats = bench.benchmark(
