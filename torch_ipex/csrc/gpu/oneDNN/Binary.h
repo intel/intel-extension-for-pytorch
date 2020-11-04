@@ -26,7 +26,11 @@ static inline Tensor bin(Tensor& output, const Tensor& t1, const Tensor& t2) {
   auto ctx2 = DPCPPTensorContext::get_tensor_ctx(t2);
 
   auto tar_ctx = ctx1.is_plain() ? (ctx2.is_plain() ? ctx1 : ctx2) : ctx1;
-  auto tar_md = tar_ctx.meta();
+  auto tar_md = (ctx1.is_plain() && ctx2.is_plain()) ?
+      memory::desc(get_onednn_dims(t1),
+                   get_onednn_dtype(t1),
+                   get_onednn_strides(t1)) :
+      tar_ctx.meta();
 
   auto md1 = ctx1.is_plain() ?
       memory::desc(get_onednn_dims(t1),
