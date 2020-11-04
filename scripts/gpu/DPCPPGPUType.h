@@ -135,6 +135,7 @@ struct TORCH_API DPCPPType final {
   static Tensor tanh(const Tensor & self); // aten::tanh(Tensor self) -> Tensor
   static Tensor & tanh_(Tensor & self); // aten::tanh_(Tensor(a!) self) -> Tensor(a!)
   static Tensor & tanh_out(Tensor & out, const Tensor & self); // aten::tanh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor rot90(const Tensor & self, int64_t k, IntArrayRef dims); // aten::rot90(Tensor self, int k=1, int[] dims=[0,1]) -> Tensor
   static Tensor roll(const Tensor & self, IntArrayRef shifts, IntArrayRef dims); // aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> Tensor
   static Tensor _s_where(const Tensor & condition, const Tensor & self, const Tensor & other); // aten::_s_where(Tensor condition, Tensor self, Tensor other) -> Tensor
   static Tensor clone(const Tensor & self, c10::optional<MemoryFormat> memory_format); // aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
@@ -425,6 +426,7 @@ struct TORCH_API DPCPPType final {
   static std::tuple<Tensor,Tensor> nll_loss2d_forward(const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index); // aten::nll_loss2d_forward(Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index) -> (Tensor output, Tensor total_weight)
   static Tensor & nll_loss2d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index, const Tensor & total_weight); // aten::nll_loss2d_backward.grad_input(Tensor grad_output, Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index, Tensor total_weight, *, Tensor(a!) grad_input) -> Tensor(a!)
   static Tensor nll_loss2d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index, const Tensor & total_weight); // aten::nll_loss2d_backward(Tensor grad_output, Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index, Tensor total_weight) -> Tensor
+  static Tensor flip(const Tensor & self, IntArrayRef dims); // aten::flip(Tensor self, int[] dims) -> Tensor
   static Tensor floor_divide(const Tensor & self, const Tensor & other); // aten::floor_divide(Tensor self, Tensor other) -> Tensor
   static Tensor & floor_divide_(Tensor & self, const Tensor & other); // aten::floor_divide_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
   static Tensor & floor_divide_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::floor_divide.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
