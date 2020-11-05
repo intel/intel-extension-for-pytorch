@@ -65,6 +65,9 @@ Tensor& softshrink_out(Tensor& out, const Tensor& self, Scalar lambd) {
 }
 
 Tensor softshrink(const Tensor& self, Scalar lambd) {
+  TORCH_CHECK(
+    lambd.to<double>() >= 0,
+    "lambda must be greater or equal to 0, but found to be ", lambd.to<double>(), ".");
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeDPCPP::softshrink_out(out, self, lambd);
 }
