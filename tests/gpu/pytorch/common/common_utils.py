@@ -827,7 +827,8 @@ class TestCase(expecttest.TestCase):
                 super(TestCase, self).assertNotEqual(x.size(), y.size())
             self.assertGreater(x.numel(), 0)
             y = y.type_as(x)
-            y = y.cuda(device=x.get_device()) if x.is_cuda else y.cpu()
+            # We don't need consider the cuda device in assertNotEqual
+            # y = y.cuda(device=x.get_device()) if x.is_cuda else y.cpu()
             nan_mask = x != x
             if torch.equal(nan_mask, y != y):
                 diff = x - y

@@ -33,5 +33,7 @@ class TestNNMethod(TestCase):
         print("x_dpcpp.grad", x_dpcpp.grad.cpu())
 
         self.assertEqual(y_cpu[0], y_dpcpp[0].to(dpcpp_device))
-        # self.assertEqual( y_cpu[1], y_dpcpp[1].to(dpcpp_device)) # For now our MaxPooling return indices are wrong, oneDNN is trying to fix them 
+        # For now our MaxPooling return indices are wrong, oneDNN is trying to fix them
+        # JIRA: https://jira.devtools.intel.com/browse/MFDNN-3672
+        # self.assertEqual( y_cpu[1], y_dpcpp[1].to(dpcpp_device))
         self.assertEqual(x_dpcpp.grad, x_dpcpp.grad.to(cpu_device))
