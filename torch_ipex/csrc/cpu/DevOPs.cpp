@@ -1821,7 +1821,14 @@ at::Tensor AtenIpexCPUDev::dil_tanh_backward(
 at::Tensor AtenIpexCPUDev::dil_reshape(const at::Tensor& self, at::IntArrayRef size) {
   DEBUG("AtenIpexCPUDev::dil_reshape\n");
   CHECK_DNNL_OP_PRE_COND(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
+  bool int8_enabled = check_auto_mix_int8_fp32() && check_tensor_own_whole_storage(self);
+  // if int8 path enabled and self own whole storage, not need to
+  // reorder to fp32 dtype, i.e, direct get dil tensor(fp32, int8).
+  if (check_auto_mix_bf16_fp32()) {
+    dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
+  } else if (!int8_enabled) {
+    dbl::comm::reorder_to_fp32(self);
+  }
 
   auto inferred_size = at::infer_size(size, self.numel());
   if (self.sizes() == inferred_size) {
