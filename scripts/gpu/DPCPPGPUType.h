@@ -50,6 +50,7 @@ struct TORCH_API DPCPPType final {
   static Tensor & logical_xor_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::logical_xor.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor bmm(const Tensor & self, const Tensor & mat2); // aten::bmm(Tensor self, Tensor mat2) -> Tensor
   static Tensor & bmm_out(Tensor & out, const Tensor & self, const Tensor & mat2); // aten::bmm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor mv(const Tensor & self, const Tensor & vec); // aten::mv(Tensor self, Tensor vec) -> Tensor
   static Tensor & bitwise_and_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::bitwise_and.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor & bitwise_and_out(Tensor & out, const Tensor & self, Scalar other); // aten::bitwise_and.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor & bitwise_or_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::bitwise_or.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
@@ -134,6 +135,7 @@ struct TORCH_API DPCPPType final {
   static Tensor tanh(const Tensor & self); // aten::tanh(Tensor self) -> Tensor
   static Tensor & tanh_(Tensor & self); // aten::tanh_(Tensor(a!) self) -> Tensor(a!)
   static Tensor & tanh_out(Tensor & out, const Tensor & self); // aten::tanh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor rot90(const Tensor & self, int64_t k, IntArrayRef dims); // aten::rot90(Tensor self, int k=1, int[] dims=[0,1]) -> Tensor
   static Tensor roll(const Tensor & self, IntArrayRef shifts, IntArrayRef dims); // aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> Tensor
   static Tensor _s_where(const Tensor & condition, const Tensor & self, const Tensor & other); // aten::_s_where(Tensor condition, Tensor self, Tensor other) -> Tensor
   static Tensor clone(const Tensor & self, c10::optional<MemoryFormat> memory_format); // aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
@@ -173,6 +175,12 @@ struct TORCH_API DPCPPType final {
   static std::tuple<Tensor,Tensor,Tensor> unique_dim_consecutive(const Tensor & self, int64_t dim, bool return_inverse, bool return_counts); // aten::unique_dim_consecutive(Tensor self, int dim, bool return_inverse=False, bool return_counts=False) -> (Tensor, Tensor, Tensor)
   static std::tuple<Tensor,Tensor,Tensor> _unique2(const Tensor & self, bool sorted, bool return_inverse, bool return_counts); // aten::_unique2(Tensor self, bool sorted=True, bool return_inverse=False, bool return_counts=False) -> (Tensor, Tensor, Tensor)
   static Tensor & normal_(Tensor & self, double mean, double std, Generator * generator); // aten::normal_(Tensor(a!) self, float mean=0, float std=1, *, Generator? generator=None) -> Tensor(a!)
+  static Tensor normal(const Tensor & mean, double std, Generator * generator); // aten::normal.Tensor_float(Tensor mean, float std=1, *, Generator? generator=None) -> Tensor
+  static Tensor normal(double mean, const Tensor & std, Generator * generator); // aten::normal.float_Tensor(float mean, Tensor std, *, Generator? generator=None) -> Tensor
+  static Tensor normal(const Tensor & mean, const Tensor & std, Generator * generator); // aten::normal.Tensor_Tensor(Tensor mean, Tensor std, *, Generator? generator=None) -> Tensor
+  static Tensor & normal_out(Tensor & out, const Tensor & mean, double std, Generator * generator); // aten::normal.Tensor_float_out(Tensor mean, float std=1, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
+  static Tensor & normal_out(Tensor & out, double mean, const Tensor & std, Generator * generator); // aten::normal.float_Tensor_out(float mean, Tensor std, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
+  static Tensor & normal_out(Tensor & out, const Tensor & mean, const Tensor & std, Generator * generator); // aten::normal.Tensor_Tensor_out(Tensor mean, Tensor std, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
   static Tensor & diag_out(Tensor & out, const Tensor & self, int64_t diagonal); // aten::diag.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor diag(const Tensor & self, int64_t diagonal); // aten::diag(Tensor self, int diagonal=0) -> Tensor
   static Tensor & triu_out(Tensor & out, const Tensor & self, int64_t diagonal); // aten::triu.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)
@@ -418,6 +426,7 @@ struct TORCH_API DPCPPType final {
   static std::tuple<Tensor,Tensor> nll_loss2d_forward(const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index); // aten::nll_loss2d_forward(Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index) -> (Tensor output, Tensor total_weight)
   static Tensor & nll_loss2d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index, const Tensor & total_weight); // aten::nll_loss2d_backward.grad_input(Tensor grad_output, Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index, Tensor total_weight, *, Tensor(a!) grad_input) -> Tensor(a!)
   static Tensor nll_loss2d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index, const Tensor & total_weight); // aten::nll_loss2d_backward(Tensor grad_output, Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index, Tensor total_weight) -> Tensor
+  static Tensor flip(const Tensor & self, IntArrayRef dims); // aten::flip(Tensor self, int[] dims) -> Tensor
   static Tensor floor_divide(const Tensor & self, const Tensor & other); // aten::floor_divide(Tensor self, Tensor other) -> Tensor
   static Tensor & floor_divide_(Tensor & self, const Tensor & other); // aten::floor_divide_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
   static Tensor & floor_divide_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::floor_divide.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)

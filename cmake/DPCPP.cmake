@@ -78,31 +78,16 @@ if(INTEL_SYCL_VERSION)
             HINTS ${sycl_root_hints}
             PATH_SUFFIXES lib
             NO_DEFAULT_PATH)
-    if(NOT OpenCL_LIBRARY)
-        message(WARNING "OpenCL library not found")
-    endif()
     set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
 
-    if(NOT ${SYCL_INCLUDE_DIR} STREQUAL ${OpenCL_INCLUDE_DIR})
-        include_directories(${OpenCL_INCLUDE_DIR})
-    endif()
-
-    #find LevelZero
+    # Find LevelZero
     find_path(LevelZero_INCLUDE_DIR
             NAMES level_zero/ze_api.h
             PATH_SUFFIXES include)
-
     find_library(LevelZero_LIBRARY
             NAMES level_zero
             PATHS
             PATH_SUFFIXES lib/x64 lib lib64)
-
-    if (NOT LevelZero_LIBRARY)
-        message(WARNING "LevelZero library not found")
-    else()
-        set(LevelZero_LIBRARIES ${LevelZero_LIBRARY})
-        set(LevelZero_INCLUDE_DIRS ${LevelZero_INCLUDE_DIR})
-    endif()
 
 else()
     # ComputeCpp-specific flags

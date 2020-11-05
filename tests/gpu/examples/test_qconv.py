@@ -1,11 +1,19 @@
 import torch
 import torch_ipex
 from torch.nn.modules.utils import _pair
+import pytest
 
 from torch.testing._internal.common_utils import TestCase
 
 class  TestTorchMethod(TestCase):
+    @pytest.mark.skipif(
+      not 'fbgemm' in torch.backends.quantized.supported_engines,
+      reason="No qengine found. USE_FBGEMM=1 is needed for building pytorch")
     def test_qconv(self, dtype=torch.float):
+        #Please open FBGEMM (PyTorch CPU INT8 default engine ) when build PyTorch,
+        #which will be referenced by GPU. Or you may meet runtime error like
+        #"Didn't find engine for operation quantized::conv2d_prepack".
+
         zero_point = 0
         
         dtype_inputs = torch.quint8
