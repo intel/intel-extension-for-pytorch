@@ -1056,18 +1056,19 @@ at::Tensor AtenIpexCPUDev::dil_linear(
 
   dil::tensor y = dbl::linear::linear_impl(x, w, b, output_scale);
 
+  if (self.dim() > 2) {
+    auto input_size = self.sizes();
+    std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
+    output_size.push_back(dil_size(weight, 0));
+    y.reshape(output_size);
+  }
+
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
     insert_or_updata_observer({self}, {aten_output}, "Linear");
   }
 
-  if (self.dim() > 2) {
-    auto input_size = self.sizes();
-    std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
-    output_size.push_back(dil_size(weight, 0));
-    return dil_view(aten_output, output_size);
-  }
   return aten_output;
 }
 
