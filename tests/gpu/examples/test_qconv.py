@@ -10,9 +10,10 @@ class  TestTorchMethod(TestCase):
       not 'fbgemm' in torch.backends.quantized.supported_engines,
       reason="No qengine found. USE_FBGEMM=1 is needed for building pytorch")
     def test_qconv(self, dtype=torch.float):
-        #Please open FBGEMM (PyTorch CPU INT8 default engine ) when build PyTorch,
-        #which will be referenced by GPU. Or you may meet runtime error like
-        #"Didn't find engine for operation quantized::conv2d_prepack".
+
+        print("Please open FBGEMM (PyTorch CPU INT8 default engine ) when build PyTorch, "
+              "which will be referenced by GPU. Or you may meet runtime error like "
+              "'Didn't find engine for operation quantized::conv2d_prepack'.")
 
         zero_point = 0
         
@@ -42,5 +43,8 @@ class  TestTorchMethod(TestCase):
         
         packed_params_gpu = torch.ops.quantized.conv2d_prepack(q_filters_gpu, bias_gpu, _pair(1),_pair(0),_pair(1),1)
         output_gpu_int8 =  torch.ops.quantized.conv2d_relu(q_inputs_gpu, packed_params_gpu, _pair(1),_pair(0),_pair(1),1,scale_out,zero_point)
+
+        cpu_result = torch.dequantize(output_int8)
+        gpu_result = torch.dequantize(output_gpu_int8)
         
-        self.assertEqual(output_int8, output_gpu_int8)
+        self.assertEqual(cpu_result, gpu_result)
