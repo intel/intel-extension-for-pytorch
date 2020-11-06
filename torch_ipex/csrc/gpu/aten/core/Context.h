@@ -50,9 +50,9 @@ inline bool is_available() {
   return count > 0;
 }
 
-void createGlobalContext();
-void clearGlobalContext();
-DPCPP::context getGlobalContext();
+void createDeviceContext();
+void clearDeviceContext();
+DPCPP::context getDeviceContext(int device_index = 0);
 CAFFE2_API Allocator* getDPCPPDeviceAllocator();
 
 } // namespace dpcpp

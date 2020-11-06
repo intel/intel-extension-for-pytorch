@@ -115,7 +115,7 @@ public:
 
   bool isHostPtr(void* ptr) {
     return DPCPP::usm::alloc::host ==
-      DPCPP::get_pointer_type(ptr, at::dpcpp::getGlobalContext());
+      DPCPP::get_pointer_type(ptr, at::dpcpp::getDeviceContext());
   }
 
   void emptyCache() {
@@ -125,7 +125,7 @@ public:
     for (auto& blk : mAvailable) {
       auto it = mBlocks.find(blk.getPtr());
       AT_ASSERT(it != mBlocks.end() && !it->second.isAllocated());
-      DPCPP::free(blk.getPtr(), at::dpcpp::getGlobalContext());
+      DPCPP::free(blk.getPtr(), at::dpcpp::getDeviceContext());
       mBlocks.erase(it);
     }
 
@@ -164,7 +164,7 @@ public:
       return DPCPP_SUCCESS;
     }
 
-    *ptr = DPCPP::malloc_host(size, at::dpcpp::getGlobalContext());
+    *ptr = DPCPP::malloc_host(size, at::dpcpp::getDeviceContext());
     mBlocks.insert({*ptr, {size, *ptr, true}});
     return DPCPP_SUCCESS;
   }

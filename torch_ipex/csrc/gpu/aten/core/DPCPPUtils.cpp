@@ -18,7 +18,7 @@ static std::once_flag init_device_flag;
 static DPCPPDevicePool gDevPool;
 
 static void clearDPCPPContextAndDevices() {
-  at::dpcpp::clearGlobalContext();
+  at::dpcpp::clearDeviceContext();
   gDevPool.dev_sels.clear();
   gDevPool.devices.clear();
 }
@@ -190,7 +190,7 @@ int dpcppGetDeviceIdFromPtr(DeviceIndex* device_id, void* ptr) {
     throw(std::out_of_range("the pointer is not allocated"));
   }
 #else
-  auto raw_device = DPCPP::get_pointer_device(ptr, at::dpcpp::getGlobalContext());
+  auto raw_device = DPCPP::get_pointer_device(ptr, at::dpcpp::getDeviceContext());
   *device_id = dpcppGetDeviceIndex(raw_device);
 #endif
   return DPCPP_SUCCESS;

@@ -562,13 +562,13 @@ class CachingAllocator {
     auto syclDev = at::dpcpp::dpcppGetRawDevice(di);
     // Our minimum allocated memory is 512. Thus we set mem align to 512.
     const size_t alignment = 512;
-    *devPtr = DPCPP::aligned_alloc_device(alignment, size, syclDev, at::dpcpp::getGlobalContext());
+    *devPtr = DPCPP::aligned_alloc_device(alignment, size, syclDev, at::dpcpp::getDeviceContext((int)di));
 
     if (*devPtr == NULL) {
       CADeviceStats& stats = get_stats_for_device(di);
       stats.num_alloc_retries += 1;
       free_cached_blocks(di);
-      *devPtr = DPCPP::aligned_alloc_device(alignment, size, syclDev, at::dpcpp::getGlobalContext());
+      *devPtr = DPCPP::aligned_alloc_device(alignment, size, syclDev, at::dpcpp::getDeviceContext((int)di));
       if (*devPtr == NULL) {
         return DPCPP_FAILURE;
       }
@@ -599,7 +599,7 @@ class CachingAllocator {
     while (it != end) {
       CABlock* block = *it;
       if (!block->prev && !block->next) {
-        DPCPP::free((void*)block->ptr, at::dpcpp::getGlobalContext());
+        DPCPP::free((void*)block->ptr, at::dpcpp::getDeviceContext(block->device));
 
         CADeviceStats& stats = get_stats_for_device(block->device);
         CAStatTypes stat_types;

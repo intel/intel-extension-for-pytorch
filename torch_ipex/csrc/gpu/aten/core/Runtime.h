@@ -142,7 +142,7 @@ struct GpuEngineManager {
     for (int i = 0; i < device_count; i++) {
       _gpu_engines.push_back({engine::kind::gpu,
                               dpcppGetRawDevice(i),
-                              at::dpcpp::getGlobalContext()});
+                              at::dpcpp::getDeviceContext(i)});
     }
   }
   ~GpuEngineManager() {}

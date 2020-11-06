@@ -36,7 +36,7 @@ class DPCPPStreamImpl {
       : /* queue_(dpcppGetRawDevice(di), asyncHandler),*/
         queue_([&]() -> DPCPP::queue {
               return dpcpp_profiling() ?
-                  DPCPP::queue(at::dpcpp::getGlobalContext(),
+                  DPCPP::queue(at::dpcpp::getDeviceContext((int)di),
                    dpcppGetDeviceSelector(di),
                    asyncHandler,
 #ifndef USE_USM
@@ -45,7 +45,7 @@ class DPCPPStreamImpl {
                    {DPCPP::property::queue::in_order(),
                     DPCPP::property::queue::enable_profiling()}) :
 #endif
-                  DPCPP::queue(at::dpcpp::getGlobalContext(),
+                  DPCPP::queue(at::dpcpp::getDeviceContext((int)di),
                    dpcppGetDeviceSelector(di),
 #ifndef USE_USM
                    asyncHandler);

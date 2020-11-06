@@ -15,7 +15,7 @@ static std::vector<std::unique_ptr<DPCPP::context>> gCtxPool;
 #endif
 
 #if !defined(USE_MULTI_CONTEXT)
-static void initGlobalContext() {
+static void initDeviceContext() {
   int cnt;
   DPCPP::vector_class<DPCPP::device> devs;
   at::dpcpp::dpcppGetDeviceCount(&cnt);
@@ -26,7 +26,7 @@ static void initGlobalContext() {
   gContext.reset(new DPCPP::context(devs, at::dpcpp::dpcppAsyncHandler));
 }
 #else
-static void initGlobalContext() {
+static void initDeviceContext() {
   int cnt;
   at::dpcpp::dpcppGetDeviceCount(&cnt);
   gCtxPool.resize(cnt);
@@ -38,11 +38,11 @@ static void initGlobalContext() {
 #endif
 
 #if !defined(USE_MULTI_CONTEXT)
-void clearGlobalContext() {
+void clearDeviceContext() {
   gContext.reset(NULL);
 }
 #else
-void clearGlobalContext() {
+void clearDeviceContext() {
   for (auto &ctx: gCtxPool) {
     ctx.reset(NULL);
   }
@@ -50,16 +50,18 @@ void clearGlobalContext() {
 #endif
 
 #if !defined(USE_MULTI_CONTEXT)
-DPCPP::context getGlobalContext() {
-  std::call_once(initFlag, initGlobalContext);
+DPCPP::context getDeviceContext(int device_index) {
+  // If we use global shared context, we just ignore device_index
+  std::call_once(initFlag, initDeviceContext);
   return *gContext;
 }
 #else
-DPCPP::context getGlobalContext() {
-  std::call_once(initFlag, initGlobalContext);
-  DeviceIndex cur_dev_idx = -1;
-  AT_ASSERT(at::dpcpp::dpcppGetDevice(&cur_dev_idx) == DPCPP_SUCCESS);
-  return *gCtxPool[cur_dev_idx];
+DPCPP::context getDeviceContext(int device_index) {
+  std::call_once(initFlag, initDeviceContext);
+  int dev_cnt = -1;
+  at::dpcpp::dpcppGetDeviceCount(&dev_cnt);
+  AT_ASSERT(device_index < dev_cnt);
+  return *gCtxPool[device_index];
 }
 #endif
 
