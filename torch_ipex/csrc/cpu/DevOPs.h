@@ -92,8 +92,8 @@ class AtenIpexCPUDev {
   static at::Tensor dil_shuffle(const at::Tensor & self, at::IntArrayRef view_shape, int64_t dim0, int64_t dim1);
   static std::tuple<at::Tensor,at::Tensor> dil__pack_padded_sequence(const at::Tensor & input, const at::Tensor & lengths, bool batch_first);
   static at::Tensor& dil_copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
-  static std::tuple<at::Tensor, at::Tensor, at::Tensor, std::vector<at::Tensor>> dil_lstm(const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first);
-  static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> dil_lstm_backward(const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first, std::vector<at::Tensor> outputs, const at::Tensor& grad_output, const at::Tensor& grad_hy, const at::Tensor& grad_cy, std::vector<at::Tensor> layer_output);
+  static std::vector<at::Tensor> dil_lstm_layer(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2, const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse, int64_t mode, int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes);
+  static std::vector<at::Tensor> dil_lstm_layer_backward(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2, const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, const at::Tensor& output, const at::Tensor& hy, const at::Tensor& cy, const at::Tensor& grad_output, const at::Tensor& grad_hy, const at::Tensor& grad_cy, bool reverse, int64_t mode, int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes);
 };
 
 }  // namespace cpu

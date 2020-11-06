@@ -7,6 +7,7 @@
 #include "dil/dil.hpp"
 #include "xsmm/libxsmm_utils.h"
 #include <ATen/Parallel.h>
+#include <ATen/MatrixRef.h>
 #include <algorithm>
 #include <c10/util/Exception.h>
 #include <torch/csrc/autograd/function.h>
@@ -439,12 +440,107 @@ at::Tensor AtenIpexTypeExt::max_pool3d(const at::Tensor &input,
   return std::get<0>(ret);
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+// RNN OPS
+
+std::vector<at::Tensor> rnn_layer(const at::Tensor& input,
+    at::TensorList weights, const at::Tensor& hx,
+    const at::Tensor& cx, bool reverse, int64_t mode,
+    int64_t hidden_size, int64_t num_layers, bool train,
+    bool bidirectional, at::IntArrayRef batch_sizes) {
+  TORCH_CHECK(weights.size() == 2 || weights.size() == 4);
+  if (weights.size() == 4) {
+    if (at::GradMode::is_enabled())
+      return NewRNNLayerOp::apply(input, weights[0], weights[1], weights[2], weights[3], hx, cx, reverse, mode, hidden_size, num_layers, true, train, bidirectional, batch_sizes);
+    return NewRNNLayerOp::_forward(input, weights[0], weights[1], weights[2], weights[3], hx, cx, reverse, mode, hidden_size, num_layers, true, train, bidirectional, batch_sizes);
+  } else {
+    if (at::GradMode::is_enabled())
+      return NewRNNLayerOp::apply(input, weights[0], weights[1], at::zeros(weights[0].sizes(), weights[0].options()), at::zeros(weights[1].sizes(), weights[1].options()), hx, cx, reverse, mode, hidden_size, num_layers, false, train, bidirectional, batch_sizes);
+    return NewRNNLayerOp::_forward(input, weights[0], weights[1], at::zeros(weights[0].sizes(), weights[0].options()), at::zeros(weights[1].sizes(), weights[1].options()), hx, cx, reverse, mode, hidden_size, num_layers, false, train, bidirectional, batch_sizes);
+  }
+}
+// MKLDNN RNN integration notes:
+// I. Memory Formats
+//   a. mkldnn will use plain formats for input, hx/cx, output, hy/cy
+//      and possibly use blocked formats for weights depending shape info.
+//   b. All mkldnn memorys are created (in plain format) as views on ATen tensor,
+//      the weight reorder(if any) is handed automatically inside dil (mkldnn bridge)
+//
+// II. MKLDNN Primitive Mapping
+//   a. mkldnn rnn primitive doesn't support training with dropout or padded input sequence.
+//   b. here break a single RNN module into { num_layers * num_directions } mkldnn rnn primitives
+//      for future need to cover these feature gaps.
+//
+//TODO: a. training with dropout
+//   b. padded sequence input support
+//
+std::vector<at::Tensor> rnn(
+    const at::Tensor& input_, std::vector<at::Tensor> weight, int64_t weight_stride0,
+    const at::Tensor& hx_, const at::Tensor& cx_,
+    int64_t mode, int64_t hidden_size,
+    int64_t num_layers, bool batch_first, double dropout_p,
+    bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
+  TORCH_CHECK(!train || dropout_p == 0.0, "mkldnn_rnn doesn't support dropout");
+  TORCH_CHECK(batch_sizes.size() == 0, "mkldnn_rnn doesn't support packed input");
+  if (static_cast<dil::rnn_kind>(mode) != dil::rnn_kind::LSTM) {
+    TORCH_CHECK(!cx_.defined(), "mkldnn_rnn: illegal defined cx for non-LSTM RNN");
+  }
+
+  auto input = input_;
+  bool is_input_packed = batch_sizes.size() != 0;
+  if (batch_first && !is_input_packed) {
+    input = input.transpose(0, 1);
+  }
+  input = input.contiguous();
+
+  auto hx = hx_.contiguous();
+  auto cx = cx_.defined() ? cx_.contiguous() : at::Tensor();
+
+  at::MatrixRef<at::Tensor> weights{weight, static_cast<size_t>(weight_stride0)};
+
+  auto num_directions = bidirectional ? 2 : 1;
+  auto layer_input = input;
+  std::vector<at::Tensor> layer_output(num_directions);
+  std::vector<at::Tensor> layer_hy(num_layers * num_directions);
+  std::vector<at::Tensor> layer_cy(num_layers * num_directions);
+  for (int64_t layer = 0; layer < num_layers; layer++) {
+    for (int64_t direction = 0; direction < num_directions; direction++) {
+      auto index = layer * num_directions + direction;
+      auto layer_weights = weights[index];
+      auto layer_hx = hx[index];
+      auto layer_cx = cx.defined() ? cx[index] : at::Tensor();
+      auto reverse = (direction > 0);
+      auto outputs = rnn_layer(layer_input, layer_weights, layer_hx, layer_cx, reverse, mode, hidden_size, num_layers, train, bidirectional, batch_sizes);
+      layer_output[direction] = outputs[0];
+      layer_hy[index] = outputs[1];
+      layer_cy[index] = outputs[2];
+    }
+    layer_input = num_directions == 1 ? layer_output[0]
+                                      : at::cat(layer_output, /*output_channels*/-1);
+  }
+  auto output = layer_input;
+  auto hy = at::stack(layer_hy, 0);
+  auto cy = at::stack(layer_cy, 0);
+
+  if (batch_first && !is_input_packed) {
+    output = output.transpose(0, 1);
+  }
+
+  return {output, hy, cy};
+}
+
  std::vector<at::Tensor> AtenIpexTypeExt::lstm(
-    const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases,
+    const at::Tensor& input, std::vector<at::Tensor> hidden, std::vector<at::Tensor> params, bool has_biases,
     int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
-  if (at::GradMode::is_enabled())
-    return NewLSTMOp::apply(input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
-  return NewLSTMOp::_forward(input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+  at::Tensor hx = hidden[0];
+  at::Tensor cx = hidden[1];
+  int64_t hidden_size = hx.size(2);
+  return rnn(
+      input, params, has_biases ? 4 : 2,
+      hx, cx, static_cast<int>(dil::rnn_kind::LSTM), hidden_size, num_layers, batch_first, dropout_p,
+      train, bidirectional, /*batch_sizes*/{});
+
 }
 
 } // namespace torch_ipex
@@ -484,7 +580,7 @@ static auto dispatch =
                   per_sample_weights, include_last_offset);
             })
         .op("torch_ipex::lstm",
-            [](const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
-              return torch_ipex::AtenIpexTypeExt::lstm(input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+            [](const at::Tensor& input, std::vector<at::Tensor> hidden, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
+              return torch_ipex::AtenIpexTypeExt::lstm(input, hidden, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
             });
 }

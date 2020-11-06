@@ -2488,35 +2488,22 @@ at::Tensor& AtenIpexCPUDev::dil_copy_(
   return self;
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, std::vector<at::Tensor>> AtenIpexCPUDev::dil_lstm(
-    const at::Tensor& input, std::vector<at::Tensor> hidden, std::vector<at::Tensor> params, bool has_biases,
-    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
-  DEBUG("AtenIpexCPUDev::dil_lstm\n");
-  at::Tensor hx = hidden[0];
-  at::Tensor cx = hidden[1];
-  int64_t hidden_size = hx.size(2);
-
-  // mkldnn_output = std::tuple<output, hy, cy, workspace>
-  return dbl::rnn::mkldnn_rnn(
-      input, params, has_biases ? 4 : 2,
-      hx, cx, static_cast<int>(dil::rnn_kind::LSTM), hidden_size, num_layers, batch_first, dropout_p,
-      train, bidirectional, /*batch_sizes*/{});
+std::vector<at::Tensor> AtenIpexCPUDev::dil_lstm_layer(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
+    const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse, int64_t mode,
+    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
+  DEBUG("AtenIpexCPUDev::dil_lstm_layer\n");
+  return dbl::rnn::mkldnn_rnn_layer(input, w1, w2, w3, w4, hx, cx, reverse, mode,
+      hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes);
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_lstm_backward(
-    const at::Tensor& input, std::vector<at::Tensor> hidden, std::vector<at::Tensor> params, bool has_biases,
-    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first,
-    std::vector<at::Tensor> outputs, const at::Tensor& grad_output, const at::Tensor& grad_hy, const at::Tensor& grad_cy, std::vector<at::Tensor> layer_output) {
-  DEBUG("AtenIpexCPUDev::dil_lstm_backward\n");
-  at::Tensor hx = hidden[0];
-  at::Tensor cx = hidden[1];
-  int64_t hidden_size = hx.size(2);
-
-  // mkldnn_output = std::tuple<dx, dhx, dcx, dw>
-  return dbl::rnn::mkldnn_rnn_backward(
-      input, params, has_biases ? 4 : 2,
-      hx, cx, static_cast<int>(dil::rnn_kind::LSTM), hidden_size, num_layers, batch_first, dropout_p,
-      train, bidirectional, /*batch_sizes*/{}, outputs, grad_output, grad_hy, grad_cy, layer_output);
+std::vector<at::Tensor> AtenIpexCPUDev::dil_lstm_layer_backward(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
+    const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, const at::Tensor& output, const at::Tensor& hy,
+    const at::Tensor& cy, const at::Tensor& grad_output, const at::Tensor& grad_hy, const at::Tensor& grad_cy, bool reverse, int64_t mode,
+    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
+  DEBUG("AtenIpexCPUDev::dil_lstm_layer_backward\n");
+  return dbl::rnn::mkldnn_rnn_layer_backward(input, w1, w2, w3, w4, hx, cx,
+      output, hy, cy, grad_output, grad_hy, grad_cy, reverse, mode, hidden_size,
+      num_layers, has_biases, train, bidirectional, batch_sizes);
 }
 
 }  // namespace cpu

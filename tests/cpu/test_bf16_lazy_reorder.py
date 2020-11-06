@@ -2338,13 +2338,23 @@ class TestRNN(TestCase):
         h0_dpcpp = h.clone().to(device=device).requires_grad_()
         c0_dpcpp = c.clone().to(device=device).requires_grad_()
         model_dpcpp = copy.deepcopy(model).to(device=device).train()
-        y, h = model(input, (h0, c0))
-        y.sum().backward()
         with AutoDNNL(True), AutoMixPrecision(True):
-            y_dpcpp, h_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
+            y, hy = model(input, (h0, c0))
+            y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
             self.assertEqual(y, y_dpcpp, 0.01)
-            y_dpcpp.sum().backward()
+            y.sum().backward(retain_graph=True)
+            y_dpcpp.sum().backward(retain_graph=True)
             self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad, 0.01)
+            self.assertEqual(model_dpcpp.bias_ih_l0.grad.to('cpu'), model.bias_ih_l0.grad, 0.02)
+            self.assertEqual(model_dpcpp.bias_hh_l0.grad.to('cpu'), model.bias_hh_l0.grad, 0.02)
+            self.assertEqual(model_dpcpp.weight_ih_l0.grad.to('cpu'), model.weight_ih_l0.grad, 0.02)
+            self.assertEqual(model_dpcpp.weight_hh_l0.grad.to('cpu'), model.weight_hh_l0.grad, 0.02)
+            hy[0].sum().backward(retain_graph=True)
+            hy_dpcpp[0].sum().backward(retain_graph=True)
+            self.assertEqual(h0_dpcpp.grad.to('cpu'), h0.grad, 0.01)
+            hy[1].sum().backward(retain_graph=True)
+            hy_dpcpp[1].sum().backward(retain_graph=True)
+            self.assertEqual(c0_dpcpp.grad.to('cpu'), c0.grad, 0.01)    
 
     def test_lstm_batch_first(self):
         ipex.core.enable_auto_dnnl()
@@ -2364,10 +2374,10 @@ class TestRNN(TestCase):
         c0_dpcpp = c.clone().to(device=device).requires_grad_()
         model_dpcpp = copy.deepcopy(model).to(device=device).train()
 
-        y, h = model(input, (h0, c0))
+        y, hy = model(input, (h0, c0))
         y.sum().backward()
         with AutoDNNL(True), AutoMixPrecision(True):
-            y_dpcpp, h_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
+            y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
             self.assertEqual(y, y_dpcpp, 0.01)
             y_dpcpp.sum().backward()
             self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad, 0.01)
@@ -2390,10 +2400,10 @@ class TestRNN(TestCase):
         c0_dpcpp = c.clone().to(device=device).requires_grad_()
         model_dpcpp = copy.deepcopy(model).to(device=device).train()
 
-        y, h = model(input, (h0, c0))
+        y, hy = model(input, (h0, c0))
         y.sum().backward()
         with AutoDNNL(True), AutoMixPrecision(True):
-            y_dpcpp, h_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
+            y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
             self.assertEqual(y, y_dpcpp, 0.01)
             y_dpcpp.sum().backward()
             self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad, 0.01)
@@ -2416,10 +2426,10 @@ class TestRNN(TestCase):
         c0_dpcpp = c.clone().to(device=device).requires_grad_()
         model_dpcpp = copy.deepcopy(model).to(device=device).train()
 
-        y, h = model(input, (h0, c0))
+        y, hy = model(input, (h0, c0))
         y.sum().backward()
         with AutoDNNL(True), AutoMixPrecision(True):
-            y_dpcpp, h_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
+            y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
             self.assertEqual(y, y_dpcpp, 0.01)
             y_dpcpp.sum().backward()
             self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad, 0.01)
@@ -2442,10 +2452,10 @@ class TestRNN(TestCase):
         c0_dpcpp = c.clone().to(device=device).requires_grad_()
         model_dpcpp = copy.deepcopy(model).to(device=device).train()
 
-        y, h = model(input, (h0, c0))
+        y, hy = model(input, (h0, c0))
         y.sum().backward()
         with AutoDNNL(True), AutoMixPrecision(True):
-            y_dpcpp, h_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
+            y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
             self.assertEqual(y, y_dpcpp, 0.01)
             y_dpcpp.sum().backward()
             self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad, 0.01)

@@ -1066,7 +1066,7 @@ class tensor : public memory {
   }
 
   tensor to_dense() const {
-    if (!(is_dense(true))) {
+    if (!is_dense(true)) {
       tensor dense(get_desc().to_default_format());
       dense.feed_from(*this);
       return dense;

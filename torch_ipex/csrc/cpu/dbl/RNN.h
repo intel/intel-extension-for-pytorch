@@ -11,20 +11,14 @@ namespace cpu {
 namespace dbl {
 namespace rnn {
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, std::vector<at::Tensor>> mkldnn_rnn(
-    const at::Tensor& input_, std::vector<at::Tensor> weight, int64_t weight_stride0,
-    const at::Tensor& hx_, const at::Tensor& cx_,
-    int64_t mode, int64_t hidden_size,
-    int64_t num_layers, bool batch_first, double dropout_p,
-    bool train, bool bidirectional, at::IntArrayRef batch_sizes);
+std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
+    const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx_, const at::Tensor& cx_, bool reverse, int64_t mode,
+    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes);
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> mkldnn_rnn_backward(
-    const at::Tensor& input_, std::vector<at::Tensor> weight, int64_t weight_stride0,
-    const at::Tensor& hx_, const at::Tensor& cx_,
-    int64_t mode, int64_t hidden_size,
-    int64_t num_layers, bool batch_first, double dropout_p,
-    bool train, bool bidirectional, at::IntArrayRef batch_sizes,
-    std::vector<at::Tensor> outputs, const at::Tensor& grad_output, const at::Tensor& grad_hy, const at::Tensor& grad_cy, std::vector<at::Tensor> layer_outputs);
+std::vector<at::Tensor> mkldnn_rnn_layer_backward(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
+    const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx_, const at::Tensor& cx_, const at::Tensor& output, const at::Tensor& hy_,
+    const at::Tensor& cy_, const at::Tensor& grad_output, const at::Tensor& grad_hy_, const at::Tensor& grad_cy_, bool reverse, int64_t mode,
+    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes);
 }  // namespace rnn
 }  // namespace dbl
 }  // namespace cpu

@@ -735,108 +735,41 @@ public:
   }
 };
 
-class NewLSTMOp : public torch::autograd::Function<NewLSTMOp> {
+class NewRNNLayerOp : public torch::autograd::Function<NewRNNLayerOp> {
 public:
-  static std::vector<at::Tensor> _forward(
-    const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases,
-    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
+  static std::vector<at::Tensor> _forward(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
+    const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse, int64_t mode,
+    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXLSTMOp::_forward", std::vector<c10::IValue>({input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("IPEXLSTMOp::_forward", std::vector<c10::IValue>({input, w1, w2, w3, w4, hx, cx, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes}), torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
           input.device().type() == c10::DeviceType::DPCPP) {
-        auto outputs = torch_ipex::cpu::AtenIpexCPUDev::dil_lstm(
-            input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
-        return {std::get<0>(outputs), std::get<1>(outputs), std::get<2>(outputs)};
+        return torch_ipex::cpu::AtenIpexCPUDev::dil_lstm_layer(
+            input, w1, w2, w3, w4, hx, cx, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes);
       }
     } catch (std::exception &e) {
 #if defined(_DEBUG)
       TORCH_WARN(e.what());
 #endif
     }
-    if (input.device().type() == c10::DeviceType::DPCPP) {
-      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input.layout() == c10::kStrided);
-      auto &&_ipex_input =
-          torch_ipex::bridge::shallowFallbackToCPUTensor(input);
-      auto &&_ipex_hx =
-          torch_ipex::bridge::shallowFallbackToCPUTensorVec(hx);
-      auto &&_ipex_params =
-          torch_ipex::bridge::shallowFallbackToCPUTensorVec(params);
-      auto &&_ipex_result = at::lstm(_ipex_input, _ipex_hx, _ipex_params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
-      static_cast<void>(_ipex_result);
-
-      return {torch_ipex::bridge::shallowUpgradeToDPCPPTensor(
-              std::get<0>(_ipex_result)),
-          torch_ipex::bridge::shallowUpgradeToDPCPPTensor(
-              std::get<1>(_ipex_result)),
-          torch_ipex::bridge::shallowUpgradeToDPCPPTensor(
-              std::get<2>(_ipex_result))};
-    } else {
-      auto outputs = at::lstm(
-            input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
-      return {std::get<0>(outputs), std::get<1>(outputs), std::get<2>(outputs)};
-    }
+    IPEX_CHECK(false, "LSTM forward not support fallback path now");
   }
 
-  static std::vector<at::Tensor> forward(torch::autograd::AutogradContext *ctx,
-    const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases,
-    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
-#if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXLSTMOp::forward", std::vector<c10::IValue>({input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first}), torch::autograd::Node::peek_at_next_sequence_nr());
-#endif
-    ctx->saved_data["has_biases"] = has_biases;
+  static std::vector<at::Tensor> forward(torch::autograd::AutogradContext *ctx, const at::Tensor& input, const at::Tensor& w1,
+    const at::Tensor& w2, const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse,
+    int64_t mode, int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
+    ctx->saved_data["reverse"] = reverse;
+    ctx->saved_data["mode"] = mode;
+    ctx->saved_data["hidden_size"] = hidden_size;
     ctx->saved_data["num_layers"] = num_layers;
-    ctx->saved_data["dropout_p"] = dropout_p;
+    ctx->saved_data["has_biases"] = has_biases;
     ctx->saved_data["train"] = train;
     ctx->saved_data["bidirectional"] = bidirectional;
-    ctx->saved_data["batch_first"] = batch_first;
-    ctx->saved_data["hx"] = hx;
-    ctx->saved_data["params"] = params;
-    #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXLSTMOp::_forward", std::vector<c10::IValue>({input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first}), torch::autograd::Node::peek_at_next_sequence_nr());
-#endif
-    try {
-      if (torch_ipex::check_auto_dnnl() &&
-          input.device().type() == c10::DeviceType::DPCPP) {
-        auto outputs = torch_ipex::cpu::AtenIpexCPUDev::dil_lstm(
-            input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
-        ctx->save_for_backward({input, std::get<0>(outputs), std::get<1>(outputs), std::get<2>(outputs)});
-        ctx->saved_data["layer_output"] = std::get<3>(outputs);
-        return {std::get<0>(outputs), std::get<1>(outputs), std::get<2>(outputs)};
-      }
-    } catch (std::exception &e) {
-#if defined(_DEBUG)
-      TORCH_WARN(e.what());
-#endif
-    }
-    if (input.device().type() == c10::DeviceType::DPCPP) {
-      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input.layout() == c10::kStrided);
-      auto &&_ipex_input =
-          torch_ipex::bridge::shallowFallbackToCPUTensor(input);
-      auto &&_ipex_hx =
-          torch_ipex::bridge::shallowFallbackToCPUTensorVec(hx);
-      auto &&_ipex_params =
-          torch_ipex::bridge::shallowFallbackToCPUTensorVec(params);
-      auto &&_ipex_result = at::lstm(_ipex_input, _ipex_hx, _ipex_params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
-      static_cast<void>(_ipex_result);
-
-      auto outputs = std::make_tuple(torch_ipex::bridge::shallowUpgradeToDPCPPTensor(
-              std::get<0>(_ipex_result)),
-          torch_ipex::bridge::shallowUpgradeToDPCPPTensor(
-              std::get<1>(_ipex_result)),
-          torch_ipex::bridge::shallowUpgradeToDPCPPTensor(
-              std::get<2>(_ipex_result)));
-      ctx->save_for_backward({input, std::get<0>(outputs), std::get<1>(outputs), std::get<2>(outputs)});
-      ctx->saved_data["layer_output"] = std::vector<at::Tensor>{at::Tensor()};
-      return {std::get<0>(outputs), std::get<1>(outputs), std::get<2>(outputs)};
-    } else {
-      auto outputs = at::lstm(
-            input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
-      ctx->save_for_backward({input, std::get<0>(outputs), std::get<1>(outputs), std::get<2>(outputs)});
-      ctx->saved_data["layer_output"] = std::vector<at::Tensor>{at::Tensor()};
-      return {std::get<0>(outputs), std::get<1>(outputs), std::get<2>(outputs)};
-    }
+    auto outputs = _forward(input, w1, w2, w3, w4, hx, cx, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes);
+    ctx->save_for_backward({input, w1, w2, w3, w4, hx, cx, outputs[0], outputs[1], outputs[2]});
+    return outputs;
   }
 
   static torch::autograd::tensor_list
@@ -847,27 +780,33 @@ public:
 #endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];
-    std::vector<at::Tensor> hx = ctx->saved_data["hx"].toTensorVector();
-    std::vector<at::Tensor> params = ctx->saved_data["params"].toTensorVector();
-    std::vector<at::Tensor> outputs = {saved[1], saved[2], saved[3]};
-    std::vector<at::Tensor> layer_output = ctx->saved_data["layer_output"].toTensorVector();
-
-    at::Tensor grad_output = grad_outputs[0];
-    at::Tensor grad_hy = grad_outputs[1];
-    at::Tensor grad_cy = grad_outputs[2];
-
-    bool has_biases = ctx->saved_data["has_biases"].toBool();
+    at::Tensor w1 = saved[1];
+    at::Tensor w2 = saved[2];
+    at::Tensor w3 = saved[3];
+    at::Tensor w4 = saved[4];
+    at::Tensor hx = saved[5];
+    at::Tensor cx = saved[6];
+    at::Tensor output = saved[7];
+    at::Tensor hy = saved[8];
+    at::Tensor cy = saved[9];
+    bool reverse = ctx->saved_data["reverse"].toBool();
+    int64_t mode = ctx->saved_data["mode"].toInt();
+    int64_t hidden_size = ctx->saved_data["hidden_size"].toInt();
     int64_t num_layers = ctx->saved_data["num_layers"].toInt();
-    double dropout_p = ctx->saved_data["dropout_p"].toDouble();
+    bool has_biases = ctx->saved_data["has_biases"].toBool();
     bool train = ctx->saved_data["train"].toBool();
     bool bidirectional = ctx->saved_data["bidirectional"].toBool();
-    bool batch_first = ctx->saved_data["batch_first"].toBool();
+    at::Tensor grad_output = grad_outputs[0].contiguous();
+    at::Tensor grad_hy = grad_outputs[1].contiguous();
+    at::Tensor grad_cy = grad_outputs[2].contiguous();
 
     try {
       if (torch_ipex::check_auto_dnnl() &&
           input.device().type() == c10::DeviceType::DPCPP) {
-        auto grad_inputs = torch_ipex::cpu::AtenIpexCPUDev::dil_lstm_backward(input, hx, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first, outputs, grad_output, grad_hy, grad_cy, layer_output);
-        return {std::get<0>(grad_inputs), at::Tensor(), at::Tensor(),
+        auto grad_inputs = torch_ipex::cpu::AtenIpexCPUDev::dil_lstm_layer_backward(input, w1, w2, w3, w4, hx, cx, output, hy, cy, grad_output, grad_hy, grad_cy, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, /*batch_sizes*/{});
+        return {grad_inputs[0], grad_inputs[1], grad_inputs[2],
+          grad_inputs[3], grad_inputs[3], grad_inputs[4],
+          grad_inputs[5], at::Tensor(), at::Tensor(),
           at::Tensor(), at::Tensor(), at::Tensor(),
           at::Tensor(), at::Tensor(), at::Tensor()};
       }

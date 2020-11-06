@@ -15,7 +15,7 @@ class AtenIpexTypeExt {
   static at::Tensor adaptive_avg_pool2d(at::Tensor const& input, at::IntArrayRef output_size);
   static at::Tensor max_pool2d(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode);
   static at::Tensor max_pool3d(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode);
-  static std::vector<at::Tensor> lstm(const at::Tensor& input, std::vector<at::Tensor> hx, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first);
+  static std::vector<at::Tensor> lstm(const at::Tensor& input, std::vector<at::Tensor> hidden, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first);
 };
 
 }  // namespace torch_ipex
