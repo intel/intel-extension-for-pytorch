@@ -7307,9 +7307,9 @@ class TestNN(NNTestCase):
     def test_dpcpp_noncontiguous_weight(self):
         # Noncontiguous weights must be contiguous() before being
         # passed to dpcpp
-        input = torch.tensor([1, 1, 1], dtype=torch.double).to("dpcpp").view(1, 1, 3)
-        weights1 = torch.tensor([1], dtype=torch.double).to("dpcpp").expand(1, 1, 2)
-        weights2 = torch.tensor([1], dtype=torch.double).to("dpcpp").expand(1, 1, 2).contiguous()
+        input = torch.tensor([1, 1, 1], dtype=torch.float).to("dpcpp").view(1, 1, 3)
+        weights1 = torch.tensor([1], dtype=torch.float).to("dpcpp").expand(1, 1, 2)
+        weights2 = torch.tensor([1], dtype=torch.float).to("dpcpp").expand(1, 1, 2).contiguous()
         self.assertEqual(F.conv1d(input, weights1, bias=None, stride=2, dilation=2),
                          F.conv1d(input, weights2, bias=None, stride=2, dilation=2))
 
@@ -9721,7 +9721,7 @@ class TestNNDeviceType(NNTestCase):
         self._test_EmbeddingBag(device, 'mean', True, dtype=torch.bfloat16, test_backward=True)
 
     @onlyDPCPP
-    @dtypes(torch.half, torch.float, torch.double)
+    @dtypes(torch.half, torch.float) # Now there is exit mechanism about dtype checking, so double case is skipped for oneDNN unsupport double
     def test_multihead_attention_dtype(self, device, dtype):
         embed_dim = 128
         num_heads = 8
@@ -9892,13 +9892,13 @@ class TestNNDeviceType(NNTestCase):
     def _test_maxpool_indices(self, num_dim, adaptive=False, device="cpu", dtype=torch.float):
         def expected_indices(dim):
             if dim == 1:
-                return torch.tensor([1, 3], dtype=torch.double).repeat(2, 2, 1)
+                return torch.tensor([1, 3], dtype=torch.float).repeat(2, 2, 1)
             if dim == 2:
-                return torch.tensor([[5, 7], [13, 15]], dtype=torch.double).repeat(2, 2, 1, 1)
+                return torch.tensor([[5, 7], [13, 15]], dtype=torch.float).repeat(2, 2, 1, 1)
 
         def expected_grad(dim):
             if dim == 1:
-                return torch.tensor([0, 1, 0, 1], dtype=torch.double).repeat(2, 2, 1)
+                return torch.tensor([0, 1, 0, 1], dtype=torch.float).repeat(2, 2, 1)
             grad = expected_grad(dim - 1)
             zero = torch.zeros(grad.size())
             return torch.stack((zero, grad, zero, grad), 2)
