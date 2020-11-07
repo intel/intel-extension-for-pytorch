@@ -8,6 +8,7 @@
 | ------ | ------ | ------ | ------ |
 | **Gen9** | Ubuntu-18.04 | [compute runtime 20.40.18075](https://github.com/intel/compute-runtime/releases/tag/20.40.18075) + [level zero](https://github.com/oneapi-src/level-zero/releases/tag/v1.0) | 3.6 + |
 | **DG1** | Ubuntu-20.04 | [agama-dg1-29/engineering build](http://10.239.87.81/zhenjie/agama/agama-dg1-29/) and replace IGC with [**igc3436**](http://10.239.87.81/zhenjie/igc3436/) | 3.6 + |
+| **ATS** | Ubuntu-20.04 | [PyTorch BKC](https://wiki.ith.intel.com/pages/viewpage.action?spaceKey=OSGCSH&title=PyTorch+Environment+BKC) | 3.6.x |
 
 ### **Dependence:**
 ```bash
@@ -22,7 +23,7 @@ logout
 
 ## **Compiler Version and Setting:**
 
-### Intel® oneAPI Base Toolkit(Beta) for Linux (version beta09) [https://dynamicinstaller.intel.com/oneapi/toolkits/base-kit/linux/]
+### [Intel® oneAPI Base Toolkit(Beta) for Linux (version beta09)](https://dynamicinstaller.intel.com/oneapi/toolkits/base-kit/linux/)
 
 ### install complier
 
@@ -74,12 +75,9 @@ map<string, vector<string>> enumDevices() {
 
 int main() {
   auto enummap = enumDevices();
-  cout << "================================================================"
-       << endl;
-  cout << "                   All Available Backend                        "
-       << endl;
-  cout << "================================================================"
-       << endl;
+  cout << "===========================================================" << endl;
+  cout << "                    All Available Backend                  " << endl;
+  cout << "===========================================================" << endl;
   for (map<string, vector<string>>::iterator each = enummap.begin();
        each != enummap.end(); ++each) {
     cout << "|Platform:" << endl << "|" << (*each).first << endl;
@@ -88,10 +86,8 @@ int main() {
          itr != (*each).second.end(); ++itr) {
       cout << "|\t   |" << *itr << endl;
     };
-    cout << "----------------------------------------------------------------"
-         << endl;
+    cout << "----------------------------------------------------------" << endl;
   }
-
   return 0;
 }
 
@@ -101,31 +97,31 @@ int main() {
 - Compile Command:
 
 ```bash
-$ clang++ -I $DPCPP_ROOT/include/sycl device_enum.cpp -L $DPCPP_ROOT/lib -fsycl -o device_enum
+$ clang++ device_enum.cpp -fsycl -o device_enum
 ```
 
 - Expected result like:
 ```bash
 ./device_enum
 
-================================================================
-                   All Available Backend                        
-================================================================
+===========================================================
+                    All Available Backend                  
+===========================================================
 |Platform:
 |Intel(R) CPU Runtime for OpenCL(TM) Applications
 |       |__|Devices:
 |          |Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz(NonGPU)
-----------------------------------------------------------------
+----------------------------------------------------------
 |Platform:
 |Intel(R) Level-Zero
 |       |__|Devices:
 |          |Intel(R) Gen9(GPU)
-----------------------------------------------------------------
+----------------------------------------------------------
 |Platform:
 |Intel(R) OpenCL HD Graphics
 |       |__|Devices:
 |          |Intel(R) Gen9 HD Graphics NEO(GPU)
-----------------------------------------------------------------
+----------------------------------------------------------
 ```
 
 ## Repo preparation:
@@ -174,7 +170,6 @@ git clone ssh://git@gitlab.devtools.intel.com:29418/intel-pytorch-extension/gpu-
 ```
 
 ## Known issues:
-*  Tensor.new() is not supported on DPCPP device. The alternative solution is Tensor.to("cpu").new().to("dpcpp").
 *  Model.storage() is not supported on DPCPP device. The alternative solution is Model.to("cpu").storage().
 
 ## Caveat:
