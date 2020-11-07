@@ -75,23 +75,18 @@ map<string, vector<string>> enumDevices() {
 
 int main() {
   auto enummap = enumDevices();
-  cout << "===========================================================" << endl;
-  cout << "                    All Available Backend                  " << endl;
-  cout << "===========================================================" << endl;
-  for (map<string, vector<string>>::iterator each = enummap.begin();
-       each != enummap.end(); ++each) {
-    cout << "|Platform:" << endl << "|" << (*each).first << endl;
-    cout << "|\t|__|Devices:" << endl;
-    for (vector<string>::iterator itr = (*each).second.begin();
-         itr != (*each).second.end(); ++itr) {
+  cout << "==============================================================" << endl
+       << "                    All Available Backend                     " << endl
+       << "==============================================================" << endl;
+  for (map<string, vector<string>>::iterator each = enummap.begin(); each != enummap.end(); ++each) {
+    cout << "|Platform:" << endl << "|" << (*each).first << endl << "|\t|__|Devices:" << endl;
+    for (vector<string>::iterator itr = (*each).second.begin(); itr != (*each).second.end(); ++itr) {
       cout << "|\t   |" << *itr << endl;
     };
-    cout << "----------------------------------------------------------" << endl;
+    cout << "--------------------------------------------------------------" << endl;
   }
   return 0;
 }
-
-
 ```
 
 - Compile Command:
@@ -104,24 +99,24 @@ $ clang++ device_enum.cpp -fsycl -o device_enum
 ```bash
 ./device_enum
 
-===========================================================
-                    All Available Backend                  
-===========================================================
+==============================================================
+                    All Available Backend                     
+==============================================================
 |Platform:
 |Intel(R) CPU Runtime for OpenCL(TM) Applications
 |       |__|Devices:
 |          |Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz(NonGPU)
-----------------------------------------------------------
+--------------------------------------------------------------
 |Platform:
 |Intel(R) Level-Zero
 |       |__|Devices:
 |          |Intel(R) Gen9(GPU)
-----------------------------------------------------------
+--------------------------------------------------------------
 |Platform:
 |Intel(R) OpenCL HD Graphics
 |       |__|Devices:
 |          |Intel(R) Gen9 HD Graphics NEO(GPU)
-----------------------------------------------------------
+--------------------------------------------------------------
 ```
 
 ## Repo preparation:
