@@ -1141,7 +1141,7 @@ Tensor _convolution_out(
     conv_attr_t attr) {
   auto output = output_r;
   auto input = input_r.contiguous();
-  auto weight = weight_r;
+  auto weight = weight_r.contiguous();
   auto bias = bias_r;
   auto k = weight.ndimension();
   if (k == input.ndimension() + 1) {
