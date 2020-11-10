@@ -39,6 +39,7 @@ import re
 import shutil
 import subprocess
 import sys
+from tools.setup.cmake import CMake
 
 try:
     import torch
@@ -172,70 +173,73 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
         ext_dir = pathlib.Path(ext.project_dir)
         if not os.path.exists(ext.build_dir):
             os.mkdir(ext.build_dir)
+        cmake = CMake(ext.build_dir)
+        if not os.path.isfile(cmake._cmake_cache_file):
+            build_type = 'Release'
 
-        build_type = 'Release'
+            if _check_env_flag('DEBUG'):
+                build_type = 'Debug'
 
-        if _check_env_flag('DEBUG'):
-            build_type = 'Debug'
+            def convert_cmake_dirs(paths):
+                def converttostr(input_seq, seperator):
+                    # Join all the strings in list
+                    final_str = seperator.join(input_seq)
+                    return final_str
+                try:
+                    return converttostr(paths, ";")
+                except:
+                    return paths
 
-        def convert_cmake_dirs(paths):
-            def converttostr(input_seq, seperator):
-                # Join all the strings in list
-                final_str = seperator.join(input_seq)
-                return final_str
-            try:
-                return converttostr(paths, ";")
-            except:
-                return paths
+            def defines(args, **kwargs):
+                for key, value in sorted(kwargs.items()):
+                    if value is not None:
+                        args.append('-D{}={}'.format(key, value))
 
-        def defines(args, **kwargs):
-            for key, value in sorted(kwargs.items()):
-                if value is not None:
-                    args.append('-D{}={}'.format(key, value))
+            cmake_args = []
+            build_options = {
+                # The default value cannot be easily obtained in CMakeLists.txt. We set it here.
+                # 'CMAKE_PREFIX_PATH': distutils.sysconfig.get_python_lib()
+                'CMAKE_BUILD_TYPE': build_type,
+                'PYTORCH_INCLUDE_DIR': convert_cmake_dirs(include_paths()),
+                'PYTORCH_LIBRARY_DIR': convert_cmake_dirs(library_paths()),
+                'PYTHON_EXECUTABLE': sys.executable,
+                'CMAKE_INSTALL_PREFIX': '/'.join([str(ext_dir.absolute()), "torch_ipex"]),
+                'PYTHON_INCLUDE_DIR': distutils.sysconfig.get_python_inc(),
+                'LIB_NAME': ext.name,
+                'PYTHON_EXECUTABLE': sys.executable,
+            }
 
-        cmake_args = []
-        build_options = {
-            # The default value cannot be easily obtained in CMakeLists.txt. We set it here.
-            # 'CMAKE_PREFIX_PATH': distutils.sysconfig.get_python_lib()
-            'CMAKE_BUILD_TYPE': build_type,
-            'PYTORCH_INCLUDE_DIR': convert_cmake_dirs(include_paths()),
-            'PYTORCH_LIBRARY_DIR': convert_cmake_dirs(library_paths()),
-            'PYTHON_EXECUTABLE': sys.executable,
-            'CMAKE_INSTALL_PREFIX': '/'.join([str(ext_dir.absolute()), "torch_ipex"]),
-            'PYTHON_INCLUDE_DIR': distutils.sysconfig.get_python_inc(),
-            'LIB_NAME': ext.name,
-            'PYTHON_EXECUTABLE': sys.executable,
-        }
+            if find_executable('ninja') is not None:
+                build_options['CMAKE_GENERATOR'] = 'Ninja'
+
+            my_env = os.environ.copy()
+            for var, val in my_env.items():
+                if var.startswith(('BUILD_', 'USE_', 'CMAKE_')):
+                    build_options[var] = val
+
+            cc, cxx = _get_complier()
+            defines(cmake_args, CMAKE_C_COMPILER=cc)
+            defines(cmake_args, CMAKE_CXX_COMPILER=cxx)
+            defines(cmake_args, **build_options)
+
+            cmake = find_executable('cmake3') or find_executable('cmake')
+            if cmake is None:
+                raise RuntimeError(
+                    "CMake must be installed to build the following extensions: " +
+                    ", ".join(e.name for e in self.extensions))
+            command = [cmake, ext.project_dir] + cmake_args
+            print(' '.join(command))
+
+            env = os.environ.copy()
+            check_call(command, cwd=ext.build_dir, env=env)
+
+        env = os.environ.copy()
+        build_args = ['-j', str(multiprocessing.cpu_count()), 'install']
+        # build_args += ['VERBOSE=1']
 
         gen_exec = 'make'
         if find_executable('ninja') is not None:
             gen_exec = 'ninja'
-            build_options['CMAKE_GENERATOR'] = 'Ninja'
-
-        my_env = os.environ.copy()
-        for var, val in my_env.items():
-            if var.startswith(('BUILD_', 'USE_', 'CMAKE_')):
-                build_options[var] = val
-
-        cc, cxx = _get_complier()
-        defines(cmake_args, CMAKE_C_COMPILER=cc)
-        defines(cmake_args, CMAKE_CXX_COMPILER=cxx)
-        defines(cmake_args, **build_options)
-
-        cmake = find_executable('cmake3') or find_executable('cmake')
-        if cmake is None:
-            raise RuntimeError(
-                "CMake must be installed to build the following extensions: " +
-                ", ".join(e.name for e in self.extensions))
-        command = [cmake, ext.project_dir] + cmake_args
-        print(' '.join(command))
-
-        env = os.environ.copy()
-        check_call(command, cwd=ext.build_dir, env=env)
-
-        build_args = ['-j', str(multiprocessing.cpu_count()), 'install']
-        # build_args += ['VERBOSE=1']
-
         print("build args: {}".format(build_args))
         check_call([gen_exec] + build_args, cwd=ext.build_dir, env=env)
 

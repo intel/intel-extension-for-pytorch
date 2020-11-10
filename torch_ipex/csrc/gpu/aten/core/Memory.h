@@ -1,7 +1,6 @@
 #pragma once
 
 #include <core/DPCPPUtils.h>
-#include <core/Memory.h>
 #include <core/Stream.h>
 
 DPCPP_DEF_K1(memory_copy);
