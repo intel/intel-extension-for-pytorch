@@ -5,7 +5,7 @@ import numpy as np
 np.set_printoptions(threshold=np.inf)
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
@@ -68,7 +68,7 @@ class TestTorchMethod(TestCase):
 #
 # print(res[0, 0:10])
 #
-# print("dpcpp")
+# print("xpu")
 # embedding.dpcpp()
 #
 # res = embedding(input.to(dpcpp_device))

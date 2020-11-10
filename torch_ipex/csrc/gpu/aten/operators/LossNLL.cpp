@@ -15,7 +15,7 @@
 #include <core/detail/TensorInfo.h>
 #include <utils/ATDispatch.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 #include <operators/Reduce.h>
 
 DPCPP_DEF_K2(updateOutputName, typename scalar_t);
@@ -36,7 +36,7 @@ DPCPP_DEF_K2(spacial_class_nll_2d_backward_kernel, typename scalar_t);
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
@@ -799,7 +799,7 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
 
 } // namespace impl
 
-// namespace AtenIpexTypeDPCPP
+// namespace AtenIpexTypeXPU
 std::tuple<Tensor&, Tensor&> nll_loss_forward_out(
     Tensor& output,
     Tensor& total_weight,
@@ -980,7 +980,7 @@ Tensor nll_loss2d_backward(
   int64_t ignore_index,
   const Tensor& total_weight) {
   Tensor grad_input = at::empty({0}, grad_output.options());
-  at::AtenIpexTypeDPCPP::nll_loss2d_backward_out(
+  at::AtenIpexTypeXPU::nll_loss2d_backward_out(
     grad_input,
     grad_output,
     self,
@@ -1059,7 +1059,7 @@ std::tuple<Tensor,Tensor> nll_loss2d_forward(
   int64_t ignore_index) {
   Tensor output = at::empty({0}, self.options());
   Tensor total_weight = at::empty({0}, self.options());
-  at::AtenIpexTypeDPCPP::nll_loss2d_forward_out(
+  at::AtenIpexTypeXPU::nll_loss2d_forward_out(
     output,
     total_weight,
     self,
@@ -1070,5 +1070,5 @@ std::tuple<Tensor,Tensor> nll_loss2d_forward(
   return std::tuple<Tensor, Tensor>{output, total_weight};
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

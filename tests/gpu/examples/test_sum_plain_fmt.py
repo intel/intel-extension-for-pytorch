@@ -8,7 +8,7 @@ import copy
 import pytest
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_conv_relu_fusion(self, dtype=torch.float):
@@ -25,9 +25,9 @@ class TestNNMethod(TestCase):
         ref3 = z_cpu + x_cpu
         ref4 = x_cpu + 2
         
-        x_dpcpp = x_cpu.to("dpcpp")
-        y_dpcpp = y_cpu.to("dpcpp")
-        z_dpcpp = z_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
+        y_dpcpp = y_cpu.to("xpu")
+        z_dpcpp = z_cpu.to("xpu")
         
         
         #real1 = x_dpcpp + y_dpcpp

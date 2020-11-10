@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 Tensor slice(
     const Tensor& self,
@@ -43,5 +43,19 @@ Tensor unfold(
   return at::native::unfold(self, dimension, size, step);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
+
+namespace AtenIpexTypeQuantizedXPU {
+Tensor view(const Tensor& self, IntArrayRef size) {
+  return at::native::view(self, size);
+}
+
+Tensor as_strided(
+  const Tensor& self,
+  IntArrayRef size,
+  at::IntArrayRef stride,
+  c10::optional<int64_t> storage_offset) {
+    return at::native::as_strided_qtensorimpl(self, size, stride, storage_offset);
+}
+} // namespace AtenIpexTypeXPU
 } // namespace at

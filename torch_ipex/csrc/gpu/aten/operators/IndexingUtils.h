@@ -54,7 +54,7 @@ static void checkIndexTensorTypes(TensorList indices) {
     if (tensor.defined()) {
       auto scalarType = tensor.scalar_type();
       if (scalarType != kLong && scalarType != kByte && scalarType != kBool) {
-        AT_INDEX_ERROR(
+        TORCH_CHECK_INDEX(
             "tensors used as indices must be long, byte or bool tensors");
       }
     }
@@ -272,28 +272,27 @@ static TensorIterator make_index_put_iterator(
         " cannot be broadcast to indexing result of shape ",
         info.src.sizes());
   }
-  auto iter = TensorIterator();
-  iter.dont_compute_common_dtype();
-  iter.dont_resize_outputs();
-  iter.add_output(info.src);
-  iter.add_input(value, info.src.device(), info.src.scalar_type());
+  TensorIteratorConfig config;
+  config.check_all_same_dtype(false)
+  .resize_outputs(false)
+  .add_output(info.src)
+  .add_input(value);
   for (auto& index : info.indices) {
-    iter.add_input(index);
+    config.add_input(index);
   }
-  iter.build();
-  return iter;
+  return config.build();
 }
 
 static TensorIterator make_index_iterator(const AdvancedIndex& info) {
-  auto iter = TensorIterator();
-  iter.dont_compute_common_dtype();
-  iter.add_output(Tensor(), info.src.device(), info.src.scalar_type());
-  iter.add_input(info.src);
+  TensorIteratorConfig config;
+  config.check_all_same_dtype(false)
+  .declare_static_dtype_and_device(info.src.scalar_type(), info.src.device())
+  .add_output(Tensor())
+  .add_input(info.src);
   for (auto& index : info.indices) {
-    iter.add_input(index);
+    config.add_input(index);
   }
-  iter.build();
-  return iter;
+  return config.build();
 }
 } // namespace dpcpp
 } // namespace at

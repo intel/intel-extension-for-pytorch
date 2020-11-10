@@ -7,7 +7,7 @@
 #include <utils/MathReduce.h>
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
-#include <ATen/aten_ipex_type_dpcpp.h>
+#include <ATen/AtenIpexTypeXPU.h>
 #include "ScanKernel.h"
 #include "Sort.h"
 
@@ -15,7 +15,7 @@ using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace {
 
 template <typename T>
@@ -590,8 +590,8 @@ void Topk(
   if (input.dim() != 0)
     topKSize = input.sizes().vec();
   topKSize[dim] = k;
-  at::AtenIpexTypeDPCPP::resize_(topK, topKSize, c10::nullopt);
-  at::AtenIpexTypeDPCPP::resize_(indices, topKSize, c10::nullopt);
+  at::AtenIpexTypeXPU::resize_(topK, topKSize, c10::nullopt);
+  at::AtenIpexTypeXPU::resize_(indices, topKSize, c10::nullopt);
 
 // static_cast is required to ensure that the correct type (INDEX_T)
 // is provided to the kernel for the arguments.
@@ -727,5 +727,5 @@ std::tuple<at::Tensor, at::Tensor> topk(
   return at::native::topk(self, k, dim, largest, sorted);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

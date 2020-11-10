@@ -24,7 +24,6 @@ using namespace at;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 #ifndef USE_USM
@@ -63,12 +62,14 @@ struct CopyOp {
 
 
 #define BUILD_TENSOR_ITER(dst, src, iter) \
-  auto iter = TensorIterator();           \
-  iter.add_output(dst);                   \
-  iter.add_input(src);                    \
-  iter.dont_resize_outputs();             \
-  iter.dont_compute_common_dtype();       \
-  iter.build();
+  auto iter = TensorIteratorConfig()      \
+    .set_check_mem_overlap(true)          \
+    .add_output(self)                     \
+    .add_input(src)                       \
+    .resize_outputs(false)                \
+    .check_all_same_dtype(false)          \
+    .check_all_same_device(false)         \
+    .build();
 
 static bool copy_requires_temporaries(TensorIterator& iter, bool p2p_enabled) {
   Device dst_device = iter.device(0);
@@ -76,8 +77,8 @@ static bool copy_requires_temporaries(TensorIterator& iter, bool p2p_enabled) {
 
   if (dst_device == src_device) {
     // We never require temporaries for copies on the same GPU.
-    TORCH_INTERNAL_ASSERT(dst_device.type() == c10::DeviceType::DPCPP &&
-      src_device.type() == c10::DeviceType::DPCPP );
+    TORCH_INTERNAL_ASSERT(dst_device.type() == c10::DeviceType::XPU &&
+      src_device.type() == c10::DeviceType::XPU );
     return false;
   }
 
@@ -85,8 +86,8 @@ static bool copy_requires_temporaries(TensorIterator& iter, bool p2p_enabled) {
   if (same_dtype && iter.is_contiguous()) {
     // Contiguous same-dtype copies can always use sycl copy
     return false;
-  } else if (dst_device.type() == c10::DeviceType::DPCPP &&
-             src_device.type() == c10::DeviceType::DPCPP ) {
+  } else if (dst_device.type() == c10::DeviceType::XPU &&
+             src_device.type() == c10::DeviceType::XPU ) {
     // Copies between GPUs can use the copy kernel if P2P is supported
     return !p2p_enabled;
   } else {
@@ -188,7 +189,7 @@ Tensor as_strided_quantized_dpcpp(const Tensor& self, IntArrayRef size, IntArray
   auto storage_offset = self.storage_offset();
   auto quantizer = at::get_qtensorimpl(self)->quantizer();
   auto result = detail::make_tensor<QTensorImpl>(
-      Storage(self.storage()), self.key_set(), quantizer);
+      Storage(self.storage()), self.key_set(), self.dtype(), quantizer);
   native::setStrided(result, size, stride, storage_offset);
   return result;
 }
@@ -230,7 +231,7 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
 
     // Type conversions are performed on the CPU for CPU-GPU copies and on
     // the src device for GPU-GPU copies.
-    if (iter.device_type(0) == kDPCPP) {
+    if (iter.device_type(0) == kXPU) {
       dst_contig = dst.is_contiguous() ? dst : at::empty_like(dst);
       if(dst.is_quantized()){
         src_contig = expand_as_quantized_dpcpp(iter.tensor(1).to(iter.dtype(0)), dst).contiguous();
@@ -257,8 +258,8 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   }
 
   // Copy on GPU (or between GPUs)
-  if (dst_device.type() == c10::DeviceType::DPCPP &&
-      src_device.type() == c10::DeviceType::DPCPP) {
+  if (dst_device.type() == c10::DeviceType::XPU &&
+      src_device.type() == c10::DeviceType::XPU) {
     copy_device_to_device(iter, non_blocking);
     return;
   }
@@ -266,12 +267,12 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   // Copy between CPU and GPU
   OptionalDPCPPGuard device_guard;
   dpcppMemcpyKind kind;
-  if (dst_device.type() == c10::DeviceType::DPCPP &&
+  if (dst_device.type() == c10::DeviceType::XPU &&
       src_device.is_cpu()) {
     device_guard.set_device(dst_device);
     kind = HostToDevice;
   } else if (dst_device.is_cpu() &&
-             src_device.type() == c10::DeviceType::DPCPP) {
+             src_device.type() == c10::DeviceType::XPU) {
     device_guard.set_device(src_device);
     kind = DeviceToHost;
   } else {
@@ -298,15 +299,31 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
 
 } // namespace impl
 
+namespace AtenIpexTypeXPU {
+Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
+  BUILD_TENSOR_ITER(self, src, iter);
+
+  if (iter.numel() == 0) {
+    return self;
+  }
+
+  impl::copy_kernel_dpcpp(iter, non_blocking);
+
+  return self;
+}
+
+} // namespace AtenIpexTypeXPU
+
+namespace AtenIpexTypeQuantizedXPU {
 Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   // TODO: valid check
   if (self.is_quantized() && src.is_quantized()) {
     if(self.device() != src.device()){
       self = _empty_affine_quantized(self.sizes(),
-               self.options(),
-               1.f,
-               static_cast<int>(0),
-               MemoryFormat::Contiguous);
+                                     self.options(),
+                                     1.f,
+                                     static_cast<int>(0),
+                                     MemoryFormat::Contiguous);
     }
     self.set_quantizer_(src.quantizer());
   }
@@ -321,6 +338,6 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
 
   return self;
 }
+} // namespace AtenIpexTypeQuantizedXPU
 
-} // namespace AtenIpexTypeDPCPP
 } // namespace at

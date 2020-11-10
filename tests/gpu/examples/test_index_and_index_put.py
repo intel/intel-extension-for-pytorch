@@ -5,7 +5,7 @@ import numpy as np
 np.set_printoptions(threshold=np.inf)
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
@@ -21,8 +21,8 @@ class TestTorchMethod(TestCase):
         print(x_cpu[mask_cpu])
 
         # dpcpp part
-        x_dpcpp = x_cpu.to("dpcpp")
-        mask_dpcpp = mask_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
+        mask_dpcpp = mask_cpu.to("xpu")
         print("mask index:")
         print(mask_dpcpp.nonzero().to("cpu"))
         print("x_dpcpp[mask_dpcpp]:")
@@ -41,8 +41,8 @@ class TestTorchMethod(TestCase):
         print("index_put accmulate=true")
         print(x_cpu)
 
-        input = input.to("dpcpp")
-        indcies = indcies.to("dpcpp")
+        input = input.to("xpu")
+        indcies = indcies.to("xpu")
         x_dpcpp[indcies] = input
         print("dpcpp index_put")
         print(x_dpcpp.cpu())

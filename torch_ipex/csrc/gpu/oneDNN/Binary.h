@@ -5,7 +5,7 @@
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
 #include <tensor/Context.h>
-#include <ATen/aten_ipex_type_dpcpp.h>
+#include <ATen/AtenIpexTypeXPU.h>
 #include "Utils.h"
 
 #include <dnnl.hpp>
@@ -15,7 +15,7 @@
 #endif
 
 using namespace dnnl;
-using namespace at::AtenIpexTypeDPCPP;
+using namespace at::AtenIpexTypeXPU;
 
 namespace at {
 namespace dpcpp {
@@ -27,7 +27,7 @@ static inline Tensor bin(
   const Tensor& t1,
   const Tensor& t2,
   const Tensor t3 = at::Tensor()) {
-  auto engine = GpuEngineManager::Instance().get_engine({kDPCPP, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
   auto ctx1 = DPCPPTensorContext::get_tensor_ctx(t1);
   auto ctx2 = DPCPPTensorContext::get_tensor_ctx(t2);

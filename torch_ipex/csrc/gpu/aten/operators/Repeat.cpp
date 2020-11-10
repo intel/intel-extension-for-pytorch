@@ -8,7 +8,7 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 DPCPP_DEF_K1(ComputeDpcppKer);
@@ -61,5 +61,5 @@ Tensor repeat_interleave(const Tensor& repeat) {
   return repeat_interleave_common<impl::repeat_interleave_dpcpp_kernel>(repeat);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

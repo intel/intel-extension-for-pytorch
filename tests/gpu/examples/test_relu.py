@@ -5,7 +5,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -13,7 +13,7 @@ class TestNNMethod(TestCase):
 
         x_cpu = torch.tensor(
             [[-0.1, 0.2], [-0.2, 0.3], [0.4, 0.5], [0.5, -0.6]])
-        x_dpcpp = x_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
 
         relu_(x_cpu)
         relu_(x_dpcpp)

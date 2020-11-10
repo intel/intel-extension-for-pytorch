@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/DPCPP.h>
 #include <utils/Numerics.h>
@@ -11,7 +12,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 IPEX_OUT_ALL_UNARY_FUNC_OPS(abs_out, Numerics<scalar_t>::abs, Real);
 IPEX_OUT_ALL_UNARY_FUNC_OPS(neg_out, Numerics<scalar_t>::neg, Real);
@@ -41,5 +42,5 @@ IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(erf, Numerics<scalar_t>::erf, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(erfc, Numerics<scalar_t>::erfc, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(exp, Numerics<scalar_t>::exp, Real);
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

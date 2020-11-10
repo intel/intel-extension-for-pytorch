@@ -8,7 +8,7 @@ from torch.testing._internal.common_utils import TestCase
 
 
 cpu_device = torch.device("cpu")
-sycl_device = torch.device("dpcpp")
+sycl_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_upsamle_linear_1d(self, dtype=torch.float):
@@ -28,7 +28,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.randn((2,3,30), dtype=torch.float32, device = cpu_device)
-        grad_out_dpcpp = grad_out_cpu.to("dpcpp")
+        grad_out_dpcpp = grad_out_cpu.to("xpu")
         grad_out_cpu = Variable(grad_out_cpu, requires_grad = True)
         grad_out_dpcpp = Variable(grad_out_dpcpp, requires_grad = True)
 
@@ -58,7 +58,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.randn((2,3,30,40), dtype=torch.float32, device = cpu_device)
-        grad_out_dpcpp = grad_out_cpu.to("dpcpp")
+        grad_out_dpcpp = grad_out_cpu.to("xpu")
         grad_out_cpu = Variable(grad_out_cpu, requires_grad = True)
         grad_out_dpcpp = Variable(grad_out_dpcpp, requires_grad = True)
 
@@ -88,7 +88,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(output_cpu, output_dpcpp.cpu())
 
         grad_out_cpu = torch.randn((2,3,12,40,5), dtype=torch.float32, device = cpu_device)
-        grad_out_dpcpp = grad_out_cpu.to("dpcpp")
+        grad_out_dpcpp = grad_out_cpu.to("xpu")
         grad_out_cpu = Variable(grad_out_cpu, requires_grad = True)
         grad_out_dpcpp = Variable(grad_out_dpcpp, requires_grad = True)
 

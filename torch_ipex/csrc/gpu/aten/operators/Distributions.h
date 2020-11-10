@@ -6,7 +6,7 @@
 #include <utils/Numerics.h>
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 
 template <typename...>
@@ -48,7 +48,7 @@ template<typename scalar_t,
   typename dist_t,
   typename transform_t>
 void distribution_nullary_kernel(at::TensorIterator& iter,
-                                 at::DPCPPGenerator* gen,
+                                 at::DPCPPGeneratorImpl* gen,
                                  const dist_t& dist_func,
                                  const transform_t transform_func) {
   int64_t numel = iter.numel();

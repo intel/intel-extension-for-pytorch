@@ -3,7 +3,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -15,7 +15,7 @@ class TestNNMethod(TestCase):
         print("CPU result:")
         print(a.repeat_interleave(2))
 
-        a_dpcpp = a.to("dpcpp")
+        a_dpcpp = a.to("xpu")
         b_dpcpp = a_dpcpp.repeat_interleave(2)
         print("[1] SYCL result using tensor.repeat_interleave:")
         print(b_dpcpp.to("cpu"))
@@ -28,7 +28,7 @@ class TestNNMethod(TestCase):
         print("CPU result:")
         print(torch.repeat_interleave(a, 2))
 
-        a_dpcpp = a.to("dpcpp")
+        a_dpcpp = a.to("xpu")
         b_dpcpp = torch.repeat_interleave(a_dpcpp, 2)
         print("[2] SYCL result using torch.repeat_interleave:")
         print(b_dpcpp.to("cpu"))

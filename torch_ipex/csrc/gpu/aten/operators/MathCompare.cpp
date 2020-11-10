@@ -1,8 +1,9 @@
 #include <ATen/ExpandUtils.h>
 #include <ATen/Functions.h>
 #include <ATen/ScalarOps.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 #include <core/ApplyUtils.h>
 #include <core/TensorImplUtils.h>
 #include <utils/Numerics.h>
@@ -11,7 +12,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename T, typename TOut>
@@ -90,7 +91,7 @@ void logicalTensor(
       at::dpcpp::TensorImpl_Unwrap(src1)) {
     at::dpcpp::DPCPP_tensor_apply2<ScalarType, ScalarType>(self_, src2, op);
   } else {
-    at::AtenIpexTypeDPCPP::resize_as_(self_, src1, c10::nullopt);
+    at::AtenIpexTypeXPU::resize_as_(self_, src1, c10::nullopt);
 
     TORCH_CHECK(src1.numel() == src2.numel(), "sizes do not match");
     at::dpcpp::DPCPP_tensor_apply3<ScalarTypeOut, ScalarType, ScalarType>(
@@ -269,7 +270,7 @@ void THDPCPPTensor_(neTensorByte)(
 } // namespace impl
 
 Tensor& lt_out(Tensor& out, const Tensor& self, Scalar other_) {
-  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  auto other = c10::scalar_to_tensor(other_, kXPU);
   // TODO: broadcast
   auto new_other =
       other.resize_as_(self).fill_(other_).toType(self.scalar_type());
@@ -279,7 +280,7 @@ Tensor& lt_out(Tensor& out, const Tensor& self, Scalar other_) {
 
 Tensor lt(const Tensor& self, Scalar other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
-  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  auto other = c10::scalar_to_tensor(other_, kXPU);
   // TODO: broadcast
   auto new_other =
       other.resize_as_(self).fill_(other_).toType(self.scalar_type());
@@ -303,7 +304,7 @@ Tensor lt(const Tensor& self, const Tensor& other) {
 }
 
 Tensor& gt_out(Tensor& out, const Tensor& self, Scalar other_) {
-  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  auto other = c10::scalar_to_tensor(other_, kXPU);
   // TODO: broadcast
   auto new_other =
       other.resize_as_(self).fill_(other_).toType(self.scalar_type());
@@ -313,7 +314,7 @@ Tensor& gt_out(Tensor& out, const Tensor& self, Scalar other_) {
 
 Tensor gt(const Tensor& self, Scalar other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
-  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  auto other = c10::scalar_to_tensor(other_, kXPU);
   // TODO: broadcast
   auto new_other =
       other.resize_as_(self).fill_(other_).toType(self.scalar_type());
@@ -338,7 +339,7 @@ Tensor gt(const Tensor& self, const Tensor& other) {
 }
 
 Tensor& ge_out(Tensor& out, const Tensor& self, Scalar other_) {
-  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  auto other = c10::scalar_to_tensor(other_, kXPU);
   // TODO: broadcast
   auto new_other =
       other.resize_as_(self).fill_(other_).toType(self.scalar_type());
@@ -348,7 +349,7 @@ Tensor& ge_out(Tensor& out, const Tensor& self, Scalar other_) {
 
 Tensor ge(const Tensor& self, Scalar other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
-  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  auto other = c10::scalar_to_tensor(other_, kXPU);
   // TODO: broadcast
   auto new_other =
       other.resize_as_(self).fill_(other_).toType(self.scalar_type());
@@ -374,7 +375,7 @@ Tensor ge(const Tensor& self, const Tensor& other) {
 }
 
 Tensor& le_out(Tensor& out, const Tensor& self, Scalar other_) {
-  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  auto other = c10::scalar_to_tensor(other_, kXPU);
   // TODO: broadcast
   auto new_other =
       other.resize_as_(self).fill_(other_).toType(self.scalar_type());
@@ -384,7 +385,7 @@ Tensor& le_out(Tensor& out, const Tensor& self, Scalar other_) {
 
 Tensor le(const Tensor& self, Scalar other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
-  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  auto other = c10::scalar_to_tensor(other_, kXPU);
   // TODO: broadcast
   auto new_other =
       other.resize_as_(self).fill_(other_).toType(self.scalar_type());
@@ -408,7 +409,7 @@ Tensor le(const Tensor& self, const Tensor& other) {
 }
 
 Tensor& eq_out(Tensor& out, const Tensor& self, Scalar other_) {
-  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  auto other = c10::scalar_to_tensor(other_, kXPU);
   // TODO: broadcast
   auto new_other =
       other.resize_as_(self).fill_(other_).toType(self.scalar_type());
@@ -417,7 +418,7 @@ Tensor& eq_out(Tensor& out, const Tensor& self, Scalar other_) {
 
 Tensor eq(const Tensor& self, Scalar other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
-  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  auto other = c10::scalar_to_tensor(other_, kXPU);
   // TODO: broadcast
   auto new_other =
       other.resize_as_(self).fill_(other_).toType(self.scalar_type());
@@ -447,14 +448,14 @@ bool equal(const Tensor& self, const Tensor& other) {
   if (!self.sizes().equals(other.sizes()))
     return false;
 
-  at::AtenIpexTypeDPCPP::eq_out(result, self, other);
-  Tensor min = at::AtenIpexTypeDPCPP::min(result);
-  Scalar min_ = at::AtenIpexTypeDPCPP::_local_scalar_dense(min);
+  at::AtenIpexTypeXPU::eq_out(result, self, other);
+  Tensor min = at::AtenIpexTypeXPU::min(result);
+  Scalar min_ = at::AtenIpexTypeXPU::_local_scalar_dense(min);
   return min_.to<bool>() != 0;
 }
 
 Tensor& ne_out(Tensor& out, const Tensor& self, Scalar other_) {
-  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  auto other = c10::scalar_to_tensor(other_, kXPU);
   // TODO: broadcast
   auto new_other =
       other.resize_as_(self).fill_(other_).toType(self.scalar_type());
@@ -464,7 +465,7 @@ Tensor& ne_out(Tensor& out, const Tensor& self, Scalar other_) {
 
 Tensor ne(const Tensor& self, Scalar other_) {
   auto result = at::empty({0}, self.options().dtype(kBool));
-  auto other = c10::scalar_to_tensor(other_, kDPCPP);
+  auto other = c10::scalar_to_tensor(other_, kXPU);
   // TODO: broadcast
   auto new_other =
       other.resize_as_(self).fill_(other_).toType(self.scalar_type());
@@ -487,5 +488,5 @@ Tensor ne(const Tensor& self, const Tensor& other) {
   return at::ne_out(result, self, other);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

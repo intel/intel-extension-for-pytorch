@@ -5,7 +5,7 @@ import torch_ipex
 from torch.testing._internal.common_utils import TestCase
 
 
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
 
 
@@ -25,10 +25,10 @@ class  TestTorchMethod(TestCase):
         y_cpu = a.mul(b).add(c)
         print("cpu mul + add result", y_cpu)
 
-        conv_dpcpp = conv.to("dpcpp")
-        a_d = x.to("dpcpp")
-        b_d = conv_dpcpp(y.to("dpcpp"))
-        c_d = conv_dpcpp(z.to("dpcpp"))
+        conv_dpcpp = conv.to("xpu")
+        a_d = x.to("xpu")
+        b_d = conv_dpcpp(y.to("xpu"))
+        c_d = conv_dpcpp(z.to("xpu"))
 
         y_dpcpp = a_d.mul(b_d).add(c_d)
         print("dpcpp mul + add result", y_dpcpp.cpu())
@@ -48,12 +48,12 @@ class  TestTorchMethod(TestCase):
         conv1 = nn.Conv2d(C, C, kernel_size=3, stride=1, padding=1, bias=False)
         conv2 = nn.Conv2d(C, C, kernel_size=3, stride=1, padding=1, bias=False)
 
-        conv1.to("dpcpp")
-        conv2.to("dpcpp")
+        conv1.to("xpu")
+        conv2.to("xpu")
 
-        x = conv1(x.to("dpcpp"))
-        y = y.to("dpcpp")
-        z = conv2(z.to("dpcpp"))
+        x = conv1(x.to("xpu"))
+        y = y.to("xpu")
+        z = conv2(z.to("xpu"))
         for i in range(16):
             y[0][i][0][0] = i
 

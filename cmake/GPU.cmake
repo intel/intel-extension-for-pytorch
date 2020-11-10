@@ -86,20 +86,28 @@ set(DPCPP_GPU_ROOT "${IPEX_C_SOURCE_DIR}/gpu")
 set(DPCPP_GPU_ATEN_SRC_ROOT "${DPCPP_GPU_ROOT}/aten")
 set(DPCPP_GPU_ATEN_GENERATED "${DPCPP_GPU_ROOT}/aten/generated")
 
-# generate c10 dispatch registration
-add_custom_command(OUTPUT ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp
-        COMMAND mkdir -p ${DPCPP_GPU_ATEN_GENERATED} && mkdir -p ${DPCPP_GPU_ATEN_GENERATED}/ATen
-        COMMAND "${PYTHON_EXECUTABLE}" ${PROJECT_SOURCE_DIR}/scripts/gpu/dispatch_gen.py --install_dir ${DPCPP_GPU_ATEN_GENERATED}/ATen/
-        DEPENDS ${PROJECT_SOURCE_DIR}/scripts/gpu/DPCPPGPUType.h)
+add_custom_command(OUTPUT
+        ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeXPU.cpp
+        ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeQuantizedXPU.cpp
+        COMMAND
+        mkdir -p ${DPCPP_GPU_ATEN_GENERATED} && mkdir -p ${DPCPP_GPU_ATEN_GENERATED}/ATen
+        COMMAND
+        "${PYTHON_EXECUTABLE}" ${PROJECT_SOURCE_DIR}/scripts/gpu/gen_code.py --declarations-path
+        ${PROJECT_SOURCE_DIR}/scripts/declarations/Declarations.yaml
+        --out ${DPCPP_GPU_ATEN_GENERATED}/ATen/
+        --source-path ${PROJECT_SOURCE_DIR}
+        DEPENDS
+        ${PROJECT_SOURCE_DIR}/scripts/gpu/DPCPPGPUType.h
+        ${PROJECT_SOURCE_DIR}/scripts/gpu/QUANTIZEDDPCPPGPUType.h)
 
 # sources
 set(DPCPP_SRCS)
-set(DPCPP_JIT_SRCS)
-set(DPCPP_ATEN_SRCS)
-add_subdirectory(torch_ipex/csrc/gpu/aten)
-list(APPEND DPCPP_SRCS ${DPCPP_ATEN_SRCS})
-add_subdirectory(torch_ipex/csrc/gpu/jit)
-add_library(torch_ipex SHARED ${DPCPP_SRCS} ${DPCPP_JIT_SRCS} ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp)
+add_subdirectory(torch_ipex/csrc/)
+
+add_library(torch_ipex SHARED ${TORCH_IPEX_SRCS}
+        ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeXPU.cpp
+        ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeQuantizedXPU.cpp)
+
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
 

@@ -5,7 +5,7 @@
 #include <tensor/Context.h>
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 struct DPCPPTensorContext;
 

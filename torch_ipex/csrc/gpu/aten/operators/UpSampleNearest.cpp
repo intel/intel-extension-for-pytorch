@@ -5,7 +5,7 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 static void upsample_nearest_out_dpcpp_kernel(
@@ -18,7 +18,7 @@ static void upsample_nearest_out_dpcpp_kernel(
   auto input = input_.contiguous();
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  Device curDevice = Device(kDPCPP, current_device());
+  Device curDevice = Device(kXPU, current_device());
   auto eng = GpuEngineManager::Instance().get_engine(curDevice);
 
   bool is_customer_scales =
@@ -81,7 +81,7 @@ static void upsample_nearest_backward_out_dpcpp_kernel(
   auto grad_output = grad_output_.contiguous();
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  Device curDevice = Device(kDPCPP, current_device());
+  Device curDevice = Device(kXPU, current_device());
   auto eng = GpuEngineManager::Instance().get_engine(curDevice);
 
   bool is_customer_scales =
@@ -338,5 +338,5 @@ Tensor upsample_nearest1d_backward(
   return grad_input;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

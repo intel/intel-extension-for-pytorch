@@ -3,7 +3,7 @@ from torch.testing._internal.common_utils import TestCase, repeat_test_for_types
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):

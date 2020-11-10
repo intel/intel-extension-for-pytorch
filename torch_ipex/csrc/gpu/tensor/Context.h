@@ -22,7 +22,7 @@ using data_t = void*;
 #endif
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 at::Tensor empty(
     at::IntArrayRef size,
@@ -224,7 +224,7 @@ class DPCPPTensorConvertor {
     mem_desc_t from_md = from_is_opaque_tensor ? opaque_md : plain_md;
     mem_desc_t to_md = to_is_opaque_tensor ? opaque_md : plain_md;
 
-    at::Device curDevice = at::Device(at::kDPCPP, current_device());
+    at::Device curDevice = at::Device(at::kXPU, current_device());
     auto engine = GpuEngineManager::Instance().get_engine(curDevice);
     auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -265,7 +265,7 @@ class DPCPPTensorConvertor {
     if (from.scalar_type() == at::ScalarType::Long)
       options = options.dtype(kInt);
 
-    auto to = at::AtenIpexTypeDPCPP::empty(ctx.dims(), options, c10::nullopt);
+    auto to = at::AtenIpexTypeXPU::empty(ctx.dims(), options, c10::nullopt);
     convert(to, from);
 
     // case-2. int32 opaque tensor in block fmt
@@ -291,14 +291,14 @@ class DPCPPTensorConvertor {
   }
 };
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at
 
 static bool
 check_has_opaque_and_no_padding(std::vector<at::Tensor> tlist) {
-  std::vector<at::AtenIpexTypeDPCPP::DPCPPTensorContext> ctx_list;
+  std::vector<at::AtenIpexTypeXPU::DPCPPTensorContext> ctx_list;
   for (auto t : tlist)
-    ctx_list.push_back(at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(t));
+    ctx_list.push_back(at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(t));
 
   bool all_plain = true;
   for (auto ctx : ctx_list)
@@ -306,7 +306,7 @@ check_has_opaque_and_no_padding(std::vector<at::Tensor> tlist) {
   if (all_plain) return false;
 
   for (int i = 0; i < tlist.size(); i++) {
-    int64_t padded_numel = at::AtenIpexTypeDPCPP::DPCPPTensorContext(
+    int64_t padded_numel = at::AtenIpexTypeXPU::DPCPPTensorContext(
         nullptr, ctx_list.at(i).meta()).padded_size();
     if (padded_numel != 0 && padded_numel != tlist.at(i).numel())
       return false;

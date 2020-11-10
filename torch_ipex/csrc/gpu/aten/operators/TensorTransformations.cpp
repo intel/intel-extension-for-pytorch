@@ -16,7 +16,7 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 constexpr size_t dim_bitset_size = 64;
@@ -245,5 +245,5 @@ Tensor rot90(const Tensor& self, int64_t k, IntArrayRef dims) {
   }
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

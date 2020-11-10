@@ -16,7 +16,7 @@ using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 Tensor mv(const Tensor & self, const Tensor & vec) {
 #ifdef USE_ONEMKL
   auto m = self.size(-2);
@@ -47,5 +47,5 @@ Tensor mv(const Tensor & self, const Tensor & vec) {
 
 
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

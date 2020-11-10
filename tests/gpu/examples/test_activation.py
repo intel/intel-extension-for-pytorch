@@ -9,7 +9,7 @@ class  TestNNMethod(TestCase):
         relu_ = torch.nn.functional.relu_
         relu = torch.nn.functional.relu
         x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]])
-        x_dpcpp = x_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
 
         relu_(x_cpu)
         relu_(x_dpcpp)
@@ -34,25 +34,25 @@ class  TestNNMethod(TestCase):
 
         RReLU = torch.nn.RReLU(0.1,0.3)
         x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]])
-        x_dpcpp = x_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
         y_cpu = RReLU(x_cpu)
         y_dpcpp = RReLU(x_dpcpp)
         print("cpu rrelu ", y_cpu)
         print("dpcpp rrelu ", y_dpcpp.cpu())
-        #self.assertEqual(y_cpu, y_dpcpp.cpu())
+        self.assertEqual(y_cpu, y_dpcpp.cpu())
 
         y_cpu.backward(x_cpu)
         y_dpcpp.backward(x_dpcpp)
 
         print("cpu rrelu bwd", x_cpu.grad)
         print("dpcpp rrelu bwd", x_dpcpp.grad.cpu())
-        #self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
         GELU = torch.nn.GELU()
         x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]])
-        x_dpcpp = x_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
         y_cpu = GELU(x_cpu)
@@ -62,7 +62,7 @@ class  TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.cpu())
 
         #y_cpu = torch.tensor([[1, 1],[1, 1],[1, 1],[1, 1]]);
-        #y_dpcpp = y_cpu.to("dpcpp")
+        #y_dpcpp = y_cpu.to("xpu")
         y_cpu.backward(x_cpu)
         y_dpcpp.backward(x_dpcpp)
 
@@ -72,7 +72,7 @@ class  TestNNMethod(TestCase):
 
         PReLU = torch.nn.PReLU()
         x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]])
-        x_dpcpp = x_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
         x_cpu.requires_grad_(True)
         x_dpcpp.requires_grad_(True)
         y_cpu = PReLU(x_cpu)

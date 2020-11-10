@@ -3,15 +3,15 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
     def test_set(self, dtype=torch.float):
         x_cpu1 = torch.randn((5, 4))
         x_cpu2 = torch.randn((5, 4))
-        x_dpcpp1 = x_cpu1.to("dpcpp")
-        x_dpcpp2 = x_cpu2.to("dpcpp")
+        x_dpcpp1 = x_cpu1.to("xpu")
+        x_dpcpp2 = x_cpu2.to("xpu")
 
         print("Before:")
         print("self dpcpp", x_dpcpp1.to("cpu"))

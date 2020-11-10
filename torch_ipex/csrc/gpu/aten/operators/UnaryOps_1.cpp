@@ -5,13 +5,14 @@
 #include <utils/Numerics.h>
 #include <utils/Pairwise.h>
 #include <utils/Pointwise.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
 #include "Loops.h"
 
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 DPCPP_DEF_K1(bitwise_not);
@@ -46,18 +47,17 @@ void logical_not_kernel(TensorIterator& iter) {
 
 Tensor bitwise_not(const Tensor& self) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::bitwise_not_out(result, self);
+  return at::AtenIpexTypeXPU::bitwise_not_out(result, self);
 }
 
 Tensor& bitwise_not_(Tensor& self) {
-  return at::AtenIpexTypeDPCPP::bitwise_not_out(self, self);
+  return at::AtenIpexTypeXPU::bitwise_not_out(self, self);
 }
 
 Tensor& bitwise_not_out(Tensor& out, const Tensor& self) {
   auto iter = TensorIterator::unary_op(
       out,
-      self,
-      /*check_mem_overlap=*/true);
+      self);
   impl::bitwise_not_kernel_dpcpp(iter);
 #ifdef BUILD_NAMEDTENSOR
   at::namedinference::propagate_names(out, self);
@@ -67,23 +67,23 @@ Tensor& bitwise_not_out(Tensor& out, const Tensor& self) {
 
 Tensor logical_not(const Tensor& self) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::AtenIpexTypeDPCPP::logical_not_out(result, self);
+  return at::AtenIpexTypeXPU::logical_not_out(result, self);
 }
 
 Tensor& logical_not_(Tensor& self) {
-  return at::AtenIpexTypeDPCPP::logical_not_out(self, self);
+  return at::AtenIpexTypeXPU::logical_not_out(self, self);
 }
 
 Tensor& logical_not_out(Tensor& result, const Tensor& self) {
-  TensorIterator iter;
-  iter.dont_compute_common_dtype();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(result);
-  iter.add_input(self);
-  iter.build();
+  TensorIterator iter = TensorIteratorConfig()
+  .check_all_same_dtype(false)
+  .set_check_mem_overlap(true)
+  .add_output(result)
+  .add_input(self)
+  .build();
   impl::logical_not_kernel(iter);
   return result;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

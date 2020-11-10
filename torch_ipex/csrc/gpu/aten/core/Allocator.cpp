@@ -8,7 +8,7 @@
 
 
 using namespace at::dpcpp;
-using namespace at::AtenIpexTypeDPCPP;
+using namespace at::AtenIpexTypeXPU;
 
 struct NaiveAllocator {
   // lock around all operations
@@ -52,7 +52,7 @@ struct DPCPPDefaultAllocator : public at::Allocator {
     return {p,
             ctx,
             &NaiveAllocatorDeleter,
-            at::Device(at::DeviceType::DPCPP, device)};
+            at::Device(at::DeviceType::XPU, device)};
   }
 
   at::DeleterFnPtr raw_deleter() const override {

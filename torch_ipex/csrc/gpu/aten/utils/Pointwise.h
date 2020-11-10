@@ -9,10 +9,10 @@
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 #define IMPLEMENT_POINTWISE_FUNC_(NAME, CFUNC, REAL)               \
   template <typename scalar_t>                                     \
@@ -32,7 +32,7 @@ namespace AtenIpexTypeDPCPP {
       at::dpcpp::DPCPP_tensor_apply1<scalar_t>(                    \
           self_, Tensor_##NAME##_##REAL##_Op<scalar_t>());         \
     } else {                                                       \
-      at::AtenIpexTypeDPCPP::resize_as_(self_, src, c10::nullopt); \
+      at::AtenIpexTypeXPU::resize_as_(self_, src, c10::nullopt); \
       at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(          \
           self_, src, Tensor_##NAME##_##REAL##_Op<scalar_t>());    \
     }                                                              \
@@ -94,7 +94,7 @@ namespace AtenIpexTypeDPCPP {
           POINTWISE_OPR_ARGS_##APPLY_NUM,                                     \
           CALLABLE<scalar_t>(CALLABLE_INIT_ARGS_##CALLABLE_ARGS_NUM));        \
     } else {                                                                  \
-      at::AtenIpexTypeDPCPP::resize_as_(POINTWISE_ARGS_2, c10::nullopt);      \
+      at::AtenIpexTypeXPU::resize_as_(POINTWISE_ARGS_2, c10::nullopt);      \
       at::dpcpp::DPCPP_tensor_apply##APPLY_NUM_EXT<                           \
           REPEAT_AS_ARGLIST_##APPLY_NUM_EXT(scalar_t)>(                       \
           POINTWISE_ARGS_##APPLY_NUM_EXT,                                     \
@@ -1026,7 +1026,7 @@ struct TensorConjOp {
   }
 };
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at
 
 #endif

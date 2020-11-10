@@ -30,11 +30,11 @@ class TestTorchMethod(TestCase):
             loss.backward()
 
             log_probs.requires_grad_(False)
-            log_probs_dpcpp = log_probs.to("dpcpp")
+            log_probs_dpcpp = log_probs.to("xpu")
             log_probs_dpcpp.requires_grad_(True)
-            targets_dpcpp = targets.to("dpcpp")
-            input_lengths_dpcpp = input_lengths.to("dpcpp")
-            target_lengths_dpcpp = target_lengths.to("dpcpp")
+            targets_dpcpp = targets.to("xpu")
+            input_lengths_dpcpp = input_lengths.to("xpu")
+            target_lengths_dpcpp = target_lengths.to("xpu")
 
             loss_dpcpp = torch.nn.functional.ctc_loss(
                 log_probs_dpcpp, targets_dpcpp, input_lengths_dpcpp, target_lengths_dpcpp)

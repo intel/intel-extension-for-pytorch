@@ -24,7 +24,7 @@ foreach (sfile ${aten_functions_src})
 endforeach()
 list(APPEND aten_reorg_src ${_SLOW_SRCS} ${_FAST_SRCS})
 
-FILE(GLOB aten_core_src "py_init.cpp" "utils/*.cpp" "core/*.cpp" "core/detail/*.cpp")
+FILE(GLOB aten_core_src "utils/*.cpp" "core/*.cpp" "core/detail/*.cpp")
 
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/core" "${CMAKE_CURRENT_SOURCE_DIR}/utils"
         DESTINATION include

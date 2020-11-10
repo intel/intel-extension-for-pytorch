@@ -18,9 +18,9 @@ class TestNNMethod(TestCase):
         input2_cpu = input2
         target_cpu = target
 
-        input1_dpcpp = input1.to("dpcpp")
-        input2_dpcpp = input2.to("dpcpp")
-        target_dpcpp = target.to("dpcpp")
+        input1_dpcpp = input1.to("xpu")
+        input2_dpcpp = input2.to("xpu")
+        target_dpcpp = target.to("xpu")
 
         def _test_cpu(input1, input2, target, reduc):
             loss = nn.MarginRankingLoss(reduction=reduc)
@@ -46,10 +46,10 @@ class TestNNMethod(TestCase):
             print(output.cpu())
             if(reduc == "none"):
                 output.backward(torch.ones_like(
-                    input1, dtype=torch.float).to("dpcpp"))
+                    input1, dtype=torch.float).to("xpu"))
             else:
                 output.backward(torch.tensor(
-                    (1.0), dtype=torch.float).to("dpcpp"))
+                    (1.0), dtype=torch.float).to("xpu"))
             print(input1.grad.cpu())
             print(input2.grad.cpu())
 
@@ -62,7 +62,7 @@ class TestNNMethod(TestCase):
         print("cpu")
         input1_cpu, input2_cpu = _test_cpu(
             input1_cpu, input2_cpu, target_cpu, "none")
-        print("dpcpp")
+        print("xpu")
         input1_dpcpp, input2_dpcpp = _test_dpcpp(
             input1_dpcpp, input2_dpcpp, target_dpcpp, "none")
         print(input1_cpu.grad)
@@ -74,7 +74,7 @@ class TestNNMethod(TestCase):
         print("cpu")
         input1_cpu, input2_cpu = _test_cpu(
             input1_cpu, input2_cpu, target_cpu, "sum")
-        print("dpcpp")
+        print("xpu")
         input1_dpcpp, input2_dpcpp = _test_dpcpp(
             input1_dpcpp, input2_dpcpp, target_dpcpp, "sum")
         self.assertEqual(input1_cpu.grad, input1_dpcpp.grad.cpu())
@@ -84,7 +84,7 @@ class TestNNMethod(TestCase):
         print("cpu")
         input1_cpu, input2_cpu = _test_cpu(
             input1_cpu, input2_cpu, target_cpu, "mean")
-        print("dpcpp")
+        print("xpu")
         input1_dpcpp, input2_dpcpp = _test_dpcpp(
             input1_dpcpp, input2_dpcpp, target_dpcpp, "mean")
         self.assertEqual(input1_cpu.grad, input1_dpcpp.grad.cpu())

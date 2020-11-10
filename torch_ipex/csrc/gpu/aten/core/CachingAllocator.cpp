@@ -706,8 +706,8 @@ struct DPCPPCachingAllocator : public Allocator {
       auto& dpcpp_queue = getCurrentDPCPPStream(curDevID).dpcpp_queue();
       caching_allocator.malloc(&r, size, &dpcpp_queue);
     }
-    auto ctx = new at::AtenIpexTypeDPCPP::DPCPPTensorContext(r);
-    return {r, ctx, &dpcpp_raw_delete, Device(DeviceType::DPCPP, curDevID)};
+    auto ctx = new at::AtenIpexTypeXPU::DPCPPTensorContext(r);
+    return {r, ctx, &dpcpp_raw_delete, Device(DeviceType::XPU, curDevID)};
   }
   DeleterFnPtr raw_deleter() const override {
     return &dpcpp_raw_delete;
@@ -787,7 +787,7 @@ void* dpcpp_raw_alloc_with_queue(size_t nbytes, DPCPP::queue &queue) {
 }
 
 void dpcpp_raw_delete(void* ptr) {
-  auto ctx = (at::AtenIpexTypeDPCPP::DPCPPTensorContext*)ptr;
+  auto ctx = (at::AtenIpexTypeXPU::DPCPPTensorContext*)ptr;
   auto data = ctx->data();
   caching_allocator.free(data);
   delete ctx;

@@ -7,13 +7,13 @@ from torch.testing._internal.common_utils import TestCase
 
 
 cpu_device = torch.device("cpu")
-sycl_device = torch.device("dpcpp")
+sycl_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_upsamle(self, dtype=torch.float):
       x_cpu = torch.tensor([[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]],[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]]], dtype=torch.float32, device = cpu_device)
       #x_sycl = torch.tensor([[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]],[[[1,2,3,4,5],[4,5,6,7,8]],[[1,2,3,4,5],[4,5,6,7,8]]]], dtype=torch.float32, device = sycl_device)
-      x_sycl=x_cpu.to("dpcpp")
+      x_sycl=x_cpu.to("xpu")
 
       print("cpu result", torch.nn.functional.upsample_nearest(x_cpu,[2,5]))
       print("sycl result", torch.nn.functional.upsample_nearest(x_sycl,[2,5]).cpu())
@@ -33,7 +33,7 @@ class TestNNMethod(TestCase):
       #self.assertEqual(torch.nn.functional.upsample_nearest(x_cpu,[1,3]), torch.nn.functional.upsample_nearest(x_sycl,[1,3]).cpu())
 
       x_cpu = torch.arange(8).view(1, 2, 2, 2).type(torch.FloatTensor)
-      x_sycl = x_cpu.to("dpcpp")
+      x_sycl = x_cpu.to("xpu")
 
       expected_out = torch.Tensor(
                   [[[[-0.31641, 0.01562, 0.56250, 0.89453],
@@ -56,7 +56,7 @@ class TestNNMethod(TestCase):
       self.assertEqual(y_cpu, y_sycl.cpu())
 
       x_cpu = torch.tensor([[[[1,2,3,4],[4,5,6,7],[1,2,3,4],[4,5,6,7]],[[1,2,3,4],[4,5,6,7],[1,2,3,4],[4,5,6,7]]]], dtype=torch.float32, device = cpu_device)
-      x_sycl=x_cpu.to("dpcpp")
+      x_sycl=x_cpu.to("xpu")
       x_cpu.requires_grad_(True)
       x_sycl.requires_grad_(True)
       y_cpu = nn.functional.interpolate(x_cpu, scale_factor=1, mode='bicubic', align_corners=False)
@@ -72,7 +72,7 @@ class TestNNMethod(TestCase):
 
       '''only available in dpcpp build
       x_cpu = torch.tensor([[[[1,2,3,4],[4,5,6,7],[1,2,3,4],[4,5,6,7]],[[1,2,3,4],[4,5,6,7],[1,2,3,4],[4,5,6,7]]]], dtype=torch.double, device = cpu_device)
-      x_sycl=x_cpu.to("dpcpp")
+      x_sycl=x_cpu.to("xpu")
       x_cpu.requires_grad_(True)
       x_sycl.requires_grad_(True)
       y_cpu = nn.functional.interpolate(x_cpu, scale_factor=1, mode='bicubic', align_corners=False)
@@ -101,7 +101,7 @@ print("cpu result", y_cpu)
 print("sycl result", y_sycl)
 
 x_cpu = torch.arange(8).view(2, 2, 2).type(torch.FloatTensor)
-x_sycl = x_cpu.to("dpcpp")
+x_sycl = x_cpu.to("xpu")
 
 y_cpu = nn.functional.interpolate(x_cpu, scale_factor=2, mode='linear', align_corners=False)
 y_sycl = nn.functional.interpolate(x_sycl, scale_factor=2, mode='linear', align_corners=False).cpu()
@@ -110,7 +110,7 @@ print("cpu result", y_cpu)
 print("sycl result", y_sycl)
 
 x_cpu = torch.arange(8).view(1, 1, 2, 2, 2).type(torch.FloatTensor)
-x_sycl = x_cpu.to("dpcpp")
+x_sycl = x_cpu.to("xpu")
 
 y_cpu = nn.functional.interpolate(x_cpu, scale_factor=2, mode='trilinear', align_corners=False)
 y_sycl = nn.functional.interpolate(x_sycl, scale_factor=2, mode='trilinear', align_corners=False).cpu()

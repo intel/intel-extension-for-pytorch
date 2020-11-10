@@ -46,7 +46,7 @@ int dpcppGetDeviceIdFromPtr(DeviceIndex* device_id, void* ptr);
 inline Device getDeviceFromPtr(void* ptr) {
   c10::DeviceIndex device;
   AT_DPCPP_CHECK(dpcppGetDeviceIdFromPtr(&device, ptr));
-  return {DeviceType::DPCPP, static_cast<int16_t>(device)};
+  return {DeviceType::XPU, static_cast<int16_t>(device)};
 }
 
 } // namespace dpcpp

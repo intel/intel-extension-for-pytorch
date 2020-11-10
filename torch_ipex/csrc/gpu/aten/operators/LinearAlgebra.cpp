@@ -20,7 +20,7 @@ using namespace at::dpcpp;
 template <typename...> class CopyTriangleSymetric {};
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
@@ -116,7 +116,7 @@ Tensor cholesky_inverse(const Tensor & self, bool upper) {
   TORCH_CHECK(self.dim() == 2, "input must be 2-d matrix. input shape=", self.sizes());
   TORCH_CHECK(self.size(0) == self.size(1), "input should be square. input shape=", self.sizes());
   Tensor out;
-  return AtenIpexTypeDPCPP::cholesky_inverse_out(out, self, upper);
+  return AtenIpexTypeXPU::cholesky_inverse_out(out, self, upper);
 }
 
 std::tuple<Tensor&, Tensor&> geqrf_out(Tensor &ra, Tensor &tau, const Tensor &a) {
@@ -163,7 +163,7 @@ std::tuple<Tensor,Tensor> geqrf(const Tensor &a) {
   auto n = a.size(1); // columns of matrix
   Tensor ra;
   Tensor rtau = at::empty({std::min(m, n)}, a.options());
-  AtenIpexTypeDPCPP::geqrf_out(ra, rtau, a);
+  AtenIpexTypeXPU::geqrf_out(ra, rtau, a);
   return std::tuple<Tensor, Tensor>(ra, rtau);
 }
 
@@ -210,8 +210,8 @@ Tensor ger(const Tensor & self, const Tensor & vec2) {
   auto n = self.size(0); // rows of matrix
   auto m = vec2.size(0); // columns of matrix
   Tensor out = at::zeros({n, m}, self.options());
-  return AtenIpexTypeDPCPP::ger_out(out, self, vec2);
+  return AtenIpexTypeXPU::ger_out(out, self, vec2);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -4,7 +4,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -26,7 +26,7 @@ class TestNNMethod(TestCase):
         output_cpu = y_cpu.backward(grad_cpu)
         print("x_cpu.grad", x_cpu.grad)
 
-        # conv1.to("dpcpp")
+        # conv1.to("xpu")
         avg_pool.to(dpcpp_device)
         x_dpcpp.requires_grad_(True)
         # y_dpcpp = conv1(x_dpcpp)

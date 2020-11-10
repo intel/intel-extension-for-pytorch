@@ -3,13 +3,13 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
     def test_median(self, dtype=torch.float):
         x_cpu = torch.randn(2, 3)
-        x_dpcpp = x_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
 
         print("x_cpu", x_cpu, " median_cpu", torch.median(x_cpu))
         print("x_dpcpp", x_dpcpp.to("cpu"), " median_dpcpp",
@@ -20,7 +20,7 @@ class TestTorchMethod(TestCase):
         x_cpu2 = torch.tensor(([1, 2, 3, 4, 5]), dtype=torch.int32,
                               device=torch.device("cpu"))
         x_dpcpp2 = torch.tensor(
-            ([1, 2, 3, 4, 5]), dtype=torch.int32, device=torch.device("dpcpp"))
+            ([1, 2, 3, 4, 5]), dtype=torch.int32, device=torch.device("xpu"))
 
         print("x_cpu2", x_cpu2, " median_cpu2", x_cpu2.median())
         print("x_dpcpp2", x_dpcpp2.to("cpu"),

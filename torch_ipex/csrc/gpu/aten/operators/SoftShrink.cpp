@@ -10,7 +10,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 DPCPP_DEF_K1(softshrink_forward);
@@ -55,11 +55,11 @@ static void softshrink_backward(TensorIterator& iter, Scalar lambd) {
 
 Tensor& softshrink_out(Tensor& out, const Tensor& self, Scalar lambd) {
   checkBackend("softshrink_forward", {out}, self.options().backend());
-  auto iter = at::TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(out);
-  iter.add_input(self);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(out)
+  .add_input(self)
+  .build();
   impl::softshrink_forward(iter, lambd);
   return out;
 }
@@ -69,7 +69,7 @@ Tensor softshrink(const Tensor& self, Scalar lambd) {
     lambd.to<double>() >= 0,
     "lambda must be greater or equal to 0, but found to be ", lambd.to<double>(), ".");
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::softshrink_out(out, self, lambd);
+  return at::AtenIpexTypeXPU::softshrink_out(out, self, lambd);
 }
 
 Tensor& softshrink_backward_out(
@@ -81,12 +81,12 @@ Tensor& softshrink_backward_out(
       "softshrink_backward",
       {grad_input, grad_output},
       self.options().backend());
-  auto iter = at::TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(grad_input);
-  iter.add_input(grad_output);
-  iter.add_input(self);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(grad_input)
+  .add_input(grad_output)
+  .add_input(self)
+  .build();
   impl::softshrink_backward(iter, lambd);
   return grad_input;
 }
@@ -98,5 +98,5 @@ Tensor softshrink_backward(
   Tensor grad_input = at::empty({0}, grad_output.options());
   return at::softshrink_backward_out(grad_input, grad_output, self, lambd);
 }
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

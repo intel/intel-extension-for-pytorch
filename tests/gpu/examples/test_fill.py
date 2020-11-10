@@ -3,7 +3,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
@@ -15,7 +15,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
 # print(y_cpu)
 
-# x_dpcpp1 = x_cpu1.to("dpcpp")
+# x_dpcpp1 = x_cpu1.to("xpu")
 #
 #
 # y_dpcpp = x_dpcpp1[1].fill_(2)

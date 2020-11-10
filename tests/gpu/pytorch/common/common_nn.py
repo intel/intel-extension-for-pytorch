@@ -4521,7 +4521,7 @@ class CriterionTest(TestBase):
             gpu_target = to_dpcpp(cpu_target, type_map=type_map)
 
             cpu_module = self.constructor(*self.constructor_args)
-            gpu_module = self.constructor(*self.constructor_args).float().to("dpcpp")
+            gpu_module = self.constructor(*self.constructor_args).float().to("xpu")
 
             cpu_output = test_case._forward_criterion(cpu_module, cpu_input, cpu_target)
             gpu_output = test_case._forward_criterion(gpu_module, gpu_input, gpu_target)

@@ -12,7 +12,7 @@ using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename T>
@@ -92,7 +92,7 @@ Tensor& fill_(Tensor& self, const Tensor& value) {
 }
 
 Tensor& zero_(Tensor& self) {
-  return at::AtenIpexTypeDPCPP::fill_(self, 0);
+  return at::AtenIpexTypeXPU::fill_(self, 0);
 }
 
 Tensor& fill_slice_with_index(Tensor& t, int dim) {
@@ -140,5 +140,5 @@ Tensor& fill_slice_with_index(Tensor& t, int dim) {
   return t;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

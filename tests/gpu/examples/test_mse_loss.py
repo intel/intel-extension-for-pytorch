@@ -5,7 +5,7 @@ import torch_ipex
 import pytest
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -14,7 +14,7 @@ class TestNNMethod(TestCase):
         print('none')
         loss = nn.MSELoss(reduction="none")
         input = torch.randn(3, 5)
-        input_dpcpp = input.to("dpcpp")
+        input_dpcpp = input.to("xpu")
         target = torch.randn(3, 5)
 
         print("cpu")
@@ -26,9 +26,9 @@ class TestNNMethod(TestCase):
         output_cpu.backward(torch.ones_like(target_cpu, dtype=torch.float))
         print(input_cpu.grad)
 
-        print("dpcpp")
+        print("xpu")
 
-        target_dpcpp = target.to("dpcpp")
+        target_dpcpp = target.to("xpu")
         input_dpcpp.requires_grad = True
         output_dpcpp = loss(input_dpcpp, target_dpcpp)
         print(output_dpcpp.cpu())
@@ -52,8 +52,8 @@ class TestNNMethod(TestCase):
         print(input_cpu.grad)
         # input_cpu.grad.zero_()
 
-        print("dpcpp")
-        target_dpcpp = target.to("dpcpp")
+        print("xpu")
+        target_dpcpp = target.to("xpu")
         input_dpcpp.requires_grad = True
         output_dpcpp = loss(input_dpcpp, target_dpcpp)
         print(output_dpcpp.cpu())
@@ -78,8 +78,8 @@ class TestNNMethod(TestCase):
         print(input_cpu.grad)
         # input_cpu.grad.zero_()
 
-        print("dpcpp")
-        target_dpcpp = target.to("dpcpp")
+        print("xpu")
+        target_dpcpp = target.to("xpu")
         input_dpcpp.requires_grad = True
         output_dpcpp = loss(input_dpcpp, target_dpcpp)
         print(output_dpcpp.cpu())

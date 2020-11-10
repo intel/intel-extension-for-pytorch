@@ -1,5 +1,5 @@
 #include <ATen/ATen.h>
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 
 #include <core/DPCPP.h>
 #include <core/Memory.h>
@@ -7,6 +7,7 @@
 #include <iterator>
 
 #include <utils/ATDispatch.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
 #ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
@@ -19,7 +20,7 @@ template <typename scalar_t>
 class Unique_Dpcpp_Kernel {};
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename policy_t, typename scalar_t, typename equal_t, typename equal_by_key_t, typename not_equal_t>
@@ -86,7 +87,7 @@ std::tuple<Tensor, Tensor, int64_t> compute_unique(
     num_out = std::unique(policy, data_begin, data_begin + num_inp, equal) - data_begin;
   } else {
     Tensor range = at::empty({0}, options);
-    range = at::AtenIpexTypeDPCPP::arange_out(range, 0, num_inp + 1, 1);
+    range = at::AtenIpexTypeXPU::arange_out(range, 0, num_inp + 1, 1);
     int64_t *range_ptr = range.data_ptr<int64_t>();
 #ifndef USE_USM
     auto range_buff = make_buffer<int64_t>(range_ptr);
@@ -334,8 +335,8 @@ unique_consecutive(const Tensor& self, const bool return_inverse, const bool ret
       return impl::unique_template<scalar_t>(self, true, return_inverse, return_counts);
     });
   }
-  return at::AtenIpexTypeDPCPP::unique_dim_consecutive(self, dim.value(), return_inverse, return_counts);
+  return at::AtenIpexTypeXPU::unique_dim_consecutive(self, dim.value(), return_inverse, return_counts);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

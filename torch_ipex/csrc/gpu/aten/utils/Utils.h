@@ -8,7 +8,7 @@ inline bool check_device(const at::TensorList& tensor_list) {
   if (tensor_list.empty()) {
     return true;
   }
-  Device curDevice = Device(kDPCPP, current_device());
+  Device curDevice = Device(kXPU, current_device());
   for (const Tensor& t : tensor_list) {
     if (t.device() != curDevice) return false;
   }

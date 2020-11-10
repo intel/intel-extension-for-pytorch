@@ -4,7 +4,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -15,8 +15,8 @@ class TestNNMethod(TestCase):
         input_cpu = input
         target_cpu = target
 
-        input_dpcpp = input.to("dpcpp")
-        target_dpcpp = target.to("dpcpp")
+        input_dpcpp = input.to("xpu")
+        target_dpcpp = target.to("xpu")
 
         def _test_cpu(input, target, reduc):
             loss = nn.SoftMarginLoss(reduction=reduc)
@@ -40,10 +40,10 @@ class TestNNMethod(TestCase):
             print(output.cpu())
             if(reduc == "none"):
                 output.backward(torch.ones_like(
-                    input, dtype=torch.float).to("dpcpp"))
+                    input, dtype=torch.float).to("xpu"))
             else:
                 output.backward(torch.tensor(
-                    (1.0), dtype=torch.float).to("dpcpp"))
+                    (1.0), dtype=torch.float).to("xpu"))
             print(input.grad.cpu())
             try:
                 return input, output
@@ -53,7 +53,7 @@ class TestNNMethod(TestCase):
         print('none')
         print("cpu")
         input_cpu, output_cpu = _test_cpu(input_cpu, target_cpu, "none")
-        print("dpcpp")
+        print("xpu")
         input_dpcpp, out_dpcpp = _test_dpcpp(input_dpcpp, target_dpcpp, "none")
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())
         self.assertEqual(output_cpu, out_dpcpp.cpu())
@@ -61,7 +61,7 @@ class TestNNMethod(TestCase):
         print('sum')
         print("cpu")
         input_cpu, output_cpu = _test_cpu(input_cpu, target_cpu, "sum")
-        print("dpcpp")
+        print("xpu")
         input_dpcpp, out_dpcpp = _test_dpcpp(input_dpcpp, target_dpcpp, "sum")
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())
         self.assertEqual(output_cpu, out_dpcpp.cpu())
@@ -69,7 +69,7 @@ class TestNNMethod(TestCase):
         print('mean')
         print("cpu")
         input_cpu, output_cpu = _test_cpu(input_cpu, target_cpu, "mean")
-        print("dpcpp")
+        print("xpu")
         input_dpcpp, out_dpcpp = _test_dpcpp(input_dpcpp, target_dpcpp, "mean")
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())
         self.assertEqual(output_cpu, out_dpcpp.cpu())

@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -17,9 +17,9 @@ class TestNNMethod(TestCase):
         posit_cpu = positive
         negat_cpu = negative
 
-        input_dpcpp = input.to("dpcpp")
-        posit_dpcpp = positive.to("dpcpp")
-        negat_dpcpp = negative.to("dpcpp")
+        input_dpcpp = input.to("xpu")
+        posit_dpcpp = positive.to("xpu")
+        negat_dpcpp = negative.to("xpu")
 
         def _test_cpu(input, positive, negative, reduc):
             loss = nn.TripletMarginLoss(reduction=reduc)
@@ -42,10 +42,10 @@ class TestNNMethod(TestCase):
             output = loss(input, positive, negative)
             print(output.cpu())
             if(reduc == "none"):
-                output.backward(torch.ones(5, dtype=torch.float).to("dpcpp"))
+                output.backward(torch.ones(5, dtype=torch.float).to("xpu"))
             else:
                 output.backward(torch.tensor(
-                    (1.0), dtype=torch.float).to("dpcpp"))
+                    (1.0), dtype=torch.float).to("xpu"))
             print(input.grad.cpu())
             try:
                 return input, output
@@ -56,7 +56,7 @@ class TestNNMethod(TestCase):
         print("cpu")
         input_cpu, output_cpu = _test_cpu(
             input_cpu, posit_cpu, negat_cpu, "none")
-        print("dpcpp")
+        print("xpu")
         input_dpcpp, output_dpcpp = _test_dpcpp(
             input_dpcpp, posit_dpcpp, negat_dpcpp, "none")
         self.assertEqual(output_cpu, output_dpcpp.cpu())
@@ -66,7 +66,7 @@ class TestNNMethod(TestCase):
         print("cpu")
         input_cpu, output_cpu = _test_cpu(
             input_cpu, posit_cpu, negat_cpu, "sum")
-        print("dpcpp")
+        print("xpu")
         input_dpcpp, output_dpcpp = _test_dpcpp(
             input_dpcpp, posit_dpcpp, negat_dpcpp, "sum")
         self.assertEqual(output_cpu, output_dpcpp.cpu())
@@ -76,7 +76,7 @@ class TestNNMethod(TestCase):
         print("cpu")
         input_cpu, output_cpu = _test_cpu(
             input_cpu, posit_cpu, negat_cpu, "mean")
-        print("dpcpp")
+        print("xpu")
         input_dpcpp, output_dpcpp = _test_dpcpp(
             input_dpcpp, posit_dpcpp, negat_dpcpp, "mean")
         self.assertEqual(output_cpu, output_dpcpp.cpu())

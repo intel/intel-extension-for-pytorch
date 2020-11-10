@@ -1,6 +1,7 @@
 #include <ATen/Context.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/DPCPP.h>
 #include <utils/General.h>
@@ -11,7 +12,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
@@ -22,7 +23,7 @@ __and___out(Tensor& result, const Tensor& self, const Tensor& other) {
     at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
         result, other, TensorBitAndOp<scalar_t>());
   } else {
-    at::AtenIpexTypeDPCPP::resize_as_(result, self, c10::nullopt);
+    at::AtenIpexTypeXPU::resize_as_(result, self, c10::nullopt);
     at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         result, self, other, TensorBitAndOp<scalar_t>());
   }
@@ -41,7 +42,7 @@ __or___out(Tensor& result, const Tensor& self, const Tensor& other) {
     at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
         result, other, TensorBitOrOp<scalar_t>());
   } else {
-    at::AtenIpexTypeDPCPP::resize_as_(result, self, c10::nullopt);
+    at::AtenIpexTypeXPU::resize_as_(result, self, c10::nullopt);
     at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         result, self, other, TensorBitOrOp<scalar_t>());
   }
@@ -60,7 +61,7 @@ __xor___out(Tensor& result, const Tensor& self, const Tensor& other) {
     at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
         result, other, TensorBitXorOp<scalar_t>());
   } else {
-    at::AtenIpexTypeDPCPP::resize_as_(result, self, c10::nullopt);
+    at::AtenIpexTypeXPU::resize_as_(result, self, c10::nullopt);
     at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         result, self, other, TensorBitXorOp<scalar_t>());
   }
@@ -78,14 +79,14 @@ IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(min_out, TensorMinOp)
 
 Tensor min(const Tensor& self, const Tensor& other) {
   auto out = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::min_out(out, self, other.expand_as(self));
+  return at::AtenIpexTypeXPU::min_out(out, self, other.expand_as(self));
 }
 
 IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(max_out, TensorMaxOp)
 
 Tensor max(const Tensor& self, const Tensor& other) {
   auto out = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::max_out(out, self, other.expand_as(self));
+  return at::AtenIpexTypeXPU::max_out(out, self, other.expand_as(self));
 }
 
 Tensor& bitwise_and_out(
@@ -123,28 +124,28 @@ Tensor& bitwise_xor_out(
 
 
 Tensor& bitwise_and_out(Tensor& out, const Tensor& self, Scalar other) {
-  auto other_ = c10::scalar_to_tensor(other, kDPCPP);
+  auto other_ = c10::scalar_to_tensor(other, kXPU);
   // TODO: broadcast
   auto new_other =
       other_.resize_as_(self).fill_(other).toType(self.scalar_type());
-  return at::AtenIpexTypeDPCPP::bitwise_and_out(out, self, new_other);
+  return at::AtenIpexTypeXPU::bitwise_and_out(out, self, new_other);
 }
 
 Tensor& bitwise_or_out(Tensor& out, const Tensor& self, Scalar other) {
-  auto other_ = c10::scalar_to_tensor(other, kDPCPP);
+  auto other_ = c10::scalar_to_tensor(other, kXPU);
   // TODO: broadcast
   auto new_other =
       other_.resize_as_(self).fill_(other).toType(self.scalar_type());
-  return at::AtenIpexTypeDPCPP::bitwise_or_out(out, self, new_other);
+  return at::AtenIpexTypeXPU::bitwise_or_out(out, self, new_other);
 }
 
 Tensor& bitwise_xor_out(Tensor& out, const Tensor& self, Scalar other) {
-  auto other_ = c10::scalar_to_tensor(other, kDPCPP);
+  auto other_ = c10::scalar_to_tensor(other, kXPU);
   // TODO: broadcast
   auto new_other =
       other_.resize_as_(self).fill_(other).toType(self.scalar_type());
-  return at::AtenIpexTypeDPCPP::bitwise_xor_out(out, self, new_other);
+  return at::AtenIpexTypeXPU::bitwise_xor_out(out, self, new_other);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

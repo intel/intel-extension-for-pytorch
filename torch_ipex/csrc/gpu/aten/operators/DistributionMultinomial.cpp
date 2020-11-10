@@ -11,7 +11,7 @@
 #include "Distributions.h"
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 template <typename scalar_t>
 int binary_search_for_multinomial(
@@ -175,8 +175,8 @@ Tensor& multinomial_out(
   const Tensor& self_,
   int64_t num_samples,
   bool replacement,
-  Generator* gen_) {
-  auto gen = get_generator_or_default<DPCPPGenerator>(
+  c10::optional<Generator> gen_) {
+  auto gen = get_generator_or_default<DPCPPGeneratorImpl>(
     gen_, dpcpp::detail::getDefaultDPCPPGenerator());
   auto shape = self_.sizes();
   TORCH_CHECK(
@@ -276,7 +276,7 @@ Tensor multinomial(
   const Tensor& self,
   int64_t num_samples,
   bool replacement,
-  Generator* generator) {
+  c10::optional<Generator> generator) {
   auto shape = self.sizes();
   TORCH_CHECK(
     shape.size() > 0 && shape.size() <= 2,
@@ -289,10 +289,10 @@ Tensor multinomial(
     "cannot sample n_sample > prob_dist size samples without replacement");
 
   Tensor ret = at::empty({num_dists, num_samples}, self.options().dtype(kLong));
-  at::AtenIpexTypeDPCPP::multinomial_out(
+  at::AtenIpexTypeXPU::multinomial_out(
     ret, self, num_samples, replacement, generator);
   return ret;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

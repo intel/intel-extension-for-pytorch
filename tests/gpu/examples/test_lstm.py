@@ -46,7 +46,7 @@ class TestNNMethod(TestCase):
         input_dpcpp = torch.tensor(
             [[[1, 2]]], dtype=torch.float, device=dpcpp_device)
         input_dpcpp.requires_grad = True
-        rnn_dpcpp = rnn.to("dpcpp")
+        rnn_dpcpp = rnn.to("xpu")
         rnn_dpcpp.zero_grad()
         h0_dpcpp = torch.tensor([[[2, 3, 2, 3]], [[3, 4, 3, 4]], [[4, 5, 4, 5]], [
             [5, 6, 5, 6]]], dtype=torch.float,  device=dpcpp_device)
@@ -60,7 +60,7 @@ class TestNNMethod(TestCase):
         print("dpcpp hn = ", hn_dpcpp.cpu())
         print("dpcpp cn = ", cn_dpcpp.cpu())
 
-        grad_out_dpcpp = grad_out.to("dpcpp")
+        grad_out_dpcpp = grad_out.to("xpu")
         grad_out_dpcpp = Variable(grad_out_dpcpp, requires_grad=True)
         output_dpcpp.backward(grad_out_dpcpp)
         input_dpcpp_grad = input_dpcpp.grad

@@ -1,28 +1,21 @@
 #include <ATen/core/Tensor.h>
 #include <ATen/native/TensorIterator.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/TensorCopy.h>
 #include <core/TensorImplUtils.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 
 namespace at {
 namespace dpcpp {
-
-#define BUILD_TENSOR_ITER(dst, src, iter) \
-  auto iter = TensorIterator();           \
-  iter.add_output(dst);                   \
-  iter.add_input(src);                    \
-  iter.dont_resize_outputs();             \
-  iter.dont_compute_common_dtype();       \
-  iter.build();
 
 void TensorImpl_copy(TensorImpl* dst, TensorImpl* src) {
   if (dst == src)
     return;
   auto dst_ = TensorImpl_wrap(dst);
   auto src_ = TensorImpl_wrap(src);
-  at::AtenIpexTypeDPCPP::copy_(dst_, src_, false);
+  at::AtenIpexTypeXPU::copy_(dst_, src_, false);
 }
 
 template <typename scalar_t>
@@ -31,7 +24,7 @@ TensorImpl* TensorImpl_newClone(TensorImpl* self) {
   TensorImpl_resizeAs(tensor, self);
   auto dst_ = TensorImpl_wrap(tensor);
   auto src_ = TensorImpl_wrap(self);
-  at::AtenIpexTypeDPCPP::copy_(dst_, src_, false);
+  at::AtenIpexTypeXPU::copy_(dst_, src_, false);
   return tensor;
 }
 
@@ -50,7 +43,7 @@ void TensorImpl_freeCopyTo(TensorImpl* self, TensorImpl* dst) {
   if (self != dst) {
     auto dst_ = TensorImpl_wrap(dst);
     auto src_ = TensorImpl_wrap(self);
-    at::AtenIpexTypeDPCPP::copy_(dst_, src_, false);
+    at::AtenIpexTypeXPU::copy_(dst_, src_, false);
   }
 
   TensorImpl_free(self);

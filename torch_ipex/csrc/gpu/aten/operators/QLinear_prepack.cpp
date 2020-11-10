@@ -12,11 +12,11 @@ using namespace at::native;
 
 namespace caffe2 {
 
-CAFFE_KNOWN_TYPE(at::AtenIpexTypeDPCPP::PackedLinearWeightQDPCPP);
+CAFFE_KNOWN_TYPE(at::AtenIpexTypeQuantizedXPU::PackedLinearWeightQDPCPP);
 }
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeQuantizedXPU {
 
 at::Tensor dpcppLinearPrepack(Tensor weight, c10::optional<Tensor> bias) {
   // This is just align with FBGEMM INT8 and Pytorch Python API!
@@ -25,18 +25,18 @@ at::Tensor dpcppLinearPrepack(Tensor weight, c10::optional<Tensor> bias) {
   return at::cpp_custom_type_hack::create(std::move(ret_ptr), weight.options());
 }
 
-static auto registry =
-    c10::RegisterOperators()
-        .op("quantized::linear_prepack(Tensor W, Tensor? B=None) -> Tensor "
-            "W_prepack",
-            c10::RegisterOperators::options()
-                .kernel<decltype(dpcppLinearPrepack), &dpcppLinearPrepack>(
-                    DispatchKey::QuantizedDPCPPTensorId))
-        .op("quantized::linear_prepack(Tensor W, Tensor? B=None) -> Tensor "
-            "W_prepack",
-            c10::RegisterOperators::options()
-                .kernel<decltype(dpcppLinearPrepack), &dpcppLinearPrepack>(
-                    DispatchKey::DPCPPTensorId));
+//static auto registry =
+//    c10::RegisterOperators()
+//        .op("quantized::linear_prepack(Tensor W, Tensor? B=None) -> Tensor "
+//            "W_prepack",
+//            c10::RegisterOperators::options()
+//                .kernel<decltype(dpcppLinearPrepack), &dpcppLinearPrepack>(
+//                    DispatchKey::QuantizedXPU))
+//        .op("quantized::linear_prepack(Tensor W, Tensor? B=None) -> Tensor "
+//            "W_prepack",
+//            c10::RegisterOperators::options()
+//                .kernel<decltype(dpcppLinearPrepack), &dpcppLinearPrepack>(
+//                    DispatchKey::XPU));
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

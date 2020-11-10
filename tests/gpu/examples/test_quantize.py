@@ -6,7 +6,7 @@ from torch.testing._internal.common_utils import TestCase
 class  TestTorchMethod(TestCase):
     def test_quantize_per_channel(self, dtype=torch.float):
         src_cpu=torch.randn(1,3,2,2)
-        src_gpu = src_cpu.to("dpcpp")
+        src_gpu = src_cpu.to("xpu")
 
         data_type = torch.qint8
         tensor_scale = 0.3
@@ -19,7 +19,7 @@ class  TestTorchMethod(TestCase):
 
     def test_quantize_per_tensor(self, dtype=torch.float):
         src_cpu=torch.randn(1,3,2,2)
-        src_gpu = src_cpu.to("dpcpp")
+        src_gpu = src_cpu.to("xpu")
 
         data_type = torch.quint8
         channel_scale = torch.Tensor([0.1, 0.3, 0.5])

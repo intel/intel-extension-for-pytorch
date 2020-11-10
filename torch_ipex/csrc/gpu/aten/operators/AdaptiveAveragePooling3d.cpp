@@ -10,7 +10,7 @@
 using namespace dnnl;
 using namespace at::dpcpp;
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 void adaptive_avg_pool3d_out_template(
@@ -216,7 +216,7 @@ Tensor& adaptive_avg_pool3d_out(
 
 Tensor adaptive_avg_pool3d(const Tensor& self, IntArrayRef output_size) {
   auto output = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::adaptive_avg_pool3d_out(output, self, output_size);
+  return at::AtenIpexTypeXPU::adaptive_avg_pool3d_out(output, self, output_size);
 }
 
 Tensor& adaptive_avg_pool3d_backward_out(
@@ -236,5 +236,5 @@ Tensor adaptive_avg_pool3d_backward(
   return grad_input;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

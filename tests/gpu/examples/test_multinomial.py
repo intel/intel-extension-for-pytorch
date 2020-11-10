@@ -31,7 +31,7 @@ def chose_prob(weight, n, i, k):
 
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):

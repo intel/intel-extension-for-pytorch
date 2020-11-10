@@ -3,7 +3,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
@@ -13,7 +13,7 @@ class TestTorchMethod(TestCase):
         print("cpu input:", input)
         print("cpu output:", torch.prod(input))
 
-        input_dpcpp = input.to("dpcpp")
+        input_dpcpp = input.to("xpu")
         print("gpu input:", input_dpcpp.cpu())
         print("gpu output:", torch.prod(input_dpcpp).cpu())
         self.assertEqual(input, input_dpcpp.cpu())

@@ -10,7 +10,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename T>
@@ -187,5 +187,5 @@ Tensor embedding_dense_backward(
       grad_output, indices, num_weights, padding_idx, scale_grad_by_freq);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

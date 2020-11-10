@@ -8,7 +8,7 @@ import torch_ipex
 import pytest
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -42,8 +42,8 @@ class TestNNMethod(TestCase):
         # torch.save(x_i, "./log/layer_norm_x.pt")
         # torch.save(grad_i, "./log/layer_norm_grad.pt")
 
-        x_dpcpp_i = x_i.to("dpcpp")
-        grad_dpcpp_i = grad_i.to("dpcpp")
+        x_dpcpp_i = x_i.to("xpu")
+        grad_dpcpp_i = grad_i.to("xpu")
 
         x_cpu = Variable(x_i, requires_grad=True)
         y_cpu = layer_norm(x_cpu)

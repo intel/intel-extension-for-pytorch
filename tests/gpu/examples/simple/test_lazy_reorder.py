@@ -6,7 +6,7 @@ import torch_ipex
 
 def test_lazy_reorder():
     cpu_device = torch.device("cpu")
-    dpcpp_device = torch.device("dpcpp")
+    dpcpp_device = torch.device("xpu")
 
     conv1 = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
     conv2 = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
@@ -24,11 +24,11 @@ def test_lazy_reorder():
     a_cpu.tanh_()
     print("cpu", a_cpu)
 
-    conv1.to("dpcpp")
-    conv2.to("dpcpp")
-    bn1.to("dpcpp")
-    bn2.to("dpcpp")
-    x_dpcpp = x_cpu.to("dpcpp")
+    conv1.to("xpu")
+    conv2.to("xpu")
+    bn1.to("xpu")
+    bn2.to("xpu")
+    x_dpcpp = x_cpu.to("xpu")
     print("iter-1 ...")
     y_dpcpp = relu(bn1(conv1(x_dpcpp)))
     z_dpcpp = relu_(bn2(conv2(y_dpcpp + x_dpcpp)))
@@ -42,7 +42,7 @@ def test_lazy_reorder():
     a_dpcpp = z_dpcpp + y_dpcpp
     a_dpcpp, _ = max_pool(a_dpcpp)
     a_dpcpp.tanh_()
-    print("dpcpp", a_dpcpp.to("cpu"))
+    print("xpu", a_dpcpp.to("cpu"))
 
 
 if __name__ == "__main__":

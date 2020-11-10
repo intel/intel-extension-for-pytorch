@@ -15,6 +15,6 @@ class TestTorchMethod(TestCase):
         print("mask", x_mask)
         print("cpu masked_select", torch.masked_select(x, x_mask))
 
-        y = x.to("dpcpp")
-        y_mask = x_mask.to("dpcpp")
+        y = x.to("xpu")
+        y_mask = x_mask.to("xpu")
         print("dpcpp masked_select", torch.masked_select(y, y_mask).cpu())

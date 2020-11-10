@@ -13,9 +13,10 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
 
-using namespace impl;
+using namespace AtenIpexTypeXPU::impl;
+
+namespace AtenIpexTypeQuantizedXPU {
 
 at::Tensor q_conv2d(
     Tensor input,
@@ -44,7 +45,7 @@ at::Tensor q_conv2d(
           padding.vec(),
           stride.vec(),
           dilation.vec()),
-      device(kDPCPP).dtype(kQInt8),
+      device(kXPU).dtype(kQInt8),
       output_scale,
       output_zero_point,
       MemoryFormat::Contiguous);
@@ -89,7 +90,7 @@ at::Tensor q_conv2d_relu(
           padding.vec(),
           stride.vec(),
           dilation.vec()),
-      device(kDPCPP).dtype(kQUInt8),
+      device(kXPU).dtype(kQUInt8),
       output_scale,
       output_zero_point,
       MemoryFormat::Contiguous);
@@ -107,20 +108,34 @@ at::Tensor q_conv2d_relu(
   return output;
 }
 
+//static auto registry =
+//    c10::RegisterOperators()
+//        .op("quantized::conv2d",
+//            c10::RegisterOperators::options()
+//                .kernel<decltype(q_conv2d), &q_conv2d>(
+//                    DispatchKey::QuantizedXPU))
+//        .op("quantized::conv2d_relu",
+//            c10::RegisterOperators::options()
+//                .kernel<decltype(q_conv2d_relu), &q_conv2d_relu>(
+//                    DispatchKey::QuantizedXPU));
+
+} // namespace AtenIpexTypeQuantizedXPU
+
+namespace AtenIpexTypeXPU {
 at::Tensor q_conv2d_sum_relu(
-    Tensor& accumu,
-    const Tensor& input,
-    const Tensor& packed_weight,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups,
-    double conv_scale,
-    int64_t conv_zero_point,
-    double sum_scale,
-    int64_t sum_zero_point) {
+  Tensor& accumu,
+  const Tensor& input,
+  const Tensor& packed_weight,
+  at::IntArrayRef stride,
+  at::IntArrayRef padding,
+  at::IntArrayRef dilation,
+  int64_t groups,
+  double conv_scale,
+  int64_t conv_zero_point,
+  double sum_scale,
+  int64_t sum_zero_point) {
   auto& pack_ptr =
-      cpp_custom_type_hack::cast<PackedConvWeightQDPCPP>(packed_weight);
+    cpp_custom_type_hack::cast<AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP>(packed_weight);
 
   at::Tensor weight = pack_ptr.weight;
   at::Tensor bias;
@@ -131,33 +146,22 @@ at::Tensor q_conv2d_sum_relu(
       static_cast<float>(sum_scale), conv_attr_t::kind_with_relu | conv_attr_t::kind_with_sum};
 
   convolution(
-      accumu,
-      input,
-      weight,
-      bias,
-      padding.vec(),
-      stride.vec(),
-      dilation.vec(),
-      groups,
-      attr);
+    accumu,
+    input,
+    weight,
+    bias,
+    padding.vec(),
+    stride.vec(),
+    dilation.vec(),
+    groups,
+    attr);
 
   accumu.set_quantizer_(
-      at::dpcpp::make_per_tensor_affine_quantizer(
+    at::dpcpp::make_per_tensor_affine_quantizer(
       sum_scale, sum_zero_point, accumu.scalar_type()));
 
   return accumu;
 }
+}
 
-static auto registry =
-    c10::RegisterOperators()
-        .op("quantized::conv2d",
-            c10::RegisterOperators::options()
-                .kernel<decltype(q_conv2d), &q_conv2d>(
-                    DispatchKey::QuantizedDPCPPTensorId))
-        .op("quantized::conv2d_relu",
-            c10::RegisterOperators::options()
-                .kernel<decltype(q_conv2d_relu), &q_conv2d_relu>(
-                    DispatchKey::QuantizedDPCPPTensorId));
-
-} // namespace AtenIpexTypeDPCPP
 } // namespace at

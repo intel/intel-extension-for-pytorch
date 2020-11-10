@@ -45,7 +45,7 @@ import torch_ipex
 from torch.testing._internal.common_utils import TestCase
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 ## Test Class
 ## Test Class name should  startswith 'Test'
@@ -94,7 +94,7 @@ from torch.testing._internal.common_utils import TestCase
 import pytest
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 ## Test Class
 ## TestTorchMethod for torch.xxx
@@ -139,7 +139,7 @@ import torch_ipex
 from torch.testing._internal.common_utils import TestCase, repeat_test_for_types
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):

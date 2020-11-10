@@ -8,7 +8,7 @@ from torch.testing._internal.common_utils import TestCase
 import pytest
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
  
 class TestNNMethod(TestCase):
     def test_nll_loss(self, dtype=torch.float):
@@ -17,9 +17,9 @@ class TestNNMethod(TestCase):
         # each element in target has to have 0 <= value < C
         target = torch.tensor([1, 0, 4])
         x = torch.tensor((0.5), dtype=torch.float)
-        input_dpcpp = input.to("dpcpp")
-        target_dpcpp = target.to("dpcpp")
-        x_dpcpp = x.to("dpcpp")
+        input_dpcpp = input.to("xpu")
+        target_dpcpp = target.to("xpu")
+        x_dpcpp = x.to("xpu")
         input.requires_grad = True
         output = F.nll_loss(input, target)
         output.backward(x)
@@ -41,8 +41,8 @@ class TestNNMethod(TestCase):
         target = torch.tensor([[[0, 1], [2, 3]],
                                [[3, 2], [1, 0]],
                                [[4, 1], [2, 3]]])
-        input_dpcpp = input.to("dpcpp")
-        target_dpcpp = target.to("dpcpp")
+        input_dpcpp = input.to("xpu")
+        target_dpcpp = target.to("xpu")
 
         input.requires_grad = True
         output = F.nll_loss(input, target, reduction='none')
@@ -53,7 +53,7 @@ class TestNNMethod(TestCase):
         input_dpcpp.requires_grad = True
 
         output_dpcpp = F.nll_loss(input_dpcpp, target_dpcpp, reduction='none')
-        x_dpcpp = x.to("dpcpp")
+        x_dpcpp = x.to("xpu")
         output_dpcpp.backward(x_dpcpp)
         print("none SYCL: ", output_dpcpp.to("cpu"))
         print("none SYCL grad: ", input_dpcpp.grad.to("cpu"))
@@ -72,7 +72,7 @@ class TestNNMethod(TestCase):
         print("sum CPU grad: ", input.grad)
 
         output_dpcpp = F.nll_loss(input_dpcpp, target_dpcpp, reduction='sum')
-        x_dpcpp = x.to("dpcpp")
+        x_dpcpp = x.to("xpu")
         output_dpcpp.backward(x_dpcpp)
         print("sum SYCL: ", output_dpcpp.to("cpu"))
         print("sum SYCL grad: ", input_dpcpp.grad.to("cpu"))

@@ -235,7 +235,7 @@ void dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
 template <typename scalar_t, typename func_t>
 void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
   for (int arg = 0; arg < iter.ntensors(); arg++) {
-    TORCH_INTERNAL_ASSERT(iter.device(arg).type() == at::kDPCPP);
+    TORCH_INTERNAL_ASSERT(iter.device(arg).type() == at::kXPU);
   }
 
   if (iter.numel() == 0) {

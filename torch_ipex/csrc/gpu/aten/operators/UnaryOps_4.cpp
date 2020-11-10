@@ -5,78 +5,79 @@
 #include <utils/Numerics.h>
 #include <utils/Pairwise.h>
 #include <utils/Pointwise.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
 #include "Loops.h"
 
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 IPEX_OUT_FLOAT_UNARY_FUNC_OPS(tanh_out, Numerics<scalar_t>::tanh, Real);
 
 Tensor& tanh_(Tensor& self) {
-  return at::AtenIpexTypeDPCPP::tanh_out(self, self);
+  return at::AtenIpexTypeXPU::tanh_out(self, self);
 }
 
 Tensor tanh(const Tensor& self) {
   auto result = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::tanh_out(result, self);
+  return at::AtenIpexTypeXPU::tanh_out(result, self);
 }
 
 IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(erfinv_out, TensorErfinvOp);
 
 Tensor& erfinv_(Tensor& self) {
-  return at::AtenIpexTypeDPCPP::erfinv_out(self, self);
+  return at::AtenIpexTypeXPU::erfinv_out(self, self);
 }
 
 Tensor erfinv(const Tensor& self) {
   auto result = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::erfinv_out(result, self);
+  return at::AtenIpexTypeXPU::erfinv_out(result, self);
 }
 
 IPEX_OUT_FLOAT_AND_HALF_CALLABLE_0_UNARY_OPS(digamma_out, TensorDigammaOp);
 
 Tensor& digamma_(Tensor& self) {
-  return at::AtenIpexTypeDPCPP::digamma_out(self, self);
+  return at::AtenIpexTypeXPU::digamma_out(self, self);
 }
 
 Tensor digamma(const Tensor& self) {
   auto result = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::digamma_out(result, self);
+  return at::AtenIpexTypeXPU::digamma_out(result, self);
 }
 
 IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(remainder_out, TensorRemainderOp);
 
 Tensor remainder(const Tensor& self, Scalar other) {
   auto out = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::remainder_out(out, self, other);
+  return at::AtenIpexTypeXPU::remainder_out(out, self, other);
 }
 
 Tensor& remainder_(Tensor& self, Scalar other) {
-  return at::AtenIpexTypeDPCPP::remainder_out(self, self, other);
+  return at::AtenIpexTypeXPU::remainder_out(self, self, other);
 }
 
 IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(fmod_out, TensorFmodOp);
 
 Tensor fmod(const Tensor& self, Scalar other) {
   auto out = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::fmod_out(out, self, other);
+  return at::AtenIpexTypeXPU::fmod_out(out, self, other);
 }
 
 Tensor& fmod_(Tensor& self, Scalar other) {
-  return at::AtenIpexTypeDPCPP::fmod_out(self, self, other);
+  return at::AtenIpexTypeXPU::fmod_out(self, self, other);
 }
 
 IPEX_OUT_ALL_CALLABLE_0_UNARY_OPS(sign_out, TensorSignOp);
 
 Tensor sign(const Tensor& self) {
   auto out = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::sign_out(out, self);
+  return at::AtenIpexTypeXPU::sign_out(out, self);
 }
 
 Tensor& sign_(Tensor& self) {
-  return at::AtenIpexTypeDPCPP::sign_out(self, self);
+  return at::AtenIpexTypeXPU::sign_out(self, self);
 }
 
 Tensor& real_out(Tensor& out, const Tensor& self) {
@@ -103,5 +104,5 @@ Tensor& conj_out(Tensor& out, const Tensor& self) {
   return out;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

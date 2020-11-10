@@ -18,14 +18,14 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
   Tensor quantize(Tensor rtensor) override {
     TORCH_CHECK(
         rtensor.scalar_type() == kFloat, "quantize only works on Float Tensor.");
-    Tensor qtensor = AtenIpexTypeDPCPP::new_qtensor(
+    Tensor qtensor = AtenIpexTypeXPU::new_qtensor(
         rtensor.sizes(),
         rtensor.options().dtype(scalar_type_),
         intrusive_from_this());
 
     rtensor = rtensor.contiguous();
 
-    return at::AtenIpexTypeDPCPP::quantize_tensor_per_tensor_affine(
+    return at::AtenIpexTypeXPU::quantize_tensor_per_tensor_affine(
         qtensor, rtensor, scale_, zero_point_);
   }
 
@@ -38,7 +38,7 @@ struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
         at::empty(qtensor.sizes(), qtensor.options().dtype(at::kFloat));
     qtensor = qtensor.contiguous();
 
-    return at::AtenIpexTypeDPCPP::dequantize_tensor_per_tensor_affine(
+    return at::AtenIpexTypeXPU::dequantize_tensor_per_tensor_affine(
         rtensor, qtensor, scale_, zero_point_);
   }
 
@@ -102,14 +102,14 @@ struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {
     TORCH_CHECK(
         rtensor.scalar_type() == kFloat, "quantize only works on Float Tensor.");
 
-    Tensor qtensor = AtenIpexTypeDPCPP::new_qtensor(
+    Tensor qtensor = AtenIpexTypeXPU::new_qtensor(
         rtensor.sizes(),
         rtensor.options().dtype(scalar_type_),
         intrusive_from_this());
 
     rtensor = rtensor.contiguous();
 
-    return at::AtenIpexTypeDPCPP::quantize_tensor_per_channel_affine(
+    return at::AtenIpexTypeXPU::quantize_tensor_per_channel_affine(
         qtensor, rtensor, scales_, zero_points_, axis_);
   }
 
@@ -122,7 +122,7 @@ struct DPCPPPerChannelAffineQuantizer : public AffineQuantizer {
         at::empty(qtensor.sizes(), qtensor.options().dtype(at::kFloat));
     qtensor = qtensor.contiguous();
 
-    return at::AtenIpexTypeDPCPP::dequantize_tensor_per_channel_affine(
+    return at::AtenIpexTypeXPU::dequantize_tensor_per_channel_affine(
         rtensor, qtensor, scales_, zero_points_, axis_);
   }
 

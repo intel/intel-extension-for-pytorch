@@ -11,7 +11,7 @@ using namespace dnnl;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 void adaptive_max_pool3d_out_template(
@@ -201,7 +201,7 @@ std::tuple<Tensor, Tensor> adaptive_max_pool3d(
     IntArrayRef output_size) {
   Tensor output = at::empty({0}, self.options());
   Tensor indices = at::empty({0}, self.options().dtype(kLong));
-  return at::AtenIpexTypeDPCPP::adaptive_max_pool3d_out(
+  return at::AtenIpexTypeXPU::adaptive_max_pool3d_out(
       output, indices, self, output_size);
 }
 
@@ -224,5 +224,5 @@ Tensor adaptive_max_pool3d_backward(
       grad_input, grad_output, self, indices);
   return grad_input;
 }
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -191,10 +191,4 @@ TAGS
 # Below files are not deleted by "setup.py clean".
 
 # generated files
-torch_ipex/csrc/gpu/aten/generated/ATen/aten_ipex_type_default.cpp
-torch_ipex/csrc/gpu/aten/generated/ATen/aten_ipex_type_default.h
-torch_ipex/csrc/gpu/aten/generated/ATen/aten_ipex_type_dpcpp.h
-scripts/gpu/RegistrationDeclarations_DPCPP.h
-scripts/gpu/aten_ipex_type_default.cpp.in
-scripts/gpu/aten_ipex_type_default.h.in
-scripts/gpu/aten_ipex_type_dpcpp.h.in
+torch_ipex/csrc/gpu/aten/generated/ATen/*

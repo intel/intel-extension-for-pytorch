@@ -5,7 +5,7 @@ import numpy as np
 np.set_printoptions(threshold=np.inf)
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     def test_index(self, dtype=torch.float):
@@ -15,7 +15,7 @@ class TestTorchMethod(TestCase):
 
         for datatype in dtypes:
             # 2-dims tensor index
-            x_cpu = torch.randn([32768, 27], dtype=torch.float, device=cpu_device)
+            x_cpu = torch.randn([327, 27], dtype=torch.float, device=cpu_device)
             if datatype == torch.half:
                 x_cpu = x_cpu.half()
 
@@ -25,7 +25,7 @@ class TestTorchMethod(TestCase):
             self.assertEqual(res_cpu, res_dpcpp.to(cpu_device))
 
             # 3-dims tensor index
-            x_cpu = torch.randn([32768, 27, 27], dtype=torch.float, device=cpu_device)
+            x_cpu = torch.randn([327, 27, 27], dtype=torch.float, device=cpu_device)
             if datatype == torch.half:
                 x_cpu = x_cpu.half()
 
@@ -40,7 +40,7 @@ class TestTorchMethod(TestCase):
             self.assertEqual(res_cpu, res_dpcpp.to(cpu_device))
 
             # 4-dims tensor index
-            x_cpu = torch.randn([32768, 27, 27, 27], dtype=torch.float, device=cpu_device)
+            x_cpu = torch.randn([327, 27, 27, 27], dtype=torch.float, device=cpu_device)
             if datatype == torch.half:
                 x_cpu = x_cpu.half()
 

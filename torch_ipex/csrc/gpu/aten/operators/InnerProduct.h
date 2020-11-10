@@ -22,7 +22,7 @@ void inner_product(
     void* weight,
     Tensor bias,
     bool use_bias) {
-  Device curDevice = Device(kDPCPP, current_device());
+  Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
   int32_t n = M;

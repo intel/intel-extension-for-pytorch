@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/ApplyUtils.h>
 #include <core/DPCPP.h>
@@ -13,7 +14,7 @@
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 #include "IndexingUtils.h"
 #include "Loops.h"
 #include "ParttenScan.h"
@@ -28,7 +29,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 DPCPP_DEF_K1(index_select_ker);
@@ -690,7 +691,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
 
   // Determine our output size
   c10::optional<ScalarType> dtype;
-  auto totalElements = at::AtenIpexTypeDPCPP::sum(mask, dtype).item().to<int>();
+  auto totalElements = at::AtenIpexTypeXPU::sum(mask, dtype).item().to<int>();
 
   // The number of `1` elements present in the mask must be <= the
   // number of elements available in `src`
@@ -781,7 +782,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
 
   // Determine our output size
   c10::optional<ScalarType> dtype;
-  int totalElements = at::AtenIpexTypeDPCPP::sum(mask, dtype).item().to<int>();
+  int totalElements = at::AtenIpexTypeXPU::sum(mask, dtype).item().to<int>();
   int64_t real_sizes[1] = {(int64_t)totalElements};
   if (totalElements == 0) {
     TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 1, real_sizes, nullptr);
@@ -1085,7 +1086,7 @@ Tensor& index_select_out(
 
 Tensor index_select(const Tensor& self, int64_t dim, const Tensor& index) {
   auto out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::index_select_out(out, self, dim, index);
+  return at::AtenIpexTypeXPU::index_select_out(out, self, dim, index);
 }
 
 Tensor& nonzero_out(Tensor& out, const Tensor& self) {
@@ -1101,7 +1102,7 @@ Tensor& nonzero_out(Tensor& out, const Tensor& self) {
 
 Tensor nonzero(const at::Tensor& self) {
   auto out = at::empty({0}, self.options().dtype(kLong));
-  return at::AtenIpexTypeDPCPP::nonzero_out(out, self);
+  return at::AtenIpexTypeXPU::nonzero_out(out, self);
 }
 
 Tensor& index_add_(
@@ -1143,7 +1144,7 @@ Tensor& index_fill_(
       "with ",
       value.dim(),
       " dimension(s).");
-  return at::AtenIpexTypeDPCPP::index_fill_(self, dim, index, value.item());
+  return at::AtenIpexTypeXPU::index_fill_(self, dim, index, value.item());
 }
 
 Tensor& diag_out(Tensor& out, const Tensor& self, int64_t diagonal) {
@@ -1159,14 +1160,14 @@ Tensor& diag_out(Tensor& out, const Tensor& self, int64_t diagonal) {
 
 Tensor diag(const Tensor& self, int64_t diagonal) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::diag_out(out, self, diagonal);
+  return at::AtenIpexTypeXPU::diag_out(out, self, diagonal);
 }
 
 Tensor trace(const Tensor& self) {
   TORCH_CHECK(self.dim() == 2, "expected a matrix");
-  Tensor diag = at::AtenIpexTypeDPCPP::diag(self, 0);
+  Tensor diag = at::AtenIpexTypeXPU::diag(self, 0);
   optional<ScalarType> dtype;
-  Tensor out = at::AtenIpexTypeDPCPP::sum(diag, dtype);
+  Tensor out = at::AtenIpexTypeXPU::sum(diag, dtype);
   return out;
 }
 
@@ -1189,7 +1190,7 @@ Tensor& masked_fill_(Tensor& self, const Tensor& mask_, Scalar value) {
 }
 
 Tensor& masked_fill_(Tensor& self, const Tensor& mask, const Tensor& value) {
-  return at::AtenIpexTypeDPCPP::masked_fill_(self, mask, value.item());
+  return at::AtenIpexTypeXPU::masked_fill_(self, mask, value.item());
 }
 
 Tensor& masked_scatter_(
@@ -1219,7 +1220,7 @@ Tensor& masked_select_out(Tensor& out, const Tensor& self, const Tensor& mask) {
 
 Tensor masked_select(const Tensor& self, const Tensor& mask) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::masked_select_out(out, self, mask);
+  return at::AtenIpexTypeXPU::masked_select_out(out, self, mask);
 }
 
 DPCPP_DEF_K1(dpcpp_put_kernel);
@@ -1346,8 +1347,8 @@ Tensor& take_out(Tensor& out, const Tensor& self, const Tensor& index) {
 
 Tensor take(const Tensor& self, const Tensor& index) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::take_out(out, self, index);
+  return at::AtenIpexTypeXPU::take_out(out, self, index);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

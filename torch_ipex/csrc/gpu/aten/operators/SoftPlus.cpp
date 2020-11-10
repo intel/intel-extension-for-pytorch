@@ -10,7 +10,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 DPCPP_DEF_K1(softplus_forward);
 DPCPP_DEF_K1(softplus_backward);
@@ -21,11 +21,11 @@ Tensor& softplus_out(
     Scalar beta,
     Scalar threshold) {
   checkBackend("softplus_forward", {out}, self.options().backend());
-  auto iter = at::TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(out);
-  iter.add_input(self);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(out)
+  .add_input(self)
+  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
@@ -50,7 +50,7 @@ Tensor& softplus_out(
 
 Tensor softplus(const Tensor& self, Scalar beta, Scalar threshold) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::softplus_out(out, self, beta, threshold);
+  return at::AtenIpexTypeXPU::softplus_out(out, self, beta, threshold);
 }
 
 Tensor& softplus_backward_out(
@@ -64,12 +64,12 @@ Tensor& softplus_backward_out(
       "softplus_backward",
       {grad_input, grad_output, output},
       self.options().backend());
-  auto iter = at::TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(grad_input);
-  iter.add_input(grad_output);
-  iter.add_input(output);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(grad_input)
+  .add_input(grad_output)
+  .add_input(output)
+  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "softplus_backward", [&]() {
@@ -95,9 +95,9 @@ Tensor softplus_backward(
     Scalar threshold,
     const Tensor& output) {
   Tensor grad_input = at::empty({0}, grad_output.options());
-  return at::AtenIpexTypeDPCPP::softplus_backward_out(
+  return at::AtenIpexTypeXPU::softplus_backward_out(
       grad_input, grad_output, self, beta, threshold, output);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

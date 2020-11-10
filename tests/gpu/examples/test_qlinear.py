@@ -29,9 +29,9 @@ class  TestTorchMethod(TestCase):
         packed_params = torch.ops.quantized.linear_prepack(q_filters, bias)
         output_int8 = torch.ops.quantized.linear(q_inputs, packed_params, 4.0, 0)
         
-        inputs_gpu = inputs.to("dpcpp")
-        filters_gpu = filters.to("dpcpp")
-        bias_gpu = bias.to("dpcpp")
+        inputs_gpu = inputs.to("xpu")
+        filters_gpu = filters.to("xpu")
+        bias_gpu = bias.to("xpu")
         
         q_inputs_gpu = torch.quantize_per_tensor(inputs_gpu, 0.4, zero_point, dtype_inputs)
         q_filters_gpu = torch.quantize_per_tensor(filters_gpu, 0.5, zero_point, dtype_filters)

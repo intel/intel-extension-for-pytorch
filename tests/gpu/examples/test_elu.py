@@ -8,7 +8,7 @@ import copy
 
 dtype = torch.float32
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
@@ -24,10 +24,10 @@ class TestTorchMethod(TestCase):
             print("cpu grad ", x_cpu.grad)
 
 
-            xelu_dpcpp = Xelu.to("dpcpp")
+            xelu_dpcpp = Xelu.to("xpu")
 
-            x_dpcpp = Variable(x_cpu.clone().to("dpcpp"), requires_grad=True)
-            grad_dpcpp = Variable(grad_x.to("dpcpp"), requires_grad=True)
+            x_dpcpp = Variable(x_cpu.clone().to("xpu"), requires_grad=True)
+            grad_dpcpp = Variable(grad_x.to("xpu"), requires_grad=True)
 
             y_dpcpp = xelu_dpcpp(x_dpcpp)
             y_dpcpp.backward(grad_dpcpp)

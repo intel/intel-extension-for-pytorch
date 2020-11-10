@@ -14,7 +14,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 DPCPP_DEF_K1(linspace_dpcpp_ker);
@@ -298,5 +298,5 @@ Tensor& arange_out(Tensor& out, Scalar start, Scalar end, Scalar step) {
   return out;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

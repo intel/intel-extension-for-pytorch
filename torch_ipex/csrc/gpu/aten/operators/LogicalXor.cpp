@@ -5,7 +5,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 DPCPP_DEF_K1(logical_xor);
@@ -34,16 +34,16 @@ Tensor& logical_xor_out(
     Tensor& result,
     const Tensor& self,
     const Tensor& other) {
-  TensorIterator iter;
-  iter.dont_compute_common_dtype();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(result);
-  iter.add_input(self);
-  iter.add_input(other);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .check_all_same_dtype(false)
+  .set_check_mem_overlap(true)
+  .add_output(result)
+  .add_input(self)
+  .add_input(other)
+  .build();
   impl::logical_xor_kernel(iter);
   return result;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

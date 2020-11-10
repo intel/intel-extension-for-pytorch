@@ -8,13 +8,13 @@
 
 #include <utils/ParamUtils.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 
 using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeQuantizedXPU {
 
 Tensor qAdd(Tensor qa, Tensor qb, double scale, int64_t zero_point) {
   auto a = at::dequantize(qa);
@@ -36,17 +36,17 @@ Tensor qAddRelu(Tensor qa, Tensor qb, double scale, int64_t zero_point) {
   return qc;
 }
 
-static auto registry =
-    c10::RegisterOperators()
-        .op("quantized::add(Tensor qa, Tensor qb, float scale, int "
-            "zero_point)-> Tensor qc",
-            c10::RegisterOperators::options().kernel<decltype(qAdd), &qAdd>(
-                DispatchKey::QuantizedDPCPPTensorId))
-        .op("quantized::add_relu(Tensor qa, Tensor qb, float scale, int "
-            "zero_point)-> Tensor qc",
-            c10::RegisterOperators::options()
-                .kernel<decltype(qAddRelu), &qAddRelu>(
-                    DispatchKey::QuantizedDPCPPTensorId));
+//static auto registry =
+//    c10::RegisterOperators()
+//        .op("quantized::add(Tensor qa, Tensor qb, float scale, int "
+//            "zero_point)-> Tensor qc",
+//            c10::RegisterOperators::options().kernel<decltype(qAdd), &qAdd>(
+//                DispatchKey::QuantizedXPU))
+//        .op("quantized::add_relu(Tensor qa, Tensor qb, float scale, int "
+//            "zero_point)-> Tensor qc",
+//            c10::RegisterOperators::options()
+//                .kernel<decltype(qAddRelu), &qAddRelu>(
+//                    DispatchKey::QuantizedXPU));
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

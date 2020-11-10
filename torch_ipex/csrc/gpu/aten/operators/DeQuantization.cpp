@@ -6,8 +6,9 @@
 #include <ATen/quantized/QTensorImpl.h>
 #include <ATen/quantized/Quantizer.h>
 #include <c10/util/Exception.h>
+#include <ATen/ipex_type_dpcpp_customized.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
 #include <utils/Numerics.h>
@@ -24,14 +25,14 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 Tensor dequantize_tensor_per_tensor_affine(
     Tensor& rtensor,
     const Tensor& qtensor,
     double scale,
     int64_t zero_point) {
-  auto q_eng = GpuEngineManager::Instance().get_engine({kDPCPP, current_device()});
+  auto q_eng = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto stream = GpuStreamManager::Instance().get_stream();
 
   memory::dims q_dims = qtensor.dim() == 4
@@ -43,7 +44,7 @@ Tensor dequantize_tensor_per_tensor_affine(
       : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
 
   auto q_md = memory::desc(q_dims, q_dt, q_fmt);
-  auto q_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(qtensor);
+  auto q_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(qtensor);
   auto q_m = q_ctx.is_plain() ? dpcpp_onednn_memory(q_md, q_eng, qtensor.data_ptr())
       : dpcpp_onednn_memory({q_ctx.meta()}, q_eng, qtensor.data_ptr());
 
@@ -70,7 +71,7 @@ Tensor dequantize_tensor_per_channel_affine(
     const Tensor& scales,
     const Tensor& zero_points,
     int64_t axis) {
-  auto q_eng = GpuEngineManager::Instance().get_engine({kDPCPP, current_device()});
+  auto q_eng = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto stream = GpuStreamManager::Instance().get_stream();
 
   memory::dims q_dims = qtensor.dim() == 4
@@ -118,5 +119,5 @@ Tensor dequantize(const Tensor& self) {
   return qtensor->quantizer()->dequantize(self);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -7,7 +7,7 @@ import pytest
 class  TestTorchMethod(TestCase):
     def test_dequantize_per_channel(self, dtype=torch.float):
         src=torch.randn(1,3,2,2)
-        src_gpu = src.to("dpcpp")
+        src_gpu = src.to("xpu")
 
         data_type = torch.qint8
 
@@ -24,7 +24,7 @@ class  TestTorchMethod(TestCase):
 
     def test_dequantize_per_tensor(self, dtype=torch.float):
         src=torch.randn(1,3,2,2)
-        src_gpu = src.to("dpcpp")
+        src_gpu = src.to("xpu")
 
         data_type = torch.quint8
         
@@ -40,7 +40,7 @@ class  TestTorchMethod(TestCase):
         self.assertEqual(dst, dst_gpu)
     def test_dequantize_FP32_input(self, dtype=torch.float):
         src = torch.randn(1,3,2,2)
-        src_gpu = src.to("dpcpp")
+        src_gpu = src.to("xpu")
 
         dst = src
         dst_gpu = torch.dequantize(src_gpu)

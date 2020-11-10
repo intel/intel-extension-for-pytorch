@@ -7,17 +7,17 @@
 #include "Loops.h"
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 DPCPP_DEF_K1(SyclOpLeakyElu);
 DPCPP_DEF_K1(SyclOpLeakyEluBackward);
 
 Tensor& leaky_relu_out(Tensor& out, const Tensor& self, Scalar negative_slope) {
-  auto iter = TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(out);
-  iter.add_input(self);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(out)
+  .add_input(self)
+  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -37,7 +37,7 @@ Tensor& leaky_relu_out(Tensor& out, const Tensor& self, Scalar negative_slope) {
 
 Tensor leaky_relu(const Tensor& self, Scalar negative_slope) {
   Tensor result = at::empty(self.sizes(), self.options());
-  at::AtenIpexTypeDPCPP::leaky_relu_out(result, self, negative_slope);
+  at::AtenIpexTypeXPU::leaky_relu_out(result, self, negative_slope);
   return result;
 }
 
@@ -46,12 +46,12 @@ Tensor& leaky_relu_backward_out(
     const Tensor& grad_output,
     const Tensor& self,
     Scalar negative_slope) {
-  auto iter = TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(grad_input);
-  iter.add_input(grad_output);
-  iter.add_input(self);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(grad_input)
+  .add_input(grad_output)
+  .add_input(self)
+  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "LeakyReLU_backward", [&]() {
@@ -75,13 +75,13 @@ Tensor leaky_relu_backward(
     bool self_is_result) {
   // TODO: self_is_result
   Tensor grad_input = at::empty({0}, grad_output.options());
-  return at::AtenIpexTypeDPCPP::leaky_relu_backward_out(
+  return at::AtenIpexTypeXPU::leaky_relu_backward_out(
       grad_input, grad_output, self, negative_slope);
 }
 
 Tensor& leaky_relu_(Tensor& self, Scalar negative_slope) {
-  return at::AtenIpexTypeDPCPP::leaky_relu_out(self, self, negative_slope);
+  return at::AtenIpexTypeXPU::leaky_relu_out(self, self, negative_slope);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

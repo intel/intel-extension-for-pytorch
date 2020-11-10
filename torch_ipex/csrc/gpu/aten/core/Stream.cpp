@@ -224,7 +224,7 @@ DPCPPStream DPCPPStreamImplToDPCPPStream(const DPCPPStreamImpl* ptr) {
       DPCPPStream::UNCHECKED,
       Stream(
           Stream::UNSAFE,
-          c10::Device(DeviceType::DPCPP, ptr->getDeviceIndex()),
+          c10::Device(DeviceType::XPU, ptr->getDeviceIndex()),
           DPCPPStream_getStreamId(ptr)));
 }
 

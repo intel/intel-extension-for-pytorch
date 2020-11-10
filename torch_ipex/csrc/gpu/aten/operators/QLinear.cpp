@@ -6,7 +6,7 @@
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 #include <utils/ParamUtils.h>
 
 #include "InnerProduct.h"
@@ -17,7 +17,7 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeQuantizedXPU {
 
 using namespace impl;
 
@@ -76,20 +76,20 @@ at::Tensor dpcppLinear_fp32_ip(
   return output;
 }
 
-static auto registry =
-    c10::RegisterOperators()
-        .op("quantized::linear(Tensor X, Tensor W_prepack, float Y_scale_i, "
-            "int "
-            "Y_zero_point_i) -> Tensor Y",
-            c10::RegisterOperators::options()
-                .kernel<decltype(dpcppLinear), &dpcppLinear>(
-                    DispatchKey::QuantizedDPCPPTensorId))
-        .op("quantized::linear(Tensor X, Tensor W_prepack, float Y_scale_i, "
-            "int "
-            "Y_zero_point_i) -> Tensor Y",
-            c10::RegisterOperators::options()
-                .kernel<decltype(dpcppLinear_fp32_ip), &dpcppLinear_fp32_ip>(
-                    DispatchKey::DPCPPTensorId));
+//static auto registry =
+//    c10::RegisterOperators()
+//        .op("quantized::linear(Tensor X, Tensor W_prepack, float Y_scale_i, "
+//            "int "
+//            "Y_zero_point_i) -> Tensor Y",
+//            c10::RegisterOperators::options()
+//                .kernel<decltype(dpcppLinear), &dpcppLinear>(
+//                    DispatchKey::QuantizedXPU))
+//        .op("quantized::linear(Tensor X, Tensor W_prepack, float Y_scale_i, "
+//            "int "
+//            "Y_zero_point_i) -> Tensor Y",
+//            c10::RegisterOperators::options()
+//                .kernel<decltype(dpcppLinear_fp32_ip), &dpcppLinear_fp32_ip>(
+//                    DispatchKey::XPU));
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

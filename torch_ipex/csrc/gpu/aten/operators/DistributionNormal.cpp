@@ -10,7 +10,7 @@
 #include "Distributions.h"
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 
 bool resize_output_for_normal(at::Tensor& output, const at::Tensor& mean, const at::Tensor& std) {
@@ -48,8 +48,8 @@ bool resize_output_for_normal(at::Tensor& output, const at::Tensor& mean, const 
 }
 
 
-void normal_dpcpp(TensorIterator& iter, double mean_, double std_, Generator* gen_) {
-  auto gen = get_generator_or_default<DPCPPGenerator>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
+void normal_dpcpp(TensorIterator& iter, double mean_, double std_, c10::optional<Generator> gen_) {
+  auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
   IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "normal_dpcpp", [&] {
     using accscalar_t = dist_acctype<scalar_t>;
     auto mean = static_cast<accscalar_t>(mean_);
@@ -59,7 +59,7 @@ void normal_dpcpp(TensorIterator& iter, double mean_, double std_, Generator* ge
       auto ret = static_cast<scalar_t>(rand * std + mean);
       return ret;
     };
-    AtenIpexTypeDPCPP::distribution_nullary_kernel<scalar_t, accscalar_t>(iter,
+    AtenIpexTypeXPU::distribution_nullary_kernel<scalar_t, accscalar_t>(iter,
       gen,
       [] (RandomState<Philox4_32_10>* state) { return state->normal<scalar_t>(); },
       normal_func);
@@ -68,45 +68,45 @@ void normal_dpcpp(TensorIterator& iter, double mean_, double std_, Generator* ge
 
 }
 
-Tensor& normal_(Tensor& self, double mean, double std, Generator* generator) {
+Tensor& normal_(Tensor& self, double mean, double std, c10::optional<Generator> generator) {
   TORCH_CHECK(std > 0.0, "normal_ expects std > 0.0, but found std=", std);
   auto iter = TensorIterator::nullary_op(self);
   normal_dpcpp(iter, mean, std, generator);
   return self;
 }
 
-Tensor normal(const Tensor& mean, double std, Generator* generator) {
+Tensor normal(const Tensor& mean, double std, c10::optional<Generator> generator) {
   Tensor ret = at::empty_like(mean, MemoryFormat::Contiguous);
   normal_out(ret, mean, std, generator);
   return ret;
 }
 
-Tensor normal(double mean, const Tensor& std, Generator* generator) {
+Tensor normal(double mean, const Tensor& std, c10::optional<Generator> generator) {
   Tensor ret = at::empty_like(std, MemoryFormat::Contiguous);
   normal_out(ret, mean, std, generator);
   return ret;
 }
 
-Tensor normal(const Tensor& mean, const Tensor& std, Generator* generator) {
+Tensor normal(const Tensor& mean, const Tensor& std, c10::optional<Generator> generator) {
   Tensor ret = at::empty({0}, mean.options(), MemoryFormat::Contiguous);
   normal_out(ret, mean, std, generator);
   return ret;
 }
 
-Tensor& normal_out(Tensor& output, const Tensor& mean, double std, Generator* generator) {
+Tensor& normal_out(Tensor& output, const Tensor& mean, double std, c10::optional<Generator> generator) {
   normal_(output, 0, std, generator);
   output.add_(mean);
   return output;
 }
 
-Tensor& normal_out(Tensor& output, double mean, const Tensor& std, Generator* generator) {
+Tensor& normal_out(Tensor& output, double mean, const Tensor& std, c10::optional<Generator> generator) {
   normal_(output, 0, 1, generator);
   auto mean_tensor = at::full({}, mean, output.options());
   output.mul_(std).add_(mean_tensor);
   return output;
 }
 
-Tensor& normal_out(Tensor& output, const Tensor& mean, const Tensor& std, Generator* generator) {
+Tensor& normal_out(Tensor& output, const Tensor& mean, const Tensor& std, c10::optional<Generator> generator) {
   bool is_deprecated_th_impl = resize_output_for_normal(output, mean, std);
   normal_(output, 0, 1, generator);
   if (is_deprecated_th_impl) {
@@ -118,5 +118,5 @@ Tensor& normal_out(Tensor& output, const Tensor& mean, const Tensor& std, Genera
   return output;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

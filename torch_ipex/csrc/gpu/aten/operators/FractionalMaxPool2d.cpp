@@ -10,7 +10,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 DPCPP_DEF_K2(FractionalMaxPool, typename scalar_t);
@@ -403,5 +403,5 @@ Tensor fractional_max_pool2d_backward(
   return grad_input;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

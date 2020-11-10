@@ -4,7 +4,7 @@
 #include <ATen/cpp_custom_type_hack.h>
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeQuantizedXPU {
 
 struct PackedConvWeightQDPCPP {
   Tensor weight;
@@ -16,5 +16,5 @@ struct PackedLinearWeightQDPCPP {
   c10::optional<Tensor> bias;
 };
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

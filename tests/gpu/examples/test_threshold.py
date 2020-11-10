@@ -6,7 +6,7 @@ import torch_ipex
 
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -21,7 +21,7 @@ class TestNNMethod(TestCase):
 
         y_ref = nn.Threshold(2, 0)(x_ref)
         print(y_ref)
-        x = x_ref.to("dpcpp")
+        x = x_ref.to("xpu")
         y = nn.Threshold(2, 0)(x)
         print(y.to("cpu"))
         self.assertEqual(y_ref, y.cpu())

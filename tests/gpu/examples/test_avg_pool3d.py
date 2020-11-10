@@ -4,7 +4,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -27,7 +27,7 @@ class TestNNMethod(TestCase):
 
         print("y_dpcpp", y_dpcpp.cpu())
 
-        # grad_dpcpp = grad_cpu.to("dpcpp")
+        # grad_dpcpp = grad_cpu.to("xpu")
         y_dpcpp.backward(torch.ones([8, 8, 24, 24], device=dpcpp_device))
         print("y_dpcpp backward", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))

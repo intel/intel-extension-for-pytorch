@@ -12,8 +12,8 @@ class TetsTorchMethod(TestCase):
         y_cpu_float = torch.randn(
             [2, 2, 2, 2], device=cpu_device, dtype=torch.float)
         y_cpu_int8 = torch.tensor([-1, 1], device=cpu_device, dtype=torch.int8)
-        y_dpcpp_float = y_cpu_float.to("dpcpp")
-        y_dpcpp_int8 = y_cpu_int8.to("dpcpp")
+        y_dpcpp_float = y_cpu_float.to("xpu")
+        y_dpcpp_int8 = y_cpu_int8.to("xpu")
 
         print("-cpu (neg)", -y_cpu_float)
         print("-dpcpp (neg)", (-y_dpcpp_float).cpu())

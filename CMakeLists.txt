@@ -84,3 +84,4 @@ function (print_configuration_summary)
 endfunction()
 
 print_configuration_summary()
+add_custom_target(pytorch_dummy COMMAND echo dummy stub)

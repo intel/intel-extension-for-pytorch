@@ -22,10 +22,10 @@ using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
-Tensor& exponential_(Tensor& self, double lambda_, Generator* gen_) {
-  auto gen = get_generator_or_default<DPCPPGenerator>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
+Tensor& exponential_(Tensor& self, double lambda_, c10::optional<Generator> gen_) {
+  auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
 #ifdef USE_ONEMKL
   if (lambda_ > 0 && self.is_contiguous()) {
     IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
@@ -70,5 +70,5 @@ Tensor& exponential_(Tensor& self, double lambda_, Generator* gen_) {
 }
 
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

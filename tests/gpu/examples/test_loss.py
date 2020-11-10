@@ -22,12 +22,12 @@ class TestNNMethod(TestCase):
 
         print(l, expected)
 
-        loss_dpcpp = loss.to("dpcpp")
-        log_prob1_dpcpp = log_prob1.to("dpcpp")
-        prob2_dpcpp = prob2.to("dpcpp")
+        loss_dpcpp = loss.to("xpu")
+        log_prob1_dpcpp = log_prob1.to("xpu")
+        prob2_dpcpp = prob2.to("xpu")
 
         l_dpcpp = loss_dpcpp(log_prob1_dpcpp, prob2_dpcpp)
-        loss_none_reduce_dpcpp = nn.KLDivLoss(reduction='sum').to("dpcpp")
+        loss_none_reduce_dpcpp = nn.KLDivLoss(reduction='sum').to("xpu")
         expected_dpcpp = loss_none_reduce_dpcpp(
             log_prob1_dpcpp, prob2_dpcpp)/input_shape[0]
 

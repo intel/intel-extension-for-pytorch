@@ -9,7 +9,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 DPCPP_DEF_K2(ReflectionPad1d, typename scalar_t);
@@ -254,7 +254,7 @@ Tensor& reflection_pad1d_out(
 
 Tensor reflection_pad1d(const Tensor& input, IntArrayRef padding) {
   auto output = at::empty({0}, input.options());
-  return at::AtenIpexTypeDPCPP::reflection_pad1d_out(output, input, padding);
+  return at::AtenIpexTypeXPU::reflection_pad1d_out(output, input, padding);
 }
 
 Tensor& reflection_pad1d_backward_out(
@@ -279,5 +279,5 @@ Tensor reflection_pad1d_backward(
   return grad_input;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

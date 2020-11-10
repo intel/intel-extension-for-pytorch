@@ -34,7 +34,6 @@ struct TORCH_API DPCPPType final {
 
   static Tensor empty(IntArrayRef size, const TensorOptions & options, c10::optional<MemoryFormat> memory_format); // aten::empty.memory_format(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
 
-  static Tensor empty_strided(IntArrayRef size, IntArrayRef stride, const TensorOptions & options);  // aten::empty_strided(int[] size, int[] stride, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
   static Tensor int_repr(const at::Tensor & self); // aten::int_repr(Tensor self) -> Tensor
 
   static Tensor dequantize(const Tensor & self); // aten::dequantize(Tensor self) -> Tensor
@@ -69,5 +68,7 @@ struct TORCH_API DPCPPType final {
   static Tensor clone(const Tensor & self, c10::optional<MemoryFormat> memory_format); // aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
   static Tensor as_strided(const Tensor & self, IntArrayRef size, IntArrayRef stride, c10::optional<int64_t> storage_offset); // aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> Tensor(a)
   static Tensor view(const Tensor & self, IntArrayRef size); // aten::view(Tensor(a) self, int[] size) -> Tensor(a)
-  static Tensor quantize_per_tensor(const at::Tensor & self, double scale, int64_t zero_point, at::ScalarType dtype); // aten::quantize_per_tensor(Tensor self, float scale, int zero_point, ScalarType dtype) -> Tensor
+
+  static Tensor record_stream(const Tensor & self, Stream s); // {"schema": "aten::record_stream(Tensor(a) self, Stream s) -> Tensor(a)", "compound": "false"}
+
 } // namespace at

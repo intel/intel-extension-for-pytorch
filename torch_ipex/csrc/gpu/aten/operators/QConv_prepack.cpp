@@ -12,11 +12,11 @@ using namespace at::native;
 
 namespace caffe2 {
 
-CAFFE_KNOWN_TYPE(at::AtenIpexTypeDPCPP::PackedConvWeightQDPCPP);
+CAFFE_KNOWN_TYPE(at::AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP);
 }
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeQuantizedXPU {
 
 at::Tensor dpcppConvPrepack(
     Tensor weight,
@@ -31,16 +31,16 @@ at::Tensor dpcppConvPrepack(
   return at::cpp_custom_type_hack::create(std::move(ret_ptr), weight.options());
 }
 
-static auto registry =
-    c10::RegisterOperators()
-        .op("quantized::conv2d_prepack",
-            c10::RegisterOperators::options()
-                .kernel<decltype(dpcppConvPrepack), &dpcppConvPrepack>(
-                    DispatchKey::DPCPPTensorId))
-        .op("quantized::conv2d_prepack",
-            c10::RegisterOperators::options()
-                .kernel<decltype(dpcppConvPrepack), &dpcppConvPrepack>(
-                    DispatchKey::QuantizedDPCPPTensorId));
+//static auto registry =
+//    c10::RegisterOperators()
+//        .op("quantized::conv2d_prepack",
+//            c10::RegisterOperators::options()
+//                .kernel<decltype(dpcppConvPrepack), &dpcppConvPrepack>(
+//                    DispatchKey::XPU))
+//        .op("quantized::conv2d_prepack",
+//            c10::RegisterOperators::options()
+//                .kernel<decltype(dpcppConvPrepack), &dpcppConvPrepack>(
+//                    DispatchKey::QuantizedXPU));
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

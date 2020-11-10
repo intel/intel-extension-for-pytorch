@@ -3,7 +3,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
@@ -14,7 +14,7 @@ class TestTorchMethod(TestCase):
         print("cpu dst = ", src.std())
         print("cpu dst with dim = ", src.std(1))
 
-        src_dpcpp = src.to("dpcpp")
+        src_dpcpp = src.to("xpu")
         print("gpu src = ", src_dpcpp.cpu())
         print("gpu dst = ", src_dpcpp.std().cpu())
         print("gpu dst with dim = ", src_dpcpp.std(1).cpu())

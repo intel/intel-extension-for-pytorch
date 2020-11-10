@@ -6,7 +6,7 @@ import torch_ipex
 import pytest
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 # Note:
 # In order to press the gradient of weight below 1,
@@ -232,13 +232,13 @@ class TestNNMethod(TestCase):
     conv6_cpu = nn.Conv2d(3, 2, kernel_size=3, stride=1, padding=1, bias=False)
     y_cpu = conv6_cpu(conv5_cpu(conv4_cpu(conv3_cpu(conv2_cpu(conv1_cpu(x_cpu))))))
 
-    conv1 = conv1_cpu.to("dpcpp")
-    conv2 = conv2_cpu.to("dpcpp")
-    conv3 = conv3_cpu.to("dpcpp")
-    conv4 = conv4_cpu.to("dpcpp")
-    conv5 = conv5_cpu.to("dpcpp")
-    conv6 = conv6_cpu.to("dpcpp")
-    x = x_cpu.to("dpcpp")
+    conv1 = conv1_cpu.to("xpu")
+    conv2 = conv2_cpu.to("xpu")
+    conv3 = conv3_cpu.to("xpu")
+    conv4 = conv4_cpu.to("xpu")
+    conv5 = conv5_cpu.to("xpu")
+    conv6 = conv6_cpu.to("xpu")
+    x = x_cpu.to("xpu")
     y = conv6(conv5(conv4(conv3(conv2(conv1(x))))))
 
     print("ref: ", y_cpu)

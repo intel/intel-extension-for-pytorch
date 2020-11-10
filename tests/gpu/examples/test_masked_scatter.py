@@ -18,8 +18,8 @@ class TestTorchMethod(TestCase):
         print("z_cpu:")
         print(z_cpu)
 
-        z_dpcpp = z_cpu.to("dpcpp")
-        z_dpcpp.masked_scatter_(mask_cpu.to("dpcpp"), x_cpu.to("dpcpp"))
+        z_dpcpp = z_cpu.to("xpu")
+        z_dpcpp.masked_scatter_(mask_cpu.to("xpu"), x_cpu.to("xpu"))
         print("z_dpcpp:")
         print(z_dpcpp.to("cpu"))
         self.assertEqual(z_cpu, z_dpcpp.cpu())

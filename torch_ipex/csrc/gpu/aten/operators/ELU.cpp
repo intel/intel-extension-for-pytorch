@@ -11,7 +11,7 @@ DPCPP_DEF_K1(SyclOpEluBackward);
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 Tensor& elu_out(
     Tensor& out,
@@ -19,11 +19,11 @@ Tensor& elu_out(
     Scalar alpha,
     Scalar scale,
     Scalar input_scale) {
-  auto iter = TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(out);
-  iter.add_input(self);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(out)
+  .add_input(self)
+  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -49,7 +49,7 @@ Tensor& elu_out(
 
 Tensor elu(const Tensor& self, Scalar alpha, Scalar scale, Scalar input_scale) {
   Tensor result = at::empty(self.sizes(), self.options());
-  at::AtenIpexTypeDPCPP::elu_out(result, self, alpha, scale, input_scale);
+  at::AtenIpexTypeXPU::elu_out(result, self, alpha, scale, input_scale);
   return result;
 }
 
@@ -60,12 +60,12 @@ Tensor& elu_backward_out(
     Scalar scale,
     Scalar input_scale,
     const Tensor& output) {
-  auto iter = TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(grad_input);
-  iter.add_input(grad_output);
-  iter.add_input(output);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(grad_input)
+  .add_input(grad_output)
+  .add_input(output)
+  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "elu_backward", [&]() {
@@ -91,13 +91,13 @@ Tensor elu_backward(
     Scalar input_scale,
     const Tensor& output) {
   Tensor grad_input = at::empty({0}, grad_output.options());
-  return at::AtenIpexTypeDPCPP::elu_backward_out(
+  return at::AtenIpexTypeXPU::elu_backward_out(
       grad_input, grad_output, alpha, scale, input_scale, output);
 }
 
 Tensor& elu_(Tensor& self, Scalar alpha, Scalar scale, Scalar input_scale) {
-  return at::AtenIpexTypeDPCPP::elu_out(self, self, alpha, scale, input_scale);
+  return at::AtenIpexTypeXPU::elu_out(self, self, alpha, scale, input_scale);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

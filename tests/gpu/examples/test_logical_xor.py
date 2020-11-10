@@ -29,8 +29,8 @@ class TestTorchMethod(TestCase):
 
             print("SYCL result:")
             print("--torch.logical_xor--")
-            input1_dpcpp = array1[i].to("dpcpp")
-            input2_dpcpp = array2[i].to("dpcpp")
+            input1_dpcpp = array1[i].to("xpu")
+            input2_dpcpp = array2[i].to("xpu")
             result_dpcpp1 = torch.logical_xor(input1_dpcpp, input2_dpcpp)
             print(result_dpcpp1.to("cpu"))
 
@@ -53,6 +53,6 @@ class TestTorchMethod(TestCase):
         print(result)
         print("SYCL result:")
         result_dpcpp = torch.logical_xor(
-            input1.to("dpcpp"), input2.to("dpcpp"), out=out.to("dpcpp"))
+            input1.to("xpu"), input2.to("xpu"), out=out.to("xpu"))
         print(result_dpcpp.to("cpu"))
         self.assertEqual(result, result_dpcpp)

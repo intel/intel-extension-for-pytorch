@@ -10,7 +10,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 // Note: dpcpp compiler does not support uname type in template.
@@ -62,8 +62,7 @@ Tensor& mul_out(Tensor& result, const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_op(
       result,
       self,
-      other,
-      /*check_mem_overlap=*/true);
+      other);
   impl::mul_kernel_dpcpp(iter);
   return result;
 }
@@ -76,23 +75,22 @@ Tensor mul(const Tensor& self, const Tensor& other) {
 }
 
 Tensor& mul_(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeDPCPP::mul_out(self, self, other);
+  return at::AtenIpexTypeXPU::mul_out(self, self, other);
 }
 
 Tensor mul(const Tensor& self, Scalar other) {
-  return at::AtenIpexTypeDPCPP::mul(self, impl::wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeXPU::mul(self, impl::wrapped_scalar_tensor(other));
 }
 
 Tensor& mul_(Tensor& self, Scalar other) {
-  return at::AtenIpexTypeDPCPP::mul_(self, impl::wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeXPU::mul_(self, impl::wrapped_scalar_tensor(other));
 }
 
 Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
   auto iter = TensorIterator::binary_op(
       result,
       self,
-      other,
-      /*check_mem_overlap=*/true);
+      other);
   impl::div_kernel_dpcpp(iter);
   return result;
 }
@@ -105,7 +103,7 @@ Tensor div(const Tensor& self, const Tensor& other) {
 }
 
 Tensor& div_(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeDPCPP::div_out(self, self, other);
+  return at::AtenIpexTypeXPU::div_out(self, self, other);
 }
 
 Tensor& floor_divide_out(
@@ -115,8 +113,7 @@ Tensor& floor_divide_out(
   auto iter = TensorIterator::binary_op(
       result,
       self,
-      other,
-      /*check_mem_overlap=*/true);
+      other);
   impl::div_kernel_dpcpp(iter);
   if (result.is_floating_point()) {
     result.trunc_();
@@ -137,7 +134,7 @@ Tensor floor_divide(const Tensor& self, const Tensor& other) {
 }
 
 Tensor& floor_divide_(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeDPCPP::floor_divide_out(self, self, other);
+  return at::AtenIpexTypeXPU::floor_divide_out(self, self, other);
 }
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at
