@@ -1828,7 +1828,7 @@ at::Tensor AtenIpexCPUDev::dil_reshape(const at::Tensor& self, at::IntArrayRef s
   if (check_auto_mix_bf16_fp32()) {
     dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
   } else if (!int8_enabled) {
-    dbl::comm::reorder_to_fp32(self);
+    dbl::comm::reorder_to_dtype(self, at::kFloat);
   }
 
   auto inferred_size = at::infer_size(size, self.numel());
