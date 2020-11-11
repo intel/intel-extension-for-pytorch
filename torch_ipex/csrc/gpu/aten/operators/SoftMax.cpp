@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/ipex_type_dpcpp_customized.h>
 #include <utils/AccumulateType.h>
 #include <utils/ATDispatch.h>
 #include <core/Context.h>
@@ -9,6 +10,7 @@
 #include <operators/Reduce.h>
 
 using namespace at::dpcpp;
+using namespace mkldnn;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -321,11 +323,97 @@ Tensor host_softmax_backward(
   return gI;
 }
 
+void get_dnnl_format(
+    const Tensor& input,
+    memory::format_tag& dnnl_format,
+    memory::dims& input_tz) {
+
+  auto input_sizes = input.sizes();
+  auto input_ndim = input_sizes.size();
+
+  if (input_ndim == 1) {
+    dnnl_format = memory::format_tag::x;
+    input_tz = {input.size(0)};
+  } else if (input_ndim == 2) {
+    dnnl_format = memory::format_tag::nc;
+    input_tz = {input.size(0), input.size(1)};
+  } else if (input_ndim == 3) {
+    dnnl_format = memory::format_tag::tnc;
+    input_tz = {input.size(0), input.size(1), input.size(2)};
+  } else if (input_ndim == 4) {
+    dnnl_format = memory::format_tag::nchw;
+    input_tz = {/*n*/ input.size(0),
+                /*c*/ input.size(1),
+                /*h*/ input.size(2),
+                /*w*/ input.size(3)};
+  } else {
+    std::stringstream ss;
+    ss << "DPCPP softmax backend got shape=" << input_sizes
+       << ", expected input with rank 1 to  rank 4 shape";
+    AT_ERROR(ss.str());
+  }
+}
+
+Tensor _softmax_onednn(
+    const Tensor& input,
+    const int64_t dim,
+    const bool half_to_float) {
+
+  TORCH_CHECK(input.dim() <= 4 && input.dim() >=1, "Input Dims out of range");
+
+  Device curDevice = Device(kDPCPP, current_device());
+  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
+  auto strm = GpuStreamManager::Instance().get_stream();
+
+  memory::format_tag dnnl_format;
+  memory::dims input_tz;
+  get_dnnl_format(input, dnnl_format, input_tz);
+
+  auto data_t = dt_to_dnnl(input.scalar_type());
+  auto input_md = memory::desc({input_tz}, data_t, dnnl_format);
+
+  auto output = at::empty_like(input);
+
+  // Create operation descriptor.
+  std::shared_ptr<softmax_forward::desc> softmax_forward_desc;
+  softmax_forward_desc.reset(new softmax_forward::desc(
+            prop_kind::forward, input_md, dim));
+  // Create primitive descriptor.
+  std::shared_ptr<softmax_forward::primitive_desc> softmax_forward_pd;
+  softmax_forward_pd.reset(new softmax_forward::primitive_desc(
+       *softmax_forward_desc, engine));
+  auto input_usr_memory = dpcpp_onednn_memory(
+         {{input_tz}, data_t, dnnl_format}, engine, input.data_ptr());
+  auto output_usr_memory = dpcpp_onednn_memory(
+         {{input_tz}, data_t, dnnl_format}, engine, output.data_ptr());
+
+  // Create the primitive.
+  std::shared_ptr<softmax_forward> softmax_onednn_forward;
+  softmax_onednn_forward.reset(new softmax_forward(*softmax_forward_pd));
+
+  // Primitive execution.
+  DPCPP_ONEDNN_EXEC(*softmax_onednn_forward, strm,
+      {{MKLDNN_ARG_SRC, input_usr_memory},
+       {MKLDNN_ARG_DST, output_usr_memory}});
+
+  return output;
+}
+
 Tensor _softmax(
     const Tensor& input,
     const int64_t dim,
     const bool half_to_float) {
-  return host_softmax<impl::SoftMaxForwardEpilogue>(input, dim, half_to_float);
+
+  checkBackend("_softmax", {input}, Backend::DPCPP);
+
+  if (input.scalar_type() != at::ScalarType::Float &&
+      input.scalar_type() != at::ScalarType::Half &&
+      input.scalar_type() != at::ScalarType::BFloat16) {
+    // oneDNN does not support this type. Use native kernel instead.
+    return host_softmax<impl::SoftMaxForwardEpilogue>(input, dim, half_to_float);
+  } else {
+    return _softmax_onednn(input, dim, half_to_float);
+  }
 }
 
 Tensor _softmax_backward_data(
