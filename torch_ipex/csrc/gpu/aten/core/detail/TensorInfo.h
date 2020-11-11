@@ -10,8 +10,8 @@ namespace detail {
 #ifdef USE_USM
 #define MAX_TENSORINFO_DIMS 12
 #else
-// Setting to 5 is to work-around dpcpp kernel argument limitation (1024B).
-#define MAX_TENSORINFO_DIMS 5
+// Setting to 10 is to work-around dpcpp kernel argument limitation (2KB).
+#define MAX_TENSORINFO_DIMS 10
 #endif
 
 #define MAX_DPCPPTORCH_DIMS MAX_TENSORINFO_DIMS
