@@ -16,6 +16,7 @@ namespace dpcpp {
 // Global device pool state
 static std::once_flag init_device_flag;
 static DPCPPDevicePool gDevPool;
+static thread_local DeviceIndex cur_dev_index = 0;
 
 static void clearDPCPPContextAndDevices() {
   at::dpcpp::clearDeviceContext();
@@ -74,9 +75,9 @@ static void initGlobalDevicePoolState() {
 
   auto device_index = ipex_dev_index();
   if (device_index >= 0 && device_index < device_count) {
-    gDevPool.cur_dev_index = device_index;
+    cur_dev_index = device_index;
   } else {
-    gDevPool.cur_dev_index = 0;
+    cur_dev_index = 0;
     TORCH_WARN("IPEX_DEV_INDEX out of range");
   }
 
@@ -103,7 +104,7 @@ int dpcppGetDevice(DeviceIndex* pDI) {
   initDevicePoolCallOnce();
   std::lock_guard<std::mutex> lock(gDevPool.devices_mutex);
   TORCH_CHECK(pDI != NULL);
-  *pDI = gDevPool.cur_dev_index;
+  *pDI = cur_dev_index;
   return DPCPP_SUCCESS;
 }
 
@@ -113,7 +114,7 @@ int dpcppSetDevice(DeviceIndex device_index) {
   if (device_index >= (DeviceIndex)gDevPool.devices.size()) {
     TORCH_WARN("dpcppSetDevice: device_index is out of range");
   } else {
-    gDevPool.cur_dev_index = device_index;
+    cur_dev_index = device_index;
   }
   return DPCPP_SUCCESS;
 }

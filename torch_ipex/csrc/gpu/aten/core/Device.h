@@ -36,11 +36,9 @@ class DPCPPDeviceSelector : public DPCPP::device_selector {
 };
 
 struct DPCPPDevicePool {
-  DPCPPDevicePool() : cur_dev_index(-1) {}
   std::vector<DPCPP::device> devices;
   std::vector<DPCPPDeviceSelector> dev_sels;
   std::mutex devices_mutex;
-  DeviceIndex cur_dev_index;
 };
 
 int dpcppGetDeviceIdFromPtr(DeviceIndex* device_id, void* ptr);
