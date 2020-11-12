@@ -741,12 +741,12 @@ public:
     const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse, int64_t mode,
     int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXLSTMOp::_forward", std::vector<c10::IValue>({input, w1, w2, w3, w4, hx, cx, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("NewRNNLayerOp::_forward", std::vector<c10::IValue>({input, w1, w2, w3, w4, hx, cx, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes}), torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
           input.device().type() == c10::DeviceType::DPCPP) {
-        return torch_ipex::cpu::AtenIpexCPUDev::dil_lstm_layer(
+        return torch_ipex::cpu::AtenIpexCPUDev::dil_rnn_layer(
             input, w1, w2, w3, w4, hx, cx, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes);
       }
     } catch (std::exception &e) {
@@ -754,7 +754,7 @@ public:
       TORCH_WARN(e.what());
 #endif
     }
-    IPEX_CHECK(false, "LSTM forward not support fallback path now");
+    IPEX_CHECK(false, "RNN forward not support fallback path now");
   }
 
   static std::vector<at::Tensor> forward(torch::autograd::AutogradContext *ctx, const at::Tensor& input, const at::Tensor& w1,
@@ -776,7 +776,7 @@ public:
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXLSTMOp::backward", std::vector<c10::IValue>({}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("NewRNNLayerOp::backward", std::vector<c10::IValue>({}), torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];
@@ -803,7 +803,7 @@ public:
     try {
       if (torch_ipex::check_auto_dnnl() &&
           input.device().type() == c10::DeviceType::DPCPP) {
-        auto grad_inputs = torch_ipex::cpu::AtenIpexCPUDev::dil_lstm_layer_backward(input, w1, w2, w3, w4, hx, cx, output, hy, cy, grad_output, grad_hy, grad_cy, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, /*batch_sizes*/{});
+        auto grad_inputs = torch_ipex::cpu::AtenIpexCPUDev::dil_rnn_layer_backward(input, w1, w2, w3, w4, hx, cx, output, hy, cy, grad_output, grad_hy, grad_cy, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, /*batch_sizes*/{});
         return {grad_inputs[0], grad_inputs[1], grad_inputs[2],
           grad_inputs[3], grad_inputs[3], grad_inputs[4],
           grad_inputs[5], at::Tensor(), at::Tensor(),
@@ -815,6 +815,6 @@ public:
       TORCH_WARN(e.what());
 #endif
     }
-    IPEX_CHECK(false, "LSTM backward not support fallback path now");
+    IPEX_CHECK(false, "RNN backward not support fallback path now");
   }
 };

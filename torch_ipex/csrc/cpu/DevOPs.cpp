@@ -2488,19 +2488,19 @@ at::Tensor& AtenIpexCPUDev::dil_copy_(
   return self;
 }
 
-std::vector<at::Tensor> AtenIpexCPUDev::dil_lstm_layer(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
+std::vector<at::Tensor> AtenIpexCPUDev::dil_rnn_layer(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
     const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse, int64_t mode,
     int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
-  DEBUG("AtenIpexCPUDev::dil_lstm_layer\n");
+  DEBUG("AtenIpexCPUDev::dil_rnn_layer\n");
   return dbl::rnn::mkldnn_rnn_layer(input, w1, w2, w3, w4, hx, cx, reverse, mode,
       hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes);
 }
 
-std::vector<at::Tensor> AtenIpexCPUDev::dil_lstm_layer_backward(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
+std::vector<at::Tensor> AtenIpexCPUDev::dil_rnn_layer_backward(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
     const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, const at::Tensor& output, const at::Tensor& hy,
     const at::Tensor& cy, const at::Tensor& grad_output, const at::Tensor& grad_hy, const at::Tensor& grad_cy, bool reverse, int64_t mode,
     int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
-  DEBUG("AtenIpexCPUDev::dil_lstm_layer_backward\n");
+  DEBUG("AtenIpexCPUDev::dil_rnn_layer_backward\n");
   return dbl::rnn::mkldnn_rnn_layer_backward(input, w1, w2, w3, w4, hx, cx,
       output, hy, cy, grad_output, grad_hy, grad_cy, reverse, mode, hidden_size,
       num_layers, has_biases, train, bidirectional, batch_sizes);

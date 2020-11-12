@@ -9,4 +9,5 @@ from .to import *
 from .roi_align import ROIAlign
 from .roi_align import roi_align
 from .nms import nms
-from .lstm import *
+from .lstm import LSTM
+from .rnn import RNN

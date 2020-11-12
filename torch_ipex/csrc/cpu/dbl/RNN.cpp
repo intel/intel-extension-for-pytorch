@@ -165,7 +165,7 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
 
   auto b = dbl::comm::try_gen_dil_tensor(bias, {1, 1, rnn.num_bias_gates, rnn.hidden_size}, dil::format_tag::ldgo);
 
-  dil::tensor y, hy, cy;
+  dil::tensor y, hy;
   dil::prop_kind aprop_kind = dil::prop_kind::forward;
   auto src_type = x.get_data_type();
   if (dil::data_type::s8 == src_type || dil::data_type::u8 == src_type) {
@@ -173,17 +173,19 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
   }
   auto _rnn_kind = static_cast<dil::rnn_kind>(rnn.mode);
   if (_rnn_kind == dil::rnn_kind::LSTM) {
+    dil::tensor cy;
     auto cx = dbl::comm::try_gen_dil_tensor(cx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
     dil::lstm_forward::compute({output_size.cbegin(), output_size.cend()}, x, hx, cx, w1, w2, b, y, hy, cy, reverse, aprop_kind);
+    return {dbl::comm::gen_aten_tensor_by(std::move(y)), dbl::comm::gen_aten_tensor_by(std::move(hy)).reshape(hx_.sizes()), dbl::comm::gen_aten_tensor_by(std::move(cy)).reshape(cx_.sizes())};
   } else if (_rnn_kind == dil::rnn_kind::GRU) {
     dil::lbr_gru_forward::compute({output_size.cbegin(), output_size.cend()}, x, hx, w1, w2, b, y, hy, reverse);
+    return {dbl::comm::gen_aten_tensor_by(std::move(y)), dbl::comm::gen_aten_tensor_by(std::move(hy)).reshape(hx_.sizes()), at::zeros(hx_.sizes(), hx_.options())};
   } else {
     TORCH_CHECK(_rnn_kind == dil::rnn_kind::RNN_RELU || _rnn_kind == dil::rnn_kind::RNN_TANH,
                 "mkldnn_rnn: unsuppored rnn mode: ", rnn.mode);
     dil::rnn_forward::compute({output_size.cbegin(), output_size.cend()}, x, hx, w1, w2, b, y, hy, rnn.mode, reverse);
+    return {dbl::comm::gen_aten_tensor_by(std::move(y)), dbl::comm::gen_aten_tensor_by(std::move(hy)).reshape(hx_.sizes()), at::zeros(hx_.sizes(), hx_.options())};
   }
-
-  return {dbl::comm::gen_aten_tensor_by(std::move(y)), dbl::comm::gen_aten_tensor_by(std::move(hy)), dbl::comm::gen_aten_tensor_by(std::move(cy))};
 }
 
 std::vector<at::Tensor> mkldnn_rnn_layer_backward(const at::Tensor& input, const at::Tensor& weight1, const at::Tensor& weight2,
@@ -215,7 +217,6 @@ std::vector<at::Tensor> mkldnn_rnn_layer_backward(const at::Tensor& input, const
   dbl::comm::reorder_to_dtype(grad_cy_, at::kFloat);
 
   // per layer input size
-
   int64_t input_size = input.size(2);
   auto x = dbl::comm::try_gen_dil_tensor(input, {rnn.seq_length, rnn.mini_batch, input_size}, dil::format_tag::tnc);
   auto hx = dbl::comm::try_gen_dil_tensor(hx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
@@ -245,12 +246,15 @@ std::vector<at::Tensor> mkldnn_rnn_layer_backward(const at::Tensor& input, const
 
   auto diff_input = dbl::comm::gen_aten_tensor_by(std::move(diff_x));
   auto diff_hx_ = dbl::comm::gen_aten_tensor_by(std::move(diff_hx)).reshape(hx_.sizes());
-  auto diff_cx_ = dbl::comm::gen_aten_tensor_by(std::move(diff_cx)).reshape(cx_.sizes());
   auto diff_weight_ih = dbl::comm::gen_aten_tensor_by(std::move(diff_w1.permute({0, 1, 3, 4, 2}))).reshape(weight_ih.sizes());
   auto diff_weight_hh = dbl::comm::gen_aten_tensor_by(std::move(diff_w2.permute({0, 1, 3, 4, 2}))).reshape(weight_hh.sizes());
   auto diff_bias = dbl::comm::gen_aten_tensor_by(std::move(diff_b)).reshape(bias.sizes());
-
-  return {diff_input, diff_weight_ih, diff_weight_hh, diff_bias, diff_hx_, diff_cx_};
+  if (_rnn_kind == dil::rnn_kind::LSTM) {
+    auto diff_cx_ = dbl::comm::gen_aten_tensor_by(std::move(diff_cx)).reshape(cx_.sizes());
+    return {diff_input, diff_weight_ih, diff_weight_hh, diff_bias, diff_hx_, diff_cx_};
+  } else {
+    return {diff_input, diff_weight_ih, diff_weight_hh, diff_bias, diff_hx_, at::Tensor()};
+  }
 }
 
 }  // namespace rnn

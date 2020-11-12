@@ -27,6 +27,7 @@ struct lstm_forward : public dnnl::lstm_forward {
     auto src_layer_desc = src_layer.get_desc();
     auto src_iter_desc = src_iter.get_desc();
     auto src_iter_c_desc = src_iter_c.get_desc();
+    // use any format for weights
     auto weights_layer_desc = weights_layer.get_desc().to_format_any();
     auto weights_iter_desc = weights_iter.get_desc().to_format_any();
     auto bias_desc = bias.get_desc();
@@ -94,15 +95,14 @@ struct lstm_backward : public dnnl::lstm_backward {
     auto src_layer_desc = src_layer.get_desc();
     auto src_iter_desc = src_iter.get_desc();
     auto src_iter_c_desc = src_iter_c.get_desc();
-
     // use any format for weights
     auto weights_layer_desc = weights_layer.get_desc().to_format_any();
     auto weights_iter_desc = weights_iter.get_desc().to_format_any();
-
     auto bias_desc = bias.get_desc();
     auto dst_layer_desc = dst_layer.get_desc();
     auto dst_iter_desc = dst_iter.get_desc();
     auto dst_iter_c_desc = dst_iter_c.get_desc();
+
     auto diff_src_layer_desc = src_layer_desc.to_type(data_type::f32);
     auto diff_src_iter_desc = src_iter_desc.to_type(data_type::f32);
     auto diff_src_iter_c_desc = src_iter_c_desc.to_type(data_type::f32);
@@ -131,14 +131,14 @@ struct lstm_backward : public dnnl::lstm_backward {
 
     auto expected_weights_layer = weights_layer.reorder_if_differ_in(pd.weights_layer_desc());
     auto expected_weights_iter = weights_iter.reorder_if_differ_in(pd.weights_iter_desc());
-    auto expected_workspace = dst_layer.get_workspace().reorder_if_differ_in(pd.workspace_desc());
 
     diff_src_layer.reinit_if_possible(pd.diff_src_layer_desc());
     diff_src_iter.reinit_if_possible(pd.diff_src_iter_desc());
     diff_src_iter_c.reinit_if_possible(pd.diff_src_iter_c_desc());
-    diff_weights_layer.reinit_if_possible(pd.diff_weights_layer_desc());
-    diff_weights_iter.reinit_if_possible(pd.diff_weights_iter_desc());
-    diff_bias.reinit_if_possible(pd.diff_bias_desc());
+    //workaround: diff_weights_layer, diff_weights_iter and diff_bias need to clear before operation begin.
+    diff_weights_layer.zero_init(pd.diff_weights_layer_desc());
+    diff_weights_iter.zero_init(pd.diff_weights_iter_desc());
+    diff_bias.zero_init(pd.diff_bias_desc());
 
     super(pd).execute(stream::default_stream(),
                       {{DNNL_ARG_SRC_LAYER, src_layer},
@@ -159,7 +159,7 @@ struct lstm_backward : public dnnl::lstm_backward {
                        {DNNL_ARG_DIFF_DST_LAYER, diff_dst_layer},
                        {DNNL_ARG_DIFF_DST_ITER, diff_dst_iter},
                        {DNNL_ARG_DIFF_DST_ITER_C, diff_dst_iter_c},
-                       {DNNL_ARG_WORKSPACE, expected_workspace}});
+                       {DNNL_ARG_WORKSPACE, dst_layer.get_workspace()}});
   }
 };
 
