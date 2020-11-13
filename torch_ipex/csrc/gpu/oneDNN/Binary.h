@@ -51,14 +51,14 @@ static inline Tensor bin(Tensor& output, const Tensor& t1, const Tensor& t2) {
   if (md1 != tar_md) {
     _t1 = empty_opaque_tensor(tar_md, t1.options(), c10::nullopt);
     m1 = dpcpp_onednn_memory(tar_md, engine, _t1.data_ptr());
-    DPCPP_ONEDNN_EXEC(reorder(m1_usr, m1), strm, m1_usr, m1);
+    DPCPP_ONEDNN_EXEC(reorder(m1_usr, m1), strm, {{DNNL_ARG_FROM, m1_usr}, {DNNL_ARG_TO, m1}});
   }
   Tensor _t2;
   auto m2 = m2_usr;
   if (md2 != tar_md) {
     _t2 = empty_opaque_tensor(tar_md, t2.options(), c10::nullopt);
     m2 = dpcpp_onednn_memory(tar_md, engine, _t2.data_ptr());
-    DPCPP_ONEDNN_EXEC(reorder(m2_usr, m2), strm, m2_usr, m2);
+    DPCPP_ONEDNN_EXEC(reorder(m2_usr, m2), strm, {{DNNL_ARG_FROM, m2_usr}, {DNNL_ARG_TO, m2}});
   }
 
   auto mdo = tar_md;
@@ -90,7 +90,7 @@ static inline Tensor bin(Tensor& output, const Tensor& t1, const Tensor& t2) {
                {DNNL_ARG_DST, mo}});
 
   if (mdo != tar_md)
-    DPCPP_ONEDNN_EXEC(reorder(mo, mo_usr), strm, mo, mo_usr);
+    DPCPP_ONEDNN_EXEC(reorder(mo, mo_usr), strm, {{DNNL_ARG_FROM, mo}, {DNNL_ARG_TO, mo_usr}});
 
   return output;
 }

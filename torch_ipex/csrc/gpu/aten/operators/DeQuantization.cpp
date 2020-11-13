@@ -67,7 +67,7 @@ Tensor dequantize_tensor_per_tensor_affine(
   attr.set_zero_points(DNNL_ARG_SRC, mask, {static_cast<int>(zero_point)});
   reorder reorder_p = reorder(q_m, r_m, attr);
 
-  DPCPP_ONEDNN_EXEC(reorder_p, stream, q_m, r_m);
+  DPCPP_ONEDNN_EXEC(reorder_p, stream, {{DNNL_ARG_FROM, q_m}, {DNNL_ARG_TO, r_m}});
   return rtensor;
 }
 
@@ -117,7 +117,7 @@ Tensor dequantize_tensor_per_channel_affine(
   attr.set_zero_points(DNNL_ARG_SRC, mask_1, {zps});
   reorder reorder_p = reorder(q_m, r_m, attr);
 
-  DPCPP_ONEDNN_EXEC(reorder_p, stream, q_m, r_m);
+  DPCPP_ONEDNN_EXEC(reorder_p, stream, {{DNNL_ARG_FROM, q_m}, {DNNL_ARG_TO, r_m}});
   return rtensor;
 }
 

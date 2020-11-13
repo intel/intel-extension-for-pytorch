@@ -198,8 +198,8 @@ static void avg_pool_out_frame(
       DPCPP_ONEDNN_EXEC(
           reorder(input_usr_memory, input_memory),
           strm,
-          input_usr_memory,
-          input_memory);
+          {{DNNL_ARG_FROM, input_usr_memory},
+          {DNNL_ARG_TO, input_memory}});
     }
   }
 
@@ -304,24 +304,8 @@ static void avg_pool_backward_out_frame(
   pooling_backward_pd.reset(new pooling_backward::primitive_desc(
       *pooling_backward_desc, engine, *pooling_forward_pd));
 
-  // auto diff_dst_md = pooling_backward_pd->diff_dst_desc();
   auto diff_dst_memory = diff_dst_usr_memory;
-
-  // Currently, SYCL path doesn't support internal format.
-  // diff_dst has the same format with dst.
-  // if (diff_dst_usr_memory.get_desc() != diff_dst_md) {
-  //   diff_dst_memory = memory(diff_dst_md, engine);
-  //   DPCPP_ONEDNN_EXEC(reorder(diff_dst_usr_memory, diff_dst_memory),
-  //       strm, diff_dst_usr_memory, diff_dst_memory);
-  // }
-
-  // auto diff_src_md = pooling_backward_pd->diff_src_desc();
   auto diff_src_memory = diff_src_usr_memory;
-
-  // diff_src has the same format with src.
-  // if (diff_src_usr_memory.get_desc() != diff_src_md) {
-  //   diff_src_memory = memory(diff_src_md, engine);
-  // }
 
   std::shared_ptr<pooling_backward> pool_backward;
   pool_backward.reset(new pooling_backward(*pooling_backward_pd));
@@ -331,12 +315,6 @@ static void avg_pool_backward_out_frame(
       strm,
       {{MKLDNN_ARG_DIFF_DST, diff_dst_memory},
        {MKLDNN_ARG_DIFF_SRC, diff_src_memory}});
-
-  // Reorder diff_src
-  // if (diff_src_memory != diff_src_usr_memory) {
-  //   DPCPP_ONEDNN_EXEC(reorder(diff_src_memory, diff_src_usr_memory),
-  //       strm, diff_src_memory, diff_src_usr_memory);
-  // }
 }
 
 template <typename scalar_t>
@@ -467,8 +445,8 @@ static void max_pool_out_frame(
       DPCPP_ONEDNN_EXEC(
           reorder(input_usr_memory, input_memory),
           strm,
-          input_usr_memory,
-          input_memory);
+          {{DNNL_ARG_FROM, input_usr_memory},
+          {DNNL_ARG_TO, input_memory}});
     }
   }
 
@@ -548,16 +526,6 @@ static void max_pool_backward_out_frame(
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  // auto data_t = memory::data_type::f32;
-  // auto format_nchw = memory::format_tag::nchw;
-
-  // memory::dims gradInput_tz = {nbatch, nPlane, gradInputHeight,
-  // gradInputWidth}; memory::dims gradOutput_tz = {
-  //     nbatch, nPlane, gradOutputHeight, gradOutputWidth};
-  // memory::dims kernel = {kH, kW};
-  // memory::dims stride = {dH, dW};
-  // memory::dims padding = {padH, padW};
-
   auto data_t = scalar_t_to_dnnl::to<scalar_t>();
   if (data_t == memory::data_type::f16) {
     // rise error
@@ -622,25 +590,8 @@ static void max_pool_backward_out_frame(
   pooling_backward_pd.reset(new pooling_backward::primitive_desc(
       *pooling_backward_desc, engine, *pooling_forward_pd));
 
-  // auto diff_dst_md = pooling_backward_pd->diff_dst_desc();
   auto diff_dst_memory = diff_dst_usr_memory;
-
-  // Currently, SYCL path doesn't support internal format.
-  // diff_dst has the same format with dst.
-  // if (diff_dst_usr_memory.get_desc() != diff_dst_md) {
-  //   diff_dst_memory = memory(diff_dst_md, engine);
-  //   DPCPP_ONEDNN_EXEC(reorder(diff_dst_usr_memory, diff_dst_memory),
-  //       strm, diff_dst_usr_memory, diff_dst_memory);
-  // }
-
-  // auto expected_diff_src_pd = pooling_backward_pd->diff_src_desc();
   auto diff_src_memory = diff_src_usr_memory;
-
-  // diff_src has the same format with src.
-  // if (diff_src_usr_memory.get_desc() != expected_diff_src_pd) {
-  //   diff_src_memory = memory(expected_diff_src_pd, engine);
-  // }
-
   std::shared_ptr<pooling_backward> pool_backward;
 
   auto indices_usr =
@@ -659,24 +610,12 @@ static void max_pool_backward_out_frame(
       indices_usr.data_ptr());
   auto indices_memory = indices_usr_memory;
 
-  // indices has the same format with indices.
-  // reorder indices if needed
-  // if (indices_usr_memory.get_desc() != indices_md) {
-  //   DPCPP_ONEDNN_EXEC(reorder(indices_usr_memory, indices_memory),
-  //       strm, indices_usr_memory, indices_memory);
-  // }
   DPCPP_ONEDNN_EXEC(
       *pool_backward,
       strm,
       {{MKLDNN_ARG_DIFF_DST, diff_dst_memory},
        {MKLDNN_ARG_DIFF_SRC, diff_src_memory},
        {MKLDNN_ARG_WORKSPACE, indices_memory}});
-
-  // Reorder diff_src
-  // if (diff_src_memory != diff_src_usr_memory) {
-  //   DPCPP_ONEDNN_EXEC(reorder(diff_src_memory, diff_src_usr_memory),
-  //       strm, diff_src_memory, diff_src_usr_memory);
-  // }
 }
 
 } // namespace impl

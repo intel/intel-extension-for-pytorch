@@ -9,6 +9,7 @@
 #include <utils/Timer.h>
 
 #include <mkldnn.hpp>
+#include <oneapi/dnnl/dnnl_sycl.hpp>
 #include <vector>
 
 using namespace mkldnn;
@@ -36,21 +37,21 @@ using namespace mkldnn;
     }                                                 \
   }
 #elif defined(USE_DPCPP)
-#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                  \
-  {                                                           \
-    static auto verbose = dpcpp_verbose();                    \
-    if (verbose) {                                            \
-      IPEX_TIMER(t, verbose, __func__);                       \
-      auto e = (prim).execute_sycl((stream), ##__VA_ARGS__);  \
-      t.now("oneDNN execute_sycl");                           \
-      DPCPP_ONEDNN_FORCE_SYNC(stream);                        \
-      t.now("oneDNN stream wait");                            \
-      dpcpp_log("onednn_kernel", e);                           \
-    } else {                                                  \
-      auto e = (prim).execute_sycl((stream), ##__VA_ARGS__);  \
-      dpcpp_log("onednn_kernel", e);                           \
-      DPCPP_ONEDNN_FORCE_SYNC(stream);                        \
-    }                                                         \
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                                  \
+  {                                                                           \
+    static auto verbose = dpcpp_verbose();                                    \
+    if (verbose) {                                                            \
+      IPEX_TIMER(t, verbose, __func__);                                       \
+      auto e = dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__);  \
+      t.now("oneDNN execute in sycl_interop");                                \
+      DPCPP_ONEDNN_FORCE_SYNC(stream);                                        \
+      t.now("oneDNN stream wait");                                            \
+      dpcpp_log("onednn_kernel", e);                                          \
+    } else {                                                                  \
+      auto e = dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__);  \
+      dpcpp_log("onednn_kernel", e);                                          \
+      DPCPP_ONEDNN_FORCE_SYNC(stream);                                        \
+    }                                                                         \
   }
 #else
 #error("Unsupported compiler!!!")
@@ -76,7 +77,7 @@ static inline dnnl::memory dpcpp_onednn_memory(
     }
     auto buffer = dpcppGetBufferMap().get_buffer(ptr);
   #endif
-    return dnnl::memory(md, engine, buffer);
+    return dnnl::sycl_interop::make_memory(md, engine, buffer);
   }
 #endif
 }
@@ -129,7 +130,7 @@ struct GpuEngineManager {
   engine& get_engine(const Device& device) {
     TORCH_INTERNAL_ASSERT(device.type() == kDPCPP);
     TORCH_INTERNAL_ASSERT(device.index() < at::dpcpp::device_count());
-    return _gpu_engines[device.index()];
+    return *engine_pool[device.index()];
   }
 
   GpuEngineManager(GpuEngineManager const&) = delete;
@@ -140,15 +141,14 @@ struct GpuEngineManager {
     int device_count = (int)at::dpcpp::device_count();
     TORCH_INTERNAL_ASSERT(device_count > 0);
     for (int i = 0; i < device_count; i++) {
-      _gpu_engines.push_back({engine::kind::gpu,
-                              dpcppGetRawDevice(i),
-                              at::dpcpp::getDeviceContext(i)});
+      engine_pool.push_back(std::make_shared<dnnl::engine>(
+          dnnl::sycl_interop::make_engine(dpcppGetRawDevice(i), at::dpcpp::getDeviceContext(i))));
     }
   }
   ~GpuEngineManager() {}
 
  private:
-  std::vector<engine> _gpu_engines;
+  std::vector<std::shared_ptr<dnnl::engine>> engine_pool;
 };
 
 // GpuStreamManager singleton
@@ -166,7 +166,7 @@ struct GpuStreamManager {
 #else
   dnnl::stream get_stream(int device_index = 0) {
     TORCH_INTERNAL_ASSERT(device_index < at::dpcpp::device_count());
-    return dnnl::stream(
+    return dnnl::sycl_interop::make_stream(
         GpuEngineManager::Instance().get_engine({kDPCPP, device_index}),
         getDefaultDPCPPStream(device_index).dpcpp_queue());
   }
@@ -182,8 +182,9 @@ struct GpuStreamManager {
     TORCH_INTERNAL_ASSERT(deviceCount > 0);
     for (DeviceIndex dev = 0; dev < deviceCount; dev++) {
       stream_pool.push_back(std::make_shared<dnnl::stream>(
-          GpuEngineManager::Instance().get_engine({kDPCPP, dev}),
-          getDefaultDPCPPStream(dev).dpcpp_queue()));
+            dnnl::sycl_interop::make_stream(
+              GpuEngineManager::Instance().get_engine({kDPCPP, dev}),
+              getDefaultDPCPPStream(dev).dpcpp_queue())));
     }
 #endif
   }

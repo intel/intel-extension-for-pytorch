@@ -118,7 +118,7 @@ Tensor quantize_tensor_per_channel_affine(
   attr.set_zero_points(DNNL_ARG_DST, mask_1, {zps});
   reorder reorder_p = reorder(r_m, q_m, attr);
 
-  DPCPP_ONEDNN_EXEC(reorder_p, stream, r_m, q_m);
+  DPCPP_ONEDNN_EXEC(reorder_p, stream, {{DNNL_ARG_FROM, r_m}, {DNNL_ARG_TO, q_m}});
 
   return qtensor;
 }
@@ -192,7 +192,7 @@ Tensor quantize_tensor_per_tensor_affine(
   attr.set_zero_points(DNNL_ARG_DST, mask, {static_cast<int>(zero_point)});
   reorder reorder_p = reorder(r_m, q_m, attr);
 
-  DPCPP_ONEDNN_EXEC(reorder_p, stream, r_m, q_m);
+  DPCPP_ONEDNN_EXEC(reorder_p, stream, {{DNNL_ARG_FROM, r_m}, {DNNL_ARG_TO, q_m}});
 
   if (!r_ctx.is_plain() && lazy_reorder_enabled()) {
     auto q_opt_ctx =

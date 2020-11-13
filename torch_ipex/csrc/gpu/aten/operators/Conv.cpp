@@ -255,8 +255,8 @@ at::Tensor convolution(
       DPCPP_ONEDNN_EXEC(
           reorder(input_usr_memory, input_memory),
           strm,
-          input_usr_memory,
-          input_memory);
+          {{DNNL_ARG_FROM, input_usr_memory},
+          {DNNL_ARG_TO, input_memory}});
     }
   }
 
@@ -293,8 +293,8 @@ at::Tensor convolution(
     DPCPP_ONEDNN_EXEC(
         reorder(weight_usr_memory, weight_memory),
         strm,
-        weight_usr_memory,
-        weight_memory);
+        {{DNNL_ARG_FROM, weight_usr_memory},
+        {DNNL_ARG_TO, weight_memory}});
 
     if (weight_cache_enabled()) {
       strm.wait();
@@ -326,8 +326,8 @@ at::Tensor convolution(
       DPCPP_ONEDNN_EXEC(
           reorder(output_usr_memory, output_memory),
           strm,
-          output_usr_memory,
-          output_memory);
+          {{DNNL_ARG_FROM, output_usr_memory},
+          {DNNL_ARG_TO, output_memory}});
     }
   }
 
@@ -366,8 +366,8 @@ at::Tensor convolution(
       DPCPP_ONEDNN_EXEC(
           reorder(bias_usr_memory, bias_memory, attr),
           strm,
-          bias_usr_memory,
-          bias_memory);
+          {{DNNL_ARG_FROM, bias_usr_memory},
+          {DNNL_ARG_TO, bias_memory}});
 
       if (weight_cache_enabled()) {
         strm.wait();
@@ -393,8 +393,8 @@ at::Tensor convolution(
     DPCPP_ONEDNN_EXEC(
         reorder(output_memory, output_usr_memory),
         strm,
-        output_memory,
-        output_usr_memory);
+        {{DNNL_ARG_FROM, output_memory},
+        {DNNL_ARG_TO, output_usr_memory}});
   } else if (lazy_reorder_enabled() && output_memory != output_usr_memory) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(output_);
     DPCPPTensorContext::set_tensor_ctx(output, std::move(blk_ctx));
@@ -538,8 +538,8 @@ Tensor dpcpp_convolution_backward_input(
     DPCPP_ONEDNN_EXEC(
         reorder(grad_output_usr_memory, grad_output_memory),
         strm,
-        grad_output_usr_memory,
-        grad_output_memory);
+        {{DNNL_ARG_FROM, grad_output_usr_memory},
+        {DNNL_ARG_TO, grad_output_memory}});
   }
 
   auto expected_weight_md = conv_backward_data_pd->weights_desc();
@@ -549,8 +549,8 @@ Tensor dpcpp_convolution_backward_input(
     DPCPP_ONEDNN_EXEC(
         reorder(weight_usr_memory, weight_memory),
         strm,
-        weight_usr_memory,
-        weight_memory);
+        {{DNNL_ARG_FROM, weight_usr_memory},
+        {DNNL_ARG_TO, weight_memory}});
   }
 
   auto expected_grad_input_md = conv_backward_data_pd->diff_src_desc();
@@ -573,8 +573,8 @@ Tensor dpcpp_convolution_backward_input(
     DPCPP_ONEDNN_EXEC(
         reorder(grad_input_memory, grad_input_usr_memory),
         strm,
-        grad_input_memory,
-        grad_input_usr_memory);
+        {{DNNL_ARG_FROM, grad_input_memory},
+        {DNNL_ARG_TO, grad_input_usr_memory}});
   }
 
   return grad_input;
@@ -732,8 +732,8 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     DPCPP_ONEDNN_EXEC(
         reorder(input_usr_memory, input_memory),
         strm,
-        input_usr_memory,
-        input_memory);
+        {{DNNL_ARG_FROM, input_usr_memory},
+        {DNNL_ARG_TO, input_memory}});
   }
 
   auto expected_grad_output_md = conv_backward_weight_pd->diff_dst_desc();
@@ -743,8 +743,8 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     DPCPP_ONEDNN_EXEC(
         reorder(grad_output_usr_memory, grad_output_memory),
         strm,
-        grad_output_usr_memory,
-        grad_output_memory);
+        {{DNNL_ARG_FROM, grad_output_usr_memory},
+        {DNNL_ARG_TO, grad_output_memory}});
   }
 
   auto expected_grad_weight_md = conv_backward_weight_pd->diff_weights_desc();
@@ -776,8 +776,8 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     DPCPP_ONEDNN_EXEC(
         reorder(grad_weight_memory, grad_weight_usr_memory),
         strm,
-        grad_weight_memory,
-        grad_weight_usr_memory);
+        {{DNNL_ARG_FROM, grad_weight_memory},
+        {DNNL_ARG_TO, grad_weight_usr_memory}});
   }
 
   return std::tuple<at::Tensor, at::Tensor>{grad_weight, grad_bias};

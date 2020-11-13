@@ -55,7 +55,7 @@ static inline Tensor sum(Tensor& output,
       _curs.push_back(_cur);
       cur_mem = memory(tar_desc, engine, _cur.data_ptr());
       DPCPP_ONEDNN_EXEC(reorder(cur_usr_mem, cur_mem),
-          strm, cur_usr_mem, cur_mem);
+          strm, {{DNNL_ARG_FROM, cur_usr_mem}, {DNNL_ARG_TO, cur_mem}});
     }
 
     inputs_desc.push_back(tar_desc);
@@ -81,7 +81,7 @@ static inline Tensor sum(Tensor& output,
   if (output_desc != tar_desc) {
     output_mem = memory(tar_desc, engine);
     DPCPP_ONEDNN_EXEC(reorder(output_usr_mem, output_mem),
-        strm, output_usr_mem, output_mem);
+        strm, {{DNNL_ARG_FROM, output_usr_mem}, {DNNL_ARG_TO, output_mem}});
   }
 
   auto sum_p = dnnl::sum({output_desc, scales, inputs_desc, engine});
@@ -94,7 +94,7 @@ static inline Tensor sum(Tensor& output,
 
   if (output_desc != tar_desc) {
     DPCPP_ONEDNN_EXEC(reorder(output_mem, output_usr_mem),
-        strm, output_mem, output_usr_mem);
+        strm, {{DNNL_ARG_FROM, output_mem}, {DNNL_ARG_TO, output_usr_mem}});
   }
 
   return output;
