@@ -805,8 +805,8 @@ public:
           input.device().type() == c10::DeviceType::DPCPP) {
         auto grad_inputs = torch_ipex::cpu::AtenIpexCPUDev::dil_rnn_layer_backward(input, w1, w2, w3, w4, hx, cx, output, hy, cy, grad_output, grad_hy, grad_cy, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, /*batch_sizes*/{});
         return {grad_inputs[0], grad_inputs[1], grad_inputs[2],
-          grad_inputs[3], grad_inputs[3], grad_inputs[4],
-          grad_inputs[5], at::Tensor(), at::Tensor(),
+          grad_inputs[3], grad_inputs[4], grad_inputs[5],
+          grad_inputs[6], at::Tensor(), at::Tensor(),
           at::Tensor(), at::Tensor(), at::Tensor(),
           at::Tensor(), at::Tensor(), at::Tensor()};
       }

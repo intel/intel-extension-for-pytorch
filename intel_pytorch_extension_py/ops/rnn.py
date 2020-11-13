@@ -10,13 +10,13 @@ from torch.nn import init
 from torch import _VF
 
 def rnn_tanh(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first):
-    if input.device == torch.device('dpcpp') and dropout == 0:
+    if input.device == torch.device('dpcpp') and (dropout == 0 or training == False):
         return torch.ops.torch_ipex.rnn_tanh(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
     else:
         return _VF.rnn_tanh(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
 
 def rnn_relu(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first):
-    if input.device == torch.device('dpcpp') and dropout == 0:
+    if input.device == torch.device('dpcpp') and (dropout == 0 or training == False):
         return torch.ops.torch_ipex.rnn_relu(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
     else:
         return _VF.rnn_relu(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)

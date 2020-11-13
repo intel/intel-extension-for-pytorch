@@ -11,3 +11,4 @@ from .roi_align import roi_align
 from .nms import nms
 from .lstm import LSTM
 from .rnn import RNN
+from .gru import GRU

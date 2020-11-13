@@ -566,6 +566,19 @@ std::vector<at::Tensor> AtenIpexTypeExt::rnn_relu(
   return {outputs[0], outputs[1]};
 }
 
+std::vector<at::Tensor> AtenIpexTypeExt::gru(
+    const at::Tensor& input, const at::Tensor& hidden, std::vector<at::Tensor> params, bool has_biases,
+    int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
+  at::Tensor hx = hidden;
+  at::Tensor cx = at::zeros(hidden.sizes(), hidden.options());
+  int64_t hidden_size = hx.size(2);
+  auto outputs = rnn(
+      input, params, has_biases ? 4 : 2,
+      hx, cx, static_cast<int>(dil::rnn_kind::GRU), hidden_size, num_layers, batch_first, dropout_p,
+      train, bidirectional, /*batch_sizes*/{});
+  return {outputs[0], outputs[1]};
+}
+
 } // namespace torch_ipex
 
 namespace {
@@ -613,5 +626,9 @@ static auto dispatch =
         .op("torch_ipex::rnn_relu",
             [](const at::Tensor& input, const at::Tensor& hidden, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
               return torch_ipex::AtenIpexTypeExt::rnn_relu(input, hidden, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
+            })
+        .op("torch_ipex::gru",
+            [](const at::Tensor& input, const at::Tensor& hidden, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
+              return torch_ipex::AtenIpexTypeExt::gru(input, hidden, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
             });
 }

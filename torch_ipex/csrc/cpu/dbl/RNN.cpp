@@ -135,7 +135,7 @@ at::Tensor _shuffle_bias(const at::Tensor& bias_ih, const at::Tensor& bias_hh, i
 };
 
 std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tensor& weight1, const at::Tensor& weight2,
-    const at::Tensor& weight3, const at::Tensor& weight4, const at::Tensor& hx_, const at::Tensor& cx_, bool reverse, int64_t mode,
+    const at::Tensor& weight3, const at::Tensor& weight4, const at::Tensor& hx_, const at::Tensor& cx_tmp, bool reverse, int64_t mode,
     int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
 
   RNNParams rnn(input, batch_sizes, mode, hidden_size, num_layers, bidirectional, train);
@@ -148,7 +148,13 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
 
   // per layer input size
   int64_t input_size = input.size(2);
-  
+
+  at::Tensor cx_;
+  if (hx_.storage().unsafeGetStorageImpl() == cx_tmp.storage().unsafeGetStorageImpl()) {
+    cx_ = at::clone(cx_tmp);
+  } else {
+    cx_ = cx_tmp;
+  }
   // TODO: should we do these reorder in DevOPs??
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
   dbl::comm::reorder_to_bf16_for_mix_prec(hx_);
@@ -189,7 +195,7 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
 }
 
 std::vector<at::Tensor> mkldnn_rnn_layer_backward(const at::Tensor& input, const at::Tensor& weight1, const at::Tensor& weight2,
-    const at::Tensor& weight3, const at::Tensor& weight4, const at::Tensor& hx_, const at::Tensor& cx_, const at::Tensor& output, const at::Tensor& hy_,
+    const at::Tensor& weight3, const at::Tensor& weight4, const at::Tensor& hx_, const at::Tensor& cx_tmp, const at::Tensor& output, const at::Tensor& hy_,
     const at::Tensor& cy_, const at::Tensor& grad_output, const at::Tensor& grad_hy_, const at::Tensor& grad_cy_, bool reverse, int64_t mode,
     int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
 
@@ -201,6 +207,12 @@ std::vector<at::Tensor> mkldnn_rnn_layer_backward(const at::Tensor& input, const
   auto bias = has_biases ? _shuffle_bias(weight3, weight4, rnn.mode)
                        : at::zeros({rnn.num_bias_gates * rnn.hidden_size}, weight_ih.options());
 
+  at::Tensor cx_;
+  if (hx_.storage().unsafeGetStorageImpl() == cx_tmp.storage().unsafeGetStorageImpl()) {
+    cx_ = at::clone(cx_tmp);
+  } else {
+    cx_ = cx_tmp;
+  }
   // TODO: should we do these reorder in DevOPs??
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
   dbl::comm::reorder_to_bf16_for_mix_prec(hx_);
@@ -251,9 +263,18 @@ std::vector<at::Tensor> mkldnn_rnn_layer_backward(const at::Tensor& input, const
   auto diff_bias = dbl::comm::gen_aten_tensor_by(std::move(diff_b)).reshape(bias.sizes());
   if (_rnn_kind == dil::rnn_kind::LSTM) {
     auto diff_cx_ = dbl::comm::gen_aten_tensor_by(std::move(diff_cx)).reshape(cx_.sizes());
-    return {diff_input, diff_weight_ih, diff_weight_hh, diff_bias, diff_hx_, diff_cx_};
+    return {diff_input, diff_weight_ih, diff_weight_hh, diff_bias, diff_bias, diff_hx_, diff_cx_};
+  }else if (_rnn_kind == dil::rnn_kind::GRU) {
+    std::vector<at::Tensor> diff_w_1 = diff_weight_ih.chunk(3, /*gates*/0);
+    auto diff_w_ih = at::cat({diff_w_1[1], diff_w_1[0], diff_w_1[2]}, /*gates*/0);
+    std::vector<at::Tensor> diff_w_2 = diff_weight_hh.chunk(3, /*gates*/0);
+    auto diff_w_hh = at::cat({diff_w_2[1], diff_w_2[0], diff_w_2[2]}, /*gates*/0);
+    std::vector<at::Tensor> diff_b = diff_bias.chunk(4, /*output_channels*/0);
+    auto diff_b1 = at::cat({diff_b[1], diff_b[0], diff_b[2]}, /*output_channels*/0);
+    auto diff_b2 = at::cat({diff_b[1], diff_b[0], diff_b[3]}, /*output_channels*/0);
+    return {diff_input, diff_w_ih, diff_w_hh, diff_b1, diff_b2, diff_hx_, at::Tensor()};
   } else {
-    return {diff_input, diff_weight_ih, diff_weight_hh, diff_bias, diff_hx_, at::Tensor()};
+    return {diff_input, diff_weight_ih, diff_weight_hh, diff_bias, diff_bias, diff_hx_, at::Tensor()};
   }
 }
 

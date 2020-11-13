@@ -18,6 +18,7 @@ class AtenIpexTypeExt {
   static std::vector<at::Tensor> lstm(const at::Tensor& input, std::vector<at::Tensor> hidden, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first);
   static std::vector<at::Tensor> rnn_tanh(const at::Tensor& input, const at::Tensor& hidden, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first);
   static std::vector<at::Tensor> rnn_relu(const at::Tensor& input, const at::Tensor& hidden, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first);
+  static std::vector<at::Tensor> gru(const at::Tensor& input, const at::Tensor& hidden, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first);
 };
 
 }  // namespace torch_ipex
