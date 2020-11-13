@@ -374,10 +374,12 @@ Tensor _softmax_onednn(
 
   auto output = at::empty_like(input);
 
+  auto axis = dim < 0 ? dim + input.dim(): dim;
+
   // Create operation descriptor.
   std::shared_ptr<softmax_forward::desc> softmax_forward_desc;
   softmax_forward_desc.reset(new softmax_forward::desc(
-            prop_kind::forward, input_md, dim));
+            prop_kind::forward, input_md, axis));
   // Create primitive descriptor.
   std::shared_ptr<softmax_forward::primitive_desc> softmax_forward_pd;
   softmax_forward_pd.reset(new softmax_forward::primitive_desc(
