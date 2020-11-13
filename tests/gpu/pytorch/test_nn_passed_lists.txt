@@ -2,8 +2,6 @@ test_nn.py::TestNNDeviceTypeDPCPP::test_AdaptiveMaxPool3d_indices_dpcpp_bfloat16
 test_nn.py::TestNNDeviceTypeDPCPP::test_AdaptiveMaxPool3d_indices_dpcpp_float16
 test_nn.py::TestNNDeviceTypeDPCPP::test_AdaptiveMaxPool3d_indices_dpcpp_float32
 test_nn.py::TestNNDeviceTypeDPCPP::test_CTCLoss_dpcpp_dpcpp
-test_nn.py::TestNNDeviceTypeDPCPP::test_Conv2d_naive_groups_dpcpp_bfloat16
-test_nn.py::TestNNDeviceTypeDPCPP::test_Conv2d_naive_groups_dpcpp_float16
 test_nn.py::TestNNDeviceTypeDPCPP::test_Conv2d_naive_groups_dpcpp_float32
 test_nn.py::TestNNDeviceTypeDPCPP::test_Dropout2d_dpcpp
 test_nn.py::TestNNDeviceTypeDPCPP::test_Dropout3d_dpcpp
