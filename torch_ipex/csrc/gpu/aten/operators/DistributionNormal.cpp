@@ -75,19 +75,19 @@ Tensor& normal_(Tensor& self, double mean, double std, Generator* generator) {
   return self;
 }
 
-Tensor& normal(const Tensor& mean, double std, Generator* generator) {
+Tensor normal(const Tensor& mean, double std, Generator* generator) {
   Tensor ret = at::empty_like(mean, MemoryFormat::Contiguous);
   normal_out(ret, mean, std, generator);
   return ret;
 }
 
-Tensor& normal(double mean, const Tensor& std, Generator* generator) {
+Tensor normal(double mean, const Tensor& std, Generator* generator) {
   Tensor ret = at::empty_like(std, MemoryFormat::Contiguous);
   normal_out(ret, mean, std, generator);
   return ret;
 }
 
-Tensor& normal(const Tensor& mean, const Tensor& std, Generator* generator) {
+Tensor normal(const Tensor& mean, const Tensor& std, Generator* generator) {
   Tensor ret = at::empty({0}, mean.options(), MemoryFormat::Contiguous);
   normal_out(ret, mean, std, generator);
   return ret;

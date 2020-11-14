@@ -5,6 +5,9 @@
 #include <core/DPCPP.h>
 #include <utils/Pointwise.h>
 
+namespace at {
+namespace AtenIpexTypeDPCPP {
+
 template <typename T>
 struct TensorBitAndConstantOp {
   TensorBitAndConstantOp(T v) : val(v) {}
@@ -175,5 +178,8 @@ struct TensorTriOp {
 
   const int64_t stride0, stride1, k;
 };
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at
 
 #endif

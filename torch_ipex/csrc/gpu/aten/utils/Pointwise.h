@@ -11,6 +11,9 @@
 
 #include <ATen/aten_ipex_type_dpcpp.h>
 
+namespace at {
+namespace AtenIpexTypeDPCPP {
+
 #define IMPLEMENT_POINTWISE_FUNC_(NAME, CFUNC, REAL)               \
   template <typename scalar_t>                                     \
   struct Tensor_##NAME##_##REAL##_Op {                             \
@@ -124,7 +127,7 @@
   }                                                \
                                                    \
   Tensor& op(Tensor& out, const Tensor& self) {    \
-    IPEX_DISPATCH_##types(                           \
+    IPEX_DISPATCH_##types(                         \
         at::ScalarType::Half,                      \
         at::ScalarType::BFloat16,                  \
         self.scalar_type(),                        \
@@ -163,7 +166,7 @@
 #define SCALAR_ARGS_DECL_2 SCALAR_ARGS_DECL_1, Scalar val2
 #define SCALAR_ARGS_DECL_3 SCALAR_ARGS_DECL_2, Scalar val3
 
-#define IPEX_INT_OR_FLOAT_CALLABLE_OPS(                                       \
+#define IPEX_INT_OR_FLOAT_CALLABLE_OPS(                              \
     op, callable, types, oprand_num, arg_num, callable_args_num)     \
   namespace impl {                                                   \
   IMPLEMENT_POINTWISE_##oprand_num##_CALLABLE_##callable_args_num(   \
@@ -173,7 +176,7 @@
                                                                      \
   Tensor& op(POINTWISE_ARGS_DECL_##arg_num COMMA_##callable_args_num \
                  SCALAR_ARGS_DECL_##callable_args_num) {             \
-    IPEX_DISPATCH_##types(                                             \
+    IPEX_DISPATCH_##types(                                           \
         POINTWISE_ARG_FOR_TYPE_##arg_num.scalar_type(), #op, [&]() { \
           impl::op<scalar_t>(                                        \
               POINTWISE_ARGS_##arg_num COMMA_##callable_args_num     \
@@ -192,7 +195,7 @@
                                                                      \
   Tensor& op(POINTWISE_ARGS_DECL_##arg_num COMMA_##callable_args_num \
                  SCALAR_ARGS_DECL_##callable_args_num) {             \
-    IPEX_DISPATCH_##types(                                             \
+    IPEX_DISPATCH_##types(                                           \
         at::ScalarType::Half,                                        \
         at::ScalarType::BFloat16,                                    \
         POINTWISE_ARG_FOR_TYPE_##arg_num.scalar_type(),              \
@@ -1022,5 +1025,8 @@ struct TensorConjOp {
     out = in;
   }
 };
+
+} // namespace AtenIpexTypeDPCPP
+} // namespace at
 
 #endif

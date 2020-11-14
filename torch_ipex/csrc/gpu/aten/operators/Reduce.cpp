@@ -525,7 +525,7 @@ template <
     typename acc_t = scalar_t,
     typename out_t = scalar_t>
 static void norm_kernel_impl(TensorIterator& iter, Scalar val) {
-  float p;
+  float p = 0.0f;
   if (val.isIntegral(false)) {
     p = val.to<int64_t>();
   } else if (val.isFloatingPoint()) {

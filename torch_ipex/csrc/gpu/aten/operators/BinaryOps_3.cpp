@@ -146,9 +146,5 @@ Tensor& bitwise_xor_out(Tensor& out, const Tensor& self, Scalar other) {
   return at::AtenIpexTypeDPCPP::bitwise_xor_out(out, self, new_other);
 }
 
-
-
-
-
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
