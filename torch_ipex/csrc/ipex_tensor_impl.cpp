@@ -3,6 +3,7 @@
 #include <c10/core/ScalarType.h>
 #include <c10/core/impl/DeviceGuardImplInterface.h>
 #include <c10/macros/Macros.h>
+#include <torch/csrc/autograd/variable.h>
 
 #include "utils.h"
 
@@ -74,8 +75,21 @@ void IPEXTensorImpl::copy_auto_grad(c10::TensorImpl *src_impl) {
     return;
   }
 
-  if (! this->requires_grad())
-    this->set_requires_grad(true);
+  if (! this->requires_grad()){
+    auto cpu_autograd_meta = static_cast<torch::autograd::AutogradMeta*>(src_impl->autograd_meta());
+    if (cpu_autograd_meta->is_view_){
+      auto cpu_view_meta = static_cast<torch::autograd::DifferentiableViewMeta*>(src_impl->autograd_meta());
+      auto base = cpu_view_meta->base_;
+      auto creation_meta = cpu_view_meta->creation_meta;
+      this->set_autograd_meta(std::make_unique<torch::autograd::DifferentiableViewMeta>(this, base, creation_meta));
+    }
+    if (!this->autograd_meta()){
+      this->set_autograd_meta(std::make_unique<torch::autograd::AutogradMeta>());
+    }
+    auto ipex_autograd_meta = static_cast<torch::autograd::AutogradMeta*>(this->autograd_meta());
+    ipex_autograd_meta->grad_fn_ = cpu_autograd_meta->grad_fn_;
+    ipex_autograd_meta->requires_grad_ = cpu_autograd_meta->requires_grad_;
+  }
 
   this->grad() = src_impl->grad();
 }

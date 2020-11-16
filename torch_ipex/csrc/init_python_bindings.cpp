@@ -110,15 +110,6 @@ void InitIpexModuleBindings(py::module m) {
         [](const at::Tensor &grad_out, const std::vector<at::Tensor> &input) {
           return AtenIpexTypeExt::interaction_backward(grad_out, input);
         });
-  m.def("embedding_bag_forward",
-        [](const at::Tensor& weight, const at::Tensor& indices, const at::Tensor& offsets, bool scale_grad_by_freq, int64_t mode, bool sparse, const c10::optional<at::Tensor>& per_sample_weights, bool include_last_offset) {
-          return AtenIpexTypeExt::embedding_bag_forward(weight, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights, include_last_offset);
-        });
-
-  m.def("embedding_bag_backward",
-        [](const at::Tensor& grad, const at::Tensor& indices, const at::Tensor& offsets, const at::Tensor offset2bag, const at::Tensor& bag_size, const at::Tensor& maximum_indices, int64_t num_weights, bool scale_grad_by_freq, int64_t mode, bool sparse, const c10::optional<at::Tensor>& per_sample_weights) {
-          return AtenIpexTypeExt::embedding_bag_backward(grad, indices, offsets, offset2bag, bag_size, maximum_indices, num_weights, scale_grad_by_freq, mode, sparse, per_sample_weights);
-        });
 
   m.def("mlp_forward", &AtenIpexTypeMLPExt::forward);
   m.def("mlp_backward", &AtenIpexTypeMLPExt::backward);

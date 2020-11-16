@@ -13,7 +13,7 @@ const int MODE_MAX = 2;
 
 static inline void
 make_offset2bag(const at::Tensor &offsets, const at::Tensor &indices, at::Tensor& offset2bag) {
-  offset2bag.index_add_(0, offsets, at::ones_like(offsets)); // offset2bag = [1 0 1 0 1]
+  offset2bag.index_add_(0, offsets, at::ones_like(offsets, offsets.options())); // offset2bag = [1 0 1 0 1]
   offset2bag[0] -= 1;                     // offset2bag = [0 0 1 0 1]
   offset2bag = offset2bag.cumsum(0);     // offset2bag = [0 0 1 1 2]
 }
@@ -25,7 +25,7 @@ static inline bool is_bfloat16_tensor(const at::Tensor tensor_) {
   return false;
 }
 
-static inline bool embedding_bag_fast_path_sum(const at::Tensor weight, const at::Tensor per_sample_weights, int64_t mode) {
+bool embedding_bag_fast_path_sum(const at::Tensor weight, const at::Tensor per_sample_weights, int64_t mode) {
   if ((mode != MODE_SUM) || (weight.stride(1) != 1) || per_sample_weights.defined()) return false;
   if ((weight.scalar_type() != at::kFloat) && (weight.scalar_type() != at::kBFloat16)) return false;
   return true;
@@ -90,15 +90,6 @@ embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indices,
     }
     return std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>(output, offset2bag, bag_size, bag_size);
   }
-
-   //May need full support for Bfloat16
-  auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
-  auto&& _ipex_indices = bridge::shallowFallbackToCPUTensor(indices);
-  auto&& _ipex_offsets = bridge::shallowFallbackToCPUTensor(offsets_);
-  auto&& _ipex_per_sample_weights = bridge::shallowFallbackToCPUTensor(per_sample_weights);
-  auto&& _ipex_result = at::embedding_bag(_ipex_weight, _ipex_indices, _ipex_offsets, scale_grad_by_freq, mode, sparse, _ipex_per_sample_weights, include_last_offset);
-  static_cast<void>(_ipex_result); // Avoid warnings in case not used
-  return std::tuple<at::Tensor,at::Tensor,at::Tensor,at::Tensor>(bridge::shallowUpgradeToDPCPPTensor(std::get<0>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<1>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<2>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<3>(_ipex_result)));
 }
 
 static inline at::Tensor expand_values_if_needed(const at::Tensor& values) {
@@ -251,7 +242,7 @@ static inline at::Tensor embedding_bag_dense_backward_sum_fast(const at::Tensor 
   return index_grad_weight;
 }
 
-static inline bool embedding_bag_backward_fast_path_sum(const at::Tensor grad, const at::Tensor indices, const at::Tensor offset2bag, const at::Tensor per_sample_weights, bool scale_grad_by_freq, int64_t mode) {
+bool embedding_bag_backward_fast_path_sum(const at::Tensor grad, const at::Tensor indices, const at::Tensor offset2bag, const at::Tensor per_sample_weights, bool scale_grad_by_freq, int64_t mode) {
 
   if ((grad.scalar_type() != at::kFloat) && (grad.scalar_type() != at::kBFloat16)) return false;
   if ((mode != MODE_SUM) || (grad.stride(1) != 1)) return false;
@@ -261,7 +252,7 @@ static inline bool embedding_bag_backward_fast_path_sum(const at::Tensor grad, c
   return true;
 }
 
-static inline at::Tensor
+at::Tensor
 embedding_bag_get_offset2bag(const at::Tensor indices, const at::Tensor & offsets, const at::Tensor & offset2bag)
 {
   int64_t indices_numel = indices.numel();
@@ -281,31 +272,17 @@ at::Tensor embedding_bag_backward_impl(const at::Tensor & grad, const at::Tensor
   int64_t num_weights, bool scale_grad_by_freq, int64_t mode, bool sparse,
   const at::Tensor & per_sample_weights) {
   if (sparse) {
-    if (embedding_bag_backward_fast_path_sum(grad, indices, offset2bag, per_sample_weights, scale_grad_by_freq, mode)) {
-      if (is_bfloat16_tensor(grad)) {
-        return embedding_bag_sparse_backward_sum_fast<at::BFloat16>(grad, indices, offsets, num_weights, mode);
-      } else {
-        return embedding_bag_sparse_backward_sum_fast<float>(grad, indices, offsets, num_weights, mode);
-      }
+    if (is_bfloat16_tensor(grad)) {
+      return embedding_bag_sparse_backward_sum_fast<at::BFloat16>(grad, indices, offsets, num_weights, mode);
     } else {
-      //May need full support for Bfloat16
-      at::Tensor offset2bag_ = embedding_bag_get_offset2bag(indices, offsets, offset2bag);
-      return at::_embedding_bag_sparse_backward(grad, indices, offsets, offset2bag_,
-		      bag_size, num_weights, scale_grad_by_freq, mode, per_sample_weights);
-    }
+      return embedding_bag_sparse_backward_sum_fast<float>(grad, indices, offsets, num_weights, mode);
+    } 
   } else {
     auto grad_c = grad.contiguous();
-    if (embedding_bag_backward_fast_path_sum(grad_c, indices, offset2bag, per_sample_weights, scale_grad_by_freq, mode)) {
-      if (is_bfloat16_tensor(grad)) {
-        return embedding_bag_dense_backward_sum_fast<at::BFloat16>(grad_c, indices, offsets, num_weights, mode);
-      } else {
-        return embedding_bag_dense_backward_sum_fast<float>(grad_c, indices, offsets, num_weights, mode);
-      }
+    if (is_bfloat16_tensor(grad)) {
+      return embedding_bag_dense_backward_sum_fast<at::BFloat16>(grad_c, indices, offsets, num_weights, mode);
     } else {
-      //May need full support for Bfloat16
-      at::Tensor offset2bag_ = embedding_bag_get_offset2bag(indices, offsets, offset2bag);
-      return at::_embedding_bag_dense_backward(grad_c, indices, offsets, offset2bag_, bag_size,
-		     maximum_indices, num_weights, scale_grad_by_freq, mode, per_sample_weights);
+      return embedding_bag_dense_backward_sum_fast<float>(grad_c, indices, offsets, num_weights, mode);
     }
   }
 }

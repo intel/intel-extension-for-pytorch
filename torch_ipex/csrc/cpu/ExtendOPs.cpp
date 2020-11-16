@@ -366,136 +366,28 @@ AtenIpexTypeExt::interaction_backward(const at::Tensor &grad_out,
   }
 }
 
-#if 0
-template<typename T>
-static inline at::Tensor _embedding_bag_forward(const at::Tensor &weights, const at::Tensor &inputs, const at::Tensor &offsets) {
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weights.is_contiguous());
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(inputs.is_contiguous());
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(offsets.is_contiguous());
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(inputs.dim() == 1);
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weights.dim() == 2);
-  RECORD_FUNCTION("_embedding_bag_forward", std::vector<c10::IValue>({weights, inputs, offsets}), torch::autograd::Node::peek_at_next_sequence_nr());
-  auto batch_size = offsets.size(0);
-  auto num_input = inputs.size(0);
-  auto vector_size = weights.size(1);
-  auto weights_data = weights.data_ptr<T>();
-  auto inputs_data = inputs.data_ptr<int64_t>();
-  auto offsets_data = offsets.data_ptr<int64_t>();
-  auto output = at::empty({batch_size, vector_size}, weights.options());
-  auto output_data = output.data_ptr<T>();
-
-  at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
-    for (int64_t i = start; i < end; i++) {
-      auto inputs_start = offsets_data[i];
-      auto inputs_end = (i < batch_size - 1) ? offsets_data[i + 1] : num_input;
-      // TODO: add acc_t support for bag size larger than 1
-      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(inputs_end - inputs_start == 1);
-      auto out_data_ptr = &output_data[i * vector_size];
-#pragma omp simd
-      for (int64_t v = 0; v < vector_size; v++) out_data_ptr[v] = 0.0;
-      for (int64_t s = inputs_start; s < inputs_end; s++) {
-        auto weight_data_ptr = &weights_data[inputs_data[s] * vector_size];
-        add_ker((T *)out_data_ptr, (T *)weight_data_ptr, vector_size);
-      }
-    }
-  });
-  return output;
-}
-
-template<typename T>
-static inline at::Tensor _embedding_bag_backward(const at::Tensor &grad_out,
-    const at::Tensor &weights, const at::Tensor &inputs, const at::Tensor offsets) {
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(inputs.dim() == 1);
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.dim() == 2);
-  RECORD_FUNCTION("_embedding_bag_backward", std::vector<c10::IValue>({grad_out, weights, inputs, offsets}), torch::autograd::Node::peek_at_next_sequence_nr());
-  auto batch_size = offsets.size(0);
-  auto num_input = inputs.size(0);
-  auto vector_size = weights.size(1);
-  auto offsets_data = offsets.data_ptr<int64_t>();
-  auto values = at::empty({num_input, vector_size}, weights.options());
-  auto values_data = values.data_ptr<T>();
-  if (grad_out.is_contiguous()) {
-    auto grad_data = grad_out.data_ptr<T>();
-    at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
-      for (int64_t i = start; i < end; i++) {
-        auto inputs_start = offsets_data[i];
-        auto inputs_end = (i < batch_size - 1) ? offsets_data[i + 1] : num_input;
-        auto grad_data_ptr = &grad_data[i * vector_size];
-        for (int64_t s = inputs_start; s < inputs_end; s++) {
-          auto value_data_ptr = &values_data[s * vector_size];
-          std::memcpy(value_data_ptr, grad_data_ptr, vector_size * sizeof(T));
-        }
-      }
-    });
-  } else {
-    auto grad_out_accessor = grad_out.accessor<T, 2>();
-    at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
-      for (int64_t i = start; i < end; i++) {
-        auto inputs_start = offsets_data[i];
-        auto inputs_end = (i < batch_size - 1) ? offsets_data[i + 1] : num_input;
-        auto grad_accessor = grad_out_accessor[i];
-        for (int64_t s = inputs_start; s < inputs_end; s++) {
-          auto value_data_ptr = &values_data[s * vector_size];
-#pragma omp simd
-          for (int64_t v = 0; v < vector_size; v++)
-            value_data_ptr[v] = grad_accessor[v];
-        }
-      }
-    });
-  }
-  // TODO:
-  auto indices = inputs.reshape({{1, -1}});
-  return at::_sparse_coo_tensor_unsafe(indices, values, weights.sizes()); 
-}
-
-at::Tensor AtenIpexTypeExt::embedding_bag_forward(const at::Tensor &weights, const at::Tensor &inputs, const at::Tensor &offsets) {
-  if (weights.scalar_type() == at::kFloat) {
-    return _embedding_bag_forward<float>(weights, inputs, offsets);
-  } else {
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weights.scalar_type() == at::kBFloat16);
-    return _embedding_bag_forward<at::BFloat16>(weights, inputs, offsets);
-  }
-}
-
-at::Tensor AtenIpexTypeExt::embedding_bag_backward(const at::Tensor &grad_out,
-    const at::Tensor &weights, const at::Tensor &inputs, const at::Tensor &offsets) {
-  if (grad_out.scalar_type() == at::kFloat) {
-    return _embedding_bag_backward<float>(grad_out, weights, inputs, offsets);
-  } else {
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.scalar_type() == at::kBFloat16);
-    return _embedding_bag_backward<at::BFloat16>(grad_out, weights, inputs, offsets);
-  }
-}
-#endif
-
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
-AtenIpexTypeExt::embedding_bag_forward(
+std::vector<at::Tensor> AtenIpexTypeExt::embedding_bag(
     const at::Tensor &weight, const at::Tensor &indices,
     const at::Tensor &offsets, bool scale_grad_by_freq, int64_t mode,
     bool sparse, const c10::optional<at::Tensor> &per_sample_weights,
     bool include_last_offset) {
-  at::Tensor _per_sample_weights;
   if (per_sample_weights.has_value()) {
-    _per_sample_weights = per_sample_weights.value();
+    if (at::GradMode::is_enabled())
+      return NewEmbeddingBagOp::apply(
+          weight, indices, offsets, scale_grad_by_freq, mode, sparse,
+          include_last_offset, per_sample_weights.value());
+    return NewEmbeddingBagOp::_forward(
+        weight, indices, offsets, scale_grad_by_freq, mode, sparse,
+        include_last_offset, per_sample_weights.value());
+  } else {
+    if (at::GradMode::is_enabled())
+      return NewEmbeddingBagOp::apply(weight, indices, offsets,
+                                    scale_grad_by_freq, mode, sparse,
+                                    include_last_offset);
+    return NewEmbeddingBagOp::_forward(weight, indices, offsets,
+                                    scale_grad_by_freq, mode, sparse,
+                                    include_last_offset);
   }
-  return cpu::aten::embedding_bag::embedding_bag_impl(
-      weight, indices, offsets, scale_grad_by_freq, mode, sparse,
-      _per_sample_weights, include_last_offset);
-}
-
-at::Tensor AtenIpexTypeExt::embedding_bag_backward(
-    const at::Tensor &grad, const at::Tensor &indices,
-    const at::Tensor &offsets, const at::Tensor &offset2bag,
-    const at::Tensor &bag_size, const at::Tensor &maximum_indices,
-    int64_t num_weights, bool scale_grad_by_freq, int64_t mode, bool sparse,
-    const c10::optional<at::Tensor> &per_sample_weights) {
-  at::Tensor _per_sample_weights;
-  if (per_sample_weights.has_value()) {
-    _per_sample_weights = per_sample_weights.value();
-  }
-  return cpu::aten::embedding_bag::embedding_bag_backward_impl(
-      grad, indices, offsets, offset2bag, bag_size, maximum_indices,
-      num_weights, scale_grad_by_freq, mode, sparse, _per_sample_weights);
 }
 
 at::Tensor AtenIpexTypeExt::linear(const at::Tensor &input,
@@ -527,9 +419,9 @@ at::Tensor AtenIpexTypeExt::max_pool2d(const at::Tensor &input,
                                        bool ceil_mode) {
   if (at::GradMode::is_enabled())
     return NewMaxPool2dOp::apply(input, kernel_size, stride, padding, dilation,
-                          ceil_mode);
-  auto ret = NewMaxPool2dOp::_forward(input, kernel_size, stride, padding, dilation,
-                                  ceil_mode);
+                                 ceil_mode);
+  auto ret = NewMaxPool2dOp::_forward(input, kernel_size, stride, padding,
+                                      dilation, ceil_mode);
   return std::get<0>(ret);
 }
 
@@ -542,8 +434,8 @@ at::Tensor AtenIpexTypeExt::max_pool3d(const at::Tensor &input,
   if (at::GradMode::is_enabled())
     return NewMaxPool3dOp::apply(input, kernel_size, stride, padding, dilation,
                                  ceil_mode);
-  auto ret = NewMaxPool3dOp::_forward(input, kernel_size, stride, padding, dilation,
-                                  ceil_mode);
+  auto ret = NewMaxPool3dOp::_forward(input, kernel_size, stride, padding,
+                                      dilation, ceil_mode);
   return std::get<0>(ret);
 }
 
@@ -573,5 +465,14 @@ static auto dispatch =
             [](const at::Tensor &self, c10::List<int64_t> output_size) {
               return torch_ipex::AtenIpexTypeExt::adaptive_avg_pool2d(
                   self, output_size.vec());
+            })
+        .op("torch_ipex::embedding_bag",
+            [](const at::Tensor &weight, const at::Tensor &indices,
+               const at::Tensor &offsets, bool scale_grad_by_freq, int64_t mode,
+               bool sparse, const c10::optional<at::Tensor> &per_sample_weights,
+               bool include_last_offset) {
+              return torch_ipex::AtenIpexTypeExt::embedding_bag(
+                  weight, indices, offsets, scale_grad_by_freq, mode, sparse,
+                  per_sample_weights, include_last_offset);
             });
 }
