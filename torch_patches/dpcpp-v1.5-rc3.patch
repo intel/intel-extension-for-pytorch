@@ -1,5 +1,5 @@
 diff --git a/aten/src/ATen/SparseTensorImpl.cpp b/aten/src/ATen/SparseTensorImpl.cpp
-index a735404..3bf11a6 100644
+index a7354047ca..3bf11a646f 100644
 --- a/aten/src/ATen/SparseTensorImpl.cpp
 +++ b/aten/src/ATen/SparseTensorImpl.cpp
 @@ -9,6 +9,8 @@ namespace {
@@ -12,7 +12,7 @@ index a735404..3bf11a6 100644
        return kCUDA;
      } else {
 diff --git a/aten/src/ATen/core/VariableFallbackKernel.cpp b/aten/src/ATen/core/VariableFallbackKernel.cpp
-index 11d0349..3cb40c8 100644
+index 11d03495c6..3cb40c8cb7 100644
 --- a/aten/src/ATen/core/VariableFallbackKernel.cpp
 +++ b/aten/src/ATen/core/VariableFallbackKernel.cpp
 @@ -32,9 +32,9 @@ void variable_fallback_kernel(const OperatorHandle& op, Stack* stack) {
@@ -30,7 +30,7 @@ index 11d0349..3cb40c8 100644
  
  }
 diff --git a/aten/src/ATen/native/sparse/SparseTensor.cpp b/aten/src/ATen/native/sparse/SparseTensor.cpp
-index 8ce6045..ba7f79e 100644
+index 8ce6045ddc..ba7f79e54e 100644
 --- a/aten/src/ATen/native/sparse/SparseTensor.cpp
 +++ b/aten/src/ATen/native/sparse/SparseTensor.cpp
 @@ -76,6 +76,8 @@ SparseTensor new_sparse(const TensorOptions& options) {
@@ -43,7 +43,7 @@ index 8ce6045..ba7f79e 100644
      dispatch_key = DispatchKey::SparseCPUTensorId;
    }
 diff --git a/aten/src/ATen/templates/TensorBody.h b/aten/src/ATen/templates/TensorBody.h
-index 0b40acc..dd1db23 100644
+index 0b40acc1ed..dd1db23d82 100644
 --- a/aten/src/ATen/templates/TensorBody.h
 +++ b/aten/src/ATen/templates/TensorBody.h
 @@ -420,6 +420,7 @@ class CAFFE2_API Tensor {
@@ -55,7 +55,7 @@ index 0b40acc..dd1db23 100644
    // ~~~~~ Autograd API ~~~~~
  
 diff --git a/aten/src/ATen/templates/TensorMethods.h b/aten/src/ATen/templates/TensorMethods.h
-index 33983ec..754efd6 100644
+index 33983ec617..754efd6c41 100644
 --- a/aten/src/ATen/templates/TensorMethods.h
 +++ b/aten/src/ATen/templates/TensorMethods.h
 @@ -42,6 +42,10 @@ inline Tensor Tensor::toType(ScalarType t) const {
@@ -70,7 +70,7 @@ index 33983ec..754efd6 100644
  inline Tensor Tensor::toBackend(Backend b) const {
    return to(options().device(backendToDeviceType(b)).layout(layout_from_backend(b)), /*non_blocking*/ false, /*copy*/ false);
 diff --git a/c10/core/Backend.h b/c10/core/Backend.h
-index 5f3d8c7..a47240b 100644
+index 5f3d8c7733..a47240b139 100644
 --- a/c10/core/Backend.h
 +++ b/c10/core/Backend.h
 @@ -25,18 +25,22 @@ namespace c10 {
@@ -212,7 +212,7 @@ index 5f3d8c7..a47240b 100644
      case Backend::SparseCUDA:
      case Backend::SparseHIP:
 diff --git a/c10/core/Device.cpp b/c10/core/Device.cpp
-index 82a02fd..8268038 100644
+index 82a02fdf04..82680381ed 100644
 --- a/c10/core/Device.cpp
 +++ b/c10/core/Device.cpp
 @@ -13,7 +13,7 @@
@@ -242,7 +242,7 @@ index 82a02fd..8268038 100644
  } // namespace
  
 diff --git a/c10/core/Device.h b/c10/core/Device.h
-index f1249e8..31f15e8 100644
+index f1249e865f..31f15e82d5 100644
 --- a/c10/core/Device.h
 +++ b/c10/core/Device.h
 @@ -86,6 +86,11 @@ struct C10_API Device final {
@@ -258,7 +258,7 @@ index f1249e8..31f15e8 100644
    std::string str() const;
  
 diff --git a/c10/core/DeviceType.cpp b/c10/core/DeviceType.cpp
-index 017267c..486b02e 100644
+index 017267cd97..486b02e1ec 100644
 --- a/c10/core/DeviceType.cpp
 +++ b/c10/core/DeviceType.cpp
 @@ -27,6 +27,8 @@ std::string DeviceTypeName(DeviceType d, bool lower_case) {
@@ -279,7 +279,7 @@ index 017267c..486b02e 100644
      default:
        return false;
 diff --git a/c10/core/DeviceType.h b/c10/core/DeviceType.h
-index 9f75966..23f6808 100644
+index 9f759666d7..23f68080d4 100644
 --- a/c10/core/DeviceType.h
 +++ b/c10/core/DeviceType.h
 @@ -23,11 +23,12 @@ enum class DeviceType : int16_t {
@@ -305,7 +305,7 @@ index 9f75966..23f6808 100644
  // define explicit int constant
  constexpr int COMPILE_TIME_MAX_DEVICE_TYPES =
 diff --git a/c10/core/DispatchKey.cpp b/c10/core/DispatchKey.cpp
-index cf20e51..b093a64 100644
+index cf20e515c2..b093a648b0 100644
 --- a/c10/core/DispatchKey.cpp
 +++ b/c10/core/DispatchKey.cpp
 @@ -36,6 +36,10 @@ const char* toString(DispatchKey t) {
@@ -320,7 +320,7 @@ index cf20e51..b093a64 100644
        return "BackendSelect";
      case DispatchKey::TESTING_ONLY_GenericModeTensorId:
 diff --git a/c10/core/DispatchKey.h b/c10/core/DispatchKey.h
-index da7c3c5..1330c2b 100644
+index da7c3c564e..1330c2be6c 100644
 --- a/c10/core/DispatchKey.h
 +++ b/c10/core/DispatchKey.h
 @@ -90,6 +90,9 @@ enum class DispatchKey : uint8_t {
@@ -334,7 +334,7 @@ index da7c3c5..1330c2b 100644
    // To see some example about how to use this, check out MSNPU
    PrivateUse1_TensorId,
 diff --git a/c10/core/Layout.h b/c10/core/Layout.h
-index c5ecc89..4aab440 100644
+index c5ecc8908a..4aab4408f5 100644
 --- a/c10/core/Layout.h
 +++ b/c10/core/Layout.h
 @@ -15,6 +15,7 @@ constexpr auto kMkldnn = Layout::Mkldnn;
@@ -346,7 +346,7 @@ index c5ecc89..4aab440 100644
      case Backend::SparseHIP:
        return Layout::Sparse;
 diff --git a/c10/core/TensorImpl.h b/c10/core/TensorImpl.h
-index de11b22..57513ae 100644
+index de11b22141..57513aeb89 100644
 --- a/c10/core/TensorImpl.h
 +++ b/c10/core/TensorImpl.h
 @@ -425,7 +425,8 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
@@ -389,7 +389,7 @@ index de11b22..57513ae 100644
      return (key_set_ == from) || (is_dense(key_set_) && is_dense(from)) || (is_sparse(key_set_) && is_sparse(from));
    }
 diff --git a/c10/core/TensorOptions.h b/c10/core/TensorOptions.h
-index 9a4c9b3..6d02405 100644
+index 9a4c9b3eb9..6d0240564a 100644
 --- a/c10/core/TensorOptions.h
 +++ b/c10/core/TensorOptions.h
 @@ -398,6 +398,8 @@ struct C10_API TensorOptions {
@@ -422,7 +422,7 @@ index 9a4c9b3..6d02405 100644
      return DeviceType::CPU;
    } else if (tid == DispatchKey::SparseCUDATensorId) {
 diff --git a/docs/source/distributed.rst b/docs/source/distributed.rst
-index 180d1d4..282e179 100644
+index 180d1d4383..282e179112 100644
 --- a/docs/source/distributed.rst
 +++ b/docs/source/distributed.rst
 @@ -10,7 +10,7 @@ Distributed communication package - torch.distributed
@@ -454,7 +454,7 @@ index 180d1d4..282e179 100644
  
  .. class:: reduce_op
 diff --git a/setup.py b/setup.py
-index 7352d3b..977f8fc 100644
+index 7352d3b667..977f8fca76 100644
 --- a/setup.py
 +++ b/setup.py
 @@ -811,6 +811,7 @@ if __name__ == '__main__':
@@ -466,7 +466,7 @@ index 7352d3b..977f8fc 100644
                  'include/torch/*.h',
                  'include/torch/csrc/*.h',
 diff --git a/test/distributed/test_distributed.py b/test/distributed/test_distributed.py
-index 37bc4ac..a8a1997 100644
+index 37bc4acd35..a8a1997ba9 100644
 --- a/test/distributed/test_distributed.py
 +++ b/test/distributed/test_distributed.py
 @@ -17,7 +17,8 @@ import torch.cuda
@@ -654,7 +654,7 @@ index 37bc4ac..a8a1997 100644
  if __name__ == "__main__":
      assert (
 diff --git a/test/run_test.py b/test/run_test.py
-index f9ffeae..7e82b87 100755
+index f9ffeae25d..7e82b8739e 100755
 --- a/test/run_test.py
 +++ b/test/run_test.py
 @@ -148,6 +148,9 @@ DISTRIBUTED_TESTS_CONFIG = {}
@@ -668,7 +668,7 @@ index f9ffeae..7e82b87 100755
          DISTRIBUTED_TESTS_CONFIG['mpi'] = {
              'WORLD_SIZE': '3',
 diff --git a/test/test_determination.py b/test/test_determination.py
-index 319abb0..b9ff7c4 100644
+index 319abb07a2..b9ff7c4ced 100644
 --- a/test/test_determination.py
 +++ b/test/test_determination.py
 @@ -92,6 +92,7 @@ class DeterminationTest(unittest.TestCase):
@@ -680,7 +680,7 @@ index 319abb0..b9ff7c4 100644
                  "test_cpp_extensions_aot_no_ninja",
                  "test_determination",
 diff --git a/tools/autograd/templates/python_variable_methods.cpp b/tools/autograd/templates/python_variable_methods.cpp
-index 2a9dc9d..9410392 100644
+index 2a9dc9d6d0..94103921d2 100644
 --- a/tools/autograd/templates/python_variable_methods.cpp
 +++ b/tools/autograd/templates/python_variable_methods.cpp
 @@ -369,6 +369,20 @@ static PyObject * THPVariable_cpu(PyObject* self, PyObject* args, PyObject* kwar
@@ -713,7 +713,7 @@ index 2a9dc9d..9410392 100644
    {"dim", (PyCFunction)THPVariable_dim, METH_NOARGS, NULL},
    {"has_names", (PyCFunction)THPVariable_has_names, METH_NOARGS, NULL},
 diff --git a/torch/csrc/distributed/c10d/init.cpp b/torch/csrc/distributed/c10d/init.cpp
-index dce5201..3b2e4fe 100644
+index dce5201ef9..3b2e4fe7de 100644
 --- a/torch/csrc/distributed/c10d/init.cpp
 +++ b/torch/csrc/distributed/c10d/init.cpp
 @@ -204,6 +204,10 @@ They are used in specifying strategies for reduction collectives, e.g.,
@@ -727,10 +727,11 @@ index dce5201..3b2e4fe 100644
    auto store =
        py::class_<::c10d::Store, std::shared_ptr<::c10d::Store>, PythonStore>(
            module, "Store")
-@@ -470,6 +474,55 @@ They are used in specifying strategies for reduction collectives, e.g.,
+@@ -469,6 +473,55 @@ They are used in specifying strategies for reduction collectives, e.g.,
+               py::arg("input_tensor"),
                py::call_guard<py::gil_scoped_release>())
  
-           .def(
++          .def(
 +              "alltoall_base",
 +              &::c10d::ProcessGroup::alltoall_base,
 +              py::arg("output_tensor"),
@@ -779,12 +780,11 @@ index dce5201..3b2e4fe 100644
 +              py::arg("input"),
 +              py::call_guard<py::gil_scoped_release>())
 +
-+          .def(
+           .def(
                "send",
                &::c10d::ProcessGroup::send,
-               py::call_guard<py::gil_scoped_release>())
 diff --git a/torch/csrc/jit/passes/quantization.cpp b/torch/csrc/jit/passes/quantization.cpp
-index a6a9fca..d42a05f 100644
+index a6a9fca462..d42a05fd4a 100644
 --- a/torch/csrc/jit/passes/quantization.cpp
 +++ b/torch/csrc/jit/passes/quantization.cpp
 @@ -1718,7 +1718,7 @@ class FoldConvBatchNorm2dHelper {
@@ -1027,7 +1027,7 @@ index a6a9fca..d42a05f 100644
  }
  
 diff --git a/torch/csrc/utils/tensor_layouts.cpp b/torch/csrc/utils/tensor_layouts.cpp
-index 6fcd84f..e42a7ba 100644
+index 6fcd84f3db..8930e938e1 100644
 --- a/torch/csrc/utils/tensor_layouts.cpp
 +++ b/torch/csrc/utils/tensor_layouts.cpp
 @@ -23,6 +23,7 @@ void initializeLayouts() {
@@ -1038,8 +1038,16 @@ index 6fcd84f..e42a7ba 100644
    registerLayoutObject((THPLayout*)strided_layout, at::Backend::QuantizedCPU);
  
    PyObject *sparse_coo_layout = THPLayout_New(at::Layout::Sparse, "torch.sparse_coo");
+@@ -32,6 +33,7 @@ void initializeLayouts() {
+   }
+   registerLayoutObject((THPLayout*)sparse_coo_layout, at::Backend::SparseCPU);
+   registerLayoutObject((THPLayout*)sparse_coo_layout, at::Backend::SparseCUDA);
++  registerLayoutObject((THPLayout*)sparse_coo_layout, at::Backend::SparseDPCPP);
+ 
+   PyObject *mkldnn_layout = THPLayout_New(at::Layout::Mkldnn, "torch._mkldnn");
+   Py_INCREF(mkldnn_layout);
 diff --git a/torch/csrc/utils/tensor_new.cpp b/torch/csrc/utils/tensor_new.cpp
-index 85add73..ea90778 100644
+index 85add73c57..ea90778e4b 100644
 --- a/torch/csrc/utils/tensor_new.cpp
 +++ b/torch/csrc/utils/tensor_new.cpp
 @@ -59,6 +59,8 @@ Backend backendToBackendOfDeviceType(Backend b, DeviceType d) {
@@ -1068,7 +1076,7 @@ index 85add73..ea90778 100644
                  || dispatch_key == c10::DispatchKey::SparseHIPTensorId,
                  "new(): expected DispatchKey: ", c10::DispatchKey::SparseCPUTensorId,
 diff --git a/torch/csrc/utils/tensor_types.cpp b/torch/csrc/utils/tensor_types.cpp
-index e6b851a..3fa1a88 100644
+index e6b851a3a7..3fa1a88b7b 100644
 --- a/torch/csrc/utils/tensor_types.cpp
 +++ b/torch/csrc/utils/tensor_types.cpp
 @@ -21,6 +21,8 @@ static const char* backend_to_string(const at::Backend& backend) {
@@ -1081,7 +1089,7 @@ index e6b851a..3fa1a88 100644
    }
  }
 diff --git a/torch/distributed/distributed_c10d.py b/torch/distributed/distributed_c10d.py
-index 4ca9596..4027312 100644
+index 4ca9596f62..169ad50b4b 100644
 --- a/torch/distributed/distributed_c10d.py
 +++ b/torch/distributed/distributed_c10d.py
 @@ -11,6 +11,7 @@ from .rendezvous import rendezvous, register_rendezvous_handler  # noqa: F401
@@ -1342,7 +1350,7 @@ index 4ca9596..4027312 100644
              async_op=False):
      """
 diff --git a/torch/lib/c10d/ProcessGroup.hpp b/torch/lib/c10d/ProcessGroup.hpp
-index ac29f13..c98b1a9 100644
+index ac29f130c9..c98b1a9815 100644
 --- a/torch/lib/c10d/ProcessGroup.hpp
 +++ b/torch/lib/c10d/ProcessGroup.hpp
 @@ -162,6 +162,22 @@ class ProcessGroup {
@@ -1369,7 +1377,7 @@ index ac29f13..c98b1a9 100644
        std::vector<at::Tensor>& tensors,
        int dstRank,
 diff --git a/torch/lib/c10d/ProcessGroupGloo.cpp b/torch/lib/c10d/ProcessGroupGloo.cpp
-index 64565e2..f145f7b 100644
+index 64565e2f35..f145f7b1cb 100644
 --- a/torch/lib/c10d/ProcessGroupGloo.cpp
 +++ b/torch/lib/c10d/ProcessGroupGloo.cpp
 @@ -725,6 +725,7 @@ std::shared_ptr<ProcessGroup::Work> ProcessGroupGloo::broadcast(
@@ -1407,7 +1415,7 @@ index 64565e2..f145f7b 100644
        work = std::make_shared<AsyncAllreduceWork>(
            std::move(context), inputs, opts.reduceOp, tag);
 diff --git a/torch/lib/c10d/ProcessGroupMPI.cpp b/torch/lib/c10d/ProcessGroupMPI.cpp
-index d09620a..a822783 100644
+index d09620aab1..a822783e87 100644
 --- a/torch/lib/c10d/ProcessGroupMPI.cpp
 +++ b/torch/lib/c10d/ProcessGroupMPI.cpp
 @@ -1,5 +1,6 @@
@@ -1631,7 +1639,7 @@ index d09620a..a822783 100644
      std::vector<at::Tensor>& tensors,
      int dstRank,
 diff --git a/torch/lib/c10d/ProcessGroupMPI.hpp b/torch/lib/c10d/ProcessGroupMPI.hpp
-index eb42c11..79648f3 100644
+index eb42c11f87..79648f305e 100644
 --- a/torch/lib/c10d/ProcessGroupMPI.hpp
 +++ b/torch/lib/c10d/ProcessGroupMPI.hpp
 @@ -155,6 +155,18 @@ class ProcessGroupMPI : public ProcessGroup {
@@ -1654,7 +1662,7 @@ index eb42c11..79648f3 100644
        std::vector<at::Tensor>& tensors,
        int dstRank,
 diff --git a/torch/lib/c10d/Types.hpp b/torch/lib/c10d/Types.hpp
-index 335f4c5..03b2e59 100644
+index 335f4c5419..03b2e59e42 100644
 --- a/torch/lib/c10d/Types.hpp
 +++ b/torch/lib/c10d/Types.hpp
 @@ -57,6 +57,10 @@ struct ReduceScatterOptions {
