@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 r"""
 This is a script for launching PyTorch training and inference on Intel Xeon CPU with optimal configurations.
-Now, single instance inferenc/training, multi-instance inference/training and distributed training 
+Now, single instance inference/training, multi-instance inference/training and distributed training 
 with oneCCL backend is enabled.
 
 To get the peak performance on Intel Xeon CPU, the script optimizes the configuration of thread and memory 
@@ -129,9 +129,9 @@ class CPUinfo():
             cur_socket_logical_core = []
             for line in self.cpuinfo:
                 if socket_id == int(line[2]):
-                   if line[1] not in cur_socket_physical_core:
-                       cur_socket_physical_core.append(line[1])
-                   cur_socket_logical_core.append(line[0])
+                    if line[1] not in cur_socket_physical_core:
+                        cur_socket_physical_core.append(line[1])
+                    cur_socket_logical_core.append(line[0])
             self.socket_physical_cores.append(cur_socket_physical_core)
             self.socket_logical_cores.append(cur_socket_logical_core)
 
@@ -147,12 +147,12 @@ class CPUinfo():
     
     def get_socket_physical_cores(self, socket_id):
         if socket_id < 0 or socket_id > self.sockets - 1:
-           logger.error("Invalid socket id")
+            logger.error("Invalid socket id")
         return self.socket_physical_cores[socket_id]
 
     def get_socket_logical_cores(self, socket_id):
         if socket_id < 0 or socket_id > self.sockets - 1:
-           logger.error("Invalid socket id")
+            logger.error("Invalid socket id")
         return self.socket_logical_cores[socket_id]
 
     def get_all_physical_cores(self):
@@ -165,8 +165,8 @@ class CPUinfo():
 def set_mpi_pin_domain(args):
     '''
     I_MPI_PIN_DOMAIN specify the cores used for every MPI process. 
-    The firt ccl_worker_count cores of every rank for ccl communication
-    and the other cores will be used to do commputation.
+    The first ccl_worker_count cores of every rank for ccl communication
+    and the other cores will be used to do computation.
     For example: on CascadeLake 8280 CPU, 2 ranks on one node. ccl_worker_count=4
     CCL_WORKER_COUNT=4
     CCL_WORKER_AFFINITY="0,1,2,3,28,29,30,31"
@@ -191,7 +191,7 @@ def set_mpi_pin_domain(args):
 def set_ccl_worker_affinity(args):
     '''
     computation and communication use different cores when using oneCCL
-    backend for distributed training. we use firt ccl_worker_count cores of 
+    backend for distributed training. we use first ccl_worker_count cores of 
     every rank for ccl communication
     '''
     cpuinfo = CPUinfo()
@@ -260,16 +260,17 @@ def set_memory_allocator(args):
 
     else:
         find_tc = add_lib_preload(lib_type="tcmalloc")
-        find_je = add_lib_preload(lib_type="jemalloc")
         if find_tc:
             logger.info("Use TCMalloc memory allocator")
-        elif find_je:
+            return 
+        find_je = add_lib_preload(lib_type="jemalloc")
+        if find_je:
             logger.info("Use JeMallocl memory allocator")
-        if not find_tc and not find_je:
-           logger.warning("Both TCMalloc and JeMalloc are not fount in $CONDA_PREFIX/lib or  /.local/lib/"
-               " or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
-               "~/.local/lib/ so the LD_PRELOAD environment variable will not be set. This may drop the performance"
-               .format(expanduser("~")))
+            return 
+        logger.warning("Both TCMalloc and JeMalloc are not fount in $CONDA_PREFIX/lib or  /.local/lib/"
+                       " or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
+                       "~/.local/lib/ so the LD_PRELOAD environment variable will not be set. This may drop the performance"
+                       .format(expanduser("~")))
          
 def set_multi_thread_and_allcator(args):
     
@@ -278,7 +279,6 @@ def set_multi_thread_and_allcator(args):
         os.environ["OMP_NUM_THREADS"] = str(args.ncore_per_instance)
     elif "OMP_NUM_THREADS" in os.environ:
         args.ncore_per_instance = int(os.environ["OMP_NUM_THREADS"])
-        ###to add warining if args.ncore_per_instance != os.environ["OMP_NUM_THREADS"]
     
     if "KMP_AFFINITY" not in os.environ:
         os.environ["KMP_AFFINITY"] = args.kmp_affinity
@@ -333,16 +333,30 @@ def launch(args):
                 cores = cpuinfo.get_socket_physical_cores(args.socket_id)
             else:
                 cores = cpuinfo.get_all_physical_cores()      
-        if not args.multi_instance:
+        if not args.multi_instance and args.ninstances == -1 and args.ncore_per_instance == -1:
             args.ninstances = 1;
             args.ncore_per_instance = len(cores)
+        elif args.multi_instance and args.ninstances == -1 and args.ncore_per_instance == -1:
+            args.throughput_performance = True
+        elif args.ncore_per_instance == -1 and args.ninstances != -1:
+            args.ncore_per_instance = len(cores) // args.ninstances
+        elif args.ncore_per_instance != -1 and args.ninstances == -1:
+            args.ninstances = len(cores) // args.ncore_per_instance
         else:
-            if args.latency_performance:
-                args.ncore_per_instance = 4
-                args.ninstances = len(cores) // args.ncore_per_instance
             if args.ninstances * args.ncore_per_instance > len(cores):
                 logger.error("Please make sure ninstances * ncore_per_instance <= total_cores")
                 exit(-1)
+        if args.latency_performance:
+            if args.ncore_per_instance !=4:
+               logger.warning("latency_performance is a specail mode, args.ncore_per_instance can only be set to be 4")
+            args.ncore_per_instance = 4
+            cores = cpuinfo.get_all_physical_cores()
+            args.ninstances = len(cores) // args.ncore_per_instance
+
+        if args.throughput_performance:
+            args.ninstances = cpuinfo.socket_nums()
+            cores = cpuinfo.get_all_physical_cores()
+            args.ncore_per_instance = len(cores) // args.ninstances
 
     set_multi_thread_and_allcator(args)
     for i in range(args.ninstances):
@@ -378,7 +392,7 @@ def mpi_dist_launch(args):
     '''
     if args.nnodes > 1 and not os.path.exists(args.hostfile):
         raise ValueError("hostfile is necessary when you use multi-node distributed training,"
-                          "Please create hostfile which include the ip list you used for distributed runing")
+                          "Please create hostfile which include the ip list you used for distributed running")
     
     set_memory_allocator(args)
     # set distributed related environmental variables
@@ -487,15 +501,11 @@ def add_memory_allocator_params(parser):
         
 def add_multi_instance_params(parser):
     
-    cpuinfo = CPUinfo()
-    socket_nums = cpuinfo.socket_nums()
-    core_nums_per_socket = len(cpuinfo.get_socket_physical_cores(socket_id=0))
-
     group = parser.add_argument_group("Multi-instance Parameters")
      #multi-instance control
-    group.add_argument("--ncore_per_instance", metavar='\b', default=core_nums_per_socket, type=int, 
+    group.add_argument("--ncore_per_instance", metavar='\b', default=-1, type=int, 
                          help="Cores per instance")
-    group.add_argument("--ninstances", metavar='\b', default=socket_nums, type=int,
+    group.add_argument("--ninstances", metavar='\b', default=-1, type=int,
                          help="For multi-instance, you should give the cores number you used for per insantance.")
     group.add_argument("--latency_performance", action='store_true', default=False,
                          help="By detault 4 core per instance and use all physical cores")
@@ -526,11 +536,11 @@ def parse_args():
     @retval ArgumentParser
     """
     parser = ArgumentParser(description="This is a script for launching PyTorch training and inference on Intel Xeon CPU "
-                                        "with optimal configurations. Now, single instance inferenc/training, multi-instance "
+                                        "with optimal configurations. Now, single instance inference/training, multi-instance "
                                         "inference/training and distributed training with oneCCL backend is enabled. "
                                         "To get the peak performance on Intel Xeon CPU, the script optimizes the configuration "
                                         "of thread and memory management. For thread management, the script configures thread "
-                                        "affinity and the preload of Intel OMP library.For memory management, it configures " 
+                                        "affinity and the preload of Intel OMP library. For memory management, it configures " 
                                         "NUMA binding and preload optimized memory allocation library (e.g. tcmalloc, jemalloc) "
                                         "\n################################# Basic usage ############################# \n"
                                         "\n 1. single instance\n" 
@@ -578,6 +588,11 @@ def main():
         raise RuntimeError("Windows platform is not supported!!!")
 
     args = parse_args()
+    if args.distributed and args.multi_instance:
+        raise RuntimeError("Either args.distributed or args.multi_instance should be set")
+    
+    if args.latency_performance and args.throughput_performance:
+        raise RuntimeError("Either args.latency_performance or args.throughput_performance  should be set")
     if args.distributed:
         mpi_dist_launch(args)
     else:
