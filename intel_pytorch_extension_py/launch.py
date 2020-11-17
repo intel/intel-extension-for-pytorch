@@ -8,6 +8,12 @@ import re
 import glob
 import numpy as np
 from argparse import ArgumentParser, REMAINDER
+from argparse import RawTextHelpFormatter
+import logging
+
+
+logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 r"""
 This is a script for launching PyTorch training and inference on Intel Xeon CPU with optimal configurations.
@@ -37,14 +43,16 @@ For memory management, it configures NUMA binding and preload optimized memory a
 *** Multi-instance inference *** 
 
 1. Multi-instance 
+   By default, one instance per socket. if you want to set the instance numbers and core per instance,  
+   --nintances and  --ncore_per_instance should be set. 
 
-   you should specify the instance number and core per-instance by  --nintances and  --ncore_per_instance 
+   
+   >>> python -m intel_pytorch_extension.launch --multi_instance script.py args
 
-   eg: on CLX8280 with 2 instance
-
+   eg: on CLX8280 with 14 instance, 4 cores per instance 
 ::
 
-   >>> python -m intel_pytorch_extension.launch --nintances 2 --ncore_per_instance 28 script.py args
+   >>> python -m intel_pytorch_extension.launch --multi_instance --nintances 14 --ncore_per_instance 4 script.py args
 
 
 *** Distributed Training ***
@@ -65,9 +73,8 @@ for well-improved multi-node distributed training performance as well.
 
 ::
 
-    >>> python  -m intel_pytorch_extension.launch --distributed  --nproc_per_node=xxx
-               YOUR_TRAINING_SCRIPT --arg1 --arg2 --arg3 and all other
-               arguments of your training script
+    >>> python  -m intel_pytorch_extension.launch --distributed  YOUR_TRAINING_SCRIPT --arg1 --arg2 --arg3 and all other
+                arguments of your training script
 
 2. Multi-Node multi-process distributed training: (e.g. two nodes)
 
@@ -140,12 +147,12 @@ class CPUinfo():
     
     def get_socket_physical_cores(self, socket_id):
         if socket_id < 0 or socket_id > self.sockets - 1:
-           print("Error: invalid socket id")
+           logger.error("Invalid socket id")
         return self.socket_physical_cores[socket_id]
 
     def get_socket_logical_cores(self, socket_id):
         if socket_id < 0 or socket_id > self.sockets - 1:
-           print("Error: invalid socket id")
+           logger.error("Invalid socket id")
         return self.socket_logical_cores[socket_id]
 
     def get_all_physical_cores(self):
@@ -221,16 +228,52 @@ def add_lib_preload(lib_type=None):
                 os.environ["LD_PRELOAD"] = matches[0]
             lib_find = True
             break
+    return lib_find
 
-    if not lib_find:
-        # Unable to find the TCMalloc library file
-        print("Warning: Unable to find the {} library file lib{}.so in $CONDA_PREFIX/lib or  /.local/lib/" 
+def set_memory_allocator(args):
+    if args.enable_tcmalloc and args.enable_jemalloc:
+        logger.error("Unable to enable TCMalloc and JEMalloc at the same time")
+        exit(-1)
+
+    if args.enable_tcmalloc: 
+        find_tc = add_lib_preload(lib_type="tcmalloc")
+        if not find_tc:
+            logger.warning("Unable to find the {} library file lib{}.so in $CONDA_PREFIX/lib or  /.local/lib/"
                " or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
                "~/.local/lib/ so the LD_PRELOAD environment variable will not be set."
-               .format(lib_type, lib_type, expanduser("~")))
-    
-def set_multi_thread_and_allcator(args):
+               .format("TCmalloc", "tcmalloc", expanduser("~")))
+        else:
+            logger.info("Use TCMalloc memory allocator")
 
+    elif args.enable_jemalloc:
+        find_je = add_lib_preload(lib_type="jemalloc")
+        if not find_je:
+            logger.warning("Unable to find the {} library file lib{}.so in $CONDA_PREFIX/lib or  /.local/lib/"
+               " or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
+               "~/.local/lib/ so the LD_PRELOAD environment variable will not be set."
+               .format("JeMalloc", "jemalloc", expanduser("~")))
+        else:
+            logger.info("Use JeMallocl memory allocator")
+
+    elif args.use_default_allocator:
+        pass
+
+    else:
+        find_tc = add_lib_preload(lib_type="tcmalloc")
+        find_je = add_lib_preload(lib_type="jemalloc")
+        if find_tc:
+            logger.info("Use TCMalloc memory allocator")
+        elif find_je:
+            logger.info("Use JeMallocl memory allocator")
+        if not find_tc and not find_je:
+           logger.warning("Both TCMalloc and JeMalloc are not fount in $CONDA_PREFIX/lib or  /.local/lib/"
+               " or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
+               "~/.local/lib/ so the LD_PRELOAD environment variable will not be set. This may drop the performance"
+               .format(expanduser("~")))
+         
+def set_multi_thread_and_allcator(args):
+    
+    set_memory_allocator(args)
     if "OMP_NUM_THREADS" not in os.environ:
         os.environ["OMP_NUM_THREADS"] = str(args.ncore_per_instance)
     elif "OMP_NUM_THREADS" in os.environ:
@@ -246,15 +289,20 @@ def set_multi_thread_and_allcator(args):
     if "DNNL_PRIMITIVE_CACHE_CAPACITY" not in os.environ:    
        os.environ["DNNL_PRIMITIVE_CACHE_CAPACITY"] = '1024'
 
-    if args.enable_tcmalloc and args.enable_jemalloc:
-        print("Error: Unable to enable tcmalloc and jemalloc at the same time")
-        exit(-1)
-    if args.enable_tcmalloc: 
-        add_lib_preload(lib_type="tcmalloc")
-    if args.enable_jemalloc:
-        add_lib_preload(lib_type="jemalloc")
+    logger.info("OMP_NUM_THREADS={} ".format(os.environ["OMP_NUM_THREADS"]))
+    logger.info("KMP_AFFINITY={}".format(os.environ["KMP_AFFINITY"]))
+    logger.info("KMP_BLOCKTIME={}".format(os.environ["KMP_BLOCKTIME"]))
+    logger.info("DNNL_PRIMITIVE_CACHE_CAPACITY={}".format(os.environ["DNNL_PRIMITIVE_CACHE_CAPACITY"]))
+     
     if args.enable_iomp:
-        add_lib_preload(lib_type="iomp")
+        find_iomp = add_lib_preload(lib_type="iomp")
+        if not find_iomp:
+            logger.warning("Unable to find the {} library file lib{}.so in $CONDA_PREFIX/lib or  /.local/lib/"
+               " or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
+               "~/.local/lib/ so the LD_PRELOAD environment variable will not be set."
+               .format("iomp", "iomp", expanduser("~")))
+        else:
+            logger.info("User iomp") 
  
 def launch(args):
     '''
@@ -267,10 +315,10 @@ def launch(args):
     if args.core_list:#user specify what cores will be used by params
         cores = args.core_list.strip().split(",")
         if args.ncore_per_instance == -1:
-            print("please specify the '--ncore_per_instance' if you have pass the --core_list params")
+            logger.error("please specify the '--ncore_per_instance' if you have pass the --core_list params")
             exit(-1) 
         elif args.ninstances > 1 and args.ncore_per_instance * args.ninstances < len(cores):
-            print("only first {} cores will be used, but you specify {} cores in core_list".format
+            logger.warning("only first {} cores will be used, but you specify {} cores in core_list".format
                   (args.ncore_per_instance * args.ninstances, len(cores)))
         else:
             args.ninstances = len(cores) // args.ncore_per_instance
@@ -285,11 +333,18 @@ def launch(args):
                 cores = cpuinfo.get_socket_physical_cores(args.socket_id)
             else:
                 cores = cpuinfo.get_all_physical_cores()      
-        if args.ncore_per_instance == -1:
-            args.ncore_per_instance = len(cores) // args.ninstances
+        if not args.multi_instance:
+            args.ninstances = 1;
+            args.ncore_per_instance = len(cores)
+        else:
+            if args.latency_performance:
+                args.ncore_per_instance = 4
+                args.ninstances = len(cores) // args.ncore_per_instance
+            if args.ninstances * args.ncore_per_instance > len(cores):
+                logger.error("Please make sure ninstances * ncore_per_instance <= total_cores")
+                exit(-1)
 
     set_multi_thread_and_allcator(args)
-
     for i in range(args.ninstances):
        cmd = []
        cur_process_cores = ""
@@ -308,7 +363,7 @@ def launch(args):
            if args.module:
                cmd.append("-m")
            cmd.append(args.program)
-           cmd.extend(args.program_args) 
+           cmd.extend(args.program_args)
        process = subprocess.Popen(cmd, env=os.environ)
        processes.append(process)
     for process in processes:
@@ -324,11 +379,11 @@ def mpi_dist_launch(args):
     if args.nnodes > 1 and not os.path.exists(args.hostfile):
         raise ValueError("hostfile is necessary when you use multi-node distributed training,"
                           "Please create hostfile which include the ip list you used for distributed runing")
-
+    
+    set_memory_allocator(args)
     # set distributed related environmental variables
     os.environ["MASTER_ADDR"] = args.master_addr
     os.environ["MASTER_PORT"] = str(args.master_port)
-    
     if "I_MPI_PIN_DOMAIN" not in os.environ:
          mpi_pin_domain = set_mpi_pin_domain(args)
     else:
@@ -336,7 +391,6 @@ def mpi_dist_launch(args):
     
     cpuinfo = CPUinfo()
     ppn = args.nproc_per_node 
-    sockets = cpuinfo.socket_nums()
     total_cores = len(cpuinfo.get_all_physical_cores())
     cores_per_rank = total_cores // ppn
     
@@ -352,15 +406,23 @@ def mpi_dist_launch(args):
 
     if "CCL_ATL_TRANSPORT" not in os.environ:
         os.environ["CCL_ATL_TRANSPORT"] = "ofi"
-     
-    if args.enable_tcmalloc:
-        add_lib_preload(lib_type="tcmalloc")
-
-    if args.enable_jemalloc:
-        add_lib_preload(lib_type="jemalloc")
-
+    
     if args.enable_iomp:
-        add_lib_preload(lib_type="iomp")    
+        find_iomp = add_lib_preload(lib_type="iomp")
+        if not find_iomp:
+            logger.warning("Unable to find the {} library file lib{}.so in $CONDA_PREFIX/lib or  /.local/lib/"
+               " or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
+               "~/.local/lib/ so the LD_PRELOAD environment variable will not be set."
+               .format("iomp", "iomp", expanduser("~")))
+        else:
+             logger.info("Enale iomp by set LD_PRELOAD")
+
+    logger.info("MASTER_ADDR={}".format(args.master_addr))
+    logger.info("MASTER_PORT={}".format(args.master_port))
+    logger.info("I_MPI_PIN_DOMAIN={}".format(mpi_pin_domain))
+    logger.info("OMP_NUM_THREADS={} ".format(opm_num_threads))
+    logger.info("CCL_WORKER_COUNT={}".format(args.ccl_worker_count))
+    logger.info("CCL_WORKER_AFFINITY={}".format(os.environ["CCL_WORKER_AFFINITY"]))
 
     cmd = ['mpiexec.hydra']
     mpi_config = "-l -np {} -ppn {} -genv I_MPI_PIN_DOMAIN={} -genv OMP_NUM_THREADS={} ".format(args.nnodes*args.nproc_per_node,
@@ -380,33 +442,36 @@ def mpi_dist_launch(args):
     process.wait()
 
 def add_distributed_training_params(parser):
+    
+    cpuinfo = CPUinfo()
+    socket_nums = cpuinfo.socket_nums()
 
     group = parser.add_argument_group("Distributed Training Parameters With oneCCL backend")
-    group.add_argument("--nnodes", type=int, default=1,
+    group.add_argument("--nnodes", metavar='\b', type=int, default=1,
                         help="The number of nodes to use for distributed "
                              "training")
-    group.add_argument("--nproc_per_node", type=int, default=2,
+    group.add_argument("--nproc_per_node", metavar='\b', type=int, default=socket_nums,
                         help="The number of processes to launch on each node")
     #ccl control 
-    group.add_argument("--ccl_worker_count", default=4, type=int,
-                        help="core numbers per rank used for ccl communication")
+    group.add_argument("--ccl_worker_count", metavar='\b', default=4, type=int,
+                        help="Core numbers per rank used for ccl communication")
     #mpi control
-    group.add_argument("--master_addr", default="127.0.0.1", type=str,
+    group.add_argument("--master_addr", metavar='\b', default="127.0.0.1", type=str,
                         help="Master node (rank 0)'s address, should be either "
                              "the IP address or the hostname of node 0, for "
                              "single node multi-proc training, the "
                              "--master_addr can simply be 127.0.0.1")
-    group.add_argument("--master_port", default=29500, type=int,
+    group.add_argument("--master_port", metavar='\b', default=29500, type=int,
                         help="Master node (rank 0)'s free port that needs to "
                              "be used for communication during distributed "
                              "training")
-    group.add_argument("--hostfile", default="hostfile", type=str,
-                        help="hostfile is necessary for multi-node multi-proc "
+    group.add_argument("--hostfile", metavar='\b', default="hostfile", type=str,
+                        help="Hostfile is necessary for multi-node multi-proc "
                               "training. hostfile includes the node address list "
                               "node address which should be either the IP address"
                               "or the hostname.")
-    group.add_argument("--more_mpi_parms", default="", type=str,
-                        help="user can pass more parameters for mpiexec.hydra "
+    group.add_argument("--more_mpi_parms", metavar='\b', default="", type=str,
+                        help="User can pass more parameters for mpiexec.hydra "
                               "except for -np -ppn -hostfile and -genv I_MPI_PIN_DOMAIN")
 
 def add_memory_allocator_params(parser):
@@ -417,32 +482,42 @@ def add_memory_allocator_params(parser):
                         help="Enable tcmalloc allocator")
     group.add_argument("--enable_jemalloc", action='store_true', default=False,
                         help="Enable jemalloc allocator")
+    group.add_argument("--use_default_allocator",  action='store_true', default=False,
+                        help="Use default memory allocator")
         
 def add_multi_instance_params(parser):
+    
+    cpuinfo = CPUinfo()
+    socket_nums = cpuinfo.socket_nums()
+    core_nums_per_socket = len(cpuinfo.get_socket_physical_cores(socket_id=0))
 
     group = parser.add_argument_group("Multi-instance Parameters")
-     #multi-instance control  
-    group.add_argument("--ncore_per_instance", default=-1, type=int, help="cores per instance")
-    group.add_argument("--ninstances", default=1, type=int,
-                         help="for multi-instance, you should give the cores number you used for "
-                              "per-insantance.")
-    group.add_argument("--socket_id", default=-1, type=int,
-                         help="socket_id for multi-instance, by default all sockets will be used")
+     #multi-instance control
+    group.add_argument("--ncore_per_instance", metavar='\b', default=core_nums_per_socket, type=int, 
+                         help="Cores per instance")
+    group.add_argument("--ninstances", metavar='\b', default=socket_nums, type=int,
+                         help="For multi-instance, you should give the cores number you used for per insantance.")
+    group.add_argument("--latency_performance", action='store_true', default=False,
+                         help="By detault 4 core per instance and use all physical cores")
+    group.add_argument("--throughput_performance", action='store_true', default=False,
+                         help="By default one instance per socket and use all physical cores")
+    group.add_argument("--socket_id", metavar='\b', default=-1, type=int,
+                         help="Socket id for multi-instance, by default all sockets will be used")
     group.add_argument("--use_logical_core", action='store_true', default=False,
-                        help="whether only use physical cores")
-    group.add_argument("--disable_numactl", action='store_true', default=False,
-                        help="Disable numactl")
-    group.add_argument("--core_list", default=None, type=str,
-                        help="specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
+                         help="Whether only use physical cores")
+    group.add_argument("--disable_numactl",  action='store_true', default=False,
+                         help="Disable numactl")
+    group.add_argument("--core_list", metavar='\b', default=None, type=str,
+                         help="Specify the core list as 'core_id, core_id, ....', otherwise, all the cores will be used.")
  
 def add_kmp_iomp_params(parser): 
 
     group = parser.add_argument_group("KMP/IOMP Affinity Parameters") 
-    group.add_argument("--kmp_affinity", default="granularity=fine,compact,1,0", type=str,
+    group.add_argument("--kmp_affinity", metavar='\b', default="granularity=fine,compact,1,0", type=str,
                         help="KMP_AFFINITY setup, environment variable has higher priority than this args."
                              "defualt value is : granularity=fine,compact,1,0")
     group.add_argument("--enable_iomp", action='store_true', default=False,
-                        help="enable iomp and libiomp.so will be add to LD_PRELOAD") 
+                        help="Enable iomp and libiomp.so will be add to LD_PRELOAD") 
    
 
 def parse_args():
@@ -450,9 +525,29 @@ def parse_args():
     Helper function parsing the command line options
     @retval ArgumentParser
     """
-    parser = ArgumentParser(description="Torch-ccl distributed training launch "
-                                        "helper utility that will spawn up "
-                                        "multiple distributed processes")
+    parser = ArgumentParser(description="This is a script for launching PyTorch training and inference on Intel Xeon CPU "
+                                        "with optimal configurations. Now, single instance inferenc/training, multi-instance "
+                                        "inference/training and distributed training with oneCCL backend is enabled. "
+                                        "To get the peak performance on Intel Xeon CPU, the script optimizes the configuration "
+                                        "of thread and memory management. For thread management, the script configures thread "
+                                        "affinity and the preload of Intel OMP library.For memory management, it configures " 
+                                        "NUMA binding and preload optimized memory allocation library (e.g. tcmalloc, jemalloc) "
+                                        "\n################################# Basic usage ############################# \n"
+                                        "\n 1. single instance\n" 
+                                         "\n   >>> python -m intel_pytorch_extension.launch python_script args \n"
+                                        "\n2. multi-instance \n"
+                                        "\n    >>> python -m intel_pytorch_extension.launch --multi_instance python_script args\n"
+                                        "\n3. Single-Node multi-process distributed training\n"
+                                        "\n    >>> python  -m intel_pytorch_extension.launch --distributed  python_script args\n"
+                                        "\n4. Multi-Node multi-process distributed training: (e.g. two nodes)\n"
+                                        "\n   rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*\n"
+                                        "\n   >>> python -m intel_pytorch_extension.launch --distributed --nproc_per_node=xxx\n"
+                                        "\n       --nnodes=2 --hostfile hostfile --master_addr='192.168.10.10' python_script args\n",
+                                        formatter_class=RawTextHelpFormatter)
+    
+    parser.add_argument("--multi_instance", action='store_true', default=False,
+                        help="Enable multi-instance, by default one instance per socket")  
+
     parser.add_argument('--distributed', action='store_true', default=False,
                     help='Enable distributed training.')
     parser.add_argument("-m", "--module", default=False, action="store_true",
@@ -470,10 +565,8 @@ def parse_args():
     add_multi_instance_params(parser)
     # positional
     parser.add_argument("program", type=str,
-                        help="The full path to the training script"
-                             "program/script to be launched in parallel, "
-                             "followed by all the arguments for the "
-                             "training script")
+                        help="The full path to the proram/script to be launched. "
+                             "followed by all the arguments for the script")
 
     # rest from the training program
     parser.add_argument('program_args', nargs=REMAINDER)
