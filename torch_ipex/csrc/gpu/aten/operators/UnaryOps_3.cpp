@@ -47,7 +47,11 @@ Tensor clamp(const Tensor& self, optional<Scalar> min, optional<Scalar> max) {
 }
 
 Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "reciprocal", [&] {
+  IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
+    at::ScalarType::Half,
+    at::ScalarType::BFloat16,
+    self.scalar_type(), 
+    "reciprocal", [&] {
     using acc_t = acc_type<scalar_t>;
     if (at::dpcpp::TensorImpl_Unwrap(out) ==
         at::dpcpp::TensorImpl_Unwrap(self)) {
