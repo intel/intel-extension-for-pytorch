@@ -164,12 +164,14 @@ if __name__ == '__main__':
     "aten::adaptive_max_pool1d(Tensor self, int[1] output_size) -> (Tensor, Tensor)",
     "aten::median.dim_values(Tensor self, int dim, bool keepdim=False, *, Tensor(a!) values, Tensor(b!) indices) -> (Tensor(a!) values, Tensor(b!) indices)",
     "aten::min.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)",
+    "aten::_test_optional_filled_intlist(Tensor values, int[2]? addends) -> Tensor"
     ]
 
     for sig in sigs:
-        aten_sig = AtenSig(sig, _ATEN_SIG_PARSER)
+        aten_sig = AtenSig(sig)
         print("------------------")
         print(aten_sig.contain_alias_tensor)
+        print(aten_sig.def_name)
         print(aten_sig.contain_output_tensor)
         print("<<<<<")
         for param in aten_sig.input_params:

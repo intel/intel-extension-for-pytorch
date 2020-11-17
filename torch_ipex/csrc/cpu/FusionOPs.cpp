@@ -1,12 +1,11 @@
 #include "torch_ipex/csrc/cpu/FusionOPs.h"
 
 #include <ATen/Context.h>
-#include <ATen/CPUGenerator.h>
 #include <ATen/InferSize.h>
+#include <ATen/record_function.h>
 #include <c10/util/Exception.h>
 #include <c10/util/Logging.h>
 #include <torch/csrc/autograd/function.h>
-#include <torch/csrc/autograd/record_function.h>
 
 #include <limits>
 

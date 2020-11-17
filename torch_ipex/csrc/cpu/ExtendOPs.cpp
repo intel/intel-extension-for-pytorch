@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <c10/util/Exception.h>
 #include <torch/csrc/autograd/function.h>
-#include <torch/csrc/autograd/record_function.h>
 
 namespace torch_ipex {
 
@@ -232,7 +231,7 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor> &input) {
   std::vector<T *> input_data(input.size());
   for (int i = 0; i < input.size(); i++) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].is_contiguous());
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].device().is_dpcpp());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].device().is_xpu());
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].dim() == 2);
     feature_sizes[i] = input[i].sizes()[1];
     total_feature_size += input[i].sizes()[1];

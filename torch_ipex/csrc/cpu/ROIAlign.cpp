@@ -3,10 +3,10 @@
 #include "torch_ipex/csrc/aten_ipex_bridge.h"
 #include "aten/aten.hpp"
 #include <ATen/Parallel.h>
+#include <ATen/record_function.h>
 #include <algorithm>
 #include <c10/util/Exception.h>
 #include <torch/csrc/autograd/function.h>
-#include <torch/csrc/autograd/record_function.h>
 namespace torch_ipex {
 
 // implementation taken from Caffe2

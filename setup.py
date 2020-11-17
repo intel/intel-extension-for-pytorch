@@ -180,7 +180,7 @@ class IPEXBuild(build_ext, object):
       build_type = 'Debug'
 
     # install _torch_ipex.so as python module
-    if ext.name is 'torch_ipex' and _check_env_flag("USE_SYCL"):
+    if ext.name == 'torch_ipex' and _check_env_flag("USE_SYCL"):
       ext_dir = ext_dir + '/torch_ipex'
 
     cmake_args = [

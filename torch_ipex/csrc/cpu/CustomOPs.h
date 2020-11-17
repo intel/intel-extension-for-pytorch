@@ -11,7 +11,6 @@
 #include <c10/util/Optional.h>
 #include <torch/csrc/autograd/custom_function.h>
 #include <torch/csrc/autograd/function.h>
-#include <torch/csrc/autograd/record_function.h>
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
 
@@ -34,7 +33,7 @@ public:
       TORCH_WARN(e.what());
 #endif
     }
-    if (input.device().type() == c10::DeviceType::DPCPP) {
+    if (input.device().type() == c10::DeviceType::XPU) {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input.layout() == c10::kStrided);
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bias.layout() == c10::kStrided);
@@ -82,7 +81,7 @@ public:
 
     try {
       if (torch_ipex::check_auto_dnnl() &&
-          input.device().type() == c10::DeviceType::DPCPP) {
+          input.device().type() == c10::DeviceType::XPU) {
         grad_input = torch_ipex::cpu::AtenIpexCPUDev::dil_linear_backward_input(
             input.sizes(),
             grad_output.is_contiguous() ? grad_output
@@ -111,7 +110,7 @@ public:
       mm_output_size.push_back(weight.sizes()[0]);
       grad_output = grad_output.reshape(mm_output_size);
     }
-    if (input.device().type() == c10::DeviceType::DPCPP) {
+    if (input.device().type() == c10::DeviceType::XPU) {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input.layout() == c10::kStrided);
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_output.layout() == c10::kStrided);
@@ -192,7 +191,7 @@ public:
 #endif
     }
     at::Tensor output, indices;
-    if (input.device().type() == c10::DeviceType::DPCPP) {
+    if (input.device().type() == c10::DeviceType::XPU) {
       auto &&_ipex_input =
           torch_ipex::bridge::shallowFallbackToCPUTensor(input);
       auto &&_ipex_result = at::max_pool2d_with_indices(
@@ -255,7 +254,7 @@ public:
 
     try {
       if (torch_ipex::check_auto_dnnl() &&
-          input.device().type() == c10::DeviceType::DPCPP) {
+          input.device().type() == c10::DeviceType::XPU) {
         grad_input = torch_ipex::cpu::AtenIpexCPUDev::dil_max_pooling_backward(
             grad_output.is_contiguous() ? grad_output
                                         : grad_output.contiguous(),
@@ -270,7 +269,7 @@ public:
       TORCH_WARN(e.what());
 #endif
     }
-    if (input.device().type() == c10::DeviceType::DPCPP) {
+    if (input.device().type() == c10::DeviceType::XPU) {
       auto &&_ipex_grad_output =
           torch_ipex::bridge::shallowFallbackToCPUTensor(grad_output);
       auto &&_ipex_input =
@@ -306,7 +305,7 @@ public:
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
-          input.device().type() == c10::DeviceType::DPCPP) {
+          input.device().type() == c10::DeviceType::XPU) {
         at::Tensor output = torch_ipex::cpu::AtenIpexCPUDev::dil_max_pooling(
             input.is_contiguous() ? input : input.contiguous(), kernel_size,
             stride, padding, dilation, ceil_mode);
@@ -318,7 +317,7 @@ public:
 #endif
     }
     at::Tensor output, indices;
-    if (input.device().type() == c10::DeviceType::DPCPP) {
+    if (input.device().type() == c10::DeviceType::XPU) {
       auto &&_ipex_input =
           torch_ipex::bridge::shallowFallbackToCPUTensor(input);
       auto &&_ipex_result = at::max_pool3d_with_indices(
@@ -381,7 +380,7 @@ public:
 
     try {
       if (torch_ipex::check_auto_dnnl() &&
-          input.device().type() == c10::DeviceType::DPCPP) {
+          input.device().type() == c10::DeviceType::XPU) {
         grad_input = torch_ipex::cpu::AtenIpexCPUDev::dil_max_pooling_backward(
             grad_output.is_contiguous() ? grad_output
                                         : grad_output.contiguous(),
@@ -396,7 +395,7 @@ public:
       TORCH_WARN(e.what());
 #endif
     }
-    if (input.device().type() == c10::DeviceType::DPCPP) {
+    if (input.device().type() == c10::DeviceType::XPU) {
       auto &&_ipex_grad_output =
           torch_ipex::bridge::shallowFallbackToCPUTensor(grad_output);
       auto &&_ipex_input =
@@ -447,7 +446,7 @@ public:
       TORCH_WARN(e.what());
 #endif
     }
-    if (input.device().type() == c10::DeviceType::DPCPP) {
+    if (input.device().type() == c10::DeviceType::XPU) {
       auto &&_ipex_input =
           torch_ipex::bridge::shallowFallbackToCPUTensor(input);
       auto &&_ipex_result = at::_adaptive_avg_pool2d(_ipex_input, output_size);
@@ -485,7 +484,7 @@ public:
 
     try {
       if (torch_ipex::check_auto_dnnl() &&
-          input.device().type() == c10::DeviceType::DPCPP) {
+          input.device().type() == c10::DeviceType::XPU) {
         grad_input =
             torch_ipex::cpu::AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(
                 grad_output.is_contiguous() ? grad_output
@@ -498,7 +497,7 @@ public:
       TORCH_WARN(e.what());
 #endif
     }
-    if (input.device().type() == c10::DeviceType::DPCPP) {
+    if (input.device().type() == c10::DeviceType::XPU) {
       auto &&_ipex_grad_output =
           torch_ipex::bridge::shallowFallbackToCPUTensor(grad_output);
       auto &&_ipex_input =

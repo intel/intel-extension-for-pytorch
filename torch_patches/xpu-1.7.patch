@@ -1,0 +1,678 @@
+diff --git a/aten/src/ATen/SparseTensorImpl.cpp b/aten/src/ATen/SparseTensorImpl.cpp
+index ee1ff71..f6e7a30 100644
+--- a/aten/src/ATen/SparseTensorImpl.cpp
++++ b/aten/src/ATen/SparseTensorImpl.cpp
+@@ -9,6 +9,8 @@ namespace {
+   DeviceType sparseTensorSetToDeviceType(DispatchKeySet key_set) {
+     if (key_set.has(DispatchKey::SparseCPU)) {
+       return kCPU;
++    } else if (key_set.has(DispatchKey::SparseXPU)) {
++      return kXPU;
+     } else if (key_set.has(DispatchKey::SparseCUDA)) {
+       return kCUDA;
+     } else {
+diff --git a/aten/src/ATen/native/sparse/SparseTensor.cpp b/aten/src/ATen/native/sparse/SparseTensor.cpp
+index 3196c08..f82ce31 100644
+--- a/aten/src/ATen/native/sparse/SparseTensor.cpp
++++ b/aten/src/ATen/native/sparse/SparseTensor.cpp
+@@ -76,6 +76,8 @@ SparseTensor new_sparse(const TensorOptions& options) {
+   DispatchKey dispatch_key;
+   if (options.device().is_cuda()) {
+     dispatch_key = DispatchKey::SparseCUDA;
++  } else if (options.device().is_xpu()) {
++    dispatch_key = DispatchKey::SparseXPU;
+   } else {
+     dispatch_key = DispatchKey::SparseCPU;
+   }
+diff --git a/aten/src/ATen/templates/TensorBody.h b/aten/src/ATen/templates/TensorBody.h
+index 202b212..87fe73b 100644
+--- a/aten/src/ATen/templates/TensorBody.h
++++ b/aten/src/ATen/templates/TensorBody.h
+@@ -445,6 +445,7 @@ class CAFFE2_API Tensor {
+ 
+   Tensor cpu() const;
+   Tensor cuda() const;
++  Tensor xpu() const;
+   Tensor hip() const;
+   Tensor vulkan() const;
+ 
+diff --git a/aten/src/ATen/templates/TensorMethods.cpp b/aten/src/ATen/templates/TensorMethods.cpp
+index 064f591..c068188 100644
+--- a/aten/src/ATen/templates/TensorMethods.cpp
++++ b/aten/src/ATen/templates/TensorMethods.cpp
+@@ -23,6 +23,10 @@ Tensor Tensor::cuda() const {
+   return to(options().device(DeviceType::CUDA), /*non_blocking*/ false, /*copy*/ false);
+ }
+ 
++Tensor Tensor::xpu() const {
++  return to(options().device(DeviceType::XPU), /*non_blocking*/ false, /*copy*/ false);
++}
++
+ Tensor Tensor::hip() const {
+   return to(options().device(DeviceType::HIP), /*non_blocking*/ false, /*copy*/ false);
+ }
+diff --git a/c10/core/Backend.h b/c10/core/Backend.h
+index ab0c45a..eb91a94 100644
+--- a/c10/core/Backend.h
++++ b/c10/core/Backend.h
+@@ -31,14 +31,17 @@ enum class Backend {
+   CUDA,
+   HIP,
+   FPGA,
++  XPU,
+   SparseCPU,
+   SparseCUDA,
+   SparseHIP,
++  SparseXPU,
+   MSNPU,
+   XLA,
+   Vulkan,
+   QuantizedCPU,
+   QuantizedCUDA,
++  QuantizedXPU,
+   Undefined,
+   MkldnnCPU,
+   NumOptions
+@@ -48,6 +51,8 @@ static inline Backend toSparse(Backend b) {
+   switch (b) {
+     case Backend::CPU:
+       return Backend::SparseCPU;
++    case Backend::XPU:
++      return Backend::SparseXPU;
+     case Backend::CUDA:
+       return Backend::SparseCUDA;
+     case Backend::HIP:
+@@ -56,6 +61,8 @@ static inline Backend toSparse(Backend b) {
+       return Backend::SparseCPU;
+     case Backend::SparseCUDA:
+       return Backend::SparseCUDA;
++    case Backend::SparseXPU:
++      return Backend::SparseXPU;
+     case Backend::SparseHIP:
+       return Backend::SparseHIP;
+     default:
+@@ -77,6 +84,10 @@ static inline Backend toDense(Backend b) {
+       return Backend::MSNPU;
+     case Backend::XLA:
+       return Backend::XLA;
++    case Backend::XPU:
++      return Backend::XPU;
++    case Backend::SparseXPU:
++      return Backend::XPU;
+     case Backend::SparseCPU:
+       return Backend::CPU;
+     case Backend::SparseCUDA:
+@@ -87,6 +98,8 @@ static inline Backend toDense(Backend b) {
+       return Backend::QuantizedCPU;
+     case Backend::QuantizedCUDA:
+       return Backend::QuantizedCUDA;
++    case Backend::QuantizedXPU:
++      return Backend::QuantizedXPU;
+     default:
+       throw std::runtime_error("Unknown backend");
+   }
+@@ -97,6 +110,8 @@ static inline Backend dispatchKeyToBackend(DispatchKey t) {
+     return Backend::CPU;
+   } else if (t == DispatchKey::CUDA || t == DispatchKey::AutogradCUDA) {
+     return Backend::CUDA;
++  } else if (t == DispatchKey::XPU || t == DispatchKey::AutogradXPU) {
++    return Backend::XPU;
+   } else if (t == DispatchKey::HIP) {
+     return Backend::HIP;
+   } else if (t == DispatchKey::FPGA) {
+@@ -111,6 +126,8 @@ static inline Backend dispatchKeyToBackend(DispatchKey t) {
+     return Backend::SparseCPU;
+   } else if (t == DispatchKey::SparseCUDA) {
+     return Backend::SparseCUDA;
++  } else if (t == DispatchKey::SparseXPU) {
++    return Backend::SparseXPU;
+   } else if (t == DispatchKey::SparseHIP) {
+     return Backend::SparseHIP;
+   } else if (t == DispatchKey::MkldnnCPU) {
+@@ -119,6 +136,8 @@ static inline Backend dispatchKeyToBackend(DispatchKey t) {
+     return Backend::QuantizedCPU;
+   } else if (t == DispatchKey::QuantizedCUDA) {
+     return Backend::QuantizedCUDA;
++  } else if (t == DispatchKey::QuantizedXPU) {
++    return Backend::QuantizedXPU;
+   } else if (t == DispatchKey::Undefined) {
+     return Backend::Undefined;
+   } else {
+@@ -132,6 +151,8 @@ static inline DispatchKey backendToDispatchKey(Backend b) {
+       return DispatchKey::CPU;
+     case Backend::CUDA:
+       return DispatchKey::CUDA;
++    case Backend::XPU:
++      return DispatchKey::XPU;
+     case Backend::HIP:
+       return DispatchKey::HIP;
+     case Backend::FPGA:
+@@ -144,6 +165,8 @@ static inline DispatchKey backendToDispatchKey(Backend b) {
+       return DispatchKey::SparseCPU;
+     case Backend::SparseCUDA:
+       return DispatchKey::SparseCUDA;
++    case Backend::SparseXPU:
++      return DispatchKey::SparseXPU;
+     case Backend::SparseHIP:
+       return DispatchKey::SparseHIP;
+     case Backend::MkldnnCPU:
+@@ -154,6 +177,8 @@ static inline DispatchKey backendToDispatchKey(Backend b) {
+       return DispatchKey::QuantizedCPU;
+     case Backend::QuantizedCUDA:
+       return DispatchKey::QuantizedCUDA;
++    case Backend::QuantizedXPU:
++      return DispatchKey::QuantizedXPU;
+     case Backend::Undefined:
+       return DispatchKey::Undefined;
+     default:
+@@ -167,6 +192,8 @@ static inline DeviceType backendToDeviceType(Backend b) {
+       return DeviceType::CPU;
+     case Backend::CUDA:
+       return DeviceType::CUDA;
++    case Backend::XPU:
++      return DeviceType::XPU;
+     case Backend::HIP:
+       return DeviceType::HIP;
+     case Backend::FPGA:
+@@ -179,6 +206,8 @@ static inline DeviceType backendToDeviceType(Backend b) {
+       return DeviceType::CPU;
+     case Backend::SparseCUDA:
+       return DeviceType::CUDA;
++    case Backend::SparseXPU:
++      return DeviceType::XPU;
+     case Backend::SparseHIP:
+       return DeviceType::HIP;
+     case Backend::MkldnnCPU:
+@@ -186,6 +215,8 @@ static inline DeviceType backendToDeviceType(Backend b) {
+       return DeviceType::CPU;
+     case Backend::QuantizedCUDA:
+       return DeviceType::CUDA;
++    case Backend::QuantizedXPU:
++      return DeviceType::XPU;
+     case Backend::Vulkan:
+       return DeviceType::Vulkan;
+     case Backend::Undefined:
+@@ -198,6 +229,7 @@ static inline DeviceType backendToDeviceType(Backend b) {
+ static inline Backend backendToCPU(Backend b) {
+   switch (b) {
+     case Backend::CPU:
++    case Backend::XPU:
+       return Backend::CPU;
+     case Backend::CUDA:
+       return Backend::CPU;
+@@ -206,6 +238,7 @@ static inline Backend backendToCPU(Backend b) {
+     case Backend::FPGA:
+       return Backend::CPU;
+     case Backend::SparseCPU:
++    case Backend::SparseXPU:
+       return Backend::SparseCPU;
+     case Backend::SparseCUDA:
+       return Backend::SparseCPU;
+@@ -216,6 +249,7 @@ static inline Backend backendToCPU(Backend b) {
+       return Backend::CPU;
+     case Backend::MkldnnCPU:
+       return Backend::MkldnnCPU;
++    case Backend::QuantizedXPU:
+     case Backend::QuantizedCPU:
+       return Backend::QuantizedCPU;
+     case Backend::QuantizedCUDA:
+@@ -227,6 +261,34 @@ static inline Backend backendToCPU(Backend b) {
+   }
+ }
+ 
++static inline Backend backendToXPU(Backend b) {
++  switch (b) {
++    case Backend::CPU:
++    case Backend::CUDA:
++    case Backend::HIP:
++    case Backend::FPGA:
++    case Backend::XPU:
++    case Backend::MSNPU:
++    case Backend::XLA:
++    case Backend::MkldnnCPU:
++    case Backend::Vulkan:
++      return Backend::XPU;
++    case Backend::SparseCPU:
++    case Backend::SparseCUDA:
++    case Backend::SparseXPU:
++    case Backend::SparseHIP:
++      return Backend::SparseXPU;
++    case Backend::QuantizedCPU:
++    case Backend::QuantizedCUDA:
++    case Backend::QuantizedXPU:
++      return Backend::QuantizedXPU;
++    case Backend::Undefined:
++      return Backend::Undefined;
++    default:
++      AT_ERROR("Unknown backend");
++  }
++}
++
+ static inline Backend backendToCUDA(Backend b) {
+   switch (b) {
+     case Backend::CPU:
+@@ -235,10 +297,12 @@ static inline Backend backendToCUDA(Backend b) {
+     case Backend::FPGA:
+     case Backend::MSNPU:
+     case Backend::XLA:
++    case Backend::XPU:
+       return Backend::CUDA;
+     case Backend::SparseCPU:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
++    case Backend::SparseXPU:
+       return Backend::SparseCUDA;
+     case Backend::Undefined:
+       return Backend::Undefined;
+@@ -255,10 +319,12 @@ static inline Backend backendToHIP(Backend b) {
+     case Backend::FPGA:
+     case Backend::MSNPU:
+     case Backend::XLA:
++    case Backend::XPU:
+       return Backend::HIP;
+     case Backend::SparseCPU:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
++    case Backend::SparseXPU:
+       return Backend::SparseHIP;
+     case Backend::Undefined:
+       return Backend::Undefined;
+@@ -282,12 +348,16 @@ static inline const char* toString(Backend b) {
+       return "MSNPU";
+     case Backend::XLA:
+       return "XLA";
++    case Backend::XPU:
++      return "XPU";
+     case Backend::SparseCPU:
+       return "SparseCPU";
+     case Backend::SparseCUDA:
+       return "SparseCUDA";
+     case Backend::SparseHIP:
+       return "SparseHIP";
++    case Backend::SparseXPU:
++      return "SparseXPU";
+     case Backend::MkldnnCPU:
+       return "MkldnnCPU";
+     case Backend::Vulkan:
+@@ -296,6 +366,8 @@ static inline const char* toString(Backend b) {
+       return "QuantizedCPU";
+     case Backend::QuantizedCUDA:
+       return "QuantizedCUDA";
++    case Backend::QuantizedXPU:
++      return "QuantizedXPU";
+     default:
+       return "UNKNOWN_BACKEND";
+   }
+@@ -306,6 +378,7 @@ static inline bool isSparse(Backend b) {
+     case Backend::SparseCPU:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
++    case Backend::SparseXPU:
+       return true;
+     default:
+       return false;
+diff --git a/c10/core/Device.cpp b/c10/core/Device.cpp
+index 60c40b5..85d56f9 100644
+--- a/c10/core/Device.cpp
++++ b/c10/core/Device.cpp
+@@ -30,9 +30,10 @@
+ namespace c10 {
+ namespace {
+ DeviceType parse_type(const std::string& device_string) {
+-  static const std::array<std::pair<std::string, DeviceType>, 10> types = {{
++  static const std::array<std::pair<std::string, DeviceType>, 11> types = {{
+       {"cpu", DeviceType::CPU},
+       {"cuda", DeviceType::CUDA},
++      {"xpu", DeviceType::XPU},
+       {"mkldnn", DeviceType::MKLDNN},
+       {"opengl", DeviceType::OPENGL},
+       {"opencl", DeviceType::OPENCL},
+@@ -52,7 +53,7 @@ DeviceType parse_type(const std::string& device_string) {
+     return device->second;
+   }
+   AT_ERROR(
+-      "Expected one of cpu, cuda, mkldnn, opengl, opencl, ideep, hip, msnpu, xla device type at start of device string: ", device_string);
++      "Expected one of cpu, cuda, xpu, mkldnn, opengl, opencl, ideep, hip, msnpu, xla device type at start of device string: ", device_string);
+ }
+ } // namespace
+ 
+diff --git a/c10/core/Device.h b/c10/core/Device.h
+index f1249e8..52bb22c 100644
+--- a/c10/core/Device.h
++++ b/c10/core/Device.h
+@@ -86,6 +86,11 @@ struct C10_API Device final {
+     return type_ == DeviceType::CPU;
+   }
+ 
++  /// Return true if the device is of XPU type.
++  bool is_xpu() const noexcept {
++    return type_ == DeviceType::XPU;
++  }
++
+   /// Same string as returned from operator<<.
+   std::string str() const;
+ 
+diff --git a/c10/core/DeviceType.cpp b/c10/core/DeviceType.cpp
+index 9c8c53b..85eda37 100644
+--- a/c10/core/DeviceType.cpp
++++ b/c10/core/DeviceType.cpp
+@@ -11,6 +11,8 @@ std::string DeviceTypeName(DeviceType d, bool lower_case) {
+       return lower_case ? "cpu" : "CPU";
+     case DeviceType::CUDA:
+       return lower_case ? "cuda" : "CUDA";
++    case DeviceType::XPU:
++      return lower_case ? "xpu" : "XPU";
+     case DeviceType::OPENGL:
+       return lower_case ? "opengl" : "OPENGL";
+     case DeviceType::OPENCL:
+@@ -62,6 +64,7 @@ bool isValidDeviceType(DeviceType d) {
+     case DeviceType::MSNPU:
+     case DeviceType::XLA:
+     case DeviceType::Vulkan:
++    case DeviceType::XPU:
+       return true;
+     default:
+       return false;
+diff --git a/c10/core/DeviceType.h b/c10/core/DeviceType.h
+index 0289cf0..d7eaa9c 100644
+--- a/c10/core/DeviceType.h
++++ b/c10/core/DeviceType.h
+@@ -24,11 +24,12 @@ enum class DeviceType : int16_t {
+   MSNPU = 8, // MSNPU
+   XLA = 9, // XLA / TPU
+   Vulkan = 10, // Vulkan
++  XPU = 11, // XPU
+   // NB: If you add more devices:
+   //  - Change the implementations of DeviceTypeName and isValidDeviceType
+   //    in DeviceType.cpp
+   //  - Change the number below
+-  COMPILE_TIME_MAX_DEVICE_TYPES = 11,
++  COMPILE_TIME_MAX_DEVICE_TYPES = 12,
+   ONLY_FOR_TEST = 20901, // This device type is only for test.
+ };
+ 
+@@ -39,6 +40,7 @@ constexpr DeviceType kFPGA = DeviceType::FPGA;
+ constexpr DeviceType kMSNPU = DeviceType::MSNPU;
+ constexpr DeviceType kXLA = DeviceType::XLA;
+ constexpr DeviceType kVulkan = DeviceType::Vulkan;
++constexpr DeviceType kXPU = DeviceType::XPU;
+ 
+ // define explicit int constant
+ constexpr int COMPILE_TIME_MAX_DEVICE_TYPES =
+diff --git a/c10/core/DispatchKey.cpp b/c10/core/DispatchKey.cpp
+index 70c36de..51c533e 100644
+--- a/c10/core/DispatchKey.cpp
++++ b/c10/core/DispatchKey.cpp
+@@ -15,6 +15,8 @@ const char* toString(DispatchKey t) {
+       return "HIP";
+     case DispatchKey::FPGA:
+       return "FPGA";
++    case DispatchKey::XPU:
++      return "XPU";
+     case DispatchKey::MSNPU:
+       return "MSNPU";
+     case DispatchKey::XLA:
+@@ -35,6 +37,8 @@ const char* toString(DispatchKey t) {
+       return "QuantizedCPU";
+     case DispatchKey::QuantizedCUDA:
+       return "QuantizedCUDA";
++    case DispatchKey::QuantizedXPU:
++      return "QuantizedXPU";
+ 
+     case DispatchKey::ComplexCPU:
+       return "ComplexCPU";
+@@ -52,6 +56,8 @@ const char* toString(DispatchKey t) {
+       return "SparseCUDA";
+     case DispatchKey::SparseHIP:
+       return "SparseHIP";
++    case DispatchKey::SparseXPU:
++      return "SparseXPU";
+ 
+     case DispatchKey::PrivateUse1:
+       return "PrivateUse1";
+@@ -69,6 +75,8 @@ const char* toString(DispatchKey t) {
+       return "AutogradCPU";
+     case DispatchKey::AutogradCUDA:
+       return "AutogradCUDA";
++    case DispatchKey::AutogradXPU:
++      return "AutogradXPU";
+     case DispatchKey::AutogradXLA:
+       return "AutogradXLA";
+     case DispatchKey::AutogradPrivateUse1:
+@@ -120,6 +128,8 @@ DispatchKey getAutogradKeyFromBackend(DispatchKey t) {
+       return DispatchKey::AutogradCPU;
+     case DispatchKey::CUDA:
+       return DispatchKey::AutogradCUDA;
++    case DispatchKey::XPU:
++      return DispatchKey::AutogradXPU;
+     case DispatchKey::XLA:
+       return DispatchKey::AutogradXLA;
+     case DispatchKey::PrivateUse1:
+diff --git a/c10/core/DispatchKey.h b/c10/core/DispatchKey.h
+index b32f991..eac2ec4 100644
+--- a/c10/core/DispatchKey.h
++++ b/c10/core/DispatchKey.h
+@@ -60,6 +60,7 @@ enum class DispatchKey : uint8_t {
+          // test/cpp_extensions/msnpu_extension.cpp
+   XLA, // lives out of tree at https://github.com/pytorch/xla
+   Vulkan,
++  XPU, // For out of tree Intel's heterogeneous computing plug-in
+ 
+   // These are Caffe2 device types which we grandfathered into
+   // DispatchKey.
+@@ -74,6 +75,7 @@ enum class DispatchKey : uint8_t {
+   // based on the dtype of the tensor.
+   QuantizedCPU, // registered at build/aten/src/ATen/QuantizedCPUType.cpp
+   QuantizedCUDA, // registered at build/aten/src/ATen/QuantizedCUDAType.cpp
++  QuantizedXPU, // For out of tree Intel's heterogeneous computing plug-in
+   ComplexCPU, // lives out of tree at
+               // https://gitlab.com/pytorch-complex/pytorch-cpu-strided-complex
+   ComplexCUDA, // and
+@@ -102,6 +104,7 @@ enum class DispatchKey : uint8_t {
+   SparseCUDA, // registered at build/aten/src/ATen/SparseCUDAType.cpp
+   SparseHIP, // TODO: I think this is not actually used, due to Note
+              // [Masquerading as CUDA]
++  SparseXPU, // For out of tree Intel's heterogeneous computing plug-in
+ 
+   // Here are reserved backends for user-defined backends, see Note [Private use
+   // DispatchKey]
+@@ -216,6 +219,7 @@ enum class DispatchKey : uint8_t {
+   AutogradCPU,
+   AutogradCUDA,
+   AutogradXLA,
++  AutogradXPU,
+   // Here are some reserved pre-autograd keys for user-defined backends, see
+   // Note [Private use DispatchKey]
+   AutogradPrivateUse1,
+diff --git a/c10/core/DispatchKeySet.cpp b/c10/core/DispatchKeySet.cpp
+index b331fd5..e8f52ce 100644
+--- a/c10/core/DispatchKeySet.cpp
++++ b/c10/core/DispatchKeySet.cpp
+@@ -14,12 +14,14 @@ constexpr DispatchKeySet autogradother_backends = DispatchKeySet({
+   DispatchKey::IDEEP,
+   DispatchKey::QuantizedCPU,
+   DispatchKey::QuantizedCUDA,
++  DispatchKey::QuantizedXPU,
+   DispatchKey::ComplexCPU,
+   DispatchKey::ComplexCUDA,
+   DispatchKey::CustomRNGKeyId,
+   DispatchKey::MkldnnCPU,
+   DispatchKey::SparseCPU,
+   DispatchKey::SparseCUDA,
++  DispatchKey::SparseXPU,
+   DispatchKey::SparseHIP,
+ });
+ 
+@@ -28,6 +30,7 @@ constexpr DispatchKeySet backend_dispatch_keyset = autogradother_backends | Disp
+   DispatchKey::CPU,
+   DispatchKey::CUDA,
+   DispatchKey::XLA,
++  DispatchKey::XPU,
+   DispatchKey::PrivateUse1,
+   DispatchKey::PrivateUse2,
+   DispatchKey::PrivateUse3,
+@@ -55,6 +58,8 @@ DispatchKeySet getBackendKeySetFromAutograd(DispatchKey t) {
+       return DispatchKeySet(DispatchKey::CPU);
+     case DispatchKey::AutogradCUDA:
+       return DispatchKeySet(DispatchKey::CUDA);
++    case DispatchKey::AutogradXPU:
++      return DispatchKeySet(DispatchKey::XPU);
+     case DispatchKey::AutogradXLA:
+       return DispatchKeySet(DispatchKey::XLA);
+     case DispatchKey::AutogradPrivateUse1:
+diff --git a/c10/core/Layout.h b/c10/core/Layout.h
+index 7e33c81..02fbd26 100644
+--- a/c10/core/Layout.h
++++ b/c10/core/Layout.h
+@@ -17,6 +17,7 @@ inline Layout layout_from_backend(Backend backend) {
+     case Backend::SparseCPU:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
++    case Backend::SparseXPU:
+       return Layout::Sparse;
+     case Backend::MkldnnCPU:
+       return Layout::Mkldnn;
+diff --git a/c10/core/TensorImpl.h b/c10/core/TensorImpl.h
+index 5b38330..9088c99 100644
+--- a/c10/core/TensorImpl.h
++++ b/c10/core/TensorImpl.h
+@@ -434,12 +434,14 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+     // NB: This method is not virtual and avoid dispatches for performance reasons.
+     return key_set_.has(DispatchKey::SparseCPU) ||
+            key_set_.has(DispatchKey::SparseCUDA) ||
++           key_set_.has(DispatchKey::SparseXPU) ||
+            key_set_.has(DispatchKey::SparseHIP);
+   }
+ 
+   bool is_quantized() const {
+     // NB: This method is not virtual and avoid dispatches for performance reasons.
+     return key_set_.has(DispatchKey::QuantizedCPU) ||
++        key_set_.has(DispatchKey::QuantizedXPU) ||
+         key_set_.has(DispatchKey::QuantizedCUDA);
+   }
+ 
+@@ -469,6 +471,13 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+     return key_set_.has(DispatchKey::Vulkan);
+   }
+ 
++  bool is_xpu() const {
++    // NB: This method is not virtual and avoid dispatches for performance reasons.
++    return key_set_.has(DispatchKey::XPU) ||
++           key_set_.has(DispatchKey::QuantizedXPU) ||
++           key_set_.has(DispatchKey::SparseXPU);
++  }
++
+   // TODO: remove this once we don't automatically enabled Autograd dispatch keys
+   //       in TensorImpl constructor.
+   // DON'T USE THIS API!! It's only created for testing purpose in
+@@ -913,11 +922,13 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+     auto is_dense = [](DispatchKeySet ts) {
+       return ts.has(DispatchKey::CPU) ||
+              ts.has(DispatchKey::CUDA) ||
++             ts.has(DispatchKey::XPU) ||
+              ts.has(DispatchKey::HIP);
+     };
+     auto is_sparse = [](DispatchKeySet ts) {
+       return ts.has(DispatchKey::SparseCPU) ||
+              ts.has(DispatchKey::SparseCUDA) ||
++             ts.has(DispatchKey::SparseXPU) ||
+              ts.has(DispatchKey::SparseHIP);
+     };
+     return (key_set_ == from) || (is_dense(key_set_) && is_dense(from)) || (is_sparse(key_set_) && is_sparse(from));
+diff --git a/c10/core/TensorOptions.h b/c10/core/TensorOptions.h
+index dd92f91..67d20ef 100644
+--- a/c10/core/TensorOptions.h
++++ b/c10/core/TensorOptions.h
+@@ -595,6 +595,12 @@ inline DispatchKey computeDispatchKey(c10::optional<ScalarType> dtype, c10::opti
+             }
+             return DispatchKey::CUDA;
+           }
++          case DeviceType::XPU: {
++            if (isQIntType(dtype_)) {
++              return DispatchKey::QuantizedXPU;
++            }
++            return DispatchKey::XPU;
++          }
+           case DeviceType::MKLDNN:
+             return DispatchKey::MKLDNN;
+           case DeviceType::OPENGL:
+@@ -623,6 +629,8 @@ inline DispatchKey computeDispatchKey(c10::optional<ScalarType> dtype, c10::opti
+             return DispatchKey::SparseCPU;
+           case DeviceType::CUDA:
+             return DispatchKey::SparseCUDA;
++          case DeviceType::XPU:
++            return DispatchKey::SparseXPU;
+           case DeviceType::HIP:
+             return DispatchKey::SparseHIP;
+           default:
+@@ -647,6 +655,8 @@ inline DeviceType computeDeviceType(DispatchKey tid) {
+     return DeviceType::CPU;
+   } else if (tid == DispatchKey::CUDA) {
+     return DeviceType::CUDA;
++  } else if (tid == DispatchKey::XPU) {
++    return DeviceType::XPU;
+   } else if (tid == DispatchKey::HIP) {
+     return DeviceType::HIP;
+   } else if (tid == DispatchKey::FPGA) {
+@@ -669,6 +679,8 @@ inline DeviceType computeDeviceType(DispatchKey tid) {
+     return DeviceType::CPU;
+   } else if (tid == DispatchKey::SparseCUDA) {
+     return DeviceType::CUDA;
++  } else if (tid == DispatchKey::SparseXPU) {
++    return DeviceType::XPU;
+   } else if (tid == DispatchKey::SparseHIP) {
+     return DeviceType::HIP;
+   } else if (tid == DispatchKey::MkldnnCPU) {
+diff --git a/torch/csrc/utils/tensor_new.cpp b/torch/csrc/utils/tensor_new.cpp
+index ee86239..e780267 100644
+--- a/torch/csrc/utils/tensor_new.cpp
++++ b/torch/csrc/utils/tensor_new.cpp
+@@ -51,6 +51,8 @@ Backend backendToBackendOfDeviceType(Backend b, DeviceType d) {
+       return backendToCPU(b);
+     case DeviceType::CUDA:
+       return backendToCUDA(b);
++    case DeviceType::XPU:
++      return backendToXPU(b);
+     case DeviceType::HIP:
+       return backendToHIP(b);
+     case DeviceType::MSNPU:
+@@ -336,10 +338,12 @@ void check_base_legacy_new(c10::DispatchKey dispatch_key, at::Layout expected_la
+   if (expected_layout == c10::kStrided) {
+     TORCH_CHECK(dispatch_key == c10::DispatchKey::CPU
+                 || dispatch_key == c10::DispatchKey::CUDA
++                || dispatch_key == c10::DispatchKey::XPU
+                 || dispatch_key == c10::DispatchKey::HIP
+                 || dispatch_key == c10::DispatchKey::XLA,
+                 "new(): expected DispatchKey: ", c10::DispatchKey::CPU,
+                 " or ", c10::DispatchKey::CUDA,
++                " or ", c10::DispatchKey::XPU,
+                 " or ", c10::DispatchKey::HIP,
+                 " or ", c10::DispatchKey::XLA,
+                 " but got: ", dispatch_key);
+@@ -347,9 +351,11 @@ void check_base_legacy_new(c10::DispatchKey dispatch_key, at::Layout expected_la
+     // NOTE: no sparse XLA
+     TORCH_CHECK(dispatch_key == c10::DispatchKey::SparseCPU
+                 || dispatch_key == c10::DispatchKey::SparseCUDA
++                || dispatch_key == c10::DispatchKey::SparseXPU
+                 || dispatch_key == c10::DispatchKey::SparseHIP,
+                 "new(): expected DispatchKey: ", c10::DispatchKey::SparseCPU,
+                 " or ", c10::DispatchKey::SparseCUDA,
++                " or ", c10::DispatchKey::SparseXPU,
+                 " or ", c10::DispatchKey::SparseHIP,
+                 " but got: ", dispatch_key);
+   } else {
+diff --git a/torch/csrc/utils/tensor_types.cpp b/torch/csrc/utils/tensor_types.cpp
+index e6b851a..e29fb93 100644
+--- a/torch/csrc/utils/tensor_types.cpp
++++ b/torch/csrc/utils/tensor_types.cpp
+@@ -19,8 +19,10 @@ static const char* backend_to_string(const at::Backend& backend) {
+   switch (backend) {
+     case at::Backend::CPU: return "torch";
+     case at::Backend::CUDA: return "torch.cuda";
++    case at::Backend::XPU: return "torch.xpu";
+     case at::Backend::SparseCPU: return "torch.sparse";
+     case at::Backend::SparseCUDA: return "torch.cuda.sparse";
++    case at::Backend::SparseXPU: return "torch.xpu.sparse";
+     default: AT_ERROR("Unimplemented backend ", backend);
+   }
+ }

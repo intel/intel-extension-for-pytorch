@@ -1,5 +1,7 @@
 #include "torch_ipex/csrc/ipex_tensor_impl.h"
 
+#include <ATen/TensorUtils.h>
+
 #include <c10/core/ScalarType.h>
 #include <c10/core/impl/DeviceGuardImplInterface.h>
 #include <c10/macros/Macros.h>
@@ -11,10 +13,10 @@ namespace torch_ipex {
 
 namespace {
 
-thread_local c10::Device g_current_device(at::DeviceType::DPCPP, 0);
+thread_local c10::Device g_current_device(at::DeviceType::XPU, 0);
 
 struct IPEXGuardImpl : public c10::impl::DeviceGuardImplInterface {
-  at::DeviceType type() const override { return at::DeviceType::DPCPP; }
+  at::DeviceType type() const override { return at::DeviceType::XPU; }
 
   c10::Device exchangeDevice(c10::Device device) const override {
     std::swap(g_current_device, device);
@@ -46,24 +48,15 @@ struct IPEXGuardImpl : public c10::impl::DeviceGuardImplInterface {
   }
 };
 
-C10_REGISTER_GUARD_IMPL(DPCPP, IPEXGuardImpl);
+C10_REGISTER_GUARD_IMPL(XPU, IPEXGuardImpl);
 
 }  // namespace
 
-
-IPEXTensorImpl::IPEXTensorImpl(at::Tensor tensor, at::Storage storage, at::DispatchKey type_id) :
-    c10::TensorImpl(std::move(storage), type_id),
-    m_src_data_tensor(std::move(tensor)) {}
-
-IPEXTensorImpl::IPEXTensorImpl(at::Storage storage, at::DispatchKey type_id) :
-    c10::TensorImpl(std::move(storage), type_id) {}
+IPEXTensorImpl::IPEXTensorImpl(at::Storage storage, at::DispatchKey type_id, at::ScalarType dtype) :
+    c10::TensorImpl(std::move(storage), type_id, at::scalarTypeToTypeMeta(dtype)) {}
 
 IPEXTensorImpl::IPEXTensorImpl(at::DispatchKeySet type_set, const caffe2::TypeMeta& data_type, c10::optional<c10::Device> device_opt) :
     c10::TensorImpl(type_set, data_type, device_opt) {}
-
-void IPEXTensorImpl::set_dpcpp_tensor_id() {
-  this->key_set_.add(at::DispatchKey::VariableTensorId);
-}
 
 void IPEXTensorImpl::reset_data_type(at::ScalarType dst_type) {
   this->data_type_ = at::scalarTypeToTypeMeta(dst_type);
@@ -91,7 +84,7 @@ void IPEXTensorImpl::copy_auto_grad(c10::TensorImpl *src_impl) {
     ipex_autograd_meta->requires_grad_ = cpu_autograd_meta->requires_grad_;
   }
 
-  this->grad() = src_impl->grad();
+  this->mutable_grad() = src_impl->mutable_grad();
 }
 
 void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl, bool keep_dtype) {
@@ -130,25 +123,36 @@ static inline void checkInBoundsForStorage(
     at::IntArrayRef size,
     at::IntArrayRef stride,
     int64_t storage_offset,
+    const caffe2::TypeMeta& data_type,
     const at::Storage& new_storage) {
-  // Port from setStrided in Aten/native/Resize.h
-  int64_t storage_size = at::detail::computeStorageSize(size, stride);
-  if (storage_size == 0) {
+  int64_t storage_size_bytes =
+      at::detail::computeStorageNbytes(size, stride, data_type.itemsize());
+  int64_t storage_offset_bytes = storage_offset * data_type.itemsize();
+  if (storage_size_bytes == 0) {
     // NB: (a tensor with arbitrary 0 dims)'s storage can have any numel.
     return;
   }
-  int64_t new_storage_size = new_storage.numel();
+  int64_t new_storage_size_bytes = new_storage.nbytes();
   TORCH_CHECK(
-      storage_offset + storage_size <= new_storage_size,
-      "setStorage: sizes ", size, ", strides ", stride, ","
-      " and storage offset ", storage_offset,
-      " requiring a storage size of ", storage_size + storage_offset,
-      " are out of bounds for storage with numel ", new_storage_size);
+      storage_size_bytes + storage_offset_bytes <= new_storage_size_bytes,
+      "setStorage: sizes ",
+      size,
+      ", strides ",
+      stride,
+      ","
+      " storage offset ",
+      storage_offset,
+      ", and itemsize ",
+      data_type.itemsize(),
+      " requiring a storage size of ",
+      storage_size_bytes,
+      " are out of bounds for storage of size ",
+      new_storage_size_bytes);
 }
 
-void IPEXTensorImpl::set_strided(at::IntArrayRef size, at::IntArrayRef stride, int64_t storage_offset) {
+void IPEXTensorImpl::set_strided(at::IntArrayRef size, at::IntArrayRef stride, int64_t storage_offset, at::ScalarType dtype) {
   // Port from setStrided in Aten/native/Resize.h
-  checkInBoundsForStorage(size, stride, storage_offset_, this->storage());
+  checkInBoundsForStorage(size, stride, storage_offset_, at::scalarTypeToTypeMeta(dtype), this->storage());
 
   // In backprop phase, grad variable might be detached (in accumulate_grad.h)
   // and forbids the metadata to be modified.
@@ -169,11 +173,6 @@ void IPEXTensorImpl::set_strided(at::IntArrayRef size, at::IntArrayRef stride, i
 
   // Restore allow_tensor_metadata_change
   this->set_allow_tensor_metadata_change(orig_allow_tensor_metadata_change);
-}
-
-// Keep data tensor in case the IPEXTensorImpl is shallow-copy from a stack variable.
-void IPEXTensorImpl::keep_source_data_tensor(at::Tensor data_tensor) {
-  this->m_src_data_tensor = data_tensor;
 }
 
 // The storage of tensor impl cannot be accessed out of TensorImpl class. So we need to expose an interface

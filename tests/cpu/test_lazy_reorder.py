@@ -141,8 +141,8 @@ class TestDeconv(TestCase):
                     and ((input_height - 1) * stride - 2 * padding + dilation * (kernel_size -1 ) + output_padding + 1 > 0) \
                     and ((input_width - 1) * stride - 2 * padding + dilation * (kernel_size -1 ) + output_padding + 1 > 0) \
                     and ((input_depth - 1) * stride - 2 * padding + dilation * (kernel_size -1 ) + output_padding + 1 > 0):
-                
-                # mkldnn does not support the case where: 
+
+                # mkldnn does not support the case where:
                 # padding - output_padding + stride <= 0
                 # while PyTorch supports this case, will fallback in this case
                 # input_width = 8
@@ -183,7 +183,7 @@ class TestDeconv(TestCase):
                 with AutoDNNL(True):
                     y_dpcpp = module_dpcpp(x_dpcpp)
                     y_dpcpp.sum().backward()
-                    
+
                     self.assertEqual(
                         y_aten, y_dpcpp)
                     self.assertEqual(
@@ -218,10 +218,10 @@ class TestDeconv(TestCase):
                 self.assertEqual(x_aten.grad, x_fallback_.grad)
                 if bias:
                     self.assertEqual(module.bias.grad, module_fallback_.bias.grad)
-    
+
     def test_deconv2d(self):
         self._test_deconv(dims=2)
-    
+
     def test_deconv3d(self):
         self._test_deconv(dims=3)
 
@@ -741,6 +741,31 @@ class TestLinear(TestCase):
                 y1.backward()
                 y2.backward()
                 self.assertEqual(x1.grad, x2.grad)
+
+
+    def test_eikan_linear_backward(self):
+        ipex.core.enable_auto_dnnl()
+        rand_seed = int(0)
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        in_features = 5
+        out_features = 10
+        for bias in [False]:
+            input_shape = [5, in_features]
+            x  = torch.randn(input_shape, dtype=torch.float32)
+            x2 = x.clone().to(device=device).requires_grad_()
+            linear = torch.nn.Linear(in_features, out_features, bias=bias)
+            print("input:")
+            print(x)
+            print("weight:")
+            print(linear.weight.data)
+            linear_dpcpp =copy.deepcopy(linear).to(device=device)
+            y2 = linear_dpcpp(x2).sum()
+            y2.backward()
+            print("input grad:")
+            print(x2.grad)
+            print("weight grad:")
+            print(linear_dpcpp.weight.data.grad)
 
 class TestPool(TestCase):
     def test_avg_pool2d(self):

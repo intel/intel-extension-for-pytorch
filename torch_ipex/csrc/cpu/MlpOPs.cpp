@@ -1,6 +1,6 @@
 #include "MlpOPs.h"
 
-#include <torch/csrc/autograd/record_function.h>
+#include <ATen/record_function.h>
 #include <torch/csrc/autograd/VariableTypeUtils.h>
 
 #include <vector>
