@@ -13,7 +13,12 @@
 #include <ATen/native/Resize.h>
 
 #include <utils/ATDispatch.h>
+
+#ifdef USE_USM
 #include "Loops.h"
+#else
+#include <core/ApplyUtils.h>
+#endif
 
 using namespace at;
 using namespace at::dpcpp;
@@ -21,6 +26,41 @@ using namespace at::dpcpp;
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
+
+#ifndef USE_USM
+template <typename T>
+struct inter_copy_type {
+  using type = T;
+};
+
+template <>
+struct inter_copy_type<uint8_t> {
+  using type = int64_t;
+};
+
+template <typename T>
+using inter_copy_type_t = typename inter_copy_type<T>::type;
+
+template <typename dst_T, typename src_T>
+class copy_functor {
+ public:
+  copy_functor() {}
+  void operator()(dst_T& dst_val, const src_T& src_val) const {
+    dst_val =
+        static_cast<dst_T>(static_cast<inter_copy_type_t<dst_T>>(src_val));
+  }
+};
+
+// Copy operator for the pointerwise apply kernel
+template <typename dst_T, typename src_T>
+struct CopyOp {
+  static void apply(Tensor& dst, const Tensor& src) {
+    DPCPP_tensor_apply2<dst_T, src_T>(dst, src, copy_functor<dst_T, src_T>());
+  }
+};
+
+#endif
+
 
 #define BUILD_TENSOR_ITER(dst, src, iter) \
   auto iter = TensorIterator();           \
@@ -64,9 +104,10 @@ static bool maybe_enable_p2p_access(Device dst_device, Device src_device) {
   return false;
 }
 
-
+#ifdef USE_USM
 DPCPP_DEF_K1(SyclOpElwCopy1);
 DPCPP_DEF_K1(SyclOpElwCopy2);
+#endif
 
 void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   auto numel = iter.numel();
@@ -98,6 +139,7 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   } else {
     ScalarType dtype = iter.dtype(0);
     if(!isQIntType(dtype)){
+      #ifdef USE_USM
       IPEX_DISPATCH_ALL_TYPES_AND3(
           kHalf, kBFloat16, kBool, iter.dtype(1), "copy_", [&] {
             using src_t = scalar_t;
@@ -106,10 +148,21 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
                   dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpElwCopy1, scalar_t, src_t)>(
                       iter, [=](src_t src_val) -> scalar_t {
                           return static_cast<scalar_t>(src_val);
-                  });
-            });
+                });
+          });
       });
+      #else
+      IPEX_DISPATCH_ALL_TYPES_AND3(
+          kHalf, kBFloat16, kBool, iter.dtype(0), "copy_", [&] {
+            using dst_t = scalar_t;
+            IPEX_DISPATCH_ALL_TYPES_AND3(
+                kHalf, kBFloat16, kBool, iter.dtype(1), "copy_", [&] {
+                  CopyOp<dst_t, scalar_t>::apply(iter.tensor(0), iter.tensor(1));
+                });
+          });
+      #endif
     } else {
+      #ifdef USE_USM
       IPEX_DISPATCH_QINT_TYPES(iter.dtype(1), "copy_", [&] {
         using src_t = scalar_t;
           dpcpp_kernel_for_tensor_iter<DPCPP_K(SyclOpElwCopy2, scalar_t, src_t)>(
@@ -117,6 +170,12 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
                   return static_cast<scalar_t>(src_val);
                });
       });
+      #else
+      IPEX_DISPATCH_QINT_TYPES(iter.dtype(0), "copy_", [&] {
+        using dst_t = scalar_t;
+          CopyOp<dst_t, scalar_t>::apply(iter.tensor(0), iter.tensor(1));
+      });
+      #endif
     }
   }
 
