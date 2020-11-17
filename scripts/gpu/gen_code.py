@@ -319,14 +319,16 @@ OpRegistration = NamedTuple('OpRegistration', [
 
 NATIVE_DISPATCH_DEFENITION_HACKY_WRAPPER = CodeTemplate("""\
 ${return_type} ${native_type_method_dispatch}(${declaration_formals}) {
-    ${return_call} decltype(c10::impl::hacky_wrapper_for_legacy_signatures<${schema_order_cpp_signature}>(
-    ::c10::CompileTimeFunctionPointer<${native_order_cpp_signature}, ${Type}::${native_type_method_decl}>()))::func_ptr()(${actuals});
+  ${lazy_reorder}
+  ${return_call} decltype(c10::impl::hacky_wrapper_for_legacy_signatures<${schema_order_cpp_signature}>(
+  ::c10::CompileTimeFunctionPointer<${native_order_cpp_signature}, ${Type}::${native_type_method_decl}>()))::func_ptr()(${actuals});
 }
 """)
 
 NATIVE_DISPATCH_DEFINITION_GENERIC_BACKEND = CodeTemplate("""\
-${return_type} ${native_type_method_dispatch}(${native_formals}) {
-    ${return_call} ${Type}::${native_type_method_decl}(${actuals});
+${return_type} ${native_type_method_dispatch}(${declaration_formals}) {
+  ${lazy_reorder}
+  ${return_call} ${Type}::${native_type_method_decl}(${actuals});
 }
 """)
 
@@ -343,6 +345,25 @@ BACKEND_UNBOXEDONLY_FUNCTION_REGISTRATION = CodeTemplate("""\
   );
 """)
 
+LAZY_REORDER_TENSORLIST = CodeTemplate("""\
+auto ${name}_vec = AtenIpexTypeXPU::to_plain_if_needed(${name});
+auto ${temp_name} = at::TensorList(${name}_vec);
+""")
+
+LAZY_REORDER_TENSOR = CodeTemplate("""\
+${name} = AtenIpexTypeXPU::to_plain_if_needed_(${name});
+""")
+
+LAZY_REORDER_CONST_TENSOR = CodeTemplate("""\
+auto ${temp_name} = AtenIpexTypeXPU::to_plain_if_needed(${name});
+""")
+
+LAZY_REORDER_OPTIONAL_TENSOR = CodeTemplate("""\
+c10::optional<Tensor> ${temp_name};
+if (${name}.has_value())
+    ${temp_name} = c10::optional<Tensor>(AtenIpexTypeXPU::to_plain_if_needed(${name}.value()));
+""")
+
 # A schema registration specifies alias analysis for an operator, but doesn't
 # actually provide an implementation.  Although our registration API allows you
 # to specify all of this information at a function registration site, it's
@@ -351,6 +372,26 @@ BACKEND_UNBOXEDONLY_FUNCTION_REGISTRATION = CodeTemplate("""\
 SCHEMA_REGISTRATION = CodeTemplate("""\
 m.def("${unqual_schema_string}");
 """)
+
+
+lazy_reorder_block_list = set([
+    'convolution_overrideable',
+    'relu',
+    'relu_',
+    'native_batch_norm',
+    'add_',
+    'add',
+    'add_out',
+    'avg_pool2d',
+    'avg_pool2d_out',
+    '_adaptive_avg_pool2d',
+    'max_pool2d_with_indices',
+    'max_pool2d_with_indices_out',
+    'quantize_per_tensor',
+    'quantize_per_channel',
+    'dequantize',
+])
+
 
 def format_formal(f):
     # type: (AtFormal) -> str
@@ -440,27 +481,27 @@ def create_derived(backend_type_env, declarations):
                 if option['use_c10_dispatcher'] == 'full':
                     # Omit the device guard entirely in these cases
                     def_backend = NATIVE_DISPATCH_DEFINITION_GENERIC_BACKEND
-                elif declaration['use_c10_dispatcher'] == 'with_codegenerated_unboxing_wrapper':
+                elif option['use_c10_dispatcher'] == 'with_codegenerated_unboxing_wrapper':
                     def_backend = NATIVE_DISPATCH_DEFINITION_GENERIC_BACKEND
                 else:
-                    assert declaration['use_c10_dispatcher'] == 'hacky_wrapper_for_legacy_signatures'
+                    assert option['use_c10_dispatcher'] == 'hacky_wrapper_for_legacy_signatures'
                     def_backend = NATIVE_DISPATCH_DEFENITION_HACKY_WRAPPER
 
                 type_object_definitions.append(def_backend.substitute(env))
 
                 if native_dispatch:
                     # See NOTE[UnboxedOnly]
-                    if declaration['use_c10_dispatcher'] == 'full':
+                    if option['use_c10_dispatcher'] == 'full':
                         op_registrations.append(OpRegistration(
                             operator_name=OPERATOR_NAME.substitute(option),
                             registration_code=BACKEND_FUNCTION_REGISTRATION.substitute(env)))
-                    elif declaration['use_c10_dispatcher'] == 'with_codegenerated_unboxing_wrapper':
+                    elif option['use_c10_dispatcher'] == 'with_codegenerated_unboxing_wrapper':
                         # assert option['use_c10_dispatcher'] == 'with_codegenerated_unboxing_wrapper'
                         op_registrations.append(OpRegistration(
                             operator_name=OPERATOR_NAME.substitute(option),
                             registration_code=BACKEND_UNBOXEDONLY_FUNCTION_REGISTRATION.substitute(env)))
                     else:
-                        assert declaration['use_c10_dispatcher'] == 'hacky_wrapper_for_legacy_signatures'
+                        assert option['use_c10_dispatcher'] == 'hacky_wrapper_for_legacy_signatures'
                         op_registrations.append(OpRegistration(
                             operator_name=OPERATOR_NAME.substitute(option),
                             registration_code=BACKEND_FUNCTION_REGISTRATION.substitute(env)))
@@ -507,6 +548,23 @@ def extract_schema(path):
     return schemas_string, errors
 
 
+def get_lazy_reorder(schema_name, argument):
+    cptype = argument['dynamic_type']
+    change_dict = {'name': argument['name'], 'temp_name': '_' + argument['name']}
+    if schema_name not in lazy_reorder_block_list:
+        if cptype == 'TensorList':
+            return LAZY_REORDER_TENSORLIST.substitute(change_dict), change_dict['temp_name']
+        elif cptype == 'Tensor':
+            if argument['type'] == 'const c10::optional<Tensor>&':
+                return LAZY_REORDER_OPTIONAL_TENSOR.substitute(change_dict), change_dict['temp_name']
+                option['actuals'][i] = change_dict['temp_name']
+            elif not argument['type'].startswith('const'):
+                return LAZY_REORDER_TENSOR.substitute(change_dict), change_dict['name']
+            else:
+                return LAZY_REORDER_CONST_TENSOR.substitute(change_dict), change_dict['temp_name']
+    return '', change_dict['name']
+
+
 def preprocess_decl(declarations):
     for declaration in declarations:
         common_with_cwrap.set_declaration_defaults(declaration)
@@ -526,28 +584,32 @@ def preprocess_decl(declarations):
 
             if declaration['use_c10_dispatcher'] == 'full':
                 option['declaration_formals'] = declaration['schema_order_formals']
+                lazy_reorder = [get_lazy_reorder(option['name'], argument) for argument in option['arguments']]
+                option['lazy_reorder'] = [elem[0] for elem in lazy_reorder]
+                option['actuals'] = [elem[1] for elem in lazy_reorder]
                 native_formals = native_get_formals(option, False, True)
-                option['actuals'] = [f['name'] for f in native_formals]
                 option['native_formals'] = [format_formal(f) for f in native_formals]
                 native_order_cpp_signature = '{} ( {} )' .format(option['return_type'], ', '.join([ f['type'] for f in native_formals ]))
                 option['native_order_cpp_signature'] = native_order_cpp_signature
             elif declaration['use_c10_dispatcher'] == 'with_codegenerated_unboxing_wrapper':
                 option['declaration_formals'] = declaration['formals']
+                lazy_reorder = [get_lazy_reorder(option['name'], argument) for argument in option['arguments']]
+                option['lazy_reorder'] = [elem[0] for elem in lazy_reorder]
+                option['actuals'] = [elem[1] for elem in lazy_reorder]
                 native_formals = native_get_formals(option, False, True)
-                option['actuals'] = [f['name'] for f in native_formals]
                 option['native_formals'] = [format_formal(f) for f in native_formals]
                 native_order_cpp_signature = '{} ( {} )' .format(option['return_type'], ', '.join([ f['type'] for f in native_formals ]))
                 option['native_order_cpp_signature'] = native_order_cpp_signature
             else:
                 assert declaration['use_c10_dispatcher'] == 'hacky_wrapper_for_legacy_signatures'
                 option['declaration_formals'] = declaration['schema_order_formals']
-                formals = native_get_formals(option, True, True)
-                option['actuals'] = [f['name'] for f in formals]
+                lazy_reorder = [get_lazy_reorder(option['name'], argument) for argument in option['schema_order_arguments']]
+                option['lazy_reorder'] = [elem[0] for elem in lazy_reorder]
+                option['actuals'] = [elem[1] for elem in lazy_reorder]
                 native_formals = native_get_formals(option, False, True)
                 option['native_formals'] = [format_formal(f) for f in native_formals]
                 native_order_cpp_signature = '{} ( {} )' .format(option['return_type'], ', '.join([ f['type'] for f in native_formals ]))
                 option['native_order_cpp_signature'] = native_order_cpp_signature
-
 
         declaration['options'] = handle_outputs_taken_as_arguments(
             declaration['options'])

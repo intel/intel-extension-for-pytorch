@@ -16,6 +16,8 @@ add_custom_command(OUTPUT
         --out ${DPCPP_GPU_ATEN_GENERATED}/ATen/
         --source-path ${PROJECT_SOURCE_DIR}
         DEPENDS
+        ${PROJECT_SOURCE_DIR}/scripts/declarations/Declarations.yaml
+        ${PROJECT_SOURCE_DIR}/scripts/gpu/gen_code.py
         ${PROJECT_SOURCE_DIR}/scripts/gpu/DPCPPGPUType.h
         ${PROJECT_SOURCE_DIR}/scripts/gpu/QUANTIZEDDPCPPGPUType.h)
 
