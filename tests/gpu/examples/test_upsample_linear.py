@@ -11,9 +11,7 @@ cpu_device = torch.device("cpu")
 sycl_device = torch.device("dpcpp")
 
 class TestNNMethod(TestCase):
-    def test_upsamle_linear(self, dtype=torch.float):
-
-        ##### upsample linear 1D #####
+    def test_upsamle_linear_1d(self, dtype=torch.float):
         input_cpu = torch.randn((2,3,5), dtype=torch.float32, device = cpu_device)
         input_dpcpp = input_cpu.to('dpcpp')
         scales = [6]
@@ -43,13 +41,14 @@ class TestNNMethod(TestCase):
         print("bwd result diff = ", grad_cpu - grad_dpcpp.cpu())
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
-        ##### upsample linear 2D #####
+    def test_upsamle_linear_2d(self, dtype=torch.float):
         input_cpu = torch.randn((2,3,5,5), dtype=torch.float32, device = cpu_device)
         input_dpcpp = input_cpu.to('dpcpp')
         scales = [6, 8]
         input_cpu.requires_grad = True
         input_dpcpp.requires_grad = True
         alc = False
+        rsf = False
 
         output_cpu = torch.nn.functional.interpolate(input_cpu, scale_factor=scales, mode='bilinear', align_corners=alc, recompute_scale_factor=rsf)
         output_dpcpp = torch.nn.functional.interpolate(input_dpcpp, scale_factor=scales, mode='bilinear', align_corners=alc, recompute_scale_factor=rsf)
@@ -72,13 +71,14 @@ class TestNNMethod(TestCase):
         print("bwd result diff = ", grad_cpu - grad_dpcpp.cpu())
         self.assertEqual(grad_cpu, grad_dpcpp.cpu())
 
-        ##### upsample linear 1D #####
+    def test_upsamle_linear_3d(self, dtype=torch.float):
         input_cpu = torch.randn((2,3,2,5,5), dtype=torch.float32, device = cpu_device)
         input_dpcpp = input_cpu.to('dpcpp')
         scales = [6, 8, 1]
         input_cpu.requires_grad = True
         input_dpcpp.requires_grad = True
         alc = False
+        rsf = False
 
         output_cpu = torch.nn.functional.interpolate(input_cpu, scale_factor=scales, mode='trilinear', align_corners=alc, recompute_scale_factor=rsf)
         output_dpcpp = torch.nn.functional.interpolate(input_dpcpp, scale_factor=scales, mode='trilinear', align_corners=alc, recompute_scale_factor=rsf)
