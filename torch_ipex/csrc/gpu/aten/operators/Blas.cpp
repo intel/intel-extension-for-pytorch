@@ -766,8 +766,7 @@ Tensor& addmv_(
 
   Tensor vec_v = vec.view({vec.size(0), 1});
   Tensor self_v = self.view({self.size(0), 1});
-  self_v = at::AtenIpexTypeXPU::addmm_(self_v, mat, vec_v, beta, alpha);
-  self = self_v.view({mat.size(0)});
+  at::AtenIpexTypeXPU::addmm_(self_v, mat, vec_v, beta, alpha);
   return self;
 }
 
