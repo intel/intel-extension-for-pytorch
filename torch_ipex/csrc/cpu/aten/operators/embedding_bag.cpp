@@ -67,19 +67,11 @@ static inline at::Tensor _embedding_bag_index_add_select_fast(const at::Tensor s
   return output;
 }
 
-std::tuple<at::Tensor,at::Tensor,at::Tensor,at::Tensor>
-embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indices,
+at::Tensor embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indices,
   const at::Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse,
   const at::Tensor & per_sample_weights, bool include_last_offset) {
 
-  at::Tensor offsets_ = offsets.contiguous();
-    at::Tensor bag_size;
-    at::Tensor offset2bag;
-  if (weight.requires_grad()) {
-    // in MODE_SUM, only initialize bag_size if we need gradients
-    bag_size = at::native::full(offsets_.sizes(), 0, indices.options());
-    offset2bag = at::empty({0}, offsets_.options());
-  }
+  at::Tensor offsets_ = offsets.is_contiguous()? offsets : offsets.contiguous();
 
   at::Tensor output;
   if(is_bfloat16_tensor(weight)) {
@@ -87,7 +79,7 @@ embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indices,
   } else {
       output = _embedding_bag_index_add_select_fast<float>(indices, weight, offsets_, include_last_offset);
   }
-  return std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>(output, offset2bag, bag_size, bag_size);
+  return output;
 }
 
 static inline at::Tensor expand_values_if_needed(const at::Tensor& values) {

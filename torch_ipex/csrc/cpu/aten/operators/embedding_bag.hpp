@@ -12,8 +12,7 @@ namespace cpu {
 namespace aten {
 namespace embedding_bag {
 
-std::tuple<at::Tensor,at::Tensor,at::Tensor,at::Tensor>
-embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indices,
+at::Tensor embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indices,
   const at::Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse,
   const at::Tensor & per_sample_weights, bool include_last_offset);
 

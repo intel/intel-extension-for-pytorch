@@ -536,7 +536,7 @@ public:
         auto ret = torch_ipex::cpu::aten::embedding_bag::embedding_bag_impl(
             weight, indices, offsets, scale_grad_by_freq, mode, sparse,
             per_sample_weights, include_last_offset);
-        return {std::get<0>(ret), std::get<1>(ret), std::get<2>(ret),std::get<3>(ret)};
+        return {ret};
       }
     } catch (std::exception &e) {
 #if defined(_DEBUG)
@@ -594,9 +594,14 @@ public:
     ctx->saved_data["include_last_offset"] = include_last_offset;
     auto ret = _forward(weight, indices, offsets, scale_grad_by_freq, mode,
                         sparse, include_last_offset, per_sample_weights);
-    ctx->save_for_backward({weight, indices, offsets, per_sample_weights,
-                            ret[1], ret[2],
-                            ret[3]});
+    if (ret.size() != 1)
+      ctx->save_for_backward({weight, indices, offsets, per_sample_weights,
+                              ret[1], ret[2],
+                              ret[3]});
+    else
+      ctx->save_for_backward({weight, indices, offsets, per_sample_weights,
+                              at::empty({0}, offsets.options()), at::Tensor(),
+                              at::Tensor()});
     return ret;
   }
   static torch::autograd::tensor_list
