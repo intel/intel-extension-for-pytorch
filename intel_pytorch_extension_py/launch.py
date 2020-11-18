@@ -10,7 +10,7 @@ import numpy as np
 from argparse import ArgumentParser, REMAINDER
 from argparse import RawTextHelpFormatter
 import logging
-
+import psutil
 
 logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -47,12 +47,12 @@ For memory management, it configures NUMA binding and preload optimized memory a
    --nintances and  --ncore_per_instance should be set. 
 
    
-   >>> python -m intel_pytorch_extension.launch --multi_instance script.py args
+   >>> python -m intel_pytorch_extension.launch --multi_instance python_script args
 
    eg: on CLX8280 with 14 instance, 4 cores per instance 
 ::
 
-   >>> python -m intel_pytorch_extension.launch --multi_instance --nintances 14 --ncore_per_instance 4 script.py args
+   >>> python -m intel_pytorch_extension.launch --multi_instance --nintances 14 --ncore_per_instance 4 python_script args
 
 
 *** Distributed Training ***
@@ -73,7 +73,7 @@ for well-improved multi-node distributed training performance as well.
 
 ::
 
-    >>> python  -m intel_pytorch_extension.launch --distributed  YOUR_TRAINING_SCRIPT --arg1 --arg2 --arg3 and all other
+    >>> python  -m intel_pytorch_extension.launch --distributed  python_script  --arg1 --arg2 --arg3 and all other
                 arguments of your training script
 
 2. Multi-Node multi-process distributed training: (e.g. two nodes)
@@ -84,8 +84,7 @@ rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*
 ::
 
     >>> python -m intel_pytorch_extension.launch --distributed --nproc_per_node=xxx
-               --nnodes=2 --hostfile hostfile --master_addr="192.168.10.10"
-               --master_port=29500 YOUR_TRAINING_SCRIPT --arg1 --arg2 --arg3 
+               --nnodes=2 --hostfile hostfile python_sript --arg1 --arg2 --arg3 
                and all other arguments of your training script)
 
 
@@ -393,7 +392,42 @@ def mpi_dist_launch(args):
     if args.nnodes > 1 and not os.path.exists(args.hostfile):
         raise ValueError("hostfile is necessary when you use multi-node distributed training,"
                           "Please create hostfile which include the ip list you used for distributed running")
-    
+    elif args.nnodes > 1:
+        ipv4_addr_pattern = r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+        ip_list = []
+        with open(args.hostfile) as f:
+             for line in f:
+                 line = line.strip().strip("\n")
+                 is_valid = re.match(ipv4_addr_pattern, line)
+                 if not is_valid:
+                     logger.error("{} is not valid IPV4 address".format(line))
+                     exit(-1)
+                 else:
+                     ip_list.append(line)
+        if len(ip_list) < args.nnodes:
+            logger.error("The number of IP {} should greater than nnodes parameters {}".format(len(ip_list), args.nnodes))
+            exit(-1)
+        master_check = False
+        dic = psutil.net_if_addrs()
+        for adapter in dic:
+            snicList = dic[adapter]
+            for snic in snicList:
+                if snic.address == ip_list[0]:
+                    master_check = True
+        if not master_check:
+           logger.error("MASTER_ADDR is not right. Please make sure the first ip {} in your hostfile is the current node".format(ip_list[0]))
+           exit(-1)
+ 
+        logger.info("Begin to validate the ip connect")
+        args.master_addr = ip_list[0]
+        for ip in ip_list[1:]:
+            completed_process = subprocess.run("ssh -o PasswordAuthentication=no {} ':'".format(ip), shell=True)
+            if completed_process.returncode != 0:
+                logger.error("Passwordless SSH login to {} failed, please make sure you have setup SSH public key right") 
+                exit(-1)
+            else:
+                logger.info("connection from master node {} to slave node {} is OK".format(args.master_addr, ip))
+
     set_memory_allocator(args)
     # set distributed related environmental variables
     os.environ["MASTER_ADDR"] = args.master_addr
@@ -448,6 +482,7 @@ def mpi_dist_launch(args):
     with_python = not args.no_python
     if with_python:
         cmd.append(sys.executable)
+        cmd.append("-u")
     if args.module:
         cmd.append("-m")
     cmd.append(args.program)
@@ -551,8 +586,8 @@ def parse_args():
                                         "\n    >>> python  -m intel_pytorch_extension.launch --distributed  python_script args\n"
                                         "\n4. Multi-Node multi-process distributed training: (e.g. two nodes)\n"
                                         "\n   rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*\n"
-                                        "\n   >>> python -m intel_pytorch_extension.launch --distributed --nproc_per_node=xxx\n"
-                                        "\n       --nnodes=2 --hostfile hostfile --master_addr='192.168.10.10' python_script args\n",
+                                        "\n   >>> python -m intel_pytorch_extension.launch --distributed --nproc_per_node=2\n"
+                                        "\n       --nnodes=2 --hostfile hostfile python_script args\n",
                                         formatter_class=RawTextHelpFormatter)
     
     parser.add_argument("--multi_instance", action='store_true', default=False,
@@ -593,6 +628,10 @@ def main():
     
     if args.latency_performance and args.throughput_performance:
         raise RuntimeError("Either args.latency_performance or args.throughput_performance  should be set")
+
+    if args.nnodes > 1:
+        args.distributed = True
+
     if args.distributed:
         mpi_dist_launch(args)
     else:
