@@ -4332,7 +4332,7 @@ class ModuleTest(TestBase):
             output = output.clone()
             d_grad = test_case._backward(module, input, output, grad_output) # dpcppTensor cannot call self storage(), so there is a workaround
             d_grad_copy = deepcopy(d_grad.cpu() if d_grad != None else d_grad) # d_grad may sometime be None, for example, Embedding backward grad
-            d_input = d_grad_copy.to('dpcpp') if d_grad_copy != None else d_grad_copy
+            d_input = d_grad_copy.to("xpu") if d_grad_copy != None else d_grad_copy
             d_param_temp = test_case._get_parameters(module)[1]
             
             if isinstance(d_param_temp, list): # dpcppTensor cannot call self storage(), so there is a workaround
@@ -4343,7 +4343,7 @@ class ModuleTest(TestBase):
             
             if isinstance(d_param, list): # dpcppTensor cannot call self storage(), so there is a workaround
                 for i in range(len(d_param)):
-                    d_param[i] = d_param[i].to('dpcpp')
+                    d_param[i] = d_param[i].to("xpu")
 
         nc_input = self.noncontiguize(input)
         nc_grad_output = self.noncontiguize(grad_output)
@@ -4356,7 +4356,7 @@ class ModuleTest(TestBase):
             if grad_output.device == torch.device(type='cpu'): # cpuTensor has storage method, so we don't need to make a workaround
                 go = deepcopy(grad_output if contig_g else nc_grad_output)
             else:
-                go = deepcopy(grad_output.cpu() if contig_g else nc_grad_output.cpu()).to('dpcpp') # dpcppTensor cannot call self storage(), so there is a workaround
+                go = deepcopy(grad_output.cpu() if contig_g else nc_grad_output.cpu()).to("xpu") # dpcppTensor cannot call self storage(), so there is a workaround
             test_case._zero_grad_parameters(module)
             test_case._zero_grad_input(i)
             with freeze_rng_state():
@@ -4382,7 +4382,7 @@ class ModuleTest(TestBase):
             gpu_input = to_dpcpp(cpu_input)
             print('****************************** In test dpcpp, gpu input dtype = ', gpu_input.dtype)
             cpu_module = self.constructor(*self.constructor_args)
-            gpu_module = self.constructor(*self.constructor_args).float().to('dpcpp')
+            gpu_module = self.constructor(*self.constructor_args).float().to("xpu")
             cpu_param = test_case._get_parameters(cpu_module)
             gpu_param = test_case._get_parameters(gpu_module)
             for cpu_p, gpu_p in zip(cpu_param[0], gpu_param[0]):
@@ -4403,7 +4403,7 @@ class ModuleTest(TestBase):
                 for _ in range(5):
                     cpu_gradOutput = cpu_output.clone().normal_()
                     # gpu_gradOutput = cpu_gradOutput.type('torch.dpcpp.FloatTensor') # invalid type: 'torch.dpcpp.FloatTensor'
-                    gpu_gradOutput = cpu_gradOutput.to(device='dpcpp', dtype=torch.float32)
+                    gpu_gradOutput = cpu_gradOutput.to(device="xpu", dtype=torch.float32)
                     cpu_gradInput = test_case._backward(cpu_module, cpu_input, cpu_output, cpu_gradOutput)
                     gpu_gradInput = test_case._backward(gpu_module, gpu_input, gpu_output, gpu_gradOutput)
                     test_case.assertEqual(cpu_gradInput, gpu_gradInput, self.precision)
@@ -4687,7 +4687,7 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
             # GPU setup
             gpu_input = to_dpcpp_in_criterion(cpu_input, False)
             gpu_target = to_dpcpp_in_criterion(cpu_target, True)
-            gpu_module.to('dpcpp')
+            gpu_module.to("xpu")
 
             # recover double for cpu_input
             cpu_input = convert_dtype(cpu_input, torch.float64, True)

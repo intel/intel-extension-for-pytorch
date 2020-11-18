@@ -9,7 +9,7 @@ import pytest
 
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_sum_blk_fusion(self, dtype=torch.float):
@@ -26,10 +26,10 @@ class TestNNMethod(TestCase):
         ref3 = conv1(x_cpu) + y_cpu
         ref4 = conv1(x_cpu) + 2
 
-        conv1_dpcpp = conv1.to("dpcpp")
-        conv2_dpcpp = conv2.to("dpcpp")
-        x_dpcpp = x_cpu.to("dpcpp")
-        y_dpcpp = y_cpu.to("dpcpp")
+        conv1_dpcpp = conv1.to("xpu")
+        conv2_dpcpp = conv2.to("xpu")
+        x_dpcpp = x_cpu.to("xpu")
+        y_dpcpp = y_cpu.to("xpu")
         real1 = conv1_dpcpp(x_dpcpp) + conv2_dpcpp(y_dpcpp)
         real2 = x_dpcpp + conv2_dpcpp(y_dpcpp)
         real3 = conv1_dpcpp(x_dpcpp) + y_dpcpp

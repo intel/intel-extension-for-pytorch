@@ -108,7 +108,7 @@ BAD_EXAMPLES = [
 ]
 
 cpu_device = torch.device("cpu")
-sycl_device = torch.device("dpcpp")
+sycl_device = torch.device("xpu")
 
 class TestDistributions(TestCase):
 
@@ -255,9 +255,9 @@ class TestDistributions(TestCase):
 
     def test_normal(self):
         loc = torch.randn(5, 5, requires_grad=True, device=sycl_device)
-        scale = torch.randn(5, 5).abs().requires_grad_().to("dpcpp")
+        scale = torch.randn(5, 5).abs().requires_grad_().to("xpu")
         loc_1d = torch.randn(1, requires_grad=True, device=sycl_device)
-        scale_1d = torch.randn(1).abs().requires_grad_().to("dpcpp")
+        scale_1d = torch.randn(1).abs().requires_grad_().to("xpu")
         loc_delta = torch.tensor([1.0, 0.0], device=sycl_device)
         scale_delta = torch.tensor([1e-5, 1e-5], device=sycl_device)
         self.assertEqual(Normal(loc, scale).sample().size(), (5, 5))

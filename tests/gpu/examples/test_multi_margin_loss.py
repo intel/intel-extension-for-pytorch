@@ -90,7 +90,7 @@ class TestNNMethod(TestCase):
 
         print('cpu')
         output_cpu, input_cpu = _test_cpu(input_cpu, target_cpu, "sum")
-        print('dpcpp')
+        print("xpu")
         output_dpcpp, input_dpcpp = _test_dpcpp(
             input_dpcpp, target_dpcpp, "sum")
         self.assertEqual(output_cpu, output_dpcpp.cpu())

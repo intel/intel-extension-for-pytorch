@@ -13,7 +13,7 @@ sycl_device = torch.device("xpu")
 class TestNNMethod(TestCase):
     def test_upsamle_linear_1d(self, dtype=torch.float):
         input_cpu = torch.randn((2,3,5), dtype=torch.float32, device = cpu_device)
-        input_dpcpp = input_cpu.to('dpcpp')
+        input_dpcpp = input_cpu.to("xpu")
         scales = [6]
         input_cpu.requires_grad = True
         input_dpcpp.requires_grad = True
@@ -43,7 +43,7 @@ class TestNNMethod(TestCase):
 
     def test_upsamle_linear_2d(self, dtype=torch.float):
         input_cpu = torch.randn((2,3,5,5), dtype=torch.float32, device = cpu_device)
-        input_dpcpp = input_cpu.to('dpcpp')
+        input_dpcpp = input_cpu.to("xpu")
         scales = [6, 8]
         input_cpu.requires_grad = True
         input_dpcpp.requires_grad = True
@@ -73,7 +73,7 @@ class TestNNMethod(TestCase):
 
     def test_upsamle_linear_3d(self, dtype=torch.float):
         input_cpu = torch.randn((2,3,2,5,5), dtype=torch.float32, device = cpu_device)
-        input_dpcpp = input_cpu.to('dpcpp')
+        input_dpcpp = input_cpu.to("xpu")
         scales = [6, 8, 1]
         input_cpu.requires_grad = True
         input_dpcpp.requires_grad = True

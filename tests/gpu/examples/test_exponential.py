@@ -12,7 +12,7 @@ class  TestTorchMethod(TestCase):
     @pytest.mark.skip(reason='Random Data Generate')
     def test_exponential(self, dtype=torch.float):
         exp_cpu = torch.ones(1000000, device=cpu_device,dtype = dtype)
-        exp_dist = exp_cpu.to('dpcpp')
+        exp_dist = exp_cpu.to("xpu")
         exp_cpu.exponential_(1)
         exp_dist.exponential_(1)
         self.assertEqual(exp_cpu, exp_dist.cpu())

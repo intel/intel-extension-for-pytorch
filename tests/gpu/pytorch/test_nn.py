@@ -2784,8 +2784,8 @@ class TestNN(NNTestCase):
         self.assertEqual(embedding.num_embeddings, 10)
 
         if TEST_DPCPP:
-            embedding.to('dpcpp')
-            self.assertEqual(embedding.weight.device.type, 'dpcpp')
+            embedding.to("xpu")
+            self.assertEqual(embedding.weight.device.type, "xpu")
             embedding.to('cpu')
             self.assertEqual(embedding.weight.device.type, 'cpu')
 
@@ -3728,7 +3728,7 @@ class TestNN(NNTestCase):
 
     @unittest.skipIf(not TEST_DPCPP, 'DPCPP not available')
     def test_ConvTranspose2d_half_gemm_dpcpp(self):
-        inputs = torch.randn(1, 1, 16, 16, device='dpcpp', dtype=torch.half)
+        inputs = torch.randn(1, 1, 16, 16, device="xpu", dtype=torch.half)
         deconv = nn.ConvTranspose2d(
             1, 1, 3, stride=2, padding=1, output_padding=1).to("xpu").half()
         output = deconv(inputs)
@@ -4281,9 +4281,9 @@ class TestNN(NNTestCase):
     @unittest.skipIf(not TEST_DPCPP, 'DPCPP not available')
     def test_pack_sequence_batch_sizes_throw_dpcpp(self):
         with self.assertRaisesRegex(ValueError, r"batch_sizes should always be on CPU"):
-            m = nn.LSTM(3, 4, bidirectional=True, num_layers=2).to('dpcpp')
-            a = torch.rand(5, 3).to('dpcpp')
-            b = torch.tensor([1, 1, 1, 1, 1]).to('dpcpp')
+            m = nn.LSTM(3, 4, bidirectional=True, num_layers=2).to("xpu")
+            a = torch.rand(5, 3).to("xpu")
+            b = torch.tensor([1, 1, 1, 1, 1]).to("xpu")
             input = nn.utils.rnn.PackedSequence(a, b)
 
     def test_Transformer_cell(self):
@@ -5471,8 +5471,8 @@ class TestNN(NNTestCase):
     # @unittest.skipIf(not TEST_DPCPP, 'DPCPP not available')
     @unittest.skipIf(True, 'segmentation fault caused by to or PReLU, so we skip it')
     def test_PReLU_backward_requires_grad_false_dpcpp(self):
-        m = nn.PReLU().to('dpcpp')
-        x = torch.randn(2, 3, 4, 5, requires_grad=False).to('dpcpp')
+        m = nn.PReLU().to("xpu")
+        x = torch.randn(2, 3, 4, 5, requires_grad=False).to("xpu")
         y = m(x)
         y.mean().backward()
         self.assertEqual(x.grad, None)
@@ -5750,8 +5750,8 @@ class TestNN(NNTestCase):
     @unittest.skipIf(not TEST_DPCPP, "DPCPP unavailable")
     def test_batchnorm_dpcpp_half(self):
         # THNN
-        input = torch.randint(1, 10, (2, 3, 2, 2), dtype=torch.half, requires_grad=True).to("dpcpp")
-        # The mean and var only support fp32, so we cannot call nn.BatchNorm2d(3).half().to('dpcpp')
+        input = torch.randint(1, 10, (2, 3, 2, 2), dtype=torch.half, requires_grad=True).to("xpu")
+        # The mean and var only support fp32, so we cannot call nn.BatchNorm2d(3).half().to("xpu")
         m = nn.BatchNorm2d(3).to("xpu")
         thnn_output = m(input)
         self.assertEqual(thnn_output.type(), input.type())
@@ -5769,7 +5769,7 @@ class TestNN(NNTestCase):
     @unittest.skipIf(not TEST_DPCPP, "DPCPP unavailable")
     @repeat_test_for_types([torch.float])
     def test_batchnorm_large_batch_dpcpp(self, dtype=torch.float):
-        bn = nn.BatchNorm2d(1).to('dpcpp', dtype)
+        bn = nn.BatchNorm2d(1).to("xpu", dtype)
         data = torch.rand(880801, 1, 1, 1, device="xpu", dtype=dtype)
         if dtype != torch.half:
             out = bn(data).sum().backward()
@@ -6172,7 +6172,7 @@ class TestNN(NNTestCase):
 
                     if TEST_DPCPP:
                         input_dpcpp = input_cpu.detach().transpose(0, 1).to("xpu").transpose(0, 1).requires_grad_()
-                        grid_dpcpp = get_grid('dpcpp', grid_cpu.detach()).requires_grad_()
+                        grid_dpcpp = get_grid("xpu", grid_cpu.detach()).requires_grad_()
                         out_dpcpp = F.grid_sample(input_dpcpp, grid_dpcpp, mode=mode, padding_mode=padding_mode,
                                                  align_corners=align_corners)
                         self.assertEqual(out_cpu, out_dpcpp)
@@ -6917,7 +6917,7 @@ class TestNN(NNTestCase):
 
         device_list = ['cpu']
         if TEST_DPCPP:
-            device_list.append('dpcpp')
+            device_list.append("xpu")
 
         for align_corners in [True, False]:
             kwargs = dict(mode='bicubic', align_corners=align_corners)
@@ -6963,7 +6963,7 @@ class TestNN(NNTestCase):
 
         device_list = ['cpu']
         if TEST_DPCPP:
-            device_list.append('dpcpp')
+            device_list.append("xpu")
 
         for align_corners in [True, False]:
             kwargs = dict(mode='bicubic', align_corners=align_corners)
@@ -7049,7 +7049,7 @@ class TestNN(NNTestCase):
 
         device_list = ['cpu']
         if TEST_DPCPP:
-            device_list.append('dpcpp')
+            device_list.append("xpu")
 
         for device in device_list:
             for scale_factor in [0.5, 1.5, 2]:
@@ -8222,7 +8222,7 @@ add_test(NewModuleTest(
 # The following are helpers for TestNN.test_affine_*
 if TEST_DPCPP:
     def device_():
-        return ['cpu', 'dpcpp']
+        return ['cpu', "xpu"]
 else:
     def device_():
         return ['cpu']
@@ -8963,7 +8963,7 @@ class TestNNDeviceType(NNTestCase):
         # Here we just test the convolution correctly route to the fallback implementation
         # that is, it does not crash. The correctness of fallback implementation should be
         # covered in other tests
-        dtype = torch.half if self.device_type == 'dpcpp' else torch.float
+        dtype = torch.half if self.device_type == "xpu" else torch.float
         conv1 = nn.Conv2d(2, 2, 8, 8).to(device).to(dtype)
         input_large = torch.randn(1, 2, 1024, 1024 * 1024, dtype=dtype, device=device)
         conv1(input_large)
@@ -9016,7 +9016,7 @@ class TestNNDeviceType(NNTestCase):
     @onlyDPCPP
     @skipDPCPPIf(True, "12GB Large Memory for this UT")
     def test_conv_transposed_large(self, device):
-        dtype = torch.half if self.device_type == 'dpcpp' else torch.float
+        dtype = torch.half if self.device_type == "xpu" else torch.float
         conv = nn.ConvTranspose2d(1, 1, 1, 1, bias=False).to(device).to(dtype)
         input_large = torch.randn(4096, 1, 512, 1024, dtype=dtype, device=device)
         # forward
@@ -9033,7 +9033,7 @@ class TestNNDeviceType(NNTestCase):
     @onlyDPCPP    
     @skipDPCPPIf(True, "12GB Large Memory for this UT")
     def test_conv_large(self, device):
-        dtype = torch.half if self.device_type == 'dpcpp' else torch.float
+        dtype = torch.half if self.device_type == "xpu" else torch.float
         conv = nn.Conv2d(2, 2, 8, 8, bias=False).to(device).to(dtype)
         input_large = torch.randn(4097, 2, 512, 512, dtype=dtype, device=device)
         # forward
@@ -9443,7 +9443,7 @@ class TestNNDeviceType(NNTestCase):
                 self.assertEqual(per_sample_weights.grad, ref_per_sample_weights.grad,
                                  prec=dtype2prec_DONTUSE[dtype])
 
-        if device == 'dpcpp':
+        if device == "xpu":
             dtypes = (torch.float, torch.double, torch.half)
         else:
             dtypes = (torch.float, torch.double)
@@ -9484,7 +9484,7 @@ class TestNNDeviceType(NNTestCase):
                 self.assertEqual(per_sample_weights.grad, ref_per_sample_weights.grad,
                                  prec=dtype2prec_DONTUSE[dtype])
 
-        if device == 'dpcpp':
+        if device == "xpu":
             dtypes = (torch.float, torch.double, torch.half)
         else:
             dtypes = (torch.float, torch.double)
@@ -9640,28 +9640,28 @@ class TestNNDeviceType(NNTestCase):
                  [1, 2],
                  [3, 4]], device=device, dtype=dtype)
         output = es(input, offsets)
-        if device != 'dpcpp' or dtype != torch.half:
+        if device != "xpu" or dtype != torch.half:
             output.backward(grad_output_with_empty)
 
             es_weight_grad = es.weight.grad.data
             if sparse:
                 es_weight_grad = es.weight.grad.to_dense()
         self.assertEqual(output, expected_output_with_empty)
-        if device != 'dpcpp' or dtype != torch.half:
+        if device != "xpu" or dtype != torch.half:
             self.assertEqual(es_weight_grad, expected_grad_weight, dtype2prec_DONTUSE[dtype])
 
         # check same example except as 2D (2 x 3)
         input = input.view(2, -1)
         es.zero_grad()
         output = es(input)
-        if device != 'dpcpp' or dtype != torch.half:
+        if device != "xpu" or dtype != torch.half:
             output.backward(grad_output)
 
             es_weight_grad = es.weight.grad
             if sparse:
                 es_weight_grad = es.weight.grad.to_dense()
         self.assertEqual(output, expected_output)
-        if device != 'dpcpp' or dtype != torch.half:
+        if device != "xpu" or dtype != torch.half:
             self.assertEqual(es_weight_grad, expected_grad_weight, dtype2prec_DONTUSE[dtype])
 
             # test all empty bags
@@ -9703,7 +9703,7 @@ class TestNNDeviceType(NNTestCase):
         self._test_EmbeddingBag(device, 'max', False, dtype)
 
         test_backward = False
-        if self.device_type == 'dpcpp':
+        if self.device_type == "xpu":
             # see 'todo' in test_embedding_bag.
             test_backward = dtype is not torch.float16
         elif self.device_type == 'cpu':

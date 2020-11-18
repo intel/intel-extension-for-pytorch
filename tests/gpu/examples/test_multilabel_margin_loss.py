@@ -89,7 +89,7 @@ class TestNNMethod(TestCase):
 
         print('cpu')
         output_cpu, input_cpu = _test_cpu(input_cpu, target_cpu, "sum")
-        print('dpcpp')
+        print("xpu")
         output_dpcpp, input_dpcpp = _test_dpcpp(
             input_dpcpp, target_dpcpp, "sum")
         tol = output_cpu.item()*5e-5

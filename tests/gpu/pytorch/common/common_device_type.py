@@ -233,7 +233,7 @@ class CPUTestBase(DeviceTypeTestBase):
     device_type = 'cpu'
 
 class DPCPPTestBase(DeviceTypeTestBase):
-    device_type = 'dpcpp'
+    device_type = "xpu"
 
 # Adds available device-type-specific test base classes
 device_type_test_bases.append(CPUTestBase)
@@ -338,7 +338,7 @@ class skipCPUIf(skipIf):
 class skipDPCPPIf(skipIf):
 
     def __init__(self, dep, reason):
-        super(skipDPCPPIf, self).__init__(dep, reason, device_type='dpcpp')
+        super(skipDPCPPIf, self).__init__(dep, reason, device_type="xpu")
 
 
 class expectedFailure(object):
@@ -468,14 +468,14 @@ class dtypesIfCPU(dtypes):
 class dtypesIfDPCPP(dtypes):
 
     def __init__(self, *args):
-        super(dtypesIfDPCPP, self).__init__(*args, device_type='dpcpp')
+        super(dtypesIfDPCPP, self).__init__(*args, device_type="xpu")
 
 
 def onlyCPU(fn):
     return onlyOn('cpu')(fn)
 
 def onlyDPCPP(fn):
-    return onlyOn('dpcpp')(fn)
+    return onlyOn("xpu")(fn)
 
 # Skips a test on CPU if LAPACK is not available.
 def skipCPUIfNoLapack(fn):
