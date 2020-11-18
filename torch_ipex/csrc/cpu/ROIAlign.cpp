@@ -507,7 +507,7 @@ at::Tensor IpexExternal::ROIAlign_forward(const at::Tensor& input,
   printf("IpexExternal::ROIAlign_forward\n");
 #endif
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IpexExternal::ROIAlign_forward", std::vector<c10::IValue>({input, rois}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("IpexExternal::ROIAlign_forward", std::vector<c10::IValue>({input, rois}));
 #endif
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(rois.layout() == c10::kStrided);
@@ -532,7 +532,7 @@ at::Tensor IpexExternal::ROIAlign_backward(const at::Tensor& grad,
   printf("IpexExternal::ROIAlign_backward\n");
 #endif
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IpexExternal::ROIAlign_backward", std::vector<c10::IValue>({grad, rois}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("IpexExternal::ROIAlign_backward", std::vector<c10::IValue>({grad, rois}));
 #endif
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(rois.layout() == c10::kStrided);

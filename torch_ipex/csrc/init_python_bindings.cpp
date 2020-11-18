@@ -112,7 +112,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_auto_dnnl", []() { return AutoOptConfig::singleton().get_auto_dnnl(); });
   m.def("enable_mix_bf16_fp32", []() { AutoOptConfig::singleton().set_mix_bf16_fp32(true); });
   m.def("disable_mix_bf16_fp32", []() { AutoOptConfig::singleton().set_mix_bf16_fp32(false); });
-  m.def("get_mix_bf16_fp32", []() { return AutoOptConfig::singleton().get_mix_bf16_fp32(); }); 
+  m.def("get_mix_bf16_fp32", []() { return AutoOptConfig::singleton().get_mix_bf16_fp32(); });
   m.def("packed_add_",
         [](at::Tensor &top_half, at::Tensor &bot_half,
            const at::Tensor &grad, float alpha) {
@@ -137,7 +137,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_jit_opt", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
   m.def("set_execution_mode", [](bool train) { AutoOptConfig::singleton().set_train(train); }, py::arg("train"));
   m.def("get_train", []() { return AutoOptConfig::singleton().get_train(); });
-  
+
   // int8 path
 
   m.def("enable_mix_int8_fp32", []() { AutoOptConfig::singleton().set_mix_int8_fp32(true); });
@@ -149,7 +149,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
   m.def("add_indicators", []() { AutoOptConfig::singleton().add_indicators(); });
   // clear indicators for case having many scopes which have different structure
-  m.def("clear_indicators", []() { AutoOptConfig::singleton().clear_indicators(); }); 
+  m.def("clear_indicators", []() { AutoOptConfig::singleton().clear_indicators(); });
   m.def("get_int8_configures", []() {
       py::list output_list;
       auto indicators = AutoOptConfig::singleton().get_indicators();
@@ -205,7 +205,7 @@ using namespace torch::jit;
 void InitIpexBindings(py::module m) {
   InitIpexModuleBindings(m);
   // jit fusion pass
-  RegisterPreFusionPass pre_pass([](std::shared_ptr<Graph>& g) {
+  torch::jit::registerPrePass([](std::shared_ptr<Graph>& g) {
     if (AutoOptConfig::singleton().get_jit_fuse()) {
       torch::jit::FusionPass(g);
     }

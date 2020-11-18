@@ -223,7 +223,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_swish(
     at::IntArrayRef dilation,
     int64_t groups) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_swish", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_swish", std::vector<c10::IValue>({input, weight, bias}));
 #endif
   return dil_convolution_outplace_fusion(
     input,
@@ -245,7 +245,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_sigmoid(
     at::IntArrayRef dilation,
     int64_t groups) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sigmoid", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sigmoid", std::vector<c10::IValue>({input, weight, bias}));
 #endif
   return dil_convolution_outplace_fusion(
     input,
@@ -269,7 +269,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_clamp(
     float lower_bound,
     float upper_bound) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_clamp", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_clamp", std::vector<c10::IValue>({input, weight, bias}));
 #endif
   return dil_convolution_outplace_fusion(
     input,
@@ -291,7 +291,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
     at::IntArrayRef dilation,
     int64_t groups) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_relu", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_relu", std::vector<c10::IValue>({input, weight, bias}));
 #endif
   return dil_convolution_outplace_fusion(
     input,
@@ -317,7 +317,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_elu(
     at::Scalar scale,
     at::Scalar input_scale) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_elu", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_elu", std::vector<c10::IValue>({input, weight, bias}));
 #endif
   auto scale_value = scale.to<float>();
   auto input_scale_value = input_scale.to<float>();
@@ -343,7 +343,7 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum(
     at::Tensor& accumu,
     at::Scalar alpha) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum", std::vector<c10::IValue>({input, weight, bias}));
 #endif
   auto scale = alpha.to<float>();
   return dil_convolution_inplace_fusion(
@@ -370,7 +370,7 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
     at::Tensor& accumu,
     at::Scalar alpha) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum_relu", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum_relu", std::vector<c10::IValue>({input, weight, bias}));
 #endif
   auto scale = alpha.to<float>();
   at::Tensor& output = dil_convolution_inplace_fusion(
@@ -399,7 +399,7 @@ at::Tensor AtenIpexJITDev::dil_linear_fuse_eltwise(
     const at::Tensor& bias,
     const dil::attr_t& attr) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_linear_fuse_eltwise", std::vector<c10::IValue>({self, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexJITDev::dil_linear_fuse_eltwise", std::vector<c10::IValue>({self, weight, bias}));
 #endif
   return AtenIpexCPUDev::dil_linear(self, weight, bias, attr);
 }

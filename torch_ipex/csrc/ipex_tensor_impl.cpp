@@ -74,7 +74,15 @@ void IPEXTensorImpl::copy_auto_grad(c10::TensorImpl *src_impl) {
       auto cpu_view_meta = static_cast<torch::autograd::DifferentiableViewMeta*>(src_impl->autograd_meta());
       auto base = cpu_view_meta->base_;
       auto creation_meta = cpu_view_meta->creation_meta;
-      this->set_autograd_meta(std::make_unique<torch::autograd::DifferentiableViewMeta>(this, base, creation_meta));
+      auto has_view_fn = cpu_view_meta->has_view_fn();
+      this->set_autograd_meta(
+        std::make_unique<torch::autograd::DifferentiableViewMeta>(
+          this,
+          base,
+          has_view_fn ? cpu_view_meta->view_fn() : nullptr,
+          creation_meta
+        )
+      );
     }
     if (!this->autograd_meta()){
       this->set_autograd_meta(std::make_unique<torch::autograd::AutogradMeta>());

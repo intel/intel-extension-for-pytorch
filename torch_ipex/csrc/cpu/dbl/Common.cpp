@@ -322,13 +322,13 @@ at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
     shade_data_context,
     cpu::ShadeDataContext::freeShadeDataContext,
     at::DeviceType::XPU);
+  size_t nbytes = shade_data_context->dil_tensor->get_nelems() * c10::elementSize(at_data_type);
   auto storage_impl = c10::make_intrusive<at::StorageImpl>(
-    at::scalarTypeToTypeMeta(at_data_type),
-    shade_data_context->dil_tensor->get_nelems(),
+    at::StorageImpl::use_byte_size_t(),
     std::move(shade_data_ptr),
     nullptr,
     /*resizeable=*/false);
-  auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::XPU);
+  auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::XPU, at::ScalarType(at::kFloat));
   sync_shape_from_dil_to_aten(_tensor, shade_data_context->dil_tensor.value());
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_tensor.layout() == c10::kStrided);
   return _tensor;

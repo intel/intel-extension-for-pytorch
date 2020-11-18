@@ -168,7 +168,7 @@ at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipexTensor.layout() == c10::kStrided);
     auto ipex_tensor_storage = ipex_tensor_impl->storage().unsafeGetStorageImpl();
     ipex_tensor_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::CPU));
-    auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(ipexTensor.storage(), at::DispatchKey::CPUTensorId);
+    auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(ipexTensor.storage(), at::DispatchKey::CPU, ipexTensor.scalar_type());
     IPEXTensorImpl* cur_ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
     cur_ipex_impl->copy_meta_info(ipexTensor.unsafeGetTensorImpl());
     cur_ipex_impl->copy_auto_grad(ipexTensor.unsafeGetTensorImpl());
@@ -216,7 +216,7 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     // [NOTE]: If the deleter of DPCPP::CPU is different form CPU deleter, we need to call
     //         compare_exchange_deleter of DataPtr to update deleter
     cpu_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU));
-    auto _tensor =  at::detail::make_tensor<IPEXTensorImpl>(cpuTensor.storage(), at::DispatchKey::XPU);
+    auto _tensor =  at::detail::make_tensor<IPEXTensorImpl>(cpuTensor.storage(), at::DispatchKey::XPU, cpuTensor.scalar_type());
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_tensor.device().type() == at::DeviceType::XPU);
     IPEXTensorImpl* ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
     ipex_impl->copy_meta_info(cpu_tensor_impl);
@@ -248,7 +248,7 @@ at::Tensor shallowUpgradeToDPCPPTensorA(const at::Tensor& ipexTensor, const at::
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cpuTensor.storage().device_type() == at::DeviceType::XPU);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipexTensor.storage().data() == cpuTensor.storage().data());
 
-  auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(at::Storage(ipexTensor.storage()), at::DispatchKey::XPU);
+  auto _tensor = at::detail::make_tensor<IPEXTensorImpl>(at::Storage(ipexTensor.storage()), at::DispatchKey::XPU, ipexTensor.scalar_type());
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_tensor.device().type() == at::DeviceType::XPU);
   IPEXTensorImpl* ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
   ipex_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());

@@ -95,6 +95,7 @@ _X_ATEN_SIG_PARSER = lark.Lark(_ATEN_SIG_GRAMMAR, parser='lalr', propagate_posit
 class AtenSig(SigParser):
     def __init__(self, aten_sig):
         super(AtenSig, self).__init__(aten_sig, _ATEN_SIG_PARSER)
+        self._def_name = self.__get_function_name(self._sig_tree)
 
     def __extract_all_params(self, params_root_tree):
         for params_tree in params_root_tree.children:
@@ -144,6 +145,13 @@ class AtenSig(SigParser):
             else:
                 assert params_tree.data == 'params'
                 return self.__extract_all_params(params_tree)
+
+    def __get_function_name(self, t):
+        assert isinstance(t, lark.tree.Tree)
+        fname = t.children[1]
+        assert isinstance(fname, lark.tree.Tree)
+        assert fname.data == 'fnname'
+        return '.'.join([item.value for item in fname.children])
 
     def get_all_input_params(self):
         for sub_tree in self._sig_tree.children:

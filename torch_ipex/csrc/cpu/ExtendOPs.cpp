@@ -24,18 +24,19 @@ void AtenIpexTypeExt::packed_add_(at::Tensor &top_half, at::Tensor &bot_half,
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bot_half.scalar_type() ==
                                    at::ScalarType::BFloat16);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad.device().type() ==
-                                   at::DeviceType::DPCPP);
+                                   at::DeviceType::XPU);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half.device().type() ==
-                                   at::DeviceType::DPCPP);
+                                   at::DeviceType::XPU);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bot_half.device().type() ==
-                                   at::DeviceType::DPCPP);
+                                   at::DeviceType::XPU);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half.sizes() == bot_half.sizes());
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half.is_contiguous());
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bot_half.is_contiguous());
 
-  RECORD_FUNCTION("packed_add_",
-                  std::vector<c10::IValue>({top_half, bot_half, grad, alpha}),
-                  torch::autograd::Node::peek_at_next_sequence_nr());
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("packed_add_", std::vector<c10::IValue>({top_half, bot_half, grad, alpha}));
+#endif
+
   if (grad.is_sparse()) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(top_half.dim() == 2);
     auto sparse_nnz = grad._nnz();
@@ -222,8 +223,9 @@ static inline void mm_backward(at::BFloat16 *out, const at::BFloat16 *in1,
 
 template <typename T>
 inline at::Tensor _interaction_forward(const std::vector<at::Tensor> &input) {
-  RECORD_FUNCTION("_interaction_forward", std::vector<c10::IValue>({input}),
-                  torch::autograd::Node::peek_at_next_sequence_nr());
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("_interaction_forward", std::vector<c10::IValue>({input}));
+#endif
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   uint32_t vector_size = input[0].sizes()[1];
@@ -273,9 +275,10 @@ inline std::vector<at::Tensor>
 _interaction_backward(const at::Tensor &grad_out,
                       const std::vector<at::Tensor> &input) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.is_contiguous());
+#if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("_interaction_backward",
-                  std::vector<c10::IValue>({grad_out, input}),
-                  torch::autograd::Node::peek_at_next_sequence_nr());
+                  std::vector<c10::IValue>({grad_out, input}));
+#endif
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   uint32_t vector_size = input[0].sizes()[1];

@@ -386,26 +386,26 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_deconvolution_b
     return std::make_tuple(grad_input, grad_weight, grad_bias);
 }
 
-at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
+at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const c10::optional<at::Tensor>& bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
   DEBUG("AtenIpexCPUDev::convolution_overrideable\n");
   try {
     if (check_auto_dnnl()) {
       std::vector<at::Tensor> dnnl_input_tensors;
       dnnl_input_tensors.push_back(input);
       dnnl_input_tensors.push_back(weight);
-      if (bias.defined()) {
-        dnnl_input_tensors.push_back(bias);
+      if (bias.has_value()) {
+        dnnl_input_tensors.push_back(bias.value());
       }
       if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
         if (transposed) {
-          return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined() && !bias.is_contiguous() ? bias.contiguous() : bias, padding, output_padding, stride, dilation, groups);
+          return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.has_value() && !bias.value().is_contiguous() ? bias.value().contiguous() : at::Tensor(), padding, output_padding, stride, dilation, groups);
         } else {
           // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
           auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
           auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8 || input.is_contiguous()) ? input : input.contiguous();
           auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
           auto weight_temp = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
-          return AtenIpexCPUDev::dil_convolution(input_temp, weight_temp, bias, stride, padding, dilation, groups);
+          return AtenIpexCPUDev::dil_convolution(input_temp, weight_temp, bias.has_value() ? bias.value() : at::Tensor(), stride, padding, dilation, groups);
         }
       }
     }
@@ -417,10 +417,13 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bias.layout() == c10::kStrided);
+  if (bias.has_value()) TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bias.value().layout() == c10::kStrided);
   auto&& _ipex_input = bridge::shallowFallbackToCPUTensor(input);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
-  auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
+  auto&& _ipex_bias = c10::optional<at::Tensor>();
+  if (bias.has_value()) {
+    _ipex_bias = c10::optional<at::Tensor>(bridge::shallowFallbackToCPUTensor(bias.value()));
+  }
   auto&& _ipex_result = at::convolution(_ipex_input, _ipex_weight, _ipex_bias, stride, padding, dilation, transposed, output_padding, groups);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
@@ -2106,7 +2109,7 @@ at::Tensor dil_as_strided(
   // share storage
   auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
   self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU));
-  auto result = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::XPU);
+  auto result = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::XPU, self.scalar_type());
 
   auto* _tensor_impl = (IPEXTensorImpl *)result.unsafeGetTensorImpl();
   _tensor_impl->copy_meta_info(self.unsafeGetTensorImpl());
@@ -2278,7 +2281,7 @@ at::Tensor alias_with_sizes_and_strides(
   // share storage
   auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
   self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU));
-  auto self_ = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::XPU);
+  auto self_ = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::XPU, self.scalar_type());
 
   auto* _tensor_impl = (IPEXTensorImpl *)self_.unsafeGetTensorImpl();
   _tensor_impl->copy_meta_info(self.unsafeGetTensorImpl());
@@ -2513,7 +2516,7 @@ at::Tensor AtenIpexCPUDev::dil_index(const at::Tensor & self, at::TensorList ind
 at::Tensor AtenIpexCPUDev::dil_shuffle(const at::Tensor & self, at::IntArrayRef view_shape, int64_t dim0, int64_t dim1) {
   DEBUG("AtenIpexCPUDev::dil_shuffle\n");
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexCPUDev::dil_shuffle", std::vector<c10::IValue>({self}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexCPUDev::dil_shuffle", std::vector<c10::IValue>({self}));
 #endif
   // NOTE: We do NOT add sanity checks here. Because PyTorch does not has shuffle operator. This dil operator is for fusion and the fusion logic
   // has more sanity checks. We found that there are some models use view + transpose + view to implement shuffle semantic. So IPEX will fuse these
@@ -2529,7 +2532,7 @@ at::Tensor AtenIpexCPUDev::dil_shuffle(const at::Tensor & self, at::IntArrayRef 
 std::tuple<at::Tensor,at::Tensor> AtenIpexCPUDev::dil__pack_padded_sequence(const at::Tensor & input, const at::Tensor & lengths, bool batch_first) {
   DEBUG("AtenIpexCPUDev::dil__pack_padded_sequence\n");
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexCPUDev::dil__pack_padded_sequence", std::vector<c10::IValue>({input, lengths}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexCPUDev::dil__pack_padded_sequence", std::vector<c10::IValue>({input, lengths}));
 #endif
   torch_ipex::reset_ipex_func_status();
 
