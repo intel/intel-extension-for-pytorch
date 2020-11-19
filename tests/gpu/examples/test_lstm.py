@@ -35,7 +35,7 @@ class TestNNMethod(TestCase):
         c0_grad = c0.grad
         param_grad = []
         for param in rnn._parameters.values():
-            param_grad.append(param._grad)
+            param_grad.append(param._grad.clone())
         print("cpu grad_src = ", input_grad)
         print("cpu grad_h0 = ", h0_grad)
         print("cpu grad_c0 = ", c0_grad)
