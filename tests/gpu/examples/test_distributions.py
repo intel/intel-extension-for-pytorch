@@ -168,7 +168,7 @@ class TestDistributions(TestCase):
         #TO DO: implement dpcpp entropy
         #self.assertEqual(Bernoulli(p_dpcpp).entropy(), torch.tensor([0.6108, 0.5004, 0.6730]), prec=1e-4)
         self.assertEqual(Bernoulli(torch.tensor([0.0])).entropy(), torch.tensor([0.0]))
-        self.assertEqual(Bernoulli(s).entropy(), torch.tensor(0.6108), prec=1e-4)
+        self.assertEqual(Bernoulli(s).entropy(), torch.tensor(0.6108), atol=1e-4, rtol=0)
         torch.set_default_dtype(dtype_origin)
 
     def test_log_normal(self):
