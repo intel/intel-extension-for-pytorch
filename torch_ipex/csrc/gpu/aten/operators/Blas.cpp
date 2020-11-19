@@ -407,6 +407,39 @@ namespace AtenIpexTypeXPU {
 
 using namespace impl;
 
+Tensor& addmm_out(
+        Tensor &result,
+        const Tensor& self,
+        const Tensor& m1,
+        const Tensor& m2,
+        Scalar beta,
+        Scalar alpha) {
+  matmul_attr_t attr(
+          alpha.to<float>(),
+          beta.to<float>(),
+          0,
+          true);
+  checkBackend("addmm_out", {result, self, m1, m2}, Backend::XPU);
+  TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(self.size(0) ==  m1.size(0) && self.size(1) == m2.size(1),
+              "size mismatch input ", self.sizes(), " m1 ", m1.sizes(), " m2 ", m2.sizes());
+
+    impl::gemm_broadcast(
+            result,
+            m1,
+            m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+            // bias convert to fp32 for accuracy when self is fp16 or bf16
+            attr,
+            // bias convert to fp32 for accuracy when self is fp16 or bf16
+            self.scalar_type() == ScalarType::Half ||
+            self.scalar_type() == ScalarType::BFloat16
+            ? self.to(ScalarType::Float) : self);
+
+  return result;
+}
+
 Tensor& addmm_(
     Tensor& self,
     const Tensor& m1,
@@ -587,7 +620,7 @@ Tensor& addbmm_out(
     b1 = batch1.view({batch1.size(1), -1});
   }
   auto b2 = batch2.view({-1, batch2.size(2)});
-  out = at::AtenIpexTypeXPU::addmm(self, b1, b2, beta, alpha);
+  at::AtenIpexTypeXPU::addmm_out(out, self, b1, b2, beta, alpha);
 
   return out;
 }
