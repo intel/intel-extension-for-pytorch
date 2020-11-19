@@ -11,7 +11,7 @@ namespace comm {
 
 /**
  * Reorder the input tensor to bf16 for mix precision
- * If not_reorder_for_training is set to true, 
+ * If not_reorder_for_training is set to true,
  * do not reorder the tensor when doing training in mix precision mode
  * @param[in] tensor                   The input tensor
  * @param[in] not_reorder_for_training Set to true if the tensor should not be reordered during training in mix precision mode

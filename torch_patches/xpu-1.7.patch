@@ -520,6 +520,18 @@ index b331fd5..e8f52ce 100644
      case DispatchKey::AutogradXLA:
        return DispatchKeySet(DispatchKey::XLA);
      case DispatchKey::AutogradPrivateUse1:
+diff --git a/c10/core/DispatchKeySet.h b/c10/core/DispatchKeySet.h
+index 58d6bee..2af911b 100644
+--- a/c10/core/DispatchKeySet.h
++++ b/c10/core/DispatchKeySet.h
+@@ -190,6 +190,7 @@ C10_API std::ostream& operator<<(std::ostream&, DispatchKeySet);
+ // Alias key DispatchKey::Autograd maps to autograd_dispatch_keyset.
+ constexpr DispatchKeySet autograd_dispatch_keyset = DispatchKeySet({
+   DispatchKey::AutogradCPU,
++  DispatchKey::AutogradXPU,
+   DispatchKey::AutogradCUDA,
+   DispatchKey::AutogradXLA,
+   DispatchKey::AutogradPrivateUse1,
 diff --git a/c10/core/Layout.h b/c10/core/Layout.h
 index 7e33c81..02fbd26 100644
 --- a/c10/core/Layout.h

@@ -1,13 +1,9 @@
 import torch
 import copy
-from torch._six import string_classes as _string_classes, PY2
-if PY2:
-    import copy_reg as copyreg
-    import cPickle as pickle
-else:
-    import copyreg
-    import pickle
-    import pathlib
+from torch._six import string_classes as _string_classes
+import copyreg
+import pickle
+import pathlib
 
 DEFAULT_PROTOCOL = 2
 
@@ -20,7 +16,7 @@ def save(obj, f, pickle_module=pickle, pickle_protocol=DEFAULT_PROTOCOL, _use_ne
                 to_cpu(obj[k])
             elif torch.is_tensor(obj[k]) and obj[k].device.type == 'dpcpp':
                 obj[k] = obj[k].to('cpu')
-    
+
     if isinstance(obj, dict):
         obj_copy = copy.deepcopy(obj)
         to_cpu(obj_copy)
