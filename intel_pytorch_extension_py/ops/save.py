@@ -26,6 +26,8 @@ def save(obj, f, pickle_module=pickle, pickle_protocol=DEFAULT_PROTOCOL, _use_ne
         to_cpu(obj_copy)
     elif torch.is_tensor(obj) and obj.device.type == 'dpcpp':
         obj_copy = copy.deepcopy(obj).to('cpu')
+    elif isinstance(obj, torch.nn.Module): 
+        obj_copy = copy.deepcopy(obj).to('cpu')
     else:
         obj_copy = obj
     return torch_save(obj_copy, f, pickle_module, pickle_protocol, _use_new_zipfile_serialization)
