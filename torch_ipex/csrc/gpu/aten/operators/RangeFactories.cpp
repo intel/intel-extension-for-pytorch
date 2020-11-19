@@ -100,8 +100,9 @@ Tensor& logspace_dpcpp_out(
     Tensor& result,
     Scalar start,
     Scalar end,
-    int64_t steps,
+    c10::optional<int64_t> optional_steps,
     double base) {
+  const auto steps = optional_steps.value_or(100);
   TORCH_CHECK(steps >= 0, "number of steps must be non-negative");
 
   if (result.numel() != steps) {
@@ -282,7 +283,7 @@ Tensor& logspace_out(
     Tensor& out,
     Scalar start,
     Scalar end,
-    int64_t steps,
+    c10::optional<int64_t> steps,
     double base) {
   impl::logspace_dpcpp_out(out, start, end, steps, base);
   return out;
