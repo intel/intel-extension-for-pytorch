@@ -402,10 +402,10 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
           return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined() && !bias.is_contiguous() ? bias.contiguous() : bias, padding, output_padding, stride, dilation, groups);
         } else {
           // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
-          auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
-          auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8 || input.is_contiguous()) ? input : input.contiguous();
-          auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
-          auto weight_temp = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
+          auto src_int8 = ShadeDataContext::isTensorMixedInt8Precision(input);
+          auto input_temp = (src_int8 || input.is_contiguous()) ? input : input.contiguous();
+          auto weight_int8 = ShadeDataContext::isTensorMixedInt8Precision(weight);
+          auto weight_temp = (weight_int8 || weight.is_contiguous()) ? weight : weight.contiguous();
           return AtenIpexCPUDev::dil_convolution(input_temp, weight_temp, bias, stride, padding, dilation, groups);
         }
       }

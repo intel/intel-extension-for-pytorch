@@ -200,8 +200,8 @@ void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> s
   if (tensor_dtype != at::kFloat)
     return;
  
-  auto src_type = try_gen_dil_storage(tensor).get_data_type();
-  if (!uint8_used && (src_type == dil::data_type::u8 || src_type == dil::data_type::s8))
+  auto src_int8 = cpu::ShadeDataContext::isTensorMixedInt8Precision(tensor);
+  if (!uint8_used && src_int8)
     return;
 
   auto dst_scalar_type = uint8_used ? at::kQUInt8 : at::kQInt8;
@@ -213,7 +213,7 @@ void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> s
       inner_scales.push_back(float(127.5) / tensor[i].abs().max().item<float>());
     }
   }
- 
+
   reorder_to_dtype(tensor, dst_scalar_type, inner_scales);
 }
 

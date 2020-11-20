@@ -40,11 +40,11 @@ at::Tensor dil_convolution_outplace_fusion(
   dil::tensor dil_weight;
   c10::optional<dil::tensor> dil_bias{c10::nullopt};
   // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
-  auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
-  auto input_contiguous = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8
-                           || input.is_contiguous()) ? input : input.contiguous();
-  auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
-  auto weight_contiguous = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
+
+  auto src_int8 = ShadeDataContext::isTensorMixedInt8Precision(input);
+  auto input_contiguous = (src_int8 || input.is_contiguous()) ? input : input.contiguous();
+  auto weight_int8 = ShadeDataContext::isTensorMixedInt8Precision(weight);
+  auto weight_contiguous = (weight_int8 || weight.is_contiguous()) ? weight : weight.contiguous();
 
   int64_t num_ops_id = -1;
   bool quantized = false;
@@ -133,11 +133,10 @@ static at::Tensor& dil_convolution_inplace_fusion(
   c10::optional<dil::tensor> dil_bias{c10::nullopt};
 
   // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
-  auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
-  auto input_contiguous = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8
-                           || input.is_contiguous()) ? input : input.contiguous();
-  auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
-  auto weight_contiguous = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
+  auto src_int8 = ShadeDataContext::isTensorMixedInt8Precision(input);
+  auto input_contiguous = (src_int8 || input.is_contiguous()) ? input : input.contiguous();
+  auto weight_int8 = ShadeDataContext::isTensorMixedInt8Precision(weight);
+  auto weight_contiguous = (weight_int8 || weight.is_contiguous()) ? weight : weight.contiguous();
   auto ouput_dil_type = dbl::comm::try_gen_dil_tensor(accumu).get_data_type();
   auto output_contiguous = (ouput_dil_type == dil::data_type::u8 || ouput_dil_type == dil::data_type::s8 || accumu.is_contiguous()) ? accumu : accumu.contiguous();
 

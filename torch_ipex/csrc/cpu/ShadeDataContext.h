@@ -228,6 +228,22 @@ struct ShadeDataContext {
   }
 
   /**
+   * Check if the data type of dnnl buffer is int8 type.
+   *
+   * @param tensor input aten tensor
+   */
+  static inline bool isTensorMixedInt8Precision(const at::Tensor &tensor) {
+    // Check mix type is MIX_INT8_FP32
+    void *raw_context = tensor.storage().data_ptr().get_context();
+    ShadeDataContext *shade_data_context = (ShadeDataContext*)raw_context;
+    if (shade_data_context->mix_prec_type == MIX_PREC_TYPE::MIX_INT8_FP32) {
+        return true;
+    } else {
+        return false;
+    }
+  }
+
+  /**
    * Check if the input aten tensor is a parameter.
    *
    * @param tensor input aten tensor
