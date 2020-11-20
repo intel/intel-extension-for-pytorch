@@ -12,7 +12,7 @@
 #include <utils/ATDispatch.h>
 #include <torch/torch.h>
 
-#ifdef USE_PSTL
+#ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
 #include <oneapi/dpl/numeric>
@@ -721,8 +721,8 @@ Tensor embedding_bag_backward_dpcpp_kernel(
   const Tensor& offset2bag,
   const Tensor& bag_size,
   const Tensor& per_sample_weights) {
-#ifndef USE_PSTL
-  throw std::runtime_error("no PSTL found when compile. USM embedding not supported");
+#ifndef USE_ONEDPL
+  throw std::runtime_error("no oneDPL found when compile. USM embedding not supported");
 #else
   auto dpcpp_queue = dpcppGetCurrentQueue();
   auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
@@ -1054,8 +1054,8 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
     bool scale_grad_by_freq,
     int64_t mode,
     const Tensor& per_sample_weights) {
-#ifndef USE_PSTL
-  throw std::runtime_error("no PSTL found when compile. USM embedding not supported");
+#ifndef USE_ONEDPL
+  throw std::runtime_error("no oneDPL found when compile. USM embedding not supported");
 #else
   auto grad_weight = at::zeros({num_weights, grad.size(1)}, grad.options());
 

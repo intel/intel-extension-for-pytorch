@@ -70,7 +70,6 @@ if(INTEL_SYCL_VERSION)
         message(FATAL_ERROR "SYCL library not found")
     endif()
     include_directories(${SYCL_INCLUDE_DIR})
-    include_directories(${SYCL_INCLUDE_DIR}/../)
 
     # Find the OpenCL library from the SYCL distribution
     find_library(OpenCL_LIBRARY

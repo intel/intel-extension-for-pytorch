@@ -8,11 +8,11 @@
 
 #include <utils/ATDispatch.h>
 
-#ifdef USE_PSTL
+#ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
 #include <oneapi/dpl/numeric>
-#include <oneapi/dpl/iterators.h>
+#include <oneapi/dpl/iterator>
 #endif
 using namespace at::dpcpp;
 template <typename scalar_t>
@@ -35,7 +35,7 @@ std::tuple<Tensor, Tensor, int64_t> compute_unique(
   equal_by_key_t equal_by_key,
   not_equal_t not_equal
 ) {
-#ifdef USE_PSTL
+#ifdef USE_ONEDPL
   // inverse indices
   Tensor inverse_indices;
 #ifndef USE_USM
@@ -120,7 +120,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
   const bool return_inverse,
   const bool return_counts
 ) {
-#ifdef USE_PSTL
+#ifdef USE_ONEDPL
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto policy = oneapi::dpl::execution::make_device_policy<Unique_Dpcpp_Kernel<scalar_t>>(dpcpp_queue);
 
@@ -203,7 +203,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
   const bool return_inverse,
   const bool return_counts
 ) {
-#if defined(USE_PSTL) && defined(USE_USM)
+#if defined(USE_ONEDPL) && defined(USE_USM)
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto policy = oneapi::dpl::execution::make_device_policy<Unique_Dpcpp_Kernel<scalar_t>>(dpcpp_queue);
 
@@ -291,7 +291,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
   origin_indices.resize_(num_out);
   return std::tuple<Tensor, Tensor, Tensor>(self.index_select(dim, origin_indices), inverse_indices, counts);
 #else
-  AT_ERROR("Unique with dimension is not implemented due to the lack of USM and PSTL in buidling.");
+  AT_ERROR("Unique with dimension is not implemented due to the lack of USM and oneDPL in buidling.");
 #endif
 }
 } // namespace impl
