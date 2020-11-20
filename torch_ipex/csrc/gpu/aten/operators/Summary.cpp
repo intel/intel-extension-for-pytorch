@@ -174,8 +174,8 @@ Tensor bincount_template(
     auto ret = dpcpp_tensor_histogram<weights_t, input_t, true>(
         output, self, weights, nbins, minvalue, maxvalue);
   } else {
-    output = native::zeros({nbins}, device(DeviceType::XPU).dtype(kInt));
-    auto ret = dpcpp_tensor_histogram<int, input_t, false>(
+    output = native::zeros({nbins}, device(DeviceType::XPU).dtype(kLong));
+    auto ret = dpcpp_tensor_histogram<typename c10::impl::ScalarTypeToCPPType<kLong>::type, input_t, false>(
         output, self, weights, nbins, minvalue, maxvalue);
   }
   return output;
@@ -188,13 +188,8 @@ Tensor bincount(const Tensor& self, const Tensor& weights, int64_t minlength) {
     const auto scalar = weights.scalar_type();
     if (scalar == ScalarType::Undefined || scalar == ScalarType::Float)
       return impl::bincount_template<scalar_t, float>(self, weights, minlength);
-    else if (scalar == ScalarType::Int)
-      return impl::bincount_template<scalar_t, float>(self, weights, minlength);
-    TORCH_CHECK(
-        0,
-        "bincount_dpcpp not implemented for weight type '",
-        toString(scalar),
-        "'");
+    return impl::bincount_template<scalar_t, double>(
+            self, weights.to(kDouble), minlength);
   });
 }
 
