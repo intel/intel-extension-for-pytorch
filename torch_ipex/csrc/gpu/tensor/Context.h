@@ -228,7 +228,7 @@ class DPCPPTensorConvertor {
     auto to_mem = dpcpp_onednn_memory(to_md, engine, to.data_ptr());
 
     DPCPP_ONEDNN_EXEC(dnnl::reorder(from_mem, to_mem),
-        strm, {{DNNL_ARG_FROM, from_mem}, {DNNL_ARG_FROM, to_mem}});
+        strm, {{DNNL_ARG_FROM, from_mem}, {DNNL_ARG_TO, to_mem}});
     return true;
   }
 
