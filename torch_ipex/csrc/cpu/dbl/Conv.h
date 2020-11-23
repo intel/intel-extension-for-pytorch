@@ -20,7 +20,7 @@ std::vector<int64_t> calc_conv_output_size(
 
 dil::tensor convolution_impl(
     const dil::tensor& x,
-    const dil::tensor& w,
+    dil::tensor& w,
     const c10::optional<dil::tensor>& b,
     at::IntArrayRef padding,
     at::IntArrayRef stride,
@@ -31,7 +31,7 @@ dil::tensor convolution_impl(
 
 void convolution_inplace_impl(
     const dil::tensor& x,
-    const dil::tensor& w,
+    dil::tensor& w,
     const c10::optional<dil::tensor>& b,
     dil::tensor& y,
     at::IntArrayRef padding,

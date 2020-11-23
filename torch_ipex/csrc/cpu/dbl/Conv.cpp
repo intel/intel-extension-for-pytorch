@@ -27,7 +27,7 @@ std::vector<int64_t> calc_conv_output_size(
 
 dil::tensor convolution_impl(
     const dil::tensor& x,
-    const dil::tensor& w,
+    dil::tensor& w,
     const c10::optional<dil::tensor>& b,
     at::IntArrayRef padding,
     at::IntArrayRef stride,
@@ -105,7 +105,7 @@ dil::tensor convolution_impl(
 
 void convolution_inplace_impl(
     const dil::tensor& x,
-    const dil::tensor& w,
+    dil::tensor& w,
     const c10::optional<dil::tensor>& b,
     dil::tensor& y,
     at::IntArrayRef padding,
@@ -219,6 +219,15 @@ void prepack_conv_weights(
       packed_weight.set_scale(dil_weight.get_scale());
     }
     packed_weight.feed_from(dil_weight);
+ 
+    if (dil_weight.has_workspace()) {
+      packed_weight.copy_workspace(dil_weight);
+    }
+
+    if (dil_weight.has_workspace()) {
+      packed_weight.copy_params(dil_weight);
+    }
+     
     dbl::comm::equip_dil_buffer(weight, packed_weight);
     cpu::ShadeDataContext::setPackedTensor(weight, true);
   }

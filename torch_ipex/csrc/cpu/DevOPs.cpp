@@ -106,6 +106,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
 
+  bool weight_updata = dil_weight.has_params();
   dil::tensor dil_output = dbl::conv::convolution_impl(
     dil_input,
     dil_weight,
@@ -116,6 +117,10 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     groups,
     dil::attr_t(),
     output_scale);
+
+  if (!weight_updata && dil_weight.has_params()) {
+    dbl::comm::equip_dil_buffer(weight, dil_weight);
+  }
 
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
 

@@ -125,7 +125,7 @@ at::Tensor _dil_pooling(
   }
 
   dil::tensor y;
-  dil::prop_kind aprop_kind = dil::prop_kind::forward;
+  dil::prop_kind aprop_kind = dil::prop_kind::forward_inference;
   auto src_type = x.get_data_type();
   if (dil::data_type::s8 == src_type || dil::data_type::u8 == src_type) {
     aprop_kind = dil::prop_kind::forward_inference;

@@ -90,7 +90,7 @@ struct convolution_forward : public dnnl::convolution_forward {
 
   // 2-in-1 compute (prepare & compute) with bias
   static void compute(const tensor& src,
-                      const tensor& weights,
+                      tensor& weights,
                       const tensor& bias,
                       const dims& dst_dims,
                       tensor& dst,
@@ -107,17 +107,32 @@ struct convolution_forward : public dnnl::convolution_forward {
                       prop_kind aprop_kind = prop_kind::forward,
                       const lowp_kind alowp_kind = u8s8,
                       const engine& aengine = engine::cpu_engine()) {
-    convolution_forward_params params;
-    do_prepare</*with_bias=*/true>(
+    // convolution_forward_params params;
+    //do_prepare</*with_bias=*/true>(
+    //    params, src, weights, bias, dst_dims, dst, strides, dilates, 
+    //    padding_l, padding_r, groups, src_scales, weights_scales, dst_scales,
+    //    attr, aalgorithm, aprop_kind, alowp_kind, aengine);
+    if (weights.has_params()) {
+      //std::cout<<"pd cache ...................."<<std::endl;
+      auto p = weights.get_params();
+      do_compute<true>(p.pd, p.bias_attr, p.dst_scales, p.groups, weights.get_workspace(), src, weights, bias, dst);
+    } else {
+     // std::cout<<"pd cacheKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK"<<std::endl;
+      convolution_forward_params params;
+      do_prepare</*with_bias=*/true>(
         params, src, weights, bias, dst_dims, dst, strides, dilates, 
         padding_l, padding_r, groups, src_scales, weights_scales, dst_scales,
         attr, aalgorithm, aprop_kind, alowp_kind, aengine);
-    do_compute</*with_bias=*/true>(params, src, weights, bias, dst);
+      weights.init_params(params.pd, params.bias_attr, params.dst_scales, params.groups);
+      weights.init_workspace(params.pd.scratchpad_desc());
+      do_compute</*with_bias=*/true>(params, src, weights, bias, dst);
+    }
+    //do_compute</*with_bias=*/true>(params, src, weights, bias, dst);
   }
 
   // 2-in-1 compute (prepare & compute) without bias
   static void compute(const tensor& src,
-                      const tensor& weights,
+                      tensor& weights,
                       const dims& dst_dims,
                       tensor& dst,
                       const dims& strides,
@@ -134,12 +149,27 @@ struct convolution_forward : public dnnl::convolution_forward {
                       const lowp_kind alowp_kind = u8s8,
                       const engine& aengine = engine::cpu_engine()) {
     static tensor dummy_bias;
-    convolution_forward_params params;
-    do_prepare</*with_bias=*/false>(
+    //convolution_forward_params params;
+    //do_prepare</*with_bias=*/false>(
+    //    params, src, weights, dummy_bias, dst_dims, dst, strides, dilates, 
+    //    padding_l, padding_r, groups, src_scales, weights_scales, dst_scales,
+    //    attr, aalgorithm, aprop_kind, alowp_kind, aengine);
+    if (weights.has_params()) {
+      //std::cout<<"pd cache.................."<<std::endl;
+      auto p = weights.get_params();
+      do_compute<false>(p.pd, p.bias_attr, p.dst_scales, p.groups, weights.get_workspace(), src, weights, dummy_bias, dst);
+    } else {
+      //std::cout<<"pdkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"<<std::endl;
+      convolution_forward_params params;
+      do_prepare</*with_bias=*/false>(
         params, src, weights, dummy_bias, dst_dims, dst, strides, dilates, 
         padding_l, padding_r, groups, src_scales, weights_scales, dst_scales,
         attr, aalgorithm, aprop_kind, alowp_kind, aengine);
-    do_compute</*with_bias=*/false>(params, src, weights, dummy_bias, dst);
+      weights.init_params(params.pd, params.bias_attr, params.dst_scales, params.groups);
+      weights.init_workspace(params.pd.scratchpad_desc());
+      do_compute</*with_bias=*/false>(params, src, weights, dummy_bias, dst);
+    }
+    //do_compute</*with_bias=*/false>(params, src, weights, dummy_bias, dst);
   }
 
   static tensor::desc expected_weights_desc(
@@ -322,9 +352,12 @@ private:
                           : dst_scales;
 
       scale_t bias_scales, op_scales;
+      bias_scales = weights_scales_in;
+      op_scales = weights_scales_in;
+      /*
       std::tie(bias_scales, op_scales) = utils::compute_scales(
           src_scales_in[0], dst_scales_in[0], weights_scales_in);
-
+      */
       if (attr.has_op_kind(kind::sum)) {
         float sum_scale =
             dst_scales_in[0] / (dst.has_scale() ? dst.get_scale()[0] : 1.0f);
@@ -398,6 +431,39 @@ private:
     tensor scratchpad(pd.scratchpad_desc());
 
     param = {pd, bias_attr, dst_scales, groups, scratchpad};
+  }
+
+  template <bool with_bias>
+  static void do_compute(const primitive_desc& pd,
+                         const attr_t& bias_attr, const scale_t& dst_scales,
+                         const int groups, const tensor& scratchpad,
+                         const tensor& src, const tensor& weights,
+                         const tensor& bias, tensor& dst) {
+    auto expected_src = src.reorder_if_differ_in(pd.src_desc());
+    auto expected_weights = weights.make_grouped_weights(groups)
+                                .reorder_if_differ_in(pd.weights_desc());
+    dst.reinit_if_possible(pd.dst_desc());
+
+    if (!dst_scales.empty() && dst.get_data_type() != data_type::f32) {
+      dst.set_scale(dst_scales);
+    }
+
+    if (with_bias) {
+      auto expected_bias =
+          bias.reorder_if_differ_in(pd.bias_desc(), bias_attr);
+      super(pd).execute(stream::default_stream(), 
+                        {{DNNL_ARG_SRC, expected_src},
+                         {DNNL_ARG_WEIGHTS, expected_weights},
+                         {DNNL_ARG_BIAS, expected_bias},
+                         {DNNL_ARG_DST, dst},
+                         {DNNL_ARG_SCRATCHPAD, scratchpad}});
+    } else {
+      super(pd).execute(stream::default_stream(), 
+                        {{DNNL_ARG_SRC, expected_src},
+                         {DNNL_ARG_WEIGHTS, expected_weights},
+                         {DNNL_ARG_DST, dst},
+                         {DNNL_ARG_SCRATCHPAD, scratchpad}});
+    }
   }
 
   template <bool with_bias>

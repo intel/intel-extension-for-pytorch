@@ -14,6 +14,16 @@ class tensor : public memory {
   using blocking_desc_t = dnnl_blocking_desc_t;
   using descriptor = tensor::desc; // for backward compatibility
 
+  struct convolution_params {
+    dnnl::convolution_forward::primitive_desc pd;
+    // bias_attr contains requantization scales for bias
+    attr_t bias_attr;
+    scale_t dst_scales;
+    int groups;
+    convolution_params(dnnl::convolution_forward::primitive_desc p, attr_t b, scale_t d,
+            int g):pd(p), bias_attr(b), dst_scales(d), groups(g) {}
+  };
+
   struct desc_wrapper {
     desc_wrapper(const dnnl_memory_desc_t *adata) : data(adata) {}
 
@@ -653,6 +663,7 @@ class tensor : public memory {
         scale_(t.scale_),
         zero_point_(t.zero_point_),
         buffer_(t.buffer_),
+        conv_params_(t.conv_params_),
         eng_(t.eng_) {}
 
   /// Move constructor
@@ -662,6 +673,7 @@ class tensor : public memory {
         scale_(std::move(t.scale_)),
         zero_point_(std::move(t.zero_point_)),
         buffer_(std::move(t.buffer_)),
+        conv_params_(std::move(t.conv_params_)),
         eng_(std::move(t.eng_)) {}
 
   /// Assignment operator
@@ -671,6 +683,7 @@ class tensor : public memory {
     scale_ = t.scale_;
     zero_point_ = t.zero_point_;
     workspace_ = t.workspace_;
+    conv_params_ = t.conv_params_;
     eng_ = t.eng_;
     return *this;
   }
@@ -682,6 +695,7 @@ class tensor : public memory {
     scale_ = std::move(t.scale_);
     zero_point_ = std::move(t.zero_point_);
     workspace_ = std::move(t.workspace_);
+    conv_params_ = std::move(t.conv_params_);
     eng_ = std::move(t.eng_);
     return *this;
   }
@@ -802,10 +816,9 @@ class tensor : public memory {
     //   already grouped, deconv weight: g, i/g, o, ... -> g, o, i/g, ...
     //   no grouped,      deconv weight: i, o, ...      -> g, o, i/g, ...
 
-    auto desc = get_desc();
     if (groups <= 1) {
       if (is_deconv) {
-        auto transposed_desc = desc.transpose(0, 1);
+        auto transposed_desc = get_desc().transpose(0, 1);
         auto this_copy = *this;
         return this_copy.set_desc(transposed_desc);
       } else {
@@ -813,12 +826,12 @@ class tensor : public memory {
       }
     };
 
-    if (desc.is_grouped()) {
+    if (get_const_desc().is_grouped()) {
       DIL_ENFORCE(
           desc.g() == groups,
           "groups does not match the pre-converted weights");
       if (is_deconv) {
-        auto transposed_grouped_desc = desc.transpose(1, 2);
+        auto transposed_grouped_desc = get_desc().transpose(1, 2);
         auto this_copy = *this;
         return this_copy.set_desc(transposed_grouped_desc);
       } else {
@@ -826,11 +839,11 @@ class tensor : public memory {
       }
     } else {
       if (is_deconv) {
-        auto transposed_grouped_desc = desc.to_grouped(groups).transpose(1, 2);
+        auto transposed_grouped_desc = get_desc().to_grouped(groups).transpose(1, 2);
         auto this_copy = *this;
         return this_copy.set_desc(transposed_grouped_desc);
       } else {
-        auto grouped_desc = desc.to_grouped(groups);
+        auto grouped_desc = get_desc().to_grouped(groups);
         auto this_copy = *this;
         return this_copy.set_desc(grouped_desc);
       }
@@ -1018,6 +1031,15 @@ class tensor : public memory {
 
   void copy_workspace(const tensor& other) { workspace_ = other.workspace_; }
 
+  void init_params(dnnl::convolution_forward::primitive_desc pd, attr_t bias_attr,
+          scale_t dst_scales, int groups) {
+    auto params = new convolution_params(pd, bias_attr, dst_scales, groups);
+    conv_params_.reset(params);
+  }
+  convolution_params &get_params() const {return *conv_params_; }
+  bool has_params() const {return conv_params_ != nullptr; }
+  void copy_params(const tensor& other) { conv_params_ = other.conv_params_;  }
+
   /// Return the scale of this param.
   const scale_t &get_scale() const { return *scale_.get(); }
 
@@ -1123,11 +1145,13 @@ class tensor : public memory {
     auto ws = std::move(workspace_);
     auto scale = std::move(scale_);
     auto zp = std::move(zero_point_);
+    auto params = std::move(conv_params_);
     init(new_desc, get_data_handle(), get_engine());
     buffer_ = std::move(buf);
     workspace_ = std::move(ws);
     scale_ = std::move(scale);
     zero_point_ = std::move(zp);
+    conv_params_ = std::move(params);
     return *this;
   }
 
@@ -1135,6 +1159,7 @@ class tensor : public memory {
   std::shared_ptr<scale_t> scale_;
   std::shared_ptr<std::vector<int32_t>> zero_point_;
   std::shared_ptr<void> buffer_;
+  std::shared_ptr<convolution_params> conv_params_;
   engine eng_;
 };
 
