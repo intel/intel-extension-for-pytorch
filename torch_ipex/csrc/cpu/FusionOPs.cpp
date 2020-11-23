@@ -13,6 +13,7 @@
 #include "torch_ipex/csrc/aten_ipex_bridge.h"
 #include "torch_ipex/csrc/ipex_tensor_impl.h"
 #include "torch_ipex/csrc/utils.h"
+#include "torch_ipex/csrc/cpu/DevOPs.h"
 #include "dbl/Common.h"
 #include "dbl/Conv.h"
 #include "dbl/Linear.h"
@@ -394,36 +395,7 @@ at::Tensor AtenIpexJITDev::dil_linear_fuse_eltwise(
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexJITDev::dil_linear_fuse_eltwise", std::vector<c10::IValue>({self, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
-  IPEX_CHECK(self.dim() >= 2,
-      "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
-  auto input_contiguous = self.is_contiguous() ? self : self.contiguous();
-  auto weight_contiguous = weight.is_contiguous() ? weight : weight.contiguous();
-
-  reorder_to_bf16_for_mix_prec(input_contiguous);
-  reorder_to_bf16_for_mix_prec(weight_contiguous);
-
-  // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
-  auto self_reshaped = self.dim() > 2 ? self.reshape({-1, input_contiguous.size(self.dim() - 1)}) : self;
-  const dil::tensor x = try_gen_dil_tensor(self_reshaped);
-  const dil::tensor w = try_gen_dil_tensor(weight_contiguous);
-
-  c10::optional<dil::tensor> b{c10::nullopt};
-  if (bias.defined()) {
-    auto bias_contiguous = bias.is_contiguous() ? bias : bias.contiguous();
-    reorder_to_bf16_for_mix_prec(bias_contiguous);
-    b = try_gen_dil_tensor(bias_contiguous);
-  }
-
-  dil::tensor y = dbl::linear::linear_impl(x, w, b, /* dst_scale */ dil::scale_t(), attr);
-
-  auto input_size = self.sizes();
-  std::vector<int64_t> output_size(input_size.begin(), input_size.end() - 1);
-  output_size.push_back(weight.size(0));
-
-  if (self.dim() > 2) {
-    return gen_aten_tensor_by(std::move(y)).reshape(output_size);
-  }
-  return gen_aten_tensor_by(std::move(y));
+  return AtenIpexCPUDev::dil_linear(self, weight, bias, attr);
 }
 
 }  // namespace cpu

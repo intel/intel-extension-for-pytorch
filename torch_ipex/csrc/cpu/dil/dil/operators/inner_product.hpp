@@ -112,6 +112,7 @@ private:
 
     // TODO(xpz): Remove int8 inner product implementation. We are switching to
     // matmul for quantized *mm ops
+    op_attr =  attr;
     if (!weights_scales_in.empty()) {
       DIL_ENFORCE(alowp_kind == u8s8 || alowp_kind == s8s8,
                     "Unsupported lowp kind");
@@ -163,7 +164,6 @@ private:
         }
       }
     } else {
-      op_attr =  attr;
       src_desc = {src.get_dims(), data_type::f32, format_tag::any};
       if (src.has_scale()) {
         auto src_scale = src.get_scale();

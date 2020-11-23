@@ -1003,12 +1003,16 @@ at::Tensor& AtenIpexCPUDev::dil_addbmm_(at::Tensor& self, const at::Tensor& batc
 at::Tensor AtenIpexCPUDev::dil_linear(
     const at::Tensor& self,
     const at::Tensor& weight,
-    const at::Tensor& bias) {
+    const at::Tensor& bias,
+    const dil::attr_t& attr) {
   DEBUG("AtenIpexCPUDev::dil_linear\n");
   CHECK_DNNL_OP_PRE_COND(self);
   CHECK_DNNL_OP_PRE_COND(weight);
   IPEX_CHECK(self.dim() >= 2,
       "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
+  IPEX_CHECK(attr.get_post_ops().len() == 0 || 
+                              attr.get_post_ops().kind(0) == dnnl::primitive::kind::eltwise, 
+                              "dil linear only fuse with eltwise now");
 
   std::vector<float> output_scale = {};
   bool quantized = false;
@@ -1055,7 +1059,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
     b = dbl::comm::try_gen_dil_tensor(bias);
   }
 
-  dil::tensor y = dbl::linear::linear_impl(x, w, b, output_scale);
+  dil::tensor y = dbl::linear::linear_impl(x, w, b, output_scale, attr);
 
   if (self.dim() > 2) {
     auto input_size = self.sizes();
@@ -1067,7 +1071,8 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer({self}, {aten_output}, "Linear");
+    auto op_name = attr.get_post_ops().len() == 0 ? "Linear" : "LinearFuseEltwise";
+    insert_or_updata_observer({self}, {aten_output}, op_name);
   }
 
   return aten_output;
