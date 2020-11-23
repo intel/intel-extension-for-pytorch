@@ -1,4 +1,6 @@
+#include <ATen/native/UpSample.h>
 #include "UpSample.h"
+
 
 using namespace dnnl;
 using namespace at::dpcpp;
@@ -145,6 +147,8 @@ static void upsample_linear_backward_out_dpcpp_kernel(
 } // namespace impl
 
 using namespace impl;
+using at::native::upsample::compute_output_size;
+using at::native::upsample::get_scale_value;
 
 Tensor& upsample_trilinear3d_out(
     Tensor& output,
@@ -189,6 +193,31 @@ Tensor upsample_trilinear3d(
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
         scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+  return output;
+}
+
+Tensor upsample_trilinear3d(
+    const Tensor& input,
+    c10::optional<IntArrayRef> output_size,
+    bool align_corners,
+    c10::optional<ArrayRef<double>> scale_factors) {
+  auto output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
+  auto scale_d = get_scale_value(scale_factors, 0);
+  auto scale_h = get_scale_value(scale_factors, 1);
+  auto scale_w = get_scale_value(scale_factors, 2);
+  if (align_corners)
+    printf(
+            "we don't support this path by currently as oneDNN don't support this "
+            "algorithm!\n");
+  else
+    upsample_linear_out_dpcpp_kernel(
+            output,
+            input,
+            osize,
+            scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+            scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
+            scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
   return output;
 }
 
@@ -242,6 +271,33 @@ Tensor upsample_trilinear3d_backward(
   return grad_input;
 }
 
+Tensor upsample_trilinear3d_backward(
+        const Tensor& grad_output,
+        c10::optional<IntArrayRef> output_size,
+        IntArrayRef input_size,
+        bool align_corners,
+        c10::optional<ArrayRef<double>> scale_factors) {
+  auto osize = compute_output_size(input_size, output_size, scale_factors);
+  auto scale_d = get_scale_value(scale_factors, 0);
+  auto scale_h = get_scale_value(scale_factors, 1);
+  auto scale_w = get_scale_value(scale_factors, 2);
+  auto grad_input = at::zeros(input_size, grad_output.options());
+  if (align_corners)
+    printf(
+            "we don't support this path by currently as oneDNN don't support this "
+            "algorithm!\n");
+  else
+    upsample_linear_backward_out_dpcpp_kernel(
+            grad_input,
+            grad_output,
+            osize,
+            input_size,
+            scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+            scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
+            scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
+  return grad_input;
+}
+
 Tensor& upsample_bilinear2d_out(
     Tensor& output,
     const Tensor& input,
@@ -281,6 +337,29 @@ Tensor upsample_bilinear2d(
         output_size,
         scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
         scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
+  return output;
+}
+
+Tensor upsample_bilinear2d(
+        const Tensor& input,
+        c10::optional<IntArrayRef> output_size,
+        bool align_corners,
+        c10::optional<ArrayRef<double>> scale_factors) {
+  auto output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
+  auto scale_h = get_scale_value(scale_factors, 0);
+  auto scale_w = get_scale_value(scale_factors, 1);
+  if (align_corners)
+    printf(
+            "we don't support this path by currently as oneDNN don't support this "
+            "algorithm!\n");
+  else
+    upsample_linear_out_dpcpp_kernel(
+            output,
+            input,
+            osize,
+            scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+            scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0);
   return output;
 }
 
@@ -330,6 +409,31 @@ Tensor upsample_bilinear2d_backward(
   return grad_input;
 }
 
+Tensor upsample_bilinear2d_backward(
+        const Tensor& grad_output,
+        c10::optional<IntArrayRef> output_size,
+        IntArrayRef input_size,
+        bool align_corners,
+        c10::optional<ArrayRef<double>> scale_factors) {
+  auto osize = compute_output_size(input_size, output_size, scale_factors);
+  auto scale_h = get_scale_value(scale_factors, 0);
+  auto scale_w = get_scale_value(scale_factors, 1);
+  auto grad_input = at::zeros(input_size, grad_output.options());
+  if (align_corners)
+    printf(
+            "we don't support this path by currently as oneDNN don't support this "
+            "algorithm!\n");
+  else
+    upsample_linear_backward_out_dpcpp_kernel(
+            grad_input,
+            grad_output,
+            osize,
+            input_size,
+            scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+            scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0);
+  return grad_input;
+}
+
 Tensor& upsample_linear1d_out(
     Tensor& output,
     const Tensor& input,
@@ -365,6 +469,27 @@ Tensor upsample_linear1d(
         input,
         output_size,
         scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+  return output;
+}
+
+Tensor upsample_linear1d(
+    const Tensor& input,
+    c10::optional<IntArrayRef> output_size,
+    bool align_corners,
+    c10::optional<ArrayRef<double>> scale_factors) {
+  auto output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
+  auto scale_w = get_scale_value(scale_factors, 0);
+  if (align_corners)
+    printf(
+            "we don't support this path by currently as oneDNN don't support this "
+            "algorithm!\n");
+  else
+    impl::upsample_linear_out_dpcpp_kernel(
+            output,
+            input,
+            osize,
+            scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
   return output;
 }
 
@@ -407,6 +532,29 @@ Tensor upsample_linear1d_backward(
         output_size,
         input_size,
         scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+  return grad_input;
+}
+
+Tensor upsample_linear1d_backward(
+        const Tensor& grad_output,
+        c10::optional<IntArrayRef> output_size,
+        IntArrayRef input_size,
+        bool align_corners,
+        c10::optional<ArrayRef<double>> scale_factors) {
+  auto osize = compute_output_size(input_size, output_size, scale_factors);
+  auto scale_w = get_scale_value(scale_factors, 0);
+  auto grad_input = at::zeros(input_size, grad_output.options());
+  if (align_corners)
+    printf(
+            "we don't support this path by currently as oneDNN don't support this "
+            "algorithm!\n");
+  else
+    upsample_linear_backward_out_dpcpp_kernel(
+            grad_input,
+            grad_output,
+            osize,
+            input_size,
+            scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
   return grad_input;
 }
 
