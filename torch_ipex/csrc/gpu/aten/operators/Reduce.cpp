@@ -760,24 +760,27 @@ Tensor min(const Tensor& self) {
       result, self, std::vector<int64_t>{}, false);
 }
 
-Tensor max_out(
+Tensor& amax_out(
     Tensor& result,
     const Tensor& self,
     IntArrayRef dim,
     bool keepdim) {
-  ScalarType dtype = impl::get_dtype(result, self, c10::nullopt);
-  auto iter = impl::make_reduction("max", result, self, dim, keepdim, dtype);
-  if (iter.numel() == 0) {
-    result.zero_();
-  } else {
-    impl::max_kernel(iter);
-  }
+  TORCH_CHECK(self.scalar_type() == result.scalar_type(), "Illegal dtype for self, and out:", self.scalar_type(), result.scalar_type());
+  auto iter = impl::make_reduction("amax", result, self, dim, keepdim, self.scalar_type());
+  TORCH_CHECK(iter.numel() > 0, "operation does not have an identity");
+  impl::max_kernel(iter);
   return result;
 }
 
+Tensor amax(const Tensor & self, IntArrayRef dim, bool keepdim) {
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeXPU::amax_out(
+          result, self, dim, keepdim);
+}
+
 Tensor max(const Tensor& self) {
-  Tensor result;
-  return at::AtenIpexTypeXPU::max_out(
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeXPU::amax_out(
       result, self, std::vector<int64_t>{}, false);
 }
 
