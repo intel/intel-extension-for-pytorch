@@ -29,8 +29,8 @@ Tensor& hardtanh_out(
       iter.dtype(),
       "hardtanh",
       [&]() {
-        auto min_ = min_val.to<scalar_t>();
-        auto max_ = max_val.to<scalar_t>();
+        scalar_t min_ = min_val.to<scalar_t>();
+        scalar_t max_ = max_val.to<scalar_t>();
         dpcpp_kernel_for_tensor_iter<DPCPP_K(DPCPPOpHardTanh)>(
             iter, [=](scalar_t x) -> scalar_t {
               if (x < min_)

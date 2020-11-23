@@ -258,7 +258,7 @@ at::Tensor convolution(
       input_memory = dpcpp_onednn_memory(expected_input_md, engine, input.data_ptr());
     } else {
       input_ = at::AtenIpexTypeDPCPP::empty(
-          {expected_input_md.get_size() / input.itemsize()},
+          {static_cast<int64_t>(expected_input_md.get_size() / input.itemsize())},
           input.options(),
           c10::nullopt);
       input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
@@ -294,7 +294,7 @@ at::Tensor convolution(
       weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_opt.data_ptr());
     } else {
       weight_ = at::AtenIpexTypeDPCPP::empty(
-          {expected_weight_md.get_size() / weight.itemsize()},
+          {static_cast<int64_t>(expected_weight_md.get_size() / weight.itemsize())},
           weight.options(),
           c10::nullopt);
       weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_.data_ptr());
@@ -327,7 +327,7 @@ at::Tensor convolution(
       }
     } else {
       output_ = at::AtenIpexTypeDPCPP::empty(
-          {expected_output_md.get_size() / output.itemsize()},
+          {static_cast<int64_t>(expected_output_md.get_size() / output.itemsize())},
           output.options(),
           c10::nullopt);
     }
@@ -357,7 +357,7 @@ at::Tensor convolution(
         bias_memory = dpcpp_onednn_memory(bias_md, engine, bias_opt.data_ptr());
       } else {
         bias_ = at::AtenIpexTypeDPCPP::empty(
-            {bias_md.get_size() / bias.itemsize()},
+            {static_cast<int64_t>(bias_md.get_size() / bias.itemsize())},
             bias.options(),
             c10::nullopt);
         bias_memory = dpcpp_onednn_memory(bias_md, engine, bias_.data_ptr());
@@ -907,7 +907,7 @@ std::ostream& operator<<(std::ostream& out, const ConvParams& params) {
   return out;
 }
 
-auto ConvParams::is_strided() const -> bool {
+bool ConvParams::is_strided() const {
   bool is_strided = false;
   for (int s : stride) {
     is_strided |= (s != 1);
@@ -915,7 +915,7 @@ auto ConvParams::is_strided() const -> bool {
   return is_strided;
 }
 
-auto ConvParams::is_dilated() const -> bool {
+bool ConvParams::is_dilated() const {
   bool is_dilated = false;
   for (int d : dilation) {
     is_dilated |= (d != 1);
@@ -923,7 +923,7 @@ auto ConvParams::is_dilated() const -> bool {
   return is_dilated;
 }
 
-auto ConvParams::is_padded() const -> bool {
+bool ConvParams::is_padded() const {
   bool is_padded = false;
   for (int p : padding) {
     is_padded |= (p != 0);
@@ -931,7 +931,7 @@ auto ConvParams::is_padded() const -> bool {
   return is_padded;
 }
 
-auto ConvParams::is_output_padding_neg() const -> bool {
+bool ConvParams::is_output_padding_neg() const {
   bool is_non_neg = false;
   for (int p : output_padding) {
     is_non_neg |= (p < 0);
@@ -939,7 +939,7 @@ auto ConvParams::is_output_padding_neg() const -> bool {
   return is_non_neg;
 }
 
-auto ConvParams::is_output_padding_big() const -> bool {
+bool ConvParams::is_output_padding_big() const {
   bool is_big = false;
   for (size_t i = 0; i < output_padding.size(); i++) {
     is_big |=
@@ -948,7 +948,7 @@ auto ConvParams::is_output_padding_big() const -> bool {
   return is_big;
 }
 
-auto ConvParams::is_padding_neg() const -> bool {
+bool ConvParams::is_padding_neg() const {
   bool is_non_neg = false;
   for (int p : padding) {
     is_non_neg |= (p < 0);
@@ -956,7 +956,7 @@ auto ConvParams::is_padding_neg() const -> bool {
   return is_non_neg;
 }
 
-auto ConvParams::is_stride_nonpos() const -> bool {
+bool ConvParams::is_stride_nonpos() const {
   bool is_nonpos = false;
   for (int s : stride) {
     is_nonpos |= (s <= 0);
@@ -964,7 +964,7 @@ auto ConvParams::is_stride_nonpos() const -> bool {
   return is_nonpos;
 }
 
-auto ConvParams::view1d_as_2d() -> void {
+void ConvParams::view1d_as_2d() {
   if (stride.size() == 1) {
     stride.insert(stride.begin(), 1);
     padding.insert(padding.begin(), 0);
@@ -973,14 +973,13 @@ auto ConvParams::view1d_as_2d() -> void {
   }
 }
 
-auto ConvParams::use_cpu_depthwise3x3_winograd(
+bool ConvParams::use_cpu_depthwise3x3_winograd(
     const at::Tensor& input,
-    const at::Tensor& weight) const -> bool {
+    const at::Tensor& weight) const {
   return false;
 }
 
-auto ConvParams::is_depthwise(const at::Tensor& input, const at::Tensor& weight)
-    const -> bool {
+bool ConvParams::is_depthwise(const at::Tensor& input, const at::Tensor& weight) const {
   return !transposed && input.ndimension() == 4 && input.size(1) == groups &&
       groups > 1 && // no point if there is only a single group
       weight.size(0) % input.size(1) ==

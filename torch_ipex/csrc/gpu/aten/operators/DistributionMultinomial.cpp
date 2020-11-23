@@ -79,9 +79,9 @@ void sample_multinomial_with_replacement(
       size_t dist_id = item_id.get_group(0);
       size_t sample_id = item_id.get_local_id(1);
       size_t global_linear_id = item_id.get_global_linear_id();
-      long* result_data = get_pointer(result_data);
-      scalar_t* norm_dist_prefix_sum_data = get_pointer(norm_dist_prefix_sum_data);
-      scalar_t* norm_dist_data = get_pointer(norm_dist_data);
+      long* result_ptr = get_pointer(result_data);
+      scalar_t* norm_dist_prefix_sum_ptr = get_pointer(norm_dist_prefix_sum_data);
+      scalar_t* norm_dist_ptr = get_pointer(norm_dist_data);
 
       RandomState<Philox4_32_10> state(
         seeds.first, global_linear_id, seeds.second);
@@ -93,13 +93,13 @@ void sample_multinomial_with_replacement(
 
         // Find the bucket that a uniform sample lies in
         int choice = binary_search_for_multinomial<scalar_t>(
-          norm_dist_prefix_sum_data + dist_id * categories,
-          norm_dist_data + dist_id * categories,
+          norm_dist_prefix_sum_ptr + dist_id * categories,
+          norm_dist_ptr + dist_id * categories,
           categories,
           r);
 
         // Torch indices are 1-based
-        result_data[dist_id * num_samples + sample] = choice;
+        result_ptr[dist_id * num_samples + sample] = choice;
       }
     };
 

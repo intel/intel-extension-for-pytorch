@@ -35,9 +35,9 @@ void flip_dpcpp_kernel(
     const std::bitset<dim_bitset_size>& flip_dims_b) {
   const std::vector<int64_t>& sizes_v = in_tensor.sizes().vec();
   const std::vector<int64_t>& strides_v = in_tensor.strides().vec();
-  Tensor stride_contiguous_t = at::empty({stride_contiguous_v.size()}, in_tensor.options().dtype(at::ScalarType::Long));
-  Tensor sizes_t = at::empty({sizes_v.size()}, in_tensor.options().dtype(at::ScalarType::Long));
-  Tensor strides_t = at::empty({strides_v.size()}, in_tensor.options().dtype(at::ScalarType::Long));
+  Tensor stride_contiguous_t = at::empty({static_cast<int64_t>(stride_contiguous_v.size())}, in_tensor.options().dtype(at::ScalarType::Long));
+  Tensor sizes_t = at::empty({static_cast<int64_t>(sizes_v.size())}, in_tensor.options().dtype(at::ScalarType::Long));
+  Tensor strides_t = at::empty({static_cast<int64_t>(strides_v.size())}, in_tensor.options().dtype(at::ScalarType::Long));
   for (int64_t i = 0; i < stride_contiguous_v.size(); i++)
     stride_contiguous_t[i] = stride_contiguous_v[i];
   for (int64_t i = 0; i < sizes_v.size(); i++)

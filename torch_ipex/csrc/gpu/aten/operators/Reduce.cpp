@@ -780,6 +780,7 @@ Tensor max(const Tensor& self) {
       result, self, std::vector<int64_t>{}, false);
 }
 
+// norm - static root entrances
 static Tensor& norm_out(
     Tensor& result,
     const Tensor& self,
@@ -832,6 +833,7 @@ static inline Tensor _norm(const Tensor& self, Scalar p) {
   }
 }
 
+// norm - customized outer entrances
 Tensor& norm_out(
     Tensor& out,
     const Tensor& self,
@@ -839,7 +841,8 @@ Tensor& norm_out(
     IntArrayRef dim,
     bool keepdim,
     ScalarType dtype) {
-  return at::AtenIpexTypeDPCPP::norm_out(out, self, p, dim, keepdim, dtype);
+  return at::AtenIpexTypeDPCPP::norm_out(
+      out, self, p, dim, keepdim, optional<ScalarType>(dtype));
 }
 
 Tensor& norm_out(

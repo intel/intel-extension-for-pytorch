@@ -200,7 +200,7 @@ static void avg_pool_out_frame(
   if (lazy_reorder_enabled()) {
     if (input_usr_memory.get_desc() != expected_input_md) {
       input_ = at::AtenIpexTypeDPCPP::empty(
-          {expected_input_md.get_size()}, input.options(), c10::nullopt);
+          {static_cast<int64_t>(expected_input_md.get_size())}, input.options(), c10::nullopt);
       input_memory =
           dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
       DPCPP_ONEDNN_EXEC(
@@ -445,7 +445,7 @@ static void max_pool_out_frame(
   if (lazy_reorder_enabled()) {
     if (input_usr_memory.get_desc() != expected_input_md) {
       input_ = at::AtenIpexTypeDPCPP::empty(
-          {expected_input_md.get_size()}, input.options(), c10::nullopt);
+          {static_cast<int64_t>(expected_input_md.get_size())}, input.options(), c10::nullopt);
       input_memory =
           dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
       DPCPP_ONEDNN_EXEC(
