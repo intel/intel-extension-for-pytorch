@@ -72,14 +72,66 @@ typename std::enable_if<!(IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t)), void>::
     type
     __xor___out(Tensor& result, const Tensor& self, const Tensor& other) {}
 
+template <typename...>
+class minimum_kernel_bool {};
+template <typename...>
+class minimum_kernel_interge {};
+template <typename...>
+class minimum_kernel_float {};
+
+void minimum_kernel(TensorIterator& iter) {
+  if (iter.dtype() == ScalarType::Bool) {
+    dpcpp_kernel_for_tensor_iter<minimum_kernel_bool<bool>>(iter, [](bool a, bool b) -> bool {
+            return a && b;
+    });
+  } else if (isIntegralType(iter.dtype(), /*includeBool=*/ false)) {
+    AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "minimum_dpcpp", [&]() {
+        dpcpp_kernel_for_tensor_iter<minimum_kernel_interge<scalar_t>>(iter, [](scalar_t a, scalar_t b) -> scalar_t {
+            return std::min(a, b);
+    });
+    });
+  } else {
+    AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "min_elementwise_dpcpp", [&]() {
+        dpcpp_kernel_for_tensor_iter<minimum_kernel_float<scalar_t>>(iter, [](scalar_t a, scalar_t b) -> scalar_t {
+            if (a != a) {
+              return a;
+            } else if (b != b) {
+              return b;
+            } else {
+              return Numerics<scalar_t>::min(a, b);
+            }
+    });
+    });
+  }
+}
 
 } // namespace impl
 
-IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(min_out, TensorMinOp)
+
+Tensor& minimum_out(Tensor& result, const Tensor& self, const Tensor& other) {
+  TORCH_CHECK(!self.is_complex() && !other.is_complex(), "minimum does not support complex inputs.");
+
+  auto iter = TensorIterator::binary_op(result, self, other);
+  impl::minimum_kernel(iter);
+  return result;
+}
+
+Tensor minimum(const Tensor& self, const Tensor& other) {
+  TORCH_CHECK(!self.is_complex() && !other.is_complex(), "minimum does not support complex inputs.");
+
+  Tensor result;
+  auto iter = TensorIterator::binary_op(result, self, other);
+  impl::minimum_kernel(iter);
+  return iter.output();
+}
+
+// binary min, alias for minimum
+Tensor& min_out(Tensor& result, const Tensor& self, const Tensor& other) {
+  return at::AtenIpexTypeXPU::minimum_out(result, self, other);
+}
 
 Tensor min(const Tensor& self, const Tensor& other) {
-  auto out = at::empty_like(self);
-  return at::AtenIpexTypeXPU::min_out(out, self, other.expand_as(self));
+  return at::AtenIpexTypeXPU::minimum(self, other);
 }
 
 IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(max_out, TensorMaxOp)
