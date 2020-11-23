@@ -569,4 +569,7 @@ static Tensor convolution_overrideable(const Tensor & input, const Tensor & weig
 static std::tuple<Tensor,Tensor,Tensor> convolution_backward_overrideable(const Tensor & grad_output, const Tensor & input, const Tensor & weight, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, bool transposed, IntArrayRef output_padding, int64_t groups, std::array<bool,3> output_mask); // aten::convolution_backward_overrideable(Tensor grad_output, Tensor input, Tensor weight, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool[3] output_mask) -> (Tensor grad_input, Tensor grad_weight, Tensor grad_bias)
 
 static Tensor record_stream(const Tensor & self, Stream s); // {"schema": "aten::record_stream(Tensor(a) self, Stream s) -> Tensor(a)", "compound": "false"}
+static Tensor frac(const Tensor & self); // {"schema": "aten::frac(Tensor self) -> Tensor", "compound": "False", "has_math_kernel": "False"}
+static Tensor & frac_(Tensor & self); // {"schema": "aten::frac_(Tensor(a!) self) -> Tensor(a!)", "compound": "False", "has_math_kernel": "False"}
+static Tensor & frac_out(Tensor & out, const Tensor & self); // {"schema": "aten::frac.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)", "compound": "False", "has_math_kernel": "False"}
 } // namespace at

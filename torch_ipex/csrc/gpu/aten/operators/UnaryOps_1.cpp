@@ -43,6 +43,16 @@ void logical_not_kernel(TensorIterator& iter) {
       });
 }
 
+template <typename...>
+class frac_kernel_class {};
+void frac_kernel(TensorIterator& iter) {
+  IPEX_DISPATCH_FLOATING_TYPES_AND(at::kHalf, iter.dtype(), "frac_xpu", [&]() {
+      dpcpp_kernel_for_tensor_iter<frac_kernel_class<scalar_t>>(iter, [](scalar_t a) -> scalar_t {
+          return a - Numerics<scalar_t>::trunc(a);
+  });
+  });
+}
+
 } // namespace impl
 
 Tensor bitwise_not(const Tensor& self) {
@@ -83,6 +93,21 @@ Tensor& logical_not_out(Tensor& result, const Tensor& self) {
   .build();
   impl::logical_not_kernel(iter);
   return result;
+}
+
+Tensor& frac_out(Tensor& result, const Tensor& self) {
+  auto iter = TensorIterator::unary_op(result, self);
+  impl::frac_kernel(iter);
+  return result;
+}
+
+Tensor frac(const Tensor& self) {
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeXPU::frac_out(result, self);
+}
+
+Tensor& frac_(Tensor& self) {
+  return at::AtenIpexTypeXPU::frac_out(self, self);
 }
 
 } // namespace AtenIpexTypeXPU
