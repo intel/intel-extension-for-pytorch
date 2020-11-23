@@ -770,7 +770,7 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
                    grad_output.options(),
                    c10::nullopt);
     grad_output_memory =
-        dpcpp_onednn_memory(expected_input_md, engine, grad_output_.data_ptr());
+        dpcpp_onednn_memory(expected_grad_output_md, engine, grad_output_.data_ptr());
     DPCPP_ONEDNN_EXEC(
         reorder(grad_output_usr_memory, grad_output_memory),
         strm,
