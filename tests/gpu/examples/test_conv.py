@@ -15,12 +15,16 @@ class TestNNMethod(TestCase):
     conv_cpu = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False)
     y_cpu = conv_cpu(x_cpu)
     y_cpu.backward(grad_cpu)
+    x_cpu_gw = conv_cpu.weight.grad.detach().clone()
     
-    x_dpcpp = x_cpu.to(dpcpp_device)
+    conv_cpu.zero_grad()
+
+    x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
     grad_dpcpp = grad_cpu.to(dpcpp_device)
     conv_dpcpp = conv_cpu.to(dpcpp_device)
     y_dpcpp = conv_dpcpp(x_dpcpp)
     y_dpcpp.backward(grad_dpcpp)
+    y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
     if not torch_ipex._double_kernel_disabled():
       print("ref: ")
@@ -34,7 +38,7 @@ class TestNNMethod(TestCase):
       print(x_dpcpp.cpu())
 
     self.assertEqual(x_cpu,       x_dpcpp.cpu())
-    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(x_cpu_gw,    y_dpcpp_gw.cpu(), 1e-02)
     self.assertEqual(y_cpu,       y_dpcpp.cpu())
 
   def test_conv2d_with_bias(self, dtype=torch.float):
@@ -43,12 +47,16 @@ class TestNNMethod(TestCase):
     conv_cpu = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=True)
     y_cpu = conv_cpu(x_cpu)
     y_cpu.backward(grad_cpu)
+    x_cpu_gw = conv_cpu.weight.grad.detach().clone()
     
-    x_dpcpp = x_cpu.to(dpcpp_device)
+    conv_cpu.zero_grad()
+
+    x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
     grad_dpcpp = grad_cpu.to(dpcpp_device)
     conv_dpcpp = conv_cpu.to(dpcpp_device)
     y_dpcpp = conv_dpcpp(x_dpcpp)
     y_dpcpp.backward(grad_dpcpp)
+    y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
     if not torch_ipex._double_kernel_disabled():
       print("ref: ")
@@ -62,7 +70,7 @@ class TestNNMethod(TestCase):
       print(x_dpcpp.cpu())
 
     self.assertEqual(x_cpu,       x_dpcpp.cpu())
-    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(x_cpu_gw,    y_dpcpp_gw.cpu(), 1e-02)
     self.assertEqual(y_cpu,       y_dpcpp.cpu())
 
   def test_conv2d_dilated(self, dtype=torch.float):
@@ -71,12 +79,16 @@ class TestNNMethod(TestCase):
     conv_cpu = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, dilation=2, bias=False)
     y_cpu = conv_cpu(x_cpu)
     y_cpu.backward(grad_cpu)
+    x_cpu_gw = conv_cpu.weight.grad.detach().clone()
+
+    conv_cpu.zero_grad()
     
-    x_dpcpp = x_cpu.to(dpcpp_device)
+    x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
     grad_dpcpp = grad_cpu.to(dpcpp_device)
     conv_dpcpp = conv_cpu.to(dpcpp_device)
     y_dpcpp = conv_dpcpp(x_dpcpp)
     y_dpcpp.backward(grad_dpcpp)
+    y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
     if not torch_ipex._double_kernel_disabled():
       print("ref: ")
@@ -90,7 +102,7 @@ class TestNNMethod(TestCase):
       print(x_dpcpp.cpu())
 
     self.assertEqual(x_cpu,       x_dpcpp.cpu())
-    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(x_cpu_gw,    y_dpcpp_gw.cpu(), 1e-02)
     self.assertEqual(y_cpu,       y_dpcpp.cpu())
 
   def test_conv2d_dilated_with_bias(self, dtype=torch.float):
@@ -99,12 +111,16 @@ class TestNNMethod(TestCase):
     conv_cpu = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, dilation=2, bias=True)
     y_cpu = conv_cpu(x_cpu)
     y_cpu.backward(grad_cpu)
+    x_cpu_gw = conv_cpu.weight.grad.detach().clone()
+
+    conv_cpu.zero_grad()
     
-    x_dpcpp = x_cpu.to(dpcpp_device)
+    x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
     grad_dpcpp = grad_cpu.to(dpcpp_device)
     conv_dpcpp = conv_cpu.to(dpcpp_device)
     y_dpcpp = conv_dpcpp(x_dpcpp)
     y_dpcpp.backward(grad_dpcpp)
+    y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
     if not torch_ipex._double_kernel_disabled():
       print("ref: ")
@@ -118,7 +134,7 @@ class TestNNMethod(TestCase):
       print(x_dpcpp.cpu())
 
     self.assertEqual(x_cpu,       x_dpcpp.cpu())
-    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(x_cpu_gw,    y_dpcpp_gw.cpu(), 1e-02)
     self.assertEqual(y_cpu,       y_dpcpp.cpu())
 
   def test_conv3d(self, dtype=torch.float):
@@ -127,12 +143,16 @@ class TestNNMethod(TestCase):
     conv_cpu = nn.Conv3d(16, 32, kernel_size=3, stride=1, padding=1, bias=False)
     y_cpu = conv_cpu(x_cpu)
     y_cpu.backward(grad_cpu)
-    
-    x_dpcpp = x_cpu.to(dpcpp_device)
+    x_cpu_gw = conv_cpu.weight.grad.detach().clone()
+
+    conv_cpu.zero_grad()
+
+    x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
     grad_dpcpp = grad_cpu.to(dpcpp_device)
     conv_dpcpp = conv_cpu.to(dpcpp_device)
     y_dpcpp = conv_dpcpp(x_dpcpp)
     y_dpcpp.backward(grad_dpcpp)
+    y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
     if not torch_ipex._double_kernel_disabled():
       print("ref: ")
@@ -146,7 +166,7 @@ class TestNNMethod(TestCase):
       print(x_dpcpp.cpu())
 
     self.assertEqual(x_cpu,       x_dpcpp.cpu())
-    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(x_cpu_gw,    y_dpcpp_gw.cpu(), 1e-02)
     self.assertEqual(y_cpu,       y_dpcpp.cpu())
 
   def test_conv3d_with_bias(self, dtype=torch.float):
@@ -155,12 +175,16 @@ class TestNNMethod(TestCase):
     conv_cpu = nn.Conv3d(16, 32, kernel_size=3, stride=1, padding=1, bias=True)
     y_cpu = conv_cpu(x_cpu)
     y_cpu.backward(grad_cpu)
+    x_cpu_gw = conv_cpu.weight.grad.detach().clone()
+
+    conv_cpu.zero_grad()
     
-    x_dpcpp = x_cpu.to(dpcpp_device)
+    x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
     grad_dpcpp = grad_cpu.to(dpcpp_device)
     conv_dpcpp = conv_cpu.to(dpcpp_device)
     y_dpcpp = conv_dpcpp(x_dpcpp)
     y_dpcpp.backward(grad_dpcpp)
+    y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
     if not torch_ipex._double_kernel_disabled():
       print("ref: ")
@@ -174,7 +198,7 @@ class TestNNMethod(TestCase):
       print(x_dpcpp.cpu())
 
     self.assertEqual(x_cpu,       x_dpcpp.cpu())
-    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(x_cpu_gw,    y_dpcpp_gw.cpu(), 1e-02)
     self.assertEqual(y_cpu,       y_dpcpp.cpu())
 
   def test_conv3d_dilated(self, dtype=torch.float):
@@ -183,12 +207,16 @@ class TestNNMethod(TestCase):
     conv_cpu = nn.Conv3d(16, 32, kernel_size=3, stride=1, padding=1, dilation=3, bias=False)
     y_cpu = conv_cpu(x_cpu)
     y_cpu.backward(grad_cpu)
-    
-    x_dpcpp = x_cpu.to(dpcpp_device)
+    x_cpu_gw = conv_cpu.weight.grad.detach().clone()
+
+    conv_cpu.zero_grad()
+
+    x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
     grad_dpcpp = grad_cpu.to(dpcpp_device)
     conv_dpcpp = conv_cpu.to(dpcpp_device)
     y_dpcpp = conv_dpcpp(x_dpcpp)
     y_dpcpp.backward(grad_dpcpp)
+    y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
     if not torch_ipex._double_kernel_disabled():
       print("ref: ")
@@ -202,7 +230,7 @@ class TestNNMethod(TestCase):
       print(x_dpcpp.cpu())
 
     self.assertEqual(x_cpu,       x_dpcpp.cpu())
-    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(x_cpu_gw,    y_dpcpp_gw.cpu(), 1e-02)
     self.assertEqual(y_cpu,       y_dpcpp.cpu())
 
   def test_conv3d_dilated_with_bias(self, dtype=torch.float):
@@ -211,12 +239,16 @@ class TestNNMethod(TestCase):
     conv_cpu = nn.Conv3d(16, 32, kernel_size=3, stride=1, padding=1, dilation=3, bias=True)
     y_cpu = conv_cpu(x_cpu)
     y_cpu.backward(grad_cpu)
-    
-    x_dpcpp = x_cpu.to(dpcpp_device)
+    x_cpu_gw = conv_cpu.weight.grad.detach().clone()
+
+    conv_cpu.zero_grad()
+
+    x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
     grad_dpcpp = grad_cpu.to(dpcpp_device)
     conv_dpcpp = conv_cpu.to(dpcpp_device)
     y_dpcpp = conv_dpcpp(x_dpcpp)
     y_dpcpp.backward(grad_dpcpp)
+    y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
     if not torch_ipex._double_kernel_disabled():
       print("ref: ")
@@ -230,7 +262,7 @@ class TestNNMethod(TestCase):
       print(x_dpcpp.cpu())
 
     self.assertEqual(x_cpu,       x_dpcpp.cpu())
-    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(x_cpu_gw,    y_dpcpp_gw.cpu(), 1e-02)
     self.assertEqual(y_cpu,       y_dpcpp.cpu())
 
   def test_conv_with_nosquare_kernel_size(self, dtype=torch.float):
@@ -239,12 +271,16 @@ class TestNNMethod(TestCase):
     conv_cpu = nn.Conv2d(16, 33, kernel_size=(3, 5), stride=(2, 1), padding=(4, 2), dilation=(3, 1), bias=True)
     y_cpu = conv_cpu(x_cpu)
     y_cpu.backward(grad_cpu)
-    
-    x_dpcpp = x_cpu.to(dpcpp_device)
+    x_cpu_gw = conv_cpu.weight.grad.detach().clone()
+
+    conv_cpu.zero_grad()
+
+    x_dpcpp = x_cpu.to(dpcpp_device).requires_grad_()
     grad_dpcpp = grad_cpu.to(dpcpp_device)
     conv_dpcpp = conv_cpu.to(dpcpp_device)
     y_dpcpp = conv_dpcpp(x_dpcpp)
     y_dpcpp.backward(grad_dpcpp)
+    y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
     if not torch_ipex._double_kernel_disabled():
       print("ref: ")
@@ -258,7 +294,7 @@ class TestNNMethod(TestCase):
       print(x_dpcpp.cpu())
 
     self.assertEqual(x_cpu,       x_dpcpp.cpu())
-    self.assertEqual(grad_cpu, grad_dpcpp.cpu())
+    self.assertEqual(x_cpu_gw,    y_dpcpp_gw.cpu(), 1e-02)
     self.assertEqual(y_cpu,       y_dpcpp.cpu())
 
 
