@@ -6,6 +6,17 @@
 
 namespace dil {
 
+struct convolution_params {
+  dnnl::convolution_forward::primitive_desc pd;
+  dnnl::convolution_forward prim;
+  // bias_attr contains requantization scales for bias
+  attr_t bias_attr;
+  scale_t dst_scales;
+  int groups;
+  convolution_params(dnnl::convolution_forward::primitive_desc p, dnnl::convolution_forward pri,
+    attr_t b, scale_t d, int g):pd(p), prim(pri), bias_attr(b), dst_scales(d), groups(g) {}
+};
+
 class tensor : public memory {
  public:
   using dim_t = dnnl_dim_t;
@@ -13,16 +24,6 @@ class tensor : public memory {
   using format_kind_t = dnnl_format_kind_t;
   using blocking_desc_t = dnnl_blocking_desc_t;
   using descriptor = tensor::desc; // for backward compatibility
-
-  struct convolution_params {
-    dnnl::convolution_forward::primitive_desc pd;
-    // bias_attr contains requantization scales for bias
-    attr_t bias_attr;
-    scale_t dst_scales;
-    int groups;
-    convolution_params(dnnl::convolution_forward::primitive_desc p, attr_t b, scale_t d,
-            int g):pd(p), bias_attr(b), dst_scales(d), groups(g) {}
-  };
 
   struct desc_wrapper {
     desc_wrapper(const dnnl_memory_desc_t *adata) : data(adata) {}
@@ -1031,9 +1032,9 @@ class tensor : public memory {
 
   void copy_workspace(const tensor& other) { workspace_ = other.workspace_; }
 
-  void init_params(dnnl::convolution_forward::primitive_desc pd, attr_t bias_attr,
-          scale_t dst_scales, int groups) {
-    auto params = new convolution_params(pd, bias_attr, dst_scales, groups);
+  void init_params(dnnl::convolution_forward::primitive_desc pd, dnnl::convolution_forward prim,
+    attr_t bias_attr, scale_t dst_scales, int groups) {
+    auto params = new convolution_params(pd, prim, bias_attr, dst_scales, groups);
     conv_params_.reset(params);
   }
   convolution_params &get_params() const {return *conv_params_; }
