@@ -47,8 +47,8 @@ static void upsample_linear_out_dpcpp_kernel(
       : (ndims == 4 ? memory::format_tag::nchw : memory::format_tag::ncw);
   memory::data_type data_type = dt_to_dnnl(input.scalar_type());
 
-  std::shared_ptr<memory::desc> src_desc, dst_desc;
-  src_desc.reset(new memory::desc(src_dims, data_type, data_format));
+  std::shared_ptr<memory::desc> dst_desc;
+  auto src_desc = memory::desc(src_dims, data_type, data_format);
   if (!is_customer_scales)
     dst_desc.reset(new memory::desc(dst_dims, data_type, data_format));
 
@@ -56,7 +56,7 @@ static void upsample_linear_out_dpcpp_kernel(
       prop_kind::forward,
       algorithm::resampling_linear,
       factors,
-      *src_desc,
+      src_desc,
       *dst_desc);
   auto resampling_pd = resampling_forward::primitive_desc(resampling_desc, eng);
   resampling_pd = resampling_forward::primitive_desc(resampling_pd.get());
@@ -109,8 +109,8 @@ static void upsample_linear_backward_out_dpcpp_kernel(
       : (ndims == 4 ? memory::format_tag::nchw : memory::format_tag::ncw);
   memory::data_type data_type = dt_to_dnnl(grad_output.scalar_type());
 
-  std::shared_ptr<memory::desc> src_desc, dst_desc;
-  src_desc.reset(new memory::desc(src_dims, data_type, data_format));
+  std::shared_ptr<memory::desc> dst_desc;
+  auto src_desc = memory::desc(src_dims, data_type, data_format);
   if (!is_customer_scales)
     dst_desc.reset(new memory::desc(dst_dims, data_type, data_format));
 
@@ -118,7 +118,7 @@ static void upsample_linear_backward_out_dpcpp_kernel(
       prop_kind::forward,
       algorithm::resampling_linear,
       factors,
-      *src_desc,
+      src_desc,
       *dst_desc);
   auto resampling_pd = resampling_forward::primitive_desc(resampling_desc, eng);
   resampling_pd = resampling_forward::primitive_desc(resampling_pd.get());
@@ -126,7 +126,7 @@ static void upsample_linear_backward_out_dpcpp_kernel(
   auto resampling_bwd_desc = resampling_backward::desc(
       algorithm::resampling_linear,
       factors,
-      *src_desc,
+      src_desc,
       resampling_pd.dst_desc());
   auto resampling_bwd_pd = resampling_backward::primitive_desc(
       resampling_bwd_desc, eng, resampling_pd);

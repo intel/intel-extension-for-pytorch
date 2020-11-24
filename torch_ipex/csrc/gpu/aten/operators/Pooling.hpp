@@ -283,35 +283,25 @@ static void avg_pool_backward_out_frame(
   auto diff_src_usr_memory = dpcpp_onednn_memory(
       {{gradInput_tz}, data_t, format}, engine, gradInput_data);
 
-  std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
-  pooling_forward_desc.reset(new pooling_forward::desc(
-      prop_kind,
-      alg_kind,
-      gradInput_md,
-      gradOutput_md,
-      stride,
-      kernel,
-      padding,
-      padding));
-  std::shared_ptr<pooling_forward::primitive_desc> pooling_forward_pd;
-  pooling_forward_pd.reset(
-      new pooling_forward::primitive_desc(*pooling_forward_desc, engine));
+  auto pooling_forward_desc = pooling_forward::desc(
+      prop_kind, alg_kind, gradInput_md, gradOutput_md,
+      stride, kernel, padding, padding);
 
-  std::shared_ptr<pooling_backward::desc> pooling_backward_desc;
-  pooling_backward_desc.reset(new pooling_backward::desc(
-      alg_kind, gradInput_md, gradOutput_md, stride, kernel, padding, padding));
-  std::shared_ptr<pooling_backward::primitive_desc> pooling_backward_pd;
-  pooling_backward_pd.reset(new pooling_backward::primitive_desc(
-      *pooling_backward_desc, engine, *pooling_forward_pd));
+  auto pooling_forward_pd = pooling_forward::primitive_desc(pooling_forward_desc, engine);
+
+  auto pooling_backward_desc = pooling_backward::desc(
+      alg_kind, gradInput_md, gradOutput_md, stride, kernel, padding, padding);
+
+  auto pooling_backward_pd = pooling_backward::primitive_desc(
+      pooling_backward_desc, engine, pooling_forward_pd);
+
+  auto pool_backward = pooling_backward(pooling_backward_pd);
 
   auto diff_dst_memory = diff_dst_usr_memory;
   auto diff_src_memory = diff_src_usr_memory;
 
-  std::shared_ptr<pooling_backward> pool_backward;
-  pool_backward.reset(new pooling_backward(*pooling_backward_pd));
-
   DPCPP_ONEDNN_EXEC(
-      *pool_backward,
+      pool_backward,
       strm,
       {{MKLDNN_ARG_DIFF_DST, diff_dst_memory},
        {MKLDNN_ARG_DIFF_SRC, diff_src_memory}});
@@ -569,30 +559,20 @@ static void max_pool_backward_out_frame(
   auto diff_src_usr_memory = dpcpp_onednn_memory(
       {{gradInput_tz}, data_t, format}, engine, gradInput_data);
 
-  std::shared_ptr<pooling_forward::desc> pooling_forward_desc;
-  pooling_forward_desc.reset(new pooling_forward::desc(
-      prop_kind,
-      alg_kind,
-      gradInput_md,
-      gradOutput_md,
-      stride,
-      kernel,
-      padding,
-      padding));
-  std::shared_ptr<pooling_forward::primitive_desc> pooling_forward_pd;
-  pooling_forward_pd.reset(
-      new pooling_forward::primitive_desc(*pooling_forward_desc, engine));
+  auto pooling_forward_desc = pooling_forward::desc(
+      prop_kind, alg_kind, gradInput_md, gradOutput_md,
+      stride, kernel, padding, padding);
 
-  std::shared_ptr<pooling_backward::desc> pooling_backward_desc;
-  pooling_backward_desc.reset(new pooling_backward::desc(
-      alg_kind, gradInput_md, gradOutput_md, stride, kernel, padding, padding));
-  std::shared_ptr<pooling_backward::primitive_desc> pooling_backward_pd;
-  pooling_backward_pd.reset(new pooling_backward::primitive_desc(
-      *pooling_backward_desc, engine, *pooling_forward_pd));
+  auto pooling_forward_pd = pooling_forward::primitive_desc(pooling_forward_desc, engine);
+
+  auto pooling_backward_desc = pooling_backward::desc(
+      alg_kind, gradInput_md, gradOutput_md, stride, kernel, padding, padding);
+
+  auto pooling_backward_pd = pooling_backward::primitive_desc(
+      pooling_backward_desc, engine, pooling_forward_pd);
 
   auto diff_dst_memory = diff_dst_usr_memory;
   auto diff_src_memory = diff_src_usr_memory;
-  std::shared_ptr<pooling_backward> pool_backward;
 
   auto indices_usr =
       at::empty({gradOutput_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
@@ -601,9 +581,9 @@ static void max_pool_backward_out_frame(
       (int64_t*)indices_data,
       indices_usr.numel());
 
-  pool_backward.reset(new pooling_backward(*pooling_backward_pd));
+  auto pool_backward = pooling_backward(pooling_backward_pd);
 
-  auto indices_md = pooling_forward_pd->workspace_desc();
+  auto indices_md = pooling_forward_pd.workspace_desc();
   auto indices_usr_memory = dpcpp_onednn_memory(
       {{gradOutput_tz}, (memory::data_type)indices_md.data.data_type, format},
       engine,
@@ -611,7 +591,7 @@ static void max_pool_backward_out_frame(
   auto indices_memory = indices_usr_memory;
 
   DPCPP_ONEDNN_EXEC(
-      *pool_backward,
+      pool_backward,
       strm,
       {{MKLDNN_ARG_DIFF_DST, diff_dst_memory},
        {MKLDNN_ARG_DIFF_SRC, diff_src_memory},

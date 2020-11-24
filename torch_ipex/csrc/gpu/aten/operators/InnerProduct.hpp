@@ -40,7 +40,6 @@ void inner_product(
   auto output_md = memory::desc({output_tz}, data_t, format_any);
 
   std::shared_ptr<inner_product_forward::desc> ipFwd_desc;
-
   if (use_bias) {
     ipFwd_desc.reset(new inner_product_forward::desc(
         prop_kind::forward_inference, input_md, weight_md, bias_md, output_md));
@@ -59,18 +58,18 @@ void inner_product(
       dpcpp_onednn_memory({{output_tz}, data_t, format_nc}, engine, output);
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  std::shared_ptr<inner_product_forward> ip_forward;
   memory bias_usr_memory;
   if (use_bias) {
     bias_usr_memory = dpcpp_onednn_memory(
         {{bias_tz}, data_t, format_x}, engine, bias.data_ptr());
   } else {
+    // dummy dnnl::memory
     bias_usr_memory = memory({{{}, data_t, format_x}, engine});
   }
 
-  ip_forward.reset(new inner_product_forward(ip_forward_pd));
+  auto ip_forward = inner_product_forward(ip_forward_pd);
   DPCPP_ONEDNN_EXEC(
-      *ip_forward,
+      ip_forward,
       strm,
       {{MKLDNN_ARG_SRC, input_usr_memory},
        {MKLDNN_ARG_WEIGHTS, weight_usr_memory},

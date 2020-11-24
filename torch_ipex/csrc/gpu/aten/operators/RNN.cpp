@@ -141,8 +141,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
       auto dst_iter_c_md =
           memory::desc({dst_iter_c_dims}, data_t, memory::format_tag::any);
 
-      std::shared_ptr<lstm_forward::desc> lstm_forward_desc;
-      lstm_forward_desc.reset(new lstm_forward::desc(
+      auto lstm_forward_desc =  lstm_forward::desc(
           prop_kind::forward_inference,
           dir,
           src_layer_md,
@@ -154,11 +153,9 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
           dst_layer_md,
           dst_iter_md,
           dst_iter_c_md,
-          rnn_flags::undef));
+          rnn_flags::undef);
 
-      std::shared_ptr<lstm_forward::primitive_desc> lstm_forward_pd;
-      lstm_forward_pd.reset(
-          new lstm_forward::primitive_desc(*lstm_forward_desc, engine));
+      auto lstm_forward_pd =  lstm_forward::primitive_desc(lstm_forward_desc, engine);
 
       auto weights_layer_usr_memory = dpcpp_onednn_memory(
           {{weights_layer_dims}, data_t, format_ldigo}, engine, weight_arr_i[index].data_ptr());
@@ -187,7 +184,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
       auto dst_iter_c_usr_memory = dpcpp_onednn_memory(
           {{dst_iter_c_dims}, data_t, format_ldnc}, engine, cy_arr[index].data_ptr());
 
-      auto expected_weights_layer_md = lstm_forward_pd->weights_layer_desc();
+      auto expected_weights_layer_md = lstm_forward_pd.weights_layer_desc();
       auto weights_layer_memory = weights_layer_usr_memory;
       if (weights_layer_usr_memory.get_desc() != expected_weights_layer_md) {
         weights_layer_memory = memory(expected_weights_layer_md, engine);
@@ -195,7 +192,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
             strm, {{DNNL_ARG_FROM, weights_layer_usr_memory}, {DNNL_ARG_TO, weights_layer_memory}});
       }
 
-      auto expected_weights_iter_md = lstm_forward_pd->weights_iter_desc();
+      auto expected_weights_iter_md = lstm_forward_pd.weights_iter_desc();
       auto weights_iter_memory = weights_iter_usr_memory;
       if (weights_iter_usr_memory.get_desc() != expected_weights_iter_md) {
         weights_iter_memory = memory(expected_weights_iter_md, engine);
@@ -203,7 +200,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
             strm, {{DNNL_ARG_FROM, weights_iter_usr_memory}, {DNNL_ARG_TO, weights_iter_memory}});
       }
 
-      auto expected_bias_md = lstm_forward_pd->bias_desc();
+      auto expected_bias_md = lstm_forward_pd.bias_desc();
       auto bias_memory = bias_usr_memory;
       if (bias_usr_memory.get_desc() != expected_bias_md) {
         bias_memory = memory(expected_bias_md, engine);
@@ -211,7 +208,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
             strm, {{DNNL_ARG_FROM, bias_usr_memory}, {DNNL_ARG_TO, bias_memory}});
       }
 
-      auto expected_src_layer_md = lstm_forward_pd->src_layer_desc();
+      auto expected_src_layer_md = lstm_forward_pd.src_layer_desc();
       auto src_layer_memory = src_layer_usr_memory;
       if (src_layer_usr_memory.get_desc() != expected_src_layer_md) {
         src_layer_memory = memory(expected_src_layer_md, engine);
@@ -219,7 +216,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
             strm, {{DNNL_ARG_FROM, src_layer_usr_memory}, {DNNL_ARG_TO, src_layer_memory}});
       }
 
-      auto expected_src_iter_md = lstm_forward_pd->src_iter_desc();
+      auto expected_src_iter_md = lstm_forward_pd.src_iter_desc();
       auto src_iter_memory = src_iter_usr_memory;
       if (src_iter_usr_memory.get_desc() != expected_src_iter_md) {
         src_iter_memory = memory(expected_src_iter_md, engine);
@@ -227,7 +224,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
             strm, {{DNNL_ARG_FROM, src_iter_usr_memory}, {DNNL_ARG_TO, src_iter_memory}});
       }
 
-      auto expected_src_iter_c_md = lstm_forward_pd->src_iter_c_desc();
+      auto expected_src_iter_c_md = lstm_forward_pd.src_iter_c_desc();
       auto src_iter_c_memory = src_iter_c_usr_memory;
       if (src_iter_c_usr_memory.get_desc() != expected_src_iter_c_md) {
         src_iter_c_memory = memory(expected_src_iter_c_md, engine);
@@ -235,7 +232,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
             strm, {{DNNL_ARG_FROM, src_iter_c_usr_memory}, {DNNL_ARG_TO, src_iter_c_memory}});
       }
 
-      auto expected_dst_layer_md = lstm_forward_pd->dst_layer_desc();
+      auto expected_dst_layer_md = lstm_forward_pd.dst_layer_desc();
       auto dst_layer_memory = dst_layer_usr_memory;
       if (dst_layer_usr_memory.get_desc() != expected_dst_layer_md) {
         dst_layer_memory = memory(expected_dst_layer_md, engine);
@@ -243,7 +240,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
             strm, {{DNNL_ARG_FROM, dst_layer_usr_memory}, {DNNL_ARG_TO, dst_layer_memory}});
       }
 
-      auto expected_dst_iter_md = lstm_forward_pd->dst_iter_desc();
+      auto expected_dst_iter_md = lstm_forward_pd.dst_iter_desc();
       auto dst_iter_memory = dst_iter_usr_memory;
       if (dst_iter_usr_memory.get_desc() != expected_dst_iter_md) {
         dst_iter_memory = memory(expected_dst_iter_md, engine);
@@ -251,7 +248,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
             strm, {{DNNL_ARG_FROM, dst_iter_usr_memory}, {DNNL_ARG_TO, dst_iter_memory}});
       }
 
-      auto expected_dst_iter_c_md = lstm_forward_pd->dst_iter_c_desc();
+      auto expected_dst_iter_c_md = lstm_forward_pd.dst_iter_c_desc();
       auto dst_iter_c_memory = dst_iter_c_usr_memory;
       if (dst_iter_c_usr_memory.get_desc() != expected_dst_iter_c_md) {
         dst_iter_c_memory = memory(expected_dst_iter_c_md, engine);
@@ -259,9 +256,8 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
             strm, {{DNNL_ARG_FROM, dst_iter_c_usr_memory}, {DNNL_ARG_TO, dst_iter_c_memory}});
       }
 
-      std::shared_ptr<lstm_forward> lstm1_forward;
-      lstm1_forward.reset(new lstm_forward(*lstm_forward_pd));
-      DPCPP_ONEDNN_EXEC(*lstm1_forward, strm,
+      auto lstm1_forward = lstm_forward(lstm_forward_pd);
+      DPCPP_ONEDNN_EXEC(lstm1_forward, strm,
           {{DNNL_ARG_SRC_LAYER, src_layer_memory},
            {DNNL_ARG_SRC_ITER, src_iter_memory},
            {DNNL_ARG_SRC_ITER_C, src_iter_c_memory},

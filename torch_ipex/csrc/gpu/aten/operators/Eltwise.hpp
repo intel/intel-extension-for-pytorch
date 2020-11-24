@@ -80,9 +80,8 @@ void dpcpp_eltwise(
   }
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  std::shared_ptr<mkldnn::primitive> eltwise_fwd;
-  eltwise_fwd.reset(new mkldnn::eltwise_forward(eltwise_forward_pd));
-  DPCPP_ONEDNN_EXEC(*eltwise_fwd, strm,
+  auto eltwise_fwd = mkldnn::eltwise_forward(eltwise_forward_pd);
+  DPCPP_ONEDNN_EXEC(eltwise_fwd, strm,
       {{MKLDNN_ARG_SRC, input_usr_memory},
        {MKLDNN_ARG_DST, output_usr_memory}});
 }
@@ -128,9 +127,8 @@ void dpcpp_eltwise_backward(
       {{input_tz}, data_t, format_nchw}, engine, diff_src);
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  std::shared_ptr<mkldnn::primitive> eltwise_bwd;
-  eltwise_bwd.reset(new mkldnn::eltwise_backward(eltwise_backward_pd));
-  DPCPP_ONEDNN_EXEC(*eltwise_bwd, strm,
+  auto eltwise_bwd = mkldnn::eltwise_backward(eltwise_backward_pd);
+  DPCPP_ONEDNN_EXEC(eltwise_bwd, strm,
       {{MKLDNN_ARG_SRC, src_usr_memory},
        {MKLDNN_ARG_DIFF_DST, diff_dst_memory},
        {MKLDNN_ARG_DIFF_SRC, diff_src_memory}});

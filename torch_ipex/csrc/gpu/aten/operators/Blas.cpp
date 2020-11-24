@@ -160,10 +160,8 @@ void mkldnnGemmImpl(
   matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
 #endif
 
-  std::shared_ptr<dnnl::matmul::primitive_desc> matmul_pd;
-  matmul_pd.reset(new dnnl::matmul::primitive_desc(*matmul_desc, attr, engine));
-  std::shared_ptr<dnnl::matmul> matmul_p;
-  matmul_p.reset(new dnnl::matmul(*matmul_pd));
+  auto matmul_pd = dnnl::matmul::primitive_desc(*matmul_desc, attr, engine);
+  auto matmul_p = dnnl::matmul(matmul_pd);
 
   auto m1_memory = dpcpp_onednn_memory(m1_md, engine, m1.data_ptr());
   auto m2_memory = dpcpp_onednn_memory(m2_md, engine, m2.data_ptr());
@@ -172,16 +170,16 @@ void mkldnnGemmImpl(
 #ifdef USE_GEN12HP_ONEDNN
   if (beta == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_memory = dpcpp_onednn_memory(b_md, engine, b.data_ptr());
-    DPCPP_ONEDNN_EXEC(*matmul_p, strm,
+    DPCPP_ONEDNN_EXEC(matmul_p, strm,
       {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
         {DNNL_ARG_BIAS, b_memory}, {DNNL_ARG_DST, r_memory}});
   } else {
-    DPCPP_ONEDNN_EXEC(*matmul_p, strm,
+    DPCPP_ONEDNN_EXEC(matmul_p, strm,
       {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
         {DNNL_ARG_DST, r_memory}});
   }
 #else
-  DPCPP_ONEDNN_EXEC(*matmul_p, strm,
+  DPCPP_ONEDNN_EXEC(matmul_p, strm,
     {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
       {DNNL_ARG_DST, r_memory}});
 #endif

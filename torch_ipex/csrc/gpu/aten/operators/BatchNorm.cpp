@@ -151,10 +151,10 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   auto output_usr_memory = dpcpp_onednn_memory(
       batch_norm_forward_pd.dst_desc(), engine, output.data_ptr());
 
-  std::shared_ptr<mkldnn::primitive> bn_fwd;
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  bn_fwd.reset(new batch_normalization_forward(batch_norm_forward_pd));
+  auto bn_fwd = batch_normalization_forward(batch_norm_forward_pd);
+
   std::unordered_map<int, memory> args = {
       {MKLDNN_ARG_SRC, input_usr_memory},
       {MKLDNN_ARG_DST, output_usr_memory},
@@ -203,7 +203,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   args.insert({MKLDNN_ARG_MEAN, mean_memory});
   args.insert({MKLDNN_ARG_VARIANCE, var_memory});
 
-  DPCPP_ONEDNN_EXEC(*bn_fwd, strm, args);
+  DPCPP_ONEDNN_EXEC(bn_fwd, strm, args);
 
   if (training && running_mean.defined() && running_var.defined()) {
     dpcppMemoryScale1(
@@ -371,9 +371,8 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
       {{input_tz}, data_t, dnnl_format}, engine, grad_input.data_ptr());
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  std::shared_ptr<mkldnn::primitive> bn_bwd;
 
-  bn_bwd.reset(new batch_normalization_backward(bn_bwd_pd));
+  auto bn_bwd = batch_normalization_backward(bn_bwd_pd);
 
   std::unordered_map<int, memory> args = {
       {MKLDNN_ARG_SRC, input_usr_memory},
@@ -408,7 +407,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     args.insert({MKLDNN_ARG_DIFF_SCALE_SHIFT, grad_weight_bias_memory});
   }
 
-  DPCPP_ONEDNN_EXEC(*bn_bwd, strm, args);
+  DPCPP_ONEDNN_EXEC(bn_bwd, strm, args);
 
   if ((bool)(flags & normalization_flags::use_scale_shift)) {
     dpcppMemcpyAsync(

@@ -53,7 +53,7 @@ static inline Tensor sum(Tensor& output,
     if (cur_desc != tar_desc) {
       _cur = empty_opaque_tensor(tar_desc, cur.options(), c10::nullopt);
       _curs.push_back(_cur);
-      cur_mem = memory(tar_desc, engine, _cur.data_ptr());
+      cur_mem = dpcpp_onednn_memory(tar_desc, engine, _cur.data_ptr());
       DPCPP_ONEDNN_EXEC(reorder(cur_usr_mem, cur_mem),
           strm, {{DNNL_ARG_FROM, cur_usr_mem}, {DNNL_ARG_TO, cur_mem}});
     }

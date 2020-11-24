@@ -377,24 +377,19 @@ Tensor _softmax_onednn(
   auto axis = dim < 0 ? dim + input.dim(): dim;
 
   // Create operation descriptor.
-  std::shared_ptr<softmax_forward::desc> softmax_forward_desc;
-  softmax_forward_desc.reset(new softmax_forward::desc(
-            prop_kind::forward, input_md, axis));
+  auto softmax_forward_desc = softmax_forward::desc(prop_kind::forward, input_md, axis);
   // Create primitive descriptor.
-  std::shared_ptr<softmax_forward::primitive_desc> softmax_forward_pd;
-  softmax_forward_pd.reset(new softmax_forward::primitive_desc(
-       *softmax_forward_desc, engine));
+  auto softmax_forward_pd = softmax_forward::primitive_desc(softmax_forward_desc, engine);
   auto input_usr_memory = dpcpp_onednn_memory(
          {{input_tz}, data_t, dnnl_format}, engine, input.data_ptr());
   auto output_usr_memory = dpcpp_onednn_memory(
          {{input_tz}, data_t, dnnl_format}, engine, output.data_ptr());
 
   // Create the primitive.
-  std::shared_ptr<softmax_forward> softmax_onednn_forward;
-  softmax_onednn_forward.reset(new softmax_forward(*softmax_forward_pd));
+  auto softmax_onednn_forward = softmax_forward(softmax_forward_pd);
 
   // Primitive execution.
-  DPCPP_ONEDNN_EXEC(*softmax_onednn_forward, strm,
+  DPCPP_ONEDNN_EXEC(softmax_onednn_forward, strm,
       {{MKLDNN_ARG_SRC, input_usr_memory},
        {MKLDNN_ARG_DST, output_usr_memory}});
 
