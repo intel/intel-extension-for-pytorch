@@ -515,14 +515,32 @@ Tensor dpcpp_convolution_backward_input(
   auto conv_backward_data_pd = convolution_backward_data::primitive_desc(
       conv_backward_data_desc, engine, conv_forward_pd);
 
-  auto grad_output_usr_memory = dpcpp_onednn_memory(
+  memory grad_output_usr_memory, weight_usr_memory, grad_input_usr_memory;
+  if (!lazy_reorder_enabled()) {
+    grad_output_usr_memory = dpcpp_onednn_memory(
       {{output_tz}, data_grad, format_nchw}, engine, grad_output.data_ptr());
 
-  auto weight_usr_memory = dpcpp_onednn_memory(
+    weight_usr_memory = dpcpp_onednn_memory(
       {{weight_tz}, weight_t, format_weight}, engine, weight.data_ptr());
 
-  auto grad_input_usr_memory = dpcpp_onednn_memory(
+    grad_input_usr_memory = dpcpp_onednn_memory(
       {{input_tz}, data_grad, format_nchw}, engine, grad_input.data_ptr());
+  } else {
+    auto grad_output_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(grad_output);
+    grad_output_usr_memory = grad_output_ctx.is_plain()
+        ? dpcpp_onednn_memory({{output_tz}, data_grad, format_nchw}, engine, grad_output.data_ptr())
+        : dpcpp_onednn_memory({grad_output_ctx.meta()}, engine, grad_output.data_ptr());
+
+    auto weight_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(weight);
+    weight_usr_memory = weight_ctx.is_plain()
+        ? dpcpp_onednn_memory({{weight_tz}, weight_t, format_nchw}, engine, weight.data_ptr())
+        : dpcpp_onednn_memory({weight_ctx.meta()}, engine, weight.data_ptr());
+
+    auto grad_input_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(grad_input);
+    grad_input_usr_memory = grad_input_ctx.is_plain()
+        ? dpcpp_onednn_memory({{output_tz}, data_grad, format_nchw}, engine, grad_input.data_ptr())
+        : dpcpp_onednn_memory({grad_input_ctx.meta()}, engine, grad_input.data_ptr());
+  }
 
   Tensor grad_output_;
   auto expected_grad_output_md = conv_backward_data_pd.diff_dst_desc();
@@ -578,12 +596,15 @@ Tensor dpcpp_convolution_backward_input(
       {MKLDNN_ARG_WEIGHTS, weight_memory},
       {MKLDNN_ARG_DIFF_SRC, grad_input_memory}});
 
-  if (grad_input_memory != grad_input_usr_memory) {
+  if (!lazy_reorder_enabled() && grad_input_memory != grad_input_usr_memory) {
     DPCPP_ONEDNN_EXEC(
         reorder(grad_input_memory, grad_input_usr_memory),
         strm,
         {{DNNL_ARG_FROM, grad_input_memory},
         {DNNL_ARG_TO, grad_input_usr_memory}});
+  } else if (lazy_reorder_enabled() && grad_input_memory != grad_input_usr_memory) {
+    auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(grad_input_);
+    DPCPPTensorContext::set_tensor_ctx(grad_input, std::move(blk_ctx));
   }
 
   return grad_input;
@@ -720,14 +741,33 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   auto conv_backward_weight_pd = mkldnn::convolution_backward_weights::primitive_desc(
           *conv_backward_weight_desc, engine, conv_forward_pd);
 
-  auto input_usr_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_grad, format_nchw}, engine, input.data_ptr());
+  // create usr memory, enable reorder here
+  memory input_usr_memory, grad_output_usr_memory, grad_weight_usr_memory;
+  if (!lazy_reorder_enabled()) {
+    input_usr_memory = dpcpp_onednn_memory(
+        {{input_tz}, data_grad, format_nchw}, engine, input.data_ptr());
 
-  auto grad_output_usr_memory = dpcpp_onednn_memory(
-      {{output_tz}, data_grad, format_nchw}, engine, grad_output.data_ptr());
+    grad_output_usr_memory = dpcpp_onednn_memory(
+        {{output_tz}, data_grad, format_nchw}, engine, grad_output.data_ptr());
 
-  auto grad_weight_usr_memory = dpcpp_onednn_memory(
-      {{weight_tz}, weight_t, format_weight}, engine, grad_weight.data_ptr());
+    grad_weight_usr_memory = dpcpp_onednn_memory(
+        {{weight_tz}, weight_t, format_weight}, engine, grad_weight.data_ptr());
+  } else {
+    auto input_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
+    input_usr_memory = input_ctx.is_plain()
+        ? dpcpp_onednn_memory({{input_tz}, data_grad, format_nchw}, engine, input.data_ptr())
+        : dpcpp_onednn_memory({input_ctx.meta()}, engine, input.data_ptr());
+
+    auto grad_output_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(grad_output);
+    grad_output_usr_memory = grad_output_ctx.is_plain()
+        ? dpcpp_onednn_memory({{output_tz}, data_grad, format_nchw}, engine, grad_output.data_ptr())
+        : dpcpp_onednn_memory({grad_output_ctx.meta()}, engine, grad_output.data_ptr());
+
+    auto grad_weight_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(grad_weight);
+    grad_weight_usr_memory = grad_weight_ctx.is_plain()
+        ? dpcpp_onednn_memory({{weight_tz}, weight_t, format_weight}, engine, grad_weight.data_ptr())
+        : dpcpp_onednn_memory({grad_weight_ctx.meta()}, engine, grad_weight.data_ptr());
+  }
 
   Tensor input_;
   auto expected_input_md = conv_backward_weight_pd.src_desc();
@@ -777,8 +817,15 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
 
   memory grad_bias_memory;
   if (bias_defined) {
-    grad_bias_memory = dpcpp_onednn_memory(
+    if (!lazy_reorder_enabled()) {
+      grad_bias_memory = dpcpp_onednn_memory(
         {{bias_tz}, bias_t, format_x}, engine, grad_bias.data_ptr());
+    } else {
+      auto grad_bias_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(grad_bias);
+      grad_bias_memory = grad_bias_ctx.is_plain()
+        ? dpcpp_onednn_memory({{bias_tz}, bias_t, format_x}, engine, grad_bias.data_ptr())
+        : dpcpp_onednn_memory({grad_bias_ctx.meta()}, engine, grad_bias.data_ptr());
+    }
   } else {
     grad_bias_memory = memory({{}, bias_t, format_x}, engine);
   }
@@ -792,12 +839,15 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
       {MKLDNN_ARG_DIFF_WEIGHTS, grad_weight_memory},
       {MKLDNN_ARG_DIFF_BIAS, grad_bias_memory}});
 
-  if (grad_weight_memory != grad_weight_usr_memory) {
+  if (!lazy_reorder_enabled() && grad_weight_memory != grad_weight_usr_memory) {
     DPCPP_ONEDNN_EXEC(
         reorder(grad_weight_memory, grad_weight_usr_memory),
         strm,
         {{DNNL_ARG_FROM, grad_weight_memory},
         {DNNL_ARG_TO, grad_weight_usr_memory}});
+  } else if (lazy_reorder_enabled() && grad_weight_memory != grad_weight_usr_memory) {
+    auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(grad_weight_);
+    DPCPPTensorContext::set_tensor_ctx(grad_weight, std::move(blk_ctx));
   }
 
   return std::tuple<at::Tensor, at::Tensor>{grad_weight, grad_bias};
