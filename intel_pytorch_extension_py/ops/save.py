@@ -14,13 +14,13 @@ def save(obj, f, pickle_module=pickle, pickle_protocol=DEFAULT_PROTOCOL, _use_ne
         for k in obj.keys():
             if isinstance(obj[k], dict):
                 to_cpu(obj[k])
-            elif torch.is_tensor(obj[k]) and obj[k].device.type == 'dpcpp':
+            elif torch.is_tensor(obj[k]) and obj[k].device.type == 'xpu':
                 obj[k] = obj[k].to('cpu')
 
     if isinstance(obj, dict):
         obj_copy = copy.deepcopy(obj)
         to_cpu(obj_copy)
-    elif torch.is_tensor(obj) and obj.device.type == 'dpcpp':
+    elif torch.is_tensor(obj) and obj.device.type == 'xpu':
         obj_copy = copy.deepcopy(obj).to('cpu')
     elif isinstance(obj, torch.nn.Module): 
         obj_copy = copy.deepcopy(obj).to('cpu')

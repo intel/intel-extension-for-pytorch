@@ -13,14 +13,14 @@ def to(module, *args, **kwargs):
     m = torch_to(module, *args, **kwargs)
 
     device, dtype, non_blocking, convert_to_format = torch._C._nn._parse_to(*args, **kwargs)
-    
-    if not device or device.type != "dpcpp":
+
+    if not device or device.type != "xpu":
         return m
-    
+
     def mark_param(t):
         for param in t.parameters():
             core.set_parameter_tensor(param.data)
-    
+
     return apply(m, mark_param)
 
 torch.nn.Module.to = to

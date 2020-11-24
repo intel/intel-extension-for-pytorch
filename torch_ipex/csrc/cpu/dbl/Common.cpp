@@ -259,7 +259,7 @@ void equip_dil_buffer_nosync_shape(const at::Tensor& tensor, dil::tensor dil_buf
     tensor_data,
     new_shade_data_context,
     &(cpu::ShadeDataContext::freeShadeDataContext),
-    tensor.device().type());
+    tensor.device());
 
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)tensor.unsafeGetTensorImpl();
   ipex_tensor_impl->storage().set_data_ptr(std::move(shade_data_ptr));
@@ -335,7 +335,7 @@ at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
     tensor_data,
     shade_data_context,
     cpu::ShadeDataContext::freeShadeDataContext,
-    at::DeviceType::XPU);
+    c10::Device(at::DeviceType::XPU, 0));
   size_t nbytes = shade_data_context->dil_tensor->get_nelems() * c10::elementSize(at_data_type);
   auto storage_impl = c10::make_intrusive<at::StorageImpl>(
     at::StorageImpl::use_byte_size_t(),
@@ -343,7 +343,7 @@ at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
     std::move(shade_data_ptr),
     nullptr,
     /*resizeable=*/false);
-  auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::XPU, at::ScalarType(at::kFloat));
+  auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::XPU, at_data_type);
   sync_shape_from_dil_to_aten(_tensor, shade_data_context->dil_tensor.value());
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_tensor.layout() == c10::kStrided);
   return _tensor;

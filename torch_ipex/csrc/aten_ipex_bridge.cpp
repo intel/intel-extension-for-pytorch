@@ -81,7 +81,7 @@ void attachShadeDataContext(const at::Tensor& tensor) {
     data_ptr.get(),
     shade_data_context,
     cpu::ShadeDataContext::freeShadeDataContext,
-    tensor.device().type());
+    tensor.device());
   tensor.unsafeGetTensorImpl()->storage().set_data_ptr(std::move(shade_data_ptr));
 }
 
@@ -215,7 +215,7 @@ at::Tensor shallowUpgradeToDPCPPTensor(const at::Tensor& cpuTensor) {
     auto cpu_storage = cpu_tensor_impl->storage().unsafeGetStorageImpl();
     // [NOTE]: If the deleter of DPCPP::CPU is different form CPU deleter, we need to call
     //         compare_exchange_deleter of DataPtr to update deleter
-    cpu_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU));
+    cpu_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU, 0));
     auto _tensor =  at::detail::make_tensor<IPEXTensorImpl>(cpuTensor.storage(), at::DispatchKey::XPU, cpuTensor.scalar_type());
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_tensor.device().type() == at::DeviceType::XPU);
     IPEXTensorImpl* ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
@@ -239,7 +239,7 @@ at::Tensor shallowUpgradeToDPCPPTensorA(const at::Tensor& ipexTensor, const at::
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cpuTensor.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipexTensor.device().type() == at::DeviceType::XPU);
 
-  ipexTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU));
+  ipexTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU, 0));
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipexTensor.storage().device_type() == at::DeviceType::XPU);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cpuTensor.device().type() == at::DeviceType::CPU);
@@ -260,16 +260,16 @@ at::Tensor shallowUpgradeToDPCPPTensorA(const at::Tensor& ipexTensor, const at::
 }
 
 
-// Upgrade CPU tensor to DPCPP Tensor with shallow copy
-// It will not create an new DPCPP tensor but shares CPU tensor buffer
+// Upgrade CPU tensor to XPU Tensor with shallow copy
+// It will not create an new XPU tensor but shares CPU tensor buffer
 const at::Tensor& shallowUpgradeToDPCPPTensorAW(const at::Tensor& ipexTensor, const at::Tensor& cpuTensor) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipexTensor.defined());
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cpuTensor.defined());
 
   // The dispatch priority of XPU is higher than other CPU tensor ids. So if a tensor is CPU and
-  // another tensor is DPCPP, it still will be disptached to DPCPP OPs.
-  //   ex, a = tensor(1, device='dpcpp')), a.to('cpu')
-  // The above code will call AtenIpexCPUDefault::copy_ and "self" parameter is cpu tensor and "src" parameter is dpcpp tensor.
+  // another tensor is XPU, it still will be disptached to XPU OPs.
+  //   ex, a = tensor(1, device='xpu')), a.to('cpu')
+  // The above code will call AtenIpexCPUDefault::copy_ and "self" parameter is cpu tensor and "src" parameter is XPU tensor.
   if (ipexTensor.device().type() == cpuTensor.device().type()) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cpuTensor.device().type() == at::DeviceType::CPU);
     return ipexTensor;
@@ -318,7 +318,7 @@ const at::Tensor& shallowUpgradeToDPCPPTensorAW(const at::Tensor& ipexTensor, co
     // Some inplace OPs replace its storage but not modify its raw data. (ex. set_)
     if (ipex_tensor_storage_impl != cpu_tensor_storage_impl) {
       TORCH_WARN("An in-place OP implements its semantic by replace storage!");
-      cpuTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU));
+      cpuTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU, 0));
       ipexTensor.unsafeGetTensorImpl()->set_storage_keep_dtype(cpuTensor.storage());
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipexTensor.scalar_type() == cpuTensor.scalar_type());
     }
@@ -335,7 +335,7 @@ const at::Tensor& shallowUpgradeToDPCPPTensorAW(const at::Tensor& ipexTensor, co
     //   ipexTensor.storage().set_data_ptr(std::move(dpcpp_data_ptr));
     //
 
-    ipexTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU));
+    ipexTensor.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU, 0));
 
     IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)ipexTensor.unsafeGetTensorImpl();
     ipex_tensor_impl->copy_meta_info(cpuTensor.unsafeGetTensorImpl());

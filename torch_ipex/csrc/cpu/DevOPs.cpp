@@ -398,7 +398,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
       }
       if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
         if (transposed) {
-          return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.has_value() && !bias.value().is_contiguous() ? bias.value().contiguous() : at::Tensor(), padding, output_padding, stride, dilation, groups);
+          return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.has_value() ? (bias.value().is_contiguous() ? bias.value() : bias.value().contiguous()) : at::Tensor(), padding, output_padding, stride, dilation, groups);
         } else {
           // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
           auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
@@ -767,6 +767,10 @@ at::Tensor& AtenIpexCPUDev::dil_bmm_out(at::Tensor &result, const at::Tensor& ba
   auto w = dbl::comm::try_gen_dil_tensor(batch2);
   dil::tensor y;
   matmul_common(x, w, dil::tensor(), y);
+
+  // Resize the storage capacity in case that the storage cannot store the result
+  auto storage_capacity = inferred_size[0] * inferred_size[1] * inferred_size[2] * result.element_size();
+  result.storage().set_nbytes(storage_capacity);
 
   dbl::comm::equip_dil_buffer(result, y);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(result.sizes().equals(inferred_size));
@@ -2108,7 +2112,7 @@ at::Tensor dil_as_strided(
 
   // share storage
   auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
-  self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU));
+  self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU, 0));
   auto result = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::XPU, self.scalar_type());
 
   auto* _tensor_impl = (IPEXTensorImpl *)result.unsafeGetTensorImpl();
@@ -2280,7 +2284,7 @@ at::Tensor alias_with_sizes_and_strides(
 
   // share storage
   auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
-  self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU));
+  self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU, 0));
   auto self_ = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::XPU, self.scalar_type());
 
   auto* _tensor_impl = (IPEXTensorImpl *)self_.unsafeGetTensorImpl();

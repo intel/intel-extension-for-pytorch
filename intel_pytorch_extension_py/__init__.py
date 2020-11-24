@@ -8,7 +8,7 @@ from .optim import *
 from .ops import *
 import _torch_ipex as core
 
-DEVICE = 'xpu'
+DEVICE = 'xpu:0'
 
 class AmpConf(object):
     def __init__(self, mixed_dtype = torch.bfloat16, configure_file = None):
