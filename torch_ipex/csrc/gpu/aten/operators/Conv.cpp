@@ -441,8 +441,8 @@ Tensor dpcpp_convolution_backward_input(
 
   // align data type with bf16
   auto data_grad = dt_to_dnnl(grad_output.scalar_type());
-  auto data_t = memory::data_type::f32;
   auto weight_t = dt_to_dnnl(weight.scalar_type());
+  auto bias_t = dnnl::memory::data_type::f32;
   auto format_any = memory::format_tag::any;
   auto format_nchw = memory::format_tag::nchw;
   auto format_weight = (g != 1) ? memory::format_tag::goihw : memory::format_tag::oihw;
@@ -489,8 +489,8 @@ Tensor dpcpp_convolution_backward_input(
   }
 
   auto input_md = memory::desc({input_tz}, data_grad, format_any);
-  auto weight_md = memory::desc({weight_tz}, data_t, format_any);
-  auto bias_md = memory::desc({bias_tz}, data_t, format_any);
+  auto weight_md = memory::desc({weight_tz}, weight_t, format_any);
+  auto bias_md = memory::desc({bias_tz}, bias_t, format_any);
   auto output_md = memory::desc({output_tz}, data_grad, format_any);
 
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
@@ -519,7 +519,7 @@ Tensor dpcpp_convolution_backward_input(
       {{output_tz}, data_grad, format_nchw}, engine, grad_output.data_ptr());
 
   auto weight_usr_memory = dpcpp_onednn_memory(
-      {{weight_tz}, data_t, format_weight}, engine, weight.data_ptr());
+      {{weight_tz}, weight_t, format_weight}, engine, weight.data_ptr());
 
   auto grad_input_usr_memory = dpcpp_onednn_memory(
       {{input_tz}, data_grad, format_nchw}, engine, grad_input.data_ptr());
@@ -598,11 +598,11 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     IntArrayRef dilation,
     int64_t groups,
     bool bias_defined) {
-  auto grad_weight = at::empty(weight_size, grad_output.options()).to(ScalarType::Float);
+  auto grad_weight = at::empty(weight_size, grad_output.options());
 
   Tensor grad_bias;
   if (bias_defined) {
-    grad_bias = at::empty({grad_output.size(1)}, grad_output.options()).to(ScalarType::Float);
+    grad_bias = at::empty({grad_output.size(1)}, grad_output.options());
   }
 
   if (input.numel() == 0) {
@@ -634,7 +634,8 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
 
   // align data type with bf16
   auto data_grad = dt_to_dnnl(grad_output.scalar_type());
-  auto data_t = memory::data_type::f32;
+  auto weight_t = dt_to_dnnl(grad_output.scalar_type());
+  auto bias_t = memory::data_type::f32;
   auto format_any = memory::format_tag::any;
   auto format_nchw = memory::format_tag::nchw;
   auto format_weight =
@@ -684,8 +685,8 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   }
 
   auto input_md = memory::desc({input_tz}, data_grad, format_any);
-  auto weight_md = memory::desc({weight_tz}, data_t, format_any);
-  auto bias_md = memory::desc({bias_tz}, data_t, format_any);
+  auto weight_md = memory::desc({weight_tz}, weight_t, format_any);
+  auto bias_md = memory::desc({bias_tz}, bias_t, format_any);
   auto output_md = memory::desc({output_tz}, data_grad, format_any);
 
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
@@ -726,7 +727,7 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
       {{output_tz}, data_grad, format_nchw}, engine, grad_output.data_ptr());
 
   auto grad_weight_usr_memory = dpcpp_onednn_memory(
-      {{weight_tz}, data_t, format_weight}, engine, grad_weight.data_ptr());
+      {{weight_tz}, weight_t, format_weight}, engine, grad_weight.data_ptr());
 
   Tensor input_;
   auto expected_input_md = conv_backward_weight_pd.src_desc();
@@ -777,10 +778,9 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   memory grad_bias_memory;
   if (bias_defined) {
     grad_bias_memory = dpcpp_onednn_memory(
-        {{bias_tz}, data_t, format_x}, engine, grad_bias.data_ptr());
+        {{bias_tz}, bias_t, format_x}, engine, grad_bias.data_ptr());
   } else {
-    // dummy dnnl::memory
-    grad_bias_memory = memory({{}, data_t, format_x}, engine);
+    grad_bias_memory = memory({{}, bias_t, format_x}, engine);
   }
 
   auto conv_backward_weight = mkldnn::convolution_backward_weights(conv_backward_weight_pd);
@@ -1436,3 +1436,4 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
 
 } // namespace AtenIpexTypeDPCPP
 } // namespace at
+
