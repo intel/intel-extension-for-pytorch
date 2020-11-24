@@ -92,6 +92,5 @@ class TestNNMethod(TestCase):
         print("xpu")
         output_dpcpp, input_dpcpp = _test_dpcpp(
             input_dpcpp, target_dpcpp, "sum")
-        tol = output_cpu.item()*5e-5
-        self.assertEqual(output_cpu, output_dpcpp.cpu(), tol)
+        self.assertTrue(torch.allclose(output_cpu, output_dpcpp.cpu(), rtol=5e-5))
         self.assertEqual(input_cpu.grad, input_dpcpp.grad.cpu())
