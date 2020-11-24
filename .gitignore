@@ -137,6 +137,7 @@ gen
 .setuptools-cmake-build
 .pytest_cache
 aten/build/*
+torch_ipex/csrc/gpu/aten/generated/*
 
 # Bram
 plsdontbreak

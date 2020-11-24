@@ -6,6 +6,10 @@
 #include <core/Runtime.h>
 #include <utils/Math.h>
 
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
+
 using namespace dnnl;
 using namespace at::dpcpp;
 
@@ -49,6 +53,11 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   normalization_flags flags = normalization_flags::use_scale_shift;
 
   bool useScaleShift = (bool)(flags & normalization_flags::use_scale_shift);
+
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  create_key(key, input_md, epsilon, (unsigned int)flags);
+#endif
   layer_normalization_forward::desc layer_norm_forward_desc(
       propagation, input_md, epsilon, flags);
   auto lnorm_fwd_pd = layer_normalization_forward::primitive_desc(
@@ -88,8 +97,16 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   }
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  DPCPP_ONEDNN_EXEC(layer_normalization_forward(lnorm_fwd_pd), strm, args);
 
+
+
+#ifdef USE_PRIMITIVE_CACHE
+  auto ln_forward = fetch_or_create_m<layer_normalization_forward>(key, lnorm_fwd_pd);
+#else
+  auto ln_forward = layer_normalization_forward(lnorm_fwd_pd);
+#endif
+
+  DPCPP_ONEDNN_EXEC(ln_forward, strm, args);
   return std::make_tuple(output.view(X.sizes()), mean, rstd);
 }
 

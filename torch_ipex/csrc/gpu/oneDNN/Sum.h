@@ -5,6 +5,7 @@
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
 #include <tensor/Context.h>
+#include <ATen/aten_ipex_type_dpcpp.h>
 #include "Utils.h"
 
 #include <dnnl.hpp>

@@ -1,5 +1,4 @@
 #include <ATen/quantized/QTensorImpl.h>
-
 #include <ATen/ipex_type_dpcpp_customized.h>
 #include <ATen/quantized/Quantizer.h>
 #include <core/DPCPPUtils.h>
@@ -7,7 +6,9 @@
 #include <core/Runtime.h>
 #include <core/TensorImplUtils.h>
 #include <tensor/Context.h>
-
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
 #include <utils/ParamUtils.h>
 
 #include "Conv.h"
@@ -132,14 +133,25 @@ at::Tensor convolution(
   auto weight_md = memory::desc({weight_tz}, wei_data_t, format_any);
   auto output_md = memory::desc({output_tz}, dst_data_t, format_any);
 
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+#endif
   std::shared_ptr<convolution_forward::desc> conv_forward_desc;
   if (bias.defined()) {
     auto bias_md = memory::desc({bias_tz}, bias_data_t, format_any);
+#ifdef USE_PRIMITIVE_CACHE
+    create_key(key, input_md, weight_md, bias_md,
+        output_md, _stride, _dilation, _padding, _padding, attr.attr());
+#endif
     conv_forward_desc.reset(new convolution_forward::desc(
         prop_kind::forward, algorithm::convolution_direct,
         input_md, weight_md, bias_md, output_md,
         _stride, _dilation, _padding, _padding));
   } else {
+#ifdef USE_PRIMITIVE_CACHE
+    create_key(key, input_md, weight_md,
+        output_md, _stride, _dilation, _padding, _padding, attr.attr());
+#endif
     conv_forward_desc.reset(new convolution_forward::desc(
         prop_kind::forward, algorithm::convolution_direct,
         input_md, weight_md, output_md,
@@ -378,7 +390,13 @@ at::Tensor convolution(
     bias_memory = memory({{}, bias_data_t, format_x}, engine);
   }
 
+#ifdef USE_PRIMITIVE_CACHE
+  auto conv_forward =
+      fetch_or_create_m<convolution_forward>(key, conv_forward_pd);
+#else
   auto conv_forward = convolution_forward(conv_forward_pd);
+#endif
+
   DPCPP_ONEDNN_EXEC(
       conv_forward,
       strm,

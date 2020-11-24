@@ -17,6 +17,10 @@ using mem_layout_tag_t = dnnl::memory::format_tag;
 using meta_t = mem_desc_t;
 using data_t = void*;
 
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
+
 namespace at {
 namespace AtenIpexTypeDPCPP {
 
@@ -227,7 +231,14 @@ class DPCPPTensorConvertor {
     auto from_mem = dpcpp_onednn_memory(from_md, engine, from.data_ptr());
     auto to_mem = dpcpp_onednn_memory(to_md, engine, to.data_ptr());
 
-    DPCPP_ONEDNN_EXEC(dnnl::reorder(from_mem, to_mem),
+#ifdef USE_PRIMITIVE_CACHE
+    lru_key_t key;
+    create_key(key, from_md, to_md);
+    auto reorder_p = fetch_or_create_m<dnnl::reorder>(key, from_mem, to_mem);
+#else
+    auto reorder_p = dnnl::reorder(from_mem, to_mem);
+#endif
+    DPCPP_ONEDNN_EXEC(reorder_p,
         strm, {{DNNL_ARG_FROM, from_mem}, {DNNL_ARG_TO, to_mem}});
     return true;
   }

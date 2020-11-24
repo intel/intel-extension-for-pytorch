@@ -9,6 +9,10 @@
 
 #include <dnnl.hpp>
 
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
+
 using namespace mkldnn;
 using namespace at::dpcpp;
 using namespace at::native;
@@ -140,6 +144,10 @@ static void avg_pool_out_frame(
                                     : input_ctx.meta();
   }
 
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  create_key(key, input_md, output_md, stride, kernel, padding, padding, alg_kind);
+#endif
   auto pooling_forward_desc = pooling_forward::desc(
       prop_kind,
       alg_kind,
@@ -204,7 +212,11 @@ static void avg_pool_out_frame(
   }
 
   auto output_memory = output_usr_memory;
+#ifdef USE_PRIMITIVE_CACHE
+  auto pool_forward = fetch_or_create_m<pooling_forward>(key, pooling_forward_pd);
+#else
   auto pool_forward = pooling_forward(pooling_forward_pd);
+#endif
   DPCPP_ONEDNN_EXEC(
       pool_forward,
       strm,
@@ -376,6 +388,10 @@ static void max_pool_out_frame(
                                     : input_ctx.meta();
   }
 
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  create_key(key, input_md, output_md, stride, kernel, padding, padding, alg_kind);
+#endif
   auto pooling_forward_desc = pooling_forward::desc(
       prop_kind,
       alg_kind,
@@ -458,7 +474,11 @@ static void max_pool_out_frame(
     }
     auto indices_memory = indices_usr_memory;
 
+#ifdef USE_PRIMITIVE_CACHE
+    auto pool_forward = fetch_or_create_m<pooling_forward>(key, pooling_forward_pd);
+#else
     auto pool_forward = pooling_forward(pooling_forward_pd);
+#endif
     DPCPP_ONEDNN_EXEC(
         pool_forward,
         strm,
@@ -480,7 +500,11 @@ static void max_pool_out_frame(
     }
   } else {
     indices = at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
+#ifdef USE_PRIMITIVE_CACHE
+    auto pool_forward = fetch_or_create_m<pooling_forward>(key, pooling_forward_pd);
+#else
     auto pool_forward = pooling_forward(pooling_forward_pd);
+#endif
     DPCPP_ONEDNN_EXEC(
         pool_forward,
         strm,

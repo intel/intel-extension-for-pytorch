@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/ExpandUtils.h>
 #include <torch/csrc/autograd/record_function.h>
+#include <oneDNN/oneDNN.h>
 
 #include <core/TensorImplUtils.h>
 
@@ -10,6 +11,10 @@
 #include <dnnl.hpp>
 
 #include "QUtil.h"
+
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
 
 using namespace dnnl;
 using namespace at::dpcpp;
@@ -89,6 +94,7 @@ void mkldnnGemmImpl(
 
   primitive_attr attr;
   post_ops po;
+  int64_t post_flags = 0;
   if (alpha != 1.f)
     attr.set_output_scales(/* mask */ 0, {(float)alpha});
 #ifdef USE_GEN12HP_ONEDNN
@@ -96,15 +102,19 @@ void mkldnnGemmImpl(
   // 1. beta == 0, nothing is needed to do
   // 2. quantization path, no bias fusion support in oneDNN so far
   // 3. beta == 1, partially support bias fusion in oneDNN
-  if (beta != 0.f && (beta != 1.f || m1.is_quantized() || m2.is_quantized()))
+  if (beta != 0.f && (beta != 1.f || m1.is_quantized() || m2.is_quantized())) {
     po.append_sum(beta);
 #else
-  if (beta != 0.f)
+  if (beta != 0.f) {
     po.append_sum(beta);
 #endif
+    post_flags |= at::dpcpp::oneDNN::with_sum;
+  }
 
-  if (with_relu)
-    po.append_eltwise(1.f, dnnl::algorithm::eltwise_relu, 0.f, 0.f);;
+  if (with_relu) {
+    po.append_eltwise(1.f, dnnl::algorithm::eltwise_relu, 0.f, 0.f);
+    post_flags |= at::dpcpp::oneDNN::with_relu;
+  }
   attr.set_post_ops(po);
 
   std::vector<float> weight_scales;
@@ -136,6 +146,10 @@ void mkldnnGemmImpl(
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+#endif
+
   std::shared_ptr<dnnl::matmul::desc> matmul_desc;
 #ifdef USE_GEN12HP_ONEDNN
   if (beta == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
@@ -152,16 +166,29 @@ void mkldnnGemmImpl(
         b_md = memory::desc({mb, m, n}, b_dt, {b.stride(0), b.stride(1), b.stride(2)});
       }
     }
+  #ifdef USE_PRIMITIVE_CACHE
+    create_key(key, m1_md, m2_md, b_md, r_md, post_flags);
+  #endif
     matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, b_md, r_md));
   } else {
+  #ifdef USE_PRIMITIVE_CACHE
+    create_key(key, m1_md, m2_md, r_md, post_flags);
+  #endif
     matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
   }
 #else
+#ifdef USE_PRIMITIVE_CACHE
+  create_key(key, m1_md, m2_md, r_md, post_flags);
+#endif
   matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
 #endif
 
   auto matmul_pd = dnnl::matmul::primitive_desc(*matmul_desc, attr, engine);
+#ifdef USE_PRIMITIVE_CACHE
+  auto matmul_p = fetch_or_create_m<dnnl::matmul>(key, matmul_pd);
+#else
   auto matmul_p = dnnl::matmul(matmul_pd);
+#endif
 
   auto m1_memory = dpcpp_onednn_memory(m1_md, engine, m1.data_ptr());
   auto m2_memory = dpcpp_onednn_memory(m2_md, engine, m2.data_ptr());
@@ -315,7 +342,7 @@ Tensor addmm(
   } else {
     result = at::empty({0}, input.options());
   }
-  
+
   if(m1.is_quantized()){
     IPEX_DISPATCH_QINT_TYPES(
       m1.scalar_type(),

@@ -5,10 +5,14 @@
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
 #include <tensor/Context.h>
+#include <ATen/aten_ipex_type_dpcpp.h>
 #include "Utils.h"
 
 #include <dnnl.hpp>
 
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
 
 using namespace dnnl;
 using namespace at::AtenIpexTypeDPCPP;
@@ -81,14 +85,18 @@ static inline Tensor bin(Tensor& output, const Tensor& t1, const Tensor& t2) {
     mo = dpcpp_onednn_memory(tar_md, engine, _output.data_ptr());
   }
 
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  create_key(key, tar_md);
+#endif
   auto pd = binary::primitive_desc({algo, tar_md, tar_md, tar_md}, engine);
+#ifdef USE_PRIMITIVE_CACHE
+  auto prim = fetch_or_create_m<binary>(key, pd);
+#else
   auto prim = binary(pd);
+#endif
 
-  prim.execute(strm,
-              {{DNNL_ARG_SRC_0, m1},
-               {DNNL_ARG_SRC_1, m2},
-               {DNNL_ARG_DST, mo}});
-
+  DPCPP_ONEDNN_EXEC(prim, strm, {{DNNL_ARG_SRC_0, m1}, {DNNL_ARG_SRC_1, m2}, {DNNL_ARG_DST, mo}});
   if (mdo != tar_md)
     DPCPP_ONEDNN_EXEC(reorder(mo, mo_usr), strm, {{DNNL_ARG_FROM, mo}, {DNNL_ARG_TO, mo_usr}});
 
