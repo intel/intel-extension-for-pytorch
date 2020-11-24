@@ -1,15 +1,27 @@
 #pragma once
 
+
+#define NUM_THREADS (C10_WARP_SIZE * 2)
+#define THREAD_WORK_SIZE 4
+#define BLOCK_WORK_SIZE (THREAD_WORK_SIZE * num_threads)
+
+//constexpr int num_threads = NUM_THREADS;
+//constexpr int thread_work_size = THREAD_WORK_SIZE;
+constexpr int thread_work_size = THREAD_WORK_SIZE;
+//constexpr int block_work_size = BLOCK_WORK_SIZE;
+
 #include <ATen/ATen.h>
 #include <ATen/core/Array.h>
 #include <ATen/detail/FunctionTraits.h>
 #include <ATen/native/TensorIterator.h>
+#include <ATen/native/TensorIteratorDynamicCasting.h>
 #include <core/detail/OffsetCalculator.h>
 #include <core/detail/TensorInfo.h>
 
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
+#include "MemoryAccess.h"
 
 using namespace at::dpcpp;
 
@@ -69,6 +81,32 @@ static OffsetCalculator<N> make_offset_calculator(const TensorIterator& iter) {
     strides[i] = iter.strides(i).data();
   }
   return OffsetCalculator<N>(iter.ndim(), iter.shape().data(), strides.data());
+}
+
+template<int N>
+static OffsetCalculator<N> make_input_offset_calculator(const TensorIterator& iter) {
+  // array size can not be 0, this happens when N == 0
+  constexpr int array_size = std::max<int>(N, 1);
+  TORCH_INTERNAL_ASSERT(N == iter.ntensors() - iter.noutputs());
+  std::array<const int64_t*, array_size> strides;
+  int64_t element_sizes[array_size];
+  for (int i = 0; i < N; i++) {
+    strides[i] = iter.strides(i + iter.noutputs()).data();
+    element_sizes[i] = iter.element_size(i + iter.noutputs());
+  }
+  return OffsetCalculator<N>(iter.ndim(), iter.shape().data(), strides.data(), element_sizes);
+}
+
+template <int num_outputs = 1>
+static OffsetCalculator<num_outputs> make_output_offset_calculator(const TensorIterator& iter) {
+  TORCH_INTERNAL_ASSERT(num_outputs == iter.noutputs());
+  std::array<const int64_t*, num_outputs> strides;
+  int64_t element_sizes[num_outputs];
+  for (int i = 0; i < num_outputs; i++) {
+    strides[i] = iter.strides(i).data();
+    element_sizes[i] = iter.element_size(i);
+  }
+  return OffsetCalculator<num_outputs>(iter.ndim(), iter.shape().data(), strides.data(), element_sizes);
 }
 
 template <typename traits, typename ptr_t, std::size_t... INDEX>
@@ -163,8 +201,192 @@ typename traits::ArgsTuple dereference(
 
 #define REPEAT_PATTERN(n, f) CHR(REPEAT_, DEC(n))(DEC(n), f)
 
+template<typename func_t, typename policy_t>
+inline void elementwise_kernel_helper(func_t f, policy_t policy) {
+  using traits = function_traits<func_t>;
+  using return_t = typename traits::result_type;
+  using args_t = typename traits::ArgsTuple;
+
+  return_t results[thread_work_size];
+  args_t args[thread_work_size];
+
+  // load
+  policy.load(args);
+
+  // compute
+  for (int i = 0; i < thread_work_size; i++) {
+    if (policy.check_inbounds(i)) {
+      results[i] = c10::guts::apply(f, args[i]);
+    }
+  }
+
+  // store
+  policy.store(results);
+}
+
+template<typename func_t, typename array_t, typename inp_calc_t, typename out_calc_t, typename loader_t, typename storer_t>
+void unrolled_elementwise_kernel(DPCPP::item<1> item_id, int N, func_t f, array_t data,
+                                            inp_calc_t ic, out_calc_t oc, loader_t l, storer_t s)
+{
+  int thread_idx = item_id.get_linear_id();
+  int remaining = N - thread_idx * thread_work_size;
+  auto policy = at::native::Memory::policies::unroll<array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(data, remaining, ic, oc, l, s,
+                                                                                                          thread_idx);
+  elementwise_kernel_helper(f, policy);
+}
+
+DPCPP_DEF_K1(launch_unrolled_kernel_impl);
+template<typename func_t, typename array_t, typename inp_calc_t, typename out_calc_t, typename loader_t, typename storer_t>
+static inline void launch_unrolled_kernel(int64_t N, const func_t& f, array_t data,
+                                          inp_calc_t ic, out_calc_t oc, loader_t l, storer_t s)
+{
+  using traits = function_traits<func_t>;
+  using ret_t = typename traits::result_type;
+
+  TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  int thread_num = (N + thread_work_size - 1)/thread_work_size;
+
+  auto cgf = DPCPP_Q_CGF(__cgh) {
+
+      auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+          unrolled_elementwise_kernel(item_id, N, f, data, ic, oc, l, s);
+      };
+
+      __cgh.parallel_for<DPCPP_K(launch_unrolled_kernel_impl, func_t, inp_calc_t, out_calc_t, loader_t, storer_t, ret_t)>(
+              DPCPP::range</*dim=*/1>(thread_num), kfn);
+  };
+
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+}
+
+#if 1
+template<int vec_size, typename func_t, typename array_t>
+void vectorized_elementwise_kernel(DPCPP::item<1> item_id, int N, func_t f, array_t data) {
+  using traits = function_traits<func_t>;
+  int thread_idx = item_id.get_linear_id();
+  int remaining = N - vec_size * thread_idx;
+
+  if (remaining < vec_size) {  // if this thread handles the reminder, just do a naive unrolled loop
+    auto input_calc = TrivialOffsetCalculator<traits::arity>();
+    auto output_calc = TrivialOffsetCalculator<1>();
+    auto loader = at::native::Memory::LoadWithoutCast();
+    auto storer = at::native::Memory::StoreWithoutCast();
+    auto policy = at::native::Memory::policies::unroll<array_t, decltype(input_calc), decltype(output_calc),
+            at::native::Memory::LoadWithoutCast, at::native::Memory::StoreWithoutCast>(
+            data, remaining, input_calc, output_calc, loader, storer, thread_idx);
+    elementwise_kernel_helper(f, policy);
+  } else {  // if this block has a full `block_work_size` data to handle, use vectorized memory access
+    elementwise_kernel_helper(f, at::native::Memory::policies::vectorized<vec_size, array_t>(data, thread_idx));
+  }
+}
+
+DPCPP_DEF_K1(launch_vectorized_kernel_impl);
+// this function assume trivial 1d and no dynamic casting
+template<typename func_t, typename array_t>
+static inline void launch_vectorized_kernel(int64_t N, const func_t& f, array_t data) {
+  using traits = function_traits<func_t>;
+  TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  int vec_size = at::native::Memory::can_vectorize_up_to<func_t>(data);
+  int thread_num = (N + vec_size - 1)/vec_size;
+
+  switch (vec_size) {
+    case 4: {
+//        std::cout << "johnlu 4 vector size launch_vectorized_kernel_impl thread num " << thread_num << std::endl;
+        auto cgf = DPCPP_Q_CGF(__cgh) {
+            auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+                vectorized_elementwise_kernel<4>(item_id, N, f, data);
+            };
+            __cgh.parallel_for<DPCPP_K(launch_vectorized_kernel_impl, func_t, int)>(
+                    DPCPP::range</*dim=*/1>(thread_num), kfn);
+        };
+        DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+        break;
+      }
+    case 2: {
+//        std::cout << "johnlu 2 vector size launch_vectorized_kernel_impl thread num " << thread_num << std::endl;
+        auto cgf = DPCPP_Q_CGF(__cgh) {
+            auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
+                vectorized_elementwise_kernel<2>(item_id, N, f, data);
+            };
+            __cgh.parallel_for<DPCPP_K(launch_vectorized_kernel_impl, func_t, float)>(
+                    DPCPP::range</*dim=*/1>(thread_num), kfn);
+        };
+        DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+        break;
+      }
+    case 1: {
+//      std::cout << "johnlu vector normal unroll kernel vec size " << vec_size << std::endl;
+      auto input_calc = TrivialOffsetCalculator<traits::arity>();
+      auto output_calc = TrivialOffsetCalculator<1>();
+      auto loader = at::native::Memory::LoadWithoutCast();
+      auto storer = at::native::Memory::StoreWithoutCast();
+      launch_unrolled_kernel(N, f, data, input_calc, output_calc, loader, storer);
+      break;
+    }
+    default:
+      TORCH_INTERNAL_ASSERT(false, "Unexpected vectorization size", vec_size);
+  }
+}
+
+#endif
+
+template <typename func_t>
+void new_dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
+  using traits = function_traits<func_t>;
+  constexpr int ntensors = traits::arity + 1;
+
+  TORCH_INTERNAL_ASSERT(iter.can_use_32bit_indexing());
+  TORCH_INTERNAL_ASSERT(iter.ninputs() == traits::arity);
+  TORCH_INTERNAL_ASSERT(iter.noutputs() == 1);
+
+  at::detail::Array<char*, ntensors> data;
+  for (int i = 0; i < ntensors; i++) {
+    data[i] = (char*)iter.data_ptr(i);
+  }
+
+  int64_t numel = iter.numel();
+
+  bool contiguous = iter.is_contiguous();
+  bool dynamic_casting = at::native::needs_dynamic_casting<func_t>::check(iter);
+
+  if (!dynamic_casting) {
+    if (contiguous) {
+//      std::cout << "johnlu contiguous "<< std::endl;
+      launch_vectorized_kernel(numel, f, data);
+    } else {
+//      std::cout << "johnlu non-contiguous "<< std::endl;
+      auto input_offset_calculator = make_input_offset_calculator<traits::arity>(iter);
+      auto output_offset_calculator = make_output_offset_calculator(iter);
+      auto loader = at::native::Memory::LoadWithoutCast();
+      auto storer = at::native::Memory::StoreWithoutCast();
+      launch_unrolled_kernel(numel, f, data, input_offset_calculator, output_offset_calculator, loader, storer);
+    }
+  } else {
+    at::detail::Array<ScalarType, traits::arity> dtypes;
+    for (int i = 0; i < traits::arity; i++) {
+      dtypes[i] = iter.tensor(i + 1).scalar_type();
+    }
+    auto loader = at::native::Memory::LoadWithCast<traits::arity>(dtypes);
+    auto storer = at::native::Memory::StoreWithCast(iter.tensor(0).scalar_type());
+
+    if (contiguous) {
+//      std::cout << "johnlu dynamic_casting contiguous "<< std::endl;
+      auto input_offset_calculator = TrivialOffsetCalculator<traits::arity>();
+      auto output_offset_calculator = TrivialOffsetCalculator<1>();
+      launch_unrolled_kernel(numel, f, data, input_offset_calculator, output_offset_calculator, loader, storer);
+    } else {
+//      std::cout << "johnlu dynamic_casting non-contiguous "<< std::endl;
+      auto input_offset_calculator = make_input_offset_calculator<traits::arity>(iter);
+      auto output_offset_calculator = make_output_offset_calculator(iter);
+      launch_unrolled_kernel(numel, f, data, input_offset_calculator, output_offset_calculator, loader, storer);
+    }
+  }
+}
+
 DPCPP_DEF_K1(dpcpp_loops_kernel_impl);
-template <typename kernel_name, typename func_t>
+template <typename func_t>
 void dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
   using traits = function_traits<func_t>;
   TORCH_INTERNAL_ASSERT(iter.can_use_32bit_indexing());
@@ -225,14 +447,14 @@ void dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
           f, dereference<traits>(&in_ptrs.data[0], &offsets.data[1], 1));
     };
 
-    __cgh.parallel_for<DPCPP_K(dpcpp_loops_kernel_impl, kernel_name, ret_t)>(
+    __cgh.parallel_for<DPCPP_K(dpcpp_loops_kernel_impl, func_t, ret_t)>(
         DPCPP::range</*dim=*/1>(numel), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
-template <typename scalar_t, typename func_t>
+template <typename kernel_name, typename func_t>
 void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
   for (int arg = 0; arg < iter.ntensors(); arg++) {
     TORCH_INTERNAL_ASSERT(iter.device(arg).type() == at::kXPU);
@@ -244,12 +466,73 @@ void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
 
   if (!iter.can_use_32bit_indexing()) {
     for (auto& sub_iter : iter.with_32bit_indexing()) {
-      dpcpp_kernel_for_tensor_iter<scalar_t>(sub_iter, f);
+      dpcpp_kernel_for_tensor_iter<kernel_name>(sub_iter, f);
     }
     return;
   }
 
-  dpcpp_loops_kernel_impl<scalar_t>(iter, f);
+  if (dpcpp_env(ENV_LOOPS_TEST)) {
+    // legacy code
+    dpcpp_loops_kernel_impl(iter, f);
+  } else {
+    new_dpcpp_loops_kernel_impl(iter, f);
+  }
+}
+
+
+template<typename func_t>
+struct AUnaryFunctor {
+  using traits = function_traits<func_t>;
+  using arg1_t = typename traits::template arg<0>::type;
+  using arg2_t = typename traits::template arg<1>::type;
+  using return_t = typename traits::result_type;
+  return_t operator()(arg2_t b) const {
+    return f(a, b);
+  }
+  AUnaryFunctor(func_t f_, arg1_t a_): f(f_), a(a_) {}
+private:
+  func_t f;
+  arg1_t a;
+};
+
+template<typename func_t>
+struct BUnaryFunctor {
+  using traits = function_traits<func_t>;
+  using arg1_t = typename traits::template arg<0>::type;
+  using arg2_t = typename traits::template arg<1>::type;
+  using return_t = typename traits::result_type;
+  return_t operator()(arg1_t a) const {
+    return f(a, b);
+  }
+  BUnaryFunctor(func_t f_, arg2_t b_): f(f_), b(b_) {}
+private:
+  func_t f;
+  arg2_t b;
+};
+
+template <typename kernel_name, typename func_t>
+void dpcpp_kernel_with_scalars(TensorIterator& iter, const func_t& f) {
+  TORCH_INTERNAL_ASSERT(iter.ntensors() == 3);
+
+  using traits = function_traits<func_t>;
+  static_assert(
+          traits::arity == 2,
+          "dpcpp_kernel_with_scalars only supports two input arguments");
+
+  using arg1_t = typename traits::template arg<0>::type;
+  using arg2_t = typename traits::template arg<1>::type;
+  if (iter.is_cpu_scalar(1)) {
+    AUnaryFunctor<func_t> af(f, iter.scalar_value<arg1_t>(1));
+    iter.remove_operand(1);
+    const OptionalDeviceGuard device_guard(device_of(iter.tensor(1)));
+    dpcpp_kernel_for_tensor_iter<kernel_name>(iter, af);
+  } else if (iter.is_cpu_scalar(2)) {
+    BUnaryFunctor<func_t> bf(f, iter.scalar_value<arg2_t>(2));
+    iter.remove_operand(2);
+    dpcpp_kernel_for_tensor_iter<kernel_name>(iter, bf);
+  } else {
+    dpcpp_kernel_for_tensor_iter<kernel_name>(iter, f);
+  }
 }
 
 DPCPP_DEF_K1(dpcpp_small_index_kernel);

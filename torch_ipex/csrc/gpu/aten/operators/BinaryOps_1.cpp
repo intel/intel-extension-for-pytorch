@@ -27,7 +27,7 @@ static void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
       "add",
       [&]() {
         auto alpha = alpha_scalar.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<SyclOpAdd>(
+          dpcpp_kernel_with_scalars<SyclOpAdd>(
             iter,
             [=](scalar_t a, scalar_t b) -> scalar_t { return a + alpha * b; });
       });
@@ -100,10 +100,7 @@ Tensor& add_out(
     other = to_plain_if_needed(_other);
   }
 
-  auto iter = TensorIterator::binary_op(
-      result,
-      self.scalar_type() == result.scalar_type() ? self : self.to(result.scalar_type()),
-      other.scalar_type() == result.scalar_type() ? other : other.to(result.scalar_type()));
+  auto iter = TensorIterator::binary_op(result, self, other);
   impl::alpha_check(iter, alpha);
   impl::add_kernel_dpcpp(iter, alpha);
   TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());

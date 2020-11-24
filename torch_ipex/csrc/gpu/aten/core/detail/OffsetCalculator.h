@@ -31,7 +31,7 @@ struct OffsetCalculator {
     return NARGS * dim + arg;
   }
 
-  OffsetCalculator(int dims, const int64_t* sizes, const int64_t* const* strides) : dims(dims) {
+  OffsetCalculator(int dims, const int64_t* sizes, const int64_t* const* strides, const int64_t* element_sizes=nullptr) : dims(dims) {
     TORCH_CHECK(dims <= MAX_DIMS, "tensor has too many (>25) dims");
     for (int i = 0; i < MAX_DIMS; ++i) {
       if (i < dims) {
@@ -40,7 +40,8 @@ struct OffsetCalculator {
         sizes_[i] = IntDivider<index_t>(1);
       }
       for (int arg = 0; arg < NARGS; arg++) {
-        strides_[__wa(i, arg)][0] =  i < dims ? strides[arg][i] : 0;
+        int64_t element_size = (element_sizes == nullptr ? 1LL : element_sizes[arg]);
+        strides_[__wa(i, arg)][0] = i < dims ? strides[arg][i] / element_size : 0;
       }
     }
   }
@@ -72,4 +73,19 @@ struct OffsetCalculator {
   int dims;
   IntDivider<index_t> sizes_[MAX_DIMS];
   index_t strides_[MAX_DIMS*NARGS][1];
+};
+
+template <int NARGS, typename index_t = uint32_t>
+struct TrivialOffsetCalculator {
+  // The offset for each argument. Wrapper around fixed-size array.
+  // The offsets are in # of elements, not in bytes.
+  using offset_type = at::dpcpp::Array<index_t, std::max<int>(NARGS, 1)>;
+
+  C10_HOST_DEVICE offset_type get(index_t linear_idx) const {
+    offset_type offsets;
+    for (int arg = 0; arg < NARGS; arg++) {
+      offsets[arg] = linear_idx;
+    }
+    return offsets;
+  }
 };

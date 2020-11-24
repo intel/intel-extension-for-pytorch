@@ -25,16 +25,16 @@ static void mul_kernel_dpcpp(TensorIterator& iter) {
       iter.dtype(),
       "mul",
       [&]() {
-        dpcpp_kernel_for_tensor_iter<SyclOpMul>(
-            iter, [=](scalar_t a, scalar_t b) -> scalar_t { return a * b; });
+        dpcpp_kernel_with_scalars<SyclOpMul>(
+          iter, [=](scalar_t a, scalar_t b) -> scalar_t { return a * b; });
       });
 }
 
 static void div_kernel_dpcpp(TensorIterator& iter) {
   if (isIntegralType(iter.dtype(), false)) {
     IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "div", [&] {
-      dpcpp_kernel_for_tensor_iter<SyclOpDiv>(
-          iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
+      dpcpp_kernel_with_scalars<SyclOpDiv>(
+        iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
     });
   } else {
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -43,8 +43,8 @@ static void div_kernel_dpcpp(TensorIterator& iter) {
         iter.dtype(),
         "div",
         [&]() {
-          dpcpp_kernel_for_tensor_iter<SyclOpDiv>(
-              iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
+          dpcpp_kernel_with_scalars<SyclOpDiv>(
+            iter, [](scalar_t a, scalar_t b) -> scalar_t { return a / b; });
         });
   }
 }
