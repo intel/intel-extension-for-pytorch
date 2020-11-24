@@ -7,6 +7,9 @@
 #include <tensor/Context.h>
 #include <ATen/ipex_type_dpcpp_customized.h>
 
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
 
 using namespace mkldnn;
 using mkldnn::algorithm;
@@ -45,6 +48,12 @@ void dpcpp_eltwise(
         dpcpp_onednn_memory(input_md, engine, input.data_ptr());
   }
 
+
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  create_key(key, input_md, alpha, beta);
+#endif
+
   eltwise_forward::desc eltwise_eltwiseFwd_desc(
       prop_kind::forward, alg_kind, input_md, alpha, beta);
   auto eltwise_forward_pd =
@@ -80,8 +89,17 @@ void dpcpp_eltwise(
   }
 
   auto strm = GpuStreamManager::Instance().get_stream();
+
+#ifdef USE_PRIMITIVE_CACHE
+  auto eltwise_fwd =
+      fetch_or_create_m<mkldnn::eltwise_forward>(key, eltwise_forward_pd);
+#else
   auto eltwise_fwd = mkldnn::eltwise_forward(eltwise_forward_pd);
-  DPCPP_ONEDNN_EXEC(eltwise_fwd, strm,
+#endif
+
+  DPCPP_ONEDNN_EXEC(
+      eltwise_fwd,
+      strm,
       {{MKLDNN_ARG_SRC, input_usr_memory},
        {MKLDNN_ARG_DST, output_usr_memory}});
 }

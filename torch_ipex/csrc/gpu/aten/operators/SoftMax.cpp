@@ -5,9 +5,12 @@
 #include <core/Context.h>
 #include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
-
 #include <utils/Numerics.h>
 #include <operators/Reduce.h>
+
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
 
 using namespace at::dpcpp;
 using namespace mkldnn;
@@ -378,6 +381,12 @@ Tensor _softmax_onednn(
 
   // Create operation descriptor.
   auto softmax_forward_desc = softmax_forward::desc(prop_kind::forward, input_md, axis);
+
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  create_key (key, input_md, axis);
+#endif
+
   // Create primitive descriptor.
   auto softmax_forward_pd = softmax_forward::primitive_desc(softmax_forward_desc, engine);
   auto input_usr_memory = dpcpp_onednn_memory(
@@ -386,10 +395,17 @@ Tensor _softmax_onednn(
          {{input_tz}, data_t, dnnl_format}, engine, output.data_ptr());
 
   // Create the primitive.
+#ifdef USE_PRIMITIVE_CACHE
+  auto softmax_onednn_forward =
+      fetch_or_create_m<softmax_forward>(key, softmax_forward_pd);
+#else
   auto softmax_onednn_forward = softmax_forward(softmax_forward_pd);
+#endif
 
   // Primitive execution.
-  DPCPP_ONEDNN_EXEC(softmax_onednn_forward, strm,
+  DPCPP_ONEDNN_EXEC(
+      softmax_onednn_forward,
+      strm,
       {{MKLDNN_ARG_SRC, input_usr_memory},
        {MKLDNN_ARG_DST, output_usr_memory}});
 

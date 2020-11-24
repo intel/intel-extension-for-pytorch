@@ -9,6 +9,9 @@
 #include <tensor/Context.h>
 #include <ATen/ipex_type_dpcpp_customized.h>
 
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
 
 using namespace mkldnn;
 using namespace at::dpcpp;
@@ -130,6 +133,11 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
         input_ctx.meta();
   }
 
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  create_key(key, input_md, epsilon, flag);
+#endif
+
   batch_normalization_forward::desc batch_norm_forward_desc(
       propagation, input_md, epsilon, flag);
   auto batch_norm_forward_pd = batch_normalization_forward::primitive_desc(
@@ -151,9 +159,12 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   auto output_usr_memory = dpcpp_onednn_memory(
       batch_norm_forward_pd.dst_desc(), engine, output.data_ptr());
 
-  auto strm = GpuStreamManager::Instance().get_stream();
-
+#ifdef USE_PRIMITIVE_CACHE
+  auto bn_fwd = fetch_or_create_m<batch_normalization_forward>(key, batch_norm_forward_pd);
+#else
   auto bn_fwd = batch_normalization_forward(batch_norm_forward_pd);
+#endif
+  auto strm = GpuStreamManager::Instance().get_stream();
 
   std::unordered_map<int, memory> args = {
       {MKLDNN_ARG_SRC, input_usr_memory},

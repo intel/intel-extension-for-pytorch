@@ -3,6 +3,11 @@
 #include <core/Runtime.h>
 #include <dnnl.hpp>
 
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+lru_key_t key;
+#endif
+
 using namespace mkldnn;
 
 namespace at {
@@ -40,10 +45,21 @@ void inner_product(
   auto output_md = memory::desc({output_tz}, data_t, format_any);
 
   std::shared_ptr<inner_product_forward::desc> ipFwd_desc;
+
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+#endif
+
   if (use_bias) {
+#ifdef USE_PRIMITIVE_CACHE
+    create_key(key, input_md, weight_md, bias_md, output_md);
+#endif
     ipFwd_desc.reset(new inner_product_forward::desc(
         prop_kind::forward_inference, input_md, weight_md, bias_md, output_md));
   } else {
+#ifdef USE_PRIMITIVE_CACHE
+    create_key(key, input_md, weight_md, output_md);
+#endif
     ipFwd_desc.reset(new inner_product_forward::desc(
         prop_kind::forward_inference, input_md, weight_md, output_md));
   }
@@ -67,7 +83,11 @@ void inner_product(
     bias_usr_memory = memory({{{}, data_t, format_x}, engine});
   }
 
+#ifdef USE_PRIMITIVE_CACHE
+  auto ip_forward = fetch_or_create_m<inner_product_forward>(key, ip_forward_pd);
+#else
   auto ip_forward = inner_product_forward(ip_forward_pd);
+#endif
   DPCPP_ONEDNN_EXEC(
       ip_forward,
       strm,

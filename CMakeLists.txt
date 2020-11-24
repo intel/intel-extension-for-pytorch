@@ -22,6 +22,7 @@ option(USE_GEN12HP_ONEDNN "Use the oneDNN Gen12HP branch" OFF)
 option(USE_PERSIST_STREAM "Use persistent oneDNN stream" ON)
 option(BUILD_INTERNAL_DEBUG "Use internal debug code path" OFF)
 cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "BUILD_INTERNAL_DEBUG" OFF)
+option(USE_PRIMITIVE_CACHE "Use primitive cache for oneDNN primitive" ON)
 
 include(cmake/GPU.cmake)
 
@@ -82,6 +83,7 @@ function (print_configuration_summary)
     message(STATUS "  BUILD_NO_L0_ONEDNN    : ${BUILD_NO_L0_ONEDNN}")
   endif()
     message(STATUS "  USE_GEN12HP_ONEDNN    : ${USE_GEN12HP_ONEDNN}")
+    message(STATUS "  USE_PRIMITIVE_CACHE   : ${USE_PRIMITIVE_CACHE}")
     message(STATUS "")
 endfunction()
 

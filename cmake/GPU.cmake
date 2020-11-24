@@ -145,6 +145,10 @@ if (USE_GEN12HP_ONEDNN)
   add_definitions(-DUSE_GEN12HP_ONEDNN)
 endif()
 
+if (USE_PRIMITIVE_CACHE)
+  add_definitions(-DUSE_PRIMITIVE_CACHE)
+endif()
+
 if(USE_DPCPP)
   add_definitions(-DUSE_DPCPP)
   # Suppress the compiler warning about undefined CL_TARGET_OPENCL_VERSION
