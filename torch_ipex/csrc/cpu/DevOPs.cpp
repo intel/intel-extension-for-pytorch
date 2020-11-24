@@ -768,10 +768,6 @@ at::Tensor& AtenIpexCPUDev::dil_bmm_out(at::Tensor &result, const at::Tensor& ba
   dil::tensor y;
   matmul_common(x, w, dil::tensor(), y);
 
-  // Resize the storage capacity in case that the storage cannot store the result
-  auto storage_capacity = inferred_size[0] * inferred_size[1] * inferred_size[2] * result.element_size();
-  result.storage().set_nbytes(storage_capacity);
-
   dbl::comm::equip_dil_buffer(result, y);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(result.sizes().equals(inferred_size));
   return result;

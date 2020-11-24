@@ -902,7 +902,7 @@ class TestPool(TestCase):
             y_cpu,
             y_dpcpp)
 
-        self.assertEqual(device, y_dpcpp.device.type)
+        self.assertEqual(torch.device(device), y_dpcpp.device)
 
     def test_adaptive_avg_pool2d_backward_not_divisible(self):
         ipex.core.enable_auto_dnnl()
@@ -922,8 +922,8 @@ class TestPool(TestCase):
         y_dpcpp.backward()
         self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
-        self.assertEqual(device, x_dpcpp.grad.device.type)
-        self.assertEqual(device, y_dpcpp.device.type)
+        self.assertEqual(torch.device(device), x_dpcpp.grad.device)
+        self.assertEqual(torch.device(device), y_dpcpp.device)
 
     def test_max_pool2d(self):
         ipex.core.enable_auto_dnnl()
@@ -972,7 +972,7 @@ class TestPool(TestCase):
                     y_dpcpp = max_pool2d(x_dpcpp)
                     self.assertEqual(y_cpu, y_dpcpp)
 
-                    self.assertEqual(device, y_dpcpp.device.type)
+                    self.assertEqual(torch.device(device), y_dpcpp.device)
 
     def test_max_pool3d(self):
         ipex.core.enable_auto_dnnl()
@@ -1041,8 +1041,8 @@ class TestPool(TestCase):
             y2.backward()
             self.assertEqual(x1.grad, x2.grad)
 
-            self.assertEqual(device, x2.grad.device.type)
-            self.assertEqual(device, y2.device.type)
+            self.assertEqual(torch.device(device), x2.grad.device)
+            self.assertEqual(torch.device(device), y2.device)
 
     def test_max_pool3d_backward(self):
         ipex.core.enable_auto_dnnl()

@@ -280,10 +280,7 @@ void equip_dil_buffer_nosync_shape(const at::Tensor& tensor, dil::tensor dil_buf
 
   // After equip_dil_buffer(), whole storage should be managed by dil tensor,
   // and thus storage metadata should be overwritten by dil tensor
-  // Note: Storage::set_numel() might be removed later
-
-  // TODO: The API has been removed
-  // ipex_tensor_impl->storage().set_numel(dil_buffer.get_nelems());
+  ipex_tensor_impl->storage().set_nbytes(dil_buffer.get_nelems() * tensor.itemsize());
 }
 
 void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer) {
