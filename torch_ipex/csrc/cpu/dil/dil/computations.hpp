@@ -19,6 +19,7 @@
 #include "operators/matmul.hpp"
 #include "operators/pool.hpp"
 #include "operators/softmax.hpp"
+#include "operators/logsoftmax.hpp"
 #include "operators/spliter.hpp"
 #include "operators/sum.hpp"
 #include "operators/vanilla_rnn.hpp"

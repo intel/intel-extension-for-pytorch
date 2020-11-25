@@ -40,6 +40,8 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::threshold_backward(Tensor grad_output, Tensor self, Scalar threshold) -> Tensor',
     'aten::_softmax(Tensor self, int dim, bool half_to_float) -> Tensor',
     'aten::_softmax_backward_data(Tensor grad_output, Tensor output, int dim, Tensor self) -> Tensor',
+    'aten::_log_softmax(Tensor self, int dim, bool half_to_float) -> Tensor',
+    'aten::_log_softmax_backward_data(Tensor grad_output, Tensor output, int dim, Tensor self) -> Tensor',
     'aten::sigmoid(Tensor self) -> Tensor',
     'aten::sigmoid_(Tensor(a!) self) -> Tensor(a!)',
     'aten::sigmoid_backward(Tensor grad_output, Tensor output) -> Tensor',

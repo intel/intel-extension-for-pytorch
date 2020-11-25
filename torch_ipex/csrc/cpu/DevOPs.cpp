@@ -1725,6 +1725,48 @@ at::Tensor AtenIpexCPUDev::dil__softmax_backward_data(
   return dbl::comm::gen_aten_tensor_by(std::move(gradx));
 }
 
+at::Tensor AtenIpexCPUDev::dil__log_softmax(
+    const at::Tensor& self,
+    const int64_t dim,
+    bool half_to_float) {
+  DEBUG("AtenIpexCPUDev::dil__log_softmax\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+  AT_ASSERTM(
+      !half_to_float,
+      "softmax with half to float conversion is not supported on Mkldnn");
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
+
+  const int64_t wrapped_dim = at::maybe_wrap_dim(dim, self.dim());
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
+  dil::tensor y;
+  dil::logsoftmax_forward::compute(x, y, wrapped_dim);
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
+}
+
+at::Tensor AtenIpexCPUDev::dil__log_softmax_backward_data(
+    const at::Tensor& grad_output,
+    const at::Tensor& output,
+    int64_t dim,
+    const at::Tensor& self) {
+  DEBUG("AtenIpexCPUDev::dil__log_softmax_backward_data\n");
+  CHECK_DNNL_OP_PRE_COND(grad_output);
+  CHECK_DNNL_OP_PRE_COND(output);
+  CHECK_DNNL_OP_PRE_COND(self);
+
+  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
+  dbl::comm::reorder_to_bf16_for_mix_prec(output, true);
+  dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
+
+  const int64_t wrapped_dim = at::maybe_wrap_dim(dim, self.dim());
+  dil::tensor y = dbl::comm::try_gen_dil_tensor(output);
+  dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_contiguous);
+  dil::tensor gradx;
+  dil::logsoftmax_backward::compute(y, grady, gradx, wrapped_dim);
+  return dbl::comm::gen_aten_tensor_by(std::move(gradx));
+}
+
 at::Tensor AtenIpexCPUDev::dil_sigmoid(const at::Tensor& self) {
   DEBUG("AtenIpexCPUDev::dil_sigmoid\n");
   CHECK_DNNL_OP_PRE_COND(self);

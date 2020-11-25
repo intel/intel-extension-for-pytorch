@@ -60,6 +60,8 @@ class AtenIpexCPUDev {
   static at::Tensor dil_threshold_backward(const at::Tensor& grad_output, const at::Tensor& input, at::Scalar threshold);
   static at::Tensor dil__softmax(const at::Tensor& self, const int64_t dim, bool half_to_float);
   static at::Tensor dil__softmax_backward_data(const at::Tensor& grad_output, const at::Tensor& output, int64_t dim, const at::Tensor& self);
+  static at::Tensor dil__log_softmax(const at::Tensor& self, const int64_t dim, bool half_to_float);
+  static at::Tensor dil__log_softmax_backward_data(const at::Tensor& grad_output, const at::Tensor& output, int64_t dim, const at::Tensor& self);
   static at::Tensor dil_sigmoid(const at::Tensor& self);
   static at::Tensor& dil_sigmoid_(at::Tensor& self);
   static at::Tensor dil_sigmoid_backward(const at::Tensor& grad_output, const at::Tensor& output);

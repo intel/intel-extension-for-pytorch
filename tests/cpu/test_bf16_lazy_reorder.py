@@ -1854,6 +1854,31 @@ class TestSoftMax(TestCase):
                     # self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_bf16.grad))
                     # self.assertEqual(x_man_bf16.grad.float(), x_auto_mix_bf16.grad)
 
+    def test_log_softmax(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        with AutoDNNL(True), AutoMixPrecision(True, train=False):
+            x_cpu = torch.randn(3, 4, 5, dtype=torch.float32) * 10
+            x_dpcpp = x_cpu.to(device=device)
+            for dim in range(x_cpu.ndim):
+                self.assertEqual(F.log_softmax(x_cpu, dim=dim), F.log_softmax(x_dpcpp, dim=dim), 0.5)
+
+    def test_log_softmax_backward(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        with AutoDNNL(True), AutoMixPrecision(True, train=True):
+            x = torch.randn(3, 4, 5, dtype=torch.float32) * 10
+            for dim in range(x.ndim):
+                x_cpu = x.clone().requires_grad_()
+                x_dpcpp = x.clone().to(device=device).requires_grad_()
+                y_cpu = F.log_softmax(x_cpu, dim=dim).sum()
+                y_dpcpp = F.log_softmax(x_dpcpp, dim=dim).sum()
+                y_cpu.backward()
+                y_dpcpp.backward()
+                self.assertEqual(x_cpu.grad, x_dpcpp.grad, 1e-2)
+
 class TestSigmoid(TestCase):
     def test_sigmoid(self):
         rand_seed = int(get_rand_seed())
