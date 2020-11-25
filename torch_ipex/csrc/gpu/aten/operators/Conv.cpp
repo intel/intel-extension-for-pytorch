@@ -542,7 +542,7 @@ Tensor dpcpp_convolution_backward_input(
 
     auto weight_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(weight);
     weight_usr_memory = weight_ctx.is_plain()
-        ? dpcpp_onednn_memory({{weight_tz}, weight_t, format_nchw}, engine, weight.data_ptr())
+        ? dpcpp_onednn_memory({{weight_tz}, weight_t, format_weight}, engine, weight.data_ptr())
         : dpcpp_onednn_memory({weight_ctx.meta()}, engine, weight.data_ptr());
 
     auto grad_input_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(grad_input);
@@ -739,7 +739,6 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   auto conv_backward_weight_pd = mkldnn::convolution_backward_weights::primitive_desc(
           *conv_backward_weight_desc, engine, conv_forward_pd);
 
-  // create usr memory, enable reorder here
   memory input_usr_memory, grad_output_usr_memory, grad_weight_usr_memory;
   if (!lazy_reorder_enabled()) {
     input_usr_memory = dpcpp_onednn_memory(
