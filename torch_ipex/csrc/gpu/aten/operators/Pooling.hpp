@@ -138,8 +138,7 @@ static void avg_pool_out_frame(
   auto output_md = memory::desc({output_tz}, data_t, format_any);
 
   if (lazy_reorder_enabled()) {
-    auto input_ctx =
-        at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
+    auto input_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
     input_md = input_ctx.is_plain() ? memory::desc({input_tz}, data_t, format)
                                     : input_ctx.meta();
   }
@@ -158,8 +157,7 @@ static void avg_pool_out_frame(
       padding,
       padding);
 
-  auto pooling_forward_pd =
-      pooling_forward::primitive_desc(pooling_forward_desc, engine);
+  auto pooling_forward_pd = pooling_forward::primitive_desc(pooling_forward_desc, engine);
 
   auto expected_input_md = pooling_forward_pd.src_desc();
   auto expected_output_md = pooling_forward_pd.dst_desc();
@@ -168,8 +166,7 @@ static void avg_pool_out_frame(
   if (!lazy_reorder_enabled()) {
     input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
 
-    output_usr_memory = dpcpp_onednn_memory(
-        {{output_tz}, data_t, format}, engine, output.data_ptr());
+    output_usr_memory = dpcpp_onednn_memory({{output_tz}, data_t, format}, engine, output.data_ptr());
   } else {
     input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
     auto plain_output_md = memory::desc({output_tz}, data_t, format);
@@ -181,14 +178,12 @@ static void avg_pool_out_frame(
             input.q_scale(),
             input.q_zero_point(),
             typeMetaToScalarType(input.options().dtype()));
-        output =
-            empty_opaque_qtensor(expected_output_md, c10::nullopt, quantizer);
+        output = empty_opaque_qtensor(expected_output_md, c10::nullopt, quantizer);
       } else {
         output = empty_opaque_tensor(
             expected_output_md, input.options(), c10::nullopt);
       }
-      output_usr_memory =
-          dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
+      output_usr_memory = dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
     } else {
       output_usr_memory = dpcpp_onednn_memory(
           {{output_tz}, data_t, format_any}, engine, output.data_ptr());
@@ -199,10 +194,9 @@ static void avg_pool_out_frame(
   Tensor input_;
   if (lazy_reorder_enabled()) {
     if (input_usr_memory.get_desc() != expected_input_md) {
-      input_ = at::AtenIpexTypeDPCPP::empty(
-          {expected_input_md.get_size()}, input.options(), c10::nullopt);
-      input_memory =
-          dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
+      auto item_num = static_cast<int64_t>(expected_input_md.get_size());
+      input_ = at::AtenIpexTypeDPCPP::empty({item_num}, input.options(), c10::nullopt);
+      input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
       DPCPP_ONEDNN_EXEC(
           reorder(input_usr_memory, input_memory),
           strm,
@@ -274,8 +268,7 @@ static void avg_pool_backward_out_frame(
   } else {
     format = memory::format_tag::ncdhw;
 
-    gradInput_tz = {
-        nbatch, nInputPlane, gradInputDepth, gradInputHeight, gradInputWidth};
+    gradInput_tz = {nbatch, nInputPlane, gradInputDepth, gradInputHeight, gradInputWidth};
     gradOutput_tz = {nbatch,
                      nInputPlane,
                      gradOutputDepth,
@@ -382,8 +375,7 @@ static void max_pool_out_frame(
   auto output_md = memory::desc({output_tz}, data_t, format_any);
 
   if (lazy_reorder_enabled()) {
-    auto input_ctx =
-        at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
+    auto input_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
     input_md = input_ctx.is_plain() ? memory::desc({input_tz}, data_t, format)
                                     : input_ctx.meta();
   }
@@ -402,8 +394,7 @@ static void max_pool_out_frame(
       padding,
       padding);
 
-  auto pooling_forward_pd =
-      pooling_forward::primitive_desc(pooling_forward_desc, engine);
+  auto pooling_forward_pd = pooling_forward::primitive_desc(pooling_forward_desc, engine);
 
   auto expected_input_md = pooling_forward_pd.src_desc();
   auto expected_output_md = pooling_forward_pd.dst_desc();
@@ -411,9 +402,7 @@ static void max_pool_out_frame(
   memory input_usr_memory, output_usr_memory;
   if (!lazy_reorder_enabled()) {
     input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
-
-    output_usr_memory = dpcpp_onednn_memory(
-        {{output_tz}, data_t, format}, engine, output.data_ptr());
+    output_usr_memory = dpcpp_onednn_memory({{output_tz}, data_t, format}, engine, output.data_ptr());
   } else {
     input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
     auto plain_output_md = memory::desc({output_tz}, data_t, format);
@@ -425,14 +414,11 @@ static void max_pool_out_frame(
             input.q_scale(),
             input.q_zero_point(),
             typeMetaToScalarType(input.options().dtype()));
-        output =
-            empty_opaque_qtensor(expected_output_md, c10::nullopt, quantizer);
+        output = empty_opaque_qtensor(expected_output_md, c10::nullopt, quantizer);
       } else {
-        output = empty_opaque_tensor(
-            expected_output_md, input.options(), c10::nullopt);
+        output = empty_opaque_tensor(expected_output_md, input.options(), c10::nullopt);
       }
-      output_usr_memory =
-          dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
+      output_usr_memory = dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
     } else {
       output_usr_memory = dpcpp_onednn_memory(
           {{output_tz}, data_t, format_any}, engine, output.data_ptr());
@@ -444,10 +430,9 @@ static void max_pool_out_frame(
   Tensor input_;
   if (lazy_reorder_enabled()) {
     if (input_usr_memory.get_desc() != expected_input_md) {
-      input_ = at::AtenIpexTypeDPCPP::empty(
-          {expected_input_md.get_size()}, input.options(), c10::nullopt);
-      input_memory =
-          dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
+      auto item_num = static_cast<int64_t>(expected_input_md.get_size());
+      input_ = at::AtenIpexTypeDPCPP::empty({item_num}, input.options(), c10::nullopt);
+      input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
       DPCPP_ONEDNN_EXEC(
           reorder(input_usr_memory, input_memory),
           strm,
@@ -461,16 +446,12 @@ static void max_pool_out_frame(
     memory indices_usr_memory;
     if (!lazy_reorder_enabled()) {
       indices_ = at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
-      indices_usr_memory =
-          dpcpp_onednn_memory(indices_md, engine, indices_.data_ptr());
+      indices_usr_memory = dpcpp_onednn_memory(indices_md, engine, indices_.data_ptr());
     } else {
       auto expected_indices_md = pooling_forward_pd.workspace_desc();
       indices_ = empty_opaque_tensor(
-          expected_indices_md,
-          at::TensorOptions(kDPCPP).dtype(kInt),
-          c10::nullopt);
-      indices_usr_memory =
-          dpcpp_onednn_memory(expected_indices_md, engine, indices_.data_ptr());
+          expected_indices_md, at::TensorOptions(kDPCPP).dtype(kInt), c10::nullopt);
+      indices_usr_memory = dpcpp_onednn_memory(expected_indices_md, engine, indices_.data_ptr());
     }
     auto indices_memory = indices_usr_memory;
 
@@ -487,16 +468,11 @@ static void max_pool_out_frame(
          {MKLDNN_ARG_WORKSPACE, indices_memory}});
 
     if (!lazy_reorder_enabled()) {
-      dpcppMemoryCopyType(
-          indices.data_ptr<int64_t>(),
-          indices_.data_ptr<int32_t>(),
-          indices_.numel());
+      dpcppMemoryCopyType(indices.data_ptr<int64_t>(),indices_.data_ptr<int32_t>(),indices_.numel());
     } else {
       // reorder if materialized
-      auto indices_internal_ctx =
-          DPCPPTensorContext::release_tensor_ctx(indices_);
-      DPCPPTensorContext::set_tensor_ctx(
-          indices, std::move(indices_internal_ctx));
+      auto indices_internal_ctx =DPCPPTensorContext::release_tensor_ctx(indices_);
+      DPCPPTensorContext::set_tensor_ctx(indices, std::move(indices_internal_ctx));
     }
   } else {
     indices = at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
@@ -561,13 +537,8 @@ static void max_pool_backward_out_frame(
     padding = {padH, padW};
   } else {
     format = memory::format_tag::ncdhw;
-    gradInput_tz = {
-        nbatch, nInputPlane, gradInputDepth, gradInputHeight, gradInputWidth};
-    gradOutput_tz = {nbatch,
-                     nInputPlane,
-                     gradOutputDepth,
-                     gradOutputHeight,
-                     gradOutputWidth};
+    gradInput_tz = {nbatch, nInputPlane, gradInputDepth, gradInputHeight, gradInputWidth};
+    gradOutput_tz = {nbatch, nInputPlane, gradOutputDepth, gradOutputHeight, gradOutputWidth};
     kernel = {kD, kH, kW};
     stride = {dD, dH, dW};
     padding = {padD, padH, padW};
@@ -598,20 +569,15 @@ static void max_pool_backward_out_frame(
   auto diff_dst_memory = diff_dst_usr_memory;
   auto diff_src_memory = diff_src_usr_memory;
 
-  auto indices_usr =
-      at::empty({gradOutput_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
-  dpcppMemoryCopyType(
-      indices_usr.data_ptr<int32_t>(),
-      (int64_t*)indices_data,
-      indices_usr.numel());
+  auto indices_usr = at::empty({gradOutput_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
+  dpcppMemoryCopyType(indices_usr.data_ptr<int32_t>(), (int64_t*)indices_data, indices_usr.numel());
 
   auto pool_backward = pooling_backward(pooling_backward_pd);
 
   auto indices_md = pooling_forward_pd.workspace_desc();
   auto indices_usr_memory = dpcpp_onednn_memory(
       {{gradOutput_tz}, (memory::data_type)indices_md.data.data_type, format},
-      engine,
-      indices_usr.data_ptr());
+      engine, indices_usr.data_ptr());
   auto indices_memory = indices_usr_memory;
 
   DPCPP_ONEDNN_EXEC(

@@ -274,8 +274,7 @@ class DPCPPTensorConvertor {
     // 1. convert to plain 2. copy to int64
     if (from.scalar_type() == at::ScalarType::Long) {
       Tensor to_ = at::empty(ctx.dims(), from.options(), c10::nullopt);
-      dpcppMemoryCopyType(
-          to_.data_ptr<int64_t>(), to.data_ptr<int32_t>(), to.numel());
+      dpcppMemoryCopyType(to_.data_ptr<int64_t>(), to.data_ptr<int32_t>(), to.numel());
       to = to_;
     }
 

@@ -18,7 +18,7 @@
 #include "Loops.h"
 #include "ParttenScan.h"
 
-#ifdef USE_PSTL
+#ifdef USE_ONEDPL
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
 #include <oneapi/dpl/numeric>
@@ -168,7 +168,7 @@ struct NonZeroOp {
   }
 };
 
-#ifdef USE_PSTL
+#ifdef USE_ONEDPL
 template <typename Iterator>
 class strided_range
 {
@@ -232,7 +232,7 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
   // Prepare input tensor strides for calculating result index
   if (N > 0) {
 #if defined(USE_USM)
-#  if defined(USE_PSTL)
+#  if defined(USE_ONEDPL)
     auto dpcpp_queue = dpcppGetCurrentQueue();
     auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
     auto tensor_begin = tensor.data_ptr<long>();
@@ -268,7 +268,7 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
     }
   tensor.resize_({num_nonzeros, num_dim});
 #  else
-    throw std::runtime_error("no PSTL found when compile. USM nonzero not supported");
+    throw std::runtime_error("no oneDPL found when compile. USM nonzero not supported");
 #  endif
 #else
     if (canUse32BitIndexMath(self)) {

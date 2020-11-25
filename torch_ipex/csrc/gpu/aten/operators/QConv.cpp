@@ -34,7 +34,7 @@ at::Tensor q_conv2d(
   if (pack_ptr.bias.has_value())
     bias = pack_ptr.bias.value();
 
-  conv_attr_t attr = {1.f, 0.f, 0.f, output_scale, 0};
+  conv_attr_t attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), 0};
 
   Tensor output = _empty_affine_quantized(
       conv_output_size(
@@ -79,7 +79,7 @@ at::Tensor q_conv2d_relu(
   if (pack_ptr.bias.has_value())
     bias = pack_ptr.bias.value();
 
-  conv_attr_t attr = {1.f, 0.f, 0.f, output_scale, conv_attr_t::kind_with_relu};
+  conv_attr_t attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), conv_attr_t::kind_with_relu};
 
   Tensor output = _empty_affine_quantized(
       conv_output_size(
@@ -127,8 +127,8 @@ at::Tensor q_conv2d_sum_relu(
   if (pack_ptr.bias.has_value())
     bias = pack_ptr.bias.value();
 
-  conv_attr_t attr = {accumu.q_scale() / sum_scale, 0.f, 0.f,
-      sum_scale, conv_attr_t::kind_with_relu | conv_attr_t::kind_with_sum};
+  conv_attr_t attr = {static_cast<float>(accumu.q_scale() / sum_scale), 0.f, 0.f,
+      static_cast<float>(sum_scale), conv_attr_t::kind_with_relu | conv_attr_t::kind_with_sum};
 
   convolution(
       accumu,

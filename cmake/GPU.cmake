@@ -153,8 +153,10 @@ if(USE_DPCPP)
   add_definitions(-DUSE_DPCPP)
   # Suppress the compiler warning about undefined CL_TARGET_OPENCL_VERSION
   add_definitions(-DCL_TARGET_OPENCL_VERSION=220)
-  if(USE_PSTL)
-    add_definitions(-DUSE_PSTL)
+  if(USE_ONEDPL)
+    find_package(oneDPL)
+    target_link_libraries(torch_ipex PUBLIC oneDPL)
+    add_definitions(-DUSE_ONEDPL)
     add_definitions(-DONEDPL_USE_TBB_BACKEND=0)
   endif()
 
