@@ -414,4 +414,4 @@ from torch import serialization
 serialization.register_package(30, _xpu_tag, _xpu_deserialize)
 
 
-torch.add_runtime('xpu', current_module)
+torch.runtime.register_runtime('xpu', current_module)
