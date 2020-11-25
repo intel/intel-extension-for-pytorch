@@ -268,20 +268,12 @@ void dnnl_inner_product_forward_frame(
   auto ipFwd_desc = inner_product_forward::desc(prop_kind::forward, input_md, weight_md, output_md);
   auto ip_forward_pd = inner_product_forward::primitive_desc(ipFwd_desc, engine);
 
-  auto input_usr_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_t, format_nc}, engine, input_data);
-
-  auto weight_usr_memory = dpcpp_onednn_memory(
-      {{weight_tz}, data_t, format_oi}, engine, target_data);
-
-  auto output_usr_memory = dpcpp_onednn_memory(
-      {{output_tz}, data_t, format_nc}, engine, output_data);
-
-  // dummy dnnl::memory
+  auto input_usr_memory = dpcpp_onednn_memory({{input_tz}, data_t, format_nc}, engine, input_data);
+  auto weight_usr_memory = dpcpp_onednn_memory({{weight_tz}, data_t, format_oi}, engine, target_data);
+  auto output_usr_memory = dpcpp_onednn_memory({{output_tz}, data_t, format_nc}, engine, output_data);
   auto bias_usr_memory = memory({{}, data_t, format_x}, engine);
 
   auto ip_forward = inner_product_forward(ip_forward_pd);
-
   DPCPP_ONEDNN_EXEC(
       ip_forward,
       strm,

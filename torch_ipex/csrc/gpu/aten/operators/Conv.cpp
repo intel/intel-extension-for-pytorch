@@ -132,31 +132,17 @@ at::Tensor convolution(
   auto input_md = memory::desc({input_tz}, src_data_t, format_any);
   auto weight_md = memory::desc({weight_tz}, wei_data_t, format_any);
   auto output_md = memory::desc({output_tz}, dst_data_t, format_any);
+  auto bias_md = bias.defined() ? memory::desc({bias_tz}, bias_data_t, format_x) : memory::desc();
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
+  create_key(key, input_md, weight_md, bias.defined() ? 1 : 0,
+      output_md, _stride, _dilation, _padding, _padding, attr.attr());
 #endif
-  std::shared_ptr<convolution_forward::desc> conv_forward_desc;
-  if (bias.defined()) {
-    auto bias_md = memory::desc({bias_tz}, bias_data_t, format_any);
-#ifdef USE_PRIMITIVE_CACHE
-    create_key(key, input_md, weight_md, bias_md,
-        output_md, _stride, _dilation, _padding, _padding, attr.attr());
-#endif
-    conv_forward_desc.reset(new convolution_forward::desc(
-        prop_kind::forward, algorithm::convolution_direct,
-        input_md, weight_md, bias_md, output_md,
-        _stride, _dilation, _padding, _padding));
-  } else {
-#ifdef USE_PRIMITIVE_CACHE
-    create_key(key, input_md, weight_md,
-        output_md, _stride, _dilation, _padding, _padding, attr.attr());
-#endif
-    conv_forward_desc.reset(new convolution_forward::desc(
-        prop_kind::forward, algorithm::convolution_direct,
-        input_md, weight_md, output_md,
-        _stride, _dilation, _padding, _padding));
-  }
+  auto conv_forward_desc = convolution_forward::desc(
+      prop_kind::forward, algorithm::convolution_direct,
+      input_md, weight_md, bias_md, output_md,
+      _stride, _dilation, _padding, _padding);
 
   std::vector<float> weight_scales;
   if (input.is_quantized()) {
@@ -208,7 +194,7 @@ at::Tensor convolution(
   }
   pattr.set_post_ops(po);
 
-  auto conv_forward_pd = convolution_forward::primitive_desc(*conv_forward_desc, pattr, engine);
+  auto conv_forward_pd = convolution_forward::primitive_desc(conv_forward_desc, pattr, engine);
   memory input_usr_memory, weight_usr_memory, output_usr_memory;
   if (!lazy_reorder_enabled()) {
     input_usr_memory = dpcpp_onednn_memory(
@@ -334,15 +320,15 @@ at::Tensor convolution(
     }
   }
 
-  memory bias_memory;
   Tensor bias_;
   Tensor bias_opt;
+  memory bias_memory = memory({{}, bias_data_t, format_x}, engine);
   if (bias.defined()) {
-    auto bias_md = memory::desc({bias_tz}, bias_data_t, format_x);
     auto bias_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(bias);
     auto bias_usr_memory = bias_ctx.is_plain()
         ? dpcpp_onednn_memory({{bias_tz}, usr_bias_data_t, format_x}, engine, bias.data_ptr())
         : dpcpp_onednn_memory({bias_ctx.meta()}, engine, bias.data_ptr());
+
     bias_memory = bias_usr_memory;
     if (bias_ctx.is_plain() && input.is_quantized()) {
       if (weight_cache_enabled()) {
@@ -359,6 +345,7 @@ at::Tensor convolution(
       for (int i = 0; i < weight_scales.size(); i++) {
         bias_scale.push_back(1.f / (in_scale * weight_scales[i] / 1.f));
       }
+
       int mask = weight_scales.size() > 1 ? 1 << 0 : 0;
       attr.set_output_scales(mask, bias_scale);
       attr.set_zero_points(DNNL_ARG_DST, 0, {0}); // TODO:Asymmetric
@@ -376,14 +363,10 @@ at::Tensor convolution(
         at::AtenIpexTypeDPCPP::DPCPPTensorContext::set_tensor_ctx(bias, std::move(bias_opt_ctx));
       }
     }
-  } else {
-    // dummy dnnl::memory
-    bias_memory = memory({{}, bias_data_t, format_x}, engine);
   }
 
 #ifdef USE_PRIMITIVE_CACHE
-  auto conv_forward =
-      fetch_or_create_m<convolution_forward>(key, conv_forward_pd);
+  auto conv_forward = fetch_or_create_m<convolution_forward>(key, conv_forward_pd);
 #else
   auto conv_forward = convolution_forward(conv_forward_pd);
 #endif
@@ -499,22 +482,15 @@ Tensor dpcpp_convolution_backward_input(
 
   auto input_md = memory::desc({input_tz}, data_grad, format_any);
   auto weight_md = memory::desc({weight_tz}, weight_t, format_any);
-  auto bias_md = memory::desc({bias_tz}, bias_t, format_any);
   auto output_md = memory::desc({output_tz}, data_grad, format_any);
+  auto bias_md = bias_defined ? memory::desc({bias_tz}, bias_t, format_any) : memory::desc();
 
-  std::shared_ptr<convolution_forward::desc> conv_forward_desc;
-  if (bias_defined)
-    conv_forward_desc.reset(new convolution_forward::desc(
-        prop_kind::forward, algorithm::convolution_direct,
-        input_md, weight_md, bias_md, output_md,
-        _stride, _dilation, _padding, _padding));
-  else
-    conv_forward_desc.reset(new convolution_forward::desc(
-        prop_kind::forward, algorithm::convolution_direct,
-        input_md, weight_md, output_md,
-        _stride, _dilation, _padding, _padding));
+  auto conv_forward_desc = convolution_forward::desc(
+      prop_kind::forward, algorithm::convolution_direct,
+      input_md, weight_md, bias_md, output_md,
+      _stride, _dilation, _padding, _padding);
 
-  auto conv_forward_pd = convolution_forward::primitive_desc(*conv_forward_desc, engine);
+  auto conv_forward_pd = convolution_forward::primitive_desc(conv_forward_desc, engine);
 
   auto conv_backward_data_desc = convolution_backward_data::desc(
       algorithm::convolution_direct,
@@ -705,39 +681,23 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
 
   auto input_md = memory::desc({input_tz}, data_grad, format_any);
   auto weight_md = memory::desc({weight_tz}, weight_t, format_any);
-  auto bias_md = memory::desc({bias_tz}, bias_t, format_any);
   auto output_md = memory::desc({output_tz}, data_grad, format_any);
+  auto bias_md = bias_defined ? memory::desc({bias_tz}, bias_t, format_any) : memory::desc();
 
-  std::shared_ptr<convolution_forward::desc> conv_forward_desc;
-  if (bias_defined)
-    conv_forward_desc.reset(new convolution_forward::desc(
-        prop_kind::forward, algorithm::convolution_direct,
-        input_md, weight_md, bias_md, output_md,
-        _stride, _dilation, _padding, _padding));
-  else
-    conv_forward_desc.reset(new convolution_forward::desc(
-        prop_kind::forward, algorithm::convolution_direct,
-        input_md, weight_md, output_md,
-        _stride, _dilation, _padding, _padding));
+  auto conv_forward_desc = convolution_forward::desc(
+      prop_kind::forward, algorithm::convolution_direct,
+      input_md, weight_md, bias_md, output_md,
+      _stride, _dilation, _padding, _padding);
 
-  auto conv_forward_pd = convolution_forward::primitive_desc(*conv_forward_desc, engine);
+  auto conv_forward_pd = convolution_forward::primitive_desc(conv_forward_desc, engine);
 
-  std::shared_ptr<mkldnn::convolution_backward_weights::desc> conv_backward_weight_desc;
-  if (bias_defined)
-    conv_backward_weight_desc.reset(
-        new mkldnn::convolution_backward_weights::desc(
-            algorithm::convolution_direct,
-            input_md, weight_md, bias_md, output_md,
-            _stride, _dilation, _padding, _padding));
-  else
-    conv_backward_weight_desc.reset(
-        new mkldnn::convolution_backward_weights::desc(
-            algorithm::convolution_direct,
-            input_md, weight_md, output_md,
-            _stride, _dilation, _padding, _padding));
+  auto conv_backward_weight_desc = mkldnn::convolution_backward_weights::desc(
+          algorithm::convolution_direct,
+          input_md, weight_md, bias_md, output_md,
+          _stride, _dilation, _padding, _padding);
 
   auto conv_backward_weight_pd = mkldnn::convolution_backward_weights::primitive_desc(
-          *conv_backward_weight_desc, engine, conv_forward_pd);
+          conv_backward_weight_desc, engine, conv_forward_pd);
 
   memory input_usr_memory, grad_output_usr_memory, grad_weight_usr_memory;
   if (!lazy_reorder_enabled()) {
@@ -803,7 +763,7 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     grad_weight_memory = dpcpp_onednn_memory(expected_grad_weight_md, engine, grad_weight_.data_ptr());
   }
 
-  memory grad_bias_memory;
+  memory grad_bias_memory = memory({{}, bias_t, format_x}, engine);
   if (bias_defined) {
     if (!lazy_reorder_enabled()) {
       grad_bias_memory = dpcpp_onednn_memory(
@@ -814,8 +774,6 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
         ? dpcpp_onednn_memory({{bias_tz}, bias_t, format_x}, engine, grad_bias.data_ptr())
         : dpcpp_onednn_memory({grad_bias_ctx.meta()}, engine, grad_bias.data_ptr());
     }
-  } else {
-    grad_bias_memory = memory({{}, bias_t, format_x}, engine);
   }
 
   auto conv_backward_weight = mkldnn::convolution_backward_weights(conv_backward_weight_pd);

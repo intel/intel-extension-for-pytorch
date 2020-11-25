@@ -238,8 +238,7 @@ class DPCPPTensorConvertor {
 #else
     auto reorder_p = dnnl::reorder(from_mem, to_mem);
 #endif
-    DPCPP_ONEDNN_EXEC(reorder_p,
-        strm, {{DNNL_ARG_FROM, from_mem}, {DNNL_ARG_TO, to_mem}});
+    DPCPP_ONEDNN_EXEC(reorder_p, strm, {{DNNL_ARG_FROM, from_mem}, {DNNL_ARG_TO, to_mem}});
     return true;
   }
 
@@ -257,8 +256,7 @@ class DPCPPTensorConvertor {
       mem_desc_t plain_md = {ctx.dims(), ctx.dtype(), ctx.get_plain_tag()};
       if (opaque_md == plain_md) {
         Tensor to = at::empty(ctx.dims(), from.options(), c10::nullopt);
-        dpcppMemoryCopyType(
-            to.data_ptr<int64_t>(), (int32_t*)from.data_ptr(), from.numel());
+        dpcppMemoryCopyType(to.data_ptr<int64_t>(), (int32_t*)from.data_ptr(), from.numel());
         return to;
       }
     }
@@ -300,8 +298,7 @@ static bool
 check_has_opaque_and_no_padding(std::vector<at::Tensor> tlist) {
   std::vector<at::AtenIpexTypeDPCPP::DPCPPTensorContext> ctx_list;
   for (auto t : tlist)
-    ctx_list.push_back(
-        at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(t));
+    ctx_list.push_back(at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(t));
 
   bool all_plain = true;
   for (auto ctx : ctx_list)

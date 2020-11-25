@@ -76,8 +76,7 @@ static inline Tensor sum(Tensor& output,
         empty_opaque_tensor(tar_desc, tar.options(), c10::nullopt);
   }
 
-  auto output_usr_mem = dpcpp_onednn_memory(
-      output_desc, engine, output.data_ptr());
+  auto output_usr_mem = dpcpp_onednn_memory(output_desc, engine, output.data_ptr());
   auto output_mem = output_usr_mem;
   if (output_desc != tar_desc) {
     output_mem = memory(tar_desc, engine);
