@@ -253,14 +253,11 @@ at::Tensor convolution(
   Tensor input_;
   if (input_usr_memory.get_desc() != expected_input_md) {
     // avoid reorder in case of, [n][C][1][1][16c] <==> [n][c][1][1]
-    if (input.sizes().size() == 4 &&
-        input.size(2) == 1 && input.size(3) == 1) {
+    if (input.sizes().size() == 4 && input.size(2) == 1 && input.size(3) == 1) {
       input_memory = dpcpp_onednn_memory(expected_input_md, engine, input.data_ptr());
     } else {
-      input_ = at::AtenIpexTypeDPCPP::empty(
-          {static_cast<int64_t>(expected_input_md.get_size() / input.itemsize())},
-          input.options(),
-          c10::nullopt);
+      auto item_num = static_cast<int64_t>(expected_input_md.get_size() / input.itemsize());
+      input_ = at::AtenIpexTypeDPCPP::empty({item_num}, input.options(), c10::nullopt);
       input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
       DPCPP_ONEDNN_EXEC(
           reorder(input_usr_memory, input_memory),
@@ -293,10 +290,8 @@ at::Tensor convolution(
       }
       weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_opt.data_ptr());
     } else {
-      weight_ = at::AtenIpexTypeDPCPP::empty(
-          {static_cast<int64_t>(expected_weight_md.get_size() / weight.itemsize())},
-          weight.options(),
-          c10::nullopt);
+      auto item_num = static_cast<int64_t>(expected_weight_md.get_size() / weight.itemsize());
+      weight_ = at::AtenIpexTypeDPCPP::empty({item_num}, weight.options(), c10::nullopt);
       weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_.data_ptr());
     }
 
@@ -326,10 +321,8 @@ at::Tensor convolution(
         output_ = empty_opaque_tensor(expected_output_md, output.options(), c10::nullopt);
       }
     } else {
-      output_ = at::AtenIpexTypeDPCPP::empty(
-          {static_cast<int64_t>(expected_output_md.get_size() / output.itemsize())},
-          output.options(),
-          c10::nullopt);
+      auto item_num = static_cast<int64_t>(expected_output_md.get_size() / output.itemsize());
+      output_ = at::AtenIpexTypeDPCPP::empty({item_num}, output.options(), c10::nullopt);
     }
     output_memory = dpcpp_onednn_memory(expected_output_md, engine, output_.data_ptr());
     if (attr.with_sum()) {
@@ -356,10 +349,8 @@ at::Tensor convolution(
         bias_opt = empty_opaque_tensor(bias_md, bias.options(), c10::nullopt);
         bias_memory = dpcpp_onednn_memory(bias_md, engine, bias_opt.data_ptr());
       } else {
-        bias_ = at::AtenIpexTypeDPCPP::empty(
-            {static_cast<int64_t>(bias_md.get_size() / bias.itemsize())},
-            bias.options(),
-            c10::nullopt);
+        auto item_num = static_cast<int64_t>(bias_md.get_size() / bias.itemsize());
+        bias_ = at::AtenIpexTypeDPCPP::empty({item_num}, bias.options(), c10::nullopt);
         bias_memory = dpcpp_onednn_memory(bias_md, engine, bias_.data_ptr());
       }
 
@@ -546,12 +537,9 @@ Tensor dpcpp_convolution_backward_input(
   auto expected_grad_output_md = conv_backward_data_pd.diff_dst_desc();
   auto grad_output_memory = grad_output_usr_memory;
   if (grad_output_usr_memory.get_desc() != expected_grad_output_md) {
-    grad_output_ = at::AtenIpexTypeDPCPP::empty(
-                   {expected_grad_output_md.get_size() / grad_output.itemsize()},
-                   grad_output.options(),
-                   c10::nullopt);
-    grad_output_memory =
-        dpcpp_onednn_memory(expected_grad_output_md, engine, grad_output_.data_ptr());
+    auto item_num = static_cast<int64_t>(expected_grad_output_md.get_size() / grad_output.itemsize());
+    grad_output_ = at::AtenIpexTypeDPCPP::empty({item_num}, grad_output.options(), c10::nullopt);
+    grad_output_memory = dpcpp_onednn_memory(expected_grad_output_md, engine, grad_output_.data_ptr());
     DPCPP_ONEDNN_EXEC(
         reorder(grad_output_usr_memory, grad_output_memory),
         strm,
@@ -563,12 +551,9 @@ Tensor dpcpp_convolution_backward_input(
   auto expected_weight_md = conv_backward_data_pd.weights_desc();
   auto weight_memory = weight_usr_memory;
   if (weight_usr_memory.get_desc() != expected_weight_md) {
-    weight_ = at::AtenIpexTypeDPCPP::empty(
-              {expected_weight_md.get_size() / weight.itemsize()},
-              weight.options(),
-              c10::nullopt);
-    weight_memory =
-        dpcpp_onednn_memory(expected_weight_md, engine, weight_.data_ptr());
+    auto item_num = static_cast<int64_t>(expected_weight_md.get_size() / weight.itemsize());
+    weight_ = at::AtenIpexTypeDPCPP::empty({item_num}, weight.options(), c10::nullopt);
+    weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_.data_ptr());
     DPCPP_ONEDNN_EXEC(
         reorder(weight_usr_memory, weight_memory),
         strm,
@@ -580,12 +565,9 @@ Tensor dpcpp_convolution_backward_input(
   auto expected_grad_input_md = conv_backward_data_pd.diff_src_desc();
   auto grad_input_memory = grad_input_usr_memory;
   if (grad_input_memory.get_desc() != expected_grad_input_md) {
-    grad_input_ = at::AtenIpexTypeDPCPP::empty(
-                  {expected_grad_input_md.get_size() / grad_input.itemsize()},
-                  grad_input.options(),
-                  c10::nullopt);
-    grad_input_memory =
-        dpcpp_onednn_memory(expected_grad_input_md, engine, grad_input_.data_ptr());
+    auto item_num = static_cast<int64_t>(expected_grad_input_md.get_size() / grad_input.itemsize());
+    grad_input_ = at::AtenIpexTypeDPCPP::empty({item_num}, grad_input.options(), c10::nullopt);
+    grad_input_memory = dpcpp_onednn_memory(expected_grad_input_md, engine, grad_input_.data_ptr());
   }
 
   auto conv_backward_data = convolution_backward_data(conv_backward_data_pd);
@@ -656,8 +638,7 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   auto bias_t = memory::data_type::f32;
   auto format_any = memory::format_tag::any;
   auto format_nchw = memory::format_tag::nchw;
-  auto format_weight =
-      (g != 1) ? memory::format_tag::goihw : memory::format_tag::oihw;
+  auto format_weight = (g != 1) ? memory::format_tag::goihw : memory::format_tag::oihw;
   auto format_x = memory::format_tag::x;
 
   memory::dims input_tz = {n, ic, ih, iw};
@@ -691,8 +672,7 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     pw = padding[2];
 
     format_nchw = memory::format_tag::ncdhw;
-    format_weight =
-        (g != 1) ? memory::format_tag::goidhw : memory::format_tag::oidhw;
+    format_weight = (g != 1) ? memory::format_tag::goidhw : memory::format_tag::oidhw;
 
     input_tz = {n, ic, id, ih, iw};
     weight_tz = (g != 1) ? memory::dims{g, oc / g, ic / g, kd, kh, kw}
@@ -751,12 +731,9 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   auto expected_input_md = conv_backward_weight_pd.src_desc();
   auto input_memory = input_usr_memory;
   if (input_usr_memory.get_desc() != expected_input_md) {
-    input_ = at::AtenIpexTypeDPCPP::empty(
-             {expected_input_md.get_size() / input.itemsize()},
-             input.options(),
-             c10::nullopt);
-    input_memory =
-        dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
+    auto item_num = static_cast<int64_t>(expected_input_md.get_size() / input.itemsize());
+    input_ = at::AtenIpexTypeDPCPP::empty({item_num}, input.options(), c10::nullopt);
+    input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
     DPCPP_ONEDNN_EXEC(
         reorder(input_usr_memory, input_memory),
         strm,
@@ -768,12 +745,9 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   auto expected_grad_output_md = conv_backward_weight_pd.diff_dst_desc();
   auto grad_output_memory = grad_output_usr_memory;
   if (grad_output_usr_memory.get_desc() != expected_grad_output_md) {
-    grad_output_ = at::AtenIpexTypeDPCPP::empty(
-                   {expected_grad_output_md.get_size() / grad_output.itemsize()},
-                   grad_output.options(),
-                   c10::nullopt);
-    grad_output_memory =
-        dpcpp_onednn_memory(expected_grad_output_md, engine, grad_output_.data_ptr());
+    auto item_num = static_cast<int64_t>(expected_grad_output_md.get_size() / grad_output.itemsize());
+    grad_output_ = at::AtenIpexTypeDPCPP::empty({item_num}, grad_output.options(), c10::nullopt);
+    grad_output_memory = dpcpp_onednn_memory(expected_grad_output_md, engine, grad_output_.data_ptr());
     DPCPP_ONEDNN_EXEC(
         reorder(grad_output_usr_memory, grad_output_memory),
         strm,
@@ -785,18 +759,14 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   auto expected_grad_weight_md = conv_backward_weight_pd.diff_weights_desc();
   auto grad_weight_memory = grad_weight_usr_memory;
   if (grad_weight_usr_memory.get_desc() != expected_grad_weight_md) {
-    grad_weight_ = at::AtenIpexTypeDPCPP::empty(
-                   {expected_grad_weight_md.get_size() / grad_weight.itemsize()},
-                   grad_weight.options(),
-                   c10::nullopt);
-    grad_weight_memory =
-        dpcpp_onednn_memory(expected_grad_weight_md, engine, grad_weight_.data_ptr());
+    auto item_num = static_cast<int64_t>(expected_grad_weight_md.get_size() / grad_weight.itemsize());
+    grad_weight_ = at::AtenIpexTypeDPCPP::empty({item_num}, grad_weight.options(), c10::nullopt);
+    grad_weight_memory = dpcpp_onednn_memory(expected_grad_weight_md, engine, grad_weight_.data_ptr());
   }
 
   memory grad_bias_memory;
   if (bias_defined) {
-    grad_bias_memory = dpcpp_onednn_memory(
-        {{bias_tz}, bias_t, format_x}, engine, grad_bias.data_ptr());
+    grad_bias_memory = dpcpp_onednn_memory({{bias_tz}, bias_t, format_x}, engine, grad_bias.data_ptr());
   } else {
     grad_bias_memory = memory({{}, bias_t, format_x}, engine);
   }
