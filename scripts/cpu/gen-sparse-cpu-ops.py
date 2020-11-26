@@ -256,18 +256,30 @@ class SparseOPCodeGen(object):
             assert param.name
         params_name = [param.ipex_name if param.ipex_name != '' else param.name for param in cpp_sig.input_params]
 
+
+        code = ''
+        start_idx, end_idx = utils.query_tensor_options(cpp_sig.input_params)
+        if start_idx >= 0 and end_idx > start_idx:
+            # assert bool((end_idx - start_idx + 1) == 4)
+            wrapped_options = 'ipex_wrapped_options'
+            code += '  auto&& {} = at::TensorOptions().dtype(dtype).device(at::DeviceType::CPU).layout(layout).pinned_memory(pin_memory);\n'
+            code = code.format(wrapped_options)
+            # Remove original param name
+            params_name = params_name[:start_idx] + [wrapped_options] + params_name[end_idx + 1:]
+
         if cpp_sig.is_tensor_member_func:
             assert "_ipex_self" in params_name
             params_name.remove('_ipex_self')
             if self.is_void_func(cpp_sig):
-                return '  {}.{}({});\n'.format('_ipex_self', cpp_sig.def_name, ', '.join(params_name))
+                code += '  {}.{}({});\n'.format('_ipex_self', cpp_sig.def_name, ', '.join(params_name))
             else:
-                return '  auto&& {} = {}.{}({});\n'.format(_RESULT_NAME, '_ipex_self', cpp_sig.def_name, ', '.join(params_name))
+                code += '  auto&& {} = {}.{}({});\n'.format(_RESULT_NAME, '_ipex_self', cpp_sig.def_name, ', '.join(params_name))
         else:
             if self.is_void_func(cpp_sig):
-                return '  at::{}({});\n'.format(cpp_sig.def_name, ', '.join(params_name))
+                code += '  at::{}({});\n'.format(cpp_sig.def_name, ', '.join(params_name))
             else:
-                return '  auto&& {} = at::{}({});\n'.format(_RESULT_NAME, cpp_sig.def_name, ', '.join(params_name))
+                code += '  auto&& {} = at::{}({});\n'.format(_RESULT_NAME, cpp_sig.def_name, ', '.join(params_name))
+        return code
 
     def gen_fallback_post_code(self, cpp_sig):
         code = ''

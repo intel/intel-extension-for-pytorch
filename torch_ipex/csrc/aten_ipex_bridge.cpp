@@ -153,7 +153,7 @@ at::Tensor shallowFallbackToCPUTensorImpl(const at::Tensor& ipexTensor) {
     auto&& cpu_values = shallowFallbackToCPUTensorImpl(ipexTensor._values());
     // Create cpu sparse tensor and copy meta data from ipex cpu sparse tensor
     auto _tensor = at::detail::make_tensor<IPEXSparseTensorImpl>(
-      at::DispatchKeySet(at::DispatchKey::SparseXPU), ipexTensor.dtype());
+      at::DispatchKeySet(at::DispatchKey::SparseCPU), ipexTensor.dtype());
     auto cpu_sparse_impl = IPEXSparseTensorImpl::get_ipex_sparse_impl(_tensor);
     auto ipex_sparse_impl = IPEXSparseTensorImpl::get_ipex_sparse_impl(ipexTensor);
     cpu_sparse_impl->copy_meta_info(ipex_sparse_impl);
