@@ -8,8 +8,11 @@ import re
 import string
 import sys
 
-from collections import namedtuple, Mapping
-
+from collections import namedtuple
+if sys.version_info < (3, 3):
+    from collections import Mapping
+else:
+    from collections.abc import Mapping
 
 def namedtuple_with_defaults(typename, field_names, default_values=()):
   ntuple = namedtuple(typename, field_names)
