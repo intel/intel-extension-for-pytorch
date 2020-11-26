@@ -45,23 +45,60 @@ typedef struct conv_attr {
   int64_t attr_;
 } conv_attr_t;
 
-static std::vector<int64_t> conv_output_size(
+static inline dnnl::memory::dims conv_output_size(
+    int64_t ndim,
+    int64_t groups,
     IntArrayRef input_size,
     IntArrayRef weight_size,
     IntArrayRef padding,
     IntArrayRef stride,
-    IntArrayRef dilation,
-    int64_t groups) {
-  auto dim = input_size.size();
-  std::vector<int64_t> output_size(dim);
+    IntArrayRef dilation) {
+  dnnl::memory::dims output_size(ndim);
   output_size[0] = input_size[input_batch_size_dim];
   output_size[1] = weight_size[weight_output_channels_dim];
-  for (size_t d = 2; d < dim; ++d) {
+  for (size_t d = 2; d < ndim; ++d) {
     auto kernel = dilation[d - 2] * (weight_size[d] - 1) + 1;
-    output_size[d] =
-        (input_size[d] + (2 * padding[d - 2]) - kernel) / stride[d - 2] + 1;
+    output_size[d] = (input_size[d] + (2 * padding[d - 2]) - kernel) / stride[d - 2] + 1;
   }
   return output_size;
+}
+
+static inline dnnl::memory::dims compatible_dilation(IntArrayRef &dilation) {
+  dnnl::memory::dims ret = dilation.vec();
+  for (auto it = ret.begin(); it != ret.end(); it++) {
+    *it -= 1;
+  }
+  return ret;
+}
+
+static inline dnnl::memory::format_tag conv_input_fmt(int64_t ndim) {
+  return (ndim == 4) ? dnnl::memory::format_tag::nchw
+    : ((ndim == 5) ? dnnl::memory::format_tag::ncdhw
+        : dnnl::memory::format_tag::undef);
+}
+
+static inline dnnl::memory::format_tag conv_weight_fmt(int64_t ndim, bool grouped) {
+  return (ndim == 4) ? (grouped ? dnnl::memory::format_tag::goihw : dnnl::memory::format_tag::oihw)
+    : ((ndim == 5) ? (grouped ? dnnl::memory::format_tag::goidhw : dnnl::memory::format_tag::oidhw)
+        : dnnl::memory::format_tag::undef);
+}
+
+static inline dnnl::memory::dims compatible_weight_dims(
+    int64_t ndim, int64_t groups, int64_t oc, int64_t ic, IntArrayRef osizes) {
+  if (ndim == 4) {
+    auto kh = osizes[2];
+    auto kw = osizes[3];
+    return (groups > 1) ? dnnl::memory::dims({groups, oc / groups, ic / groups, kh, kw})
+      : dnnl::memory::dims({oc, ic, kh, kw});
+  } else if (ndim == 5) {
+    auto kd = osizes[2];
+    auto kh = osizes[3];
+    auto kw = osizes[4];
+    return (groups > 1) ? dnnl::memory::dims({groups, oc / groups, ic / groups, kd, kh, kw})
+      : dnnl::memory::dims({oc, ic, kd, kh, kw});
+  }
+
+  return {};
 }
 
 at::Tensor convolution(

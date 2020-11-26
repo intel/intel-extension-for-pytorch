@@ -38,12 +38,13 @@ at::Tensor q_conv2d(
 
   Tensor output = _empty_affine_quantized(
       conv_output_size(
+          input.ndimension(),
+          groups,
           input.sizes(),
           weight.sizes(),
           padding.vec(),
           stride.vec(),
-          dilation.vec(),
-          groups),
+          dilation.vec()),
       device(kDPCPP).dtype(kQInt8),
       output_scale,
       output_zero_point,
@@ -83,12 +84,13 @@ at::Tensor q_conv2d_relu(
 
   Tensor output = _empty_affine_quantized(
       conv_output_size(
+          input.ndimension(),
+          groups,
           input.sizes(),
           weight.sizes(),
           padding.vec(),
           stride.vec(),
-          dilation.vec(),
-          groups),
+          dilation.vec()),
       device(kDPCPP).dtype(kQUInt8),
       output_scale,
       output_zero_point,

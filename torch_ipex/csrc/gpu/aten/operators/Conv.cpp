@@ -13,20 +13,13 @@
 
 #include "Conv.h"
 
-using namespace mkldnn;
+using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
-
-memory::dims dilation_sub(IntArrayRef dilation) {
-  memory::dims ret;
-  for (auto i = 0; i < dilation.size(); i++)
-    ret.push_back(dilation[i] - 1);
-  return ret;
-}
 
 at::Tensor convolution(
     at::Tensor& output,
@@ -38,96 +31,43 @@ at::Tensor convolution(
     IntArrayRef dilation,
     int64_t groups,
     conv_attr_t attr) {
-  auto output_size = conv_output_size(
-      input.sizes(), weight.sizes(), padding, stride, dilation, groups);
+  auto engine = GpuEngineManager::Instance().get_engine({kDPCPP, current_device()});
+  auto strm = GpuStreamManager::Instance().get_stream();
+
+  auto ndim = input.ndimension();
+  auto output_tz = conv_output_size(
+      ndim, groups, input.sizes(), weight.sizes(), padding, stride, dilation);
 
   if (!lazy_reorder_enabled() && !output.defined()) {
     auto out_dt = attr.with_relu() ? device(kDPCPP).dtype(kQUInt8) : device(kDPCPP).dtype(kQInt8);
-    output = at::empty(output_size, input.is_quantized() ? out_dt : input.options());
+    output = at::empty(output_tz, input.is_quantized() ? out_dt : input.options());
   }
-
-  Device curDevice = Device(kDPCPP, current_device());
-  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
-
-  auto strm = GpuStreamManager::Instance().get_stream();
-
-  int32_t g = groups;
-
-  int32_t n = input.size(0);
-  int32_t ic = input.size(1);
-  int32_t ih = input.size(2);
-  int32_t iw = input.size(3);
-
-  int32_t oc = output_size[1];
-  int32_t oh = output_size[2];
-  int32_t ow = output_size[3];
-
-  int32_t kh = weight.size(2);
-  int32_t kw = weight.size(3);
-
-  int32_t sh = stride[0];
-  int32_t sw = stride[1];
-  int32_t ph = padding[0];
-  int32_t pw = padding[1];
 
   auto src_data_t = dt_to_dnnl(input.scalar_type());
   auto wei_usr_data_t = dt_to_dnnl(weight.scalar_type());
-  auto wei_data_t = input.is_quantized()
-    ? dnnl::memory::data_type::s8 : dt_to_dnnl(weight.scalar_type());
+  auto wei_data_t = input.is_quantized() ? dnnl::memory::data_type::s8
+    : dt_to_dnnl(weight.scalar_type());
   auto dst_data_t = output.defined() ? dt_to_dnnl(output.scalar_type()) : src_data_t;
-
   auto bias_data_t = dnnl::memory::data_type::f32;
-  if (bias.defined()) {
-    bias_data_t = !lazy_reorder_enabled() && input.is_quantized()
-        ? dnnl::memory::data_type::s32 : dt_to_dnnl(bias.scalar_type());
-  }
   auto usr_bias_data_t = dnnl::memory::data_type::f32;
+  if (bias.defined()) {
+    bias_data_t = (!lazy_reorder_enabled() && input.is_quantized()) ? dnnl::memory::data_type::s32
+      : dt_to_dnnl(bias.scalar_type());
+  }
 
   auto format_any = memory::format_tag::any;
-  auto format_nchw = memory::format_tag::nchw;
-  auto format_weight = (g != 1) ? memory::format_tag::goihw : memory::format_tag::oihw;
+  auto format_input = conv_input_fmt(ndim);
+  auto format_weight = conv_weight_fmt(ndim, groups != 1);
   auto format_x = memory::format_tag::x;
 
-  memory::dims input_tz = {n, ic, ih, iw};
-  memory::dims weight_tz = (g != 1)
-    ? memory::dims{g, oc / g, ic / g, kh, kw} : memory::dims{oc, ic, kh, kw};
+  auto ic = input.size(1);
+  auto oc = output_tz[1];
+  memory::dims input_tz = input.sizes().vec();
+  memory::dims weight_tz = compatible_weight_dims(ndim, groups, oc, ic, weight.sizes());
   memory::dims bias_tz = {oc};
-  memory::dims output_tz = {n, oc, oh, ow};
-  memory::dims _stride = {sh, sw};
-  memory::dims _padding = {ph, pw};
-  memory::dims _dilation = dilation_sub(dilation);
-
-  if (input.ndimension() == 5) {
-    int32_t id = input.size(2);
-    ih = input.size(3);
-    iw = input.size(4);
-
-    int32_t od = output_size[2];
-    oh = output_size[3];
-    ow = output_size[4];
-
-    int32_t kd = weight.size(2);
-    kh = weight.size(3);
-    kw = weight.size(4);
-
-    int32_t sd = stride[0];
-    sh = stride[1];
-    sw = stride[2];
-
-    int32_t pd = padding[0];
-    ph = padding[1];
-    pw = padding[2];
-
-    format_nchw = memory::format_tag::ncdhw;
-    format_weight = (g != 1) ? memory::format_tag::goidhw : memory::format_tag::oidhw;
-
-    input_tz = {n, ic, id, ih, iw};
-    weight_tz = (g != 1)
-      ? memory::dims{g, oc / g, ic / g, kd, kh, kw} : memory::dims{oc, ic, kd, kh, kw};
-    output_tz = {n, oc, od, oh, ow};
-    _stride = {sd, sh, sw};
-    _padding = {pd, ph, pw};
-  }
+  memory::dims _stride = stride.vec();
+  memory::dims _padding = padding.vec();
+  memory::dims _dilation = compatible_dilation(dilation);
 
   auto input_md = memory::desc({input_tz}, src_data_t, format_any);
   auto weight_md = memory::desc({weight_tz}, wei_data_t, format_any);
@@ -198,37 +138,37 @@ at::Tensor convolution(
   memory input_usr_memory, weight_usr_memory, output_usr_memory;
   if (!lazy_reorder_enabled()) {
     input_usr_memory = dpcpp_onednn_memory(
-        {{input_tz}, src_data_t, format_nchw}, engine, input.data_ptr());
+        {{input_tz}, src_data_t, format_input}, engine, input.data_ptr());
 
     weight_usr_memory = dpcpp_onednn_memory(
         {{weight_tz}, wei_usr_data_t, format_weight}, engine, weight.data_ptr());
 
     output_usr_memory = dpcpp_onednn_memory(
-        {{output_tz}, dst_data_t, format_nchw}, engine, output.data_ptr());
+        {{output_tz}, dst_data_t, format_input}, engine, output.data_ptr());
   } else {
     auto input_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
     input_usr_memory = input_ctx.is_plain()
-        ? dpcpp_onednn_memory({{input_tz}, src_data_t, format_nchw}, engine, input.data_ptr())
+        ? dpcpp_onednn_memory({{input_tz}, src_data_t, format_input}, engine, input.data_ptr())
         : dpcpp_onednn_memory({input_ctx.meta()}, engine, input.data_ptr());
 
     auto weight_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(weight);
     weight_usr_memory = weight_ctx.is_plain()
-        ? dpcpp_onednn_memory({{weight_tz}, wei_usr_data_t, format_nchw}, engine, weight.data_ptr())
+        ? dpcpp_onednn_memory({{weight_tz}, wei_usr_data_t, format_input}, engine, weight.data_ptr())
         : dpcpp_onednn_memory({weight_ctx.meta()}, engine, weight.data_ptr());
 
     if (output.defined()) {
       auto output_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(output);
       output_usr_memory = output_ctx.is_plain()
-          ? dpcpp_onednn_memory({{output_tz}, dst_data_t, format_nchw}, engine, output.data_ptr())
+          ? dpcpp_onednn_memory({{output_tz}, dst_data_t, format_input}, engine, output.data_ptr())
           : dpcpp_onednn_memory({output_ctx.meta()}, engine, output.data_ptr());
     } else {
       auto expected_output_md = conv_forward_pd.dst_desc();
-      auto plain_output_md = mkldnn::memory::desc({output_tz}, dst_data_t, format_nchw);
+      auto plain_output_md = memory::desc({output_tz}, dst_data_t, format_input);
       if (expected_output_md != plain_output_md) {
         output = empty_opaque_tensor(expected_output_md, input.options(), c10::nullopt);
         output_usr_memory = dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
       } else {
-        output = at::empty(output_size, input.options());
+        output = at::empty(output_tz, input.options());
         output_usr_memory = dpcpp_onednn_memory(plain_output_md, engine, output.data_ptr());
       }
     }
@@ -446,7 +386,7 @@ Tensor dpcpp_convolution_backward_input(
   memory::dims output_tz = {n, oc, oh, ow};
   memory::dims _stride = {sh, sw};
   memory::dims _padding = {ph, pw};
-  memory::dims _dilation = dilation_sub(dilation);
+  memory::dims _dilation = compatible_dilation(dilation);
 
   if (grad_input.ndimension() == 5) {
     int32_t id = grad_input.size(2);
@@ -645,7 +585,7 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
   memory::dims output_tz = {n, oc, oh, ow};
   memory::dims _stride = {sh, sw};
   memory::dims _padding = {ph, pw};
-  memory::dims _dilation = dilation_sub(dilation);
+  memory::dims _dilation = compatible_dilation(dilation);
 
   if (input.ndimension() == 5) {
     int32_t id = input.size(2);
@@ -691,12 +631,12 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
 
   auto conv_forward_pd = convolution_forward::primitive_desc(conv_forward_desc, engine);
 
-  auto conv_backward_weight_desc = mkldnn::convolution_backward_weights::desc(
+  auto conv_backward_weight_desc = convolution_backward_weights::desc(
           algorithm::convolution_direct,
           input_md, weight_md, bias_md, output_md,
           _stride, _dilation, _padding, _padding);
 
-  auto conv_backward_weight_pd = mkldnn::convolution_backward_weights::primitive_desc(
+  auto conv_backward_weight_pd = convolution_backward_weights::primitive_desc(
           conv_backward_weight_desc, engine, conv_forward_pd);
 
   memory input_usr_memory, grad_output_usr_memory, grad_weight_usr_memory;
@@ -776,7 +716,7 @@ std::tuple<at::Tensor, at::Tensor> convolution_backward_weights(
     }
   }
 
-  auto conv_backward_weight = mkldnn::convolution_backward_weights(conv_backward_weight_pd);
+  auto conv_backward_weight = dnnl::convolution_backward_weights(conv_backward_weight_pd);
   DPCPP_ONEDNN_EXEC(
       conv_backward_weight,
       strm,
