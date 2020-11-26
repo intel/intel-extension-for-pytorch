@@ -264,20 +264,6 @@ void equip_dil_buffer_nosync_shape(const at::Tensor& tensor, dil::tensor dil_buf
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)tensor.unsafeGetTensorImpl();
   ipex_tensor_impl->storage().set_data_ptr(std::move(shade_data_ptr));
 
-  // IPEX creates the output tensor with the empty storage and update the meta data when equips new stroage.
-  // When equiping the new storage, IPEX will check the new storage data size is greater than the original storage data size.
-  // The storage contained the element number in PyTorch 1.5, IPEX could calculate the storage data size by the element number.
-  // However, PyTorch 1.7 removes the element number of the storage class, the storage class adds nbytes(data size) instead. As
-  // mentioned before, IPEX creates the output tensor with 0 size storage, so IPEX needs to update the storage data size when equiping
-  // the new dil buffer, othewise, it cannot pass check.
-  if (tensor.storage().nbytes() == 0) {
-    int64_t storage_size_bytes = at::detail::computeStorageNbytes(
-      dil_buffer.get_dims(),
-      dil_buffer.get_strides(),
-      c10::elementSize(tensor.scalar_type()));
-    tensor.storage().set_nbytes(storage_size_bytes);
-  }
-
   // After equip_dil_buffer(), whole storage should be managed by dil tensor,
   // and thus storage metadata should be overwritten by dil tensor
   ipex_tensor_impl->storage().set_nbytes(dil_buffer.get_nelems() * tensor.itemsize());
