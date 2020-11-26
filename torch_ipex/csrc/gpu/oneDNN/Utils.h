@@ -163,6 +163,19 @@ inline void _to_bytes<std::vector<long>>(bytestring& bytes, std::vector<long> ar
   }
 }
 
+template <>
+inline void _to_bytes<std::vector<float>>(bytestring& bytes, std::vector<float> arg) {
+  if (arg.size() > 0) {
+    for (float elems : arg) {
+      _to_bytes(bytes, elems);
+      bytes.append(1, 'x');
+    }
+    bytes.pop_back();
+  } else {
+    bytes.append(1, 'x');
+  }
+}
+
 template <typename T>
 inline void to_bytes(bytestring& bytes, T arg) {
   _to_bytes(bytes, arg);

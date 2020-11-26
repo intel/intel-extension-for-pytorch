@@ -73,11 +73,6 @@ at::Tensor convolution(
   auto output_md = memory::desc(output_tz, dst_data_t, format_any);
   auto bias_md = bias.defined() ? memory::desc(bias_tz, bias_data_t, format_bias) : memory::desc();
 
-#ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, input_md, weight_md, bias.defined() ? 1 : 0,
-      output_md, _stride, _dilation, _padding, _padding, attr.attr());
-#endif
   auto conv_forward_desc = convolution_forward::desc(
       prop_kind::forward, algorithm::convolution_direct,
       input_md, weight_md, bias_md, output_md,
@@ -103,18 +98,26 @@ at::Tensor convolution(
 
   primitive_attr pattr;
   float in_scale;
+  std::vector<float> conv_scale;
+  int conv_zero_point;
   if (input.is_quantized()) {
     auto out_scale = attr.oscale_;
     in_scale = input.q_scale();
-    std::vector<float> conv_scale;
     for (int i = 0; i < weight_scales.size(); i++) {
       conv_scale.push_back(1.f / (out_scale / (in_scale * weight_scales[i])));
     }
+    conv_zero_point = static_cast<int>(output.q_zero_point());
     int mask_ac = 0;
     int mask_conv = weight_scales.size() > 1 ? 1 << 1 : 0;
     pattr.set_output_scales(mask_conv, conv_scale);
-    pattr.set_zero_points(DNNL_ARG_DST, mask_ac, {static_cast<int>(output.q_zero_point())});
+    pattr.set_zero_points(DNNL_ARG_DST, mask_ac, {conv_zero_point});
   }
+
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  create_key(key, input_md, weight_md, bias.defined() ? 1 : 0,
+      output_md, _stride, _dilation, _padding, _padding, attr.attr(), conv_scale, conv_zero_point);
+#endif
 
   post_ops po;
   if (attr.with_sum()) {
