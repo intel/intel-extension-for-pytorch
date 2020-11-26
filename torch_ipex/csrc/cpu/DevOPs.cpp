@@ -2512,6 +2512,37 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_rnn_layer_backward(const at::Tensor&
   return dbl::rnn::mkldnn_rnn_layer_backward(input, w1, w2, w3, w4, hx, cx,
       output, hy, cy, grad_output, grad_hy, grad_cy, reverse, mode, hidden_size,
       num_layers, has_biases, train, bidirectional, batch_sizes);
+
+at::Tensor AtenIpexCPUDev::dil_upsample_nearest2d(const at::Tensor& input, at::IntArrayRef output_size, c10::optional<double> scales_h, c10::optional<double> scales_w) {
+  DEBUG("AtenIpexCPUDev::dil_upsample_nearest2d\n");
+  CHECK_DNNL_OP_PRE_COND(input);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
+  dil::tensor y;
+  auto out_size = input.sizes().vec();
+  out_size[input.dim() - 2] = output_size.vec()[0];
+  out_size[input.dim() - 1] = output_size.vec()[1];
+  if (scales_h.has_value() && scales_w.has_value()) {
+    dil::resampling_forward::compute(x, y, out_size, {float(scales_h.value()), float(scales_w.value())}, dil::algorithm::resampling_nearest);
+  } else {
+    dil::resampling_forward::compute(x, y, out_size, {}, dil::algorithm::resampling_nearest);
+  }
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
+}
+
+at::Tensor AtenIpexCPUDev::dil_upsample_nearest2d_backward(const at::Tensor& grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, c10::optional<double> scales_h, c10::optional<double> scales_w) {
+  DEBUG("AtenIpexCPUDev::dil_upsample_nearest2d_backward\n");
+  CHECK_DNNL_OP_PRE_COND(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dil::tensor dy = dbl::comm::try_gen_dil_tensor(grad_output);
+  dil::tensor dx;
+  if (scales_h.has_value() && scales_w.has_value()) {
+    dil::resampling_backward::compute(dy, dx, input_size.vec(), {float(scales_h.value()), float(scales_w.value())}, dil::algorithm::resampling_nearest);
+  } else {
+    dil::resampling_backward::compute(dy, dx, input_size.vec(), {}, dil::algorithm::resampling_nearest);
+  }
+  return dbl::comm::gen_aten_tensor_by(std::move(dx));
+
 }
 
 }  // namespace cpu

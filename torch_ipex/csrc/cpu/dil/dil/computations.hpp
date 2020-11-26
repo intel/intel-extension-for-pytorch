@@ -22,5 +22,6 @@
 #include "operators/spliter.hpp"
 #include "operators/sum.hpp"
 #include "operators/vanilla_rnn.hpp"
+#include "operators/resampling.hpp"
 
 #endif
