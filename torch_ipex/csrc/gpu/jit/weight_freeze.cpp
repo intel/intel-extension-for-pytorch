@@ -44,7 +44,7 @@ static void gatherParams(
 
 //
 // We don't know when to call this pass, so we need to check both symbols
-// in pytorch or in mkldnn
+// in pytorch or in oneDNN
 //
 bool nodeOfInterest(const Node* node) {
   return node->kind() == aten::conv2d

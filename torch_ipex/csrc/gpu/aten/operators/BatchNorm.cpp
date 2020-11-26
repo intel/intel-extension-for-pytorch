@@ -13,7 +13,7 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
-using namespace mkldnn;
+using namespace dnnl;
 using namespace at::dpcpp;
 
 namespace at {
@@ -24,31 +24,19 @@ void get_dnnl_format(
     const Tensor& input,
     memory::format_tag& dnnl_format,
     memory::dims& input_tz) {
-  auto input_sizes = input.sizes();
-  auto input_ndim = input_sizes.size();
-
+  input_tz = input.sizes().vec();
+  auto input_ndim = input.ndimension();
   if (input_ndim == 2) {
     dnnl_format = memory::format_tag::nc;
-    input_tz = {/*n*/ input.size(0), /*c*/ input.size(1)};
   } else if (input_ndim == 3) {
     dnnl_format = memory::format_tag::ncw;
-    input_tz = {/*n*/ input.size(0), /*c*/ input.size(1), /*w*/ input.size(2)};
   } else if (input_ndim == 4) {
     dnnl_format = memory::format_tag::nchw;
-    input_tz = {/*n*/ input.size(0),
-                /*c*/ input.size(1),
-                /*h*/ input.size(2),
-                /*w*/ input.size(3)};
   } else if (input_ndim == 5) {
     dnnl_format = memory::format_tag::ncdhw;
-    input_tz = {/*n*/ input.size(0),
-                /*c*/ input.size(1),
-                /*d*/ input.size(2),
-                /*h*/ input.size(3),
-                /*w*/ input.size(4)};
   } else {
     std::stringstream ss;
-    ss << "SYCL batch_norm backend got shape=" << input_sizes
+    ss << "SYCL batch_norm backend got shape=" << input.sizes()
        << ", expected input with rank 2 [n, c], rank 3 [n, c, l], rank 4 [n, "
           "c, h, w] or rank 5 [n, c, d, h, w] shape ";
     AT_ERROR(ss.str());
@@ -71,20 +59,20 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
     bool training,
     double momentum,
     double epsilon) {
+  auto engine = GpuEngineManager::Instance().get_engine({kDPCPP, current_device()});
+  auto strm = GpuStreamManager::Instance().get_stream();
+
   Tensor input = condition_contiguous(input_);
   Tensor weight = condition_contiguous(weight_);
   Tensor bias = condition_contiguous(bias_);
   Tensor running_mean = condition_contiguous(running_mean_);
   Tensor running_var = condition_contiguous(running_var_);
   Tensor output;
+
   if (!lazy_reorder_enabled())
       output = at::empty_like(input);
 
-  Device curDevice = Device(kDPCPP, current_device());
-  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
-
-  auto propagation =
-      training ? prop_kind::forward_training : prop_kind::forward_inference;
+  auto propagation = training ? prop_kind::forward_training : prop_kind::forward_inference;
   normalization_flags flag = normalization_flags::use_scale_shift;
 
   if (!weight.defined()) {
@@ -97,10 +85,10 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
 
   if (!weight.defined() || !bias.defined()) {
     flag &= ~normalization_flags::use_scale_shift;
-    //        if (mkldnn_use_scaleshift)
-    //            flag |= normalization_flags::use_scale_shift;
-    //        else
-    //            TODO: Add warning
+    // if (dnnl_use_scaleshift)
+    //     flag |= normalization_flags::use_scale_shift;
+    // else
+    //     TODO: Add warning
   }
 
   if (!training) {
@@ -114,22 +102,19 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
     //    trainning");
   }
 
-  int64_t feature_num = input.size(1);
-  int64_t feature_size = input.numel() / feature_num;
+  auto feature_num = input.size(1);
+  auto feature_size = input.numel() / feature_num;
   memory::format_tag dnnl_format;
   memory::dims input_tz;
   get_dnnl_format(input, dnnl_format, input_tz);
 
-  auto data_t = dt_to_dnnl(input.scalar_type());
-
   memory::desc input_md;
-  auto input_ctx =
-      at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
+  auto data_t = dt_to_dnnl(input.scalar_type());
+  auto input_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
   if (!lazy_reorder_enabled()) {
     input_md = memory::desc({input_tz}, data_t, dnnl_format);
   } else {
-    input_md = input_ctx.is_plain() ?
-        memory::desc({input_tz}, data_t, dnnl_format) :
+    input_md = input_ctx.is_plain() ? memory::desc({input_tz}, data_t, dnnl_format) :
         input_ctx.meta();
   }
 
@@ -138,13 +123,11 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   create_key(key, input_md, epsilon, flag);
 #endif
 
-  batch_normalization_forward::desc batch_norm_forward_desc(
-      propagation, input_md, epsilon, flag);
+  batch_normalization_forward::desc batch_norm_forward_desc(propagation, input_md, epsilon, flag);
   auto batch_norm_forward_pd = batch_normalization_forward::primitive_desc(
       batch_norm_forward_desc, engine);
 
-  auto input_usr_memory = dpcpp_onednn_memory(
-      input_md, engine, input.data_ptr());
+  auto input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
 
   if (lazy_reorder_enabled()) {
     if (!input_ctx.is_plain()) {
@@ -164,16 +147,14 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
 #else
   auto bn_fwd = batch_normalization_forward(batch_norm_forward_pd);
 #endif
-  auto strm = GpuStreamManager::Instance().get_stream();
 
   std::unordered_map<int, memory> args = {
-      {MKLDNN_ARG_SRC, input_usr_memory},
-      {MKLDNN_ARG_DST, output_usr_memory},
+      {DNNL_ARG_SRC, input_usr_memory},
+      {DNNL_ARG_DST, output_usr_memory},
   };
 
   // local memory freed before kernel finished
-  auto weight_bias =
-      at::empty(2 * feature_num, weight.options().dtype(ScalarType::Float));
+  auto weight_bias = at::empty(2 * feature_num, weight.options().dtype(ScalarType::Float));
   auto weight_bias_memory = dpcpp_onednn_memory(
       batch_norm_forward_pd.weights_desc(), engine, weight_bias.data_ptr());
   Tensor _weight = weight.to(ScalarType::Float);
@@ -191,7 +172,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
       feature_num * sizeof(float),
       DeviceToDevice);
 
-  args.insert({MKLDNN_ARG_SCALE_SHIFT, weight_bias_memory});
+  args.insert({DNNL_ARG_SCALE_SHIFT, weight_bias_memory});
 
   Tensor save_mean = at::empty({feature_num}, input.options()).to(ScalarType::Float);
   Tensor save_var = at::empty({feature_num}, input.options()).to(ScalarType::Float);
@@ -206,19 +187,16 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
     var_data = save_var.data_ptr();
   }
 
-  auto mean_memory = dpcpp_onednn_memory(
-      batch_norm_forward_pd.mean_desc(), engine, mean_data);
-  auto var_memory = dpcpp_onednn_memory(
-      batch_norm_forward_pd.variance_desc(), engine, var_data);
+  auto mean_memory = dpcpp_onednn_memory(batch_norm_forward_pd.mean_desc(), engine, mean_data);
+  auto var_memory = dpcpp_onednn_memory(batch_norm_forward_pd.variance_desc(), engine, var_data);
 
-  args.insert({MKLDNN_ARG_MEAN, mean_memory});
-  args.insert({MKLDNN_ARG_VARIANCE, var_memory});
+  args.insert({DNNL_ARG_MEAN, mean_memory});
+  args.insert({DNNL_ARG_VARIANCE, var_memory});
 
   DPCPP_ONEDNN_EXEC(bn_fwd, strm, args);
 
   if (training && running_mean.defined() && running_var.defined()) {
-    dpcppMemoryScale1(
-        running_mean.data_ptr(), save_mean.data_ptr(), feature_num, momentum);
+    dpcppMemoryScale1(running_mean.data_ptr(), save_mean.data_ptr(), feature_num, momentum);
     size_t orig_size = feature_size;
     size_t adjust_size = orig_size - 1;
     float adjust_factor = (static_cast<float>(orig_size)) / adjust_size;
@@ -287,6 +265,9 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     bool training,
     double epsilon,
     std::array<bool, 3> grad_input_mask) {
+  auto engine = GpuEngineManager::Instance().get_engine({kDPCPP, current_device()});
+  auto strm = GpuStreamManager::Instance().get_stream();
+
   Tensor grad_output = impl::condition_contiguous(grad_output_);
   Tensor input = impl::condition_contiguous(input_);
   Tensor weight = impl::condition_contiguous(weight_);
@@ -309,18 +290,16 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     grad_bias = at::empty_like(weight);
   }
 
-  Device curDevice = Device(kDPCPP, current_device());
-  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
-  auto flags = normalization_flags::use_scale_shift; // backward only support
-                                                     // training mode
+  // backward only support training mode
+  auto flags = normalization_flags::use_scale_shift;
 
   if (!(grad_input_mask[1] && grad_input_mask[2])) {
     flags &=
         ~normalization_flags::use_scale_shift; // No grad_weight and grad_bias
-    //        if (mkldnn_use_scaleshift)
-    //            flag |= normalization_flags::use_scale_shift;
-    //        else
-    //            TODO: Add warning
+    // if (dnnl_use_scaleshift)
+    //     flag |= normalization_flags::use_scale_shift;
+    // else
+    //     TODO: Add warning
   }
 
   size_t feature_num = input.size(1);
@@ -338,7 +317,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
 
   prop_kind p_kind;
 
-  //  The check is not nnecessarybecause the use_scale_shift defined as:
+  // The check is not nnecessary because the use_scale_shift defined as:
   // If not specified:
   //  - on backward propagation
   //    prop_kind == #dnnl::prop_kind::backward_data has the
@@ -360,10 +339,10 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
       bwd_desc, engine, batch_norm_forward_pd);
 
   auto input_usr_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_t, dnnl_format}, engine, input.data_ptr());
+      {input_tz, data_t, dnnl_format}, engine, input.data_ptr());
 
   auto grad_output_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_t, dnnl_format}, engine, grad_output.data_ptr());
+      {input_tz, data_t, dnnl_format}, engine, grad_output.data_ptr());
 
   memory mean_memory, var_memory;
   if (training) {
@@ -379,22 +358,19 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   }
 
   auto grad_input_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_t, dnnl_format}, engine, grad_input.data_ptr());
-
-  auto strm = GpuStreamManager::Instance().get_stream();
+      {input_tz, data_t, dnnl_format}, engine, grad_input.data_ptr());
 
   auto bn_bwd = batch_normalization_backward(bn_bwd_pd);
 
   std::unordered_map<int, memory> args = {
-      {MKLDNN_ARG_SRC, input_usr_memory},
-      {MKLDNN_ARG_DIFF_DST, grad_output_memory},
-      {MKLDNN_ARG_MEAN, mean_memory},
-      {MKLDNN_ARG_VARIANCE, var_memory},
-      {MKLDNN_ARG_DIFF_SRC, grad_input_memory},
+      {DNNL_ARG_SRC, input_usr_memory},
+      {DNNL_ARG_DIFF_DST, grad_output_memory},
+      {DNNL_ARG_MEAN, mean_memory},
+      {DNNL_ARG_VARIANCE, var_memory},
+      {DNNL_ARG_DIFF_SRC, grad_input_memory},
   };
 
   Tensor grad_weight_bias;
-
   if ((bool)(flags & normalization_flags::use_scale_shift)) {
     auto weight_bias = at::empty(2 * feature_num, weight.options());
     dpcppMemcpyAsync(
@@ -403,8 +379,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
         feature_num * sizeof(float),
         DeviceToDevice);
     dpcppMemsetAsync(
-        static_cast<uint8_t*>(weight_bias.data_ptr()) +
-            feature_num * sizeof(float),
+        static_cast<uint8_t*>(weight_bias.data_ptr()) + feature_num * sizeof(float),
         0,
         feature_num * sizeof(float));
     auto weight_bias_memory = dpcpp_onednn_memory(
@@ -414,8 +389,8 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     auto grad_weight_bias_memory = dpcpp_onednn_memory(
         bn_bwd_pd.diff_weights_desc(), engine, grad_weight_bias.data_ptr());
 
-    args.insert({MKLDNN_ARG_SCALE_SHIFT, weight_bias_memory});
-    args.insert({MKLDNN_ARG_DIFF_SCALE_SHIFT, grad_weight_bias_memory});
+    args.insert({DNNL_ARG_SCALE_SHIFT, weight_bias_memory});
+    args.insert({DNNL_ARG_DIFF_SCALE_SHIFT, grad_weight_bias_memory});
   }
 
   DPCPP_ONEDNN_EXEC(bn_bwd, strm, args);

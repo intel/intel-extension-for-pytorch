@@ -7,15 +7,15 @@
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
+#include <core/Runtime.h>
 #include <core/TensorImplUtils.h>
 #include <utils/ATDispatch.h>
 
-#include <mkldnn.hpp>
 
 #include "Im2Col.h"
 #include "Im2ColShapeCheck.h"
 
-using namespace mkldnn;
+using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
 
@@ -56,16 +56,16 @@ static void col2im_out_template(
       "It is expected stride equals to 2, but got size ",
       stride.size());
 
-  int64_t output_height = output_size[0];
-  int64_t output_width = output_size[1];
-  int64_t kernel_height = kernel_size[0];
-  int64_t kernel_width = kernel_size[1];
-  int64_t dilation_height = dilation[0];
-  int64_t dilation_width = dilation[1];
-  int64_t pad_height = padding[0];
-  int64_t pad_width = padding[1];
-  int64_t stride_height = stride[0];
-  int64_t stride_width = stride[1];
+  auto output_height = output_size[0];
+  auto output_width = output_size[1];
+  auto kernel_height = kernel_size[0];
+  auto kernel_width = kernel_size[1];
+  auto dilation_height = dilation[0];
+  auto dilation_width = dilation[1];
+  auto pad_height = padding[0];
+  auto pad_width = padding[1];
+  auto stride_height = stride[0];
+  auto stride_width = stride[1];
 
   col2im_shape_check(
       input_,
@@ -89,9 +89,9 @@ static void col2im_out_template(
     input.resize_({1, input.size(0), input.size(1)});
   }
 
-  int64_t batch_size = input.size(0);
-  int64_t n_input_plane = input.size(1);
-  int64_t n_output_plane = n_input_plane / (kernel_width * kernel_height);
+  auto batch_size = input.size(0);
+  auto n_input_plane = input.size(1);
+  auto n_output_plane = n_input_plane / (kernel_width * kernel_height);
 
   output.resize_({batch_size, n_output_plane, output_height, output_width});
   output.zero_();
@@ -101,14 +101,10 @@ static void col2im_out_template(
         Tensor input_n = Tensor();
         Tensor output_n = Tensor();
 
-        int64_t height_col = (output_height + 2 * pad_height -
-                              (dilation_height * (kernel_height - 1) + 1)) /
-                stride_height +
-            1;
-        int64_t width_col = (output_width + 2 * pad_width -
-                             (dilation_width * (kernel_width - 1) + 1)) /
-                stride_width +
-            1;
+        auto height_col = (output_height + 2 * pad_height
+            - (dilation_height * (kernel_height - 1) + 1)) / stride_height + 1;
+        auto width_col = (output_width + 2 * pad_width
+            - (dilation_width * (kernel_width - 1) + 1)) / stride_width + 1;
 
         for (int64_t elt = 0; elt < batch_size; elt++) {
           input_n = input.select(0, elt);
@@ -145,8 +141,7 @@ void col2im_backward_out_template(
     IntArrayRef dilation,
     IntArrayRef padding,
     IntArrayRef stride) {
-  at::AtenIpexTypeDPCPP::im2col_out(
-      grad_input, grad_output, kernel_size, dilation, padding, stride);
+  at::AtenIpexTypeDPCPP::im2col_out(grad_input, grad_output, kernel_size, dilation, padding, stride);
 }
 
 } // namespace impl
@@ -159,8 +154,7 @@ Tensor& col2im_out(
     IntArrayRef dilation,
     IntArrayRef padding,
     IntArrayRef stride) {
-  impl::col2im_out_template(
-      out, self, output_size, kernel_size, dilation, padding, stride);
+  impl::col2im_out_template(out, self, output_size, kernel_size, dilation, padding, stride);
   return out;
 }
 
@@ -173,8 +167,7 @@ Tensor col2im(
     IntArrayRef stride) {
   Tensor output = at::empty_like(self);
 
-  impl::col2im_out_template(
-      output, self, output_size, kernel_size, dilation, padding, stride);
+  impl::col2im_out_template(output, self, output_size, kernel_size, dilation, padding, stride);
   return output;
 }
 
@@ -185,8 +178,7 @@ Tensor& col2im_backward_out(
     IntArrayRef dilation,
     IntArrayRef padding,
     IntArrayRef stride) {
-  impl::col2im_backward_out_template(
-      grad_input, grad_output, kernel_size, dilation, padding, stride);
+  impl::col2im_backward_out_template(grad_input, grad_output, kernel_size, dilation, padding, stride);
   return grad_input;
 }
 
@@ -198,8 +190,7 @@ Tensor col2im_backward(
     IntArrayRef stride) {
   Tensor grad_input = at::empty_like(grad_output);
 
-  impl::col2im_backward_out_template(
-      grad_input, grad_output, kernel_size, dilation, padding, stride);
+  impl::col2im_backward_out_template(grad_input, grad_output, kernel_size, dilation, padding, stride);
   return grad_input;
 }
 

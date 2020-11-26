@@ -8,7 +8,7 @@
 lru_key_t key;
 #endif
 
-using namespace mkldnn;
+using namespace dnnl;
 
 namespace at {
 namespace dpcpp {
@@ -39,10 +39,10 @@ void inner_product(
   memory::dims bias_tz = {oc};
   memory::dims output_tz = {n, oc};
 
-  auto input_md = memory::desc({input_tz}, data_t, format_any);
-  auto weight_md = memory::desc({weight_tz}, data_t, format_any);
-  auto output_md = memory::desc({output_tz}, data_t, format_any);
-  auto bias_md = use_bias ? memory::desc({bias_tz}, data_t, format_any) : memory::desc();
+  auto input_md = memory::desc(input_tz, data_t, format_any);
+  auto weight_md = memory::desc(weight_tz, data_t, format_any);
+  auto output_md = memory::desc(output_tz, data_t, format_any);
+  auto bias_md = use_bias ? memory::desc(bias_tz, data_t, format_any) : memory::desc();
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
@@ -52,13 +52,13 @@ void inner_product(
       prop_kind::forward_inference, input_md, weight_md, bias_md, output_md);
   auto ip_forward_pd = inner_product_forward::primitive_desc(ipFwd_desc, engine);
 
-  auto input_usr_memory = dpcpp_onednn_memory({{input_tz}, data_t, format_nc}, engine, input);
-  auto weight_usr_memory = dpcpp_onednn_memory({{weight_tz}, data_t, format_oi}, engine, weight);
-  auto output_usr_memory = dpcpp_onednn_memory({{output_tz}, data_t, format_nc}, engine, output);
+  auto input_usr_memory = dpcpp_onednn_memory({input_tz, data_t, format_nc}, engine, input);
+  auto weight_usr_memory = dpcpp_onednn_memory({weight_tz, data_t, format_oi}, engine, weight);
+  auto output_usr_memory = dpcpp_onednn_memory({output_tz, data_t, format_nc}, engine, output);
 
-  memory bias_usr_memory = memory({{{}, data_t, format_x}, engine});
+  memory bias_usr_memory = memory({{}, data_t, format_x}, engine);
   if (use_bias) {
-    bias_usr_memory = dpcpp_onednn_memory({{bias_tz}, data_t, format_x}, engine, bias.data_ptr());
+    bias_usr_memory = dpcpp_onednn_memory({bias_tz, data_t, format_x}, engine, bias.data_ptr());
   }
 
   auto strm = GpuStreamManager::Instance().get_stream();
@@ -70,10 +70,10 @@ void inner_product(
   DPCPP_ONEDNN_EXEC(
       ip_forward,
       strm,
-      {{MKLDNN_ARG_SRC, input_usr_memory},
-       {MKLDNN_ARG_WEIGHTS, weight_usr_memory},
-       {MKLDNN_ARG_BIAS, bias_usr_memory},
-       {MKLDNN_ARG_DST, output_usr_memory}});
+      {{DNNL_ARG_SRC, input_usr_memory},
+       {DNNL_ARG_WEIGHTS, weight_usr_memory},
+       {DNNL_ARG_BIAS, bias_usr_memory},
+       {DNNL_ARG_DST, output_usr_memory}});
 }
 } // namespace dpcpp
 } // namespace at

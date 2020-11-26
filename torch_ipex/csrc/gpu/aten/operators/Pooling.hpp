@@ -13,7 +13,7 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
-using namespace mkldnn;
+using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
 
@@ -49,7 +49,7 @@ class scalar_t_to_dnnl {
       typename scalar_t,
       std::enable_if_t<std::is_same<scalar_t, double>::value, int> = 0>
   static memory::data_type to() {
-    TORCH_CHECK(0, " mkldnn not support for double");
+    TORCH_CHECK(0, "Double data type is not supported in oneDNN so far.");
   };
 
   template <
@@ -214,7 +214,7 @@ static void avg_pool_out_frame(
   DPCPP_ONEDNN_EXEC(
       pool_forward,
       strm,
-      {{MKLDNN_ARG_SRC, input_memory}, {MKLDNN_ARG_DST, output_memory}});
+      {{DNNL_ARG_SRC, input_memory}, {DNNL_ARG_DST, output_memory}});
 }
 
 template <typename scalar_t>
@@ -308,8 +308,8 @@ static void avg_pool_backward_out_frame(
   DPCPP_ONEDNN_EXEC(
       pool_backward,
       strm,
-      {{MKLDNN_ARG_DIFF_DST, diff_dst_memory},
-       {MKLDNN_ARG_DIFF_SRC, diff_src_memory}});
+      {{DNNL_ARG_DIFF_DST, diff_dst_memory},
+       {DNNL_ARG_DIFF_SRC, diff_src_memory}});
 }
 
 template <typename scalar_t>
@@ -463,9 +463,9 @@ static void max_pool_out_frame(
     DPCPP_ONEDNN_EXEC(
         pool_forward,
         strm,
-        {{MKLDNN_ARG_SRC, input_memory},
-         {MKLDNN_ARG_DST, output_memory},
-         {MKLDNN_ARG_WORKSPACE, indices_memory}});
+        {{DNNL_ARG_SRC, input_memory},
+         {DNNL_ARG_DST, output_memory},
+         {DNNL_ARG_WORKSPACE, indices_memory}});
 
     if (!lazy_reorder_enabled()) {
       dpcppMemoryCopyType(indices.data_ptr<int64_t>(),indices_.data_ptr<int32_t>(),indices_.numel());
@@ -484,7 +484,7 @@ static void max_pool_out_frame(
     DPCPP_ONEDNN_EXEC(
         pool_forward,
         strm,
-        {{MKLDNN_ARG_SRC, input_memory}, {MKLDNN_ARG_DST, output_memory}});
+        {{DNNL_ARG_SRC, input_memory}, {DNNL_ARG_DST, output_memory}});
   }
 }
 
@@ -544,7 +544,7 @@ static void max_pool_backward_out_frame(
     padding = {padD, padH, padW};
   }
 
-  // Currently, MKLDNN GPU doens't support format_any in pooling
+  // Currently, oneDNN doens't support format_any in pooling
   auto gradInput_md = memory::desc({gradInput_tz}, data_t, format);
   auto gradOutput_md = memory::desc({gradOutput_tz}, data_t, format);
 
@@ -583,9 +583,9 @@ static void max_pool_backward_out_frame(
   DPCPP_ONEDNN_EXEC(
       pool_backward,
       strm,
-      {{MKLDNN_ARG_DIFF_DST, diff_dst_memory},
-       {MKLDNN_ARG_DIFF_SRC, diff_src_memory},
-       {MKLDNN_ARG_WORKSPACE, indices_memory}});
+      {{DNNL_ARG_DIFF_DST, diff_dst_memory},
+       {DNNL_ARG_DIFF_SRC, diff_src_memory},
+       {DNNL_ARG_WORKSPACE, indices_memory}});
 }
 
 } // namespace impl

@@ -8,7 +8,7 @@
 #include <utils/ATDispatch.h>
 #include "Pooling.hpp"
 
-using namespace mkldnn;
+using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
 
@@ -30,48 +30,41 @@ void max_pool2d_with_indices_out_template(
       "max_pool2d: kernel_size must either be a single int, or a tuple "
       "of two ints")
   const int kH = safe_downcast<int, int64_t>(kernel_size[0]);
-  const int kW = kernel_size.size() == 1
-      ? kH
-      : safe_downcast<int, int64_t>(kernel_size[1]);
+  const int kW = kernel_size.size() == 1 ? kH : safe_downcast<int, int64_t>(kernel_size[1]);
 
   TORCH_CHECK(
       stride.size() == 0 || stride.size() == 1 || stride.size() == 2,
       "max_pool2d: stride must either be omitted, a single int, or a "
       "tuple of two ints")
   const int dH = stride.empty() ? kH : safe_downcast<int, int64_t>(stride[0]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+    : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 2,
       "max_pool2d: padding must be either be a single int, or a tuple "
       "of two ints");
   const int padH = safe_downcast<int, int64_t>(padding[0]);
-  const int padW =
-      padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
+  const int padW = padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
 
   TORCH_CHECK(
       dilation.size() == 1 || dilation.size() == 2,
       "max_pool2d: dilation must be either a single int, or a tuple of "
       "two ints");
   const int dilationH = safe_downcast<int, int64_t>(dilation[0]);
-  const int dilationW = dilation.size() == 1
-      ? dilationH
-      : safe_downcast<int, int64_t>(dilation[1]);
+  const int dilationW = dilation.size() == 1 ? dilationH : safe_downcast<int, int64_t>(dilation[1]);
 
-  TORCH_CHECK(
-      input_.ndimension() == 4, "only support 4 dims on DPCPP device now!");
+  TORCH_CHECK(input_.ndimension() == 4, "only support 4 dims on DPCPP device now!");
 
   /* sizes */
-  const int64_t nbatch = input_.size(-4);
-  const int64_t nInputPlane = input_.size(-3);
-  const int64_t inputHeight = input_.size(-2);
-  const int64_t inputWidth = input_.size(-1);
+  const auto nbatch = input_.size(-4);
+  const auto nInputPlane = input_.size(-3);
+  const auto inputHeight = input_.size(-2);
+  const auto inputWidth = input_.size(-1);
 
-  const int64_t outputHeight = pooling_output_shape<int64_t>(
+  const auto outputHeight = pooling_output_shape<int64_t>(
       inputHeight, kH, padH, dH, dilationH, ceil_mode);
-  const int64_t outputWidth = pooling_output_shape<int64_t>(
+  const auto outputWidth = pooling_output_shape<int64_t>(
       inputWidth, kW, padW, dW, dilationW, ceil_mode);
 
   pool2d_shape_check(
@@ -174,38 +167,31 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       "max_pool2d: kernel_size must either be a single int, or a tuple "
       "of two ints")
   const int kH = safe_downcast<int, int64_t>(kernel_size[0]);
-  const int kW = kernel_size.size() == 1
-      ? kH
-      : safe_downcast<int, int64_t>(kernel_size[1]);
+  const int kW = kernel_size.size() == 1 ? kH : safe_downcast<int, int64_t>(kernel_size[1]);
 
   TORCH_CHECK(
       stride.size() == 0 || stride.size() == 1 || stride.size() == 2,
       "max_pool2d: stride must either be omitted, a single int, or a "
       "tuple of two ints")
   const int dH = stride.empty() ? kH : safe_downcast<int, int64_t>(stride[0]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+    : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 2,
       "max_pool2d: padding must be either be a single int, or a tuple "
       "of two ints");
   const int padH = safe_downcast<int, int64_t>(padding[0]);
-  const int padW =
-      padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
+  const int padW = padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
 
   TORCH_CHECK(
       dilation.size() == 1 || dilation.size() == 2,
       "max_pool2d: dilation must be either a single int, or a tuple of "
       "two ints");
   const int dilationH = safe_downcast<int, int64_t>(dilation[0]);
-  const int dilationW = dilation.size() == 1
-      ? dilationH
-      : safe_downcast<int, int64_t>(dilation[1]);
+  const int dilationW = dilation.size() == 1 ? dilationH : safe_downcast<int, int64_t>(dilation[1]);
 
-  TORCH_CHECK(
-      input.ndimension() == 4, "only support 4 dims on DPCPP device now!");
+  TORCH_CHECK(input.ndimension() == 4, "only support 4 dims on DPCPP device now!");
 
   /* get contiguous gradOutput */
   const Tensor gradOutput = gradOutput_.contiguous();
@@ -215,16 +201,16 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   gradInput.zero_();
 
   /* sizes */
-  const int64_t nbatch = input.size(-4);
-  const int64_t nInputPlane = input.size(-3);
-  const int64_t inputHeight = input.size(-2);
-  const int64_t inputWidth = input.size(-1);
-  const int64_t outputHeight = gradOutput.size(-2);
-  const int64_t outputWidth = gradOutput.size(-1);
+  const auto nbatch = input.size(-4);
+  const auto nInputPlane = input.size(-3);
+  const auto inputHeight = input.size(-2);
+  const auto inputWidth = input.size(-1);
+  const auto outputHeight = gradOutput.size(-2);
+  const auto outputWidth = gradOutput.size(-1);
 
-  const int64_t outputHeight_for_shape_check = pooling_output_shape<int64_t>(
+  const auto outputHeight_for_shape_check = pooling_output_shape<int64_t>(
       inputHeight, kH, padH, dH, dilationH, ceil_mode);
-  const int64_t outputWidth_for_shape_check = pooling_output_shape<int64_t>(
+  const auto outputWidth_for_shape_check = pooling_output_shape<int64_t>(
       inputWidth, kW, padW, dW, dilationW, ceil_mode);
 
   auto alg_kind = algorithm::pooling_max;

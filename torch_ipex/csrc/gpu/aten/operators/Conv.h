@@ -47,17 +47,18 @@ typedef struct conv_attr {
 
 static inline dnnl::memory::dims conv_output_size(
     int64_t ndim,
-    int64_t groups,
     IntArrayRef input_size,
     IntArrayRef weight_size,
     IntArrayRef padding,
     IntArrayRef stride,
     IntArrayRef dilation) {
+  bool has_dilation = dilation.size() > 0;
   dnnl::memory::dims output_size(ndim);
   output_size[0] = input_size[input_batch_size_dim];
   output_size[1] = weight_size[weight_output_channels_dim];
   for (size_t d = 2; d < ndim; ++d) {
-    auto kernel = dilation[d - 2] * (weight_size[d] - 1) + 1;
+    auto dilate = has_dilation ? dilation[d - 2] : 1;
+    auto kernel = dilate * (weight_size[d] - 1) + 1;
     output_size[d] = (input_size[d] + (2 * padding[d - 2]) - kernel) / stride[d - 2] + 1;
   }
   return output_size;
@@ -77,24 +78,24 @@ static inline dnnl::memory::format_tag conv_input_fmt(int64_t ndim) {
         : dnnl::memory::format_tag::undef);
 }
 
-static inline dnnl::memory::format_tag conv_weight_fmt(int64_t ndim, bool grouped) {
+static inline dnnl::memory::format_tag conv_weight_fmt(int64_t ndim, bool grouped = false) {
   return (ndim == 4) ? (grouped ? dnnl::memory::format_tag::goihw : dnnl::memory::format_tag::oihw)
     : ((ndim == 5) ? (grouped ? dnnl::memory::format_tag::goidhw : dnnl::memory::format_tag::oidhw)
         : dnnl::memory::format_tag::undef);
 }
 
 static inline dnnl::memory::dims compatible_weight_dims(
-    int64_t ndim, int64_t groups, int64_t oc, int64_t ic, IntArrayRef osizes) {
+    int64_t ndim, int64_t groups, int64_t oc, int64_t ic, IntArrayRef wsizes) {
   if (ndim == 4) {
-    auto kh = osizes[2];
-    auto kw = osizes[3];
-    return (groups > 1) ? dnnl::memory::dims({groups, oc / groups, ic / groups, kh, kw})
+    auto kh = wsizes[2];
+    auto kw = wsizes[3];
+    return (groups != 1) ? dnnl::memory::dims({groups, oc / groups, ic / groups, kh, kw})
       : dnnl::memory::dims({oc, ic, kh, kw});
   } else if (ndim == 5) {
-    auto kd = osizes[2];
-    auto kh = osizes[3];
-    auto kw = osizes[4];
-    return (groups > 1) ? dnnl::memory::dims({groups, oc / groups, ic / groups, kd, kh, kw})
+    auto kd = wsizes[2];
+    auto kh = wsizes[3];
+    auto kw = wsizes[4];
+    return (groups != 1) ? dnnl::memory::dims({groups, oc / groups, ic / groups, kd, kh, kw})
       : dnnl::memory::dims({oc, ic, kd, kh, kw});
   }
 

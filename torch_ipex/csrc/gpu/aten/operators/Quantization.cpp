@@ -11,7 +11,7 @@
 DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
 DPCPP_DEF_K1(make_per_channel_quantized_tensor_dpcpp);
 
-using namespace mkldnn;
+using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
 
@@ -35,10 +35,8 @@ Tensor _make_per_tensor_quantized_tensor(
         iter.add_input(self);
         iter.dont_compute_common_dtype();
         iter.build();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(
-            make_per_tensor_quantized_tensor_dpcpp)>(
-            iter,
-            [=](underlying_t value) -> scalar_t { return scalar_t(value); });
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(make_per_tensor_quantized_tensor_dpcpp)>(
+            iter, [=](underlying_t value) -> scalar_t { return scalar_t(value); });
       });
   return dst;
 }
@@ -62,10 +60,8 @@ Tensor _make_per_channel_quantized_tensor(
         iter.add_input(self);
         iter.dont_compute_common_dtype();
         iter.build();
-        dpcpp_kernel_for_tensor_iter<DPCPP_K(
-            make_per_channel_quantized_tensor_dpcpp)>(
-            iter,
-            [=](underlying_t value) -> scalar_t { return scalar_t(value); });
+        dpcpp_kernel_for_tensor_iter<DPCPP_K(make_per_channel_quantized_tensor_dpcpp)>(
+            iter, [=](underlying_t value) -> scalar_t { return scalar_t(value); });
       });
   return dst;
 }
@@ -81,15 +77,11 @@ Tensor quantize_tensor_per_channel_affine(
   auto r_eng = GpuEngineManager::Instance().get_engine(curDevice);
 
   memory::dims r_dims = qtensor.dim() == 4
-      ? memory::dims({qtensor.size(0),
-                      qtensor.size(1),
-                      qtensor.size(2),
-                      qtensor.size(3)})
+      ? memory::dims({qtensor.size(0), qtensor.size(1), qtensor.size(2), qtensor.size(3)})
       : qtensor.dim() == 2 ? memory::dims({qtensor.size(0), qtensor.size(1)})
                            : memory::dims({qtensor.size(0)});
   memory::data_type r_dt = dt_to_dnnl(rtensor.scalar_type());
-  memory::format_tag r_fmt = qtensor.dim() == 4
-      ? memory::format_tag::nchw
+  memory::format_tag r_fmt = qtensor.dim() == 4 ? memory::format_tag::nchw
       : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
   memory::desc r_md = memory::desc(r_dims, r_dt, r_fmt);
   memory r_m = dpcpp_onednn_memory(r_md, r_eng, rtensor.data_ptr());
@@ -109,10 +101,8 @@ Tensor quantize_tensor_per_channel_affine(
   for (int i = 0; i < scales.numel(); i++) {
     scls.push_back(1.0f / scales[i].item().to<float>());
   }
-  zps.push_back(
-      zero_points[0]
-          .item()
-          .to<float>()); // oneDNN only support single zero_point by currently.
+  // oneDNN only support single zero_point by currently.
+  zps.push_back(zero_points[0].item().to<float>());
 
   attr.set_output_scales(mask_0, {scls});
   attr.set_zero_points(DNNL_ARG_DST, mask_1, {zps});
@@ -138,8 +128,7 @@ Tensor quantize_tensor_per_tensor_affine(
       return rtensor;
     }
     // for int8 weight cache
-    if (!r_ctx.is_plain() &&
-        (r_ctx.meta().data_type() != memory::data_type::f32)) {
+    if (!r_ctx.is_plain() && (r_ctx.meta().data_type() != memory::data_type::f32)) {
       return rtensor;
     }
   }
@@ -149,15 +138,11 @@ Tensor quantize_tensor_per_tensor_affine(
   auto r_eng = GpuEngineManager::Instance().get_engine(curDevice);
 
   memory::dims r_dims = rtensor.dim() == 4
-      ? memory::dims({rtensor.size(0),
-                      rtensor.size(1),
-                      rtensor.size(2),
-                      rtensor.size(3)})
+      ? memory::dims({rtensor.size(0), rtensor.size(1), rtensor.size(2), rtensor.size(3)})
       : rtensor.dim() == 2 ? memory::dims({rtensor.size(0), rtensor.size(1)})
                            : memory::dims({rtensor.size(0)});
   memory::data_type r_dt = dt_to_dnnl(rtensor.scalar_type());
-  memory::format_tag r_fmt = rtensor.dim() == 4
-      ? memory::format_tag::nchw
+  memory::format_tag r_fmt = rtensor.dim() == 4 ? memory::format_tag::nchw
       : rtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
   memory::desc r_md = memory::desc(r_dims, r_dt, r_fmt);
 
@@ -172,12 +157,10 @@ Tensor quantize_tensor_per_tensor_affine(
   if (!r_ctx.is_plain() && lazy_reorder_enabled()) {
     if (rtensor.is_quantized())
       return rtensor;
-    r_m = r_ctx.is_plain()
-        ? dpcpp_onednn_memory(r_md, r_eng, rtensor.data_ptr())
+    r_m = r_ctx.is_plain() ? dpcpp_onednn_memory(r_md, r_eng, rtensor.data_ptr())
         : dpcpp_onednn_memory({r_ctx.meta()}, r_eng, rtensor.data_ptr());
     auto q_type = qtensor.scalar_type();
-    auto quantizer =
-        make_per_tensor_affine_quantizer(scale, zero_point, q_type);
+    auto quantizer = make_per_tensor_affine_quantizer(scale, zero_point, q_type);
     qtensor_opt = empty_opaque_qtensor(q_md, c10::nullopt, quantizer);
 
     q_m = dpcpp_onednn_memory(q_md, q_eng, qtensor_opt.data_ptr());
@@ -195,11 +178,8 @@ Tensor quantize_tensor_per_tensor_affine(
   DPCPP_ONEDNN_EXEC(reorder_p, stream, {{DNNL_ARG_FROM, r_m}, {DNNL_ARG_TO, q_m}});
 
   if (!r_ctx.is_plain() && lazy_reorder_enabled()) {
-    auto q_opt_ctx =
-        at::AtenIpexTypeDPCPP::DPCPPTensorContext::release_tensor_ctx(
-            qtensor_opt);
-    at::AtenIpexTypeDPCPP::DPCPPTensorContext::set_tensor_ctx(
-        rtensor, std::move(q_opt_ctx));
+    auto q_opt_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::release_tensor_ctx(qtensor_opt);
+    at::AtenIpexTypeDPCPP::DPCPPTensorContext::set_tensor_ctx(rtensor, std::move(q_opt_ctx));
     return rtensor;
   }
 
@@ -214,8 +194,7 @@ Tensor quantize_per_tensor(
   if(self.is_quantized()){
     return self;
   }
-  auto quantizer =
-      at::dpcpp::make_per_tensor_affine_quantizer(scale, zero_point, dtype);
+  auto quantizer = at::dpcpp::make_per_tensor_affine_quantizer(scale, zero_point, dtype);
   return quantizer->quantize(self);
 }
 
@@ -225,8 +204,7 @@ Tensor quantize_per_channel(
     const Tensor& zero_points,
     int64_t axis,
     ScalarType dtype) {
-  auto quantizer = at::dpcpp::make_per_channel_affine_quantizer(
-      scales, zero_points, axis, dtype);
+  auto quantizer = at::dpcpp::make_per_channel_affine_quantizer(scales, zero_points, axis, dtype);
   return quantizer->quantize(self);
 }
 

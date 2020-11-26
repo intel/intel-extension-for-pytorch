@@ -11,8 +11,8 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
-using namespace mkldnn;
-using mkldnn::algorithm;
+using namespace dnnl;
+using dnnl::algorithm;
 using namespace at::dpcpp;
 
 namespace at {
@@ -83,16 +83,16 @@ void dpcpp_eltwise(
 
 #ifdef USE_PRIMITIVE_CACHE
   auto eltwise_fwd =
-      fetch_or_create_m<mkldnn::eltwise_forward>(key, eltwise_forward_pd);
+      fetch_or_create_m<dnnl::eltwise_forward>(key, eltwise_forward_pd);
 #else
-  auto eltwise_fwd = mkldnn::eltwise_forward(eltwise_forward_pd);
+  auto eltwise_fwd = dnnl::eltwise_forward(eltwise_forward_pd);
 #endif
 
   DPCPP_ONEDNN_EXEC(
       eltwise_fwd,
       strm,
-      {{MKLDNN_ARG_SRC, input_usr_memory},
-       {MKLDNN_ARG_DST, output_usr_memory}});
+      {{DNNL_ARG_SRC, input_usr_memory},
+       {DNNL_ARG_DST, output_usr_memory}});
 }
 
 template <algorithm alg_kind>
@@ -129,11 +129,11 @@ void dpcpp_eltwise_backward(
   auto diff_src_memory = dpcpp_onednn_memory({{input_tz}, data_t, format_nchw}, engine, diff_src);
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  auto eltwise_bwd = mkldnn::eltwise_backward(eltwise_backward_pd);
+  auto eltwise_bwd = dnnl::eltwise_backward(eltwise_backward_pd);
   DPCPP_ONEDNN_EXEC(eltwise_bwd, strm,
-      {{MKLDNN_ARG_SRC, src_usr_memory},
-       {MKLDNN_ARG_DIFF_DST, diff_dst_memory},
-       {MKLDNN_ARG_DIFF_SRC, diff_src_memory}});
+      {{DNNL_ARG_SRC, src_usr_memory},
+       {DNNL_ARG_DIFF_DST, diff_dst_memory},
+       {DNNL_ARG_DIFF_SRC, diff_src_memory}});
 }
 } // namespace dpcpp
 } // namespace at

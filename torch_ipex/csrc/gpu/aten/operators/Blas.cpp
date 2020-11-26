@@ -33,7 +33,7 @@ Tensor computecpp_workaround(const Tensor& t) {
 }
 
 template <typename scalar_t>
-void mkldnnGemmImpl(
+void dnnlGemmImpl(
     Tensor& result_,
     scalar_t beta,
     scalar_t alpha,
@@ -47,7 +47,7 @@ void mkldnnGemmImpl(
   Tensor b = computecpp_workaround(b_);
 #else
 template <typename scalar_t>
-void mkldnnGemmImpl(
+void dnnlGemmImpl(
     Tensor& result,
     scalar_t beta,
     scalar_t alpha,
@@ -57,8 +57,8 @@ void mkldnnGemmImpl(
     bool with_relu) {
 #endif
   size_t dims = result.dim();
-  TORCH_CHECK(dims == 2 || dims == 3, "mkldnn matmul only works with 2D or 3D, got ", dims);
-  TORCH_CHECK(dims == m1.dim() && dims == m2.dim(), "mkldnn input matrixes must have the same ranks");
+  TORCH_CHECK(dims == 2 || dims == 3, "oneDNN matmul only works with 2D or 3D, got ", dims);
+  TORCH_CHECK(dims == m1.dim() && dims == m2.dim(), "oneDNN input matrixes must have the same ranks");
 
   int64_t m = result.size(-2);
   int64_t n = result.size(-1);
@@ -276,7 +276,7 @@ void gemm_broadcast(Tensor& result,
     result.resize_(result_shape);
   }
 
-  mkldnnGemmImpl<scalar_t>(result, beta, alpha, m1, m2_unpack, bc_bias, with_relu);
+  dnnlGemmImpl<scalar_t>(result, beta, alpha, m1, m2_unpack, bc_bias, with_relu);
 }
 } // namespace impl
 

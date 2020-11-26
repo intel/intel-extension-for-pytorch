@@ -7,7 +7,7 @@
 #include <utils/ATDispatch.h>
 #include "Pooling.hpp"
 
-using namespace mkldnn;
+using namespace dnnl;
 using namespace at::dpcpp;
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -17,20 +17,17 @@ void adaptive_avg_pool2d_out_template(
     Tensor& output,
     const Tensor& input,
     IntArrayRef output_size) {
-  TORCH_CHECK(
-      (input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
-
-  int64_t nInputCols, nInputRows, nInputPlane, batchSize;
+  TORCH_CHECK((input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
 
   // bool ceil_mode = false;
-  int64_t nOutputCols = output_size[1];
-  int64_t nOutputRows = output_size[0];
+  auto nOutputCols = output_size[1];
+  auto nOutputRows = output_size[0];
 
   // Input is NCHW format
-  nInputCols = input.size(3);
-  nInputRows = input.size(2);
-  nInputPlane = input.size(1);
-  batchSize = input.size(0);
+  auto nInputCols = input.size(3);
+  auto nInputRows = input.size(2);
+  auto nInputPlane = input.size(1);
+  auto batchSize = input.size(0);
 
   int dW = DPCPP::floor((float)2 * nInputCols / nOutputCols) -
       DPCPP::floor((float)nInputCols / nOutputCols);
@@ -117,20 +114,17 @@ void adaptive_avg_pool2d_backward_out_template(
     const Tensor& input) {
   Tensor gradOutput = gradOutput_.contiguous();
 
-  TORCH_CHECK(
-      (input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
-
-  int64_t nInputCols, nInputRows, nInputPlane, batchSize;
+  TORCH_CHECK((input.ndimension() == 4), "only support 4 dims on DPCPP device now!");
 
   auto output_size_vec = gradOutput.sizes();
-  int64_t nOutputCols = output_size_vec[3];
-  int64_t nOutputRows = output_size_vec[2];
+  auto nOutputCols = output_size_vec[3];
+  auto nOutputRows = output_size_vec[2];
 
   // Input is NCHW format
-  nInputCols = input.size(3);
-  nInputRows = input.size(2);
-  nInputPlane = input.size(1);
-  batchSize = input.size(0);
+  auto nInputCols = input.size(3);
+  auto nInputRows = input.size(2);
+  auto nInputPlane = input.size(1);
+  auto batchSize = input.size(0);
 
   int dW = DPCPP::floor((float)2 * nInputCols / nOutputCols) -
       DPCPP::floor((float)nInputCols / nOutputCols);
@@ -203,8 +197,7 @@ Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
     output = at::empty({0}, self.options());
   }
 
-  return at::AtenIpexTypeDPCPP::adaptive_avg_pool2d_out(
-      output, self, output_size);
+  return at::AtenIpexTypeDPCPP::adaptive_avg_pool2d_out(output, self, output_size);
 }
 
 Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
@@ -219,8 +212,7 @@ Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
     output = at::empty({0}, self.options());
   }
 
-  return at::AtenIpexTypeDPCPP::adaptive_avg_pool2d_out(
-      output, self, output_size);
+  return at::AtenIpexTypeDPCPP::adaptive_avg_pool2d_out(output, self, output_size);
 }
 
 Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
@@ -236,8 +228,7 @@ Tensor _adaptive_avg_pool2d_backward(
     const Tensor& grad_output,
     const Tensor& self) {
   auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
-  impl::adaptive_avg_pool2d_backward_out_template(
-      grad_input, grad_output, self);
+  impl::adaptive_avg_pool2d_backward_out_template(grad_input, grad_output, self);
   return grad_input;
 }
 

@@ -29,7 +29,7 @@ static inline bool is_contiguous(const int64_t* strides) {
 template <typename scalar_t>
 static void dpcpp_threshold_kernel(TensorIterator& iter) {
   auto loop = [&](char** data, const int64_t* strides, int64_t n) {
-    dpcpp_eltwise_backward<mkldnn::algorithm::eltwise_relu>(
+    dpcpp_eltwise_backward<dnnl::algorithm::eltwise_relu>(
         data[0], data[1], data[2], n, 0.0f, 0.0f);
   };
   iter.serial_for_each(loop, {0L, iter.numel()});
@@ -471,12 +471,12 @@ void GeluBackwardKernelImpl(
 
 Tensor relu(const Tensor& self) {
   Tensor result;
-  at::dpcpp::dpcpp_eltwise<mkldnn::algorithm::eltwise_relu>(result, self, 0.0f, 0.0f);
+  at::dpcpp::dpcpp_eltwise<dnnl::algorithm::eltwise_relu>(result, self, 0.0f, 0.0f);
   return result;
 }
 
 Tensor& relu_(Tensor& self) {
-  at::dpcpp::dpcpp_eltwise<mkldnn::algorithm::eltwise_relu>(self, self, 0.0f, 0.0f);
+  at::dpcpp::dpcpp_eltwise<dnnl::algorithm::eltwise_relu>(self, self, 0.0f, 0.0f);
   return self;
 }
 

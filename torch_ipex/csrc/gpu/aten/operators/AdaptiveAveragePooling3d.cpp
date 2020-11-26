@@ -7,7 +7,7 @@
 #include <utils/ATDispatch.h>
 #include "Pooling.hpp"
 
-using namespace mkldnn;
+using namespace dnnl;
 using namespace at::dpcpp;
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -34,15 +34,15 @@ void adaptive_avg_pool3d_out_template(
       (input.ndimension() == 4 || input.ndimension() == 5),
       "non-empty 4D or 5D (batch mode) tensor expected for input");
 
-  int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
-  int64_t nblock = input.size(-4);
-  int64_t inputDepth = input.size(-3);
-  int64_t inputHeight = input.size(-2);
-  int64_t inputWidth = input.size(-1);
+  auto nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
+  auto nblock = input.size(-4);
+  auto inputDepth = input.size(-3);
+  auto inputHeight = input.size(-2);
+  auto inputWidth = input.size(-1);
 
-  int64_t outputDepth = output_size[0];
-  int64_t outputHeight = output_size[1];
-  int64_t outputWidth = output_size[2];
+  auto outputDepth = output_size[0];
+  auto outputHeight = output_size[1];
+  auto outputWidth = output_size[2];
 
   int dD = DPCPP::floor((float)2 * inputDepth / outputDepth) -
       DPCPP::floor((float)inputDepth / outputDepth);
@@ -138,15 +138,15 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
     const Tensor& input) {
   auto gradOutput = gradOutput_.contiguous();
 
-  int64_t nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
-  int64_t nblock = input.size(-4);
-  int64_t gradInputDepth = input.size(-3);
-  int64_t gradInputHeight = input.size(-2);
-  int64_t gradInputWidth = input.size(-1);
+  auto nbatch = input.ndimension() == 5 ? input.size(-5) : 1;
+  auto nblock = input.size(-4);
+  auto gradInputDepth = input.size(-3);
+  auto gradInputHeight = input.size(-2);
+  auto gradInputWidth = input.size(-1);
 
-  int64_t gradOutputDepth = gradOutput.size(-3);
-  int64_t gradOutputHeight = gradOutput.size(-2);
-  int64_t gradOutputWidth = gradOutput.size(-1);
+  auto gradOutputDepth = gradOutput.size(-3);
+  auto gradOutputHeight = gradOutput.size(-2);
+  auto gradOutputWidth = gradOutput.size(-1);
 
   int dD = DPCPP::floor((float)2 * gradInputDepth / gradOutputDepth) -
       DPCPP::floor((float)gradInputDepth / gradOutputDepth);
@@ -216,8 +216,7 @@ Tensor& adaptive_avg_pool3d_out(
 
 Tensor adaptive_avg_pool3d(const Tensor& self, IntArrayRef output_size) {
   auto output = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::adaptive_avg_pool3d_out(
-      output, self, output_size);
+  return at::AtenIpexTypeDPCPP::adaptive_avg_pool3d_out(output, self, output_size);
 }
 
 Tensor& adaptive_avg_pool3d_backward_out(
@@ -225,8 +224,7 @@ Tensor& adaptive_avg_pool3d_backward_out(
     const Tensor& grad_output,
     const Tensor& self) {
   grad_input.resize_as_(self).zero_();
-  impl::adaptive_avg_pool3d_backward_out_template(
-      grad_input, grad_output, self);
+  impl::adaptive_avg_pool3d_backward_out_template(grad_input, grad_output, self);
   return grad_input;
 }
 
@@ -234,8 +232,7 @@ Tensor adaptive_avg_pool3d_backward(
     const Tensor& grad_output,
     const Tensor& self) {
   auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
-  impl::adaptive_avg_pool3d_backward_out_template(
-      grad_input, grad_output, self);
+  impl::adaptive_avg_pool3d_backward_out_template(grad_input, grad_output, self);
   return grad_input;
 }
 

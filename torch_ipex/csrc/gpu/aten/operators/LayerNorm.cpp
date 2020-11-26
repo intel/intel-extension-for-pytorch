@@ -64,8 +64,8 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
       layer_norm_forward_desc, engine);
 
   std::unordered_map<int, memory> args = {
-      {MKLDNN_ARG_SRC, input_usr_memory},
-      {MKLDNN_ARG_DST, output_usr_memory},
+      {DNNL_ARG_SRC, input_usr_memory},
+      {DNNL_ARG_DST, output_usr_memory},
   };
 
   Tensor mean = at::empty({n * ih * ic}, input.options()).to(ScalarType::Float);

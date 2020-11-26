@@ -8,11 +8,11 @@
 #include <utils/Profiler.h>
 #include <utils/Timer.h>
 
-#include <mkldnn.hpp>
+#include <dnnl.hpp>
 #include <oneapi/dnnl/dnnl_sycl.hpp>
 #include <vector>
 
-using namespace mkldnn;
+using namespace dnnl;
 
 #define DPCPP_ONEDNN_FORCE_SYNC(stream)               \
   {                                                   \

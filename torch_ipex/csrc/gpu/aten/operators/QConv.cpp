@@ -8,7 +8,7 @@
 #include "Conv.h"
 #include "QUtil.h"
 
-using namespace mkldnn;
+using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
 
@@ -39,7 +39,6 @@ at::Tensor q_conv2d(
   Tensor output = _empty_affine_quantized(
       conv_output_size(
           input.ndimension(),
-          groups,
           input.sizes(),
           weight.sizes(),
           padding.vec(),
@@ -85,7 +84,6 @@ at::Tensor q_conv2d_relu(
   Tensor output = _empty_affine_quantized(
       conv_output_size(
           input.ndimension(),
-          groups,
           input.sizes(),
           weight.sizes(),
           padding.vec(),

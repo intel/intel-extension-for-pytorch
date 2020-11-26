@@ -277,10 +277,10 @@ void dnnl_inner_product_forward_frame(
   DPCPP_ONEDNN_EXEC(
       ip_forward,
       strm,
-      {{MKLDNN_ARG_SRC, input_usr_memory},
-       {MKLDNN_ARG_WEIGHTS, weight_usr_memory},
-       {MKLDNN_ARG_BIAS, bias_usr_memory},
-       {MKLDNN_ARG_DST, output_usr_memory}});
+      {{DNNL_ARG_SRC, input_usr_memory},
+       {DNNL_ARG_WEIGHTS, weight_usr_memory},
+       {DNNL_ARG_BIAS, bias_usr_memory},
+       {DNNL_ARG_DST, output_usr_memory}});
 }
 
 template <typename scalar_t>

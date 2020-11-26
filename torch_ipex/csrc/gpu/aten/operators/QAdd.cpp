@@ -30,7 +30,7 @@ Tensor qAddRelu(Tensor qa, Tensor qb, double scale, int64_t zero_point) {
   auto b = at::dequantize(qb);
   auto c = at::add(a, b, 1.f);
 
-  // use mkldnn reorder of s8 to u8 to do relu's thing!
+  // use oneDNN reorder of s8 to u8 to do relu's thing!
   auto qc = at::quantize_per_tensor(c, scale, zero_point, ScalarType::QUInt8);
 
   return qc;

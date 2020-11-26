@@ -13,7 +13,7 @@
 #endif
 
 using namespace at::dpcpp;
-using namespace mkldnn;
+using namespace dnnl;
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -89,11 +89,6 @@ void SpatialSoftMaxForward(
     size_t outer_size,
     size_t dim_size,
     size_t dim_stride) {
-  using local_accessor_t = DPCPP::accessor<
-      accscalar_t,
-      1,
-      DPCPP::access::mode::read_write,
-      DPCPP::access::target::local>;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   size_t local_size = dpcppMaxWorkGroupSize(dpcpp_queue);
   local_size = std::min(local_size, dim_size);
@@ -102,8 +97,8 @@ void SpatialSoftMaxForward(
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = get_buffer<dpcpp_r_mode>(cgh, input);
     auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, output);
-    auto local_acc_max = local_accessor_t(local_size, cgh);
-    auto local_acc_sum = local_accessor_t(local_size, cgh);
+    auto local_acc_max = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
+    auto local_acc_sum = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
     cgh.parallel_for<SpatialSoftmaxForwardKernelName<
         scalar_t,
         Epilogue<scalar_t, accscalar_t, outscalar_t>>>(
@@ -171,11 +166,6 @@ void SpatialSoftMaxBackward(
     size_t outer_size,
     size_t dim_size,
     size_t dim_stride) {
-  using local_accessor_t = DPCPP::accessor<
-      accscalar_t,
-      1,
-      DPCPP::access::mode::read_write,
-      DPCPP::access::target::local>;
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   size_t local_size = dpcppMaxWorkGroupSize(dpcpp_queue);
   local_size = std::min(local_size, dim_size);
@@ -185,7 +175,7 @@ void SpatialSoftMaxBackward(
     auto gradInput_data = get_buffer<dpcpp_discard_w_mode>(cgh, gradInput);
     auto output_data = get_buffer<dpcpp_r_mode>(cgh, output);
     auto gradOutput_data = get_buffer<dpcpp_r_mode>(cgh, gradOutput);
-    auto local_acc_sum = local_accessor_t(local_size, cgh);
+    auto local_acc_sum = dpcpp_local_acc_t<accscalar_t>(local_size, cgh);
     cgh.parallel_for<SpatialSoftmaxBackwardKernelName<
         scalar_t,
         Epilogue<scalar_t, accscalar_t, outscalar_t>>>(
@@ -406,8 +396,8 @@ Tensor _softmax_onednn(
   DPCPP_ONEDNN_EXEC(
       softmax_onednn_forward,
       strm,
-      {{MKLDNN_ARG_SRC, input_usr_memory},
-       {MKLDNN_ARG_DST, output_usr_memory}});
+      {{DNNL_ARG_SRC, input_usr_memory},
+       {DNNL_ARG_DST, output_usr_memory}});
 
   return output;
 }

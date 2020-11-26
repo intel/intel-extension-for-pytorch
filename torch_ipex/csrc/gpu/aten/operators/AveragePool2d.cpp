@@ -7,7 +7,7 @@
 #include <utils/ATDispatch.h>
 #include "Pooling.hpp"
 
-using namespace mkldnn;
+using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
 
@@ -29,40 +29,33 @@ void avg_pool2d_out_template(
       "avg_pool2d: kernel_size must either be a single int, or a tuple "
       "of two ints");
   const int kH = safe_downcast<int, int64_t>(kernel_size[0]);
-  const int kW = kernel_size.size() == 1
-      ? kH
-      : safe_downcast<int, int64_t>(kernel_size[1]);
+  const int kW = kernel_size.size() == 1 ? kH : safe_downcast<int, int64_t>(kernel_size[1]);
 
   TORCH_CHECK(
       stride.empty() || stride.size() == 1 || stride.size() == 2,
       "avg_pool2d: stride must either be omitted, a single int, or a "
       "tuple of two ints");
   const int dH = stride.empty() ? kH : safe_downcast<int, int64_t>(stride[0]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+    : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 2,
       "avg_pool2d: padding must either be a single int, or a tuple of "
       "two ints");
   const int padH = safe_downcast<int, int64_t>(padding[0]);
-  const int padW =
-      padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
+  const int padW = padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
 
-  TORCH_CHECK(
-      (input_.ndimension() == 4), "only support 4 dims on DPCPP device now!");
+  TORCH_CHECK( (input_.ndimension() == 4), "only support 4 dims on DPCPP device now!");
 
   /* sizes */
-  const int64_t nbatch = input_.size(-4);
-  const int64_t nInputPlane = input_.size(-3);
-  const int64_t inputHeight = input_.size(-2);
-  const int64_t inputWidth = input_.size(-1);
+  const auto nbatch = input_.size(-4);
+  const auto nInputPlane = input_.size(-3);
+  const auto inputHeight = input_.size(-2);
+  const auto inputWidth = input_.size(-1);
 
-  const int64_t outputHeight =
-      pooling_output_shape<int64_t>(inputHeight, kH, padH, dH, 1, ceil_mode);
-  const int64_t outputWidth =
-      pooling_output_shape<int64_t>(inputWidth, kW, padW, dW, 1, ceil_mode);
+  const auto outputHeight = pooling_output_shape<int64_t>(inputHeight, kH, padH, dH, 1, ceil_mode);
+  const auto outputWidth = pooling_output_shape<int64_t>(inputWidth, kW, padW, dW, 1, ceil_mode);
 
   pool2d_shape_check(
       input_,
@@ -87,7 +80,7 @@ void avg_pool2d_out_template(
   Tensor input = input_.contiguous();
 
   auto alg_kind = count_include_pad ? algorithm::pooling_avg_include_padding
-                                    : algorithm::pooling_avg_exclude_padding;
+    : algorithm::pooling_avg_exclude_padding;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
   if(!input.is_quantized()){
@@ -123,7 +116,7 @@ void avg_pool2d_out_template(
   } else {
     IPEX_DISPATCH_QINT_TYPES(
         input.scalar_type(), "q_avg_pool2d_out_frame", [&] {
-	      avg_pool_out_frame<scalar_t>(
+        avg_pool_out_frame<scalar_t>(
             input,
             output,
             nbatch,
@@ -158,45 +151,39 @@ Tensor& avg_pool2d_backward_out_template(
     IntArrayRef padding,
     bool ceil_mode,
     bool count_include_pad) {
-  
+
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 2,
       "avg_pool2d: kernel_size must either be a single int, or a tuple "
       "of two ints");
   const int kH = safe_downcast<int, int64_t>(kernel_size[0]);
-  const int kW = kernel_size.size() == 1
-      ? kH
-      : safe_downcast<int, int64_t>(kernel_size[1]);
+  const int kW = kernel_size.size() == 1 ? kH : safe_downcast<int, int64_t>(kernel_size[1]);
 
   TORCH_CHECK(
       stride.empty() || stride.size() == 1 || stride.size() == 2,
       "avg_pool2d: stride must either be omitted, a single int, or a "
       "tuple of two ints");
   const int dH = stride.empty() ? kH : safe_downcast<int, int64_t>(stride[0]);
-  const int dW = stride.empty()
-      ? kW
-      : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
+  const int dW = stride.empty() ? kW
+    : stride.size() == 1 ? dH : safe_downcast<int, int64_t>(stride[1]);
 
   TORCH_CHECK(
       padding.size() == 1 || padding.size() == 2,
       "avg_pool2d: padding must either be a single int, or a tuple of "
       "two ints");
   const int padH = safe_downcast<int, int64_t>(padding[0]);
-  const int padW =
-      padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
+  const int padW = padding.size() == 1 ? padH : safe_downcast<int, int64_t>(padding[1]);
 
-  const int64_t ndim = input.ndimension();
+  const auto ndim = input.ndimension();
   TORCH_CHECK((ndim == 4), "only support 4 dims on DPCPP device now!");
 
   /* sizes */
-  const int64_t nbatch = input.size(-4);
-  const int64_t nInputPlane = input.size(-3);
-  const int64_t inputHeight = input.size(-2);
-  const int64_t inputWidth = input.size(-1);
-  const int64_t outputWidth =
-      pooling_output_shape<int64_t>(inputWidth, kW, padW, dW, 1, ceil_mode);
-  const int64_t outputHeight =
-      pooling_output_shape<int64_t>(inputHeight, kH, padH, dH, 1, ceil_mode);
+  const auto nbatch = input.size(-4);
+  const auto nInputPlane = input.size(-3);
+  const auto inputHeight = input.size(-2);
+  const auto inputWidth = input.size(-1);
+  const auto outputWidth = pooling_output_shape<int64_t>(inputWidth, kW, padW, dW, 1, ceil_mode);
+  const auto outputHeight = pooling_output_shape<int64_t>(inputHeight, kH, padH, dH, 1, ceil_mode);
 
   avg_pool2d_backward_shape_check(
       input,
@@ -223,7 +210,7 @@ Tensor& avg_pool2d_backward_out_template(
   TORCH_CHECK(gradInput.is_contiguous(), "gradInput must be contiguous");
 
   auto alg_kind = count_include_pad ? algorithm::pooling_avg_include_padding
-                                    : algorithm::pooling_avg_exclude_padding;
+    : algorithm::pooling_avg_exclude_padding;
   auto prop_kind = dnnl::prop_kind::forward_training;
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
