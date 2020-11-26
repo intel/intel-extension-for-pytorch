@@ -94,7 +94,9 @@ static void memsetDevice(
     DPCPP_Q_SYNC_SUBMIT(dpcpp_queue, cgf);
   }
 }
-#else
+
+#else // USE_USM
+
 static void memcpyHostToDevice(
     void* dst,
     const void* src,

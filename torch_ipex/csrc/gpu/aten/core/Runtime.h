@@ -22,21 +22,6 @@ using namespace dnnl;
       }                                               \
   }
 
-#ifdef USE_COMPUTECPP
-#define DPCPP_ONEDNN_EXEC(prim, stream, ...)          \
-  {                                                   \
-    static auto verbose = dpcpp_verbose();            \
-    (prim).execute((stream), ##__VA_ARGS__);          \
-    if (verbose) {                                    \
-      IPEX_TIMER(t, verbose, __func__);               \
-      t.now("oneDNN execute");                        \
-      DPCPP_ONEDNN_FORCE_SYNC(stream);                \
-      t.now("oneDNN stream wait");                    \
-    } else {                                          \
-      DPCPP_ONEDNN_FORCE_SYNC(stream);                \
-    }                                                 \
-  }
-#elif defined(USE_DPCPP)
 #define DPCPP_ONEDNN_EXEC(prim, stream, ...)                                  \
   {                                                                           \
     static auto verbose = dpcpp_verbose();                                    \
@@ -53,9 +38,6 @@ using namespace dnnl;
       DPCPP_ONEDNN_FORCE_SYNC(stream);                                        \
     }                                                                         \
   }
-#else
-#error("Unsupported compiler!!!")
-#endif
 
 namespace at {
 namespace dpcpp {
@@ -68,15 +50,7 @@ static inline dnnl::memory dpcpp_onednn_memory(
   }
 #else
   {
-  #if defined(USE_DPCPP)
     auto buffer = make_buffer<uint8_t>(ptr);
-  #elif defined(USE_COMPUTECPP)
-    if (dpcppGetBufferMap().get_offset(ptr) != 0) {
-      TORCH_CHECK(
-          0, "the offset of dpcpp buffer is not 0. We don't support this case.");
-    }
-    auto buffer = dpcppGetBufferMap().get_buffer(ptr);
-  #endif
     return dnnl::sycl_interop::make_memory(md, engine, buffer);
   }
 #endif

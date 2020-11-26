@@ -5,10 +5,6 @@
 #include <utils/Timer.h>
 #include <utils/Env.h>
 
-#if defined(USE_COMPUTECPP)
-#include <SYCL/event.h>
-#endif
-
 // alias for dpcpp namespace
 namespace DPCPP = cl::sycl;
 
@@ -80,11 +76,7 @@ namespace DPCPP = cl::sycl;
 #define DPCPP_SUB_GROUP_SIZE (1L)
 
 // dpcpp get ptr from accessor
-#if defined(USE_DPCPP)
 #define GET_ACC_PTR(acc, T) acc.get_pointer().get()
-#elif defined(USE_COMPUTECPP)
-#define GET_ACC_PTR(acc, T) acc.template get_pointer<T>().get()
-#endif
 
 // dpcpp device info
 static constexpr auto dpcpp_dev_type =
@@ -259,7 +251,7 @@ DPCPP_HOST using dpcpp_host_acc_t =
     DPCPP::accessor<ScalarType, Dims, Mode, dpcpp_host_buf>;
 
 // printf utils
-#if defined(USE_DPCPP) && defined(__SYCL_DEVICE_ONLY__)
+#if defined(__SYCL_DEVICE_ONLY__)
 #define DPCPP_CONSTANT __attribute__((opencl_constant))
 #else
 #define DPCPP_CONSTANT
@@ -267,12 +259,8 @@ DPCPP_HOST using dpcpp_host_acc_t =
 
 #define DPCPP_KER_STRING(var, str) static const DPCPP_CONSTANT char var[] = str;
 
-#if defined(USE_DPCPP)
-  #if (__SYCL_COMPILER_VERSION >= 20200930)
-    #define DPCPP_PRINTF DPCPP::ONEAPI::experimental::printf
-  #else
-    #define DPCPP_PRINTF DPCPP::intel::experimental::printf
-  #endif
+#if (__SYCL_COMPILER_VERSION >= 20200930)
+  #define DPCPP_PRINTF DPCPP::ONEAPI::experimental::printf
 #else
-#define DPCPP_PRINTF printf
+  #define DPCPP_PRINTF DPCPP::intel::experimental::printf
 #endif

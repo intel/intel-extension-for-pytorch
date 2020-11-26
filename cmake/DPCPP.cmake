@@ -55,58 +55,35 @@ find_file(INTEL_SYCL_VERSION
         lib/clang/8.0.0/include/CL/sycl
     NO_DEFAULT_PATH)
 
-set(USE_DPCPP OFF)
-set(USE_COMPUTECPP OFF)
-if(INTEL_SYCL_VERSION)
-    set(USE_DPCPP ON)
-    get_filename_component(SYCL_INCLUDE_DIR "${INTEL_SYCL_VERSION}/../../.." ABSOLUTE)
+if(NOT INTEL_SYCL_VERSION)
+  message(FATAL_ERROR "Can NOT find SYCL file path!")
+endif()
 
-    find_library(SYCL_LIBRARY
-        NAMES "sycl"
+get_filename_component(SYCL_INCLUDE_DIR "${INTEL_SYCL_VERSION}/../../.." ABSOLUTE)
+
+find_library(SYCL_LIBRARY
+    NAMES "sycl"
+    HINTS ${sycl_root_hints}
+    PATH_SUFFIXES lib
+    NO_DEFAULT_PATH)
+if(NOT SYCL_LIBRARY)
+    message(FATAL_ERROR "SYCL library not found")
+endif()
+include_directories(${SYCL_INCLUDE_DIR})
+
+# Find the OpenCL library from the SYCL distribution
+find_library(OpenCL_LIBRARY
+        NAMES "OpenCL"
         HINTS ${sycl_root_hints}
         PATH_SUFFIXES lib
         NO_DEFAULT_PATH)
-    if(NOT SYCL_LIBRARY)
-        message(FATAL_ERROR "SYCL library not found")
-    endif()
-    include_directories(${SYCL_INCLUDE_DIR})
+set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
 
-    # Find the OpenCL library from the SYCL distribution
-    find_library(OpenCL_LIBRARY
-            NAMES "OpenCL"
-            HINTS ${sycl_root_hints}
-            PATH_SUFFIXES lib
-            NO_DEFAULT_PATH)
-    set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
-
-    # Find LevelZero
-    find_path(LevelZero_INCLUDE_DIR
-            NAMES level_zero/ze_api.h
-            PATH_SUFFIXES include)
-    find_library(LevelZero_LIBRARY
-            NAMES level_zero
-            PATHS
-            PATH_SUFFIXES lib/x64 lib lib64)
-
-else()
-    # ComputeCpp-specific flags
-    # 1. Ignore the warning about undefined symbols in SYCL kernels - comes from
-    #    SYCL CPU thunks
-    # 2. Fix remark [Computecpp:CC0027] about memcpy/memset intrinsics
-    set(COMPUTECPP_USER_FLAGS
-        -Wno-sycl-undef-func
-        -no-serial-memop
-        CACHE STRING "")
-    set(ComputeCpp_DIR ${sycl_root_hint})
-    include(cmake/Modules/FindComputeCpp.cmake)
-    if(NOT ComputeCpp_FOUND)
-        message(FATAL_ERROR "SYCL not found")
-    endif()
-
-    set(USE_COMPUTECPP ON)
-    include_directories(SYSTEM ${ComputeCpp_INCLUDE_DIRS})
-    list(APPEND EXTRA_SHARED_LIBS ${COMPUTECPP_RUNTIME_LIBRARY})
-
-    include_directories(${OpenCL_INCLUDE_DIRS})
-    list(APPEND EXTRA_SHARED_LIBS ${OpenCL_LIBRARIES})
-endif()
+# Find LevelZero
+find_path(LevelZero_INCLUDE_DIR
+        NAMES level_zero/ze_api.h
+        PATH_SUFFIXES include)
+find_library(LevelZero_LIBRARY
+        NAMES level_zero
+        PATHS
+        PATH_SUFFIXES lib/x64 lib lib64)

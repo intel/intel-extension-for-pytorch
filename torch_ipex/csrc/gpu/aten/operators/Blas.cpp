@@ -23,29 +23,6 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-
-#if defined(USE_COMPUTECPP)
-Tensor computecpp_workaround(const Tensor& t) {
-  if (dpcppGetBufferMap().get_offset(t.data_ptr()) != 0) {
-    return t.clone();
-  }
-  return t;
-}
-
-template <typename scalar_t>
-void dnnlGemmImpl(
-    Tensor& result_,
-    scalar_t beta,
-    scalar_t alpha,
-    const Tensor& m1_,
-    const Tensor& m2_,
-    const Tensor& b_,
-    bool with_relu) {
-  Tensor result = computecpp_workaround(result_);
-  Tensor m1 = computecpp_workaround(m1_);
-  Tensor m2 = computecpp_workaround(m2_);
-  Tensor b = computecpp_workaround(b_);
-#else
 template <typename scalar_t>
 void dnnlGemmImpl(
     Tensor& result,
@@ -55,7 +32,6 @@ void dnnlGemmImpl(
     const Tensor& m2,
     const Tensor& b,
     bool with_relu) {
-#endif
   size_t dims = result.dim();
   TORCH_CHECK(dims == 2 || dims == 3, "oneDNN matmul only works with 2D or 3D, got ", dims);
   TORCH_CHECK(dims == m1.dim() && dims == m2.dim(), "oneDNN input matrixes must have the same ranks");
@@ -209,11 +185,6 @@ void dnnlGemmImpl(
   DPCPP_ONEDNN_EXEC(matmul_p, strm,
     {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
       {DNNL_ARG_DST, r_memory}});
-#endif
-
-#if defined(USE_COMPUTECPP)
-  if (!result_.is_same(result))
-    result_.copy_(result);
 #endif
 }
 

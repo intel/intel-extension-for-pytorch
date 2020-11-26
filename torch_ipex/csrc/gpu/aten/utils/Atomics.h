@@ -23,7 +23,6 @@ static inline DPCPP_DEVICE void atomicAdd(
   } while (!address_var.compare_exchange_strong(assumed, newval));
 }
 
-#if defined(USE_DPCPP)
 static inline DPCPP_DEVICE void atomicAdd(
     const dpcpp_global_ptr_pt<double>& address,
     double val) {
@@ -39,7 +38,6 @@ static inline DPCPP_DEVICE void atomicAdd(
     newval = __double_as_long_long(val + __long_long_as_double(assumed));
   } while (!address_var.compare_exchange_strong(assumed, newval));
 }
-#endif
 
 static inline DPCPP_DEVICE void atomicAdd(
     const dpcpp_global_ptr_pt<at::Half>& address,

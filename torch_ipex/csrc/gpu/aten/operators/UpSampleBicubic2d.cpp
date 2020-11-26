@@ -287,7 +287,6 @@ static void upsample_bicubic2d_backward_out_template(
   grad_input.resize_({nbatch, channels, input_height, input_width});
   grad_input.zero_();
 
-  #if defined(USE_DPCPP)
   IPEX_DISPATCH_FLOATING_TYPES(
       grad_output.scalar_type(), "upsample_bicubic2d_backward", [&] {
         scalar_t* idata = grad_input.data_ptr<scalar_t>();
@@ -306,29 +305,6 @@ static void upsample_bicubic2d_backward_out_template(
             onum,
             align_corners);
       });
-
-  #else
-  if (grad_output.scalar_type() == at::ScalarType::Float){
-    float_t* idata = grad_input.data_ptr<float_t>();
-    float_t* odata = grad_output.data_ptr<float_t>();
-    auto onum = grad_output.numel();
-
-    upsample_bicubic2d_backward_out_frame<float_t>(
-        odata,
-        idata,
-        input_height,
-        input_width,
-        output_height,
-        output_width,
-        nbatch,
-        channels,
-        onum,
-        align_corners);
-  }
-  else{
-    TORCH_CHECK(false, "The datatype ", grad_output.scalar_type() ," is not supported in bicubic2d backward yet.");
-  }
-  #endif
 }
 } // namespace impl
 
