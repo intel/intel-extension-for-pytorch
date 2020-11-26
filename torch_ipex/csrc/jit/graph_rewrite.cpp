@@ -49,6 +49,8 @@ std::unordered_map<std::string, c10::IValue> getConvParams(
   calc_values["padding"] = padding_value;
   auto dilation_value = getIValue("dilation", match_vmap, vmap).value();
   calc_values["dilation"] = dilation_value;
+  auto allow_tf32_value = getIValue("allow_tf32", match_vmap, vmap).value();
+  calc_values["allow_tf32_value"] = allow_tf32_value;
   return calc_values;
 }
 
@@ -276,29 +278,29 @@ void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
   std::string convolution = R"(
       graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
           %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool):
+          %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool):
         %r = aten::_convolution(%a, %w, %b, %stride, %padding, %dilation,
-            %transposed, %output_padding, %groups, %benchmark, %deterministic, %cudnn_enabled)
+            %transposed, %output_padding, %groups, %benchmark, %deterministic, %cudnn_enabled, %allow_tf32)
         return (%r) )";
 
   std::string conv2d = R"(
       graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
           %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool):
+          %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool):
         %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
         return (%r) )";
 
   std::string conv1d = R"(
       graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
           %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool):
+          %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool):
         %r = aten::conv1d(%a, %w, %b, %stride, %padding, %dilation, %groups)
         return (%r) )";
 
   std::string conv3d = R"(
       graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
           %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
-          %deterministic:bool, %cudnn_enabled:bool):
+          %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool):
         %r = aten::conv3d(%a, %w, %b, %stride, %padding, %dilation, %groups)
         return (%r) )";
 
