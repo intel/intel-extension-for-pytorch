@@ -98,7 +98,7 @@ at::Tensor dil_convolution_outplace_fusion(
     dil_bias = dbl::comm::try_gen_dil_tensor(bias_contiguous);
   }
 
-  bool weight_updata = dil_weight.has_params();
+  bool weight_updata = dil_weight.has_conv_params();
   dil::tensor dil_output = dbl::conv::convolution_impl(
     dil_input,
     dil_weight,
@@ -110,7 +110,7 @@ at::Tensor dil_convolution_outplace_fusion(
     op_attr,
     output_scale);
 
-  if (!weight_updata && dil_weight.has_params()) {
+  if (!weight_updata && dil_weight.has_conv_params()) {
     dbl::comm::equip_dil_buffer(weight_contiguous, dil_weight);
   }
     auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
@@ -201,7 +201,7 @@ static at::Tensor& dil_convolution_inplace_fusion(
     dil_bias = dbl::comm::try_gen_dil_tensor(bias_contiguous);
   }
 
-  bool weight_updata = dil_weight.has_params();
+  bool weight_updata = dil_weight.has_conv_params();
   dbl::conv::convolution_inplace_impl(
     dil_input,
     dil_weight,
@@ -214,7 +214,7 @@ static at::Tensor& dil_convolution_inplace_fusion(
     attr,
     output_scale);
 
-  if (!weight_updata && dil_weight.has_params()) {
+  if (!weight_updata && dil_weight.has_conv_params()) {
     dbl::comm::equip_dil_buffer(weight_contiguous, dil_weight);
   }
   

@@ -17,6 +17,19 @@ struct convolution_params {
     attr_t b, scale_t d, int g):pd(p), prim(pri), bias_attr(b), dst_scales(d), groups(g) {}
 };
 
+struct inner_product_params {
+  dnnl::inner_product_forward::primitive_desc pd;
+  dnnl::inner_product_forward prim;
+  attr_t attr;
+  attr_t src_attr;
+  attr_t weights_attr;
+  attr_t bias_attr;
+  scale_t dst_scales;
+  inner_product_params( dnnl::inner_product_forward::primitive_desc p,  dnnl::inner_product_forward pri,
+    attr_t op_a, attr_t src_a, attr_t weight_a, attr_t b_a, scale_t d): pd(p), prim(pri), attr(op_a), src_attr(src_a),
+    weights_attr(weight_a), bias_attr(b_a), dst_scales(d) {}
+};
+
 class tensor : public memory {
  public:
   using dim_t = dnnl_dim_t;
@@ -665,6 +678,7 @@ class tensor : public memory {
         zero_point_(t.zero_point_),
         buffer_(t.buffer_),
         conv_params_(t.conv_params_),
+        inner_product_params_(t.inner_product_params_),
         eng_(t.eng_) {}
 
   /// Move constructor
@@ -675,6 +689,7 @@ class tensor : public memory {
         zero_point_(std::move(t.zero_point_)),
         buffer_(std::move(t.buffer_)),
         conv_params_(std::move(t.conv_params_)),
+        inner_product_params_(std::move(t.inner_product_params_)),
         eng_(std::move(t.eng_)) {}
 
   /// Assignment operator
@@ -685,6 +700,7 @@ class tensor : public memory {
     zero_point_ = t.zero_point_;
     workspace_ = t.workspace_;
     conv_params_ = t.conv_params_;
+    inner_product_params_ = t.inner_product_params_;
     eng_ = t.eng_;
     return *this;
   }
@@ -697,6 +713,7 @@ class tensor : public memory {
     zero_point_ = std::move(t.zero_point_);
     workspace_ = std::move(t.workspace_);
     conv_params_ = std::move(t.conv_params_);
+    inner_product_params_ = std::move(t.inner_product_params_);
     eng_ = std::move(t.eng_);
     return *this;
   }
@@ -1032,14 +1049,23 @@ class tensor : public memory {
 
   void copy_workspace(const tensor& other) { workspace_ = other.workspace_; }
 
-  void init_params(dnnl::convolution_forward::primitive_desc pd, dnnl::convolution_forward prim,
+  void init_conv_params(dnnl::convolution_forward::primitive_desc pd, dnnl::convolution_forward prim,
     attr_t bias_attr, scale_t dst_scales, int groups) {
     auto params = new convolution_params(pd, prim, bias_attr, dst_scales, groups);
     conv_params_.reset(params);
   }
-  convolution_params &get_params() const {return *conv_params_; }
-  bool has_params() const {return conv_params_ != nullptr; }
-  void copy_params(const tensor& other) { conv_params_ = other.conv_params_;  }
+  convolution_params &get_conv_params() const {return *conv_params_; }
+  bool has_conv_params() const {return conv_params_ != nullptr; }
+  void copy_conv_params(const tensor& other) { conv_params_ = other.conv_params_;  }
+
+  void init_inner_product_params(dnnl::inner_product_forward::primitive_desc pd, dnnl::inner_product_forward prim,
+    attr_t attr, attr_t src_attr, attr_t weights_attr, attr_t bias_attr, scale_t dst_scales) {
+    auto params = new inner_product_params(pd, prim, attr, src_attr, weights_attr, bias_attr, dst_scales );
+    inner_product_params_.reset(params);
+  }
+  inner_product_params &get_inner_product_params() const {return *inner_product_params_; }
+  bool has_inner_product_params() const {return inner_product_params_ != nullptr; }
+  void copy_inner_product_params(const tensor& other) { inner_product_params_ = other.inner_product_params_;  }
 
   /// Return the scale of this param.
   const scale_t &get_scale() const { return *scale_.get(); }
@@ -1146,13 +1172,15 @@ class tensor : public memory {
     auto ws = std::move(workspace_);
     auto scale = std::move(scale_);
     auto zp = std::move(zero_point_);
-    auto params = std::move(conv_params_);
+    auto params1 = std::move(conv_params_);
+    auto params2 = std::move(inner_product_params_);
     init(new_desc, get_data_handle(), get_engine());
     buffer_ = std::move(buf);
     workspace_ = std::move(ws);
     scale_ = std::move(scale);
     zero_point_ = std::move(zp);
-    conv_params_ = std::move(params);
+    conv_params_ = std::move(params1);
+    inner_product_params_ = std::move(params2);
     return *this;
   }
 
@@ -1161,6 +1189,7 @@ class tensor : public memory {
   std::shared_ptr<std::vector<int32_t>> zero_point_;
   std::shared_ptr<void> buffer_;
   std::shared_ptr<convolution_params> conv_params_;
+  std::shared_ptr<inner_product_params> inner_product_params_;
   engine eng_;
 };
 

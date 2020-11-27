@@ -70,9 +70,13 @@ dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
     if (dil_buffer.has_workspace()) {
       result.copy_workspace(dil_buffer);
     }
-    if (dil_buffer.has_params()) {
-      result.copy_params(dil_buffer);
+    if (dil_buffer.has_conv_params()) {
+      result.copy_conv_params(dil_buffer);
     }
+    if (dil_buffer.has_inner_product_params()) {
+      result.copy_inner_product_params(dil_buffer);
+    }
+
     // TODO(xpz): copy scales and zero_points of qtensor (what if slicing?)
 
     return result;

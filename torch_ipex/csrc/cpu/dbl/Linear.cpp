@@ -10,7 +10,7 @@ namespace linear {
 
 dil::tensor linear_impl(
     const dil::tensor& x,
-    const dil::tensor& w,
+    dil::tensor& w,
     const c10::optional<dil::tensor>& b,
     const dil::scale_t& dst_scales,
     const dil::attr_t& attr) {

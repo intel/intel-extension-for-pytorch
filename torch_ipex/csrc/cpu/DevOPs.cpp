@@ -106,7 +106,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     dil_bias = dbl::comm::try_gen_dil_tensor(bias);
   }
 
-  bool weight_updata = dil_weight.has_params();
+  bool weight_updata = dil_weight.has_conv_params();
   dil::tensor dil_output = dbl::conv::convolution_impl(
     dil_input,
     dil_weight,
@@ -118,7 +118,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     dil::attr_t(),
     output_scale);
 
-  if (!weight_updata && dil_weight.has_params()) {
+  if (!weight_updata && dil_weight.has_conv_params()) {
     dbl::comm::equip_dil_buffer(weight, dil_weight);
   }
 
@@ -1045,7 +1045,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   if (!check_train()) {
     dbl::linear::prepack_linear_weights(self_reshaped, x, weight);
   }
-  const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
+  dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
 
   c10::optional<dil::tensor> b{c10::nullopt};
   if (bias.defined()) {
@@ -1068,7 +1068,12 @@ at::Tensor AtenIpexCPUDev::dil_linear(
     b = dbl::comm::try_gen_dil_tensor(bias);
   }
 
+  bool weight_updata = w.has_inner_product_params();
   dil::tensor y = dbl::linear::linear_impl(x, w, b, output_scale, attr);
+
+  if (!weight_updata && w.has_inner_product_params()) {
+    dbl::comm::equip_dil_buffer(weight, w);
+  }
 
   if (self.dim() > 2) {
     auto input_size = self.sizes();
