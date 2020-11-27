@@ -119,6 +119,9 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     output_scale);
 
   if (!weight_updata && dil_weight.has_conv_params()) {
+    auto params = dil_weight.get_conv_params();
+    auto expexted_input = dil_input.reorder_if_differ_in(params.pd.src_desc());
+    dbl::comm::equip_dil_buffer(input, expexted_input);
     dbl::comm::equip_dil_buffer(weight, dil_weight);
   }
 
@@ -1072,7 +1075,10 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   dil::tensor y = dbl::linear::linear_impl(x, w, b, output_scale, attr);
 
   if (!weight_updata && w.has_inner_product_params()) {
-    dbl::comm::equip_dil_buffer(weight, w);
+    auto params = w.get_inner_product_params();
+    auto expected_weights = w.reorder_if_differ_in(params.pd.weights_desc(), params.weights_attr);
+    expected_weights.copy_inner_product_params(w);
+    dbl::comm::equip_dil_buffer(weight, expected_weights);
   }
 
   if (self.dim() > 2) {

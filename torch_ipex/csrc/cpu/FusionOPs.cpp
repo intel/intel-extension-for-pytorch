@@ -111,9 +111,13 @@ at::Tensor dil_convolution_outplace_fusion(
     output_scale);
 
   if (!weight_updata && dil_weight.has_conv_params()) {
+    auto params = dil_weight.get_conv_params();
+    auto expexted_input = dil_input.reorder_if_differ_in(params.pd.src_desc());
+    dbl::comm::equip_dil_buffer(input, expexted_input);
     dbl::comm::equip_dil_buffer(weight_contiguous, dil_weight);
   }
-    auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
+
+  auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
     insert_or_updata_observer({input_contiguous}, {aten_output}, op_name,  fetch_and_add_ops_id());
   }

@@ -351,12 +351,10 @@ private:
                           : dst_scales;
 
       scale_t bias_scales, op_scales;
-      bias_scales = weights_scales_in;
-      op_scales = weights_scales_in;
-      /*
+   
       std::tie(bias_scales, op_scales) = utils::compute_scales(
           src_scales_in[0], dst_scales_in[0], weights_scales_in);
-      */
+
       if (attr.has_op_kind(kind::sum)) {
         float sum_scale =
             dst_scales_in[0] / (dst.has_scale() ? dst.get_scale()[0] : 1.0f);
