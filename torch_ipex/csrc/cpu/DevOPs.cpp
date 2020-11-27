@@ -2607,5 +2607,37 @@ at::Tensor AtenIpexCPUDev::dil_upsample_nearest3d_backward(const at::Tensor & gr
   return dbl::comm::gen_aten_tensor_by(std::move(dx));
 }
 
+at::Tensor AtenIpexCPUDev::dil_upsample_linear1d(const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales) {
+  DEBUG("AtenIpexCPUDev::dil_upsample_linear1d\n");
+  IPEX_CHECK(align_corners == false, "dil_upsample_linear1d not support align_corners mode yet");
+  CHECK_DNNL_OP_PRE_COND(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
+  dil::tensor y;
+  auto out_size = self.sizes().vec();
+  out_size[self.dim() - 1] = output_size.vec()[0];
+  if (scales.has_value()) {
+    dil::resampling_forward::compute(x, y, out_size, {float(scales.value())}, dil::algorithm::resampling_linear);
+  } else {
+    dil::resampling_forward::compute(x, y, out_size, {}, dil::algorithm::resampling_linear);
+  }
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
+}
+
+at::Tensor AtenIpexCPUDev::dil_upsample_linear1d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales) {
+  DEBUG("AtenIpexCPUDev::dil_upsample_linear1d_backward\n");
+  IPEX_CHECK(align_corners == false, "dil_upsample_linear1d_backward not support align_corners mode yet");
+  CHECK_DNNL_OP_PRE_COND(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dil::tensor dy = dbl::comm::try_gen_dil_tensor(grad_output);
+  dil::tensor dx;
+  if (scales.has_value()) {
+    dil::resampling_backward::compute(dy, dx, input_size.vec(), {float(scales.value())}, dil::algorithm::resampling_linear);
+  } else {
+    dil::resampling_backward::compute(dy, dx, input_size.vec(), {}, dil::algorithm::resampling_linear);
+  }
+  return dbl::comm::gen_aten_tensor_by(std::move(dx));
+}
+
 }  // namespace cpu
 }  // namespace torch_ipex
