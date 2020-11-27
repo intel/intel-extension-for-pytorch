@@ -2087,7 +2087,7 @@ class TestInterpolate(TestCase):
             y_dpcpp.sum().backward()
             self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
-    def test_upsample_linear_scale_factor(self):
+    def test_upsample_linear1d_scale_factor(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -2102,7 +2102,7 @@ class TestInterpolate(TestCase):
             y_dpcpp.sum().backward()
             self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
-    def test_upsample_linear_size(self):
+    def test_upsample_linear1d_size(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
@@ -2112,6 +2112,36 @@ class TestInterpolate(TestCase):
             x_dpcpp = x.clone().to(device=device).requires_grad_()
             y_cpu = F.interpolate(x_cpu, 8, mode='linear')
             y_dpcpp = F.interpolate(x_dpcpp, 8, mode='linear')
+            self.assertEqual(y_cpu, y_dpcpp)
+            y_cpu.sum().backward()
+            y_dpcpp.sum().backward()
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+
+    def test_upsample_bilinear2d_scale_factor(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        with AutoDNNL(True):
+            x = torch.randn(2, 2, 4, 4)
+            x_cpu = x.clone().requires_grad_()
+            x_dpcpp = x.clone().to(device=device).requires_grad_()
+            y_cpu = F.interpolate(x_cpu, scale_factor = 2, mode='bilinear', recompute_scale_factor=False)
+            y_dpcpp = F.interpolate(x_dpcpp, scale_factor = 2, mode='bilinear', recompute_scale_factor=False)
+            self.assertEqual(y_cpu, y_dpcpp)
+            y_cpu.sum().backward()
+            y_dpcpp.sum().backward()
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+
+    def test_upsample_bilinear2d_size(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        with AutoDNNL(True):
+            x = torch.randn(2, 2, 4, 4)
+            x_cpu = x.clone().requires_grad_()
+            x_dpcpp = x.clone().to(device=device).requires_grad_()
+            y_cpu = F.interpolate(x_cpu, (4, 8), mode='bilinear')
+            y_dpcpp = F.interpolate(x_dpcpp, (4, 8), mode='bilinear')
             self.assertEqual(y_cpu, y_dpcpp)
             y_cpu.sum().backward()
             y_dpcpp.sum().backward()
