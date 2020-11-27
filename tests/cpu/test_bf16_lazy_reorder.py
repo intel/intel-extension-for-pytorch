@@ -2821,5 +2821,35 @@ class TestInterpolate(TestCase):
             y_dpcpp.sum().backward()
             self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
+    def test_upsample_trilinear3d_scale_factor(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        with AutoDNNL(True), AutoMixPrecision(True):
+            x = torch.randn(2, 2, 2, 4, 4)
+            x_cpu = x.clone().requires_grad_()
+            x_dpcpp = x.clone().to(device=device).requires_grad_()
+            y_cpu = F.interpolate(x_cpu, scale_factor = 2, mode='trilinear', recompute_scale_factor=False)
+            y_dpcpp = F.interpolate(x_dpcpp, scale_factor = 2, mode='trilinear', recompute_scale_factor=False)
+            self.assertEqual(y_cpu, y_dpcpp, 2e-2)
+            y_cpu.sum().backward()
+            y_dpcpp.sum().backward()
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+
+    def test_upsample_trilinear3d_size(self):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        with AutoDNNL(True), AutoMixPrecision(True):
+            x = torch.randn(2, 2, 2, 4, 4)
+            x_cpu = x.clone().requires_grad_()
+            x_dpcpp = x.clone().to(device=device).requires_grad_()
+            y_cpu = F.interpolate(x_cpu, (4, 8, 8), mode='trilinear')
+            y_dpcpp = F.interpolate(x_dpcpp, (4, 8, 8), mode='trilinear')
+            self.assertEqual(y_cpu, y_dpcpp, 2e-2)
+            y_cpu.sum().backward()
+            y_dpcpp.sum().backward()
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+
 if __name__ == '__main__':
     test = unittest.main()
