@@ -2513,6 +2513,36 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_rnn_layer_backward(const at::Tensor&
       output, hy, cy, grad_output, grad_hy, grad_cy, reverse, mode, hidden_size,
       num_layers, has_biases, train, bidirectional, batch_sizes);
 
+at::Tensor AtenIpexCPUDev::dil_upsample_nearest1d(const at::Tensor & self, at::IntArrayRef output_size, c10::optional<double> scales) {
+  DEBUG("AtenIpexCPUDev::dil_upsample_nearest1d\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+  dbl::comm::reorder_to_bf16_for_mix_prec(self);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
+  dil::tensor y;
+  auto out_size = self.sizes().vec();
+  out_size[self.dim() - 1] = output_size.vec()[0];
+  if (scales.has_value()) {
+    dil::resampling_forward::compute(x, y, out_size, {float(scales.value())}, dil::algorithm::resampling_nearest);
+  } else {
+    dil::resampling_forward::compute(x, y, out_size, {}, dil::algorithm::resampling_nearest);
+  }
+  return dbl::comm::gen_aten_tensor_by(std::move(y));
+}
+
+at::Tensor AtenIpexCPUDev::dil_upsample_nearest1d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, c10::optional<double> scales) {
+  DEBUG("AtenIpexCPUDev::dil_upsample_nearest1d_backward\n");
+  CHECK_DNNL_OP_PRE_COND(grad_output);
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
+  dil::tensor dy = dbl::comm::try_gen_dil_tensor(grad_output);
+  dil::tensor dx;
+  if (scales.has_value()) {
+    dil::resampling_backward::compute(dy, dx, input_size.vec(), {float(scales.value())}, dil::algorithm::resampling_nearest);
+  } else {
+    dil::resampling_backward::compute(dy, dx, input_size.vec(), {}, dil::algorithm::resampling_nearest);
+  }
+  return dbl::comm::gen_aten_tensor_by(std::move(dx));
+}
+
 at::Tensor AtenIpexCPUDev::dil_upsample_nearest2d(const at::Tensor& input, at::IntArrayRef output_size, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   DEBUG("AtenIpexCPUDev::dil_upsample_nearest2d\n");
   CHECK_DNNL_OP_PRE_COND(input);

@@ -94,6 +94,8 @@ class AtenIpexCPUDev {
   static at::Tensor& dil_copy_(at::Tensor & self, const at::Tensor & src, bool non_blocking);
   static std::vector<at::Tensor> dil_rnn_layer(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2, const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse, int64_t mode, int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes);
   static std::vector<at::Tensor> dil_rnn_layer_backward(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2, const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, const at::Tensor& output, const at::Tensor& hy, const at::Tensor& cy, const at::Tensor& grad_output, const at::Tensor& grad_hy, const at::Tensor& grad_cy, bool reverse, int64_t mode, int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes);
+  static at::Tensor dil_upsample_nearest1d(const at::Tensor & self, at::IntArrayRef output_size, c10::optional<double> scales);
+  static at::Tensor dil_upsample_nearest1d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, c10::optional<double> scales);
   static at::Tensor dil_upsample_nearest2d(const at::Tensor& input, at::IntArrayRef output_size, c10::optional<double> scales_h, c10::optional<double> scales_w);
   static at::Tensor dil_upsample_nearest2d_backward(const at::Tensor& grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, c10::optional<double> scales_h, c10::optional<double> scales_w);
 };
