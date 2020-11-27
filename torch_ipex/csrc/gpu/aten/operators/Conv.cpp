@@ -6,9 +6,7 @@
 #include <core/Runtime.h>
 #include <core/TensorImplUtils.h>
 #include <tensor/Context.h>
-#ifdef USE_PRIMITIVE_CACHE
-#include <oneDNN/LRUCache.h>
-#endif
+
 #include <utils/ParamUtils.h>
 
 #include "Conv.h"
@@ -115,8 +113,8 @@ at::Tensor convolution(
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key(key, input_md, weight_md, bias.defined() ? 1 : 0,
-      output_md, _stride, _dilation, _padding, _padding, attr.attr(), conv_scale, conv_zero_point);
+  create_key(key, input_md, weight_md, bias.defined(),
+      output_md, _stride, _dilation, _padding, _padding, attr, conv_scale, conv_zero_point);
 #endif
 
   post_ops po;

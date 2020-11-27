@@ -3,8 +3,11 @@
 #include <ATen/NativeFunctions.h>
 
 #include <oneDNN/oneDNN.h>
-#include <core/DPCPP.h>
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
 
+#include <core/DPCPP.h>
 
 namespace at {
 namespace AtenIpexTypeDPCPP {
@@ -37,6 +40,16 @@ typedef struct conv_attr {
   int64_t attr() {
     return attr_;
   }
+
+#ifdef USE_PRIMITIVE_CACHE
+  void to_bytes(bytestring& bytes) {
+    at::dpcpp::to_bytes(bytes, scale_);
+    at::dpcpp::to_bytes(bytes, alpha_);
+    at::dpcpp::to_bytes(bytes, beta_);
+    at::dpcpp::to_bytes(bytes, oscale_);
+    at::dpcpp::to_bytes(bytes, attr_);
+  }
+#endif
 
   float scale_;
   float alpha_;

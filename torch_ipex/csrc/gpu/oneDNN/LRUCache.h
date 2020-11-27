@@ -1,17 +1,19 @@
 #ifndef _LRU_CACHE_CPP
 #define _LRU_CACHE_CPP
 
-#include "Utils.h"
-
 #include <string>
+#include <vector>
 #include <unordered_map>
 #include <list>
+#include <dnnl.hpp>
 
-using mem_desc_t = dnnl::memory::desc;
-using mem_dims_t = dnnl::memory::dims;
-using meta_t = mem_desc_t;
+using namespace dnnl;
 
-using lru_key_t = std::string;
+namespace at {
+namespace dpcpp {
+
+using bytestring = std::string;
+using lru_key_t = bytestring;
 
 template <class key_t, class value_t,
          template <typename ...> class map = std::unordered_map>
@@ -26,8 +28,7 @@ public:
   typedef typename std::list<node_t>::const_iterator const_iterator;
 
   typedef typename map<key_t, iterator>::iterator map_it;
-  typedef typename map<key_t, iterator>::const_iterator
-    const_map_it;
+  typedef typename map<key_t, iterator>::const_iterator const_map_it;
 
   // Only class possible, we can't use typedef or using. Or can we?
   class node_t : public std::pair<map_it, value_t> {
@@ -154,146 +155,6 @@ private:
   size_type capacity_;
 };
 
-template <class key_t, class value_t>
-class lru_multicache {
-public:
-  class node_t;
-
-  typedef typename std::pair<key_t, value_t> value_type;
-
-  // Only need opaque node_t pointer, it'll compile
-  typedef typename std::list<node_t>::iterator iterator;
-  typedef typename std::list<node_t>::const_iterator const_iterator;
-
-  typedef typename std::unordered_multimap<key_t, iterator>::iterator map_it;
-  typedef typename std::unordered_multimap<key_t, iterator>::const_iterator
-    const_map_it;
-
-  // Only class possible, we can't use typedef or using. Or can we?
-  class node_t : public std::pair<map_it, value_t> {
-  public:
-    node_t (const std::pair<map_it, value_t> &l) :
-      std::pair<map_it, value_t>(l) {}
-    node_t (std::pair<map_it, value_t> &&l) :
-      std::pair<map_it, value_t>(std::move(l)) {}
-  };
-
-  typedef typename std::list<node_t>::size_type size_type;
-
-  lru_multicache(size_type capacity) : capacity_(capacity) {}
-
-  size_type size() const { map_.size(); }
-  size_type max_size() const { return capacity_; }
-  void resize(size_type new_capacity) {
-    capacity_ = new_capacity;
-
-    // Trim cache
-    while (map_.size() > capacity_) {
-      auto last = vlist_.end();
-      last --;
-      map_.erase(last->first);
-      vlist_.pop_back();
-    }
-  }
-
-  iterator begin() noexcept {
-    auto it = map_.begin();
-    if (it == map_.end()) {
-      return vlist_.end();
-    }
-    return it->second;
-  }
-  const_iterator begin() const noexcept {
-    const auto it = map_.begin();
-    if (it == map_.end()) {
-      return vlist_.end();
-    }
-    return it->second;
-  }
-  iterator end() noexcept {
-    return vlist_.end();
-  }
-  const_iterator end() const noexcept {
-    return vlist_.end();
-  }
-
-  iterator find(const key_t &key) {
-    auto it = map_.find(key);
-    if (it == map_.end()) {
-      return end();
-    } else {
-      vlist_.splice(vlist_.begin(), vlist_, it->second);
-      return it->second;
-    }
-  }
-
-  // Is this feasible?
-  const_iterator find(const key_t &key) const {
-    const auto it = map_.find(key);
-    if (it == map_.end()) {
-      return end();
-    } else {
-      vlist_.splice(vlist_.begin(), vlist_, it->second);
-      return it->second;
-    }
-  }
-
-  bool empty() const noexcept {
-    return vlist_.empty();
-  }
-
-  void clear() noexcept {
-    vlist_.clear();
-    map_.clear();
-  }
-
-  // Can we?
-  // template <class... Args>
-  // std::pair<iterator, bool> emplace(Args&&... args) {
-  // }
-
-  std::pair<iterator, bool> insert(const value_type& value) {
-    auto map_it = map_.find(value.first);
-
-    if (map_it == map_.end()) {
-      vlist_.push_front(std::make_pair(map_it, value.second));
-      auto list_it = vlist_.begin();
-      auto updated = map_.insert(std::make_pair(value.first, list_it));
-      // Update node to pointer to new map position
-      list_it->first = updated;
-    } else
-      return std::make_pair(map_it->second, false);
-
-    // Trim cache
-    while (map_.size() > capacity_) {
-      auto last = vlist_.end();
-      last --;
-      map_.erase(last->first);
-      vlist_.pop_back();
-    }
-
-    return std::make_pair(vlist_.begin(), true);
-  }
-
-  iterator erase(iterator pos) {
-    auto map_pos = pos->first;
-    map_.erase(map_pos);
-    return vlist_.erase(pos);
-  }
-
-  // Warning: carefully check iterator validity
-  void swap(lru_multicache & other) {
-    std::swap(vlist_, other.vlist_);
-    std::swap(map_, other.map_);
-    std::swap(capacity_, other.capacity_);
-  }
-
-private:
-  std::list<node_t> vlist_;
-  std::unordered_multimap<key_t, iterator> map_;
-  size_type capacity_;
-};
-
 template <class value_t, size_t capacity = 128, class key_t = std::string>
 class computation_cache {
 public:
@@ -329,75 +190,17 @@ public:
     return fetch(create(key, std::forward<Ts>(args)...));
   }
 
-  static inline void release(
-      const key_t& key, const value_t& computation) {
+  static inline void release(const key_t& key, const value_t& computation) {
     // Empty
   }
 
-  static inline void release(
-      const key_t& key, value_t&& computation) {
+  static inline void release(const key_t& key, value_t&& computation) {
     // Empty
   }
 
   static inline lru_cache<key_t, value_t> &t_store() {
     static thread_local lru_cache<key_t, value_t> t_store_(capacity);
     return t_store_;
-  }
-};
-
-// TODO: mutex it
-template <class value_t, size_t capacity = 128, class key_t = std::string>
-class computation_gcache {
-public:
-  using iterator = typename lru_cache<key_t, value_t>::iterator;
-
-protected:
-  template <typename ...Ts>
-  static inline value_t create(Ts&&... args) {
-    return value_t(std::forward<Ts>(args)...);
-  }
-
-  static inline value_t& fetch(iterator it) {
-    auto comp = std::move(it->second);
-    g_store().erase(it);
-    return comp;
-  }
-
-  static inline iterator find(const key_t& key) {
-    return g_store().find(key);
-  }
-
-  static inline iterator end() {
-    return g_store().end();
-  }
-
-public:
-  template <typename ...Ts>
-  static inline value_t& fetch_or_create(const key_t& key, Ts&&... args) {
-    const auto it = g_store().find(key);
-
-    if (it != g_store().end()) {
-      value_t comp = std::move(it->second);
-      g_store().erase(it);
-      return comp;
-    }
-
-    return value_t(std::forward<Ts>(args)...);
-  }
-
-  static inline void release(
-      const key_t& key, const value_t& computation) {
-    g_store().insert(std::make_pair(key, computation));
-  }
-
-  static inline void release(
-      const key_t& key, value_t&& computation) {
-    g_store().insert(std::make_pair(key, std::move(computation)));
-  }
-
-  static lru_cache<key_t, value_t> &g_store() {
-    static lru_cache<key_t, value_t> g_store_(capacity);
-    return g_store_;
   }
 };
 
@@ -422,46 +225,69 @@ inline value_t fetch_or_create_m(key_t key, Ts&&... args) {
       fetch_or_create_m(key, std::forward<Ts>(args)...);
 }
 
-// Possible better performance, but use inside class scope only (private)
-// #define fetch_or_create_m(op, key, ...)  \
-//     auto it = find(key);  \
-//     auto op = it == end() ? fetch(create(key, __VA_ARGS__)) : fetch(it);
+template <typename T>
+inline typename std::enable_if<std::is_integral<T>::value, void>::type
+to_bytes(bytestring& bytes, const T arg) {
+  if (arg == 0) return;
+  auto len = sizeof(T) - (__builtin_clz(arg) / 8);
+  auto as_cstring = reinterpret_cast<const char*>(&arg);
+  bytes.append(as_cstring, len);
+}
 
 template <typename T>
-inline std::string to_string(const T arg) {
-  return std::to_string(arg);
+inline typename std::enable_if<std::is_floating_point<T>::value, void>::type
+to_bytes(bytestring& bytes, const T arg) {
+  auto as_cstring = reinterpret_cast<const char*>(&arg);
+  bytes.append(as_cstring, sizeof(T));
 }
 
-inline std::string to_string(const mem_dims_t arg) {
-  return std::accumulate(std::next(arg.begin()), arg.end(),
-      std::to_string(arg[0]), [](std::string a, int b) {
-        return a + 'x' + std::to_string(b);
-      });
+template <typename T>
+inline typename std::enable_if<std::is_enum<T>::value, void>::type
+to_bytes(bytestring& bytes, T arg) {
+  to_bytes(bytes, static_cast<int>(arg));
 }
 
-template <typename T, typename ...Ts>
-inline std::string to_string(T&& arg, Ts&&... args) {
-  return to_string(std::forward<T>(arg)) +
-    '*' + to_string(std::forward<Ts>(args)...);
+template <typename T>
+inline typename std::enable_if<std::is_class<T>::value, void>::type
+to_bytes(bytestring& bytes, T& arg) {
+  arg.to_bytes(bytes);
 }
 
-inline void to_bytes(bytestring& bytes, const meta_t meta) {
-  auto desc = meta.data;
+template <typename T>
+inline void to_bytes(bytestring& bytes, std::vector<T>& arg) {
+  if (arg.size() > 0) {
+    for (T elems : arg) {
+      to_bytes(bytes, elems);
+      bytes.append(1, 'v');
+    }
+    bytes.pop_back();
+  } else {
+    bytes.append(1, 'v');
+  }
+}
+
+inline void to_bytes(bytestring& bytes, memory::desc& adesc) {
+  auto desc = adesc.data;
   for (int i = 0; i < desc.ndims; i++) {
-    to_bytes(bytes, static_cast<int>(desc.dims[i]));
-    to_bytes(bytes, static_cast<int>(desc.padded_dims[i]));
-    to_bytes(bytes, static_cast<int>(desc.padded_offsets[i]));
-    to_bytes(bytes, static_cast<int>(desc.format_desc.blocking.strides[i]));
+    to_bytes(bytes, desc.dims[i]);
+    to_bytes(bytes, desc.padded_dims[i]);
+    to_bytes(bytes, desc.padded_offsets[i]);
+    to_bytes(bytes, desc.format_desc.blocking.strides[i]);
   }
 
   for (int i = 0; i < desc.format_desc.blocking.inner_nblks; i++) {
-    to_bytes(bytes, static_cast<int>(desc.format_desc.blocking.inner_blks[i]));
-    to_bytes(bytes, static_cast<int>(desc.format_desc.blocking.inner_idxs[i]));
+    to_bytes(bytes, desc.format_desc.blocking.inner_blks[i]);
+    to_bytes(bytes, desc.format_desc.blocking.inner_idxs[i]);
   }
 
-  to_bytes(bytes, static_cast<uint64_t>(desc.data_type));
-  to_bytes(bytes, static_cast<uint64_t>(desc.offset0));
-  to_bytes(bytes, static_cast<uint64_t>(desc.format_kind));
+  to_bytes(bytes, desc.data_type);
+  to_bytes(bytes, desc.offset0);
+  to_bytes(bytes, desc.format_kind);
+}
+
+inline void to_bytes(bytestring& bytes, const bool arg) {
+  to_bytes(bytes, arg ? 1 : 0);
+  bytes.append(1, 'b');
 }
 
 template <typename T, typename ...Ts>
@@ -476,4 +302,5 @@ inline void create_key(bytestring& key_to_create, Ts&&... args) {
   to_bytes(key_to_create, std::forward<Ts>(args)...);
 }
 
+}}
 #endif
