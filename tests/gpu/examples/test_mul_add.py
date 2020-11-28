@@ -34,8 +34,8 @@ class  TestTorchMethod(TestCase):
         print("dpcpp mul + add result", y_dpcpp.cpu())
         self.assertEqual(y_cpu, y_dpcpp.cpu())
 
-        y_dpcpp_2 = torch_ipex.mul_add(a_d, b_d, c_d)
-        print("dpcpp mul_add_ result", y_dpcpp_2.cpu())
+        y_dpcpp_2 = torch_ipex.MulAdd(a_d, b_d, c_d)
+        print("dpcpp MulAdd result", y_dpcpp_2.cpu())
         self.assertEqual(y_cpu, y_dpcpp_2.cpu())
 
     def test_expand(self, dtype=torch.float):
@@ -57,7 +57,7 @@ class  TestTorchMethod(TestCase):
         for i in range(16):
             y[0][i][0][0] = i
 
-        real = torch_ipex.mul_add(x, y, z).cpu()
+        real = torch_ipex.MulAdd(x, y, z).cpu()
         ref = x.cpu() * y.cpu() + z.cpu()
         print(real, ref)
         self.assertEqual(real, ref)

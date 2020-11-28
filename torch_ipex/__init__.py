@@ -13,9 +13,9 @@ def version():
     print("ipex gpu version: {}".format(__version__))
     print("ipex gpu git sha: {}".format(__ipex_gitrev__))
 
+
+# Customized operators:
 # for now, we don't support bwk propagation
-
-
 class LinearReLU(Module):
     __constants__ = ['in_features', 'out_features']
 
@@ -46,7 +46,7 @@ class LinearReLU(Module):
         )
 
 
-def mul_add(input, other, accumu, alpha=1.0):
+def MulAdd(input, other, accumu, alpha=1.0):
     return torch_ipex.mul_add(input, other, accumu, alpha)
 
 
@@ -106,13 +106,14 @@ def library_paths():
     return paths
 
 
-def _usm_pstl_is_enabled():
-    return torch_ipex._usm_pstl_is_enabled()
+def _usm_is_enabled():
+    return torch_ipex._usm_is_enabled()
 
-
-def _double_kernel_disabled():
-    return torch_ipex._double_kernel_disabled()
-
+def _onedpl_is_enabled():
+    return torch_ipex._onedpl_is_enabled()
 
 def _onemkl_is_enabled():
     return torch_ipex._onemkl_is_enabled()
+
+def _double_kernel_disabled():
+    return torch_ipex._double_kernel_disabled()

@@ -19,12 +19,12 @@ PYBIND11_MODULE(torch_ipex, m) {
   torch::jit::InitFusionPass();
 
   m.def("linear_relu",
-        [](const at::Tensor & input,
-           const at::Tensor & weight,
-           const at::Tensor & bias) {
-          return at::AtenIpexTypeDPCPP::linear_relu(input, weight, bias);
-        },
-        "fused linear with relu opt. on Intel device");
+      [](const at::Tensor & input,
+         const at::Tensor & weight,
+         const at::Tensor & bias) {
+        return at::AtenIpexTypeDPCPP::linear_relu(input, weight, bias);
+      },
+      "fused linear with relu opt. on Intel device");
 
   m.def("mul_add",
       [](const at::Tensor & self,
@@ -35,11 +35,19 @@ PYBIND11_MODULE(torch_ipex, m) {
       },
       "fused mul with add opt. on Intel device");
 
-#if defined(USE_ONEDPL) && defined(USE_USM)
-  m.def("_usm_pstl_is_enabled",
+#if defined(USE_USM)
+  m.def("_usm_is_enabled",
         []() {return true;});
 #else
-  m.def("_usm_pstl_is_enabled",
+  m.def("_usm_is_enabled",
+        []() {return false;});
+#endif
+
+#if defined(USE_ONEDPL)
+  m.def("_onedpl_is_enabled",
+        []() {return true;});
+#else
+  m.def("_onedpl_is_enabled",
         []() {return false;});
 #endif
 
@@ -58,7 +66,7 @@ PYBIND11_MODULE(torch_ipex, m) {
   m.def("_double_kernel_disabled",
         []() {return true;});
 #endif
-  
+
   auto set_module_attr = [&](const char* name, PyObject* v) {
     // PyObject_SetAttrString doesn't steal reference. So no need to incref.
     if (PyObject_SetAttrString(m.ptr(), name, v) < 0) {

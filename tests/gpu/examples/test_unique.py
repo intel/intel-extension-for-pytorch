@@ -7,7 +7,7 @@ cpu_device = torch.device("cpu")
 sycl_device = torch.device("dpcpp")
 
 class  TestTorchMethod(TestCase):
-    @pytest.mark.skipif("not torch_ipex._usm_pstl_is_enabled()")
+    @pytest.mark.skipif("not torch_ipex._usm_is_enabled() or not torch_ipex._onedpl_is_enabled()")
     def test_activation(self):
         output = torch.unique(torch.tensor([1, 3, 2, 3], dtype=torch.long))
         output_dpcpp = torch.unique(torch.tensor([1, 3, 2, 3], dtype=torch.long, device=sycl_device))
@@ -29,7 +29,7 @@ class  TestTorchMethod(TestCase):
         self.assertEqual(output, output_dpcpp.cpu())
         self.assertEqual(inverse_indices, inverse_indices_dpcpp.cpu())
         self.assertEqual(counts, counts_dpcpp.cpu())
-        
+
         output, inverse_indices, counts = torch.unique_consecutive(torch.tensor([[1, 3], [2, 3]], dtype=torch.long), return_inverse=True, return_counts=True)
         output_dpcpp, inverse_indices_dpcpp, counts_dpcpp = torch.unique_consecutive(torch.tensor([[1, 3], [2, 3]], dtype=torch.long, device=sycl_device), return_inverse=True, return_counts=True)
         print(output_dpcpp)
