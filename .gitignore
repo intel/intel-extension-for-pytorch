@@ -46,9 +46,6 @@ env
 # macOS dir files
 .DS_Store
 
-# Symbolic files
-tools/shared/cwrap_common.py
-
 # Ninja files
 .ninja_deps
 .ninja_log
@@ -174,23 +171,24 @@ CTAGS
 tags
 TAGS
 
-# BEGIN NOT-CLEAN-FILES (setup.py handles this marker. Do not change.)
-#
-# Below files are not deleted by "setup.py clean".
-
 # Visual Studio Code files
+.vscode-ctags
 .vscode
 .vs
 
 # YouCompleteMe config file
 .ycm_extra_conf.py
 
+# clangd cache
+.cache
+
 # Files generated when a patch is rejected
 *.orig
 *.rej
 
-# vs code tags
-.vscode-ctags
+# BEGIN NOT-CLEAN-FILES (setup.py handles this marker. Do not change.)
+#
+# Below files are not deleted by "setup.py clean".
 
 # generated files
 torch_ipex/csrc/gpu/aten/generated/ATen/aten_ipex_type_default.cpp
