@@ -372,7 +372,7 @@ std::vector<at::Tensor> AtenIpexTypeExt::embedding_bag(
     bool sparse, const c10::optional<at::Tensor> &per_sample_weights,
     bool include_last_offset) {
   if (per_sample_weights.has_value()) {
-    if (at::GradMode::is_enabled())
+    if (at::GradMode::is_enabled() && weight.requires_grad())
       return NewEmbeddingBagOp::apply(
           weight, indices, offsets, scale_grad_by_freq, mode, sparse,
           include_last_offset, per_sample_weights.value());
@@ -380,7 +380,7 @@ std::vector<at::Tensor> AtenIpexTypeExt::embedding_bag(
         weight, indices, offsets, scale_grad_by_freq, mode, sparse,
         include_last_offset, per_sample_weights.value());
   } else {
-    if (at::GradMode::is_enabled())
+    if (at::GradMode::is_enabled() && weight.requires_grad())
       return NewEmbeddingBagOp::apply(weight, indices, offsets,
                                     scale_grad_by_freq, mode, sparse,
                                     include_last_offset);
@@ -394,11 +394,11 @@ at::Tensor AtenIpexTypeExt::linear(const at::Tensor &input,
                                    const at::Tensor &weight,
                                    const c10::optional<at::Tensor> &bias) {
   if (bias.has_value()) {
-    if (at::GradMode::is_enabled())
+    if (at::GradMode::is_enabled() && weight.requires_grad())
       return NewLinearOp::apply(input, weight, bias.value());
     return NewLinearOp::_forward(input, weight, bias.value());
   } else {
-    if (at::GradMode::is_enabled())
+    if (at::GradMode::is_enabled() && weight.requires_grad())
       return NewLinearOp::apply(input, weight);
     return NewLinearOp::_forward(input, weight);
   }
