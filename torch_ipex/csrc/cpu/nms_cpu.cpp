@@ -40,7 +40,13 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
   auto x2 = x2_t.data<scalar_t>();
   auto y2 = y2_t.data<scalar_t>();
   auto areas = areas_t.data<scalar_t>();
-
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+# pragma omp parallel for simd
+#else
+# pragma omp parallel for schedule(static)
+#endif
+#endif
   for (int64_t _i = 0; _i < ndets; _i++) {
     auto i = order[_i];
     if (suppressed[i] == 1)

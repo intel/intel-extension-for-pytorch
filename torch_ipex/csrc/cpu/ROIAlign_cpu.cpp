@@ -99,7 +99,7 @@ void pre_calc_for_bilinear_interpolate(
           T hy = 1. - ly, hx = 1. - lx;
           T w1 = hy * hx, w2 = hy * lx, w3 = ly * hx, w4 = ly * lx;
 
-          // save weights and indeces
+          // save weights and indices
           PreCalc<T> pc;
           pc.pos1 = y_low * width + x_low;
           pc.pos2 = y_low * width + x_high;
@@ -139,6 +139,13 @@ void ROIAlignForward_cpu_kernel(
   // (n, c, ph, pw) is an element in the pooled output
   // can be parallelized using omp
   // #pragma omp parallel for num_threads(32)
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+# pragma omp parallel for simd
+#else
+# pragma omp parallel for schedule(static)
+#endif
+#endif
   for (int n = 0; n < n_rois; n++) {
     int index_n = n * channels * pooled_width * pooled_height;
 
@@ -176,8 +183,8 @@ void ROIAlignForward_cpu_kernel(
     // We do average (integral) pooling inside a bin
     const T count = roi_bin_grid_h * roi_bin_grid_w; // e.g. = 4
 
-    // we want to precalculate indeces and weights shared by all chanels,
-    // this is the key point of optimiation
+    // we want to precalculate indices and weights shared by all channels,
+    // this is the key point of optimization
     std::vector<PreCalc<T>> pre_calc(
         roi_bin_grid_h * roi_bin_grid_w * pooled_width * pooled_height);
     pre_calc_for_bilinear_interpolate(
@@ -350,7 +357,13 @@ void RoIAlignBackwardFeature_cpu_kernel(
     const T* bottom_rois) {
   //DCHECK(rois_cols == 4 || rois_cols == 5);
   int rois_cols = 5;
-
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+# pragma omp parallel for simd
+#else
+# pragma omp parallel for schedule(static)
+#endif
+#endif
   for (int index = 0; index < nthreads; index++) {
     // (n, c, ph, pw) is an element in the pooled output
     int pw = index % pooled_width;
