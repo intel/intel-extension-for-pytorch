@@ -10,7 +10,7 @@
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
 
-#include "Eltwise.hpp"
+#include "Eltwise.h"
 #include "Loops.h"
 #include "Random.h"
 

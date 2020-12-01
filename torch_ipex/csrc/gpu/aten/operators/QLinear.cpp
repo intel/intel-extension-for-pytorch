@@ -9,7 +9,7 @@
 #include <ATen/aten_ipex_type_dpcpp.h>
 #include <utils/ParamUtils.h>
 
-#include "InnerProduct.hpp"
+#include "InnerProduct.h"
 #include "QUtil.h"
 
 using namespace dnnl;

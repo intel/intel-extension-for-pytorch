@@ -5,7 +5,7 @@
 #include <core/Runtime.h>
 #include <vector>
 #include <utils/ATDispatch.h>
-#include "Pooling.hpp"
+#include "Pooling.h"
 
 using namespace dnnl;
 using namespace at::dpcpp;
@@ -150,7 +150,7 @@ void avg_pool3d_out_template(
   } else {
     IPEX_DISPATCH_QINT_TYPES(
         input_.scalar_type(), "q_avg_pool3d_out_frame", [&] {
-	  avg_pool_out_frame<scalar_t>(
+    avg_pool_out_frame<scalar_t>(
             input_,
             output,
             nbatch,

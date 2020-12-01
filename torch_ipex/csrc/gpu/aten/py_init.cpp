@@ -4,7 +4,6 @@
 #include <ATen/aten_ipex_type_default.h>
 #include <ATen/ipex_type_dpcpp_customized.h>
 #include <../jit/fusion_pass.h>
-#include <../jit/weight_freeze.h>
 #include <core/Generator.h>
 
 #include <pybind11/pybind11.h>

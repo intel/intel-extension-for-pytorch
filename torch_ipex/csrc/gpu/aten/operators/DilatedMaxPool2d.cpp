@@ -6,7 +6,7 @@
 #include <core/Runtime.h>
 #include <utils/Math.h>
 #include <utils/ATDispatch.h>
-#include "Pooling.hpp"
+#include "Pooling.h"
 
 using namespace dnnl;
 using namespace at::dpcpp;
