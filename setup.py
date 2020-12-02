@@ -54,7 +54,7 @@ def _get_complier():
         # dpcpp build
         return "clang", "clang++"
     else:
-        return "gcc", "compute++"
+        raise RuntimeError("Failed to find compiler path from DPCPP_ROOT")
 
 
 def _check_env_flag(name, default=''):
@@ -150,13 +150,12 @@ class DPCPPExt(Extension, object):
         self.build_dir = os.path.join(project_dir, 'build')
 
 
-class install(setuptools.command.install.install):
+class DPCPPInstall(setuptools.command.install.install):
     def run(self):
         setuptools.command.install.install.run(self)
 
 
 class DPCPPClean(distutils.command.clean.clean, object):
-
     def run(self):
         import glob
         import re
@@ -183,14 +182,6 @@ class DPCPPClean(distutils.command.clean.clean, object):
 
 class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
     def run(self):
-        print("run")
-        cmake = find_executable('cmake3') or find_executable('cmake')
-        if cmake is None:
-            raise RuntimeError(
-                "CMake must be installed to build the following extensions: " +
-                ", ".join(e.name for e in self.extensions))
-        self.cmake = cmake
-
         if platform.system() == "Windows":
             raise RuntimeError("Does not support windows")
 
@@ -236,6 +227,11 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
             'PYTHON_EXECUTABLE': sys.executable,
         }
 
+        gen_exec = 'make'
+        if find_executable('ninja') is not None:
+            gen_exec = 'ninja'
+            build_options['CMAKE_GENERATOR'] = 'Ninja'
+
         my_env = os.environ.copy()
         for var, val in my_env.items():
             if var.startswith(('BUILD_', 'USE_', 'CMAKE_')):
@@ -246,16 +242,22 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
         defines(cmake_args, CMAKE_CXX_COMPILER=cxx)
         defines(cmake_args, **build_options)
 
-        command = [self.cmake, ext.project_dir] + cmake_args
+        cmake = find_executable('cmake3') or find_executable('cmake')
+        if cmake is None:
+            raise RuntimeError(
+                "CMake must be installed to build the following extensions: " +
+                ", ".join(e.name for e in self.extensions))
+        command = [cmake, ext.project_dir] + cmake_args
         print(' '.join(command))
 
         env = os.environ.copy()
         check_call(command, cwd=ext.build_dir, env=env)
 
         build_args = ['-j', str(multiprocessing.cpu_count()), 'install']
-
         # build_args += ['VERBOSE=1']
-        check_call(['make'] + build_args, cwd=ext.build_dir, env=env)
+
+        print("build args: {}".format(build_args))
+        check_call([gen_exec] + build_args, cwd=ext.build_dir, env=env)
 
 
 ipex_git_sha, torch_git_sha = get_git_head_sha(base_dir)
@@ -263,13 +265,6 @@ version = get_build_version(ipex_git_sha)
 
 # Generate version info (torch_ipex.__version__)
 create_version_files(base_dir, version, ipex_git_sha, torch_git_sha)
-
-# Constant known variables used throughout this file
-
-# PyTorch installed library
-IS_WINDOWS = (platform.system() == 'Windows')
-IS_DARWIN = (platform.system() == 'Darwin')
-IS_LINUX = (platform.system() == 'Linux')
 
 setup(
     name='torch_ipex',
@@ -285,7 +280,7 @@ setup(
     zip_safe=False,
     ext_modules=[DPCPPExt('torch_ipex')],
     cmdclass={
-        'install': install,
+        'install': DPCPPInstall,
         'build_ext': DPCPPBuild,
         'clean': DPCPPClean,
     })
