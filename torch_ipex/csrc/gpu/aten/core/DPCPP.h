@@ -260,7 +260,13 @@ DPCPP_HOST using dpcpp_host_acc_t =
 #define DPCPP_KER_STRING(var, str) static const DPCPP_CONSTANT char var[] = str;
 
 #if (__SYCL_COMPILER_VERSION >= 20200930)
-  #define DPCPP_PRINTF DPCPP::ONEAPI::experimental::printf
+  #define DPCPP_KER_PRINTF DPCPP::ONEAPI::experimental::printf
 #else
-  #define DPCPP_PRINTF DPCPP::intel::experimental::printf
+  #define DPCPP_KER_PRINTF DPCPP::intel::experimental::printf
 #endif
+
+#define DPCPP_PRINT(fmt_str, ...)             \
+  {                                           \
+    DPCPP_KER_STRING(fmt_var, fmt_str);       \
+    DPCPP_KER_PRINTF(fmt_var, ##__VA_ARGS__); \
+  }

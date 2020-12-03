@@ -315,10 +315,8 @@ void dpcpp_index_kernel_impl(
             index += sizes[i];
           }
           offset += index * strides[i];
-        }
-        else {
-          DPCPP_KER_STRING(err_info, "index %ld out of bounds, expected [%ld, %ld)\n");
-          DPCPP_PRINTF(err_info, index, -sizes[i], sizes[i]);
+        } else {
+          DPCPP_PRINT("index %ld out of bounds, expected [%ld, %ld)\n", index, -sizes[i], sizes[i]);
         }
       }
       f(out_ptr, in_ptr, offset);
