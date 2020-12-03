@@ -186,7 +186,7 @@ static void avg_pool_out_frame(
       output_usr_memory = dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
     } else {
       output_usr_memory = dpcpp_onednn_memory(
-          {{output_tz}, data_t, format_any}, engine, output.data_ptr());
+          {{output_tz}, data_t, format}, engine, output.data_ptr());
     }
   }
 
@@ -421,7 +421,7 @@ static void max_pool_out_frame(
       output_usr_memory = dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
     } else {
       output_usr_memory = dpcpp_onednn_memory(
-          {{output_tz}, data_t, format_any}, engine, output.data_ptr());
+          {{output_tz}, data_t, format}, engine, output.data_ptr());
     }
   }
 
