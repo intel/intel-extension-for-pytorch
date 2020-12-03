@@ -32,7 +32,7 @@ struct convolution_forward : public dnnl::convolution_forward {
       const scale_t& src_scales = scale_t(),
       const scale_t& weights_scales = scale_t(),
       const scale_t& dst_scales = scale_t(),
-      const attr_t& attr = attr_t(),
+      const attr_t& attr = DUMMY_ATTR,
       algorithm aalgorithm = algorithm::convolution_direct,
       prop_kind aprop_kind = prop_kind::forward,
       const lowp_kind alowp_kind = u8s8,
@@ -58,7 +58,7 @@ struct convolution_forward : public dnnl::convolution_forward {
       const scale_t& src_scales = scale_t(),
       const scale_t& weights_scales = scale_t(),
       const scale_t& dst_scales = scale_t(),
-      const attr_t& attr = attr_t(),
+      const attr_t& attr = DUMMY_ATTR,
       algorithm aalgorithm = algorithm::convolution_direct,
       prop_kind aprop_kind = prop_kind::forward,
       const lowp_kind alowp_kind = u8s8,
@@ -102,7 +102,7 @@ struct convolution_forward : public dnnl::convolution_forward {
                       const scale_t& src_scales = scale_t(),
                       const scale_t& weights_scales = scale_t(),
                       const scale_t& dst_scales = scale_t(),
-                      const attr_t& attr = attr_t(),
+                      const attr_t& attr = DUMMY_ATTR,
                       algorithm aalgorithm = algorithm::convolution_direct,
                       prop_kind aprop_kind = prop_kind::forward,
                       const lowp_kind alowp_kind = u8s8,
@@ -143,7 +143,7 @@ struct convolution_forward : public dnnl::convolution_forward {
                       const scale_t& src_scales = scale_t(),
                       const scale_t& weights_scales = scale_t(),
                       const scale_t& dst_scales = scale_t(),
-                      const attr_t& attr = attr_t(),
+                      const attr_t& attr = DUMMY_ATTR,
                       algorithm aalgorithm = algorithm::convolution_direct,
                       prop_kind aprop_kind = prop_kind::forward,
                       const lowp_kind alowp_kind = u8s8,
@@ -183,7 +183,7 @@ struct convolution_forward : public dnnl::convolution_forward {
       prop_kind aprop_kind = prop_kind::forward,
       data_type x_dtype = data_type::f32,
       const dims& src_dims = dims(),
-      const attr_t& attr = attr_t(),
+      const attr_t& attr = DUMMY_ATTR,
       const engine& aengine = engine::cpu_engine()) {
 
     auto src_size = weights_dims.size(); // weights_dims is 4 for conv2d and 5 for conv3d
@@ -254,7 +254,7 @@ struct convolution_forward : public dnnl::convolution_forward {
 
     auto pd = get_primitive_desc</*with_bias=*/false>(
         src_desc, weights_desc, tensor::desc(), dst_desc, strides, dilates_,
-        padding_l, padding_r, attr_t(), aalgorithm, apkind);
+        padding_l, padding_r, DUMMY_ATTR, aalgorithm, apkind);
 
     // embed group info into weights_desc
     return tensor::desc(pd.weights_desc(), groups);
@@ -270,7 +270,7 @@ struct convolution_forward : public dnnl::convolution_forward {
       const dims& dilates,
       const dims& padding_l,
       const dims& padding_r,
-      const attr_t& attr = attr_t(),
+      const attr_t& attr = DUMMY_ATTR,
       algorithm aalgorithm = algorithm::convolution_direct,
       prop_kind aprop_kind = prop_kind::forward,
       const engine& aengine = engine::cpu_engine()) {
@@ -664,7 +664,7 @@ struct convolution_backward_weights
     auto forward_hints =
         convolution_forward::get_primitive_desc<with_diff_bias>(
             src_desc, weights_desc, diff_bias_desc, diff_dst_desc, strides,
-            dilates_, padding_l, padding_r, attr_t(), aalgorithm,
+            dilates_, padding_l, padding_r, DUMMY_ATTR, aalgorithm,
             prop_kind::forward, aengine);
 
     auto pd = with_diff_bias

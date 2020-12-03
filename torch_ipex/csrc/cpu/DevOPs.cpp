@@ -115,7 +115,7 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
     stride,
     dilation,
     groups,
-    dil::attr_t(),
+    dil::DUMMY_ATTR,
     output_scale);
 
   if (!weight_updata && dil_weight.has_conv_params()) {
@@ -733,7 +733,7 @@ void matmul_common(
     dil::tensor &y,
     at::Scalar beta=1,
     at::Scalar alpha=1,
-    const dil::attr_t& attr = dil::attr_t()) {
+    const dil::attr_t& attr = dil::DUMMY_ATTR) {
   DEBUG("AtenIpexCPUDev::matmul_common\n");
   float dst_coeff = alpha.to<float>();
   float sum_coeff = beta.to<float>();

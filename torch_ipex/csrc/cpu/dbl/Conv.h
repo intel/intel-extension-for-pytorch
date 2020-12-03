@@ -26,7 +26,7 @@ dil::tensor convolution_impl(
     at::IntArrayRef stride,
     at::IntArrayRef dilation,
     int64_t groups,
-    const dil::attr_t& attr = dil::attr_t(),
+    const dil::attr_t& attr = dil::DUMMY_ATTR,
     const dil::scale_t& dst_scales = dil::scale_t());
 
 void convolution_inplace_impl(
@@ -38,7 +38,7 @@ void convolution_inplace_impl(
     at::IntArrayRef stride,
     at::IntArrayRef dilation,
     int64_t groups,
-    const dil::attr_t& attr = dil::attr_t(),
+    const dil::attr_t& attr = dil::DUMMY_ATTR,
     const dil::scale_t& dst_scales = dil::scale_t());
 
 void prepack_conv_weights(

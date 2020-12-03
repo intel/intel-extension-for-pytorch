@@ -316,7 +316,8 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
     padding,
     dilation,
     groups,
-    dil::attr_t::fuse_relu(),
+    dil::FUSE_RELU_ATTR,
+    //dil::attr_t::fuse_relu(),
     "Convolution_Relu");
 }
 

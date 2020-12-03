@@ -150,6 +150,10 @@ struct attr_t : public dnnl::primitive_attr {
   }
 };
 
+static attr_t FUSE_RELU_ATTR = dil::attr_t::fuse_relu();
+
+static attr_t DUMMY_ATTR = attr_t();
+
 }  // namespace dil
 
 #endif

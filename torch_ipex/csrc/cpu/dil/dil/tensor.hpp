@@ -800,7 +800,7 @@ class tensor : public memory {
     return nchw_dims;
   }
 
-  tensor reorder_if_differ_in(const desc &expected_desc, const attr_t &aattr = attr_t()) const {
+  tensor reorder_if_differ_in(const desc &expected_desc, const attr_t &aattr = DUMMY_ATTR) const {
     if (expected_desc == get_desc()) {
       return *this;
     } else {
@@ -920,7 +920,7 @@ class tensor : public memory {
         .execute(stream::default_stream(), const_cast<tensor &>(src), *this);
   }
 
-  inline void reorder_to(tensor &dst, const attr_t &aattr = attr_t()) const {
+  inline void reorder_to(tensor &dst, const attr_t &aattr = DUMMY_ATTR) const {
     dnnl::reorder({get_engine(), get_desc(), dst.get_engine(), dst.get_desc(), aattr})
         .execute(stream::default_stream(), const_cast<tensor &>(*this), dst);
   }
@@ -1014,7 +1014,7 @@ class tensor : public memory {
 
   // reorder src to part of this tensor
   void insert_submemory(const tensor &src, const dims &adims,
-                        const dims &offsets, const attr_t &attr = attr_t()) {
+                        const dims &offsets, const attr_t &attr = DUMMY_ATTR) {
     auto view = get_desc().submemory_desc(adims, offsets);
     dnnl::reorder({src.get_engine(), src.get_desc(), get_engine(), view, attr})
         .execute(stream::default_stream(), const_cast<tensor &>(src), *this);
@@ -1022,7 +1022,7 @@ class tensor : public memory {
 
   // reorder part of this tensor to dst
   void extract_submemory(tensor &dst, const dims &adims, const dims &offsets,
-                         const attr_t &attr = attr_t()) const {
+                         const attr_t &attr = DUMMY_ATTR) const {
     auto view = get_desc().submemory_desc(adims, offsets);
     dnnl::reorder({get_engine(), view, dst.get_engine(), dst.get_desc(), attr})
         .execute(stream::default_stream(), const_cast<tensor &>(*this), dst);
@@ -1030,7 +1030,7 @@ class tensor : public memory {
 
   // simple api for extract_submemory
   tensor extract_submemory(const dims &adims, const dims &offsets,
-                           const attr_t &attr = attr_t()) const {
+                           const attr_t &attr = DUMMY_ATTR) const {
     tensor dst{adims, get_data_type(), get_engine()};
     extract_submemory(dst, adims, offsets, attr);
     return dst;
