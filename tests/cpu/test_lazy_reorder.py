@@ -1890,5 +1890,15 @@ class TestInterpolate(TestCase):
             y_dpcpp.sum().backward()
             self.assertEqual(x_cpu.grad, x_dpcpp.grad)
 
+class TestPermute(TestCase):
+    def test_permute(self):
+        ipex.core.enable_auto_dnnl()
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        x_cpu = torch.randn((2, 3, 4, 5), dtype=torch.float32) * 10
+        x_dpcpp = x_cpu.to(device=device)
+        self.assertEqual(x_cpu.permute(0, 2, 1, 3), x_dpcpp.permute(0, 2, 1, 3))
+
 if __name__ == '__main__':
     test = unittest.main()

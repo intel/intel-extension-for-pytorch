@@ -2176,12 +2176,10 @@ at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, 
   // store a different desc for transposed view when storage are sharing.
   dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
 
-  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
-  IPEX_CHECK(x.ndims() > 0, "DNNL transpose cannot generate DNNL tensor for the input aten Tensor. input tensor dim: ", self.dim());
-
-  auto trans_desc = x.get_desc().transpose(dim0, dim1);
-  auto sizes = trans_desc.get_dims();
-  auto strides = trans_desc.get_strides();
+  auto strides = self.strides().vec();
+  auto sizes = self.sizes().vec();
+  std::swap(strides[dim0], strides[dim1]);
+  std::swap(sizes[dim0], sizes[dim1]);
   auto result = dil_as_strided(self, sizes, strides, self.storage_offset());
   propagate_transposed_names(result, self, dim0, dim1);
   return result;
@@ -2768,6 +2766,30 @@ at::Tensor &AtenIpexCPUDev::dil_div_out(at::Tensor &out, const at::Tensor &self,
 
   torch_ipex::set_ipex_func_status(torch_ipex::IPEXFuncStatus::IPEX_FALLBACK);
   return out;
+}
+
+at::Tensor AtenIpexCPUDev::dil_permute(const at::Tensor & self, at::IntArrayRef dims) {
+  DEBUG("AtenIpexCPUDev::dil_permute\n");
+  CHECK_DNNL_OP_PRE_COND(self);
+  auto nDims = self.dim();
+  TORCH_CHECK(dims.size() == (size_t)nDims,
+           "dil_permute not support the number of dims");
+
+  dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
+  auto oldSizes = self.sizes();
+  auto oldStrides = self.strides();
+  std::vector<int64_t> newSizes(nDims);
+  std::vector<int64_t> newStrides(nDims);
+  std::vector<bool> seen(nDims);
+  for (int64_t i = 0; i < nDims; i++) {
+    auto dim = at::maybe_wrap_dim(dims[i], nDims);
+    TORCH_CHECK(!seen[dim],
+             "dil_permute not support repeated dim");
+    seen[dim] = true;
+    newSizes[i] = oldSizes[dim];
+    newStrides[i] = oldStrides[dim];
+  }
+  return dil_as_strided(self, newSizes, newStrides, self.storage_offset());
 }
 
 }  // namespace cpu

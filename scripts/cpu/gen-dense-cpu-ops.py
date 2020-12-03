@@ -103,6 +103,7 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::div_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)',
     'aten::div.Scalar(Tensor self, Scalar other) -> Tensor',
     'aten::div.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)',
+    'aten::permute(Tensor(a) self, int[] dims) -> Tensor(a)',
 ]
 
 _FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG = [

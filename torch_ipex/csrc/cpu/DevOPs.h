@@ -115,6 +115,7 @@ class AtenIpexCPUDev {
   static at::Tensor &dil_div_(at::Tensor &self, at::Scalar &other);
   static at::Tensor &dil_div_out(at::Tensor &out, const at::Tensor &self,
                                  const at::Tensor &other);
+  static at::Tensor dil_permute(const at::Tensor & self, at::IntArrayRef dims);
 };
 
 }  // namespace cpu
