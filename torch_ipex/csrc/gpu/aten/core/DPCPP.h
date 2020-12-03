@@ -75,9 +75,6 @@ namespace DPCPP = cl::sycl;
 // TODO: set subgourp size with api get_max_sub_group_size
 #define DPCPP_SUB_GROUP_SIZE (1L)
 
-// dpcpp get ptr from accessor
-#define GET_ACC_PTR(acc, T) acc.get_pointer().get()
-
 // dpcpp device info
 static constexpr auto dpcpp_dev_type =
     DPCPP::info::device::device_type;

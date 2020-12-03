@@ -351,7 +351,7 @@ IndexType parallel_transform_scan(
       auto __group_size = item_id.get_local_range().size();
       auto __acc_ptr = __acc.template get_pointer<InputType>();
       auto __result_ptr = __result_acc.template get_pointer<OutputType>();
-      auto __dynamic_id_ptr = GET_ACC_PTR(__dynamic_id_acc, uint32_t);
+      auto __dynamic_id_ptr = __dynamic_id_acc.get_pointer().get();
       auto __ready_flags_ptr =
           __ready_flags_acc.template get_pointer<_AtomicType>();
       auto __local_sums_ptr =
