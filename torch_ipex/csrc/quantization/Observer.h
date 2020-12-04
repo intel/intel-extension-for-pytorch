@@ -15,8 +15,8 @@ struct Observer {
   std::string algorithm = "min_max";
   float averaging_constant = 0.01;  // for MovingAverage method
   // only useful for conv, onednn only support per_channel foo conv's weight,
-  // default is per_tensor
-  std::string weight_granularity = "per_tensor";
+  // default is per_channel
+  std::string weight_granularity = "per_channel";
   // ture means input will be quantized to int8, otherwise quantized to uint8.
   std::vector<bool> inputs_dtype_uint8 = {false};
   std::vector<bool> outputs_dtype_uint8 = {false};

@@ -64,12 +64,23 @@ public:
     std::vector<std::vector<float>> i_min_max_values, std::vector<std::vector<float>> o_min_max_values) {
     num_ops_id++;
     if (observers_.size() < num_ops_id) {
-      // this path is that user not set int8 op's configure, using default configures if user not set it.
+      // this path is that to set int8 op's configure, using default configures if user not set it.
       std::string observer_algorithm = "min_max";
+      float averaging_constant = 0.01; // will be enabled for moving_averager_min_max
+      std::string weight_granularity = "per_channel";
+      const int nums_input = i_min_max_values.size();
+      const int nums_output = o_min_max_values.size();
+      std::vector<bool> inputs_dtype_uint8(nums_input, false);
+      std::vector<bool> outputs_dtype_uint8(nums_output, false);
+      bool quantized = true;
       if (!indicators_.empty()) {
         observer_algorithm = indicators_[num_ops_id - 1].get_indicator_algorithm();
+        weight_granularity = indicators_[num_ops_id - 1].get_indicator_weight_granularity();
+        std::tie(inputs_dtype_uint8, outputs_dtype_uint8) = indicators_[num_ops_id - 1].get_indicator_uint8_status();
+        quantized = indicators_[num_ops_id - 1].get_indicator_quantized_status();
       }
-      Observer new_observer = {num_ops_id - 1, op_name, i_min_max_values, o_min_max_values, observer_algorithm};
+      Observer new_observer = {num_ops_id - 1, op_name, i_min_max_values, o_min_max_values, observer_algorithm,
+          averaging_constant, weight_granularity, inputs_dtype_uint8, outputs_dtype_uint8, quantized};
       observers_.push_back(new_observer);
     } else {
       // user has set configure or have run one interation
@@ -105,7 +116,7 @@ public:
   inline void add_indicators() {
     num_ops_id = 0;
     indicators_.clear();
-    // default used is s8
+    // default used is s8, TODO: check inputs_dtype_uint8 and outputs_dtype_uint8 get the scales.
     for (auto i = 0; i < observers_.size(); i++) {
       std::vector<float> inputs_scale, outputs_scale;
       std::vector<std::vector<float>> inputs_values = observers_[i].inputs_min_max_values;
