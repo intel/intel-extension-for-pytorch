@@ -757,12 +757,9 @@ Tensor hardshrink_backward(
 }
 
 Tensor gelu(const Tensor & self){
-  auto self_ = self.contiguous();
-  Tensor Y = at::empty_like(self_);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self_.scalar_type(), "GeluKernelImpl", [&](){
-    impl::GeluKernelImpl<scalar_t>(self_, Y);
-  });
-  return Y;
+  Tensor result;
+  at::dpcpp::dpcpp_eltwise<dnnl::algorithm::eltwise_gelu_erf>(result, self, 0.0f, 0.0f);
+  return result;
 }
 
 Tensor gelu_backward(const Tensor & grad, const Tensor & self){
