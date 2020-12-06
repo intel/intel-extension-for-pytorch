@@ -1,4 +1,10 @@
 #include <ATen/ATen.h>
+#include <ATen/Config.h>
+
+#include <core/Memory.h>
+#include <core/Runtime.h>
+#include <tensor/Context.h>
+#include <ATen/ipex_type_dpcpp_customized.h>
 
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
@@ -6,6 +12,7 @@
 #include <core/detail/IndexUtils.h>
 #include <utils/ATDispatch.h>
 
+using namespace dnnl;
 using namespace at::dpcpp;
 
 namespace at {
@@ -308,10 +315,137 @@ static void cat(
 #endif
 }
 
+static void dnnl_cat(
+    Tensor& output,
+    TensorList inputs,
+    int numInputs,
+    int dimension) {
+  int i, j;
+  int64_t offset;
+  bool hasSkippedInput = false;
+  Tensor notSkippedTensor; // non-owning reference
+  auto should_skip = [](const Tensor& t) {
+    return !t.defined() && t.dim() == 1;
+  };
+  
+  int nDims = 0;
+  for (i = 0; i < numInputs; i++) {
+    if (should_skip(inputs[i])) {
+      hasSkippedInput = true;
+      continue;
+    }
+    nDims = inputs[i].dim();
+    notSkippedTensor = inputs[i];
+  }
+
+  // If all inputs are empty tensors, return an empty tensor
+  if (!notSkippedTensor.defined()) {
+    return;
+  }
+
+  TORCH_CHECK(numInputs > 0, "invalid number of inputs");
+  TORCH_CHECK(dimension >= 0, "invalid dimension");
+
+  std::vector<Tensor> cat_tensors; 
+  int64_t cat_dim_size = 0;
+  for (int i = 0; i < numInputs; i++) {
+    Tensor tensor = inputs[i];
+    if (should_skip(tensor)) {
+      continue;
+    }
+    check_shape_except_dim(notSkippedTensor, tensor, dimension);
+    cat_dim_size += tensor.size(dimension);
+    cat_tensors.push_back(tensor);
+  }
+
+  std::vector<int64_t> size(nDims);
+  for (int dim = 0; dim < nDims; dim++) {
+    int64_t result_dim_size = notSkippedTensor.size(dim);
+    if (dim == dimension) {
+      result_dim_size = cat_dim_size;
+    }
+    size[dim] = result_dim_size;
+  }
+  memory::dims output_dims = size;
+  output.resize_(size);
+
+  Device curDevice = Device(kDPCPP, current_device());
+  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
+
+  std::vector<memory::desc> cat_tensors_md;
+  std::vector<memory> cat_tensors_mem;
+  for (size_t i = 0; i < cat_tensors.size(); i++) {
+    std::vector<int64_t> dims;
+    for (size_t j = 0; j < cat_tensors[i].dim(); j++) {
+      dims.push_back(cat_tensors[i].size(j));
+    }
+
+    memory::dims input_tz = dims;
+    auto data_t = dt_to_dnnl(cat_tensors[i].scalar_type());
+    auto format_any = get_dnnl_default_format(cat_tensors[i].dim());
+    
+    memory::desc tensor_md;
+    if (!lazy_reorder_enabled()) {
+      tensor_md = memory::desc({input_tz}, data_t, format_any);
+    } else {
+      auto input_ctx =
+          at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(cat_tensors[i]);
+      tensor_md = input_ctx.is_plain() ?
+          memory::desc({input_tz}, data_t, format_any) :
+          input_ctx.meta();
+    }
+    cat_tensors_md.push_back(tensor_md);
+    
+    auto input_usr_memory = dpcpp_onednn_memory(
+        tensor_md, engine, cat_tensors[i].data_ptr());
+    cat_tensors_mem.push_back(input_usr_memory);
+  }
+   
+  auto data_t = dt_to_dnnl(cat_tensors[0].scalar_type());
+  auto format_any = get_dnnl_default_format(cat_tensors[0].dim());
+  auto plain_output_md = memory::desc(output_dims, data_t, format_any);
+  auto concat_pd = concat::primitive_desc(
+      plain_output_md, static_cast<int>(dimension), cat_tensors_md, engine);
+  
+  //Tensor output;
+  memory output_usr_memory;
+  if (!lazy_reorder_enabled()) {
+    output_usr_memory = dpcpp_onednn_memory(
+        plain_output_md, engine, output.data_ptr());
+  } else {
+    auto expected_output_md = concat_pd.dst_desc();
+    if (plain_output_md != expected_output_md) {
+      output = at::AtenIpexTypeDPCPP::empty_opaque_tensor(
+          expected_output_md, cat_tensors[0].options(), c10::nullopt);
+      output_usr_memory = dpcpp_onednn_memory(
+          expected_output_md, engine, output.data_ptr());
+    } else {
+      output_usr_memory = dpcpp_onednn_memory(
+          plain_output_md, engine, output.data_ptr());
+    }
+  }
+
+  std::unordered_map<int, memory> args = {
+      {DNNL_ARG_DST, output_usr_memory},
+  };
+  for (int i = 0; i < (int)cat_tensors.size(); i++) {
+    args.insert({DNNL_ARG_MULTIPLE_SRC + i, cat_tensors_mem[i]});
+  }
+
+  std::shared_ptr<dnnl::primitive> concat_p;
+  auto strm = GpuStreamManager::Instance().get_stream();
+  concat_p.reset(new concat(concat_pd));
+  DPCPP_ONEDNN_EXEC(*concat_p, strm, args);
+}
+
 } // namespace impl
 
 Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
-  impl::cat(out, tensors, tensors.size(), dim);
+  if (tensors[0].scalar_type() == ScalarType::Double) {
+    impl::cat(out, tensors, tensors.size(), dim);
+  } else {
+    impl::dnnl_cat(out, tensors, tensors.size(), dim);
+  }
   return out;
 }
 
