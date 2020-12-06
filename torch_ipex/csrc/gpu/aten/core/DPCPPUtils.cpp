@@ -220,6 +220,28 @@ int64_t dpcppMaxComputeUnitSize() {
   return dpcppMaxComputeUnitSize(queue);
 }
 
+int64_t dpcppMaxDSSNum(DPCPP::queue& queue) {
+  // TODO: We need to got this info from DPC++ Runtime
+  // Hardcode to 32 for ATS
+  int64_t dss_num = 32;
+  return dss_num;
+}
+
+int64_t dpcppMaxDSSNum() {
+  auto& queue = dpcppGetCurrentQueue();
+  return dpcppMaxDSSNum(queue);
+}
+
+int64_t dpcppLocalMemSize(DPCPP::queue& queue) {
+  return queue.get_device()
+      .template get_info<DPCPP::info::device::local_mem_size>();
+}
+
+int64_t dpcppLocalMemSize() {
+  auto& queue = dpcppGetCurrentQueue();
+  return dpcppLocalMemSize(queue);
+}
+
 std::string getPreferredPlatform() {
   // TODO: To use more stable api from dpc++ runtime to preferred select
   // platform Following code logic based upon the assumption: gpu_selector will

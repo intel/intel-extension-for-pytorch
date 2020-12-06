@@ -124,6 +124,8 @@ struct AdvancedIndex {
   std::vector<Tensor> indices;
   DimVector indexed_sizes;
   DimVector indexed_strides;
+  DimVector non_indexed_sizes;
+  DimVector non_indexed_strides;
   int64_t dims_before;
   int64_t dims_after;
 };
@@ -195,6 +197,8 @@ AdvancedIndex::AdvancedIndex(const Tensor& src, TensorList indices_list) {
       } else {
         dims_after++;
       }
+      non_indexed_sizes.push_back(src.size(dim));
+      non_indexed_strides.push_back(src.stride(dim) * element_size_bytes);
     } else {
       dims_indexed++;
       replacement_shape = indices_list[dim].sizes();
@@ -213,7 +217,7 @@ AdvancedIndex::AdvancedIndex(const Tensor& src, TensorList indices_list) {
   this->dims_before = dims_before;
   this->dims_after = dims_after;
   this->src = restride_src(src, dims_before, dims_indexed, replacement_shape);
-
+  
   for (auto& index : indices_list) {
     if (index.defined()) {
       indices.push_back(reshape_indexer(index, dims_before, dims_after));
@@ -245,6 +249,7 @@ static AdvancedIndex make_info(Tensor self, TensorList orig) {
   while (indices.size() < (size_t)self.dim()) {
     indices.emplace_back();
   }
+
   if (!hasContiguousSubspace(indices)) {
     std::tie(self, indices) = transposeToFront(self, indices);
   }

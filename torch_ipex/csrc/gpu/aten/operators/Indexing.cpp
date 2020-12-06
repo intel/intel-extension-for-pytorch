@@ -951,7 +951,9 @@ DPCPP_DEF_K1(index_kernel);
 void index(
     TensorIterator& iter,
     IntArrayRef index_size,
-    IntArrayRef index_stride) {
+    IntArrayRef index_stride,
+    IntArrayRef non_index_size,
+    IntArrayRef non_index_stride) {
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
@@ -964,6 +966,8 @@ void index(
             iter,
             index_size,
             index_stride,
+            non_index_size,
+            non_index_stride,
             [](char *out_data,
                char *in_data,
                int64_t offset) {
@@ -987,6 +991,8 @@ void index_put(
           iter,
           index_size,
           index_stride,
+          IntArrayRef{},
+          IntArrayRef{},
           [](char *out_data,
              char *in_data,
              int64_t offset) {
@@ -1009,6 +1015,8 @@ void index_put(
             iter,
             index_size,
             index_stride,
+            IntArrayRef{},
+            IntArrayRef{},
             [](char *out_data,
                char *in_data,
                int64_t offset) {
@@ -1300,7 +1308,8 @@ Tensor index(const Tensor& self, TensorList indices) {
 
   auto info = make_info(self, indices);
   auto iter = make_index_iterator(info);
-  impl::index(iter, info.indexed_sizes, info.indexed_strides);
+  impl::index(iter, info.indexed_sizes, info.indexed_strides, 
+      info.non_indexed_sizes, info.non_indexed_strides);
   return iter.output();
 }
 

@@ -43,6 +43,14 @@ int64_t dpcppMaxComputeUnitSize();
 
 int64_t dpcppMaxComputeUnitSize(DPCPP::queue& queue);
 
+int64_t dpcppMaxDSSNum();
+
+int64_t dpcppMaxDSSNum(DPCPP::queue& queue);
+
+int64_t dpcppLocalMemSize();
+
+int64_t dpcppLocalMemSize(DPCPP::queue& queue);
+
 std::string getPreferredPlatform();
 
 void parallel_for_setup(
