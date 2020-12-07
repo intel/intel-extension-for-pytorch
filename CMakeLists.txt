@@ -12,8 +12,8 @@ include(cmake/DPCPP.cmake)
 
 # The options to build torch_ipex
 include(CMakeDependentOption)
-option(USE_USM "Use USM" OFF)
-option(USE_ONEDPL "Use oneDPL" OFF)
+option(USE_USM "Use USM" ON)
+option(USE_ONEDPL "Use oneDPL" ON)
 option(USE_ONEMKL "Use oneMKL BLAS" OFF)
 option(USE_MULTI_CONTEXT "Create runtime context per device" OFF)
 option(BUILD_BY_PER_KERNEL "Build by DPC++ per_kernel option" ON)
