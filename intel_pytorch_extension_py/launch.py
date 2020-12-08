@@ -212,15 +212,16 @@ def add_lib_preload(lib_type=None):
                      "/usr/local/lib64/", "/usr/lib/", "/usr/lib64/"]
     lib_find = False
     for lib_path in library_paths:
-        library_file = lib_path + "lib" + lib_type + ".so"
-        matches = glob.glob(library_file)
-        if len(matches) > 0:
-            if "LD_PRELOAD" in os.environ:
-                os.environ["LD_PRELOAD"] = matches[0] + ":" + os.environ["LD_PRELOAD"]
-            else:
-                os.environ["LD_PRELOAD"] = matches[0]
-            lib_find = True
-            break
+        for each_lib_type in lib_type.split(","):
+            library_file = lib_path + "lib" + each_lib_type + ".so"
+            matches = glob.glob(library_file)
+            if len(matches) > 0:
+                if "LD_PRELOAD" in os.environ:
+                    os.environ["LD_PRELOAD"] = matches[0] + ":" + os.environ["LD_PRELOAD"]
+                else:
+                    os.environ["LD_PRELOAD"] = matches[0]
+                lib_find = True
+                break
 
     if not lib_find:
         # Unable to find the TCMalloc library file
@@ -254,7 +255,7 @@ def set_multi_thread_and_allcator(args):
     if args.enable_jemalloc:
         add_lib_preload(lib_type="jemalloc")
     if args.enable_iomp:
-        add_lib_preload(lib_type="iomp")
+        add_lib_preload(lib_type="iomp,iomp5")
  
 def launch(args):
     '''
@@ -293,22 +294,19 @@ def launch(args):
     for i in range(args.ninstances):
        cmd = []
        cur_process_cores = ""
-       if args.disable_numactl: 
-           cmd.append(args.program)
-           cmd.extend(args.program_args)
-       else:
+       if not args.disable_numactl:
            cmd = ["numactl"]
            for core in cores[i * args.ncore_per_instance:(i + 1) * args.ncore_per_instance]:
                cur_process_cores = cur_process_cores + str(core) + ","
            numa_params = "-C {} ".format(cur_process_cores[:-1])
            cmd.extend(numa_params.split())
-           with_python = not args.no_python
-           if with_python:
-               cmd.append(sys.executable)
-           if args.module:
-               cmd.append("-m")
-           cmd.append(args.program)
-           cmd.extend(args.program_args) 
+       with_python = not args.no_python
+       if with_python:
+           cmd.append(sys.executable)
+       if args.module:
+           cmd.append("-m")
+       cmd.append(args.program)
+       cmd.extend(args.program_args)
        process = subprocess.Popen(cmd, env=os.environ)
        processes.append(process)
     for process in processes:
@@ -481,6 +479,7 @@ def parse_args():
 
 def main():
 
+    env_before = set(os.environ.keys())
     if platform.system() == "Windows":
         raise RuntimeError("Windows platform is not supported!!!")
 
@@ -489,6 +488,10 @@ def main():
         mpi_dist_launch(args)
     else:
         launch(args)
+    if os.environ.get("DUMP_LAUNCH_ARGS",False):
+        print(f'Launch settings: ')
+        for x in set(os.environ.keys()) - env_before:
+            print(f'{x}: {os.environ[x]}')
  
 if __name__ == "__main__":
     main()
