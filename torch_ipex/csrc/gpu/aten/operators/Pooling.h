@@ -145,7 +145,7 @@ static void avg_pool_out_frame(
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key(key, input_md, output_md, stride, kernel, padding, padding, alg_kind);
+  create_key(key, input_md, output_tz, stride, kernel, padding, padding, alg_kind);
 #endif
   auto pooling_forward_desc = pooling_forward::desc(
       prop_kind,
@@ -166,7 +166,7 @@ static void avg_pool_out_frame(
   if (!lazy_reorder_enabled()) {
     input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
 
-    output_usr_memory = dpcpp_onednn_memory({{output_tz}, data_t, format}, engine, output.data_ptr());
+    output_usr_memory = dpcpp_onednn_memory({output_tz, data_t, format}, engine, output.data_ptr());
   } else {
     input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
     auto plain_output_md = memory::desc({output_tz}, data_t, format);
@@ -186,7 +186,7 @@ static void avg_pool_out_frame(
       output_usr_memory = dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
     } else {
       output_usr_memory = dpcpp_onednn_memory(
-          {{output_tz}, data_t, format}, engine, output.data_ptr());
+          {output_tz, data_t, format}, engine, output.data_ptr());
     }
   }
 
@@ -283,10 +283,10 @@ static void avg_pool_backward_out_frame(
   auto gradOutput_md = memory::desc({gradOutput_tz}, data_t, format);
 
   auto diff_dst_usr_memory = dpcpp_onednn_memory(
-      {{gradOutput_tz}, data_t, format}, engine, gradOutput_data);
+      {gradOutput_tz, data_t, format}, engine, gradOutput_data);
 
   auto diff_src_usr_memory = dpcpp_onednn_memory(
-      {{gradInput_tz}, data_t, format}, engine, gradInput_data);
+      {gradInput_tz, data_t, format}, engine, gradInput_data);
 
   auto pooling_forward_desc = pooling_forward::desc(
       prop_kind, alg_kind, gradInput_md, gradOutput_md,
@@ -370,9 +370,9 @@ static void max_pool_out_frame(
   }
 
   auto format_any = memory::format_tag::any;
-  auto input_md = memory::desc({input_tz}, data_t, format);
-  auto indices_md = memory::desc({output_tz}, data_t, format);
-  auto output_md = memory::desc({output_tz}, data_t, format_any);
+  auto input_md = memory::desc(input_tz, data_t, format);
+  auto indices_md = memory::desc(output_tz, data_t, format);
+  auto output_md = memory::desc(output_tz, data_t, format_any);
 
   if (lazy_reorder_enabled()) {
     auto input_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
@@ -382,7 +382,7 @@ static void max_pool_out_frame(
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key(key, input_md, output_md, stride, kernel, padding, padding, alg_kind);
+  create_key(key, input_md, output_tz, stride, kernel, padding, padding, alg_kind);
 #endif
   auto pooling_forward_desc = pooling_forward::desc(
       prop_kind,
@@ -402,10 +402,10 @@ static void max_pool_out_frame(
   memory input_usr_memory, output_usr_memory;
   if (!lazy_reorder_enabled()) {
     input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
-    output_usr_memory = dpcpp_onednn_memory({{output_tz}, data_t, format}, engine, output.data_ptr());
+    output_usr_memory = dpcpp_onednn_memory({output_tz, data_t, format}, engine, output.data_ptr());
   } else {
     input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
-    auto plain_output_md = memory::desc({output_tz}, data_t, format);
+    auto plain_output_md = memory::desc(output_tz, data_t, format);
 
     if (expected_output_md != plain_output_md) {
       // reallocate memory due to padding needed by oneDNN in some blk fmt
@@ -421,7 +421,7 @@ static void max_pool_out_frame(
       output_usr_memory = dpcpp_onednn_memory(expected_output_md, engine, output.data_ptr());
     } else {
       output_usr_memory = dpcpp_onednn_memory(
-          {{output_tz}, data_t, format}, engine, output.data_ptr());
+          {output_tz, data_t, format}, engine, output.data_ptr());
     }
   }
 
@@ -549,10 +549,10 @@ static void max_pool_backward_out_frame(
   auto gradOutput_md = memory::desc({gradOutput_tz}, data_t, format);
 
   auto diff_dst_usr_memory = dpcpp_onednn_memory(
-      {{gradOutput_tz}, data_t, format}, engine, gradOutput_data);
+      {gradOutput_tz, data_t, format}, engine, gradOutput_data);
 
   auto diff_src_usr_memory = dpcpp_onednn_memory(
-      {{gradInput_tz}, data_t, format}, engine, gradInput_data);
+      {gradInput_tz, data_t, format}, engine, gradInput_data);
 
   auto pooling_forward_desc = pooling_forward::desc(
       prop_kind, alg_kind, gradInput_md, gradOutput_md,
@@ -576,7 +576,7 @@ static void max_pool_backward_out_frame(
 
   auto indices_md = pooling_forward_pd.workspace_desc();
   auto indices_usr_memory = dpcpp_onednn_memory(
-      {{gradOutput_tz}, (memory::data_type)indices_md.data.data_type, format},
+      {gradOutput_tz, (memory::data_type)indices_md.data.data_type, format},
       engine, indices_usr.data_ptr());
   auto indices_memory = indices_usr_memory;
 

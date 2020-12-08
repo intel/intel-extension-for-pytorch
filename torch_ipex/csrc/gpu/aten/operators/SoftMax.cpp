@@ -380,9 +380,9 @@ Tensor _softmax_onednn(
   // Create primitive descriptor.
   auto softmax_forward_pd = softmax_forward::primitive_desc(softmax_forward_desc, engine);
   auto input_usr_memory = dpcpp_onednn_memory(
-         {{input_tz}, data_t, dnnl_format}, engine, input.data_ptr());
+         {input_tz, data_t, dnnl_format}, engine, input.data_ptr());
   auto output_usr_memory = dpcpp_onednn_memory(
-         {{input_tz}, data_t, dnnl_format}, engine, output.data_ptr());
+         {input_tz, data_t, dnnl_format}, engine, output.data_ptr());
 
   // Create the primitive.
 #ifdef USE_PRIMITIVE_CACHE

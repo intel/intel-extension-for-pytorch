@@ -124,9 +124,9 @@ void dpcpp_eltwise_backward(
   auto eltwise_backward_pd = eltwise_backward::primitive_desc(
       eltwise_reluBwd_desc, engine, eltwise_forward_pd);
 
-  auto src_usr_memory = dpcpp_onednn_memory({{input_tz}, data_t, format_nchw}, engine, src);
-  auto diff_dst_memory = dpcpp_onednn_memory({{input_tz}, data_t, format_nchw}, engine, diff_dst);
-  auto diff_src_memory = dpcpp_onednn_memory({{input_tz}, data_t, format_nchw}, engine, diff_src);
+  auto src_usr_memory = dpcpp_onednn_memory({input_tz, data_t, format_nchw}, engine, src);
+  auto diff_dst_memory = dpcpp_onednn_memory({input_tz, data_t, format_nchw}, engine, diff_dst);
+  auto diff_src_memory = dpcpp_onednn_memory({input_tz, data_t, format_nchw}, engine, diff_src);
 
   auto strm = GpuStreamManager::Instance().get_stream();
   auto eltwise_bwd = dnnl::eltwise_backward(eltwise_backward_pd);

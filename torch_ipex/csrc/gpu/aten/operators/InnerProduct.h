@@ -46,7 +46,7 @@ void inner_product(
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key(key, input_md, weight_md, use_bias, output_md);
+  create_key(key, input_md, weight_md, use_bias);
 #endif
   auto ipFwd_desc = inner_product_forward::desc(
       prop_kind::forward_inference, input_md, weight_md, bias_md, output_md);

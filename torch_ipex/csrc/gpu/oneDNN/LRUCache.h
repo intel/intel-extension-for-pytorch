@@ -7,8 +7,6 @@
 #include <list>
 #include <dnnl.hpp>
 
-using namespace dnnl;
-
 namespace at {
 namespace dpcpp {
 
@@ -227,17 +225,17 @@ inline value_t fetch_or_create_m(key_t key, Ts&&... args) {
 
 template <typename T>
 inline typename std::enable_if<std::is_integral<T>::value, void>::type
-to_bytes(bytestring& bytes, const T arg) {
+to_bytes(bytestring& bytes, T arg) {
   if (arg == 0) return;
   auto len = sizeof(T) - (__builtin_clz(arg) / 8);
-  auto as_cstring = reinterpret_cast<const char*>(&arg);
+  auto as_cstring = reinterpret_cast<char*>(&arg);
   bytes.append(as_cstring, len);
 }
 
 template <typename T>
 inline typename std::enable_if<std::is_floating_point<T>::value, void>::type
-to_bytes(bytestring& bytes, const T arg) {
-  auto as_cstring = reinterpret_cast<const char*>(&arg);
+to_bytes(bytestring& bytes, T arg) {
+  auto as_cstring = reinterpret_cast<char*>(&arg);
   bytes.append(as_cstring, sizeof(T));
 }
 
@@ -256,7 +254,7 @@ to_bytes(bytestring& bytes, T& arg) {
 template <typename T>
 inline void to_bytes(bytestring& bytes, std::vector<T>& arg) {
   if (arg.size() > 0) {
-    for (T elems : arg) {
+    for (T& elems : arg) {
       to_bytes(bytes, elems);
       bytes.append(1, 'v');
     }
@@ -266,7 +264,8 @@ inline void to_bytes(bytestring& bytes, std::vector<T>& arg) {
   }
 }
 
-inline void to_bytes(bytestring& bytes, memory::desc& adesc) {
+template<>
+inline void to_bytes(bytestring& bytes, dnnl::memory::desc& adesc) {
   auto desc = adesc.data;
   for (int i = 0; i < desc.ndims; i++) {
     to_bytes(bytes, desc.dims[i]);
@@ -285,7 +284,8 @@ inline void to_bytes(bytestring& bytes, memory::desc& adesc) {
   to_bytes(bytes, desc.format_kind);
 }
 
-inline void to_bytes(bytestring& bytes, const bool arg) {
+template<>
+inline void to_bytes(bytestring& bytes, bool arg) {
   to_bytes(bytes, arg ? 1 : 0);
   bytes.append(1, 'b');
 }

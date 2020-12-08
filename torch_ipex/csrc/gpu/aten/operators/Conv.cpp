@@ -113,8 +113,8 @@ at::Tensor convolution(
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key(key, input_md, weight_md, bias.defined(),
-      output_md, _stride, _dilation, _padding, _padding, attr, conv_scale, conv_zero_point);
+  create_key(key, input_md, weight_md, bias.defined(), dst_data_t,
+      _stride, _dilation, _padding, _padding, attr, conv_scale, conv_zero_point);
 #endif
 
   post_ops po;

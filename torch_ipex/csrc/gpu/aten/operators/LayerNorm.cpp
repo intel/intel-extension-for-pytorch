@@ -45,10 +45,10 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   auto input_md = memory::desc({input_tz}, data_t, format_nch);
 
   auto input_usr_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_t, format_nch}, engine, input.data_ptr());
+      {input_tz, data_t, format_nch}, engine, input.data_ptr());
 
   auto output_usr_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_t, format_nch}, engine, output.data_ptr());
+      {input_tz, data_t, format_nch}, engine, output.data_ptr());
 
   normalization_flags flags = normalization_flags::use_scale_shift;
 
@@ -56,7 +56,7 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key(key, input_md, epsilon, (unsigned int)flags);
+  create_key(key, input_md, epsilon, flags);
 #endif
   layer_normalization_forward::desc layer_norm_forward_desc(
       propagation, input_md, epsilon, flags);
@@ -170,13 +170,13 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
       lnorm_bwd_d, engine, lnorm_fwd_pd);
 
   auto input_usr_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_t, format_nchw}, engine, input.data_ptr());
+      {input_tz, data_t, format_nchw}, engine, input.data_ptr());
 
   auto grad_output_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_t, format_nchw}, engine, grad_output.data_ptr());
+      {input_tz, data_t, format_nchw}, engine, grad_output.data_ptr());
 
   auto grad_input_memory = dpcpp_onednn_memory(
-      {{input_tz}, data_t, format_nchw}, engine, grad_input.data_ptr());
+      {input_tz, data_t, format_nchw}, engine, grad_input.data_ptr());
 
   auto mean_memory = dpcpp_onednn_memory(
       lnorm_bwd_pd.mean_desc(), engine, mean.data_ptr());
