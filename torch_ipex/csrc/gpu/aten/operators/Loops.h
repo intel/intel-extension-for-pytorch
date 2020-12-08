@@ -354,7 +354,6 @@ void dpcpp_small_index_kernel_impl(
         }
         local_offset[local_index] = offset;
       }
-      item_id.barrier(DPCPP::access::fence_space::local_space);
 
       // calculate the number of workloads on each group
       auto group_linear_id = group_id * group_numel;
@@ -365,6 +364,7 @@ void dpcpp_small_index_kernel_impl(
       }
       auto out_ptr = get_pointer(out_data);
       auto in_ptr = get_pointer(in_data);
+      item_id.barrier(DPCPP::access::fence_space::local_space);
 
       // compute the in/out/indices offsets and perform memory copy
       for (int64_t local_index = local_id; local_index < group_numel_range; local_index += wgroup_size) {
