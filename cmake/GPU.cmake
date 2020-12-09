@@ -78,7 +78,6 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-math-errno")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
 #link option
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
 set(CMAKE_SKIP_RPATH TRUE)
 
 # ---[ Main build
@@ -147,6 +146,7 @@ if (USE_GEN12HP_ONEDNN)
 endif()
 
 if (USE_PRIMITIVE_CACHE)
+  # Enable FRAMEWORK primitive cache
   add_definitions(-DUSE_PRIMITIVE_CACHE)
 endif()
 
@@ -159,6 +159,12 @@ if(USE_ONEDPL)
   add_definitions(-DONEDPL_USE_TBB_BACKEND=0)
 endif()
 
+set(AOT_ARCH_OPT "spir64_gen-unknown-unknown-sycldevice")
+set(SPIRV_OPT "spir64-unknown-unknown-sycldevice")
+if(USE_AOT_DEVLIST)
+  set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT}")
+endif()
+
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -D__STRICT_ANSI__")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl-unnamed-lambda")
@@ -166,7 +172,12 @@ set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fno-sycl-early-optimizations")
 set_source_files_properties(${DPCPP_SRCS} COMPILE_FLAGS "${IPEX_COMPILE_FLAGS}")
 
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl")
-if(BUILD_BY_PER_KERNEL)
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
+if(USE_AOT_DEVLIST)
+  set(BUILD_BY_PER_KERNEL OFF)
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT} -Xsycl-target-backend=${AOT_ARCH_OPT} \"-device ${USE_AOT_DEVLIST}\"")
+elseif(BUILD_BY_PER_KERNEL)
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
 else()

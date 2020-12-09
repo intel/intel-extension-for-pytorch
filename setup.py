@@ -6,10 +6,13 @@
 # USE_USM               - to use USM, instead of SYCL buffer
 # USE_ONEDPL            - to use oneDPL in operators
 # USE_ONEMKL            - to use oneMKL in operators
-# USE_PERSIST_STREAM    - to use persistent oneDNN stream
 # USE_GEN12HP_ONEDNN    - to use oneDNN Gen12HP branch
-# USE_PRIMITIVE_CACHE   - to use primitive cache for oneDNN
-# BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option
+# USE_PERSIST_STREAM    - to use persistent oneDNN stream
+# USE_PRIMITIVE_CACHE   - to use FRAMEWORK primitive cache to cache oneDNN primitives
+# USE_MULTI_CONTEXT     - to create DPC++ runtime context per device
+# USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
+# BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
+# BUILD_NO_L0_ONEDNN    - to build oneDNN without LevelZero support
 # BUILD_INTERNAL_DEBUG  - to build internal debug code path
 # BUILD_DOUBLE_KERNEL   - to build double data type kernel (if BUILD_INTERNAL_DEBUG==ON)
 #
