@@ -80,17 +80,17 @@ Tensor& add_out(
     const Tensor& _other,
     Scalar alpha) {
   Tensor self, other;
-  if (1.0 == alpha.to<float>() &&
-      _self.defined() &&
-      _other.defined() &&
-      _self.sizes() == _other.sizes() &&
-      !impl::is_wrapped_number(_self) &&
-      !impl::is_wrapped_number(_other) &&
-      (!DPCPPTensorContext::is_plain(_self) ||
-       !DPCPPTensorContext::is_plain(_other))) {
-    // oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
-    oneDNN::bin<dnnl::algorithm::binary_add>(
-        result, _self.contiguous(), _other.contiguous());
+ if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
+      _self.scalar_type() == ScalarType::Float &&
+      _other.scalar_type() == ScalarType::Float &&
+      _self.dim() > 0 && _other.dim() > 0 &&
+      !(DPCPPTensorContext::is_plain(_self) &&
+        !DPCPPTensorContext::is_plain(_other) &&
+        _self.sizes() != _other.sizes()) &&
+      !(is_expandable_to(_self.sizes(), _other.sizes()) &&
+      !is_expandable_to(_other.sizes(), _self.sizes())) &&
+      !impl::is_wrapped_number(_self) && !impl::is_wrapped_number(_other)) {
+      oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {
     result = to_plain_if_needed(result);
@@ -111,17 +111,17 @@ Tensor& add_out(
 
 Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
   Tensor result, self, other;
-  if (1.0 == alpha.to<float>() &&
-      _self.defined() &&
-      _other.defined() &&
-      _self.sizes() == _other.sizes() &&
-      !impl::is_wrapped_number(_self) &&
-      !impl::is_wrapped_number(_other) &&
-      (!DPCPPTensorContext::is_plain(_self) ||
-       !DPCPPTensorContext::is_plain(_other))) {
-    // oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
-    oneDNN::bin<dnnl::algorithm::binary_add>(
-        result, _self.contiguous(), _other.contiguous());
+ if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
+      _self.scalar_type() == ScalarType::Float &&
+      _other.scalar_type() == ScalarType::Float &&
+      _self.dim() > 0 && _other.dim() > 0 &&
+      !(DPCPPTensorContext::is_plain(_self) &&
+        !DPCPPTensorContext::is_plain(_other) &&
+        _self.sizes() != _other.sizes()) &&
+      !(is_expandable_to(_self.sizes(), _other.sizes()) &&
+      !is_expandable_to(_other.sizes(), _self.sizes())) &&
+      !impl::is_wrapped_number(_self) && !impl::is_wrapped_number(_other)) {
+      oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {
     self = to_plain_if_needed(_self);
