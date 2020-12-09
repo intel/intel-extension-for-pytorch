@@ -643,7 +643,7 @@ void MultiMarginCriterion_updateOutput(
   auto queue = dpcppGetCurrentQueue();
   int64_t local_size =
       queue.get_device()
-          .template get_info<DPCPP::info::device::max_work_group_size>();
+          .template get_info<dpcpp_dev_max_wgroup_size>();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto input_data = get_buffer<dpcpp_r_mode>(cgh, input_contiguous.data_ptr<scalar_t>());
@@ -783,7 +783,7 @@ void MultiMarginCriterion_updateGradInput(
   auto queue = dpcppGetCurrentQueue();
   int64_t local_size =
       queue.get_device()
-          .template get_info<DPCPP::info::device::max_work_group_size>();
+          .template get_info<dpcpp_dev_max_wgroup_size>();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto grad_input_data = get_buffer<dpcpp_w_mode>(cgh, grad_input.data_ptr<scalar_t>());
@@ -894,7 +894,7 @@ void MultilabelMarginCriterion_updateOutput(
   auto queue = dpcppGetCurrentQueue();
   int64_t local_size =
       queue.get_device()
-          .template get_info<DPCPP::info::device::max_work_group_size>();
+          .template get_info<dpcpp_dev_max_wgroup_size>();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto input_data = get_buffer<dpcpp_r_mode>(cgh, input_contiguous.data_ptr<scalar_t>());
@@ -1066,7 +1066,7 @@ void MultilabelMarginCriterion_updateGradInput(
   auto queue = dpcppGetCurrentQueue();
   int64_t local_size =
       queue.get_device()
-          .template get_info<DPCPP::info::device::max_work_group_size>();
+          .template get_info<dpcpp_dev_max_wgroup_size>();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto grad_input_data = get_buffer<dpcpp_w_mode>(cgh,  grad_input.data_ptr<scalar_t>());

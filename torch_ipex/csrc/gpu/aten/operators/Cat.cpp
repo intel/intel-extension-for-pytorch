@@ -97,8 +97,8 @@ void CatArrayBatchedCopy(
   //This will have cating two tensors fill the entire grid, but prevent
   //many threads from needlessly load meta data if their sizes is small.
 
-  auto numCU = queue.get_device().get_info<DPCPP::info::device::max_compute_units>();
-  auto numWI = queue.get_device().get_info<DPCPP::info::device::max_work_group_size>();
+  auto numCU = queue.get_device().get_info<dpcpp_dev_max_units>();
+  auto numWI = queue.get_device().get_info<dpcpp_dev_max_wgroup_size>();
   DPCPP::range<2> global_range(numCU * numWI / 2, batchCounter);
   DPCPP::range<2> local_range(numWI, 1);
 

@@ -200,7 +200,7 @@ class CachingAllocator {
         update_stat_array(stats.reserved_bytes, alloc_size, stat_types);
       } else {
         auto dpcppDev = dpcppGetRawDevice(curDevID);
-        size_t device_total = dpcppDev.get_info<DPCPP::info::device::global_mem_size>();
+        size_t device_total = dpcppDev.get_info<dpcpp_dev_global_mem_size>();
         stats.num_ooms += 1;
 
         AT_ERROR("DPCPP out of memory. Tried to allocate ", format_size(alloc_size),

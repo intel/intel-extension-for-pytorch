@@ -58,7 +58,7 @@ static void initGlobalDevicePoolState() {
                                 sub_devices.end());
       } catch (DPCPP::feature_not_supported &e) {
         TORCH_WARN("Can not split into tile for Device ", 
-          root_device.get_info<DPCPP::info::device::name>());
+          root_device.get_info<dpcpp_dev_name>());
         gDevPool.devices.push_back(root_device);
       }
     }
@@ -212,7 +212,7 @@ int64_t dpcppMaxWorkGroupSize() {
 
 int64_t dpcppMaxComputeUnitSize(DPCPP::queue& queue) {
   return queue.get_device()
-      .template get_info<DPCPP::info::device::max_compute_units>();
+      .template get_info<dpcpp_dev_max_units>();
 }
 
 int64_t dpcppMaxComputeUnitSize() {
@@ -234,7 +234,7 @@ int64_t dpcppMaxDSSNum() {
 
 int64_t dpcppLocalMemSize(DPCPP::queue& queue) {
   return queue.get_device()
-      .template get_info<DPCPP::info::device::local_mem_size>();
+      .template get_info<dpcpp_dev_local_mem_size>();
 }
 
 int64_t dpcppLocalMemSize() {

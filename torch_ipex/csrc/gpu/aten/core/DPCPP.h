@@ -76,6 +76,8 @@ namespace DPCPP = cl::sycl;
 #define DPCPP_SUB_GROUP_SIZE (1L)
 
 // dpcpp device info
+static constexpr auto dpcpp_dev_name =
+    DPCPP::info::device::name;
 static constexpr auto dpcpp_dev_type =
     DPCPP::info::device::device_type;
 static constexpr auto dpcpp_dev_max_units =
