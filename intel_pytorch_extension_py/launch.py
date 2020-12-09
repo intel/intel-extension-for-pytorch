@@ -8,6 +8,7 @@ import re
 import glob
 import numpy as np
 from argparse import ArgumentParser, REMAINDER
+THP_LOC = "/sys/kernel/mm/transparent_hugepage/enabled"
 
 r"""
 This is a script for launching PyTorch training and inference on Intel Xeon CPU with optimal configurations.
@@ -91,6 +92,7 @@ rank 0: *(IP: 192.168.10.10, and has a free port: 295000)*
 *** Memory allocator  ***
 
 "--enable_tcmalloc" and "--enable_jemalloc" can be used to enable different memory allcator. 
+"--set_thp" can be used to set Transparent HugePages setting.
 
 """
 
@@ -229,6 +231,22 @@ def add_lib_preload(lib_type=None):
                " or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or "
                "~/.local/lib/ so the LD_PRELOAD environment variable will not be set."
                .format(lib_type, lib_type, expanduser("~")))
+
+def get_thp():
+    if os.path.exists(THP_LOC):
+        with open(THP_LOC) as f:
+           val = f.read().strip().split("[")[1].split("]")[0]
+           if val in ['always','never','madvise']:
+               return val
+    return None
+
+def set_thp(arg):
+    if not arg: return
+    if os.path.exists(THP_LOC):
+        os.system("sync;echo 3 > /proc/sys/vm/drop_caches")
+        os.system(f"echo {arg} > {THP_LOC}")
+    else:
+        print("Warning: Unable to enable Transparent HugePages.")
     
 def set_multi_thread_and_allcator(args):
 
@@ -256,6 +274,9 @@ def set_multi_thread_and_allcator(args):
         add_lib_preload(lib_type="jemalloc")
     if args.enable_iomp:
         add_lib_preload(lib_type="iomp,iomp5")
+    if args.set_thp:
+        set_thp(args.set_thp)
+        os.environ["LAUNCH_THP_SET"] = get_thp()
  
 def launch(args):
     '''
@@ -289,8 +310,10 @@ def launch(args):
         if args.ncore_per_instance == -1:
             args.ncore_per_instance = len(cores) // args.ninstances
 
+    os.environ["LAUNCH_THP_OLD"] = get_thp()
     set_multi_thread_and_allcator(args)
 
+    os.environ["LAUNCH_CMD"] = "#"
     for i in range(args.ninstances):
        cmd = []
        cur_process_cores = ""
@@ -307,13 +330,18 @@ def launch(args):
            cmd.append("-m")
        cmd.append(args.program)
        cmd.extend(args.program_args)
+       os.environ["LAUNCH_CMD"] += " ".join(cmd) + ",#"
        process = subprocess.Popen(cmd, env=os.environ)
        processes.append(process)
+    os.environ["LAUNCH_CMD"] = os.environ["LAUNCH_CMD"][:-2]
     for process in processes:
         process.wait()
         if process.returncode != 0:
             raise subprocess.CalledProcessError(returncode=process.returncode,
                                                 cmd=cmd) 
+    if args.set_thp:
+        # reset to existing val
+        set_thp(os.environ["LAUNCH_THP_OLD"])
     
 def mpi_dist_launch(args):
     '''
@@ -415,6 +443,8 @@ def add_memory_allocator_params(parser):
                         help="Enable tcmalloc allocator")
     group.add_argument("--enable_jemalloc", action='store_true', default=False,
                         help="Enable jemalloc allocator")
+    group.add_argument("--set_thp", default=None, choices=['always','madvise','never'],
+                        help="Set Transparent HugePages setting")
         
 def add_multi_instance_params(parser):
 
@@ -490,8 +520,8 @@ def main():
         launch(args)
     if os.environ.get("DUMP_LAUNCH_ARGS",False):
         print(f'Launch settings: ')
-        for x in set(os.environ.keys()) - env_before:
-            print(f'{x}: {os.environ[x]}')
+        for x in sorted(set(os.environ.keys()) - env_before):
+            print(f'{x}={os.environ[x]}')
  
 if __name__ == "__main__":
     main()
