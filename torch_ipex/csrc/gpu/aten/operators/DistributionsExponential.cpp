@@ -38,10 +38,10 @@ Tensor& exponential_(Tensor& self, double lambda_, Generator* gen_) {
         std::lock_guard<std::mutex> lock(gen->mutex_);
         seed = gen->current_seed();
       }
-      mkl::rng::philox4x32x10 engine(sycl_queue, seed);
-      mkl::rng::exponential<scalar_t> distribution(displ, scale);
+      oneapi::mkl::rng::philox4x32x10 engine(sycl_queue, seed);
+      oneapi::mkl::rng::exponential<scalar_t> distribution(displ, scale);
       auto sycl_buffer = make_buffer<scalar_t>(self.data_ptr());
-      mkl::rng::generate(distribution, engine, self.numel(), sycl_buffer);
+      oneapi::mkl::rng::generate(distribution, engine, self.numel(), sycl_buffer);
     });
   } else
 #endif

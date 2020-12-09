@@ -49,10 +49,10 @@ Tensor& log_normal_(Tensor& self, double mean_, double std_, Generator* gen_) {
       scalar_t displ = static_cast<scalar_t>(0.0);
       scalar_t scale = static_cast<scalar_t>(1.0);
       auto &dpcpp_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
-      mkl::rng::philox4x32x10 engine(dpcpp_queue, gen->seed());
-      mkl::rng::lognormal<scalar_t, mkl::rng::lognormal_method::box_muller2> distribution(mean, std, displ, scale);
+      oneapi::mkl::rng::philox4x32x10 engine(dpcpp_queue, gen->seed());
+      oneapi::mkl::rng::lognormal<scalar_t, oneapi::mkl::rng::lognormal_method::box_muller2> distribution(mean, std, displ, scale);
       auto dpcpp_buffer = make_buffer<scalar_t>(self.data_ptr());
-      mkl::rng::generate(distribution, engine, self.numel(), dpcpp_buffer);
+      oneapi::mkl::rng::generate(distribution, engine, self.numel(), dpcpp_buffer);
     });
   } else
 #endif
