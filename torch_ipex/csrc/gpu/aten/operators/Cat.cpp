@@ -1,16 +1,20 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 
-#include <core/Memory.h>
-#include <core/Runtime.h>
-#include <tensor/Context.h>
-#include <ATen/ipex_type_dpcpp_customized.h>
-
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <utils/ATDispatch.h>
+
+#include <core/Memory.h>
+#include <core/Runtime.h>
+#include <tensor/Context.h>
+#include <ATen/ipex_type_dpcpp_customized.h>
+
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
 
 using namespace dnnl;
 using namespace at::dpcpp;
@@ -403,26 +407,27 @@ static void dnnl_cat(
    
   auto data_t = dt_to_dnnl(cat_tensors[0].scalar_type());
   auto format_any = get_dnnl_default_format(cat_tensors[0].dim());
-  auto plain_output_md = memory::desc(output_dims, data_t, format_any);
+  auto output_md = memory::desc(output_dims, data_t, format_any);
   auto concat_pd = concat::primitive_desc(
-      plain_output_md, static_cast<int>(dimension), cat_tensors_md, engine);
+      output_md, static_cast<int>(dimension), cat_tensors_md, engine);
+
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  create_key(key, output_dims, static_cast<int>(dimension), cat_tensors_md);
+#endif
   
   //Tensor output;
   memory output_usr_memory;
   if (!lazy_reorder_enabled()) {
     output_usr_memory = dpcpp_onednn_memory(
-        plain_output_md, engine, output.data_ptr());
+        output_md, engine, output.data_ptr());
   } else {
     auto expected_output_md = concat_pd.dst_desc();
-    if (plain_output_md != expected_output_md) {
+      // reallocate memory for some blk fmt
       output = at::AtenIpexTypeDPCPP::empty_opaque_tensor(
           expected_output_md, cat_tensors[0].options(), c10::nullopt);
       output_usr_memory = dpcpp_onednn_memory(
           expected_output_md, engine, output.data_ptr());
-    } else {
-      output_usr_memory = dpcpp_onednn_memory(
-          plain_output_md, engine, output.data_ptr());
-    }
   }
 
   std::unordered_map<int, memory> args = {
@@ -432,16 +437,33 @@ static void dnnl_cat(
     args.insert({DNNL_ARG_MULTIPLE_SRC + i, cat_tensors_mem[i]});
   }
 
-  std::shared_ptr<dnnl::primitive> concat_p;
   auto strm = GpuStreamManager::Instance().get_stream();
-  concat_p.reset(new concat(concat_pd));
-  DPCPP_ONEDNN_EXEC(*concat_p, strm, args);
+
+#ifdef USE_PRIMITIVE_CACHE
+  auto concat_p = fetch_or_create_m<dnnl::concat>(key, concat_pd);
+#else
+  auto concat_p = dnnl::concat(concat_pd);
+#endif
+
+  DPCPP_ONEDNN_EXEC(concat_p, strm, args);
 }
 
 } // namespace impl
 
 Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
-  if (tensors[0].scalar_type() == ScalarType::Double) {
+  bool is_double = false;
+  for (int i = 0; i < tensors.size(); i++) {
+    Tensor tensor = tensors[i];
+    if (tensor.defined() && tensor.dim() != 1) {
+      if (tensor.scalar_type() == ScalarType::Double) {
+        is_double = true;
+      }
+      break;
+    }
+  }
+
+  // DNNL cat does not support double datatype now.
+  if (is_double) {
     impl::cat(out, tensors, tensors.size(), dim);
   } else {
     impl::dnnl_cat(out, tensors, tensors.size(), dim);
