@@ -23,15 +23,38 @@ namespace at {
 namespace AtenIpexTypeDPCPP {
 namespace impl {
 
-template <typename scalar_t>
+typedef struct matmul_attr {
+  static const int64_t kind_with_relu = at::dpcpp::oneDNN::with_relu;
+  static const int64_t kind_with_sigmoid = at::dpcpp::oneDNN::with_sigmoid;
+
+  matmul_attr() : alpha_(0.f), beta_(0.f), attr_(0), m2_trans_(true) {}
+  matmul_attr(float alpha, float beta, int64_t attr, bool m2_trans) :
+      alpha_(alpha), beta_(beta), attr_(attr), m2_trans_(m2_trans) {}
+
+  bool with_relu() {
+    return attr_ & kind_with_relu;
+  }
+
+  bool with_sigmoid() {
+    return attr_ & kind_with_sigmoid;
+  }
+
+  int64_t attr() {
+    return attr_;
+  }
+
+  float alpha_;
+  float beta_;
+  int64_t attr_;
+  bool m2_trans_;
+} matmul_attr_t;
+
 void dnnlGemmImpl(
     Tensor& result,
-    scalar_t beta,
-    scalar_t alpha,
     const Tensor& m1,
     const Tensor& m2,
     const Tensor& b,
-    bool with_relu) {
+    matmul_attr_t attr) {
   size_t dims = result.dim();
   TORCH_CHECK(dims == 2 || dims == 3, "oneDNN matmul only works with 2D or 3D, got ", dims);
   TORCH_CHECK(dims == m1.dim() && dims == m2.dim(), "oneDNN input matrixes must have the same ranks");
@@ -45,7 +68,7 @@ void dnnlGemmImpl(
     TORCH_CHECK(mb == m1.size(0) && mb == m2.size(0), "batch size mismatch, result mb: ",\
         mb, "m1 mb", m1.size(0), " m2 mb: ", m2.size(0));
   }
-  TORCH_CHECK(k == m2.size(-2), "size mismatch, m1: ", m1.sizes(), " m2: ", m2.sizes());
+  // ipex matmul support both ab/ba shape for m2 tensor, we don't check any more
 
   auto m1_dt = dt_to_dnnl(m1.scalar_type());
   auto m2_dt = dt_to_dnnl(m2.scalar_type());
@@ -55,10 +78,20 @@ void dnnlGemmImpl(
   memory::desc m2_md;
   memory::desc r_md;
   memory::desc b_md;
+
+  memory::desc m1_md_any;
+  memory::desc m2_md_any;
+  memory::desc r_md_any;
+
   if (dims == 2) {
     m1_md = memory::desc({m, k}, m1_dt, {m1.stride(0), m1.stride(1)});
-    m2_md = memory::desc({k, n}, m2_dt, {m2.stride(0), m2.stride(1)});
+    m2_md = attr.m2_trans_ ? memory::desc({k, n}, m2_dt, {m2.stride(0), m2.stride(1)}) :
+            memory::desc({k, n}, m2_dt, {m2.stride(1), m2.stride(0)});
     r_md = memory::desc({m, n}, result_dt, {result.stride(0), result.stride(1)});
+
+    m1_md_any = memory::desc({m, k}, m1_dt, memory::format_tag::any);
+    m2_md_any = memory::desc({k, n}, m2_dt, memory::format_tag::any);
+    r_md_any = memory::desc({m, n}, result_dt, memory::format_tag::any);
   } else {
     m1_md = memory::desc({mb, m, k}, m1_dt,
       {m1.stride(0), m1.stride(1), m1.stride(2)});
@@ -67,31 +100,35 @@ void dnnlGemmImpl(
     r_md = memory::desc({mb, m, n}, result_dt,
       {result.stride(0), result.stride(1), result.stride(2)});
   }
-
-  primitive_attr attr;
+  primitive_attr pattr;
   post_ops po;
   int64_t post_flags = 0;
-  if (alpha != 1.f)
-    attr.set_output_scales(/* mask */ 0, {(float)alpha});
+  if (attr.alpha_ != 1.f)
+    pattr.set_output_scales(/* mask */ 0, {(float)attr.alpha_});
 #ifdef USE_GEN12HP_ONEDNN
   // Handle difference cases based-on beta value here:
   // 1. beta == 0, nothing is needed to do
   // 2. quantization path, no bias fusion support in oneDNN so far
   // 3. beta == 1, partially support bias fusion in oneDNN
-  if (beta != 0.f && (beta != 1.f || m1.is_quantized() || m2.is_quantized())) {
-    po.append_sum(beta);
+  if (attr.beta_ != 0.f && (attr.beta_ != 1.f || m1.is_quantized() || m2.is_quantized())) {
+    po.append_sum(attr.beta_);
 #else
-  if (beta != 0.f) {
-    po.append_sum(beta);
+  if (attr.beta_ != 0.f) {
+    po.append_sum(attr.beta_);
 #endif
     post_flags |= at::dpcpp::oneDNN::with_sum;
   }
 
-  if (with_relu) {
+  if (attr.with_relu()) {
     po.append_eltwise(1.f, dnnl::algorithm::eltwise_relu, 0.f, 0.f);
     post_flags |= at::dpcpp::oneDNN::with_relu;
   }
-  attr.set_post_ops(po);
+
+  if (attr.with_sigmoid()) {
+    po.append_eltwise(1.f, dnnl::algorithm::eltwise_logistic, 0.f, 0.f);
+    post_flags |= at::dpcpp::oneDNN::with_sigmoid;
+  }
+  pattr.set_post_ops(po);
 
   std::vector<float> weight_scales;
   if(m2.is_quantized()){
@@ -113,8 +150,8 @@ void dnnlGemmImpl(
     }
     int mask_ac = 0;
     int mask_matmul = weight_scales.size() > 1? 1 << 1 : 0;
-    attr.set_output_scales(mask_matmul, matmul_scale);
-    attr.set_zero_points(DNNL_ARG_DST, mask_ac,
+    pattr.set_output_scales(mask_matmul, matmul_scale);
+    pattr.set_zero_points(DNNL_ARG_DST, mask_ac,
         {static_cast<int>(result.is_quantized()? result.q_zero_point() : 0)});
   }
 
@@ -123,12 +160,12 @@ void dnnlGemmImpl(
   auto strm = GpuStreamManager::Instance().get_stream();
 
 #ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
+  lru_key_t key, key_r;
 #endif
 
   std::shared_ptr<dnnl::matmul::desc> matmul_desc;
 #ifdef USE_GEN12HP_ONEDNN
-  if (beta == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
+  if (attr.beta_ == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_dt = b.defined() ? dt_to_dnnl(b.scalar_type()) : dnnl::memory::data_type::f32;
     if (b.sizes() != result.sizes()) {
       dnnl::memory::dims b_dims(result.sizes().size() - 1, 1);
@@ -142,16 +179,31 @@ void dnnlGemmImpl(
         b_md = memory::desc({mb, m, n}, b_dt, {b.stride(0), b.stride(1), b.stride(2)});
       }
     }
+    if (dims == 2 && lazy_reorder_enabled()) {
+  #ifdef USE_PRIMITIVE_CACHE
+    create_key(key, m1_md_any, m2_md_any, b_md, r_md_any, post_flags);
+  #endif
+    matmul_desc.reset(new dnnl::matmul::desc(m1_md_any, m2_md_any, b_md, r_md_any));
+    } else {
   #ifdef USE_PRIMITIVE_CACHE
     create_key(key, m1_md, m2_md, b_md, r_md, post_flags);
   #endif
     matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, b_md, r_md));
+    }
   } else {
+    if (dims == 2 && lazy_reorder_enabled()) {
+  #ifdef USE_PRIMITIVE_CACHE
+    create_key(key, m1_md_any, m2_md_any, r_md_any, post_flags);
+  #endif
+    matmul_desc.reset(new dnnl::matmul::desc(m1_md_any, m2_md_any, r_md_any));
+    } else {
   #ifdef USE_PRIMITIVE_CACHE
     create_key(key, m1_md, m2_md, r_md, post_flags);
   #endif
     matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
+    }
   }
+
 #else
 #ifdef USE_PRIMITIVE_CACHE
   create_key(key, m1_md, m2_md, r_md, post_flags);
@@ -159,19 +211,110 @@ void dnnlGemmImpl(
   matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
 #endif
 
-  auto matmul_pd = dnnl::matmul::primitive_desc(*matmul_desc, attr, engine);
+  auto matmul_pd = dnnl::matmul::primitive_desc(*matmul_desc, pattr, engine);
 #ifdef USE_PRIMITIVE_CACHE
   auto matmul_p = fetch_or_create_m<dnnl::matmul>(key, matmul_pd);
 #else
   auto matmul_p = dnnl::matmul(matmul_pd);
 #endif
 
-  auto m1_memory = dpcpp_onednn_memory(m1_md, engine, m1.data_ptr());
-  auto m2_memory = dpcpp_onednn_memory(m2_md, engine, m2.data_ptr());
-  auto r_memory = dpcpp_onednn_memory(r_md, engine, result.data_ptr());
+
 
 #ifdef USE_GEN12HP_ONEDNN
-  if (beta == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
+  memory m1_usr_memory, m2_usr_memory, r_usr_memory;
+  memory m1_memory, m2_memory, r_memory;
+  Tensor r_;
+
+  if (!lazy_reorder_enabled() || dims == 3) {
+    m1_memory = dpcpp_onednn_memory(m1_md, engine, m1.data_ptr());
+    m2_memory = dpcpp_onednn_memory(m2_md, engine, m2.data_ptr());
+    r_memory = dpcpp_onednn_memory(r_md, engine, result.data_ptr());
+
+  } else {
+    auto m1_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(m1);
+    m1_usr_memory = m1_ctx.is_plain() ?
+        dpcpp_onednn_memory(m1_md, engine, m1.data_ptr()) :
+        dpcpp_onednn_memory({m1_ctx.meta()}, engine, m1.data_ptr());
+
+    auto m2_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(m2);
+    m2_usr_memory = m2_ctx.is_plain() ?
+        dpcpp_onednn_memory(m2_md, engine, m2.data_ptr()) :
+        dpcpp_onednn_memory({m2_ctx.meta()}, engine, m2.data_ptr());
+
+    auto r_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(result);
+    r_usr_memory = r_ctx.is_plain() ?
+        dpcpp_onednn_memory(r_md, engine, result.data_ptr()) :
+        dpcpp_onednn_memory({r_ctx.meta()}, engine, result.data_ptr());
+
+    auto expected_m1_md = matmul_pd.src_desc();
+    Tensor m1_;
+    m1_memory = m1_usr_memory;
+    if (m1_usr_memory.get_desc() != expected_m1_md) {
+      m1_ = at::AtenIpexTypeDPCPP::empty({expected_m1_md.get_size() / m1.itemsize()},
+      m1.options(), c10::nullopt);
+      m1_memory = dpcpp_onednn_memory(expected_m1_md, engine, m1_.data_ptr());
+#ifdef USE_PRIMITIVE_CACHE
+      create_key(key_r, m1_md, expected_m1_md);
+      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key, m1_usr_memory, m1_memory);
+#else
+      auto reorder_p = dnnl::reorder(m1_usr_memory, m1_memory);
+#endif
+      DPCPP_ONEDNN_EXEC(reorder_p,
+          strm, {{DNNL_ARG_FROM, m1_usr_memory}, {DNNL_ARG_TO, m1_memory}});
+    }
+
+    auto expected_m2_md = matmul_pd.weights_desc();
+    Tensor m2_;
+    m2_memory = m2_usr_memory;
+    if (m2_usr_memory.get_desc() != expected_m2_md) {
+      Tensor m2_opt;
+      if (weight_cache_enabled()) {
+        m2_opt = empty_opaque_tensor(expected_m2_md, m2.options(), c10::nullopt);
+        m2_memory = dpcpp_onednn_memory(expected_m2_md, engine, m2_opt.data_ptr());
+      } else {
+        m2_ = at::AtenIpexTypeDPCPP::empty(
+          {expected_m2_md.get_size() / m2.itemsize()}, m2.options(), c10::nullopt);
+        m2_memory = dpcpp_onednn_memory(expected_m2_md, engine, m2_.data_ptr());
+      }
+#ifdef USE_PRIMITIVE_CACHE
+      create_key(key_r, m2_md, expected_m2_md);
+      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key, m2_usr_memory, m2_memory);
+#else
+      auto reorder_p = dnnl::reorder(m2_usr_memory, m2_memory);
+#endif
+      DPCPP_ONEDNN_EXEC(reorder_p,
+          strm, {{DNNL_ARG_FROM, m2_usr_memory}, {DNNL_ARG_TO, m2_memory}});
+
+      if (weight_cache_enabled()) {
+        strm.wait();
+        // FIXME: thread safty
+        auto m2_opt_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::
+            release_tensor_ctx(m2_opt);
+        at::AtenIpexTypeDPCPP::DPCPPTensorContext::
+            set_tensor_ctx(m2, std::move(m2_opt_ctx));
+      }
+    }
+
+    auto expected_r_md = matmul_pd.dst_desc();
+
+    r_memory = r_usr_memory;
+    if (r_usr_memory.get_desc() != expected_r_md) {
+      r_ = empty_opaque_tensor(expected_r_md, result.options(), c10::nullopt);
+      r_memory = dpcpp_onednn_memory(expected_r_md, engine, r_.data_ptr());
+      if (attr.beta_ != 1.f) {
+#ifdef USE_PRIMITIVE_CACHE
+      create_key(key_r, r_md, expected_r_md);
+      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key, r_usr_memory, r_memory);
+#else
+      auto reorder_p = dnnl::reorder(r_usr_memory, r_memory);
+#endif
+        DPCPP_ONEDNN_EXEC(reorder(r_usr_memory, r_memory),
+            strm, {{DNNL_ARG_FROM, r_usr_memory}, {DNNL_ARG_TO, r_memory}});
+      }
+    }
+  }
+
+  if (attr.beta_ == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_memory = dpcpp_onednn_memory(b_md, engine, b.data_ptr());
     DPCPP_ONEDNN_EXEC(matmul_p, strm,
       {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
@@ -181,7 +324,12 @@ void dnnlGemmImpl(
       {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
         {DNNL_ARG_DST, r_memory}});
   }
+
 #else
+  auto m1_memory = dpcpp_onednn_memory(m1_md, engine, m1.data_ptr());
+  auto m2_memory = dpcpp_onednn_memory(m2_md, engine, m2.data_ptr());
+  auto r_memory = dpcpp_onednn_memory(r_md, engine, result.data_ptr());
+
   DPCPP_ONEDNN_EXEC(matmul_p, strm,
     {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
       {DNNL_ARG_DST, r_memory}});
@@ -203,14 +351,11 @@ bool check_broadcast(const Tensor& src, const IntArrayRef& shape){
   return true;
 }
 
-template <typename scalar_t>
 void gemm_broadcast(Tensor& result,
                     const Tensor& m1,
                     const Tensor& m2,
-                    scalar_t beta,
-                    scalar_t alpha,
-                    const Tensor bias = at::Tensor(),
-                    bool with_relu = false) {
+                    matmul_attr_t attr,
+                    const Tensor bias = at::Tensor()) {
   std::vector<int64_t> result_shape;
   auto dim = m1.dim();
   Tensor m2_unpack;
@@ -227,16 +372,18 @@ void gemm_broadcast(Tensor& result,
     m2_unpack = m2;
   }
   if (dim == 2) {
-    result_shape = std::vector<int64_t>{m1.size(0), m2_unpack.size(1)};
+    result_shape = attr.m2_trans_ ? std::vector<int64_t>{m1.size(0), m2_unpack.size(1)} :
+    std::vector<int64_t>{m1.size(0), m2_unpack.size(0)};
   } else {
-    result_shape = std::vector<int64_t>{m1.size(0), m1.size(1), m2_unpack.size(2)};
+    result_shape = attr.m2_trans_ ? std::vector<int64_t>{m1.size(0), m1.size(1), m2_unpack.size(2)} :
+    std::vector<int64_t>{m1.size(0), m1.size(1), m2_unpack.size(1)};
   }
 
   Tensor bc_bias = bias;
 #ifdef USE_GEN12HP_ONEDNN
-  if (bias.defined() && beta && (beta != 1.f || m1.is_quantized())) {
+  if (bias.defined() && attr.beta_ && (attr.beta_ != 1.f || m1.is_quantized())) {
 #else
-  if (bias.defined() && beta) {
+  if (bias.defined() && attr.beta_) {
 #endif
     TORCH_CHECK(check_broadcast(bias, result_shape),
                 "bias ", bias.sizes(), " cannot broadcast to ", result_shape);
@@ -247,9 +394,11 @@ void gemm_broadcast(Tensor& result,
     result.resize_(result_shape);
   }
 
-  dnnlGemmImpl<scalar_t>(result, beta, alpha, m1, m2_unpack, bc_bias, with_relu);
+  dnnlGemmImpl(result, m1, m2_unpack, bc_bias, attr);
 }
 } // namespace impl
+
+using namespace impl;
 
 Tensor& addmm_(
     Tensor& self,
@@ -257,6 +406,11 @@ Tensor& addmm_(
     const Tensor& m2,
     Scalar beta,
     Scalar alpha) {
+  matmul_attr_t attr(
+      alpha.to<float>(),
+      beta.to<float>(),
+      0,
+      true);
   checkBackend("addmm_", {self, m1, m2}, Backend::DPCPP);
   TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
@@ -264,23 +418,15 @@ Tensor& addmm_(
   TORCH_CHECK(self.size(0) ==  m1.size(0) && self.size(1) == m2.size(1),
               "size mismatch input ", self.sizes(), " m1 ", m1.sizes(), " m2 ", m2.sizes());
 
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-    at::ScalarType::Half,
-    at::ScalarType::BFloat16,
-    self.scalar_type(),
-    "addmm",
-    [&]() {
-      impl::gemm_broadcast<scalar_t>(
-      self,
-      m1,
-      m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
-      beta.to<scalar_t>(),
-      alpha.to<scalar_t>(),
-      // bias convert to fp32 for accuracy when self is fp16 or bf16
-      self.scalar_type() == ScalarType::Half ||
-              self.scalar_type() == ScalarType::BFloat16
-          ? self.to(ScalarType::Float) : self);
-    });
+  impl::gemm_broadcast(
+  self,
+  m1,
+  m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+  // bias convert to fp32 for accuracy when self is fp16 or bf16
+  attr,
+  self.scalar_type() == ScalarType::Half ||
+          self.scalar_type() == ScalarType::BFloat16
+      ? self.to(ScalarType::Float) : self);
 
   return self;
 }
@@ -291,6 +437,11 @@ Tensor addmm(
     const Tensor& m2,
     Scalar beta,
     Scalar alpha) {
+  matmul_attr_t attr(
+      alpha.to<float>(),
+      beta.to<float>(),
+      0,
+      true);
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
 
   if(m1.is_quantized()){
@@ -315,59 +466,33 @@ Tensor addmm(
   }
 
   if(m1.is_quantized()){
-    IPEX_DISPATCH_QINT_TYPES(
-      m1.scalar_type(),
-      "q_addmm",
-      [&]() {
-        impl::gemm_broadcast(
-        result,
-  m1,
-  m2,
-  beta.to<float>(),
-  alpha.to<float>(),
-  input);
-      });
+    impl::gemm_broadcast(result, m1, m2, attr, input);
   } else {
-    IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      result.scalar_type(),
-      "addmm",
-      [&]() {
-        impl::gemm_broadcast<scalar_t>(
-        result,
-        m1,
-        m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
-        beta.to<scalar_t>(),
-        alpha.to<scalar_t>(),
-        // bias convert to fp32 for accuracy when input is fp16 or bf16
-        input.scalar_type() == ScalarType::Half ||
-                input.scalar_type() == ScalarType::BFloat16
-            ? input.to(ScalarType::Float) : input);
-      });
+    impl::gemm_broadcast(
+    result,
+    m1,
+    m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+    // bias convert to fp32 for accuracy when input is fp16 or bf16
+    attr,
+    input.scalar_type() == ScalarType::Half ||
+            input.scalar_type() == ScalarType::BFloat16
+        ? input.to(ScalarType::Float) : input);
   }
 
   return result;
 }
 
 Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
+  matmul_attr_t attr(1.f, 0.f, 0, true);
   checkBackend("mm_out", {result, self, mat2}, Backend::DPCPP);
   TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(mat2.dim() == 2, "expected 2D tensor");
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-    at::ScalarType::Half,
-    at::ScalarType::BFloat16,
-    self.scalar_type(),
-    "mm_out",
-    [&]() {
-      impl::gemm_broadcast<scalar_t>(
-      result,
-      self.scalar_type() == result.scalar_type() ? self : self.to(result.scalar_type()),
-      mat2.scalar_type() == result.scalar_type() ? mat2 : mat2.to(result.scalar_type()),
-      0,
-      1);
-    });
+  impl::gemm_broadcast(
+  result,
+  self.scalar_type() == result.scalar_type() ? self : self.to(result.scalar_type()),
+  mat2.scalar_type() == result.scalar_type() ? mat2 : mat2.to(result.scalar_type()),
+  attr);
 
   return result;
 }
@@ -384,6 +509,11 @@ Tensor& baddbmm_(
   const Tensor& batch2,
   Scalar beta,
   Scalar alpha) {
+  matmul_attr_t attr(
+      alpha.to<float>(),
+      beta.to<float>(),
+      0,
+      true);
   checkBackend("baddbmm_", {self, batch1, batch2}, Backend::DPCPP);
   TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
@@ -393,15 +523,7 @@ Tensor& baddbmm_(
               self.size(2) == batch2.size(2),
               "size mismatch input ", self.sizes(),
               " batch1 ", batch1.sizes(), " batch2 ", batch2.sizes());
-
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-    at::ScalarType::Half,
-    at::ScalarType::BFloat16,
-    self.scalar_type(),
-    "baddbmm_",
-    [&]() {
-      impl::gemm_broadcast<scalar_t>(self, batch1, batch2, beta.to<scalar_t>(), alpha.to<scalar_t>(), self);
-    });
+  impl::gemm_broadcast(self, batch1, batch2, attr, self);
 
   return self;
 }
@@ -413,18 +535,16 @@ Tensor& baddbmm_out(
     const Tensor& batch2,
     Scalar beta,
     Scalar alpha) {
+  matmul_attr_t attr(
+      alpha.to<float>(),
+      beta.to<float>(),
+      0,
+      true);
   checkBackend("baddbmm_out", {input, batch1, batch2}, Backend::DPCPP);
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-    at::ScalarType::Half,
-    at::ScalarType::BFloat16,
-    input.scalar_type(),
-    "baddbmm_out",
-    [&]() {
-      impl::gemm_broadcast<scalar_t>(result, batch1, batch2, beta.to<scalar_t>(), alpha.to<scalar_t>(), input);
-    });
+  impl::gemm_broadcast(result, batch1, batch2, attr, input);
 
   return result;
 }
@@ -452,7 +572,7 @@ Tensor& addbmm_out(
   TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
- 
+
   Tensor b1;
   if (batch1.size(0) > 1) {
     b1 = batch1.transpose(0, 1).contiguous().view({batch1.size(1), -1});
@@ -461,7 +581,7 @@ Tensor& addbmm_out(
   }
   auto b2 = batch2.view({-1, batch2.size(2)});
   out = at::AtenIpexTypeDPCPP::addmm(self, b1, b2, beta, alpha);
- 
+
   return out;
 }
 
@@ -471,7 +591,7 @@ Tensor& addbmm_(
     const Tensor& batch2,
     Scalar beta,
     Scalar alpha) {
-  at::AtenIpexTypeDPCPP::addbmm_out(self, self, batch1, batch2, beta, alpha); 
+  at::AtenIpexTypeDPCPP::addbmm_out(self, self, batch1, batch2, beta, alpha);
   return self;
 }
 
@@ -482,23 +602,18 @@ Tensor addbmm(
     Scalar beta,
     Scalar alpha) {
   Tensor out = at::empty({0}, self.options());
-  at::AtenIpexTypeDPCPP::addbmm_out(out, self, batch1, batch2, beta, alpha); 
+  at::AtenIpexTypeDPCPP::addbmm_out(out, self, batch1, batch2, beta, alpha);
   return out;
 }
 
 Tensor& bmm_out(Tensor& result, const Tensor& self, const Tensor& batch2) {
+  matmul_attr_t attr(1, 0, 0, true);
   checkBackend("bmm_out", {result, self, batch2}, Backend::DPCPP);
   TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-    at::ScalarType::Half,
-    at::ScalarType::BFloat16,
-    self.scalar_type(),
-    "bmm_out",
-    [&]() {
-      impl::gemm_broadcast<scalar_t>(result, self, batch2, 0, 1);
-    });
+  impl::gemm_broadcast(result, self, batch2, attr);
+
   return result;
 }
 
@@ -510,6 +625,11 @@ Tensor bmm(const Tensor& self, const Tensor& batch2) {
 
 // FIXME: should not be here
 Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & bias) {
+  matmul_attr_t attr(
+      1.f,
+      1.f,
+      matmul_attr_t::kind_with_relu,
+      false);
   RECORD_FUNCTION("linear_relu",
                   std::vector<c10::IValue>({input, weight, bias}));
   if (input.dim() == 2 && bias.defined()) {
@@ -519,14 +639,8 @@ Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & b
     TORCH_CHECK(weight.dim() == 2, "expected 2D tensor");
 
     auto result = at::empty({0}, input.options());
-    IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      result.scalar_type(),
-      "linear_relu",
-      [&]() {
-        impl::gemm_broadcast<scalar_t>(result, input, weight.t(), 1.f, 1.f, bias, true);
-      });
+
+    impl::gemm_broadcast(result, input, weight, attr, bias);
 
     return result;
   }
@@ -538,11 +652,88 @@ Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & b
   return at::relu(output);
 }
 
+Tensor linear_sigmoid(const Tensor & input, const Tensor & weight, const Tensor & bias) {
+  matmul_attr_t attr(
+      1.f,
+      1.f,
+      matmul_attr_t::kind_with_sigmoid,
+      false);
+  RECORD_FUNCTION("linear_sigmoid",
+                  std::vector<c10::IValue>({input, weight, bias}));
+  if (input.dim() == 2 && bias.defined()) {
+    // Fused op is marginally faster.
+    checkBackend("linear_sigmoid", {input, weight, bias}, Backend::DPCPP);
+    TORCH_CHECK(input.dim() == 2, "expected 2D tensor");
+    TORCH_CHECK(weight.dim() == 2, "expected 2D tensor");
+
+    auto result = at::empty({0}, input.options());
+    impl::gemm_broadcast(result, input, weight, attr, bias);
+
+    return result;
+  }
+  auto output = at::matmul(input, weight.t());
+  if (bias.defined()) {
+    output.add_(bias);
+  }
+  return at::sigmoid(output);
+
+}
+
+Tensor trans_linear(
+    const Tensor& input,
+    const Tensor& m1,
+    const Tensor& m2) {
+  matmul_attr_t attr(
+      1.f,
+      1.f,
+      0,
+      false);
+  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
+
+  if(m1.is_quantized()){
+    checkBackend("addmm", m1, Backend::QuantizedDPCPP);
+  } else {
+    checkBackend("addmm", {input, m1, m2}, Backend::DPCPP);
+    TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
+  }
+
+  Tensor result;
+  if(input.is_quantized()){
+    result = _empty_affine_quantized({0},
+              device(kDPCPP).dtype(input.scalar_type()),
+              1.f,
+              static_cast<int>(0),
+              MemoryFormat::Contiguous);
+  } else if (m1.scalar_type() == at::ScalarType::BFloat16){
+    // align with bf16 input
+    result = at::empty({0}, m1.options());
+  } else {
+    result = at::empty({0}, input.options());
+  }
+
+  if(m1.is_quantized()){
+    impl::gemm_broadcast(result, m1, m2, attr, input);
+  } else {
+    impl::gemm_broadcast(
+    result,
+    m1,
+    m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+    // bias convert to fp32 for accuracy when input is fp16 or bf16
+    attr,
+    input.scalar_type() == ScalarType::Half ||
+            input.scalar_type() == ScalarType::BFloat16
+        ? input.to(ScalarType::Float) : input);
+
+  }
+
+  return result;
+}
+
 Tensor addmv(
-    const Tensor & self, 
-    const Tensor & mat, 
-    const Tensor & vec, 
-    at::Scalar beta, 
+    const Tensor & self,
+    const Tensor & mat,
+    const Tensor & vec,
+    at::Scalar beta,
     at::Scalar alpha) {
   TORCH_CHECK(self.dim() == 1, "expected 1D tensor");
   TORCH_CHECK(mat.dim() == 2, "expected 2D tensor");
@@ -556,10 +747,10 @@ Tensor addmv(
 }
 
 Tensor& addmv_(
-    Tensor & self, 
-    const Tensor & mat, 
-    const Tensor & vec, 
-    at::Scalar beta, 
+    Tensor & self,
+    const Tensor & mat,
+    const Tensor & vec,
+    at::Scalar beta,
     at::Scalar alpha) {
   TORCH_CHECK(self.dim() == 1, "expected 1D tensor");
   TORCH_CHECK(mat.dim() == 2, "expected 2D tensor");

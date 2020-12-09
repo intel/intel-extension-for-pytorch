@@ -25,6 +25,14 @@ PYBIND11_MODULE(torch_ipex, m) {
       },
       "fused linear with relu opt. on Intel device");
 
+  m.def("linear_sigmoid",
+      [](const at::Tensor & input,
+         const at::Tensor & weight,
+         const at::Tensor & bias) {
+        return at::AtenIpexTypeDPCPP::linear_sigmoid(input, weight, bias);
+      },
+      "fused linear with sigmoid opt. on Intel device");
+
   m.def("mul_add",
       [](const at::Tensor & self,
         const at::Tensor & other,
