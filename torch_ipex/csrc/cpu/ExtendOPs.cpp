@@ -2,6 +2,7 @@
 #include "../utils.h"
 #include "CustomOPs.h"
 #include "DevOPs.h"
+#include "FusionOPs.h"
 #include "aten/aten.hpp"
 #include "bf16/vec/bf16_vec_kernel.h"
 #include "dil/dil.hpp"
@@ -579,12 +580,21 @@ std::vector<at::Tensor> AtenIpexTypeExt::gru(
   return {outputs[0], outputs[1]};
 }
 
+at::Tensor AtenIpexTypeExt::linear_relu(const at::Tensor &input,
+                                   const at::Tensor &weight,
+                                   const c10::optional<at::Tensor> &bias) {
+  if (bias.has_value()) 
+    return cpu::AtenIpexJITDev::dil_linear_fuse_eltwise(input, weight, bias.value(), dil::attr_t::fuse_relu());
+  return cpu::AtenIpexJITDev::dil_linear_fuse_eltwise(input, weight, at::Tensor(), dil::attr_t::fuse_relu());
+}
+
 } // namespace torch_ipex
 
 namespace {
 static auto dispatch =
     torch::RegisterOperators()
         .op("torch_ipex::linear", &torch_ipex::AtenIpexTypeExt::linear)
+        .op("torch_ipex::linear_relu", &torch_ipex::AtenIpexTypeExt::linear_relu)
         .op("torch_ipex::max_pool2d",
             [](const at::Tensor &self, c10::List<int64_t> kernel_size,
                c10::List<int64_t> stride, c10::List<int64_t> padding,

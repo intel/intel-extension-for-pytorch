@@ -26,6 +26,7 @@
 #include "cpu/MlpOPs.h"
 #include "cpu/ExternalOPs.h"
 #include "quantization/Observer.h"
+#include "cpu/FusionOPs.h"
 
 namespace torch_ipex {
 namespace {
@@ -186,6 +187,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("roi_align_forward", &IpexExternal::ROIAlign_forward);
   m.def("roi_align_backward", &IpexExternal::ROIAlign_backward);
   m.def("nms", &IpexExternal::nms);
+  m.def("linear_relu", &AtenIpexTypeExt::linear_relu);
 }
 
 }  // namespace

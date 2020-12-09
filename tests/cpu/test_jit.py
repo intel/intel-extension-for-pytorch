@@ -828,6 +828,18 @@ class Tester(TestCase):
             torch.rand(32, 3, 64, 64),
             kind_not_in_graph="ipex::conv2d_sum")
 
+    def test_manmually_fused_linear_relu(self):
+        m =  LinearRelu(3, 32, bias=True).to(ipex.DEVICE).eval()
+        x = torch.rand(32, 3).to(ipex.DEVICE)
+        with torch.no_grad():
+            result = m(x)
+        fused_m = ipex.LinearRelu(3, 32)
+        fused_m.weight = m.linear.weight
+        fused_m.bias = m.linear.bias
+        with torch.no_grad():
+            fused_result = fused_m(x)
+        self.assertEqual(fused_result, result)
+
 
 if __name__ == '__main__':
     torch.manual_seed(2020)
