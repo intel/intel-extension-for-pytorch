@@ -386,16 +386,16 @@ static void dnnl_cat(
 
     memory::dims input_tz = dims;
     auto data_t = dt_to_dnnl(cat_tensors[i].scalar_type());
-    auto format_any = get_dnnl_default_format(cat_tensors[i].dim());
+    auto format_plain = get_dnnl_default_format(cat_tensors[i].dim());
     
     memory::desc tensor_md;
     if (!lazy_reorder_enabled()) {
-      tensor_md = memory::desc({input_tz}, data_t, format_any);
+      tensor_md = memory::desc({input_tz}, data_t, format_plain);
     } else {
       auto input_ctx =
           at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(cat_tensors[i]);
       tensor_md = input_ctx.is_plain() ?
-          memory::desc({input_tz}, data_t, format_any) :
+          memory::desc({input_tz}, data_t, format_plain) :
           input_ctx.meta();
     }
     cat_tensors_md.push_back(tensor_md);
@@ -406,8 +406,8 @@ static void dnnl_cat(
   }
    
   auto data_t = dt_to_dnnl(cat_tensors[0].scalar_type());
-  auto format_any = get_dnnl_default_format(cat_tensors[0].dim());
-  auto output_md = memory::desc(output_dims, data_t, format_any);
+  auto format_plain = get_dnnl_default_format(cat_tensors[0].dim());
+  auto output_md = memory::desc(output_dims, data_t, format_plain);
   auto concat_pd = concat::primitive_desc(
       output_md, static_cast<int>(dimension), cat_tensors_md, engine);
 
@@ -423,11 +423,16 @@ static void dnnl_cat(
         output_md, engine, output.data_ptr());
   } else {
     auto expected_output_md = concat_pd.dst_desc();
+    if (output_md != expected_output_md) {
       // reallocate memory for some blk fmt
       output = at::AtenIpexTypeXPU::empty_opaque_tensor(
           expected_output_md, cat_tensors[0].options(), c10::nullopt);
       output_usr_memory = dpcpp_onednn_memory(
           expected_output_md, engine, output.data_ptr());
+    } else {
+      output_usr_memory = dpcpp_onednn_memory(
+          output_md, engine, output.data_ptr());
+    }
   }
 
   std::unordered_map<int, memory> args = {
@@ -463,12 +468,16 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
     }
   }
 
+#ifdef USE_ONEDNN_CAT
   // DNNL cat does not support double datatype now.
   if (skip_dnnl_cat) {
     impl::cat(out, tensors, tensors.size(), dim);
   } else {
     impl::dnnl_cat(out, tensors, tensors.size(), dim);
   }
+#else
+  impl::cat(out, tensors, tensors.size(), dim);
+#endif
   return out;
 }
 
