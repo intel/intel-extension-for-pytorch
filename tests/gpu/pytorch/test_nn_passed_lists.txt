@@ -1,7 +1,6 @@
 test_nn.py::TestNNDeviceTypeXPU::test_AdaptiveMaxPool3d_indices_xpu_bfloat16
 test_nn.py::TestNNDeviceTypeXPU::test_AdaptiveMaxPool3d_indices_xpu_float16
 test_nn.py::TestNNDeviceTypeXPU::test_AdaptiveMaxPool3d_indices_xpu_float32
-test_nn.py::TestNNDeviceTypeXPU::test_CTCLoss_xpu_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_Conv2d_naive_groups_xpu_float32
 test_nn.py::TestNNDeviceTypeXPU::test_Dropout2d_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_Dropout3d_xpu
@@ -12,7 +11,6 @@ test_nn.py::TestNNDeviceTypeXPU::test_MaxPool3d_indices_xpu_float16
 test_nn.py::TestNNDeviceTypeXPU::test_MaxPool3d_indices_xpu_float32
 test_nn.py::TestNNDeviceTypeXPU::test_activations_bfloat16_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_conv_cudnn_nhwc_support_xpu_float32
-test_nn.py::TestNNDeviceTypeXPU::test_conv_cudnn_nhwc_support_xpu_float64
 test_nn.py::TestNNDeviceTypeXPU::test_conv_noncontig_weights_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_embedding_padding_idx_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_empty_dropout_xpu
@@ -25,7 +23,6 @@ test_nn.py::TestNNDeviceTypeXPU::test_max_pool_nan_xpu_float32
 test_nn.py::TestNNDeviceTypeXPU::test_multi_margin_loss_errors_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_multihead_attention_dtype_xpu_float16
 test_nn.py::TestNNDeviceTypeXPU::test_multihead_attention_dtype_xpu_float32
-test_nn.py::TestNNDeviceTypeXPU::test_multihead_attention_dtype_xpu_float64
 test_nn.py::TestNNDeviceTypeXPU::test_nll_loss_mismatched_batch_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_nll_loss_out_of_bounds_ignore_index_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_nn_scalars_xpu
