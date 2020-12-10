@@ -34,6 +34,7 @@ test_nn.py::TestNNDeviceTypeDPCPP::test_pool_invalid_size_dpcpp_bfloat16
 test_nn.py::TestNNDeviceTypeDPCPP::test_pool_invalid_size_dpcpp_float16
 test_nn.py::TestNNDeviceTypeDPCPP::test_pool_invalid_size_dpcpp_float32
 test_nn.py::TestNNDeviceTypeDPCPP::test_pool_large_size_dpcpp_float16
+test_nn.py::TestNNDeviceTypeDPCPP::test_pool_large_size_dpcpp_float32
 test_nn.py::TestNNDeviceTypeDPCPP::test_rnn_retain_variables_dpcpp_float32
 test_nn.py::TestNNDeviceTypeDPCPP::test_softmax_bfloat16_dpcpp
 test_nn.py::TestNNDeviceTypeDPCPP::test_softmax_dpcpp_float16

@@ -10019,8 +10019,7 @@ class TestNNDeviceType(NNTestCase):
                 res = fn(x, 1 if adaptive else 3)
                 self.assertTrue(math.isnan(res.item()))
 
-    # Temp remove troch.float from DPCPP due to long time process hang but case passed...
-    @dtypesIfDPCPP(torch.half, torch.bfloat16)
+    @dtypesIfDPCPP(torch.half, torch.float, torch.bfloat16)
     @dtypes(torch.float)
     def test_pool_large_size(self, device, dtype):
         for op in ('max', 'avg'):
