@@ -86,6 +86,8 @@ Tensor& add_out(
       _self.scalar_type() == ScalarType::Float &&
       _other.scalar_type() == ScalarType::Float &&
       _self.dim() > 0 && _other.dim() > 0 &&
+      _self.dim() == _other.dim() &&
+      _self.is_contiguous() && _other.is_contiguous() &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&
@@ -113,6 +115,8 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
       _self.scalar_type() == ScalarType::Float &&
       _other.scalar_type() == ScalarType::Float &&
       _self.dim() > 0 && _other.dim() > 0 &&
+      _self.dim() == _other.dim() &&
+      _self.is_contiguous() && _other.is_contiguous() &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&

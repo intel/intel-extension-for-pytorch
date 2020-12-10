@@ -86,29 +86,16 @@ static inline Tensor bin(
     md2 = tar_md;
   }
 
-  auto mdo = tar_md;
-  if (output.defined()) {
-    auto output_ctx = DPCPPTensorContext::get_tensor_ctx(output);
-    if(lazy_reorder_enabled()) {
-      mdo = output_ctx.is_plain() ? md1 : output_ctx.meta();
-    } else {
-      mdo = output_ctx.is_plain() ?
-                      memory::desc(get_onednn_dims(output),
-                                  get_onednn_dtype(output),
-                                  get_onednn_strides(output)) :
-                      output_ctx.meta();
-    }
-  } else {
+  // 1. output: undefined, lazy_reorder: off
+  // 2. output: undefined, lazy_reorder: on, output: plain
+  if (!output.defined() && tar_ctx.is_plain())
+    output = at::empty_like(t1);
+  // 1. output: undefined, lazy_reorder: on, output: block
+  // 2. output: defined, lazy_reorder: on, output block
+  else if (lazy_reorder_enabled() && !tar_ctx.is_plain())
     output = empty_opaque_tensor(tar_md, t1.options(), c10::nullopt);
-  }
 
-  Tensor _output;
-  auto mo_usr = dpcpp_onednn_memory(mdo, engine, output.data_ptr());
-  auto mo = mo_usr;
-  if (mdo != tar_md) {
-    _output = at::empty_like(t1);
-    mo = dpcpp_onednn_memory(tar_md, engine, _output.data_ptr());
-  }
+  auto mo = dpcpp_onednn_memory(tar_md, engine, output.data_ptr());
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
@@ -127,17 +114,14 @@ static inline Tensor bin(
 #endif
 
   if (t3.defined()) {
-    DPCPP_ONEDNN_EXEC(prim, strm,
+    prim.execute(strm,
                 {{DNNL_ARG_SRC_0, m1},
                  {DNNL_ARG_SRC_1, m2},
                  {DNNL_ARG_ATTR_MULTIPLE_POST_OP(0) | DNNL_ARG_SRC_1, m3_usr},
                  {DNNL_ARG_DST, mo}});
   } else {
-    DPCPP_ONEDNN_EXEC(
-        prim, strm, {{DNNL_ARG_SRC_0, m1}, {DNNL_ARG_SRC_1, m2}, {DNNL_ARG_DST, mo}});
+    DPCPP_ONEDNN_EXEC(prim, strm, {{DNNL_ARG_SRC_0, m1}, {DNNL_ARG_SRC_1, m2}, {DNNL_ARG_DST, mo}});
   }
-  if (mdo != tar_md)
-    DPCPP_ONEDNN_EXEC(reorder(mo, mo_usr), strm, {{DNNL_ARG_FROM, mo}, {DNNL_ARG_TO, mo_usr}});
 
   return output;
 }
