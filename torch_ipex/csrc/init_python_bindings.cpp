@@ -187,6 +187,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("roi_align_forward", &IpexExternal::ROIAlign_forward);
   m.def("roi_align_backward", &IpexExternal::ROIAlign_backward);
   m.def("nms", &IpexExternal::nms);
+  m.def("batch_score_nms", &IpexExternal::batch_score_nms);
   m.def("linear_relu", &AtenIpexTypeExt::linear_relu);
 }
 

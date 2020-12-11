@@ -8,7 +8,7 @@ from .save import *
 from .to import *
 from .roi_align import ROIAlign
 from .roi_align import roi_align
-from .nms import nms
+from .nms import *
 from .lstm import *
 from .rnn import *
 from .gru import *

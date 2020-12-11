@@ -12,7 +12,7 @@ namespace torch_ipex {
 template <typename scalar_t>
 at::Tensor nms_cpu_kernel(const at::Tensor& dets,
                           const at::Tensor& scores,
-                          const float threshold) {
+                          const float threshold, float pixel=1) {
   AT_ASSERTM(!dets.type().is_cuda(), "dets must be a CPU tensor");
   AT_ASSERTM(!scores.type().is_cuda(), "scores must be a CPU tensor");
   AT_ASSERTM(dets.type() == scores.type(), "dets should have the same type as scores");
@@ -26,7 +26,7 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
   auto x2_t = dets.select(1, 2).contiguous();
   auto y2_t = dets.select(1, 3).contiguous();
 
-  at::Tensor areas_t = (x2_t - x1_t + 1) * (y2_t - y1_t + 1);
+  at::Tensor areas_t = (x2_t - x1_t + pixel) * (y2_t - y1_t + pixel);
 
   auto order_t = std::get<1>(scores.sort(0, /* descending=*/true));
 
@@ -40,13 +40,6 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
   auto x2 = x2_t.data<scalar_t>();
   auto y2 = y2_t.data<scalar_t>();
   auto areas = areas_t.data<scalar_t>();
-#ifdef _OPENMP
-#if (_OPENMP >= 201307)
-# pragma omp parallel for simd
-#else
-# pragma omp parallel for schedule(static)
-#endif
-#endif
   for (int64_t _i = 0; _i < ndets; _i++) {
     auto i = order[_i];
     if (suppressed[i] == 1)
@@ -57,6 +50,13 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
     auto iy2 = y2[i];
     auto iarea = areas[i];
 
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+# pragma omp parallel for simd
+#else
+# pragma omp parallel for schedule(static)
+#endif
+#endif
     for (int64_t _j = _i + 1; _j < ndets; _j++) {
       auto j = order[_j];
       if (suppressed[j] == 1)
@@ -66,8 +66,8 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
       auto xx2 = std::min(ix2, x2[j]);
       auto yy2 = std::min(iy2, y2[j]);
 
-      auto w = std::max(static_cast<scalar_t>(0), xx2 - xx1 + 1);
-      auto h = std::max(static_cast<scalar_t>(0), yy2 - yy1 + 1);
+      auto w = std::max(static_cast<scalar_t>(0), xx2 - xx1 + pixel);
+      auto h = std::max(static_cast<scalar_t>(0), yy2 - yy1 + pixel);
       auto inter = w * h;
       auto ovr = inter / (iarea + areas[j] - inter);
       if (ovr >= threshold)
@@ -77,12 +77,97 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
   return at::nonzero(suppressed_t == 0).squeeze(1);
 }
 
+void remove_empty(std::vector<at::Tensor>& candidate) {
+  candidate.erase(std::remove_if(
+    candidate.begin(), candidate.end(),
+    [](const at::Tensor& x) { 
+        return !x.defined();
+    }), candidate.end());
+}
+
+template <typename scalar_t>
+std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_cpu_kernel(const at::Tensor& dets,
+                          const at::Tensor& scores,
+                          const float threshold, int max_num=200) {
+  // Reference to: https://github.com/mlcommons/inference/blob/0f096a18083c3fd529c1fbf97ebda7bc3f1fda70/others/cloud/single_stage_detector/pytorch/utils.py#L163
+  auto ndets = dets.size(0);
+  auto nscore = scores.size(1);
+
+  std::vector<at::Tensor> scores_split = scores.split(1, 1);
+
+  std::vector<at::Tensor> bboxes_out(nscore);
+  std::vector<at::Tensor> scores_out(nscore);
+  std::vector<at::Tensor> labels_out(nscore);
+
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+# pragma omp parallel for simd
+#else
+# pragma omp parallel for schedule(static)
+#endif
+#endif
+  for (int64_t i = 0; i < nscore; i++) {
+    if (i == 0) {
+      bboxes_out[i] = at::Tensor();
+      scores_out[i] = at::Tensor();
+      labels_out[i] = at::Tensor();      
+      continue;
+    }
+    at::Tensor score = scores_split[i].squeeze(1);
+
+    at::Tensor mask_index = at::nonzero(score > 0.05).squeeze(1);
+    at::Tensor bboxes = at::index_select(dets, /*dim*/0, mask_index);
+    score = at::index_select(score, /*dim*/0, mask_index);
+    
+    if (score.size(0) == 0) {
+      bboxes_out[i] = at::Tensor();
+      scores_out[i] = at::Tensor();
+      labels_out[i] = at::Tensor();
+      continue;
+    }
+
+    at::Tensor score_sorted, score_idx_sorted;
+    std::tie(score_sorted, score_idx_sorted) = score.sort(0);
+
+    // # select max_num indices
+    score_idx_sorted = score_idx_sorted.slice(/*dim*/0, /*start*/std::max(score.size(0) - max_num, static_cast<int64_t>(0)), /*end*/score.size(0));
+
+    at::Tensor keep = nms_cpu_kernel<scalar_t>(at::index_select(bboxes, /*dim*/0, score_idx_sorted), at::index_select(score, /*dim*/0, score_idx_sorted), threshold, /*pixel*/0);
+    at::Tensor candidates = at::index_select(score_idx_sorted, /*dim*/0, keep);
+
+    bboxes_out[i] = at::index_select(bboxes, /*dim*/0, candidates);
+    scores_out[i] = at::index_select(score, /*dim*/0, candidates);
+    // TODO optimize the fill_
+    labels_out[i] = at::empty({candidates.sizes()}).fill_(i);
+  }
+
+  remove_empty(bboxes_out);
+  remove_empty(scores_out);
+  remove_empty(labels_out);
+
+  at::Tensor bboxes_out_ = at::cat(bboxes_out, 0);
+  at::Tensor labels_out_ = at::cat(labels_out, 0);
+  at::Tensor scores_out_ = at::cat(scores_out, 0);
+
+  return std::make_tuple(bboxes_out_, labels_out_, scores_out_);
+}
+
 at::Tensor nms_cpu(const at::Tensor& dets,
                const at::Tensor& scores,
                const float threshold) {
   at::Tensor result;
   AT_DISPATCH_FLOATING_TYPES(dets.type(), "nms", [&] {
     result = nms_cpu_kernel<scalar_t>(dets, scores, threshold);
+  });
+  return result;
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_cpu(const at::Tensor& dets,
+               const at::Tensor& scores,
+               const float threshold) {
+  std::tuple<at::Tensor, at::Tensor, at::Tensor> result;
+  AT_DISPATCH_FLOATING_TYPES(dets.type(), "batch_score_nms", [&] {
+    result = batch_score_nms_cpu_kernel<scalar_t>(dets, scores, threshold);
   });
   return result;
 }
@@ -103,5 +188,23 @@ at::Tensor IpexExternal::nms(const at::Tensor& dets,
   auto&& _ipex_result = nms_cpu(_ipex_dets, _ipex_scores, threshold);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> IpexExternal::batch_score_nms(const at::Tensor& dets,
+               const at::Tensor& scores,
+               const float threshold) {
+#if defined(IPEX_DISP_OP)
+  printf("IpexExternal::batch_score_nms\n");
+#endif
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("IpexExternal::batch_score_nms", std::vector<c10::IValue>({dets, scores}), torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dets.layout() == c10::kStrided);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(scores.layout() == c10::kStrided);
+  auto&& _ipex_dets = bridge::shallowFallbackToCPUTensor(dets);
+  auto&& _ipex_scores = bridge::shallowFallbackToCPUTensor(scores);
+  auto&& _ipex_result = batch_score_nms_cpu(_ipex_dets, _ipex_scores, threshold);
+  static_cast<void>(_ipex_result); // Avoid warnings in case not used
+  return std::tuple<at::Tensor,at::Tensor,at::Tensor>(bridge::shallowUpgradeToDPCPPTensor(std::get<0>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<1>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<2>(_ipex_result)));
 }
 }
