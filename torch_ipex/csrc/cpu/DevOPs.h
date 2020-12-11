@@ -108,6 +108,7 @@ class AtenIpexCPUDev {
   static at::Tensor dil_upsample_bilinear2d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w);
   static at::Tensor dil_upsample_trilinear3d(const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w);
   static at::Tensor dil_upsample_trilinear3d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w);
+  static at::Tensor dil_unsqueeze(const at::Tensor& self, int64_t dim);
 };
 
 }  // namespace cpu

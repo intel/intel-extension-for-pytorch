@@ -1269,6 +1269,15 @@ class TestTensorShape(TestCase):
             x_dpcpp_view_clone = x_dpcpp_view.clone()
             self.assertEqual(x_cpu_view_clone, x_dpcpp_view_clone)
 
+    def test_unsqueeze(self):
+        with AutoDNNL(True):
+            rand_seed = int(get_rand_seed())
+            print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+            torch.manual_seed(rand_seed)
+            x = torch.randn(2, 3, 4, dtype=torch.float32)
+            x_dpcpp = x.clone().to(device=device)
+            self.assertEqual(x_dpcpp.unsqueeze(1), x.unsqueeze(1))
+
 class TestSoftMax(TestCase):
     def test_softmax(self):
         with AutoDNNL(True):

@@ -2682,5 +2682,18 @@ at::Tensor AtenIpexCPUDev::dil_upsample_trilinear3d_backward(const at::Tensor & 
   return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_linear, scales_d, scales_h, scales_w);
 }
 
+at::Tensor AtenIpexCPUDev::dil_unsqueeze(const at::Tensor& self, int64_t dim) {
+  DEBUG("AtenIpexCPUDev::dil_unsqueeze\n");
+  dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
+
+  dim = at::maybe_wrap_dim(dim, self.dim() + 1);
+  auto sizes = self.sizes().vec();
+  auto strides = self.strides().vec();
+  int64_t new_stride = dim >= self.dim() ? 1 : sizes[dim] * strides[dim];
+  sizes.insert(sizes.begin() + dim, 1);
+  strides.insert(strides.begin() + dim, new_stride);
+  return dil_as_strided(self, sizes, strides, self.storage_offset());
+}
+
 }  // namespace cpu
 }  // namespace torch_ipex

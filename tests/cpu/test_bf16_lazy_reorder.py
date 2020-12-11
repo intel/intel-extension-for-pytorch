@@ -2486,7 +2486,8 @@ class TestRNN(TestCase):
             hy.sum().backward(retain_graph=True)
             hy_dpcpp.sum().backward(retain_graph=True)
             self.assertEqual(h0_dpcpp.grad.to('cpu'), h0.grad, 0.05)
-    
+
+    @unittest.skip("Not ready yet")
     def test_rnn_relu(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
