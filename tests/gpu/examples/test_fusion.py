@@ -31,7 +31,37 @@ class Conv2dSigmoid(torch.nn.Module):
         return torch.sigmoid(self.conv(x))
 
 
+class MatmulSum(torch.nn.Module):
+    def __init__(self):
+        super(MatmulSum, self).__init__()
+
+
+    def forward(self, m1, m2, a):
+        y = torch.matmul(m1, m2)
+        y += a
+        return y
+
+
 class TestNNMethod(TestCase):
+    def test_matmul_sum_fusion(self, dtype=torch.float):
+        m1 = torch.randn([4, 2], device=cpu_device)
+        m2 = torch.randn([2, 2], device=cpu_device)
+        acc = torch.randn([2], device=cpu_device)
+
+        m1_dpcpp = m1.to("dpcpp")
+        m2_dpcpp = m2.to("dpcpp")
+        acc_dpcpp = acc.to("dpcpp")
+        model = MatmulSum()
+        raw = model(m1, m2, acc)
+        print("raw: ", raw)
+        modelJit = torch.jit.script(model)
+        with torch.no_grad():
+            real = modelJit(m1_dpcpp, m2_dpcpp, acc_dpcpp)
+            print("real: ", real.cpu())
+        self.assertEqual(raw, real.to(cpu_device))
+        del modelJit
+
+
     def test_conv_relu_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
         a1 = torch.ones([1, 2, 1, 1], device=cpu_device)

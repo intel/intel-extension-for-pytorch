@@ -28,6 +28,9 @@ at::Tensor conv2d_sigmoid(
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
     int64_t groups);
 
+at::Tensor matmul_sum(at::Tensor& accumu,
+    const at::Tensor& m1, const at::Tensor& m2, at::Scalar alpha);
+
 at::Tensor mul_add(const at::Tensor& self,
     const at::Tensor& other, const at::Tensor& accumu, at::Scalar alpha);
 

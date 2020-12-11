@@ -173,6 +173,23 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
+      "dpcpp::matmul_sum(Tensor m1, Tensor m2, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
+      [] (const Node* node) ->Operation {
+        return [] (Stack* stack) {
+          auto output = (std::move(peek(stack, 2, 4))).toTensor();
+          auto result = torch::jit::dpcpp::matmul_sum(
+              output,
+              (std::move(peek(stack, 0, 4))).toTensor(),
+              (std::move(peek(stack, 1, 4))).toTensor(),
+              (std::move(peek(stack, 3, 4))).toScalar()
+          );
+          drop(stack, 4);
+          pack(stack, std::move(result));
+        };
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
       "dpcpp::mul_add(Tensor self, Tensor other, Tensor accumu, Scalar alpha) -> Tensor",
       [] (const Node* node) ->Operation {
         return [] (Stack* stack) {

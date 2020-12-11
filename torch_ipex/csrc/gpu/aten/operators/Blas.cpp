@@ -1,14 +1,14 @@
 #include <ATen/ATen.h>
 #include <ATen/ExpandUtils.h>
 #include <ATen/record_function.h>
-#include <oneDNN/oneDNN.h>
-
+#include <ATen/CPUApplyUtils.h>
 #include <core/TensorImplUtils.h>
-
 #include <utils/ATDispatch.h>
 
 #include <core/Runtime.h>
+#include <oneDNN/oneDNN.h>
 #include <dnnl.hpp>
+#include <vector>
 
 #include "QUtil.h"
 
@@ -222,8 +222,6 @@ void dnnlGemmImpl(
   auto matmul_p = dnnl::matmul(matmul_pd);
 #endif
 
-
-
 #ifdef USE_GEN12HP_ONEDNN
   memory m1_usr_memory, m2_usr_memory, r_usr_memory;
   memory m1_memory, m2_memory, r_memory;
@@ -345,7 +343,6 @@ void dnnlGemmImpl(
     DPCPPTensorContext::set_tensor_ctx(result, std::move(blk_ctx));
   }
 #endif
-
 }
 
 bool check_broadcast(const Tensor& src, const IntArrayRef& shape){
@@ -790,6 +787,63 @@ Tensor& addmv_(
   return self;
 }
 
+Tensor matmul_sum(
+    Tensor& accumu,
+    const Tensor& m1,
+    const Tensor& m2,
+    at::Scalar beta) {
+  Tensor result, bias;
+
+  TORCH_CHECK(m1.dim() == 2 || m2.dim() == 2, "expected 2D tensor");
+  if (accumu.dim() == 1) {
+    if (beta.to<float>() == 1.0f) {
+      result = at::empty({0}, m1.options());
+      bias = accumu;
+    } else {
+      std::tie(result) = expand_size(
+          accumu, m1.dim() == 2 ? m1.sizes() : m2.sizes());
+    }
+  } else {
+    result = accumu;
+  }
+
+  // collaps a,b,c to axb,c for m1
+  // FIXME: no m2 to collaps so far
+  std::vector<int64_t> m1_shape, r_shape;
+  if (m1.dim() != 2) {
+    for (int i = 0; i < m1.sizes().size() - 1; i++) {
+      m1_shape.push_back(m1.sizes()[i]);
+      r_shape.push_back(m1.sizes()[i]);
+    }
+    m1_shape.push_back(m1.sizes()[m1.sizes().size() - 1]);
+    r_shape.push_back(m2.sizes()[1]);
+
+    std::vector<int64_t> sizes = m1.sizes().vec();
+    std::vector<int64_t> strides = m1.strides().vec();
+    at::collapse_dims(sizes.data(), strides.data(), m1.dim(), m1.dim() - 1);
+    m1.resize_({sizes.data()[0], sizes.data()[1]});
+  }
+
+  matmul_attr_t attr(
+      1.f,
+      beta.to<float>(),
+      0,
+      true);
+
+  impl::gemm_broadcast(
+      result,
+      m1,
+      m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+      attr,
+      bias);
+
+  if (r_shape.size()) {
+    m1.resize_(m1_shape);
+    result.resize_(r_shape);
+  }
+
+  return result;
+}
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
@@ -825,5 +879,4 @@ Tensor addmm(
   return result;
 }
 } // namespace AtenIpexTypeQuantizedXPU
-
 } // namespace at

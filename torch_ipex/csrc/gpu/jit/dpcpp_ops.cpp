@@ -53,6 +53,13 @@ at::Tensor conv2d_sigmoid(
       input, weight, bias, stride, padding, dilation, false, {{0, 0}}, groups);
 }
 
+at::Tensor matmul_sum(at::Tensor& accumu,
+    const at::Tensor& m1, const at::Tensor& m2, at::Scalar alpha) {
+  RECORD_FUNCTION("matmul_sum",
+                  std::vector<c10::IValue>({m1, m2, accumu}));
+  return at::AtenIpexTypeXPU::matmul_sum(accumu, m1, m2, alpha);
+}
+
 at::Tensor mul_add(const at::Tensor& self,
     const at::Tensor& other, const at::Tensor& accumu, at::Scalar alpha) {
   RECORD_FUNCTION("mul_add",
