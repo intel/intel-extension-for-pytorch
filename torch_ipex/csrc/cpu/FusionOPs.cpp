@@ -138,7 +138,7 @@ static at::Tensor& dil_convolution_inplace_fusion(
   auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
   auto weight_contiguous = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
   auto ouput_dil_type = dbl::comm::try_gen_dil_tensor(accumu).get_data_type();
-  auto output_contiguous = (ouput_dil_type == dil::data_type::s8 || accumu.is_contiguous()) ? accumu : accumu.contiguous();
+  auto output_contiguous = (ouput_dil_type == dil::data_type::u8 || ouput_dil_type == dil::data_type::s8 || accumu.is_contiguous()) ? accumu : accumu.contiguous();
 
   std::vector<float> output_scale = {};
   bool quantized = false;
