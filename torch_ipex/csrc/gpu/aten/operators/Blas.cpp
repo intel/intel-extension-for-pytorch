@@ -235,17 +235,17 @@ void dnnlGemmImpl(
     r_memory = dpcpp_onednn_memory(r_md, engine, result.data_ptr());
 
   } else {
-    auto m1_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(m1);
+    auto m1_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m1);
     m1_usr_memory = m1_ctx.is_plain() ?
         dpcpp_onednn_memory(m1_md, engine, m1.data_ptr()) :
         dpcpp_onednn_memory({m1_ctx.meta()}, engine, m1.data_ptr());
 
-    auto m2_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(m2);
+    auto m2_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m2);
     m2_usr_memory = m2_ctx.is_plain() ?
         dpcpp_onednn_memory(m2_md, engine, m2.data_ptr()) :
         dpcpp_onednn_memory({m2_ctx.meta()}, engine, m2.data_ptr());
 
-    auto r_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(result);
+    auto r_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(result);
     r_usr_memory = r_ctx.is_plain() ?
         dpcpp_onednn_memory(r_md, engine, result.data_ptr()) :
         dpcpp_onednn_memory({r_ctx.meta()}, engine, result.data_ptr());
@@ -254,7 +254,7 @@ void dnnlGemmImpl(
     Tensor m1_;
     m1_memory = m1_usr_memory;
     if (m1_usr_memory.get_desc() != expected_m1_md) {
-      m1_ = at::AtenIpexTypeDPCPP::empty({expected_m1_md.get_size() / m1.itemsize()},
+      m1_ = at::AtenIpexTypeXPU::empty({expected_m1_md.get_size() / m1.itemsize()},
       m1.options(), c10::nullopt);
       m1_memory = dpcpp_onednn_memory(expected_m1_md, engine, m1_.data_ptr());
 #ifdef USE_PRIMITIVE_CACHE
@@ -276,7 +276,7 @@ void dnnlGemmImpl(
         m2_opt = empty_opaque_tensor(expected_m2_md, m2.options(), c10::nullopt);
         m2_memory = dpcpp_onednn_memory(expected_m2_md, engine, m2_opt.data_ptr());
       } else {
-        m2_ = at::AtenIpexTypeDPCPP::empty(
+        m2_ = at::AtenIpexTypeXPU::empty(
           {expected_m2_md.get_size() / m2.itemsize()}, m2.options(), c10::nullopt);
         m2_memory = dpcpp_onednn_memory(expected_m2_md, engine, m2_.data_ptr());
       }
@@ -292,9 +292,9 @@ void dnnlGemmImpl(
       if (weight_cache_enabled()) {
         strm.wait();
         // FIXME: thread safty
-        auto m2_opt_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::
+        auto m2_opt_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::
             release_tensor_ctx(m2_opt);
-        at::AtenIpexTypeDPCPP::DPCPPTensorContext::
+        at::AtenIpexTypeXPU::DPCPPTensorContext::
             set_tensor_ctx(m2, std::move(m2_opt_ctx));
       }
     }
@@ -842,7 +842,6 @@ Tensor addmm(
   }
 
   if(m1.is_quantized()){
-    std::cout << "johnlu here " << std::endl;
     impl::gemm_broadcast(result, m1, m2, attr, input);
   } else {
     impl::gemm_broadcast(
