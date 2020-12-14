@@ -1,5 +1,0 @@
-test_nn.py::TestNNDeviceTypeXPU::test_CTCLoss_xpu_xpu
-test_nn.py::TestNNDeviceTypeXPU::test_conv_cudnn_nhwc_support_xpu_float64
-test_nn.py::TestNNDeviceTypeXPU::test_multihead_attention_dtype_xpu_float64
-
-
