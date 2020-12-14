@@ -491,6 +491,10 @@ def parse_args():
     parser.add_argument("--no_python", default=False, action="store_true",
                         help="Do not prepend the --program script with \"python\" - just exec "
                              "it directly. Useful when the script is not a Python script.")
+    parser.add_argument("--print_env", default=False, action="store_true",
+                        help="print modified env configuration")
+    parser.add_argument("--dnnverbose", default=False, action="store_true",
+                        help="enable verbose log for OneDNN and OneMKL")
     add_memory_allocator_params(parser)
     add_kmp_iomp_params(parser)
      
@@ -514,11 +518,16 @@ def main():
         raise RuntimeError("Windows platform is not supported!!!")
 
     args = parse_args()
+    if args.dnnverbose:
+        os.environ["DNNL_VERBOSE"] = "1"
+        os.environ["MKLDNN_VERBOSE"] = "1"
+        os.environ["MKL_VERBOSE"] = "1"
     if args.distributed:
         mpi_dist_launch(args)
     else:
         launch(args)
-    if os.environ.get("DUMP_LAUNCH_ARGS",False):
+
+    if args.print_env:
         print(f'Launch settings: ')
         for x in sorted(set(os.environ.keys()) - env_before):
             print(f'{x}={os.environ[x]}')
