@@ -25,7 +25,7 @@ option(BUILD_NO_L0_ONEDNN "Build oneDNN without LevelZero support" ON)
 option(BUILD_INTERNAL_DEBUG "Use internal debug code path" OFF)
 cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "BUILD_INTERNAL_DEBUG" OFF)
 
-include(cmake/GPU.cmake)
+add_subdirectory(./torch_ipex/csrc)
 
 function (print_configuration_summary)
   get_directory_property(CMAKE_COMPILE_DEFINITIONS DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_DEFINITIONS)

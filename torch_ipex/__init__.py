@@ -169,7 +169,7 @@ def _onemkl_is_enabled():
     return _C._onemkl_is_enabled()
 
 def _double_kernel_disabled():
-    return torch_ipex._double_kernel_disabled()
+    return _C._double_kernel_disabled()
 
 
 def device_count() -> int:

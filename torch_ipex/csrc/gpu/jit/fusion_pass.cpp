@@ -26,7 +26,7 @@ struct hash<std::pair<Symbol, Symbol>> {
 };
 }
 
-namespace torch { namespace jit {
+namespace torch_ipex { namespace jit {
 
 //
 // The main goal of MKL-DNN fusion is to limit bandwidth wasting.
@@ -357,12 +357,15 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
 
 void InitFusionPass() {
   RegisterPreFusionPass pass_3([](std::shared_ptr<Graph>& g) {
-    torch::jit::FusionPass(g);
+      torch_ipex::jit::FusionPass(g);
   });
 }
 
+}} // namespace torch_ipex::jit
+
+
+namespace torch { namespace jit {
 RegisterPreFusionPass::RegisterPreFusionPass(GraphPass p) {
   registerPrePass(std::move(p));
 }
-
 }} // namespace torch::jit

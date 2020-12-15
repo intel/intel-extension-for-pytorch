@@ -7,38 +7,36 @@
 
 PyObject *THDPStreamClass = nullptr;
 
-static PyObject * THDPStream_pynew(
-  PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+static PyObject * THDPStream_pynew(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
   HANDLE_TH_ERRORS
-
-      int current_device = 0;
+  int current_device = 0;
 //      THCudaCheck(cudaGetDevice(&current_device));
 
-      int priority = 0;
-      uint64_t cdata = 0;
+  int priority = 0;
+  uint64_t cdata = 0;
 
-      static char *kwlist[] = {"priority", "_cdata", nullptr};
-      if (!PyArg_ParseTupleAndKeywords(
-        args, kwargs, "|iK", kwlist, &priority, &cdata)) {
-        return nullptr;
-      }
+  static char *kwlist[] = {"priority", "_cdata", nullptr};
+  if (!PyArg_ParseTupleAndKeywords(
+    args, kwargs, "|iK", kwlist, &priority, &cdata)) {
+    return nullptr;
+  }
 
-      THPObjectPtr ptr(type->tp_alloc(type, 0));
-      if (!ptr) {
-        return nullptr;
-      }
+  THPObjectPtr ptr(type->tp_alloc(type, 0));
+  if (!ptr) {
+    return nullptr;
+  }
 
-      at::dpcpp::DPCPPStream stream =
-        cdata ?
-        at::dpcpp::DPCPPStream::unpack(cdata) :
-        at::dpcpp::getDPCPPStreamFromPool(
-          /* isHighPriority */ priority < 0 ? true : false, current_device);
+  at::dpcpp::DPCPPStream stream =
+    cdata ?
+    at::dpcpp::DPCPPStream::unpack(cdata) :
+    at::dpcpp::getDPCPPStreamFromPool(
+      /* isHighPriority */ priority < 0 ? true : false, current_device);
 
-      THDPStream* self = (THDPStream *)ptr.get();
-      self->base.cdata = stream.pack();
-      new (&self->dpcpp_stream) at::dpcpp::DPCPPStream(stream);
+  THDPStream* self = (THDPStream *)ptr.get();
+  self->base.cdata = stream.pack();
+  new (&self->dpcpp_stream) at::dpcpp::DPCPPStream(stream);
 
-      return (PyObject *)ptr.release();
+  return (PyObject *)ptr.release();
   END_HANDLE_TH_ERRORS
 }
 
@@ -49,52 +47,52 @@ static void THDPStream_dealloc(THDPStream *self) {
 
 static PyObject * THDPStream_get_device(THDPStream *self, void *unused) {
   HANDLE_TH_ERRORS
-      return THPDevice_New(self->dpcpp_stream.device());
+  return THPDevice_New(self->dpcpp_stream.device());
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject * THDPStream_get_dpcpp_stream(THDPStream *self, void *unused) {
   HANDLE_TH_ERRORS
-      return PyLong_FromLong(self->dpcpp_stream.stream());
+  return PyLong_FromLong(self->dpcpp_stream.stream());
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject * THDPStream_get_priority(THDPStream *self, void *unused) {
   HANDLE_TH_ERRORS
-//      return PyLong_FromLong(self->dpcpp_stream.priority());
-      return PyLong_FromLong(0);
+//  return PyLong_FromLong(self->dpcpp_stream.priority());
+  return PyLong_FromLong(0);
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject * THDPStream_priority_range() {
   HANDLE_TH_ERRORS
-      int least_priority = 0, greatest_priority = 0;
-//      std::tie(least_priority, greatest_priority) =
-//        at::cuda::CUDAStream::priority_range();
-      return Py_BuildValue("(ii)", least_priority, greatest_priority);
+  int least_priority = 0, greatest_priority = 0;
+//  std::tie(least_priority, greatest_priority) =
+//  at::cuda::CUDAStream::priority_range();
+  return Py_BuildValue("(ii)", least_priority, greatest_priority);
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject * THDPStream_query(THDPStream *self, PyObject *noargs) {
   HANDLE_TH_ERRORS
-//      return PyBool_FromLong(self->dpcpp_stream.query());
-      return PyBool_FromLong(0);
+//  return PyBool_FromLong(self->dpcpp_stream.query());
+  return PyBool_FromLong(0);
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject * THDPStream_synchronize(THDPStream *self, PyObject *noargs) {
   HANDLE_TH_ERRORS
-      {
-        pybind11::gil_scoped_release no_gil;
-//        self->dpcpp_stream.synchronize();
-      }
-      Py_RETURN_NONE;
+  {
+    pybind11::gil_scoped_release no_gil;
+//  self->dpcpp_stream.synchronize();
+  }
+  Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject * THDPStream_eq(THDPStream *self, THDPStream *other) {
   HANDLE_TH_ERRORS
-      return PyBool_FromLong(self->dpcpp_stream == other->dpcpp_stream);
+  return PyBool_FromLong(self->dpcpp_stream == other->dpcpp_stream);
   END_HANDLE_TH_ERRORS
 }
 

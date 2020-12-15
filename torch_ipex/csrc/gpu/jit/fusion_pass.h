@@ -5,12 +5,16 @@
 #include <torch/csrc/jit/passes/pass_manager.h>
 
 namespace torch { namespace jit {
-
 // LEGACY CALL
 struct TORCH_API RegisterPreFusionPass {
   RegisterPreFusionPass(GraphPass p);
 };
-
-void FusionPass(std::shared_ptr<Graph>& graph);
-void InitFusionPass();
 }} // namespace torch::jit
+
+
+namespace torch_ipex { namespace jit {
+using torch::jit::Graph;
+void FusionPass(std::shared_ptr<Graph> &graph);
+
+void InitFusionPass();
+}} // namespace torch_ipex::jit
