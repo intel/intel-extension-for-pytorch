@@ -77,12 +77,14 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
   return at::nonzero(suppressed_t == 0).squeeze(1);
 }
 
-void remove_empty(std::vector<at::Tensor>& candidate) {
-  candidate.erase(std::remove_if(
-    candidate.begin(), candidate.end(),
-    [](const at::Tensor& x) { 
-        return !x.defined();
-    }), candidate.end());
+std::vector<at::Tensor> remove_empty(std::vector<at::Tensor>& candidate) {
+  std::vector<at::Tensor> valid_candidate;
+  for (int64_t i = 0; i < candidate.size(); i++) {
+    if (candidate[i].defined()) {
+      valid_candidate.push_back(candidate[i]);
+    }
+  }
+  return valid_candidate;
 }
 
 template <typename scalar_t>
@@ -106,13 +108,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_cpu_kernel(const 
 # pragma omp parallel for schedule(static)
 #endif
 #endif
-  for (int64_t i = 0; i < nscore; i++) {
-    if (i == 0) {
-      bboxes_out[i] = at::Tensor();
-      scores_out[i] = at::Tensor();
-      labels_out[i] = at::Tensor();      
-      continue;
-    }
+  // skip background (i = 0)
+  for (int64_t i = 1; i < nscore; i++) {
     at::Tensor score = scores_split[i].squeeze(1);
 
     at::Tensor mask_index = at::nonzero(score > 0.05).squeeze(1);
@@ -120,9 +117,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_cpu_kernel(const 
     score = at::index_select(score, /*dim*/0, mask_index);
     
     if (score.size(0) == 0) {
-      bboxes_out[i] = at::Tensor();
-      scores_out[i] = at::Tensor();
-      labels_out[i] = at::Tensor();
       continue;
     }
 
@@ -141,13 +135,13 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_cpu_kernel(const 
     labels_out[i] = at::empty({candidates.sizes()}).fill_(i);
   }
 
-  remove_empty(bboxes_out);
-  remove_empty(scores_out);
-  remove_empty(labels_out);
+  std::vector<at::Tensor> valid_bboxes_out = remove_empty(bboxes_out);
+  std::vector<at::Tensor> valid_scores_out = remove_empty(scores_out);
+  std::vector<at::Tensor> valid_labels_out = remove_empty(labels_out);
 
-  at::Tensor bboxes_out_ = at::cat(bboxes_out, 0);
-  at::Tensor labels_out_ = at::cat(labels_out, 0);
-  at::Tensor scores_out_ = at::cat(scores_out, 0);
+  at::Tensor bboxes_out_ = at::cat(valid_bboxes_out, 0);
+  at::Tensor labels_out_ = at::cat(valid_labels_out, 0);
+  at::Tensor scores_out_ = at::cat(valid_scores_out, 0);
 
   return std::make_tuple(bboxes_out_, labels_out_, scores_out_);
 }
