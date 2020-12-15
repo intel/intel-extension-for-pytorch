@@ -1,11 +1,15 @@
 //
 // Created by johnlu on 2020/10/21.
 //
-#include <Module.h>
-#include <torch/csrc/THP.h>
-#include <Stream.h>
 #include <torch/csrc/Exceptions.h>
+#include <torch/csrc/THP.h>
+
+#include <Module.h>
+#include <Stream.h>
+#include <Storage.h>
 #include <core/Functions.h>
+
+#define ASSERT_TRUE(cmd) if (!(cmd)) return
 
 PyObject* module;
 
@@ -36,19 +40,33 @@ PyObject * THPModule_getDeviceCount_wrap(PyObject *self, PyObject *noargs)
   END_HANDLE_TH_ERRORS
 }
 
+static PyObject * THPModule_initExtension(PyObject *self, PyObject *noargs)
+{
+  HANDLE_TH_ERRORS
+  auto module = THPObjectPtr(PyImport_ImportModule("torch_ipex"));
+  if (!module) throw python_error();
+
+  // Register Storage Python objects with DynamicTypes.cpp
+  THXPStorage_postInit<at::kFloat>(module);
+  THXPStorage_postInit<at::kDouble>(module);
+
+  Py_RETURN_NONE;
+  END_HANDLE_TH_ERRORS
+}
+
 PyObject * THPModule_getCurrentStream_wrap(
   PyObject * /* unused */, PyObject *device_index) {
   HANDLE_TH_ERRORS
-      THPUtils_assert(
-        THPUtils_checkLong(device_index), "invalid argument to getCurrentStream");
-      int64_t device = THPUtils_unpackLong(device_index);
-      return PyLong_FromUnsignedLongLong(
-        at::dpcpp::getCurrentDPCPPStream(device).pack());
+  THPUtils_assert(
+    THPUtils_checkLong(device_index), "invalid argument to getCurrentStream");
+  int64_t device = THPUtils_unpackLong(device_index);
+  return PyLong_FromUnsignedLongLong(
+    at::dpcpp::getCurrentDPCPPStream(device).pack());
   END_HANDLE_TH_ERRORS
 }
 
 static struct PyMethodDef _THCPModule_methods[] = {
-//  {"_cuda_init",        (PyCFunction)THCPModule_initExtension,    METH_NOARGS,  nullptr},
+  {"_initExtension",  (PyCFunction)THPModule_initExtension,   METH_NOARGS,       nullptr},
   {"_setDevice",   (PyCFunction)THPModule_setDevice_wrap,   METH_O,       nullptr},
   {"_getDevice",   (PyCFunction)THPModule_getDevice_wrap,   METH_NOARGS,  nullptr},
   {"_getDeviceCount", (PyCFunction)THPModule_getDeviceCount_wrap, METH_NOARGS, nullptr},
@@ -59,8 +77,11 @@ static struct PyMethodDef _THCPModule_methods[] = {
 void init_module(pybind11::module& m) {
 //  py::object torch = py::module::import("torch");
 //  py::object torch_C = torch.attr("_C");
-  pybind11::module torch_ipex_c = m.def_submodule("_C");
+//  pybind11::module torch_ipex_c = m.def_submodule("_C");
 
-  THDPStream_init(torch_ipex_c.ptr());
-  PyModule_AddFunctions(torch_ipex_c.ptr(), _THCPModule_methods);
+  auto module = m.ptr();
+  THDPStream_init(module);
+  PyModule_AddFunctions(module, _THCPModule_methods);
+  ASSERT_TRUE(THXPStorage_init<at::kFloat>(module));
+  ASSERT_TRUE(THXPStorage_init<at::kDouble>(module));
 }

@@ -117,35 +117,6 @@ def create_version_files(base_dir, version, ipex_git_sha, torch_git_sha):
         f.write('}  // namespace torch_ipex\n')
 
 
-def generate_ipex_cpu_aten_code(base_dir):
-    cur_dir = os.path.abspath(os.path.curdir)
-
-    os.chdir(os.path.join(base_dir, 'scripts', 'cpu'))
-    generate_code_cmd = ['./gen-cpu-sparse-dispatch.sh',
-                         os.path.join(base_dir, 'torch_ipex', 'csrc')]
-    if subprocess.call(generate_code_cmd) != 0:
-        print("Failed to run '{}'".format(generate_code_cmd), file=sys.stderr)
-        os.chdir(cur_dir)
-        sys.exit(1)
-
-    generate_code_cmd = ['./gen-cpu-sparse-ops.sh',
-                         os.path.join(base_dir, 'torch_ipex', 'csrc', 'cpu')]
-    if subprocess.call(generate_code_cmd) != 0:
-        print("Failed to run '{}'".format(generate_code_cmd), file=sys.stderr)
-        os.chdir(cur_dir)
-        sys.exit(1)
-
-    os.chdir(os.path.join(base_dir, 'scripts'))
-    generate_code_cmd = ['./gen-cpu-ops.sh',
-                         os.path.join(base_dir, 'torch_ipex', 'csrc', 'cpu')]
-    if subprocess.call(generate_code_cmd) != 0:
-        print("Failed to run '{}'".format(generate_code_cmd), file=sys.stderr)
-        os.chdir(cur_dir)
-        sys.exit(1)
-
-    os.chdir(cur_dir)
-
-
 class DPCPPExt(Extension, object):
     def __init__(self, name, project_dir=os.path.dirname(__file__)):
         Extension.__init__(self, name, sources=[])
@@ -188,11 +159,17 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
         if platform.system() == "Windows":
             raise RuntimeError("Does not support windows")
 
-        for ext in self.extensions:
+        dpcpp_exts = [ext for ext in self.extensions if isinstance(ext, DPCPPExt)]
+        for ext in dpcpp_exts:
             self.build_extension(ext)
+        self.extensions = [ext for ext in self.extensions if not isinstance(ext, DPCPPExt)]
+        super(DPCPPBuild, self).run()
+
 
     def build_extension(self, ext):
-        ext_dir = pathlib.Path(self.get_ext_fullpath(ext.name))
+        if not isinstance(ext, DPCPPExt):
+            return super(DPCPPBuild, self).build_extension(ext)
+        ext_dir = pathlib.Path(ext.project_dir)
         if not os.path.exists(ext.build_dir):
             os.mkdir(ext.build_dir)
 
@@ -224,7 +201,7 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
             'PYTORCH_INCLUDE_DIR': convert_cmake_dirs(include_paths()),
             'PYTORCH_LIBRARY_DIR': convert_cmake_dirs(library_paths()),
             'PYTHON_EXECUTABLE': sys.executable,
-            'CMAKE_INSTALL_PREFIX': '/'.join([str(ext_dir.parent.absolute()), ext.name]),
+            'CMAKE_INSTALL_PREFIX': '/'.join([str(ext_dir.absolute()), "torch_ipex"]),
             'PYTHON_INCLUDE_DIR': distutils.sysconfig.get_python_inc(),
             'LIB_NAME': ext.name,
             'PYTHON_EXECUTABLE': sys.executable,
@@ -269,6 +246,57 @@ version = get_build_version(ipex_git_sha)
 # Generate version info (torch_ipex.__version__)
 create_version_files(base_dir, version, ipex_git_sha, torch_git_sha)
 
+# Constant known variables used throughout this file
+
+# PyTorch installed library
+IS_WINDOWS = (platform.system() == 'Windows')
+IS_DARWIN = (platform.system() == 'Darwin')
+IS_LINUX = (platform.system() == 'Linux')
+
+def get_c_module():
+    main_compile_args = []
+    main_libraries = ['torch_ipex']
+    main_link_args = []
+    main_sources = ["torch_ipex/csrc/_C.cpp"]
+    cwd = os.path.dirname(os.path.abspath(__file__))
+    lib_path = os.path.join(cwd, "torch_ipex", "lib")
+    library_dirs = [lib_path]
+    extra_link_args = []
+    extra_compile_args = [
+        '-Wall',
+        '-Wextra',
+        '-Wno-strict-overflow',
+        '-Wno-unused-parameter',
+        '-Wno-missing-field-initializers',
+        '-Wno-write-strings',
+        '-Wno-unknown-pragmas',
+        # This is required for Python 2 declarations that are deprecated in 3.
+        '-Wno-deprecated-declarations',
+        # Python 2.6 requires -fno-strict-aliasing, see
+        # http://legacy.python.org/dev/peps/pep-3123/
+        # We also depend on it in our code (even Python 3).
+        '-fno-strict-aliasing',
+        # Clang has an unfixed bug leading to spurious missing
+        # braces warnings, see
+        # https://bugs.llvm.org/show_bug.cgi?id=21629
+        '-Wno-missing-braces',
+    ]
+
+    def make_relative_rpath(path):
+            return '-Wl,-rpath,$ORIGIN/' + path
+
+    C = Extension("torch_ipex._C",
+                  libraries=main_libraries,
+                  sources=main_sources,
+                  language='c',
+                  extra_compile_args=main_compile_args + extra_compile_args,
+                  include_dirs=include_paths(),
+                  library_dirs=library_dirs,
+                  extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
+    return C
+
+C = get_c_module()
+
 setup(
     name='torch_ipex',
     version=version,
@@ -281,7 +309,7 @@ setup(
         'torch_ipex': ['lib/*.so',
                        'include/*.h']},
     zip_safe=False,
-    ext_modules=[DPCPPExt('torch_ipex')],
+    ext_modules=[DPCPPExt('torch_ipex'), C],
     cmdclass={
         'install': DPCPPInstall,
         'build_ext': DPCPPBuild,

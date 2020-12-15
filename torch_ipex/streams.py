@@ -2,7 +2,7 @@ import ctypes
 import torch_ipex
 
 
-class Stream(torch_ipex.torch_ipex._C._DPCPPStreamBase):
+class Stream(torch_ipex._C._DPCPPStreamBase):
     def __new__(cls, device=None, priority=0, **kwargs):
         with torch_ipex.device(device):
             return super(Stream, cls).__new__(cls, priority=priority, **kwargs)

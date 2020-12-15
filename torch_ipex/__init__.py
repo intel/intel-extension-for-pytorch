@@ -3,15 +3,17 @@ import math
 import sys
 
 import torch
+from torch._utils import _get_async_or_non_blocking
 from torch.nn import Module
 from torch.nn import Parameter
 from torch.nn import init
 from torch import device as _device
 from ._utils import _get_device_index #, _dummy_type
 from typing import List, Optional, Tuple, Union
-from .lib import torch_ipex
+from . import _C
 from .version import __version__, __ipex_gitrev__
 from .streams import Stream, Event
+
 
 
 _device_t = Union[_device, str, int]
@@ -46,7 +48,7 @@ class LinearReLU(Module):
             init.uniform_(self.bias, -bound, bound)
 
     def forward(self, input):
-        return torch_ipex.linear_relu(input, self.weight, self.bias)
+        return _C.linear_relu(input, self.weight, self.bias)
 
     def extra_repr(self):
         return 'in_features={}, out_features={}, bias={}'.format(
@@ -84,7 +86,7 @@ class LinearSigmoid(Module):
 
 
 def MulAdd(input, other, accumu, alpha=1.0):
-    return torch_ipex.mul_add(input, other, accumu, alpha)
+    return _C.mul_add(input, other, accumu, alpha)
 
 
 class ReLUDummy(Module):
@@ -112,7 +114,7 @@ def is_available() -> bool:
     #     return False
     # This function never throws and returns 0 if driver is missing or can't
     # be initialized
-    # return torch_ipex._C._cuda_getDeviceCount() > 0
+    # return _C._cuda_getDeviceCount() > 0
     return True
 
 
@@ -158,13 +160,13 @@ def library_paths():
 
 
 def _usm_is_enabled():
-    return torch_ipex._usm_is_enabled()
+    return _C._usm_is_enabled()
 
 def _onedpl_is_enabled():
-    return torch_ipex._onedpl_is_enabled()
+    return _C._onedpl_is_enabled()
 
 def _onemkl_is_enabled():
-    return torch_ipex._onemkl_is_enabled()
+    return _C._onemkl_is_enabled()
 
 def _double_kernel_disabled():
     return torch_ipex._double_kernel_disabled()
@@ -173,7 +175,7 @@ def _double_kernel_disabled():
 def device_count() -> int:
     r"""Returns the number of XPUs device available."""
     if is_available():
-        return torch_ipex._C._getDeviceCount()
+        return _C._getDeviceCount()
     else:
         return 0
 
@@ -193,14 +195,14 @@ class device(object):
     def __enter__(self):
         if self.idx == -1:
             return
-        self.prev_idx = torch_ipex._C._getDevice()
+        self.prev_idx = _C._getDevice()
         if self.prev_idx != self.idx:
-            torch_ipex._C._setDevice(self.idx)
+            _C._setDevice(self.idx)
         _lazy_init()
 
     def __exit__(self, *args):
         if self.prev_idx != self.idx:
-            torch_ipex._C._setDevice(self.prev_idx)
+            _C._setDevice(self.prev_idx)
         return False
 
 
@@ -231,7 +233,7 @@ def set_device(device: _device_t) -> None:
     """
     device = _get_device_index(device)
     if device >= 0:
-        torch_ipex._C._setDevice(device)
+        _C._setDevice(device)
 
 
 def get_device_name(device: Optional[_device_t] = None) -> str:
@@ -275,7 +277,7 @@ def get_device_properties(device: _device_t):# -> _CudaDeviceProperties:
 def current_device() -> int:
     r"""Returns the index of a currently selected device."""
     _lazy_init()
-    return torch_ipex._C._getDevice()
+    return _C._getDevice()
 
 
 def synchronize(device: _device_t = None) -> None:
@@ -298,9 +300,8 @@ def current_stream(device: Optional[_device_t] = None) -> Stream:
             by :func:`~torch.xpu.current_device`, if :attr:`device` is ``None``
             (default).
     """
-    # return Stream(_cdata=torch._C._cuda_getCurrentStream(
-    #     _get_device_index(device, optional=True)))
-    pass
+    return Stream(_cdata=_C._getCurrentStream(
+        _get_device_index(device, optional=True)))
 
 
 def default_stream(device: Optional[_device_t] = None) -> Stream:
@@ -318,5 +319,99 @@ def default_stream(device: Optional[_device_t] = None) -> Stream:
     pass
 
 
+from torch.storage import _StorageBase
+
+
+class DoubleStorage(_C.DoubleStorageBase, _StorageBase):
+    pass
+
+
+class FloatStorage(_C.FloatStorageBase, _StorageBase):
+    pass
+
+
+torch._storage_classes.add(DoubleStorage)
+torch._storage_classes.add(FloatStorage)
+_C._initExtension()
+
+
+
+def _xpu_tag(obj):
+    if type(obj).__module__ == 'torch_ipex':
+        return 'xpu:' + str(obj.get_device())
+
+
+def validate_xpu_device(location):
+    # device = torch.cuda._utils._get_device_index(location, True)
+    #
+    # if not torch.cuda.is_available():
+    #     raise RuntimeError('Attempting to deserialize object on a CUDA '
+    #                        'device but torch.cuda.is_available() is False. '
+    #                        'If you are running on a CPU-only machine, '
+    #                        'please use torch.load with map_location=torch.device(\'cpu\') '
+    #                        'to map your storages to the CPU.')
+    # device_count = torch.cuda.device_count()
+    # if device >= device_count:
+    #     raise RuntimeError('Attempting to deserialize object on CUDA device '
+    #                        f'{device} but torch.cuda.device_count() is {device_count}. Please use '
+    #                        'torch.load with map_location to map your storages '
+    #                        'to an existing device.')
+    # return device
+    return current_device()
+
+
 current_module = sys.modules[__name__]
+
+
+def _xpu(self, device_idx=None, non_blocking=False, **kwargs):
+    """Returns a copy of this object in CUDA memory.
+
+    If this object is already in CUDA memory and on the correct device, then
+    no copy is performed and the original object is returned.
+
+    Args:
+        device (int): The destination GPU id. Defaults to the current device.
+        non_blocking (bool): If ``True`` and the source is in pinned memory,
+            the copy will be asynchronous with respect to the host. Otherwise,
+            the argument has no effect.
+        **kwargs: For compatibility, may contain the key ``async`` in place of
+            the ``non_blocking`` argument.
+    """
+    # non_blocking = _get_async_or_non_blocking('xpu', non_blocking, kwargs)
+    # if self.is_cuda:
+    #     if device is None:
+    #         device = torch.cuda.current_device()
+    #     if self.get_device() == device:
+    #         return self
+    # else:
+    #     if device is None:
+    #         device = -1
+    with device(device_idx):
+        if self.is_sparse:
+            # new_type = getattr(torch.cuda.sparse, self.__class__.__name__)
+            # indices = torch._indices(self).cuda(device, non_blocking)
+            # values = torch._values(self).cuda(device, non_blocking)
+            # return new_type(indices, values, self.size())
+            pass
+        else:
+            new_type = getattr(current_module, self.__class__.__name__)
+            return new_type(self.size()).copy_(self, non_blocking)
+
+
+def _xpu_deserialize(obj, location):
+    if location.startswith('xpu'):
+        device = validate_xpu_device(location)
+        if getattr(obj, "_torch_load_uninitialized", False):
+            storage_type = getattr(_C, type(obj).__name__)
+            with _C.device(device):
+                return storage_type(obj.size())
+        else:
+            return _xpu(obj, device=device)
+
+
+from torch import serialization
+
+serialization.register_package(30, _xpu_tag, _xpu_deserialize)
+
+
 torch.add_runtime('xpu', current_module)

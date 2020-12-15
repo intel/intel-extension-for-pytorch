@@ -3,9 +3,8 @@
 #include <jit/fusion_pass.h>
 #include <core/Generator.h>
 
-#include <pybind11/pybind11.h>
 #include <gpu/Module.h>
-
+#include <py_init.h>
 
 namespace py = pybind11;
 
@@ -14,7 +13,7 @@ static std::vector<PyMethodDef> methods;
 
 
 void THDPStream_init(PyObject *module);
-PYBIND11_MODULE(torch_ipex, m) {
+void torch_ipex_init(pybind11::module &m) {
   m.doc() = "PyTorch Extension for Intel dGPU";
 
   torch::jit::InitFusionPass();

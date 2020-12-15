@@ -101,7 +101,7 @@ add_custom_command(OUTPUT
         ${PROJECT_SOURCE_DIR}/scripts/gpu/QUANTIZEDDPCPPGPUType.h)
 
 # sources
-set(DPCPP_SRCS)
+set(TORCH_IPEX_SRCS)
 add_subdirectory(torch_ipex/csrc/)
 
 add_library(torch_ipex SHARED ${TORCH_IPEX_SRCS}
@@ -109,7 +109,7 @@ add_library(torch_ipex SHARED ${TORCH_IPEX_SRCS}
         ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeQuantizedXPU.cpp)
 
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
-set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
+set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME "lib${LIB_NAME}")
 
 # includes
 if(DEFINED PYTORCH_INCLUDE_DIR)
@@ -177,7 +177,7 @@ set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -D__STRICT_ANSI__")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl-unnamed-lambda")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fno-sycl-early-optimizations")
-set_source_files_properties(${DPCPP_SRCS} COMPILE_FLAGS "${IPEX_COMPILE_FLAGS}")
+set_source_files_properties(${TORCH_IPEX_SRCS} COMPILE_FLAGS "${IPEX_COMPILE_FLAGS}")
 
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
