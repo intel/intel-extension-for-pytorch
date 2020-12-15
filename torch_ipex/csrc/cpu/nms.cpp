@@ -88,7 +88,7 @@ std::vector<at::Tensor> remove_empty(std::vector<at::Tensor>& candidate) {
 }
 
 template <typename scalar_t>
-std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_cpu_kernel(const at::Tensor& dets,
+std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_kernel(const at::Tensor& dets,
                           const at::Tensor& scores,
                           const float threshold, int max_num=200) {
   // Reference to: https://github.com/mlcommons/inference/blob/0f096a18083c3fd529c1fbf97ebda7bc3f1fda70/others/cloud/single_stage_detector/pytorch/utils.py#L163
@@ -161,7 +161,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_cpu(const at::Ten
                const float threshold) {
   std::tuple<at::Tensor, at::Tensor, at::Tensor> result;
   AT_DISPATCH_FLOATING_TYPES(dets.type(), "batch_score_nms", [&] {
-    result = batch_score_nms_cpu_kernel<scalar_t>(dets, scores, threshold);
+    result = batch_score_nms_kernel<scalar_t>(dets, scores, threshold);
   });
   return result;
 }
