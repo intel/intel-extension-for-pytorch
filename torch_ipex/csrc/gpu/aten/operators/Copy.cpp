@@ -16,12 +16,14 @@
 
 #ifdef USE_USM
 #include "Loops.h"
+#include <oneDNN/ReorderCopy.h>
 #else
 #include <core/ApplyUtils.h>
 #endif
 
 using namespace at;
 using namespace at::dpcpp;
+using namespace at::dpcpp::oneDNN;
 
 namespace at {
 namespace impl {
@@ -297,24 +299,21 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   }
 }
 
-} // namespace impl
-
-namespace AtenIpexTypeXPU {
-Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
-  BUILD_TENSOR_ITER(self, src, iter);
-
-  if (iter.numel() == 0) {
-    return self;
-  }
-
-  impl::copy_kernel_dpcpp(iter, non_blocking);
-
-  return self;
+static bool dtype_isSupported(const at::Tensor& tensor) {
+   switch (tensor.scalar_type()) {
+   case at::ScalarType::Byte:
+   case at::ScalarType::Char:
+   case at::ScalarType::Int:
+   case at::ScalarType::Half:
+   case at::ScalarType::Float:
+   case at::ScalarType::BFloat16:
+     return true;
+   default:
+     printf("not supported dtype\n");
+     return false;
+   };
 }
 
-} // namespace AtenIpexTypeXPU
-
-namespace AtenIpexTypeQuantizedXPU {
 Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   // TODO: valid check
   if (self.is_quantized() && src.is_quantized()) {
@@ -334,9 +333,40 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
     return self;
   }
 
-  impl::copy_kernel_dpcpp(iter, non_blocking);
+#ifdef USE_USM
+  Device dst_device = self.device();
+  Device src_device = src.device();
+  bool Same_device = dst_device.type() == c10::DeviceType::XPU &&
+      src_device.type() == c10::DeviceType::XPU;
 
+  if (Same_device && (!self.is_contiguous() || !src.is_contiguous()) &&
+      dtype_isSupported(self) && dtype_isSupported(src)) {
+    printf("enter recorder_copy\n");
+    std::cout<<"self.size"<<self.sizes()<<"self.stride"<<self.strides()<<std::endl;
+    std::cout<<"src.size"<<src.sizes()<<"src.stride"<<src.strides()<<std::endl;
+
+    oneDNN::reordercopy(self, src);
+    printf("recorder_copy finished\n");
+  } else {
+    impl::copy_kernel_dpcpp(iter, non_blocking);
+  }
+#else
+  impl::copy_kernel_dpcpp(iter, non_blocking);
+#endif
   return self;
+}
+} // namespace impl
+
+namespace AtenIpexTypeXPU {
+Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
+  return impl::copy_(self, src, non_blocking);
+}
+
+} // namespace AtenIpexTypeXPU
+
+namespace AtenIpexTypeQuantizedXPU {
+Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
+  return impl::copy_(self, src, non_blocking);
 }
 } // namespace AtenIpexTypeQuantizedXPU
 
