@@ -1,7 +1,3 @@
-//
-// Created by johnlu on 2020/11/6.
-//
-
 #ifndef TORCH_IPEX_PY_INIT_H
 #define TORCH_IPEX_PY_INIT_H
 

@@ -112,15 +112,16 @@ set(DPCPP_JIT_SRCS)
 add_subdirectory(torch_ipex/csrc/gpu/jit)
 
 set(TORCH_IPEX_SRCS)
-FILE(GLOB IPEX_UTIL_SRC "${IPEX_C_SOURCE_DIR}/*.cpp")
-FILE(GLOB GPU_UTIL_SRC "${DPCPP_GPU_ROOT}/*.cpp")
+file(GLOB IPEX_UTIL_SRC "${IPEX_C_SOURCE_DIR}/*.cpp")
+list(REMOVE_ITEM IPEX_UTIL_SRC "${IPEX_C_SOURCE_DIR}/_C.cpp")
+file(GLOB GPU_UTIL_SRC "${DPCPP_GPU_ROOT}/*.cpp")
 list(APPEND TORCH_IPEX_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_JIT_SRCS} ${IPEX_UTIL_SRC} ${GPU_UTIL_SRC})
 
 add_library(torch_ipex SHARED ${TORCH_IPEX_SRCS}
         ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeXPU.cpp
         ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeQuantizedXPU.cpp)
 
-set_target_properties(torch_ipex PROPERTIES PREFIX "")
+set_target_properties(torch_ipex PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
 
 # includes
@@ -239,4 +240,4 @@ endif()
 
 target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
 
-install(TARGETS ${LIB_NAME} LIBRARY DESTINATION lib)
+install(TARGETS torch_ipex LIBRARY DESTINATION lib)

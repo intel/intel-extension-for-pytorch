@@ -293,7 +293,6 @@ static inline void launch_vectorized_kernel(int64_t N, const func_t& f, array_t 
 
   switch (vec_size) {
     case 4: {
-//        std::cout << "johnlu 4 vector size launch_vectorized_kernel_impl thread num " << thread_num << std::endl;
         auto cgf = DPCPP_Q_CGF(__cgh) {
             auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
                 vectorized_elementwise_kernel<4>(item_id, N, f, data);
@@ -305,7 +304,6 @@ static inline void launch_vectorized_kernel(int64_t N, const func_t& f, array_t 
         break;
       }
     case 2: {
-//        std::cout << "johnlu 2 vector size launch_vectorized_kernel_impl thread num " << thread_num << std::endl;
         auto cgf = DPCPP_Q_CGF(__cgh) {
             auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
                 vectorized_elementwise_kernel<2>(item_id, N, f, data);
@@ -317,7 +315,6 @@ static inline void launch_vectorized_kernel(int64_t N, const func_t& f, array_t 
         break;
       }
     case 1: {
-//      std::cout << "johnlu vector normal unroll kernel vec size " << vec_size << std::endl;
       auto input_calc = TrivialOffsetCalculator<traits::arity>();
       auto output_calc = TrivialOffsetCalculator<1>();
       auto loader = at::native::Memory::LoadWithoutCast();
@@ -353,10 +350,8 @@ void new_dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
 
   if (!dynamic_casting) {
     if (contiguous) {
-//      std::cout << "johnlu contiguous "<< std::endl;
       launch_vectorized_kernel(numel, f, data);
     } else {
-//      std::cout << "johnlu non-contiguous "<< std::endl;
       auto input_offset_calculator = make_input_offset_calculator<traits::arity>(iter);
       auto output_offset_calculator = make_output_offset_calculator(iter);
       auto loader = at::native::Memory::LoadWithoutCast();
@@ -372,12 +367,10 @@ void new_dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
     auto storer = at::native::Memory::StoreWithCast(iter.tensor(0).scalar_type());
 
     if (contiguous) {
-//      std::cout << "johnlu dynamic_casting contiguous "<< std::endl;
       auto input_offset_calculator = TrivialOffsetCalculator<traits::arity>();
       auto output_offset_calculator = TrivialOffsetCalculator<1>();
       launch_unrolled_kernel(numel, f, data, input_offset_calculator, output_offset_calculator, loader, storer);
     } else {
-//      std::cout << "johnlu dynamic_casting non-contiguous "<< std::endl;
       auto input_offset_calculator = make_input_offset_calculator<traits::arity>(iter);
       auto output_offset_calculator = make_output_offset_calculator(iter);
       launch_unrolled_kernel(numel, f, data, input_offset_calculator, output_offset_calculator, loader, storer);

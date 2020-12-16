@@ -1,7 +1,3 @@
-//
-// Created by johnlu on 2020/10/21.
-//
-
 #ifndef TORCH_IPEX_MODULE_H
 #define TORCH_IPEX_MODULE_H
 

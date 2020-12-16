@@ -286,7 +286,7 @@ def get_c_module():
     def make_relative_rpath(path):
             return '-Wl,-rpath,$ORIGIN/' + path
 
-    C = Extension("torch_ipex._C",
+    C_ext = Extension("torch_ipex._C",
                   libraries=main_libraries,
                   sources=main_sources,
                   language='c',
@@ -294,9 +294,7 @@ def get_c_module():
                   include_dirs=include_paths(),
                   library_dirs=library_dirs,
                   extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
-    return C
-
-C = get_c_module()
+    return C_ext
 
 setup(
     name='torch_ipex',
@@ -310,7 +308,7 @@ setup(
         'torch_ipex': ['lib/*.so',
                        'include/*.h']},
     zip_safe=False,
-    ext_modules=[DPCPPExt('torch_ipex'), C],
+    ext_modules=[DPCPPExt('torch_ipex'), get_c_module()],
     cmdclass={
         'install': DPCPPInstall,
         'build_ext': DPCPPBuild,

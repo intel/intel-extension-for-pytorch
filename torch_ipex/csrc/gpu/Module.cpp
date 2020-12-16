@@ -1,6 +1,3 @@
-//
-// Created by johnlu on 2020/10/21.
-//
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/THP.h>
 #include <torch/csrc/jit/python/pybind_utils.h>
