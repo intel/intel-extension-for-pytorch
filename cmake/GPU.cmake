@@ -121,7 +121,7 @@ add_library(torch_ipex SHARED ${TORCH_IPEX_SRCS}
         ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeQuantizedXPU.cpp)
 
 set_target_properties(torch_ipex PROPERTIES PREFIX "")
-set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME "lib${LIB_NAME}")
+set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
 
 # includes
 if(DEFINED PYTORCH_INCLUDE_DIR)
