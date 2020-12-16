@@ -31,6 +31,9 @@ at::Tensor conv2d_sigmoid(
 at::Tensor matmul_sum(at::Tensor& accumu,
     const at::Tensor& m1, const at::Tensor& m2, at::Scalar alpha);
 
+at::Tensor matmul_div_scalar(const at::Tensor& tensor1,
+    const at::Tensor& tensor2, at::Scalar alpha);
+
 at::Tensor mul_add(const at::Tensor& self,
     const at::Tensor& other, const at::Tensor& accumu, at::Scalar alpha);
 

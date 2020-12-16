@@ -190,6 +190,22 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
+      "dpcpp::matmul_div_scalar(Tensor m1, Tensor m2, Scalar alpha) -> Tensor(a!)",
+      [] (const Node* node) ->Operation {
+        return [] (Stack& stack) {
+          auto result = torch::jit::dpcpp::matmul_div_scalar(
+              (std::move(peek(stack, 0, 3))).toTensor(),
+              (std::move(peek(stack, 1, 3))).toTensor(),
+              (std::move(peek(stack, 2, 3))).toScalar()
+          );
+          drop(stack, 3);
+          pack(stack, std::move(result));
+          return 0;
+        };
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
       "dpcpp::mul_add(Tensor self, Tensor other, Tensor accumu, Scalar alpha) -> Tensor",
       [] (const Node* node) ->Operation {
         return [] (Stack* stack) {

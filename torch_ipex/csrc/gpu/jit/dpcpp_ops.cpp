@@ -60,6 +60,69 @@ at::Tensor matmul_sum(at::Tensor& accumu,
   return at::AtenIpexTypeXPU::matmul_sum(accumu, m1, m2, alpha);
 }
 
+at::Tensor matmul_div_scalar(const at::Tensor& tensor1,
+    const at::Tensor& tensor2, at::Scalar alpha) {
+  RECORD_FUNCTION("matmul_div_scalar",
+                  std::vector<c10::IValue>({tensor1, tensor2}));
+
+  auto dim_tensor1 = tensor1.dim();
+  auto dim_tensor2 = tensor2.dim();
+
+  // TODO: matmul case is complicated
+  // temporarily we only support div fusion for bmm case
+  if ((dim_tensor1 >= 1 && dim_tensor2 >= 1) && (dim_tensor1 >= 3 || dim_tensor2 >= 3)) {
+    // We are multiplying b1 x n x m1 by x2 x m2 x p (where b1 can be a list);
+    // we track m1 vs m2 separately even though they must match for nicer error messages
+    int64_t n = dim_tensor1 > 1 ? tensor1.size(-2) : 1;
+    int64_t m1 = tensor1.size(-1);
+    at::IntArrayRef batch_tensor1(tensor1.sizes().data(), std::max<int64_t>(dim_tensor1 - 2, 0));
+    int64_t m2 = dim_tensor2 > 1 ? tensor2.size(-2) : 1;
+    int64_t p = tensor2.size(-1);
+    at::IntArrayRef batch_tensor2(tensor2.sizes().data(), std::max<int64_t>(dim_tensor2 - 2, 0));
+
+    // expand the batch portion (i.e. cut off matrix dimensions and expand rest)
+    std::vector<int64_t> expand_batch_portion = at::infer_size(batch_tensor1, batch_tensor2);
+
+    std::vector<int64_t> tensor1_expand_size(expand_batch_portion);
+    tensor1_expand_size.insert(tensor1_expand_size.end(), {n, m1});
+
+    std::vector<int64_t> tensor2_expand_size(expand_batch_portion);
+    tensor2_expand_size.insert(tensor2_expand_size.end(), {m2, p});
+
+    int expand_batch_product = std::accumulate(expand_batch_portion.begin(), expand_batch_portion.end(),
+                                               1, std::multiplies<int64_t>());
+
+    std::vector<int64_t> tensor1_bmm_view({expand_batch_product});
+    tensor1_bmm_view.insert(tensor1_bmm_view.end(), {n, m1});
+
+    std::vector<int64_t> tensor2_bmm_view({expand_batch_product});
+    tensor2_bmm_view.insert(tensor2_bmm_view.end(), {m2, p});
+
+    // flatten expanded batches
+    at::Tensor tensor1_expanded = tensor1.expand(tensor1_expand_size).contiguous().view(tensor1_bmm_view);
+    at::Tensor tensor2_expanded = tensor2.expand(tensor2_expand_size).contiguous().view(tensor2_bmm_view);
+
+    // reshape batches back into result
+    std::vector<int64_t> output_shape(expand_batch_portion);
+    if (dim_tensor1 > 1) {
+      output_shape.push_back(n);
+    }
+    if (dim_tensor2 > 1) {
+      output_shape.push_back(p);
+    }
+
+    at::Tensor self = at::empty({0}, tensor1_expanded.options());
+    at::Tensor output = at::_unsafe_view(
+        at::AtenIpexTypeDPCPP::baddbmm(self, tensor1_expanded, tensor2_expanded,
+                                   .0f, 1 / alpha.to<float>()), output_shape);
+
+    return output;
+  } else {
+    return at::AtenIpexTypeDPCPP::mul(
+        at::native::matmul(tensor1, tensor2), 1 / alpha.to<float>());
+  }
+}
+
 at::Tensor mul_add(const at::Tensor& self,
     const at::Tensor& other, const at::Tensor& accumu, at::Scalar alpha) {
   RECORD_FUNCTION("mul_add",

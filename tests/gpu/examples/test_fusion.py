@@ -13,6 +13,25 @@ cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
+class MatmulSum(torch.nn.Module):
+    def __init__(self):
+        super(MatmulSum, self).__init__()
+
+
+    def forward(self, m1, m2, a):
+        y = torch.matmul(m1, m2)
+        y += a
+        return y
+
+
+class MatmulDiv(torch.nn.Module):
+    def __init__(self):
+        super(MatmulDiv, self).__init__()
+
+    def forward(self, m1, m2):
+        return torch.matmul(m1, m2) / 8
+
+
 class Conv2dRelu(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dRelu, self).__init__()
@@ -29,17 +48,6 @@ class Conv2dSigmoid(torch.nn.Module):
 
     def forward(self, x, a):
         return torch.sigmoid(self.conv(x))
-
-
-class MatmulSum(torch.nn.Module):
-    def __init__(self):
-        super(MatmulSum, self).__init__()
-
-
-    def forward(self, m1, m2, a):
-        y = torch.matmul(m1, m2)
-        y += a
-        return y
 
 
 class TestNNMethod(TestCase):
@@ -61,6 +69,23 @@ class TestNNMethod(TestCase):
         self.assertEqual(raw, real.to(cpu_device))
         del modelJit
 
+    def test_baddbmm_div_fusion(self, dtype=torch.float):
+        m1 = torch.randn((2,2,3), device=cpu_device)
+        m2 = torch.randn((2,3,2), device=cpu_device)
+        model = MatmulDiv()
+        raw = model(m1, m2)
+        print("raw: ", raw)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+
+        modelJit = torch.jit.script(model)
+        with torch.no_grad():
+            # print(modelJit.graph_for(m1_dpcpp, m2_dpcpp))
+            real = modelJit(m1_dpcpp, m2_dpcpp)
+            print("real:", real.to(cpu_device))
+        self.assertEqual(raw, real.to(cpu_device))
+        del modelJit
 
     def test_conv_relu_fusion(self, dtype=torch.float):
         x = torch.randn([1, 2, 3, 3], device=cpu_device)
