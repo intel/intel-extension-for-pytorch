@@ -97,12 +97,22 @@ add_custom_command(OUTPUT
         --out ${DPCPP_GPU_ATEN_GENERATED}/ATen/
         --source-path ${PROJECT_SOURCE_DIR}
         DEPENDS
+        ${PROJECT_SOURCE_DIR}/scripts/declarations/Declarations.yaml
+        ${PROJECT_SOURCE_DIR}/scripts/gpu/gen_code.py
         ${PROJECT_SOURCE_DIR}/scripts/gpu/DPCPPGPUType.h
         ${PROJECT_SOURCE_DIR}/scripts/gpu/QUANTIZEDDPCPPGPUType.h)
 
 # sources
+set(DPCPP_ATEN_SRCS)
+add_subdirectory(torch_ipex/csrc/gpu/aten)
+
+set(DPCPP_JIT_SRCS)
+add_subdirectory(torch_ipex/csrc/gpu/jit)
+
 set(TORCH_IPEX_SRCS)
-add_subdirectory(torch_ipex/csrc/)
+FILE(GLOB IPEX_UTIL_SRC "${IPEX_C_SOURCE_DIR}/*.cpp")
+FILE(GLOB GPU_UTIL_SRC "${DPCPP_GPU_ROOT}/*.cpp")
+list(APPEND TORCH_IPEX_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_JIT_SRCS} ${IPEX_UTIL_SRC} ${GPU_UTIL_SRC})
 
 add_library(torch_ipex SHARED ${TORCH_IPEX_SRCS}
         ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeXPU.cpp
