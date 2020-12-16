@@ -9,10 +9,15 @@
 #include <torch/csrc/autograd/record_function.h>
 namespace torch_ipex {
 
+/*
+ When calculating the Intersection over Union:
+  MaskRCNN: bias = 1
+  SSD-Resnet34: bias = 0
+*/
 template <typename scalar_t>
 at::Tensor nms_cpu_kernel(const at::Tensor& dets,
                           const at::Tensor& scores,
-                          const float threshold, float pixel=1) {
+                          const float threshold, float bias=1) {
   AT_ASSERTM(!dets.type().is_cuda(), "dets must be a CPU tensor");
   AT_ASSERTM(!scores.type().is_cuda(), "scores must be a CPU tensor");
   AT_ASSERTM(dets.type() == scores.type(), "dets should have the same type as scores");
@@ -26,7 +31,7 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
   auto x2_t = dets.select(1, 2).contiguous();
   auto y2_t = dets.select(1, 3).contiguous();
 
-  at::Tensor areas_t = (x2_t - x1_t + pixel) * (y2_t - y1_t + pixel);
+  at::Tensor areas_t = (x2_t - x1_t + bias) * (y2_t - y1_t + bias);
 
   auto order_t = std::get<1>(scores.sort(0, /* descending=*/true));
 
@@ -66,8 +71,8 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
       auto xx2 = std::min(ix2, x2[j]);
       auto yy2 = std::min(iy2, y2[j]);
 
-      auto w = std::max(static_cast<scalar_t>(0), xx2 - xx1 + pixel);
-      auto h = std::max(static_cast<scalar_t>(0), yy2 - yy1 + pixel);
+      auto w = std::max(static_cast<scalar_t>(0), xx2 - xx1 + bias);
+      auto h = std::max(static_cast<scalar_t>(0), yy2 - yy1 + bias);
       auto inter = w * h;
       auto ovr = inter / (iarea + areas[j] - inter);
       if (ovr >= threshold)
@@ -126,7 +131,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_kernel(const at::
     // # select max_num indices
     score_idx_sorted = score_idx_sorted.slice(/*dim*/0, /*start*/std::max(score.size(0) - max_num, static_cast<int64_t>(0)), /*end*/score.size(0));
 
-    at::Tensor keep = nms_cpu_kernel<scalar_t>(at::index_select(bboxes, /*dim*/0, score_idx_sorted), at::index_select(score, /*dim*/0, score_idx_sorted), threshold, /*pixel*/0);
+    at::Tensor keep = nms_cpu_kernel<scalar_t>(at::index_select(bboxes, /*dim*/0, score_idx_sorted), at::index_select(score, /*dim*/0, score_idx_sorted), threshold, /*bias*/0);
     at::Tensor candidates = at::index_select(score_idx_sorted, /*dim*/0, keep);
 
     bboxes_out[i] = at::index_select(bboxes, /*dim*/0, candidates);
