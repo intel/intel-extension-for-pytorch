@@ -9,6 +9,9 @@
 
 #include <dnnl.hpp>
 
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
 
 using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
@@ -38,8 +41,14 @@ static inline Tensor reordercopy(Tensor& output, const Tensor & src) {
                                               : src_ctx.meta();
   memory src_mem = dpcpp_onednn_memory(src_desc, engine, src.data_ptr());
   if (output_desc != src_desc) {
-    DPCPP_ONEDNN_EXEC(reorder(src_mem, output_mem), strm,
-      {{DNNL_ARG_SRC, src_mem}, {DNNL_ARG_DST, output_mem}});
+#ifdef USE_PRIMITIVE_CACHE
+    lru_key_t key;
+    create_key(key, src_desc, output_desc);
+    auto prim = fetch_or_create_m<dnnl::reorder>(key, src_mem, output_mem);
+#else
+    auto prim = dnnl::reorder(src_mem, output_mem);
+#endif
+    DPCPP_ONEDNN_EXEC(prim, strm, {{DNNL_ARG_SRC, src_mem}, {DNNL_ARG_DST, output_mem}});
   }
   return output;
 }
