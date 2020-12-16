@@ -309,7 +309,6 @@ static bool dtype_isSupported(const at::Tensor& tensor) {
    case at::ScalarType::BFloat16:
      return true;
    default:
-     printf("not supported dtype\n");
      return false;
    };
 }
@@ -341,12 +340,7 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
 
   if (Same_device && (!self.is_contiguous() || !src.is_contiguous()) &&
       dtype_isSupported(self) && dtype_isSupported(src)) {
-    printf("enter recorder_copy\n");
-    std::cout<<"self.size"<<self.sizes()<<"self.stride"<<self.strides()<<std::endl;
-    std::cout<<"src.size"<<src.sizes()<<"src.stride"<<src.strides()<<std::endl;
-
     oneDNN::reordercopy(self, src);
-    printf("recorder_copy finished\n");
   } else {
     impl::copy_kernel_dpcpp(iter, non_blocking);
   }
