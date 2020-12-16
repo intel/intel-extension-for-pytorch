@@ -30,8 +30,6 @@ test_nn.py::TestNNDeviceTypeXPU::test_one_hot_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_pool_invalid_size_xpu_bfloat16
 test_nn.py::TestNNDeviceTypeXPU::test_pool_invalid_size_xpu_float16
 test_nn.py::TestNNDeviceTypeXPU::test_pool_invalid_size_xpu_float32
-test_nn.py::TestNNDeviceTypeXPU::test_pool_large_size_xpu_float16
-test_nn.py::TestNNDeviceTypeXPU::test_pool_large_size_xpu_float32
 test_nn.py::TestNNDeviceTypeXPU::test_rnn_retain_variables_xpu_float32
 test_nn.py::TestNNDeviceTypeXPU::test_softmax_bfloat16_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_softmax_xpu_float16
