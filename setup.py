@@ -39,7 +39,7 @@ import re
 import shutil
 import subprocess
 import sys
-from tools.setup.cmake import CMake
+from scripts.tools.setup.cmake import CMake
 
 try:
     import torch
