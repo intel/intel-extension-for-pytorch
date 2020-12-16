@@ -35,7 +35,6 @@ test_nn.py::TestNNDeviceTypeXPU::test_softmax_bfloat16_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_softmax_xpu_float16
 test_nn.py::TestNNDeviceTypeXPU::test_softmax_xpu_float32
 test_nn.py::TestNNDeviceTypeXPU::test_variable_sequence_xpu_float32
-test_nn.py::TestNNDeviceTypeXPU::test_CTCLoss_dpcpp_xpu
 test_nn.py::TestNN::test_BCELoss_dpcpp_half
 test_nn.py::TestNN::test_BCELoss_scalar_weights_dpcpp_half
 test_nn.py::TestNN::test_BCELoss_weights_dpcpp_half
