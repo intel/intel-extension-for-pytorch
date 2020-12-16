@@ -468,16 +468,12 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
     }
   }
 
-#ifdef USE_ONEDNN_CAT
   // DNNL cat does not support double datatype now.
   if (skip_dnnl_cat) {
     impl::cat(out, tensors, tensors.size(), dim);
   } else {
     impl::dnnl_cat(out, tensors, tensors.size(), dim);
   }
-#else
-  impl::cat(out, tensors, tensors.size(), dim);
-#endif
   return out;
 }
 
