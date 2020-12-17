@@ -6,7 +6,6 @@ from torch.testing._internal.common_utils import TestCase
 
 class  TestNNMethod(TestCase):
 
-    @pytest.mark.skip(reason='Temp disable this case for 1.7 rebase.')
     def test_activation_relu(self, dtype=torch.float):
         relu_ = torch.nn.functional.relu_
         relu = torch.nn.functional.relu

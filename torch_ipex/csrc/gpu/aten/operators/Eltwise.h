@@ -49,7 +49,7 @@ void dpcpp_eltwise(
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key(key, input_md, alpha, beta);
+  create_key(key, alg_kind, input_md, alpha, beta);
 #endif
 
   eltwise_forward::desc eltwise_eltwiseFwd_desc(prop_kind::forward, alg_kind, input_md, alpha, beta);
