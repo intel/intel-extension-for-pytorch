@@ -640,5 +640,7 @@ static auto dispatch =
         .op("torch_ipex::gru",
             [](const at::Tensor& input, const at::Tensor& hidden, std::vector<at::Tensor> params, bool has_biases, int64_t num_layers, double dropout_p, bool train, bool bidirectional, bool batch_first) {
               return torch_ipex::AtenIpexTypeExt::gru(input, hidden, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
-            });
+            })
+        .op("torch_ipex::interaction_forward", &torch_ipex::AtenIpexTypeExt::interaction_forward)
+        .op("torch_ipex::interaction_backward", &torch_ipex::AtenIpexTypeExt::interaction_backward);
 }

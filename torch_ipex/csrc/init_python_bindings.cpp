@@ -108,15 +108,6 @@ void InitIpexModuleBindings(py::module m) {
            const at::Tensor &grad, float alpha) {
           AtenIpexTypeExt::packed_add_(top_half, bot_half, grad, alpha);
         });
-  m.def("interaction_forward",
-        [](const std::vector<at::Tensor> &input) {
-          return AtenIpexTypeExt::interaction_forward(input);
-        });
-  m.def("interaction_backward",
-        [](const at::Tensor &grad_out, const std::vector<at::Tensor> &input) {
-          return AtenIpexTypeExt::interaction_backward(grad_out, input);
-        });
-
   m.def("mlp_forward", &AtenIpexTypeMLPExt::forward);
   m.def("mlp_backward", &AtenIpexTypeMLPExt::backward);
   m.def("mlp_create_handle", &AtenIpexTypeMLPExt::create_handle);
