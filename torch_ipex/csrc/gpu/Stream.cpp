@@ -10,7 +10,7 @@ PyObject *THDPStreamClass = nullptr;
 static PyObject * THDPStream_pynew(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
   HANDLE_TH_ERRORS
   int current_device = 0;
-//      THCudaCheck(cudaGetDevice(&current_device));
+//      THXPUCheck(xpuGetDevice(&current_device));
 
   int priority = 0;
   uint64_t cdata = 0;
@@ -68,7 +68,7 @@ static PyObject * THDPStream_priority_range() {
   HANDLE_TH_ERRORS
   int least_priority = 0, greatest_priority = 0;
 //  std::tie(least_priority, greatest_priority) =
-//  at::cuda::CUDAStream::priority_range();
+//  at::xpu::XPUStream::priority_range();
   return Py_BuildValue("(ii)", least_priority, greatest_priority);
   END_HANDLE_TH_ERRORS
 }

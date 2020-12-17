@@ -110,11 +110,11 @@ def _lazy_init():
 
 def is_available() -> bool:
     r"""Returns a bool indicating if XPU is currently available."""
-    # if not hasattr(torch._C, '_cuda_getDeviceCount'):
+    # if not hasattr(torch._C, '_xpu_getDeviceCount'):
     #     return False
     # This function never throws and returns 0 if driver is missing or can't
     # be initialized
-    # return _C._cuda_getDeviceCount() > 0
+    # return _C._xpu_getDeviceCount() > 0
     return True
 
 
@@ -217,7 +217,7 @@ class device_of(device):
     """
     pass
     # def __init__(self, obj):
-    #     idx = obj.get_device() if obj.is_cuda else -1
+    #     idx = obj.get_device() if obj.is_xpu else -1
     #     super(device_of, self).__init__(idx)
 
 
@@ -225,7 +225,7 @@ def set_device(device: _device_t) -> None:
     r"""Sets the current device.
 
     Usage of this function is discouraged in favor of :any:`device`. In most
-    cases it's better to use ``CUDA_VISIBLE_DEVICES`` environmental variable.
+    cases it's better to use ``xpu_VISIBLE_DEVICES`` environmental variable.
 
     Arguments:
         device (torch.device or int): selected device. This function is a no-op
@@ -242,30 +242,30 @@ def get_device_name(device: Optional[_device_t] = None) -> str:
     Arguments:
         device (torch.device or int, optional): device for which to return the
             name. This function is a no-op if this argument is a negative
-            integer. It uses the current device, given by :func:`~torch.cuda.current_device`,
+            integer. It uses the current device, given by :func:`~torch.xpu.current_device`,
             if :attr:`device` is ``None`` (default).
     """
     return get_device_properties(device).name
 
 
 def get_device_capability(device: Optional[_device_t] = None) -> Tuple[int, int]:
-    r"""Gets the cuda capability of a device.
+    r"""Gets the xpu capability of a device.
 
     Arguments:
         device (torch.device or int, optional): device for which to return the
             device capability. This function is a no-op if this argument is
             a negative integer. It uses the current device, given by
-            :func:`~torch.cuda.current_device`, if :attr:`device` is ``None``
+            :func:`~torch.xpu.current_device`, if :attr:`device` is ``None``
             (default).
 
     Returns:
-        tuple(int, int): the major and minor cuda capability of the device
+        tuple(int, int): the major and minor xpu capability of the device
     """
     prop = get_device_properties(device)
     return prop.major, prop.minor
 
 
-def get_device_properties(device: _device_t):# -> _CudaDeviceProperties:
+def get_device_properties(device: _device_t):# -> _xpuDeviceProperties:
     # _lazy_init()  # will define _get_device_properties
     # device = _get_device_index(device, optional=True)
     # if device < 0 or device >= device_count():
@@ -314,7 +314,7 @@ def default_stream(device: Optional[_device_t] = None) -> Stream:
             (default).
     """
     # _lazy_init()
-    # return Stream(_cdata=torch._C._cuda_getDefaultStream(
+    # return Stream(_cdata=torch._C._xpu_getDefaultStream(
     #     _get_device_index(device, optional=True)))
     pass
 
@@ -342,18 +342,18 @@ def _xpu_tag(obj):
 
 
 def validate_xpu_device(location):
-    # device = torch.cuda._utils._get_device_index(location, True)
+    # device = torch.xpu._utils._get_device_index(location, True)
     #
-    # if not torch.cuda.is_available():
-    #     raise RuntimeError('Attempting to deserialize object on a CUDA '
-    #                        'device but torch.cuda.is_available() is False. '
+    # if not torch.xpu.is_available():
+    #     raise RuntimeError('Attempting to deserialize object on a xpu '
+    #                        'device but torch.xpu.is_available() is False. '
     #                        'If you are running on a CPU-only machine, '
     #                        'please use torch.load with map_location=torch.device(\'cpu\') '
     #                        'to map your storages to the CPU.')
-    # device_count = torch.cuda.device_count()
+    # device_count = torch.xpu.device_count()
     # if device >= device_count:
-    #     raise RuntimeError('Attempting to deserialize object on CUDA device '
-    #                        f'{device} but torch.cuda.device_count() is {device_count}. Please use '
+    #     raise RuntimeError('Attempting to deserialize object on xpu device '
+    #                        f'{device} but torch.xpu.device_count() is {device_count}. Please use '
     #                        'torch.load with map_location to map your storages '
     #                        'to an existing device.')
     # return device
@@ -364,9 +364,9 @@ current_module = sys.modules[__name__]
 
 
 def _xpu(self, device_idx=None, non_blocking=False, **kwargs):
-    """Returns a copy of this object in CUDA memory.
+    """Returns a copy of this object in xpu memory.
 
-    If this object is already in CUDA memory and on the correct device, then
+    If this object is already in xpu memory and on the correct device, then
     no copy is performed and the original object is returned.
 
     Args:
@@ -378,9 +378,9 @@ def _xpu(self, device_idx=None, non_blocking=False, **kwargs):
             the ``non_blocking`` argument.
     """
     # non_blocking = _get_async_or_non_blocking('xpu', non_blocking, kwargs)
-    # if self.is_cuda:
+    # if self.is_xpu:
     #     if device is None:
-    #         device = torch.cuda.current_device()
+    #         device = torch.xpu.current_device()
     #     if self.get_device() == device:
     #         return self
     # else:
@@ -388,9 +388,9 @@ def _xpu(self, device_idx=None, non_blocking=False, **kwargs):
     #         device = -1
     with device(device_idx):
         if self.is_sparse:
-            # new_type = getattr(torch.cuda.sparse, self.__class__.__name__)
-            # indices = torch._indices(self).cuda(device, non_blocking)
-            # values = torch._values(self).cuda(device, non_blocking)
+            # new_type = getattr(torch.xpu.sparse, self.__class__.__name__)
+            # indices = torch._indices(self).xpu(device, non_blocking)
+            # values = torch._values(self).xpu(device, non_blocking)
             # return new_type(indices, values, self.size())
             pass
         else:

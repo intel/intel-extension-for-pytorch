@@ -134,7 +134,7 @@ struct StoreWithCast {
   }
 };
 
-// aligned vector generates vectorized load/store on CUDA
+// aligned vector generates vectorized load/store on XPU
 template<int N_BYTES>
 struct aligned_element {};
 template<>

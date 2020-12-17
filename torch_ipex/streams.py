@@ -9,7 +9,7 @@ class Stream(torch_ipex._C._DPCPPStreamBase):
 
     @property
     def _as_parameter_(self):
-        return ctypes.c_void_p(self.cuda_stream)
+        return ctypes.c_void_p(self.xpu_stream)
 
     def __eq__(self, o):
         if isinstance(o, Stream):
