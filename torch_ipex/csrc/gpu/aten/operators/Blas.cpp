@@ -362,25 +362,17 @@ void gemm_broadcast(Tensor& result,
                     const Tensor bias = at::Tensor()) {
   std::vector<int64_t> result_shape;
   auto dim = m1.dim();
-  Tensor m2_unpack;
-  /*if(m1.is_quantized()){
-    auto& pack_ptr = cpp_custom_type_hack::cast<AtenIpexTypeQuantizedXPU::PackedLinearWeightQDPCPP>(m2);
-    m2_unpack = pack_ptr.weight;
-
-    TORCH_CHECK(m2_unpack.dim() == 2, "expected 2D tensor");
-
-    if(m2_unpack.sizes()[1] == m1.sizes()[1]){
-      m2_unpack.transpose_(0,1);
+  if(m1.is_quantized()){
+    if(m2.sizes()[1] == m1.sizes()[1]){
+      m2.transpose_(0,1);
     }
-  } else */{
-    m2_unpack = m2;
   }
   if (dim == 2) {
-    result_shape = attr.m2_trans_ ? std::vector<int64_t>{m1.size(0), m2_unpack.size(1)} :
-    std::vector<int64_t>{m1.size(0), m2_unpack.size(0)};
+    result_shape = attr.m2_trans_ ? std::vector<int64_t>{m1.size(0), m2.size(1)} :
+    std::vector<int64_t>{m1.size(0), m2.size(0)};
   } else {
-    result_shape = attr.m2_trans_ ? std::vector<int64_t>{m1.size(0), m1.size(1), m2_unpack.size(2)} :
-    std::vector<int64_t>{m1.size(0), m1.size(1), m2_unpack.size(1)};
+    result_shape = attr.m2_trans_ ? std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(2)} :
+    std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(1)};
   }
 
   Tensor bc_bias = bias;
@@ -398,7 +390,7 @@ void gemm_broadcast(Tensor& result,
     result.resize_(result_shape);
   }
 
-  dnnlGemmImpl(result, m1, m2_unpack, bc_bias, attr);
+  dnnlGemmImpl(result, m1, m2, bc_bias, attr);
 }
 } // namespace impl
 
@@ -482,42 +474,29 @@ Tensor addmm(
       beta.to<float>(),
       0,
       true);
-  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
 
-  if(m1.is_quantized()){
-    checkBackend("addmm", m1, Backend::QuantizedXPU);
-  } else {
-    checkBackend("addmm", {input, m1, m2}, Backend::XPU);
-    TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
-  }
+  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
+
+  checkBackend("addmm", {input, m1, m2}, Backend::XPU);
 
   Tensor result;
-  if(input.is_quantized()){
-    result = _empty_affine_quantized({0},
-              device(kXPU).dtype(input.scalar_type()),
-              1.f,
-              static_cast<int>(0),
-              MemoryFormat::Contiguous);
-  } else if (m1.scalar_type() == at::ScalarType::BFloat16){
+  if (m1.scalar_type() == at::ScalarType::BFloat16){
     // align with bf16 input
     result = at::empty({0}, m1.options());
   } else {
     result = at::empty({0}, input.options());
   }
 
-  if(m1.is_quantized()){
-    impl::gemm_broadcast(result, m1, m2, attr, input);
-  } else {
-    impl::gemm_broadcast(
-    result,
-    m1,
-    m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
-    // bias convert to fp32 for accuracy when input is fp16 or bf16
-    attr,
-    input.scalar_type() == ScalarType::Half ||
-            input.scalar_type() == ScalarType::BFloat16
-        ? input.to(ScalarType::Float) : input);
-  }
+  impl::gemm_broadcast(
+  result,
+  m1,
+  m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+  // bias convert to fp32 for accuracy when input is fp16 or bf16
+  attr,
+  input.scalar_type() == ScalarType::Half ||
+          input.scalar_type() == ScalarType::BFloat16
+      ? input.to(ScalarType::Float) : input);
 
   return result;
 }
@@ -820,12 +799,7 @@ Tensor addmm(
           true);
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
 
-  if(m1.is_quantized()){
-    checkBackend("addmm", m1, Backend::QuantizedXPU);
-  } else {
-    checkBackend("addmm", {input, m1, m2}, Backend::XPU);
-    TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
-  }
+  checkBackend("addmm", m1, Backend::QuantizedXPU);
 
   Tensor result;
   if(input.is_quantized()){
@@ -834,26 +808,11 @@ Tensor addmm(
                                      1.f,
                                      static_cast<int>(0),
                                      MemoryFormat::Contiguous);
-  } else if (m1.scalar_type() == at::ScalarType::BFloat16){
-    // align with bf16 input
-    result = at::empty({0}, m1.options());
   } else {
     result = at::empty({0}, input.options());
   }
 
-  if(m1.is_quantized()){
-    impl::gemm_broadcast(result, m1, m2, attr, input);
-  } else {
-    impl::gemm_broadcast(
-            result,
-            m1,
-            m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
-            // bias convert to fp32 for accuracy when input is fp16 or bf16
-            attr,
-            input.scalar_type() == ScalarType::Half ||
-            input.scalar_type() == ScalarType::BFloat16
-            ? input.to(ScalarType::Float) : input);
-  }
+  impl::gemm_broadcast(result, m1, m2, attr, input);
 
   return result;
 }
