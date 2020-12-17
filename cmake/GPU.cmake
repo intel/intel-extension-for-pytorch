@@ -240,4 +240,4 @@ endif()
 
 target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
 
-install(TARGETS torch_ipex LIBRARY DESTINATION lib)
+install(TARGETS torch_ipex LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})

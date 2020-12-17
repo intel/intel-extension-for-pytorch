@@ -131,6 +131,16 @@ class DPCPPClean(distutils.command.clean.clean, object):
     def run(self):
         import glob
         import re
+
+        installed_doc_files = [
+                "torch_ipex/requirements.txt",
+                "torch_ipex/README.md",
+                "torch_ipex/THIRD-PARTY-PROGRAMS.txt"
+                ]
+        for filename in installed_doc_files:
+            if os.path.isfile(filename):
+                os.remove(filename)
+
         with open('.gitignore', 'r') as f:
             ignores = f.read()
             pat = re.compile(r'^#( BEGIN NOT-CLEAN-FILES )?')
@@ -299,14 +309,15 @@ def get_c_module():
 setup(
     name='torch_ipex',
     version=version,
-    description='Intel PyTorch Extension',
+    description='Intel Extension for PyTorch',
     # url='https://github.com/pytorch/ipex',
-    author='Intel/PyTorch Dev Team',
+    author='Intel PyTorch Team',
+    url='https://github.com/intel/intel-extension-for-pytorch',
     # Exclude the build files.
     packages=['torch_ipex'],
     package_data={
-        'torch_ipex': ['lib/*.so',
-                       'include/*.h']},
+        '':['.md', '.txt', '.py', 'lib/*.so',
+            'include/*.h', 'include/core/*.h', 'include/utils/*.h']},
     zip_safe=False,
     ext_modules=[DPCPPExt('torch_ipex'), get_c_module()],
     cmdclass={
