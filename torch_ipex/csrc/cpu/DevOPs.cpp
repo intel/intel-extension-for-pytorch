@@ -1036,6 +1036,9 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
   auto self_reshaped = self.dim() > 2 ? dil_reshape(self, {-1, dil_size(self, self.dim() - 1)}) : self;
   const dil::tensor x = dbl::comm::try_gen_dil_tensor(self_reshaped);
+  if (!check_train()) {
+    dbl::linear::prepack_linear_weights(self_reshaped, x, weight);
+  }
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
 
   c10::optional<dil::tensor> b{c10::nullopt};

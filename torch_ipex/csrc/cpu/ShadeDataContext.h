@@ -56,9 +56,17 @@ struct ShadeDataContext {
   MIX_PREC_TYPE      mix_prec_type; ///< Record if the aten tensor is mix-precision
   SHADE_TENSOR_TAG   shade_tensor_tag; ///< Record if the tensor is a PARAMETER (in mix-precision, never reorder a PARAMETER to bf16)
 
+ // Generally, to get bert performance oneDNN kernel,  we need pack tensor to specific format (like ab -> ba)
+  // For weight tensor, since each iter the packed format is the same, we should only pack once via using this flag
+  // Note: while a tensor has been inplace reordered, this tensor will be attached a new ShadeDataContext
+  // and the flag for "packed" will be auto automaticly set to "false". This is  exactly what we want now because 
+  // only reorder for auto mix precision is inplace now, and new dtype may need new format for oneDNN kernel
+  bool packed;
+
   ShadeDataContext() : dil_tensor(),
                        cpu_raw_data(nullptr),
                        cpu_del_fun(nullptr),
+                       packed(false),
                        data_type(SHADE_DATA_TYPE::CPU_RAW),
                        mix_prec_type(MIX_PREC_TYPE::NONE),
                        shade_tensor_tag(SHADE_TENSOR_TAG::OTHER) {}
@@ -262,6 +270,30 @@ struct ShadeDataContext {
     shade_data_context->shade_tensor_tag = SHADE_TENSOR_TAG::PARAM;
   }
 
+  /**
+   * Check if the input aten tensor is already packed.
+   *
+   * @param tensor input aten tensor
+   */
+  static inline bool isPackedTensor(const at::Tensor &tensor) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
+    if (!check_tensor_own_shade_context(tensor)) return false;
+    void *storage_context = tensor.storage().data_ptr().get_context();
+    ShadeDataContext *shade_data_context = (ShadeDataContext*)storage_context;
+    return shade_data_context->packed;
+  }
+
+  /**
+   * Set the packing status of the input aten tensor.
+   *
+   * @param tensor input aten tensor
+   */
+  static inline void setPackedTensor(const at::Tensor &tensor, bool value) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
+    void *storage_context = tensor.storage().data_ptr().get_context();
+    ShadeDataContext *shade_data_context = (ShadeDataContext*)storage_context;
+    shade_data_context->packed = value;
+  }
 };
 
 }  // namespace cpu

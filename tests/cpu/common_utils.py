@@ -88,6 +88,7 @@ import torch.backends.mkl
 from torch.autograd import gradcheck
 from torch.autograd.gradcheck import gradgradcheck
 
+import intel_pytorch_extension as ipex
 
 torch.backends.disable_global_flags()
 
@@ -1047,6 +1048,56 @@ class TestCase(expecttest.TestCase):
         assertNotRegex = unittest.TestCase.assertNotRegexpMatches
 
 
+class VerboseTestCase(TestCase):
+
+    def __init__(self, method_name='runTest'):
+        super(TestCase, self).__init__(method_name)
+
+    def is_dnnl_verbose(self, line):
+        tokens = line.strip().split(',')
+        return tokens[0] == 'dnnl_verbose' and len(tokens) == 11
+
+    def is_dnnl_reorder(self, line):
+        assert self.is_dnnl_verbose(line)
+        return line.strip().split(',')[3] == 'reorder'
+
+    def get_reorder_info(self, line):
+        assert self.is_dnnl_reorder(line)
+        tokens = line.split(',')
+        src_desc, dst_desc = tokens[6].split(' ')
+        src_dtype = src_desc.split('::')[0].split('-')
+        src_format = src_desc.split('::')[1]
+        dst_dtype = dst_desc.split('::')[0].split('-')
+        dst_format = dst_desc.split('::')[1]
+        return src_dtype, src_format, dst_dtype, dst_format
+
+    def ReorderForPack(self, line):
+        if not self.is_dnnl_reorder(line):
+            return False
+        src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
+        return src_dtype == dst_dtype
+
+    def OnlyReorderDtype(self, line):
+        if not self.is_dnnl_reorder(line):
+            return False
+        src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
+        return src_dtype != dst_dtype and src_format == dst_dtype
+        
+    def OnlyReorderFormat(self, line):
+        if not self.is_dnnl_reorder(line):
+            return False
+        src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
+        return src_dtype == dst_dtype and src_format != dst_dtype
+
+    def assertOnlyReorderDtype(self, line):
+        assert OnlyReorderDtype(line), 'the verbose msg shows not only reorder dtype'
+        
+    def assertOnlyReorderFormat(self, line):
+        assert OnlyReorderFormat(line), 'the verbose msg shows not only reorder format'
+
+    def assertNotReorder(self, line):
+        assert not is_dnnl_reorder(line)
+
 def download_file(url, binary=True):
     if sys.version_info < (3,):
         from urlparse import urlsplit
@@ -1356,3 +1407,12 @@ dtype2prec_DONTUSE = {torch.float: 1e-5,
                       torch.double: 1e-5,
                       torch.half: 1e-2,
                       torch.bfloat16: 1e-1}
+
+# using data to do calibration for model and saving int8 configs at dir
+def  int8_calibration(model, data, dir):
+    conf = ipex.AmpConf(torch.int8)
+    with torch.no_grad():
+        for x in data:
+            with ipex.AutoMixPrecision(conf, running_mode="calibration"):
+                model(x)
+    conf.save(dir)

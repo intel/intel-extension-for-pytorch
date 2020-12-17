@@ -25,6 +25,7 @@
 #include "cpu/ExtendOPs.h"
 #include "cpu/MlpOPs.h"
 #include "cpu/ExternalOPs.h"
+#include "cpu/dbl/Common.h"
 #include "quantization/Observer.h"
 #include "cpu/FusionOPs.h"
 
@@ -88,6 +89,10 @@ dil::dims getDilStorageStrides(const at::Tensor &tensor) {
   }
   return dil::dims();
 }
+
+void reorder_to_float32(at::Tensor &tensor){
+  cpu::dbl::comm::reorder_to_dtype(tensor, at::kFloat);
+}
 /// ****************************
 
 void InitIpexModuleBindings(py::module m) {
@@ -124,6 +129,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_dil_tensor_strides", &getDilStorageStrides);
   m.def("set_parameter_tensor", &setParameterTensor);
   m.def("is_parameter_tensor", &isParameterTensor);
+  m.def("reorder_to_float32", &reorder_to_float32);
   m.def("enable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(true); });
   m.def("disable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
   m.def("get_jit_opt", []() { return AutoOptConfig::singleton().get_jit_fuse(); });

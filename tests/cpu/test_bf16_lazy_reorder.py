@@ -1167,6 +1167,7 @@ class TestLinear(TestCase):
                     self.assertEqual(res_auto_mix, res_man_bf16.float())
 
     def test_linear_backward(self):
+        ipex.core.set_execution_mode(train = True)
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)

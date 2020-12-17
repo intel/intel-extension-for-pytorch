@@ -27,10 +27,7 @@ public:
     try {
       if (torch_ipex::check_auto_dnnl() &&
           input.device().type() == c10::DeviceType::DPCPP) {
-        return torch_ipex::cpu::AtenIpexCPUDev::dil_linear(
-            input.is_contiguous() ? input : input.contiguous(),
-            weight.is_contiguous() ? weight : weight.contiguous(),
-            bias.is_contiguous() ? bias : bias.contiguous());
+        return torch_ipex::cpu::AtenIpexCPUDev::dil_linear(input, weight, bias);
       }
     } catch (std::exception &e) {
 #if defined(_DEBUG)

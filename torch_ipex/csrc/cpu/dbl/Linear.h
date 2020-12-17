@@ -18,6 +18,11 @@ dil::tensor linear_impl(
     const dil::scale_t& dst_scales = dil::scale_t(),
     const dil::attr_t& attr = dil::attr_t());
 
+void prepack_linear_weights(
+    const at::Tensor& input,
+    const dil::tensor& dil_input,
+    const at::Tensor& weight);
+    
 } // namespace linear
 } // namespace dbl
 } // namespace cpu
