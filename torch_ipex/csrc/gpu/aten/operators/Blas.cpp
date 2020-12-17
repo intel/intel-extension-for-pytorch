@@ -259,7 +259,7 @@ void dnnlGemmImpl(
       m1_memory = dpcpp_onednn_memory(expected_m1_md, engine, m1_.data_ptr());
 #ifdef USE_PRIMITIVE_CACHE
       create_key(key_r, m1_md, expected_m1_md);
-      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key, m1_usr_memory, m1_memory);
+      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key_r, m1_usr_memory, m1_memory);
 #else
       auto reorder_p = dnnl::reorder(m1_usr_memory, m1_memory);
 #endif
@@ -282,7 +282,7 @@ void dnnlGemmImpl(
       }
 #ifdef USE_PRIMITIVE_CACHE
       create_key(key_r, m2_md, expected_m2_md);
-      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key, m2_usr_memory, m2_memory);
+      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key_r, m2_usr_memory, m2_memory);
 #else
       auto reorder_p = dnnl::reorder(m2_usr_memory, m2_memory);
 #endif
@@ -308,7 +308,7 @@ void dnnlGemmImpl(
       if (attr.beta_ != 1.f) {
 #ifdef USE_PRIMITIVE_CACHE
       create_key(key_r, r_md, expected_r_md);
-      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key, r_usr_memory, r_memory);
+      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key_r, r_usr_memory, r_memory);
 #else
       auto reorder_p = dnnl::reorder(r_usr_memory, r_memory);
 #endif
@@ -338,6 +338,14 @@ void dnnlGemmImpl(
     {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
       {DNNL_ARG_DST, r_memory}});
 #endif
+
+#ifdef USE_GEN12HP_ONEDNN
+  if (lazy_reorder_enabled() && r_memory != r_usr_memory && dims == 2) {
+    auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(r_);
+    DPCPPTensorContext::set_tensor_ctx(result, std::move(blk_ctx));
+  }
+#endif
+
 }
 
 bool check_broadcast(const Tensor& src, const IntArrayRef& shape){
