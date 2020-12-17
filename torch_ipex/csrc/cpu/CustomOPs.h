@@ -50,6 +50,7 @@ public:
       return at::linear(input, weight, bias);
     }
   }
+
   static at::Tensor forward(torch::autograd::AutogradContext *ctx,
                             at::Tensor input, at::Tensor weight,
                             at::Tensor bias = at::Tensor()) {
@@ -208,6 +209,7 @@ public:
     }
     return std::tuple<at::Tensor, at::Tensor>(output, indices);
   }
+
   static at::Tensor forward(torch::autograd::AutogradContext *ctx,
                             at::Tensor input, at::IntArrayRef kernel_size,
                             at::IntArrayRef stride, at::IntArrayRef padding,
@@ -333,6 +335,7 @@ public:
     }
     return std::tuple<at::Tensor, at::Tensor>(output, indices);
   }
+
   static at::Tensor forward(torch::autograd::AutogradContext *ctx,
                             at::Tensor input, at::IntArrayRef kernel_size,
                             at::IntArrayRef stride, at::IntArrayRef padding,
@@ -573,6 +576,7 @@ public:
       return {std::get<0>(ret), std::get<1>(ret), std::get<2>(ret),std::get<3>(ret)};
     }
   }
+
   static std::vector<at::Tensor>
   forward(torch::autograd::AutogradContext *ctx, const at::Tensor &weight,
           const at::Tensor &indices, const at::Tensor &offsets,
@@ -602,6 +606,7 @@ public:
                               at::Tensor()});
     return ret;
   }
+
   static torch::autograd::tensor_list
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
@@ -813,5 +818,45 @@ public:
 #endif
     }
     IPEX_CHECK(false, "RNN backward not support fallback path now");
+  }
+};
+
+class FrozenBatchNormOp : public torch::autograd::Function<FrozenBatchNormOp> {
+public:
+  static at::Tensor _forward(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean, const at::Tensor& running_var) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("FrozenBatchNormOp::_forward",
+                    std::vector<c10::IValue>({input, weight, bias, running_mean, running_var}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
+    return torch_ipex::cpu::AtenIpexCPUDev::dil_frozen_batch_norm(input, weight, bias, running_mean, running_var, 0);
+  }
+
+  static at::Tensor forward(torch::autograd::AutogradContext *ctx,
+                            const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean, const at::Tensor& running_var) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("FrozenBatchNormOp::forward",
+                    std::vector<c10::IValue>({input, weight, bias, running_mean, running_var}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
+    ctx->save_for_backward({input, weight, running_mean, running_var});
+    return torch_ipex::cpu::AtenIpexCPUDev::dil_frozen_batch_norm(input, weight, bias, running_mean, running_var, 0);
+  }
+
+  static torch::autograd::tensor_list
+  backward(torch::autograd::AutogradContext *ctx,
+           torch::autograd::tensor_list grad_outputs) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("FrozenBatchNormOp::backward", std::vector<c10::IValue>({}),
+                    torch::autograd::Node::peek_at_next_sequence_nr());
+#endif
+    auto saved = ctx->get_saved_variables();
+    at::Tensor input = saved[0];
+    at::Tensor weight = saved[1];
+    at::Tensor running_mean = saved[2];
+    at::Tensor running_var = saved[3];
+    at::Tensor grad_output = grad_outputs[0].contiguous();
+    auto output = torch_ipex::cpu::AtenIpexCPUDev::dil_frozen_batch_norm_backward(grad_output, input, weight, running_mean, running_var, 0);
+    return {output, at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor()};
   }
 };

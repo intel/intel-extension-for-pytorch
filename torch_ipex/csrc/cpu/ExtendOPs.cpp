@@ -588,6 +588,12 @@ at::Tensor AtenIpexTypeExt::linear_relu(const at::Tensor &input,
   return cpu::AtenIpexJITDev::dil_linear_fuse_eltwise(input, weight, at::Tensor(), dil::attr_t::fuse_relu());
 }
 
+at::Tensor AtenIpexTypeExt::frozen_batch_norm(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean, const at::Tensor& running_var) {
+  if (at::GradMode::is_enabled())
+    return FrozenBatchNormOp::apply(input, weight, bias, running_mean, running_var);
+  return FrozenBatchNormOp::_forward(input, weight, bias, running_mean, running_var);
+}
+
 } // namespace torch_ipex
 
 namespace {
@@ -642,5 +648,6 @@ static auto dispatch =
               return torch_ipex::AtenIpexTypeExt::gru(input, hidden, params, has_biases, num_layers, dropout_p, train, bidirectional, batch_first);
             })
         .op("torch_ipex::interaction_forward", &torch_ipex::AtenIpexTypeExt::interaction_forward)
-        .op("torch_ipex::interaction_backward", &torch_ipex::AtenIpexTypeExt::interaction_backward);
+        .op("torch_ipex::interaction_backward", &torch_ipex::AtenIpexTypeExt::interaction_backward)
+        .op("torch_ipex::frozen_batch_norm", torch_ipex::AtenIpexTypeExt::frozen_batch_norm);
 }

@@ -1322,6 +1322,81 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
       dbl::comm::gen_aten_tensor_by(std::move(gradb)));
 }
 
+at::Tensor AtenIpexCPUDev::dil_frozen_batch_norm(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    const at::Tensor& running_mean,
+    const at::Tensor& running_var,
+    double eps) {
+  DEBUG("AtenIpexCPUDev::dil_frozen_batch_norm\n");
+  CHECK_DNNL_OP_PRE_COND(input);
+  CHECK_DNNL_OP_PRE_COND(weight);
+  IPEX_CHECK(input.dim() == 4 || input.dim() == 5,
+             "mkldnn_batch_norm: currently mkldnn only support 2d and 3d batchnorm");
+
+  std::vector<float> input_scales = {};
+  std::vector<float> output_scales = {};
+  bool quantized = false;
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    std::vector<std::vector<float>> scales;
+    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/false);
+    //quantized = false;
+    if (quantized) {
+      input_scales = scales[0];
+      output_scales = scales[1];
+      dbl::comm::reorder_to_int8_for_mix_prec(input, input_scales);
+    } else {
+      dbl::comm::reorder_to_dtype(input, at::kFloat);
+    }
+  } else {
+    dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
+  }
+
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
+  dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
+  dil::tensor b = dbl::comm::try_gen_dil_tensor(bias);
+  dil::tensor m = dbl::comm::try_gen_dil_tensor(running_mean);
+  dil::tensor v = dbl::comm::try_gen_dil_tensor(running_var);
+  dil::tensor y;
+  dil::batch_normalization_forward_inference::compute(
+      x, m, v, w, b, y, eps, input_scales, output_scales);
+
+  auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
+  if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
+    insert_or_updata_observer({input}, {aten_output}, "BatchNorm");
+  }
+  return aten_output;
+}
+
+at::Tensor AtenIpexCPUDev::dil_frozen_batch_norm_backward(const at::Tensor& grad_output,
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& running_mean,
+    const at::Tensor& running_var,
+    double eps) {
+  DEBUG("AtenIpexCPUDev::dil_frozen_batch_norm_backward\n");
+  CHECK_DNNL_OP_PRE_COND(input);
+  CHECK_DNNL_OP_PRE_COND(weight);
+
+  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+
+  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
+  dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
+
+  dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_contiguous);
+  dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
+  dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
+  dil::tensor m = dbl::comm::try_gen_dil_tensor(running_mean);
+  dil::tensor v = dbl::comm::try_gen_dil_tensor(running_var);
+
+  dil::tensor gradx, gradw, gradb;
+  dil::batch_normalization_backward::compute(
+      x, m, v, grady, w, gradx, gradw, gradb, eps, dil::tensor(), dil::batch_normalization_flag::use_global_stats | dil::batch_normalization_flag::use_scale_shift);
+
+  return dbl::comm::gen_aten_tensor_by(std::move(gradx));
+}
+
 at::Tensor AtenIpexCPUDev::dil_max_pooling(
     const at::Tensor& input,
     at::IntArrayRef kernel_size,

@@ -12,3 +12,4 @@ from .nms import *
 from .lstm import *
 from .rnn import *
 from .gru import *
+from .frozen_batch_norm import *
