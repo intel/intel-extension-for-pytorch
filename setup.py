@@ -310,13 +310,12 @@ setup(
     name='torch_ipex',
     version=version,
     description='Intel Extension for PyTorch',
-    # url='https://github.com/pytorch/ipex',
     author='Intel PyTorch Team',
     url='https://github.com/intel/intel-extension-for-pytorch',
     # Exclude the build files.
     packages=['torch_ipex'],
     package_data={
-        '':['.md', '.txt', '.py', 'lib/*.so',
+        'torch_ipex':['.md', '.txt', '.py', 'lib/*.so',
             'include/*.h', 'include/core/*.h', 'include/utils/*.h']},
     zip_safe=False,
     ext_modules=[DPCPPExt('torch_ipex'), get_c_module()],

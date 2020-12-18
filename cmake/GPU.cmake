@@ -194,13 +194,12 @@ set_source_files_properties(${TORCH_IPEX_SRCS} COMPILE_FLAGS "${IPEX_COMPILE_FLA
 
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
-if(USE_AOT_DEVLIST)
-  set(BUILD_BY_PER_KERNEL OFF)
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT} -Xsycl-target-backend=${AOT_ARCH_OPT} \"-device ${USE_AOT_DEVLIST}\"")
-elseif(BUILD_BY_PER_KERNEL)
+if(BUILD_BY_PER_KERNEL)
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
+elseif(USE_AOT_DEVLIST)
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT} -Xsycl-target-backend=${AOT_ARCH_OPT} \"-device ${USE_AOT_DEVLIST}\"")
 else()
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
 endif()
@@ -240,4 +239,4 @@ endif()
 
 target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
 
-install(TARGETS torch_ipex LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+install(TARGETS torch_ipex LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
