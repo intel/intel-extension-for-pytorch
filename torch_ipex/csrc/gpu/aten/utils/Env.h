@@ -8,7 +8,7 @@ enum DPCPP_ENV {
   ENV_WEIGHT_CACHE,
   ENV_TILE_AS_DEVICE,
   ENV_DEV_INDEX ,
-  ENV_LOOPS_TEST};
+  ENV_LEGACY_LOOPS};
 
 int dpcpp_env(int env);
 

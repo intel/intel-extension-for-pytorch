@@ -464,7 +464,7 @@ void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
     return;
   }
 
-  if (dpcpp_env(ENV_LOOPS_TEST)) {
+  if (dpcpp_env(ENV_LEGACY_LOOPS)) {
     // legacy code
     dpcpp_loops_kernel_impl(iter, f);
   } else {
