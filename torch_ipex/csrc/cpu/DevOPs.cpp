@@ -22,6 +22,7 @@
 #include "dbl/DNNLChecker.h"
 #include "dbl/Linear.h"
 #include "dbl/RNN.h"
+#include "dbl/UpSample.h"
 #include "ShadeDataContext.h"
 
 #include "dil/dil.hpp"
@@ -2517,193 +2518,79 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_rnn_layer_backward(const at::Tensor&
 at::Tensor AtenIpexCPUDev::dil_upsample_nearest1d(const at::Tensor & self, at::IntArrayRef output_size, c10::optional<double> scales) {
   DEBUG("AtenIpexCPUDev::dil_upsample_nearest1d\n");
   CHECK_DNNL_OP_PRE_COND(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
-  dil::tensor y;
-  auto out_size = self.sizes().vec();
-  out_size[self.dim() - 1] = output_size.vec()[0];
-  if (scales.has_value()) {
-    dil::resampling_forward::compute(x, y, out_size, {float(scales.value())}, dil::algorithm::resampling_nearest);
-  } else {
-    dil::resampling_forward::compute(x, y, out_size, {}, dil::algorithm::resampling_nearest);
-  }
-  return dbl::comm::gen_aten_tensor_by(std::move(y));
+  return dbl::upsample::dil_upsample(self, output_size, dil::algorithm::resampling_nearest, scales);
 }
 
 at::Tensor AtenIpexCPUDev::dil_upsample_nearest1d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, c10::optional<double> scales) {
   DEBUG("AtenIpexCPUDev::dil_upsample_nearest1d_backward\n");
   CHECK_DNNL_OP_PRE_COND(grad_output);
-  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
-  dil::tensor dy = dbl::comm::try_gen_dil_tensor(grad_output);
-  dil::tensor dx;
-  if (scales.has_value()) {
-    dil::resampling_backward::compute(dy, dx, input_size.vec(), {float(scales.value())}, dil::algorithm::resampling_nearest);
-  } else {
-    dil::resampling_backward::compute(dy, dx, input_size.vec(), {}, dil::algorithm::resampling_nearest);
-  }
-  return dbl::comm::gen_aten_tensor_by(std::move(dx));
+  return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_nearest, scales);
 }
 
 at::Tensor AtenIpexCPUDev::dil_upsample_nearest2d(const at::Tensor& input, at::IntArrayRef output_size, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   DEBUG("AtenIpexCPUDev::dil_upsample_nearest2d\n");
   CHECK_DNNL_OP_PRE_COND(input);
-  dbl::comm::reorder_to_bf16_for_mix_prec(input);
-  dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
-  dil::tensor y;
-  auto out_size = input.sizes().vec();
-  out_size[input.dim() - 2] = output_size.vec()[0];
-  out_size[input.dim() - 1] = output_size.vec()[1];
-  if (scales_h.has_value() && scales_w.has_value()) {
-    dil::resampling_forward::compute(x, y, out_size, {float(scales_h.value()), float(scales_w.value())}, dil::algorithm::resampling_nearest);
-  } else {
-    dil::resampling_forward::compute(x, y, out_size, {}, dil::algorithm::resampling_nearest);
-  }
-  return dbl::comm::gen_aten_tensor_by(std::move(y));
+  return dbl::upsample::dil_upsample(input, output_size, dil::algorithm::resampling_nearest, scales_h, scales_w);
 }
 
 at::Tensor AtenIpexCPUDev::dil_upsample_nearest2d_backward(const at::Tensor& grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   DEBUG("AtenIpexCPUDev::dil_upsample_nearest2d_backward\n");
   CHECK_DNNL_OP_PRE_COND(grad_output);
-  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
-  dil::tensor dy = dbl::comm::try_gen_dil_tensor(grad_output);
-  dil::tensor dx;
-  if (scales_h.has_value() && scales_w.has_value()) {
-    dil::resampling_backward::compute(dy, dx, input_size.vec(), {float(scales_h.value()), float(scales_w.value())}, dil::algorithm::resampling_nearest);
-  } else {
-    dil::resampling_backward::compute(dy, dx, input_size.vec(), {}, dil::algorithm::resampling_nearest);
-  }
-  return dbl::comm::gen_aten_tensor_by(std::move(dx));
+  return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_nearest, scales_h, scales_w);
 }
 
 at::Tensor AtenIpexCPUDev::dil_upsample_nearest3d(const at::Tensor & self, at::IntArrayRef output_size, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   DEBUG("AtenIpexCPUDev::dil_upsample_nearest3d\n");
   CHECK_DNNL_OP_PRE_COND(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
-  dil::tensor y;
-  auto out_size = self.sizes().vec();
-  out_size[self.dim() - 3] = output_size.vec()[0];
-  out_size[self.dim() - 2] = output_size.vec()[1];
-  out_size[self.dim() - 1] = output_size.vec()[2];
-  if (scales_d.has_value() && scales_h.has_value() && scales_w.has_value()) {
-    dil::resampling_forward::compute(x, y, out_size, {float(scales_d.value()), float(scales_h.value()), float(scales_w.value())}, dil::algorithm::resampling_nearest);
-  } else {
-    dil::resampling_forward::compute(x, y, out_size, {}, dil::algorithm::resampling_nearest);
-  }
-  return dbl::comm::gen_aten_tensor_by(std::move(y));
+  return dbl::upsample::dil_upsample(self, output_size, dil::algorithm::resampling_nearest, scales_d, scales_h, scales_w);
 }
 
 at::Tensor AtenIpexCPUDev::dil_upsample_nearest3d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   DEBUG("AtenIpexCPUDev::dil_upsample_nearest3d_backward\n");
   CHECK_DNNL_OP_PRE_COND(grad_output);
-  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
-  dil::tensor dy = dbl::comm::try_gen_dil_tensor(grad_output);
-  dil::tensor dx;
-  if (scales_d.has_value() && scales_h.has_value() && scales_w.has_value()) {
-    dil::resampling_backward::compute(dy, dx, input_size.vec(), {float(scales_d.value()), float(scales_h.value()), float(scales_w.value())}, dil::algorithm::resampling_nearest);
-  } else {
-    dil::resampling_backward::compute(dy, dx, input_size.vec(), {}, dil::algorithm::resampling_nearest);
-  }
-  return dbl::comm::gen_aten_tensor_by(std::move(dx));
+  return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_nearest, scales_d, scales_h, scales_w);
 }
 
 at::Tensor AtenIpexCPUDev::dil_upsample_linear1d(const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales) {
   DEBUG("AtenIpexCPUDev::dil_upsample_linear1d\n");
   IPEX_CHECK(align_corners == false, "dil_upsample_linear1d not support align_corners mode yet");
   CHECK_DNNL_OP_PRE_COND(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
-  dil::tensor y;
-  auto out_size = self.sizes().vec();
-  out_size[self.dim() - 1] = output_size.vec()[0];
-  if (scales.has_value()) {
-    dil::resampling_forward::compute(x, y, out_size, {float(scales.value())}, dil::algorithm::resampling_linear);
-  } else {
-    dil::resampling_forward::compute(x, y, out_size, {}, dil::algorithm::resampling_linear);
-  }
-  return dbl::comm::gen_aten_tensor_by(std::move(y));
+  return dbl::upsample::dil_upsample(self, output_size, dil::algorithm::resampling_linear, scales);
 }
 
 at::Tensor AtenIpexCPUDev::dil_upsample_linear1d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales) {
   DEBUG("AtenIpexCPUDev::dil_upsample_linear1d_backward\n");
   IPEX_CHECK(align_corners == false, "dil_upsample_linear1d_backward not support align_corners mode yet");
   CHECK_DNNL_OP_PRE_COND(grad_output);
-  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
-  dil::tensor dy = dbl::comm::try_gen_dil_tensor(grad_output);
-  dil::tensor dx;
-  if (scales.has_value()) {
-    dil::resampling_backward::compute(dy, dx, input_size.vec(), {float(scales.value())}, dil::algorithm::resampling_linear);
-  } else {
-    dil::resampling_backward::compute(dy, dx, input_size.vec(), {}, dil::algorithm::resampling_linear);
-  }
-  return dbl::comm::gen_aten_tensor_by(std::move(dx));
+  return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_linear, scales);
 }
 
 at::Tensor AtenIpexCPUDev::dil_upsample_bilinear2d(const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   DEBUG("AtenIpexCPUDev::dil_upsample_bilinear2d\n");
   IPEX_CHECK(align_corners == false, "dil_upsample_bilinear2d not support align_corners mode yet");
   CHECK_DNNL_OP_PRE_COND(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
-  dil::tensor y;
-  auto out_size = self.sizes().vec();
-  out_size[self.dim() - 2] = output_size.vec()[0];
-  out_size[self.dim() - 1] = output_size.vec()[1];
-  if (scales_h.has_value() && scales_w.has_value()) {
-    dil::resampling_forward::compute(x, y, out_size, {float(scales_h.value()), float(scales_w.value())}, dil::algorithm::resampling_linear);
-  } else {
-    dil::resampling_forward::compute(x, y, out_size, {}, dil::algorithm::resampling_linear);
-  }
-  return dbl::comm::gen_aten_tensor_by(std::move(y));
+  return dbl::upsample::dil_upsample(self, output_size, dil::algorithm::resampling_linear, scales_h, scales_w);
 }
 
 at::Tensor AtenIpexCPUDev::dil_upsample_bilinear2d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   DEBUG("AtenIpexCPUDev::dil_upsample_bilinear2d_backward\n");
   IPEX_CHECK(align_corners == false, "dil_upsample_bilinear2d_backward not support align_corners mode yet");
   CHECK_DNNL_OP_PRE_COND(grad_output);
-  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
-  dil::tensor dy = dbl::comm::try_gen_dil_tensor(grad_output);
-  dil::tensor dx;
-  if (scales_h.has_value() && scales_w.has_value()) {
-    dil::resampling_backward::compute(dy, dx, input_size.vec(), {float(scales_h.value()), float(scales_w.value())}, dil::algorithm::resampling_linear);
-  } else {
-    dil::resampling_backward::compute(dy, dx, input_size.vec(), {}, dil::algorithm::resampling_linear);
-  }
-  return dbl::comm::gen_aten_tensor_by(std::move(dx));
+  return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_linear, scales_h, scales_w);
 }
 
 at::Tensor AtenIpexCPUDev::dil_upsample_trilinear3d(const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   DEBUG("AtenIpexCPUDev::dil_upsample_trilinear3d\n");
   IPEX_CHECK(align_corners == false, "dil_upsample_trilinear3d not support align_corners mode yet");
   CHECK_DNNL_OP_PRE_COND(self);
-  dbl::comm::reorder_to_bf16_for_mix_prec(self);
-  dil::tensor x = dbl::comm::try_gen_dil_tensor(self);
-  dil::tensor y;
-  auto out_size = self.sizes().vec();
-  out_size[self.dim() - 3] = output_size.vec()[0];
-  out_size[self.dim() - 2] = output_size.vec()[1];
-  out_size[self.dim() - 1] = output_size.vec()[2];
-  if (scales_d.has_value() && scales_h.has_value() && scales_w.has_value()) {
-    dil::resampling_forward::compute(x, y, out_size, {float(scales_d.value()), float(scales_h.value()), float(scales_w.value())}, dil::algorithm::resampling_linear);
-  } else {
-    dil::resampling_forward::compute(x, y, out_size, {}, dil::algorithm::resampling_linear);
-  }
-  return dbl::comm::gen_aten_tensor_by(std::move(y));
+  return dbl::upsample::dil_upsample(self, output_size, dil::algorithm::resampling_linear, scales_d, scales_h, scales_w);
 }
 
 at::Tensor AtenIpexCPUDev::dil_upsample_trilinear3d_backward(const at::Tensor & grad_output, at::IntArrayRef output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   DEBUG("AtenIpexCPUDev::dil_upsample_trilinear3d_backward\n");
   IPEX_CHECK(align_corners == false, "dil_upsample_trilinear3d_backward not support align_corners mode yet");
   CHECK_DNNL_OP_PRE_COND(grad_output);
-  dbl::comm::reorder_to_bf16_for_mix_prec(grad_output);
-  dil::tensor dy = dbl::comm::try_gen_dil_tensor(grad_output);
-  dil::tensor dx;
-  if (scales_d.has_value() && scales_h.has_value() && scales_w.has_value()) {
-    dil::resampling_backward::compute(dy, dx, input_size.vec(), {float(scales_d.value()), float(scales_h.value()), float(scales_w.value())}, dil::algorithm::resampling_linear);
-  } else {
-    dil::resampling_backward::compute(dy, dx, input_size.vec(), {}, dil::algorithm::resampling_linear);
-  }
-  return dbl::comm::gen_aten_tensor_by(std::move(dx));
+  return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_linear, scales_d, scales_h, scales_w);
 }
 
 }  // namespace cpu
