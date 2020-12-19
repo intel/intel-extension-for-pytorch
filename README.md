@@ -8,7 +8,9 @@
 | ------ | ------ | ------ | ------ |
 | **Gen9** | Ubuntu-20.04 | [compute runtime 20.43.18277](https://github.com/intel/compute-runtime/releases/tag/20.43.18277) | 3.6 + |
 | **DG1** | Ubuntu-20.04 |  [Pytorch BKC](https://wiki.ith.intel.com/pages/viewpage.action?spaceKey=OSGCSH&title=PyTorch+Environment+BKC)| 3.6 + |
+| **DG1** | OpenSUSE Leap 15sp2| [BKC](about:blank) | 3.6+ |
 | **ATS** | Ubuntu-20.04 |  [PyTorch BKC](https://wiki.ith.intel.com/pages/viewpage.action?spaceKey=OSGCSH&title=PyTorch+Environment+BKC) | 3.6 + |
+| **ATS** | OpenSUSE Leap 15sp2| [BKC](about:blank) | 3.6+ |
 
 ### **Dependence:**
 
@@ -24,19 +26,36 @@ logout
 
 ## **Compiler Version and Setting:**
 
-### [Intel® oneAPI Base Toolkit(Beta) for Linux](https://dynamicinstaller.intel.com/oneapi/toolkits/base-kit/linux/)
+### Using oneAPI BaseKit 
 
-### install complier
+#### [Intel® oneAPI Base Toolkit(Beta) for Linux](https://dynamicinstaller.intel.com/oneapi/toolkits/base-kit/linux/)
+
+#### install complier
 
 ```bash
 chmod +x ./l_[Toolkit Name]Kit_[version].sh
 bash ./l_[Toolkit Name]Kit_[version].sh -s -a --silent --eula accept
 ```
 
-- Environment Variables Setting for DPC++:
+- Evironment Variables Setting for DPC++:
 
 ```bash
 export DPCPP_ROOT=${HOME}/intel/oneapi/compiler/latest/linux
+export LD_LIBRARY_PATH=${DPCPP_ROOT}/lib:${DPCPP_ROOT}/compiler/lib/intel64_lin:${LD_LIBRARY_PATH}
+export PATH=${DPCPP_ROOT}/bin:$PATH
+```
+### Using Intel LLVM for DPC++ Preview Vesion
+
+#### install complier
+
+```bash
+tar zxvf xxxx.tar.gz
+```
+
+- Evironment Variables Setting for DPC++:
+
+```bash
+export DPCPP_ROOT=path/to/compiler/latest/linux
 export LD_LIBRARY_PATH=${DPCPP_ROOT}/lib:${DPCPP_ROOT}/compiler/lib/intel64_lin:${LD_LIBRARY_PATH}
 export PATH=${DPCPP_ROOT}/bin:$PATH
 ```
@@ -49,48 +68,41 @@ Finally, compile and execute the following program and check the result. It is o
 ```c++
 // source file: device_enum.cpp
 #include <CL/sycl.hpp>
-#include <iostream>
-#include <map>
 #include <stdlib.h>
-#include <string>
-#include <vector>
 
-using namespace std;
-
-map<string, vector<string>> enumDevices() {
-  map<string, vector<string>> enummap;
-  auto platform_list = cl::sycl::platform::get_platforms();
-  for (const auto &platform : platform_list) {
-    if (platform.is_host() == false) {
-      auto platform_name = platform.get_info<cl::sycl::info::platform::name>();
-      auto devices = platform.get_devices();
-      for (const auto &device : devices) {
-        vector<string> temp;
-        if (device.is_gpu()) {
-          auto name = device.get_info<cl::sycl::info::device::name>();
-          temp.push_back(name);
-        }
-        enummap.insert(pair<string, vector<string>>(platform_name, temp));
+int main(int argc, char *argv[]) {
+  std::cout
+      << "================================================================\n";
+  std::cout
+      << "           Available DPC++ Platforms / Devices                  \n";
+  std::cout
+      << "================================================================\n";
+  sycl::vector_class<sycl::platform> platforms =
+      sycl::platform::get_platforms();
+  for (size_t pid = 0; pid < platforms.size(); pid++) {
+    sycl::string_class pname =
+        platforms[pid].get_info<sycl::info::platform::name>();
+    std::cout << "|Platform" << pid << " :\n"
+              << "|" << pname << std::endl;
+    sycl::vector_class<sycl::device> devices =
+        platforms[pid].get_devices(sycl::info::device_type::all);
+    for (size_t device_id = 0; device_id < devices.size(); device_id++) {
+      sycl::string_class dname =
+          devices[device_id].get_info<sycl::info::device::name>();
+      sycl::string_class dtype;
+      if (devices[device_id].is_gpu()) {
+        dtype = "GPU";
+      } else {
+        dtype = "NonGPU";
       }
+      std::cout << "|\t|__|Device" << device_id << " :\n"
+                << "|\t|  |" << dname << " (" << dtype << ")" << std::endl;
     }
+    std::cout
+        << "----------------------------------------------------------------\n";
   }
-  return enummap;
 }
 
-int main() {
-  auto enummap = enumDevices();
-  cout << "==============================================================" << endl
-       << "                    All Available Backend                     " << endl
-       << "==============================================================" << endl;
-  for (map<string, vector<string>>::iterator each = enummap.begin(); each != enummap.end(); ++each) {
-    cout << "|Platform:" << endl << "|" << (*each).first << endl << "|\t|__|Devices:" << endl;
-    for (vector<string>::iterator itr = (*each).second.begin(); itr != (*each).second.end(); ++itr) {
-      cout << "|\t   |" << *itr << endl;
-    };
-    cout << "--------------------------------------------------------------" << endl;
-  }
-  return 0;
-}
 ```
 
 - Compile Command:
