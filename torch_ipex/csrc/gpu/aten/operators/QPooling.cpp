@@ -7,14 +7,14 @@
 
 #include <utils/ParamUtils.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 
 using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeQuantizedXPU {
 
 using namespace impl;
 
@@ -32,5 +32,5 @@ at::Tensor quantized_max_pool2d(
   return output;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

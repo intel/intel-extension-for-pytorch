@@ -5,8 +5,9 @@
 #include <ATen/native/TensorFactories.h>
 #include <c10/util/Exception.h>
 #include <ATen/quantized/Quantizer.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
 #include <utils/ATDispatch.h>
@@ -19,15 +20,47 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
 namespace impl {
+
+Tensor empty_dpcpp(
+  IntArrayRef size,
+  const TensorOptions& options,
+  c10::optional<MemoryFormat> optional_memory_format) {
+  TORCH_INTERNAL_ASSERT(options.backend() == at::Backend::XPU
+                        || options.backend() == at::Backend::QuantizedXPU);
+  // TORCH_INTERNAL_ASSERT(!options.is_variable()); // is_variable should have
+  // been
+  // "unpacked"
+
+  auto* allocator = at::dpcpp::getDPCPPDeviceAllocator();
+  int64_t nelements = prod_intlist(size);
+  auto dtype = options.dtype();
+  int64_t size_bytes = nelements * dtype.itemsize();
+  auto storage_impl = c10::make_intrusive<StorageImpl>(
+    StorageImpl::use_byte_size_t(),
+    size_bytes,
+    allocator->allocate(size_bytes),
+    allocator,
+    /*resizeable=*/true);
+  auto tensor = detail::make_tensor<TensorImpl>(
+    storage_impl, options.computeDispatchKey(), dtype);
+  // Default TensorImpl has size [0]
+  if (size.size() != 1 || size[0] != 0) {
+    tensor.unsafeGetTensorImpl()->set_sizes_contiguous(size);
+  }
+
+  auto memory_format =
+    optional_memory_format.value_or(MemoryFormat::Contiguous);
+  tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
+  return tensor;
+}
 
 Tensor empty_strided_dpcpp(
     IntArrayRef size,
     IntArrayRef stride,
     const TensorOptions& options) {
   check_size_nonnegative(size);
-  auto t = at::AtenIpexTypeDPCPP::empty({0}, options, c10::nullopt);
+  auto t = at::AtenIpexTypeXPU::empty({0}, options, c10::nullopt);
   TensorImpl_resizeImpl(t.unsafeGetTensorImpl(), size, stride);
   return t;
 }
@@ -232,7 +265,7 @@ Tensor triu_indices_dpcpp(
 
   auto triu_size = row * col - get_tril_size(row, col, offset - 1);
   auto tensor =
-      at::AtenIpexTypeDPCPP::empty({2, triu_size}, options, c10::nullopt);
+      at::AtenIpexTypeXPU::empty({2, triu_size}, options, c10::nullopt);
 
   if (triu_size > 0) {
     // # of triu elements in the first row
@@ -270,7 +303,7 @@ Tensor tril_indices_dpcpp(
 
   auto tril_size = get_tril_size(row, col, offset);
   auto tensor =
-      at::AtenIpexTypeDPCPP::empty({2, tril_size}, options, c10::nullopt);
+      at::AtenIpexTypeXPU::empty({2, tril_size}, options, c10::nullopt);
 
   if (tril_size > 0) {
     auto m_first_row = (offset > 0) ? std::min<int64_t>(col, 1 + offset)
@@ -301,36 +334,12 @@ Tensor tril_indices_dpcpp(
 
 } // namespace impl
 
+namespace AtenIpexTypeXPU {
 Tensor empty(
     IntArrayRef size,
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
-  TORCH_INTERNAL_ASSERT(options.backend() == at::Backend::DPCPP
-  || options.backend() == at::Backend::QuantizedDPCPP);
-  // TORCH_INTERNAL_ASSERT(!options.is_variable()); // is_variable should have
-  // been
-  // "unpacked"
-
-  auto* allocator = at::dpcpp::getDPCPPDeviceAllocator();
-  int64_t nelements = prod_intlist(size);
-  auto dtype = options.dtype();
-  auto storage_impl = c10::make_intrusive<StorageImpl>(
-      dtype,
-      nelements,
-      allocator->allocate(nelements * dtype.itemsize()),
-      allocator,
-      /*resizeable=*/true);
-  auto tensor = detail::make_tensor<TensorImpl>(
-      storage_impl, options.computeDispatchKey());
-  // Default TensorImpl has size [0]
-  if (size.size() != 1 || size[0] != 0) {
-    tensor.unsafeGetTensorImpl()->set_sizes_contiguous(size);
-  }
-
-  auto memory_format =
-      optional_memory_format.value_or(MemoryFormat::Contiguous);
-  tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
-  return tensor;
+  return impl::empty_dpcpp(size, options, optional_memory_format);
 }
 
 Tensor empty_strided(
@@ -368,7 +377,7 @@ Tensor triu_indices(
 
 Tensor var(const Tensor& self, IntArrayRef dim, bool unbiased, bool keepdim) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::std_var_out(
+  return at::AtenIpexTypeXPU::std_var_out(
       result, self, dim, unbiased, keepdim, false);
 }
 
@@ -381,7 +390,7 @@ Tensor var(const Tensor& self, bool unbiased) {
 
 Tensor _var(const Tensor& self, bool unbiased) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::std_var_out(
+  return at::AtenIpexTypeXPU::std_var_out(
       result, self, IntArrayRef{}, unbiased, false, false);
 }
 
@@ -402,7 +411,7 @@ Tensor std(const Tensor& self, bool unbiased) {
 
 Tensor std(const Tensor& self, IntArrayRef dim, bool unbiased, bool keepdim) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::std_var_out(
+  return at::AtenIpexTypeXPU::std_var_out(
       result, self, dim, unbiased, keepdim, true);
 }
 
@@ -412,13 +421,13 @@ Tensor& std_out(
     IntArrayRef dim,
     bool unbiased,
     bool keepdim) {
-  return at::AtenIpexTypeDPCPP::std_var_out(
+  return at::AtenIpexTypeXPU::std_var_out(
       out, self, dim, unbiased, keepdim, true);
 }
 
 Tensor _std(const Tensor& self, bool unbiased) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::std_var_out(
+  return at::AtenIpexTypeXPU::std_var_out(
       result, self, IntArrayRef{}, unbiased, false, true);
 }
 
@@ -429,7 +438,7 @@ std::tuple<Tensor, Tensor> var_mean(
     bool keepdim) {
   Tensor result1 = at::empty({0}, self.options());
   Tensor result2 = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::std_var_mean_out(
+  return at::AtenIpexTypeXPU::std_var_mean_out(
       "var_mean", result1, result2, self, dim, unbiased, keepdim, false);
 }
 
@@ -440,24 +449,35 @@ std::tuple<Tensor, Tensor> std_mean(
     bool keepdim) {
   Tensor result1 = at::empty({0}, self.options());
   Tensor result2 = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::std_var_mean_out(
+  return at::AtenIpexTypeXPU::std_var_mean_out(
       "std_mean", result1, result2, self, dim, unbiased, keepdim, true);
 }
 
 std::tuple<Tensor, Tensor> std_mean(const Tensor& self, bool unbiased) {
   Tensor result1 = at::empty({0}, self.options());
   Tensor result2 = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::std_var_mean_out(
+  return at::AtenIpexTypeXPU::std_var_mean_out(
       "std_mean", result1, result2, self, {}, unbiased, false, true);
 }
 
 std::tuple<Tensor, Tensor> var_mean(const Tensor& self, bool unbiased) {
   Tensor result1 = at::empty({0}, self.options());
   Tensor result2 = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::std_var_mean_out(
+  return at::AtenIpexTypeXPU::std_var_mean_out(
       "var_mean", result1, result2, self, {}, unbiased, false, false);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
+
+
+namespace AtenIpexTypeQuantizedXPU {
+Tensor empty(
+  IntArrayRef size,
+  const TensorOptions& options,
+  c10::optional<MemoryFormat> optional_memory_format) {
+  return impl::empty_dpcpp(size, options, optional_memory_format);
+}
+} // namespace AtenIpexTypeQuantizedXPU
+
 } // namespace at
 

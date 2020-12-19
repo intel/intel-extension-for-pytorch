@@ -6,7 +6,7 @@ import torch_ipex
 
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
@@ -18,7 +18,7 @@ class TestTorchMethod(TestCase):
         z = torch.arange(1, 2.5, 0.5, device=cpu_device)
         n = torch.range(1, 2.5, 0.5, device=cpu_device)
 
-        # x_dpcpp=x.to("dpcpp")
+        # x_dpcpp=x.to("xpu")
         x_out = torch.logspace(start=-10, end=10, steps=5, device=dpcpp_device)
         y_out = torch.linspace(start=-10, end=10, steps=5, device=dpcpp_device)
         z_out = torch.arange(1, 2.5, 0.5, device=dpcpp_device)

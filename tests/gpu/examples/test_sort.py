@@ -4,7 +4,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -15,7 +15,7 @@ class TestNNMethod(TestCase):
         print("x_cpu = ", x_cpu, "sorted = ",
               sorted_cpu, "indices = ", indices_cpu)
 
-        x_dpcpp = x_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
         sorted_dpcpp, indices_dpcpp = torch.sort(x_dpcpp)
         print("x_dpcpp = ", x_dpcpp.cpu(), "sorted_dpcpp = ",
               sorted_dpcpp.cpu(), "indices_dpcpp", indices_dpcpp.cpu())

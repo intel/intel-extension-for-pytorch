@@ -16,11 +16,11 @@
 #endif
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 
-void log_normal_dpcpp(TensorIterator& iter, double mean_, double std_, Generator* gen_) {
-  auto gen = get_generator_or_default<DPCPPGenerator>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
+void log_normal_dpcpp(TensorIterator& iter, double mean_, double std_, c10::optional<Generator> gen_) {
+  auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
   IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "log_normal_dpcpp", [&] {
     using accscalar_t = dist_acctype<scalar_t>;
     auto mean = static_cast<accscalar_t>(mean_);
@@ -29,7 +29,7 @@ void log_normal_dpcpp(TensorIterator& iter, double mean_, double std_, Generator
     auto log_normal_func = [mean, std](accscalar_t rand) {
       return static_cast<scalar_t>(DPCPP::exp(rand * std + mean));
     };
-    AtenIpexTypeDPCPP::distribution_nullary_kernel<scalar_t, accscalar_t>(iter,
+    AtenIpexTypeXPU::distribution_nullary_kernel<scalar_t, accscalar_t>(iter,
       gen,
       [](RandomState<Philox4_32_10> *state) { return state->normal<scalar_t>(); },
       log_normal_func);
@@ -37,11 +37,11 @@ void log_normal_dpcpp(TensorIterator& iter, double mean_, double std_, Generator
 }
 
 
-Tensor& log_normal_(Tensor& self, double mean_, double std_, Generator* gen_) {
+Tensor& log_normal_(Tensor& self, double mean_, double std_, c10::optional<Generator> gen_) {
   TORCH_CHECK(std_ > 0.0, "log_normal_ expects std > 0.0, but found std=", std_);
 #ifdef USE_ONEMKL
   if (self.is_contiguous()) {
-    auto gen = get_generator_or_default<DPCPPGenerator>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
+    auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
 
     IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "log_normal_", [&] {
       auto mean = static_cast<scalar_t>(mean_);
@@ -63,5 +63,5 @@ Tensor& log_normal_(Tensor& self, double mean_, double std_, Generator* gen_) {
   return self;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -5,14 +5,14 @@
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
 #include <tensor/Context.h>
-#include <ATen/aten_ipex_type_dpcpp.h>
+#include <ATen/AtenIpexTypeXPU.h>
 #include "Utils.h"
 
 #include <dnnl.hpp>
 
 
 using namespace dnnl;
-using namespace at::AtenIpexTypeDPCPP;
+using namespace at::AtenIpexTypeXPU;
 
 namespace at {
 namespace dpcpp {
@@ -21,7 +21,7 @@ namespace oneDNN {
 static inline Tensor sum(Tensor& output,
                          const std::vector<Tensor>& inputs,
                          const std::vector<float>& scales) {
-  auto engine = GpuEngineManager::Instance().get_engine({kDPCPP, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   // align to first inputs

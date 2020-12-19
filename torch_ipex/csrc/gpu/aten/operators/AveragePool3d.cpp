@@ -12,7 +12,7 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 void avg_pool3d_out_template(
@@ -354,7 +354,7 @@ Tensor avg_pool3d(
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
   Tensor output = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::avg_pool3d_out(
+  return at::AtenIpexTypeXPU::avg_pool3d_out(
       output,
       self,
       kernel_size,
@@ -400,7 +400,7 @@ Tensor avg_pool3d_backward(
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
   auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
-  return at::AtenIpexTypeDPCPP::avg_pool3d_backward_out(
+  return at::AtenIpexTypeXPU::avg_pool3d_backward_out(
       grad_input,
       grad_output,
       self,
@@ -412,5 +412,5 @@ Tensor avg_pool3d_backward(
       divisor_override);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

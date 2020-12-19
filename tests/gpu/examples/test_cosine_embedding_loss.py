@@ -4,7 +4,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 def _test_cpu(input1, input2, target, reduc):
@@ -53,27 +53,27 @@ class TestNNMethod(TestCase):
         input2_cpu = input2
         target_cpu = target
 
-        input1_dpcpp = input1.to("dpcpp")
-        input2_dpcpp = input2.to("dpcpp")
-        target_dpcpp = target.to("dpcpp")
+        input1_dpcpp = input1.to("xpu")
+        input2_dpcpp = input2.to("xpu")
+        target_dpcpp = target.to("xpu")
         print('none')
         print("cpu")
         output_cpu_1 = _test_cpu(input1_cpu, input2_cpu, target_cpu, "none")
-        print("dpcpp")
+        print("xpu")
         output_dpcpp_1 = _test_dpcpp(
             input1_dpcpp, input2_dpcpp, target_dpcpp, "none")
 
         print('sum')
         print("cpu")
         output_cpu_2 = _test_cpu(input1_cpu, input2_cpu, target_cpu, "sum")
-        print("dpcpp")
+        print("xpu")
         output_dpcpp_2 = _test_dpcpp(
             input1_dpcpp, input2_dpcpp, target_dpcpp, "sum")
 
         print('mean')
         print("cpu")
         output_cpu_3 = _test_cpu(input1_cpu, input2_cpu, target_cpu, "mean")
-        print("dpcpp")
+        print("xpu")
         output_dpcpp_3 = _test_dpcpp(
             input1_dpcpp, input2_dpcpp, target_dpcpp, "mean")
 

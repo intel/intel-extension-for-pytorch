@@ -105,9 +105,9 @@ qconfig = torch.quantization.QConfig(
 data_ = torch.nn.ReLU()(data_)
 print("ref ...", model(data_))
 
-data = data_.to("dpcpp")
+data = data_.to("xpu")
 
-m = torch.jit.script(model.eval().to("dpcpp"))
+m = torch.jit.script(model.eval().to("xpu"))
 m = wrap_cpp_module(torch._C._jit_pass_fold_convbn(m._c))
 with torch.no_grad():
     m = prepare_script(m, {'': script_qconfig(qconfig)}, True)

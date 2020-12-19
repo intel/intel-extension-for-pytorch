@@ -8,8 +8,8 @@ class TestNNMethod(TestCase):
     def test_reflection_pad1d(self, dtype=torch.float):
         x_cpu = torch.arange(8, dtype=dtype).reshape(1, 2, 4)
         grad_cpu = torch.arange(16, dtype=dtype).reshape(1, 2, 8)
-        x_dpcpp = x_cpu.to("dpcpp")
-        grad_dpcpp = grad_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
+        grad_dpcpp = grad_cpu.to("xpu")
         m = nn.ReflectionPad1d(2)
 
         x_cpu.requires_grad_(True)
@@ -18,7 +18,7 @@ class TestNNMethod(TestCase):
         output_cpu = y_cpu.backward(grad_cpu)
         print("x_cpu.grad", x_cpu.grad)
 
-        m.to("dpcpp")
+        m.to("xpu")
         x_dpcpp.requires_grad_(True)
         y_dpcpp = m(x_dpcpp)
         print("y_dpcpp", y_dpcpp.to("cpu"))

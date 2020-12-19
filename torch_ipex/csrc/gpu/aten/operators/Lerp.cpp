@@ -7,7 +7,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename T>
@@ -127,13 +127,13 @@ Tensor& lerp_(Tensor& self, const Tensor& end, Scalar weight) {
 
 Tensor lerp(const Tensor& self, const Tensor& end, const Tensor& weight) {
   Tensor result = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::lerp_out(result, self, end, weight);
+  return at::AtenIpexTypeXPU::lerp_out(result, self, end, weight);
 }
 
 Tensor lerp(const Tensor& self, const Tensor& end, Scalar weight) {
   Tensor result = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::lerp_out(result, self, end, weight);
+  return at::AtenIpexTypeXPU::lerp_out(result, self, end, weight);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

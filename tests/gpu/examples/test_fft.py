@@ -7,7 +7,7 @@ class TestNNMethod(TestCase):
     @pytest.mark.skip(reason='MKL support')
     def test_fft(self, dtype=torch.float):
         x = torch.randn(5, 5)
-        x_dpcpp = x.to("dpcpp")
+        x_dpcpp = x.to("xpu")
         y = torch.rfft(x, 2, onesided=True, normalized=False)
         y_dpcpp = torch.rfft(x_dpcpp, 2, onesided=True, normalized=False)
 

@@ -16,7 +16,7 @@ using namespace at::dpcpp;
 using namespace dnnl;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename...>
@@ -354,7 +354,7 @@ Tensor _softmax_onednn(
 
   TORCH_CHECK(input.dim() <= 4 && input.dim() >=1, "Input Dims out of range");
 
-  Device curDevice = Device(kDPCPP, current_device());
+  Device curDevice = Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -407,7 +407,7 @@ Tensor _softmax(
     const int64_t dim,
     const bool half_to_float) {
 
-  checkBackend("_softmax", {input}, Backend::DPCPP);
+  checkBackend("_softmax", {input}, Backend::XPU);
 
   if (input.scalar_type() != at::ScalarType::Float &&
       input.scalar_type() != at::ScalarType::Half &&
@@ -456,5 +456,5 @@ Tensor _log_softmax_backward_data(
       grad, output, dim, half_to_float);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

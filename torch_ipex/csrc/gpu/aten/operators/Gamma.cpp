@@ -21,7 +21,7 @@ using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 Tensor lgamma(const Tensor & self) {
 #ifdef USE_ONEMKL
   int64_t n = self.numel();
@@ -96,5 +96,5 @@ Tensor& mvlgamma_(Tensor& self, int64_t p) {
 
 
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -4,7 +4,7 @@ import torch_ipex
 from torch.testing._internal.common_utils import TestCase
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -32,13 +32,13 @@ class TestNNMethod(TestCase):
         # out = out_unf.view(1, 2, 7, 8)
         print((torch.nn.functional.conv2d(inp, w) - out).abs().max())
 
-        fold_dpcpp = fold.to("dpcpp")
-        fold_input_dpcpp = fold_input.to("dpcpp")
+        fold_dpcpp = fold.to("xpu")
+        fold_input_dpcpp = fold_input.to("xpu")
         output_dpcpp_flod = fold_dpcpp(fold_input_dpcpp)
         # print(output_dpcpp.to("cpu"))
 
-        unfold_dpcpp = unfold.to("dpcpp")
-        unfold_input_dpcpp = unfold_input.to("dpcpp")
+        unfold_dpcpp = unfold.to("xpu")
+        unfold_input_dpcpp = unfold_input.to("xpu")
         output_dpcpp_unflod = unfold_dpcpp(unfold_input_dpcpp)
         # print(output_dpcpp.to("cpu"))
         self.assertEqual(output_flod, output_dpcpp_flod.cpu())

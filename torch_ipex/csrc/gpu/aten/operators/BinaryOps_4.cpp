@@ -1,6 +1,7 @@
 #include <ATen/Context.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/DPCPP.h>
 #include <utils/Numerics.h>
@@ -11,19 +12,19 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 DPCPP_DEF_K1(tanh_backward);
 Tensor& tanh_backward_out(
     Tensor& grad_input,
     const Tensor& grad_output,
     const Tensor& output) {
-  auto iter = at::TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(grad_input);
-  iter.add_input(grad_output);
-  iter.add_input(output);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(grad_input)
+  .add_input(grad_output)
+  .add_input(output)
+  .build();
 
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "tanh_backward_out", [&]() {
@@ -60,34 +61,34 @@ Tensor& atan2_out(Tensor& result, const Tensor& self, const Tensor& other) {
 
 Tensor atan2(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::atan2_out(result, self, other);
+  return at::AtenIpexTypeXPU::atan2_out(result, self, other);
 }
 
 Tensor& atan2_(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeDPCPP::atan2_out(self, self, other);
+  return at::AtenIpexTypeXPU::atan2_out(self, self, other);
 }
 
 IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(remainder_out, TensorCRemainderOp)
 
 Tensor remainder(const Tensor& self, const Tensor& other) {
   auto out = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::remainder_out(out, self, other);
+  return at::AtenIpexTypeXPU::remainder_out(out, self, other);
 }
 
 Tensor& remainder_(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeDPCPP::remainder_out(self, self, other);
+  return at::AtenIpexTypeXPU::remainder_out(self, self, other);
 }
 
 IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(fmod_out, TensorCFmodOp)
 
 Tensor fmod(const Tensor& self, const Tensor& other) {
   auto out = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::fmod_out(out, self, other);
+  return at::AtenIpexTypeXPU::fmod_out(out, self, other);
 }
 
 Tensor& fmod_(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeDPCPP::fmod_out(self, self, other);
+  return at::AtenIpexTypeXPU::fmod_out(self, self, other);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -8,7 +8,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 Scalar _local_scalar_dense_dpcpp(const Tensor& self) {
@@ -34,5 +34,5 @@ Scalar _local_scalar_dense(const Tensor& self) {
   return impl::_local_scalar_dense_dpcpp(self);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

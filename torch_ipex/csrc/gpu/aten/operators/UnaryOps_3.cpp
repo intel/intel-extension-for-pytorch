@@ -6,13 +6,14 @@
 #include <utils/Numerics.h>
 #include <utils/Pairwise.h>
 #include <utils/Pointwise.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
 #include "Loops.h"
 
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 IPEX_ALL_CALLABLE_1_UNARY_OPS(clamp_max_, TensorMinValueOp);
 IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(clamp_max_out, TensorMinValueOp);
@@ -26,11 +27,11 @@ Tensor& clamp_out(
     optional<Scalar> min,
     optional<Scalar> max) {
   if (min && max) {
-    at::AtenIpexTypeDPCPP::clamp_min_max(result, self, *min, *max);
+    at::AtenIpexTypeXPU::clamp_min_max(result, self, *min, *max);
   } else if (max) {
-    at::AtenIpexTypeDPCPP::clamp_max_out(result, self, *max);
+    at::AtenIpexTypeXPU::clamp_max_out(result, self, *max);
   } else if (min) {
-    at::AtenIpexTypeDPCPP::clamp_min_out(result, self, *min);
+    at::AtenIpexTypeXPU::clamp_min_out(result, self, *min);
   } else {
     TORCH_CHECK(false, "At least one of 'min' or 'max' must not be None");
   }
@@ -38,12 +39,12 @@ Tensor& clamp_out(
 }
 
 Tensor& clamp_(Tensor& self, optional<Scalar> min, optional<Scalar> max) {
-  return at::AtenIpexTypeDPCPP::clamp_out(self, self, min, max);
+  return at::AtenIpexTypeXPU::clamp_out(self, self, min, max);
 }
 
 Tensor clamp(const Tensor& self, optional<Scalar> min, optional<Scalar> max) {
   auto result = at::empty_like(self);
-  return at::AtenIpexTypeDPCPP::clamp_out(result, self, min, max);
+  return at::AtenIpexTypeXPU::clamp_out(result, self, min, max);
 }
 
 Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
@@ -58,7 +59,7 @@ Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
       at::dpcpp::DPCPP_tensor_apply1<scalar_t>(
           out, TensorReciprocalOp<scalar_t, acc_t>());
     } else {
-      at::AtenIpexTypeDPCPP::resize_as_(out, self, c10::nullopt);
+      at::AtenIpexTypeXPU::resize_as_(out, self, c10::nullopt);
       at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
           out, self, TensorReciprocalOp<scalar_t, acc_t>());
     }
@@ -66,5 +67,5 @@ Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
   return out;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

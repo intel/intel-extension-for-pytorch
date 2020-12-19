@@ -6,7 +6,7 @@ from torch.testing._internal.common_utils import TestCase
 import pytest
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_linear(self, dtype=torch.float):
@@ -30,10 +30,10 @@ class TestNNMethod(TestCase):
         print("cpu linear grad", linear.weight.grad)
 
         #dpcpp
-        linear_dpcpp = linear.to("dpcpp")
+        linear_dpcpp = linear.to("xpu")
         linear.zero_grad()
 
-        tanh_dpcpp = tanh.to("dpcpp")
+        tanh_dpcpp = tanh.to("xpu")
 
         print("dpcpp linear weight", linear_dpcpp.weight.to("cpu"))
 

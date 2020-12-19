@@ -1,20 +1,19 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
-
 #include <ATen/core/op_registration/op_registration.h>
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
-
 #include <utils/ParamUtils.h>
+#include <torch/custom_class.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 
 using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeQuantizedXPU {
 
 Tensor qAdd(Tensor qa, Tensor qb, double scale, int64_t zero_point) {
   auto a = at::dequantize(qa);
@@ -36,17 +35,10 @@ Tensor qAddRelu(Tensor qa, Tensor qb, double scale, int64_t zero_point) {
   return qc;
 }
 
-static auto registry =
-    c10::RegisterOperators()
-        .op("quantized::add(Tensor qa, Tensor qb, float scale, int "
-            "zero_point)-> Tensor qc",
-            c10::RegisterOperators::options().kernel<decltype(qAdd), &qAdd>(
-                DispatchKey::QuantizedDPCPPTensorId))
-        .op("quantized::add_relu(Tensor qa, Tensor qb, float scale, int "
-            "zero_point)-> Tensor qc",
-            c10::RegisterOperators::options()
-                .kernel<decltype(qAddRelu), &qAddRelu>(
-                    DispatchKey::QuantizedDPCPPTensorId));
+TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
+  m.impl("add", qAdd);
+  m.impl("add_relu", qAddRelu);
+}
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

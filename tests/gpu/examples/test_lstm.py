@@ -5,7 +5,7 @@ import torch_ipex
 from torch.testing._internal.common_utils import TestCase
 
 cpu_device = torch.device('cpu')
-dpcpp_device = torch.device('dpcpp')
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -35,7 +35,7 @@ class TestNNMethod(TestCase):
         c0_grad = c0.grad
         param_grad = []
         for param in rnn._parameters.values():
-            param_grad.append(param._grad)
+            param_grad.append(param._grad.clone())
         print("cpu grad_src = ", input_grad)
         print("cpu grad_h0 = ", h0_grad)
         print("cpu grad_c0 = ", c0_grad)
@@ -46,7 +46,7 @@ class TestNNMethod(TestCase):
         input_dpcpp = torch.tensor(
             [[[1, 2]]], dtype=torch.float, device=dpcpp_device)
         input_dpcpp.requires_grad = True
-        rnn_dpcpp = rnn.to("dpcpp")
+        rnn_dpcpp = rnn.to("xpu")
         rnn_dpcpp.zero_grad()
         h0_dpcpp = torch.tensor([[[2, 3, 2, 3]], [[3, 4, 3, 4]], [[4, 5, 4, 5]], [
             [5, 6, 5, 6]]], dtype=torch.float,  device=dpcpp_device)
@@ -60,7 +60,7 @@ class TestNNMethod(TestCase):
         print("dpcpp hn = ", hn_dpcpp.cpu())
         print("dpcpp cn = ", cn_dpcpp.cpu())
 
-        grad_out_dpcpp = grad_out.to("dpcpp")
+        grad_out_dpcpp = grad_out.to("xpu")
         grad_out_dpcpp = Variable(grad_out_dpcpp, requires_grad=True)
         output_dpcpp.backward(grad_out_dpcpp)
         input_dpcpp_grad = input_dpcpp.grad

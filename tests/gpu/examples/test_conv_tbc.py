@@ -3,7 +3,7 @@ import torch_ipex
 from torch.testing._internal.common_utils import TestCase
 import pytest
 
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
 
 
@@ -14,9 +14,9 @@ class  TestTorchMethod(TestCase):
         weight_cpu = torch.randn(3, 5, 4)
         bias_cpu = torch.randn(4)
 
-        input_sycl = input_cpu.to("dpcpp")
-        weight_sycl = weight_cpu.to("dpcpp")
-        bias_sycl = bias_cpu.to("dpcpp")
+        input_sycl = input_cpu.to("xpu")
+        weight_sycl = weight_cpu.to("xpu")
+        bias_sycl = bias_cpu.to("xpu")
 
         m = torch.conv_tbc
 
@@ -33,7 +33,7 @@ class  TestTorchMethod(TestCase):
         output_sycl = m(input_sycl, weight_sycl, bias_sycl)
         if not torch_ipex._double_kernel_disabled():
             print("output: ", output_sycl.cpu())
-        output_sycl.backward(torch.ones_like(output_sycl).to("dpcpp"))
+        output_sycl.backward(torch.ones_like(output_sycl).to("xpu"))
         if not torch_ipex._double_kernel_disabled():
             print("input.grad: ", input_sycl.grad)
         # input_sycl.grad.zero_()

@@ -5,7 +5,7 @@ import torch_ipex
 
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -27,12 +27,12 @@ class TestNNMethod(TestCase):
         y_cpu[0].backward(grad_cpu)
         print("y_cpu backward", x_cpu.grad)
 
-        max_pool.to("dpcpp")
+        max_pool.to("xpu")
         x_dpcpp.requires_grad_(True)
         y_dpcpp = max_pool(x_dpcpp)
 
         print("y_dpcpp", y_dpcpp[0].cpu())
-        grad_dpcpp = grad_cpu.to("dpcpp")
+        grad_dpcpp = grad_cpu.to("xpu")
         y_dpcpp[0].backward(grad_dpcpp)
         print("y_dpcpp backward", x_dpcpp.grad.cpu())
 

@@ -12,7 +12,7 @@ DPCPP_DEF_K1(addcmul);
 DPCPP_DEF_K1(addcdiv);
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 static void addcmul_kernel(TensorIterator& iter, Scalar value) {
@@ -48,13 +48,13 @@ Tensor& addcmul_out(
     const Tensor& tensor2,
     Scalar value) {
   // checkBackend("addcmul_cpu", out, self.options().backend());
-  auto iter = at::TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(out);
-  iter.add_input(self);
-  iter.add_input(tensor1);
-  iter.add_input(tensor2);
-  iter.build();
+  auto iter = at::TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(out)
+  .add_input(self)
+  .add_input(tensor1)
+  .add_input(tensor2)
+  .build();
   impl::addcmul_kernel(iter, value);
   return out;
 }
@@ -65,7 +65,7 @@ Tensor addcmul(
     const Tensor& tensor2,
     Scalar value) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::addcmul_out(
+  return at::AtenIpexTypeXPU::addcmul_out(
       result, self, tensor1, tensor2, value);
 }
 
@@ -74,7 +74,7 @@ Tensor& addcmul_(
     const Tensor& tensor1,
     const Tensor& tensor2,
     Scalar value) {
-  return at::AtenIpexTypeDPCPP::addcmul_out(
+  return at::AtenIpexTypeXPU::addcmul_out(
       self, self, tensor1, tensor2, value);
 }
 
@@ -85,13 +85,13 @@ Tensor& addcdiv_out(
     const Tensor& tensor2,
     Scalar value) {
   // checkBackend("addcdiv_cpu", out, self.options().backend());
-  auto iter = at::TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(out);
-  iter.add_input(self);
-  iter.add_input(tensor1);
-  iter.add_input(tensor2);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(out)
+  .add_input(self)
+  .add_input(tensor1)
+  .add_input(tensor2)
+  .build();
   impl::addcdiv_kernel(iter, value);
   return out;
 }
@@ -102,7 +102,7 @@ Tensor addcdiv(
     const Tensor& tensor2,
     Scalar value) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::addcdiv_out(
+  return at::AtenIpexTypeXPU::addcdiv_out(
       result, self, tensor1, tensor2, value);
 }
 
@@ -111,9 +111,9 @@ Tensor& addcdiv_(
     const Tensor& tensor1,
     const Tensor& tensor2,
     Scalar value) {
-  return at::AtenIpexTypeDPCPP::addcdiv_out(
+  return at::AtenIpexTypeXPU::addcdiv_out(
       self, self, tensor1, tensor2, value);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -10,7 +10,7 @@ torch._C._jit_set_profiling_mode(False)
 torch._C._jit_set_profiling_executor(False)
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class Conv2dRelu(torch.nn.Module):
@@ -45,10 +45,10 @@ class TestNNMethod(TestCase):
         y = model(x, a1)
         print("raw: ", y)
 
-        x = x.to("dpcpp")
-        model.to("dpcpp")
+        x = x.to("xpu")
+        model.to("xpu")
         modelJit = torch.jit.script(model)
-        # modelJit.to("dpcpp")
+        # modelJit.to("xpu")
         # print(modelJit.graph)
         with torch.no_grad():
             # print(modelJit.graph_for(x, a2))
@@ -70,8 +70,8 @@ class TestNNMethod(TestCase):
         y = model(x, a1)
         print("raw: ", y)
 
-        x = x.to("dpcpp")
-        model.to("dpcpp")
+        x = x.to("xpu")
+        model.to("xpu")
         modelJit = torch.jit.script(model)
         with torch.no_grad():
             y_dpcpp = modelJit(x, a3)

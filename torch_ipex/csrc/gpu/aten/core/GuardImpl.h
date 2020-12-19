@@ -15,16 +15,16 @@ namespace dpcpp {
 namespace impl {
 
 struct DPCPPGuardImpl final : public c10::impl::DeviceGuardImplInterface {
-  static constexpr DeviceType static_type = DeviceType::DPCPP;
+  static constexpr DeviceType static_type = DeviceType::XPU;
   DPCPPGuardImpl() {}
   DPCPPGuardImpl(DeviceType t) {
-    TORCH_INTERNAL_ASSERT(t == DeviceType::DPCPP);
+    TORCH_INTERNAL_ASSERT(t == DeviceType::XPU);
   }
   DeviceType type() const override {
-    return DeviceType::DPCPP;
+    return DeviceType::XPU;
   }
   Device exchangeDevice(Device d) const override {
-    TORCH_INTERNAL_ASSERT(d.type() == DeviceType::DPCPP);
+    TORCH_INTERNAL_ASSERT(d.type() == DeviceType::XPU);
     Device old_device = getDevice();
     if (old_device.index() != d.index()) {
       AT_DPCPP_CHECK(dpcppSetDevice(d.index()));
@@ -34,10 +34,10 @@ struct DPCPPGuardImpl final : public c10::impl::DeviceGuardImplInterface {
   Device getDevice() const override {
     DeviceIndex device;
     AT_DPCPP_CHECK(dpcppGetDevice(&device));
-    return Device(DeviceType::DPCPP, device);
+    return Device(DeviceType::XPU, device);
   }
   void setDevice(Device d) const override {
-    TORCH_INTERNAL_ASSERT(d.type() == DeviceType::DPCPP);
+    TORCH_INTERNAL_ASSERT(d.type() == DeviceType::XPU);
     AT_DPCPP_CHECK(dpcppSetDevice(d.index()));
   }
   void uncheckedSetDevice(Device d) const noexcept override {

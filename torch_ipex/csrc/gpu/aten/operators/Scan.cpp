@@ -11,7 +11,7 @@ using namespace at::detail;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename T, typename BinOp>
@@ -219,7 +219,7 @@ Tensor& _cumsum_out(Tensor& out, const Tensor& self, int64_t dim) {
 
 Tensor _cumsum(const Tensor& self, int64_t dim) {
   auto out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::_cumsum_out(out, self, dim);
+  return at::AtenIpexTypeXPU::_cumsum_out(out, self, dim);
 }
 
 Tensor& _cumprod_out(Tensor& out, const Tensor& self, int64_t dim) {
@@ -237,8 +237,8 @@ Tensor& _cumprod_out(Tensor& out, const Tensor& self, int64_t dim) {
 
 Tensor _cumprod(const Tensor& self, int64_t dim) {
   auto out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::_cumprod_out(out, self, dim);
+  return at::AtenIpexTypeXPU::_cumprod_out(out, self, dim);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

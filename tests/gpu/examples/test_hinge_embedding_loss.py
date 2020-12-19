@@ -5,7 +5,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -51,7 +51,7 @@ class TestNNMethod(TestCase):
         print('none')
         print("cpu")
         input_cpu, output_cpu = _test_cpu(input_cpu, target_cpu, "none")
-        print("dpcpp")
+        print("xpu")
         input_dpcpp, output_dpcpp = _test_dpcpp(
             input_dpcpp, target_dpcpp, "none")
         self.assertEqual(input_cpu, input_dpcpp.to(cpu_device))
@@ -60,7 +60,7 @@ class TestNNMethod(TestCase):
         print('sum')
         print("cpu")
         input_cpu, output_cpu = _test_cpu(input_cpu, target_cpu, "sum")
-        print("dpcpp")
+        print("xpu")
         input_dpcpp, output_dpcpp = _test_dpcpp(
             input_dpcpp, target_dpcpp, "sum")
         self.assertEqual(input_cpu, input_dpcpp.to(cpu_device))
@@ -69,7 +69,7 @@ class TestNNMethod(TestCase):
         print('mean')
         print("cpu")
         input_cpu, output_cpu = _test_cpu(input_cpu, target_cpu, "mean")
-        print("dpcpp")
+        print("xpu")
         input_dpcpp, output_dpcpp = _test_dpcpp(
             input_dpcpp, target_dpcpp, "mean")
         self.assertEqual(input_cpu, input_dpcpp.to(cpu_device))

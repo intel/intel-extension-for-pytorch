@@ -18,7 +18,7 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 class scalar_t_to_dnnl {
@@ -97,7 +97,7 @@ static void avg_pool_out_frame(
     int padW,
     algorithm alg_kind,
     prop_kind prop_kind) {
-  Device curDevice = Device(kDPCPP, current_device());
+  Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -138,7 +138,7 @@ static void avg_pool_out_frame(
   auto output_md = memory::desc({output_tz}, data_t, format_any);
 
   if (lazy_reorder_enabled()) {
-    auto input_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
+    auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
     input_md = input_ctx.is_plain() ? memory::desc({input_tz}, data_t, format)
                                     : input_ctx.meta();
   }
@@ -195,7 +195,7 @@ static void avg_pool_out_frame(
   if (lazy_reorder_enabled()) {
     if (input_usr_memory.get_desc() != expected_input_md) {
       auto item_num = static_cast<int64_t>(expected_input_md.get_size());
-      input_ = at::AtenIpexTypeDPCPP::empty({item_num}, input.options(), c10::nullopt);
+      input_ = at::AtenIpexTypeXPU::empty({item_num}, input.options(), c10::nullopt);
       input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
       DPCPP_ONEDNN_EXEC(
           reorder(input_usr_memory, input_memory),
@@ -240,7 +240,7 @@ static void avg_pool_backward_out_frame(
     int padW,
     algorithm alg_kind,
     prop_kind prop_kind) {
-  at::Device curDevice = at::Device(kDPCPP, current_device());
+  at::Device curDevice = at::Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -336,7 +336,7 @@ static void max_pool_out_frame(
     int padW,
     algorithm alg_kind,
     prop_kind prop_kind) {
-  at::Device curDevice = at::Device(kDPCPP, current_device());
+  at::Device curDevice = at::Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -375,7 +375,7 @@ static void max_pool_out_frame(
   auto output_md = memory::desc(output_tz, data_t, format_any);
 
   if (lazy_reorder_enabled()) {
-    auto input_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
+    auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
     input_md = input_ctx.is_plain() ? memory::desc({input_tz}, data_t, format)
                                     : input_ctx.meta();
   }
@@ -431,7 +431,7 @@ static void max_pool_out_frame(
   if (lazy_reorder_enabled()) {
     if (input_usr_memory.get_desc() != expected_input_md) {
       auto item_num = static_cast<int64_t>(expected_input_md.get_size());
-      input_ = at::AtenIpexTypeDPCPP::empty({item_num}, input.options(), c10::nullopt);
+      input_ = at::AtenIpexTypeXPU::empty({item_num}, input.options(), c10::nullopt);
       input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
       DPCPP_ONEDNN_EXEC(
           reorder(input_usr_memory, input_memory),
@@ -445,12 +445,12 @@ static void max_pool_out_frame(
     Tensor indices_;
     memory indices_usr_memory;
     if (!lazy_reorder_enabled()) {
-      indices_ = at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
+      indices_ = at::empty({output_tz}, at::TensorOptions(kXPU).dtype(kInt));
       indices_usr_memory = dpcpp_onednn_memory(indices_md, engine, indices_.data_ptr());
     } else {
       auto expected_indices_md = pooling_forward_pd.workspace_desc();
       indices_ = empty_opaque_tensor(
-          expected_indices_md, at::TensorOptions(kDPCPP).dtype(kInt), c10::nullopt);
+          expected_indices_md, at::TensorOptions(kXPU).dtype(kInt), c10::nullopt);
       indices_usr_memory = dpcpp_onednn_memory(expected_indices_md, engine, indices_.data_ptr());
     }
     auto indices_memory = indices_usr_memory;
@@ -475,7 +475,7 @@ static void max_pool_out_frame(
       DPCPPTensorContext::set_tensor_ctx(indices, std::move(indices_internal_ctx));
     }
   } else {
-    indices = at::empty({output_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
+    indices = at::empty({output_tz}, at::TensorOptions(kXPU).dtype(kInt));
 #ifdef USE_PRIMITIVE_CACHE
     auto pool_forward = fetch_or_create_m<pooling_forward>(key, pooling_forward_pd);
 #else
@@ -512,7 +512,7 @@ static void max_pool_backward_out_frame(
     int padW,
     algorithm alg_kind,
     prop_kind prop_kind) {
-  at::Device curDevice = at::Device(at::kDPCPP, current_device());
+  at::Device curDevice = at::Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -569,7 +569,7 @@ static void max_pool_backward_out_frame(
   auto diff_dst_memory = diff_dst_usr_memory;
   auto diff_src_memory = diff_src_usr_memory;
 
-  auto indices_usr = at::empty({gradOutput_tz}, at::TensorOptions(kDPCPP).dtype(kInt));
+  auto indices_usr = at::empty({gradOutput_tz}, at::TensorOptions(kXPU).dtype(kInt));
   dpcppMemoryCopyType(indices_usr.data_ptr<int32_t>(), (int64_t*)indices_data, indices_usr.numel());
 
   auto pool_backward = pooling_backward(pooling_backward_pd);
@@ -589,5 +589,5 @@ static void max_pool_backward_out_frame(
 }
 
 } // namespace impl
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

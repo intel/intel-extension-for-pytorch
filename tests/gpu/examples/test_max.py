@@ -3,7 +3,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
@@ -14,7 +14,7 @@ class TestTorchMethod(TestCase):
         #
         # y = torch.randn(3, 3)
         #
-        # y_dpcpp = y.to("dpcpp")
+        # y_dpcpp = y.to("xpu")
         # z_dpcpp = torch.max(y_dpcpp)
         #
         # print("Testing maxall OP!\n")
@@ -27,7 +27,7 @@ class TestTorchMethod(TestCase):
         # Test cmax OP.
         #
         # print("Testing cmax OP!\n")
-        # c_dpcpp = torch.randn(4).to("dpcpp")
+        # c_dpcpp = torch.randn(4).to("xpu")
         # d_dpcpp = torch.tensor([[ 0.0120, -0.9505, -0.3025, -1.4899]], device = dpcpp_device)
         # e_dpcpp = torch.max(c_dpcpp, d_dpcpp)
         #
@@ -41,7 +41,7 @@ class TestTorchMethod(TestCase):
         # Test max OP.
         #
         print("Testing max OP!\n")
-        a_dpcpp = torch.randn((4, 10)).to("dpcpp")
+        a_dpcpp = torch.randn((4, 10)).to("xpu")
 
         print("1-test (-2) dim")
 

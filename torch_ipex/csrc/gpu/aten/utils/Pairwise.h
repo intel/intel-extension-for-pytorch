@@ -6,7 +6,7 @@
 #include <utils/Pointwise.h>
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 template <typename T>
 struct TensorBitAndConstantOp {
@@ -178,7 +178,7 @@ struct TensorTriOp {
   const int64_t stride0, stride1, k;
 };
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at
 
 #endif

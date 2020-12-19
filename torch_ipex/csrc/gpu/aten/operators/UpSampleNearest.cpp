@@ -1,3 +1,4 @@
+#include <ATen/native/UpSample.h>
 #include "UpSample.h"
 
 using namespace dnnl;
@@ -5,7 +6,7 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 static void upsample_nearest_out_dpcpp_kernel(
@@ -18,7 +19,7 @@ static void upsample_nearest_out_dpcpp_kernel(
   auto input = input_.contiguous();
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  Device curDevice = Device(kDPCPP, current_device());
+  Device curDevice = Device(kXPU, current_device());
   auto eng = GpuEngineManager::Instance().get_engine(curDevice);
 
   bool is_customer_scales =
@@ -81,7 +82,7 @@ static void upsample_nearest_backward_out_dpcpp_kernel(
   auto grad_output = grad_output_.contiguous();
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  Device curDevice = Device(kDPCPP, current_device());
+  Device curDevice = Device(kXPU, current_device());
   auto eng = GpuEngineManager::Instance().get_engine(curDevice);
 
   bool is_customer_scales =
@@ -145,6 +146,8 @@ static void upsample_nearest_backward_out_dpcpp_kernel(
 } // namespace impl
 
 using namespace impl;
+using at::native::upsample::compute_output_size;
+using at::native::upsample::get_scale_value;
 
 Tensor& upsample_nearest3d_out(
     Tensor& output,
@@ -177,6 +180,25 @@ Tensor upsample_nearest3d(
       scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
       scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0,
       scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0);
+  return output;
+}
+
+Tensor upsample_nearest3d(
+        const Tensor& input,
+        c10::optional<IntArrayRef> output_size,
+        c10::optional<ArrayRef<double>> scale_factors) {
+  auto output = at::empty({0}, input.options());
+  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
+  auto scale_d = get_scale_value(scale_factors, 0);
+  auto scale_h = get_scale_value(scale_factors, 1);
+  auto scale_w = get_scale_value(scale_factors, 2);
+  upsample_nearest_out_dpcpp_kernel(
+          output,
+          input,
+          osize,
+          scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+          scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
+          scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
   return output;
 }
 
@@ -218,6 +240,27 @@ Tensor upsample_nearest3d_backward(
   return grad_input;
 }
 
+Tensor upsample_nearest3d_backward(
+        const Tensor& grad_output,
+        c10::optional<IntArrayRef> output_size,
+        IntArrayRef input_size,
+        c10::optional<ArrayRef<double>> scale_factors) {
+  auto osize = compute_output_size(input_size, output_size, scale_factors);
+  auto scale_d = get_scale_value(scale_factors, 0);
+  auto scale_h = get_scale_value(scale_factors, 1);
+  auto scale_w = get_scale_value(scale_factors, 2);
+  auto grad_input = at::zeros(input_size, grad_output.options());
+  upsample_nearest_backward_out_dpcpp_kernel(
+          grad_input,
+          grad_output,
+          osize,
+          input_size,
+          scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+          scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0,
+          scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0);
+  return grad_input;
+}
+
 Tensor& upsample_nearest2d_out(
     Tensor& output,
     const Tensor& input,
@@ -245,6 +288,23 @@ Tensor upsample_nearest2d(
       output_size,
       scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0,
       scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0);
+  return output;
+}
+
+Tensor upsample_nearest2d(
+        const Tensor& input,
+        c10::optional<IntArrayRef> output_size,
+        c10::optional<ArrayRef<double>> scale_factors) {
+  auto output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
+  auto scale_h = get_scale_value(scale_factors, 0);
+  auto scale_w = get_scale_value(scale_factors, 1);
+  upsample_nearest_out_dpcpp_kernel(
+          output,
+          input,
+          osize,
+          scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+          scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0);
   return output;
 }
 
@@ -282,6 +342,25 @@ Tensor upsample_nearest2d_backward(
   return grad_input;
 }
 
+Tensor upsample_nearest2d_backward(
+        const Tensor& grad_output,
+        c10::optional<IntArrayRef> output_size,
+        IntArrayRef input_size,
+        c10::optional<ArrayRef<double>> scale_factors) {
+  auto osize = compute_output_size(input_size, output_size, scale_factors);
+  auto scale_h = get_scale_value(scale_factors, 0);
+  auto scale_w = get_scale_value(scale_factors, 1);
+  auto grad_input = at::zeros(input_size, grad_output.options());
+  upsample_nearest_backward_out_dpcpp_kernel(
+          grad_input,
+          grad_output,
+          osize,
+          input_size,
+          scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0,
+          scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0);
+  return grad_input;
+}
+
 Tensor& upsample_nearest1d_out(
     Tensor& output,
     const Tensor& input,
@@ -305,6 +384,21 @@ Tensor upsample_nearest1d(
       input,
       output_size,
       scales.has_value() ? static_cast<double>(scales.value()) : 0.0);
+  return output;
+}
+
+Tensor upsample_nearest1d(
+    const Tensor& input,
+    c10::optional<IntArrayRef> output_size,
+    c10::optional<ArrayRef<double>> scale_factors) {
+  auto output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
+  auto scale_w = get_scale_value(scale_factors, 0);
+  upsample_nearest_out_dpcpp_kernel(
+          output,
+          input,
+          osize,
+          scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
   return output;
 }
 
@@ -338,5 +432,22 @@ Tensor upsample_nearest1d_backward(
   return grad_input;
 }
 
-} // namespace AtenIpexTypeDPCPP
+Tensor upsample_nearest1d_backward(
+        const Tensor& grad_output,
+        c10::optional<IntArrayRef> output_size,
+        IntArrayRef input_size,
+        c10::optional<ArrayRef<double>> scale_factors) {
+  auto osize = compute_output_size(input_size, output_size, scale_factors);
+  auto scale_w = get_scale_value(scale_factors, 0);
+  auto grad_input = at::zeros(input_size, grad_output.options());
+  upsample_nearest_backward_out_dpcpp_kernel(
+          grad_input,
+          grad_output,
+          osize,
+          input_size,
+          scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0);
+  return grad_input;
+}
+
+} // namespace AtenIpexTypeXPU
 } // namespace at

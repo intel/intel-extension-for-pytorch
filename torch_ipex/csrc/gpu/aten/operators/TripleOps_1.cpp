@@ -1,6 +1,7 @@
 #include <ATen/Context.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/DPCPP.h>
 #include <utils/Pointwise.h>
@@ -10,7 +11,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 // Note: dpcpp compiler does not support uname type in template.
@@ -80,17 +81,17 @@ Tensor mul_add(
       }
     }
 
-    auto tar_ctx = AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(tar);
+    auto tar_ctx = AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(tar);
 
     for (int i = 0; i < inputs.size(); ++i) {
       if (!tar.is_same(inputs[i])) {
         Tensor cur = inputs[i];
         auto cur_ctx =
-            AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(cur);
+            AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(cur);
         if (cur_ctx.meta() != tar_ctx.meta()) {
           cur = empty_opaque_tensor(
               tar_ctx.meta(), inputs[i].options(), c10::nullopt);
-          AtenIpexTypeDPCPP::DPCPPTensorConvertor::convert(cur, inputs[i]);
+          AtenIpexTypeXPU::DPCPPTensorConvertor::convert(cur, inputs[i]);
         }
         _inputs.push_back(cur);
       } else {
@@ -108,17 +109,17 @@ Tensor mul_add(
     result = at::empty_like(self);
   }
 
-  auto iter = TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(result);
-  iter.add_input(_self);
-  iter.add_input(_other);
-  iter.add_input(_accumu);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(result)
+  .add_input(_self)
+  .add_input(_other)
+  .add_input(_accumu)
+  .build();
   impl::mul_add_kernel_dpcpp(iter, alpha);
   TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
   return result;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

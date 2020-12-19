@@ -25,7 +25,7 @@ template <typename...>
 class ctc_loss_zero_padded_kernel {};
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 // this ad-hoc converts from targets (l in [1]) to augmented targets (l' in [1])
@@ -842,7 +842,7 @@ std::tuple<Tensor, Tensor> ctc_loss_template(
   CheckedFrom c = "ctc_loss_sycl";
   using target_t =
       typename std::conditional<target_scalar_type == kInt, int, int64_t>::type;
-  checkBackend(c, {log_probs, targets}, Backend::DPCPP);
+  checkBackend(c, {log_probs, targets}, Backend::XPU);
 
   auto log_probs_arg = TensorArg(log_probs, "log_probs", 1);
   auto targets_arg = TensorArg(targets, "targets", 2);
@@ -919,7 +919,7 @@ std::tuple<Tensor, Tensor> ctc_loss_template(
       at::tensor(target_lengths, targets.options().dtype(kLong));
   auto input_lengths_t =
       at::tensor(input_lengths, targets.options().dtype(kLong));
-  tg_batch_offsets = tg_batch_offsets.to("dpcpp");
+  tg_batch_offsets = tg_batch_offsets.to("xpu");
 
   Tensor log_alpha = at::empty(
       {batch_size, log_probs.size(0), 2 * max_target_length + 1},
@@ -993,7 +993,7 @@ Tensor ctc_loss_backward_template(
       at::tensor(target_lengths, targets.options().dtype(kLong));
   auto input_lengths_t =
       at::tensor(input_lengths, targets.options().dtype(kLong));
-  tg_batch_offsets = tg_batch_offsets.to("dpcpp");
+  tg_batch_offsets = tg_batch_offsets.to("xpu");
 
   Tensor log_beta = at::empty_like(log_alpha);
   log_beta.fill_(neginf);
@@ -1176,5 +1176,5 @@ Tensor _ctc_loss_backward(
       });
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

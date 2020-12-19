@@ -2,6 +2,8 @@
 #include <ATen/Functions.h>
 #include <ATen/TensorUtils.h>
 #include <ATen/core/Reduction.h>
+#include <ATen/native/TensorIterator.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/ApplyUtils.h>
 #include <core/DPCPP.h>
@@ -14,7 +16,8 @@
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+#include "Loops.h"
+
 
 template <typename...>
 class MultiMarginCriterionUpdateOutputKernel1 {};
@@ -30,10 +33,14 @@ class MultilabelMarginCriterionUpdateOutputKernel2 {};
 template <typename...>
 class MultilabelMarginCriterionUpdateGradInputKernel {};
 
+class SmoothL1Backward {};
+
+class SmoothL1Forward {};
+
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename T>
@@ -239,7 +246,7 @@ void dnnl_inner_product_forward_frame(
     scalar_t* input_data,
     scalar_t* target_data,
     scalar_t* output_data) {
-  at::Device curDevice = at::Device(kDPCPP, current_device());
+  at::Device curDevice = at::Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -321,9 +328,9 @@ void BCECriterion_updateOutput(
 
   optional<ScalarType> dtype;
   if (reduction == at::Reduction::Mean) {
-    at::AtenIpexTypeDPCPP::mean_out(output, output_, IntArrayRef{}, false, dtype);
+    at::AtenIpexTypeXPU::mean_out(output, output_, IntArrayRef{}, false, dtype);
   } else if(reduction == at::Reduction::Sum) {
-    at::AtenIpexTypeDPCPP::sum_out(output, output_, IntArrayRef{}, false, dtype);
+    at::AtenIpexTypeXPU::sum_out(output, output_, IntArrayRef{}, false, dtype);
   }
 }
 
@@ -396,9 +403,9 @@ void MSECriterion_updateOutput(
         output_, input, target, TensorMSEOp<scalar_t>());
     optional<ScalarType> dtype;
     if (reduction == at::Reduction::Mean) {
-      at::AtenIpexTypeDPCPP::mean_out(output, output_, IntArrayRef{}, false, dtype);
+      at::AtenIpexTypeXPU::mean_out(output, output_, IntArrayRef{}, false, dtype);
     } else if(reduction == at::Reduction::Sum) {
-      at::AtenIpexTypeDPCPP::sum_out(output, output_, IntArrayRef{}, false, dtype);
+      at::AtenIpexTypeXPU::sum_out(output, output_, IntArrayRef{}, false, dtype);
     }
 
     return;
@@ -457,9 +464,9 @@ void AbsCriterion_updateOutput(
       output_, input, target, TensorAbsOp<scalar_t>());
   optional<ScalarType> dtype;
   if (reduction == at::Reduction::Mean) {
-    at::AtenIpexTypeDPCPP::mean_out(output, output_, IntArrayRef{}, false, dtype);
+    at::AtenIpexTypeXPU::mean_out(output, output_, IntArrayRef{}, false, dtype);
   } else if(reduction == at::Reduction::Sum) {
-    at::AtenIpexTypeDPCPP::sum_out(output, output_, IntArrayRef{}, false, dtype);
+    at::AtenIpexTypeXPU::sum_out(output, output_, IntArrayRef{}, false, dtype);
   }
 
 }
@@ -492,55 +499,32 @@ void AbsCriterion_updateGradInput(
       grad_input, input, target, TensorAbsNormOp<scalar_t>(norm));
 }
 
-template <typename scalar_t>
-void SmoothL1Criterion_updateOutput(
-    Tensor& output,
-    const Tensor& input,
-    const Tensor& target,
-    int64_t reduction) {
-  TORCH_CHECK(check_size(input, target), "input and target shape do not match");
-
-  if (reduction == Reduction::None) {
-    output.resize_as_(input);
-    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
-        output, input, target, TensorSmoothL1Op<scalar_t>());
-    return;
-  }
-
-  output.resize_({});
-  Tensor output_ = at::empty(input.sizes(), input.options());
-  at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
-      output_, input, target, TensorSmoothL1Op<scalar_t>());
-  optional<ScalarType> dtype;
-  if (reduction == at::Reduction::Mean) {
-    at::AtenIpexTypeDPCPP::mean_out(output, output_, IntArrayRef{}, false, dtype);
-  } else if(reduction == at::Reduction::Sum) {
-    at::AtenIpexTypeDPCPP::sum_out(output, output_, IntArrayRef{}, false, dtype);
-  }
+void smooth_l1_kernel(TensorIterator& iter, double beta) {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "smooth_l1_kernel",
+    [&iter, beta]() {
+      scalar_t beta_val(beta);
+      dpcpp_kernel_for_tensor_iter<SmoothL1Forward>(iter, [beta_val] (scalar_t a, scalar_t b) -> scalar_t {
+        auto z = ::abs(a - b);
+        return z < beta_val ? scalar_t(0.5) * z * z / beta_val : z - scalar_t(0.5) * beta_val;
+    });
+  });
 }
 
-template <typename scalar_t>
-void SmoothL1Criterion_updateGradInput(
-    Tensor& grad_input,
-    const Tensor& grad_output,
-    const Tensor& input,
-    const Tensor& target,
-    int64_t reduction) {
-  TORCH_CHECK(check_size(input, target), "input and target shape do not match");
-  grad_input.resize_as_(input);
-
-  if (reduction == Reduction::None) {
-    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
-        grad_input, input, target, TensorSmoothL1GradOp<scalar_t>());
-    at::mul_out(grad_input, grad_input, grad_output);
-    return;
-  }
-  scalar_t gradOutput0d = grad_output.item().to<scalar_t>();
-  scalar_t norm =
-      (reduction == Reduction::Mean ? 1. / (scalar_t)input.numel() : 1.) *
-      gradOutput0d;
-  at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
-      grad_input, input, target, TensorSmoothL1NormOp<scalar_t>(norm));
+void smooth_l1_backward_kernel(TensorIterator& iter, Scalar norm, double beta) {
+  IPEX_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, iter.dtype(), "smooth_l1_backward_kernel",
+   [&iter, &norm, beta] {
+      auto norm_val = norm.to<scalar_t>();
+      scalar_t beta_val(beta);
+      dpcpp_kernel_for_tensor_iter<SmoothL1Backward>(iter, [norm_val, beta_val](scalar_t input, scalar_t target, scalar_t grad_output) -> scalar_t {
+        const auto x = input - target;
+        if (x < -beta_val)
+        return -norm_val * grad_output;
+        else if (x > beta_val)
+        return norm_val * grad_output;
+        else
+        return norm_val * x * grad_output / beta_val;
+    });
+  });
 }
 
 template <typename scalar_t>
@@ -564,9 +548,9 @@ void SoftMarginCriterion_updateOutput(
       output_, input, target, TensorSoftMarginOp<scalar_t>());
   optional<ScalarType> dtype;
   if (reduction == at::Reduction::Mean) {
-    at::AtenIpexTypeDPCPP::mean_out(output, output_, IntArrayRef{}, false, dtype);
+    at::AtenIpexTypeXPU::mean_out(output, output_, IntArrayRef{}, false, dtype);
   } else if(reduction == at::Reduction::Sum) {
-    at::AtenIpexTypeDPCPP::sum_out(output, output_, IntArrayRef{}, false, dtype);
+    at::AtenIpexTypeXPU::sum_out(output, output_, IntArrayRef{}, false, dtype);
   }
 }
 
@@ -1139,7 +1123,7 @@ Tensor binary_cross_entropy(
     const Tensor& weight,
     int64_t reduction) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::binary_cross_entropy_out(
+  return at::AtenIpexTypeXPU::binary_cross_entropy_out(
       out, self, target, weight, reduction);
 }
 
@@ -1168,7 +1152,7 @@ Tensor binary_cross_entropy_backward(
     const Tensor& weight,
     int64_t reduction) {
   Tensor grad_input = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::binary_cross_entropy_backward_out(
+  return at::AtenIpexTypeXPU::binary_cross_entropy_backward_out(
       grad_input, grad_output, self, target, weight, reduction);
 }
 
@@ -1190,7 +1174,7 @@ Tensor& mse_loss_out(
 
 Tensor mse_loss(const Tensor& self, const Tensor& target, int64_t reduction) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::mse_loss_out(out, self, target, reduction);
+  return at::AtenIpexTypeXPU::mse_loss_out(out, self, target, reduction);
 }
 
 Tensor& mse_loss_backward_out(
@@ -1216,7 +1200,7 @@ Tensor mse_loss_backward(
     const Tensor& target,
     int64_t reduction) {
   Tensor grad_input = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::mse_loss_backward_out(
+  return at::AtenIpexTypeXPU::mse_loss_backward_out(
       grad_input, grad_output, self, target, reduction);
 }
 
@@ -1238,7 +1222,7 @@ Tensor& l1_loss_out(
 
 Tensor l1_loss(const Tensor& self, const Tensor& target, int64_t reduction) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::l1_loss_out(out, self, target, reduction);
+  return at::AtenIpexTypeXPU::l1_loss_out(out, self, target, reduction);
 }
 
 Tensor& l1_loss_backward_out(
@@ -1264,7 +1248,7 @@ Tensor l1_loss_backward(
     const Tensor& target,
     int64_t reduction) {
   Tensor grad_input = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::l1_loss_backward_out(
+  return at::AtenIpexTypeXPU::l1_loss_backward_out(
       grad_input, grad_output, self, target, reduction);
 }
 
@@ -1272,26 +1256,50 @@ Tensor& smooth_l1_loss_out(
     Tensor& out,
     const Tensor& self,
     const Tensor& target,
-    int64_t reduction) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "smooth_l1_loss_out",
-      [&] {
-        impl::SmoothL1Criterion_updateOutput<scalar_t>(
-            out, self, target, reduction);
-      });
+    int64_t reduction,
+    double beta) {
+  TORCH_CHECK(beta >= 0, "smooth_l1_loss does not support negative values for beta.")
+  if (beta == 0) {
+    return at::AtenIpexTypeXPU::l1_loss_out(out, self, target, reduction);
+  }
+  if (reduction != Reduction::None) {
+    Tensor loss;
+    auto iter = TensorIterator::binary_op(loss, self, target);
+    impl::smooth_l1_kernel(iter, beta);
+    if (reduction == Reduction::Mean) {
+      at::AtenIpexTypeXPU::mean_out(out, iter.output(), 0, false, c10::nullopt);
+    } else {
+      at::AtenIpexTypeXPU::sum_out(out, iter.output(), 0, false, c10::nullopt);
+    }
+  } else {
+    auto iter = TensorIterator::binary_op(out, self, target);
+    impl::smooth_l1_kernel(iter, beta);
+  }
   return out;
+}
+
+static inline at::Tensor apply_loss_reduction(const at::Tensor& unreduced, int64_t reduction) {
+  if (reduction == at::Reduction::Mean) {
+    return unreduced.mean();
+  } else if (reduction == at::Reduction::Sum) {
+    return unreduced.sum();
+  }
+  return unreduced;
 }
 
 Tensor smooth_l1_loss(
     const Tensor& self,
     const Tensor& target,
-    int64_t reduction) {
-  Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::smooth_l1_loss_out(
-      out, self, target, reduction);
+    int64_t reduction,
+    double beta) {
+  TORCH_CHECK(beta >= 0, "smooth_l1_loss does not support negative values for beta.")
+  if (beta == 0) {
+    return at::AtenIpexTypeXPU::l1_loss(self, target, reduction);
+  }
+  Tensor loss;
+  auto iter = TensorIterator::binary_op(loss, self, target);
+  impl::smooth_l1_kernel(iter, beta);
+  return apply_loss_reduction(iter.output(), reduction);
 }
 
 Tensor& smooth_l1_loss_backward_out(
@@ -1299,15 +1307,18 @@ Tensor& smooth_l1_loss_backward_out(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
-    int64_t reduction) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "smooth_l1_loss_backward_out",
-      [&] {
-        impl::SmoothL1Criterion_updateGradInput<scalar_t>(
-            grad_input, grad_output, self, target, reduction);
-      });
+    int64_t reduction,
+    double beta) {
+  if (beta <= 0)
+    return at::AtenIpexTypeXPU::l1_loss_backward_out(grad_input, grad_output, self, target, reduction);
+  auto norm = reduction == Reduction::Mean ? 1. / self.numel() : 1.;
+  auto iter = at::TensorIteratorConfig()
+          .add_output(grad_input)
+          .add_input(self)
+          .add_input(target)
+          .add_input(grad_output)
+          .build();
+  impl::smooth_l1_backward_kernel(iter, norm, beta);
   return grad_input;
 }
 
@@ -1315,10 +1326,13 @@ Tensor smooth_l1_loss_backward(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
-    int64_t reduction) {
+    int64_t reduction,
+    double beta) {
+  if (beta <= 0)
+    return at::AtenIpexTypeXPU::l1_loss_backward(grad_output, self, target, reduction);
   Tensor grad_input = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::smooth_l1_loss_backward_out(
-      grad_input, grad_output, self, target, reduction);
+  return at::AtenIpexTypeXPU::smooth_l1_loss_backward_out(
+      grad_input, grad_output, self, target, reduction, beta);
 }
 
 Tensor& soft_margin_loss_out(
@@ -1343,7 +1357,7 @@ Tensor soft_margin_loss(
     const Tensor& target,
     int64_t reduction) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::soft_margin_loss_out(
+  return at::AtenIpexTypeXPU::soft_margin_loss_out(
       out, self, target, reduction);
 }
 
@@ -1370,7 +1384,7 @@ Tensor soft_margin_loss_backward(
     const Tensor& target,
     int64_t reduction) {
   Tensor grad_input = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::soft_margin_loss_backward_out(
+  return at::AtenIpexTypeXPU::soft_margin_loss_backward_out(
       grad_input, grad_output, self, target, reduction);
 }
 
@@ -1402,7 +1416,7 @@ Tensor multi_margin_loss(
     const Tensor& weights,
     int64_t reduction) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::multi_margin_loss_out(
+  return at::AtenIpexTypeXPU::multi_margin_loss_out(
       out, self, target, p, margin, weights, reduction);
 }
 
@@ -1442,7 +1456,7 @@ Tensor multi_margin_loss_backward(
     const Tensor& weights,
     int64_t reduction) {
   Tensor grad_input = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::multi_margin_loss_backward_out(
+  return at::AtenIpexTypeXPU::multi_margin_loss_backward_out(
       grad_input, grad_output, self, target, p, margin, weights, reduction);
 }
 
@@ -1469,7 +1483,7 @@ Tensor multilabel_margin_loss(
     const Tensor& target,
     int64_t reduction) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::multilabel_margin_loss_out(
+  return at::AtenIpexTypeXPU::multilabel_margin_loss_out(
       out, self, target, reduction);
 }
 
@@ -1497,7 +1511,7 @@ std::tuple<Tensor, Tensor> multilabel_margin_loss_forward(
     int64_t reduction) {
   Tensor output = at::empty({0}, self.options());
   Tensor is_target = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::multilabel_margin_loss_forward_out(
+  return at::AtenIpexTypeXPU::multilabel_margin_loss_forward_out(
       output, is_target, self, target, reduction);
 }
 
@@ -1526,9 +1540,9 @@ Tensor multilabel_margin_loss_backward(
     int64_t reduction,
     const Tensor& is_target) {
   Tensor grad_input = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::multilabel_margin_loss_backward_out(
+  return at::AtenIpexTypeXPU::multilabel_margin_loss_backward_out(
       grad_input, grad_output, self, target, reduction, is_target);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

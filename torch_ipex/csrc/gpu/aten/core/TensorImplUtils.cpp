@@ -12,8 +12,9 @@ namespace dpcpp {
 TensorImpl* TensorImpl_new(caffe2::TypeMeta type_meta, bool is_quantized) {
   return c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
              c10::intrusive_ptr<at::StorageImpl>::reclaim(
-                 StorageImpl_new(type_meta)),
-             is_quantized? c10::DispatchKey::QuantizedDPCPPTensorId : c10::DispatchKey::DPCPPTensorId)
+                 StorageImpl_new()),
+             is_quantized? c10::DispatchKey::QuantizedXPU : c10::DispatchKey::XPU,
+             type_meta)
       .release();
 }
 
@@ -123,10 +124,12 @@ TensorImpl* TensorImpl_resizeImpl(
     if (!TensorImpl_getStoragePtr(self)) {
       TORCH_CHECK(0, "Tensor: invalid null storage");
     }
-    if (storage_size + self->storage_offset() > self->storage().numel()) {
+    int64_t new_size_bytes =
+      (storage_size + self->storage_offset()) * self->dtype().itemsize();
+    if (new_size_bytes > self->storage().nbytes()) {
       StorageImpl_resize(
           TensorImpl_getStoragePtr(self),
-          storage_size + self->storage_offset());
+          new_size_bytes);
     }
   }
   return self;
@@ -190,7 +193,6 @@ void TensorImpl_stealAndSetStoragePtr(
     at::TensorImpl* tensor,
     at::StorageImpl* storage) {
   TORCH_INTERNAL_ASSERT(storage);
-  TORCH_INTERNAL_ASSERT(tensor->storage().dtype() == storage->dtype());
 
   TORCH_CHECK(
       tensor->storage().device() == storage->device(),
@@ -199,7 +201,7 @@ void TensorImpl_stealAndSetStoragePtr(
       "\" to a storage on different device \"",
       storage->device(),
       "\".  This is no longer allowed; the devices must match.");
-  tensor->set_storage(
+  tensor->set_storage_keep_dtype(
       at::Storage(c10::intrusive_ptr<at::StorageImpl>::reclaim(storage)));
 }
 
@@ -246,12 +248,12 @@ void TensorImpl_setStorageNd(
     if (!TensorImpl_getStoragePtr(self)) {
       TORCH_CHECK(false, "Tensor: invalid null storage");
     }
-    auto data_type = TensorImpl_getStoragePtr(self)->dtype();
+
     if (storage) {
       at::raw::intrusive_ptr::incref(storage);
       TensorImpl_stealAndSetStoragePtr(self, storage);
     } else {
-      TensorImpl_stealAndSetStoragePtr(self, StorageImpl_new(data_type));
+      TensorImpl_stealAndSetStoragePtr(self, StorageImpl_new());
     }
   }
 

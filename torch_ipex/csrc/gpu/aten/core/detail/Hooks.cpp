@@ -18,11 +18,11 @@ namespace dpcpp {
 namespace detail {
 
 #ifdef USE_USM
-void DPCPPHooks::initDPCPP() const {
+void DPCPPHooks::initXPU() const {
   // TODO:
 }
 
-bool DPCPPHooks::hasDPCPP() const {
+bool DPCPPHooks::hasXPU() const {
   return true;
 }
 
@@ -66,11 +66,12 @@ at::Allocator* DPCPPHooks::getPinnedMemoryAllocator() const {
   return dpcpp_getCachingHostAllocator();
 }
 
-at::Generator* DPCPPHooks::getDefaultDPCPPGenerator(DeviceIndex device_index = -1) const {
+const Generator&
+DPCPPHooks::getDefaultXPUGenerator(DeviceIndex device_index) const {
   return at::dpcpp::detail::getDefaultDPCPPGenerator(device_index);
 }
 
-REGISTER_DPCPP_HOOKS(DPCPPHooks);
+REGISTER_XPU_HOOKS(DPCPPHooks);
 #endif
 
 } // detail

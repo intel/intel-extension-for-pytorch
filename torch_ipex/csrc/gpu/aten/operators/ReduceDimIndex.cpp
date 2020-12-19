@@ -5,7 +5,7 @@
 #include <utils/ATDispatch.h>
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 std::tuple<Tensor&, Tensor&> _min_out(
     Tensor& min,
@@ -39,11 +39,11 @@ std::tuple<Tensor, Tensor> _min(const Tensor& self, int64_t dim, bool keepdim) {
   auto min = empty({0}, self.options());
   auto min_indices = empty({0}, self.options().dtype(kLong));
 
-  return AtenIpexTypeDPCPP::_min_out(min, min_indices, self, dim, keepdim);
+  return AtenIpexTypeXPU::_min_out(min, min_indices, self, dim, keepdim);
 }
 
 std::tuple<Tensor, Tensor> min(const Tensor& self, int64_t dim, bool keepdim) {
-  return AtenIpexTypeDPCPP::_min(self, dim, keepdim);
+  return AtenIpexTypeXPU::_min(self, dim, keepdim);
 }
 
 std::tuple<Tensor&, Tensor&> min_out(
@@ -52,7 +52,7 @@ std::tuple<Tensor&, Tensor&> min_out(
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
-  return AtenIpexTypeDPCPP::_min_out(min, min_values, self, dim, keepdim);
+  return AtenIpexTypeXPU::_min_out(min, min_values, self, dim, keepdim);
 }
 
 std::tuple<Tensor&, Tensor&> _max_out(
@@ -87,11 +87,11 @@ std::tuple<Tensor, Tensor> _max(const Tensor& self, int64_t dim, bool keepdim) {
   auto max = empty({0}, self.options());
   auto max_indices = empty({0}, self.options().dtype(kLong));
 
-  return AtenIpexTypeDPCPP::_max_out(max, max_indices, self, dim, keepdim);
+  return AtenIpexTypeXPU::_max_out(max, max_indices, self, dim, keepdim);
 }
 
 std::tuple<Tensor, Tensor> max(const Tensor& self, int64_t dim, bool keepdim) {
-  return AtenIpexTypeDPCPP::_max(self, dim, keepdim);
+  return AtenIpexTypeXPU::_max(self, dim, keepdim);
 }
 
 std::tuple<Tensor&, Tensor&> max_out(
@@ -100,8 +100,8 @@ std::tuple<Tensor&, Tensor&> max_out(
     const Tensor& self,
     int64_t dim,
     bool keepdim) {
-  return AtenIpexTypeDPCPP::_max_out(max, max_values, self, dim, keepdim);
+  return AtenIpexTypeXPU::_max_out(max, max_values, self, dim, keepdim);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

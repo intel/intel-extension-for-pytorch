@@ -11,6 +11,7 @@
  * IPEX_WEIGHT_CACHE:       Default = 0, Set 1 to cache the packed weight in original weight Tensor
  * IPEX_TILE_AS_DEVICE:     Default = 0, Set 1 to map every device to physical tile.
  * IPEX_DEV_INDEX:          Default = 0, Set GPU device index to choose.
+ * IPEX_LEGACY_LOOPS:       Default = 0, Set 1 to use legacy loops implementation.
 */
 #define DPCPP_ENV_TYPE_DEF(type, var)                                    \
     int type = [&]() -> int {                                            \
@@ -39,6 +40,7 @@ int dpcpp_env(int env_type) {
     DPCPP_ENV_TYPE_DEF(weight_cache, WEIGHT_CACHE);
     DPCPP_ENV_TYPE_DEF(tile_as_device, TILE_AS_DEVICE);
     DPCPP_ENV_TYPE_DEF(dev_index, DEV_INDEX);
+    DPCPP_ENV_TYPE_DEF(legacy_loops, LEGACY_LOOPS);
   } env;
 
   static auto _footer = []() -> bool {
@@ -61,6 +63,8 @@ int dpcpp_env(int env_type) {
       return env.tile_as_device;
     case ENV_DEV_INDEX:
       return env.dev_index;
+    case ENV_LEGACY_LOOPS:
+      return env.legacy_loops;
     default:
       return 0;
   }

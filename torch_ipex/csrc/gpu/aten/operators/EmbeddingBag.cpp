@@ -22,7 +22,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 constexpr int MODE_SUM = 0;
@@ -1401,5 +1401,5 @@ Tensor _embedding_bag_dense_backward(
       per_sample_weights);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -13,7 +13,7 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 void max_pool2d_with_indices_out_template(
@@ -304,18 +304,10 @@ std::tuple<Tensor, Tensor> max_pool2d_with_indices(
     IntArrayRef dilation,
     bool ceil_mode) {
   Tensor output, indices;
-  if(input.is_quantized()) {
-    output = _empty_affine_quantized({0},
-                input.options(),
-                input.q_scale(),
-                input.q_zero_point(),
-                MemoryFormat::Contiguous); //Relu fusion?
-  } else {
-    output = at::empty({0}, input.options());
-  }
+  output = at::empty({0}, input.options());
   indices = at::empty({0}, input.options().dtype(kLong));
 
-  return at::AtenIpexTypeDPCPP::max_pool2d_with_indices_out(
+  return at::AtenIpexTypeXPU::max_pool2d_with_indices_out(
       output,
       indices,
       input,
@@ -359,7 +351,7 @@ Tensor max_pool2d_with_indices_backward(
     bool ceil_mode,
     const Tensor& indices) {
   auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
-  return at::AtenIpexTypeDPCPP::max_pool2d_with_indices_backward_out(
+  return at::AtenIpexTypeXPU::max_pool2d_with_indices_backward_out(
       grad_input,
       grad_output,
       self,
@@ -371,5 +363,35 @@ Tensor max_pool2d_with_indices_backward(
       indices);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
+
+
+namespace AtenIpexTypeQuantizedXPU {
+
+std::tuple<Tensor, Tensor> max_pool2d_with_indices(
+  const Tensor& input,
+  IntArrayRef kernel_size,
+  IntArrayRef stride,
+  IntArrayRef padding,
+  IntArrayRef dilation,
+  bool ceil_mode) {
+  Tensor output, indices;
+  output = _empty_affine_quantized({0},
+    input.options(),
+    input.q_scale(),
+    input.q_zero_point(),
+    MemoryFormat::Contiguous); //Relu fusion?
+  indices = at::empty({0}, input.options().dtype(kLong));
+
+  return at::AtenIpexTypeXPU::max_pool2d_with_indices_out(
+    output,
+    indices,
+    input,
+    kernel_size,
+    stride,
+    padding,
+    dilation,
+    ceil_mode);
+}
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

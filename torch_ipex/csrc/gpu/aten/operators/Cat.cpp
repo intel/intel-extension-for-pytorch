@@ -20,7 +20,7 @@ using namespace dnnl;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 #ifdef USE_USM
@@ -373,7 +373,7 @@ static void dnnl_cat(
   memory::dims output_dims = size;
   output.resize_(size);
 
-  Device curDevice = Device(kDPCPP, current_device());
+  Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
   std::vector<memory::desc> cat_tensors_md;
@@ -393,7 +393,7 @@ static void dnnl_cat(
       tensor_md = memory::desc({input_tz}, data_t, format_any);
     } else {
       auto input_ctx =
-          at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(cat_tensors[i]);
+          at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(cat_tensors[i]);
       tensor_md = input_ctx.is_plain() ?
           memory::desc({input_tz}, data_t, format_any) :
           input_ctx.meta();
@@ -424,7 +424,7 @@ static void dnnl_cat(
   } else {
     auto expected_output_md = concat_pd.dst_desc();
       // reallocate memory for some blk fmt
-      output = at::AtenIpexTypeDPCPP::empty_opaque_tensor(
+      output = at::AtenIpexTypeXPU::empty_opaque_tensor(
           expected_output_md, cat_tensors[0].options(), c10::nullopt);
       output_usr_memory = dpcpp_onednn_memory(
           expected_output_md, engine, output.data_ptr());
@@ -473,8 +473,8 @@ Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
 
 Tensor _cat(TensorList tensors, int64_t dim) {
   auto out = at::empty({0}, tensors[0].options());
-  return at::AtenIpexTypeDPCPP::_cat_out(out, tensors, dim);
+  return at::AtenIpexTypeXPU::_cat_out(out, tensors, dim);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

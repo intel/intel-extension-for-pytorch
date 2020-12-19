@@ -17,7 +17,7 @@ using namespace dnnl;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 void get_dnnl_format(
@@ -59,7 +59,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
     bool training,
     double momentum,
     double epsilon) {
-  auto engine = GpuEngineManager::Instance().get_engine({kDPCPP, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   Tensor input = condition_contiguous(input_);
@@ -110,7 +110,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
 
   memory::desc input_md;
   auto data_t = dt_to_dnnl(input.scalar_type());
-  auto input_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(input);
+  auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
   if (!lazy_reorder_enabled()) {
     input_md = memory::desc({input_tz}, data_t, dnnl_format);
   } else {
@@ -132,7 +132,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   if (lazy_reorder_enabled()) {
     if (!input_ctx.is_plain()) {
       auto output_md = batch_norm_forward_pd.dst_desc();
-      output = at::AtenIpexTypeDPCPP::empty_opaque_tensor(
+      output = at::AtenIpexTypeXPU::empty_opaque_tensor(
           batch_norm_forward_pd.dst_desc(), input.options(), c10::nullopt);
     } else {
       output = at::empty_like(input);
@@ -225,7 +225,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm(
   checkBackend(
       "batch_norm",
       {input, weight, bias, running_mean, running_var},
-      Backend::DPCPP);
+      Backend::XPU);
 
   if (input.scalar_type() != at::ScalarType::Float &&
       input.scalar_type() != at::ScalarType::Half &&
@@ -265,7 +265,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     bool training,
     double epsilon,
     std::array<bool, 3> grad_input_mask) {
-  auto engine = GpuEngineManager::Instance().get_engine({kDPCPP, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   Tensor grad_output = impl::condition_contiguous(grad_output_);
@@ -411,5 +411,5 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   return std::make_tuple(grad_input, grad_weight, grad_bias);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

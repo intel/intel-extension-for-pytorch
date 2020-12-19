@@ -17,7 +17,7 @@
 using namespace at::dpcpp::detail;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
@@ -115,9 +115,9 @@ static void RReLU_updateOutput(
   double upper,
   bool train,
   bool inplace,
-  Generator* generator)
+  c10::optional<Generator> generator)
 {
-  auto gen = at::get_generator_or_default<at::DPCPPGenerator>(
+  auto gen = at::get_generator_or_default<at::DPCPPGeneratorImpl>(
       generator, getDefaultDPCPPGenerator());
   if(train){
     auto input_ = input.contiguous();
@@ -517,7 +517,7 @@ Tensor threshold_backward(
   return threshold_out(nullopt, self, threshold, 0, grad);
 }
 
-Tensor rrelu_with_noise(const Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, Generator * generator){
+Tensor rrelu_with_noise(const Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, c10::optional<Generator> generator){
   auto self_ = self.contiguous();
   Tensor output = at::empty_like(self_);
   auto lower_ = lower.toDouble();
@@ -536,7 +536,7 @@ Tensor rrelu_with_noise(const Tensor & self, const Tensor & noise, Scalar lower,
   return output;
 }
 //TODO: fix const self
-Tensor & rrelu_with_noise_(Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, Generator * generator){
+Tensor & rrelu_with_noise_(Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, c10::optional<Generator> generator){
   auto lower_ = lower.toDouble();
   auto upper_ = upper.toDouble();
   IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateOutput", [&]() {
@@ -553,7 +553,7 @@ Tensor & rrelu_with_noise_(Tensor & self, const Tensor & noise, Scalar lower, Sc
   return self;
 }
 
-Tensor & rrelu_with_noise_out(Tensor & out, const Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, Generator * generator){
+Tensor & rrelu_with_noise_out(Tensor & out, const Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, c10::optional<Generator> generator){
   auto lower_ = lower.toDouble();
   auto upper_ = upper.toDouble();
   IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, self.scalar_type(), "RReLU_updateOutput", [&]() {
@@ -588,11 +588,11 @@ Tensor rrelu_with_noise_backward(const Tensor & grad_output, const Tensor & self
   return grad_input;
 }
 
-Tensor rrelu(const Tensor & self, Scalar lower, Scalar upper, bool training, Generator* generator) {
+Tensor rrelu(const Tensor & self, Scalar lower, Scalar upper, bool training, c10::optional<Generator> generator) {
   return at::rrelu_with_noise(self, at::empty_like(self), lower, upper, training, generator);
 }
 
-Tensor & rrelu_(Tensor & self, Scalar lower, Scalar upper, bool training, Generator* generator) {
+Tensor & rrelu_(Tensor & self, Scalar lower, Scalar upper, bool training, c10::optional<Generator> generator) {
   return at::rrelu_with_noise_(self, at::empty_like(self), lower, upper, training, generator);
 }
 
@@ -712,10 +712,10 @@ DPCPP_DEF_K1(DPCPPOpHardShrink);
 Tensor hardshrink(const Tensor& self, Scalar lambd_) {
   auto out_tensor = at::empty_like(self);
 
-  auto iter = TensorIterator();
-  iter.add_output(out_tensor);
-  iter.add_input(self);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .add_output(out_tensor)
+  .add_input(self)
+  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -739,11 +739,11 @@ Tensor hardshrink_backward(
     Scalar lambd_) {
   auto out_tensor = at::empty_like(grad);
 
-  auto iter = TensorIterator();
-  iter.add_output(out_tensor);
-  iter.add_input(grad);
-  iter.add_input(self);
-  iter.build();
+  TensorIterator iter = TensorIteratorConfig()
+                .add_output(out_tensor)
+                .add_input(grad)
+                .add_input(self)
+                .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, self.scalar_type(), "hardshrink_backward", [&] {
@@ -771,5 +771,5 @@ Tensor gelu_backward(const Tensor & grad, const Tensor & self){
   return dX;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

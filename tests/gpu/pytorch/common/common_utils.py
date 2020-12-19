@@ -409,9 +409,9 @@ def to_dpcpp(obj, type_map=None):
         with torch.no_grad():
             res = obj.clone().type(t)
             if obj.dtype != torch.int64:
-                res = res.to(device='dpcpp', dtype=torch.float32).requires_grad_() # That makes the dpcpp tensor to be leaf
+                res = res.to(device="xpu", dtype=torch.float32).requires_grad_() # That makes the dpcpp tensor to be leaf
             else:
-                res = res.to(device='dpcpp') # keep input datatype int64 for some special case, like EmbeddingBag needs long input
+                res = res.to(device="xpu") # keep input datatype int64 for some special case, like EmbeddingBag needs long input
         return res
     elif torch.is_storage(obj):
         return obj.new().resize_(obj.size()).copy_(obj)
@@ -426,7 +426,7 @@ def to_dpcpp_in_criterion(cpuTensor, isTarget):
     if isinstance(cpuTensor, torch.Tensor):
         assert cpuTensor.is_leaf
         res = cpuTensor.detach().clone()
-        res = res.to(device='dpcpp')
+        res = res.to(device="xpu")
         if not isTarget:
             res.requires_grad=True
         return res

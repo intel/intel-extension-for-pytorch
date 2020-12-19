@@ -11,7 +11,7 @@ using namespace dnnl;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 void adaptive_max_pool2d_out_template(
@@ -191,7 +191,7 @@ std::tuple<Tensor, Tensor> adaptive_max_pool2d(
   Tensor output = at::empty({0}, self.options());
   Tensor indices = at::empty({0}, self.options().dtype(kLong));
   TORCH_INTERNAL_ASSERT(output_size.size() == 2);
-  return at::AtenIpexTypeDPCPP::adaptive_max_pool2d_out(
+  return at::AtenIpexTypeXPU::adaptive_max_pool2d_out(
       output, indices, self, output_size);
 }
 
@@ -210,9 +210,9 @@ Tensor adaptive_max_pool2d_backward(
     const Tensor& self,
     const Tensor& indices) {
   auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
-  return at::AtenIpexTypeDPCPP::adaptive_max_pool2d_backward_out(
+  return at::AtenIpexTypeXPU::adaptive_max_pool2d_backward_out(
       grad_input, grad_output, self, indices);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -15,7 +15,7 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 DPCPP_DEF_K2(
@@ -253,5 +253,5 @@ std::tuple<Tensor&, Tensor&> kthvalue_out(
   return std::forward_as_tuple(values, indices);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

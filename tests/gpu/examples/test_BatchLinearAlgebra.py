@@ -5,7 +5,7 @@ import time
 import pytest
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     def test_batch_linear_algebra(self, dtype=torch.float):

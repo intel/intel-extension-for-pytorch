@@ -9,10 +9,10 @@
 
 using namespace torch::autograd::profiler;
 
-struct DPCPPEventStubImpl : public DPCPPEventStubBase {
+struct DPCPPEventStubImpl : public XPUEventStubBase {
  public:
   DPCPPEventStubImpl() = delete;
-  DPCPPEventStubImpl(cl::sycl::event event) : event_(event){};
+  DPCPPEventStubImpl(cl::sycl::event event) : event_(std::move(event)){};
   virtual float elapsed() override;
   virtual ~DPCPPEventStubImpl() = default;
 
@@ -20,8 +20,8 @@ struct DPCPPEventStubImpl : public DPCPPEventStubBase {
   cl::sycl::event event_;
 };
 
-struct DPCPPProvfilerStubsImpl : public DPCPPStubs {
-  virtual float elapsed(DPCPPEventStub event) override {
+struct DPCPPProvfilerStubsImpl : public XPUStubs {
+  virtual float elapsed(XPUEventStub event) override {
     return event->elapsed();
   }
   virtual bool enabled() override {
@@ -31,7 +31,8 @@ struct DPCPPProvfilerStubsImpl : public DPCPPStubs {
 
 static inline void dpcpp_log(std::string name, cl::sycl::event& dpcpp_event) {
   if (dpcpp_profiling() && profilerEnabled()) {
-    auto stub = std::make_shared<DPCPPEventStubImpl>(dpcpp_event);
-    mark_dpcpp(std::move(name), std::move(stub));
+    XPUEventStub dpcpp_evt_stub;
+    dpcpp_evt_stub.reset(new DPCPPEventStubImpl(dpcpp_event));
+    mark_xpu(std::move(name), dpcpp_evt_stub);
   }
 }

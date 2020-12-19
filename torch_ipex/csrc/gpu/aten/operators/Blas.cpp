@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/ExpandUtils.h>
-#include <torch/csrc/autograd/record_function.h>
+#include <ATen/record_function.h>
 #include <oneDNN/oneDNN.h>
 
 #include <core/TensorImplUtils.h>
@@ -15,12 +15,16 @@
 #ifdef USE_PRIMITIVE_CACHE
 #include <oneDNN/LRUCache.h>
 #endif
+#include <c10/util/typeid.h>
 
 using namespace dnnl;
 using namespace at::dpcpp;
 
+namespace caffe2 {
+CAFFE_KNOWN_TYPE(at::AtenIpexTypeQuantizedXPU::PackedLinearWeightQDPCPP)
+}
+
 namespace at {
-namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 typedef struct matmul_attr {
@@ -155,7 +159,7 @@ void dnnlGemmImpl(
         {static_cast<int>(result.is_quantized()? result.q_zero_point() : 0)});
   }
 
-  at::Device curDevice = at::Device(at::kDPCPP, current_device());
+  at::Device curDevice = at::Device(at::kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -231,17 +235,17 @@ void dnnlGemmImpl(
     r_memory = dpcpp_onednn_memory(r_md, engine, result.data_ptr());
 
   } else {
-    auto m1_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(m1);
+    auto m1_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m1);
     m1_usr_memory = m1_ctx.is_plain() ?
         dpcpp_onednn_memory(m1_md, engine, m1.data_ptr()) :
         dpcpp_onednn_memory({m1_ctx.meta()}, engine, m1.data_ptr());
 
-    auto m2_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(m2);
+    auto m2_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m2);
     m2_usr_memory = m2_ctx.is_plain() ?
         dpcpp_onednn_memory(m2_md, engine, m2.data_ptr()) :
         dpcpp_onednn_memory({m2_ctx.meta()}, engine, m2.data_ptr());
 
-    auto r_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::get_tensor_ctx(result);
+    auto r_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(result);
     r_usr_memory = r_ctx.is_plain() ?
         dpcpp_onednn_memory(r_md, engine, result.data_ptr()) :
         dpcpp_onednn_memory({r_ctx.meta()}, engine, result.data_ptr());
@@ -250,7 +254,7 @@ void dnnlGemmImpl(
     Tensor m1_;
     m1_memory = m1_usr_memory;
     if (m1_usr_memory.get_desc() != expected_m1_md) {
-      m1_ = at::AtenIpexTypeDPCPP::empty({expected_m1_md.get_size() / m1.itemsize()},
+      m1_ = at::AtenIpexTypeXPU::empty({expected_m1_md.get_size() / m1.itemsize()},
       m1.options(), c10::nullopt);
       m1_memory = dpcpp_onednn_memory(expected_m1_md, engine, m1_.data_ptr());
 #ifdef USE_PRIMITIVE_CACHE
@@ -272,7 +276,7 @@ void dnnlGemmImpl(
         m2_opt = empty_opaque_tensor(expected_m2_md, m2.options(), c10::nullopt);
         m2_memory = dpcpp_onednn_memory(expected_m2_md, engine, m2_opt.data_ptr());
       } else {
-        m2_ = at::AtenIpexTypeDPCPP::empty(
+        m2_ = at::AtenIpexTypeXPU::empty(
           {expected_m2_md.get_size() / m2.itemsize()}, m2.options(), c10::nullopt);
         m2_memory = dpcpp_onednn_memory(expected_m2_md, engine, m2_.data_ptr());
       }
@@ -288,9 +292,9 @@ void dnnlGemmImpl(
       if (weight_cache_enabled()) {
         strm.wait();
         // FIXME: thread safty
-        auto m2_opt_ctx = at::AtenIpexTypeDPCPP::DPCPPTensorContext::
+        auto m2_opt_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::
             release_tensor_ctx(m2_opt);
-        at::AtenIpexTypeDPCPP::DPCPPTensorContext::
+        at::AtenIpexTypeXPU::DPCPPTensorContext::
             set_tensor_ctx(m2, std::move(m2_opt_ctx));
       }
     }
@@ -358,25 +362,17 @@ void gemm_broadcast(Tensor& result,
                     const Tensor bias = at::Tensor()) {
   std::vector<int64_t> result_shape;
   auto dim = m1.dim();
-  Tensor m2_unpack;
   if(m1.is_quantized()){
-    auto& pack_ptr = cpp_custom_type_hack::cast<PackedLinearWeightQDPCPP>(m2);
-    m2_unpack = pack_ptr.weight;
-
-    TORCH_CHECK(m2_unpack.dim() == 2, "expected 2D tensor");
-
-    if(m2_unpack.sizes()[1] == m1.sizes()[1]){
-      m2_unpack.transpose_(0,1);
+    if(m2.sizes()[1] == m1.sizes()[1]){
+      m2.transpose_(0,1);
     }
-  } else {
-    m2_unpack = m2;
   }
   if (dim == 2) {
-    result_shape = attr.m2_trans_ ? std::vector<int64_t>{m1.size(0), m2_unpack.size(1)} :
-    std::vector<int64_t>{m1.size(0), m2_unpack.size(0)};
+    result_shape = attr.m2_trans_ ? std::vector<int64_t>{m1.size(0), m2.size(1)} :
+    std::vector<int64_t>{m1.size(0), m2.size(0)};
   } else {
-    result_shape = attr.m2_trans_ ? std::vector<int64_t>{m1.size(0), m1.size(1), m2_unpack.size(2)} :
-    std::vector<int64_t>{m1.size(0), m1.size(1), m2_unpack.size(1)};
+    result_shape = attr.m2_trans_ ? std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(2)} :
+    std::vector<int64_t>{m1.size(0), m1.size(1), m2.size(1)};
   }
 
   Tensor bc_bias = bias;
@@ -394,11 +390,47 @@ void gemm_broadcast(Tensor& result,
     result.resize_(result_shape);
   }
 
-  dnnlGemmImpl(result, m1, m2_unpack, bc_bias, attr);
+  dnnlGemmImpl(result, m1, m2, bc_bias, attr);
 }
 } // namespace impl
 
+
+namespace AtenIpexTypeXPU {
+
 using namespace impl;
+
+Tensor& addmm_out(
+        Tensor &result,
+        const Tensor& self,
+        const Tensor& m1,
+        const Tensor& m2,
+        Scalar beta,
+        Scalar alpha) {
+  matmul_attr_t attr(
+          alpha.to<float>(),
+          beta.to<float>(),
+          0,
+          true);
+  checkBackend("addmm_out", {result, self, m1, m2}, Backend::XPU);
+  TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(self.size(0) ==  m1.size(0) && self.size(1) == m2.size(1),
+              "size mismatch input ", self.sizes(), " m1 ", m1.sizes(), " m2 ", m2.sizes());
+
+    impl::gemm_broadcast(
+            result,
+            m1,
+            m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+            // bias convert to fp32 for accuracy when self is fp16 or bf16
+            attr,
+            // bias convert to fp32 for accuracy when self is fp16 or bf16
+            self.scalar_type() == ScalarType::Half ||
+            self.scalar_type() == ScalarType::BFloat16
+            ? self.to(ScalarType::Float) : self);
+
+  return result;
+}
 
 Tensor& addmm_(
     Tensor& self,
@@ -411,7 +443,7 @@ Tensor& addmm_(
       beta.to<float>(),
       0,
       true);
-  checkBackend("addmm_", {self, m1, m2}, Backend::DPCPP);
+  checkBackend("addmm_", {self, m1, m2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
@@ -442,49 +474,36 @@ Tensor addmm(
       beta.to<float>(),
       0,
       true);
-  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
 
-  if(m1.is_quantized()){
-    checkBackend("addmm", m1, Backend::QuantizedDPCPP);
-  } else {
-    checkBackend("addmm", {input, m1, m2}, Backend::DPCPP);
-    TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
-  }
+  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
+  TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
+
+  checkBackend("addmm", {input, m1, m2}, Backend::XPU);
 
   Tensor result;
-  if(input.is_quantized()){
-    result = _empty_affine_quantized({0},
-              device(kDPCPP).dtype(input.scalar_type()),
-              1.f,
-              static_cast<int>(0),
-              MemoryFormat::Contiguous);
-  } else if (m1.scalar_type() == at::ScalarType::BFloat16){
+  if (m1.scalar_type() == at::ScalarType::BFloat16){
     // align with bf16 input
     result = at::empty({0}, m1.options());
   } else {
     result = at::empty({0}, input.options());
   }
 
-  if(m1.is_quantized()){
-    impl::gemm_broadcast(result, m1, m2, attr, input);
-  } else {
-    impl::gemm_broadcast(
-    result,
-    m1,
-    m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
-    // bias convert to fp32 for accuracy when input is fp16 or bf16
-    attr,
-    input.scalar_type() == ScalarType::Half ||
-            input.scalar_type() == ScalarType::BFloat16
-        ? input.to(ScalarType::Float) : input);
-  }
+  impl::gemm_broadcast(
+  result,
+  m1,
+  m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+  // bias convert to fp32 for accuracy when input is fp16 or bf16
+  attr,
+  input.scalar_type() == ScalarType::Half ||
+          input.scalar_type() == ScalarType::BFloat16
+      ? input.to(ScalarType::Float) : input);
 
   return result;
 }
 
 Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
   matmul_attr_t attr(1.f, 0.f, 0, true);
-  checkBackend("mm_out", {result, self, mat2}, Backend::DPCPP);
+  checkBackend("mm_out", {result, self, mat2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(mat2.dim() == 2, "expected 2D tensor");
 
@@ -499,7 +518,7 @@ Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
 
 Tensor mm(const Tensor& self, const Tensor& mat2) {
   auto result = at::empty({0}, self.options());
-  at::AtenIpexTypeDPCPP::mm_out(result, self, mat2);
+  at::AtenIpexTypeXPU::mm_out(result, self, mat2);
   return result;
 }
 
@@ -514,7 +533,7 @@ Tensor& baddbmm_(
       beta.to<float>(),
       0,
       true);
-  checkBackend("baddbmm_", {self, batch1, batch2}, Backend::DPCPP);
+  checkBackend("baddbmm_", {self, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
@@ -540,7 +559,7 @@ Tensor& baddbmm_out(
       beta.to<float>(),
       0,
       true);
-  checkBackend("baddbmm_out", {input, batch1, batch2}, Backend::DPCPP);
+  checkBackend("baddbmm_out", {input, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
 
@@ -556,7 +575,7 @@ Tensor baddbmm(
     Scalar beta,
     Scalar alpha) {
   Tensor r = at::empty({0}, input.options());
-  at::AtenIpexTypeDPCPP::baddbmm_out(r, input, batch1, batch2, beta, alpha);
+  at::AtenIpexTypeXPU::baddbmm_out(r, input, batch1, batch2, beta, alpha);
   return r;
 }
 
@@ -568,7 +587,7 @@ Tensor& addbmm_out(
     Scalar beta,
     Scalar alpha) {
 
-  checkBackend("addbmm_out", {out, self, batch1, batch2}, Backend::DPCPP);
+  checkBackend("addbmm_out", {out, self, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
@@ -580,7 +599,7 @@ Tensor& addbmm_out(
     b1 = batch1.view({batch1.size(1), -1});
   }
   auto b2 = batch2.view({-1, batch2.size(2)});
-  out = at::AtenIpexTypeDPCPP::addmm(self, b1, b2, beta, alpha);
+  at::AtenIpexTypeXPU::addmm_out(out, self, b1, b2, beta, alpha);
 
   return out;
 }
@@ -591,7 +610,7 @@ Tensor& addbmm_(
     const Tensor& batch2,
     Scalar beta,
     Scalar alpha) {
-  at::AtenIpexTypeDPCPP::addbmm_out(self, self, batch1, batch2, beta, alpha);
+  at::AtenIpexTypeXPU::addbmm_out(self, self, batch1, batch2, beta, alpha);
   return self;
 }
 
@@ -602,13 +621,13 @@ Tensor addbmm(
     Scalar beta,
     Scalar alpha) {
   Tensor out = at::empty({0}, self.options());
-  at::AtenIpexTypeDPCPP::addbmm_out(out, self, batch1, batch2, beta, alpha);
+  at::AtenIpexTypeXPU::addbmm_out(out, self, batch1, batch2, beta, alpha);
   return out;
 }
 
 Tensor& bmm_out(Tensor& result, const Tensor& self, const Tensor& batch2) {
   matmul_attr_t attr(1, 0, 0, true);
-  checkBackend("bmm_out", {result, self, batch2}, Backend::DPCPP);
+  checkBackend("bmm_out", {result, self, batch2}, Backend::XPU);
   TORCH_CHECK(self.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
 
@@ -619,7 +638,7 @@ Tensor& bmm_out(Tensor& result, const Tensor& self, const Tensor& batch2) {
 
 Tensor bmm(const Tensor& self, const Tensor& batch2) {
   auto result = at::empty({0}, self.options());
-  at::AtenIpexTypeDPCPP::bmm_out(result, self, batch2);
+  at::AtenIpexTypeXPU::bmm_out(result, self, batch2);
   return result;
 }
 
@@ -634,7 +653,7 @@ Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & b
                   std::vector<c10::IValue>({input, weight, bias}));
   if (input.dim() == 2 && bias.defined()) {
     // Fused op is marginally faster.
-    checkBackend("linear_relu", {input, weight, bias}, Backend::DPCPP);
+    checkBackend("linear_relu", {input, weight, bias}, Backend::XPU);
     TORCH_CHECK(input.dim() == 2, "expected 2D tensor");
     TORCH_CHECK(weight.dim() == 2, "expected 2D tensor");
 
@@ -662,7 +681,7 @@ Tensor linear_sigmoid(const Tensor & input, const Tensor & weight, const Tensor 
                   std::vector<c10::IValue>({input, weight, bias}));
   if (input.dim() == 2 && bias.defined()) {
     // Fused op is marginally faster.
-    checkBackend("linear_sigmoid", {input, weight, bias}, Backend::DPCPP);
+    checkBackend("linear_sigmoid", {input, weight, bias}, Backend::XPU);
     TORCH_CHECK(input.dim() == 2, "expected 2D tensor");
     TORCH_CHECK(weight.dim() == 2, "expected 2D tensor");
 
@@ -691,16 +710,16 @@ Tensor trans_linear(
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
 
   if(m1.is_quantized()){
-    checkBackend("addmm", m1, Backend::QuantizedDPCPP);
+    checkBackend("addmm", m1, Backend::QuantizedXPU);
   } else {
-    checkBackend("addmm", {input, m1, m2}, Backend::DPCPP);
+    checkBackend("addmm", {input, m1, m2}, Backend::XPU);
     TORCH_CHECK(m2.dim() == 2, "expected 2D tensor");
   }
 
   Tensor result;
   if(input.is_quantized()){
     result = _empty_affine_quantized({0},
-              device(kDPCPP).dtype(input.scalar_type()),
+              device(kXPU).dtype(input.scalar_type()),
               1.f,
               static_cast<int>(0),
               MemoryFormat::Contiguous);
@@ -742,7 +761,7 @@ Tensor addmv(
 
   Tensor vec_v = vec.view({vec.size(0), 1});
   Tensor self_v = self.view({self.size(0), 1});
-  Tensor result = at::AtenIpexTypeDPCPP::addmm(self_v, mat, vec_v, beta, alpha);
+  Tensor result = at::AtenIpexTypeXPU::addmm(self_v, mat, vec_v, beta, alpha);
   return result.view({mat.size(0)});
 }
 
@@ -759,10 +778,44 @@ Tensor& addmv_(
 
   Tensor vec_v = vec.view({vec.size(0), 1});
   Tensor self_v = self.view({self.size(0), 1});
-  self_v = at::AtenIpexTypeDPCPP::addmm_(self_v, mat, vec_v, beta, alpha);
-  self = self_v.view({mat.size(0)});
+  at::AtenIpexTypeXPU::addmm_(self_v, mat, vec_v, beta, alpha);
   return self;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
+
+namespace AtenIpexTypeQuantizedXPU {
+
+Tensor addmm(
+  const Tensor& input,
+  const Tensor& m1,
+  const Tensor& m2,
+  Scalar beta,
+  Scalar alpha) {
+  matmul_attr_t attr(
+          alpha.to<float>(),
+          beta.to<float>(),
+          0,
+          true);
+  TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");
+
+  checkBackend("addmm", m1, Backend::QuantizedXPU);
+
+  Tensor result;
+  if(input.is_quantized()){
+    result = _empty_affine_quantized({0},
+                                     device(kXPU).dtype(input.scalar_type()),
+                                     1.f,
+                                     static_cast<int>(0),
+                                     MemoryFormat::Contiguous);
+  } else {
+    result = at::empty({0}, input.options());
+  }
+
+  impl::gemm_broadcast(result, m1, m2, attr, input);
+
+  return result;
+}
+} // namespace AtenIpexTypeQuantizedXPU
+
 } // namespace at

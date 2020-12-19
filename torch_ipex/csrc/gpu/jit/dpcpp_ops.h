@@ -1,7 +1,8 @@
 #pragma once
 #include <ATen/ATen.h>
-#include <dnnl.hpp>
+#include <ATen/native/quantized/cpu/conv_packed_params.h>
 
+#include <dnnl.hpp>
 
 namespace torch {
 namespace jit {
@@ -46,9 +47,8 @@ at::Tensor reorder(
     dnnl::memory::format_tag from, dnnl::memory::format_tag to, int64_t groups);
 
 at::Tensor q_conv2d_sum_relu(
-    at::Tensor& accumu, const at::Tensor& input, const at::Tensor& packed_weight,
-    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
-    int64_t groups, double conv_scale, int64_t conv_zpoint, double sum_scale,
+    at::Tensor& accumu, const at::Tensor& input, const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
+    double conv_scale, int64_t conv_zpoint, double sum_scale,
     int64_t sum_zpoint);
 
 } // dpcpp

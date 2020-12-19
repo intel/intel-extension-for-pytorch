@@ -10,7 +10,7 @@
 using namespace dnnl;
 using namespace at::dpcpp;
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 void adaptive_avg_pool2d_out_template(
@@ -197,7 +197,7 @@ Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
     output = at::empty({0}, self.options());
   }
 
-  return at::AtenIpexTypeDPCPP::adaptive_avg_pool2d_out(output, self, output_size);
+  return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(output, self, output_size);
 }
 
 Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
@@ -212,7 +212,7 @@ Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
     output = at::empty({0}, self.options());
   }
 
-  return at::AtenIpexTypeDPCPP::adaptive_avg_pool2d_out(output, self, output_size);
+  return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(output, self, output_size);
 }
 
 Tensor& adaptive_avg_pool2d_backward_out_dpcpp(
@@ -232,5 +232,39 @@ Tensor _adaptive_avg_pool2d_backward(
   return grad_input;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
+
+namespace AtenIpexTypeQuantizedXPU {
+
+Tensor& adaptive_avg_pool2d_out(
+  Tensor& out,
+  const Tensor& self,
+  IntArrayRef output_size) {
+  at::AtenIpexTypeXPU::impl::adaptive_avg_pool2d_out_template(out, self, output_size);
+  return out;
+}
+
+Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
+  Tensor output;
+  output = _empty_affine_quantized({0},
+    self.options(),
+    self.q_scale(),
+    self.q_zero_point(),
+    MemoryFormat::Contiguous);
+  return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(
+    output, self, output_size);
+}
+
+Tensor adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
+  Tensor output;
+  output = _empty_affine_quantized({0},
+    self.options(),
+    self.q_scale(),
+    self.q_zero_point(),
+    MemoryFormat::Contiguous);
+  return at::AtenIpexTypeXPU::adaptive_avg_pool2d_out(
+    output, self, output_size);
+}
+
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

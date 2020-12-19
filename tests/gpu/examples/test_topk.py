@@ -4,7 +4,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -17,7 +17,7 @@ class TestNNMethod(TestCase):
         #x_cpu = torch.ones([2], dtype=torch.float)
         #x_cpu[0] = 1.0
         #x_cpu[1] = -1.0
-        x_dpcpp = x_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
 
         y_cpu, y_cpu_idx = torch.topk(x_cpu, 2)
 
@@ -35,7 +35,7 @@ class TestNNMethod(TestCase):
         #x_cpu1 = torch.randn([1, 10], device=torch.device("cpu"), dtype=torch.float)
         x_cpu1 = torch.tensor([[-0.2911, -1.3204,  -2.6425,  -2.4644,  -0.6018, -0.0839, -
                                 0.1322, -0.4713, -0.3586, -0.8882]], device=torch.device("cpu"), dtype=torch.float)
-        x_dpcpp1 = x_cpu1.to("dpcpp")
+        x_dpcpp1 = x_cpu1.to("xpu")
 
         print("x_cpu1=", x_cpu1)
         y_cpu0, y_cpu1 = x_cpu1.topk(5, 1, True, True)
@@ -51,7 +51,7 @@ class TestNNMethod(TestCase):
 
         x_cpu1 = torch.randn(
             [3000, 3000], device=torch.device("cpu"), dtype=torch.float)
-        x_dpcpp1 = x_cpu1.to("dpcpp")
+        x_dpcpp1 = x_cpu1.to("xpu")
 
         y_cpu0, y_cpu1 = x_cpu1.topk(5, 1, True, True)
 

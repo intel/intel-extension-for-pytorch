@@ -14,7 +14,7 @@ using namespace dnnl;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
     const Tensor& X,
@@ -26,7 +26,7 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   auto input = X.contiguous().view({1, M, N});
   auto output = at::empty_like(input);
 
-  Device curDevice = Device(kDPCPP, current_device());
+  Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   // FP16 Data Type only support forward_inference
   bool training = input.scalar_type() == ScalarType::Half ? false : true;
@@ -135,7 +135,7 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
     grad_bias = at::empty_like(weight);
   }
 
-  Device curDevice = Device(kDPCPP, current_device());
+  Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto flags = normalization_flags::use_scale_shift;
   bool useScaleShift = (bool)(flags & normalization_flags::use_scale_shift);
@@ -232,5 +232,5 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
 
   return std::make_tuple(grad_input.view(X.sizes()), grad_weight, grad_bias);
 }
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

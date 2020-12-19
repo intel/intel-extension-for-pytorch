@@ -4,7 +4,7 @@ import torch_ipex
 
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
@@ -15,7 +15,7 @@ class TestTorchMethod(TestCase):
         print("y = ", y)
 
         x_dpcpp = torch.tensor([[-0.2911, -1.3204,  -2.6425], [-2.4644,  -0.6018, -0.0839],
-                                [-0.1322, -0.4713, -0.3586]], device=torch.device("dpcpp"), dtype=torch.float)
+                                [-0.1322, -0.4713, -0.3586]], device=torch.device("xpu"), dtype=torch.float)
         y_dpcpp = torch.trace(x_dpcpp)
 
         print("y_dpcpp = ", y_dpcpp.to("cpu"))

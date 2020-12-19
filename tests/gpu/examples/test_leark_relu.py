@@ -6,7 +6,7 @@ from torch.autograd import Variable
 from torch.testing._internal.common_utils import TestCase
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 # functionality
 x_cpu = torch.randn([3, 4], device=cpu_device, requires_grad=True)
@@ -21,11 +21,11 @@ class TestNNMethod(TestCase):
         print("cpu output ", y_cpu)
         print("cpu grad ", x_cpu.grad)
 
-        Xelu.to("dpcpp")
+        Xelu.to("xpu")
         Xelu.zero_grad()
 
-        x_dpcpp = Variable(x_cpu.to("dpcpp"), requires_grad=True)
-        grad_dpcpp = Variable(grad_x.to("dpcpp"), requires_grad=True)
+        x_dpcpp = Variable(x_cpu.to("xpu"), requires_grad=True)
+        grad_dpcpp = Variable(grad_x.to("xpu"), requires_grad=True)
 
         y_dpcpp = Xelu(x_dpcpp)
         y_dpcpp.backward(grad_dpcpp)

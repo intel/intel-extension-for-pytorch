@@ -4,14 +4,15 @@
 #include <ATen/native/ReduceOps.h>
 #include <ATen/native/ReduceOpsUtils.h>
 #include <ATen/native/TensorIterator.h>
-#include <c10/core/ScalarType.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
+#include <c10/core/ScalarType.h>
 #include <utils/Numerics.h>
 #include <utils/AccumulateType.h>
 #include <utils/ATDispatch.h>
 #include <iostream>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 #include "Loops.h"
 #ifndef USE_USM
 #include "Reduce.h"
@@ -24,7 +25,7 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 using DimMask = TensorIterator::DimMask;
@@ -653,11 +654,11 @@ Tensor sum(
     bool keepdim,
     c10::optional<ScalarType> dtype) {
   Tensor result;
-  return at::AtenIpexTypeDPCPP::sum_out(result, self, dim, keepdim, dtype);
+  return at::AtenIpexTypeXPU::sum_out(result, self, dim, keepdim, dtype);
 }
 
 Tensor sum(const Tensor& self, c10::optional<ScalarType> dtype) {
-  return at::AtenIpexTypeDPCPP::sum(self, std::vector<int64_t>{}, false, dtype);
+  return at::AtenIpexTypeXPU::sum(self, std::vector<int64_t>{}, false, dtype);
 }
 
 Tensor& prod_out_impl(
@@ -682,7 +683,7 @@ Tensor& prod_out(
     int64_t dim,
     bool keepdim,
     c10::optional<ScalarType> dtype) {
-  return at::AtenIpexTypeDPCPP::prod_out_impl(
+  return at::AtenIpexTypeXPU::prod_out_impl(
       result, self, {dim}, keepdim, dtype);
 }
 
@@ -692,13 +693,13 @@ Tensor prod(
     bool keepdim,
     c10::optional<ScalarType> dtype) {
   Tensor result;
-  return at::AtenIpexTypeDPCPP::prod_out_impl(
+  return at::AtenIpexTypeXPU::prod_out_impl(
       result, self, {dim}, keepdim, dtype);
 }
 
 Tensor prod(const Tensor& self, c10::optional<ScalarType> dtype) {
   Tensor result;
-  return at::AtenIpexTypeDPCPP::prod_out_impl(result, self, {}, false, dtype);
+  return at::AtenIpexTypeXPU::prod_out_impl(result, self, {}, false, dtype);
 }
 
 Tensor& mean_out(
@@ -726,7 +727,7 @@ Tensor& mean_out(
 }
 
 Tensor mean(const Tensor& self, optional<ScalarType> dtype) {
-  return at::AtenIpexTypeDPCPP::mean(self, IntArrayRef{}, false, dtype);
+  return at::AtenIpexTypeXPU::mean(self, IntArrayRef{}, false, dtype);
 }
 
 Tensor mean(
@@ -735,7 +736,7 @@ Tensor mean(
     bool keepdim,
     optional<ScalarType> dtype) {
   Tensor result;
-  return at::AtenIpexTypeDPCPP::mean_out(result, self, dim, keepdim, dtype);
+  return at::AtenIpexTypeXPU::mean_out(result, self, dim, keepdim, dtype);
 }
 
 Tensor min_out(
@@ -755,28 +756,31 @@ Tensor min_out(
 
 Tensor min(const Tensor& self) {
   Tensor result;
-  return at::AtenIpexTypeDPCPP::min_out(
+  return at::AtenIpexTypeXPU::min_out(
       result, self, std::vector<int64_t>{}, false);
 }
 
-Tensor max_out(
+Tensor& amax_out(
     Tensor& result,
     const Tensor& self,
     IntArrayRef dim,
     bool keepdim) {
-  ScalarType dtype = impl::get_dtype(result, self, c10::nullopt);
-  auto iter = impl::make_reduction("max", result, self, dim, keepdim, dtype);
-  if (iter.numel() == 0) {
-    result.zero_();
-  } else {
-    impl::max_kernel(iter);
-  }
+  TORCH_CHECK(self.scalar_type() == result.scalar_type(), "Illegal dtype for self, and out:", self.scalar_type(), result.scalar_type());
+  auto iter = impl::make_reduction("amax", result, self, dim, keepdim, self.scalar_type());
+  TORCH_CHECK(iter.numel() > 0, "operation does not have an identity");
+  impl::max_kernel(iter);
   return result;
 }
 
+Tensor amax(const Tensor & self, IntArrayRef dim, bool keepdim) {
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeXPU::amax_out(
+          result, self, dim, keepdim);
+}
+
 Tensor max(const Tensor& self) {
-  Tensor result;
-  return at::AtenIpexTypeDPCPP::max_out(
+  Tensor result = at::empty({0}, self.options());
+  return at::AtenIpexTypeXPU::amax_out(
       result, self, std::vector<int64_t>{}, false);
 }
 
@@ -814,7 +818,7 @@ static Tensor norm(
     bool keepdim,
     optional<ScalarType> opt_dtype) {
   Tensor result;
-  return at::AtenIpexTypeDPCPP::norm_out(
+  return at::AtenIpexTypeXPU::norm_out(
       result, self, p, dim, keepdim, opt_dtype);
 }
 
@@ -828,7 +832,7 @@ static inline Tensor _norm(const Tensor& self, Scalar p) {
         "norm only supports floating-point dtypes");
 
     Tensor result;
-    return at::AtenIpexTypeDPCPP::norm_out(
+    return at::AtenIpexTypeXPU::norm_out(
         result, self, p, IntArrayRef{}, false, c10::nullopt);
   }
 }
@@ -841,7 +845,7 @@ Tensor& norm_out(
     IntArrayRef dim,
     bool keepdim,
     ScalarType dtype) {
-  return at::AtenIpexTypeDPCPP::norm_out(
+  return at::AtenIpexTypeXPU::norm_out(
       out, self, p, dim, keepdim, optional<ScalarType>(dtype));
 }
 
@@ -851,7 +855,7 @@ Tensor& norm_out(
     c10::optional<Scalar> p,
     IntArrayRef dim,
     bool keepdim) {
-  return at::AtenIpexTypeDPCPP::norm_out(
+  return at::AtenIpexTypeXPU::norm_out(
       out, self, p, dim, keepdim, c10::nullopt);
 }
 
@@ -861,12 +865,12 @@ Tensor norm(
     IntArrayRef dim,
     bool keepdim,
     ScalarType dtype) {
-  return at::AtenIpexTypeDPCPP::norm(
+  return at::AtenIpexTypeXPU::norm(
       self, p, dim, keepdim, optional<ScalarType>(dtype));
 }
 
 Tensor norm(const Tensor& self, c10::optional<Scalar> p, ScalarType dtype) {
-  return at::AtenIpexTypeDPCPP::norm(
+  return at::AtenIpexTypeXPU::norm(
       self, p, IntArrayRef{}, false, optional<ScalarType>(dtype));
 }
 
@@ -875,11 +879,11 @@ Tensor norm(
     c10::optional<Scalar> p,
     IntArrayRef dim,
     bool keepdim) {
-  return at::AtenIpexTypeDPCPP::norm(self, p, dim, keepdim, c10::nullopt);
+  return at::AtenIpexTypeXPU::norm(self, p, dim, keepdim, c10::nullopt);
 }
 
 Tensor norm(const Tensor& self, Scalar p) {
-  return at::AtenIpexTypeDPCPP::_norm(self, p);
+  return at::AtenIpexTypeXPU::_norm(self, p);
 }
 
 inline Tensor& _all(Tensor& result, TensorIterator& iter) {
@@ -902,7 +906,7 @@ Tensor all(const at::Tensor& self) {
   auto iter =
       impl::make_reduction("all", result, self, {}, false, self.scalar_type());
 
-  return at::AtenIpexTypeDPCPP::_all(result, iter);
+  return at::AtenIpexTypeXPU::_all(result, iter);
 }
 
 Tensor& all_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
@@ -916,13 +920,13 @@ Tensor& all_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
   } else {
     auto iter = impl::make_reduction(
         "all", result, self, dim, keepdim, self.scalar_type());
-    return at::AtenIpexTypeDPCPP::_all(result, iter);
+    return at::AtenIpexTypeXPU::_all(result, iter);
   }
 }
 
 Tensor all(const Tensor& self, int64_t dim, bool keepdim) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::all_out(result, self, dim, keepdim);
+  return at::AtenIpexTypeXPU::all_out(result, self, dim, keepdim);
 }
 
 inline Tensor& _any(Tensor& result, TensorIterator& iter) {
@@ -945,7 +949,7 @@ Tensor any(const at::Tensor& self) {
   auto iter =
       impl::make_reduction("any", result, self, {}, false, self.scalar_type());
 
-  return at::AtenIpexTypeDPCPP::_any(result, iter);
+  return at::AtenIpexTypeXPU::_any(result, iter);
 }
 
 Tensor& any_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
@@ -959,13 +963,13 @@ Tensor& any_out(Tensor& result, const Tensor& self, int64_t dim, bool keepdim) {
   } else {
     auto iter = impl::make_reduction(
         "any", result, self, dim, keepdim, self.scalar_type());
-    return at::AtenIpexTypeDPCPP::_any(result, iter);
+    return at::AtenIpexTypeXPU::_any(result, iter);
   }
 }
 
 Tensor any(const Tensor& self, int64_t dim, bool keepdim) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::any_out(result, self, dim, keepdim);
+  return at::AtenIpexTypeXPU::any_out(result, self, dim, keepdim);
 }
 
 class OpRenorm {};
@@ -983,7 +987,7 @@ Tensor& renorm_out(
 
   auto norm_vec_sz = self.size(dim);
   Tensor norm = at::empty(norm_vec_sz, self.options().dtype(kFloat));
-  at::AtenIpexTypeDPCPP::norm_out(
+  at::AtenIpexTypeXPU::norm_out(
       norm,
       self.transpose(0, dim).reshape({norm_vec_sz, -1}),
       p,
@@ -991,11 +995,11 @@ Tensor& renorm_out(
       false,
       c10::nullopt);
 
-  auto iter = TensorIterator();
-  iter.add_output(norm);
-  iter.add_input(norm);
-  iter.set_check_mem_overlap(true);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .add_output(norm)
+  .add_input(norm)
+  .set_check_mem_overlap(true)
+  .build();
   float maxnorm_ = maxnorm.toFloat();
   dpcpp_kernel_for_tensor_iter<OpRenorm>(iter, [=](float norm) -> float {
     if (norm > maxnorm_)
@@ -1010,7 +1014,7 @@ Tensor& renorm_out(
     sizes_.push_back(1);
   }
 
-  return at::AtenIpexTypeDPCPP::mul_out(
+  return at::AtenIpexTypeXPU::mul_out(
       out, self, norm.contiguous().view(sizes_));
 }
 
@@ -1019,12 +1023,12 @@ Tensor renorm(const Tensor& self, Scalar p, int64_t dim, Scalar maxnorm) {
 
   Tensor result;
   result = at::empty(self.sizes(), self.options());
-  at::AtenIpexTypeDPCPP::renorm_out(result, self, p, dim, maxnorm);
+  at::AtenIpexTypeXPU::renorm_out(result, self, p, dim, maxnorm);
   return result;
 }
 
 Tensor& renorm_(Tensor& self, Scalar p, int64_t dim, Scalar maxnorm) {
-  return at::AtenIpexTypeDPCPP::renorm_out(self, self, p, dim, maxnorm);
+  return at::AtenIpexTypeXPU::renorm_out(self, self, p, dim, maxnorm);
 }
 
 Tensor& std_var_out(
@@ -1122,7 +1126,7 @@ std::tuple<Tensor&, Tensor&> std_var_mean_out(
     at::add_out(
         result2,
         real_out_mean,
-        at::mul(imag_out_mean, std::complex<double>{0.0, 1.0}));
+        at::mul(imag_out_mean, c10::complex<double>{0.0, 1.0}));
   } else {
     ScalarType dtype = get_dtype(result1, self, {}, true);
     auto iter =
@@ -1193,5 +1197,5 @@ Tensor argmin(const Tensor& self, c10::optional<int64_t> dim, bool keepdims) {
   return argmin_out(result, self, dim, keepdims);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

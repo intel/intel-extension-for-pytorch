@@ -1,16 +1,19 @@
 #include <core/TensorImplUtils.h>
+#include <ATen/core/TensorBody.h>
 
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 Tensor& set_(Tensor& self, Storage source) {
+  int64_t new_size =
+    static_cast<int64_t>(source.nbytes() / self.dtype().itemsize());
   TensorImpl_setStorage(
       TensorImpl_Unwrap(self),
       source.unsafeGetStorageImpl(),
       0,
-      {static_cast<int64_t>(source.size())},
+      {static_cast<int64_t>(new_size)},
       {});
   return self;
 }
@@ -44,5 +47,5 @@ bool is_set_to(const Tensor& self, const Tensor& tensor) {
   return TensorImpl_isSetTo(TensorImpl_Unwrap(self), TensorImpl_Unwrap(tensor));
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

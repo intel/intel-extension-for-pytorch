@@ -6,7 +6,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 Tensor& resize_(Tensor& self, IntArrayRef size) {
@@ -33,8 +33,19 @@ Tensor& resize_as_(
     Tensor& self,
     const Tensor& the_template,
     c10::optional<MemoryFormat> memory_format) {
-  return at::AtenIpexTypeDPCPP::resize_(
+  return at::AtenIpexTypeXPU::resize_(
       self, the_template.sizes(), memory_format);
 }
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
+
+
+namespace AtenIpexTypeQuantizedXPU {
+Tensor& resize_(
+  Tensor& self,
+  IntArrayRef size,
+  c10::optional<MemoryFormat> memory_format) {
+  at::AtenIpexTypeXPU::impl::resize_(self, size);
+  return self;
+}
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

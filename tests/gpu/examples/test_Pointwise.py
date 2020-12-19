@@ -5,7 +5,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTensorMethod(TestCase):
@@ -14,7 +14,7 @@ class TestTensorMethod(TestCase):
         x = torch.tensor([[0.6580, -1.0969, -0.4614],
                           [-0.1034, -0.5790,  0.1497]], device=cpu_device)
         #x_dpcpp = torch.tensor([[ 0.6580, -1.0969, -0.4614], [-0.1034, -0.5790,  0.1497]], device = dpcpp_device)
-        x_dpcpp = x.to("dpcpp")
+        x_dpcpp = x.to("xpu")
 
         y = torch.addcdiv(x, 0.1, x, x)
 
@@ -33,7 +33,7 @@ class TestTensorMethod(TestCase):
         x = torch.tensor([[0.6580, -1.0969, -0.4614],
                           [-0.1034, -0.5790,  0.1497]], device=cpu_device)
         #x_dpcpp = torch.tensor([[ 0.6580, -1.0969, -0.4614], [-0.1034, -0.5790,  0.1497]], device = dpcpp_device)
-        x_dpcpp = x.to("dpcpp")
+        x_dpcpp = x.to("xpu")
 
         y = torch.addcmul(x, 0.1, x, x)
 
@@ -52,7 +52,7 @@ class TestTensorMethod(TestCase):
         x = torch.tensor([[0.6580, -1.0969, -0.4614],
                           [-0.1034, -0.5790,  0.1497]], device=cpu_device)
         #x_dpcpp = torch.tensor([[ 0.6580, -1.0969, -0.4614], [-0.1034, -0.5790,  0.1497]], device = dpcpp_device)
-        x_dpcpp = x.to("dpcpp")
+        x_dpcpp = x.to("xpu")
 
         y = torch.lerp(x, x, 0.5)
         y_dpcpp = torch.lerp(x_dpcpp, x_dpcpp, 0.5)

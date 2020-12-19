@@ -16,7 +16,7 @@ DPCPP_DEF_K2(fill_with_conjugate_symmetry_ker, typename scalar_t);
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
@@ -279,5 +279,5 @@ Tensor _fft_with_size(
 #endif
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

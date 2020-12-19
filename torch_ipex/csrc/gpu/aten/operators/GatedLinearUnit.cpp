@@ -8,12 +8,12 @@
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
@@ -76,7 +76,7 @@ void GatedLinearUnit_updateGradInput(
 
 } // namespace impl
 
-// namespace AtenIpexTypeDPCPP
+// namespace AtenIpexTypeXPU
 Tensor& glu_out(Tensor& out, const Tensor& self, int64_t dim) {
   IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(self.scalar_type(), "glu_out", [&] {
     impl::GatedLinearUnit_updateOutput<scalar_t>(out, self, dim);
@@ -86,7 +86,7 @@ Tensor& glu_out(Tensor& out, const Tensor& self, int64_t dim) {
 
 Tensor glu(const Tensor& self, int64_t dim) {
   Tensor out = at::empty({}, self.options());
-  return at::AtenIpexTypeDPCPP::glu_out(out, self, dim);
+  return at::AtenIpexTypeXPU::glu_out(out, self, dim);
 }
 
 Tensor& glu_backward_out(
@@ -107,9 +107,9 @@ Tensor glu_backward(
     const Tensor& self,
     int64_t dim) {
   Tensor grad_input = at::empty({}, self.options());
-  return at::AtenIpexTypeDPCPP::glu_backward_out(
+  return at::AtenIpexTypeXPU::glu_backward_out(
       grad_input, grad_output, self, dim);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

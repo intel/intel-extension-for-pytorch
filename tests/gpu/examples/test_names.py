@@ -3,11 +3,11 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 class TestTensorMethod(TestCase):
     def test_names(self, dtype=torch.float):
-        imgs_dpcpp = torch.rand(2, 3, 5, 7, device='dpcpp')
+        imgs_dpcpp = torch.rand(2, 3, 5, 7, device="xpu")
         self.assertEqual(False, imgs_dpcpp.has_names())
         self.assertEqual((None, None, None, None), imgs_dpcpp.names)
 

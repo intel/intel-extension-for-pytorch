@@ -26,7 +26,7 @@ float DPCPPEventStubImpl::elapsed() {
 struct RegisterDPCPPMethods {
   RegisterDPCPPMethods() {
     static DPCPPProvfilerStubsImpl methods;
-    registerDPCPPMethods(&methods);
+    registerXPUMethods(&methods);
   }
 };
 

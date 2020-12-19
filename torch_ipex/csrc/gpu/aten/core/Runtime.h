@@ -102,7 +102,7 @@ struct GpuEngineManager {
   }
 
   engine& get_engine(const Device& device) {
-    TORCH_INTERNAL_ASSERT(device.type() == kDPCPP);
+    TORCH_INTERNAL_ASSERT(device.type() == kXPU);
     TORCH_INTERNAL_ASSERT(device.index() < at::dpcpp::device_count());
     return *engine_pool[device.index()];
   }
@@ -141,7 +141,7 @@ struct GpuStreamManager {
   dnnl::stream get_stream(int device_index = 0) {
     TORCH_INTERNAL_ASSERT(device_index < at::dpcpp::device_count());
     return dnnl::sycl_interop::make_stream(
-        GpuEngineManager::Instance().get_engine({kDPCPP, device_index}),
+        GpuEngineManager::Instance().get_engine({kXPU, device_index}),
         getDefaultDPCPPStream(device_index).dpcpp_queue());
   }
 #endif
@@ -157,7 +157,7 @@ struct GpuStreamManager {
     for (DeviceIndex dev = 0; dev < deviceCount; dev++) {
       stream_pool.push_back(std::make_shared<dnnl::stream>(
             dnnl::sycl_interop::make_stream(
-              GpuEngineManager::Instance().get_engine({kDPCPP, dev}),
+              GpuEngineManager::Instance().get_engine({kXPU, dev}),
               getDefaultDPCPPStream(dev).dpcpp_queue())));
     }
 #endif

@@ -169,7 +169,7 @@ python3 setup.py install --user
 ## Programming Model:
 
 *  ```import torch_ipex``` is a MUST before running any cases with Intel GPU Extension for PyTorch.
-*  New devcie "dpcpp" is added into PyTorch proper. Must convert Tensors/Operators/Models onto DPCPP device before running with this Extension.
+*  New devcie "xpu" is added into PyTorch proper. Must convert Tensors/Operators/Models onto DPCPP device before running with this Extension.
 
 ## Supported Models:
 

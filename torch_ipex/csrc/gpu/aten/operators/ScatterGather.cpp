@@ -13,7 +13,7 @@ using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 #define RUN(TYPE, DIMS, REAL)                   \
@@ -498,8 +498,8 @@ Tensor gather(
     const Tensor& index,
     bool sparse_grad) {
   Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::gather_out(out, self, dim, index, sparse_grad);
+  return at::AtenIpexTypeXPU::gather_out(out, self, dim, index, sparse_grad);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

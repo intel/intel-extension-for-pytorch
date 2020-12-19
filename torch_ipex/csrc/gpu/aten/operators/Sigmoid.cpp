@@ -11,7 +11,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
@@ -43,10 +43,10 @@ Tensor& sigmoid_out(Tensor& out, const Tensor& self) {
 }
 Tensor sigmoid(const Tensor& self) {
   Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeDPCPP::sigmoid_out(result, self);
+  return at::AtenIpexTypeXPU::sigmoid_out(result, self);
 }
 Tensor& sigmoid_(Tensor& self) {
-  return at::AtenIpexTypeDPCPP::sigmoid_out(self, self);
+  return at::AtenIpexTypeXPU::sigmoid_out(self, self);
 }
 
 Tensor& sigmoid_backward_out(
@@ -69,9 +69,9 @@ Tensor& sigmoid_backward_out(
 
 Tensor sigmoid_backward(const Tensor& grad_output, const Tensor& output) {
   auto grad_input = at::empty({0}, grad_output.options());
-  return at::AtenIpexTypeDPCPP::sigmoid_backward_out(
+  return at::AtenIpexTypeXPU::sigmoid_backward_out(
       grad_input, grad_output, output);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

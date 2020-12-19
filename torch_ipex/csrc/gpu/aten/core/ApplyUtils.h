@@ -1186,7 +1186,7 @@ void kernelPointwiseApply4(
 
 template <typename scalar, int step, typename Op, bool with_offset = false>
 inline void DPCPP_tensor_apply1(at::Tensor a, const Op& op) {
-  checkBackend("DPCPP_Tensor_apply1", {a}, Backend::DPCPP);
+  checkBackend("DPCPP_Tensor_apply1", {a}, Backend::XPU);
   auto dim = a.dim();
 
   std::vector<int64_t> collapsed_shape;
@@ -1287,9 +1287,9 @@ template <
     bool with_offset = false>
 inline void DPCPP_tensor_apply2(at::Tensor dst, at::Tensor src, const Op& op) {
   if(src.is_quantized())
-      checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::QuantizedDPCPP);
+      checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::QuantizedXPU);
   else
-      checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::DPCPP);
+      checkBackend("DPCPP_Tensor_apply2", {dst, src}, Backend::XPU);
   int64_t totalElements = dst.numel();
 
   TORCH_CHECK(
@@ -1414,7 +1414,7 @@ inline void DPCPP_tensor_apply3(
     at::Tensor src1,
     at::Tensor src2,
     const Op& op) {
-  checkBackend("DPCPP_Tensor_apply3", {dst, src1, src2}, Backend::DPCPP);
+  checkBackend("DPCPP_Tensor_apply3", {dst, src1, src2}, Backend::XPU);
   int64_t totalElements = dst.numel();
 
   TORCH_CHECK(
@@ -1570,7 +1570,7 @@ inline void DPCPP_tensor_apply4(
     at::Tensor src2,
     at::Tensor src3,
     const Op& op) {
-  checkBackend("DPCPP_Tensor_apply4", {dst, src1, src2, src3}, Backend::DPCPP);
+  checkBackend("DPCPP_Tensor_apply4", {dst, src1, src2, src3}, Backend::XPU);
   int64_t totalElements = dst.numel();
 
   TORCH_CHECK(

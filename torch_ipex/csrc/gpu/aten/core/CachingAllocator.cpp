@@ -248,6 +248,9 @@ class CachingAllocator {
 
     *devPtr = block->ptr;
 
+    c10::reportMemoryUsageToProfiler(
+        block, block->size, c10::Device(c10::DeviceType::XPU, curDevID));
+
     update_stat_array(stats.allocation, 1, stat_types);
     update_stat_array(stats.allocated_bytes, block->size, stat_types);
     update_stat_array(stats.active, 1, stat_types);
@@ -450,6 +453,9 @@ class CachingAllocator {
     AT_ASSERT(!block->allocated && block->event_count == 0);
 
     size_t original_block_size = block->size;
+
+    c10::reportMemoryUsageToProfiler(
+        block, -block->size, c10::Device(c10::DeviceType::XPU, block->device));
 
     auto& pool = *block->pool;
     int64_t net_change_inactive_split_blocks = 0;
@@ -706,8 +712,8 @@ struct DPCPPCachingAllocator : public Allocator {
       auto& dpcpp_queue = getCurrentDPCPPStream(curDevID).dpcpp_queue();
       caching_allocator.malloc(&r, size, &dpcpp_queue);
     }
-    auto ctx = new at::AtenIpexTypeDPCPP::DPCPPTensorContext(r);
-    return {r, ctx, &dpcpp_raw_delete, Device(DeviceType::DPCPP, curDevID)};
+    auto ctx = new at::AtenIpexTypeXPU::DPCPPTensorContext(r);
+    return {r, ctx, &dpcpp_raw_delete, Device(DeviceType::XPU, curDevID)};
   }
   DeleterFnPtr raw_deleter() const override {
     return &dpcpp_raw_delete;
@@ -787,7 +793,7 @@ void* dpcpp_raw_alloc_with_queue(size_t nbytes, DPCPP::queue &queue) {
 }
 
 void dpcpp_raw_delete(void* ptr) {
-  auto ctx = (at::AtenIpexTypeDPCPP::DPCPPTensorContext*)ptr;
+  auto ctx = (at::AtenIpexTypeXPU::DPCPPTensorContext*)ptr;
   auto data = ctx->data();
   caching_allocator.free(data);
   delete ctx;

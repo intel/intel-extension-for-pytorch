@@ -11,7 +11,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 DPCPP_DEF_K2(MaxUnpool2d, typename scalar_t);
@@ -642,7 +642,7 @@ Tensor max_unpool2d(
     const Tensor& indices,
     IntArrayRef output_size) {
   auto out = at::empty({0}, self.options());
-  at::AtenIpexTypeDPCPP::max_unpool2d_out(out, self, indices, output_size);
+  at::AtenIpexTypeXPU::max_unpool2d_out(out, self, indices, output_size);
   return out;
 }
 
@@ -663,7 +663,7 @@ Tensor max_unpool2d_backward(
     const Tensor& indices,
     IntArrayRef output_size) {
   auto grad_input = at::empty_like(self, MemoryFormat::Contiguous);
-  at::AtenIpexTypeDPCPP::max_unpool2d_backward_out(
+  at::AtenIpexTypeXPU::max_unpool2d_backward_out(
       grad_input, grad_output, self, indices, output_size);
   return grad_input;
 }
@@ -687,7 +687,7 @@ Tensor max_unpool3d(
     IntArrayRef stride,
     IntArrayRef padding) {
   auto out = at::empty({0}, self.options());
-  at::AtenIpexTypeDPCPP::max_unpool3d_out(
+  at::AtenIpexTypeXPU::max_unpool3d_out(
       out, self, indices, output_size, stride, padding);
   return out;
 }
@@ -713,10 +713,10 @@ Tensor max_unpool3d_backward(
     IntArrayRef stride,
     IntArrayRef padding) {
   auto grad_input = at::empty_like(self, MemoryFormat::Contiguous);
-  at::AtenIpexTypeDPCPP::max_unpool3d_backward_out(
+  at::AtenIpexTypeXPU::max_unpool3d_backward_out(
       grad_input, grad_output, self, indices, output_size, stride, padding);
   return grad_input;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -11,7 +11,7 @@
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t, typename scalar1_t>
@@ -63,5 +63,5 @@ Tensor isnan(const Tensor& self) {
   return self != self;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -24,7 +24,7 @@ class AT_DPCPP_API DPCPPStream {
   enum Unchecked { UNCHECKED };
 
   explicit DPCPPStream(Stream stream) : stream_(stream) {
-    TORCH_CHECK(stream_.device_type() == DeviceType::DPCPP);
+    TORCH_CHECK(stream_.device_type() == DeviceType::XPU);
   }
 
   explicit DPCPPStream(Unchecked, Stream stream) : stream_(stream) {}
@@ -46,7 +46,7 @@ class AT_DPCPP_API DPCPPStream {
   }
 
   Device device() const {
-    return Device(DeviceType::DPCPP, device_index());
+    return Device(DeviceType::XPU, device_index());
   }
 
   StreamId id() const {

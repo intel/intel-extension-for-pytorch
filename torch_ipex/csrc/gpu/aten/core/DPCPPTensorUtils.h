@@ -7,18 +7,18 @@ static inline void checkSameDPCPP(
     at::CheckedFrom c,
     const at::TensorArg& t1,
     const at::TensorArg& t2) {
-  if ((t1->device().type() != at::kDPCPP) ||
-      (t2->device().type() != at::kDPCPP)) {
+  if ((t1->device().type() != at::kXPU) ||
+      (t2->device().type() != at::kXPU)) {
     std::ostringstream oss;
-    if (t1->device().type() != at::kDPCPP) {
+    if (t1->device().type() != at::kXPU) {
       oss << "Tensor for " << t1 << " is not on DPCPP, ";
     }
-    if (t2->device().type() != at::kDPCPP) {
+    if (t2->device().type() != at::kXPU) {
       oss << "Tensor for " << t2 << " is not on DPCPP, ";
     }
     oss << "but expected "
-        << ((!(t1->device().type() == at::kDPCPP ||
-               t2->device().type() == at::kDPCPP))
+        << ((!(t1->device().type() == at::kXPU ||
+               t2->device().type() == at::kXPU))
                 ? "them"
                 : "it")
         << " to be on DPCPP (while checking arguments for " << c << ")";

@@ -4,13 +4,13 @@
 
 namespace at {
 
-struct CAFFE2_API DPCPPGenerator : public Generator {
+struct CAFFE2_API DPCPPGeneratorImpl : public GeneratorImpl {
   // Constructors
-  DPCPPGenerator(DeviceIndex device_index = -1);
-  ~DPCPPGenerator() = default;
+  DPCPPGeneratorImpl(DeviceIndex device_index = -1);
+  ~DPCPPGeneratorImpl() = default;
 
-  // DPCPPGenerator methods
-  std::shared_ptr<DPCPPGenerator> clone() const;
+  // DPCPPGeneratorImpl methods
+  std::shared_ptr<DPCPPGeneratorImpl> clone() const;
   void set_current_seed(uint64_t seed) override;
   uint64_t current_seed() const override;
   uint64_t seed() override;
@@ -20,7 +20,7 @@ struct CAFFE2_API DPCPPGenerator : public Generator {
   static DeviceType device_type();
 
  private:
-  DPCPPGenerator* clone_impl() const override;
+  DPCPPGeneratorImpl* clone_impl() const override;
   uint64_t seed_ = default_rng_seed_val;
   uint64_t philox_offset_per_thread_ = 0;
 };
@@ -28,10 +28,8 @@ struct CAFFE2_API DPCPPGenerator : public Generator {
 namespace dpcpp {
 namespace detail {
 
-CAFFE2_API DPCPPGenerator* getDefaultDPCPPGenerator(
-    DeviceIndex device_index = -1);
-CAFFE2_API std::shared_ptr<DPCPPGenerator> createDPCPPGenerator(
-    DeviceIndex device_index = -1);
+CAFFE2_API const Generator& getDefaultDPCPPGenerator(DeviceIndex device_index = -1);
+CAFFE2_API Generator createDPCPPGenerator(DeviceIndex device_index = -1);
 
 } // namespace detail
 } // namespace dpcpp

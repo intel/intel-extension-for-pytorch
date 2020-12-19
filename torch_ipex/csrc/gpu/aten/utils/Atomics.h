@@ -91,6 +91,14 @@ static inline DPCPP_DEVICE void atomicAdd(
   address_var.fetch_add(val);
 }
 
+static inline DPCPP_DEVICE void atomicAdd(
+        const dpcpp_global_ptr_pt<long>& address,
+        int val) {
+  dpcpp_multi_ptr<long, dpcpp_global_space> address_multi_ptr(address);
+  DPCPP::atomic<long> address_var(address_multi_ptr);
+  address_var.fetch_add(val);
+}
+
 // (TODO) add support for atomicAdd
 // dpcpp_global_ptr_pt<uint8_t *>
 // dpcpp_global_ptr_pt<int8_t>

@@ -3,7 +3,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
@@ -27,7 +27,7 @@ class TestTorchMethod(TestCase):
         # Test bmm OP.
         #
 
-        M_dpcpp = M.to("dpcpp")
+        M_dpcpp = M.to("xpu")
         print("torch.baddbmm cpu", torch.baddbmm(M, batch1, batch2))
         print("torch.baddbmm dpcpp", torch.baddbmm(
             M_dpcpp, batch1_dpcpp, batch2_dpcpp).to('cpu'))

@@ -4,7 +4,7 @@ from torch.testing._internal.common_utils import TestCase
 import pytest
 
 cpu_device = torch.device("cpu")
-sycl_device = torch.device("dpcpp")
+sycl_device = torch.device("xpu")
 
 class  TestTorchMethod(TestCase):
     @pytest.mark.skipif("not torch_ipex._usm_is_enabled() or not torch_ipex._onedpl_is_enabled()")

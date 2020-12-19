@@ -10,7 +10,7 @@
 #include <core/DPCPP.h>
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 constexpr int input_batch_size_dim = 0;
@@ -127,5 +127,5 @@ at::Tensor convolution(
     conv_attr_t attr);
 
 } // namespace impl
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

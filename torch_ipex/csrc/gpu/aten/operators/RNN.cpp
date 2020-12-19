@@ -10,7 +10,7 @@ using namespace dnnl;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
     const Tensor& input,
@@ -24,7 +24,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
     bool bidirectional,
     bool batch_first) {
   TORCH_CHECK(!batch_first, "oneDNN does not support batch first input");
-  Device curDevice = Device(kDPCPP, current_device());
+  Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -306,5 +306,5 @@ void lstm_dpcpp(
       batch_first);
   std::tie(output, hy, cy) = result;
 }
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -12,7 +12,7 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 void avg_pool2d_out_template(
@@ -293,7 +293,7 @@ Tensor avg_pool2d(
     output = at::empty({0}, input.options());
   }
 
-  return at::AtenIpexTypeDPCPP::avg_pool2d_out(
+  return at::AtenIpexTypeXPU::avg_pool2d_out(
       output,
       input,
       kernel_size,
@@ -339,7 +339,7 @@ Tensor avg_pool2d_backward(
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
   Tensor grad_input = at::zeros_like(input, MemoryFormat::Contiguous);
-  return at::AtenIpexTypeDPCPP::avg_pool2d_backward_out(
+  return at::AtenIpexTypeXPU::avg_pool2d_backward_out(
       grad_input,
       grad_output,
       input,
@@ -351,5 +351,58 @@ Tensor avg_pool2d_backward(
       divisor_override);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
+
+namespace AtenIpexTypeQuantizedXPU {
+
+Tensor& avg_pool2d_out(
+  Tensor& output,
+  const Tensor& input,
+  IntArrayRef kernel_size,
+  IntArrayRef stride,
+  IntArrayRef padding,
+  bool ceil_mode,
+  bool count_include_pad,
+  c10::optional<int64_t> divisor_override) {
+  TORCH_CHECK(
+    !divisor_override.has_value(),
+    "dpcpp_avg_pool2d operator does not support divisor");
+  at::AtenIpexTypeXPU::impl::avg_pool2d_out_template(
+    output,
+    input,
+    kernel_size,
+    stride,
+    padding,
+    ceil_mode,
+    count_include_pad);
+  return output;
+}
+
+Tensor avg_pool2d(
+  const Tensor& input,
+  IntArrayRef kernel_size,
+  IntArrayRef stride,
+  IntArrayRef padding,
+  bool ceil_mode,
+  bool count_include_pad,
+  c10::optional<int64_t> divisor_override) {
+
+  Tensor output;
+  output = _empty_affine_quantized({0},
+                                     input.options(),
+                                     input.q_scale(),
+                                     input.q_zero_point(),
+                                     MemoryFormat::Contiguous);
+
+  return at::AtenIpexTypeXPU::avg_pool2d_out(
+    output,
+    input,
+    kernel_size,
+    stride,
+    padding,
+    ceil_mode,
+    count_include_pad,
+    divisor_override);
+}
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

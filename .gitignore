@@ -23,11 +23,15 @@
 */**/**/**/**/*.pyc
 
 torch_ipex/version.py
-torch_ipex/csrc/version.cpp
+torch_ipex/README.md
+torch_ipex/requirements.txt
+torch_ipex/THIRD-PARTY-PROGRAMS.txt
+torch_ipex/csrc/version.h
 torch_ipex/csrc/aten_ipex_sparse_type_default.*
 torch_ipex/csrc/cpu/SparseOPs.*
 torch_ipex/include/
 torch_ipex/lib/
+
 # Root level file used in CI to specify certain env configs.
 # E.g., see .circleci/config.yaml
 env
@@ -51,7 +55,6 @@ env
 .ninja_log
 compile_commands.json
 *.egg-info/
-docs/source/scripts/activation_images/
 
 ## General
 
@@ -134,7 +137,6 @@ gen
 .setuptools-cmake-build
 .pytest_cache
 aten/build/*
-torch_ipex/csrc/gpu/aten/generated/*
 
 # Bram
 plsdontbreak
@@ -153,12 +155,8 @@ LOCK
 CURRENT
 MANIFEST-*
 
-# generated version file
-caffe2/version.py
-
 # setup.py intermediates
 .eggs
-caffe2.egg-info
 
 # Atom/Watchman required file
 .watchmanconfig
@@ -191,10 +189,8 @@ TAGS
 # Below files are not deleted by "setup.py clean".
 
 # generated files
-torch_ipex/csrc/gpu/aten/generated/ATen/aten_ipex_type_default.cpp
-torch_ipex/csrc/gpu/aten/generated/ATen/aten_ipex_type_default.h
-torch_ipex/csrc/gpu/aten/generated/ATen/aten_ipex_type_dpcpp.h
-scripts/gpu/RegistrationDeclarations_DPCPP.h
-scripts/gpu/aten_ipex_type_default.cpp.in
-scripts/gpu/aten_ipex_type_default.h.in
-scripts/gpu/aten_ipex_type_dpcpp.h.in
+#
+#
+tests/gpu/examples/simple_trace_case.zip
+torch_ipex/csrc/gpu/aten/generated/ATen/*
+torch_ipex/csrc/gpu/aten/generated/*

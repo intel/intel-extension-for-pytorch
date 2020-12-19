@@ -1,8 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/div_rtn.h>
 #include <ATen/native/TensorIterator.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 #include <core/ApplyUtils.h>
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
@@ -20,7 +21,7 @@ using namespace at::dpcpp;
 using namespace at::native;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 static void col2im_out_template(
@@ -141,7 +142,7 @@ void col2im_backward_out_template(
     IntArrayRef dilation,
     IntArrayRef padding,
     IntArrayRef stride) {
-  at::AtenIpexTypeDPCPP::im2col_out(grad_input, grad_output, kernel_size, dilation, padding, stride);
+  at::AtenIpexTypeXPU::im2col_out(grad_input, grad_output, kernel_size, dilation, padding, stride);
 }
 
 } // namespace impl
@@ -194,5 +195,5 @@ Tensor col2im_backward(
   return grad_input;
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

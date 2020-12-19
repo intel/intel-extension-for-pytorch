@@ -5,15 +5,15 @@ import torch_ipex
 from torch.testing._internal.common_utils import TestCase
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
     def test_max_pool3d(self, dtype=torch.float):
         x_cpu = torch.randn([1, 4, 4, 3], device=cpu_device, dtype=dtype)
         grad_cpu = torch.randn([1, 4, 4, 3], device=cpu_device, dtype=dtype)
-        x_dpcpp = x_cpu.to("dpcpp")
-        grad_dpcpp = grad_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
+        grad_dpcpp = grad_cpu.to("xpu")
 
         max_pool = nn.MaxPool2d(kernel_size=3, stride=1,
                                 padding=1, return_indices=True)
@@ -24,7 +24,7 @@ class TestNNMethod(TestCase):
         output_cpu = y_cpu[0].backward(grad_cpu)
         print("x_cpu.grad", x_cpu.grad)
 
-        max_pool.to("dpcpp")
+        max_pool.to("xpu")
         x_dpcpp.requires_grad_(True)
         y_dpcpp = max_pool(x_dpcpp)
         print("y_dpcpp", y_dpcpp[0].to("cpu"))

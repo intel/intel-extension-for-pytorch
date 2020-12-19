@@ -1,6 +1,7 @@
 #include <ATen/Context.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
+#include <ATen/ipex_type_dpcpp_customized.h>
 
 #include <core/DPCPP.h>
 #include <utils/Pointwise.h>
@@ -12,7 +13,6 @@ using namespace at::dpcpp;
 using namespace at::dpcpp::oneDNN;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
 namespace impl {
 
 // Note: dpcpp compiler does not support uname type in template.
@@ -27,7 +27,7 @@ static void add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
       "add",
       [&]() {
         auto alpha = alpha_scalar.to<scalar_t>();
-        dpcpp_kernel_for_tensor_iter<SyclOpAdd>(
+          dpcpp_kernel_with_scalars<SyclOpAdd>(
             iter,
             [=](scalar_t a, scalar_t b) -> scalar_t { return a + alpha * b; });
       });
@@ -74,6 +74,8 @@ static inline void sub_check(const Tensor& self, const Tensor& other) {
 
 } // namespace impl
 
+namespace AtenIpexTypeXPU {
+
 Tensor& add_out(
     Tensor& result,
     const Tensor& _self,
@@ -84,6 +86,8 @@ Tensor& add_out(
       _self.scalar_type() == ScalarType::Float &&
       _other.scalar_type() == ScalarType::Float &&
       _self.dim() > 0 && _other.dim() > 0 &&
+      _self.dim() == _other.dim() &&
+      _self.is_contiguous() && _other.is_contiguous() &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&
@@ -98,11 +102,7 @@ Tensor& add_out(
     other = to_plain_if_needed(_other);
   }
 
-  auto iter = TensorIterator::binary_op(
-      result,
-      self.scalar_type() == result.scalar_type() ? self : self.to(result.scalar_type()),
-      other.scalar_type() == result.scalar_type() ? other : other.to(result.scalar_type()),
-      /*check_mem_overlap=*/true);
+  auto iter = TensorIterator::binary_op(result, self, other);
   impl::alpha_check(iter, alpha);
   impl::add_kernel_dpcpp(iter, alpha);
   TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
@@ -115,6 +115,8 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
       _self.scalar_type() == ScalarType::Float &&
       _other.scalar_type() == ScalarType::Float &&
       _self.dim() > 0 && _other.dim() > 0 &&
+      _self.dim() == _other.dim() &&
+      _self.is_contiguous() && _other.is_contiguous() &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
         _self.sizes() != _other.sizes()) &&
@@ -135,16 +137,16 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
 }
 
 Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::add_out(self, self, other, alpha);
+  return at::AtenIpexTypeXPU::add_out(self, self, other, alpha);
 }
 
 Tensor add(const Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::add(
+  return at::AtenIpexTypeXPU::add(
       self, impl::wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& add_(Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::add_(
+  return at::AtenIpexTypeXPU::add_(
       self, impl::wrapped_scalar_tensor(other), alpha);
 }
 
@@ -157,8 +159,7 @@ Tensor& sub_out(
   auto iter = TensorIterator::binary_op(
       result,
       self,
-      other,
-      /*check_mem_overlap=*/true);
+      other);
   impl::alpha_check(iter, alpha);
   impl::sub_kernel_dpcpp(iter, alpha);
   TORCH_INTERNAL_ASSERT(result.scalar_type() == iter.output().dtype());
@@ -175,27 +176,55 @@ Tensor sub(const Tensor& self, const Tensor& other, Scalar alpha) {
 }
 
 Tensor& sub_(Tensor& self, const Tensor& other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::sub_out(self, self, other, alpha);
+  return at::AtenIpexTypeXPU::sub_out(self, self, other, alpha);
 }
 
 Tensor rsub(const Tensor& self, const Tensor& other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::sub(other, self, alpha);
+  return at::AtenIpexTypeXPU::sub(other, self, alpha);
 }
 
 Tensor sub(const Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::sub(
+  return at::AtenIpexTypeXPU::sub(
       self, impl::wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& sub_(Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::sub_(
+  return at::AtenIpexTypeXPU::sub_(
       self, impl::wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor rsub(const Tensor& self, Scalar other, Scalar alpha) {
-  return at::AtenIpexTypeDPCPP::rsub(
+  return at::AtenIpexTypeXPU::rsub(
       self, impl::wrapped_scalar_tensor(other), alpha);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
+
+
+namespace AtenIpexTypeQuantizedXPU {
+
+Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
+  Tensor result, self, other;
+  if (1.0 == alpha.to<float>() &&
+      _self.defined() &&
+      _other.defined() &&
+      _self.sizes() == _other.sizes() &&
+      !impl::is_wrapped_number(_self) &&
+      !impl::is_wrapped_number(_other) &&
+      (!DPCPPTensorContext::is_plain(_self) ||
+       !DPCPPTensorContext::is_plain(_other))) {
+    oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
+    return result;
+  } else {
+    self = to_plain_if_needed(_self);
+    other = to_plain_if_needed(_other);
+  }
+
+  auto iter = TensorIterator::binary_op(result, self, other);
+  impl::alpha_check(iter, alpha);
+  impl::add_kernel_dpcpp(iter, alpha);
+  return iter.output();
+}
+
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

@@ -7,7 +7,7 @@
 #include "Loops.h"
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 DPCPP_DEF_K1(DPCPPOpHardTanh);
 Tensor& hardtanh_out(
@@ -17,11 +17,11 @@ Tensor& hardtanh_out(
     Scalar max_val) {
   checkBackend("hardtanh", out, self.options().backend());
   // Compare the norm and maxnorm value.
-  auto iter = TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(out);
-  iter.add_input(self);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(out)
+  .add_input(self)
+  .build();
 
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::BFloat16,
@@ -48,12 +48,12 @@ Tensor& hardtanh_out(
 Tensor hardtanh(const Tensor& self, Scalar min_val, Scalar max_val) {
   TORCH_CHECK(!self.is_sparse(), "hardtanh(dpcpp_sparse) is not supported.");
   Tensor result = at::empty(self.sizes(), self.options());
-  at::AtenIpexTypeDPCPP::hardtanh_out(result, self, min_val, max_val);
+  at::AtenIpexTypeXPU::hardtanh_out(result, self, min_val, max_val);
   return result;
 }
 
 Tensor& hardtanh_(Tensor& self, Scalar min_val, Scalar max_val) {
-  return at::AtenIpexTypeDPCPP::hardtanh_out(self, self, min_val, max_val);
+  return at::AtenIpexTypeXPU::hardtanh_out(self, self, min_val, max_val);
 }
 
 DPCPP_DEF_K1(DPCPPOpHardTanhBackward);
@@ -66,12 +66,12 @@ Tensor& hardtanh_backward_out(
   checkBackend(
       "hardtanh_backward", {grad_input, grad_output}, self.options().backend());
   // Compare the norm and maxnorm value.
-  auto iter = TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(grad_input);
-  iter.add_input(grad_output);
-  iter.add_input(self);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(grad_input)
+  .add_input(grad_output)
+  .add_input(self)
+  .build();
 
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "hardtanh_backward", [&]() {
@@ -95,8 +95,8 @@ Tensor hardtanh_backward(
     Scalar min_val,
     Scalar max_val) {
   Tensor grad_input = at::empty({0}, grad_output.options());
-  return at::AtenIpexTypeDPCPP::hardtanh_backward_out(
+  return at::AtenIpexTypeXPU::hardtanh_backward_out(
       grad_input, grad_output, self, min_val, max_val);
 }
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

@@ -8,7 +8,7 @@
 #include "Loops.h"
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 DPCPP_DEF_K1(DPCPPPOpLogSigmoid);
 std::tuple<Tensor&, Tensor&> log_sigmoid_forward_out(
@@ -17,11 +17,11 @@ std::tuple<Tensor&, Tensor&> log_sigmoid_forward_out(
     const Tensor& self) {
   checkBackend("log_sigmoid_forward", output, self.options().backend());
   // Compare the norm and maxnorm value.
-  auto iter = TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(output);
-  iter.add_input(self);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(output)
+  .add_input(self)
+  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
@@ -46,7 +46,7 @@ std::tuple<Tensor, Tensor> log_sigmoid_forward(const Tensor& self) {
       !self.is_sparse(), "log_sigmoid_forward(dpcpp_sparse) is not supported.");
   Tensor buffer = at::empty({0}, self.options());
   Tensor result = at::empty(self.sizes(), self.options());
-  at::AtenIpexTypeDPCPP::log_sigmoid_forward_out(result, buffer, self);
+  at::AtenIpexTypeXPU::log_sigmoid_forward_out(result, buffer, self);
   return std::tuple<Tensor, Tensor>{result, buffer};
 }
 
@@ -61,12 +61,12 @@ Tensor& log_sigmoid_backward_out(
       {grad_input, grad_output},
       self.options().backend());
   // Compare the norm and maxnorm value.
-  auto iter = TensorIterator();
-  iter.set_check_mem_overlap(true);
-  iter.add_output(grad_input);
-  iter.add_input(grad_output);
-  iter.add_input(self);
-  iter.build();
+  auto iter = TensorIteratorConfig()
+  .set_check_mem_overlap(true)
+  .add_output(grad_input)
+  .add_input(grad_output)
+  .add_input(self)
+  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "log_sigmoid_backward", [&]() {
@@ -93,8 +93,8 @@ Tensor log_sigmoid_backward(
     const Tensor& self,
     const Tensor& buffer) {
   Tensor grad_input = at::empty({0}, grad_output.options());
-  return at::AtenIpexTypeDPCPP::log_sigmoid_backward_out(
+  return at::AtenIpexTypeXPU::log_sigmoid_backward_out(
       grad_input, grad_output, self, buffer);
 }
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

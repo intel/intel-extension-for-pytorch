@@ -6,7 +6,7 @@ import torch_ipex
 import pytest
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -30,12 +30,12 @@ class TestNNMethod(TestCase):
         print("linear grad", linear.weight.grad)
 
         # dpcpp
-        linear_dpcpp = linear.to("dpcpp")
-        tanh_dpcpp = tanh.to("dpcpp")
+        linear_dpcpp = linear.to("xpu")
+        tanh_dpcpp = tanh.to("xpu")
 
         print("dpcpp linear weight", linear_dpcpp.weight.cpu())
 
-        x_dpcpp = x_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
         print("x_dpcpp", x_dpcpp.cpu())
 
         z_dpcpp = linear_dpcpp(x_dpcpp)

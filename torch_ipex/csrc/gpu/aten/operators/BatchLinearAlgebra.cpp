@@ -17,7 +17,7 @@ using namespace at::dpcpp;
 DPCPP_DEF_K2(triuTrilSycl, typename scalar_t, typename IndexType, bool upper);
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t, typename IndexType, bool upper>
@@ -190,11 +190,11 @@ Tensor& tril_out(Tensor& out, const Tensor& self, int64_t diagonal) {
 }
 
 Tensor& tril_(Tensor& self, int64_t diagonal) {
-  return at::AtenIpexTypeDPCPP::tril_out(self, self, diagonal);
+  return at::AtenIpexTypeXPU::tril_out(self, self, diagonal);
 }
 
 Tensor& triu_(Tensor& self, int64_t diagonal) {
-  return at::AtenIpexTypeDPCPP::triu_out(self, self, diagonal);
+  return at::AtenIpexTypeXPU::triu_out(self, self, diagonal);
 }
 
 std::tuple<Tensor,Tensor,Tensor> _lu_with_info(const Tensor & self, bool pivot, bool check_errors) {
@@ -228,5 +228,5 @@ std::tuple<Tensor,Tensor,Tensor> _lu_with_info(const Tensor & self, bool pivot, 
   return std::make_tuple(self_working_copy, pivots_tensor, infos_tensor);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

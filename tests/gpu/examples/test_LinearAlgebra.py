@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import pytest
 
 cpu_device = torch.device('cpu')
-dpcpp_device = torch.device('dpcpp')
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
@@ -21,13 +21,13 @@ class TestTorchMethod(TestCase):
         t = torch.cholesky_inverse(u)
         print("cpu", t)
         t_dpcpp = torch.cholesky_inverse(u.to(dpcpp_device))
-        print("dpcpp", t_dpcpp.to(cpu_device))
+        print("xpu", t_dpcpp.to(cpu_device))
         self.assertEqual(t, t_dpcpp.to(cpu_device))
        
         t1 = torch.cholesky_inverse(u, upper=True)
         print("cpu", t1)
         t1_dpcpp = torch.cholesky_inverse(u.to(dpcpp_device), upper=True)
-        print("dpcpp", t1_dpcpp.to(cpu_device))
+        print("xpu", t1_dpcpp.to(cpu_device))
         self.assertEqual(t1, t1_dpcpp.to(cpu_device))
 
     @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")

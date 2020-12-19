@@ -3,7 +3,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
@@ -14,7 +14,7 @@ class TestTorchMethod(TestCase):
         print("cpu result:")
         print(res_cpu)
         print("begin dpcpp compute:")
-        res_dpcpp = torch.mean(user_cpu.to("dpcpp"), (0, 4), False)
+        res_dpcpp = torch.mean(user_cpu.to("xpu"), (0, 4), False)
         print("dpcpp result:")
         print(res_dpcpp.cpu())
         self.assertEqual(res_cpu, res_dpcpp.cpu())

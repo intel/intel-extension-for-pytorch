@@ -8,12 +8,12 @@
 #include <core/Memory.h>
 #include <utils/ATDispatch.h>
 
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
@@ -111,7 +111,7 @@ void ConvolutionTBC_updateGradInput(
 }
 
 } // namespace impl
-//namespace AtenIpexTypeDPCPP
+//namespace AtenIpexTypeXPU
 
 Tensor conv_tbc(
     const Tensor& self,
@@ -144,5 +144,5 @@ std::tuple<Tensor, Tensor, Tensor>conv_tbc_backward(
   return std::make_tuple(dInput, dWeight, dBias);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

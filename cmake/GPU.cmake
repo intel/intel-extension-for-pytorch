@@ -42,9 +42,11 @@ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-private-field")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-inconsistent-missing-override")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-aligned-allocation-unavailable")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-c++14-extensions")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-constexpr-not-const")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-missing-braces")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-writable-strings")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-c++14-extensions")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-c++17-extensions")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Qunused-arguments")
   if (${COLORIZE_OUTPUT})
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
@@ -86,21 +88,40 @@ set(DPCPP_GPU_ROOT "${IPEX_C_SOURCE_DIR}/gpu")
 set(DPCPP_GPU_ATEN_SRC_ROOT "${DPCPP_GPU_ROOT}/aten")
 set(DPCPP_GPU_ATEN_GENERATED "${DPCPP_GPU_ROOT}/aten/generated")
 
-# generate c10 dispatch registration
-add_custom_command(OUTPUT ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp
-        COMMAND mkdir -p ${DPCPP_GPU_ATEN_GENERATED} && mkdir -p ${DPCPP_GPU_ATEN_GENERATED}/ATen
-        COMMAND "${PYTHON_EXECUTABLE}" ${PROJECT_SOURCE_DIR}/scripts/gpu/dispatch_gen.py --install_dir ${DPCPP_GPU_ATEN_GENERATED}/ATen/
-        DEPENDS ${PROJECT_SOURCE_DIR}/scripts/gpu/DPCPPGPUType.h)
+add_custom_command(OUTPUT
+        ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeXPU.cpp
+        ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeQuantizedXPU.cpp
+        COMMAND
+        mkdir -p ${DPCPP_GPU_ATEN_GENERATED} && mkdir -p ${DPCPP_GPU_ATEN_GENERATED}/ATen
+        COMMAND
+        "${PYTHON_EXECUTABLE}" ${PROJECT_SOURCE_DIR}/scripts/gpu/gen_code.py --declarations-path
+        ${PROJECT_SOURCE_DIR}/scripts/declarations/Declarations.yaml
+        --out ${DPCPP_GPU_ATEN_GENERATED}/ATen/
+        --source-path ${PROJECT_SOURCE_DIR}
+        DEPENDS
+        ${PROJECT_SOURCE_DIR}/scripts/declarations/Declarations.yaml
+        ${PROJECT_SOURCE_DIR}/scripts/gpu/gen_code.py
+        ${PROJECT_SOURCE_DIR}/scripts/gpu/DPCPPGPUType.h
+        ${PROJECT_SOURCE_DIR}/scripts/gpu/QUANTIZEDDPCPPGPUType.h)
 
 # sources
-set(DPCPP_SRCS)
-set(DPCPP_JIT_SRCS)
 set(DPCPP_ATEN_SRCS)
 add_subdirectory(torch_ipex/csrc/gpu/aten)
-list(APPEND DPCPP_SRCS ${DPCPP_ATEN_SRCS})
+
+set(DPCPP_JIT_SRCS)
 add_subdirectory(torch_ipex/csrc/gpu/jit)
-add_library(torch_ipex SHARED ${DPCPP_SRCS} ${DPCPP_JIT_SRCS} ${DPCPP_GPU_ATEN_GENERATED}/ATen/aten_ipex_type_default.cpp)
-set_target_properties(torch_ipex PROPERTIES PREFIX "")
+
+set(TORCH_IPEX_SRCS)
+file(GLOB IPEX_UTIL_SRC "${IPEX_C_SOURCE_DIR}/*.cpp")
+list(REMOVE_ITEM IPEX_UTIL_SRC "${IPEX_C_SOURCE_DIR}/_C.cpp")
+file(GLOB GPU_UTIL_SRC "${DPCPP_GPU_ROOT}/*.cpp")
+list(APPEND TORCH_IPEX_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_JIT_SRCS} ${IPEX_UTIL_SRC} ${GPU_UTIL_SRC})
+
+add_library(torch_ipex SHARED ${TORCH_IPEX_SRCS}
+        ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeXPU.cpp
+        ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeQuantizedXPU.cpp)
+
+set_target_properties(torch_ipex PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}")
 set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
 
 # includes
@@ -169,17 +190,16 @@ set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -D__STRICT_ANSI__")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl-unnamed-lambda")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fno-sycl-early-optimizations")
-set_source_files_properties(${DPCPP_SRCS} COMPILE_FLAGS "${IPEX_COMPILE_FLAGS}")
+set_source_files_properties(${TORCH_IPEX_SRCS} COMPILE_FLAGS "${IPEX_COMPILE_FLAGS}")
 
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
-if(USE_AOT_DEVLIST)
-  set(BUILD_BY_PER_KERNEL OFF)
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT} -Xsycl-target-backend=${AOT_ARCH_OPT} \"-device ${USE_AOT_DEVLIST}\"")
-elseif(BUILD_BY_PER_KERNEL)
+if(BUILD_BY_PER_KERNEL)
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
+elseif(USE_AOT_DEVLIST)
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT} -Xsycl-target-backend=${AOT_ARCH_OPT} \"-device ${USE_AOT_DEVLIST}\"")
 else()
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
 endif()
@@ -219,4 +239,4 @@ endif()
 
 target_link_libraries(torch_ipex PUBLIC ${EXTRA_SHARED_LIBS})
 
-install(TARGETS ${LIB_NAME} LIBRARY DESTINATION lib)
+install(TARGETS torch_ipex LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

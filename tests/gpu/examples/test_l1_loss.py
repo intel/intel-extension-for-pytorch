@@ -4,7 +4,7 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
@@ -24,10 +24,10 @@ class TestNNMethod(TestCase):
         print(input_cpu.grad)
         input_cpu.grad.zero_()
 
-        print("dpcpp")
+        print("xpu")
         input_dpcpp = input
         target_dpcpp = target
-        output_dpcpp = loss(input_dpcpp.to("dpcpp"), target_dpcpp.to("dpcpp"))
+        output_dpcpp = loss(input_dpcpp.to("xpu"), target_dpcpp.to("xpu"))
         print(output_dpcpp.cpu())
         output_dpcpp.backward(torch.ones_like(
             target_dpcpp, dtype=torch.float, device=dpcpp_device))
@@ -48,10 +48,10 @@ class TestNNMethod(TestCase):
         print(input_cpu.grad)
         input_cpu.grad.zero_()
 
-        print("dpcpp")
+        print("xpu")
         input_dpcpp = input
         target_dpcpp = target
-        output_dpcpp = loss(input_dpcpp.to("dpcpp"), target_dpcpp.to("dpcpp"))
+        output_dpcpp = loss(input_dpcpp.to("xpu"), target_dpcpp.to("xpu"))
         print(output_dpcpp.cpu())
         output_dpcpp.backward(torch.tensor(
             (2.0), dtype=torch.float, device=dpcpp_device))
@@ -72,10 +72,10 @@ class TestNNMethod(TestCase):
         print(input_cpu.grad)
         input_cpu.grad.zero_()
 
-        print("dpcpp")
+        print("xpu")
         input_dpcpp = input
         target_dpcpp = target
-        output_dpcpp = loss(input_dpcpp.to("dpcpp"), target_dpcpp.to("dpcpp"))
+        output_dpcpp = loss(input_dpcpp.to("xpu"), target_dpcpp.to("xpu"))
         print(output_dpcpp.cpu())
         output_dpcpp.backward(torch.tensor(
             (2.0), dtype=torch.float, device=dpcpp_device))

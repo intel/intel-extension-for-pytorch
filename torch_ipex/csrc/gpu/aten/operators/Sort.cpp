@@ -1,10 +1,11 @@
-#include <ATen/aten_ipex_type_dpcpp.h>
+
 #include <core/DPCPP.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
+#include <ATen/AtenIpexTypeXPU.h>
 
 #include "Sort.h"
 
@@ -12,7 +13,7 @@ using namespace at::dpcpp::detail;
 using namespace at::dpcpp;
 
 namespace at {
-namespace AtenIpexTypeDPCPP {
+namespace AtenIpexTypeXPU {
 
 std::tuple<Tensor&, Tensor&> sort_out(
     Tensor& sorted,
@@ -39,7 +40,7 @@ std::tuple<Tensor&, Tensor&> sort_out(
   if (sliceSize <= maxSliceSize) { // inplace sort
     // Fill `indices` (the values) with the
     // slice-relative index.
-    at::AtenIpexTypeDPCPP::fill_slice_with_index(indices, dim);
+    at::AtenIpexTypeXPU::fill_slice_with_index(indices, dim);
 
     // We sort k/v pairs in-place; copy unsorted input to output
     sorted.copy_(input);
@@ -65,9 +66,9 @@ std::tuple<at::Tensor, at::Tensor> sort(
     bool descending) {
   auto sorted = at::empty_like(self);
   auto indices = at::empty({0}, self.options().dtype(kLong));
-  return at::AtenIpexTypeDPCPP::sort_out(
+  return at::AtenIpexTypeXPU::sort_out(
       sorted, indices, self, dim, descending);
 }
 
-} // namespace AtenIpexTypeDPCPP
+} // namespace AtenIpexTypeXPU
 } // namespace at

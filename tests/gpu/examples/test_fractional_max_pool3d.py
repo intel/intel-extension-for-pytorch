@@ -4,15 +4,15 @@ from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
     def test_fractional_max_pool3d(self, dtype=torch.float):
         x_cpu = torch.randn([2, 2, 4, 5, 6], device=cpu_device, dtype=dtype)
-        x_dpcpp = x_cpu.to("dpcpp")
+        x_dpcpp = x_cpu.to("xpu")
         grad_cpu = torch.randn([2, 2, 2, 2, 2], device=cpu_device)
-        grad_dpcpp = grad_cpu.to("dpcpp")
+        grad_dpcpp = grad_cpu.to("xpu")
         max_pool = nn.FractionalMaxPool3d(
             2, output_size=(2, 2, 2), return_indices=True)
 
@@ -25,12 +25,12 @@ class TestNNMethod(TestCase):
 
         max_pool = nn.FractionalMaxPool3d(
             2, output_size=(2, 2, 2), return_indices=True)
-        max_pool.to("dpcpp")
+        max_pool.to("xpu")
         x_dpcpp.requires_grad_(True)
         y_dpcpp = max_pool(x_dpcpp)
 
         print("y_dpcpp", y_dpcpp[0].cpu())
-        grad_dpcpp = grad_cpu.to("dpcpp")
+        grad_dpcpp = grad_cpu.to("xpu")
         y_dpcpp[0].backward(grad_dpcpp)
         print("y_dpcpp backward", x_dpcpp.grad.cpu())
         self.assertEqual(y_cpu[0], y_dpcpp[0].to(cpu_device))

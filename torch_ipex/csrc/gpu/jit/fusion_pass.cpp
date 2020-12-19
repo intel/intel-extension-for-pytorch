@@ -3,7 +3,7 @@
 #include "graph_ext.h"
 #include "fusion_pass.h"
 #include "accelerated_ops.h"
-#include <torch/csrc/utils/hash.h>
+#include <c10/util/hash.h>
 #include <torch/csrc/jit/runtime/operator.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 #include <torch/csrc/jit/ir/alias_analysis.h>
@@ -26,7 +26,7 @@ struct hash<std::pair<Symbol, Symbol>> {
 };
 }
 
-namespace torch { namespace jit {
+namespace torch_ipex { namespace jit {
 
 //
 // The main goal of MKL-DNN fusion is to limit bandwidth wasting.
@@ -354,11 +354,18 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   ConstantPropagation(graph);
 }
 
+
 void InitFusionPass() {
   RegisterPreFusionPass pass_3([](std::shared_ptr<Graph>& g) {
-    torch::jit::FusionPass(g);
+      torch_ipex::jit::FusionPass(g);
   });
 }
 
+}} // namespace torch_ipex::jit
 
+
+namespace torch { namespace jit {
+RegisterPreFusionPass::RegisterPreFusionPass(GraphPass p) {
+  registerPrePass(std::move(p));
+}
 }} // namespace torch::jit
