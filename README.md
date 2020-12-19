@@ -114,26 +114,31 @@ $ clang++ device_enum.cpp -fsycl -o device_enum
 - Expected result like:
 
 ```bash
+## one dual card dg1 host on a Xeon hw env with Level-Zero
 ./device_enum
-
-==============================================================
-                    All Available Backend                     
-==============================================================
-|Platform:
-|Intel(R) CPU Runtime for OpenCL(TM) Applications
-|       |__|Devices:
-|          |Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz(NonGPU)
---------------------------------------------------------------
-|Platform:
-|Intel(R) Level-Zero
-|       |__|Devices:
-|          |Intel(R) Gen9(GPU)
---------------------------------------------------------------
-|Platform:
+================================================================
+           Available DPC++ Platforms / Devices
+================================================================
+|Platform0 :
 |Intel(R) OpenCL HD Graphics
-|       |__|Devices:
-|          |Intel(R) Gen9 HD Graphics NEO(GPU)
---------------------------------------------------------------
+|       |__|Device0 :
+|       |  |Intel(R) Graphics [0x4905] (GPU)
+|       |__|Device1 :
+|       |  |Intel(R) Graphics [0x4905] (GPU)
+----------------------------------------------------------------
+|Platform1 :
+|Intel(R) Level-Zero
+|       |__|Device0 :
+|       |  |Intel(R) Graphics [0x4905] (GPU)
+|       |__|Device1 :
+|       |  |Intel(R) Graphics [0x4905] (GPU)
+----------------------------------------------------------------
+|Platform2 :
+|SYCL host platform
+|       |__|Device0 :
+|       |  |SYCL host device (NonGPU)
+----------------------------------------------------------------
+
 ```
 
 ## Repo preparation:
