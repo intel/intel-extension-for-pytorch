@@ -114,7 +114,7 @@ $ clang++ device_enum.cpp -fsycl -o device_enum
 - Expected result like:
 
 ```bash
-## one dual card dg1 host on a Xeon hw env with Level-Zero
+## dual dg1 card host on a Xeon hw env with Level-Zero
 ./device_enum
 ================================================================
            Available DPC++ Platforms / Devices
