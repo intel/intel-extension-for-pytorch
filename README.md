@@ -40,7 +40,7 @@ bash ./l_[Toolkit Name]Kit_[version].sh -s -a --silent --eula accept
 - Evironment Variables Setting for DPC++:
 
 ```bash
-export DPCPP_ROOT=${HOME}/intel/oneapi/compiler/latest/linux
+export DPCPP_ROOT=${HOME}/intel/oneapi/compiler/linux
 export LD_LIBRARY_PATH=${DPCPP_ROOT}/lib:${DPCPP_ROOT}/compiler/lib/intel64_lin:${LD_LIBRARY_PATH}
 export PATH=${DPCPP_ROOT}/bin:$PATH
 ```
