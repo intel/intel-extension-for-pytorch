@@ -1,3 +1,3 @@
 #!/bin/sh
 
-TEST_CASES=`for case in \`cat ./test_nn_passed_lists.txt\`; do echo -n $case " "; done`; pytest -v $TEST_CASES
+cat test_nn_passed_lists.txt | grep -v '#' | tr '\n' ' ' | xargs pytest -vs
