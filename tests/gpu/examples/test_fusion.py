@@ -24,12 +24,12 @@ class MatmulSum(torch.nn.Module):
         return y
 
 
-class MatmulDiv(torch.nn.Module):
+class TransMatmulScalePost(torch.nn.Module):
     def __init__(self):
-        super(MatmulDiv, self).__init__()
+        super(TransMatmulScalePost, self).__init__()
 
-    def forward(self, m1, m2):
-        return torch.matmul(m1, m2) / 8
+    def forward(self, m1, m2, added):
+        return torch.matmul(m1, m2.transpose(-1, -2)) / 8 + added
 
 
 class Conv2dRelu(torch.nn.Module):
@@ -69,22 +69,31 @@ class TestNNMethod(TestCase):
         self.assertEqual(raw, real.to(cpu_device))
         del modelJit
 
-    def test_baddbmm_div_fusion(self, dtype=torch.float):
+    def test_trans_baddbmm_scale_sum_fusion(self, dtype=torch.float):
         m1 = torch.randn((2,2,3), device=cpu_device)
-        m2 = torch.randn((2,3,2), device=cpu_device)
-        model = MatmulDiv()
-        raw = model(m1, m2)
-        print("raw: ", raw)
+        m2 = torch.randn((2,2,3), device=cpu_device)
+        added1 = torch.randn((2,1,1), device=cpu_device)
+        added2 = torch.randn((2,2,2), device=cpu_device)
+
+        model = TransMatmulScalePost()
+        raw1 = model(m1, m2, added1)
+        raw2 = model(m1, m2, added2)
+        print("raw1: ", raw1)
+        print("raw2: ", raw2)
 
         m1_dpcpp = m1.to(dpcpp_device)
         m2_dpcpp = m2.to(dpcpp_device)
+        added1_dpcpp = added1.to(dpcpp_device)
+        added2_dpcpp = added2.to(dpcpp_device)
 
         modelJit = torch.jit.script(model)
         with torch.no_grad():
-            # print(modelJit.graph_for(m1_dpcpp, m2_dpcpp))
-            real = modelJit(m1_dpcpp, m2_dpcpp)
-            print("real:", real.to(cpu_device))
-        self.assertEqual(raw, real.to(cpu_device))
+            real1 = modelJit(m1_dpcpp, m2_dpcpp, added1_dpcpp)
+            real2 = modelJit(m1_dpcpp, m2_dpcpp, added2_dpcpp)
+            print("real1:", real1.to(cpu_device))
+            print("real2:", real2.to(cpu_device))
+        self.assertEqual(raw1, real1.to(cpu_device))
+        self.assertEqual(raw2, real2.to(cpu_device))
         del modelJit
 
     def test_conv_relu_fusion(self, dtype=torch.float):

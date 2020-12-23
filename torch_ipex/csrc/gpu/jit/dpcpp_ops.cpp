@@ -2,9 +2,8 @@
 #include <ATen/record_function.h>
 #include <dnnl.hpp>
 
-
+#include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/ipex_type_dpcpp_customized.h>
-
 
 
 namespace torch {
@@ -60,9 +59,9 @@ at::Tensor matmul_sum(at::Tensor& accumu,
   return at::AtenIpexTypeXPU::matmul_sum(accumu, m1, m2, alpha);
 }
 
-at::Tensor matmul_div_scalar(const at::Tensor& tensor1,
-    const at::Tensor& tensor2, at::Scalar alpha) {
-  RECORD_FUNCTION("matmul_div_scalar",
+at::Tensor trans_matmul_scale_sum(at::Tensor& accumu, const at::Tensor& tensor1,
+    const at::Tensor& tensor2, at::Scalar oscale, at::Scalar alpha) {
+  RECORD_FUNCTION("trans_matmul_scale_sum",
                   std::vector<c10::IValue>({tensor1, tensor2}));
 
   auto dim_tensor1 = tensor1.dim();
@@ -76,8 +75,11 @@ at::Tensor matmul_div_scalar(const at::Tensor& tensor1,
     int64_t n = dim_tensor1 > 1 ? tensor1.size(-2) : 1;
     int64_t m1 = tensor1.size(-1);
     at::IntArrayRef batch_tensor1(tensor1.sizes().data(), std::max<int64_t>(dim_tensor1 - 2, 0));
-    int64_t m2 = dim_tensor2 > 1 ? tensor2.size(-2) : 1;
-    int64_t p = tensor2.size(-1);
+
+    // inverse dims in non-transpose case
+    int64_t m2 = dim_tensor2 > 1 ? tensor2.size(-1) : 1;
+    int64_t p = tensor2.size(-2);
+
     at::IntArrayRef batch_tensor2(tensor2.sizes().data(), std::max<int64_t>(dim_tensor2 - 2, 0));
 
     // expand the batch portion (i.e. cut off matrix dimensions and expand rest)
@@ -87,7 +89,7 @@ at::Tensor matmul_div_scalar(const at::Tensor& tensor1,
     tensor1_expand_size.insert(tensor1_expand_size.end(), {n, m1});
 
     std::vector<int64_t> tensor2_expand_size(expand_batch_portion);
-    tensor2_expand_size.insert(tensor2_expand_size.end(), {m2, p});
+    tensor2_expand_size.insert(tensor2_expand_size.end(), {p, m2});
 
     int expand_batch_product = std::accumulate(expand_batch_portion.begin(), expand_batch_portion.end(),
                                                1, std::multiplies<int64_t>());
@@ -96,7 +98,7 @@ at::Tensor matmul_div_scalar(const at::Tensor& tensor1,
     tensor1_bmm_view.insert(tensor1_bmm_view.end(), {n, m1});
 
     std::vector<int64_t> tensor2_bmm_view({expand_batch_product});
-    tensor2_bmm_view.insert(tensor2_bmm_view.end(), {m2, p});
+    tensor2_bmm_view.insert(tensor2_bmm_view.end(), {p, m2});
 
     // flatten expanded batches
     at::Tensor tensor1_expanded = tensor1.expand(tensor1_expand_size).contiguous().view(tensor1_bmm_view);
@@ -111,15 +113,37 @@ at::Tensor matmul_div_scalar(const at::Tensor& tensor1,
       output_shape.push_back(p);
     }
 
-    at::Tensor self = at::empty({0}, tensor1_expanded.options());
-    at::Tensor output = at::_unsafe_view(
-        at::AtenIpexTypeDPCPP::baddbmm(self, tensor1_expanded, tensor2_expanded,
-                                   .0f, 1 / alpha.to<float>()), output_shape);
+    at::Tensor output, self, input;
+    if (accumu.sizes().vec() == output_shape) {
+      output = at::_unsafe_view(
+          at::AtenIpexTypeXPU::trans_baddbmm_out(accumu,
+                                                   accumu,
+                                                   tensor1_expanded,
+                                                   tensor2_expanded,
+                                                   alpha, 1 / oscale.to<float>()),
+          output_shape
+      );
+    } else {
+      self = at::empty({0}, tensor1_expanded.options());
+      output = at::_unsafe_view(
+          at::AtenIpexTypeXPU::trans_baddbmm_out(self,
+                                                   input,
+                                                   tensor1_expanded,
+                                                   tensor2_expanded,
+                                                   0.f, 1 / oscale.to<float>()),
+          output_shape
+      );
+      output = at::AtenIpexTypeXPU::add(output, accumu, alpha);
+    }
 
     return output;
   } else {
-    return at::AtenIpexTypeDPCPP::mul(
-        at::native::matmul(tensor1, tensor2), 1 / alpha.to<float>());
+    return at::AtenIpexTypeXPU::add(
+               at::AtenIpexTypeXPU::mul(
+                   at::native::matmul(tensor1, tensor2.transpose(-1, -2)),
+                   1 / oscale.to<float>()
+               ), accumu, alpha
+           );
   }
 }
 

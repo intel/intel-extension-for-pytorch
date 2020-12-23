@@ -20,6 +20,8 @@ at::Tensor convolution_sigmoid(const at::Tensor & input, const at::Tensor & weig
 
 at::Tensor matmul_sum(at::Tensor& accumu, const at::Tensor& m1, const at::Tensor& m2, at::Scalar beta);
 
+at::Tensor& trans_baddbmm_out(at::Tensor& result, const at::Tensor& input, const at::Tensor& batch1, const at::Tensor& batch2, Scalar beta, Scalar alpha);
+
 at::Tensor & fill_slice_with_index(at::Tensor & t, int dim);
 
 at::Tensor & std_var_out(at::Tensor & result, const at::Tensor & self, at::IntArrayRef dim, bool unbiased, bool keepdim, bool take_sqrt);

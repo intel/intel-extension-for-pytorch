@@ -31,7 +31,7 @@ typedef struct matmul_attr {
   static const int64_t kind_with_relu = at::dpcpp::oneDNN::with_relu;
   static const int64_t kind_with_sigmoid = at::dpcpp::oneDNN::with_sigmoid;
 
-  matmul_attr() : alpha_(0.f), beta_(0.f), attr_(0), m2_trans_(true) {}
+  matmul_attr() : alpha_(1.f), beta_(0.f), attr_(0), m2_trans_(true) {}
   matmul_attr(float alpha, float beta, int64_t attr, bool m2_trans) :
       alpha_(alpha), beta_(beta), attr_(attr), m2_trans_(m2_trans) {}
 
@@ -99,8 +99,10 @@ void dnnlGemmImpl(
   } else {
     m1_md = memory::desc({mb, m, k}, m1_dt,
       {m1.stride(0), m1.stride(1), m1.stride(2)});
-    m2_md = memory::desc({mb, k, n}, m2_dt,
-      {m2.stride(0), m2.stride(1), m2.stride(2)});
+    m2_md = attr.m2_trans_ ? memory::desc({mb, k, n}, m2_dt,
+                                 {m2.stride(0), m2.stride(1), m2.stride(2)}) :
+                             memory::desc({mb, k, n}, m2_dt,
+                                 {m2.stride(0), m2.stride(2), m2.stride(1)});
     r_md = memory::desc({mb, m, n}, result_dt,
       {result.stride(0), result.stride(1), result.stride(2)});
   }
@@ -114,7 +116,11 @@ void dnnlGemmImpl(
   // 1. beta == 0, nothing is needed to do
   // 2. quantization path, no bias fusion support in oneDNN so far
   // 3. beta == 1, partially support bias fusion in oneDNN
-  if (attr.beta_ != 0.f && (attr.beta_ != 1.f || m1.is_quantized() || m2.is_quantized())) {
+  // 4. alpha != 1, post-sum is needed for, alpha * (m1 x m2) + post
+  if (attr.beta_ != 0.f && (attr.alpha_ != 1.f ||
+                            attr.beta_ != 1.f ||
+                            m1.is_quantized() ||
+                            m2.is_quantized())) {
     po.append_sum(attr.beta_);
 #else
   if (attr.beta_ != 0.f) {
@@ -169,7 +175,7 @@ void dnnlGemmImpl(
 
   std::shared_ptr<dnnl::matmul::desc> matmul_desc;
 #ifdef USE_GEN12HP_ONEDNN
-  if (attr.beta_ == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
+  if (attr.beta_ == 1.f && attr.alpha_ == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_dt = b.defined() ? dt_to_dnnl(b.scalar_type()) : dnnl::memory::data_type::f32;
     if (b.sizes() != result.sizes()) {
       dnnl::memory::dims b_dims(result.sizes().size() - 1, 1);
@@ -184,27 +190,27 @@ void dnnlGemmImpl(
       }
     }
     if (dims == 2 && lazy_reorder_enabled()) {
-  #ifdef USE_PRIMITIVE_CACHE
-    create_key(key, m1_md_any, m2_md_any, b_md, r_md_any, post_flags);
-  #endif
-    matmul_desc.reset(new dnnl::matmul::desc(m1_md_any, m2_md_any, b_md, r_md_any));
+    #ifdef USE_PRIMITIVE_CACHE
+      create_key(key, m1_md_any, m2_md_any, b_md, r_md_any, post_flags);
+    #endif
+      matmul_desc.reset(new dnnl::matmul::desc(m1_md_any, m2_md_any, b_md, r_md_any));
     } else {
-  #ifdef USE_PRIMITIVE_CACHE
-    create_key(key, m1_md, m2_md, b_md, r_md, post_flags);
-  #endif
-    matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, b_md, r_md));
+    #ifdef USE_PRIMITIVE_CACHE
+      create_key(key, m1_md, m2_md, b_md, r_md, post_flags);
+    #endif
+      matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, b_md, r_md));
     }
   } else {
     if (dims == 2 && lazy_reorder_enabled()) {
-  #ifdef USE_PRIMITIVE_CACHE
-    create_key(key, m1_md_any, m2_md_any, r_md_any, post_flags);
-  #endif
-    matmul_desc.reset(new dnnl::matmul::desc(m1_md_any, m2_md_any, r_md_any));
+    #ifdef USE_PRIMITIVE_CACHE
+      create_key(key, m1_md_any, m2_md_any, r_md_any, post_flags);
+    #endif
+      matmul_desc.reset(new dnnl::matmul::desc(m1_md_any, m2_md_any, r_md_any));
     } else {
-  #ifdef USE_PRIMITIVE_CACHE
-    create_key(key, m1_md, m2_md, r_md, post_flags);
-  #endif
-    matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
+    #ifdef USE_PRIMITIVE_CACHE
+      create_key(key, m1_md, m2_md, r_md, post_flags);
+    #endif
+      matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
     }
   }
 
@@ -316,7 +322,8 @@ void dnnlGemmImpl(
     }
   }
 
-  if (attr.beta_ == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
+  if (attr.beta_ == 1.f && attr.alpha_ == 1.f &&
+      (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_memory = dpcpp_onednn_memory(b_md, engine, b.data_ptr());
     DPCPP_ONEDNN_EXEC(matmul_p, strm,
       {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
@@ -841,6 +848,27 @@ Tensor matmul_sum(
     m1.resize_(m1_shape);
     result.resize_(r_shape);
   }
+
+  return result;
+}
+
+Tensor& trans_baddbmm_out(
+    Tensor& result,
+    const Tensor& input,
+    const Tensor& batch1,
+    const Tensor& batch2,
+    Scalar beta,
+    Scalar alpha) {
+  matmul_attr_t attr(
+      alpha.to<float>(),
+      beta.to<float>(),
+      0,
+      false);
+  checkBackend("trans_baddbmm_out", {input, batch1, batch2}, Backend::XPU);
+  TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
+  TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
+
+  impl::gemm_broadcast(result, batch1, batch2, attr, input);
 
   return result;
 }

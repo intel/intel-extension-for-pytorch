@@ -15,7 +15,9 @@ namespace dpcpp {
   static auto conv2d_sum_relu_sym = Symbol::fromQualString("dpcpp::conv2d_sum_relu");
   static auto conv2d_sigmoid_sym = Symbol::fromQualString("dpcpp::conv2d_sigmoid");
   static auto matmul_sum_sym = Symbol::fromQualString("dpcpp::matmul_sum");
-  static auto matmul_div_scalar_sym = Symbol::fromQualString("dpcpp::matmul_div_scalar");
+  static auto trans_matmul_sym = Symbol::fromQualString("dpcpp::trans_matmul");
+  static auto trans_matmul_scale_sym = Symbol::fromQualString("dpcpp::trans_matmul_scale");
+  static auto trans_matmul_scale_sum_sym = Symbol::fromQualString("dpcpp::trans_matmul_scale_sum");
   static auto mul_add_sym = Symbol::fromQualString("dpcpp::mul_add");
   static auto q_conv2d_sum_relu_sym = Symbol::fromQualString("dpcpp::q_conv2d_sum_relu");
 
