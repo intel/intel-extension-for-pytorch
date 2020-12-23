@@ -1105,7 +1105,7 @@ at::Tensor AtenIpexCPUDev::dil_linear_backward_input(
     grady, w, {input_reshaped_size.begin(), input_reshaped_size.end()}, gradx);
 
   if (input_size.size() > 2) {
-    return dbl::comm::gen_aten_tensor_by(std::move(gradx)).reshape(input_size);
+    return dbl::comm::gen_aten_tensor_by(std::move(gradx.reshape(input_size.vec())));
   }
   return dbl::comm::gen_aten_tensor_by(std::move(gradx));
 }
@@ -2425,7 +2425,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_
         variance,
         eps);
   return std::make_tuple(
-        dbl::comm::gen_aten_tensor_by(std::move(y)).reshape(X.sizes()),
+        dbl::comm::gen_aten_tensor_by(std::move(y.reshape(X.sizes().vec()))),
         dbl::comm::gen_aten_tensor_by(std::move(mean)),
         dbl::comm::gen_aten_tensor_by(std::move(variance)));
 }
@@ -2466,7 +2466,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_
         src, m, r, grady, g, gradx, gradg, gradb, eps);
 
   return std::make_tuple(
-      dbl::comm::gen_aten_tensor_by(std::move(gradx)).reshape(X.sizes()),
+      dbl::comm::gen_aten_tensor_by(std::move(gradx.reshape(X.sizes().vec()))),
       dbl::comm::gen_aten_tensor_by(std::move(gradg)),
       dbl::comm::gen_aten_tensor_by(std::move(gradb)));
 }
