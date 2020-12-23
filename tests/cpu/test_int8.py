@@ -7,6 +7,7 @@ import random
 import unittest
 import itertools
 import time
+import json
 
 import torch
 import torch.nn as nn
@@ -22,6 +23,46 @@ import torch.nn.functional as F
 from common_utils import TestCase
 
 device = ipex.DEVICE
+class TestQuantizationConfigueTune(TestCase):
+    def test_quantization_status(self):
+        x = torch.randn((4, 5), dtype=torch.float32).to(device)
+        model = torch.nn.Linear(5, 10, bias=True).float().to(device)
+
+        conf = ipex.AmpConf(torch.int8)
+        with ipex.AutoMixPrecision(conf, running_mode='calibration'):
+            ref = model(x)
+        conf.save('configure.json')
+        conf = ipex.AmpConf(torch.int8, 'configure.json')
+        with ipex.AutoMixPrecision(conf, running_mode='inference'):
+            y = model(x)
+        self.assertTrue(ipex.core.is_int8_dil_tensor(y))
+        jsonFile = open('configure.json', 'r')
+        data = json.load(jsonFile)
+        jsonFile.close()
+        self.assertTrue(data[0]['quantized'])
+
+        # check configure's change can works for calibration step,
+        # need get fp32 tensor for quantized=False.
+        data[0]['quantized'] = False
+        jsonFile = open('configure.json', "w+")
+        jsonFile.write(json.dumps(data))
+        jsonFile.close()
+        # use user's changed configure.
+        conf = ipex.AmpConf(torch.int8, 'configure.json')
+        with ipex.AutoMixPrecision(conf, running_mode='calibration'):
+            ref = model(x)
+        conf.save('configure.json')
+        conf = ipex.AmpConf(torch.int8, 'configure.json')
+        jsonFile = open('configure.json', 'r')
+        data = json.load(jsonFile)
+        jsonFile.close()
+        self.assertFalse(data[0]['quantized'])
+
+        with ipex.AutoMixPrecision(conf, running_mode='inference'):
+            y = model(x)
+        self.assertTrue(ipex.core.is_fp32_dil_tensor(y))
+        os.remove('configure.json')
+
 
 class TestQuantization(TestCase):
     def compare_fp32_int8(self, model, x):

@@ -139,8 +139,6 @@ public:
   }
 
   inline std::tuple<std::vector<std::vector<float>>, bool> get_indicator_scales(std::vector<bool> i_uint8_used, std::vector<bool> o_uint8_used) {
-    if (num_ops_id > indicators_.size() - 1) num_ops_id = 0;
-
     std::vector<float> inputs_scale, outputs_scale;
     std::vector<bool> inputs_uint8_used, outputs_uint8_used;
     bool quantized_status;
@@ -179,11 +177,13 @@ public:
       indicators_[num_ops_id].set_indicator_uint8_status(inputs_uint8_used, outputs_uint8_used);
     }
     num_ops_id++;
+    // if whole workload has been run, reset the num_ops_id to zero.
+    if (num_ops_id > indicators_.size() - 1) num_ops_id = 0;
     std::vector<std::vector<float>> input_output_scale = {inputs_scale, outputs_scale};
     return std::make_tuple(input_output_scale, quantized_status);
   }
 
-  void set_indicators(std::vector<Indicator> indicators) {
+  void set_indicators(std::vector<Indicator> indicators) { 
     indicators_ = indicators;
   }
 
