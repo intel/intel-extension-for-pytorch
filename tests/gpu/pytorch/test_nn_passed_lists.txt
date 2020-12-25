@@ -2,7 +2,7 @@ test_nn.py::TestNNDeviceTypeXPU::test_AdaptiveMaxPool3d_indices_xpu_bfloat16
 test_nn.py::TestNNDeviceTypeXPU::test_AdaptiveMaxPool3d_indices_xpu_float16
 test_nn.py::TestNNDeviceTypeXPU::test_AdaptiveMaxPool3d_indices_xpu_float32
 test_nn.py::TestNNDeviceTypeXPU::test_Conv2d_naive_groups_xpu_float32
-# test_nn.py::TestNNDeviceTypeXPU::test_CTCLoss_dpcpp_xpu
+test_nn.py::TestNNDeviceTypeXPU::test_CTCLoss_dpcpp_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_Dropout2d_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_Dropout3d_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_Dropout_xpu
