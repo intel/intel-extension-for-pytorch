@@ -56,6 +56,16 @@ bool isDilTensor(const at::Tensor &tensor) {
   return cpu::ShadeDataContext::isDilTensor(tensor);
 }
 
+bool isINT8DilTensor(const at::Tensor &tensor) {
+  if (isDilTensor(tensor)) {
+    auto dil_tensor = cpu::ShadeDataContext::getDilStorage(tensor);
+    return dil_tensor.get_data_type() == dil::data_type::s8
+      || dil_tensor.get_data_type() == dil::data_type::u8;
+  }
+
+  return false;
+}
+
 bool isBF16DilTensor(const at::Tensor &tensor) {
   if (isDilTensor(tensor)) {
     auto dil_tensor = cpu::ShadeDataContext::getDilStorage(tensor);
@@ -114,6 +124,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("mlp_set_relu_mask", &AtenIpexTypeMLPExt::set_relu_mask);
   m.def("mlp_release_handle", &AtenIpexTypeMLPExt::release_handle);
   m.def("is_dil_tensor", &isDilTensor);
+  m.def("is_int8_dil_tensor", &isINT8DilTensor);
   m.def("is_bf16_dil_tensor", &isBF16DilTensor);
   m.def("is_fp32_dil_tensor", &isFP32DilTensor);
   m.def("get_dil_tensor_sizes", &getDilStorageSizes);
