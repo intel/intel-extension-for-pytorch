@@ -451,19 +451,20 @@ static void dnnl_cat(
 } // namespace impl
 
 Tensor& _cat_out(Tensor& out, TensorList tensors, int64_t dim) {
-  bool is_double = false;
+  bool skip_dnnl_cat = false;
   for (int i = 0; i < tensors.size(); i++) {
     Tensor tensor = tensors[i];
-    if (tensor.defined() && tensor.dim() != 1) {
-      if (tensor.scalar_type() == ScalarType::Double) {
-        is_double = true;
+    if (tensor.defined()) {
+      if (tensor.scalar_type() == ScalarType::Double || 
+          tensor.scalar_type() == ScalarType::Long) {
+        skip_dnnl_cat = true;
       }
       break;
     }
   }
 
   // DNNL cat does not support double datatype now.
-  if (is_double) {
+  if (skip_dnnl_cat) {
     impl::cat(out, tensors, tensors.size(), dim);
   } else {
     impl::dnnl_cat(out, tensors, tensors.size(), dim);
