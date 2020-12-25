@@ -146,7 +146,7 @@ $ clang++ device_enum.cpp -fsycl -o device_enum
 1.  Download source code of corresponding PyTorch
 
 ```bash
-git clone https://github.com/pytorch/pytorch.git -b v1.5.0
+git clone https://github.com/pytorch/pytorch.git -b v1.7.1
 cd pytorch
 git submodule update --init --recursive
 ```
@@ -154,7 +154,7 @@ git submodule update --init --recursive
 2.  Download source code of Intel GPU Extension for PyTorch
 
 ```bash
-git clone ssh://git@gitlab.devtools.intel.com:29418/intel-pytorch-extension/intel-pytorch-extension.git
+git clone https://gitlab.devtools.intel.com/intel-pytorch-extension/intel-pytorch-extension.git
 cd intel-pytorch-extension
 git submodule update --init --recursive
 ```
@@ -193,7 +193,7 @@ python3 setup.py install --user
 Please download pre-optimized models for this Extension through below command:
 
 ```bash
-git clone ssh://git@gitlab.devtools.intel.com:29418/intel-pytorch-extension/gpu-optimized-models.git
+git clone ssh://git@gitlab.devtools.intel.com/intel-pytorch-extension/gpu-optimized-models.git
 ```
 
 ## Known issues:
@@ -204,7 +204,7 @@ git clone ssh://git@gitlab.devtools.intel.com:29418/intel-pytorch-extension/gpu-
 
 ### 1. Set https proxy:
 
-Please configure http(s).proxy for git, otherwise you will get an error similar to “fatal: unable to access 'https://git@gitlab.devtools.intel.com:29418/intel-pytorch-extension/intel-pytorch-extension.git': gnutls_handshake() failed: The TLS connection was non-properly terminated.”
+Please configure http(s).proxy for git, otherwise you will get an error similar to “fatal: unable to access 'https://git@gitlab.devtools.intel.com/intel-pytorch-extension/intel-pytorch-extension.git': gnutls_handshake() failed: The TLS connection was non-properly terminated.”
 
 ```bash
 git config --global http.proxy YourAddress:Port
