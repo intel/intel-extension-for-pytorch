@@ -68,9 +68,11 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
       {DNNL_ARG_DST, output_usr_memory},
   };
 
-  Tensor mean = at::empty({n * ih * ic}, input.options()).to(ScalarType::Float);
-  Tensor rstd = at::empty({n * ih * ic}, input.options()).to(ScalarType::Float);
+  Tensor mean;
+  Tensor rstd;
   if (training) {
+    mean = at::empty({n * ih * ic}, input.options().dtype(kFloat));
+    rstd = at::empty({n * ih * ic}, input.options().dtype(kFloat));
     auto mean_memory = dpcpp_onednn_memory(
         lnorm_fwd_pd.mean_desc(), engine, mean.data_ptr());
     auto var_memory = dpcpp_onednn_memory(
