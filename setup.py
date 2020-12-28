@@ -124,6 +124,7 @@ class DPCPPExt(Extension, object):
 
 class DPCPPInstall(setuptools.command.install.install):
     def run(self):
+        self.run_command("build_ext")
         setuptools.command.install.install.run(self)
 
 
@@ -131,16 +132,6 @@ class DPCPPClean(distutils.command.clean.clean, object):
     def run(self):
         import glob
         import re
-
-        installed_doc_files = [
-                "torch_ipex/requirements.txt",
-                "torch_ipex/README.md",
-                "torch_ipex/THIRD-PARTY-PROGRAMS.txt"
-                ]
-        for filename in installed_doc_files:
-            if os.path.isfile(filename):
-                os.remove(filename)
-
         with open('.gitignore', 'r') as f:
             ignores = f.read()
             pat = re.compile(r'^#( BEGIN NOT-CLEAN-FILES )?')
@@ -257,13 +248,6 @@ version = get_build_version(ipex_git_sha)
 # Generate version info (torch_ipex.__version__)
 create_version_files(base_dir, version, ipex_git_sha, torch_git_sha)
 
-# Constant known variables used throughout this file
-
-# PyTorch installed library
-IS_WINDOWS = (platform.system() == 'Windows')
-IS_DARWIN = (platform.system() == 'Darwin')
-IS_LINUX = (platform.system() == 'Linux')
-
 def get_c_module():
     main_compile_args = []
     main_libraries = ['torch_ipex']
@@ -315,8 +299,17 @@ setup(
     # Exclude the build files.
     packages=['torch_ipex'],
     package_data={
-        'torch_ipex':['.md', '.txt', '.py', 'lib/*.so',
-            'include/*.h', 'include/core/*.h', 'include/utils/*.h']},
+        '': [
+            'README.md',
+            'requirements.txt',
+            'THIRD-PARTY-PROGRAMS.txt'],
+        'torch_ipex':[
+            '*.py',
+            'lib/*.so',
+            'include/*.h',
+            'include/core/*.h',
+            'include/utils/*.h']
+        },
     zip_safe=False,
     ext_modules=[DPCPPExt('torch_ipex'), get_c_module()],
     cmdclass={

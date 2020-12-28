@@ -89,7 +89,3 @@ function (print_configuration_summary)
 endfunction()
 
 print_configuration_summary()
-
-install(FILES README.md DESTINATION ${CMAKE_INSTALL_PREFIX})
-install(FILES requirements.txt DESTINATION ${CMAKE_INSTALL_PREFIX})
-install(FILES THIRD-PARTY-PROGRAMS.txt DESTINATION ${CMAKE_INSTALL_PREFIX})
