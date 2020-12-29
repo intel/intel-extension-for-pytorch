@@ -30,7 +30,11 @@ static void addcmul_kernel(TensorIterator& iter, Scalar value) {
 }
 
 static void addcdiv_kernel(TensorIterator& iter, Scalar value) {
-  IPEX_DISPATCH_ALL_TYPES(iter.dtype(), "addcdiv_dpcpp", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+    at::ScalarType::Half,
+    at::ScalarType::BFloat16,
+    iter.dtype(), 
+    "addcdiv_dpcpp", [&]() {
     auto alpha = value.to<scalar_t>();
     dpcpp_kernel_for_tensor_iter<DPCPP_K(addcdiv)>(
         iter, [alpha](scalar_t a, scalar_t b, scalar_t c) -> scalar_t {
