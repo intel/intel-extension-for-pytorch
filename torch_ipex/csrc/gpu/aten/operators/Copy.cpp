@@ -299,20 +299,6 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   }
 }
 
-static bool dtype_isSupported(const at::Tensor& tensor) {
-   switch (tensor.scalar_type()) {
-   case at::ScalarType::Byte:
-   case at::ScalarType::Char:
-   case at::ScalarType::Int:
-   case at::ScalarType::Half:
-   case at::ScalarType::Float:
-   case at::ScalarType::BFloat16:
-     return true;
-   default:
-     return false;
-   };
-}
-
 Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   // TODO: valid check
   if (self.is_quantized() && src.is_quantized()) {
@@ -333,14 +319,12 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   }
 
 #ifdef USE_USM
-  Device dst_device = self.device();
-  Device src_device = src.device();
-  bool Same_device = dst_device.type() == c10::DeviceType::XPU &&
-      src_device.type() == c10::DeviceType::XPU;
-
-  if (Same_device && (!self.is_contiguous() || !src.is_contiguous()) &&
-      dtype_isSupported(self) && dtype_isSupported(src)) {
-    oneDNN::reordercopy(self, src);
+  bool same_device = self.device().type() == c10::DeviceType::XPU &&
+      src.device().type() == c10::DeviceType::XPU;
+  if (same_device &&
+      oneDNN::is_supported_onednn_dtype(self) &&
+      oneDNN::is_supported_onednn_dtype(src)) {
+    oneDNN::reorder_copy(self, src);
   } else {
     impl::copy_kernel_dpcpp(iter, non_blocking);
   }

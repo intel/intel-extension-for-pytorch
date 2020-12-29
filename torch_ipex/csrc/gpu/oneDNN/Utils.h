@@ -9,6 +9,20 @@ namespace at {
 namespace dpcpp {
 namespace oneDNN {
 
+static bool is_supported_onednn_dtype(const at::Tensor& tensor) {
+   switch (tensor.scalar_type()) {
+   case at::ScalarType::Byte:
+   case at::ScalarType::Char:
+   case at::ScalarType::Int:
+   case at::ScalarType::Half:
+   case at::ScalarType::Float:
+   case at::ScalarType::BFloat16:
+     return true;
+   default:
+     return false;
+   };
+}
+
 static inline memory::data_type
 get_onednn_dtype(const at::Tensor& tensor) {
   switch (tensor.scalar_type()) {
