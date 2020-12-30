@@ -7,7 +7,7 @@ import pytest
 
 
 cpu_device = torch.device("cpu")
-dpcpp_device = torch.device("dpcpp")
+dpcpp_device = torch.device("xpu")
 
 class TestTensorMethod(TestCase):
     def test_permute(self, dtype=torch.float):
