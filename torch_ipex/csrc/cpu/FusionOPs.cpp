@@ -374,7 +374,7 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
   RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum_relu", std::vector<c10::IValue>({input, weight, bias}), torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
   auto scale = alpha.to<float>();
-  return dil_convolution_inplace_fusion(
+  at::Tensor& output = dil_convolution_inplace_fusion(
     input,
     weight,
     bias,
@@ -385,6 +385,13 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
     groups,
     dil::attr_t::residual(scale),
     "Convolution_Sum_Relu");
+  // if the next operator is convolution, u8 output can get a better performance than s8, so always convert
+  // accumu's dil tensor to u8 data type.
+  ShadeDataContext *shade_data_contex = (ShadeDataContext*)(output.storage().data_ptr().get_context());
+  if (shade_data_contex->mix_prec_type == MIX_PREC_TYPE::MIX_INT8_FP32) {
+    shade_data_contex->dil_tensor->to_type(dil::data_type::u8);
+  }
+  return output;
 }
 
 at::Tensor AtenIpexJITDev::dil_linear_fuse_eltwise(

@@ -146,34 +146,29 @@ public:
     std::tie(inputs_scale, outputs_scale) = indicators_[num_ops_id].get_indicator_scales();
     quantized_status = indicators_[num_ops_id].get_indicator_quantized_status();
     bool scale_update = false;
+    // For symmetric: s = (Q_max - Q_min) / 2max(|x_min|, x_max), z = 0 for s8 and z=128 for u8,
+    // but for onednn, we don't need set zero point value.
+    // TODO; for asymmetric: s = (Q_max - Q_min) / (x_max - x_min), z = Q_min - round(x_min / s),
+    // we need update zero point if expected typy is not same with given type.
     for (auto i = 0; i < i_uint8_used.size(); i++) {
       if (!inputs_uint8_used[i] && i_uint8_used[i]) {
-        // update zero_point and scales
-        inputs_scale[i] /= 127.5;
-        inputs_scale[i] *= 255.5;
+        // update zero_point
         scale_update = true;
       } else if (inputs_uint8_used[i] && !i_uint8_used[i]) {
-        // update zero_point and scales
-        inputs_scale[i] /= 255.5;
-        inputs_scale[i] *= 127.5;
+        // update zero_point
         scale_update = true;
       }
     }
     for (auto j = 0; j < o_uint8_used.size(); j++) {
       if (!outputs_uint8_used[j] && o_uint8_used[j]) {
         // update zero_point and scales
-        outputs_scale[j] /= 127.5;
-        outputs_scale[j] *= 255.5;
         scale_update = true;
       } else if (outputs_uint8_used[j] && !o_uint8_used[j]) {
-        // update zero_point and scales
-        outputs_scale[j] /= 255.5;
-        outputs_scale[j] *= 127.5;
+        // update zero_point
         scale_update = true;
       }
     }
     if (scale_update) {
-      indicators_[num_ops_id].set_indicator_scales(inputs_scale, outputs_scale);
       indicators_[num_ops_id].set_indicator_uint8_status(inputs_uint8_used, outputs_uint8_used);
     }
     num_ops_id++;

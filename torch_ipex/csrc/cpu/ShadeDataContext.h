@@ -56,7 +56,7 @@ struct ShadeDataContext {
   MIX_PREC_TYPE      mix_prec_type; ///< Record if the aten tensor is mix-precision
   SHADE_TENSOR_TAG   shade_tensor_tag; ///< Record if the tensor is a PARAMETER (in mix-precision, never reorder a PARAMETER to bf16)
 
- // Generally, to get bert performance oneDNN kernel,  we need pack tensor to specific format (like ab -> ba)
+  // Generally, to get bert performance oneDNN kernel,  we need pack tensor to specific format (like ab -> ba)
   // For weight tensor, since each iter the packed format is the same, we should only pack once via using this flag
   // Note: while a tensor has been inplace reordered, this tensor will be attached a new ShadeDataContext
   // and the flag for "packed" will be auto automaticly set to "false". This is  exactly what we want now because 
