@@ -93,7 +93,7 @@ private:
       new_dims[0] = src.get_dim(0);
       src_.reshape(new_dims);
     }
-    if (weights.has_inner_product_params()) {
+    if (weights.has_inner_product_params() && weights.get_inner_product_params().src_dims == src.get_dims()) {
       compute_impl_<with_bias>(weights.get_inner_product_params(), src_, weights, bias, dst);
     } else {
       inner_product_forward_params params;
@@ -101,7 +101,7 @@ private:
                              weights_scales, dst_scales, attr, aprop_kind,
                              alowp_kind, aengine);
       weights.init_inner_product_params(params.pd, super(params.pd), params.attr,
-          params.src_attr, params.weights_attr, params.bias_attr, params.dst_scales);
+          params.src_attr, params.weights_attr, params.bias_attr, params.dst_scales, src.get_dims());
       compute_impl_<with_bias>(params, src_, weights, bias, dst); 
     }
   }

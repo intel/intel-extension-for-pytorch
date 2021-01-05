@@ -112,18 +112,16 @@ struct convolution_forward : public dnnl::convolution_forward {
     //    params, src, weights, bias, dst_dims, dst, strides, dilates, 
     //    padding_l, padding_r, groups, src_scales, weights_scales, dst_scales,
     //    attr, aalgorithm, aprop_kind, alowp_kind, aengine);
-    if (weights.has_conv_params()) {
-      //std::cout<<"pd cache ...................."<<std::endl;
+    if (weights.has_conv_params() && weights.get_conv_params().dst_dims == dst_dims) {
       auto p = weights.get_conv_params();
       do_compute<true>(p, weights.get_workspace(), src, weights, bias, dst);
     } else {
-     // std::cout<<"pd cacheKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK"<<std::endl;
       convolution_forward_params params;
       do_prepare</*with_bias=*/true>(
         params, src, weights, bias, dst_dims, dst, strides, dilates, 
         padding_l, padding_r, groups, src_scales, weights_scales, dst_scales,
         attr, aalgorithm, aprop_kind, alowp_kind, aengine);
-      weights.init_conv_params(params.pd, super(params.pd), params.bias_attr, params.dst_scales, params.groups);
+      weights.init_conv_params(params.pd, super(params.pd), params.bias_attr, params.dst_scales, params.groups, dst_dims);
       weights.init_workspace(params.pd.scratchpad_desc());
       do_compute</*with_bias=*/true>(params, src, weights, bias, dst);
     }
@@ -154,8 +152,7 @@ struct convolution_forward : public dnnl::convolution_forward {
     //    params, src, weights, dummy_bias, dst_dims, dst, strides, dilates, 
     //    padding_l, padding_r, groups, src_scales, weights_scales, dst_scales,
     //    attr, aalgorithm, aprop_kind, alowp_kind, aengine);
-    if (weights.has_conv_params()) {
-      //std::cout<<"pd cache.................."<<std::endl;
+    if (weights.has_conv_params() && weights.get_conv_params().dst_dims == dst_dims) {
       auto p = weights.get_conv_params();
       do_compute<false>(p, weights.get_workspace(), src, weights, dummy_bias, dst);
     } else {
@@ -164,7 +161,7 @@ struct convolution_forward : public dnnl::convolution_forward {
         params, src, weights, dummy_bias, dst_dims, dst, strides, dilates, 
         padding_l, padding_r, groups, src_scales, weights_scales, dst_scales,
         attr, aalgorithm, aprop_kind, alowp_kind, aengine);
-      weights.init_conv_params(params.pd, super(params.pd), params.bias_attr, params.dst_scales, params.groups);
+      weights.init_conv_params(params.pd, super(params.pd), params.bias_attr, params.dst_scales, params.groups, dst_dims);
       weights.init_workspace(params.pd.scratchpad_desc());
       do_compute</*with_bias=*/false>(params, src, weights, dummy_bias, dst);
     }

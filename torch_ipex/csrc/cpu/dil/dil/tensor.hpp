@@ -13,8 +13,9 @@ struct convolution_params {
   attr_t bias_attr;
   scale_t dst_scales;
   int groups;
-  convolution_params(dnnl::convolution_forward::primitive_desc p, dnnl::convolution_forward pri,
-    attr_t b, scale_t d, int g):pd(p), prim(pri), bias_attr(b), dst_scales(d), groups(g) {}
+  dims dst_dims;
+  convolution_params(dnnl::convolution_forward::primitive_desc p, dnnl::convolution_forward pri, attr_t b,
+    scale_t d, int g, dims d_dims): pd(p), prim(pri), bias_attr(b), dst_scales(d), groups(g), dst_dims(d_dims) {}
 };
 
 struct inner_product_params {
@@ -25,9 +26,10 @@ struct inner_product_params {
   attr_t weights_attr;
   attr_t bias_attr;
   scale_t dst_scales;
+  dims src_dims;
   inner_product_params( dnnl::inner_product_forward::primitive_desc p,  dnnl::inner_product_forward pri,
-    attr_t op_a, attr_t src_a, attr_t weight_a, attr_t b_a, scale_t d): pd(p), prim(pri), attr(op_a), src_attr(src_a),
-    weights_attr(weight_a), bias_attr(b_a), dst_scales(d) {}
+    attr_t op_a, attr_t src_a, attr_t weight_a, attr_t b_a, scale_t d, dims s_dims): pd(p), prim(pri), attr(op_a),
+    src_attr(src_a), weights_attr(weight_a), bias_attr(b_a), dst_scales(d), src_dims(s_dims) {}
 };
 
 class tensor : public memory {
@@ -1050,8 +1052,8 @@ class tensor : public memory {
   void copy_workspace(const tensor& other) { workspace_ = other.workspace_; }
 
   void init_conv_params(dnnl::convolution_forward::primitive_desc pd, dnnl::convolution_forward prim,
-    attr_t bias_attr, scale_t dst_scales, int groups) {
-    auto params = new convolution_params(pd, prim, bias_attr, dst_scales, groups);
+    attr_t bias_attr, scale_t dst_scales, int groups, dims dst_dims ) {
+    auto params = new convolution_params(pd, prim, bias_attr, dst_scales, groups, dst_dims);
     conv_params_.reset(params);
   }
   convolution_params &get_conv_params() const {return *conv_params_; }
@@ -1059,8 +1061,8 @@ class tensor : public memory {
   void copy_conv_params(const tensor& other) { conv_params_ = other.conv_params_;  }
 
   void init_inner_product_params(dnnl::inner_product_forward::primitive_desc pd, dnnl::inner_product_forward prim,
-    attr_t attr, attr_t src_attr, attr_t weights_attr, attr_t bias_attr, scale_t dst_scales) {
-    auto params = new inner_product_params(pd, prim, attr, src_attr, weights_attr, bias_attr, dst_scales );
+    attr_t attr, attr_t src_attr, attr_t weights_attr, attr_t bias_attr, scale_t dst_scales, dims src_dims) {
+    auto params = new inner_product_params(pd, prim, attr, src_attr, weights_attr, bias_attr, dst_scales, src_dims);
     inner_product_params_.reset(params);
   }
   inner_product_params &get_inner_product_params() const {return *inner_product_params_; }
