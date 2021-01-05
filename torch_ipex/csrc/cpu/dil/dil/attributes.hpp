@@ -73,7 +73,7 @@ struct attr_t : public dnnl::primitive_attr {
                           float beta = 0.f) {
     attr_t attr;
     post_ops po;
-    po.append_eltwise(scale, algorithm::eltwise_gelu_tanh, alpha, beta);
+    po.append_eltwise(scale, algorithm::eltwise_gelu_erf, alpha, beta);
     attr.set_post_ops(po);
     return attr;
   }
