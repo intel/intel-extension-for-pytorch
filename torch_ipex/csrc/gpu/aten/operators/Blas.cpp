@@ -191,24 +191,24 @@ void dnnlGemmImpl(
     }
     if (dims == 2 && lazy_reorder_enabled()) {
     #ifdef USE_PRIMITIVE_CACHE
-      create_key(key, m1_md_any, m2_md_any, b_md, r_md_any, post_flags);
+      create_key(key, m1_md_any, m2_md_any, b_md, r_md_any, attr.beta_, attr.alpha_, post_flags);
     #endif
       matmul_desc.reset(new dnnl::matmul::desc(m1_md_any, m2_md_any, b_md, r_md_any));
     } else {
     #ifdef USE_PRIMITIVE_CACHE
-      create_key(key, m1_md, m2_md, b_md, r_md, post_flags);
+      create_key(key, m1_md, m2_md, b_md, r_md, attr.beta_, attr.alpha_, post_flags);
     #endif
       matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, b_md, r_md));
     }
   } else {
     if (dims == 2 && lazy_reorder_enabled()) {
     #ifdef USE_PRIMITIVE_CACHE
-      create_key(key, m1_md_any, m2_md_any, r_md_any, post_flags);
+      create_key(key, m1_md_any, m2_md_any, r_md_any, attr.beta_, attr.alpha_, post_flags);
     #endif
       matmul_desc.reset(new dnnl::matmul::desc(m1_md_any, m2_md_any, r_md_any));
     } else {
     #ifdef USE_PRIMITIVE_CACHE
-      create_key(key, m1_md, m2_md, r_md, post_flags);
+      create_key(key, m1_md, m2_md, r_md, attr.beta_, attr.alpha_, post_flags);
     #endif
       matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
     }
@@ -216,7 +216,7 @@ void dnnlGemmImpl(
 
 #else
 #ifdef USE_PRIMITIVE_CACHE
-  create_key(key, m1_md, m2_md, r_md, post_flags);
+  create_key(key, m1_md, m2_md, r_md, attr.beta_, attr.alpha_, post_flags);
 #endif
   matmul_desc.reset(new dnnl::matmul::desc(m1_md, m2_md, r_md));
 #endif

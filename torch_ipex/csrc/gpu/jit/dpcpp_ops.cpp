@@ -114,26 +114,28 @@ at::Tensor trans_matmul_scale_sum(at::Tensor& accumu, const at::Tensor& tensor1,
     }
 
     at::Tensor output, self, input;
-    if (accumu.sizes().vec() == output_shape) {
+    if (accumu.defined() && accumu.sizes().vec() == output_shape) {
       output = at::_unsafe_view(
           at::AtenIpexTypeXPU::trans_baddbmm_out(accumu,
-                                                   accumu,
-                                                   tensor1_expanded,
-                                                   tensor2_expanded,
-                                                   alpha, 1 / oscale.to<float>()),
+                                                 accumu,
+                                                 tensor1_expanded,
+                                                 tensor2_expanded,
+                                                 alpha, 1 / oscale.to<float>()),
           output_shape
       );
     } else {
       self = at::empty({0}, tensor1_expanded.options());
       output = at::_unsafe_view(
           at::AtenIpexTypeXPU::trans_baddbmm_out(self,
-                                                   input,
-                                                   tensor1_expanded,
-                                                   tensor2_expanded,
-                                                   0.f, 1 / oscale.to<float>()),
+                                                 input,
+                                                 tensor1_expanded,
+                                                 tensor2_expanded,
+                                                 0.f, 1 / oscale.to<float>()),
           output_shape
       );
-      output = at::AtenIpexTypeXPU::add(output, accumu, alpha);
+
+      if (accumu.defined() && alpha.to<float>() != 0.f)
+        output = at::AtenIpexTypeXPU::add(output, accumu, alpha);
     }
 
     return output;

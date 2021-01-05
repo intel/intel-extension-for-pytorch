@@ -193,7 +193,16 @@ RegisterOperators op({
       "dpcpp::trans_matmul(Tensor m2, int dim1, int dim2, Tensor m1) -> Tensor(a!)",
       [] (const Node* node) ->Operation {
         return [] (Stack* stack) {
-          // TODO: fusion intermediate node (scalable functionality)
+          at::Tensor input;
+          auto result = torch::jit::dpcpp::trans_matmul_scale_sum(
+              input,
+              (std::move(peek(stack, 3, 4))).toTensor(),
+              (std::move(peek(stack, 0, 4))).toTensor(),
+              1.0f,
+              0.f
+          );
+          drop(stack, 4);
+          pack(stack, std::move(result));
         };
       },
       aliasAnalysisFromSchema()
@@ -202,7 +211,16 @@ RegisterOperators op({
       "dpcpp::trans_matmul_scale(Tensor m2, int dim1, int dim2, Tensor m1, Scalar oscale) -> Tensor(a!)",
       [] (const Node* node) ->Operation {
         return [] (Stack* stack) {
-          // TODO: fusion intermediate node (scalable functionality)
+          at::Tensor input;
+          auto result = torch::jit::dpcpp::trans_matmul_scale_sum(
+              input,
+              (std::move(peek(stack, 3, 5))).toTensor(),
+              (std::move(peek(stack, 0, 5))).toTensor(),
+              (std::move(peek(stack, 4, 5))).toScalar(),
+              0.f
+          );
+          drop(stack, 5);
+          pack(stack, std::move(result));
         };
       },
       aliasAnalysisFromSchema()

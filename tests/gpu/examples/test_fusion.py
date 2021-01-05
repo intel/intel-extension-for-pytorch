@@ -32,6 +32,22 @@ class TransMatmulScalePost(torch.nn.Module):
         return torch.matmul(m1, m2.transpose(-1, -2)) / 8 + added
 
 
+class TransMatmul(torch.nn.Module):
+    def __init__(self):
+        super(TransMatmul, self).__init__()
+
+    def forward(self, m1, m2):
+        return torch.matmul(m1, m2.transpose(-1, -2))
+
+
+class TransMatmulScale(torch.nn.Module):
+    def __init__(self):
+        super(TransMatmulScale, self).__init__()
+
+    def forward(self, m1, m2):
+        return torch.matmul(m1, m2.transpose(-1, -2)) / 8
+
+
 class Conv2dRelu(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dRelu, self).__init__()
@@ -90,6 +106,52 @@ class TestNNMethod(TestCase):
         with torch.no_grad():
             real1 = modelJit(m1_dpcpp, m2_dpcpp, added1_dpcpp)
             real2 = modelJit(m1_dpcpp, m2_dpcpp, added2_dpcpp)
+            print("real1:", real1.to(cpu_device))
+            print("real2:", real2.to(cpu_device))
+        self.assertEqual(raw1, real1.to(cpu_device))
+        self.assertEqual(raw2, real2.to(cpu_device))
+        del modelJit
+
+    def test_trans_baddbmm_fusion(self, dtype=torch.float):
+        m1 = torch.randn((2,2,3), device=cpu_device)
+        m2 = torch.randn((2,2,3), device=cpu_device)
+
+        model = TransMatmul()
+        raw1 = model(m1, m2)
+        raw2 = model(m1, m2)
+        print("raw1: ", raw1)
+        print("raw2: ", raw2)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+
+        modelJit = torch.jit.script(model)
+        with torch.no_grad():
+            real1 = modelJit(m1_dpcpp, m2_dpcpp)
+            real2 = modelJit(m1_dpcpp, m2_dpcpp)
+            print("real1:", real1.to(cpu_device))
+            print("real2:", real2.to(cpu_device))
+        self.assertEqual(raw1, real1.to(cpu_device))
+        self.assertEqual(raw2, real2.to(cpu_device))
+        del modelJit
+
+    def test_trans_baddbmm_scale_fusion(self, dtype=torch.float):
+        m1 = torch.randn((2,2,3), device=cpu_device)
+        m2 = torch.randn((2,2,3), device=cpu_device)
+
+        model = TransMatmulScale()
+        raw1 = model(m1, m2)
+        raw2 = model(m1, m2)
+        print("raw1: ", raw1)
+        print("raw2: ", raw2)
+
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+
+        modelJit = torch.jit.script(model)
+        with torch.no_grad():
+            real1 = modelJit(m1_dpcpp, m2_dpcpp)
+            real2 = modelJit(m1_dpcpp, m2_dpcpp)
             print("real1:", real1.to(cpu_device))
             print("real2:", real2.to(cpu_device))
         self.assertEqual(raw1, real1.to(cpu_device))
