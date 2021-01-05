@@ -146,7 +146,8 @@ static at::Tensor& dil_convolution_inplace_fusion(
   auto weight_int8 = ShadeDataContext::isTensorMixedInt8Precision(weight);
   auto weight_contiguous = (weight_int8 || weight.is_contiguous()) ? weight : weight.contiguous();
   auto ouput_dil_type = dbl::comm::try_gen_dil_tensor(accumu).get_data_type();
-  auto output_contiguous = (ouput_dil_type == dil::data_type::u8 || ouput_dil_type == dil::data_type::s8 || accumu.is_contiguous()) ? accumu : accumu.contiguous();
+  auto output_contiguous = (ouput_dil_type == dil::data_type::s8 || ouput_dil_type == dil::data_type::u8
+                            || accumu.is_contiguous()) ? accumu : accumu.contiguous();
 
   int64_t num_ops_id = -1;
   bool quantized = false;
@@ -400,8 +401,6 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
     groups,
     dil::attr_t::residual(scale),
     "Convolution_Sum_Relu");
-  // if the next operator is convolution, u8 output can get a better performance than s8, so always convert
-  // accumu's dil tensor to u8 data type.
   ShadeDataContext *shade_data_contex = (ShadeDataContext*)(output.storage().data_ptr().get_context());
   if (shade_data_contex->mix_prec_type == MIX_PREC_TYPE::MIX_INT8_FP32) {
     shade_data_contex->dil_tensor->to_type(dil::data_type::u8);
