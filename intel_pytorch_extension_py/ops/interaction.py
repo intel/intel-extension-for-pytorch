@@ -10,7 +10,7 @@ def interaction(*args):
     # We will drop python custom function after c++ are supported
     if torch.is_grad_enabled():
         return InteractionFunc.apply(*args)
-    return torch.ops.torch_ipex.interaction(args)
+    return torch.ops.torch_ipex.interaction_forward(args)
 
 class InteractionFunc(Function):
     @staticmethod

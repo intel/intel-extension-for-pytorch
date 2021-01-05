@@ -344,7 +344,8 @@ _interaction_backward(const at::Tensor &grad_out,
 at::Tensor
 AtenIpexTypeExt::interaction_forward(const std::vector<at::Tensor> &input) {
   if (input[0].scalar_type() == at::kFloat) {
-    for (const auto &in : input) {
+    for (auto &in : input) {
+      cpu::dbl::comm::reorder_to_public(in);
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(in.scalar_type() == at::kFloat);
     }
     return _interaction_forward<float>(input);
@@ -361,6 +362,7 @@ std::vector<at::Tensor>
 AtenIpexTypeExt::interaction_backward(const at::Tensor &grad_out,
                                       const std::vector<at::Tensor> &input) {
   if (grad_out.scalar_type() == at::kFloat) {
+    cpu::dbl::comm::reorder_to_public(grad_out);
     return _interaction_backward<float>(grad_out, input);
   } else {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.scalar_type() == at::kBFloat16);
