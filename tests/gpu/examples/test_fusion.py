@@ -56,9 +56,9 @@ class TestNNMethod(TestCase):
         m2 = torch.randn([2, 2], device=cpu_device)
         acc = torch.randn([2], device=cpu_device)
 
-        m1_dpcpp = m1.to("dpcpp")
-        m2_dpcpp = m2.to("dpcpp")
-        acc_dpcpp = acc.to("dpcpp")
+        m1_dpcpp = m1.to(dpcpp_device)
+        m2_dpcpp = m2.to(dpcpp_device)
+        acc_dpcpp = acc.to(dpcpp_device)
         model = MatmulSum()
         raw = model(m1, m2, acc)
         print("raw: ", raw)
