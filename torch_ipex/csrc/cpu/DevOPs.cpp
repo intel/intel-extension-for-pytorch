@@ -393,19 +393,19 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
       std::vector<at::Tensor> dnnl_input_tensors;
       dnnl_input_tensors.push_back(input);
       dnnl_input_tensors.push_back(weight);
-      if (bias.has_value()) {
+      if (bias.has_value() && bias.value().defined()) {
         dnnl_input_tensors.push_back(bias.value());
       }
       if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
         if (transposed) {
-          return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.has_value() ? (bias.value().is_contiguous() ? bias.value() : bias.value().contiguous()) : at::Tensor(), padding, output_padding, stride, dilation, groups);
+          return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), (bias.has_value() && bias.value().defined()) ? (bias.value().is_contiguous() ? bias.value() : bias.value().contiguous()) : at::Tensor(), padding, output_padding, stride, dilation, groups);
         } else {
           // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
           auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
           auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8 || input.is_contiguous()) ? input : input.contiguous();
           auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
           auto weight_temp = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
-          return AtenIpexCPUDev::dil_convolution(input_temp, weight_temp, bias.has_value() ? bias.value() : at::Tensor(), stride, padding, dilation, groups);
+          return AtenIpexCPUDev::dil_convolution(input_temp, weight_temp, (bias.has_value() && bias.value().defined()) ? bias.value() : at::Tensor(), stride, padding, dilation, groups);
         }
       }
     }
@@ -417,11 +417,11 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
-  if (bias.has_value()) TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bias.value().layout() == c10::kStrided);
+  if (bias.has_value() && bias.value().defined()) TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bias.value().layout() == c10::kStrided);
   auto&& _ipex_input = bridge::shallowFallbackToCPUTensor(input);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
   auto&& _ipex_bias = c10::optional<at::Tensor>();
-  if (bias.has_value()) {
+  if (bias.has_value() && bias.value().defined()) {
     _ipex_bias = c10::optional<at::Tensor>(bridge::shallowFallbackToCPUTensor(bias.value()));
   }
   auto&& _ipex_result = at::convolution(_ipex_input, _ipex_weight, _ipex_bias, stride, padding, dilation, transposed, output_padding, groups);
@@ -2499,7 +2499,7 @@ at::Tensor AtenIpexCPUDev::dil_index(const at::Tensor & self, at::TensorList ind
   torch_ipex::reset_ipex_func_status();
 
   IPEX_CHECK(
-    self.device().type() == c10::DeviceType::DPCPP,
+    self.device().type() == c10::DeviceType::XPU,
     "IPEX index only work on DPCPP tensor");
   if (ShadeDataContext::isDilTensor(self) && ShadeDataContext::isTensorMixPrecision(self)) {
     dil::tensor& self_dil_storage = ShadeDataContext::getDilStorage(self);

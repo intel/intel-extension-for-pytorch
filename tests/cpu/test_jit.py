@@ -731,7 +731,8 @@ class Tester(TestCase):
         self._test_output_bf16(
             ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex::conv2d_relu")
+            kind_in_graph="ipex::conv2d_relu",
+            prec=0.02)
         self._test_output_int8(
             ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),

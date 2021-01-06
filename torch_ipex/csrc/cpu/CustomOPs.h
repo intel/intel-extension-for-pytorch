@@ -24,7 +24,7 @@ public:
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
-          input.device().type() == c10::DeviceType::DPCPP) {
+          input.device().type() == c10::DeviceType::XPU) {
         return torch_ipex::cpu::AtenIpexCPUDev::dil_linear(input, weight, bias);
       }
     } catch (std::exception &e) {
@@ -167,7 +167,7 @@ public:
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
-          input.device().type() == c10::DeviceType::DPCPP) {
+          input.device().type() == c10::DeviceType::XPU) {
         auto src_dil_type =
             torch_ipex::cpu::dbl::comm::try_gen_dil_tensor(input)
                 .get_data_type();
@@ -419,7 +419,7 @@ public:
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
-          input.device().type() == c10::DeviceType::DPCPP) {
+          input.device().type() == c10::DeviceType::XPU) {
         auto src_dil_type =
             torch_ipex::cpu::dbl::comm::try_gen_dil_tensor(input)
                 .get_data_type();
@@ -731,7 +731,7 @@ public:
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
-          input.device().type() == c10::DeviceType::DPCPP) {
+          input.device().type() == c10::DeviceType::XPU) {
         return torch_ipex::cpu::AtenIpexCPUDev::dil_rnn_layer(
             input, w1, w2, w3, w4, hx, cx, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes);
       }
@@ -788,7 +788,7 @@ public:
 
     try {
       if (torch_ipex::check_auto_dnnl() &&
-          input.device().type() == c10::DeviceType::DPCPP) {
+          input.device().type() == c10::DeviceType::XPU) {
         auto grad_inputs = torch_ipex::cpu::AtenIpexCPUDev::dil_rnn_layer_backward(input, w1, w2, w3, w4, hx, cx, output, hy, cy, grad_output, grad_hy, grad_cy, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, /*batch_sizes*/{});
         return {grad_inputs[0], grad_inputs[1], grad_inputs[2],
           grad_inputs[3], grad_inputs[4], grad_inputs[5],
