@@ -321,7 +321,11 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
 #ifdef USE_USM
   bool same_device = self.device().type() == c10::DeviceType::XPU &&
       src.device().type() == c10::DeviceType::XPU;
-  if (same_device &&
+  bool has_sz_st = src.sizes().size() != 0 &&
+                   src.strides().size() != 0 &&
+                   self.sizes().size() != 0 &&
+                   self.strides().size() != 0;
+  if (same_device && has_sz_st &&
       oneDNN::is_supported_onednn_dtype(self) &&
       oneDNN::is_supported_onednn_dtype(src)) {
     oneDNN::reorder_copy(self, src);
