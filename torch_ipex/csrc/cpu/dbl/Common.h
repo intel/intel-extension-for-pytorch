@@ -18,7 +18,9 @@ namespace comm {
  */
 void reorder_to_bf16_for_mix_prec(const at::Tensor& tensor, bool not_reorder_for_training = false);
 
-std::tuple<std::vector<std::vector<float>>, bool> get_int8_scales(const at::TensorList& tensor, bool uint8_used);
+std::vector<std::vector<float>> get_int8_scales(const at::TensorList& tensor, bool uint8_used, int64_t ops_id);
+
+bool get_int8_quantized_status(const int64_t ops_id);
 
 void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> scales, bool uint8_used = false);
 

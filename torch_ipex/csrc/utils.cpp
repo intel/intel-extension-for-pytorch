@@ -4,6 +4,7 @@
 #include <c10/util/Exception.h>
 
 #include "auto_opt_config.h"
+#include "cpu/int8/Config.h"
 
 namespace torch_ipex {
 
@@ -128,7 +129,7 @@ bool check_int8_calibration() {
   return AutoOptConfig::singleton().get_int8_calibration();
 }
 
-void insert_or_updata_observer(const at::TensorList& inputs, const at::TensorList& outputs, std::string op_name) {
+void insert_or_updata_observer(const at::TensorList& inputs, const at::TensorList& outputs, std::string op_name, int64_t ops_id) {
   std::vector<std::vector<float>> inputs_min_max_values, outputs_min_max_values;
   for (auto i = 0; i < inputs.size(); i++) {
     inputs_min_max_values.push_back({inputs[i].abs().min().item<float>(), inputs[i].abs().max().item<float>()});
@@ -136,11 +137,19 @@ void insert_or_updata_observer(const at::TensorList& inputs, const at::TensorLis
   for (auto j = 0; j < outputs.size(); j++) {
     outputs_min_max_values.push_back({outputs[j].abs().min().item<float>(), outputs[j].abs().max().item<float>()});
   }
-  AutoOptConfig::singleton().insert_or_updata_observer(op_name, inputs_min_max_values, outputs_min_max_values);
+  Int8OptConfig::get_config().insert_or_updata_observer(op_name, inputs_min_max_values, outputs_min_max_values, ops_id);
 }
 
-std::tuple<std::vector<std::vector<float>>, bool> get_indicator_scales(std::vector<bool> i_uint8_used, std::vector<bool> o_uint8_used) {
-  return AutoOptConfig::singleton().get_indicator_scales(i_uint8_used, o_uint8_used);
+std::vector<std::vector<float>> get_indicator_scales(std::vector<bool> i_uint8_used, std::vector<bool> o_uint8_used, const int64_t ops_id) {
+  return Int8OptConfig::get_config().get_indicator_scales(i_uint8_used, o_uint8_used, ops_id);
+ }
+
+bool get_indicator_quantized_status(const int64_t ops_id) {
+  return Int8OptConfig::get_config().get_indicator_quantized_status(ops_id);
+ }
+
+int64_t fetch_and_add_ops_id(){
+  return Int8OptConfig::get_config().fetch_and_add_ops_id();
 }
 
 bool check_tensor_own_whole_storage(const at::Tensor& tensor) {

@@ -26,8 +26,9 @@
 #include "cpu/MlpOPs.h"
 #include "cpu/ExternalOPs.h"
 #include "cpu/dbl/Common.h"
-#include "quantization/Observer.h"
 #include "cpu/FusionOPs.h"
+#include "cpu/int8/quantization/Observer.h"
+#include "cpu/int8/Config.h"
 
 namespace torch_ipex {
 namespace {
@@ -145,14 +146,14 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_mix_int8_fp32", []() { return AutoOptConfig::singleton().get_mix_int8_fp32(); });
   m.def("enable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(true); });
   m.def("disable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(false); });
-  m.def("get_int8_calibration", []() { return AutoOptConfig::singleton().get_int8_calibration(); });
-  m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
-  m.def("add_indicators", []() { AutoOptConfig::singleton().add_indicators(); });
+  m.def("get_int8_calibration", []() { AutoOptConfig::singleton().get_int8_calibration(); });
+  m.def("calibration_reset", []() { Int8OptConfig::get_config().calibration_reset(); });
+  m.def("add_indicators", []() { Int8OptConfig::get_config().add_indicators(); });
+  m.def("clear_indicators", []() { Int8OptConfig::get_config().clear_indicators(); }); 
   // clear indicators for case having many scopes which have different structure
-  m.def("clear_indicators", []() { AutoOptConfig::singleton().clear_indicators(); }); 
   m.def("get_int8_configures", []() {
       py::list output_list;
-      auto indicators = AutoOptConfig::singleton().get_indicators();
+      auto indicators = Int8OptConfig::get_config().get_indicators();
       IPEX_CHECK(indicators.size() > 0, "can't load a empty indicators, please first do calibration step");
       for (auto indicator: indicators) {
         py::dict d;
@@ -189,7 +190,7 @@ void InitIpexModuleBindings(py::module m) {
           i_uint8_used, o_uint8_used, quantized);
         indicators.push_back(temp);
       }
-      AutoOptConfig::singleton().set_indicators(indicators); } );
+      Int8OptConfig::get_config().set_indicators(indicators); } );
 
   // external OPs
   m.def("roi_align_forward", &IpexExternal::ROIAlign_forward);

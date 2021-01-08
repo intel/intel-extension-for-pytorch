@@ -46,12 +46,13 @@ at::Tensor dil_convolution_outplace_fusion(
   auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
   auto weight_contiguous = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
 
-  std::vector<float> output_scale = {};
+  int64_t num_ops_id = -1;
   bool quantized = false;
+  std::vector<float> output_scale = {};
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<std::vector<float>> scales;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /* uint8_used for output*/false);
-    //quantized = false;
+    num_ops_id = fetch_and_add_ops_id();
+    quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
+    std::vector<std::vector<float>> scales = dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/false, num_ops_id);
     if (quantized) {
       output_scale.push_back(scales[1][0]);
       dbl::comm::reorder_to_int8_for_mix_prec(input_contiguous, scales[0]);
@@ -110,7 +111,7 @@ at::Tensor dil_convolution_outplace_fusion(
 
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer({input_contiguous}, {aten_output}, op_name);
+    insert_or_updata_observer({input_contiguous}, {aten_output}, op_name,  fetch_and_add_ops_id());
   }
   return aten_output;
 }
@@ -140,12 +141,13 @@ static at::Tensor& dil_convolution_inplace_fusion(
   auto ouput_dil_type = dbl::comm::try_gen_dil_tensor(accumu).get_data_type();
   auto output_contiguous = (ouput_dil_type == dil::data_type::u8 || ouput_dil_type == dil::data_type::s8 || accumu.is_contiguous()) ? accumu : accumu.contiguous();
 
-  std::vector<float> output_scale = {};
+  int64_t num_ops_id = -1;
   bool quantized = false;
+  std::vector<float> output_scale = {};
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<std::vector<float>> scales;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /* uint8_used for output*/false);
-    //quantized = false;
+    num_ops_id = fetch_and_add_ops_id();
+    quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
+    std::vector<std::vector<float>> scales = dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/false, num_ops_id);
     if (quantized) {
       output_scale.push_back(scales[1][0]);
       dbl::comm::reorder_to_int8_for_mix_prec(input_contiguous, scales[0]);
@@ -177,7 +179,7 @@ static at::Tensor& dil_convolution_inplace_fusion(
 
   if (bias.defined()) {
     auto bias_contiguous = bias.is_contiguous() ? bias : bias.contiguous();
-    if (check_auto_mix_int8_fp32() && !check_int8_calibration() && quantized) {
+    if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
       if (quantized) {
         auto src = dbl::comm::try_gen_dil_storage(bias_contiguous);
         auto src_type = src.get_data_type();
@@ -210,7 +212,7 @@ static at::Tensor& dil_convolution_inplace_fusion(
 
   dbl::comm::equip_dil_buffer(accumu, dil_output);
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer({input_contiguous}, {accumu}, op_name);
+    insert_or_updata_observer({input_contiguous}, {accumu}, op_name,  fetch_and_add_ops_id());
   }
   return accumu;
 }
