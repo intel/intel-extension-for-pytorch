@@ -20,14 +20,15 @@
 #include "utils.h"
 #include "auto_opt_config.h"
 
-#include "cpu/dil/dil.hpp"
-#include "cpu/ShadeDataContext.h"
 #include "cpu/ExtendOPs.h"
-#include "cpu/MlpOPs.h"
 #include "cpu/ExternalOPs.h"
-#include "cpu/dbl/Common.h"
-#include "quantization/Observer.h"
 #include "cpu/FusionOPs.h"
+#include "cpu/MlpOPs.h"
+#include "cpu/ShadeDataContext.h"
+#include "cpu/dbl/Common.h"
+#include "cpu/dil/dil.hpp"
+#include "cpu/int8/Config.h"
+#include "cpu/int8/quantization/Observer.h"
 
 namespace torch_ipex {
 namespace {
@@ -137,7 +138,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_jit_opt", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
   m.def("set_execution_mode", [](bool train) { AutoOptConfig::singleton().set_train(train); }, py::arg("train"));
   m.def("get_train", []() { return AutoOptConfig::singleton().get_train(); });
-  
+
   // int8 path
 
   m.def("enable_mix_int8_fp32", []() { AutoOptConfig::singleton().set_mix_int8_fp32(true); });
@@ -145,14 +146,17 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_mix_int8_fp32", []() { return AutoOptConfig::singleton().get_mix_int8_fp32(); });
   m.def("enable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(true); });
   m.def("disable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(false); });
-  m.def("get_int8_calibration", []() { return AutoOptConfig::singleton().get_int8_calibration(); });
-  m.def("calibration_reset", []() { AutoOptConfig::singleton().calibration_reset(); });
-  m.def("add_indicators", []() { AutoOptConfig::singleton().add_indicators(); });
+  m.def("get_int8_calibration",
+        []() { AutoOptConfig::singleton().get_int8_calibration(); });
+  m.def("calibration_reset", []() { Int8OptConfig::calibration_reset(); });
+  m.def("add_indicators",
+        []() { Int8OptConfig::get_config().add_indicators(); });
+  m.def("clear_indicators",
+        []() { Int8OptConfig::get_config().clear_indicators(); });
   // clear indicators for case having many scopes which have different structure
-  m.def("clear_indicators", []() { AutoOptConfig::singleton().clear_indicators(); }); 
   m.def("get_int8_configures", []() {
       py::list output_list;
-      auto indicators = AutoOptConfig::singleton().get_indicators();
+      auto indicators = Int8OptConfig::get_config().get_indicators();
       IPEX_CHECK(indicators.size() > 0, "can't load a empty indicators, please first do calibration step");
       for (auto indicator: indicators) {
         py::dict d;
@@ -172,24 +176,32 @@ void InitIpexModuleBindings(py::module m) {
         output_list.append(d);
       }
       return output_list; } );
-  m.def("load_indicators_file", [](const py::list& l) {
-      IPEX_CHECK(py::len(l) > 0, "can't load a empty configures, please first do calibration step");
-      std::vector<Indicator> indicators;
-      for (py::handle i : l) {
-        int64_t id = py::cast<std::int64_t>(i["id"]);
-        std::string op_name = py::cast<std::string>(i["name"]);
-        std::string algorithm = py::cast<std::string>(i["algorithm"]);
-        std::string weight_granularity = py::cast<std::string>(i["weight_granularity"]);
-        std::vector<float> i_scale = py::cast<std::vector<float>>(i["inputs_scale"]);
-        std::vector<float> o_scale = py::cast<std::vector<float>>(i["outputs_scale"]);
-        std::vector<bool> i_uint8_used = py::cast<std::vector<bool>>(i["inputs_uint8_used"]);
-        std::vector<bool> o_uint8_used = py::cast<std::vector<bool>>(i["outputs_uint8_used"]);
-        bool quantized  = py::cast<bool>(i["quantized"]);
-        Indicator temp(id, op_name, algorithm, weight_granularity, i_scale, o_scale,
-          i_uint8_used, o_uint8_used, quantized);
-        indicators.push_back(temp);
-      }
-      AutoOptConfig::singleton().set_indicators(indicators); } );
+  m.def("load_indicators_file", [](const py::list &l) {
+    IPEX_CHECK(
+        py::len(l) > 0,
+        "can't load a empty configures, please first do calibration step");
+    std::vector<Indicator> indicators;
+    for (py::handle i : l) {
+      int64_t id = py::cast<std::int64_t>(i["id"]);
+      std::string op_name = py::cast<std::string>(i["name"]);
+      std::string algorithm = py::cast<std::string>(i["algorithm"]);
+      std::string weight_granularity =
+          py::cast<std::string>(i["weight_granularity"]);
+      std::vector<float> i_scale =
+          py::cast<std::vector<float>>(i["inputs_scale"]);
+      std::vector<float> o_scale =
+          py::cast<std::vector<float>>(i["outputs_scale"]);
+      std::vector<bool> i_uint8_used =
+          py::cast<std::vector<bool>>(i["inputs_uint8_used"]);
+      std::vector<bool> o_uint8_used =
+          py::cast<std::vector<bool>>(i["outputs_uint8_used"]);
+      bool quantized = py::cast<bool>(i["quantized"]);
+      Indicator temp(id, op_name, algorithm, weight_granularity, i_scale,
+                     o_scale, i_uint8_used, o_uint8_used, quantized);
+      indicators.push_back(temp);
+    }
+    Int8OptConfig::get_config().set_indicators(indicators);
+  });
 
   // external OPs
   m.def("roi_align_forward", &IpexExternal::ROIAlign_forward);

@@ -11,6 +11,7 @@
 
 #include <limits>
 
+#include "torch_ipex/csrc/cpu/int8/Config.h"
 #include "torch_ipex/csrc/aten_ipex_bridge.h"
 #include "torch_ipex/csrc/ipex_tensor_impl.h"
 #include "torch_ipex/csrc/utils.h"
@@ -56,12 +57,13 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   CHECK_DNNL_OP_PRE_COND(input);
   CHECK_DNNL_OP_PRE_COND(weight);
 
-  std::vector<float> output_scale = {};
   bool quantized = false;
+  std::vector<float> output_scale = {};
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<std::vector<float>> scales;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /* uint8_used for output*/false);
-    //quantized = false;
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
+    std::vector<std::vector<float>> scales = dbl::comm::get_int8_scales(
+        {input}, /*  uint8_used for output*/ false, num_ops_id);
     if (quantized) {
       output_scale.push_back(scales[1][0]);
       dbl::comm::reorder_to_int8_for_mix_prec(input, scales[0]);
@@ -120,7 +122,8 @@ at::Tensor AtenIpexCPUDev::dil_convolution(
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer({input}, {aten_output}, "Convolution");
+    insert_or_updata_observer({input}, {aten_output}, "Convolution",
+                              Int8OptConfig::fetch_and_add_ops_id());
   }
 
   return aten_output;
@@ -1018,9 +1021,10 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   std::vector<float> output_scale = {};
   bool quantized = false;
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<std::vector<float>> scales;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales({self}, /*  uint8_used for output*/false);
-    //quantized = false;
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
+    std::vector<std::vector<float>> scales = dbl::comm::get_int8_scales(
+        {self}, /*  uint8_used for output*/ false, num_ops_id);
     if (quantized) {
       output_scale.push_back(scales[1][0]);
       dbl::comm::reorder_to_int8_for_mix_prec(self, scales[0]);
@@ -1076,7 +1080,8 @@ at::Tensor AtenIpexCPUDev::dil_linear(
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
     auto op_name = attr.get_post_ops().len() == 0 ? "Linear" : "LinearFuseEltwise";
-    insert_or_updata_observer({self}, {aten_output}, op_name);
+    insert_or_updata_observer({self}, {aten_output}, op_name,
+                              Int8OptConfig::fetch_and_add_ops_id());
   }
 
   return aten_output;
@@ -1226,11 +1231,11 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
   }
   std::vector<float> input_scales = {};
   std::vector<float> output_scales = {};
-  bool quantized = false;
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<std::vector<float>> scales;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/false);
-    //quantized = false;
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    bool quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
+    std::vector<std::vector<float>> scales = dbl::comm::get_int8_scales(
+        {input}, /*  uint8_used for output*/ false, num_ops_id);
     if (quantized) {
       input_scales = scales[0];
       output_scales = scales[1];
@@ -1279,7 +1284,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
     auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
 
     if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-      insert_or_updata_observer({input}, {aten_output}, "BatchNorm");
+      insert_or_updata_observer({input}, {aten_output}, "BatchNorm",
+                                Int8OptConfig::fetch_and_add_ops_id());
     }
 
     return std::make_tuple(aten_output, at::Tensor(), at::Tensor());
@@ -1339,9 +1345,10 @@ at::Tensor AtenIpexCPUDev::dil_frozen_batch_norm(
   std::vector<float> output_scales = {};
   bool quantized = false;
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<std::vector<float>> scales;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/false);
-    //quantized = false;
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
+    std::vector<std::vector<float>> scales = dbl::comm::get_int8_scales(
+        {input}, /*  uint8_used for output*/ false, num_ops_id);
     if (quantized) {
       input_scales = scales[0];
       output_scales = scales[1];
@@ -1364,7 +1371,8 @@ at::Tensor AtenIpexCPUDev::dil_frozen_batch_norm(
 
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(y));
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer({input}, {aten_output}, "BatchNorm");
+    insert_or_updata_observer({input}, {aten_output}, "BatchNorm",
+                              Int8OptConfig::fetch_and_add_ops_id());
   }
   return aten_output;
 }
@@ -1407,10 +1415,10 @@ at::Tensor AtenIpexCPUDev::dil_max_pooling(
   DEBUG("AtenIpexCPUDev::dil_max_pooling\n");
   CHECK_DNNL_OP_PRE_COND(input);
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<std::vector<float>> scales;
-    bool quantized;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/false);
-    //quantized = false;
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    bool quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
+    std::vector<std::vector<float>> scales = dbl::comm::get_int8_scales(
+        {input}, /*  uint8_used for output*/ false, num_ops_id);
     if (quantized) {
       dbl::comm::reorder_to_int8_for_mix_prec(input, scales[0]);
     } else {
@@ -1421,7 +1429,8 @@ at::Tensor AtenIpexCPUDev::dil_max_pooling(
   }
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer({input}, {input}, "MaxPooling");
+    insert_or_updata_observer({input}, {input}, "MaxPooling",
+                              Int8OptConfig::fetch_and_add_ops_id());
   }
   return dbl::pool::_dil_pooling(
       input,
@@ -1447,10 +1456,10 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool2d(
            "dil_avg_pooling operator does not support divisor");
 
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<std::vector<float>> scales;
-    bool quantized;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/false);
-    //quantized = false;
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    bool quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
+    std::vector<std::vector<float>> scales = dbl::comm::get_int8_scales(
+        {input}, /*  uint8_used for output*/ false, num_ops_id);
     if (quantized) {
       dbl::comm::reorder_to_int8_for_mix_prec(input, scales[0]);
     } else {
@@ -1461,7 +1470,8 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool2d(
   }
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer({input}, {input}, "AvgPool2d");
+    insert_or_updata_observer({input}, {input}, "AvgPool2d",
+                              Int8OptConfig::fetch_and_add_ops_id());
   }
 
   return dbl::pool::_dil_pooling(
@@ -1508,10 +1518,10 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
   CHECK_DNNL_OP_PRE_COND(input);
 
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<std::vector<float>> scales;
-    bool quantized;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/false);
-    //quantized = false;
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    bool quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
+    std::vector<std::vector<float>> scales = dbl::comm::get_int8_scales(
+        {input}, /*  uint8_used for output*/ false, num_ops_id);
     if (quantized) {
       dbl::comm::reorder_to_int8_for_mix_prec(input, scales[0]);
     } else {
@@ -1542,7 +1552,8 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d(
   }
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer({input}, {input}, "AdaptiveAvgPool2d");
+    insert_or_updata_observer({input}, {input}, "AdaptiveAvgPool2d",
+                              Int8OptConfig::fetch_and_add_ops_id());
   }
   return dbl::pool::_dil_pooling(
       input,
@@ -1690,10 +1701,10 @@ at::Tensor AtenIpexCPUDev::dil_relu(const at::Tensor& input) {
   DEBUG("AtenIpexCPUDev::dil_relu\n");
   CHECK_DNNL_OP_PRE_COND(input);
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<std::vector<float>> scales;
-    bool quantized;
-    std::tie(scales, quantized)= dbl::comm::get_int8_scales({input}, /*  uint8_used for output*/true);
-    //quantized = false;
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    bool quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
+    std::vector<std::vector<float>> scales = dbl::comm::get_int8_scales(
+        {input}, /*  uint8_used for output*/ true, num_ops_id);
     if (quantized) {
       dbl::comm::reorder_to_int8_for_mix_prec(input, scales[0]);
     } else {
@@ -1709,7 +1720,8 @@ at::Tensor AtenIpexCPUDev::dil_relu(const at::Tensor& input) {
       x, y, dil::algorithm::eltwise_relu, dil::prop_kind::forward_training, /*alpha*/ 0.0);
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer({input}, {input}, "Relu");
+    insert_or_updata_observer({input}, {input}, "Relu",
+                              Int8OptConfig::fetch_and_add_ops_id());
   }
 
   return dbl::comm::gen_aten_tensor_by(std::move(y));
@@ -1720,9 +1732,10 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
   CHECK_DNNL_OP_PRE_COND(input);
 
   if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<std::vector<float>> scales;
-    bool quantized;
-    std::tie(scales, quantized) = dbl::comm::get_int8_scales({input}, /*   uint8_used for output*/true);
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    bool quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
+    std::vector<std::vector<float>> scales = dbl::comm::get_int8_scales(
+        {input}, /*  uint8_used for output*/ true, num_ops_id);
     //quantized = false;
     if (quantized) {
       dbl::comm::reorder_to_int8_for_mix_prec(input, scales[0]);
@@ -1734,7 +1747,8 @@ at::Tensor& AtenIpexCPUDev::dil_relu_(at::Tensor& input) {
   }
 
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
-    insert_or_updata_observer({input}, {input}, "Relu_");
+    insert_or_updata_observer({input}, {input}, "Relu_",
+                              Int8OptConfig::fetch_and_add_ops_id());
   }
 
   auto dil_self = dbl::comm::try_gen_dil_tensor(input);

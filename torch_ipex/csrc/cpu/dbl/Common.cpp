@@ -174,17 +174,25 @@ dil::tensor reorder_dil_tensor_to_dtype(const dil::tensor &dil_tensor, dil::data
   return dst;
 }
 
-std::tuple<std::vector<std::vector<float>>, bool> get_int8_scales(const at::TensorList& inputs, bool uint8_used) {
-  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
-    std::vector<bool> inputs_uint8_used;
-    for (auto i = 0; i < inputs.size(); i++) {
-      auto src_dil_type = try_gen_dil_tensor(inputs[i]).get_data_type();
-      inputs_uint8_used.push_back(src_dil_type == dil::data_type::u8);
-    }
-    return get_indicator_scales(inputs_uint8_used, {uint8_used});
-  } else {
-    return std::make_tuple(std::vector<std::vector<float>>(), false);
+std::vector<std::vector<float>> get_int8_scales(const at::TensorList &inputs,
+                                                bool uint8_used,
+                                                const int64_t ops_id) {
+  IPEX_CHECK(check_auto_mix_int8_fp32(),
+             "Need enable auto mix_int8 _p32 to query int8 scales");
+  IPEX_CHECK(!check_int8_calibration(),
+             "Should query int8 scales after calibration");
+  std::vector<bool> inputs_uint8_used;
+  for (auto i = 0; i < inputs.size(); i++) {
+    auto src_dil_type = try_gen_dil_tensor(inputs[i]).get_data_type();
+    inputs_uint8_used.push_back(src_dil_type == dil::data_type::u8);
   }
+  return get_indicator_scales(inputs_uint8_used, {uint8_used}, ops_id);
+}
+
+bool get_int8_quantized_status(const int64_t ops_id) {
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration())
+    return get_indicator_quantized_status(ops_id);
+  return false;
 }
 
 void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> scales, bool uint8_used) {
