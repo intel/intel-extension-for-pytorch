@@ -198,7 +198,10 @@ void prepack_conv_weights(
   //
   // TODO: once semantics of "own shade context" is equivalent to
   //       "is dil tensor", we could remove the first check below
-  if (!cpu::ShadeDataContext::isPackedTensor(weight)) {
+  // if (!cpu::ShadeDataContext::isPackedTensor(weight)) {
+  if (!check_tensor_own_shade_context(weight) ||
+  !cpu::ShadeDataContext::isDilOwnTheTensor(weight) ||
+  cpu::ShadeDataContext::getDilStorage(weight).is_public_format()) {
     auto dil_weight = dbl::comm::try_gen_dil_tensor(weight);
     auto packed_desc = dil::convolution_forward::expected_weights_desc(
       weight.sizes().vec(),
@@ -213,6 +216,18 @@ void prepack_conv_weights(
       dil_input.get_data_type(),
       input.sizes().vec());
 
+    if (packed_desc.is_default()) {
+      // In some cases of grouped conv, there's no optimized kernel using 
+      // blocked weight. So if queried format is still a public (plain) format,
+      // we should skip the plain-to-plain reorder. (e.g. g8ic32oc80sp7k3)
+      // 
+      // TODO: Now we're deciding whether to prepack weight based on if it's
+      // already been a blocked tensor. But if its optimzal format is not
+      // blocked, we are wasting time to query format on each call because of
+      // pd-creation overhead.
+      return;
+    }
+    
     dil::tensor packed_weight {packed_desc};
     
     if (dil_weight.has_scale()) {

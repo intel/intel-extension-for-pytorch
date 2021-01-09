@@ -1,6 +1,6 @@
 #ifndef DIL_OPERATORS_INNER_PRODUCT_HPP
 #define DIL_OPERATORS_INNER_PRODUCT_HPP
-
+#include "cpu/int8/Config.h"
 namespace dil {
 
 struct inner_product_forward_params {
@@ -93,16 +93,30 @@ private:
       new_dims[0] = src.get_dim(0);
       src_.reshape(new_dims);
     }
-    if (weights.has_inner_product_params() && weights.get_inner_product_params().src_dims == src.get_dims()) {
-      compute_impl_<with_bias>(weights.get_inner_product_params(), src_, weights, bias, dst);
+    auto cache_size = PrimitiveCache::singleton().get_cache_size();
+    auto ops_id = torch_ipex::Int8OptConfig::current_ops_id - 1;
+    if (weights.get_data_type() == data_type::f32){
+      compute_impl_<with_bias>(src_, weights, bias, dst, src_scales, weights_scales, dst_scales,
+      attr, aprop_kind,alowp_kind, aengine);
+      return;
+    }
+    if (PrimitiveCache::singleton().hit(ops_id)){
+      auto thread_id = std::this_thread::get_id();
+      //cache hit
+      inner_product_params p = *PrimitiveCache::singleton().get_params(ops_id);
+      compute_impl_<with_bias>(p, src_, weights, bias, dst);
     } else {
+      //cache miss
+      auto thread_id = std::this_thread::get_id();
       inner_product_forward_params params;
       do_prepare<with_bias>(params, src_, weights, bias, dst, src_scales,
                              weights_scales, dst_scales, attr, aprop_kind,
                              alowp_kind, aengine);
-      weights.init_inner_product_params(params.pd, super(params.pd), params.attr,
-          params.src_attr, params.weights_attr, params.bias_attr, params.dst_scales, src.get_dims());
-      compute_impl_<with_bias>(params, src_, weights, bias, dst); 
+      std::shared_ptr<inner_product_params> p = std::make_shared<inner_product_params>(params.pd,
+                                super(params.pd), params.attr,params.src_attr, params.weights_attr, params.bias_attr, 
+                                params.dst_scales, src.get_dims());
+      PrimitiveCache::singleton().insert_params(ops_id, p);
+      compute_impl_<with_bias>(params, src_, weights, bias, dst);
     }
   }
 

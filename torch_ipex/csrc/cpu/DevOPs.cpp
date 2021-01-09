@@ -1069,15 +1069,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
     b = dbl::comm::try_gen_dil_tensor(bias);
   }
 
-  bool weight_updata = w.has_inner_product_params();
   dil::tensor y = dbl::linear::linear_impl(x, w, b, output_scale, attr);
-
-  if (!weight_updata && w.has_inner_product_params()) {
-    auto params = w.get_inner_product_params();
-    auto expected_weights = w.reorder_if_differ_in(params.pd.weights_desc(), params.weights_attr);
-    expected_weights.copy_inner_product_params(w);
-    dbl::comm::equip_dil_buffer(weight, expected_weights);
-  }
 
   if (self.dim() > 2) {
     auto input_size = self.sizes();

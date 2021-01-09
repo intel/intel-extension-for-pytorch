@@ -38,6 +38,7 @@
 
 #include "dil/abstract_types.hpp"
 #include "dil/tensor.hpp"
+#include "cpu/dil/dil/primitive_cache.hpp"
 #include "dil/computations.hpp"
 
 #endif

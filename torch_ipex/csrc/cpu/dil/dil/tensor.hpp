@@ -18,19 +18,6 @@ struct convolution_params {
     scale_t d, int g, dims d_dims): pd(p), prim(pri), bias_attr(b), dst_scales(d), groups(g), dst_dims(d_dims) {}
 };
 
-struct inner_product_params {
-  dnnl::inner_product_forward::primitive_desc pd;
-  dnnl::inner_product_forward prim;
-  attr_t attr;
-  attr_t src_attr;
-  attr_t weights_attr;
-  attr_t bias_attr;
-  scale_t dst_scales;
-  dims src_dims;
-  inner_product_params( dnnl::inner_product_forward::primitive_desc p,  dnnl::inner_product_forward pri,
-    attr_t op_a, attr_t src_a, attr_t weight_a, attr_t b_a, scale_t d, dims s_dims): pd(p), prim(pri), attr(op_a),
-    src_attr(src_a), weights_attr(weight_a), bias_attr(b_a), dst_scales(d), src_dims(s_dims) {}
-};
 
 class tensor : public memory {
  public:
@@ -680,7 +667,6 @@ class tensor : public memory {
         zero_point_(t.zero_point_),
         buffer_(t.buffer_),
         conv_params_(t.conv_params_),
-        inner_product_params_(t.inner_product_params_),
         eng_(t.eng_) {}
 
   /// Move constructor
@@ -691,7 +677,6 @@ class tensor : public memory {
         zero_point_(std::move(t.zero_point_)),
         buffer_(std::move(t.buffer_)),
         conv_params_(std::move(t.conv_params_)),
-        inner_product_params_(std::move(t.inner_product_params_)),
         eng_(std::move(t.eng_)) {}
 
   /// Assignment operator
@@ -702,7 +687,6 @@ class tensor : public memory {
     zero_point_ = t.zero_point_;
     workspace_ = t.workspace_;
     conv_params_ = t.conv_params_;
-    inner_product_params_ = t.inner_product_params_;
     eng_ = t.eng_;
     return *this;
   }
@@ -715,7 +699,6 @@ class tensor : public memory {
     zero_point_ = std::move(t.zero_point_);
     workspace_ = std::move(t.workspace_);
     conv_params_ = std::move(t.conv_params_);
-    inner_product_params_ = std::move(t.inner_product_params_);
     eng_ = std::move(t.eng_);
     return *this;
   }
@@ -836,6 +819,7 @@ class tensor : public memory {
     //   already grouped, deconv weight: g, i/g, o, ... -> g, o, i/g, ...
     //   no grouped,      deconv weight: i, o, ...      -> g, o, i/g, ...
 
+    auto desc = get_desc();
     if (groups <= 1) {
       if (is_deconv) {
         auto transposed_desc = get_desc().transpose(0, 1);
@@ -1060,15 +1044,6 @@ class tensor : public memory {
   bool has_conv_params() const {return conv_params_ != nullptr; }
   void copy_conv_params(const tensor& other) { conv_params_ = other.conv_params_;  }
 
-  void init_inner_product_params(dnnl::inner_product_forward::primitive_desc pd, dnnl::inner_product_forward prim,
-    attr_t attr, attr_t src_attr, attr_t weights_attr, attr_t bias_attr, scale_t dst_scales, dims src_dims) {
-    auto params = new inner_product_params(pd, prim, attr, src_attr, weights_attr, bias_attr, dst_scales, src_dims);
-    inner_product_params_.reset(params);
-  }
-  inner_product_params &get_inner_product_params() const {return *inner_product_params_; }
-  bool has_inner_product_params() const {return inner_product_params_ != nullptr; }
-  void copy_inner_product_params(const tensor& other) { inner_product_params_ = other.inner_product_params_;  }
-
   /// Return the scale of this param.
   const scale_t &get_scale() const { return *scale_.get(); }
 
@@ -1175,14 +1150,12 @@ class tensor : public memory {
     auto scale = std::move(scale_);
     auto zp = std::move(zero_point_);
     auto params1 = std::move(conv_params_);
-    auto params2 = std::move(inner_product_params_);
     init(new_desc, get_data_handle(), get_engine());
     buffer_ = std::move(buf);
     workspace_ = std::move(ws);
     scale_ = std::move(scale);
     zero_point_ = std::move(zp);
     conv_params_ = std::move(params1);
-    inner_product_params_ = std::move(params2);
     return *this;
   }
 
@@ -1191,7 +1164,6 @@ class tensor : public memory {
   std::shared_ptr<std::vector<int32_t>> zero_point_;
   std::shared_ptr<void> buffer_;
   std::shared_ptr<convolution_params> conv_params_;
-  std::shared_ptr<inner_product_params> inner_product_params_;
   engine eng_;
 };
 

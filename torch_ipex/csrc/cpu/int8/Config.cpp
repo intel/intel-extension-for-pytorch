@@ -155,9 +155,9 @@ std::vector<Indicator> Int8OptConfig::get_indicators() { return indicators_; }
 void Int8OptConfig::calibration_reset() { current_ops_id = 0; }
 
 int64_t Int8OptConfig::fetch_and_add_ops_id() {
-  int64_t ops_id = current_ops_id++;
-  if (current_ops_id == std::max(observers_.size(), indicators_.size()))
+  if (current_ops_id == indicators_.size())
     current_ops_id = 0;
+  int64_t ops_id = current_ops_id++;
   return ops_id;
 }
 
