@@ -77,7 +77,7 @@ class LinearSigmoid(Module):
             init.uniform_(self.bias, -bound, bound)
 
     def forward(self, input):
-        return torch_ipex.linear_sigmoid(input, self.weight, self.bias)
+        return _C.linear_sigmoid(input, self.weight, self.bias)
 
     def extra_repr(self):
         return 'in_features={}, out_features={}, bias={}'.format(
