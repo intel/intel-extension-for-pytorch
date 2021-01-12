@@ -288,14 +288,10 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   if (non_blocking) {
     // here do the dpcpp copy synchronisation.
     // we use a very simple version for the singleton sycl queue.
-    // TODO: enhance this for the multi-queue.
+    // TODO: enhance the full functionality in multi-queue scenario.
     dpcppMemcpyAsync(dst, src, nbytes, kind);
   } else {
     dpcppMemcpy(dst, src, nbytes, kind);
-    // FIXME: Without queue wait, resource exhaustion occurs due to never release kernel events.
-    // Need to confirm with compiler team the root cause here.
-    auto& queue = getCurrentDPCPPStream().dpcpp_queue();
-    queue.wait();
   }
 }
 
