@@ -23,6 +23,19 @@ static bool is_supported_onednn_dtype(const at::Tensor& tensor) {
    };
 }
 
+static bool is_supported_dtype_in_binary(ScalarType t) {
+   switch (t) {
+   case at::ScalarType::Byte:
+   case at::ScalarType::Char:
+   case at::ScalarType::Half:
+   case at::ScalarType::Float:
+   case at::ScalarType::BFloat16:
+     return true;
+   default:
+     return false;
+   };
+}
+
 static inline memory::data_type
 get_onednn_dtype(const at::Tensor& tensor) {
   switch (tensor.scalar_type()) {
