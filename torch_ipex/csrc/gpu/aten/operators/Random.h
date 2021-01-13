@@ -91,6 +91,15 @@ public:
     return static_cast<T>(ret);
   }
 
+  template <typename T>
+  T random(){
+    if(std::is_same<T, uint64_t>::value) {
+      return make64BitsFrom32Bits(engine(), engine());
+    } else {
+      return engine();
+    }
+  }
+
 private:
 
   engine_t engine;
