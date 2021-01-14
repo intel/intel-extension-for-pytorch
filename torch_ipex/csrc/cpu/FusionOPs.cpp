@@ -111,9 +111,6 @@ at::Tensor dil_convolution_outplace_fusion(
     output_scale);
 
   if (!weight_updata && dil_weight.has_conv_params()) {
-    auto params = dil_weight.get_conv_params();
-    auto expexted_input = dil_input.reorder_if_differ_in(params.pd.src_desc());
-    dbl::comm::equip_dil_buffer(input, expexted_input);
     dbl::comm::equip_dil_buffer(weight_contiguous, dil_weight);
   }
 
