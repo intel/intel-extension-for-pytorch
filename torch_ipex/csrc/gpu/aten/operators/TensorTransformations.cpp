@@ -87,7 +87,7 @@ void flip_dpcpp_kernel(
       out_tensor_ptr[linear_index] = in_tensor_ptr[dst_offset];
     };
     cgh.parallel_for<flip_dpcpp_ker<scalar_t>>(
-        DPCPP::range<1>(tileSize), kfn);
+        DPCPP::nd_range<1>(GRange, tileSize), kfn);
   };
 
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
