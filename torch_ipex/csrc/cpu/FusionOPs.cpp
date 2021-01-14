@@ -110,7 +110,7 @@ at::Tensor dil_convolution_outplace_fusion(
     op_attr,
     output_scale);
 
-  if (!weight_updata && dil_weight.has_conv_params()) {
+  if (dil_input.get_desc().is_nhwc() && !weight_updata && dil_weight.has_conv_params()) {
     dbl::comm::equip_dil_buffer(weight_contiguous, dil_weight);
   }
 
