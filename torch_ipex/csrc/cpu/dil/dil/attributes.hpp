@@ -148,6 +148,47 @@ struct attr_t : public dnnl::primitive_attr {
 
     return true;
   }
+
+  void to_bytes(utils::bytestring& bytes) const {
+    // encode post ops
+    auto num_ops = get_post_ops().len();
+    for (int i = 0; i < num_ops; i ++) {
+      kind akind;
+      algorithm alg;
+      float scale = 1.0, alpha = 1.0, beta = 0.0;
+      std::tie(akind, scale, alpha, beta, alg) = get_params(i);
+
+      switch(akind) {
+        case kind::sum:
+          utils::to_bytes(bytes, akind);
+          bytes.append(1, '.');
+          utils::to_bytes(bytes, scale);
+          break;
+        case kind::eltwise:
+          utils::to_bytes(bytes, akind);
+          bytes.append(1, '.');
+          utils::to_bytes(bytes, scale);
+          bytes.append(1, '.');
+          utils::to_bytes(bytes, alpha);
+          bytes.append(1, '.');
+          utils::to_bytes(bytes, beta);
+          bytes.append(1, '.');
+          utils::to_bytes(bytes, alg);
+        default:
+          break;
+      }
+    }
+
+    // encode output scales
+    auto scales = get_output_scales();
+    utils::to_bytes(bytes, scales.first);
+    utils::to_bytes(bytes, scales.second);
+
+    // Note: depthwise/binary post op, zero points, scales, rnn params are
+    // not encoded so far. PD cache is supposed to use in convolution only
+    // as a temporary workaround for gemm-based conv pd overhead
+  }
+
 };
 
 }  // namespace dil

@@ -150,6 +150,103 @@ inline std::pair<std::vector<float>, std::vector<float>> compute_scales(
   return std::make_pair(std::move(bias_scales), std::move(op_scales));
 }
 
+using bytestring = std::string;
+
+/* Definitions for builtins unavailable on MSVC */
+// see https://github.com/llvm/llvm-project/blob/master/compiler-rt/lib/builtins/int_lib.h
+#if defined(_MSC_VER) && !defined(__clang__)
+#include <intrin.h>
+uint32_t __inline clz(uint32_t x) {
+  unsigned long leading_zero = 0;
+  if (_BitScanReverse(&leading_zero, x))
+    return 31 - leading_zero;
+  return 32;
+}
+#else
+uint32_t __inline clz(uint32_t x) {
+  return __builtin_clz(x);
+}
+#endif
+
+inline void to_bytes(bytestring& bytes, const int arg) {
+  auto as_cstring = reinterpret_cast<const char*>(&arg);
+  if (arg == 0) return;
+  auto len = sizeof(arg) - (clz(arg) / 8);
+  bytes.append(as_cstring, len);
+}
+
+inline void to_bytes(bytestring& bytes, const bool arg) {
+  to_bytes(bytes, arg ? 1 : 0);
+  bytes.append(1, 'b');
+}
+
+inline void to_bytes(bytestring& bytes, const float arg) {
+  auto as_cstring = reinterpret_cast<const char*>(&arg);
+  bytes.append(as_cstring, sizeof(float));
+}
+
+inline void to_bytes(bytestring& bytes, const uint64_t arg) {
+  auto as_cstring = reinterpret_cast<const char*>(&arg);
+  bytes.append(as_cstring, sizeof(uint64_t));
+}
+
+inline void to_bytes(bytestring& bytes, const int64_t arg) {
+  auto as_cstring = reinterpret_cast<const char*>(&arg);
+  bytes.append(as_cstring, sizeof(int64_t));
+}
+
+template <typename T>
+inline void to_bytes(bytestring& bytes, std::vector<T>& arg) {
+  if (arg.size() > 0) {
+    for (T elems : arg) {
+      to_bytes(bytes, elems);
+      bytes.append(1, 'v');
+    }
+    bytes.pop_back();
+  } else {
+    bytes.append(1, 'v');
+  }
+}
+
+template <typename T>
+inline void to_bytes(bytestring& bytes, const std::vector<T>& arg) {
+  // remove constness, then jumps to `to_bytes(bytestring&, vector<T>&)`
+  to_bytes(bytes, const_cast<std::vector<T>&>(arg));
+}
+
+template <typename T>
+inline void to_bytes(bytestring& bytes, std::vector<T>&& arg) {
+  // `arg` is an lval ref now, then jumps to `to_bytes(bytestring&, vector<T>&)`
+  to_bytes(bytes, arg);
+}
+
+template <typename T,
+          typename = typename std::enable_if<std::is_enum<T>::value>::type>
+inline void to_bytes(bytestring& bytes, T arg) {
+  to_bytes(bytes, static_cast<int>(arg));
+}
+
+template <typename T,
+          typename = typename std::enable_if<std::is_class<T>::value>::type,
+          typename = void>
+inline void to_bytes(bytestring& bytes, const T arg) {
+  arg.to_bytes(bytes);
+}
+
+template <typename T, typename ...Ts>
+inline void to_bytes(bytestring& bytes, T&& arg, Ts&&... args) {
+  to_bytes(bytes, std::forward<T>(arg));
+  bytes.append(1, '*');
+  to_bytes(bytes, std::forward<Ts>(args)...);
+}
+
+template <typename ...Ts>
+inline key_t create_key(Ts&&... args) {
+  key_t k;
+  to_bytes(k, std::forward<Ts>(args)...);
+  return k;
+}
+
 /** sorts an array of values using @p comparator. While sorting the array
  * of value, the function permutes an array of @p keys accordingly.
  *

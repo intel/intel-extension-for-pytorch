@@ -249,6 +249,41 @@ class tensor : public memory {
     desc(const dims &adims, data_type adata_type, const dims &astrides)
         : memory::desc(adims, adata_type, astrides) { set_g(1); }
 
+
+     format_kind_t format_kind() const { return get_const_desc().format_kind(); }
+     dim_t offset0() const { return get_const_desc().offset0(); }
+     const dims_t &padded_dims() const { return get_const_desc().padded_dims(); }
+     const dims_t &padded_offsets() const { return get_const_desc().padded_offsets(); }
+     bool is_blocking_desc() const { return get_const_desc().is_blocking_desc(); }
+     dims_t& blocking_strides() const { return get_const_desc().blocking_strides(); }
+
+     void to_bytes(utils::bytestring& bytes) const {
+      utils::to_bytes(bytes, get_data_type());
+      utils::to_bytes(bytes, format_kind());
+      utils::to_bytes(bytes, offset0());
+
+      auto& paddim = padded_dims();
+      auto& padoff = padded_offsets();
+
+      for (int i = 0; i < data.ndims; i++) {
+        utils::to_bytes(bytes, data.dims[i]);
+        utils::to_bytes(bytes, paddim[i]);
+        utils::to_bytes(bytes, padoff[i]);
+      }
+
+      if (is_blocking_desc()) {
+        auto& blk = blocking_desc();
+        auto& stride = blocking_strides();
+        for (int i = 0; i < data.ndims; i++) {
+          utils::to_bytes(bytes, stride[i]);
+        }
+        for (int i = 0; i < blk.inner_nblks; i++) {
+          utils::to_bytes(bytes, blk.inner_idxs[i]);
+          utils::to_bytes(bytes, blk.inner_blks[i]);
+        }
+      }
+    }
+
     /// public ndims
     int get_ndims() const { return get_const_desc().get_ndims(); }
 

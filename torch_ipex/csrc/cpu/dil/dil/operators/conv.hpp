@@ -12,7 +12,8 @@ struct convolution_forward_params {
   tensor scratchpad;
 };
 
-struct convolution_forward : public dnnl::convolution_forward {
+struct convolution_forward
+    : public dnnl::convolution_forward, utils::computation_cache<dnnl::convolution_forward::primitive_desc> {
 
   using super = dnnl::convolution_forward;
 
@@ -250,6 +251,10 @@ struct convolution_forward : public dnnl::convolution_forward {
     auto bias_desc_any = with_bias ? bias_desc.to_format_any() : tensor::desc();
     auto dst_desc_any = dst_desc.to_format_any();
 
+    auto key = utils::create_key(aprop_kind, aalgorithm, src_desc_any,
+                                 weights_desc_any, with_bias, strides,
+                                 dilates, padding_l, padding_r, attr);
+    return fetch_or_create(key, [&]() {
     if (with_bias) {
       return primitive_desc({aprop_kind, aalgorithm, src_desc_any,
                              weights_desc_any, bias_desc_any, dst_desc_any,
@@ -261,6 +266,7 @@ struct convolution_forward : public dnnl::convolution_forward {
                              strides, dilates, padding_l, padding_r},
                             attr, aengine);
     }
+    });
   }
 
 private:
