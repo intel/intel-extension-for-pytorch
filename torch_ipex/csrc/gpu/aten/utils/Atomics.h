@@ -44,21 +44,21 @@ static inline DPCPP_DEVICE void atomicAdd(
     at::Half val) {
   unsigned int* address_as_ui =
       (unsigned int*)((char*)address - ((size_t)address & 2));
-  unsigned int old = *address_as_ui;
-  unsigned int assumed;
+  unsigned int assumed = *address_as_ui;
+  unsigned int newval;
 
   dpcpp_multi_ptr<unsigned int, dpcpp_global_space> address_multi_ptr(
       address_as_ui);
   DPCPP::atomic<unsigned int> address_var(address_multi_ptr);
 
   do {
-    assumed = old;
+    newval = assumed;
     at::Half hsum;
-    hsum.x = (size_t)address & 2 ? (old >> 16) : (old & 0xffff);
+    hsum.x = (size_t)address & 2 ? (newval >> 16) : (newval & 0xffff);
     hsum = Numerics<at::Half>::add(hsum, val);
-    old = (size_t)address & 2 ? (old & 0xffff) | (hsum.x << 16)
-                              : (old & 0xffff0000) | hsum.x;
-  } while (!address_var.compare_exchange_strong(old, assumed));
+    newval = (size_t)address & 2 ? (newval & 0xffff) | (hsum.x << 16)
+                              : (newval & 0xffff0000) | hsum.x;
+  } while (!address_var.compare_exchange_strong(assumed, newval));
 }
 
 static inline DPCPP_DEVICE void atomicAdd(
@@ -66,21 +66,21 @@ static inline DPCPP_DEVICE void atomicAdd(
     at::BFloat16 val) {
   unsigned int* address_as_ui =
       (unsigned int*)((char*)address - ((size_t)address & 2));
-  unsigned int old = *address_as_ui;
-  unsigned int assumed;
+  unsigned int assumed = *address_as_ui;
+  unsigned int newval;
 
   dpcpp_multi_ptr<unsigned int, dpcpp_global_space> address_multi_ptr(
       address_as_ui);
   DPCPP::atomic<unsigned int> address_var(address_multi_ptr);
 
   do {
-    assumed = old;
+    newval = assumed;
     at::BFloat16 hsum;
-    hsum.x = (size_t)address & 2 ? (old >> 16) : (old & 0xffff);
+    hsum.x = (size_t)address & 2 ? (newval >> 16) : (newval & 0xffff);
     hsum = Numerics<at::BFloat16>::add(hsum, val);
-    old = (size_t)address & 2 ? (old & 0xffff) | (hsum.x << 16)
-                              : (old & 0xffff0000) | hsum.x;
-  } while (!address_var.compare_exchange_strong(old, assumed));
+    newval = (size_t)address & 2 ? (newval & 0xffff) | (hsum.x << 16)
+                              : (newval & 0xffff0000) | hsum.x;
+  } while (!address_var.compare_exchange_strong(assumed, newval));
 }
 
 static inline DPCPP_DEVICE void atomicAdd(

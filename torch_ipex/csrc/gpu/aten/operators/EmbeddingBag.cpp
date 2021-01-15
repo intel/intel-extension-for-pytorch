@@ -419,7 +419,7 @@ Tensor embedding_bag_backward_dpcpp_kernel(
         // should match `acc_type`
         using partial_weight_t = acc_type<scalar_t>;
         TensorOptions op;
-        if (grad.dtype() == at::kHalf) {
+        if (grad.dtype() == at::kBFloat16) {
           op = grad.options().dtype(at::kFloat);
         } else {
           op = grad.options();
@@ -799,7 +799,7 @@ Tensor embedding_bag_backward_dpcpp_kernel(
     "embedding_bag_backward_dpcpp_compute_grad_weight",
     [&] {
       TensorOptions op;
-      if (grad.dtype() == at::kHalf) {
+      if (grad.dtype() == at::kBFloat16) {
         op = grad.options().dtype(at::kFloat);
       } else {
         op = grad.options();
