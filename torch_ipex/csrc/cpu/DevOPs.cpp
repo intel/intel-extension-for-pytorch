@@ -1039,7 +1039,7 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   // reshape first if input dim is greater than 2 and the reshape will cost a memory copy.
   auto self_reshaped = self.dim() > 2 ? dil_reshape(self, {-1, dil_size(self, self.dim() - 1)}) : self;
   const dil::tensor x = dbl::comm::try_gen_dil_tensor(self_reshaped);
-  if (!check_train()) {
+  if (!check_train() && check_tensor_own_whole_storage(weight)) {
     dbl::linear::prepack_linear_weights(self_reshaped, x, weight);
   }
   const dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
@@ -2372,7 +2372,7 @@ at::Tensor AtenIpexCPUDev::dil_gelu(const at::Tensor& input) {
   dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
   dil::tensor y;
   dil::eltwise_forward::compute(
-      x, y, dil::algorithm::eltwise_gelu_tanh, dil::prop_kind::forward_training, /*alpha*/ 0.0);
+      x, y, dil::algorithm::eltwise_gelu_erf, dil::prop_kind::forward_training, /*alpha*/ 0.0);
   return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
@@ -2390,7 +2390,7 @@ at::Tensor AtenIpexCPUDev::dil_gelu_backward(const at::Tensor& grad_output, cons
   dil::tensor grady = dbl::comm::try_gen_dil_tensor(grad_output_contiguous);
   dil::tensor gradx;
   dil::eltwise_backward::compute(x, grady, gradx,
-      dil::algorithm::eltwise_gelu_tanh, /*alpha*/ 0.0);
+      dil::algorithm::eltwise_gelu_erf, /*alpha*/ 0.0);
   return dbl::comm::gen_aten_tensor_by(std::move(gradx));
 }
 
