@@ -18,15 +18,15 @@ namespace dpcpp {
 namespace detail {
 
 #ifdef USE_USM
-void DPCPPHooks::initXPU() const {
+void XPUHooks::initXPU() const {
   // TODO:
 }
 
-bool DPCPPHooks::hasXPU() const {
+bool XPUHooks::hasXPU() const {
   return true;
 }
 
-bool DPCPPHooks::hasOneMKL() const {
+bool XPUHooks::hasOneMKL() const {
 #ifdef USE_ONEMKL
   return true;
 #else
@@ -34,44 +34,44 @@ bool DPCPPHooks::hasOneMKL() const {
 #endif
 }
 
-bool DPCPPHooks::hasOneDNN() const {
+bool XPUHooks::hasOneDNN() const {
   return true;
 }
 
-std::string DPCPPHooks::showConfig() const {
+std::string XPUHooks::showConfig() const {
   return "DPCPP backend version: 1.0";
 }
 
-int64_t DPCPPHooks::getCurrentDevice() const {
+int64_t XPUHooks::getCurrentDevice() const {
   c10::DeviceIndex device_index;
   dpcppGetDevice(&device_index);
   return device_index;
 }
 
-int DPCPPHooks::getDeviceCount() const {
+int XPUHooks::getDeviceCount() const {
   int count;
   dpcppGetDeviceCount(&count);
   return count;
 }
 
-at::Device DPCPPHooks::getDeviceFromPtr(void* data) const {
+at::Device XPUHooks::getDeviceFromPtr(void* data) const {
   return getDeviceFromPtr(data);
 }
 
-bool DPCPPHooks::isPinnedPtr(void* data) const {
+bool XPUHooks::isPinnedPtr(void* data) const {
   return dpcpp_isAllocatedByCachingHostAllocator(data);
 }
 
-at::Allocator* DPCPPHooks::getPinnedMemoryAllocator() const {
+at::Allocator* XPUHooks::getPinnedMemoryAllocator() const {
   return dpcpp_getCachingHostAllocator();
 }
 
 const Generator&
-DPCPPHooks::getDefaultXPUGenerator(DeviceIndex device_index) const {
+XPUHooks::getDefaultXPUGenerator(DeviceIndex device_index) const {
   return at::dpcpp::detail::getDefaultDPCPPGenerator(device_index);
 }
 
-REGISTER_XPU_HOOKS(DPCPPHooks);
+REGISTER_XPU_HOOKS(XPUHooks);
 #endif
 
 } // detail

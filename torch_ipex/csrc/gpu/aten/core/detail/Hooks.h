@@ -7,9 +7,9 @@
 
 namespace at { namespace dpcpp { namespace detail {
 
-// The real implementation of DPCPPHooksInterface
-struct DPCPPHooks : public at::XPUHooksInterface {
-  DPCPPHooks(at::XPUHooksArgs) {}
+// The real implementation of XPUHooksInterface
+struct XPUHooks : public at::XPUHooksInterface {
+  XPUHooks(at::XPUHooksArgs) {}
   void initXPU() const override;
   bool hasXPU() const override;
   bool hasOneMKL() const override;

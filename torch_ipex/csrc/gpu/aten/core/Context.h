@@ -14,7 +14,7 @@ namespace dpcpp {
 /*
  * A common DPCPP interface for ATen.
  *
- * This interface is distinct from DPCPPHooks, which defines an interface that
+ * This interface is distinct from XPUHooks, which defines an interface that
  * links
  * to both CPU-only and DPCPP builds. That interface is intended for runtime
  * dispatch and should be used from files that are included in both CPU-only and
@@ -25,10 +25,10 @@ namespace dpcpp {
  * DPCPP builds. It is intended to expose DPCPP functionality in a consistent
  * manner.
  *
- * This means there is some overlap between the DPCPPContext and DPCPPHooks, but
+ * This means there is some overlap between the DPCPPContext and XPUHooks, but
  * the choice of which to use is simple: use DPCPPContext when in a DPCPP-only
  * file,
- * use DPCPPHooks otherwise.
+ * use XPUHooks otherwise.
  *
  * Note that DPCPPContext simply defines an interface with no associated class.
  * It is expected that the modules whose functions compose this interface will
