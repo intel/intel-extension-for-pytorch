@@ -29,11 +29,14 @@ using namespace dnnl;
       IPEX_TIMER(t, verbose, __func__);                                       \
       auto e = dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__);  \
       t.now("oneDNN execute in sycl_interop");                                \
+      dnnl::sycl_interop::get_queue((stream)).throw_asynchronous();           \
+      t.now("oneDNN throw asynchronous");                                     \
       DPCPP_ONEDNN_FORCE_SYNC(stream);                                        \
       t.now("oneDNN stream wait");                                            \
       dpcpp_log("onednn_kernel", e);                                          \
     } else {                                                                  \
       auto e = dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__);  \
+      dnnl::sycl_interop::get_queue((stream)).throw_asynchronous();           \
       dpcpp_log("onednn_kernel", e);                                          \
       DPCPP_ONEDNN_FORCE_SYNC(stream);                                        \
     }                                                                         \

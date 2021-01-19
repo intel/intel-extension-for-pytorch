@@ -56,11 +56,14 @@ namespace DPCPP = cl::sycl;
             IPEX_TIMER(t, verbose, __func__);           \
             auto e = (q).submit((cgf), ##__VA_ARGS__);  \
             t.now("submit");                            \
+            (q).throw_asynchronous();                   \
+            t.now("DPCPP throw asynchronous");          \
             DPCPP_Q_FORCE_SYNC(q);                      \
             t.now("queue wait");                        \
             dpcpp_log("dpcpp_kernel", e);               \
         } else {                                        \
             auto e = (q).submit((cgf), ##__VA_ARGS__);  \
+            (q).throw_asynchronous();                   \
             dpcpp_log("dpcpp_kernel", e);               \
             DPCPP_Q_FORCE_SYNC(q);                      \
         }                                               \

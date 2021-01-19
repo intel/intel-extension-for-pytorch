@@ -150,5 +150,6 @@ static DPCPP::async_handler dpcppAsyncHandler = [](DPCPP::exception_list eL) {
     AT_DPCPP_CATCH_RETHROW(__FILE__, __LINE__)
   }
 };
+
 } // namespace dpcpp
 } // namespace at
