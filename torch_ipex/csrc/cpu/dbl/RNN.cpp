@@ -5,8 +5,9 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/TensorUtils.h>
 #include <c10/util/Exception.h>
-#include "RNN.h"
+#include <ATen/core/grad_mode.h>
 
+#include "RNN.h"
 #include "Common.h"
 #include "cpu/ShadeDataContext.h"
 
@@ -117,6 +118,17 @@ std::vector<int64_t> _output_size(const RNNParams& rnn) {
 //                           +---------+
 //
 at::Tensor _shuffle_weight(const at::Tensor& weight, int64_t fn_mode) {
+  // TODO contiguous
+  // for lstm prepacked weight, should not do contiguous here
+  // TODO: use a function to check if the tensor is prepacked or not
+  if (static_cast<dil::rnn_kind>(fn_mode) == dil::rnn_kind::LSTM && \
+   cpu::ShadeDataContext::isDilTensor(weight)) {
+    auto dil_weight = dbl::comm::try_gen_dil_tensor(weight);
+    if (dil_weight.ndims() == 5) {
+      return weight;
+    }
+  }
+
   auto weight_t = weight.contiguous();
   if (static_cast<dil::rnn_kind>(fn_mode) == dil::rnn_kind::GRU) {
     std::vector<at::Tensor> gates = weight_t.chunk(3, /*gates*/0);
@@ -133,6 +145,56 @@ at::Tensor _shuffle_bias(const at::Tensor& bias_ih, const at::Tensor& bias_hh, i
   }
   return bias_ih + bias_hh;
 };
+
+void prepack_lstm_weights(
+  const at::Tensor& weight_ih, 
+  const at::Tensor& weight_hh,
+  int64_t input_size,
+  int64_t num_gates,
+  int64_t hidden_size,
+  const dil::dims& output_sizes,
+  const dil::tensor& src_layer,
+  const dil::tensor& src_iter,
+  const dil::tensor& src_iter_c,
+  const dil::tensor& bias,
+  const bool reverse = false,
+  dil::prop_kind aprop = dil::prop_kind::forward,
+  const dil::engine& aengine = dil::engine::cpu_engine()) {
+    // TODO: use a function to check if the tensor is prepacked or not
+    if (cpu::ShadeDataContext::isDilTensor(weight_ih) 
+        && cpu::ShadeDataContext::isDilTensor(weight_hh)) {
+      auto dil_weight = dbl::comm::try_gen_dil_tensor(weight_ih);
+      if (dil_weight.ndims() == 5) {
+        return;
+      }
+    }
+
+    auto w1 = dbl::comm::try_gen_dil_tensor(weight_ih, {1, 1, input_size, num_gates, hidden_size}, dil::format_tag::ldgoi);
+    auto w2 = dbl::comm::try_gen_dil_tensor(weight_hh, {1, 1, hidden_size, num_gates, hidden_size}, dil::format_tag::ldgoi);
+ 
+
+    dil::tensor::desc expected_weights_layer_desc, expected_weights_iter_desc;
+    std::tie(expected_weights_layer_desc, expected_weights_iter_desc) = dil::lstm_forward::expected_weights_desc(
+                      output_sizes,
+                      src_layer,
+                      src_iter,
+                      src_iter_c,
+                      w1,
+                      w2,
+                      bias,
+                      reverse,
+                      aprop, 
+                      aengine);
+
+    dil::tensor expected_weight_ih {expected_weights_layer_desc};
+    dil::tensor expected_weight_hh {expected_weights_iter_desc};
+
+    expected_weight_ih.feed_from(w1);
+    expected_weight_hh.feed_from(w2);
+
+    dbl::comm::equip_dil_buffer(weight_ih, expected_weight_ih);
+    dbl::comm::equip_dil_buffer(weight_hh, expected_weight_hh);
+  }
 
 std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tensor& weight1, const at::Tensor& weight2,
     const at::Tensor& weight3, const at::Tensor& weight4, const at::Tensor& hx_, const at::Tensor& cx_tmp, bool reverse, int64_t mode,
@@ -166,21 +228,48 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
   auto x = dbl::comm::try_gen_dil_tensor(input, {rnn.seq_length, rnn.mini_batch, input_size}, dil::format_tag::tnc);
   auto hx = dbl::comm::try_gen_dil_tensor(hx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
 
-  auto w1 = dbl::comm::try_gen_dil_tensor(weight_ih, {1, 1, input_size, rnn.num_gates, rnn.hidden_size}, dil::format_tag::ldgoi);
-  auto w2 = dbl::comm::try_gen_dil_tensor(weight_hh, {1, 1, rnn.hidden_size, rnn.num_gates, rnn.hidden_size}, dil::format_tag::ldgoi);
-
+  auto cx = dbl::comm::try_gen_dil_tensor(cx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
   auto b = dbl::comm::try_gen_dil_tensor(bias, {1, 1, rnn.num_bias_gates, rnn.hidden_size}, dil::format_tag::ldgo);
-
-  dil::tensor y, hy;
   dil::prop_kind aprop_kind = dil::prop_kind::forward;
+
+  // TODO: fp32 training not ok
+  auto _rnn_kind = static_cast<dil::rnn_kind>(rnn.mode);
+
   auto src_type = x.get_data_type();
-  if (dil::data_type::s8 == src_type || dil::data_type::u8 == src_type) {
+  if (src_type == dil::data_type::s8 ||src_type ==  dil::data_type::u8) {
     aprop_kind = dil::prop_kind::forward_inference;
   }
-  auto _rnn_kind = static_cast<dil::rnn_kind>(rnn.mode);
+
+  dil::tensor w1, w2;
+
+  if (_rnn_kind == dil::rnn_kind::LSTM && \
+    ((!check_auto_mix_bf16_fp32() && !weight_ih.requires_grad() && !weight_hh.requires_grad()) || (check_auto_mix_bf16_fp32() && !check_train()))) {
+    prepack_lstm_weights(
+      weight_ih,
+      weight_hh,
+      input_size,
+      rnn.num_gates,
+      rnn.hidden_size,
+      {output_size.cbegin(), output_size.cend()}, 
+      x,
+      hx,
+      cx,
+      b,
+      reverse,
+      aprop_kind
+    );
+    w1 = dbl::comm::try_gen_dil_tensor(weight_ih);
+    w2 = dbl::comm::try_gen_dil_tensor(weight_hh);
+  } else {
+    w1 = dbl::comm::try_gen_dil_tensor(weight_ih, {1, 1, input_size, rnn.num_gates, rnn.hidden_size}, dil::format_tag::ldgoi);
+    w2 = dbl::comm::try_gen_dil_tensor(weight_hh, {1, 1, rnn.hidden_size, rnn.num_gates, rnn.hidden_size}, dil::format_tag::ldgoi);
+  }
+
+
+  dil::tensor y, hy;
+
   if (_rnn_kind == dil::rnn_kind::LSTM) {
     dil::tensor cy;
-    auto cx = dbl::comm::try_gen_dil_tensor(cx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
     dil::lstm_forward::compute({output_size.cbegin(), output_size.cend()}, x, hx, cx, w1, w2, b, y, hy, cy, reverse, aprop_kind);
     return {dbl::comm::gen_aten_tensor_by(std::move(y)), dbl::comm::gen_aten_tensor_by(std::move(hy)).reshape(hx_.sizes()), dbl::comm::gen_aten_tensor_by(std::move(cy)).reshape(cx_.sizes())};
   } else if (_rnn_kind == dil::rnn_kind::GRU) {

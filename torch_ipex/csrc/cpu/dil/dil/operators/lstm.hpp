@@ -27,11 +27,19 @@ struct lstm_forward : public dnnl::lstm_forward {
     auto src_layer_desc = src_layer.get_desc();
     auto src_iter_desc = src_iter.get_desc().to_type(src_layer.get_data_type());
     auto src_iter_c_desc = src_iter_c.get_desc();
-    // use any format for weights
-    // For accuracy consideration, weight remains fp32 when doing training,
-    // so it is necessary to align weights data type with src in here.
-    auto weights_layer_desc = weights_layer.get_desc().to_format_any().to_type(src_layer.get_data_type());
-    auto weights_iter_desc = weights_iter.get_desc().to_format_any().to_type(src_layer.get_data_type());
+
+    // TODO : how to check whether prepacked or not
+    auto weights_layer_desc = weights_layer.get_desc();
+    auto weights_iter_desc = weights_iter.get_desc();
+
+    // after prepack, the weight will be padded, which is not dense
+    if (weights_layer_desc.is_dense()) {
+      weights_layer_desc = weights_layer_desc.to_format_any().to_type(src_layer.get_data_type());
+    }
+    if (weights_iter_desc.is_dense()) {
+      weights_iter_desc = weights_iter_desc.to_format_any().to_type(src_layer.get_data_type());
+    }
+
     auto bias_desc = bias.get_desc();
     tensor::desc dst_layer_desc(output_sizes, src_layer.get_data_type(), tag::tnc);
 
@@ -66,6 +74,45 @@ struct lstm_forward : public dnnl::lstm_forward {
 
     super(pd).execute(stream::default_stream(), args);
   }
+  
+  static std::tuple<tensor::desc, tensor::desc> expected_weights_desc(const dims& output_sizes,
+                      const tensor& src_layer,
+                      const tensor& src_iter,
+                      const tensor& src_iter_c,
+
+                      const tensor& weights_layer,
+                      const tensor& weights_iter,
+
+
+                      const tensor& bias,
+                      const bool reverse = false,
+                      prop_kind aprop = prop_kind::forward,
+                      const engine& aengine = engine::cpu_engine()) {
+
+    auto direction = reverse ? rnn_direction::unidirectional_right2left
+                             : rnn_direction::unidirectional_left2right;
+    
+    auto src_layer_desc = src_layer.get_desc();
+    auto src_iter_desc = src_iter.get_desc();
+    auto src_iter_c_desc = src_iter_c.get_desc();
+
+    auto weights_layer_desc = weights_layer.get_desc().to_format_any();
+    auto weights_iter_desc = weights_iter.get_desc().to_format_any();
+    
+    auto bias_desc = bias.get_desc();
+    tensor::desc dst_layer_desc(output_sizes, src_layer.get_data_type(), tag::tnc);
+
+    auto pd = primitive_desc(
+        {aprop, direction, src_layer_desc, src_iter_desc, src_iter_c_desc,
+         weights_layer_desc, weights_iter_desc, bias_desc,
+         dst_layer_desc, src_iter_desc, src_iter_c_desc},
+         aengine);
+
+    auto expected_weights_layer = pd.weights_layer_desc();
+    auto expected_weights_iter = pd.weights_iter_desc();
+
+    return std::make_tuple(expected_weights_layer, expected_weights_iter);
+  }  
 };
 
 struct lstm_backward : public dnnl::lstm_backward {
