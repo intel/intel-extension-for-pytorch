@@ -175,7 +175,7 @@ class IPEXBuild(build_ext, object):
 
     build_type = 'Release'
     use_ninja = False
-
+    
     if _check_env_flag('DEBUG'):
       build_type = 'Debug'
 
@@ -191,6 +191,8 @@ class IPEXBuild(build_ext, object):
             '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + ext_dir,
             '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + ext_dir,
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
+            '-DPYTORCH_INCLUDE_DIRS=' + pytorch_install_dir + "/include",
+            '-DPYTORCH_LIBRARY_DIRS=' + pytorch_install_dir + "/lib", 
         ]
 
     if _check_env_flag("IPEX_DISP_OP"):
@@ -223,7 +225,7 @@ class IPEXBuild(build_ext, object):
       check_call(['ninja'] + build_args, cwd=ext.build_dir, env=env)
     else:
       check_call(['make'] + build_args, cwd=ext.build_dir, env=env)
-
+    check_call(['make', 'install'] + build_args, cwd=ext.build_dir, env=env)
 
 ipex_git_sha, torch_git_sha = get_git_head_sha(base_dir)
 version = get_build_version(ipex_git_sha)

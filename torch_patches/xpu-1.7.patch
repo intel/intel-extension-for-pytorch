@@ -688,3 +688,30 @@ index e6b851a..e29fb93 100644
      default: AT_ERROR("Unimplemented backend ", backend);
    }
  }
+diff --git a/torch/csrc/distributed/c10d/reducer.cpp b/torch/csrc/distributed/c10d/reducer.cpp
+index 92a8f9e..8ef8d50 100644
+--- a/torch/csrc/distributed/c10d/reducer.cpp
++++ b/torch/csrc/distributed/c10d/reducer.cpp
+@@ -357,7 +357,7 @@ void Reducer::copy_grad_to_bucket(at::Tensor& grad, at::Tensor& bucket_view) {
+     auto wrapped = c10::scalar_to_tensor(double(1.) / divFactor_);
+     wrapped.unsafeGetTensorImpl()->set_wrapped_number(true);
+     // Divides while copying into the bucket view.
+-    at::native::mul_out(bucket_view, grad, wrapped);
++    at::mul_out(bucket_view, grad, wrapped);
+   } else {
+     bucket_view.copy_(grad);
+   }
+diff --git a/torch/nn/parallel/distributed.py b/torch/nn/parallel/distributed.py
+index 3d2f00e..a33c29a 100644
+--- a/torch/nn/parallel/distributed.py
++++ b/torch/nn/parallel/distributed.py
+@@ -354,7 +354,7 @@ class DistributedDataParallel(Module):
+         ).format(distinct_device_types)
+         self.device_type = list(distinct_device_types)[0]
+
+-        if self.device_type == "cpu" or self.is_multi_device_module:
++        if self.device_type == "cpu" or self.device_type == "xpu" or self.is_multi_device_module:
+             assert not device_ids and not output_device, (
+                 "DistributedDataParallel device_ids and output_device arguments "
+                 "only work with single-device GPU modules, but got "
+

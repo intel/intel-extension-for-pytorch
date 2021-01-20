@@ -28,6 +28,8 @@
 #include "cpu/dbl/Common.h"
 #include "quantization/Observer.h"
 #include "cpu/FusionOPs.h"
+#include "ProcessGroupCCL.hpp"
+#include <pybind11/chrono.h>
 
 namespace torch_ipex {
 namespace {
@@ -190,6 +192,20 @@ void InitIpexModuleBindings(py::module m) {
         indicators.push_back(temp);
       }
       AutoOptConfig::singleton().set_indicators(indicators); } );
+  
+  m.def("enable_torch_ccl", [=]() {
+       py::object module = py::module::import("torch.distributed");
+       py::object register_backend = module.attr("Backend").attr("register_backend"); 
+       register_backend("ccl", py::cpp_function(&c10d::ProcessGroupCCL::createProcessGroupCCL,
+                                            py::arg("store"),
+                                            py::arg("rank"),
+                                            py::arg("size"),
+                                            py::arg("timeout") = std::chrono::milliseconds(
+                                              ::c10d::ProcessGroupCCL::OP_TIMEOUT_MILLIS)));
+       
+  });
+  m.def("set_xpu_mode", [=](std::string mode){
+       AutoOptConfig::singleton().set_xpu_mode(torch_ipex::stringToXPUMode(mode));});
 
   // external OPs
   m.def("roi_align_forward", &IpexExternal::ROIAlign_forward);

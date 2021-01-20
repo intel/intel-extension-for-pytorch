@@ -7,6 +7,7 @@ from .tensor import *
 from .optim import *
 from .ops import *
 import _torch_ipex as core
+core.enable_torch_ccl()
 
 DEVICE = 'xpu:0'
 
