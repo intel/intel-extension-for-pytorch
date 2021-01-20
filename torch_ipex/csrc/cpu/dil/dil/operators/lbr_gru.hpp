@@ -25,8 +25,10 @@ struct lbr_gru_forward : public dnnl::lbr_gru_forward {
     auto src_layer_desc = src_layer.get_desc();
     auto src_iter_desc = src_iter.get_desc();
     // use any format for weights
-    auto weights_layer_desc = weights_layer.get_desc().to_format_any();
-    auto weights_iter_desc = weights_iter.get_desc().to_format_any();
+    // For accuracy consideration, weight remains fp32 when doing training,
+    // so it is necessary to align weights data type with src in here.
+    auto weights_layer_desc = weights_layer.get_desc().to_format_any().to_type(src_layer.get_data_type());
+    auto weights_iter_desc = weights_iter.get_desc().to_format_any().to_type(src_layer.get_data_type());
     auto bias_desc = bias.get_desc();
     tensor::desc dst_layer_desc(output_sizes, src_layer.get_data_type(), tag::tnc);
 
@@ -85,8 +87,9 @@ struct lbr_gru_backward : public dnnl::lbr_gru_backward {
     auto src_layer_desc = src_layer.get_desc();
     auto src_iter_desc = src_iter.get_desc();
     // use any format for weights
-    auto weights_layer_desc = weights_layer.get_desc().to_format_any();
-    auto weights_iter_desc = weights_iter.get_desc().to_format_any();
+    // align weights data type with src
+    auto weights_layer_desc = weights_layer.get_desc().to_format_any().to_type(src_layer.get_data_type());
+    auto weights_iter_desc = weights_iter.get_desc().to_format_any().to_type(src_layer.get_data_type());
     auto bias_desc = bias.get_desc();
     auto dst_layer_desc = dst_layer.get_desc();
     auto dst_iter_desc = dst_iter.get_desc();
