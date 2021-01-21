@@ -100,7 +100,7 @@ private:
       attr, aprop_kind,alowp_kind, aengine);
       return;
     }
-    if (PrimitiveCache::singleton().hit(ops_id)){
+    if (PrimitiveCache::singleton().hit(ops_id, src.get_dims())){
       auto thread_id = std::this_thread::get_id();
       //cache hit
       inner_product_params p = *PrimitiveCache::singleton().get_params(ops_id);

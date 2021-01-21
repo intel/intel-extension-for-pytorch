@@ -83,8 +83,11 @@ public:
       para_.insert(std::make_pair(id, p));
     }
 
-    bool hit(int64_t id){
-      return para_.find(id) != para_.end();
+    bool hit(int64_t id, dims d){
+      if (para_.find(id) == para_.end())
+        return false;
+      auto p = *(para_.find(id)->second);
+      return p.src_dims == d;
     }
 
 public:
@@ -117,8 +120,8 @@ public:
       get_thread_param().insert_params(id, p);
     }
 
-    bool hit(int64_t id){
-      return get_thread_param().hit(id);
+    bool hit(int64_t id, dims d){
+      return get_thread_param().hit(id, d);
     }
 
 private:
