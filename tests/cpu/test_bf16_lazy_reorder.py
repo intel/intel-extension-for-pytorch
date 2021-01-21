@@ -2377,7 +2377,7 @@ class TestRNN(TestCase):
 
         y, hy = model(input, (h0, c0))
         y.sum().backward()
-        with AutoDNNL(True), AutoMixPrecision(True):
+        with AutoDNNL(True), AutoMixPrecision(True, True):
             y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
             self.assertEqual(y, y_dpcpp, 0.05)
             y_dpcpp.sum().backward()
@@ -2402,7 +2402,7 @@ class TestRNN(TestCase):
 
         y, hy = model(input, (h0, c0))
         y.sum().backward()
-        with AutoDNNL(True), AutoMixPrecision(True):
+        with AutoDNNL(True), AutoMixPrecision(True, True):
             y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
             self.assertEqual(y, y_dpcpp, 0.05)
             y_dpcpp.sum().backward()
@@ -2427,7 +2427,7 @@ class TestRNN(TestCase):
 
         y, hy = model(input, (h0, c0))
         y.sum().backward()
-        with AutoDNNL(True), AutoMixPrecision(True):
+        with AutoDNNL(True), AutoMixPrecision(True, True):
             y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
             self.assertEqual(y, y_dpcpp, 0.05)
             y_dpcpp.sum().backward()
@@ -2452,7 +2452,7 @@ class TestRNN(TestCase):
 
         y, hy = model(input, (h0, c0))
         y.sum().backward()
-        with AutoDNNL(True), AutoMixPrecision(True):
+        with AutoDNNL(True), AutoMixPrecision(True, True):
             y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
             self.assertEqual(y, y_dpcpp, 0.05)
             y_dpcpp.sum().backward()
@@ -2501,7 +2501,7 @@ class TestRNN(TestCase):
         input_dpcpp = x.clone().to(device=device).requires_grad_()
         h0_dpcpp = h.clone().to(device=device).requires_grad_()
         model_dpcpp = copy.deepcopy(model).to(device=device).train()
-        with AutoDNNL(True), AutoMixPrecision(True):
+        with AutoDNNL(True), AutoMixPrecision(True, True):
             y, hy = model(input, h0)
             y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
             self.assertEqual(y, y_dpcpp, 0.05)
@@ -2523,7 +2523,7 @@ class TestRNN(TestCase):
         input_dpcpp = x.clone().to(device=device).requires_grad_()
         h0_dpcpp = h.clone().to(device=device).requires_grad_()
         model_dpcpp = copy.deepcopy(model).to(device=device).train()
-        with AutoDNNL(True), AutoMixPrecision(True):
+        with AutoDNNL(True), AutoMixPrecision(True, True):
             y, hy = model(input, h0)
             y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
             self.assertEqual(y, y_dpcpp, 0.05)
@@ -2545,7 +2545,7 @@ class TestRNN(TestCase):
         input_dpcpp = x.clone().to(device=device).requires_grad_()
         h0_dpcpp = h.clone().to(device=device).requires_grad_()
         model_dpcpp = copy.deepcopy(model).to(device=device).train()
-        with AutoDNNL(True), AutoMixPrecision(True):
+        with AutoDNNL(True), AutoMixPrecision(True, True):
             y, hy = model(input, h0)
             y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
             self.assertEqual(y, y_dpcpp, 0.05)
@@ -2567,7 +2567,7 @@ class TestRNN(TestCase):
         input_dpcpp = x.clone().to(device=device).requires_grad_()
         h0_dpcpp = h.clone().to(device=device).requires_grad_()
         model_dpcpp = copy.deepcopy(model).to(device=device).train()
-        with AutoDNNL(True), AutoMixPrecision(True):
+        with AutoDNNL(True), AutoMixPrecision(True, True):
             y, hy = model(input, h0)
             y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
             self.assertEqual(y, y_dpcpp, 0.05)
@@ -2618,7 +2618,7 @@ class TestRNN(TestCase):
         input_dpcpp = x.clone().to(device=device).requires_grad_()
         h0_dpcpp = h.clone().to(device=device).requires_grad_()
         model_dpcpp = copy.deepcopy(model).to(device=device).train()
-        with AutoDNNL(True), AutoMixPrecision(True):
+        with AutoDNNL(True), AutoMixPrecision(True, True):
             y, hy = model(input, h0)
             y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
             self.assertEqual(y, y_dpcpp, 0.05)
@@ -2640,7 +2640,7 @@ class TestRNN(TestCase):
         input_dpcpp = x.clone().to(device=device).requires_grad_()
         h0_dpcpp = h.clone().to(device=device).requires_grad_()
         model_dpcpp = copy.deepcopy(model).to(device=device).train()
-        with AutoDNNL(True), AutoMixPrecision(True):
+        with AutoDNNL(True), AutoMixPrecision(True, True):
             y, hy = model(input, h0)
             y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
             self.assertEqual(y, y_dpcpp, 0.05)
@@ -2662,7 +2662,7 @@ class TestRNN(TestCase):
         input_dpcpp = x.clone().to(device=device).requires_grad_()
         h0_dpcpp = h.clone().to(device=device).requires_grad_()
         model_dpcpp = copy.deepcopy(model).to(device=device).train()
-        with AutoDNNL(True), AutoMixPrecision(True):
+        with AutoDNNL(True), AutoMixPrecision(True, True):
             y, hy = model(input, h0)
             y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
             self.assertEqual(y, y_dpcpp, 0.05)

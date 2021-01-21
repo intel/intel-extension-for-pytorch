@@ -25,7 +25,7 @@ struct lstm_forward : public dnnl::lstm_forward {
     auto direction = reverse ? rnn_direction::unidirectional_right2left
                              : rnn_direction::unidirectional_left2right;
     auto src_layer_desc = src_layer.get_desc();
-    auto src_iter_desc = src_iter.get_desc();
+    auto src_iter_desc = src_iter.get_desc().to_type(src_layer.get_data_type());
     auto src_iter_c_desc = src_iter_c.get_desc();
     // use any format for weights
     // For accuracy consideration, weight remains fp32 when doing training,
@@ -41,6 +41,7 @@ struct lstm_forward : public dnnl::lstm_forward {
          dst_layer_desc, src_iter_desc, src_iter_c_desc},
         aengine);
 
+    auto expected_src_iter = src_iter.reorder_if_differ_in(pd.src_iter_desc());
     auto expected_weights_layer = weights_layer.reorder_if_differ_in(pd.weights_layer_desc());
     auto expected_weights_iter = weights_iter.reorder_if_differ_in(pd.weights_iter_desc());
 
@@ -49,7 +50,7 @@ struct lstm_forward : public dnnl::lstm_forward {
     dst_iter_c.reinit_if_possible(pd.dst_iter_c_desc());
 
     exec_args args {{DNNL_ARG_SRC_LAYER, src_layer},
-                    {DNNL_ARG_SRC_ITER, src_iter},
+                    {DNNL_ARG_SRC_ITER, expected_src_iter},
                     {DNNL_ARG_SRC_ITER_C, src_iter_c},
                     {DNNL_ARG_WEIGHTS_LAYER, expected_weights_layer},
                     {DNNL_ARG_WEIGHTS_ITER, expected_weights_iter},
@@ -95,7 +96,7 @@ struct lstm_backward : public dnnl::lstm_backward {
     auto direction = reverse ? rnn_direction::unidirectional_right2left
                              : rnn_direction::unidirectional_left2right;
     auto src_layer_desc = src_layer.get_desc();
-    auto src_iter_desc = src_iter.get_desc();
+    auto src_iter_desc = src_iter.get_desc().to_type(src_layer.get_data_type());
     auto src_iter_c_desc = src_iter_c.get_desc();
     // use any format for weights
     // align weights data type with src
@@ -132,6 +133,7 @@ struct lstm_backward : public dnnl::lstm_backward {
          diff_dst_layer_desc, diff_dst_iter_desc, diff_dst_iter_c_desc},
         aengine, forward_hints);
 
+    auto expected_src_iter = src_iter.reorder_if_differ_in(pd.src_iter_desc());
     auto expected_weights_layer = weights_layer.reorder_if_differ_in(pd.weights_layer_desc());
     auto expected_weights_iter = weights_iter.reorder_if_differ_in(pd.weights_iter_desc());
 
@@ -145,7 +147,7 @@ struct lstm_backward : public dnnl::lstm_backward {
 
     super(pd).execute(stream::default_stream(),
                       {{DNNL_ARG_SRC_LAYER, src_layer},
-                       {DNNL_ARG_SRC_ITER, src_iter},
+                       {DNNL_ARG_SRC_ITER, expected_src_iter},
                        {DNNL_ARG_SRC_ITER_C, src_iter_c},
                        {DNNL_ARG_WEIGHTS_LAYER, expected_weights_layer},
                        {DNNL_ARG_WEIGHTS_ITER, expected_weights_iter},

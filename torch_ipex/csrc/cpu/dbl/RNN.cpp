@@ -157,7 +157,7 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
   }
   // TODO: should we do these reorder in DevOPs??
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
-  dbl::comm::reorder_to_bf16_for_mix_prec(hx_);
+  dbl::comm::reorder_to_bf16_for_mix_prec(hx_, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(weight_ih, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(weight_hh, true);
   // cx, cy and bias should always be fp32 in bf16 inference
@@ -215,7 +215,7 @@ std::vector<at::Tensor> mkldnn_rnn_layer_backward(const at::Tensor& input, const
   }
   // TODO: should we do these reorder in DevOPs??
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
-  dbl::comm::reorder_to_bf16_for_mix_prec(hx_);
+  dbl::comm::reorder_to_bf16_for_mix_prec(hx_, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(weight_ih, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(weight_hh, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(hy_);

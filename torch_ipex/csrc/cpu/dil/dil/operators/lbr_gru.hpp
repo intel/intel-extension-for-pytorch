@@ -23,7 +23,7 @@ struct lbr_gru_forward : public dnnl::lbr_gru_forward {
     auto direction = reverse ? rnn_direction::unidirectional_right2left
                              : rnn_direction::unidirectional_left2right;
     auto src_layer_desc = src_layer.get_desc();
-    auto src_iter_desc = src_iter.get_desc();
+    auto src_iter_desc = src_iter.get_desc().to_type(src_layer.get_data_type());
     // use any format for weights
     // For accuracy consideration, weight remains fp32 when doing training,
     // so it is necessary to align weights data type with src in here.
@@ -38,6 +38,7 @@ struct lbr_gru_forward : public dnnl::lbr_gru_forward {
          dst_layer_desc, src_iter_desc},
         aengine);
 
+    auto expected_src_iter = src_iter.reorder_if_differ_in(pd.src_iter_desc());
     auto expected_weights_layer = weights_layer.reorder_if_differ_in(pd.weights_desc());
     auto expected_weights_iter = weights_iter.reorder_if_differ_in(pd.weights_iter_desc());
 
@@ -45,7 +46,7 @@ struct lbr_gru_forward : public dnnl::lbr_gru_forward {
     dst_iter.reinit_if_possible(pd.dst_iter_desc());
 
     exec_args args {{DNNL_ARG_SRC_LAYER, src_layer},
-                    {DNNL_ARG_SRC_ITER, src_iter},
+                    {DNNL_ARG_SRC_ITER, expected_src_iter},
                     {DNNL_ARG_WEIGHTS_LAYER, expected_weights_layer},
                     {DNNL_ARG_WEIGHTS_ITER, expected_weights_iter},
                     {DNNL_ARG_BIAS, bias},
@@ -85,7 +86,7 @@ struct lbr_gru_backward : public dnnl::lbr_gru_backward {
     auto direction = reverse ? rnn_direction::unidirectional_right2left
                              : rnn_direction::unidirectional_left2right;
     auto src_layer_desc = src_layer.get_desc();
-    auto src_iter_desc = src_iter.get_desc();
+    auto src_iter_desc = src_iter.get_desc().to_type(src_layer.get_data_type());
     // use any format for weights
     // align weights data type with src
     auto weights_layer_desc = weights_layer.get_desc().to_format_any().to_type(src_layer.get_data_type());
@@ -116,7 +117,8 @@ struct lbr_gru_backward : public dnnl::lbr_gru_backward {
          diff_weights_layer_desc, diff_weights_iter_desc, diff_bias_desc,
          diff_dst_layer_desc, diff_dst_iter_desc},
         aengine, forward_hints);
-    
+
+    auto expected_src_iter = src_iter.reorder_if_differ_in(pd.src_iter_desc());
     auto expected_weights_layer = weights_layer.reorder_if_differ_in(pd.weights_desc());
     auto expected_weights_iter = weights_iter.reorder_if_differ_in(pd.weights_iter_desc());
 
@@ -129,7 +131,7 @@ struct lbr_gru_backward : public dnnl::lbr_gru_backward {
 
     super(pd).execute(stream::default_stream(),
                       {{DNNL_ARG_SRC_LAYER, src_layer},
-                       {DNNL_ARG_SRC_ITER, src_iter},
+                       {DNNL_ARG_SRC_ITER, expected_src_iter},
                        {DNNL_ARG_WEIGHTS_LAYER, expected_weights_layer},
                        {DNNL_ARG_WEIGHTS_ITER, expected_weights_iter},
                        {DNNL_ARG_BIAS, bias},
