@@ -148,8 +148,7 @@ static inline void checkInBoundsForStorage(
 
 void IPEXTensorImpl::set_strided(at::IntArrayRef size, at::IntArrayRef stride, int64_t storage_offset) {
   // Port from setStrided in Aten/native/Resize.h
-  // TODO how to check tensor with padded dims
-  // checkInBoundsForStorage(size, stride, storage_offset_, this->storage());
+  checkInBoundsForStorage(size, stride, storage_offset_, this->storage());
 
   // In backprop phase, grad variable might be detached (in accumulate_grad.h)
   // and forbids the metadata to be modified.

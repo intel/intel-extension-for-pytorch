@@ -56,7 +56,8 @@ dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor) {
   auto data_type = dil_buffer.get_data_type();
   if (dil_buffer.is_public_format() &&
       dil_buffer.get_groups() <= 1 &&
-      !(data_type == dil::data_type::s8 || data_type == dil::data_type::u8)) {
+      !(data_type == dil::data_type::s8 || data_type == dil::data_type::u8) 
+      && !dil_buffer.is_padded()) {
     auto size = tensor.sizes().vec();
     auto stride = tensor.strides().vec();
     auto data_ptr = static_cast<void *>(
@@ -282,7 +283,7 @@ void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer) {
   equip_dil_buffer_nosync_shape(tensor, dil_buffer);
 
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)tensor.unsafeGetTensorImpl();
-  if (dil_buffer.is_public_format()) {
+  if (dil_buffer.is_public_format() && !dil_buffer.is_padded()) {
     ipex_tensor_impl->set_strided(dil_buffer.get_dims(), dil_buffer.get_strides(), ipex_tensor_impl->storage_offset());
   } else {
     // ??? TORCH_INTERNAL_ASSERT_DEBUG_ONLY(sizes.size() != 1 || sizes[0] != 0);

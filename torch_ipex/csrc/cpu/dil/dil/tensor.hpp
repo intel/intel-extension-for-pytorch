@@ -69,6 +69,22 @@ class tensor : public memory {
       return is_blocking_desc() && blocking_desc().inner_nblks == 0;
     };
 
+    bool is_padded() const {
+      if (!is_plain()) return true;
+      const auto &dims = data->dims;
+      const auto &strides = blocking_strides();
+
+      int stride = 1;
+
+      for (int i = data->ndims - 1; i >= 0; i--) {
+        if (strides[i] != stride) {
+          return true;
+        }
+        stride *= dims[i];
+      }
+      return false;
+    }
+
     bool is_default() const {
       if (!is_plain()) return false;
 
@@ -733,6 +749,10 @@ class tensor : public memory {
   // "public format" has the same semantic as DNNL's "plain format"
   bool is_public_format() const {
     return get_const_desc().is_plain();
+  }
+
+  bool is_padded() const {
+    return get_const_desc().is_padded();
   }
 
   static format_tag get_default_format(const dims &adims) {
