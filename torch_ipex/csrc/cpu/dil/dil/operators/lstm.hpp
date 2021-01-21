@@ -32,7 +32,7 @@ struct lstm_forward : public dnnl::lstm_forward {
     auto weights_layer_desc = weights_layer.get_desc();
     auto weights_iter_desc = weights_iter.get_desc();
 
-    // after prepack, the weight will be padded, which is not dense
+    // after prepack, the weight will be padded(fp32 & bf16) or blocked(int8), which is not dense
     if (weights_layer_desc.is_dense()) {
       weights_layer_desc = weights_layer_desc.to_format_any().to_type(src_layer.get_data_type());
     }

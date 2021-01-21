@@ -69,20 +69,26 @@ class tensor : public memory {
       return is_blocking_desc() && blocking_desc().inner_nblks == 0;
     };
 
-    bool is_padded() const {
-      if (!is_plain()) return true;
+    // compute the storage_size using dims and strides
+    int64_t compute_storage_size() const {
+      // port from aten/src/ATen/TensorUtils.cpp
       const auto &dims = data->dims;
       const auto &strides = blocking_strides();
-
-      int stride = 1;
-
-      for (int i = data->ndims - 1; i >= 0; i--) {
-        if (strides[i] != stride) {
-          return true;
+      // size of the underlying storage is 1 bigger than the offset
+      // of the last element according to stride
+      int64_t size = 1;
+      for(size_t i = 0; i < data->ndims; i++) {
+        if(dims[i] == 0) {
+          return 0;
         }
-        stride *= dims[i];
+        size += strides[i]*(dims[i]-1);
       }
-      return false;
+      return size;
+    }
+
+    // This should only be called for a public format desc
+    int64_t get_padding_size() const {
+      return compute_storage_size() - nelems();
     }
 
     bool is_default() const {
@@ -266,6 +272,8 @@ class tensor : public memory {
     dim_t nelems(bool with_padding = false) const {
       return get_const_desc().nelems(with_padding);
     }
+
+    int64_t get_padding_size() const { return get_const_desc().get_padding_size(); }
 
     bool is_plain() const { return get_const_desc().is_plain(); };
 
@@ -728,6 +736,8 @@ class tensor : public memory {
   /// It is the number without counting in paddings.
   dim_t get_nelems() const { return get_const_desc().nelems(); }
 
+  int64_t get_padding_size() const { return get_const_desc().get_padding_size(); }
+
   /// Returns descriptor data type
   data_type get_data_type() const { return get_const_desc().get_data_type(); }
 
@@ -749,10 +759,6 @@ class tensor : public memory {
   // "public format" has the same semantic as DNNL's "plain format"
   bool is_public_format() const {
     return get_const_desc().is_plain();
-  }
-
-  bool is_padded() const {
-    return get_const_desc().is_padded();
   }
 
   static format_tag get_default_format(const dims &adims) {

@@ -118,15 +118,9 @@ std::vector<int64_t> _output_size(const RNNParams& rnn) {
 //                           +---------+
 //
 at::Tensor _shuffle_weight(const at::Tensor& weight, int64_t fn_mode) {
-  // TODO contiguous
-  // for lstm prepacked weight, should not do contiguous here
-  // TODO: use a function to check if the tensor is prepacked or not
-  if (static_cast<dil::rnn_kind>(fn_mode) == dil::rnn_kind::LSTM && \
-   cpu::ShadeDataContext::isDilTensor(weight)) {
-    auto dil_weight = dbl::comm::try_gen_dil_tensor(weight);
-    if (dil_weight.ndims() == 5) {
+  // for prepacked weight, should not do contiguous here
+  if (cpu::ShadeDataContext::isPackedTensor(weight)) {
       return weight;
-    }
   }
 
   auto weight_t = weight.contiguous();
@@ -160,19 +154,13 @@ void prepack_lstm_weights(
   const bool reverse = false,
   dil::prop_kind aprop = dil::prop_kind::forward,
   const dil::engine& aengine = dil::engine::cpu_engine()) {
-    // TODO: use a function to check if the tensor is prepacked or not
-    if (cpu::ShadeDataContext::isDilTensor(weight_ih) 
-        && cpu::ShadeDataContext::isDilTensor(weight_hh)) {
-      auto dil_weight = dbl::comm::try_gen_dil_tensor(weight_ih);
-      if (dil_weight.ndims() == 5) {
+    if (cpu::ShadeDataContext::isPackedTensor(weight_ih) && cpu::ShadeDataContext::isPackedTensor(weight_hh)) {
         return;
-      }
     }
 
     auto w1 = dbl::comm::try_gen_dil_tensor(weight_ih, {1, 1, input_size, num_gates, hidden_size}, dil::format_tag::ldgoi);
     auto w2 = dbl::comm::try_gen_dil_tensor(weight_hh, {1, 1, hidden_size, num_gates, hidden_size}, dil::format_tag::ldgoi);
  
-
     dil::tensor::desc expected_weights_layer_desc, expected_weights_iter_desc;
     std::tie(expected_weights_layer_desc, expected_weights_iter_desc) = dil::lstm_forward::expected_weights_desc(
                       output_sizes,
@@ -192,8 +180,12 @@ void prepack_lstm_weights(
     expected_weight_ih.feed_from(w1);
     expected_weight_hh.feed_from(w2);
 
-    dbl::comm::equip_dil_buffer(weight_ih, expected_weight_ih);
-    dbl::comm::equip_dil_buffer(weight_hh, expected_weight_hh);
+    // TODO: int8 weight is blocked format
+    dbl::comm::equip_dil_buffer(weight_ih, expected_weight_ih, /*padding_size*/expected_weight_ih.get_padding_size());
+    dbl::comm::equip_dil_buffer(weight_hh, expected_weight_hh, /*padding_size*/expected_weight_hh.get_padding_size());
+    
+    cpu::ShadeDataContext::setPackedTensor(weight_ih, true);
+    cpu::ShadeDataContext::setPackedTensor(weight_hh, true);
   }
 
 std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tensor& weight1, const at::Tensor& weight2,
@@ -232,8 +224,6 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
   auto b = dbl::comm::try_gen_dil_tensor(bias, {1, 1, rnn.num_bias_gates, rnn.hidden_size}, dil::format_tag::ldgo);
   dil::prop_kind aprop_kind = dil::prop_kind::forward;
 
-  // TODO: fp32 training not ok
-  auto _rnn_kind = static_cast<dil::rnn_kind>(rnn.mode);
 
   auto src_type = x.get_data_type();
   if (src_type == dil::data_type::s8 ||src_type ==  dil::data_type::u8) {
@@ -242,8 +232,11 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
 
   dil::tensor w1, w2;
 
+  auto _rnn_kind = static_cast<dil::rnn_kind>(rnn.mode);
+  // TODO: only implemented prepack for fp32 & bf16 inference of LSTM cell
   if (_rnn_kind == dil::rnn_kind::LSTM && \
-    ((!check_auto_mix_bf16_fp32() && !weight_ih.requires_grad() && !weight_hh.requires_grad()) || (check_auto_mix_bf16_fp32() && !check_train()))) {
+    ((!check_auto_mix_bf16_fp32() && !weight_ih.requires_grad() && !weight_hh.requires_grad()) || \
+    (check_auto_mix_bf16_fp32() && !check_train()))) {
     prepack_lstm_weights(
       weight_ih,
       weight_hh,

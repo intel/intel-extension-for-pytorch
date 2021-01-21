@@ -130,7 +130,8 @@ static inline void checkInBoundsForStorage(
     at::IntArrayRef size,
     at::IntArrayRef stride,
     int64_t storage_offset,
-    const at::Storage& new_storage) {
+    const at::Storage& new_storage,
+    int64_t padding_size = 0) {
   // Port from setStrided in Aten/native/Resize.h
   int64_t storage_size = at::detail::computeStorageSize(size, stride);
   if (storage_size == 0) {
@@ -139,16 +140,17 @@ static inline void checkInBoundsForStorage(
   }
   int64_t new_storage_size = new_storage.numel();
   TORCH_CHECK(
-      storage_offset + storage_size <= new_storage_size,
+      storage_offset + storage_size <= new_storage_size + padding_size,
       "setStorage: sizes ", size, ", strides ", stride, ","
       " and storage offset ", storage_offset,
       " requiring a storage size of ", storage_size + storage_offset,
-      " are out of bounds for storage with numel ", new_storage_size);
+      " are out of bounds for storage with numel ", new_storage_size,
+      " and padding_size", padding_size);
 }
 
-void IPEXTensorImpl::set_strided(at::IntArrayRef size, at::IntArrayRef stride, int64_t storage_offset) {
+void IPEXTensorImpl::set_strided(at::IntArrayRef size, at::IntArrayRef stride, int64_t storage_offset, int64_t padding_size) {
   // Port from setStrided in Aten/native/Resize.h
-  checkInBoundsForStorage(size, stride, storage_offset_, this->storage());
+  checkInBoundsForStorage(size, stride, storage_offset_, this->storage(), padding_size);
 
   // In backprop phase, grad variable might be detached (in accumulate_grad.h)
   // and forbids the metadata to be modified.
