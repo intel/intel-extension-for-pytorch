@@ -55,7 +55,7 @@ int XPUHooks::getDeviceCount() const {
 }
 
 at::Device XPUHooks::getDeviceFromPtr(void* data) const {
-  return getDeviceFromPtr(data);
+  return at::dpcpp::getDeviceFromPtr(data);
 }
 
 bool XPUHooks::isPinnedPtr(void* data) const {
