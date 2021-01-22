@@ -83,8 +83,7 @@ Tensor& add_out(
     Scalar alpha) {
   Tensor self, other;
  if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
-      oneDNN::is_supported_dtype_in_binary(_self.scalar_type()) &&
-      oneDNN::is_supported_dtype_in_binary(_other.scalar_type()) &&
+      oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
       _self.dim() > 0 && _other.dim() > 0 &&
       _self.dim() == _other.dim() &&
       _self.is_contiguous() && _other.is_contiguous() &&
@@ -112,8 +111,7 @@ Tensor& add_out(
 Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
   Tensor result, self, other;
  if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
-      oneDNN::is_supported_dtype_in_binary(_self.scalar_type()) &&
-      oneDNN::is_supported_dtype_in_binary(_other.scalar_type()) &&
+      oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
       _self.dim() > 0 && _other.dim() > 0 &&
       _self.dim() == _other.dim() &&
       _self.is_contiguous() && _other.is_contiguous() &&
