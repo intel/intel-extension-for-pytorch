@@ -93,7 +93,7 @@ struct lstm_forward : public dnnl::lstm_forward {
                              : rnn_direction::unidirectional_left2right;
     
     auto src_layer_desc = src_layer.get_desc();
-    auto src_iter_desc = src_iter.get_desc();
+    auto src_iter_desc = src_iter.get_desc().to_type(src_layer.get_data_type());
     auto src_iter_c_desc = src_iter_c.get_desc();
 
     auto weights_layer_desc = weights_layer.get_desc().to_format_any();
