@@ -1538,473 +1538,177 @@ class TestSave(TestCase):
         self.assertEqual(model1(input), model2(input))
 
 class TestRNN(TestCase):
-    def test_lstm(self):
-        ipex.core.enable_auto_dnnl()
+    def _lstm_params_list(self, cell):
+        params_dict = {
+            "input_size": [1, 2],
+            "hidden_size": [5],
+            "num_layers": [1, 3],
+            "bidirectional": [False, True],
+            "bias": [False, True],
+            "empty_state": [False, True],
+            "batch_first": [False, True],
+            "dropout": [0, 1], # [0, 0.5, 1] # TODO 0.5 will fail
+            "batch_size": [1, 2],
+            "seq_len": [1, 3]
+        }
+
+        if cell == "RNN":
+            params_dict["nonlinearity"] = ["tanh"] # ["tanh", "relu"] TODO relu has accuracy issue
+        elif cell == "GRU":
+            params_dict["nonlinearity"] = [""] 
+
+        params_list = []
+
+        for key, value in params_dict.items():
+            params_list.append(value)
+        return params_list
+
+    def _test_lstm(self, training):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        model = torch.nn.LSTM(5, 3, 1).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 2, 3)
-        c = torch.randn(1, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-        c0 = c.clone().requires_grad_()
+        
+        params_list = self._lstm_params_list("LSTM")
 
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        c0_dpcpp = c.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
+        for input_size, hidden_size, num_layers, bidirectional, bias, empty_state, batch_first, dropout, batch_size, seq_len in itertools.product(*params_list):
+            # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
+            if dropout > 0 and num_layers == 1:
+                continue
+            
+            num_directions = 2 if bidirectional else 1
+            
+            if batch_first:
+                input = torch.randn(batch_size, seq_len, input_size)
+            else:
+                input = torch.randn(seq_len, batch_size, input_size)
+            h = torch.randn(num_layers * num_directions, batch_size, hidden_size)
+            c = torch.randn(num_layers * num_directions, batch_size, hidden_size)
 
-        y, hy = model(input, (h0, c0))
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
-        self.assertEqual(y, y_dpcpp)
-        self.assertEqual(hy[0], hy_dpcpp[0])
-        self.assertEqual(hy[1], hy_dpcpp[1])
-        y.sum().backward(retain_graph=True)
-        y_dpcpp.sum().backward(retain_graph=True)
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
-        self.assertEqual(model_dpcpp.bias_ih_l0.grad.to('cpu'), model.bias_ih_l0.grad)
-        self.assertEqual(model_dpcpp.bias_hh_l0.grad.to('cpu'), model.bias_hh_l0.grad)
-        self.assertEqual(model_dpcpp.weight_ih_l0.grad.to('cpu'), model.weight_ih_l0.grad)
-        self.assertEqual(model_dpcpp.weight_hh_l0.grad.to('cpu'), model.weight_hh_l0.grad)
-        hy[0].sum().backward(retain_graph=True)
-        hy_dpcpp[0].sum().backward(retain_graph=True)
-        self.assertEqual(h0_dpcpp.grad.to('cpu'), h0.grad)
-        hy[1].sum().backward(retain_graph=True)
-        hy_dpcpp[1].sum().backward(retain_graph=True)
-        self.assertEqual(c0_dpcpp.grad.to('cpu'), c0.grad)
+            input_cpu = input.clone().requires_grad_(training)
+            h_cpu = h.clone().requires_grad_(training)
+            c_cpu = c.clone().requires_grad_(training)
 
-    def test_lstm_no_bias(self):
-        ipex.core.enable_auto_dnnl()
+            model_cpu = torch.nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
+            model_cpu.train() if training else model_cpu.eval()
+
+            input_dpcpp = input.clone().to(device=device).requires_grad_(training)
+            h0_dpcpp = h.clone().to(device=device).requires_grad_(training)
+            c0_dpcpp = c.clone().to(device=device).requires_grad_(training)
+            model_dpcpp = copy.deepcopy(model_cpu).to(device=device)
+            model_dpcpp.train() if training else model_dpcpp.eval()
+
+            if empty_state:
+                y_cpu, hy_cpu = model_cpu(input_cpu)
+                y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp)
+                self.assertEqual(hy_cpu[0], hy_dpcpp[0])
+                self.assertEqual(hy_cpu[1], hy_dpcpp[1])
+
+            else:
+                y_cpu, hy_cpu = model_cpu(input_cpu, (h_cpu, c_cpu))
+                y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
+                self.assertEqual(hy_cpu[0], hy_dpcpp[0])
+                self.assertEqual(hy_cpu[1], hy_dpcpp[1])
+
+            self.assertEqual(y_cpu, y_dpcpp)
+
+            if training:
+                y_cpu.sum().backward(retain_graph=True)
+                y_dpcpp.sum().backward(retain_graph=True)
+                self.assertEqual(input_dpcpp.grad.to('cpu'), input_cpu.grad)
+                self.assertEqual(model_dpcpp.weight_ih_l0.grad.to('cpu'), model_cpu.weight_ih_l0.grad)
+                self.assertEqual(model_dpcpp.weight_hh_l0.grad.to('cpu'), model_cpu.weight_hh_l0.grad)
+                if bias:
+                    self.assertEqual(model_dpcpp.bias_ih_l0.grad.to('cpu'), model_cpu.bias_ih_l0.grad)
+                    self.assertEqual(model_dpcpp.bias_hh_l0.grad.to('cpu'), model_cpu.bias_hh_l0.grad)
+                if not empty_state:
+                    hy_cpu[0].sum().backward(retain_graph=True)
+                    hy_dpcpp[0].sum().backward(retain_graph=True)
+                    self.assertEqual(h0_dpcpp.grad.to('cpu'), h_cpu.grad)
+                    
+                    hy_cpu[1].sum().backward(retain_graph=True)
+                    hy_dpcpp[1].sum().backward(retain_graph=True)
+                    self.assertEqual(c0_dpcpp.grad.to('cpu'), c_cpu.grad)
+
+    def _test_rnn(self, cell, training):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        model = torch.nn.LSTM(5, 3, 1, bias=False).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 2, 3)
-        c = torch.randn(1, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-        c0 = c.clone().requires_grad_()
+        
+        params_list = self._lstm_params_list(cell)
 
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        c0_dpcpp = c.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
+        for input_size, hidden_size, num_layers, bidirectional, bias, empty_state, batch_first, dropout, batch_size, seq_len, nonlinearity in itertools.product(*params_list):
+            # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
+            if dropout > 0 and num_layers == 1:
+                continue
+            
+            num_directions = 2 if bidirectional else 1
+            
+            if batch_first:
+                input = torch.randn(batch_size, seq_len, input_size)
+            else:
+                input = torch.randn(seq_len, batch_size, input_size)
+            h = torch.randn(num_layers * num_directions, batch_size, hidden_size)
+            c = torch.randn(num_layers * num_directions, batch_size, hidden_size)
 
-        y, hy = model(input, (h0, c0))
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
-        self.assertEqual(y, y_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
+            input_cpu = input.clone().requires_grad_(training)
+            h_cpu = h.clone().requires_grad_(training)
+            c_cpu = c.clone().requires_grad_(training)
 
-    def test_lstm_dropout(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.LSTM(5, 3, 1, dropout=1).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 2, 3)
-        c = torch.randn(1, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-        c0 = c.clone().requires_grad_()
+            if cell == "RNN":
+                model_cpu = torch.nn.RNN(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first, nonlinearity=nonlinearity)
+            elif cell == "GRU":
+                model_cpu = torch.nn.GRU(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
+                
+            model_cpu.train() if training else model_cpu.eval()
 
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        c0_dpcpp = c.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
+            input_dpcpp = input.clone().to(device=device).requires_grad_(training)
+            h0_dpcpp = h.clone().to(device=device).requires_grad_(training)
+            c0_dpcpp = c.clone().to(device=device).requires_grad_(training)
+            model_dpcpp = copy.deepcopy(model_cpu).to(device=device)
+            model_dpcpp.train() if training else model_dpcpp.eval()
 
-        y, hy = model(input, (h0, c0))
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
-        self.assertEqual(y, y_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
+            if empty_state:
+                y_cpu, hy_cpu = model_cpu(input_cpu)
+                y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp)
+                self.assertEqual(hy_cpu, hy_dpcpp)
+            else:
+                y_cpu, hy_cpu = model_cpu(input_cpu, h_cpu)
+                y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
+                self.assertEqual(hy_cpu, hy_dpcpp)
+            self.assertEqual(y_cpu, y_dpcpp)
 
-    def test_lstm_dropout_inf(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.LSTM(5, 3, 1, dropout=1).eval()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 2, 3)
-        c = torch.randn(1, 2, 3)
-        input = x.clone()
-        h0 = h.clone()
-        c0 = c.clone()
+            if training:
+                y_cpu.sum().backward(retain_graph=True)
+                y_dpcpp.sum().backward(retain_graph=True)
+                self.assertEqual(input_dpcpp.grad.to('cpu'), input_cpu.grad)
+                self.assertEqual(model_dpcpp.weight_ih_l0.grad.to('cpu'), model_cpu.weight_ih_l0.grad)
+                self.assertEqual(model_dpcpp.weight_hh_l0.grad.to('cpu'), model_cpu.weight_hh_l0.grad)
+                if bias:
+                    self.assertEqual(model_dpcpp.bias_ih_l0.grad.to('cpu'), model_cpu.bias_ih_l0.grad)
+                    self.assertEqual(model_dpcpp.bias_hh_l0.grad.to('cpu'), model_cpu.bias_hh_l0.grad)
+                if not empty_state:
+                    hy_cpu.sum().backward(retain_graph=True)
+                    hy_dpcpp.sum().backward(retain_graph=True)
+                    self.assertEqual(h0_dpcpp.grad.to('cpu'), h_cpu.grad)
 
-        input_dpcpp = x.clone().to(device=device)
-        h0_dpcpp = h.clone().to(device=device)
-        c0_dpcpp = c.clone().to(device=device)
-        model_dpcpp = copy.deepcopy(model).to(device=device)
-
-        y, hy = model(input, (h0, c0))
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
-        self.assertEqual(y, y_dpcpp)
-
-    def test_lstm_batch_first(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.LSTM(5, 3, 1, batch_first=True).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 11, 3)
-        c = torch.randn(1, 11, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-        c0 = c.clone().requires_grad_()
-
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        c0_dpcpp = c.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
-
-        y, hy = model(input, (h0, c0))
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
-        self.assertEqual(y, y_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
-
-    def test_lstm_direction(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.LSTM(5, 3, 1, bidirectional=True).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(2, 2, 3)
-        c = torch.randn(2, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-        c0 = c.clone().requires_grad_()
-
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        c0_dpcpp = c.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
-
-        y, hy = model(input, (h0, c0))
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
-        self.assertEqual(y, y_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
-
-    def test_lstm_layer(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.LSTM(5, 3, 2).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(2, 2, 3)
-        c = torch.randn(2, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-        c0 = c.clone().requires_grad_()
-
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        c0_dpcpp = c.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
-
-        y, hy = model(input, (h0, c0))
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
-        self.assertEqual(y, y_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
-
-    def test_lstm_layer_direction(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.LSTM(5, 3, 2, bidirectional=True).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(4, 2, 3)
-        c = torch.randn(4, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-        c0 = c.clone().requires_grad_()
-
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        c0_dpcpp = c.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
-
-        y, hy = model(input, (h0, c0))
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
-        self.assertEqual(y, y_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
-
-    def test_rnn(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.RNN(5, 3, 1).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
-
-        y, hy = model(input, h0)
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
-        self.assertEqual(y, y_dpcpp)
-        self.assertEqual(hy, hy_dpcpp)
-        y.sum().backward(retain_graph=True)
-        y_dpcpp.sum().backward(retain_graph=True)
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
-        self.assertEqual(model_dpcpp.bias_ih_l0.grad.to('cpu'), model.bias_ih_l0.grad)
-        self.assertEqual(model_dpcpp.bias_hh_l0.grad.to('cpu'), model.bias_hh_l0.grad)
-        self.assertEqual(model_dpcpp.weight_ih_l0.grad.to('cpu'), model.weight_ih_l0.grad)
-        self.assertEqual(model_dpcpp.weight_hh_l0.grad.to('cpu'), model.weight_hh_l0.grad)
-        hy.sum().backward(retain_graph=True)
-        hy_dpcpp.sum().backward(retain_graph=True)
-        self.assertEqual(h0_dpcpp.grad.to('cpu'), h0.grad)
+    def test_lstm_inference(self):
+        self._test_lstm(training=False)
     
-    def test_rnn_relu(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.RNN(5, 3, 1, nonlinearity='relu').train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
+    def test_lstm_training(self):
+        self._test_lstm(training=True)
 
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
+    def test_rnn_inference(self):
+        self._test_rnn(cell="RNN", training=False)
 
-        y, hy = model(input, h0)
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
-        self.assertEqual(y, y_dpcpp)
-        self.assertEqual(hy, hy_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
+    def test_rnn_training(self):
+        self._test_rnn(cell="RNN", training=True)
 
-    def test_rnn_no_bias(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.RNN(5, 3, 1, bias=False).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
+    def test_gru_inference(self):
+        self._test_rnn(cell="GRU", training=False)
 
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
+    def test_gru_training(self):
+        self._test_rnn(cell="GRU", training=True)
 
-        y, hy = model(input, h0)
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
-        self.assertEqual(y, y_dpcpp)
-        self.assertEqual(hy, hy_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
-
-    def test_rnn_dropout_inf(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.RNN(5, 3, 1, dropout=1).eval()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 2, 3)
-        input = x.clone()
-        h0 = h.clone()
-
-        input_dpcpp = x.clone().to(device=device)
-        h0_dpcpp = h.clone().to(device=device)
-        model_dpcpp = copy.deepcopy(model).to(device=device)
-
-        y, hy = model(input, h0)
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
-        self.assertEqual(y, y_dpcpp)
-
-    def test_rnn_batch_first(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.RNN(5, 3, 1, batch_first=True).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 11, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
-
-        y, hy = model(input, h0)
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
-        self.assertEqual(y, y_dpcpp)
-        self.assertEqual(hy, hy_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
-
-    def test_rnn_layer_direction(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.RNN(5, 3, 2, bidirectional=True).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(4, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
-
-        y, hy = model(input, h0)
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
-        self.assertEqual(y, y_dpcpp)
-        self.assertEqual(hy, hy_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
-
-    def test_gru(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.GRU(5, 3, 1).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
-
-        y, hy = model(input, h0)
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
-        self.assertEqual(y, y_dpcpp)
-        self.assertEqual(hy, hy_dpcpp)
-        y.sum().backward(retain_graph=True)
-        y_dpcpp.sum().backward(retain_graph=True)
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
-        self.assertEqual(model_dpcpp.bias_ih_l0.grad.to('cpu'), model.bias_ih_l0.grad)
-        self.assertEqual(model_dpcpp.bias_hh_l0.grad.to('cpu'), model.bias_hh_l0.grad)
-        self.assertEqual(model_dpcpp.weight_ih_l0.grad.to('cpu'), model.weight_ih_l0.grad)
-        self.assertEqual(model_dpcpp.weight_hh_l0.grad.to('cpu'), model.weight_hh_l0.grad)
-        hy.sum().backward(retain_graph=True)
-        hy_dpcpp.sum().backward(retain_graph=True)
-        self.assertEqual(h0_dpcpp.grad.to('cpu'), h0.grad)
-
-    def test_gru_no_bias(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.GRU(5, 3, 1, bias=False).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
-
-        y, hy = model(input, h0)
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
-        self.assertEqual(y, y_dpcpp)
-        self.assertEqual(hy, hy_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
-
-    def test_gru_dropout_inf(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.GRU(5, 3, 1, dropout=1).eval()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 2, 3)
-        input = x.clone()
-        h0 = h.clone()
-
-        input_dpcpp = x.clone().to(device=device)
-        h0_dpcpp = h.clone().to(device=device)
-        model_dpcpp = copy.deepcopy(model).to(device=device)
-
-        y, hy = model(input, h0)
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
-        self.assertEqual(y, y_dpcpp)
-
-    def test_gru_batch_first(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.GRU(5, 3, 1, batch_first=True).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(1, 11, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
-
-        y, hy = model(input, h0)
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
-        self.assertEqual(y, y_dpcpp)
-        self.assertEqual(hy, hy_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
-
-    def test_gru_layer_direction(self):
-        ipex.core.enable_auto_dnnl()
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
-        model = torch.nn.GRU(5, 3, 2, bidirectional=True).train()
-        x = torch.randn(11, 2, 5)
-        h = torch.randn(4, 2, 3)
-        input = x.clone().requires_grad_()
-        h0 = h.clone().requires_grad_()
-
-        input_dpcpp = x.clone().to(device=device).requires_grad_()
-        h0_dpcpp = h.clone().to(device=device).requires_grad_()
-        model_dpcpp = copy.deepcopy(model).to(device=device).train()
-
-        y, hy = model(input, h0)
-        y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
-        self.assertEqual(y, y_dpcpp)
-        self.assertEqual(hy, hy_dpcpp)
-        y.sum().backward()
-        y_dpcpp.sum().backward()
-        self.assertEqual(input_dpcpp.grad.to('cpu'), input.grad)
 class TestInterpolate(TestCase):
     def test_upsample_nearest1d_scale_factor(self):
         rand_seed = int(get_rand_seed())
