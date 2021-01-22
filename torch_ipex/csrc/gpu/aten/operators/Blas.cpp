@@ -67,6 +67,7 @@ void dnnlGemmImpl(
   int64_t n = result.size(-1);
   int64_t k = m1.size(-1);
   int64_t mb = 1;
+
   if (dims == 3) {
     mb = result.size(0);
     TORCH_CHECK(mb == m1.size(0) && mb == m2.size(0), "batch size mismatch, result mb: ",\
@@ -78,20 +79,44 @@ void dnnlGemmImpl(
   auto m2_dt = dt_to_dnnl(m2.scalar_type());
   auto result_dt = dt_to_dnnl(result.scalar_type());
 
-  memory::desc m1_md;
-  memory::desc m2_md;
-  memory::desc r_md;
+  auto m1_usr_dt = m1_dt;
+  auto m2_usr_dt = m2_dt;
+  auto result_usr_dt = result_dt;
+
+  memory::desc m1_md, m1_usr_md;
+  memory::desc m2_md, m2_usr_md;
+  memory::desc r_md, r_usr_md;
   memory::desc b_md;
 
   memory::desc m1_md_any;
   memory::desc m2_md_any;
   memory::desc r_md_any;
 
+  // Master weight
+  auto gradient_weight_float = 0;
+  if (m1_dt == dnnl::memory::data_type::bf16 && m2_dt == dnnl::memory::data_type::f32) {
+    m2_dt = dnnl::memory::data_type::bf16;
+    result_dt = dnnl::memory::data_type::bf16;
+
+  } else if (m1_dt == dnnl::memory::data_type::f32 && m2_dt == dnnl::memory::data_type::bf16) {
+    m1_dt = dnnl::memory::data_type::bf16;
+    result_dt = dnnl::memory::data_type::bf16;
+
+  } else if (m1_dt == dnnl::memory::data_type::bf16 && m2_dt == dnnl::memory::data_type::bf16) {
+    gradient_weight_float = 1;
+    result_dt = dnnl::memory::data_type::bf16; // oneDNN unsupport fp32 output
+  }
+
   if (dims == 2) {
     m1_md = memory::desc({m, k}, m1_dt, {m1.stride(0), m1.stride(1)});
     m2_md = attr.m2_trans_ ? memory::desc({k, n}, m2_dt, {m2.stride(0), m2.stride(1)}) :
             memory::desc({k, n}, m2_dt, {m2.stride(1), m2.stride(0)});
     r_md = memory::desc({m, n}, result_dt, {result.stride(0), result.stride(1)});
+
+    m1_usr_md = memory::desc({m, k}, m1_usr_dt, {m1.stride(0), m1.stride(1)});
+    m2_usr_md = attr.m2_trans_ ? memory::desc({k, n}, m2_usr_dt, {m2.stride(0), m2.stride(1)}) :
+            memory::desc({k, n}, m2_usr_dt, {m2.stride(1), m2.stride(0)});
+    r_usr_md = memory::desc({m, n}, result_usr_dt, {result.stride(0), result.stride(1)});
 
     m1_md_any = memory::desc({m, k}, m1_dt, memory::format_tag::any);
     m2_md_any = memory::desc({k, n}, m2_dt, memory::format_tag::any);
@@ -105,7 +130,17 @@ void dnnlGemmImpl(
                                  {m2.stride(0), m2.stride(2), m2.stride(1)});
     r_md = memory::desc({mb, m, n}, result_dt,
       {result.stride(0), result.stride(1), result.stride(2)});
+
+    m1_usr_md = memory::desc({mb, m, k}, m1_usr_dt,
+      {m1.stride(0), m1.stride(1), m1.stride(2)});
+    m2_usr_md = attr.m2_trans_ ? memory::desc({mb, k, n}, m2_usr_dt,
+                                 {m2.stride(0), m2.stride(1), m2.stride(2)}) :
+                             memory::desc({mb, k, n}, m2_usr_dt,
+                                 {m2.stride(0), m2.stride(2), m2.stride(1)});
+    r_usr_md = memory::desc({mb, m, n}, result_usr_dt,
+      {result.stride(0), result.stride(1), result.stride(2)});
   }
+
   primitive_attr pattr;
   post_ops po;
   int64_t post_flags = 0;
@@ -214,7 +249,7 @@ void dnnlGemmImpl(
     }
   }
 
-#else
+#else // No USE_GEN12HP_ONEDNN
 #ifdef USE_PRIMITIVE_CACHE
   create_key(key, m1_md, m2_md, r_md, attr.beta_, attr.alpha_, post_flags);
 #endif
@@ -234,25 +269,9 @@ void dnnlGemmImpl(
   Tensor r_;
 
   if (!lazy_reorder_enabled() || dims == 3) {
-    m1_memory = dpcpp_onednn_memory(m1_md, engine, m1.data_ptr());
-    m2_memory = dpcpp_onednn_memory(m2_md, engine, m2.data_ptr());
-    r_memory = dpcpp_onednn_memory(r_md, engine, result.data_ptr());
-
-  } else {
-    auto m1_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m1);
-    m1_usr_memory = m1_ctx.is_plain() ?
-        dpcpp_onednn_memory(m1_md, engine, m1.data_ptr()) :
-        dpcpp_onednn_memory({m1_ctx.meta()}, engine, m1.data_ptr());
-
-    auto m2_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m2);
-    m2_usr_memory = m2_ctx.is_plain() ?
-        dpcpp_onednn_memory(m2_md, engine, m2.data_ptr()) :
-        dpcpp_onednn_memory({m2_ctx.meta()}, engine, m2.data_ptr());
-
-    auto r_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(result);
-    r_usr_memory = r_ctx.is_plain() ?
-        dpcpp_onednn_memory(r_md, engine, result.data_ptr()) :
-        dpcpp_onednn_memory({r_ctx.meta()}, engine, result.data_ptr());
+    m1_usr_memory = dpcpp_onednn_memory(m1_usr_md, engine, m1.data_ptr());
+    m2_usr_memory = dpcpp_onednn_memory(m2_usr_md, engine, m2.data_ptr());
+    r_usr_memory = dpcpp_onednn_memory(r_usr_md, engine, result.data_ptr());
 
     auto expected_m1_md = matmul_pd.src_desc();
     Tensor m1_;
@@ -262,7 +281,7 @@ void dnnlGemmImpl(
       m1.options(), c10::nullopt);
       m1_memory = dpcpp_onednn_memory(expected_m1_md, engine, m1_.data_ptr());
 #ifdef USE_PRIMITIVE_CACHE
-      create_key(key_r, m1_md, expected_m1_md);
+      create_key(key_r, m1_usr_md, expected_m1_md);
       auto reorder_p = fetch_or_create_m<dnnl::reorder>(key_r, m1_usr_memory, m1_memory);
 #else
       auto reorder_p = dnnl::reorder(m1_usr_memory, m1_memory);
@@ -285,7 +304,81 @@ void dnnlGemmImpl(
         m2_memory = dpcpp_onednn_memory(expected_m2_md, engine, m2_.data_ptr());
       }
 #ifdef USE_PRIMITIVE_CACHE
-      create_key(key_r, m2_md, expected_m2_md);
+      create_key(key_r, m2_usr_md, expected_m2_md);
+      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key_r, m2_usr_memory, m2_memory);
+#else
+      auto reorder_p = dnnl::reorder(m2_usr_memory, m2_memory);
+#endif
+      DPCPP_ONEDNN_EXEC(reorder_p,
+          strm, {{DNNL_ARG_FROM, m2_usr_memory}, {DNNL_ARG_TO, m2_memory}});
+    }
+
+    auto expected_r_md = matmul_pd.dst_desc();
+    r_memory = r_usr_memory;
+    if (r_usr_memory.get_desc() != expected_r_md) {
+      r_ = empty_opaque_tensor(expected_r_md, result.options(), c10::nullopt);
+      r_memory = dpcpp_onednn_memory(expected_r_md, engine, r_.data_ptr());
+      if (attr.beta_ != 1.f) {
+#ifdef USE_PRIMITIVE_CACHE
+      create_key(key_r, r_usr_md, expected_r_md);
+      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key_r, r_usr_memory, r_memory);
+#else
+      auto reorder_p = dnnl::reorder(r_usr_memory, r_memory);
+#endif
+        DPCPP_ONEDNN_EXEC(reorder(r_usr_memory, r_memory),
+            strm, {{DNNL_ARG_FROM, r_usr_memory}, {DNNL_ARG_TO, r_memory}});
+      }
+    }
+
+  } else { // lazy_reorder_enabled || dims != 3
+
+    auto m1_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m1);
+    m1_usr_memory = m1_ctx.is_plain() ?
+        dpcpp_onednn_memory(m1_usr_md, engine, m1.data_ptr()) :
+        dpcpp_onednn_memory({m1_ctx.meta()}, engine, m1.data_ptr());
+
+    auto m2_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m2);
+    m2_usr_memory = m2_ctx.is_plain() ?
+        dpcpp_onednn_memory(m2_usr_md, engine, m2.data_ptr()) :
+        dpcpp_onednn_memory({m2_ctx.meta()}, engine, m2.data_ptr());
+
+    auto r_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(result);
+    r_usr_memory = r_ctx.is_plain() ?
+        dpcpp_onednn_memory(r_usr_md, engine, result.data_ptr()) :
+        dpcpp_onednn_memory({r_ctx.meta()}, engine, result.data_ptr());
+
+    auto expected_m1_md = matmul_pd.src_desc();
+    Tensor m1_;
+    m1_memory = m1_usr_memory;
+    if (m1_usr_memory.get_desc() != expected_m1_md) {
+      m1_ = at::AtenIpexTypeXPU::empty({expected_m1_md.get_size() / m1.itemsize()},
+      m1.options(), c10::nullopt);
+      m1_memory = dpcpp_onednn_memory(expected_m1_md, engine, m1_.data_ptr());
+#ifdef USE_PRIMITIVE_CACHE
+      create_key(key_r, m1_usr_md, expected_m1_md);
+      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key_r, m1_usr_memory, m1_memory);
+#else
+      auto reorder_p = dnnl::reorder(m1_usr_memory, m1_memory);
+#endif
+      DPCPP_ONEDNN_EXEC(reorder_p,
+          strm, {{DNNL_ARG_FROM, m1_usr_memory}, {DNNL_ARG_TO, m1_memory}});
+    }
+
+    auto expected_m2_md = matmul_pd.weights_desc();
+    Tensor m2_;
+    m2_memory = m2_usr_memory;
+    if (m2_usr_memory.get_desc() != expected_m2_md) {
+      Tensor m2_opt;
+      if (weight_cache_enabled()) {
+        m2_opt = empty_opaque_tensor(expected_m2_md, m2.options(), c10::nullopt);
+        m2_memory = dpcpp_onednn_memory(expected_m2_md, engine, m2_opt.data_ptr());
+      } else {
+        m2_ = at::AtenIpexTypeXPU::empty(
+          {expected_m2_md.get_size() / m2.itemsize()}, m2.options(), c10::nullopt);
+        m2_memory = dpcpp_onednn_memory(expected_m2_md, engine, m2_.data_ptr());
+      }
+#ifdef USE_PRIMITIVE_CACHE
+      create_key(key_r, m2_usr_md, expected_m2_md);
       auto reorder_p = fetch_or_create_m<dnnl::reorder>(key_r, m2_usr_memory, m2_memory);
 #else
       auto reorder_p = dnnl::reorder(m2_usr_memory, m2_memory);
@@ -304,14 +397,13 @@ void dnnlGemmImpl(
     }
 
     auto expected_r_md = matmul_pd.dst_desc();
-
     r_memory = r_usr_memory;
     if (r_usr_memory.get_desc() != expected_r_md) {
       r_ = empty_opaque_tensor(expected_r_md, result.options(), c10::nullopt);
       r_memory = dpcpp_onednn_memory(expected_r_md, engine, r_.data_ptr());
       if (attr.beta_ != 1.f) {
 #ifdef USE_PRIMITIVE_CACHE
-      create_key(key_r, r_md, expected_r_md);
+      create_key(key_r, r_usr_md, expected_r_md);
       auto reorder_p = fetch_or_create_m<dnnl::reorder>(key_r, r_usr_memory, r_memory);
 #else
       auto reorder_p = dnnl::reorder(r_usr_memory, r_memory);
@@ -334,10 +426,54 @@ void dnnlGemmImpl(
         {DNNL_ARG_DST, r_memory}});
   }
 
+#else // No USE_GEN12HP_ONEDNN
+
+  memory m1_usr_memory, m2_usr_memory, r_usr_memory;
+  memory m1_memory, m2_memory, r_memory;
+
+  m1_usr_memory = dpcpp_onednn_memory(m1_usr_md, engine, m1.data_ptr());
+  m2_usr_memory = dpcpp_onednn_memory(m2_usr_md, engine, m2.data_ptr());
+  r_memory = dpcpp_onednn_memory(r_usr_md, engine, result.data_ptr());
+
+  auto expected_m1_md = matmul_pd.src_desc();
+  Tensor m1_;
+  m1_memory = m1_usr_memory;
+  if (m1_usr_memory.get_desc() != expected_m1_md) {
+    m1_ = at::AtenIpexTypeXPU::empty({expected_m1_md.get_size() / m1.itemsize()},
+    m1.options(), c10::nullopt);
+    m1_memory = dpcpp_onednn_memory(expected_m1_md, engine, m1_.data_ptr());
+#ifdef USE_PRIMITIVE_CACHE
+    create_key(key_r, m1_usr_md, expected_m1_md);
+    auto reorder_p = fetch_or_create_m<dnnl::reorder>(key_r, m1_usr_memory, m1_memory);
 #else
-  auto m1_memory = dpcpp_onednn_memory(m1_md, engine, m1.data_ptr());
-  auto m2_memory = dpcpp_onednn_memory(m2_md, engine, m2.data_ptr());
-  auto r_memory = dpcpp_onednn_memory(r_md, engine, result.data_ptr());
+    auto reorder_p = dnnl::reorder(m1_usr_memory, m1_memory);
+#endif
+    DPCPP_ONEDNN_EXEC(reorder_p,
+        strm, {{DNNL_ARG_FROM, m1_usr_memory}, {DNNL_ARG_TO, m1_memory}});
+  }
+
+  auto expected_m2_md = matmul_pd.weights_desc();
+  Tensor m2_;
+  m2_memory = m2_usr_memory;
+  if (m2_usr_memory.get_desc() != expected_m2_md) {
+    Tensor m2_opt;
+    if (weight_cache_enabled()) {
+      m2_opt = empty_opaque_tensor(expected_m2_md, m2.options(), c10::nullopt);
+      m2_memory = dpcpp_onednn_memory(expected_m2_md, engine, m2_opt.data_ptr());
+    } else {
+      m2_ = at::AtenIpexTypeXPU::empty(
+        {expected_m2_md.get_size() / m2.itemsize()}, m2.options(), c10::nullopt);
+      m2_memory = dpcpp_onednn_memory(expected_m2_md, engine, m2_.data_ptr());
+    }
+#ifdef USE_PRIMITIVE_CACHE
+    create_key(key_r, m2_usr_md, expected_m2_md);
+    auto reorder_p = fetch_or_create_m<dnnl::reorder>(key_r, m2_usr_memory, m2_memory);
+#else
+    auto reorder_p = dnnl::reorder(m2_usr_memory, m2_memory);
+#endif
+    DPCPP_ONEDNN_EXEC(reorder_p,
+        strm, {{DNNL_ARG_FROM, m2_usr_memory}, {DNNL_ARG_TO, m2_memory}});
+  }
 
   DPCPP_ONEDNN_EXEC(matmul_p, strm,
     {{DNNL_ARG_SRC, m1_memory}, {DNNL_ARG_WEIGHTS, m2_memory},
@@ -348,6 +484,11 @@ void dnnlGemmImpl(
   if (lazy_reorder_enabled() && r_memory != r_usr_memory && dims == 2) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(r_);
     DPCPPTensorContext::set_tensor_ctx(result, std::move(blk_ctx));
+  }
+
+  // Master weight
+  if (gradient_weight_float) {
+    result = result.to(ScalarType::Float);
   }
 #endif
 }
@@ -465,7 +606,9 @@ Tensor& addmm_(
   impl::gemm_broadcast(
   self,
   m1,
-  m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+  m2.scalar_type() == m1.scalar_type() ? m2 :
+                     (m1.scalar_type() == ScalarType::BFloat16 || m2.scalar_type() == ScalarType::BFloat16) ? m2 :
+                      m2.to(m1.scalar_type()),
   // bias convert to fp32 for accuracy when self is fp16 or bf16
   attr,
   self.scalar_type() == ScalarType::Half ||
@@ -503,7 +646,9 @@ Tensor addmm(
   impl::gemm_broadcast(
   result,
   m1,
-  m2.scalar_type() == m1.scalar_type() ? m2 : m2.to(m1.scalar_type()),
+  m2.scalar_type() == m1.scalar_type() ? m2 :
+                     (m1.scalar_type() == ScalarType::BFloat16 || m2.scalar_type() == ScalarType::BFloat16) ? m2 :
+                      m2.to(m1.scalar_type()),
   // bias convert to fp32 for accuracy when input is fp16 or bf16
   attr,
   input.scalar_type() == ScalarType::Half ||
@@ -519,10 +664,16 @@ Tensor& mm_out(Tensor& result, const Tensor& self, const Tensor& mat2) {
   TORCH_CHECK(self.dim() == 2, "expected 2D tensor");
   TORCH_CHECK(mat2.dim() == 2, "expected 2D tensor");
 
+  auto self_dt = self.scalar_type();
+  auto result_dt = result.scalar_type();
+  auto mat2_dt = mat2.scalar_type();
+
   impl::gemm_broadcast(
   result,
-  self.scalar_type() == result.scalar_type() ? self : self.to(result.scalar_type()),
-  mat2.scalar_type() == result.scalar_type() ? mat2 : mat2.to(result.scalar_type()),
+  (self_dt == result_dt ||
+   ((self_dt == ScalarType::BFloat16 && result_dt != ScalarType::BFloat16) || (result_dt == ScalarType::BFloat16 && self_dt != ScalarType::BFloat16))) ? self : self.to(result_dt),
+  (mat2_dt == result_dt || 
+   ((mat2_dt == ScalarType::BFloat16 && result_dt != ScalarType::BFloat16) || (result_dt == ScalarType::BFloat16 && mat2_dt != ScalarType::BFloat16))) ? mat2 : mat2.to(result_dt),
   attr);
 
   return result;

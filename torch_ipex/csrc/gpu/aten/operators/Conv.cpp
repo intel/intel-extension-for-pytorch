@@ -52,6 +52,13 @@ at::Tensor convolution(
   }
   auto usr_bias_data_t = dnnl::memory::data_type::f32;
 
+  //master weight
+  if (src_data_t == dnnl::memory::data_type::bf16) {
+    wei_data_t = dnnl::memory::data_type::bf16;
+    bias_data_t = dnnl::memory::data_type::bf16;
+    dst_data_t = src_data_t;
+  }
+
   auto format_any = memory::format_tag::any;
   auto format_input = conv_input_fmt(ndim);
   auto format_weight = conv_weight_fmt(ndim, groups != 1);
@@ -358,6 +365,7 @@ Tensor dpcpp_convolution_backward_input(
   auto data_grad = dt_to_dnnl(grad_output.scalar_type());
   auto weight_t = dt_to_dnnl(weight.scalar_type());
   auto bias_t = dnnl::memory::data_type::f32;
+  auto weight_usr_t = dt_to_dnnl(weight.scalar_type());
   auto format_any = memory::format_tag::any;
   auto format_input = conv_input_fmt(ndim);
   auto format_weight = conv_weight_fmt(ndim, groups != 1);
@@ -371,6 +379,12 @@ Tensor dpcpp_convolution_backward_input(
   memory::dims _stride = stride.vec();
   memory::dims _padding = padding.vec();
   memory::dims _dilation = compatible_dilation(dilation);
+
+  //Master weight
+  if (data_grad == dnnl::memory::data_type::bf16) {
+      weight_t = dnnl::memory::data_type::bf16;
+      bias_t = dnnl::memory::data_type::bf16;
+  }
 
   auto input_md = memory::desc(input_tz, data_grad, format_any);
   auto weight_md = memory::desc(weight_tz, weight_t, format_any);
@@ -398,7 +412,7 @@ Tensor dpcpp_convolution_backward_input(
       {output_tz, data_grad, format_input}, engine, grad_output.data_ptr());
 
     weight_usr_memory = dpcpp_onednn_memory(
-      {weight_tz, weight_t, format_weight}, engine, weight.data_ptr());
+      {weight_tz, weight_usr_t, format_weight}, engine, weight.data_ptr());
 
     grad_input_usr_memory = dpcpp_onednn_memory(
       {input_tz, data_grad, format_input}, engine, grad_input.data_ptr());
@@ -410,7 +424,7 @@ Tensor dpcpp_convolution_backward_input(
 
     auto weight_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(weight);
     weight_usr_memory = weight_ctx.is_plain()
-        ? dpcpp_onednn_memory({weight_tz, weight_t, format_weight}, engine, weight.data_ptr())
+        ? dpcpp_onednn_memory({weight_tz, weight_usr_t, format_weight}, engine, weight.data_ptr())
         : dpcpp_onednn_memory({weight_ctx.meta()}, engine, weight.data_ptr());
 
     auto grad_input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_input);
@@ -513,6 +527,24 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   auto format_weight = conv_weight_fmt(ndim, groups != 1);
   auto format_bias = memory::format_tag::x;
 
+  // Master weight
+  auto grad_weight_t = weight_t;
+  auto grad_bias_t = weight_t;
+
+  // Better to check at runtime for BF16 supported machine, like ATS, PVC.
+  // For now, recreate plain gw and gb in FP32 for BF16 training.
+  if (data_grad == dnnl::memory::data_type::bf16) {
+    grad_weight_t = dnnl::memory::data_type::f32;
+    grad_weight = at::empty(weight_size, grad_output.options().dtype(kFloat));
+  }
+  
+  if (bias_defined) {
+    if (data_grad == dnnl::memory::data_type::bf16) {
+      grad_bias_t = dnnl::memory::data_type::f32;
+      grad_bias = at::empty({grad_output.size(1)}, grad_output.options().dtype(kFloat));
+    }
+  }
+
   memory::dims input_tz = input.sizes().vec();
   memory::dims weight_tz = compatible_weight_dims(ndim, groups, oc, ic, grad_weight.sizes());
   memory::dims bias_tz = {oc};
@@ -524,10 +556,13 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   memory::dims _dilation = compatible_dilation(dilation);
 
   auto input_md = memory::desc(input_tz, data_grad, format_any);
-  auto weight_md = memory::desc(weight_tz, weight_t, format_any);
-  auto output_md = memory::desc(output_tz, data_grad, format_any);
-  auto bias_md = bias_defined ? memory::desc(bias_tz, bias_t, format_any) : memory::desc();
+  // Master weight - for now, we want plain gw output and gb output because weight and bias in sgd is plain.
+  //                 while plain calculation in Conv3d cannot get the correct gw in PreCI.
+  //                 Thus, we still use format_any here and add one reorder in the end.
+  auto weight_md = memory::desc(weight_tz, grad_weight_t, format_any);
+  auto bias_md = bias_defined ? memory::desc(bias_tz, grad_bias_t, format_any) : memory::desc();
 
+  auto output_md = memory::desc(output_tz, weight_t, format_any);
   auto conv_forward_desc = convolution_forward::desc(
       prop_kind::forward, algorithm::convolution_direct,
       input_md, weight_md, bias_md, output_md,
@@ -552,7 +587,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
         {output_tz, data_grad, format_input}, engine, grad_output.data_ptr());
 
     grad_weight_usr_memory = dpcpp_onednn_memory(
-        {weight_tz, weight_t, format_weight}, engine, grad_weight.data_ptr());
+        {weight_tz, grad_weight_t, format_weight}, engine, grad_weight.data_ptr());
   } else {
     auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
     input_usr_memory = input_ctx.is_plain()
@@ -566,7 +601,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
 
     auto grad_weight_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_weight);
     grad_weight_usr_memory = grad_weight_ctx.is_plain()
-        ? dpcpp_onednn_memory({weight_tz, weight_t, format_weight}, engine, grad_weight.data_ptr())
+        ? dpcpp_onednn_memory({weight_tz, grad_weight_t, format_weight}, engine, grad_weight.data_ptr())
         : dpcpp_onednn_memory({grad_weight_ctx.meta()}, engine, grad_weight.data_ptr());
   }
 
@@ -615,7 +650,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
     } else {
       auto grad_bias_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_bias);
       grad_bias_memory = grad_bias_ctx.is_plain()
-        ? dpcpp_onednn_memory({bias_tz, bias_t, format_bias}, engine, grad_bias.data_ptr())
+        ? dpcpp_onednn_memory({bias_tz, grad_bias_t, format_bias}, engine, grad_bias.data_ptr())
         : dpcpp_onednn_memory({grad_bias_ctx.meta()}, engine, grad_bias.data_ptr());
     }
   }
@@ -629,15 +664,15 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
       {DNNL_ARG_DIFF_WEIGHTS, grad_weight_memory},
       {DNNL_ARG_DIFF_BIAS, grad_bias_memory}});
 
-  if (!lazy_reorder_enabled() && grad_weight_memory != grad_weight_usr_memory) {
+  if (grad_weight_memory.get_desc() != grad_weight_usr_memory.get_desc()) {
+    // grad_weight_ contains the result of gw backward, while it is blk format. 
+    // In training mode, plain gw output is expected for sgd update regardless of lazy_reorder_enabled or not.
+    // Thus, we need one additional reorder here to make grad_weight plain.
     DPCPP_ONEDNN_EXEC(
         reorder(grad_weight_memory, grad_weight_usr_memory),
         strm,
         {{DNNL_ARG_FROM, grad_weight_memory},
         {DNNL_ARG_TO, grad_weight_usr_memory}});
-  } else if (lazy_reorder_enabled() && grad_weight_memory != grad_weight_usr_memory) {
-    auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(grad_weight_);
-    DPCPPTensorContext::set_tensor_ctx(grad_weight, std::move(blk_ctx));
   }
 
   return std::tuple<at::Tensor, at::Tensor>{grad_weight, grad_bias};
