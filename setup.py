@@ -205,6 +205,7 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
                 'PYTHON_INCLUDE_DIR': distutils.sysconfig.get_python_inc(),
                 'LIB_NAME': ext.name,
                 'PYTHON_EXECUTABLE': sys.executable,
+                'CMAKE_INSTALL_LIBDIR': 'lib',
             }
 
             if find_executable('ninja') is not None:
