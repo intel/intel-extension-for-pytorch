@@ -234,9 +234,11 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
 
   auto _rnn_kind = static_cast<dil::rnn_kind>(rnn.mode);
   // TODO: only implemented prepack for fp32 & bf16 inference of LSTM cell
-  if (_rnn_kind == dil::rnn_kind::LSTM && \
-    ((!check_auto_mix_bf16_fp32() && !weight_ih.requires_grad() && !weight_hh.requires_grad()) || \
-    (check_auto_mix_bf16_fp32() && !check_train()))) {
+  // We only do the weight prepack during the inference since 
+  // the format of the weight in the FW and BW of the LSTM is different:
+  // FW weight format: ldigo
+  // BW weight format: ldgoi
+  if (_rnn_kind == dil::rnn_kind::LSTM && !train) {
     prepack_lstm_weights(
       weight_ih,
       weight_hh,
