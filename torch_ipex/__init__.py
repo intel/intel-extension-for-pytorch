@@ -14,6 +14,9 @@ from . import _C
 from .version import __version__, __ipex_gitrev__
 from .streams import Stream, Event
 
+from . import profiler as profiler
+from . import itt as itt
+
 
 
 _device_t = Union[_device, str, int]
