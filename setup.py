@@ -9,10 +9,11 @@ except ImportError as e:
     print('You need to install pytorch first.')
     sys.exit(1)
 
-from subprocess import check_call
+from subprocess import check_call, check_output
 from setuptools import setup, Extension, find_packages, distutils
 from setuptools.command.build_ext import build_ext
 from distutils.spawn import find_executable
+from distutils.version import LooseVersion
 from sysconfig import get_paths
 
 import distutils.ccompiler
@@ -32,6 +33,39 @@ pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
 base_dir = os.path.dirname(os.path.abspath(__file__))
 python_include_dir = get_paths()['include']
 
+# from https://github.com/pytorch/pytorch/blob/master/tools/setup_helpers/__init__.py
+def which(thefile):
+    path = os.environ.get("PATH", os.defpath).split(os.pathsep)
+    for d in path:
+        fname = os.path.join(d, thefile)
+        fnames = [fname]
+        if sys.platform == 'win32':
+            exts = os.environ.get('PATHEXT', '').split(os.pathsep)
+            fnames += [fname + ext for ext in exts]
+        for name in fnames:
+            if os.access(name, os.F_OK | os.X_OK) and not os.path.isdir(name):
+                return name
+    return None
+
+def get_cmake_command():
+    def _get_version(cmd):
+        for line in check_output([cmd, '--version']).decode('utf-8').split('\n'):
+            if 'version' in line:
+                return LooseVersion(line.strip().split(' ')[2])
+        raise RuntimeError('no version found')
+    "Returns cmake command."
+    cmake_command = 'cmake'
+    if platform.system() == 'Windows':
+        return cmake_command
+    cmake3 = which('cmake3')
+    cmake = which('cmake')
+    if cmake3 is not None and _get_version(cmake3) >= LooseVersion("3.13.0"):
+        cmake_command = 'cmake3'
+        return cmake_command
+    elif cmake is not None and _get_version(cmake) >= LooseVersion("3.13.0"):
+         return cmake_command
+    else:
+         raise RuntimeError('no cmake or cmake3 with version >= 3.13.0 found')
 
 def _check_env_flag(name, default=''):
   return os.getenv(name, default).upper() in ['ON', '1', 'YES', 'TRUE', 'Y']
@@ -155,7 +189,8 @@ class IPEXBuild(build_ext, object):
     # Generate the code before globbing!
     generate_ipex_cpu_aten_code(base_dir)
 
-    cmake = find_executable('cmake3') or find_executable('cmake')
+    cmake = get_cmake_command()
+
     if cmake is None:
       raise RuntimeError(
           "CMake must be installed to build the following extensions: " +
@@ -175,7 +210,7 @@ class IPEXBuild(build_ext, object):
 
     build_type = 'Release'
     use_ninja = False
-    
+
     if _check_env_flag('DEBUG'):
       build_type = 'Debug'
 
@@ -192,7 +227,7 @@ class IPEXBuild(build_ext, object):
             '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + ext_dir,
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
             '-DPYTORCH_INCLUDE_DIRS=' + pytorch_install_dir + "/include",
-            '-DPYTORCH_LIBRARY_DIRS=' + pytorch_install_dir + "/lib", 
+            '-DPYTORCH_LIBRARY_DIRS=' + pytorch_install_dir + "/lib",
         ]
 
     if _check_env_flag("IPEX_DISP_OP"):
