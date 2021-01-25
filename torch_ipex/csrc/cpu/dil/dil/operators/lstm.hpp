@@ -28,11 +28,14 @@ struct lstm_forward : public dnnl::lstm_forward {
     auto src_iter_desc = src_iter.get_desc().to_type(src_layer.get_data_type());
     auto src_iter_c_desc = src_iter_c.get_desc();
 
-    // TODO : how to check whether prepacked or not
     auto weights_layer_desc = weights_layer.get_desc();
     auto weights_iter_desc = weights_iter.get_desc();
 
-    // after prepack, the weight will be padded(fp32 & bf16) or blocked(int8), which is not dense
+    // If the weight is prepacked, the weight will be padded(fp32 & bf16) or blocked(int8), which is not dense
+    // If not prepacked:     
+    //  use any format for weights
+    //  For accuracy consideration, weight remains fp32 when doing training,
+    //  so it is necessary to align weights data type with src in here.
     if (weights_layer_desc.is_dense()) {
       weights_layer_desc = weights_layer_desc.to_format_any().to_type(src_layer.get_data_type());
     }
@@ -79,11 +82,8 @@ struct lstm_forward : public dnnl::lstm_forward {
                       const tensor& src_layer,
                       const tensor& src_iter,
                       const tensor& src_iter_c,
-
                       const tensor& weights_layer,
                       const tensor& weights_iter,
-
-
                       const tensor& bias,
                       const bool reverse = false,
                       prop_kind aprop = prop_kind::forward,

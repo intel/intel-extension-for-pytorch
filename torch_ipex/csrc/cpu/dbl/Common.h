@@ -61,6 +61,7 @@ void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected
  * Replace the whole original storage with a dil storage `dil_buffer`
  * @param[in] tensor            The input tensor
  * @param[in] dil_tensor_buffer The dil tensor buffer
+ * @param[in] padding_size      The padded size of the dil_buffer ( = storage size calculated using dims and strides - numel())
  */
 void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer, int64_t padding_size = 0);
 

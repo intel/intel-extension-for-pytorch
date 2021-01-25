@@ -5,7 +5,6 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/TensorUtils.h>
 #include <c10/util/Exception.h>
-#include <ATen/core/grad_mode.h>
 
 #include "RNN.h"
 #include "Common.h"
@@ -118,7 +117,7 @@ std::vector<int64_t> _output_size(const RNNParams& rnn) {
 //                           +---------+
 //
 at::Tensor _shuffle_weight(const at::Tensor& weight, int64_t fn_mode) {
-  // for prepacked weight, should not do contiguous here
+  // for prepacked weight, return the weight tensor directly
   if (cpu::ShadeDataContext::isPackedTensor(weight)) {
       return weight;
   }
@@ -151,6 +150,7 @@ void prepack_lstm_weights(
   const dil::tensor& src_iter,
   const dil::tensor& src_iter_c,
   const dil::tensor& bias,
+  dil::rnn_kind _rnn_kind,
   const bool reverse = false,
   dil::prop_kind aprop = dil::prop_kind::forward,
   const dil::engine& aengine = dil::engine::cpu_engine()) {
@@ -162,17 +162,35 @@ void prepack_lstm_weights(
     auto w2 = dbl::comm::try_gen_dil_tensor(weight_hh, {1, 1, hidden_size, num_gates, hidden_size}, dil::format_tag::ldgoi);
  
     dil::tensor::desc expected_weights_layer_desc, expected_weights_iter_desc;
-    std::tie(expected_weights_layer_desc, expected_weights_iter_desc) = dil::lstm_forward::expected_weights_desc(
-                      output_sizes,
-                      src_layer,
-                      src_iter,
-                      src_iter_c,
-                      w1,
-                      w2,
-                      bias,
-                      reverse,
-                      aprop, 
-                      aengine);
+
+    // TODO: add prepack of GRU
+    if (_rnn_kind == dil::rnn_kind::LSTM) {
+      std::tie(expected_weights_layer_desc, expected_weights_iter_desc) = dil::lstm_forward::expected_weights_desc(
+                        output_sizes,
+                        src_layer,
+                        src_iter,
+                        src_iter_c,
+                        w1,
+                        w2,
+                        bias,
+                        reverse,
+                        aprop,
+                        aengine);
+    } else {
+      TORCH_CHECK(_rnn_kind == dil::rnn_kind::RNN_RELU || _rnn_kind == dil::rnn_kind::RNN_TANH,
+            "mkldnn_rnn: unsuppored rnn mode: ", _rnn_kind);
+    std::tie(expected_weights_layer_desc, expected_weights_iter_desc) = dil::rnn_forward::expected_weights_desc(
+                        output_sizes, 
+                        src_layer, 
+                        src_iter, 
+                        w1, 
+                        w2, 
+                        bias,
+                        _rnn_kind,
+                        reverse,
+                        aprop,
+                        aengine);
+    }
 
     dil::tensor expected_weight_ih {expected_weights_layer_desc};
     dil::tensor expected_weight_hh {expected_weights_iter_desc};
@@ -226,7 +244,7 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
 
 
   auto src_type = x.get_data_type();
-  if (src_type == dil::data_type::s8 ||src_type ==  dil::data_type::u8) {
+  if (src_type == dil::data_type::s8 || src_type ==  dil::data_type::u8) {
     aprop_kind = dil::prop_kind::forward_inference;
   }
 
@@ -238,7 +256,11 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
   // the format of the weight in the FW and BW of the LSTM is different:
   // FW weight format: ldigo
   // BW weight format: ldgoi
-  if (_rnn_kind == dil::rnn_kind::LSTM && !train) {
+
+  // TODO: prepack for GRU inference: GRU need to shuffle weight
+  // We need to design how to sync the shape of the dil tensor and the aten tensor
+  // during FW and BW
+  if (!train && _rnn_kind != dil::rnn_kind::GRU) {
     prepack_lstm_weights(
       weight_ih,
       weight_hh,
@@ -250,6 +272,7 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
       hx,
       cx,
       b,
+      _rnn_kind,
       reverse,
       aprop_kind
     );

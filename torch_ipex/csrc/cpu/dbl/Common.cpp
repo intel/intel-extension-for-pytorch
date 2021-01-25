@@ -283,6 +283,9 @@ void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer, int64_t 
 
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)tensor.unsafeGetTensorImpl();
   if (dil_buffer.is_public_format()) {
+    // We add the padding_size here since the dil_buffer could be plain format with paddings
+    // (for example the expected LSTM weight format of oneDNN), we should take the paddings 
+    // into consideration during checkInBoundsForStorage
     ipex_tensor_impl->set_strided(dil_buffer.get_dims(), dil_buffer.get_strides(), ipex_tensor_impl->storage_offset(), padding_size);
   } else {
     // ??? TORCH_INTERNAL_ASSERT_DEBUG_ONLY(sizes.size() != 1 || sizes[0] != 0);
