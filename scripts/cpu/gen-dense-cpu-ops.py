@@ -97,14 +97,24 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::upsample_bilinear2d_backward(Tensor grad_output, int[2] output_size, int[4] input_size, bool align_corners, float? scales_h=None, float? scales_w=None) -> Tensor',
     'aten::upsample_trilinear3d(Tensor self, int[3] output_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> Tensor',
     'aten::upsample_trilinear3d_backward(Tensor grad_output, int[3] output_size, int[5] input_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> Tensor',
-    'aten::unsqueeze(Tensor(a) self, int dim) -> Tensor(a)'
+    'aten::unsqueeze(Tensor(a) self, int dim) -> Tensor(a)',
+    'aten::div.Tensor(Tensor self, Tensor other) -> Tensor',
+    'aten::div_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)',
+    'aten::div_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)',
+    'aten::div.Scalar(Tensor self, Scalar other) -> Tensor',
+    'aten::div.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)',
 ]
 
 _FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
     'aten::index.Tensor(Tensor self, Tensor?[] indices) -> Tensor',
     # 'aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)',
-    'aten::_pack_padded_sequence(Tensor input, Tensor lengths, bool batch_first) -> (Tensor, Tensor)'
+    'aten::_pack_padded_sequence(Tensor input, Tensor lengths, bool batch_first) -> (Tensor, Tensor)',
+    'aten::div.Tensor(Tensor self, Tensor other) -> Tensor',
+    'aten::div_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)',
+    'aten::div_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)',
+    'aten::div.Scalar(Tensor self, Scalar other) -> Tensor',
+    'aten::div.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)',
 ]
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
@@ -353,12 +363,12 @@ class DenseOPCodeGen(object):
         fname = cpp_sig.def_name
         if fname.endswith('_'):
             assert len(dnnl_tensor_param_vars) > 0
-            code += '      if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors)) {\n'
             if self.is_ipex_func(aten_func_sig_str):
                 code += self.gen_ipex_func_code(fname, param_vars)
             else:
+                code += '      if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors)) {\n'
                 code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(list(param_vars)))
-            code += '      }\n' # Check support tensors
+                code += '      }\n' # Check support tensors
         else:
             param_seq_str_vec = []
             for param_var in param_vars:

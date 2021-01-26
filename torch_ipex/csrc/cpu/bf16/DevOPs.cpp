@@ -25,6 +25,22 @@ at::Tensor index(const at::Tensor & self, at::TensorList indices) {
   return bf16::gen_mix_prec_tensor(_ipex_result);
 }
 
+at::Tensor div(const at::Tensor &self, const at::Tensor &other) {
+  auto &&_ipex_self = bf16::gen_consistent_tensor(self);
+  auto &&_ipex_other = bf16::gen_consistent_tensor(other);
+  auto &&_ipex_result = at::div(_ipex_self, _ipex_other);
+  return bf16::gen_mix_prec_tensor(_ipex_result);
+}
+
+at::Tensor &div_out(at::Tensor &out, const at::Tensor &self,
+                    const at::Tensor &other) {
+  auto &&_ipex_out = bf16::gen_consistent_tensor(out);
+  auto &&_ipex_self = bf16::gen_consistent_tensor(self);
+  auto &&_ipex_other = bf16::gen_consistent_tensor(other);
+  at::div_out(_ipex_out, _ipex_self, _ipex_other);
+  return out;
+}
+
 }  // namespace bf16
 }  // namespace cpu
 }  // namespace torch_ipex

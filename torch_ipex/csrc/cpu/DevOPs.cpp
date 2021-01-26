@@ -41,6 +41,34 @@ namespace cpu {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.defined());                                \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.layout() == c10::kStrided)
 
+#define CHECK_ATEN_BF16_USABLE(tensor)                                                                                     \
+  ShadeDataContext::isDilTensor(tensor) &&                                                                                         \
+  ShadeDataContext::isTensorMixPrecision(tensor) &&                                                                     \
+  ShadeDataContext::getDilStorage(tensor).get_data_type() ==  dil::data_type::bf16 &&  \
+  dbl::comm::try_gen_dil_tensor(tensor).is_public_format()
+
+dil::tensor reshape_tensor_for_broadcast(dil::tensor &src1, dil::tensor &src2) {
+  auto diff_ndims = src1.ndims() - src2.ndims();
+  auto right = diff_ndims > 0 ? src2 : src1;
+  auto &left = diff_ndims > 0 ? src1 : src2;
+
+  diff_ndims = diff_ndims > 0 ? diff_ndims : -diff_ndims;
+
+  dil::dims reshape_dims;
+  for (int i = 0; i < diff_ndims; i++) {
+    reshape_dims.push_back(1);
+  }
+  for (int i = 0; i < right.ndims(); i++) {
+    reshape_dims.push_back(right.get_dim(i));
+  }
+  for (int i = left.ndims() - 1; i >= 0; i--) {
+    IPEX_CHECK(reshape_dims[i] == left.get_dim(i) || reshape_dims[i] == 1,
+               "dil mul not support the shape for broadcast");
+  }
+  right.reshape(reshape_dims);
+  return right;
+}
+
 at::Tensor AtenIpexCPUDev::dil_convolution(
     const at::Tensor & input,
     const at::Tensor & weight,
@@ -641,28 +669,6 @@ at::Tensor & AtenIpexCPUDev::dil_add_(at::Tensor& self, const at::Tensor& other,
   DEBUG("AtenIpexCPUDev::dil_add_\n");
 
   return dil_add_common</*inplace=*/true>(self, self, other, alpha);
-}
-
-dil::tensor reshape_tensor_for_broadcast(dil::tensor& src1, dil::tensor& src2) {
-  auto diff_ndims = src1.ndims() - src2.ndims();
-  auto right = diff_ndims > 0 ? src2 : src1;
-  auto& left = diff_ndims > 0 ? src1 : src2;
-
-  diff_ndims = diff_ndims > 0 ? diff_ndims : -diff_ndims;
-
-  dil::dims reshape_dims;
-  for (int i = 0; i < diff_ndims; i++) {
-    reshape_dims.push_back(1);
-  }
-  for (int i = 0; i < right.ndims(); i++) {
-    reshape_dims.push_back(right.get_dim(i));
-  }
-  for (int i = left.ndims() - 1; i >= 0; i--) {
-    IPEX_CHECK(reshape_dims[i] == left.get_dim(i) || reshape_dims[i] == 1,
-               "dil mul not support the shape for broadcast");
-  }
-  right.reshape(reshape_dims);
-  return right;
 }
 
 template<bool inplace>
@@ -2693,6 +2699,75 @@ at::Tensor AtenIpexCPUDev::dil_unsqueeze(const at::Tensor& self, int64_t dim) {
   sizes.insert(sizes.begin() + dim, 1);
   strides.insert(strides.begin() + dim, new_stride);
   return dil_as_strided(self, sizes, strides, self.storage_offset());
+}
+
+at::Tensor AtenIpexCPUDev::dil_div(const at::Tensor &self,
+                                   const at::Tensor &other) {
+  DEBUG("AtenIpexCPUDev::dil_div\n");
+  torch_ipex::reset_ipex_func_status();
+
+  IPEX_CHECK(self.device().type() == c10::DeviceType::DPCPP,
+             "IPEX div only work when dividend is DPCPP tensor");
+  IPEX_CHECK(
+      other.device().type() == c10::DeviceType::DPCPP ||
+          other.unsafeGetTensorImpl()->is_wrapped_number(),
+      "IPEX div only work when divisor is DPCPP tensor or is wrapped number");
+  if (CHECK_ATEN_BF16_USABLE(self)) {
+    if (other.unsafeGetTensorImpl()->is_wrapped_number() ||
+        CHECK_ATEN_BF16_USABLE(other))
+      return bf16::div(self, other);
+  }
+
+  torch_ipex::set_ipex_func_status(torch_ipex::IPEXFuncStatus::IPEX_FALLBACK);
+  return at::Tensor();
+}
+
+at::Tensor AtenIpexCPUDev::dil_div(const at::Tensor &self, at::Scalar &other) {
+  auto tensor = at::scalar_to_tensor(other);
+  DEBUG("AtenIpexCPUDev::dil_div_Scalar\n");
+  auto impl = tensor.unsafeGetTensorImpl();
+  impl->set_wrapped_number(true);
+  impl->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(
+      c10::Device(at::DeviceType::DPCPP));
+  return dil_div(self, tensor);
+}
+
+at::Tensor &AtenIpexCPUDev::dil_div_(at::Tensor &self,
+                                     const at::Tensor &other) {
+  DEBUG("AtenIpexCPUDev::dil_div_\n");
+  return AtenIpexCPUDev::dil_div_out(self, self, other);
+}
+
+at::Tensor &AtenIpexCPUDev::dil_div_(at::Tensor &self, at::Scalar &other) {
+  auto tensor = at::scalar_to_tensor(other);
+  DEBUG("AtenIpexCPUDev::dil_div_Scalar\n");
+  auto impl = tensor.unsafeGetTensorImpl();
+  impl->set_wrapped_number(true);
+  impl->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(
+      c10::Device(at::DeviceType::DPCPP));
+  return AtenIpexCPUDev::dil_div_out(self, self, tensor);
+}
+
+at::Tensor &AtenIpexCPUDev::dil_div_out(at::Tensor &out, const at::Tensor &self,
+                                        const at::Tensor &other) {
+  DEBUG("AtenIpexCPUDev::dil_div_out\n");
+  torch_ipex::reset_ipex_func_status();
+
+  IPEX_CHECK(out.device().type() == c10::DeviceType::DPCPP &&
+                 self.device().type() == c10::DeviceType::DPCPP,
+             "IPEX div only work when dividend is DPCPP tensor");
+  IPEX_CHECK(
+      other.device().type() == c10::DeviceType::DPCPP ||
+          other.unsafeGetTensorImpl()->is_wrapped_number(),
+      "IPEX div only work when divisor is DPCPP tensor or is wrapped number");
+  if (CHECK_ATEN_BF16_USABLE(out) && CHECK_ATEN_BF16_USABLE(self)) {
+    if (other.unsafeGetTensorImpl()->is_wrapped_number() ||
+        CHECK_ATEN_BF16_USABLE(other))
+      return bf16::div_out(out, self, other);
+  }
+
+  torch_ipex::set_ipex_func_status(torch_ipex::IPEXFuncStatus::IPEX_FALLBACK);
+  return out;
 }
 
 }  // namespace cpu
