@@ -110,7 +110,7 @@ void _mkl_dft(
     bool complex_output,
     bool inverse,
     IntArrayRef checked_signal_sizes,
-    bool normalized,
+    int64_t normalization,
     bool onesided,
     int64_t batch) {
   auto& dpcpp_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
@@ -138,11 +138,14 @@ void _mkl_dft(
     desc.set_value(
         oneapi::mkl::dft::config_param::CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
   }
-  if (normalized || inverse) {
+
+  // rescale if requested
+  const auto norm = static_cast<at::native::fft_norm_mode>(normalization);
+  if (norm != at::native::fft_norm_mode::none) {
     auto signal_numel = at::prod_intlist(checked_signal_sizes);
     double double_scale;
-    if (normalized) {
-      double_scale = 1.0 / Numerics<double>::sqrt(signal_numel);
+    if (norm == at::native::fft_norm_mode::by_root_n) {
+      double_scale = 1.0 / Numerics<double>::sqrt(signal_numel);;
     } else {
       double_scale = 1.0 / static_cast<double>(signal_numel);
     }
@@ -154,13 +157,19 @@ void _mkl_dft(
   }
 
   desc.commit(dpcpp_queue);
-  auto in_buffer = make_buffer<scalar_t>(input.data_ptr());
-  auto out_buffer = make_buffer<scalar_t>(output.data_ptr());
+
+#ifdef USE_USM
+  auto in_data = (scalar_t*)input.data_ptr();
+  auto out_data = (scalar_t*)output.data_ptr();
+#else
+  auto in_data = make_buffer<scalar_t>(input.data_ptr());
+  auto out_data = make_buffer<scalar_t>(output.data_ptr());
+#endif
 
   if (!inverse) {
-    desc.compute_forward(in_buffer, out_buffer);
+    desc.compute_forward(in_data, out_data);
   } else {
-    desc.compute_backward(in_buffer, out_buffer);
+    desc.compute_backward(in_data, out_data);
   }
 
   if (!complex_input && complex_output && !onesided) {
@@ -182,7 +191,7 @@ Tensor _fft_with_size(
     bool complex_output,
     bool inverse,
     IntArrayRef checked_signal_sizes,
-    bool normalized,
+    int64_t normalization,
     bool onesided,
     IntArrayRef output_sizes) {
 #ifdef USE_ONEMKL
@@ -222,7 +231,7 @@ Tensor _fft_with_size(
           complex_output,
           inverse,
           checked_signal_sizes,
-          normalized,
+          normalization,
           onesided,
           batch);
     } else {
@@ -235,7 +244,7 @@ Tensor _fft_with_size(
               complex_output,
               inverse,
               checked_signal_sizes,
-              normalized,
+              normalization,
               onesided,
               batch);
     }
@@ -252,7 +261,7 @@ Tensor _fft_with_size(
           complex_output,
           inverse,
           checked_signal_sizes,
-          normalized,
+          normalization,
           onesided,
           batch);
     } else {
@@ -265,7 +274,7 @@ Tensor _fft_with_size(
               complex_output,
               inverse,
               checked_signal_sizes,
-              normalized,
+              normalization,
               onesided,
               batch);
     }

@@ -7,13 +7,26 @@ class TestNNMethod(TestCase):
     @pytest.mark.skip(reason='MKL support')
     def test_fft(self, dtype=torch.float):
         x = torch.randn(5, 5)
-        x_dpcpp = x.to("xpu")
-        y = torch.rfft(x, 2, onesided=True, normalized=False)
-        y_dpcpp = torch.rfft(x_dpcpp, 2, onesided=True, normalized=False)
+        x2 = torch.randn(4, 3, 2)
+        x1_dpcpp = x1.to("xpu")
+        x2_dpcpp = x2.to("xpu")
+        y1 = torch.rfft(x1, 2, onesided=True, normalized=False)
+        y2 = torch.irfft(y1, 2, onesided=True, signal_sizes=x1.shape)
+        y3 = torch.stft(x1, 1, hop_length=1)
+        y4 = torch.fft(x2, 2)
+        y5 = torch.ifft(y4, 2)
 
-        self.assertEqual(y, y_dpcpp.cpu())
+        y1_dpcpp = torch.rfft(x1_dpcpp, 2, onesided=True, normalized=False)
+        y2_dpcpp = torch.irfft(y1_dpcpp, 2, onesided=True, signal_sizes=x1.shape)
+        y3_dpcpp = torch.stft(x1_dpcpp, 1, hop_length=1)
+        y4_dpcpp = torch.fft(x2_dpcpp, 2)
+        y5_dpcpp = torch.ifft(y4_dpcpp, 2)
 
-        y2 = torch.stft(x, 1, hop_length=1)
-        y2_dpcpp = torch.stft(x, 1, hop_length=1)
+
+        self.assertEqual(y1, y1_dpcpp.cpu())
         self.assertEqual(y2, y2_dpcpp.cpu())
+        self.assertEqual(y3, y3_dpcpp.cpu())
+        self.assertEqual(y4, y4_dpcpp.cpu())
+        self.assertEqual(y5, y5_dpcpp.cpu())
+
 
