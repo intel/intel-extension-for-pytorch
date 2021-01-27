@@ -7,8 +7,7 @@ enum DPCPP_ENV {
   ENV_LAZY_REORDER,
   ENV_WEIGHT_CACHE,
   ENV_TILE_AS_DEVICE,
-  ENV_DEV_INDEX ,
-  ENV_LEGACY_LOOPS};
+  ENV_DEV_INDEX };
 
 int dpcpp_env(int env);
 

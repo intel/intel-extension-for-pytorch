@@ -378,75 +378,6 @@ void new_dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
   }
 }
 
-DPCPP_DEF_K1(dpcpp_loops_kernel_impl);
-template <typename func_t>
-void dpcpp_loops_kernel_impl(TensorIterator& iter, const func_t f) {
-  using traits = function_traits<func_t>;
-  TORCH_INTERNAL_ASSERT(iter.can_use_32bit_indexing());
-  TORCH_INTERNAL_ASSERT(iter.ntensors() == traits::arity + 1);
-  TORCH_INTERNAL_ASSERT(
-      traits::arity <= MAX_INPUT_TENSOR_NUM,
-      "loops kernel for",
-      traits::arity,
-      " operands is not generated");
-  constexpr int n_in_tensors = traits::arity;
-  using ret_t = typename traits::result_type;
-
-  int64_t numel = iter.numel();
-  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-
-  auto cgf = DPCPP_Q_CGF(__cgh) {
-    auto out_data = get_buffer<dpcpp_discard_w_mode>(__cgh, (char*)iter.data_ptr(0));
-#ifdef USE_USM
-    at::detail::Array<char*, MAX_INPUT_TENSOR_NUM> in_ptrs;
-    for (size_t i = 0; i < n_in_tensors; i++) {
-      in_ptrs[i] = get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(i + 1));
-    }
-#else
-    // Initial the in_data with some dummy valid address.
-    at::detail::Array<char*, MAX_INPUT_TENSOR_NUM> in_data((char*)iter.data_ptr(0));
-    for (int i = 0; i < n_in_tensors; i++) {
-      in_data[i] = (char*)iter.data_ptr(i + 1);
-    }
-
-#define ACCESSOR_DEFINE(n) \
-  auto in_acc_##n = get_buffer<dpcpp_r_mode>(__cgh, in_data[n]);
-    REPEAT_PATTERN(MAX_INPUT_TENSOR_NUM, ACCESSOR_DEFINE)
-#undef ACCESSOR_DEFINE
-#endif
-
-    at::detail::Array<SyclOffsetCal<uint32_t>, MAX_TOTAL_TENSOR_NUM> tensor_offsets;
-    for (size_t i = 0; i < n_in_tensors + 1; i++) {
-      tensor_offsets[i] = make_offset_calculator<uint32_t>(iter, i);
-    }
-
-    auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-      auto linear_idx = item_id.get_id(0);
-      auto out_ptr = get_pointer(out_data);
-#ifndef USE_USM
-      at::detail::Array<char*, MAX_INPUT_TENSOR_NUM> in_ptrs;
-#define ACCESSOR_DEREFER(n) in_ptrs[n] = in_acc_##n.template get_pointer();
-      REPEAT_PATTERN(MAX_INPUT_TENSOR_NUM, ACCESSOR_DEREFER)
-#undef ACCESSOR_DEREFER
-#endif
-
-      at::detail::Array<int64_t, MAX_TOTAL_TENSOR_NUM> offsets;
-      for (size_t i = 0; i < n_in_tensors + 1; i++) {
-        offsets[i] = tensor_offsets[i].get(linear_idx);
-      }
-
-      ret_t* out = (ret_t*)(out_ptr + offsets[0]);
-      *out = c10::guts::apply(
-          f, dereference<traits>(&in_ptrs.data[0], &offsets.data[1], 1));
-    };
-
-    __cgh.parallel_for<DPCPP_K(dpcpp_loops_kernel_impl, func_t, ret_t)>(
-        DPCPP::range</*dim=*/1>(numel), kfn);
-  };
-
-  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
-}
-
 template <typename kernel_name, typename func_t>
 void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
   for (int arg = 0; arg < iter.ntensors(); arg++) {
@@ -464,14 +395,8 @@ void dpcpp_kernel_for_tensor_iter(TensorIterator& iter, const func_t& f) {
     return;
   }
 
-  if (dpcpp_env(ENV_LEGACY_LOOPS)) {
-    // legacy code
-    dpcpp_loops_kernel_impl(iter, f);
-  } else {
-    new_dpcpp_loops_kernel_impl(iter, f);
-  }
+  new_dpcpp_loops_kernel_impl(iter, f);
 }
-
 
 template<typename func_t>
 struct AUnaryFunctor {
