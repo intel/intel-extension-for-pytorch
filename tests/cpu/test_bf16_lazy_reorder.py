@@ -2449,9 +2449,9 @@ class TestRNN(TestCase):
             h = torch.randn(num_layers * num_directions, batch_size, hidden_size)
             c = torch.randn(num_layers * num_directions, batch_size, hidden_size)
 
-            input_cpu = input.clone().requires_grad_(training)
-            h_cpu = h.clone().requires_grad_(training)
-            c_cpu = c.clone().requires_grad_(training)
+            input_cpu = input.bfloat16().float().clone().requires_grad_(training)
+            h_cpu = h.bfloat16().float().clone().requires_grad_(training)
+            c_cpu = c.bfloat16().float().clone().requires_grad_(training)
 
             model_cpu = torch.nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
             model_cpu.train() if training else model_cpu.eval()
@@ -2516,9 +2516,9 @@ class TestRNN(TestCase):
             h = torch.randn(num_layers * num_directions, batch_size, hidden_size)
             c = torch.randn(num_layers * num_directions, batch_size, hidden_size)
 
-            input_cpu = input.clone().requires_grad_(training)
-            h_cpu = h.clone().requires_grad_(training)
-            c_cpu = c.clone().requires_grad_(training)
+            input_cpu = input.bfloat16().float().clone().requires_grad_(training)
+            h_cpu = h.bfloat16().float().clone().requires_grad_(training)
+            c_cpu = c.bfloat16().float().clone().requires_grad_(training)
 
             if cell == "RNN":
                 model_cpu = torch.nn.RNN(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first, nonlinearity=nonlinearity)
