@@ -2554,6 +2554,67 @@ class TestRNN(TestCase):
                         self.assertTrue(torch.allclose(h0_dpcpp.grad.to('cpu'), h_cpu.grad, rtol=0.01, atol=0.05))
 
 
+    def _test_pack_padded_sequence_lstm(self, training):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        
+        embedding_dim = 1024
+        hidden_dim = 10
+        batch_size = 24
+        num_layers = 1
+        bidirectional = True
+        num_direc = 2 if bidirectional else 1
+        max_lens = 96
+
+        sent = torch.randn(batch_size, max_lens, embedding_dim)
+        hid_0 = torch.rand(num_layers * num_direc, batch_size, hidden_dim)
+        hid_1 = torch.randn(num_layers * num_direc, batch_size, hidden_dim)
+
+        sentences = sent.clone().requires_grad_(training)
+        sent_lens = torch.Tensor([1, 2, 3, 4, 5, 1, 3, 2, 96, 5, 3, 1, 1, 2, 1, 2, 3, 6, \
+        1, 2, 4, 6, 2, 1])
+
+        sentences_dpcpp = sent.clone().to(device=device).requires_grad_(training)
+        sent_lens_dpcpp = sent_lens.clone().to(device=device)
+
+        assert sent_lens.shape[0] == batch_size
+        assert sent_lens.max().item() == max_lens
+
+        hidden_0 = hid_0.clone().requires_grad_(training)
+        hidden_1 = hid_1.clone().requires_grad_(training)
+        embeds = torch.nn.utils.rnn.pack_padded_sequence(sentences, sent_lens, batch_first=True, enforce_sorted=False)
+        lstm = nn.LSTM(embedding_dim, hidden_dim, num_layers=num_layers, bidirectional=bidirectional, batch_first=True)
+
+        hidden_0_dpcpp = hid_0.clone().to(device=device).requires_grad_(training)
+        hidden_1_dpcpp = hid_1.clone().to(device=device).requires_grad_(training)
+        embeds_dpcpp = torch.nn.utils.rnn.pack_padded_sequence(sentences_dpcpp, sent_lens_dpcpp, batch_first=True, enforce_sorted=False)
+        lstm_dpcpp = copy.deepcopy(lstm).to(device=device)
+
+        lstm_out, hidden_out = lstm(embeds, (hidden_0, hidden_1))
+        lstm_out, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_out, batch_first=True)
+        
+        with AutoDNNL(True), AutoMixPrecision(True, train=training):
+            lstm_out_dpcpp, hidden_out_dpcpp = lstm_dpcpp(embeds_dpcpp, (hidden_0_dpcpp, hidden_1_dpcpp))
+            lstm_out_dpcpp, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_out_dpcpp, batch_first=True)
+            # TODO: pad_packed_sequence will call IPEX OPs (reorder fp32 <=> bf16)
+            self.assertEqual(lstm_out, lstm_out_dpcpp, 0.01)
+            self.assertEqual(hidden_out[0], hidden_out_dpcpp[0])
+            self.assertEqual(hidden_out[1], hidden_out_dpcpp[1])
+
+            if training:
+                lstm_out.sum().backward()
+                lstm_out_dpcpp.sum().backward()
+                self.assertEqual(sentences_dpcpp.grad.to('cpu'), sentences.grad)
+                self.assertEqual(lstm_dpcpp.weight_ih_l0.grad.to('cpu'), lstm.weight_ih_l0.grad)
+                self.assertEqual(lstm_dpcpp.weight_hh_l0.grad.to('cpu'), lstm.weight_hh_l0.grad)
+                    
+                self.assertEqual(lstm_dpcpp.bias_ih_l0.grad.to('cpu'), lstm.bias_ih_l0.grad)
+                self.assertEqual(lstm_dpcpp.bias_hh_l0.grad.to('cpu'), lstm.bias_hh_l0.grad)
+                
+                self.assertEqual(hidden_0_dpcpp.grad.to('cpu'), hidden_0.grad)
+                self.assertEqual(hidden_1_dpcpp.grad.to('cpu'), hidden_1.grad)
+
     def test_lstm_inference(self):
         self._test_lstm(training=False)
     
@@ -2571,6 +2632,12 @@ class TestRNN(TestCase):
 
     def test_gru_training(self):
         self._test_rnn(cell="GRU", training=True)
+
+    def test_pack_padded_sequence_lstm_inference(self):
+        self._test_pack_padded_sequence_lstm(training=False)
+
+    def test_pack_padded_sequence_lstm_training(self):
+        self._test_pack_padded_sequence_lstm(training=True)
 
 class TestInterpolate(TestCase):
     def test_upsample_nearest1d_scale_factor(self):
