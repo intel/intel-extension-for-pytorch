@@ -292,6 +292,10 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
     dpcppMemcpyAsync(dst, src, nbytes, kind);
   } else {
     dpcppMemcpy(dst, src, nbytes, kind);
+    // FIXME: Without queue wait, resource exhaustion occurs due to never release kernel events.
+    // Need to confirm with compiler team the root cause here.
+    auto& queue = getCurrentDPCPPStream().dpcpp_queue();
+    queue.wait();
   }
 }
 
