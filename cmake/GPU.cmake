@@ -111,7 +111,6 @@ add_subdirectory(torch_ipex/csrc/gpu/aten)
 set(DPCPP_JIT_SRCS)
 add_subdirectory(torch_ipex/csrc/gpu/jit)
 
-
 set(TORCH_IPEX_SRCS)
 file(GLOB IPEX_UTIL_SRC "${IPEX_C_SOURCE_DIR}/*.cpp")
 list(REMOVE_ITEM IPEX_UTIL_SRC "${IPEX_C_SOURCE_DIR}/_C.cpp")
