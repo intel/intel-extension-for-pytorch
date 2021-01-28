@@ -159,5 +159,4 @@ void init_module(pybind11::module& m) {
   PyModule_AddFunctions(module, _THCPModule_methods);
   ASSERT_TRUE(THXPStorage_init<at::kFloat>(module));
   ASSERT_TRUE(THXPStorage_init<at::kDouble>(module));
-
 }
