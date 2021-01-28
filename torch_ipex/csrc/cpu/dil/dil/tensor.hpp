@@ -1107,6 +1107,21 @@ class tensor : public memory {
     return dense;
   }
 
+  dims compute_strides(int axis) const {
+    auto dims = get_dims();
+    auto nd = ndims();
+    std::vector<dim> strides(nd);
+    strides[axis] = 1;
+    auto step = dims[axis];
+    for (auto i = nd - 1; i >= 0; i--) {
+      if (i != axis) {
+        strides[i] = step;
+        step = step * dims[i];
+      }
+    }
+    return strides;
+  }
+
  private:
   void reset_internal(const desc &adesc, const engine &aengine, void *ahandle) {
     dnnl_memory_t result;
