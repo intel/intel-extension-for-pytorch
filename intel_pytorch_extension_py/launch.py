@@ -357,28 +357,28 @@ def launch(args):
             cores = cpuinfo.get_all_physical_cores()
             args.ncore_per_instance = len(cores) // args.ninstances
 
+    os.environ["LAUNCH_CMD"] = "#"
     set_multi_thread_and_allcator(args)
     for i in range(args.ninstances):
        cmd = []
        cur_process_cores = ""
-       if args.disable_numactl: 
-           cmd.append(args.program)
-           cmd.extend(args.program_args)
-       else:
+       if not args.disable_numactl:
            cmd = ["numactl"]
            for core in cores[i * args.ncore_per_instance:(i + 1) * args.ncore_per_instance]:
                cur_process_cores = cur_process_cores + str(core) + ","
            numa_params = "-C {} ".format(cur_process_cores[:-1])
            cmd.extend(numa_params.split())
-           with_python = not args.no_python
-           if with_python:
-               cmd.append(sys.executable)
-           if args.module:
-               cmd.append("-m")
-           cmd.append(args.program)
-           cmd.extend(args.program_args)
+       with_python = not args.no_python
+       if with_python:
+           cmd.append(sys.executable)
+       if args.module:
+           cmd.append("-m")
+       cmd.append(args.program)
+       cmd.extend(args.program_args)
+       os.environ["LAUNCH_CMD"] += " ".join(cmd) + ",#"
        process = subprocess.Popen(cmd, env=os.environ)
        processes.append(process)
+    os.environ["LAUNCH_CMD"] = os.environ["LAUNCH_CMD"][:-2]
     for process in processes:
         process.wait()
         if process.returncode != 0:
@@ -472,6 +472,7 @@ def mpi_dist_launch(args):
     logger.info("CCL_WORKER_COUNT={}".format(args.ccl_worker_count))
     logger.info("CCL_WORKER_AFFINITY={}".format(os.environ["CCL_WORKER_AFFINITY"]))
 
+    os.environ["LAUNCH_CMD"] = "#"
     cmd = ['mpiexec.hydra']
     mpi_config = "-l -np {} -ppn {} -genv I_MPI_PIN_DOMAIN={} -genv OMP_NUM_THREADS={} ".format(args.nnodes*args.nproc_per_node,
                   args.nproc_per_node,  mpi_pin_domain, opm_num_threads)
@@ -489,6 +490,8 @@ def mpi_dist_launch(args):
     cmd.extend(args.program_args)
     process = subprocess.Popen(cmd, env=os.environ)
     process.wait()
+    os.environ["LAUNCH_CMD"] += " ".join(cmd) + ",#"
+    os.environ["LAUNCH_CMD"] = os.environ["LAUNCH_CMD"][:-2]
 
 def add_distributed_training_params(parser):
     
@@ -619,10 +622,12 @@ def parse_args():
 
 def main():
 
+    env_before = set(os.environ.keys())
     if platform.system() == "Windows":
         raise RuntimeError("Windows platform is not supported!!!")
 
     args = parse_args()
+
     if args.distributed and args.multi_instance:
         raise RuntimeError("Either args.distributed or args.multi_instance should be set")
     
@@ -636,6 +641,9 @@ def main():
         mpi_dist_launch(args)
     else:
         launch(args)
+
+    for x in sorted(set(os.environ.keys()) - env_before):
+        logger.debug(f'{x}={os.environ[x]}')
  
 if __name__ == "__main__":
     main()
