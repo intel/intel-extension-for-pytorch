@@ -25,10 +25,10 @@ struct DPCPPEventStubImpl : public XPUEventStubBase {
 };
 
 struct DPCPPProvfilerStubsImpl : public XPUStubs {
-  virtual float elapsed(XPUEventStub event) override {
+  float elapsed(XPUEventStub event) override {
     return event->elapsed();
   }
-  virtual bool enabled() override {
+  bool enabled() override {
     return true;
   }
   void ittMark(const char* name) override {
