@@ -527,23 +527,9 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   auto format_weight = conv_weight_fmt(ndim, groups != 1);
   auto format_bias = memory::format_tag::x;
 
-  // Master weight
+  // Naive Master weight - We keep BF16 gw and gb output, and reorder them to fp32 in SGD.
   auto grad_weight_t = weight_t;
   auto grad_bias_t = weight_t;
-
-  // Better to check at runtime for BF16 supported machine, like ATS, PVC.
-  // For now, recreate plain gw and gb in FP32 for BF16 training.
-  if (data_grad == dnnl::memory::data_type::bf16) {
-    grad_weight_t = dnnl::memory::data_type::f32;
-    grad_weight = at::empty(weight_size, grad_output.options().dtype(kFloat));
-  }
-  
-  if (bias_defined) {
-    if (data_grad == dnnl::memory::data_type::bf16) {
-      grad_bias_t = dnnl::memory::data_type::f32;
-      grad_bias = at::empty({grad_output.size(1)}, grad_output.options().dtype(kFloat));
-    }
-  }
 
   memory::dims input_tz = input.sizes().vec();
   memory::dims weight_tz = compatible_weight_dims(ndim, groups, oc, ic, grad_weight.sizes());
@@ -674,7 +660,6 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
         {{DNNL_ARG_FROM, grad_weight_memory},
         {DNNL_ARG_TO, grad_weight_usr_memory}});
   }
-
   return std::tuple<at::Tensor, at::Tensor>{grad_weight, grad_bias};
 }
 

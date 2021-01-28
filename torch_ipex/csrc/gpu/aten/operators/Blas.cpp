@@ -92,8 +92,7 @@ void dnnlGemmImpl(
   memory::desc m2_md_any;
   memory::desc r_md_any;
 
-  // Master weight
-  auto gradient_weight_float = 0;
+  // Naive Master weight
   if (m1_dt == dnnl::memory::data_type::bf16 && m2_dt == dnnl::memory::data_type::f32) {
     m2_dt = dnnl::memory::data_type::bf16;
     result_dt = dnnl::memory::data_type::bf16;
@@ -101,10 +100,6 @@ void dnnlGemmImpl(
   } else if (m1_dt == dnnl::memory::data_type::f32 && m2_dt == dnnl::memory::data_type::bf16) {
     m1_dt = dnnl::memory::data_type::bf16;
     result_dt = dnnl::memory::data_type::bf16;
-
-  } else if (m1_dt == dnnl::memory::data_type::bf16 && m2_dt == dnnl::memory::data_type::bf16) {
-    gradient_weight_float = 1;
-    result_dt = dnnl::memory::data_type::bf16; // oneDNN unsupport fp32 output
   }
 
   if (dims == 2) {
@@ -484,11 +479,6 @@ void dnnlGemmImpl(
   if (lazy_reorder_enabled() && r_memory != r_usr_memory && dims == 2) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(r_);
     DPCPPTensorContext::set_tensor_ctx(result, std::move(blk_ctx));
-  }
-
-  // Master weight
-  if (gradient_weight_float) {
-    result = result.to(ScalarType::Float);
   }
 #endif
 }
