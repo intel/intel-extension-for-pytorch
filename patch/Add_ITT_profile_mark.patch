@@ -1,0 +1,207 @@
+Index: pytorch-1.7/torch/_C/_autograd.pyi
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- pytorch-1.7/torch/_C/_autograd.pyi	(revision 47c78155320cfd1504a78f951dff1f9470375732)
++++ pytorch-1.7/torch/_C/_autograd.pyi	(revision 2f3bda7bdb3c4421738c16067858987756e36a3a)
+@@ -8,6 +8,8 @@
+     CPU = 1
+     CUDA = 2
+     NVTX = 3
++    XPU = 4
++    ITT = 5
+ 
+ 
+ class ProfilerConfig:
+Index: pytorch-1.7/torch/csrc/autograd/init.cpp
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- pytorch-1.7/torch/csrc/autograd/init.cpp	(revision 47c78155320cfd1504a78f951dff1f9470375732)
++++ pytorch-1.7/torch/csrc/autograd/init.cpp	(revision 2f3bda7bdb3c4421738c16067858987756e36a3a)
+@@ -39,8 +39,9 @@
+       .value("Disabled", ProfilerState::Disabled)
+       .value("CPU", ProfilerState::CPU)
+       .value("CUDA", ProfilerState::CUDA)
++      .value("NVTX", ProfilerState::NVTX)
+       .value("XPU", ProfilerState::XPU)
+-      .value("NVTX", ProfilerState::NVTX);
++      .value("ITT", ProfilerState::ITT);
+ 
+   py::class_<ProfilerConfig>(m, "ProfilerConfig")
+       .def(py::init<ProfilerState, bool, bool, bool>());
+Index: pytorch-1.7/torch/csrc/autograd/profiler.cpp
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- pytorch-1.7/torch/csrc/autograd/profiler.cpp	(revision 47c78155320cfd1504a78f951dff1f9470375732)
++++ pytorch-1.7/torch/csrc/autograd/profiler.cpp	(revision 2f3bda7bdb3c4421738c16067858987756e36a3a)
+@@ -71,7 +71,6 @@
+ constexpr CUDAStubs* default_stubs_addr = &default_stubs;
+ constexpr XPUStubs* default_xpu_stubs_addr = &default_xpu_stubs;
+ // constant initialization, so it is guaranteed to be initialized before
+-// Constant initialization, so it is guaranteed to be initialized before
+ // static initialization calls which may invoke registerCUDAMethods
+ static CUDAStubs* cuda_stubs = default_stubs_addr;
+ static XPUStubs* xpu_stubs = default_xpu_stubs_addr;
+@@ -206,7 +205,10 @@
+     }
+     if (config_.state == ProfilerState::NVTX) {
+       cuda_stubs->nvtxMarkA(name.c_str());
+-    } else {
++    } else if (config_.state == ProfilerState::ITT) {
++      xpu_stubs->ittMark(name.c_str());
++    }
++    else {
+       Event evt(
+           EventKind::Mark,
+           at::StringView(std::move(name)),
+@@ -218,15 +220,14 @@
+   }
+ 
+   void mark_xpu(std::string name, XPUEventStub& xpu_event) {
+-    if (config_.state == ProfilerState::Disabled) {
+-      return;
+-    }
+-    getEventList().record(
+-      EventKind::Mark,
+-      at::StringView(std::move(name)),
+-      at::RecordFunction::currentThreadId(),
+-      config_.state,
+-      xpu_event);
++    if (config_.state == ProfilerState::XPU) {
++      getEventList().record(
++              EventKind::Mark,
++              at::StringView(std::move(name)),
++              at::RecordFunction::currentThreadId(),
++              config_.state,
++              xpu_event);
++    }
+   }
+ 
+   void setOrAddRemoteProfiledEvents(
+@@ -251,6 +252,8 @@
+     if (config_.state == ProfilerState::NVTX) {
+       cuda_stubs->nvtxRangePushA(getNvtxStr(
+           fn.name(), msg, fn.seqNr(), shapes).c_str());
++    } else if (config_.state == ProfilerState::ITT) {
++      xpu_stubs->ittRangePush(fn.name().str());
+     } else {
+       Event evt(
+           EventKind::PushRange,
+@@ -284,6 +287,8 @@
+     }
+     if (config_.state == ProfilerState::NVTX) {
+       cuda_stubs->nvtxRangePop();
++    } else if (config_.state == ProfilerState::ITT) {
++      xpu_stubs->ittRangePop();
+     } else {
+       // In some cases RecordFunction (and popRange) may be
+       // called on a different thread than pushRange
+@@ -542,6 +547,8 @@
+ void enableProfiler(const ProfilerConfig& new_config) {
+   TORCH_CHECK(new_config.state != ProfilerState::NVTX || cuda_stubs->enabled(),
+     "Can't use NVTX profiler - PyTorch was compiled without CUDA");
++  TORCH_CHECK(new_config.state != ProfilerState::ITT || xpu_stubs->enabled(),
++    "Can't use Intel(R) VTune Profiler's ITT functionality - PyTorch was compiled without ITT");
+ 
+   auto state_ptr = getProfilerTLSState();
+   TORCH_CHECK(!state_ptr, "Profiler is already enabled on this thread");
+@@ -732,8 +739,6 @@
+ 
+ CUDAStubs::~CUDAStubs() = default;
+ 
+-XPUStubs::~XPUStubs() = default;
+-
+ static jit::CodeTemplate event_template(R"(
+ {
+   "name": "${name}",
+Index: pytorch-1.7/torch/csrc/autograd/profiler.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- pytorch-1.7/torch/csrc/autograd/profiler.h	(revision 47c78155320cfd1504a78f951dff1f9470375732)
++++ pytorch-1.7/torch/csrc/autograd/profiler.h	(revision 2f3bda7bdb3c4421738c16067858987756e36a3a)
+@@ -81,7 +81,16 @@
+   virtual bool enabled() {
+     return false;
+   }
+-  virtual ~XPUStubs();
++  virtual void ittMark(const char* name) {
++    fail();
++  }
++  virtual void ittRangePush(const char* name) {
++    fail();
++  }
++  virtual void ittRangePop() {
++    fail();
++  }
++  virtual ~XPUStubs() {};
+ 
+ private:
+   void fail() {
+@@ -133,8 +142,9 @@
+     Disabled,
+     CPU, // CPU-only profiling
+     CUDA, // CPU + CUDA events
+-    XPU, // CPU + XPU events
+     NVTX,  // only emit NVTX markers
++    XPU, // CPU + XPU events
++    ITT, // only emit ITT markers
+ };
+ 
+ struct TORCH_API ProfilerConfig {
+@@ -182,7 +192,6 @@
+         kind_(kind),
+         thread_id_(thread_id),
+         handle_(handle),
+-        xpu_kernel(false),
+         shapes_(shapes),
+         node_id_(node_id) {
+     record(state);
+@@ -198,7 +207,6 @@
+     : name_(std::move(name)),
+       kind_(kind),
+       thread_id_(thread_id),
+-      xpu_kernel(true),
+       xpu_event(event) {
+     record(state);
+   }
+@@ -223,7 +231,6 @@
+         kind_(kind),
+         thread_id_(thread_id),
+         handle_(handle),
+-        xpu_kernel(false),
+         shapes_(shapes),
+         cpu_memory_usage_(cpu_memory_usage),
+         cuda_memory_usage_(cuda_memory_usage),
+@@ -291,7 +298,7 @@
+   }
+ 
+   bool has_xpu() const {
+-    return xpu_kernel;
++    return (xpu_event != nullptr);
+   }
+ 
+   int device() const {
+@@ -391,7 +398,6 @@
+   uint64_t thread_id_;
+   uint64_t fwd_thread_id_;
+   at::RecordFunctionHandle handle_ {0};
+-  bool xpu_kernel;
+   std::vector<std::vector<int64_t>> shapes_;
+   int64_t cpu_memory_usage_ = 0;
+   int64_t cuda_memory_usage_ = 0;
+@@ -405,7 +411,7 @@
+ 
+   std::vector<std::string> stack_;
+   uint8_t scope_;
+-  XPUEventStub xpu_event;
++  XPUEventStub xpu_event = nullptr;
+ };
+ 
+ // a linked-list of fixed sized vectors, to avoid
