@@ -105,9 +105,6 @@ compile_commands.json
 # QtCreator files
 *.user
 
-# PyCharm files
-.idea
-
 # OSX dir files
 .DS_Store
 
@@ -191,3 +188,6 @@ TAGS
 tests/gpu/examples/simple_trace_case.zip
 torch_ipex/csrc/gpu/aten/generated/ATen/*
 torch_ipex/csrc/gpu/aten/generated/*
+
+# Clion files
+.idea
