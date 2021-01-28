@@ -1119,7 +1119,7 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
 
   return embedding_bag_backward_dpcpp_kernel(
       grad,
-      indices,
+      orig_indices,
       sorted_indices,
       count,
       num_weights,
