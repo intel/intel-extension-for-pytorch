@@ -2466,34 +2466,30 @@ class TestRNN(TestCase):
                 if empty_state:
                     y_cpu, hy_cpu = model_cpu(input_cpu)
                     y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp)
-                    self.assertEqual(hy_cpu[0], hy_dpcpp[0], 0.01)
-                    self.assertEqual(hy_cpu[1], hy_dpcpp[1], 0.01)
-
                 else:
                     y_cpu, hy_cpu = model_cpu(input_cpu, (h_cpu, c_cpu))
                     y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, (h0_dpcpp, c0_dpcpp))
-                    self.assertEqual(hy_cpu[0], hy_dpcpp[0], 0.01)
-                    self.assertEqual(hy_cpu[1], hy_dpcpp[1], 0.01)
-
-                self.assertEqual(y_cpu, y_dpcpp, 0.05)
+                self.assertTrue(torch.allclose(y_cpu, y_dpcpp, rtol=0.01, atol=0.05))
+                self.assertTrue(torch.allclose(hy_cpu[0],hy_dpcpp[0], rtol=0.01, atol=0.01))
+                self.assertTrue(torch.allclose(hy_cpu[1],hy_dpcpp[1], rtol=0.01, atol=0.01))
 
                 if training:
                     y_cpu.sum().backward(retain_graph=True)
                     y_dpcpp.sum().backward(retain_graph=True)
-                    self.assertEqual(input_dpcpp.grad.to('cpu'), input_cpu.grad, 0.05)
-                    self.assertEqual(model_dpcpp.weight_ih_l0.grad.to('cpu'), model_cpu.weight_ih_l0.grad, 0.05)
-                    self.assertEqual(model_dpcpp.weight_hh_l0.grad.to('cpu'), model_cpu.weight_hh_l0.grad, 0.05)
+                    self.assertTrue(torch.allclose(input_dpcpp.grad.to('cpu'), input_cpu.grad, rtol=0.01, atol=0.05))
+                    self.assertTrue(torch.allclose(model_dpcpp.weight_ih_l0.grad.to('cpu'), model_cpu.weight_ih_l0.grad, rtol=0.01, atol=0.05))
+                    self.assertTrue(torch.allclose(model_dpcpp.weight_hh_l0.grad.to('cpu'), model_cpu.weight_hh_l0.grad, rtol=0.01, atol=0.05))
                     if bias:
-                        self.assertEqual(model_dpcpp.bias_ih_l0.grad.to('cpu'), model_cpu.bias_ih_l0.grad, 0.05)
-                        self.assertEqual(model_dpcpp.bias_hh_l0.grad.to('cpu'), model_cpu.bias_hh_l0.grad, 0.05)
+                        self.assertTrue(torch.allclose(model_dpcpp.bias_ih_l0.grad.to('cpu'), model_cpu.bias_ih_l0.grad, rtol=0.01, atol=0.05))
+                        self.assertTrue(torch.allclose(model_dpcpp.bias_hh_l0.grad.to('cpu'), model_cpu.bias_hh_l0.grad, rtol=0.01, atol=0.05))
                     if not empty_state:
                         hy_cpu[0].sum().backward(retain_graph=True)
                         hy_dpcpp[0].sum().backward(retain_graph=True)
-                        self.assertEqual(h0_dpcpp.grad.to('cpu'), h_cpu.grad, 0.05)
+                        self.assertTrue(torch.allclose(h0_dpcpp.grad.to('cpu'), h_cpu.grad, rtol=0.01, atol=0.05))
                         
                         hy_cpu[1].sum().backward(retain_graph=True)
                         hy_dpcpp[1].sum().backward(retain_graph=True)
-                        self.assertEqual(c0_dpcpp.grad.to('cpu'), c_cpu.grad, 0.05)
+                        self.assertTrue(torch.allclose(c0_dpcpp.grad.to('cpu'), c_cpu.grad, rtol=0.01, atol=0.05))
 
     def _test_rnn(self, cell, training):
         rand_seed = int(get_rand_seed())
@@ -2537,26 +2533,26 @@ class TestRNN(TestCase):
                 if empty_state:
                     y_cpu, hy_cpu = model_cpu(input_cpu)
                     y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp)
-                    self.assertEqual(hy_cpu, hy_dpcpp, 0.05)
                 else:
                     y_cpu, hy_cpu = model_cpu(input_cpu, h_cpu)
                     y_dpcpp, hy_dpcpp = model_dpcpp(input_dpcpp, h0_dpcpp)
-                    self.assertEqual(hy_cpu, hy_dpcpp, 0.05)
-                self.assertEqual(y_cpu, y_dpcpp, 0.05)
+                self.assertTrue(torch.allclose(y_cpu, y_dpcpp, rtol=0.01, atol=0.05))
+                self.assertTrue(torch.allclose(hy_cpu,hy_dpcpp, rtol=0.01, atol=0.05))
 
                 if training:
                     y_cpu.sum().backward(retain_graph=True)
                     y_dpcpp.sum().backward(retain_graph=True)
-                    self.assertEqual(input_dpcpp.grad.to('cpu'), input_cpu.grad, 0.05)
-                    self.assertEqual(model_dpcpp.weight_ih_l0.grad.to('cpu'), model_cpu.weight_ih_l0.grad, 0.05)
-                    self.assertEqual(model_dpcpp.weight_hh_l0.grad.to('cpu'), model_cpu.weight_hh_l0.grad, 0.05)
+                    self.assertTrue(torch.allclose(input_dpcpp.grad.to('cpu'), input_cpu.grad, rtol=0.01, atol=0.05))
+                    self.assertTrue(torch.allclose(model_dpcpp.weight_ih_l0.grad.to('cpu'), model_cpu.weight_ih_l0.grad, rtol=0.01, atol=0.05))
+                    self.assertTrue(torch.allclose(model_dpcpp.weight_hh_l0.grad.to('cpu'), model_cpu.weight_hh_l0.grad, rtol=0.01, atol=0.05))
                     if bias:
-                        self.assertEqual(model_dpcpp.bias_ih_l0.grad.to('cpu'), model_cpu.bias_ih_l0.grad, 0.05)
-                        self.assertEqual(model_dpcpp.bias_hh_l0.grad.to('cpu'), model_cpu.bias_hh_l0.grad, 0.05)
+                        self.assertTrue(torch.allclose(model_dpcpp.bias_ih_l0.grad.to('cpu'), model_cpu.bias_ih_l0.grad, rtol=0.01, atol=0.05))
+                        self.assertTrue(torch.allclose(model_dpcpp.bias_hh_l0.grad.to('cpu'), model_cpu.bias_hh_l0.grad, rtol=0.01, atol=0.05))
                     if not empty_state:
                         hy_cpu.sum().backward(retain_graph=True)
                         hy_dpcpp.sum().backward(retain_graph=True)
-                        self.assertEqual(h0_dpcpp.grad.to('cpu'), h_cpu.grad, 0.05)
+                        self.assertTrue(torch.allclose(h0_dpcpp.grad.to('cpu'), h_cpu.grad, rtol=0.01, atol=0.05))
+
 
     def test_lstm_inference(self):
         self._test_lstm(training=False)
