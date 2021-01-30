@@ -10,6 +10,7 @@
 #include <utils/ParamUtils.h>
 
 #include "Conv.h"
+#include "ConvTranspose.h"
 
 using namespace dnnl;
 using namespace at::dpcpp;
@@ -997,19 +998,33 @@ Tensor _convolution_out(
     weight = view4d(weight);
   }
 
-  Tensor output_ = convolution(
-      output,
-      input,
-      weight,
-      bias,
-      params.padding,
-      params.stride,
-      params.dilation,
-      params.groups,
-      attr);
+  Tensor output_;
 
-  if (k == 3) {
-    output_ = view3d(output_);
+  if(transposed_) {
+    output_ = dpcpp_convolution_transpose(
+	input,
+	weight,
+	bias,
+	params.stride,
+	params.padding,
+	params.output_padding,
+	params.dilation,
+	params.groups);
+  } else {
+    output_ = convolution(
+	output,
+	input,
+	weight,
+	bias,
+	params.padding,
+	params.stride,
+	params.dilation,
+	params.groups,
+	attr);
+
+    if (k == 3) {
+      output_ = view3d(output_);
+    }
   }
 
   return output_;
@@ -1220,26 +1235,50 @@ std::tuple<Tensor, Tensor, Tensor> convolution_backward_overrideable(
   Tensor grad_input, grad_weight, grad_bias;
 
   if (output_mask[0]) {
-    grad_input = dpcpp_convolution_backward_input(
-        input_.sizes(),
-        grad_output_,
-        weight,
-        padding,
-        stride,
-        dilation,
-        groups,
-        output_mask[2]);
+    if(transposed){
+      grad_input = dpcpp_convolution_transpose_backward_input(
+	  input,
+	  weight,
+	  grad_output,
+	  stride,
+	  padding,
+	  dilation,
+	  groups,
+	  output_mask[2]);
+    } else {
+      grad_input = dpcpp_convolution_backward_input(
+	  input_.sizes(),
+	  grad_output_,
+	  weight,
+	  padding,
+	  stride,
+	  dilation,
+	  groups,
+	  output_mask[2]);
+    }
   }
   if (output_mask[1] || output_mask[2]) {
-    std::tie(grad_weight, grad_bias) = dpcpp_convolution_backward_weights(
-        weight.sizes(),
-        grad_output_,
-        input_,
-        padding,
-        stride,
-        dilation,
-        groups,
-        output_mask[2]);
+    if(transposed){
+      std::tie(grad_weight, grad_bias) = dpcpp_convolution_transpose_backward_weights(
+	  input,
+	  weight,
+	  grad_output,
+	  stride,
+	  padding,
+	  dilation,
+	  groups,
+	  output_mask[2]);
+    } else {
+      std::tie(grad_weight, grad_bias) = dpcpp_convolution_backward_weights(
+	  weight.sizes(),
+	  grad_output_,
+	  input_,
+	  padding,
+	  stride,
+	  dilation,
+	  groups,
+	  output_mask[2]);
+    }
   }
 
   return std::tuple<Tensor, Tensor, Tensor>{grad_input, grad_weight, grad_bias};
