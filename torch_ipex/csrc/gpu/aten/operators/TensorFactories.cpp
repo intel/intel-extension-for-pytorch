@@ -477,6 +477,12 @@ Tensor empty(
   c10::optional<MemoryFormat> optional_memory_format) {
   return impl::empty_dpcpp(size, options, optional_memory_format);
 }
+Tensor empty_strided(
+    IntArrayRef size,
+    IntArrayRef stride,
+    const TensorOptions& options) {
+  return impl::empty_strided_dpcpp(size, stride, options);
+}
 } // namespace AtenIpexTypeQuantizedXPU
 
 } // namespace at

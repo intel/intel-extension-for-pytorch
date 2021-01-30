@@ -244,6 +244,7 @@ struct TORCH_API DPCPPType final {
   static Tensor & max_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::max.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor max(const Tensor & self, const Tensor & other); // aten::max.other(Tensor self, Tensor other) -> Tensor
   static Tensor max(const Tensor & self); // aten::max(Tensor self) -> Tensor
+  static std::tuple<Tensor,Tensor> _aminmax(const Tensor & self); // aten::_aminmax(Tensor self) -> (Tensor, Tensor)
   static Tensor median(const Tensor & self); // aten::median(Tensor self) -> Tensor
   static std::tuple<Tensor &,Tensor &> sort_out(Tensor & values, Tensor & indices, const Tensor & self, int64_t dim, bool descending); // aten::sort.values(Tensor self, int dim=-1, bool descending=False, *, Tensor(a!) values, Tensor(b!) indices) -> (Tensor(a!) values, Tensor(b!) indices)
   static std::tuple<Tensor,Tensor> sort(const Tensor & self, int64_t dim, bool descending); // aten::sort(Tensor self, int dim=-1, bool descending=False) -> (Tensor values, Tensor indices)
@@ -573,6 +574,8 @@ static Tensor amax(const Tensor & self, IntArrayRef dim, bool keepdim); // {"sch
 static Tensor & amax_out(Tensor & out, const Tensor & self, IntArrayRef dim, bool keepdim); // {"schema": "aten::amax.out(Tensor self, int[1] dim=[], bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)", "compound": "False", "has_math_kernel": "False"}
 static Tensor minimum(const Tensor & self, const Tensor & other); // {"schema": "aten::minimum(Tensor self, Tensor other) -> Tensor", "compound": "False", "has_math_kernel": "False"}
 static Tensor & minimum_out(Tensor & out, const Tensor & self, const Tensor & other); // {"schema": "aten::minimum.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)", "compound": "False", "has_math_kernel": "False"}
+static Tensor maximum(const Tensor & self, const Tensor & other); // {"schema": "aten::maximum(Tensor self, Tensor other) -> Tensor", "compound": "False", "has_math_kernel": "False"}
+static Tensor & maximum_out(Tensor & out, const Tensor & self, const Tensor & other); // {"schema": "aten::maximum.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)", "compound": "False", "has_math_kernel": "False"}
 static Tensor frac(const Tensor & self); // {"schema": "aten::frac(Tensor self) -> Tensor", "compound": "False", "has_math_kernel": "False"}
 static Tensor & frac_(Tensor & self); // {"schema": "aten::frac_(Tensor(a!) self) -> Tensor(a!)", "compound": "False", "has_math_kernel": "False"}
 static Tensor & frac_out(Tensor & out, const Tensor & self); // {"schema": "aten::frac.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)", "compound": "False", "has_math_kernel": "False"}

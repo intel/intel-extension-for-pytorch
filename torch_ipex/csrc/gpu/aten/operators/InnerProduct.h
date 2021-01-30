@@ -17,13 +17,15 @@ void inner_product(
     int M,
     int N,
     int K,
-    void* output,
-    void* input,
-    void* weight,
+    at::Tensor& output,
+    const at::Tensor& input_,
+    const at::Tensor& weight,
     Tensor bias,
     bool use_bias) {
+  Tensor input = input_.is_quantized()? at::dequantize(input_) : input_;
   Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
+  auto strm = GpuStreamManager::Instance().get_stream();
 
   int32_t n = M;
   int32_t ic = K;
@@ -52,16 +54,15 @@ void inner_product(
       prop_kind::forward_inference, input_md, weight_md, bias_md, output_md);
   auto ip_forward_pd = inner_product_forward::primitive_desc(ipFwd_desc, engine);
 
-  auto input_usr_memory = dpcpp_onednn_memory({input_tz, data_t, format_nc}, engine, input);
-  auto weight_usr_memory = dpcpp_onednn_memory({weight_tz, data_t, format_oi}, engine, weight);
-  auto output_usr_memory = dpcpp_onednn_memory({output_tz, data_t, format_nc}, engine, output);
+  auto input_memory = dpcpp_onednn_memory({input_tz, data_t, format_nc}, engine, input.data_ptr());
+  auto weight_memory = dpcpp_onednn_memory({weight_tz, data_t, format_oi}, engine, weight.data_ptr());
+  auto output_memory = dpcpp_onednn_memory({output_tz, data_t, format_nc}, engine, output.data_ptr());
 
-  memory bias_usr_memory = memory({{}, data_t, format_x}, engine);
+  memory bias_memory = memory({{}, data_t, format_x}, engine);
   if (use_bias) {
-    bias_usr_memory = dpcpp_onednn_memory({bias_tz, data_t, format_x}, engine, bias.data_ptr());
+    bias_memory = dpcpp_onednn_memory({bias_tz, data_t, format_x}, engine, bias.data_ptr());
   }
 
-  auto strm = GpuStreamManager::Instance().get_stream();
 #ifdef USE_PRIMITIVE_CACHE
   auto ip_forward = fetch_or_create_m<inner_product_forward>(key, ip_forward_pd);
 #else
@@ -70,10 +71,11 @@ void inner_product(
   DPCPP_ONEDNN_EXEC(
       ip_forward,
       strm,
-      {{DNNL_ARG_SRC, input_usr_memory},
-       {DNNL_ARG_WEIGHTS, weight_usr_memory},
-       {DNNL_ARG_BIAS, bias_usr_memory},
-       {DNNL_ARG_DST, output_usr_memory}});
+      {{DNNL_ARG_SRC, input_memory},
+       {DNNL_ARG_WEIGHTS, weight_memory},
+       {DNNL_ARG_BIAS, bias_memory},
+       {DNNL_ARG_DST, output_memory}});
 }
+
 } // namespace dpcpp
 } // namespace at

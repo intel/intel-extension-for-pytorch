@@ -442,6 +442,30 @@ struct AbsMaxOps {
   }
 };
 
+template <typename scalar_t, typename acc_scalar_t, typename index_t>
+struct MinMaxOps {
+  using acc_t = std::pair<acc_scalar_t, acc_scalar_t>;
+  inline acc_t reduce(acc_t acc, scalar_t data) const {
+    return combine(acc, {data, data});
+  }
+
+  inline acc_t combine(acc_t a, acc_t b) const {
+    auto min_val = (Numerics<acc_scalar_t>::isnan(a.first) || a.first < b.first) ? a.first : b.first;
+    auto max_val = (Numerics<acc_scalar_t>::isnan(a.second) || a.second > b.second) ? a.second : b.second;
+
+    return {min_val, max_val};
+  }
+
+  inline acc_t project(acc_t acc) const {
+    return acc;
+  }
+
+  inline acc_t sg_shfl_down(acc_t arg, int offset) const {
+    // FIXME:
+    return arg;
+  }
+};
+
 template <typename scalar_t>
 void std_var_kernel_impl(TensorIterator& iter, bool unbiased, bool take_sqrt) {
   dpcpp_reduce_kernel<scalar_t, scalar_t, 2>(
@@ -627,6 +651,21 @@ void and_kernel(TensorIterator& iter) {
 void or_kernel(TensorIterator& iter) {
   dpcpp_reduce_kernel<uint8_t, uint8_t>(
       iter, func_wrapper<uint8_t>(ReduceOrOps<uint8_t>()), false);
+}
+
+template <typename scalar_t>
+void _min_max_values_kernel_dpcpp_impl(TensorIterator& iter) {
+  dpcpp_reduce_kernel<scalar_t, scalar_t>(
+    iter, MinMaxOps<scalar_t, scalar_t, int32_t>{}, std::pair<scalar_t, scalar_t>(
+      at::numeric_limits<scalar_t>::upper_bound(),
+      at::numeric_limits<scalar_t>::lower_bound()
+  ));
+}
+
+void aminmax_kernel(TensorIterator& iter) {
+    IPEX_DISPATCH_ALL_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "aminmax_elementwise_dpcpp", [&]() {
+       _min_max_values_kernel_dpcpp_impl<scalar_t>(iter);
+    });
 }
 
 } // namespace impl
@@ -1195,6 +1234,20 @@ Tensor& argmin_out(
 Tensor argmin(const Tensor& self, c10::optional<int64_t> dim, bool keepdims) {
   Tensor result = at::empty({0}, self.options().dtype(at::kLong));
   return argmin_out(result, self, dim, keepdims);
+}
+
+void aminmax_out(Tensor& min_result, Tensor& max_result, const Tensor& self) {
+  auto iter = impl::make_reduction("aminmax", min_result, max_result, self, std::vector<int64_t>{}, false, self.scalar_type());//TensorIterator::binary_op(min_result, max_result, self);
+  impl::aminmax_kernel(iter);
+}
+
+std::tuple<Tensor, Tensor> _aminmax(const Tensor& self) {
+  TORCH_CHECK(!self.is_complex(), "max is not yet implemented for complex tensors.");
+  TORCH_CHECK(self.numel() > 0, "operation does not have an identity.");
+  Tensor min_result = at::empty_like(self);
+  Tensor max_result = at::empty_like(self);
+  at::AtenIpexTypeXPU::aminmax_out(min_result, max_result, self);
+  return std::tuple<Tensor&, Tensor&>(min_result, max_result);
 }
 
 } // namespace AtenIpexTypeXPU

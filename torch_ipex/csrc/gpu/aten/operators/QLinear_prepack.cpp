@@ -32,5 +32,9 @@ TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
   m.impl("linear_prepack", dpcppLinearPrepack);
 }
 
+TORCH_LIBRARY_IMPL(quantized, XPU, m) {
+  m.impl("linear_prepack", dpcppLinearPrepack);
+}
+
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

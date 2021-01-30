@@ -286,6 +286,28 @@ Tensor _empty_affine_quantized(
                   scale, zero_point, typeMetaToScalarType(options.dtype())));
 }
 
+Tensor quantize_per_tensor(
+    const Tensor& self,
+    double scale,
+    int64_t zero_point,
+    ScalarType dtype) {
+  if(self.is_quantized()){
+    return self;
+  }
+  auto quantizer = at::dpcpp::make_per_tensor_affine_quantizer(scale, zero_point, dtype);
+  return quantizer->quantize(self);
+}
+
+Tensor quantize_per_channel(
+    const Tensor& self,
+    const Tensor& scales,
+    const Tensor& zero_points,
+    int64_t axis,
+    ScalarType dtype) {
+  auto quantizer = at::dpcpp::make_per_channel_affine_quantizer(scales, zero_points, axis, dtype);
+  return quantizer->quantize(self);
+}
+
 }
 
 }// namespace at

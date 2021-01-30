@@ -105,6 +105,38 @@ void minimum_kernel(TensorIterator& iter) {
   }
 }
 
+template <typename...>
+class maximum_kernel_bool {};
+template <typename...>
+class maximum_kernel_interge {};
+template <typename...>
+class maximum_kernel_float {};
+
+void maximum_kernel(TensorIterator& iter) {
+  if (iter.dtype() == ScalarType::Bool) {
+    dpcpp_kernel_for_tensor_iter<maximum_kernel_bool<bool>>(iter, [](bool a, bool b) -> bool {
+            return a || b;
+    });
+  } else if (isIntegralType(iter.dtype(), /*includeBool=*/ false)) {
+    AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "maximum_dpcpp", [&]() {
+        dpcpp_kernel_for_tensor_iter<maximum_kernel_interge<scalar_t>>(iter, [](scalar_t a, scalar_t b) -> scalar_t {
+            return std::max(a, b);
+    });
+    });
+  } else {
+    AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "max_elementwise_dpcpp", [&]() {
+        dpcpp_kernel_for_tensor_iter<maximum_kernel_float<scalar_t>>(iter, [](scalar_t a, scalar_t b) -> scalar_t {
+            if (a != a) {
+              return a;
+            } else if (b != b) {
+              return b;
+            } else {
+              return Numerics<scalar_t>::max(a, b);
+            }
+    });
+    });
+  }
+}
 } // namespace impl
 
 
@@ -134,11 +166,30 @@ Tensor min(const Tensor& self, const Tensor& other) {
   return at::AtenIpexTypeXPU::minimum(self, other);
 }
 
-IPEX_OUT_ALL_CALLABLE_0_BINARY_OPS(max_out, TensorMaxOp)
+Tensor& maximum_out(Tensor& result, const Tensor& self, const Tensor& other) {
+  TORCH_CHECK(!self.is_complex() && !other.is_complex(), "maximum does not support complex inputs.");
+
+  auto iter = TensorIterator::binary_op(result, self, other);
+  impl::maximum_kernel(iter);
+  return result;
+}
+
+Tensor maximum(const Tensor& self, const Tensor& other) {
+  TORCH_CHECK(!self.is_complex() && !other.is_complex(), "maximum does not support complex inputs.");
+
+  Tensor result;
+  auto iter = TensorIterator::binary_op(result, self, other);
+  impl::maximum_kernel(iter);
+  return iter.output();
+}
+
+// binary max, alias for maximum
+Tensor& max_out(Tensor& result, const Tensor& self, const Tensor& other) {
+  return at::AtenIpexTypeXPU::maximum_out(result, self, other);
+}
 
 Tensor max(const Tensor& self, const Tensor& other) {
-  auto out = at::empty_like(self);
-  return at::AtenIpexTypeXPU::max_out(out, self, other.expand_as(self));
+  return at::AtenIpexTypeXPU::maximum(self, other);
 }
 
 Tensor& bitwise_and_out(

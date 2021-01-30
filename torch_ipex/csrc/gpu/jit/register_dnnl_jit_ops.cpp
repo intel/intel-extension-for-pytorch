@@ -263,17 +263,17 @@ RegisterOperators op({
       "dpcpp::q_conv2d_sum_relu(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float conv_scale, int conv_zpoint, Tensor(a!) accumu, *, float sum_scale, int sum_zpoint) -> Tensor(a!)",
       [] (const Node* node) ->Operation {
         return [] (Stack* stack) {
-          auto output = (std::move(peek(stack, 8, 11))).toTensor();
+          auto output = (std::move(peek(stack, 4, 7))).toTensor();
           auto result = torch::jit::dpcpp::q_conv2d_sum_relu(
               output,
-              (std::move(peek(stack, 0, 11))).toTensor(),
-              (std::move(peek(stack, 1, 11))).toCustomClass<ConvPackedParamsBase<2>>(),
-              (std::move(peek(stack, 2, 11))).toDouble(),
-              (std::move(peek(stack, 3, 11))).toInt(),
-              (std::move(peek(stack, 4, 11))).toDouble(),
-              (std::move(peek(stack, 5, 11))).toInt()
+              (std::move(peek(stack, 0, 7))).toTensor(),
+              (std::move(peek(stack, 1, 7))).toCustomClass<ConvPackedParamsBase<2>>(),
+              (std::move(peek(stack, 2, 7))).toDouble(),
+              (std::move(peek(stack, 3, 7))).toInt(),
+              (std::move(peek(stack, 5, 7))).toDouble(),
+              (std::move(peek(stack, 6, 7))).toInt()
           );
-          drop(stack, 11);
+          drop(stack, 7);
           pack(stack, std::move(result));
         };
       },

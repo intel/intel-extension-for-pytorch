@@ -20,10 +20,6 @@
 using namespace dnnl;
 using namespace at::dpcpp;
 
-namespace caffe2 {
-CAFFE_KNOWN_TYPE(at::AtenIpexTypeQuantizedXPU::PackedLinearWeightQDPCPP)
-}
-
 namespace at {
 namespace impl {
 

@@ -42,5 +42,9 @@ TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
   m.impl("conv2d_prepack", TORCH_FN(dpcppConvPrepack));
 }
 
+TORCH_LIBRARY_IMPL(quantized, XPU, m) {
+  m.impl("conv2d_prepack", TORCH_FN(dpcppConvPrepack));
+}
+
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
