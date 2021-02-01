@@ -488,6 +488,13 @@ def _xpu_deserialize(obj, location):
             return _xpu(obj, device=device)
 
 
+def get_device_type() -> str:
+    return 'xpu'
+
+
+from .random import *
+
+
 from torch import serialization
 
 serialization.register_package(30, _xpu_tag, _xpu_deserialize)
