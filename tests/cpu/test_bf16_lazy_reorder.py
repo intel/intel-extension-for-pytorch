@@ -2764,7 +2764,7 @@ class TestPermute(TestCase):
             y_cpu = x_cpu.permute(0, 2, 1, 3)
             y_dpcpp = x_dpcpp.permute(0, 2, 1, 3)
             self.assertTrue(ipex.core.is_bf16_dil_tensor(y_dpcpp))
-            self.assertEqual(y_cpu, y_dpcpp, 0.1)
+            self.assertEqual(y_cpu.bfloat16().float(), y_dpcpp)
 
 if __name__ == '__main__':
     test = unittest.main()
