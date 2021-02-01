@@ -100,7 +100,13 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_kernel(const at::
   auto ndets = dets.size(0);
   auto nscore = scores.size(1);
 
-  std::vector<at::Tensor> scores_split = scores.split(1, 1);
+  // Make the dimension of the score is always physically dense.
+  std::vector<at::Tensor> scores_split;
+  if (scores.stride(0) == 1) {
+    scores_split = scores.split(1, 1);
+  } else {
+    scores_split = scores.t().contiguous().split(1, 0);
+  }
 
   std::vector<at::Tensor> bboxes_out(nscore);
   std::vector<at::Tensor> scores_out(nscore);
@@ -115,7 +121,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_kernel(const at::
 #endif
   // skip background (i = 0)
   for (int64_t i = 1; i < nscore; i++) {
-    at::Tensor score = scores_split[i].squeeze(1);
+    at::Tensor score = scores_split[i].squeeze();
 
     at::Tensor mask_index = at::nonzero(score > 0.05).squeeze(1);
     at::Tensor bboxes = at::index_select(dets, /*dim*/0, mask_index);
