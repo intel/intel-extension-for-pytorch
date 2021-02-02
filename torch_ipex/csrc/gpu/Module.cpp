@@ -104,6 +104,15 @@ void init_module(pybind11::module& m) {
         },
         "fused mul with add opt. on Intel device");
 
+  m.def("packed_add",
+      [](at::Tensor & top_half,
+        at::Tensor & bot_half,
+        const at::Tensor & grad,
+        float alpha) {
+        return at::AtenIpexTypeXPU::packed_add(top_half, bot_half, grad, alpha);
+      },
+      "enable split SGD for BF16 weight update. on Intel device");
+
 #if defined(USE_USM)
   m.def("_usm_is_enabled",
         []() {return true;});

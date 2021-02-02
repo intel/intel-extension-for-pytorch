@@ -121,5 +121,69 @@ Tensor mul_add(
   return result;
 }
 
+template <typename T>
+class PackedAdd_ker {};
+
+template <typename scalar_t>
+static inline void packed_add_kernel(
+    unsigned short* __restrict__ w_MSB,
+    unsigned short* __restrict__ w_LSB,
+    const at::BFloat16* __restrict__ gw,
+    int num_elem,
+    float lr) {
+  union packed_bf16 {
+    unsigned short s[2];
+    float f;
+  };
+  static const auto read_mode = DPCPP::access::mode::read;
+  static const auto write_mode = DPCPP::access::mode::write;
+  static const auto read_write_mode = DPCPP::access::mode::read_write;
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+      auto MSB_data = get_buffer<read_write_mode>(cgh, w_MSB);
+      auto LSB_data = get_buffer<read_write_mode>(cgh, w_LSB);
+      auto gw_data = get_buffer<read_mode>(cgh, gw);
+
+      cgh.parallel_for<PackedAdd_ker<scalar_t>>(
+        DPCPP::range<1>(num_elem), [=](DPCPP::item<1> item) {
+
+          int64_t gid = item.get_linear_id();
+          auto MSB_p = get_pointer(MSB_data);
+          auto LSB_p = get_pointer(LSB_data);
+          auto gw_p = get_pointer(gw_data);
+
+          packed_bf16 p16;
+          p16.s[0] = LSB_p[gid];
+          p16.s[1] = MSB_p[gid];
+          p16.f += lr * (float)(gw_p[gid]);
+          LSB_p[gid] = p16.s[0];
+          MSB_p[gid] = p16.s[1];
+      });
+  };
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+}
+
+Tensor packed_add(
+    at::Tensor & top_half,
+    at::Tensor & bot_half,
+    const at::Tensor & grad,
+    float alpha) {
+  RECORD_FUNCTION("packed_add", std::vector<c10::IValue>({top_half, bot_half, grad}));
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      top_half.scalar_type(),
+      "packed_add_kernel",
+      [&]() {
+        packed_add_kernel<scalar_t>(
+            (unsigned short *)top_half.data_ptr<scalar_t>(),
+            (unsigned short *)bot_half.data_ptr<scalar_t>(),
+            grad.data_ptr<at::BFloat16>(),
+            top_half.numel(),
+            static_cast<float>(alpha));
+      });
+  return top_half;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
