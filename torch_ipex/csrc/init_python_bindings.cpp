@@ -30,6 +30,9 @@
 #include "cpu/int8/Config.h"
 #include "cpu/int8/quantization/Observer.h"
 
+#include "cpu/toolkit/sklearn.h"
+#include "cpu/toolkit/thread.h"
+
 namespace torch_ipex {
 namespace {
 
@@ -209,6 +212,12 @@ void InitIpexModuleBindings(py::module m) {
   m.def("nms", &IpexExternal::nms);
   m.def("batch_score_nms", &IpexExternal::batch_score_nms);
   m.def("linear_relu", &AtenIpexTypeExt::linear_relu);
+  m.def("reshape",
+        [](const at::Tensor& input, at::IntArrayRef size) {
+          return AtenIpexTypeExt::reshape(input, size);
+  });
+  m.def("roc_auc_score", &toolkit::roc_auc_score);
+  m.def("thread_bind", &toolkit::thread_bind);
 }
 
 }  // namespace

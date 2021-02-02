@@ -1,6 +1,7 @@
 from .interaction import interaction
 from .embeddingbag import embeddingbag
 from .linear import *
+from .reshape import *
 from .pooling import *
 from .mlp import * 
 from .jit import *
