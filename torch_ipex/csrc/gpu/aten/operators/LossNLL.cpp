@@ -946,7 +946,7 @@ Tensor& nll_loss2d_backward_out(
       grad_output,
       target);
 
-    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_backward", [&](){
+    IPEX_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, self.scalar_type(), "nll_loss2d_dpcpp_backward", [&](){
       impl::spatial_class_nll_criterion_update_grad_input_no_reduce_kernel<scalar_t>(
           target,
           grad_output,
@@ -955,7 +955,7 @@ Tensor& nll_loss2d_backward_out(
           ignore_index);
     });
   } else {
-    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_backward", [&](){
+    IPEX_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, self.scalar_type(), "nll_loss2d_dpcpp_backward", [&](){
       impl::spatial_class_nll_criterion_update_grad_input_kernel<scalar_t>(
         grad_input,
         grad_output,
@@ -1023,7 +1023,7 @@ std::tuple<Tensor&,Tensor&> nll_loss2d_forward_out(
     if (reduction == at::Reduction::None) {
       output.resize_({batch_size, H, W});
 
-      IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_forward", [&](){
+      IPEX_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, self.scalar_type(), "nll_loss2d_dpcpp_forward", [&](){
         impl::spatial_class_nll_criterion_update_output_no_reduce_kernel<scalar_t>(
           self,
           target,
@@ -1034,7 +1034,7 @@ std::tuple<Tensor&,Tensor&> nll_loss2d_forward_out(
     } else {
       output.fill_(0);
       total_weight.fill_(0);
-      IPEX_DISPATCH_ATOMIC_FLOATING_TYPES(self.scalar_type(), "nll_loss2d_dpcpp_forward", [&](){
+      IPEX_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, self.scalar_type(), "nll_loss2d_dpcpp_forward", [&](){
         using accscalar_t = acc_type<scalar_t>;
         impl::spatial_class_nll_criterion_update_output_kernel<scalar_t, accscalar_t>(
           output,
