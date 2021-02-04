@@ -19,13 +19,13 @@
       try {                                                              \
         _##type = std::stoi(env, 0, 10);                                 \
       } catch (...) { /* Do Nothing */ }                                 \
-      std::cout << " ** IPEX_" << #var << ": " << _##type << std::endl;  \
+      std::cerr << " ** IPEX_" << #var << ": " << _##type << std::endl;  \
       return _##type;                                                    \
     } ()
 
 int dpcpp_env(int env_type) {
   static auto _header = []() -> bool {
-    std::cout << std::endl
+    std::cerr << std::endl
       << "/*********************************************************" << std::endl
       << " ** The values of all available launch options for IPEX **" << std::endl;
     return true;
@@ -42,7 +42,7 @@ int dpcpp_env(int env_type) {
   } env;
 
   static auto _footer = []() -> bool {
-    std::cout << " *********************************************************/" << std::endl;
+    std::cerr << " *********************************************************/" << std::endl;
     return true;
   } ();
 

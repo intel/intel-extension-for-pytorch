@@ -66,7 +66,7 @@ public:
 
   template<at::ScalarType cpuType>
   static void THXStorage_copyToCPU(at::StorageImpl * cpu, at::StorageImpl * xpu_src) {
-    std::cout << "copyToCPU" << std::endl;
+    // std::cout << "copyToCPU" << std::endl;
     using src_scalar_t = typename c10::impl::ScalarTypeToCPPType<cpuType>::type;
     at::TensorImpl *selfTensor = THXSTensor_newWithStorage1d(cpu, 0, cpu->nbytes() / sizeof(scalar_t), 1, at::DispatchKey::CPU);
     at::TensorImpl *srcTensor = THXSTensor_newWithStorage1d(xpu_src, 0, xpu_src->nbytes() / sizeof(src_scalar_t), 1,at::DispatchKey::XPU);
@@ -77,7 +77,7 @@ public:
 
   template<>
   static void THXStorage_copyToCPU<scalarType>(at::StorageImpl * cpu, at::StorageImpl * xpu_src) {
-    std::cout << "copyToCPU" << std::endl;
+    // std::cout << "copyToCPU" << std::endl;
     THArgCheck(cpu->nbytes() == xpu_src->nbytes(), 2, "size does not match");
     at::dpcpp::dpcppMemcpy(
             cpu->data(),
@@ -143,7 +143,7 @@ public:
 
   template <at::ScalarType cpuType>
   static void THXStorage_copyFromCPU(at::StorageImpl * xpu, at::StorageImpl * cpu_src) {
-    std::cout << "copyFromCPU" << std::endl;
+    // std::cout << "copyFromCPU" << std::endl;
     using src_scalar_t = typename c10::impl::ScalarTypeToCPPType<cpuType>::type;
     at::TensorImpl *selfTensor = THXSTensor_newWithStorage1d(xpu, 0, xpu->nbytes() / sizeof(scalar_t), 1, at::DispatchKey::XPU);
     at::TensorImpl *srcTensor = THXSTensor_newWithStorage1d(cpu_src, 0, cpu_src->nbytes() / sizeof(src_scalar_t), 1,at::DispatchKey::CPU);
@@ -154,7 +154,7 @@ public:
 
   template <>
   static void THXStorage_copyFromCPU<scalarType>(at::StorageImpl * xpu, at::StorageImpl * cpu_src) {
-    std::cout << "copyFromCPU" << std::endl;
+    // std::cout << "copyFromCPU" << std::endl;
     THArgCheck(xpu->nbytes() == cpu_src->nbytes(), 2, "size does not match");
     at::dpcpp::dpcppMemcpy(
             xpu->data(),
