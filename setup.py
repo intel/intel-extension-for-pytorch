@@ -65,7 +65,7 @@ def get_git_head_sha(base_dir):
 
 
 def get_build_version(ipex_git_sha):
-  version = os.getenv('TORCH_IPEX_VERSION', '1.0.0')
+  version = os.getenv('TORCH_IPEX_VERSION', '1.1.0')
   if _check_env_flag('VERSIONED_IPEX_BUILD', default='0'):
     try:
       version += '+' + ipex_git_sha[:7]
