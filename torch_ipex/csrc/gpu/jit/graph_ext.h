@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <memory>
-#include <dnnl.hpp>
+#include <oneapi/dnnl/dnnl.hpp>
 #include "accelerated_ops.h"
 #include <c10/util/Optional.h>
 #include <torch/csrc/jit/ir/ir.h>

@@ -2,7 +2,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/quantized/cpu/conv_packed_params.h>
 
-#include <dnnl.hpp>
+#include <oneapi/dnnl/dnnl.hpp>
 
 namespace torch {
 namespace jit {

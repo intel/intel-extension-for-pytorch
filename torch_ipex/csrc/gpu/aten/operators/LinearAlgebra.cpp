@@ -6,7 +6,7 @@
 #include <core/Context.h>
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
-#include "dnnl.hpp"
+#include <core/Runtime.h>
 
 #ifdef USE_ONEMKL
 #include <mkl_sycl.hpp>

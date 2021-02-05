@@ -1,7 +1,6 @@
 #pragma once
 
 #include <core/Runtime.h>
-#include <dnnl.hpp>
 
 #ifdef USE_PRIMITIVE_CACHE
 #include <oneDNN/LRUCache.h>

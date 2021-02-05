@@ -6,7 +6,7 @@
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/Runtime.h>
-#include <dnnl.hpp>
+#include <oneapi/dnnl/dnnl.hpp>
 
 using namespace at::dpcpp;
 

@@ -8,7 +8,7 @@
 #include <ATen/AtenIpexTypeXPU.h>
 #include "Utils.h"
 
-#include <dnnl.hpp>
+#include <oneapi/dnnl/dnnl.hpp>
 
 #ifdef USE_PRIMITIVE_CACHE
 #include <oneDNN/LRUCache.h>

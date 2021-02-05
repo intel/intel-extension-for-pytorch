@@ -12,7 +12,7 @@
 
 #include <utils/ATDispatch.h>
 
-#include <dnnl.hpp>
+#include <core/Runtime.h>
 
 #include "Im2Col.h"
 #include "Im2ColShapeCheck.h"

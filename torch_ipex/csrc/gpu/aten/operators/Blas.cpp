@@ -7,7 +7,6 @@
 
 #include <core/Runtime.h>
 #include <oneDNN/oneDNN.h>
-#include <dnnl.hpp>
 #include <vector>
 
 #include "QUtil.h"

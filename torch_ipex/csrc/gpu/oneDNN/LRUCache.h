@@ -5,7 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <list>
-#include <dnnl.hpp>
+#include <oneapi/dnnl/dnnl.hpp>
 
 namespace at {
 namespace dpcpp {

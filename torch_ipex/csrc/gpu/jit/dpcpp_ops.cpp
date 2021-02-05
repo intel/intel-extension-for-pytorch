@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/record_function.h>
-#include <dnnl.hpp>
+#include <oneapi/dnnl/dnnl.hpp>
 
 #include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/ipex_type_dpcpp_customized.h>

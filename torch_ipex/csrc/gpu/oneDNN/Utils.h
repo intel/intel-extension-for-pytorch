@@ -1,7 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
-#include <dnnl.hpp>
+#include <oneapi/dnnl/dnnl.hpp>
 
 using namespace dnnl;
 

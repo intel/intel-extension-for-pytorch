@@ -7,8 +7,6 @@
 #include <tensor/Context.h>
 #include <utils/Env.h>
 
-#include <dnnl.hpp>
-
 #ifdef USE_PRIMITIVE_CACHE
 #include <oneDNN/LRUCache.h>
 #endif

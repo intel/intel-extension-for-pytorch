@@ -8,7 +8,7 @@
 #include <utils/Profiler.h>
 #include <utils/Timer.h>
 
-#include <dnnl.hpp>
+#include <oneapi/dnnl/dnnl.hpp>
 #include <oneapi/dnnl/dnnl_sycl.hpp>
 #include <vector>
 
