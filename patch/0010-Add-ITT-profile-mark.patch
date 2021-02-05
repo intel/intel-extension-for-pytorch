@@ -1,11 +1,20 @@
-Index: pytorch-1.7/torch/_C/_autograd.pyi
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
---- pytorch-1.7/torch/_C/_autograd.pyi	(revision 47c78155320cfd1504a78f951dff1f9470375732)
-+++ pytorch-1.7/torch/_C/_autograd.pyi	(revision 2f3bda7bdb3c4421738c16067858987756e36a3a)
-@@ -8,6 +8,8 @@
+From f41dd97d83282c5f8ea35ec5b75a6cab97fdc5a9 Mon Sep 17 00:00:00 2001
+From: johnlu <chengjun.lu@intel.com>
+Date: Thu, 28 Jan 2021 00:09:25 +0800
+Subject: [PATCH 10/11] Add ITT profile mark
+
+---
+ torch/_C/_autograd.pyi           |  2 ++
+ torch/csrc/autograd/init.cpp     |  3 ++-
+ torch/csrc/autograd/profiler.cpp | 29 +++++++++++++++++------------
+ torch/csrc/autograd/profiler.h   | 22 ++++++++++++++--------
+ 4 files changed, 35 insertions(+), 21 deletions(-)
+
+diff --git a/torch/_C/_autograd.pyi b/torch/_C/_autograd.pyi
+index a154fb1948..7d7d663ab9 100644
+--- a/torch/_C/_autograd.pyi
++++ b/torch/_C/_autograd.pyi
+@@ -8,6 +8,8 @@ class ProfilerState(Enum):
      CPU = 1
      CUDA = 2
      NVTX = 3
@@ -14,14 +23,11 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  
  
  class ProfilerConfig:
-Index: pytorch-1.7/torch/csrc/autograd/init.cpp
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
---- pytorch-1.7/torch/csrc/autograd/init.cpp	(revision 47c78155320cfd1504a78f951dff1f9470375732)
-+++ pytorch-1.7/torch/csrc/autograd/init.cpp	(revision 2f3bda7bdb3c4421738c16067858987756e36a3a)
-@@ -39,8 +39,9 @@
+diff --git a/torch/csrc/autograd/init.cpp b/torch/csrc/autograd/init.cpp
+index 5f498b37e5..905d349d0f 100644
+--- a/torch/csrc/autograd/init.cpp
++++ b/torch/csrc/autograd/init.cpp
+@@ -39,8 +39,9 @@ PyObject* THPAutograd_initExtension(PyObject* _unused, PyObject *unused) {
        .value("Disabled", ProfilerState::Disabled)
        .value("CPU", ProfilerState::CPU)
        .value("CUDA", ProfilerState::CUDA)
@@ -32,14 +38,11 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  
    py::class_<ProfilerConfig>(m, "ProfilerConfig")
        .def(py::init<ProfilerState, bool, bool, bool>());
-Index: pytorch-1.7/torch/csrc/autograd/profiler.cpp
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
---- pytorch-1.7/torch/csrc/autograd/profiler.cpp	(revision 47c78155320cfd1504a78f951dff1f9470375732)
-+++ pytorch-1.7/torch/csrc/autograd/profiler.cpp	(revision 2f3bda7bdb3c4421738c16067858987756e36a3a)
-@@ -71,7 +71,6 @@
+diff --git a/torch/csrc/autograd/profiler.cpp b/torch/csrc/autograd/profiler.cpp
+index 128b8e65da..894040d275 100644
+--- a/torch/csrc/autograd/profiler.cpp
++++ b/torch/csrc/autograd/profiler.cpp
+@@ -71,7 +71,6 @@ XPUStubs default_xpu_stubs;
  constexpr CUDAStubs* default_stubs_addr = &default_stubs;
  constexpr XPUStubs* default_xpu_stubs_addr = &default_xpu_stubs;
  // constant initialization, so it is guaranteed to be initialized before
@@ -47,7 +50,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  // static initialization calls which may invoke registerCUDAMethods
  static CUDAStubs* cuda_stubs = default_stubs_addr;
  static XPUStubs* xpu_stubs = default_xpu_stubs_addr;
-@@ -206,7 +205,10 @@
+@@ -206,7 +205,10 @@ struct ProfilerThreadLocalState : public c10::MemoryReportingInfoBase {
      }
      if (config_.state == ProfilerState::NVTX) {
        cuda_stubs->nvtxMarkA(name.c_str());
@@ -59,19 +62,12 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
        Event evt(
            EventKind::Mark,
            at::StringView(std::move(name)),
-@@ -218,15 +220,14 @@
+@@ -218,15 +220,14 @@ struct ProfilerThreadLocalState : public c10::MemoryReportingInfoBase {
    }
  
    void mark_xpu(std::string name, XPUEventStub& xpu_event) {
 -    if (config_.state == ProfilerState::Disabled) {
 -      return;
--    }
--    getEventList().record(
--      EventKind::Mark,
--      at::StringView(std::move(name)),
--      at::RecordFunction::currentThreadId(),
--      config_.state,
--      xpu_event);
 +    if (config_.state == ProfilerState::XPU) {
 +      getEventList().record(
 +              EventKind::Mark,
@@ -79,11 +75,17 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 +              at::RecordFunction::currentThreadId(),
 +              config_.state,
 +              xpu_event);
-+    }
+     }
+-    getEventList().record(
+-      EventKind::Mark,
+-      at::StringView(std::move(name)),
+-      at::RecordFunction::currentThreadId(),
+-      config_.state,
+-      xpu_event);
    }
  
    void setOrAddRemoteProfiledEvents(
-@@ -251,6 +252,8 @@
+@@ -251,6 +252,8 @@ struct ProfilerThreadLocalState : public c10::MemoryReportingInfoBase {
      if (config_.state == ProfilerState::NVTX) {
        cuda_stubs->nvtxRangePushA(getNvtxStr(
            fn.name(), msg, fn.seqNr(), shapes).c_str());
@@ -92,7 +94,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
      } else {
        Event evt(
            EventKind::PushRange,
-@@ -284,6 +287,8 @@
+@@ -284,6 +287,8 @@ struct ProfilerThreadLocalState : public c10::MemoryReportingInfoBase {
      }
      if (config_.state == ProfilerState::NVTX) {
        cuda_stubs->nvtxRangePop();
@@ -101,7 +103,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
      } else {
        // In some cases RecordFunction (and popRange) may be
        // called on a different thread than pushRange
-@@ -542,6 +547,8 @@
+@@ -542,6 +547,8 @@ bool profilerEnabled() {
  void enableProfiler(const ProfilerConfig& new_config) {
    TORCH_CHECK(new_config.state != ProfilerState::NVTX || cuda_stubs->enabled(),
      "Can't use NVTX profiler - PyTorch was compiled without CUDA");
@@ -110,7 +112,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  
    auto state_ptr = getProfilerTLSState();
    TORCH_CHECK(!state_ptr, "Profiler is already enabled on this thread");
-@@ -732,8 +739,6 @@
+@@ -732,8 +739,6 @@ double Event::xpu_elapsed_us() {
  
  CUDAStubs::~CUDAStubs() = default;
  
@@ -119,14 +121,11 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  static jit::CodeTemplate event_template(R"(
  {
    "name": "${name}",
-Index: pytorch-1.7/torch/csrc/autograd/profiler.h
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
---- pytorch-1.7/torch/csrc/autograd/profiler.h	(revision 47c78155320cfd1504a78f951dff1f9470375732)
-+++ pytorch-1.7/torch/csrc/autograd/profiler.h	(revision 2f3bda7bdb3c4421738c16067858987756e36a3a)
-@@ -81,7 +81,16 @@
+diff --git a/torch/csrc/autograd/profiler.h b/torch/csrc/autograd/profiler.h
+index b44dd16f86..8b0c50e74e 100644
+--- a/torch/csrc/autograd/profiler.h
++++ b/torch/csrc/autograd/profiler.h
+@@ -81,7 +81,16 @@ struct TORCH_API XPUStubs {
    virtual bool enabled() {
      return false;
    }
@@ -144,7 +143,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  
  private:
    void fail() {
-@@ -133,8 +142,9 @@
+@@ -133,8 +142,9 @@ enum class C10_API_ENUM ProfilerState {
      Disabled,
      CPU, // CPU-only profiling
      CUDA, // CPU + CUDA events
@@ -155,7 +154,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  };
  
  struct TORCH_API ProfilerConfig {
-@@ -182,7 +192,6 @@
+@@ -182,7 +192,6 @@ struct TORCH_API Event final {
          kind_(kind),
          thread_id_(thread_id),
          handle_(handle),
@@ -163,7 +162,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
          shapes_(shapes),
          node_id_(node_id) {
      record(state);
-@@ -198,7 +207,6 @@
+@@ -198,7 +207,6 @@ struct TORCH_API Event final {
      : name_(std::move(name)),
        kind_(kind),
        thread_id_(thread_id),
@@ -171,7 +170,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
        xpu_event(event) {
      record(state);
    }
-@@ -223,7 +231,6 @@
+@@ -223,7 +231,6 @@ struct TORCH_API Event final {
          kind_(kind),
          thread_id_(thread_id),
          handle_(handle),
@@ -179,7 +178,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
          shapes_(shapes),
          cpu_memory_usage_(cpu_memory_usage),
          cuda_memory_usage_(cuda_memory_usage),
-@@ -291,7 +298,7 @@
+@@ -291,7 +298,7 @@ struct TORCH_API Event final {
    }
  
    bool has_xpu() const {
@@ -188,7 +187,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
    }
  
    int device() const {
-@@ -391,7 +398,6 @@
+@@ -391,7 +398,6 @@ struct TORCH_API Event final {
    uint64_t thread_id_;
    uint64_t fwd_thread_id_;
    at::RecordFunctionHandle handle_ {0};
@@ -196,7 +195,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
    std::vector<std::vector<int64_t>> shapes_;
    int64_t cpu_memory_usage_ = 0;
    int64_t cuda_memory_usage_ = 0;
-@@ -405,7 +411,7 @@
+@@ -405,7 +411,7 @@ struct TORCH_API Event final {
  
    std::vector<std::string> stack_;
    uint8_t scope_;
@@ -205,3 +204,6 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  };
  
  // a linked-list of fixed sized vectors, to avoid
+-- 
+2.25.1
+

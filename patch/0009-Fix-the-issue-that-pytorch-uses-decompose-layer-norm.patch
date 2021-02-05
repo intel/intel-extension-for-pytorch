@@ -1,0 +1,42 @@
+From ceb76001cdc7a6fb478becfaa401dafc907ed5d3 Mon Sep 17 00:00:00 2001
+From: johnlu <chengjun.lu@intel.com>
+Date: Thu, 21 Jan 2021 21:39:19 +0800
+Subject: [PATCH 09/11] Fix the issue that pytorch uses decompose layer norm
+ for GPU device.
+
+---
+ test/cpp/jit/test_argument_spec.cpp     | 4 ++--
+ torch/csrc/jit/passes/decompose_ops.cpp | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/test/cpp/jit/test_argument_spec.cpp b/test/cpp/jit/test_argument_spec.cpp
+index bf40761fc4..800a4767dc 100644
+--- a/test/cpp/jit/test_argument_spec.cpp
++++ b/test/cpp/jit/test_argument_spec.cpp
+@@ -9,8 +9,8 @@ namespace jit {
+ 
+ namespace {
+ 
+-int device(const autograd::Variable& v) {
+-  return v.device().is_cuda() ? v.get_device() : -1;
++at::Device device(const autograd::Variable& v) {
++  return v.device();
+ }
+ 
+ bool isEqual(at::IntArrayRef lhs, at::IntArrayRef rhs) {
+diff --git a/torch/csrc/jit/passes/decompose_ops.cpp b/torch/csrc/jit/passes/decompose_ops.cpp
+index 2d0f70a011..605cd59d4d 100644
+--- a/torch/csrc/jit/passes/decompose_ops.cpp
++++ b/torch/csrc/jit/passes/decompose_ops.cpp
+@@ -41,7 +41,7 @@ bool isDecomposableNorm(Node* normalize_op) {
+   auto device = input->type()->expect<TensorType>()->device();
+   // As of now, we do the decomposition for batchnorm/layernorm on GPU device
+   // only
+-  if (!device || (*device).is_cpu()) {
++  if (!device || (*device).is_cpu() || (*device).is_xpu()) {
+     return false;
+   }
+ 
+-- 
+2.25.1
+

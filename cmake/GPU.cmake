@@ -153,10 +153,6 @@ else()
   message(FATAL_ERROR, "Cannot find PyTorch library directory")
 endif()
 
-# FIXME: A workaround to disable assert conflict in PyTorch proper
-# Should be removed if DPC++ compiler provides its owner macro
-target_compile_definitions(torch_ipex PUBLIC USE_DPCPP)
-
 if(USE_PERSIST_STREAM)
   target_compile_definitions(torch_ipex PUBLIC USE_PERSIST_STREAM)
 endif()

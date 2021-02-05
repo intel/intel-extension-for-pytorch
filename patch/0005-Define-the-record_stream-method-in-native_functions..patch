@@ -1,0 +1,939 @@
+From dff0601c9b0b6dc9647a64bf9cc423dc376d737d Mon Sep 17 00:00:00 2001
+From: chengjun <chengjun.lu@intel.com>
+Date: Wed, 14 Oct 2020 00:13:00 +0800
+Subject: [PATCH 05/11] Define the record_stream method in
+ native_functions.yaml (#44301)
+
+Summary:
+The record_stream method was hard coded for CUDA device. Define the record_stream in the native_functions.yaml to enable the dynamic dispatch to different end device.
+
+Fixes https://github.com/pytorch/pytorch/issues/36556
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/44301
+
+Reviewed By: glaringlee
+
+Differential Revision: D23763954
+
+Pulled By: ezyang
+
+fbshipit-source-id: e6d24f5e7892b56101fa858a6cad2abc5cdc4293
+
+(cherry picked from commit 5741de883af2ac63cec537fc8a554610a5cea853)
+---
+ aten/src/ATen/core/ivalue.cpp                 |   6 +
+ aten/src/ATen/core/ivalue.h                   |  10 ++
+ aten/src/ATen/core/ivalue_inl.h               |   7 ++
+ aten/src/ATen/core/jit_type.h                 |  29 +++++
+ aten/src/ATen/core/type.cpp                   |   4 +
+ aten/src/ATen/function_wrapper.py             |   0
+ aten/src/ATen/native/cuda/RecordStream.cu     |   7 ++
+ aten/src/ATen/native/native_functions.yaml    |   6 +
+ aten/src/ATen/templates/TensorBody.h          |   3 +
+ aten/src/ATen/templates/TensorMethods.cpp     |   3 +
+ test/test_overrides.py                        |   2 +
+ tools/autograd/gen_python_functions.py        |   1 +
+ tools/autograd/gen_variable_type.py           |   2 +
+ .../templates/python_variable_methods.cpp     |  25 +---
+ tools/build_variables.bzl                     |   1 +
+ tools/codegen/api/cpp.py                      |   2 +-
+ tools/codegen/model.py                        |   1 +
+ tools/pyi/gen_pyi.py                          |   3 +-
+ torch/_C/__init__.pyi.in                      |  11 ++
+ torch/csrc/Module.cpp                         |   2 +
+ torch/csrc/Stream.cpp                         | 117 ++++++++++++++++++
+ torch/csrc/Stream.h                           |  18 +++
+ torch/csrc/cuda/Stream.cpp                    |   7 +-
+ torch/csrc/cuda/Stream.h                      |   5 +-
+ .../csrc/jit/frontend/schema_type_parser.cpp  |   2 +
+ torch/csrc/jit/frontend/string_to_type.cpp    |   1 +
+ torch/csrc/jit/frontend/tracer.cpp            |   3 +
+ torch/csrc/jit/frontend/tracer.h              |   1 +
+ torch/csrc/jit/ir/constants.cpp               |   7 ++
+ torch/csrc/jit/python/pybind_utils.h          |   7 ++
+ torch/csrc/jit/python/python_ir.cpp           |   3 +
+ torch/csrc/jit/serialization/unpickler.cpp    |   1 +
+ torch/csrc/utils/python_arg_parser.cpp        |   7 ++
+ torch/csrc/utils/python_arg_parser.h          |  12 +-
+ torch/jit/annotations.py                      |   4 +-
+ 35 files changed, 286 insertions(+), 34 deletions(-)
+ create mode 100644 aten/src/ATen/function_wrapper.py
+ create mode 100644 aten/src/ATen/native/cuda/RecordStream.cu
+ create mode 100644 torch/csrc/Stream.cpp
+ create mode 100644 torch/csrc/Stream.h
+
+diff --git a/aten/src/ATen/core/ivalue.cpp b/aten/src/ATen/core/ivalue.cpp
+index e786d36256..9b9cf0b35a 100644
+--- a/aten/src/ATen/core/ivalue.cpp
++++ b/aten/src/ATen/core/ivalue.cpp
+@@ -97,6 +97,8 @@ TypePtr IValue::type() const {
+       return RRefType::create(toRRef()->type());
+     case Tag::Device:
+       return DeviceObjType::get();
++    case Tag::Stream:
++      return StreamObjType::get();
+     case Tag::Object:
+       return toObjectRef().type();
+     case Tag::PyObject:
+@@ -269,6 +271,8 @@ IValue IValue::equals(const IValue& rhs) const {
+       return rhs.isGenericDict() && lhs.toGenericDict() == rhs.toGenericDict();
+     case Tag::Tuple:
+       return rhs.isTuple() && *lhs.toTuple() == *rhs.toTuple();
++    case Tag::Stream:
++      return rhs.isStream() && lhs.toStream() == lhs.toStream();
+     case Tag::Device:
+       return rhs.isDevice() && lhs.toDevice() == rhs.toDevice();
+     case Tag::GenericList:
+@@ -634,6 +638,8 @@ std::ostream& operator<<(std::ostream & out, const IValue & v) {
+       return out << "Uninitialized";
+     case IValue::Tag::Device:
+       return out << v.toDevice();
++    case IValue::Tag::Stream:
++      return out << v.toStream();
+     case IValue::Tag::GenericDict:
+       return printDict(out, v.toGenericDict(), formatter);
+     case IValue::Tag::PyObject: {
+diff --git a/aten/src/ATen/core/ivalue.h b/aten/src/ATen/core/ivalue.h
+index 101af2beb5..1db594b688 100644
+--- a/aten/src/ATen/core/ivalue.h
++++ b/aten/src/ATen/core/ivalue.h
+@@ -98,6 +98,7 @@ struct OptionalArray {
+   _(GenericDict)             \
+   _(Future)                  \
+   _(Device)                  \
++  _(Stream)                  \
+   _(Object)                  \
+   _(PyObject)                \
+   _(Uninitialized)           \
+@@ -551,6 +552,15 @@ struct CAFFE2_API IValue final {
+     return c10::Device(payload.as_device.type, payload.as_device.index);
+   }
+ 
++  //Stream
++  IValue(c10::Stream stream)
++    : tag(Tag::Stream), is_intrusive_ptr(false) {
++    payload.as_int = stream.pack();
++  }
++  c10::Stream toStream() &&;
++  c10::Stream toStream() const &;
++  bool isStream() const { return Tag::Stream == tag; }
++
+   // ScalarType
+   IValue(ScalarType t)
+   : IValue(static_cast<std::underlying_type<ScalarType>::type>(t)) {}
+diff --git a/aten/src/ATen/core/ivalue_inl.h b/aten/src/ATen/core/ivalue_inl.h
+index e0f143a030..0d978ec91d 100644
+--- a/aten/src/ATen/core/ivalue_inl.h
++++ b/aten/src/ATen/core/ivalue_inl.h
+@@ -130,6 +130,12 @@ inline at::Tensor IValue::toTensor() const & {
+   AT_ASSERT(isTensor(), "Expected Tensor but got ", tagKind());
+   return at::Tensor(toIntrusivePtr<at::TensorImpl, at::UndefinedTensorImpl>());
+ }
++inline c10::Stream IValue::toStream() && {
++  return c10::Stream::unpack(payload.as_int);
++}
++inline c10::Stream IValue::toStream() const & {
++  return c10::Stream::unpack(payload.as_int);
++}
+ inline c10::intrusive_ptr<caffe2::Blob> IValue::toBlob() && {
+   AT_ASSERT(isBlob(), "Expected Blob but got ", tagKind());
+   return moveToIntrusivePtr<caffe2::Blob>();
+@@ -645,6 +651,7 @@ inline type IValue::to<type>() const & { \
+   return this->method_name(); \
+ }
+ DEFINE_TO(at::Tensor, toTensor)
++DEFINE_TO(c10::Stream, toStream)
+ DEFINE_TO(float, toDouble)
+ DEFINE_TO(double, toDouble)
+ DEFINE_TO(unsigned char, toInt)
+diff --git a/aten/src/ATen/core/jit_type.h b/aten/src/ATen/core/jit_type.h
+index 1c9d31dd63..7e0a290801 100644
+--- a/aten/src/ATen/core/jit_type.h
++++ b/aten/src/ATen/core/jit_type.h
+@@ -47,6 +47,7 @@ using OptNameList = c10::optional<std::vector<std::string>>;
+   _(OptionalType)           \
+   _(VarType)                \
+   _(DeviceObjType)          \
++  _(StreamObjType)          \
+   _(FunctionType)           \
+   _(ClassType)              \
+   _(PyObjectType)           \
+@@ -1543,6 +1544,28 @@ struct CAFFE2_API DeviceObjType : public Type {
+   DeviceObjType() : Type(TypeKind::DeviceObjType) {}
+ };
+ 
++struct StreamObjType;
++using StreamObjTypePtr = std::shared_ptr<StreamObjType>;
++// This type represents a Generator
++struct CAFFE2_API StreamObjType : public Type {
++  static StreamObjTypePtr create() {
++    return StreamObjTypePtr(
++      new StreamObjType()); // NOLINT(modernize-make-shared)
++  }
++  bool operator==(const Type& rhs) const override {
++    return rhs.kind() == kind();
++  }
++  std::string str() const override {
++    return "Stream";
++  }
++  static const TypeKind Kind = TypeKind::StreamObjType;
++  // global singleton
++  static StreamObjTypePtr get();
++
++private:
++  StreamObjType() : Type(TypeKind::StreamObjType) {}
++};
++
+ struct VarType;
+ using VarTypePtr = std::shared_ptr<VarType>;
+ // This type represents a type variable, used in FunctionSchema
+@@ -1720,6 +1743,12 @@ struct getTypePtr_<at::Tensor> final {
+   }
+ };
+ template <>
++struct getTypePtr_<c10::Stream> final {
++  static TypePtr call() {
++    return StreamObjType::get();
++  }
++};
++template <>
+ struct getTypePtr_<double> final {
+   static TypePtr call() {
+     return FloatType::get();
+diff --git a/aten/src/ATen/core/type.cpp b/aten/src/ATen/core/type.cpp
+index 13e82d4346..45bee50ccb 100644
+--- a/aten/src/ATen/core/type.cpp
++++ b/aten/src/ATen/core/type.cpp
+@@ -151,6 +151,10 @@ DeviceObjTypePtr DeviceObjType::get() {
+   static auto value = DeviceObjType::create();
+   return value;
+ }
++StreamObjTypePtr StreamObjType::get() {
++  static auto value = StreamObjType::create();
++  return value;
++}
+ ScalarTypeTypePtr ScalarTypeType::get() {
+ static auto value = ScalarTypeType::create();
+ return value;
+diff --git a/aten/src/ATen/function_wrapper.py b/aten/src/ATen/function_wrapper.py
+new file mode 100644
+index 0000000000..e69de29bb2
+diff --git a/aten/src/ATen/native/cuda/RecordStream.cu b/aten/src/ATen/native/cuda/RecordStream.cu
+new file mode 100644
+index 0000000000..d48561df00
+--- /dev/null
++++ b/aten/src/ATen/native/cuda/RecordStream.cu
+@@ -0,0 +1,7 @@
++#include <ATen/ATen.h>
++#include <c10/cuda/CUDACachingAllocator.h>
++namespace at { namespace native {
++void record_stream_cuda(Tensor& self, c10::Stream stream) {
++  c10::cuda::CUDACachingAllocator::recordStream(self.storage().data_ptr(), at::cuda::CUDAStream::unpack(stream.pack()));
++}
++}}  // namespace at::native
+diff --git a/aten/src/ATen/native/native_functions.yaml b/aten/src/ATen/native/native_functions.yaml
+index 4d748250ab..44831e401c 100644
+--- a/aten/src/ATen/native/native_functions.yaml
++++ b/aten/src/ATen/native/native_functions.yaml
+@@ -8107,6 +8107,12 @@
+   variants: function, method
+   device_guard: False
+ 
++- func: record_stream(Tensor(a!) self, Stream s) -> ()
++  use_c10_dispatcher: full
++  variants: method
++  dispatch:
++    CUDA: record_stream_cuda
++
+ - func: isposinf(Tensor self) -> Tensor
+   use_c10_dispatcher: full
+   variants: function, method
+diff --git a/aten/src/ATen/templates/TensorBody.h b/aten/src/ATen/templates/TensorBody.h
+index d4f0f267b7..f6f48f1a08 100644
+--- a/aten/src/ATen/templates/TensorBody.h
++++ b/aten/src/ATen/templates/TensorBody.h
+@@ -4,6 +4,7 @@
+ #include <c10/core/Layout.h>
+ #include <c10/core/MemoryFormat.h>
+ #include <c10/core/QScheme.h>
++#include <c10/core/Stream.h>
+ #include <c10/core/Scalar.h>
+ #include <c10/core/ScalarType.h>
+ #include <c10/core/Storage.h>
+@@ -49,6 +50,8 @@ namespace at {
+ class Tensor;
+ using TensorList = ArrayRef<Tensor>;
+ 
++using Stream = c10::Stream;
++
+ namespace impl {
+ inline bool variable_excluded_from_dispatch() {
+ #ifdef C10_MOBILE
+diff --git a/aten/src/ATen/templates/TensorMethods.cpp b/aten/src/ATen/templates/TensorMethods.cpp
+index 7b50f9dba6..2cf15f771e 100644
+--- a/aten/src/ATen/templates/TensorMethods.cpp
++++ b/aten/src/ATen/templates/TensorMethods.cpp
+@@ -1,6 +1,7 @@
+ #include <c10/core/Scalar.h>
+ #include <c10/core/MemoryFormat.h>
+ #include <c10/core/QScheme.h>
++#include <c10/core/Stream.h>
+ #include <c10/macros/Macros.h>
+ #include <c10/core/TensorOptions.h>
+ #include <c10/util/intrusive_ptr.h>
+@@ -14,6 +15,8 @@
+ 
+ namespace at {
+ 
++using Stream = c10::Stream;
++
+ Tensor Tensor::cpu() const {
+   return to(options().device(DeviceType::CPU), /*non_blocking*/ false, /*copy*/ false);
+ }
+diff --git a/test/test_overrides.py b/test/test_overrides.py
+index ffd627379f..df34f96e7a 100644
+--- a/test/test_overrides.py
++++ b/test/test_overrides.py
+@@ -575,6 +575,8 @@ def generate_tensor_like_override_tests(cls):
+                     func_args.append(False)
+                 elif t.startswith('int') or t in {'Dimname', 'DimnameList'}:
+                     func_args.append(0)
++                elif t in {'Stream'}:
++                    func_args.append(torch.Stream())
+                 elif t.startswith('float') or t == 'double':
+                     func_args.append(1.0)
+                 elif t in {'Generator', 'MemoryFormat', 'TensorOptions'}:
+diff --git a/tools/autograd/gen_python_functions.py b/tools/autograd/gen_python_functions.py
+index 8f272de9a5..da26bda8b0 100644
+--- a/tools/autograd/gen_python_functions.py
++++ b/tools/autograd/gen_python_functions.py
+@@ -264,6 +264,7 @@ def create_python_bindings(python_functions, is_python_method, module):
+ UNPACK_METHODS = {
+     'const Tensor &': 'tensor',
+     'Tensor &': 'tensor',
++    'Stream': 'stream',
+     'c10::optional<Tensor>': 'optionalTensor',
+     'const c10::optional<Tensor>&': 'optionalTensor',
+     'c10::optional<Generator>': 'generator',
+diff --git a/tools/autograd/gen_variable_type.py b/tools/autograd/gen_variable_type.py
+index ee37c4749a..d3af7dfda6 100644
+--- a/tools/autograd/gen_variable_type.py
++++ b/tools/autograd/gen_variable_type.py
+@@ -146,6 +146,8 @@ DONT_REQUIRE_DERIVATIVE = {
+     # Functions that return integers should not have output that require gradients
+     'argmax', 'argmin', 'argsort', 'searchsorted',
+     'bucketize'
++    # Functions return none are not differentiable
++    'record_stream',
+ }
+ 
+ # The C -> R functions at the time of adding this are still being audited and tested
+diff --git a/tools/autograd/templates/python_variable_methods.cpp b/tools/autograd/templates/python_variable_methods.cpp
+index 5dafd11786..f79e5ea395 100644
+--- a/tools/autograd/templates/python_variable_methods.cpp
++++ b/tools/autograd/templates/python_variable_methods.cpp
+@@ -12,7 +12,6 @@
+ #include "torch/csrc/autograd/utils/wrap_outputs.h"
+ #include "torch/csrc/jit/frontend/tracer.h"
+ #ifdef USE_CUDA
+-#include "torch/csrc/cuda/Stream.h"
+ #include "torch/csrc/cuda/Event.h"
+ #endif
+ #include "torch/csrc/utils/cuda_lazy_init.h"
+@@ -30,6 +29,7 @@
+ 
+ #include <ATen/ATen.h>
+ #include "c10/util/Optional.h"
++#include "c10/core/Stream.h"
+ 
+ #include <stdexcept>
+ 
+@@ -40,6 +40,7 @@ using at::Backend;
+ using at::Scalar;
+ using at::ScalarType;
+ using at::Tensor;
++using c10::Stream;
+ using namespace torch::autograd::utils;
+ 
+ namespace torch { namespace autograd {
+@@ -726,27 +727,6 @@ static PyObject * THPVariable_numpy(PyObject* self, PyObject* arg)
+   END_HANDLE_TH_ERRORS
+ }
+ 
+-// TODO: move this to ATen. We would need to expose Stream objects in ATen.
+-static PyObject * THPVariable_record_stream(PyObject* self, PyObject* arg)
+-{
+-  HANDLE_TH_ERRORS
+-  if (check_has_torch_function(self)) {
+-    auto args = py::make_tuple(py::handle(arg));
+-    return handle_torch_function(self, "record_stream", args.ptr());
+-  }
+-#ifdef USE_CUDA
+-  auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
+-  if (!THCPStream_Check(arg)) {
+-    return PyErr_Format(PyExc_TypeError, "expected Stream object");
+-  }
+-  c10::cuda::CUDACachingAllocator::recordStream(self_.storage().data_ptr(), at::cuda::CUDAStream::unpack(((THCPStream*)arg)->cdata));
+-  Py_RETURN_NONE;
+-#else
+-  throw std::runtime_error("PyTorch compiled without CUDA support");
+-#endif
+-  END_HANDLE_TH_ERRORS
+-}
+-
+ static PyObject * THPVariable_requires_grad_(PyObject* self, PyObject* args, PyObject* kwargs)
+ {
+   HANDLE_TH_ERRORS
+@@ -1204,7 +1184,6 @@ PyMethodDef variable_methods[] = {
+   {"nonzero", (PyCFunction)(void(*)(void))THPVariable_nonzero, METH_VARARGS | METH_KEYWORDS, NULL},
+   {"numel", (PyCFunction)THPVariable_numel, METH_NOARGS, NULL},
+   {"numpy", (PyCFunction)THPVariable_numpy, METH_NOARGS, NULL},
+-  {"record_stream", (PyCFunction)THPVariable_record_stream, METH_O, NULL},
+   {"requires_grad_", (PyCFunction)(void(*)(void))THPVariable_requires_grad_, METH_VARARGS | METH_KEYWORDS, NULL},
+   {"set_", (PyCFunction)(void (*)(void))THPVariable_set_, METH_VARARGS | METH_KEYWORDS, NULL},
+   {"short", (PyCFunction)(void(*)(void))THPVariable_short, METH_VARARGS | METH_KEYWORDS, NULL},
+diff --git a/tools/build_variables.bzl b/tools/build_variables.bzl
+index f5fe9d24aa..341cb96763 100644
+--- a/tools/build_variables.bzl
++++ b/tools/build_variables.bzl
+@@ -476,6 +476,7 @@ libtorch_python_core_sources = [
+     "torch/csrc/python_dimname.cpp",
+     "torch/csrc/Size.cpp",
+     "torch/csrc/Storage.cpp",
++    "torch/csrc/Stream.cpp",
+     "torch/csrc/TypeInfo.cpp",
+     "torch/csrc/api/src/python/init.cpp",
+     "torch/csrc/autograd/functions/init.cpp",
+diff --git a/tools/codegen/api/cpp.py b/tools/codegen/api/cpp.py
+index d8445f02ee..ce3d8949fe 100644
+--- a/tools/codegen/api/cpp.py
++++ b/tools/codegen/api/cpp.py
+@@ -45,7 +45,7 @@ def valuetype_type(t: Type) -> Optional[str]:
+         elif t.name in [BaseTy.bool, BaseTy.QScheme, BaseTy.Scalar,
+                         BaseTy.ScalarType, BaseTy.Generator, BaseTy.Storage,
+                         BaseTy.Layout, BaseTy.Device, BaseTy.MemoryFormat,
+-                        BaseTy.Dimname, BaseTy.ConstQuantizerPtr]:
++                        BaseTy.Dimname, BaseTy.Stream, BaseTy.ConstQuantizerPtr]:
+             # These C++ names line up with their schema names
+             return t.name.name
+         else:
+diff --git a/tools/codegen/model.py b/tools/codegen/model.py
+index 5b4b25096f..2a00b912d6 100644
+--- a/tools/codegen/model.py
++++ b/tools/codegen/model.py
+@@ -455,6 +455,7 @@ BaseTy = Enum('BaseTy', (
+     'MemoryFormat',
+     'QScheme',
+     'Storage',
++    'Stream',
+     'ConstQuantizerPtr',  # TODO: rename
+ ))
+ 
+diff --git a/tools/pyi/gen_pyi.py b/tools/pyi/gen_pyi.py
+index d2c3074c69..f1d9596eda 100644
+--- a/tools/pyi/gen_pyi.py
++++ b/tools/pyi/gen_pyi.py
+@@ -146,7 +146,8 @@ def type_to_python(typename, size=None):
+         'Dimname': 'Union[str, ellipsis, None]',
+         'DimnameList': 'Sequence[Union[str, ellipsis, None]]',
+         'QScheme': '_qscheme',
+-        'ArrayRef<double>' : 'Sequence[float]'
++        'ArrayRef<double>' : 'Sequence[float]',
++        'Stream': 'Stream',
+     }[typename]
+ 
+     return typename
+diff --git a/torch/_C/__init__.pyi.in b/torch/_C/__init__.pyi.in
+index 302679fe49..54b93fe787 100644
+--- a/torch/_C/__init__.pyi.in
++++ b/torch/_C/__init__.pyi.in
+@@ -35,6 +35,13 @@ class device:
+ 
+     def __reduce__(self) -> Tuple[Any, ...]: ...  # THPDevice_reduce
+ 
++# Defined in torch/csrc/Stream.cpp
++class Stream:
++    _cdata: _int  # Stream handle
++    device: device # The device of the stream
++
++    ...
++
+ # Defined in torch/csrc/Size.cpp
+ class Size(Tuple[_int, ...]):
+     # TODO: __reduce__
+@@ -650,6 +657,10 @@ class DeviceObjType(JitType):
+     @staticmethod
+     def get() -> DeviceObjType: ...
+ 
++class StreamObjType(JitType):
++    @staticmethod
++    def get() -> StreamObjType: ...
++
+ class ListType(JitType):
+     def __init__(self, a: JitType) -> None: ...
+     def getElementType(self) -> JitType: ...
+diff --git a/torch/csrc/Module.cpp b/torch/csrc/Module.cpp
+index b618ad418f..ddc4226c69 100644
+--- a/torch/csrc/Module.cpp
++++ b/torch/csrc/Module.cpp
+@@ -23,6 +23,7 @@
+ #include <torch/csrc/THP.h>
+ #include <torch/csrc/DynamicTypes.h>
+ #include <torch/csrc/Device.h>
++#include <torch/csrc/Stream.h>
+ #include <torch/csrc/Dtype.h>
+ #include <torch/csrc/DataLoader.h>
+ #include <torch/csrc/Generator.h>
+@@ -722,6 +723,7 @@ PyObject* initModule() {
+   THPMemoryFormat_init(module);
+   THPQScheme_init(module);
+   THPDevice_init(module);
++  THPStream_init(module);
+   ASSERT_TRUE(THPVariable_initModule(module));
+   ASSERT_TRUE(THPFunction_initModule(module));
+   ASSERT_TRUE(THPEngine_initModule(module));
+diff --git a/torch/csrc/Stream.cpp b/torch/csrc/Stream.cpp
+new file mode 100644
+index 0000000000..8e2458faf6
+--- /dev/null
++++ b/torch/csrc/Stream.cpp
+@@ -0,0 +1,117 @@
++#include <pybind11/pybind11.h>
++#include <torch/csrc/Device.h>
++#include <torch/csrc/THP.h>
++#include <torch/csrc/utils/python_arg_parser.h>
++
++#include <structmember.h>
++
++PyTypeObject *THPStreamClass = nullptr;
++
++static PyObject* THPStream_pynew(
++  PyTypeObject *type, PyObject *args, PyObject *kwargs) {
++  HANDLE_TH_ERRORS
++  uint64_t cdata = 0;
++  static char *kwlist[] = {"_cdata", nullptr};
++  if (!PyArg_ParseTupleAndKeywords(
++    args, kwargs, "|K", kwlist, &cdata)) {
++    return nullptr;
++  }
++
++  THPObjectPtr ptr(type->tp_alloc(type, 0));
++  if (!ptr) {
++    return nullptr;
++  }
++
++  THPStream* self = (THPStream *)ptr.get();
++  self->cdata = cdata;
++  return (PyObject *)ptr.release();
++  END_HANDLE_TH_ERRORS
++}
++
++static void THPStream_dealloc(THPStream *self) {
++  Py_TYPE(self)->tp_free((PyObject*)self);
++}
++
++static PyObject * THPStream_get_device(THPStream *self, void *unused) {
++  HANDLE_TH_ERRORS
++  return THPDevice_New(c10::Stream::unpack(self->cdata).device());
++  END_HANDLE_TH_ERRORS
++}
++
++static PyObject * THPStream_eq(THPStream *self, THPStream *other) {
++  HANDLE_TH_ERRORS
++  return PyBool_FromLong(self->cdata == other->cdata);
++  END_HANDLE_TH_ERRORS
++}
++
++static struct PyMemberDef THPStream_members[] = {
++  {(char*)"_cdata",
++    T_ULONGLONG, offsetof(THPStream, cdata), READONLY, nullptr},
++  {nullptr}
++};
++
++static struct PyGetSetDef THPStream_properties[] = {
++  {"device", (getter)THPStream_get_device, nullptr, nullptr, nullptr},
++  {nullptr}
++};
++
++static PyMethodDef THPStream_methods[] = {
++  {(char*)"__eq__", (PyCFunction)THPStream_eq, METH_O, nullptr},
++  {nullptr}
++};
++
++PyTypeObject THPStreamType = {
++  PyVarObject_HEAD_INIT(nullptr, 0)
++  "torch.Stream",                        /* tp_name */
++  sizeof(THPStream),                     /* tp_basicsize */
++  0,                                     /* tp_itemsize */
++  (destructor)THPStream_dealloc,         /* tp_dealloc */
++  0,                                     /* tp_vectorcall_offset */
++  0,                                     /* tp_getattr */
++  0,                                     /* tp_setattr */
++  0,                                     /* tp_reserved */
++  0,                                     /* tp_repr */
++  0,                                     /* tp_as_number */
++  0,                                     /* tp_as_sequence */
++  0,                                     /* tp_as_mapping */
++  0,                                     /* tp_hash  */
++  0,                                     /* tp_call */
++  0,                                     /* tp_str */
++  0,                                     /* tp_getattro */
++  0,                                     /* tp_setattro */
++  0,                                     /* tp_as_buffer */
++  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
++  nullptr,                                  /* tp_doc */
++  0,                                     /* tp_traverse */
++  0,                                     /* tp_clear */
++  0,                                     /* tp_richcompare */
++  0,                                     /* tp_weaklistoffset */
++  0,                                     /* tp_iter */
++  0,                                     /* tp_iternext */
++  THPStream_methods,                     /* tp_methods */
++  THPStream_members,                     /* tp_members */
++  THPStream_properties,                  /* tp_getset */
++  0,                                     /* tp_base */
++  0,                                     /* tp_dict */
++  0,                                     /* tp_descr_get */
++  0,                                     /* tp_descr_set */
++  0,                                     /* tp_dictoffset */
++  0,                                     /* tp_init */
++  0,                                     /* tp_alloc */
++  THPStream_pynew,                       /* tp_new */
++};
++
++
++void THPStream_init(PyObject *module)
++{
++  THPStreamClass = &THPStreamType;
++  Py_TYPE(&THPStreamType) = &PyType_Type;
++  if (PyType_Ready(&THPStreamType) < 0) {
++    throw python_error();
++  }
++  Py_INCREF(&THPStreamType);
++  if (PyModule_AddObject(
++      module, "Stream", (PyObject *)&THPStreamType) < 0) {
++    throw python_error();
++  }
++}
+diff --git a/torch/csrc/Stream.h b/torch/csrc/Stream.h
+new file mode 100644
+index 0000000000..8d507977e1
+--- /dev/null
++++ b/torch/csrc/Stream.h
+@@ -0,0 +1,18 @@
++#ifndef THP_STREAM_INC
++#define THP_STREAM_INC
++
++#include <torch/csrc/python_headers.h>
++
++struct THPStream {
++  PyObject_HEAD
++  uint64_t cdata;
++};
++extern PyTypeObject *THPStreamClass;
++
++void THPStream_init(PyObject *module);
++
++inline bool THPStream_Check(PyObject* obj) {
++  return THPStreamClass && PyObject_IsInstance(obj, (PyObject*)THPStreamClass);
++}
++
++#endif // THP_STREAM_INC
+diff --git a/torch/csrc/cuda/Stream.cpp b/torch/csrc/cuda/Stream.cpp
+index 775d48e16f..844d7b1e86 100644
+--- a/torch/csrc/cuda/Stream.cpp
++++ b/torch/csrc/cuda/Stream.cpp
+@@ -101,13 +101,10 @@ static PyObject * THCPStream_eq(THCPStream *self, THCPStream *other) {
+ }
+ 
+ static struct PyMemberDef THCPStream_members[] = {
+-  {(char*)"_cdata",
+-    T_ULONGLONG, offsetof(THCPStream, cdata), READONLY, nullptr},
+   {nullptr}
+ };
+ 
+ static struct PyGetSetDef THCPStream_properties[] = {
+-  {"device", (getter)THCPStream_get_device, nullptr, nullptr, nullptr},
+   {"cuda_stream",
+     (getter)THCPStream_get_cuda_stream, nullptr, nullptr, nullptr},
+   {"priority", (getter)THCPStream_get_priority, nullptr, nullptr, nullptr},
+@@ -154,7 +151,7 @@ PyTypeObject THCPStreamType = {
+   0,                                     /* tp_iternext */
+   THCPStream_methods,                    /* tp_methods */
+   THCPStream_members,                    /* tp_members */
+-  THCPStream_properties,                /* tp_getset */
++  THCPStream_properties,                 /* tp_getset */
+   0,                                     /* tp_base */
+   0,                                     /* tp_dict */
+   0,                                     /* tp_descr_get */
+@@ -168,6 +165,8 @@ PyTypeObject THCPStreamType = {
+ 
+ void THCPStream_init(PyObject *module)
+ {
++  Py_INCREF(THPStreamClass);
++  THCPStreamType.tp_base = THPStreamClass;
+   THCPStreamClass = (PyObject*)&THCPStreamType;
+   if (PyType_Ready(&THCPStreamType) < 0) {
+     throw python_error();
+diff --git a/torch/csrc/cuda/Stream.h b/torch/csrc/cuda/Stream.h
+index c98d1352e3..71acdc5b7d 100644
+--- a/torch/csrc/cuda/Stream.h
++++ b/torch/csrc/cuda/Stream.h
+@@ -1,13 +1,12 @@
+ #ifndef THCP_STREAM_INC
+ #define THCP_STREAM_INC
+ 
++#include <torch/csrc/Stream.h>
+ #include <c10/cuda/CUDAStream.h>
+ #include <torch/csrc/python_headers.h>
+ #include <THC/THC.h>
+ 
+-struct THCPStream {
+-  PyObject_HEAD
+-  uint64_t cdata;
++struct THCPStream : THPStream{
+   at::cuda::CUDAStream cuda_stream;
+ };
+ extern PyObject *THCPStreamClass;
+diff --git a/torch/csrc/jit/frontend/schema_type_parser.cpp b/torch/csrc/jit/frontend/schema_type_parser.cpp
+index a089abf7fb..e18b5bd08d 100644
+--- a/torch/csrc/jit/frontend/schema_type_parser.cpp
++++ b/torch/csrc/jit/frontend/schema_type_parser.cpp
+@@ -24,6 +24,7 @@ using c10::OptionalType;
+ using c10::QSchemeType;
+ using c10::QuantizerType;
+ using c10::RRefType;
++using c10::StreamObjType;
+ using c10::StringType;
+ using c10::Symbol;
+ using c10::TensorType;
+@@ -48,6 +49,7 @@ TypePtr SchemaTypeParser::parseBaseType() {
+                         // parser, it should use the custom class mechanism
+                         // instead. @jerryzh
+       {"Device", DeviceObjType::get()},
++      {"Stream", StreamObjType::get()},
+       {"Scalar", NumberType::get()},
+       {"str", StringType::get()},
+       {"float", FloatType::get()},
+diff --git a/torch/csrc/jit/frontend/string_to_type.cpp b/torch/csrc/jit/frontend/string_to_type.cpp
+index 2674011abc..3aaf0aa192 100644
+--- a/torch/csrc/jit/frontend/string_to_type.cpp
++++ b/torch/csrc/jit/frontend/string_to_type.cpp
+@@ -11,6 +11,7 @@ const std::unordered_map<std::string, TypePtr>& string_to_type_lut() {
+       {"bool", BoolType::get()},
+       {"str", StringType::get()},
+       {"Device", DeviceObjType::get()},
++      {"Stream", StreamObjType::get()},
+       // technically this is not a python type but we need it when
+       // parsing serialized methods that use implicit conversions to Scalar
+       {"number", NumberType::get()},
+diff --git a/torch/csrc/jit/frontend/tracer.cpp b/torch/csrc/jit/frontend/tracer.cpp
+index b4bc481ae5..f86895eb71 100644
+--- a/torch/csrc/jit/frontend/tracer.cpp
++++ b/torch/csrc/jit/frontend/tracer.cpp
+@@ -614,6 +614,9 @@ void addInputs(
+ void addInputs(Node* n, const char* name, at::Device value) {
+   detail::genericAddInput(n, value);
+ }
++void addInputs(Node* n, const char* name, c10::Stream stream) {
++  detail::genericAddInput(n, static_cast<int64_t>(stream.pack()));
++}
+ void addInputs(Node* n, const char* name, at::Layout value) {
+   detail::genericAddInput(n, static_cast<int64_t>(value));
+ }
+diff --git a/torch/csrc/jit/frontend/tracer.h b/torch/csrc/jit/frontend/tracer.h
+index 74a5225d4f..61d79cb3ef 100644
+--- a/torch/csrc/jit/frontend/tracer.h
++++ b/torch/csrc/jit/frontend/tracer.h
+@@ -271,6 +271,7 @@ TORCH_API void addInputs(
+     const char* name,
+     const c10::optional<std::string>& value);
+ TORCH_API void addInputs(Node* n, const char* name, at::Device value);
++TORCH_API void addInputs(Node* n, const char* name, c10::Stream stream);
+ TORCH_API void addInputs(Node* n, const char* name, at::Layout value);
+ TORCH_API void addInputs(Node* n, const char* name, at::ScalarType value);
+ TORCH_API void addInputs(
+diff --git a/torch/csrc/jit/ir/constants.cpp b/torch/csrc/jit/ir/constants.cpp
+index 8b2c0a0da5..3a81adf088 100644
+--- a/torch/csrc/jit/ir/constants.cpp
++++ b/torch/csrc/jit/ir/constants.cpp
+@@ -110,6 +110,10 @@ c10::optional<Value*> tryInsertConstant(
+     ss << val.toDevice();
+     n->s_(attr::value, ss.str());
+     n->output()->setType(DeviceObjType::get());
++  } else if (val.isStream()) {
++    auto stream = val.toStream();
++    n->i_(attr::value, stream.pack());
++    n->output()->setType(StreamObjType::get());
+   } else if (val.isNone()) {
+     n->output()->setType(NoneType::get());
+   } else if (val.isTuple()) {
+@@ -179,6 +183,9 @@ c10::optional<IValue> toIValue(const Value* v) {
+   } else if (type == DeviceObjType::get()) {
+     auto d = c10::Device(node->s(attr::value));
+     return d;
++  } else if (type == StreamObjType::get()) {
++    auto s = c10::Stream::unpack(node->i(attr::value));
++    return s;
+   } else if (node->mustBeNone()) {
+     return IValue();
+   } else if (type->cast<EnumType>()) {
+diff --git a/torch/csrc/jit/python/pybind_utils.h b/torch/csrc/jit/python/pybind_utils.h
+index 4be55a9caa..a719f701ee 100644
+--- a/torch/csrc/jit/python/pybind_utils.h
++++ b/torch/csrc/jit/python/pybind_utils.h
+@@ -10,6 +10,7 @@
+ #include <torch/csrc/Dtype.h>
+ #include <torch/csrc/Layout.h>
+ #include <torch/csrc/QScheme.h>
++#include <torch/csrc/Stream.h>
+ #include <torch/csrc/WindowsTorchApiMacro.h>
+ #include <torch/csrc/jit/api/module.h>
+ #include <torch/csrc/jit/frontend/schema_matching.h>
+@@ -282,6 +283,8 @@ inline InferredType tryToInferType(py::handle input) {
+     return InferredType(IntType::get());
+   } else if (THPDevice_Check(input.ptr())) {
+     return InferredType(DeviceObjType::get());
++  } else if (THPStream_Check(input.ptr())) {
++    return InferredType(StreamObjType::get());
+   } else if (THPDtype_Check(input.ptr())) {
+     return InferredType(IntType::get());
+   } else if (THPQScheme_Check(input.ptr())) {
+@@ -577,6 +580,10 @@ inline IValue toIValue(
+       auto device = reinterpret_cast<THPDevice*>(obj.ptr());
+       return device->device;
+     }
++    case TypeKind::StreamObjType: {
++      auto stream = reinterpret_cast<THPStream*>(obj.ptr());
++      return static_cast<int64_t>(stream->cdata);
++    }
+     case TypeKind::ListType: {
+       const auto& elem_type = type->expect<ListType>()->getElementType();
+       switch (elem_type->kind()) {
+diff --git a/torch/csrc/jit/python/python_ir.cpp b/torch/csrc/jit/python/python_ir.cpp
+index c5889144bd..6992ee6405 100644
+--- a/torch/csrc/jit/python/python_ir.cpp
++++ b/torch/csrc/jit/python/python_ir.cpp
+@@ -755,6 +755,9 @@ void initPythonIRBindings(PyObject* module_) {
+   py::class_<DeviceObjType, Type, std::shared_ptr<DeviceObjType>>(
+       m, "DeviceObjType")
+       .def_static("get", &DeviceObjType::get);
++  py::class_<StreamObjType, Type, std::shared_ptr<StreamObjType>>(
++      m, "StreamObjType")
++      .def_static("get", &StreamObjType::get);
+   py::class_<PyObjectType, Type, std::shared_ptr<PyObjectType>>(
+       m, "PyObjectType")
+       .def_static("get", &PyObjectType::get);
+diff --git a/torch/csrc/jit/serialization/unpickler.cpp b/torch/csrc/jit/serialization/unpickler.cpp
+index cb36fd6b7e..68145bf2a5 100644
+--- a/torch/csrc/jit/serialization/unpickler.cpp
++++ b/torch/csrc/jit/serialization/unpickler.cpp
+@@ -67,6 +67,7 @@ void restoreAccurateTypeTags(const IValue& root, const TypePtr& type_tag) {
+       case StringType::Kind:
+       case FunctionType::Kind:
+       case DeviceObjType::Kind:
++      case StreamObjType::Kind:
+       case QSchemeType::Kind:
+       case LayoutType::Kind:
+       case ScalarTypeType::Kind:
+diff --git a/torch/csrc/utils/python_arg_parser.cpp b/torch/csrc/utils/python_arg_parser.cpp
+index 81c55b83bf..00df557a1b 100644
+--- a/torch/csrc/utils/python_arg_parser.cpp
++++ b/torch/csrc/utils/python_arg_parser.cpp
+@@ -35,6 +35,7 @@ static std::unordered_map<std::string, ParameterType> type_map = {
+   {"MemoryFormat", ParameterType::MEMORY_FORMAT},
+   {"QScheme", ParameterType::QSCHEME},
+   {"Device", ParameterType::DEVICE},
++  {"Stream", ParameterType::STREAM},
+   {"std::string", ParameterType::STRING},
+   {"Dimname", ParameterType::DIMNAME},
+   {"DimnameList", ParameterType::DIMNAME_LIST},
+@@ -431,6 +432,8 @@ auto FunctionParameter::check(PyObject* obj, std::vector<py::handle> &overloaded
+     case ParameterType::QSCHEME: return THPQScheme_Check(obj);
+     case ParameterType::DEVICE:
+       return THPUtils_checkLong(obj) || THPUtils_checkString(obj) || THPDevice_Check(obj);
++    case ParameterType::STREAM:
++      return THPStream_Check(obj);
+     case ParameterType::STRING: return THPUtils_checkString(obj);
+     default: throw std::runtime_error("unknown parameter type");
+   }
+@@ -557,6 +560,10 @@ void FunctionParameter::set_default_str(const std::string& str) {
+     if (str != "None") {
+       throw std::runtime_error("invalid device: " + str);
+     }
++  } else if (type_ == ParameterType::STREAM) {
++    if (str != "None") {
++      throw std::runtime_error("invalid stream: " + str);
++    }
+   } else if (type_ == ParameterType::STRING) {
+     if (str != "None" && str != "") {
+       throw std::runtime_error("invalid default string: " + str);
+diff --git a/torch/csrc/utils/python_arg_parser.h b/torch/csrc/utils/python_arg_parser.h
+index 0454e7e2af..832d8b77b9 100644
+--- a/torch/csrc/utils/python_arg_parser.h
++++ b/torch/csrc/utils/python_arg_parser.h
+@@ -42,6 +42,7 @@
+ 
+ #include <torch/csrc/python_headers.h>
+ 
++#include <torch/csrc/Stream.h>
+ #include <torch/csrc/Device.h>
+ #include <torch/csrc/Dtype.h>
+ #include <torch/csrc/DynamicTypes.h>
+@@ -78,7 +79,7 @@ namespace torch {
+ 
+ enum class ParameterType {
+   TENSOR, SCALAR, INT64, DOUBLE, COMPLEX, TENSOR_LIST, INT_LIST, GENERATOR,
+-  BOOL, STORAGE, PYOBJECT, SCALARTYPE, LAYOUT, MEMORY_FORMAT, DEVICE, STRING,
++  BOOL, STORAGE, PYOBJECT, SCALARTYPE, LAYOUT, MEMORY_FORMAT, DEVICE, STREAM, STRING,
+   DIMNAME, DIMNAME_LIST, QSCHEME, FLOAT_LIST
+ };
+ 
+@@ -165,6 +166,7 @@ struct PythonArgs {
+   inline std::vector<int64_t> intlistWithDefault(int i, std::vector<int64_t> default_intlist);
+   inline c10::optional<at::Generator> generator(int i);
+   inline at::Storage storage(int i);
++  inline c10::Stream stream(int i);
+   inline at::ScalarType scalartype(int i);
+   inline at::ScalarType scalartypeWithDefault(int i, at::ScalarType default_scalartype);
+   inline c10::optional<at::ScalarType> scalartypeOptional(int i);
+@@ -620,6 +622,14 @@ inline at::Storage PythonArgs::storage(int i) {
+   return createStorage(args[i]);
+ }
+ 
++inline c10::Stream PythonArgs::stream(int i) {
++  if (!args[i]) return c10::Stream(c10::Stream::Default::DEFAULT, c10::Device(DeviceType::CPU, -1));
++  if (!THPStream_Check(args[i])) {
++    throw TypeError("expected Stream object. Got '%s'", Py_TYPE(args[i])->tp_name);
++  }
++  return c10::Stream::unpack(((THPStream*)args[i])->cdata);
++}
++
+ inline PyObject* PythonArgs::pyobject(int i) {
+   if (!args[i]) return Py_None;
+   return args[i];
+diff --git a/torch/jit/annotations.py b/torch/jit/annotations.py
+index ba68920fa6..d8e5727f5e 100644
+--- a/torch/jit/annotations.py
++++ b/torch/jit/annotations.py
+@@ -10,7 +10,7 @@ from ._state import _get_script_class
+ 
+ from torch._C import TensorType, TupleType, FloatType, IntType, \
+     ListType, StringType, DictType, BoolType, OptionalType, ClassType, InterfaceType, AnyType, NoneType, \
+-    DeviceObjType, FutureType, EnumType
++    DeviceObjType, StreamObjType, FutureType, EnumType
+ 
+ 
+ from textwrap import dedent
+@@ -314,6 +314,8 @@ def try_ann_to_type(ann, loc):
+         return InterfaceType(_qualified_name(ann))
+     if ann is torch.device:
+         return DeviceObjType.get()
++    if ann is torch.Stream:
++        return StreamObjType.get()
+     if ann is torch.dtype:
+         return IntType.get()  # dtype not yet bound in as its own type
+     if inspect.isclass(ann) and issubclass(ann, enum.Enum):
+-- 
+2.25.1
+

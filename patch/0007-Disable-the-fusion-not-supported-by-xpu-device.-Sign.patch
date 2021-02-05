@@ -1,0 +1,43 @@
+From 95710a844a39fd75a93e96d78b85a29072d2e13f Mon Sep 17 00:00:00 2001
+From: Ye Ting <ting.ye@intel.com>
+Date: Mon, 11 Jan 2021 23:11:01 +0800
+Subject: [PATCH 07/11] Disable the fusion not supported by xpu device.
+ Signed-Off-by: Ye Ting <ting.ye@intel.com>
+
+---
+ c10/core/Device.h                         | 5 +++++
+ torch/csrc/jit/codegen/fuser/executor.cpp | 2 ++
+ 2 files changed, 7 insertions(+)
+
+diff --git a/c10/core/Device.h b/c10/core/Device.h
+index f1249e865f..52bb22cc00 100644
+--- a/c10/core/Device.h
++++ b/c10/core/Device.h
+@@ -86,6 +86,11 @@ struct C10_API Device final {
+     return type_ == DeviceType::CPU;
+   }
+ 
++  /// Return true if the device is of XPU type.
++  bool is_xpu() const noexcept {
++    return type_ == DeviceType::XPU;
++  }
++
+   /// Same string as returned from operator<<.
+   std::string str() const;
+ 
+diff --git a/torch/csrc/jit/codegen/fuser/executor.cpp b/torch/csrc/jit/codegen/fuser/executor.cpp
+index da085f267c..e59d579b21 100644
+--- a/torch/csrc/jit/codegen/fuser/executor.cpp
++++ b/torch/csrc/jit/codegen/fuser/executor.cpp
+@@ -362,6 +362,8 @@ bool runFusion(const int64_t key, Stack& stack, std::string* code_out) {
+     return false;
+   if (device.is_cpu() && !canFuseOnCPU())
+     return false;
++  if (device.is_xpu())
++    return false;
+ 
+   // Validates sizes and expands inputs as needed
+   auto maybe_map_size = canRunKernel(spec, inputs);
+-- 
+2.25.1
+

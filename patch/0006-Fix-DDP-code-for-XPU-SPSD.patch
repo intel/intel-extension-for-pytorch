@@ -1,0 +1,47 @@
+From 190407ee637f01fd3fc80df11c24d62b259fb188 Mon Sep 17 00:00:00 2001
+From: johnlu <chengjun.lu@intel.com>
+Date: Fri, 8 Jan 2021 23:53:30 +0800
+Subject: [PATCH 06/11] Fix DDP code for XPU SPSD
+
+---
+ torch/csrc/distributed/c10d/reducer.cpp | 2 +-
+ torch/nn/parallel/distributed.py        | 9 +++------
+ 2 files changed, 4 insertions(+), 7 deletions(-)
+
+diff --git a/torch/csrc/distributed/c10d/reducer.cpp b/torch/csrc/distributed/c10d/reducer.cpp
+index 92a8f9ed15..8ef8d5001a 100644
+--- a/torch/csrc/distributed/c10d/reducer.cpp
++++ b/torch/csrc/distributed/c10d/reducer.cpp
+@@ -357,7 +357,7 @@ void Reducer::copy_grad_to_bucket(at::Tensor& grad, at::Tensor& bucket_view) {
+     auto wrapped = c10::scalar_to_tensor(double(1.) / divFactor_);
+     wrapped.unsafeGetTensorImpl()->set_wrapped_number(true);
+     // Divides while copying into the bucket view.
+-    at::native::mul_out(bucket_view, grad, wrapped);
++    at::mul_out(bucket_view, grad, wrapped);
+   } else {
+     bucket_view.copy_(grad);
+   }
+diff --git a/torch/nn/parallel/distributed.py b/torch/nn/parallel/distributed.py
+index 3d2f00ead9..db450f2166 100644
+--- a/torch/nn/parallel/distributed.py
++++ b/torch/nn/parallel/distributed.py
+@@ -613,13 +613,10 @@ class DistributedDataParallel(Module):
+             # Notify joined ranks whether they should sync in backwards pass or not.
+             self._check_global_requires_backward_grad_sync(is_joined_rank=False)
+ 
+-        if self.device_ids:
++        if self.device_ids and len(self.device_ids) != 1:
+             inputs, kwargs = self.scatter(inputs, kwargs, self.device_ids)
+-            if len(self.device_ids) == 1:
+-                output = self.module(*inputs[0], **kwargs[0])
+-            else:
+-                outputs = self.parallel_apply(self._module_copies[:len(inputs)], inputs, kwargs)
+-                output = self.gather(outputs, self.output_device)
++            outputs = self.parallel_apply(self._module_copies[:len(inputs)], inputs, kwargs)
++            output = self.gather(outputs, self.output_device)
+         else:
+             output = self.module(*inputs, **kwargs)
+ 
+-- 
+2.25.1
+

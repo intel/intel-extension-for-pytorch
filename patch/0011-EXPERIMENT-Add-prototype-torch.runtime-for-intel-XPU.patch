@@ -1,0 +1,251 @@
+From 6ea0362fbed22100edef355b2c5279e07c861beb Mon Sep 17 00:00:00 2001
+From: johnlu <chengjun.lu@intel.com>
+Date: Wed, 9 Dec 2020 17:25:50 +0800
+Subject: [PATCH 11/11] [EXPERIMENT] Add prototype torch.runtime for intel XPU
+
+---
+ torch/_utils.py                    | 51 ++++++++++++++++++----------
+ torch/cuda/__init__.py             |  8 +++++
+ torch/nn/parallel/data_parallel.py | 27 ++++++++++-----
+ torch/runtime/__init__.py          | 53 ++++++++++++++++++++++++++++++
+ 4 files changed, 114 insertions(+), 25 deletions(-)
+ create mode 100644 torch/runtime/__init__.py
+
+diff --git a/torch/_utils.py b/torch/_utils.py
+index 11f378a4d7..909fd9f77a 100644
+--- a/torch/_utils.py
++++ b/torch/_utils.py
+@@ -1,11 +1,15 @@
+ import torch
+ import torch._six
++from .runtime import current_runtime
+ from typing import Optional
+ import warnings
+ from collections import defaultdict
+ import sys
+ import traceback
+-
++from torch.runtime import (
++    get_runtime_attr,
++    get_device_type
++)
+ 
+ def _type(self, dtype=None, non_blocking=False, **kwargs):
+     """Returns the type if `dtype` is not provided, else casts this object to
+@@ -429,33 +433,24 @@ class ExceptionWrapper(object):
+ 
+ 
+ def _get_available_device_type():
+-    if torch.cuda.is_available():
+-        return "cuda"
+-    # add more available device types here
+-    return None
+-
+-
+-def _get_device_attr(get_member):
+-    device_type = _get_available_device_type()
+-    if device_type.lower() == "cuda":
+-        return get_member(torch.cuda)
+-    # add more available device types here
++    if get_runtime_attr(lambda m: m.is_available()):
++        return get_device_type()
+     return None
+ 
+ 
+ def _get_current_device_index():
+     # current device index
+-    return _get_device_attr(lambda m: m.current_device())
++    return get_runtime_attr(lambda m: m.current_device())
+ 
+ 
+ def _get_all_device_indices():
+     # all device index
+-    return _get_device_attr(lambda m: list(range(m.device_count())))
++    return get_runtime_attr(lambda m: list(range(m.device_count())))
+ 
+ 
+ def _get_devices_properties(device_ids):
+     # all device properties
+-    return [_get_device_attr(lambda m: m.get_device_properties(i)) for i in device_ids]
++    return [get_runtime_attr(lambda m: m.get_device_properties(i)) for i in device_ids]
+ 
+ 
+ def _get_device_index(device, optional=False, allow_cpu=False) -> int:
+@@ -471,8 +466,8 @@ def _get_device_index(device, optional=False, allow_cpu=False) -> int:
+     If :attr:`device` is a Python integer, it is returned as is.
+ 
+     If :attr:`device` is ``None``, this will return the current default
+-    device of the supported runtime platform if :attr:`optional` is ``True``.
+-    i.e., the current default CUDA device will be returned if CUDA runtime is supported.
++    device of the current runtime platform if :attr:`optional` is ``True``.
++    i.e., the current default CUDA device will be returned if current runtime is CUDA.
+     """
+     if isinstance(device, str):
+         device = torch.device(device)
+@@ -491,3 +486,25 @@ def _get_device_index(device, optional=False, allow_cpu=False) -> int:
+             raise ValueError('Expected a torch.device with a specified index '
+                              'or an integer, but got:{}'.format(device))
+     return device_idx
++
++
++def _get_device_type(device, optional=False, allow_cpu=False) -> str:
++    r"""TODO
++    """
++    if isinstance(device, str):
++        device = torch.device(device)
++    device_type: Optional[str]
++    device_type = None
++    if isinstance(device, torch.device):
++        if not allow_cpu and device.type == 'cpu':
++            raise ValueError('Expected a non cpu device, but got: {}'.format(device))
++        device_type = device.type
++    if isinstance(device, int):
++        device_type = _get_available_device_type()
++    if device_type is None:
++        if optional:
++            device_type = _get_available_device_type()
++        else:
++            raise ValueError('Expected a torch.device with a specified index '
++                             'or an integer or string, but got:{}'.format(device))
++    return device_type
+diff --git a/torch/cuda/__init__.py b/torch/cuda/__init__.py
+index 1176c6ee30..78f474126c 100644
+--- a/torch/cuda/__init__.py
++++ b/torch/cuda/__init__.py
+@@ -8,6 +8,7 @@ It is lazily initialized, so you can always import it, and use
+ :ref:`cuda-semantics` has more details about working with CUDA.
+ """
+ 
++import sys
+ import contextlib
+ import os
+ import torch
+@@ -536,3 +537,10 @@ from . import sparse
+ from . import profiler
+ from . import nvtx
+ from . import amp
++
++from torch.runtime import register_runtime
++
++
++current_module = sys.modules[__name__]
++register_runtime('cuda', current_module)
++
+diff --git a/torch/nn/parallel/data_parallel.py b/torch/nn/parallel/data_parallel.py
+index b66c1513ad..d8ba838cff 100644
+--- a/torch/nn/parallel/data_parallel.py
++++ b/torch/nn/parallel/data_parallel.py
+@@ -10,6 +10,7 @@ from torch._utils import (
+     _get_all_device_indices,
+     _get_available_device_type,
+     _get_device_index,
++    _get_device_type,
+     _get_devices_properties
+ )
+ 
+@@ -121,14 +122,19 @@ class DataParallel(Module):
+     def __init__(self, module, device_ids=None, output_device=None, dim=0):
+         super(DataParallel, self).__init__()
+ 
+-        device_type = _get_available_device_type()
+-        if device_type is None:
+-            self.module = module
+-            self.device_ids = []
+-            return
+-
+         if device_ids is None:
++            device_type = _get_available_device_type()
++            if device_type is None:
++                self.module = module
++                self.device_ids = []
++                return
+             device_ids = _get_all_device_indices()
++        else:
++            distinct_device_types = {_get_device_type(device_id, optional=True) for device_id in device_ids}
++            assert len(distinct_device_types) == 1, (
++                "DataParallel's device_ids must be the same type of devices, but device_ids locate in {}."
++            ).format(distinct_device_types)
++            device_type = list(distinct_device_types)[0]
+ 
+         if output_device is None:
+             output_device = device_ids[0]
+@@ -192,10 +198,15 @@ def data_parallel(module, inputs, device_ids=None, output_device=None, dim=0, mo
+     if not isinstance(inputs, tuple):
+         inputs = (inputs,)
+ 
+-    device_type = _get_available_device_type()
+-
+     if device_ids is None:
++        device_type = _get_available_device_type()
+         device_ids = _get_all_device_indices()
++    else:
++        distinct_device_types = {_get_device_type(device_id, optional=True) for device_id in device_ids}
++        assert len(distinct_device_types) == 1, (
++            "DataParallel's device_ids must be the same type of devices, but device_ids locate in {}."
++        ).format(distinct_device_types)
++        device_type = list(distinct_device_types)[0]
+ 
+     if output_device is None:
+         output_device = device_ids[0]
+diff --git a/torch/runtime/__init__.py b/torch/runtime/__init__.py
+new file mode 100644
+index 0000000000..45ee08815b
+--- /dev/null
++++ b/torch/runtime/__init__.py
+@@ -0,0 +1,53 @@
++from collections import deque
++import torch
++
++_current_runtime = 'cpu'
++
++_run_time_dict = {}
++
++
++def _available_runtimes():
++    print(_run_time_dict)
++
++
++def register_runtime(name, module):
++    """Register a runtime module for backends to expose the APIs not being included in ATen."""
++    global _current_runtime
++
++    if name in _run_time_dict:
++        raise RuntimeError("Runtime {} already registered with {}.".format(name, _run_time_dict[name]))
++    if hasattr(torch, name):
++        raise RuntimeError("torch attribute {} already exists.".format(name))
++    try:
++        # the runtime type should have the same name as the device type
++        device = torch.device(name)
++    except RuntimeError as e:
++        raise RuntimeError("Unsupported runtime type {}.".format(name)) from e
++
++
++    attributes = ['current_device', 'device_count', 'get_device_properties', 'is_available']
++
++    def check_attributes(attr):
++        if not hasattr(module, attr):
++            raise RuntimeError("There is no {} in runtime {}.".format(attr, name))
++
++    for attr in attributes:
++        check_attributes(attr)
++
++    _run_time_dict[name] = module
++    setattr(torch, name, module)
++    _current_runtime = name
++
++
++def current_runtime():
++    global _current_runtime
++    return _run_time_dict[_current_runtime]
++
++
++def get_device_type() -> str:
++    return _current_runtime
++
++
++def get_runtime_attr(get_member):
++    runtime = current_runtime()
++    return get_member(runtime)
+-- 
+2.25.1
+

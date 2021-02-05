@@ -1,0 +1,36 @@
+From ddd61eef157d31a6f96741f6e945a9ea8cfbcc78 Mon Sep 17 00:00:00 2001
+From: chengjun <chengjun.lu@intel.com>
+Date: Thu, 29 Oct 2020 21:47:49 +0800
+Subject: [PATCH 04/11] To disable __assert_fail in pytorch for the conflict
+ declaration with dpcpp.
+
+---
+ c10/macros/Macros.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/c10/macros/Macros.h b/c10/macros/Macros.h
+index f8e703e087..1c39e4ec50 100644
+--- a/c10/macros/Macros.h
++++ b/c10/macros/Macros.h
+@@ -270,6 +270,10 @@ extern "C" {
+ #else // __APPLE__, _MSC_VER
+ #if defined(NDEBUG)
+ extern "C" {
++#ifdef __SYCL_DEVICE_ONLY__
++extern SYCL_EXTERNAL void __assert_fail(const char *expr, const char *file,
++                                        unsigned int line, const char *func);
++#else
+ #if (defined(__CUDA_ARCH__) && !(defined(__clang__) && defined(__CUDA__))) || \
+     defined(__HIP_ARCH__) || defined(__HIP__)
+ __host__ __device__
+@@ -280,6 +284,7 @@ __host__ __device__
+         const char* file,
+         unsigned int line,
+         const char* function) throw();
++#endif
+ }
+ #endif // NDEBUG
+ #define CUDA_KERNEL_ASSERT(cond)                                         \
+-- 
+2.25.1
+
