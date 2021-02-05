@@ -95,10 +95,11 @@ struct lstm_forward : public dnnl::lstm_forward, utils::computation_cache<dnnl::
     auto bias_desc = bias.get_desc();
     tensor::desc dst_layer_desc(output_sizes, src_layer.get_data_type(), tag::tnc);
 
+    // weight_desc is different after prepacking. No need to calculate key during prepack
     auto pd = get_primitive_desc(
       src_layer_desc, src_iter_desc, src_iter_c_desc, 
       weights_layer_desc, weights_iter_desc, bias_desc, dst_layer_desc, 
-      reverse, aprop, aengine);
+      reverse, aprop, aengine, /*use_key*/false);
 
     auto expected_weights_layer = pd.weights_layer_desc();
     auto expected_weights_iter = pd.weights_iter_desc();
@@ -115,31 +116,28 @@ struct lstm_forward : public dnnl::lstm_forward, utils::computation_cache<dnnl::
     const tensor::desc& bias_desc,
     const tensor::desc& dst_layer_desc,
     const bool reverse = false,
-    
     prop_kind aprop = prop_kind::forward,
-
-    const engine& aengine = engine::cpu_engine()) {
+    const engine& aengine = engine::cpu_engine(), 
+    const bool use_key = true) {
     auto direction = reverse ? rnn_direction::unidirectional_right2left
                              : rnn_direction::unidirectional_left2right;
-
-    // return primitive_desc(
-    //     {aprop, direction, src_layer_desc, src_iter_desc, src_iter_c_desc,
-    //      weights_layer_desc, weights_iter_desc, bias_desc,
-    //      dst_layer_desc, src_iter_desc, src_iter_c_desc},
-    //      aengine);
-
-
-    auto key = utils::create_key(aprop, direction, src_layer_desc, src_iter_desc, src_iter_c_desc,
-                                 weights_layer_desc, weights_iter_desc, bias_desc,
-                                 dst_layer_desc);
-    return fetch_or_create(key, [&]() {
+    if (use_key) {
+      auto key = utils::create_key(aprop, direction, src_layer_desc, src_iter_desc, src_iter_c_desc,
+                                  weights_layer_desc, weights_iter_desc, bias_desc,
+                                  dst_layer_desc);
+      return fetch_or_create(key, [&]() {
+        return primitive_desc({aprop, direction, src_layer_desc, src_iter_desc, src_iter_c_desc,
+          weights_layer_desc, weights_iter_desc, bias_desc,
+          dst_layer_desc, src_iter_desc, src_iter_c_desc},
+          aengine);
+      
+      });
+    } else {
       return primitive_desc({aprop, direction, src_layer_desc, src_iter_desc, src_iter_c_desc,
-         weights_layer_desc, weights_iter_desc, bias_desc,
-         dst_layer_desc, src_iter_desc, src_iter_c_desc},
-         aengine);
-    
-    });
-
+        weights_layer_desc, weights_iter_desc, bias_desc,
+        dst_layer_desc, src_iter_desc, src_iter_c_desc},
+        aengine);
+    }
   }  
 };
 
