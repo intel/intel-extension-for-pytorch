@@ -20,8 +20,6 @@ struct lstm_forward : public dnnl::lstm_forward, utils::computation_cache<dnnl::
                       const bool reverse = false,
                       prop_kind aprop = prop_kind::forward,
                       const engine& aengine = engine::cpu_engine()) {
-    auto prep_start = std::chrono::high_resolution_clock::now();
-
     bool with_workspace = aprop == prop_kind::forward_training;
     auto src_layer_desc = src_layer.get_desc();
     auto src_iter_desc = src_iter.get_desc().to_type(src_layer.get_data_type());
@@ -45,34 +43,18 @@ struct lstm_forward : public dnnl::lstm_forward, utils::computation_cache<dnnl::
     auto bias_desc = bias.get_desc();
     tensor::desc dst_layer_desc(output_sizes, src_layer.get_data_type(), tag::tnc);
 
-    auto primitive_start = std::chrono::high_resolution_clock::now();
-
     auto pd = get_primitive_desc(
       src_layer_desc, src_iter_desc, src_iter_c_desc, 
       weights_layer_desc, weights_iter_desc, bias_desc, dst_layer_desc, 
       reverse, aprop, aengine);
 
-    auto primitive_end = std::chrono::high_resolution_clock::now();
-
-
-    std::cout << "reorder start\n";
     auto expected_src_iter = src_iter.reorder_if_differ_in(pd.src_iter_desc());
-
-
-    auto reorder_end = std::chrono::high_resolution_clock::now();
-
     auto expected_weights_layer = weights_layer.reorder_if_differ_in(pd.weights_layer_desc());
     auto expected_weights_iter = weights_iter.reorder_if_differ_in(pd.weights_iter_desc());
-
-
-    auto wreorder_end = std::chrono::high_resolution_clock::now();
-    std::cout << "reorder end\n";
 
     dst_layer.reinit_if_possible(pd.dst_layer_desc());
     dst_iter.reinit_if_possible(pd.dst_iter_desc());
     dst_iter_c.reinit_if_possible(pd.dst_iter_c_desc());
-
-    auto reinit_end = std::chrono::high_resolution_clock::now();
 
     exec_args args {{DNNL_ARG_SRC_LAYER, src_layer},
                     {DNNL_ARG_SRC_ITER, expected_src_iter},
@@ -89,55 +71,7 @@ struct lstm_forward : public dnnl::lstm_forward, utils::computation_cache<dnnl::
       args.insert({DNNL_ARG_WORKSPACE, dst_layer.get_workspace()});
     }
 
-    auto prep_end = std::chrono::high_resolution_clock::now();
-
-
     super(pd).execute(stream::default_stream(), args);
-  
-    auto execute_end = std::chrono::high_resolution_clock::now();
-
-    auto dur_prep = prep_end - prep_start;
-    auto dur_prep1 = primitive_start - prep_start;
-    auto dur_primitive = primitive_end - primitive_start;
-    auto dur_prep2 = prep_end - reinit_end;
-    auto dur_reorder = reorder_end - primitive_end;
-    auto dur_wreorder = wreorder_end - reorder_end;
-    auto dur_reinit = reinit_end - wreorder_end;
-    auto dur_exec = execute_end - prep_end;
-
-    std::cout << "Lstm prep time = " << std::chrono::duration_cast<std::chrono::nanoseconds>(dur_prep).count()/ 1000000.0 << " ms, "
-              << "\n"
-              << "dur prep1% = " << dur_prep1.count()*100.0/dur_prep.count() << "%,"
-              << "dur prep1 = " << std::chrono::duration_cast<std::chrono::nanoseconds>(dur_prep1).count() / 1000000.0 << "ms, "
-              << "\n"
-              
-              << "dur primitive% = " << dur_primitive.count()*100.0/dur_prep.count() << "%,"
-              << "dur primitive = " <<  std::chrono::duration_cast<std::chrono::nanoseconds>(dur_primitive).count() / 1000000.0 << "ms,"
-              << "\n"
-              
-              << "dur reorder% = " << dur_reorder.count()*100.0/dur_prep.count() << "%,"
-              << "dur reorder = " << std::chrono::duration_cast<std::chrono::nanoseconds>(dur_reorder).count() / 1000000.0 << "ms,"
-              << "\n"
-
-              << "dur wreorder% = " << dur_wreorder.count()*100.0/dur_prep.count() << "%,"
-              << "dur wreorder = " << std::chrono::duration_cast<std::chrono::nanoseconds>(dur_wreorder).count() / 1000000.0 << "ms,"
-              << "\n"
-
-              << "dur reinit = " << dur_reinit.count()*100.0/dur_prep.count() << "%,"
-              << "dur reinit = " << std::chrono::duration_cast<std::chrono::nanoseconds>(dur_reinit).count() / 1000000.0 << "ms,"
-              << "\n"
-
-
-
-              << "dur prep2 = " << dur_prep2.count()*100.0/dur_prep.count() << "%,"
-              << "dur prep2 = " << std::chrono::duration_cast<std::chrono::nanoseconds>(dur_prep2).count() / 1000000.0 << "ms,"
-
-              << "\n"
-
-
-              << " exec time = " << std::chrono::duration_cast<std::chrono::nanoseconds>(dur_exec).count()/ 1000000.0 << " ms." << std::endl;
-  
-  
   }
   
   static std::tuple<tensor::desc, tensor::desc> expected_weights_desc(const dims& output_sizes,
