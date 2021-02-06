@@ -43,7 +43,7 @@ class TestTorchMethod(TestCase):
         print(x_dpcpp.to(cpu_device))
         self.assertEqual(x, x_dpcpp.to(cpu_device))
 
-    @pytest.mark.skip()
+    @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
     def test_mvlgamma(self, dtype=torch.float):
         a = np.array([[1.6835, 1.8474, 1.1929],
                       [1.0475, 1.7162, 1.4180]])

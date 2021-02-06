@@ -6,8 +6,7 @@ import pytest
 from torch.testing._internal.common_utils import TestCase
 
 class  TestTorchMethod(TestCase):
-    @pytest.mark.skipif(
-      not 'fbgemm' in torch.backends.quantized.supported_engines,
+    @pytest.mark.skipif(not 'fbgemm' in torch.backends.quantized.supported_engines,
       reason="No qengine found. USE_FBGEMM=1 is needed for building pytorch")
     def test_qconv(self, dtype=torch.float):
 

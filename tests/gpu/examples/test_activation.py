@@ -33,8 +33,8 @@ class  TestNNMethod(TestCase):
         print("dpcpp relu bwd", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
-    @pytest.mark.skip(reason='Temp disable this case for 1.7 rebase.')
     def test_activation_rrelu(self, dtype=torch.float):
+        # Will not check the result due to different random seeds on cpu and xpu
         RReLU = torch.nn.RReLU(0.1,0.3)
         x_cpu = torch.tensor([[-0.1, 0.2],[-0.2, 0.3],[0.4, 0.5],[0.5, -0.6]])
         x_dpcpp = x_cpu.to("xpu")
@@ -44,14 +44,14 @@ class  TestNNMethod(TestCase):
         y_dpcpp = RReLU(x_dpcpp)
         print("cpu rrelu ", y_cpu)
         print("dpcpp rrelu ", y_dpcpp.cpu())
-        self.assertEqual(y_cpu, y_dpcpp.cpu())
+        # self.assertEqual(y_cpu, y_dpcpp.cpu())
 
         y_cpu.backward(x_cpu)
         y_dpcpp.backward(x_dpcpp)
 
         print("cpu rrelu bwd", x_cpu.grad)
         print("dpcpp rrelu bwd", x_dpcpp.grad.cpu())
-        self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+        # self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
     def test_activation_gelu(self, dtype=torch.float):
         GELU = torch.nn.GELU()

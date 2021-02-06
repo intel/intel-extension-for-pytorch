@@ -9,13 +9,13 @@ cpu_device = torch.device("cpu")
 
 
 class  TestTorchMethod(TestCase):
-    @pytest.mark.skip(reason='Random Data Generate')
     def test_exponential(self, dtype=torch.float):
+        # Will not compare the results due to random seeds
         exp_cpu = torch.ones(1000000, device=cpu_device,dtype = dtype)
         exp_dist = exp_cpu.to("xpu")
         exp_cpu.exponential_(1)
         exp_dist.exponential_(1)
-        self.assertEqual(exp_cpu, exp_dist.cpu())
+        # self.assertEqual(exp_cpu, exp_dist.cpu())
 
         print("exponential device ", exp_dist.device)
         print("exponential ", exp_dist.to("cpu"))

@@ -30,7 +30,7 @@ class TestTorchMethod(TestCase):
         self.assertEqual(torch.triu(y_cpu2),
                          torch.triu(y_dpcpp2).to(cpu_device))
 
-    @pytest.mark.skip()
+    @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
     def test_logdet(self, dtype=torch.float):
         ts = int(time.time())
         torch.manual_seed(ts)

@@ -35,7 +35,6 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip(reason='Random Data Generate')
     def test_multinomial(self, dtype=torch.float):
         # create a tensor of weights
         w = torch.tensor([1, 10, 3, 2], dtype=torch.float)
@@ -46,31 +45,32 @@ class TestTorchMethod(TestCase):
 
         weights_dpcpp = weights.to(dpcpp_device)
         x_cpu = torch.multinomial(weights, 1000, replacement=True)
-        x_dpcpp = torch.multinomial(weights_dpcpp, 1000, replacement=True)
+        x_xpu = torch.multinomial(weights_dpcpp, 1000, replacement=True)
         for i in range(len(x_cpu)):
-            y_cpu = x_cpu[i].cpu().bincount().unsqueeze(
-                0).float().renorm(1, 0, 1)
-            y_dpcpp = x_dpcpp[i].cpu().bincount().unsqueeze(
-                0).float().renorm(1, 0, 1)
-            self.assertEqual(y_cpu, y_dpcpp)
-        # print("x[0] replacement=True", x[0].cpu(
-        # ).bincount().unsqueeze(0).float().renorm(1, 0, 1))
-        # print("x[200] replacement=True", x[200].cpu(
-        # ).bincount().unsqueeze(0).float().renorm(1, 0, 1))
-        # print("x[999] replacement=True", x[999].cpu(
-        # ).bincount().unsqueeze(0).float().renorm(1, 0, 1))
+            y_cpu = x_cpu[i].cpu().bincount().unsqueeze(0).float().renorm(1, 0, 1)
+            y_xpu = x_xpu[i].cpu().bincount().unsqueeze(0).float().renorm(1, 0, 1)
+            # Will not check the results due to different random seed
+            # self.assertEqual(y_cpu, y_xpu)
+
+        print("x_cpu[0] replacement=True", x_cpu[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        print("x_cpu[200] replacement=True", x_cpu[200].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        print("x_cpu[999] replacement=True", x_cpu[999].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+
+        print("x_xpu[0] replacement=True", x_xpu[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        print("x_xpu[200] replacement=True", x_xpu[200].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        print("x_xpu[999] replacement=True", x_xpu[999].bincount().unsqueeze(0).float().renorm(1, 0, 1))
 
         x_cpu2 = torch.multinomial(weights, 4, replacement=False)
         x_cpu2 = x_cpu2.transpose(0, 1)
-        x_dpcpp2 = torch.multinomial(weights_dpcpp, 4, replacement=False)
-        x_dpcpp2 = x_cpu2.transpose(0, 1).to(cpu_device)
+        x_xpu2 = torch.multinomial(weights_dpcpp, 4, replacement=False)
+        x_xpu2 = x_cpu2.transpose(0, 1).to(cpu_device)
         for i in range(len(x_cpu2)):
             y_cpu2 = x_cpu2[i].bincount().unsqueeze(0).float().renorm(1, 0, 1)
-            y_dpcp2 = x_dpcpp2[i].bincount().unsqueeze(
+            y_dpcp2 = x_xpu2[i].bincount().unsqueeze(
                 0).float().renorm(1, 0, 1)
 
-        # print("x.transpose(0,1)[0] replacement=False",
-        # 	x[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        print("x_cpu.transpose(0,1)[0] replacement=False", x_cpu2[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
+        print("x_xpu.transpose(0,1)[0] replacement=False", x_xpu2[0].bincount().unsqueeze(0).float().renorm(1, 0, 1))
 
 # TODO: test full bincount distribution over all trails with no replacement
 # weights = weights.unsqueeze(0).renorm(1, 0, 1).squeeze()

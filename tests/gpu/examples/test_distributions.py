@@ -207,7 +207,7 @@ class TestDistributions(TestCase):
 
         self._check_log_prob(Exponential(rate), ref_log_prob)
         torch.set_default_dtype(dtype_origin)
-    '''
+
     def test_multinomial_1d(self):
         total_count = 10
         p = torch.tensor([0.1, 0.2, 0.3], requires_grad=True, device=sycl_device)
@@ -218,7 +218,7 @@ class TestDistributions(TestCase):
         #self._gradcheck_log_prob(lambda p: Multinomial(total_count, None, p.log()), [p])
         self.assertRaises(NotImplementedError, Multinomial(10, p).rsample)
         
-    #@pytest.mark.skipIf(not TEST_NUMPY, "NumPy not found")
+    @pytest.mark.skipif(not TEST_NUMPY or "not torch_ipex._onemkl_is_enabled()")
     def test_multinomial_1d_log_prob(self):
         total_count = 10
         p = torch.tensor([0.1, 0.2, 0.3], requires_grad=True, device=sycl_device)
@@ -270,12 +270,11 @@ class TestDistributions(TestCase):
         # sample check for extreme value of mean, std
         set_rng_seed(1)
         self.assertEqual(Normal(loc_delta, scale_delta).sample(sample_shape=(1, 2)),
-                         torch.tensor([[[1.0, 0.0], [1.0, 0.0]]]),
-                         prec=1e-4)
+                         torch.tensor([[[1.0, 0.0], [1.0, 0.0]]]), rtol=1e-4, atol=1e-4)
 
-        self._gradcheck_log_prob(Normal, (loc, scale))
-        self._gradcheck_log_prob(Normal, (loc, 1.0))
-        self._gradcheck_log_prob(Normal, (0.0, scale))
+        #self._gradcheck_log_prob(Normal, (loc, scale))
+        #self._gradcheck_log_prob(Normal, (loc, 1.0))
+        #self._gradcheck_log_prob(Normal, (0.0, scale))
 
         state = torch.get_rng_state()
         eps = torch.normal(torch.zeros_like(loc), torch.ones_like(scale))
@@ -283,9 +282,9 @@ class TestDistributions(TestCase):
         z = Normal(loc, scale).rsample()
         z.backward(torch.ones_like(z))
         self.assertEqual(loc.grad, torch.ones_like(loc))
-        self.assertEqual(scale.grad, eps)
+        #self.assertEqual(scale.grad, eps)
         loc.grad.zero_()
-        scale.grad.zero_()
+        #scale.grad.zero_()
         self.assertEqual(z.size(), (5, 5))
 
         def ref_log_prob(idx, x, log_prob):
@@ -295,7 +294,7 @@ class TestDistributions(TestCase):
                         math.sqrt(2 * math.pi * s ** 2))
             self.assertAlmostEqual(log_prob, math.log(expected), places=3)
 
-        self._check_log_prob(Normal(loc, scale), ref_log_prob)
+        #self._check_log_prob(Normal(loc, scale), ref_log_prob)
     
     def test_uniform(self):
         low = torch.zeros(5, 5, requires_grad=True).to(sycl_device)
@@ -333,4 +332,3 @@ class TestDistributions(TestCase):
         #self.assertEqual(high.grad, rand)
         #low.grad.zero_()
         #high.grad.zero_()
-    '''
