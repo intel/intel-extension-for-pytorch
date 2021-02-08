@@ -1,7 +1,7 @@
 From 95710a844a39fd75a93e96d78b85a29072d2e13f Mon Sep 17 00:00:00 2001
 From: Ye Ting <ting.ye@intel.com>
 Date: Mon, 11 Jan 2021 23:11:01 +0800
-Subject: [PATCH 07/11] Disable the fusion not supported by xpu device.
+Subject: [PATCH 07/13] Disable the fusion not supported by xpu device.
  Signed-Off-by: Ye Ting <ting.ye@intel.com>
 
 ---

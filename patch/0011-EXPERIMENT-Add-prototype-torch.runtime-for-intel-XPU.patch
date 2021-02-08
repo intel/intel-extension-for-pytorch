@@ -1,7 +1,7 @@
 From 6ea0362fbed22100edef355b2c5279e07c861beb Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Wed, 9 Dec 2020 17:25:50 +0800
-Subject: [PATCH 11/11] [EXPERIMENT] Add prototype torch.runtime for intel XPU
+Subject: [PATCH 11/13] [EXPERIMENT] Add prototype torch.runtime for intel XPU
 
 ---
  torch/_utils.py                    | 51 ++++++++++++++++++----------

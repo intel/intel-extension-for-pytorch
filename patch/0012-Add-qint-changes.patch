@@ -1,0 +1,151 @@
+From d43bd78d66438d32071429d6bbd04c1d70e0d8cc Mon Sep 17 00:00:00 2001
+From: johnlu <chengjun.lu@intel.com>
+Date: Tue, 2 Feb 2021 19:12:08 +0800
+Subject: [PATCH 12/13] Add qint changes.
+
+---
+ aten/src/ATen/core/jit_type.h                 | 17 ++++++-------
+ .../passes/quantization/insert_observers.cpp  |  7 +++---
+ torch/nn/quantized/modules/conv.py            |  4 ++++
+ .../quantized/modules/functional_modules.py   |  5 ++++
+ torch/quantization/observer.py                | 24 ++++++++++++-------
+ torch/quantization/quantize_jit.py            |  3 ++-
+ 6 files changed, 39 insertions(+), 21 deletions(-)
+
+diff --git a/aten/src/ATen/core/jit_type.h b/aten/src/ATen/core/jit_type.h
+index 7e0a290801..86b881d37f 100644
+--- a/aten/src/ATen/core/jit_type.h
++++ b/aten/src/ATen/core/jit_type.h
+@@ -2112,14 +2112,15 @@ struct CAFFE2_API ClassType : public NamedType {
+         name,
+         "'");
+     TypePtr atype = getAttribute(*slot_idx);
+-    TORCH_CHECK(
+-      ty->isSubtypeOf(atype),
+-      ty->repr_str(),
+-      " is not compatible with the type ",
+-      atype->repr_str(),
+-      " for the field '",
+-      name,
+-      "'");
++    //This is a workaroud for JIT multi-qconfig, will remove it after oneDNN supporting Asymmetric.
++    //TORCH_CHECK(
++    //  ty->isSubtypeOf(atype),
++    //  ty->repr_str(),
++    //  " is not compatible with the type ",
++    //  atype->repr_str(),
++    //  " for the field '",
++    //  name,
++    //  "'");
+     return *slot_idx;
+   }
+ 
+diff --git a/torch/csrc/jit/passes/quantization/insert_observers.cpp b/torch/csrc/jit/passes/quantization/insert_observers.cpp
+index f637a68121..9b9aaa91bb 100644
+--- a/torch/csrc/jit/passes/quantization/insert_observers.cpp
++++ b/torch/csrc/jit/passes/quantization/insert_observers.cpp
+@@ -1263,9 +1263,10 @@ c10::optional<Module> InsertObserversHelper::getObserverFor(Value* v) {
+         // Need to make sure all values are
+         // configured with same observer
+         if (result) {
+-          TORCH_CHECK(
+-              *observer_opt == *result,
+-              "Expecting all values in the graph only configured with one observer");
++	  //This is a workaroud for JIT multi-qconfig, will remove it after oneDNN supporting Asymmetric.
++          //TORCH_CHECK(
++          //    *observer_opt == *result,
++          //    "Expecting all values in the graph only configured with one observer");
+         } else {
+           result = observer_opt;
+         }
+diff --git a/torch/nn/quantized/modules/conv.py b/torch/nn/quantized/modules/conv.py
+index 31c914d2bf..badade7655 100644
+--- a/torch/nn/quantized/modules/conv.py
++++ b/torch/nn/quantized/modules/conv.py
+@@ -360,6 +360,10 @@ class Conv2d(_ConvNd):
+             # inherit from Conv2d instead
+             if type(mod) == nni.ConvReLU2d:
+                 activation_post_process = mod[1].activation_post_process
++                #Add workaroud for oneDNN Symmetric INT8, will remove it when Asymmetric is ready.
++                if activation_post_process.qscheme == torch.per_tensor_symmetric \
++                    or activation_post_process.qscheme == torch.per_channel_symmetric:
++                    activation_post_process.dtype = torch.quint8
+                 mod = mod[0]
+             else:
+                 activation_post_process = mod.activation_post_process
+diff --git a/torch/nn/quantized/modules/functional_modules.py b/torch/nn/quantized/modules/functional_modules.py
+index d3fa7189e0..dfebb15cfe 100644
+--- a/torch/nn/quantized/modules/functional_modules.py
++++ b/torch/nn/quantized/modules/functional_modules.py
+@@ -79,6 +79,11 @@ class FloatFunctional(torch.nn.Module):
+         # type: (Tensor, Tensor) -> Tensor
+         r = torch.add(x, y)
+         r = torch.nn.functional.relu(r)
++        #Add workaroud for oneDNN Symmetric INT8, will remove it when Asymmetric is ready.
++        if type(self.activation_post_process) != torch.nn.modules.linear.Identity \
++            and (self.activation_post_process.qscheme == torch.per_tensor_symmetric \
++            or self.activation_post_process.qscheme == torch.per_channel_symmetric):
++            self.activation_post_process.dtype = torch.quint8
+         r = self.activation_post_process(r)
+         return r
+ 
+diff --git a/torch/quantization/observer.py b/torch/quantization/observer.py
+index fc0d2a436d..bab55e6672 100644
+--- a/torch/quantization/observer.py
++++ b/torch/quantization/observer.py
+@@ -262,14 +262,17 @@ class _ObserverBase(ObserverBase):
+ 
+         if self.qscheme == torch.per_tensor_symmetric or self.qscheme == torch.per_channel_symmetric:
+             max_val_pos = torch.max(-min_val_neg, max_val_pos)
+-            scale = max_val_pos / (float(quant_max - quant_min) / 2)
+-            scale = torch.max(scale, self.eps)
+-            if self.dtype == torch.quint8:
+-                if self.has_customized_qrange:
+-                    # When customized quantization range is used, down-rounded midpoint of the range is chosen.
+-                    zero_point = zero_point.new_full(zero_point.size(), (quant_min + quant_max) // 2)
+-                else:
+-                    zero_point = zero_point.new_full(zero_point.size(), 128)
++            #This is workaroud for oneDNN Symmetric INT8, will remove it when Asymmetric is ready.
++            #scale = max_val_pos / (float(quant_max - quant_min) / 2)
++            #scale = torch.max(scale, self.eps)
++            #if self.dtype == torch.quint8:
++            #    if self.has_customized_qrange:
++            #        # When customized quantization range is used, down-rounded midpoint of the range is chosen.
++            #        zero_point = zero_point.new_full(zero_point.size(), (quant_min + quant_max) // 2)
++            #    else:
++            #        zero_point = zero_point.new_full(zero_point.size(), 128)
++            scale = max_val_pos / ((quant_max - quant_min) / 2) if self.dtype == torch.qint8 else (max_val_pos / (quant_max - quant_min))
++            zero_point = zero_point.new_full(zero_point.size(), 0)
+         elif self.qscheme == torch.per_channel_affine_float_qparams:
+             scale = (max_val - min_val) / float(quant_max - quant_min)
+             scale = torch.where(scale > self.eps, scale, torch.ones_like(scale))
+@@ -388,8 +391,11 @@ class MinMaxObserver(_ObserverBase):
+     def forward(self, x_orig):
+         r"""Records the running minimum and maximum of ``x``."""
+         x = x_orig.detach()  # avoid keeping autograd tape
+-        x = x.to(self.min_val.dtype)
++        #Optimize to compatible with more devices like gpu.
++        #x = x.to(self.min_val.dtype)
+         min_val_cur, max_val_cur = torch._aminmax(x)
++        self.min_val = self.min_val.to(min_val_cur.device)
++        self.max_val = self.max_val.to(max_val_cur.device)
+         min_val = torch.min(min_val_cur, self.min_val)
+         max_val = torch.max(max_val_cur, self.max_val)
+         self.min_val.copy_(min_val)
+diff --git a/torch/quantization/quantize_jit.py b/torch/quantization/quantize_jit.py
+index ef6792d521..100609e30b 100644
+--- a/torch/quantization/quantize_jit.py
++++ b/torch/quantization/quantize_jit.py
+@@ -76,7 +76,8 @@ def _convert_jit(model, inplace=False, debug=False, quant_type=QuantType.STATIC,
+     if not debug:
+         # Moving model parameters to CPU since quantized operators
+         # are only supported on CPU right now
+-        model.cpu()
++        #Optimize to compatible with more devices like gpu.
++        #model.cpu()
+         if preserved_attrs is None:
+             preserved_attrs = []
+         model_c = torch._C._jit_pass_quant_finalize(model_c, quant_type, preserved_attrs)
+-- 
+2.25.1
+

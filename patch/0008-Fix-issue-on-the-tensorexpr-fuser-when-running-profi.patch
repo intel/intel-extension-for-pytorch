@@ -1,7 +1,7 @@
 From 20bb072d7060e99b3c329ad5b5f9b5f0687b3fb9 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Thu, 21 Jan 2021 00:35:21 +0800
-Subject: [PATCH 08/11] Fix issue on the tensorexpr fuser when running profile
+Subject: [PATCH 08/13] Fix issue on the tensorexpr fuser when running profile
  JIT executor
 
 ---

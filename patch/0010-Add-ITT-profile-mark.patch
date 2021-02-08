@@ -1,7 +1,7 @@
 From f41dd97d83282c5f8ea35ec5b75a6cab97fdc5a9 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Thu, 28 Jan 2021 00:09:25 +0800
-Subject: [PATCH 10/11] Add ITT profile mark
+Subject: [PATCH 10/13] Add ITT profile mark
 
 ---
  torch/_C/_autograd.pyi           |  2 ++

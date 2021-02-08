@@ -1,7 +1,7 @@
 From dff0601c9b0b6dc9647a64bf9cc423dc376d737d Mon Sep 17 00:00:00 2001
 From: chengjun <chengjun.lu@intel.com>
 Date: Wed, 14 Oct 2020 00:13:00 +0800
-Subject: [PATCH 05/11] Define the record_stream method in
+Subject: [PATCH 05/13] Define the record_stream method in
  native_functions.yaml (#44301)
 
 Summary:

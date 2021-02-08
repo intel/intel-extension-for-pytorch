@@ -1,7 +1,7 @@
 From 66b5e39ae14aac54c004b68f74dbbea7865eea6d Mon Sep 17 00:00:00 2001
 From: chengjun <chengjun.lu@intel.com>
 Date: Thu, 29 Oct 2020 21:49:28 +0800
-Subject: [PATCH 01/11] Add intel XPU backend
+Subject: [PATCH 01/13] Add intel XPU backend
 
 ---
  aten/src/ATen/SparseTensorImpl.cpp            |  2 +

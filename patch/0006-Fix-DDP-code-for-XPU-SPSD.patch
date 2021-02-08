@@ -1,7 +1,7 @@
 From 190407ee637f01fd3fc80df11c24d62b259fb188 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Fri, 8 Jan 2021 23:53:30 +0800
-Subject: [PATCH 06/11] Fix DDP code for XPU SPSD
+Subject: [PATCH 06/13] Fix DDP code for XPU SPSD
 
 ---
  torch/csrc/distributed/c10d/reducer.cpp | 2 +-

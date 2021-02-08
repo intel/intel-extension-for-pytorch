@@ -1,0 +1,27 @@
+From 226c0afd17c791c122ce34a0d4273f351ae76ad2 Mon Sep 17 00:00:00 2001
+From: johnlu <chengjun.lu@intel.com>
+Date: Mon, 8 Feb 2021 18:30:39 +0800
+Subject: [PATCH 13/13] Revert JIT code changes which causes the build issue
+
+---
+ test/cpp/jit/test_argument_spec.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/test/cpp/jit/test_argument_spec.cpp b/test/cpp/jit/test_argument_spec.cpp
+index 800a4767dc..bf40761fc4 100644
+--- a/test/cpp/jit/test_argument_spec.cpp
++++ b/test/cpp/jit/test_argument_spec.cpp
+@@ -9,8 +9,8 @@ namespace jit {
+ 
+ namespace {
+ 
+-at::Device device(const autograd::Variable& v) {
+-  return v.device();
++int device(const autograd::Variable& v) {
++  return v.device().is_cuda() ? v.get_device() : -1;
+ }
+ 
+ bool isEqual(at::IntArrayRef lhs, at::IntArrayRef rhs) {
+-- 
+2.25.1
+
