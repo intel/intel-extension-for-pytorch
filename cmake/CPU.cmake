@@ -125,6 +125,11 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
 # includes
 
+# include mkl-dnn before PyTorch
+# Otherwise, path_to_pytorch/torch/include/dnnl.hpp will be used as the header
+include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
+include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
+
 # Set installed PyTorch dir
 if(DEFINED PYTORCH_INSTALL_DIR)
   include_directories(${PYTORCH_INSTALL_DIR}/include)
@@ -137,8 +142,6 @@ include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
-include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
-include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
 include_directories(${TORCHCCL_INCLUDE_DIR})
 
