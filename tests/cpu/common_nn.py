@@ -4680,7 +4680,7 @@ class NewModuleTest(InputVariableMixin, ModuleTest):
             test_case.assertEqual(input._version, input_version)
 
             input_ip = deepcopy(input)
-            if input.device == torch.device('xpu'):
+            if input.device.type == 'xpu':
                 input_ip.requires_grad = True
             input_ip_clone = input_ip.clone()
             with freeze_rng_state():

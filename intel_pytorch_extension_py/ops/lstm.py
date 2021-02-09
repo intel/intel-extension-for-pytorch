@@ -4,7 +4,7 @@ from torch import _VF
 VF_lstm = _VF.lstm
 
 def ipex_lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first):
-    if input.device == torch.device('xpu') and (dropout == 0 or training == False):
+    if input.device.type == 'xpu' and (dropout == 0 or training == False):
         return torch.ops.torch_ipex.lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
     else:
         return VF_lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
@@ -33,9 +33,9 @@ def fallback_lstm(*args, device):
         else:
             item_cpu = item
         args_cpu.append(item_cpu)
-    
+
     output = VF_lstm(*args_cpu)
-    
+
     # move output to the original device
     output_device = []
     # output is a tuple which does not support item assignment
