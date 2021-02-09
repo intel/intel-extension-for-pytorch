@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <c10/util/Exception.h>
 #include <torch/csrc/autograd/function.h>
-#include <torch/csrc/autograd/record_function.h>
 namespace torch_ipex {
 
 /*

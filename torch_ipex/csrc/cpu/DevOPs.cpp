@@ -1,13 +1,12 @@
 #include "torch_ipex/csrc/cpu/DevOPs.h"
 
 #include <ATen/Context.h>
-#include <ATen/CPUGenerator.h>
 #include <ATen/InferSize.h>
 #include <ATen/NamedTensorUtils.h>
+#include <ATen/record_function.h>
 #include <c10/util/Exception.h>
 #include <c10/util/Logging.h>
 #include <torch/csrc/autograd/function.h>
-#include <torch/csrc/autograd/record_function.h>
 
 #include <limits>
 
@@ -304,14 +303,14 @@ at::Tensor AtenIpexCPUDev::dil_deconvolution(
 }
 
 at::Tensor dil_deconvolution_backward_input(
-    at::IntArrayRef input_size, 
-    const at::Tensor& grad_output, 
+    at::IntArrayRef input_size,
+    const at::Tensor& grad_output,
     const at::Tensor& weight,
     at::IntArrayRef padding,
     std::vector<int64_t> padding_r,
-    at::IntArrayRef stride, 
-    at::IntArrayRef dilation, 
-    int64_t groups, 
+    at::IntArrayRef stride,
+    at::IntArrayRef dilation,
+    int64_t groups,
     bool bias_defined) {
       // for training case, grad_output can be cpu tensor or MKLDNN tensor,
       // but weight and bias always cpu tensor
@@ -333,15 +332,15 @@ at::Tensor dil_deconvolution_backward_input(
 }
 
 std::tuple<at::Tensor, at::Tensor> dil_deconvolution_backward_weights(
-    const at::Tensor& weight, 
-    const at::Tensor& grad_output, 
+    const at::Tensor& weight,
+    const at::Tensor& grad_output,
     const at::Tensor& input,
     at::IntArrayRef padding,
     std::vector<int64_t> padding_r,
-    at::IntArrayRef stride, 
-    at::IntArrayRef dilation, 
-    int64_t groups, 
-    bool bias_defined) { 
+    at::IntArrayRef stride,
+    at::IntArrayRef dilation,
+    int64_t groups,
+    bool bias_defined) {
       // for training case, grad_output and input can be cpu tensor or MKLDNN tensor,
       // but weight and bias always cpu tensor
       const dil::tensor dil_grad_output = dbl::comm::try_gen_dil_tensor(grad_output);
@@ -378,7 +377,7 @@ std::tuple<at::Tensor, at::Tensor> dil_deconvolution_backward_weights(
             padding.vec(),
             padding_r,
             dilation.vec(),
-            groups, 
+            groups,
             diff_weight_type);
         return std::make_tuple(
             dbl::comm::gen_aten_tensor_by(std::move(dil_grad_weight)),
@@ -387,14 +386,14 @@ std::tuple<at::Tensor, at::Tensor> dil_deconvolution_backward_weights(
 }
 
 std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_deconvolution_backward(
-  const at::Tensor& input, 
-  const at::Tensor& grad_output, 
-  const at::Tensor& weight, 
-  at::IntArrayRef padding, 
+  const at::Tensor& input,
+  const at::Tensor& grad_output,
+  const at::Tensor& weight,
+  at::IntArrayRef padding,
   at::IntArrayRef output_padding,
-  at::IntArrayRef stride, 
-  at::IntArrayRef dilation, 
-  int64_t groups, 
+  at::IntArrayRef stride,
+  at::IntArrayRef dilation,
+  int64_t groups,
   std::array<bool,3> output_mask) {
     DEBUG("AtenIpexCPUDev::dil_deconvolution_backward\n");
     CHECK_DNNL_OP_PRE_COND(input);
@@ -418,26 +417,26 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_deconvolution_b
     return std::make_tuple(grad_input, grad_weight, grad_bias);
 }
 
-at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
+at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input, const at::Tensor & weight, const c10::optional<at::Tensor>& bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups) {
   DEBUG("AtenIpexCPUDev::convolution_overrideable\n");
   try {
     if (check_auto_dnnl()) {
       std::vector<at::Tensor> dnnl_input_tensors;
       dnnl_input_tensors.push_back(input);
       dnnl_input_tensors.push_back(weight);
-      if (bias.defined()) {
-        dnnl_input_tensors.push_back(bias);
+      if (bias.has_value() && bias.value().defined()) {
+        dnnl_input_tensors.push_back(bias.value());
       }
       if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
         if (transposed) {
-          return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), bias.defined() && !bias.is_contiguous() ? bias.contiguous() : bias, padding, output_padding, stride, dilation, groups);
+          return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), (bias.has_value() && bias.value().defined()) ? (bias.value().is_contiguous() ? bias.value() : bias.value().contiguous()) : at::Tensor(), padding, output_padding, stride, dilation, groups);
         } else {
           // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
           auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
           auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8 || input.is_contiguous()) ? input : input.contiguous();
           auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
           auto weight_temp = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
-          return AtenIpexCPUDev::dil_convolution(input_temp, weight_temp, bias, stride, padding, dilation, groups);
+          return AtenIpexCPUDev::dil_convolution(input_temp, weight_temp, (bias.has_value() && bias.value().defined()) ? bias.value() : at::Tensor(), stride, padding, dilation, groups);
         }
       }
     }
@@ -449,10 +448,13 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
 
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(weight.layout() == c10::kStrided);
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bias.layout() == c10::kStrided);
+  if (bias.has_value() && bias.value().defined()) TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bias.value().layout() == c10::kStrided);
   auto&& _ipex_input = bridge::shallowFallbackToCPUTensor(input);
   auto&& _ipex_weight = bridge::shallowFallbackToCPUTensor(weight);
-  auto&& _ipex_bias = bridge::shallowFallbackToCPUTensor(bias);
+  auto&& _ipex_bias = c10::optional<at::Tensor>();
+  if (bias.has_value() && bias.value().defined()) {
+    _ipex_bias = c10::optional<at::Tensor>(bridge::shallowFallbackToCPUTensor(bias.value()));
+  }
   auto&& _ipex_result = at::convolution(_ipex_input, _ipex_weight, _ipex_bias, stride, padding, dilation, transposed, output_padding, groups);
   static_cast<void>(_ipex_result); // Avoid warnings in case not used
   return bridge::shallowUpgradeToDPCPPTensor(_ipex_result);
@@ -495,7 +497,7 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
   } catch (std::exception& e) {
 #if defined(_DEBUG)
     TORCH_WARN(e.what());
-#endif 
+#endif
   }
 
   if (transposed) {
@@ -537,14 +539,14 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::cpu_deconvolution_b
   /*
     when groups != 1, we should:
         1). slice _ipex_grad_output ,_ipex_weight and _ipex_self according to groups,;
-        2). call at::slow_conv_transpose2d_backward or at::slow_conv_transpose3d_backward on the sliced tensors 
+        2). call at::slow_conv_transpose2d_backward or at::slow_conv_transpose3d_backward on the sliced tensors
             (since these two functions only support groups = 1) to calculate g_input, g_weight and g_bias
         3). cat g_input, g_weight and g_bias in each group and return
 
       In cpu path, decovolution_forward will do the following:
-  
+
       aten/src/ATen/native/Convolution.cpp:
-      
+
         std::vector<Tensor> outputs(params.groups);
         input = input.contiguous();
         for (int g = 0; g < params.groups; ++g) {
@@ -572,9 +574,9 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::cpu_deconvolution_b
   IPEX_CHECK(dim == 4 || dim == 5, "deconvolution backward fallback only support 2d or 3d deconv");
 
   at::Tensor g_input_concat, g_weight_concat, g_bias_concat;
-  
+
   std::vector<at::Tensor> g_input(groups), g_weight(groups), g_bias(groups);
-  
+
   _ipex_self = _ipex_self.is_contiguous() ? _ipex_self : _ipex_self.contiguous();
   _ipex_grad_output = _ipex_grad_output.is_contiguous() ? _ipex_grad_output : _ipex_grad_output.contiguous();
   _ipex_weight = _ipex_weight.is_contiguous() ? _ipex_weight : _ipex_weight.contiguous();
@@ -582,32 +584,32 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::cpu_deconvolution_b
     auto _ipex_self_g = dbl::comm::subtensor(_ipex_self, 1, groups, g);
     auto _ipex_grad_output_g = dbl::comm::subtensor(_ipex_grad_output, 1, groups, g);
     auto _ipex_weight_g = dbl::comm::subtensor(_ipex_weight, 0, groups, g);
-    
+
     if (dim == 4) {
       std::tie(g_input[g], g_weight[g], g_bias[g]) = at::slow_conv_transpose2d_backward(
-        _ipex_grad_output_g, 
-        _ipex_self_g, 
-        _ipex_weight_g, 
-        kernel_size, 
-        stride, 
-        padding, 
-        output_padding, 
-        dilation, 
-        empty_like(_ipex_grad_output_g, at::MemoryFormat::Contiguous), 
-        empty_like(_ipex_grad_output_g, at::MemoryFormat::Contiguous), 
+        _ipex_grad_output_g,
+        _ipex_self_g,
+        _ipex_weight_g,
+        kernel_size,
+        stride,
+        padding,
+        output_padding,
+        dilation,
+        empty_like(_ipex_grad_output_g, at::MemoryFormat::Contiguous),
+        empty_like(_ipex_grad_output_g, at::MemoryFormat::Contiguous),
         output_mask);
     } else {
       std::tie(g_input[g], g_weight[g], g_bias[g]) = at::slow_conv_transpose3d_backward(
         _ipex_grad_output_g,
         _ipex_self_g,
-        _ipex_weight_g, 
-        kernel_size, 
-        stride, 
-        padding, 
-        output_padding, 
-        dilation, 
-        empty_like(_ipex_grad_output_g, at::MemoryFormat::Preserve), 
-        empty_like(_ipex_grad_output_g, at::MemoryFormat::Preserve), 
+        _ipex_weight_g,
+        kernel_size,
+        stride,
+        padding,
+        output_padding,
+        dilation,
+        empty_like(_ipex_grad_output_g, at::MemoryFormat::Preserve),
+        empty_like(_ipex_grad_output_g, at::MemoryFormat::Preserve),
         output_mask);
     }
   }
@@ -2126,21 +2128,21 @@ at::Tensor dil_as_strided(
 
   // share storage
   auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
-  self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
-  auto result = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::DPCPPTensorId);
+  self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU, 0));
+  auto result = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::XPU, self.scalar_type());
 
   auto* _tensor_impl = (IPEXTensorImpl *)result.unsafeGetTensorImpl();
   _tensor_impl->copy_meta_info(self.unsafeGetTensorImpl());
-  // When a tensor is chunked, the obtained chunked tensors do not share the version counter. 
-  // We have copied the version counter in copy_meta_info and it is a workaround to reset the 
+  // When a tensor is chunked, the obtained chunked tensors do not share the version counter.
+  // We have copied the version counter in copy_meta_info and it is a workaround to reset the
   // version counter here.
-  // Note that when a tensor is sliced, PyTorch will call as_view which will copy the version 
+  // Note that when a tensor is sliced, PyTorch will call as_view which will copy the version
   // counter to the sliced tensor. We do not need to handle it here.
   _tensor_impl->set_version_counter(0);
   _tensor_impl->copy_auto_grad(self.unsafeGetTensorImpl());
 
   auto storage_offset = storage_offset_.value_or(self.storage_offset());
-  _tensor_impl->set_strided(size, stride, storage_offset);
+  _tensor_impl->set_strided(size, stride, storage_offset, result.scalar_type());
   return result;
 }
 
@@ -2195,7 +2197,7 @@ at::Tensor AtenIpexCPUDev::dil_slice(const at::Tensor & self, int64_t dim, int64
   // Port from aten/src/ATen/native/TensorShape.cpp
   int64_t ndim = self.dim();
   if (ndim == 0) {
-    AT_INDEX_ERROR("dil_slice() cannot be applied to a 0-dim tensor.");
+    AT_ERROR("dil_slice() cannot be applied to a 0-dim tensor.");
   }
   dim = at::maybe_wrap_dim(dim, ndim);
   auto sizes = self.sizes().vec();
@@ -2256,17 +2258,17 @@ at::Tensor AtenIpexCPUDev::dil_select(const at::Tensor & self, int64_t dim, int6
   // Port from aten/src/ATen/native/TensorShape.cpp
   int64_t ndim = self.dim();
   if (ndim == 0) {
-    AT_INDEX_ERROR("select() cannot be applied to a 0-dim tensor.");
+    AT_ERROR("select() cannot be applied to a 0-dim tensor.");
   }
   dim = at::maybe_wrap_dim(dim, ndim);
   auto size = dil_size(self, dim);
   if (index < -size || index >= size) {
     if (self.has_names() && self.names()[dim] != at::Dimname::wildcard()) {
-      AT_INDEX_ERROR("select(): index ", index, " out of range for tensor of size ",
-                     self.sizes(), " at dimension ", self.names()[dim]);
+      AT_ERROR("select(): index ", index, " out of range for tensor of size ",
+                self.sizes(), " at dimension ", self.names()[dim]);
     }
-    AT_INDEX_ERROR("select(): index ", index, " out of range for tensor of size ",
-                   self.sizes(), " at dimension ", dim);
+    AT_ERROR("select(): index ", index, " out of range for tensor of size ",
+              self.sizes(), " at dimension ", dim);
   }
   if (index < 0) {
     index += size;
@@ -2296,15 +2298,15 @@ at::Tensor alias_with_sizes_and_strides(
 
   // share storage
   auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
-  self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::DPCPP));
-  auto self_ = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::DPCPPTensorId);
+  self_storage->data_ptr().unsafe_set_device(c10::Device(at::DeviceType::XPU, 0));
+  auto self_ = at::detail::make_tensor<IPEXTensorImpl>(self.storage(), at::DispatchKey::XPU, self.scalar_type());
 
   auto* _tensor_impl = (IPEXTensorImpl *)self_.unsafeGetTensorImpl();
   _tensor_impl->copy_meta_info(self.unsafeGetTensorImpl());
   _tensor_impl->copy_auto_grad(self.unsafeGetTensorImpl());
 
   auto storage_offset = self.storage_offset();
-  _tensor_impl->set_strided(sizes, strides, storage_offset);
+  _tensor_impl->set_strided(sizes, strides, storage_offset, self.scalar_type());
 
   at::namedinference::propagate_names(self_, self);
   return self_;
@@ -2355,7 +2357,7 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split(const at::Tensor& self, int64_
   // Port from aten/src/ATen/native/TensorShape.cpp
   TORCH_CHECK(self.dim() != 0, "split expects at least a 1-dimensional tensor");
   TORCH_CHECK(split_size >= 0,  "split expects split_size be non-negative, but got split_size=", split_size);
-  
+
   CHECK_DNNL_OP_PRE_COND(self);
   dim = at::maybe_wrap_dim(dim, self.dim());
   int64_t dim_size = dil_size(self, dim);
@@ -2496,7 +2498,7 @@ at::Tensor AtenIpexCPUDev::dil_index_select(
   torch_ipex::reset_ipex_func_status();
   DEBUG("AtenIpexCPUDev::dil_index_select\n");
   IPEX_CHECK(
-    self.device().type() == c10::DeviceType::DPCPP,
+    self.device().type() == c10::DeviceType::XPU,
     "IPEX index select only work on DPCPP tensor");
   if (ShadeDataContext::isDilTensor(self) && ShadeDataContext::isTensorMixPrecision(self)) {
     dil::tensor& self_dil_storage = ShadeDataContext::getDilStorage(self);
@@ -2515,7 +2517,7 @@ at::Tensor AtenIpexCPUDev::dil_index(const at::Tensor & self, at::TensorList ind
   torch_ipex::reset_ipex_func_status();
 
   IPEX_CHECK(
-    self.device().type() == c10::DeviceType::DPCPP,
+    self.device().type() == c10::DeviceType::XPU,
     "IPEX index only work on DPCPP tensor");
   if (ShadeDataContext::isDilTensor(self) && ShadeDataContext::isTensorMixPrecision(self)) {
     dil::tensor& self_dil_storage = ShadeDataContext::getDilStorage(self);
@@ -2532,7 +2534,7 @@ at::Tensor AtenIpexCPUDev::dil_index(const at::Tensor & self, at::TensorList ind
 at::Tensor AtenIpexCPUDev::dil_shuffle(const at::Tensor & self, at::IntArrayRef view_shape, int64_t dim0, int64_t dim1) {
   DEBUG("AtenIpexCPUDev::dil_shuffle\n");
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexCPUDev::dil_shuffle", std::vector<c10::IValue>({self}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexCPUDev::dil_shuffle", std::vector<c10::IValue>({self}));
 #endif
   // NOTE: We do NOT add sanity checks here. Because PyTorch does not has shuffle operator. This dil operator is for fusion and the fusion logic
   // has more sanity checks. We found that there are some models use view + transpose + view to implement shuffle semantic. So IPEX will fuse these
@@ -2548,7 +2550,7 @@ at::Tensor AtenIpexCPUDev::dil_shuffle(const at::Tensor & self, at::IntArrayRef 
 std::tuple<at::Tensor,at::Tensor> AtenIpexCPUDev::dil__pack_padded_sequence(const at::Tensor & input, const at::Tensor & lengths, bool batch_first) {
   DEBUG("AtenIpexCPUDev::dil__pack_padded_sequence\n");
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexCPUDev::dil__pack_padded_sequence", std::vector<c10::IValue>({input, lengths}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("AtenIpexCPUDev::dil__pack_padded_sequence", std::vector<c10::IValue>({input, lengths}));
 #endif
   torch_ipex::reset_ipex_func_status();
 
@@ -2572,8 +2574,8 @@ at::Tensor& AtenIpexCPUDev::dil_copy_(
   torch_ipex::reset_ipex_func_status();
 
   IPEX_CHECK(
-    self.device().type() == c10::DeviceType::DPCPP &&
-    src.device().type() == c10::DeviceType::DPCPP,
+    self.device().type() == c10::DeviceType::XPU &&
+    src.device().type() == c10::DeviceType::XPU,
     "IPEX copy only work on DPCPP tensor");
   if (ShadeDataContext::isDilTensor(src) &&ShadeDataContext::isTensorMixPrecision(src)){
     IPEX_CHECK(check_tensor_own_whole_storage(self),  "IPEX copy only works while self tensor own the whole storage");

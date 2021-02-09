@@ -4,7 +4,7 @@
 
 #include "cpu/FusionOPs.h"
 
-#include <torch/csrc/utils/hash.h>
+#include <c10/util/hash.h>
 #include <torch/csrc/jit/runtime/operator.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 #include <torch/csrc/jit/ir/alias_analysis.h>

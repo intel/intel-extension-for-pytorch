@@ -20,7 +20,7 @@ at::DeleterFnPtr DefaultDPCPPAllocator::raw_deleter() const {
 
 std::shared_ptr<at::Allocator> DefaultDPCPPAllocator::get_current_allocator() const {
   TORCH_CHECK(IPEXTensorImpl::GetCurrentAtenDevice().has_index());
-  TORCH_CHECK(IPEXTensorImpl::GetCurrentAtenDevice().type() == at::DeviceType::DPCPP);
+  TORCH_CHECK(IPEXTensorImpl::GetCurrentAtenDevice().type() == at::DeviceType::XPU);
   TORCH_CHECK(IPEXTensorImpl::GetCurrentAtenDevice().index() == 0);
   TORCH_CHECK(m_dpcpp_cpu_allocator != nullptr);
   return m_dpcpp_cpu_allocator;
@@ -29,11 +29,11 @@ std::shared_ptr<at::Allocator> DefaultDPCPPAllocator::get_current_allocator() co
 void NoDelete(void*) {}
 
 at::Allocator* GetDPCPPAllocator() {
-  return at::GetAllocator(at::DeviceType::DPCPP);
+  return at::GetAllocator(at::DeviceType::XPU);
 }
 
 void SetDPCPPAllocator(at::Allocator* alloc) {
-  SetAllocator(at::DeviceType::DPCPP, alloc);
+  SetAllocator(at::DeviceType::XPU, alloc);
 }
 
 static DefaultDPCPPAllocator g_dpcpp_alloc(std::shared_ptr<at::Allocator>(new cpu::DefaultDPCPPCPUAllocator()));
@@ -46,6 +46,6 @@ at::Allocator* GetDefaultDPCPPAllocator() {
 
 namespace c10 {
 
-REGISTER_ALLOCATOR(at::DeviceType::DPCPP, &torch_ipex::g_dpcpp_alloc);
+REGISTER_ALLOCATOR(at::DeviceType::XPU, &torch_ipex::g_dpcpp_alloc);
 
 } // c10

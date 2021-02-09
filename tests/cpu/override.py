@@ -14,7 +14,7 @@ def make_hooked_func(torch_func):
         if 'device' in kwargs:
             return torch_func(*args, **kwargs)
         else:
-            return torch_func(*args, **kwargs).to("dpcpp")
+            return torch_func(*args, **kwargs).to(ipex.DEVICE)
     return hooked_func
 
 for torch_func_name in torch_function:

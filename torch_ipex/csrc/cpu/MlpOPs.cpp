@@ -1,6 +1,6 @@
 #include "MlpOPs.h"
 
-#include <torch/csrc/autograd/record_function.h>
+#include <ATen/record_function.h>
 #include <torch/csrc/autograd/VariableTypeUtils.h>
 
 #include <vector>
@@ -75,7 +75,7 @@ at::Tensor AtenIpexTypeMLPExt::forward(
   libxsmm_dnn_fullyconnected_set_ptr_helper(libxsmm_handle, LIBXSMM_DNN_REGULAR_CHANNEL_BIAS, bias.view({nbk, bk}), "Bias");
   libxsmm_dnn_fullyconnected_set_ptr_helper(libxsmm_handle, LIBXSMM_DNN_REGULAR_OUTPUT, output, "Output");
   {
-    RECORD_FUNCTION("ipex_mm_fwd", std::vector<c10::IValue>(/*input, weight*/), -1 /*torch::autograd::Node::peek_at_next_sequence_nr()*/);
+    RECORD_FUNCTION("ipex_mm_fwd", std::vector<c10::IValue>(/*input, weight*/));
     #ifdef _OPENMP
     #pragma omp parallel
     #endif
@@ -114,7 +114,7 @@ std::vector<at::Tensor> AtenIpexTypeMLPExt::backward(
   libxsmm_dnn_fullyconnected_set_ptr_helper(libxsmm_handle, LIBXSMM_DNN_GRADIENT_INPUT, grad_input, "GradInput");
   libxsmm_dnn_fullyconnected_set_ptr_helper(libxsmm_handle, LIBXSMM_DNN_GRADIENT_FILTER, grad_weight, "GradWeight");
 
-  RECORD_FUNCTION("ipex_mm_bwdupd", std::vector<c10::IValue>(/*grad_output, weight*/), -1 /*torch::autograd::Node::peek_at_next_sequence_nr()*/);
+  RECORD_FUNCTION("ipex_mm_bwdupd", std::vector<c10::IValue>(/*grad_output, weight*/));
   #ifdef _OPENMP
   #pragma omp parallel
   #endif

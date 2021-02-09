@@ -251,7 +251,7 @@ class LinearRelu(nn.Module):
 
     def forward(self, x):
         return F.relu(self.linear(x), inplace=True)
- 
+
 class LinearGelu(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearGelu, self).__init__()
@@ -319,7 +319,7 @@ class ConvSumInDiffBlock(nn.Module):
         seed = 2018
         torch.manual_seed(seed)
         self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
-    
+
     def forward(self, x):
         y = self.conv(x)
         if y.size(1) != x.size(1):
@@ -715,7 +715,7 @@ class Tester(TestCase):
             ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 32, 32, 32),
             kind_in_graph="aten::conv3d",
-            kind_not_in_graph="aten::batch_norm",)
+            kind_not_in_graph="aten::batch_norm")
         self._test_output_bf16(
             ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 32, 32, 32),
@@ -731,7 +731,8 @@ class Tester(TestCase):
         self._test_output_bf16(
             ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
-            kind_in_graph="ipex::conv2d_relu")
+            kind_in_graph="ipex::conv2d_relu",
+            prec=0.02)
         self._test_output_int8(
             ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
@@ -746,7 +747,8 @@ class Tester(TestCase):
         self._test_output_bf16(
             ConvRelu_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 32, 32, 32),
-            kind_in_graph="ipex::conv3d_relu")
+            kind_in_graph="ipex::conv3d_relu",
+            prec=0.02)
 
     def test_output_conv_sum_2d(self):
         self._test_output(

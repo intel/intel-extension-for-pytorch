@@ -61,7 +61,7 @@ bool check_device_by_device(const at::Device& device, DPCPPSubDev sub_dev) {
 }
 
 bool get_device_count(c10::Device device, c10::DeviceIndex *count) {
-  TORCH_CHECK(device.type() == at::DeviceType::DPCPP);
+  TORCH_CHECK(device.type() == at::DeviceType::XPU);
   // TORCH_WARN(device.has_index());
   if (device.index() <= 0) {
     // Always set cpu count to 1
@@ -159,8 +159,7 @@ bool check_tensor_own_whole_storage(const at::Tensor& tensor) {
     return false;
 
   return (tensor.storage_offset() == 0) &&
-         (tensor.numel() == tensor.storage().numel()) &&
-         (tensor.itemsize() == tensor.storage().itemsize());
+         (tensor.numel() * tensor.itemsize() == tensor.storage().nbytes());
 }
 
 bool check_tensor_own_shade_context(const at::Tensor& tensor) {

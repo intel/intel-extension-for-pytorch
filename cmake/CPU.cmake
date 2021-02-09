@@ -12,7 +12,7 @@ SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/cpu")
 add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
-
+find_package(TorchCCL REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 FIND_PACKAGE(AVX)
@@ -128,6 +128,7 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 # Set installed PyTorch dir
 if(DEFINED PYTORCH_INSTALL_DIR)
   include_directories(${PYTORCH_INSTALL_DIR}/include)
+  include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include/)
 else()
   message(FATAL_ERROR, "Cannot find installed PyTorch directory")
 endif()
@@ -139,6 +140,7 @@ include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
 include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
+include_directories(${TORCHCCL_INCLUDE_DIR})
 
 # sources
 set(DPCPP_SRCS)
@@ -167,7 +169,7 @@ set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP
 pybind11_add_module(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 target_link_libraries(${PLUGIN_NAME} PRIVATE ${DPCPP_THIRD_PARTY_ROOT}/xsmm/lib/libxsmm.a)
 
-link_directories(${PYTORCH_INSTALL_DIR}/lib)
+#link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
@@ -184,12 +186,11 @@ else()
 endif()
 
 add_dependencies(${PLUGIN_NAME} pybind11)
-
+add_dependencies(${PLUGIN_NAME} torch_ccl)
 add_dependencies(${PLUGIN_NAME} dnnl)
 target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl)
-
 add_dependencies(${PLUGIN_NAME} xsmm)
-
+target_link_libraries(${PLUGIN_NAME} PUBLIC torch_ccl)
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_python.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)

@@ -240,7 +240,7 @@ class TestDeconv(TestCase):
                 x_aten = x.clone().requires_grad_()
                 x_auto_mix_infer = x.clone().to(device=device).requires_grad_()
                 x_auto_mix_train = x.clone().to(device=device).requires_grad_()
-                
+
                 y_aten = module(x_aten)
                 y_aten.sum().backward()
 
@@ -250,11 +250,11 @@ class TestDeconv(TestCase):
                     self.assertFalse(ipex.core.is_bf16_dil_tensor(module_auto_mix_infer.weight))
                     if bias:
                         self.assertFalse(ipex.core.is_bf16_dil_tensor(module_auto_mix_infer.bias))
-                    
+
                     y_auto_mix_infer = module_auto_mix_infer(x_auto_mix_infer)
                     y_auto_mix_infer.sum().backward()
 
-                    if padding - output_padding + stride > 0: 
+                    if padding - output_padding + stride > 0:
                         self.assertTrue(ipex.core.is_bf16_dil_tensor(x_auto_mix_infer.grad))
                         self.assertTrue(ipex.core.is_bf16_dil_tensor(module_auto_mix_infer.weight))
                         if bias:
@@ -263,7 +263,7 @@ class TestDeconv(TestCase):
                         self.assertEqual(
                             y_aten, y_auto_mix_infer, 1e-2)
 
-                    # mkldnn does not support the case where: 
+                    # mkldnn does not support the case where:
                     # padding - output_padding + stride <= 0
                     # while PyTorch supports this case, will fallback in this case
                     else:
@@ -277,7 +277,7 @@ class TestDeconv(TestCase):
                     self.assertFalse(ipex.core.is_bf16_dil_tensor(module_auto_mix_train.weight))
                     if bias:
                         self.assertFalse(ipex.core.is_bf16_dil_tensor(module_auto_mix_train.bias))
-                    
+
                     y_auto_mix_train = module_auto_mix_train(x_auto_mix_train)
                     y_auto_mix_train.sum().backward()
 
@@ -297,8 +297,8 @@ class TestDeconv(TestCase):
                             x_aten.grad, x_auto_mix_train.grad, 1e-2)
                         if bias:
                             self.assertEqual(module.bias.grad, module_auto_mix_train.bias.grad)
-                    
-                    # mkldnn does not support the case where: 
+
+                    # mkldnn does not support the case where:
                     # padding - output_padding + stride <= 0
                     # while PyTorch supports this case, will fallback in this case
                     else:
@@ -810,7 +810,7 @@ class TestShape(TestCase):
             F.relu_(x_cpu_slice)
             F.relu_(x_dpcpp_slice)
             self._check_tensor_shape(x_cpu_slice, x_dpcpp_slice)
-            self.assertEqual(x_cpu_slice, x_dpcpp_slice, 0.01)        
+            self.assertEqual(x_cpu_slice, x_dpcpp_slice, 0.01)
 
     def test_sliced_eltwise_backward(self):
         rand_seed = int(get_rand_seed())
@@ -830,7 +830,7 @@ class TestShape(TestCase):
 
             y_cpu.sum().backward()
             y_dpcpp.sum().backward()
-            
+
             self._check_tensor_shape(y_cpu, y_dpcpp)
             self.assertEqual(y_cpu, y_dpcpp)
             self.assertEqual(x_cpu.grad, x_dpcpp.grad)
@@ -854,18 +854,18 @@ class TestShape(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        
+
         x_dpcpp = torch.randn(32, 4096).to(device).requires_grad_()
-        
+
         with AutoDNNL(True), AutoMixPrecision(True, train=True):
-            x_chunked = x_dpcpp.chunk(4, 1)
-            
+            x_chunked = x_dpcpp.unsafe_chunk(4, 1)
+
             output = x_chunked[0].sigmoid_()
             version_counter = output._version
-            
+
             output_other = x_chunked[1].sigmoid_()
             self.assertTrue(output._version == version_counter)
-    
+
     def test_unbind(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
@@ -880,7 +880,7 @@ class TestShape(TestCase):
             self.assertTrue(ipex.core.is_bf16_dil_tensor(x_dpcpp))
             self.assertTrue(ipex.core.is_bf16_dil_tensor(x_dpcpp_unbind[0]))
             self.assertTrue(ipex.core.is_bf16_dil_tensor(x_dpcpp_unbind[1]))
-            
+
             self._check_tensor_shape(x_cpu_unbind[0], x_dpcpp_unbind[0])
             self._check_tensor_shape(x_cpu_unbind[1], x_dpcpp_unbind[1])
             self.assertEqual(x_cpu_unbind[0], x_dpcpp_unbind[0], 0.01)
@@ -1267,7 +1267,7 @@ class TestLinear(TestCase):
                 out_man_bf16 = linear_man_bf16(in_man_bf16).sum()
                 out_man_bf16.backward()
                 self.assertEqual(in_man_bf16.grad.dtype, torch.bfloat16)
-                # rand_seed = 1600407821102260224 # self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 2e-2) AssertionError: tensor(0.0312) not less than or equal to 0.02 
+                # rand_seed = 1600407821102260224 # self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 2e-2) AssertionError: tensor(0.0312) not less than or equal to 0.02
                 self.assertEqual(_in_cpu.grad.bfloat16().float(), in_man_bf16.grad, 4e-2)
 
                 with AutoMixPrecision(True, train=True):
@@ -2227,6 +2227,8 @@ class TestLinearAlgebraOps(TestCase):
         x_auto_mix_a, x_auto_mix_b, _, x_man_bf16_a, x_man_bf16_b, _ = self._gen_mm_tensor(rand_seed)
 
         with AutoDNNL(True), AutoMixPrecision(False):
+            self.assertEqual(x_man_bf16_a.dtype, torch.bfloat16)
+            self.assertEqual(x_man_bf16_b.dtype, torch.bfloat16)
             res_man_bf16 = torch.mm(x_man_bf16_a, x_man_bf16_b)
             self.assertEqual(res_man_bf16.dtype, torch.bfloat16)
             with AutoMixPrecision(True):
