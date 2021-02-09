@@ -1022,8 +1022,8 @@ at::Tensor AtenIpexCPUDev::dil_linear(
   CHECK_DNNL_OP_PRE_COND(weight);
   IPEX_CHECK(self.dim() >= 2,
       "dil_linear: input needs to has dim at least 2, input dim ", self.dim());
-  IPEX_CHECK(attr.get_post_ops().len() == 0 || 
-                              attr.get_post_ops().kind(0) == dnnl::primitive::kind::eltwise, 
+  IPEX_CHECK(attr.get_post_ops().len() == 0 ||
+                              attr.get_post_ops().kind(0) == dnnl::primitive::kind::eltwise,
                               "dil linear only fuse with eltwise now");
 
   std::vector<float> output_scale = {};
@@ -2499,7 +2499,7 @@ at::Tensor AtenIpexCPUDev::dil_index_select(
   DEBUG("AtenIpexCPUDev::dil_index_select\n");
   IPEX_CHECK(
     self.device().type() == c10::DeviceType::XPU,
-    "IPEX index select only work on DPCPP tensor");
+    "IPEX index select only work on XPU tensor");
   if (ShadeDataContext::isDilTensor(self) && ShadeDataContext::isTensorMixPrecision(self)) {
     dil::tensor& self_dil_storage = ShadeDataContext::getDilStorage(self);
     if (self_dil_storage.get_data_type() == dil::data_type::bf16) {
@@ -2518,7 +2518,7 @@ at::Tensor AtenIpexCPUDev::dil_index(const at::Tensor & self, at::TensorList ind
 
   IPEX_CHECK(
     self.device().type() == c10::DeviceType::XPU,
-    "IPEX index only work on DPCPP tensor");
+    "IPEX index only work on XPU tensor");
   if (ShadeDataContext::isDilTensor(self) && ShadeDataContext::isTensorMixPrecision(self)) {
     dil::tensor& self_dil_storage = ShadeDataContext::getDilStorage(self);
     if (self_dil_storage.get_data_type() == dil::data_type::bf16) {
@@ -2560,7 +2560,7 @@ std::tuple<at::Tensor,at::Tensor> AtenIpexCPUDev::dil__pack_padded_sequence(cons
   auto&& _ipex_lengths = bridge::shallowFallbackToCPUTensor(lengths);
   auto&& _ipex_result = at::_pack_padded_sequence(_ipex_input, _ipex_lengths, batch_first);
 
-  // PyTorch requires the device of batch_size tensor is CPU, so IPEX does not covert the batch_size tensor(std::get<1>(_ipex_result)) to DPCPP
+  // PyTorch requires the device of batch_size tensor is CPU, so IPEX does not covert the batch_size tensor(std::get<1>(_ipex_result)) to XPU
   return std::tuple<at::Tensor,at::Tensor>(
     bridge::shallowUpgradeToDPCPPTensor(std::get<0>(_ipex_result)),
     std::get<1>(_ipex_result));
@@ -2576,7 +2576,7 @@ at::Tensor& AtenIpexCPUDev::dil_copy_(
   IPEX_CHECK(
     self.device().type() == c10::DeviceType::XPU &&
     src.device().type() == c10::DeviceType::XPU,
-    "IPEX copy only work on DPCPP tensor");
+    "IPEX copy only work on XPU tensor");
   if (ShadeDataContext::isDilTensor(src) &&ShadeDataContext::isTensorMixPrecision(src)){
     IPEX_CHECK(check_tensor_own_whole_storage(self),  "IPEX copy only works while self tensor own the whole storage");
     auto dil_src = dbl::comm::try_gen_dil_tensor(src);
@@ -2706,12 +2706,12 @@ at::Tensor AtenIpexCPUDev::dil_div(const at::Tensor &self,
   DEBUG("AtenIpexCPUDev::dil_div\n");
   torch_ipex::reset_ipex_func_status();
 
-  IPEX_CHECK(self.device().type() == c10::DeviceType::DPCPP,
-             "IPEX div only work when dividend is DPCPP tensor");
+  IPEX_CHECK(self.device().type() == c10::DeviceType::XPU,
+             "IPEX div only work when dividend is XPU tensor");
   IPEX_CHECK(
-      other.device().type() == c10::DeviceType::DPCPP ||
+      other.device().type() == c10::DeviceType::XPU ||
           other.unsafeGetTensorImpl()->is_wrapped_number(),
-      "IPEX div only work when divisor is DPCPP tensor or is wrapped number");
+      "IPEX div only work when divisor is XPU tensor or is wrapped number");
   if (CHECK_ATEN_BF16_USABLE(self)) {
     if (other.unsafeGetTensorImpl()->is_wrapped_number() ||
         CHECK_ATEN_BF16_USABLE(other))
@@ -2728,7 +2728,7 @@ at::Tensor AtenIpexCPUDev::dil_div(const at::Tensor &self, at::Scalar &other) {
   auto impl = tensor.unsafeGetTensorImpl();
   impl->set_wrapped_number(true);
   impl->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(
-      c10::Device(at::DeviceType::DPCPP));
+      c10::Device(at::DeviceType::XPU));
   return dil_div(self, tensor);
 }
 
@@ -2744,7 +2744,7 @@ at::Tensor &AtenIpexCPUDev::dil_div_(at::Tensor &self, at::Scalar &other) {
   auto impl = tensor.unsafeGetTensorImpl();
   impl->set_wrapped_number(true);
   impl->storage().unsafeGetStorageImpl()->data_ptr().unsafe_set_device(
-      c10::Device(at::DeviceType::DPCPP));
+      c10::Device(at::DeviceType::XPU));
   return AtenIpexCPUDev::dil_div_out(self, self, tensor);
 }
 
@@ -2753,13 +2753,13 @@ at::Tensor &AtenIpexCPUDev::dil_div_out(at::Tensor &out, const at::Tensor &self,
   DEBUG("AtenIpexCPUDev::dil_div_out\n");
   torch_ipex::reset_ipex_func_status();
 
-  IPEX_CHECK(out.device().type() == c10::DeviceType::DPCPP &&
-                 self.device().type() == c10::DeviceType::DPCPP,
-             "IPEX div only work when dividend is DPCPP tensor");
+  IPEX_CHECK(out.device().type() == c10::DeviceType::XPU &&
+                 self.device().type() == c10::DeviceType::XPU,
+             "IPEX div only work when dividend is XPU tensor");
   IPEX_CHECK(
-      other.device().type() == c10::DeviceType::DPCPP ||
+      other.device().type() == c10::DeviceType::XPU ||
           other.unsafeGetTensorImpl()->is_wrapped_number(),
-      "IPEX div only work when divisor is DPCPP tensor or is wrapped number");
+      "IPEX div only work when divisor is XPU tensor or is wrapped number");
   if (CHECK_ATEN_BF16_USABLE(out) && CHECK_ATEN_BF16_USABLE(self)) {
     if (other.unsafeGetTensorImpl()->is_wrapped_number() ||
         CHECK_ATEN_BF16_USABLE(other))
