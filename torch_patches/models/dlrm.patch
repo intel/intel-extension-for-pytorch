@@ -1,0 +1,618 @@
+diff --git a/dlrm_data_pytorch.py b/dlrm_data_pytorch.py
+index 6cbe382..3166607 100644
+--- a/dlrm_data_pytorch.py
++++ b/dlrm_data_pytorch.py
+@@ -378,7 +378,7 @@ def ensure_dataset_preprocessed(args, d_path):
+ 
+ def make_criteo_data_and_loaders(args):
+ 
+-    if args.mlperf_logging and args.memory_map and args.data_set == "terabyte":
++    if args.memory_map and args.data_set == "terabyte":
+         # more efficient for larger batches
+         data_directory = path.dirname(args.raw_data_file)
+ 
+diff --git a/dlrm_s_pytorch.py b/dlrm_s_pytorch.py
+index 344c167..5fc9b4b 100644
+--- a/dlrm_s_pytorch.py
++++ b/dlrm_s_pytorch.py
+@@ -92,6 +92,7 @@ import sklearn.metrics
+ # from torch.nn.parameter import Parameter
+ 
+ from torch.optim.lr_scheduler import _LRScheduler
++from torch.utils import ThroughputBenchmark
+ 
+ exc = getattr(builtins, "IOError", "FileNotFoundError")
+ 
+@@ -141,7 +142,10 @@ class DLRM_Net(nn.Module):
+             m = ln[i + 1]
+ 
+             # construct fully connected operator
+-            LL = nn.Linear(int(n), int(m), bias=True)
++            if args.ipex and args.inference_only and i != sigmoid_layer:
++                LL = ipex.LinearRelu(int(n), int(m), bias=True)
++            else:
++                LL = nn.Linear(int(n), int(m), bias=True)
+ 
+             # initialize the weights
+             # with torch.no_grad():
+@@ -166,6 +170,8 @@ class DLRM_Net(nn.Module):
+             if i == sigmoid_layer:
+                 layers.append(nn.Sigmoid())
+             else:
++                if args.ipex:
++                    continue
+                 layers.append(nn.ReLU())
+ 
+         # approach 1: use ModuleList
+@@ -192,19 +198,22 @@ class DLRM_Net(nn.Module):
+                 EE.embs.weight.data = torch.tensor(W, requires_grad=True)
+ 
+             else:
++                # print("create emb", i)
+                 EE = nn.EmbeddingBag(n, m, mode="sum", sparse=True)
+-
+-                # initialize embeddings
+-                # nn.init.uniform_(EE.weight, a=-np.sqrt(1 / n), b=np.sqrt(1 / n))
+-                W = np.random.uniform(
+-                    low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=(n, m)
+-                ).astype(np.float32)
+-                # approach 1
+-                EE.weight.data = torch.tensor(W, requires_grad=True)
+-                # approach 2
+-                # EE.weight.data.copy_(torch.tensor(W))
+-                # approach 3
+-                # EE.weight = Parameter(torch.tensor(W),requires_grad=True)
++                if args.load_model == "":
++                    # initialize embeddings
++                    # nn.init.uniform_(EE.weight, a=-np.sqrt(1 / n), b=np.sqrt(1 / n))
++                    W = np.random.uniform(
++                        low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=(n, m)
++                    ).astype(np.float32)
++                    # approach 1
++                    EE.weight.data = torch.tensor(W, requires_grad=True)
++                    # approach 2
++                    # EE.weight.data.copy_(torch.tensor(W))
++                    # approach 3
++                    # EE.weight = Parameter(torch.tensor(W),requires_grad=True)
++                else:
++                    del(EE.weight)
+ 
+             emb_l.append(EE)
+ 
+@@ -299,26 +308,30 @@ class DLRM_Net(nn.Module):
+ 
+     def interact_features(self, x, ly):
+         if self.arch_interaction_op == "dot":
+-            # concatenate dense and sparse features
+-            (batch_size, d) = x.shape
+-            T = torch.cat([x] + ly, dim=1).view((batch_size, -1, d))
+-            # perform a dot product
+-            Z = torch.bmm(T, torch.transpose(T, 1, 2))
+-            # append dense feature with the interactions (into a row vector)
+-            # approach 1: all
+-            # Zflat = Z.view((batch_size, -1))
+-            # approach 2: unique
+-            _, ni, nj = Z.shape
+-            # approach 1: tril_indices
+-            # offset = 0 if self.arch_interaction_itself else -1
+-            # li, lj = torch.tril_indices(ni, nj, offset=offset)
+-            # approach 2: custom
+-            offset = 1 if self.arch_interaction_itself else 0
+-            li = torch.tensor([i for i in range(ni) for j in range(i + offset)])
+-            lj = torch.tensor([j for i in range(nj) for j in range(i + offset)])
+-            Zflat = Z[:, li, lj]
+-            # concatenate dense features and interactions
+-            R = torch.cat([x] + [Zflat], dim=1)
++            if args.ipex:
++                T = [x] + ly
++                R = ipex.interaction(*T)
++            else:
++                # concatenate dense and sparse features
++                (batch_size, d) = x.shape
++                T = torch.cat([x] + ly, dim=1).view((batch_size, -1, d))
++                # perform a dot product
++                Z = torch.bmm(T, torch.transpose(T, 1, 2))
++                # append dense feature with the interactions (into a row vector)
++                # approach 1: all
++                # Zflat = Z.view((batch_size, -1))
++                # approach 2: unique
++                _, ni, nj = Z.shape
++                # approach 1: tril_indices
++                # offset = 0 if self.arch_interaction_itself else -1
++                # li, lj = torch.tril_indices(ni, nj, offset=offset)
++                # approach 2: custom
++                offset = 1 if self.arch_interaction_itself else 0
++                li = torch.tensor([i for i in range(ni) for j in range(i + offset)])
++                lj = torch.tensor([j for i in range(nj) for j in range(i + offset)])
++                Zflat = Z[:, li, lj]
++                # concatenate dense features and interactions
++                R = torch.cat([x] + [Zflat], dim=1)
+         elif self.arch_interaction_op == "cat":
+             # concatenation features (into a row vector)
+             R = torch.cat([x] + ly, dim=1)
+@@ -472,6 +485,38 @@ class DLRM_Net(nn.Module):
+ 
+         return z0
+ 
++    def load_state_dict(self, state_dict):
++        if args.ipex and args.inference_only:
++        # for this case we use manully fused linear+relu, the layer index should be half of the index in
++        # official trained weight
++            scale = 2
++        else:
++            scale = 1
++        for i in range(len(self.top_l)):
++            if hasattr(self.top_l[i], 'weight'):
++                self.top_l[i].weight.data.copy_(state_dict["top_l.%d.weight" % (scale*i)].to(device))
++                self.top_l[i].bias.data.copy_(state_dict["top_l.%d.bias" % (scale*i)].to(device))
++        for i in range(len(self.bot_l)):
++            if hasattr(self.bot_l[i], 'weight'):
++                self.bot_l[i].weight.data.copy_(state_dict["bot_l.%d.weight" % (scale*i)].to(device))
++                self.bot_l[i].bias.data.copy_(state_dict["bot_l.%d.bias" % (scale*i)].to(device))
++        for i in range(len(self.emb_l)):
++            dlrm.emb_l[i].weight = torch.nn.Parameter(ld_model["state_dict"]["emb_l.%d.weight" % i])
++
++    def eval(self):
++        for m in self.top_l:
++            if hasattr(m, 'weight'):
++                m.weight.requires_grad = False
++            if hasattr(m, 'bias'):
++                m.requires_grad = False
++        for m in self.bot_l:
++            if hasattr(m, 'weight'):
++                m.weight.requires_grad = False
++            if hasattr(m, 'bias'):
++                m.requires_grad = False
++        for m in self.emb_l:
++            if hasattr(m, 'weight'):
++                m.weight.requires_grad = False
+ 
+ if __name__ == "__main__":
+     ### import packages ###
+@@ -482,6 +527,9 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser(
+         description="Train Deep Learning Recommendation Model (DLRM)"
+     )
++    # share weight when running multi-instance
++    parser.add_argument("--share-weight", action="store_true", default=False)
++    parser.add_argument("--num-instance", type=int, default=28)
+     # model related parameters
+     parser.add_argument("--arch-sparse-feature-size", type=int, default=2)
+     parser.add_argument("--arch-embedding-size", type=str, default="4-3-2")
+@@ -532,6 +580,7 @@ if __name__ == "__main__":
+     parser.add_argument("--sync-dense-params", type=bool, default=True)
+     # inference
+     parser.add_argument("--inference-only", action="store_true", default=False)
++    parser.add_argument("--verify-auc-only", action="store_true", default=False)
+     # onnx
+     parser.add_argument("--save-onnx", action="store_true", default=False)
+     # gpu
+@@ -560,6 +609,21 @@ if __name__ == "__main__":
+     parser.add_argument("--lr-num-warmup-steps", type=int, default=0)
+     parser.add_argument("--lr-decay-start-step", type=int, default=0)
+     parser.add_argument("--lr-num-decay-steps", type=int, default=0)
++    # ipex
++    parser.add_argument('--ipex', action='store_true', default=False,
++                        help='enable Intel_PyTorch_Extension')
++    parser.add_argument('--dnnl', action='store_true', default=False,
++                        help='enable Intel_PyTorch_Extension auto dnnl path')
++    parser.add_argument('--jit', action='store_true', default=False,
++                        help='enable Intel_PyTorch_Extension JIT path')
++    parser.add_argument('--bf16', action='store_true', default=False,
++                        help='enable ipex mix precision')
++    parser.add_argument('--int8', action='store_true', default=False,
++                        help='enable ipex mix precision')
++    parser.add_argument('--int8-calibration', action='store_true', default=False,
++                        help='enable ipex mix precision')
++    parser.add_argument('--int8-configuration-dir', default='int8_configure.json', type=str, metavar='PATH',
++                       help = 'path to int8 configures, default file name is configure.json')
+     args = parser.parse_args()
+ 
+     if args.mlperf_logging:
+@@ -571,6 +635,28 @@ if __name__ == "__main__":
+     torch.set_printoptions(precision=args.print_precision)
+     torch.manual_seed(args.numpy_rand_seed)
+ 
++    if args.ipex:
++        import intel_pytorch_extension as ipex
++        if args.dnnl:
++            ipex.core.enable_auto_dnnl()
++        else:
++            ipex.core.disable_auto_dnnl()
++        if args.bf16:
++            ipex_conf = ipex.AmpConf(torch.bfloat16, training=not args.inference_only)
++        elif args.int8:
++            import os
++            if os.path.exists(args.int8_configuration_dir) and os.stat(args.int8_configuration_dir).st_size != 0:
++                ipex_conf = ipex.AmpConf(torch.int8, args.int8_configuration_dir)
++        else:
++            ipex_conf = None
++        ipex.core.set_execution_mode(train = not args.inference_only)
++
++        # jit path only enabled for inference
++        if args.jit and args.inference_only:
++            ipex.core.enable_jit_opt()
++        else:
++            ipex.core.disable_jit_opt()
++
+     if (args.test_mini_batch_size < 0):
+         # if the parameter is not set, use the training batch size
+         args.test_mini_batch_size = args.mini_batch_size
+@@ -585,6 +671,8 @@ if __name__ == "__main__":
+         device = torch.device("cuda", 0)
+         ngpus = torch.cuda.device_count()  # 1
+         print("Using {} GPU(s)...".format(ngpus))
++    elif args.ipex:
++        device = ipex.DEVICE
+     else:
+         device = torch.device("cpu")
+         print("Using CPU...")
+@@ -779,6 +867,10 @@ if __name__ == "__main__":
+         if dlrm.ndevices > 1:
+             dlrm.emb_l = dlrm.create_emb(m_spa, ln_emb)
+ 
++    if args.ipex:
++        dlrm = dlrm.to(device)
++        # print(dlrm)
++
+     # specify the loss function
+     if args.loss_function == "mse":
+         loss_fn = torch.nn.MSELoss(reduction="mean")
+@@ -802,30 +894,23 @@ if __name__ == "__main__":
+             torch.cuda.synchronize()
+         return time.time()
+ 
+-    def dlrm_wrap(X, lS_o, lS_i, use_gpu, device):
+-        if use_gpu:  # .cuda()
+-            # lS_i can be either a list of tensors or a stacked tensor.
+-            # Handle each case below:
++    def input_wrap(X, lS_o, lS_i, use_gpu, device):
++        if use_gpu or args.ipex:
+             lS_i = [S_i.to(device) for S_i in lS_i] if isinstance(lS_i, list) \
+                 else lS_i.to(device)
+             lS_o = [S_o.to(device) for S_o in lS_o] if isinstance(lS_o, list) \
+                 else lS_o.to(device)
+-            return dlrm(
+-                X.to(device),
+-                lS_o,
+-                lS_i
+-            )
+-        else:
+-            return dlrm(X, lS_o, lS_i)
++            X = X.to(device)
++        return X, lS_o, lS_i
+ 
+     def loss_fn_wrap(Z, T, use_gpu, device):
+         if args.loss_function == "mse" or args.loss_function == "bce":
+-            if use_gpu:
++            if use_gpu or args.ipex:
+                 return loss_fn(Z, T.to(device))
+             else:
+                 return loss_fn(Z, T)
+         elif args.loss_function == "wbce":
+-            if use_gpu:
++            if use_gpu or args.ipex:
+                 loss_ws_ = loss_ws[T.data.view(-1).long()].view_as(T).to(device)
+                 loss_fn_ = loss_fn(Z, T.to(device))
+             else:
+@@ -837,6 +922,33 @@ if __name__ == "__main__":
+             # print(loss_fn_)
+             return loss_sc_.mean()
+ 
++    def run_throughtput_benchmark(model, data_loader):
++        bench = ThroughputBenchmark(model)
++        j = 0
++        for j, (X, lS_o, lS_i, T) in enumerate(data_loader):
++            bench.add_input(*input_wrap(X, lS_o, lS_i, use_gpu, device))
++            if j == 1000: 
++                break
++        with torch.autograd.profiler.profile(args.enable_profiling, use_gpu) as prof:
++            stats = bench.benchmark(
++                num_calling_threads=args.num_instance,
++                num_warmup_iters=100,
++                num_iters=1000 * args.num_instance,
++            )
++        print(stats)
++        if args.enable_profiling:
++            print(prof.key_averages().table(sort_by="self_cpu_time_total"))
++
++    def int8_calibration(model, data_loader, num_calib_batches):
++        conf = ipex.AmpConf(torch.int8)
++        with torch.no_grad():
++            for j, (X, lS_o, lS_i, T) in enumerate(data_loader):
++                with ipex.AutoMixPrecision(conf, running_mode="calibration"):
++                    model(*input_wrap(X, lS_o, lS_i, use_gpu, device))
++                if j == num_calib_batches:
++                    conf.save(args.int8_configuration_dir)
++                    return
++
+     # training or inference
+     best_gA_test = 0
+     best_auc_test = 0
+@@ -882,6 +994,7 @@ if __name__ == "__main__":
+         ld_gA_test = ld_model["test_acc"]
+         ld_gL_test = ld_model["test_loss"]
+         if not args.inference_only:
++            optimizer = torch.optim.SGD(dlrm.parameters(), lr=args.learning_rate)
+             optimizer.load_state_dict(ld_model["opt_state_dict"])
+             best_gA_test = ld_gA_test
+             total_loss = ld_total_loss
+@@ -908,7 +1021,44 @@ if __name__ == "__main__":
+             )
+         )
+ 
++    if args.inference_only:
++        torch.set_grad_enabled(False) 
++        dlrm.eval()
++
++    if args.jit:
++        for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
++            print("=====================trace begin")
++            dlrm = torch.jit.trace(dlrm, input_wrap(X, lS_o, lS_i, use_gpu, device), check_trace=False)
++            print("============================trace end")
++            break
++
++    if args.int8_calibration:
++        assert args.int8 and args.inference_only, "int8 type only support inference, only using int8 type needs to int8_calibration"
++        int8_calibration(dlrm, test_ld, num_calib_batches=8)
++        print("do int8 calibration done")
++        ipex_conf = ipex.AmpConf(torch.int8, args.int8_configuration_dir)
++
+     print("time/loss/accuracy (if enabled):")
++    if args.share_weight:
++        assert args.inference_only
++        if args.ipex:
++            ## prepack and reorder for mix-precision if needed
++            for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
++                if args.bf16 or args.int8:
++                    with ipex.AutoMixPrecision(ipex_conf):
++                        Z = dlrm(*input_wrap(X, lS_o, lS_i, use_gpu, device))
++                else:
++                    Z = dlrm(*input_wrap(X, lS_o, lS_i, use_gpu, device))
++                break
++        print("===========================prepack and dtype convert done")
++
++        if args.ipex and (args.bf16 or args.int8):
++            with ipex.AutoMixPrecision(ipex_conf):
++                run_throughtput_benchmark(dlrm, train_ld)
++        else:
++            run_throughtput_benchmark(dlrm, train_ld)
++        sys.exit()
++
+     with torch.autograd.profiler.profile(args.enable_profiling, use_gpu) as prof:
+         while k < args.nepochs:
+             if k < skip_upto_epoch:
+@@ -944,16 +1094,20 @@ if __name__ == "__main__":
+                 print("input and targets")
+                 print(X.detach().cpu().numpy())
+                 print([np.diff(S_o.detach().cpu().tolist()
+-                       + list(lS_i[i].shape)).tolist() for i, S_o in enumerate(lS_o)])
++                        + list(lS_i[i].shape)).tolist() for i, S_o in enumerate(lS_o)])
+                 print([S_i.detach().cpu().numpy().tolist() for S_i in lS_i])
+                 print(T.detach().cpu().numpy())
+                 '''
+ 
+                 # forward pass
+-                Z = dlrm_wrap(X, lS_o, lS_i, use_gpu, device)
++                if args.ipex and (args.bf16 or args.int8):
++                    with ipex.AutoMixPrecision(ipex_conf):
++                        Z = dlrm(*input_wrap(X, lS_o, lS_i, use_gpu, device))
++                        E = loss_fn_wrap(Z, T, use_gpu, device)
++                else:
++                    Z = dlrm(*input_wrap(X, lS_o, lS_i, use_gpu, device))
++                    E = loss_fn_wrap(Z, T, use_gpu, device)
+ 
+-                # loss
+-                E = loss_fn_wrap(Z, T, use_gpu, device)
+                 '''
+                 # debug prints
+                 print("output and loss")
+@@ -1024,7 +1178,7 @@ if __name__ == "__main__":
+                     total_samp = 0
+ 
+                 # testing
+-                if should_test and not args.inference_only:
++                if args.verify_auc_only or should_test and not args.inference_only:
+                     # don't measure training iter time in a test iteration
+                     if args.mlperf_logging:
+                         previous_iteration_time = None
+@@ -1043,12 +1197,18 @@ if __name__ == "__main__":
+                         if nbatches > 0 and i >= nbatches:
+                             break
+ 
++                        if i < 8 and args.int8:
++                            continue
++
+                         t1_test = time_wrap(use_gpu)
+ 
+                         # forward pass
+-                        Z_test = dlrm_wrap(
+-                            X_test, lS_o_test, lS_i_test, use_gpu, device
+-                        )
++                        if args.ipex and (args.bf16 or args.int8):
++                            with ipex.AutoMixPrecision(ipex_conf):
++                                Z_test = dlrm(*input_wrap(X_test, lS_o_test, lS_i_test, use_gpu, device))
++                        else:
++                            Z_test = dlrm(*input_wrap(X_test, lS_o_test, lS_i_test, use_gpu, device))
++
+                         if args.mlperf_logging:
+                             S_test = Z_test.detach().cpu().numpy()  # numpy array
+                             T_test = T_test.detach().cpu().numpy()  # numpy array
+@@ -1073,7 +1233,6 @@ if __name__ == "__main__":
+                     if args.mlperf_logging:
+                         scores = np.concatenate(scores, axis=0)
+                         targets = np.concatenate(targets, axis=0)
+-
+                         metrics = {
+                             'loss' : sklearn.metrics.log_loss,
+                             'recall' : lambda y_true, y_score:
+@@ -1175,6 +1334,8 @@ if __name__ == "__main__":
+                                 best_gA_test * 100
+                             )
+                         )
++                        if args.verify_auc_only :
++                            sys.exit()
+                     else:
+                         print(
+                             "Testing at - {}/{} of epoch {},".format(j + 1, nbatches, 0)
+@@ -1190,16 +1351,16 @@ if __name__ == "__main__":
+                         and (args.mlperf_acc_threshold > 0)
+                         and (best_gA_test > args.mlperf_acc_threshold)):
+                         print("MLPerf testing accuracy threshold "
+-                              + str(args.mlperf_acc_threshold)
+-                              + " reached, stop training")
++                                + str(args.mlperf_acc_threshold)
++                                + " reached, stop training")
+                         break
+ 
+                     if (args.mlperf_logging
+                         and (args.mlperf_auc_threshold > 0)
+                         and (best_auc_test > args.mlperf_auc_threshold)):
+                         print("MLPerf testing auc threshold "
+-                              + str(args.mlperf_auc_threshold)
+-                              + " reached, stop training")
++                                + str(args.mlperf_auc_threshold)
++                                + " reached, stop training")
+                         break
+ 
+             k += 1  # nepochs
+@@ -1209,7 +1370,7 @@ if __name__ == "__main__":
+         with open("dlrm_s_pytorch.prof", "w") as prof_f:
+             prof_f.write(prof.key_averages().table(sort_by="cpu_time_total"))
+             prof.export_chrome_trace("./dlrm_s_pytorch.json")
+-        # print(prof.key_averages().table(sort_by="cpu_time_total"))
++        print(prof.key_averages().table(sort_by="self_cpu_time_total"))
+ 
+     # plot compute graph
+     if args.plot_compute_graph:
+diff --git a/run_inference_accuracy.sh b/run_inference_accuracy.sh
+new file mode 100755
+index 0000000..37d9d0d
+--- /dev/null
++++ b/run_inference_accuracy.sh
+@@ -0,0 +1,35 @@
++#!/bin/sh
++
++###############################################################################
++### How to run?
++### Test cpu accuracy. Just run
++###
++###############################################################################
++export KMP_AFFINITY="granularity=fine,compact,1,0"
++export KMP_BLOCKTIME=1
++export DNNL_PRIMITIVE_CACHE_CAPACITY=1024
++
++ARGS=""
++
++if [[ "$1" == "int8" ]]
++then
++    ARGS="$ARGS --ipex --dnnl --int8 --int8-calibration"
++    echo "### running auto_dnnl mode"
++fi
++
++CORES=`lscpu | grep Core | awk '{print $4}'`
++# use first socket
++numa_cmd="numactl -C 0-$((CORES-1))  -m 0"
++echo "will run on core 0-$((CORES-1)) on socket 0" 
++
++export OMP_NUM_THREADS=$CORES
++$numa_cmd python -u dlrm_s_pytorch.py \
++--raw-data-file=${DATASET_PATH}/day --processed-data-file=${DATASET_PATH}/terabyte_processed.npz \
++--loss-function=bce --data-generation=dataset --data-set=terabyte \
++--memory-map --mlperf-bin-loader --round-targets=True --learning-rate=1.0 \
++--arch-mlp-bot=13-512-256-128 --arch-mlp-top=1024-1024-512-256-1 \
++--arch-sparse-feature-size=128 --max-ind-range=40000000 \
++--numpy-rand-seed=727  --verify-auc-only --inference-only \
++--print-freq=2048 --print-time --mini-batch-size=2048  --test-mini-batch-size=16384 \
++--test-freq=2048 --mlperf-logging \
++--load-model=${WEIGHT_PATH} $ARGS
+diff --git a/run_inference_latency.sh b/run_inference_latency.sh
+new file mode 100755
+index 0000000..0de108a
+--- /dev/null
++++ b/run_inference_latency.sh
+@@ -0,0 +1,43 @@
++#!/bin/sh
++
++###############################################################################
++### How to run?
++### Test cpu accuracy. Just run
++###
++###############################################################################
++export KMP_AFFINITY="granularity=fine,compact,1,0"
++export KMP_BLOCKTIME=1
++export LD_PRELOAD="${CONDA_PREFIX}/lib/libiomp5.so:$LDPRELOAD"
++export DNNL_PRIMITIVE_CACHE_CAPACITY=1024
++export KMP_SETTINGS=1
++
++ARGS=""
++
++if [[ "$1" == "dnnl" ]]
++then
++    ARGS="$ARGS --ipex --dnnl"
++    echo "### running auto_dnnl mode"
++fi
++
++if [[ "$2" == "int8" ]]
++then
++    ARGS="$ARGS --int8 --int8-calibration"
++    echo "### running int8 mode"
++fi
++
++
++CORES=`lscpu | grep Core | awk '{print $4}'`
++# use first socket
++numa_cmd="numactl -C 0-$((CORES-1))  -m 0"
++echo "will run on core 0-$((CORES-1)) on socket 0"
++
++export OMP_NUM_THREADS=1
++$numa_cmd python -u dlrm_s_pytorch.py \
++--raw-data-file=${DATASET_PATH}/day --processed-data-file=${DATASET_PATH}/terabyte_processed.npz \
++--loss-function=bce --data-generation=dataset --data-set=terabyte \
++--memory-map --mlperf-bin-loader --round-targets=True --learning-rate=1.0 \
++--arch-mlp-bot=13-512-256-128 --arch-mlp-top=1024-1024-512-256-1 \
++--arch-sparse-feature-size=128 --max-ind-range=40000000 \
++--numpy-rand-seed=727  --inference-only --jit \
++--print-freq=100 --print-time --mini-batch-size=16 \
++--share-weight --num-instance=$CORES $ARGS
+diff --git a/run_inference_throughput.sh b/run_inference_throughput.sh
+new file mode 100755
+index 0000000..0ab587a
+--- /dev/null
++++ b/run_inference_throughput.sh
+@@ -0,0 +1,35 @@
++#!/bin/sh
++
++###############################################################################
++### How to run?
++### Test cpu accuracy. Just run
++###
++###############################################################################
++export KMP_AFFINITY="granularity=fine,compact,1,0"
++export KMP_BLOCKTIME=1
++export LD_PRELOAD=${CONDA_PREFIX}/lib/libjemalloc.so:${CONDA_PREFIX}/lib/libiomp5.so 
++export DNNL_PRIMITIVE_CACHE_CAPACITY=1024
++
++ARGS=""
++
++if [[ "$1" == "int8" ]]
++then
++    ARGS="$ARGS --ipex --dnnl --int8 --int8-calibration"
++    echo "### running auto_dnnl mode"
++fi
++
++CORES=`lscpu | grep Core | awk '{print $4}'`
++# use first socket
++numa_cmd="numactl -C 0-$((CORES-1))  -m 0"
++echo "will run on core 0-$((CORES-1)) on socket 0" 
++
++export OMP_NUM_THREADS=$CORES
++$numa_cmd python -u dlrm_s_pytorch.py \
++--raw-data-file=${DATASET_PATH}/day --processed-data-file=${DATASET_PATH}/terabyte_processed.npz \
++--loss-function=bce --data-generation=dataset --data-set=terabyte \
++--memory-map --mlperf-bin-loader --round-targets=True --learning-rate=1.0 \
++--arch-mlp-bot=13-512-256-128 --arch-mlp-top=1024-1024-512-256-1 \
++--arch-sparse-feature-size=128 --max-ind-range=40000000 \
++--numpy-rand-seed=727  --inference-only \
++--print-freq=100 --print-time --mini-batch-size=2048  --test-mini-batch-size=16384 \
++--test-freq=2048 --num-batches=1000 $ARGS
