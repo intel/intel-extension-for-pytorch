@@ -3,7 +3,7 @@
 #include <torch/csrc/jit/python/pybind_utils.h>
 
 #include <ATen/ipex_type_dpcpp_customized.h>
-#include <jit/fusion_pass.h>
+#include <gpu/jit/fusion_pass.h>
 #include <Module.h>
 #include <Stream.h>
 #include <Storage.h>

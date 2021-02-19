@@ -1,6 +1,4 @@
 #include <string>
-#include <iostream>
-#include "graph_ext.h"
 #include "fusion_pass.h"
 #include "accelerated_ops.h"
 #include <c10/util/hash.h>
@@ -40,7 +38,7 @@ class OpFuser {
   using Symbols = std::vector<Symbol>;
   using RuleTab = std::unordered_map<::std::pair<Symbol, Symbol>, Symbol>;
   using Rule = RuleTab::iterator;
-  static RuleTab dpcppRules;
+  static RuleTab dnnlRules;
 
 public:
   OpFuser(Block* block, std::shared_ptr<Graph> graph)
@@ -72,8 +70,8 @@ public:
     if (curr->owningBlock() != block_)
       return c10::nullopt;
 
-    auto choice = dpcppRules.find({prev->kind(), curr->kind()});
-    if (choice != dpcppRules.end())
+    auto choice = dnnlRules.find({prev->kind(), curr->kind()});
+    if (choice != dnnlRules.end())
       return choice;
 
     return c10::nullopt;
@@ -83,8 +81,60 @@ public:
     aliasDb_ = std::make_unique<AliasDb>(graph_);
   }
 
+  Node* fuseOpsWithNewKind(Node *curr, Value *v, Graph *g, NodeKind kind) {
+    auto newNode = g->create(kind);
+    auto prev = v->node();
+    newNode->insertBefore(prev);
+    newNode->setScope(prev->scope());
+    newNode->copyAttributes(*prev);
+
+    for (auto input : prev->inputs()) {
+      newNode->addInput(input);
+    }
+
+    for (auto input : curr->inputs()) {
+      if (input != v) {
+        newNode->addInput(input);
+      }
+    }
+
+    // Copy curr or prev?
+    newNode->output()->copyMetadata(prev->output());
+    newNode->output()->setType(prev->output()->type());
+
+    v->replaceAllUsesWith(newNode->output());
+    curr->replaceAllUsesWith(newNode);
+
+    prev->destroy();
+    curr->destroy();
+
+    return newNode;
+  }
+
   Node* fuseNodes(Node *curr, Value *path, Rule rule) {
     return fuseOpsWithNewKind(curr, path, curr->owningGraph(), rule->second);
+  }
+
+  bool BatchNorm2dNode_hasConstantParams(Node* node) const {
+    bool has =
+            node->input(1)->node()->kind() == prim::Constant
+            && node->input(2)->node()->kind() == prim::Constant
+            && node->input(3)->node()->kind() == prim::Constant
+            && node->input(4)->node()->kind() == prim::Constant
+            && node->input(7)->node()->kind() == prim::Constant;
+
+    // TODO: more check to make sure
+
+    return has;
+  }
+
+  bool Conv2dNode_hasConstantParams(Node* node) const {
+    bool has = true;
+    for (int i = 1; i < node->inputs().size(); ++i) {
+      has = has && (node->input(i)->node()->kind() == prim::Constant);
+    }
+
+    return has;
   }
 
   //
@@ -98,12 +148,10 @@ public:
     // Check whether all the sources are constant ???
     // Does performance improve no matter we do it pre-compiling or runtime?
     //
-    auto* conv2d = reinterpret_cast<NodeExt *>(prev)->cast<Conv2dNode>();
-    auto* batch_norm = reinterpret_cast<NodeExt *>(node)->cast<BatchNorm2dNode>();
 
     foldable = foldable
-      && conv2d->hasConstantParams()
-      && batch_norm->hasConstantParams();
+      && Conv2dNode_hasConstantParams(prev)
+      && BatchNorm2dNode_hasConstantParams(node);
     return foldable;
   }
 
@@ -220,6 +268,10 @@ public:
 
   bool aliasIsSafeForFusion(Node *node, Value *v, c10::optional<Rule> r) {
     bool safe = false;
+    // Returns false if the two nodes to be fused do not have the same owning block
+    if (node->owningBlock() != v->node()->owningBlock()) {
+      return safe;
+    }
     // TODO: it might be flawed because we don't have 'alias must' information
     //
     // Simple fusion, unary ops:
@@ -298,40 +350,36 @@ public:
   }
 
   std::pair<graph_node_list::iterator, bool> processNode(Node *node) {
-    auto nodeExt = reinterpret_cast<NodeExt *>(node);
 
     Node* pos = node;
     bool changed = false;
 
-    // no rewrite here, check all aten Ops
-    if (nodeExt->isDNNLOps()) {
-      //
-      // Check whether we could fuse to one certain value path
-      //
-      for (auto *v : node->inputs()) {
-        auto prev = v->node();
-        auto fuseRule = isFusable(node, prev);
+    //
+    // Check whether we could fuse to one certain value path
+    //
+    for (auto *v : node->inputs()) {
+      auto prev = v->node();
+      auto fuseRule = isFusable(node, prev);
 
-        // We can fuse only one path
-        if (fuseRule && aliasIsSafeForFusion(node, v, fuseRule)) {
-          pos = fuseNodes(node, v, fuseRule.value());
-          changed = true;
-          break;
-        } else if (isFoldable(node, prev)
-            && aliasIsSafeForSquashingValue(node, v)) {
-          pos = foldNodes(prev, node);
-          changed = true;
-          break;
-        }
+      // We can fuse only one path
+      if (fuseRule && aliasIsSafeForFusion(node, v, fuseRule)) {
+        pos = fuseNodes(node, v, fuseRule.value());
+        changed = true;
+        break;
+      } else if (isFoldable(node, prev)
+          && aliasIsSafeForSquashingValue(node, v)) {
+        pos = foldNodes(prev, node);
+        changed = true;
+        break;
       }
     }
-
     return std::make_pair(++pos->iterator(), changed);
-}
+  }
+
 };
 
 // TODO: These rules should be more scalable
-OpFuser::RuleTab OpFuser::dpcppRules = {
+OpFuser::RuleTab OpFuser::dnnlRules = {
   {{aten::conv2d, aten::relu}, dpcpp::conv2d_relu_sym},
   {{aten::conv2d, Symbol::fromQualString("aten::relu_")}, dpcpp::conv2d_relu_sym},
   {{dpcpp::conv2d_sum_sym, aten::relu}, dpcpp::conv2d_sum_relu_sym},
@@ -357,7 +405,6 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   OpFuser(graph->block(), graph).run();
 
   // TODO: Some post processing?? ECS/EDC/Peephole???
-  // std::cout<<graph->toString(true);
   ConstantPropagation(graph);
 }
 

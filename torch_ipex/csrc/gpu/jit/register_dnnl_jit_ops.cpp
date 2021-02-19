@@ -3,7 +3,7 @@
 #include <aten/operators/QUtil.h>
 #include "dpcpp_ops.h"
 #include "accelerated_ops.h"
-#include "graph_ext.h"
+//#include "graph_ext.h"
 
 namespace torch {
 namespace jit {
@@ -22,23 +22,23 @@ at::Tensor toOptionalTensor(const IValue& v) {
 using namespace at::native;
 
 RegisterOperators op({
-    Operator(
-      "dnnl::reorder(Tensor self) -> Tensor",
-      [](const Node* node) -> Operation {
-        return [node] (Stack* stack) {
-          auto* enode = reinterpret_cast<const NodeExt *>(node);
-          auto from = enode->inputFormat(0);
-          auto to = enode->inputFormat(1);
-          auto groups = enode->getGroupInfo();
-
-          auto result = torch::jit::dpcpp::reorder(
-              (std::move(peek(stack, 0, 1))).toTensor(), from, to, groups);
-          drop(stack, 1);
-          pack(stack, std::move(result));
-        };
-      },
-      aliasAnalysisFromSchema()
-      ),
+//    Operator(
+//      "dnnl::reorder(Tensor self) -> Tensor",
+//      [](const Node* node) -> Operation {
+//        return [node] (Stack* stack) {
+//          auto* enode = reinterpret_cast<const NodeExt *>(node);
+//          auto from = enode->inputFormat(0);
+//          auto to = enode->inputFormat(1);
+//          auto groups = enode->getGroupInfo();
+//
+//          auto result = torch::jit::dpcpp::reorder(
+//              (std::move(peek(stack, 0, 1))).toTensor(), from, to, groups);
+//          drop(stack, 1);
+//          pack(stack, std::move(result));
+//        };
+//      },
+//      aliasAnalysisFromSchema()
+//      ),
     Operator(
       "dpcpp::conv2d_relu(Tensor input, Tensor weight, Tensor? bias=None, int[2] stride=1, int[2] padding=0, int[2] dilation=1, int groups=1) -> Tensor",
       [] (const Node* node) ->Operation {
