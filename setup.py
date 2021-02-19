@@ -9,10 +9,11 @@ except ImportError as e:
     print('You need to install pytorch first.')
     sys.exit(1)
 
-from subprocess import check_call
+from subprocess import check_call, check_output
 from setuptools import setup, Extension, find_packages, distutils
 from setuptools.command.build_ext import build_ext
 from distutils.spawn import find_executable
+from distutils.version import LooseVersion
 from sysconfig import get_paths
 
 import distutils.ccompiler
@@ -32,6 +33,39 @@ pytorch_install_dir = os.path.dirname(os.path.abspath(torch.__file__))
 base_dir = os.path.dirname(os.path.abspath(__file__))
 python_include_dir = get_paths()['include']
 
+# from https://github.com/pytorch/pytorch/blob/master/tools/setup_helpers/__init__.py
+def which(thefile):
+    path = os.environ.get("PATH", os.defpath).split(os.pathsep)
+    for d in path:
+        fname = os.path.join(d, thefile)
+        fnames = [fname]
+        if sys.platform == 'win32':
+            exts = os.environ.get('PATHEXT', '').split(os.pathsep)
+            fnames += [fname + ext for ext in exts]
+        for name in fnames:
+            if os.access(name, os.F_OK | os.X_OK) and not os.path.isdir(name):
+                return name
+    return None
+
+def get_cmake_command():
+    def _get_version(cmd):
+        for line in check_output([cmd, '--version']).decode('utf-8').split('\n'):
+            if 'version' in line:
+                return LooseVersion(line.strip().split(' ')[2])
+        raise RuntimeError('no version found')
+    "Returns cmake command."
+    cmake_command = 'cmake'
+    if platform.system() == 'Windows':
+        return cmake_command
+    cmake3 = which('cmake3')
+    cmake = which('cmake')
+    if cmake3 is not None and _get_version(cmake3) >= LooseVersion("3.13.0"):
+        cmake_command = 'cmake3'
+        return cmake_command
+    elif cmake is not None and _get_version(cmake) >= LooseVersion("3.13.0"):
+         return cmake_command
+    else:
+         raise RuntimeError('no cmake or cmake3 with version >= 3.13.0 found')
 
 def _check_env_flag(name, default=''):
   return os.getenv(name, default).upper() in ['ON', '1', 'YES', 'TRUE', 'Y']
@@ -65,7 +99,7 @@ def get_git_head_sha(base_dir):
 
 
 def get_build_version(ipex_git_sha):
-  version = os.getenv('TORCH_IPEX_VERSION', '0.1')
+  version = os.getenv('TORCH_IPEX_VERSION', '1.1.0')
   if _check_env_flag('VERSIONED_IPEX_BUILD', default='0'):
     try:
       version += '+' + ipex_git_sha[:7]
@@ -115,14 +149,14 @@ def generate_ipex_cpu_aten_code(base_dir):
   os.chdir(cur_dir)
 
 
-class DPCPPExt(Extension, object):
+class IPEXExt(Extension, object):
   def __init__(self, name, project_dir=os.path.dirname(__file__)):
     Extension.__init__(self, name, sources=[])
     self.project_dir = os.path.abspath(project_dir)
     self.build_dir = os.path.join(project_dir, 'build')
 
 
-class DPCPPClean(distutils.command.clean.clean, object):
+class IPEXClean(distutils.command.clean.clean, object):
 
   def run(self):
     import glob
@@ -148,14 +182,15 @@ class DPCPPClean(distutils.command.clean.clean, object):
     distutils.command.clean.clean.run(self)
 
 
-class DPCPPBuild(build_ext, object):
+class IPEXBuild(build_ext, object):
   def run(self):
     print("run")
 
     # Generate the code before globbing!
     generate_ipex_cpu_aten_code(base_dir)
 
-    cmake = find_executable('cmake3') or find_executable('cmake')
+    cmake = get_cmake_command()
+
     if cmake is None:
       raise RuntimeError(
           "CMake must be installed to build the following extensions: " +
@@ -180,7 +215,7 @@ class DPCPPBuild(build_ext, object):
       build_type = 'Debug'
 
     # install _torch_ipex.so as python module
-    if ext.name is 'torch_ipex' and _check_env_flag("USE_SYCL"):
+    if ext.name == 'torch_ipex' and _check_env_flag("USE_SYCL"):
       ext_dir = ext_dir + '/torch_ipex'
 
     cmake_args = [
@@ -189,8 +224,17 @@ class DPCPPBuild(build_ext, object):
             '-DPYTHON_EXECUTABLE=' + sys.executable,
             '-DCMAKE_INSTALL_PREFIX=' + ext_dir,
             '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + ext_dir,
+            '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=' + ext_dir,
             '-DPYTHON_INCLUDE_DIR=' + python_include_dir,
+            '-DPYTORCH_INCLUDE_DIRS=' + pytorch_install_dir + "/include",
+            '-DPYTORCH_LIBRARY_DIRS=' + pytorch_install_dir + "/lib",
         ]
+
+    if _check_env_flag("IPEX_DISP_OP"):
+      cmake_args += ['-DIPEX_DISP_OP=1']
+
+    if _check_env_flag("IPEX_PROFILE_OP"):
+      cmake_args += ['-DIPEX_PROFILE_OP=1']
 
     if _check_env_flag("USE_SYCL"):
       cmake_args += ['-DUSE_SYCL=1']
@@ -216,7 +260,7 @@ class DPCPPBuild(build_ext, object):
       check_call(['ninja'] + build_args, cwd=ext.build_dir, env=env)
     else:
       check_call(['make'] + build_args, cwd=ext.build_dir, env=env)
-
+    check_call(['make', 'install'] + build_args, cwd=ext.build_dir, env=env)
 
 ipex_git_sha, torch_git_sha = get_git_head_sha(base_dir)
 version = get_build_version(ipex_git_sha)
@@ -254,10 +298,10 @@ setup(
       'intel_pytorch_extension',
       'intel_pytorch_extension.optim',
       'intel_pytorch_extension.ops'],
-    package_dir={'torch_ipex': 'torch_ipex_py', 'intel_pytorch_extension': 'intel_pytorch_extension_py'},
+    package_dir={'intel_pytorch_extension': 'intel_pytorch_extension_py'},
     zip_safe=False,
-    ext_modules=[DPCPPExt('_torch_ipex')],
+    ext_modules=[IPEXExt('_torch_ipex')],
     cmdclass={
-        'build_ext': DPCPPBuild,
-        'clean': DPCPPClean,
+        'build_ext': IPEXBuild,
+        'clean': IPEXClean,
     })

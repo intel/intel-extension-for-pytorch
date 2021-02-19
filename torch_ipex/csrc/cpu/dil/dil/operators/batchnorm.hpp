@@ -14,11 +14,13 @@ struct batch_normalization_forward_inference
                       const tensor& shift,
                       tensor& dst,
                       float epsilon,
+                      const scale_t& src_scales = scale_t(),
+                      const scale_t& dst_scales = scale_t(),
                       const batch_normalization_flag flags = batch_normalization_flag::use_scale_shift,
                       const engine& aengine = engine::cpu_engine()) {
     static tensor dummy;
     compute_impl</*use_stats=*/false>(
-        src, dummy, dummy, scale, shift, dst, epsilon, flags, aengine);
+        src, dummy, dummy, scale, shift, dst, epsilon, src_scales, dst_scales, flags, aengine);
   }
 
   static void compute(const tensor& src,
@@ -28,10 +30,12 @@ struct batch_normalization_forward_inference
                       const tensor& shift,
                       tensor& dst,
                       float epsilon,
+                      const scale_t& src_scales = scale_t(),
+                      const scale_t& dst_scales = scale_t(),
                       const batch_normalization_flag flags = batch_normalization_flag::use_scale_shift,
                       const engine& aengine = engine::cpu_engine()) {
     compute_impl</*use_stats=*/true>(
-        src, mean, variance, scale, shift, dst, epsilon, flags, aengine);
+        src, mean, variance, scale, shift, dst, epsilon, src_scales, dst_scales, flags, aengine);
   }
  private:
   template <bool use_stats>
@@ -42,6 +46,8 @@ struct batch_normalization_forward_inference
                            const tensor& shift,
                            tensor& dst,
                            float epsilon,
+                           const scale_t& src_scales,
+                           const scale_t& dst_scales,
                            const batch_normalization_flag flags,
                            const engine& aengine) {
     auto pd_flags = batch_normalization_flag::use_scale_shift;
@@ -50,24 +56,62 @@ struct batch_normalization_forward_inference
 
     // workaround: use src.get_desc() once issue intel/mkl-dnn#588 is resolved
     auto src_desc = src._get_unblocked_desc_if_4c_blocked();
-    // auto src_desc = src.get_desc();
+    //auto src_desc = src.get_desc();
 
     bool fuse_norm_relu = (bool) (flags & batch_normalization_flag::fuse_norm_relu);
     attr_t attr = fuse_norm_relu ? attr_t::fuse_relu() : attr_t();
     auto pd = primitive_desc(
         {prop_kind::forward_inference, src_desc, epsilon, pd_flags}, attr, aengine);
 
-    tensor scale_shift {pd.weights_desc()};
-    auto* scale_shift_buf = static_cast<char *>(scale_shift.get_data_handle());
-    std::memcpy(scale_shift_buf, scale.get_data_handle(), scale.get_size());
-    std::memcpy(scale_shift_buf + scale.get_size(),
-                shift.get_data_handle(), shift.get_size());
+  
     auto expected_src = src.reorder_if_differ_in(pd.src_desc());
     dst.reinit_if_possible(pd.dst_desc());
 
+    if (!dst_scales.empty() && dst.get_data_type() != data_type::f32) {
+      dst.set_scale(dst_scales);
+    }
+ 
+    tensor scale_shift {pd.weights_desc()};
+    if (src_scales.empty() && dst_scales.empty()) {
+      auto* scale_shift_buf = static_cast<char *>(scale_shift.get_data_handle());
+      std::memcpy(scale_shift_buf, scale.get_data_handle(), scale.get_size());
+      std::memcpy(scale_shift_buf + scale.get_size(),
+                  shift.get_data_handle(), shift.get_size());
+    }
+
     if (use_stats) {
-      auto expected_mean = mean.reorder_if_differ_in(pd.mean_desc());
-      auto expected_var = variance.reorder_if_differ_in(pd.variance_desc());
+      tensor expected_mean, expected_var;
+      // int8 path, need updata scale and shift
+      if (!src_scales.empty() && (!dst_scales.empty())) {
+        int channel_count = scale.get_nelems();
+        float* scale_ptr = static_cast<float *>(scale.get_data_handle());
+        float* shift_ptr = static_cast<float *>(shift.get_data_handle()); 
+        float* scale_shift_buf = static_cast<float *>(scale_shift.get_data_handle());
+ 
+        expected_mean = {pd.mean_desc()};
+        expected_var = {pd.variance_desc()}; 
+        float* mean_ptr = static_cast<float *>(mean.get_data_handle());
+        float* var_ptr = static_cast<float *>(variance.get_data_handle());
+        float* expected_mean_ptr = static_cast<float *>(expected_mean.get_data_handle());
+        float* expected_var_ptr = static_cast<float *>(expected_var.get_data_handle());
+    #ifdef _OPENMP
+    #if (_OPENMP >= 201307)
+    # pragma omp parallel for simd
+    #else
+    # pragma omp parallel for schedule(static)
+    #endif
+    #endif
+        for (int c = 0; c < channel_count; c++) {
+          float scale_temp = scale_ptr[c] / std::sqrt(var_ptr[c] + epsilon);
+          scale_shift_buf[c] = scale_temp * dst_scales[0] / src_scales[0];
+          scale_shift_buf[c + channel_count] = (shift_ptr[c] - mean_ptr[c] * scale_temp) * dst_scales[0];
+          expected_mean_ptr[c] = 0.0f;
+          expected_var_ptr[c] = 1.0f;
+        }
+      } else {
+        expected_mean = mean.reorder_if_differ_in(pd.mean_desc());
+        expected_var = variance.reorder_if_differ_in(pd.variance_desc());
+      }
       super(pd).execute(stream::default_stream(),
                         {{DNNL_ARG_SRC, expected_src},
                          {DNNL_ARG_SCALE_SHIFT, scale_shift},
@@ -75,6 +119,17 @@ struct batch_normalization_forward_inference
                          {DNNL_ARG_MEAN, expected_mean},
                          {DNNL_ARG_DST, dst}});
     } else {
+      // int8 path, need updata scale and shift
+      if (!src_scales.empty() && !dst_scales.empty()) {
+        int channel_count = scale.get_nelems();
+        float* scale_shift_buf = static_cast<float *>(scale_shift.get_data_handle());
+        float* scale_ptr = static_cast<float *>(scale.get_data_handle());
+        float* shift_ptr = static_cast<float *>(shift.get_data_handle());
+        for (int c = 0; c < channel_count; c++) {
+          scale_shift_buf[c] = scale_ptr[c] * dst_scales[0] / src_scales[0];
+          scale_shift_buf[c + channel_count] = shift_ptr[c] * dst_scales[0];
+        }
+      }
       super(pd).execute(stream::default_stream(),
                         {{DNNL_ARG_SRC, expected_src},
                          {DNNL_ARG_SCALE_SHIFT, scale_shift},

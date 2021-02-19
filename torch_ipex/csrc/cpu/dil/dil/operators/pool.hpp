@@ -61,7 +61,8 @@ struct pooling_backward : public dnnl::pooling_backward {
                       algorithm aalgorithm,
                       const engine& aengine = engine::cpu_engine()) {
     auto src_desc = src.get_desc().to_format_any();
-    auto dst_desc = dst.get_desc();
+    // align data type of diff_dst with src
+    auto dst_desc = dst.get_desc().to_type(src_desc.get_data_type());
 
     auto forward_hints =
         pooling_forward::primitive_desc(

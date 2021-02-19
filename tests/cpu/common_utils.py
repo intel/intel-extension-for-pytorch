@@ -85,7 +85,10 @@ from torch._utils_internal import get_writable_path
 from torch._six import string_classes, inf
 import torch.backends.cudnn
 import torch.backends.mkl
+from torch.autograd import gradcheck
+from torch.autograd.gradcheck import gradgradcheck
 
+import intel_pytorch_extension as ipex
 
 torch.backends.disable_global_flags()
 
@@ -133,10 +136,6 @@ def shell(command, cwd=None):
     finally:
         # Always call p.wait() to ensure exit
         p.wait()
-
-ALL_TENSORTYPES = [torch.float,
-                   torch.double,
-                   torch.half]
 
 # Used to run the same test with different tensor types
 def repeat_test_for_types(dtypes):
@@ -260,6 +259,20 @@ TEST_SKIP_FAST = os.getenv('PYTORCH_TEST_SKIP_FAST', '0') == '1'
 if TEST_NUMPY:
     import numpy
 
+ALL_TENSORTYPES = [torch.float,
+                   torch.double,
+                   torch.half]
+
+# bfloat16 bringup is currently only available on ROCm
+# ALL_TENSORTYPES2 will eventually be unified with ALL_TENSORTYPES
+# when bfloat16 bringup is complete on all platforms
+if TEST_WITH_ROCM:
+    ALL_TENSORTYPES2 = [torch.float,
+                        torch.double,
+                        torch.half,
+                        torch.bfloat16]
+else:
+    ALL_TENSORTYPES2 = ALL_TENSORTYPES
 
 def skipIfRocm(fn):
     @wraps(fn)
@@ -590,7 +603,7 @@ class TestCase(expecttest.TestCase):
         # the import below may initialize CUDA context, so we do it only if
         # self._do_cuda_memory_leak_check or self._do_cuda_non_default_stream
         # is True.
-        from common_cuda import TEST_CUDA
+        TEST_CUDA = torch.cuda.is_available()
         fullname = self.id().lower()  # class_name.method_name
         if TEST_CUDA and ('gpu' in fullname or 'cuda' in fullname):
             setattr(self, method_name, self.wrap_method_with_cuda_policy(test_method, policy))
@@ -1035,6 +1048,56 @@ class TestCase(expecttest.TestCase):
         assertNotRegex = unittest.TestCase.assertNotRegexpMatches
 
 
+class VerboseTestCase(TestCase):
+
+    def __init__(self, method_name='runTest'):
+        super(TestCase, self).__init__(method_name)
+
+    def is_dnnl_verbose(self, line):
+        tokens = line.strip().split(',')
+        return tokens[0] == 'dnnl_verbose' and len(tokens) == 11
+
+    def is_dnnl_reorder(self, line):
+        assert self.is_dnnl_verbose(line)
+        return line.strip().split(',')[3] == 'reorder'
+
+    def get_reorder_info(self, line):
+        assert self.is_dnnl_reorder(line)
+        tokens = line.split(',')
+        src_desc, dst_desc = tokens[6].split(' ')
+        src_dtype = src_desc.split('::')[0].split('-')
+        src_format = src_desc.split('::')[1]
+        dst_dtype = dst_desc.split('::')[0].split('-')
+        dst_format = dst_desc.split('::')[1]
+        return src_dtype, src_format, dst_dtype, dst_format
+
+    def ReorderForPack(self, line):
+        if not self.is_dnnl_reorder(line):
+            return False
+        src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
+        return src_dtype == dst_dtype
+
+    def OnlyReorderDtype(self, line):
+        if not self.is_dnnl_reorder(line):
+            return False
+        src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
+        return src_dtype != dst_dtype and src_format == dst_dtype
+        
+    def OnlyReorderFormat(self, line):
+        if not self.is_dnnl_reorder(line):
+            return False
+        src_dtype, src_format, dst_dtype, dst_format = self.get_reorder_info(line)
+        return src_dtype == dst_dtype and src_format != dst_dtype
+
+    def assertOnlyReorderDtype(self, line):
+        assert OnlyReorderDtype(line), 'the verbose msg shows not only reorder dtype'
+        
+    def assertOnlyReorderFormat(self, line):
+        assert OnlyReorderFormat(line), 'the verbose msg shows not only reorder format'
+
+    def assertNotReorder(self, line):
+        assert not is_dnnl_reorder(line)
+
 def download_file(url, binary=True):
     if sys.version_info < (3,):
         from urlparse import urlsplit
@@ -1331,3 +1394,25 @@ def load_tests(loader, tests, pattern):
             check_test_defined_in_running_script(test)
             test_suite.addTest(test)
     return test_suite
+
+def _assertGradAndGradgradChecks(test_case, apply_fn, inputs):
+    # call assert function rather than returning a bool since it's nicer
+    # if we get whether this failed on the gradcheck or the gradgradcheck.
+    test_case.assertTrue(gradcheck(apply_fn, inputs))
+    test_case.assertTrue(gradgradcheck(apply_fn, inputs))
+
+    # Using @precisionOverride specific to your test is the recommended way
+# of doing this. These are just some values that worked for test_nn.
+dtype2prec_DONTUSE = {torch.float: 1e-5,
+                      torch.double: 1e-5,
+                      torch.half: 1e-2,
+                      torch.bfloat16: 1e-1}
+
+# using data to do calibration for model and saving int8 configs at dir
+def  int8_calibration(model, data, dir):
+    conf = ipex.AmpConf(torch.int8)
+    with torch.no_grad():
+        for x in data:
+            with ipex.AutoMixPrecision(conf, running_mode="calibration"):
+                model(x)
+    conf.save(dir)

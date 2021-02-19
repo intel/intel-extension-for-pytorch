@@ -12,6 +12,7 @@ import json
 from common.codegen import write_or_skip
 from common.cpp_sig_parser import CPPSig
 from common.aten_sig_parser import AtenSig
+import common.utils as utils
 
 _FN_BYPASS_REGEX = [
     # ATEN CUDA functions
@@ -22,9 +23,9 @@ _FN_BYPASS_REGEX = [
 ]
 
 _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
-    # 'aten::add.Tensor(Tensor self, Tensor other, *, Scalar alpha=1) -> Tensor',
-    # 'aten::add_.Tensor(Tensor(a!) self, Tensor other, *, Scalar alpha=1) -> Tensor(a!)',
-    # 'aten::add.out(Tensor self, Tensor other, *, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)',
+    'aten::add.Tensor(Tensor self, Tensor other, *, Scalar alpha=1) -> Tensor',
+    'aten::add_.Tensor(Tensor(a!) self, Tensor other, *, Scalar alpha=1) -> Tensor(a!)',
+    'aten::add.out(Tensor self, Tensor other, *, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)',
     'aten::mul.Tensor(Tensor self, Tensor other) -> Tensor',
     'aten::mul_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)',
     'aten::mul.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)',
@@ -40,9 +41,14 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::threshold_backward(Tensor grad_output, Tensor self, Scalar threshold) -> Tensor',
     'aten::_softmax(Tensor self, int dim, bool half_to_float) -> Tensor',
     'aten::_softmax_backward_data(Tensor grad_output, Tensor output, int dim, Tensor self) -> Tensor',
+    'aten::_log_softmax(Tensor self, int dim, bool half_to_float) -> Tensor',
+    'aten::_log_softmax_backward_data(Tensor grad_output, Tensor output, int dim, Tensor self) -> Tensor',
     'aten::sigmoid(Tensor self) -> Tensor',
     'aten::sigmoid_(Tensor(a!) self) -> Tensor(a!)',
     'aten::sigmoid_backward(Tensor grad_output, Tensor output) -> Tensor',
+    'aten::tanh(Tensor self) -> Tensor',
+    'aten::tanh_(Tensor(a!) self) -> Tensor(a!)',
+    'aten::tanh_backward(Tensor grad_output, Tensor output) -> Tensor',
     'aten::transpose.int(Tensor(a) self, int dim0, int dim1) -> Tensor(a)',
     'aten::cat.out(Tensor[] tensors, int dim=0, *, Tensor(a!) out) -> Tensor(a!)',
     'aten::cat(Tensor[] tensors, int dim=0) -> Tensor',
@@ -63,7 +69,54 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::addbmm.out(Tensor self, Tensor batch1, Tensor batch2, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)',
     'aten::convolution_overrideable(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups) -> Tensor',
     'aten::convolution_backward_overrideable(Tensor grad_output, Tensor input, Tensor weight, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool[3] output_mask) -> (Tensor grad_input, Tensor grad_weight, Tensor grad_bias)',
+    'aten::size.int(Tensor self, int dim) -> int',
     'aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor',
+    'aten::gelu(Tensor self) -> Tensor',
+    'aten::gelu_backward(Tensor grad, Tensor self) -> Tensor',
+    'aten::slice.Tensor(Tensor(a) self, int dim=0, int start=0, int end=9223372036854775807, int step=1) -> Tensor(a)',
+    'aten::select.int(Tensor(a) self, int dim, int index) -> Tensor(a)',
+    'aten::select.Dimname(Tensor(a) self, Dimname dim, int index) -> Tensor(a)',
+    'aten::unbind.int(Tensor(a) self, int dim=0) -> Tensor(a)[]',
+    'aten::unbind.Dimname(Tensor(a) self, Dimname dim) -> Tensor(a)[]',
+    'aten::view(Tensor(a) self, int[] size) -> Tensor(a)',
+    'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
+    'aten::index.Tensor(Tensor self, Tensor?[] indices) -> Tensor',
+    'aten::_unsafe_view(Tensor self, int[] size) -> Tensor',
+    'aten::native_layer_norm(Tensor input, Tensor? weight, Tensor? bias, int M, int N, float eps) -> (Tensor, Tensor, Tensor)',
+    'aten::native_layer_norm_backward(Tensor grad_out, Tensor input, Tensor mean, Tensor rstd, Tensor? weight, int M, int N, bool[3] output_mask) -> (Tensor, Tensor, Tensor)',
+    # 'aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)',
+    'aten::_pack_padded_sequence(Tensor input, Tensor lengths, bool batch_first) -> (Tensor, Tensor)',
+    'aten::upsample_nearest1d(Tensor self, int[1] output_size, float? scales=None) -> Tensor',
+    'aten::upsample_nearest1d_backward(Tensor grad_output, int[1] output_size, int[3] input_size, float? scales=None) -> Tensor',
+    'aten::upsample_nearest2d(Tensor self, int[2] output_size, float? scales_h=None, float? scales_w=None) -> Tensor',
+    'aten::upsample_nearest2d_backward(Tensor grad_output, int[2] output_size, int[4] input_size, float? scales_h=None, float? scales_w=None) -> Tensor',
+    'aten::upsample_nearest3d(Tensor self, int[3] output_size, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> Tensor',
+    'aten::upsample_nearest3d_backward(Tensor grad_output, int[3] output_size, int[5] input_size, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> Tensor',
+    'aten::upsample_linear1d(Tensor self, int[1] output_size, bool align_corners, float? scales=None) -> Tensor',
+    'aten::upsample_linear1d_backward(Tensor grad_output, int[1] output_size, int[3] input_size, bool align_corners, float? scales=None) -> Tensor',
+    'aten::upsample_bilinear2d(Tensor self, int[2] output_size, bool align_corners, float? scales_h=None, float? scales_w=None) -> Tensor',
+    'aten::upsample_bilinear2d_backward(Tensor grad_output, int[2] output_size, int[4] input_size, bool align_corners, float? scales_h=None, float? scales_w=None) -> Tensor',
+    'aten::upsample_trilinear3d(Tensor self, int[3] output_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> Tensor',
+    'aten::upsample_trilinear3d_backward(Tensor grad_output, int[3] output_size, int[5] input_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> Tensor',
+    'aten::unsqueeze(Tensor(a) self, int dim) -> Tensor(a)',
+    'aten::div.Tensor(Tensor self, Tensor other) -> Tensor',
+    'aten::div_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)',
+    'aten::div_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)',
+    'aten::div.Scalar(Tensor self, Scalar other) -> Tensor',
+    'aten::div.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)',
+    'aten::permute(Tensor(a) self, int[] dims) -> Tensor(a)',
+]
+
+_FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG = [
+    'aten::index_select(Tensor self, int dim, Tensor index) -> Tensor',
+    'aten::index.Tensor(Tensor self, Tensor?[] indices) -> Tensor',
+    # 'aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)',
+    'aten::_pack_padded_sequence(Tensor input, Tensor lengths, bool batch_first) -> (Tensor, Tensor)',
+    'aten::div.Tensor(Tensor self, Tensor other) -> Tensor',
+    'aten::div_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)',
+    'aten::div_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)',
+    'aten::div.Scalar(Tensor self, Scalar other) -> Tensor',
+    'aten::div.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)',
 ]
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
@@ -73,30 +126,14 @@ _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_VEC = 'shallowUpgradeToDPCPPTensorVec'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_A = 'shallowUpgradeToDPCPPTensorA'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_AW = 'shallowUpgradeToDPCPPTensorAW'
 
-_TYPE_NSMAP = {
-    'Tensor': 'at::Tensor', # Cover TensorList, TensorOptions and Tensor
-    'Scalar': 'at::Scalar', # Cover ScalarType and Scalar
-    'Storage': 'at::Storage',
-    'IntList': 'at::IntList',
-    'IntArrayRef': 'at::IntArrayRef',
-    'Generator': 'at::Generator',
-    'SparseTensorRef': 'at::SparseTensorRef',
-    'Device': 'c10::Device',
-    'optional': 'c10::optional',
-    'MemoryFormat': 'at::MemoryFormat',
-    'QScheme': 'at::QScheme',
-    'ConstQuantizerPtr': 'at::ConstQuantizerPtr',
-    'Dimname': 'at::Dimname',  # Cover DimnameList and Dimname
-}
-
 _REG_PATTERN =  """
-    .op(torch::RegisterOperators::options().schema("{}")
-      .impl_unboxedOnlyKernel<{}, &{}>(at::DispatchKey::DPCPPTensorId)
-      .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))"""
+    m.impl_UNBOXED("{}", static_cast<{}>(&{}));"""
 
 _REG_BLOCK = """
 namespace {{
-  static auto dispatch = torch::RegisterOperators(){reg_ops};
+  TORCH_LIBRARY_IMPL(aten, XPU, m) {{
+    {reg_ops}
+  }}
 }}"""
 
 _H_HEADER = """// Autogenerated file by {gen}. Do not edit directly!
@@ -122,9 +159,14 @@ _CPP_HEADER = """// Autogenerated file by {gen}. Do not edit directly!
 
 #include <ATen/Context.h>
 #include <ATen/core/op_registration/op_registration.h>
-#include <ATen/CPUGenerator.h>
+#include <ATen/CPUGeneratorImpl.h>
+#include <ATen/record_function.h>
+#include <c10/core/Layout.h>
+#include <c10/util/ArrayRef.h>
 #include <c10/util/Exception.h>
 #include <c10/util/Logging.h>
+#include <torch/csrc/autograd/function.h>
+#include <torch/library.h>
 
 #include "aten_ipex_bridge.h"
 #include "utils.h"
@@ -176,6 +218,13 @@ class DenseOPCodeGen(object):
     def is_dnnl_func(self, simple_aten_sig):
         stripped_str = simple_aten_sig.replace(' ', '')
         for item in _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG:
+            if stripped_str == item.replace(' ', ''):
+                return True
+        return False
+
+    def is_ipex_func(self, simple_aten_sig):
+        stripped_str = simple_aten_sig.replace(' ', '')
+        for item in _FN_IPEX_FUNCS_WITH_SIMPLE_ATEN_SIG:
             if stripped_str == item.replace(' ', ''):
                 return True
         return False
@@ -239,35 +288,22 @@ class DenseOPCodeGen(object):
         return alias_tensors[idx]
 
     def get_ret_type_str(self, cpp_func_str):
-        for key in _TYPE_NSMAP:
-            cpp_func_str = cpp_func_str.replace(key, _TYPE_NSMAP[key])
+        cpp_func_str = utils.add_ns(cpp_func_str)
 
         m = re.search(r'(.*) (\b\S*)\(', cpp_func_str)
         assert m
         return m.group(1)
 
     def get_func_dec(self, cpp_sig):
-        ret_params = cpp_sig.ret_params
-        assert len(cpp_sig.ret_params) == 1
-        assert cpp_sig.ret_params[0].core_type_temp_ins != ''
-        input_params_type = [input_param.core_type_temp_ins for input_param in cpp_sig.input_params]
-        func_dec_str = ret_params[0].core_type_temp_ins +  '(' + ", ".join(input_params_type) + ')'
-        for key in _TYPE_NSMAP:
-            func_dec_str = func_dec_str.replace(key, _TYPE_NSMAP[key])
-        return func_dec_str
+        func_dec_str = cpp_sig.sig_str.replace(cpp_sig.def_name + '(', ' (*)(')
+        return utils.add_ns(func_dec_str)
 
-    def gen_func_signature(self, cpp_func_str):
-        cpp_func_str_h = cpp_func_str
-        for key in _TYPE_NSMAP:
-            cpp_func_str_h = cpp_func_str_h.replace(key, _TYPE_NSMAP[key])
+    def gen_func_signature(self, cpp_func_str, old_func_name, new_func_name):
+        cpp_func_str_h = utils.add_ns(cpp_func_str.replace(old_func_name + '(', new_func_name + '('))
+        func_name_with_ns = "{}::{}".format(_IPEX_OP_FUNC_NS, new_func_name)
+        cpp_func_str_cpp = cpp_func_str_h.replace(new_func_name + '(', func_name_with_ns + '(')
 
-        m = re.search(r'(\b\S*)\(', cpp_func_str_h)
-        assert m
-        orig_func_name = m.group(1)
-        func_name_with_ns = "{}::{}".format(_IPEX_OP_FUNC_NS, orig_func_name)
-        cpp_func_str_cpp = cpp_func_str_h.replace(orig_func_name + '(', func_name_with_ns + '(')
-
-        return (cpp_func_str_h, cpp_func_str_cpp)
+        return cpp_func_str_h, cpp_func_str_cpp
 
     def gen_dnnl_code(self, cpp_sig, aten_func_sig_str):
         code = ''
@@ -282,37 +318,53 @@ class DenseOPCodeGen(object):
         dnnl_tensor_param_vars = []
         for param in cpp_sig.input_params:
             if param.core_type == 'Tensor':
-                dnnl_tensor_param_vars.append(param.name)
-            param_vars.append(param.name)
+                dnnl_tensor_param_vars.append(param)
+
+            if param.core_type == 'Tensor' and param.is_optional:
+                param_vars.append("{}.has_value() ? {}.value() : at::Tensor()".format(param.name, param.name))
+            else:
+                param_vars.append(param.name)
 
         code += '  try {\n'
 
         code += '    if (check_auto_dnnl()) {\n'
-        code += '      std::vector<at::Tensor> dnnl_input_tensors;\n'
-        if len(dnnl_tensor_param_vars) > 0:
-            for dnnl_tensor_param_var in dnnl_tensor_param_vars:
-                code += '      dnnl_input_tensors.push_back({});\n'.format(dnnl_tensor_param_var)
+
+        if not self.is_ipex_func(aten_func_sig_str):
+            # There are two different kind of DevOPs in IPEX
+            #    1. DNNL Operator
+            #    2. CPU BF16/INT8 Operator in Vanilla PyTorch. IPEX itegrates this kind of operators in IPEX for
+            #       mixture precision.
+            # For the type 2, IPEX does not need to check if DNNL supports these tensors.
+            code += '      std::vector<at::Tensor> dnnl_input_tensors;\n'
+            if len(dnnl_tensor_param_vars) > 0:
+                for dnnl_tensor_param_var in dnnl_tensor_param_vars:
+                    if dnnl_tensor_param_var.is_optional:
+                        code += '      if ({}.has_value()) dnnl_input_tensors.push_back({}.value());\n'.format(dnnl_tensor_param_var.name, dnnl_tensor_param_var.name)
+                    else:
+                        code += '      dnnl_input_tensors.push_back({});\n'.format(dnnl_tensor_param_var.name)
 
         fname = cpp_sig.def_name
         if fname.endswith('_'):
             assert len(dnnl_tensor_param_vars) > 0
-            code += '      if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors))\n'
-            code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(list(param_vars)))
+            if self.is_ipex_func(aten_func_sig_str):
+                code += self.gen_ipex_func_code(fname, param_vars)
+            else:
+                code += '      if (dbl::chk::dnnl_inplace_support_the_tensors(dnnl_input_tensors)) {\n'
+                code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(list(param_vars)))
+                code += '      }\n' # Check support tensors
         else:
             param_seq_str_vec = []
             for param_var in param_vars:
                 param_seq_str = param_var
-                if param_var in dnnl_tensor_param_vars:
-                    if param_var == 'out' and is_out_func(fname):
-                        code += '      TORCH_INTERNAL_ASSERT_DEBUG_ONLY({}.is_contiguous());\n'.format(param_var)
-                    else:
-                        param_seq_str = '{}.is_contiguous() ? {} : {}.contiguous()'.format(param_var, param_var, param_var)
                 param_seq_str_vec.append(param_seq_str)
-            code += '      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors))\n'
-            code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))
 
-        code += '    }\n'
-
+            if self.is_ipex_func(aten_func_sig_str):
+                code += self.gen_ipex_func_code(fname, param_seq_str_vec)
+            else:
+                code += '      if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {\n'
+                code += '        return AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_seq_str_vec))
+                code += '      }\n' # Check support tensors
+        code += '    }\n' # Check auto dnnl
         code += '  } catch (std::exception& e) {\n'
         code += '#if defined(_DEBUG)\n'
         code += '    TORCH_WARN(e.what());\n'
@@ -320,6 +372,16 @@ class DenseOPCodeGen(object):
         code += '  }\n\n'
 
 
+        return code
+
+    def gen_ipex_func_code(self, fname, param_vars):
+        code = ''
+        code += '        auto _result = AtenIpexCPUDev::dil_{}({});\n'.format(fname, ', '.join(param_vars))
+        code += '        if (is_ipex_func_success()) {\n'
+        code += '          return _result;\n'
+        code += '        } else {\n'
+        code += '          reset_ipex_func_status();\n'
+        code += '        }\n'
         return code
 
     def gen_fallback_prepare_code(self, cpp_sig):
@@ -333,11 +395,11 @@ class DenseOPCodeGen(object):
             elif param.core_type == 'TensorOptions':
                 ipex_name = '_ipex_{}'.format(param.name)
                 param.ipex_name = ipex_name
-                check_cond = '{}.device().type() == at::DeviceType::DPCPP'.format(param.name)
+                check_cond = '{}.device().type() == at::DeviceType::XPU'.format(param.name)
                 op_check_code += '  TORCH_INTERNAL_ASSERT_DEBUG_ONLY({});\n'.format(check_cond)
                 code += '  at::TensorOptions {} = {}.device(at::DeviceType::CPU);\n'.format(ipex_name, param.name)
             elif param.core_type == 'Storage':
-                code += '  TORCH_INTERNAL_ASSERT_DEBUG_ONLY({}.device_type() == c10::DeviceType::DPCPP);\n'.format(param.name)
+                code += '  TORCH_INTERNAL_ASSERT_DEBUG_ONLY({}.device_type() == c10::DeviceType::XPU);\n'.format(param.name)
             elif param.core_type == 'MemoryFormat':
                 if param.is_optional:
                     check_cond = '{}.value_or(c10::MemoryFormat::Contiguous) != c10::MemoryFormat::Contiguous'.format(param.name)
@@ -351,9 +413,20 @@ class DenseOPCodeGen(object):
             else:
                 assert param.core_type == 'Tensor'
                 ipex_name = '_ipex_{}'.format(param.name)
-                check_cond = '{}.layout() == c10::kStrided'.format(param.name)
+                check_cond = ''
+                if param.is_optional:
+                    check_cond = '(!({}.has_value())) || ({}->layout() == c10::kStrided)'.format(param.name, param.name)
+                else:
+                    check_cond = '{}.layout() == c10::kStrided'.format(param.name)
                 op_check_code += '  TORCH_INTERNAL_ASSERT_DEBUG_ONLY({});\n'.format(check_cond)
-                code += '  auto&& {} = bridge::{}({});\n'.format(ipex_name, _SHALLOW_FALLBACK_TO_CPU_TENSOR, param.name)
+
+                if param.is_optional:
+                    code += '  auto&& {} = c10::optional<at::Tensor>();\n'.format(ipex_name)
+                    code += '  if ({}.has_value()) {{\n'.format(param.name)
+                    code += '    {} = c10::optional<at::Tensor>(bridge::{}({}.value()));\n'.format(ipex_name, _SHALLOW_FALLBACK_TO_CPU_TENSOR, param.name)
+                    code += '  }\n'
+                else:
+                    code += '  auto&& {} = bridge::{}({});\n'.format(ipex_name, _SHALLOW_FALLBACK_TO_CPU_TENSOR, param.name)
                 param.ipex_name = ipex_name
         return op_check_code + code
 
@@ -364,18 +437,31 @@ class DenseOPCodeGen(object):
             assert param.name
         params_name = [param.ipex_name if param.ipex_name != '' else param.name for param in cpp_sig.input_params]
 
+        code = ''
+        # Wrap the input parameters as tensor option
+        start_idx, end_idx = utils.query_tensor_options(cpp_sig.input_params)
+        if start_idx >= 0 and end_idx > start_idx:
+            # assert bool((end_idx - start_idx + 1) == 4)
+            wrapped_options = 'ipex_wrapped_options'
+            code += '  auto&& {} = at::TensorOptions().dtype(dtype).device(at::DeviceType::CPU).layout(layout).pinned_memory(pin_memory);\n'
+            code = code.format(wrapped_options)
+            # Remove original param name
+            params_name = params_name[:start_idx] + [wrapped_options] + params_name[end_idx + 1:]
+
         if self.is_tensor_member_function(func_name):
             assert "_ipex_self" in params_name
             params_name.remove('_ipex_self')
             if self.is_void_func(cpp_sig):
-                return '  {}.{}({});\n'.format('_ipex_self', cpp_sig.def_name, ', '.join(params_name))
+                code += '  {}.{}({});\n'.format('_ipex_self', cpp_sig.def_name, ', '.join(params_name))
             else:
-                return '  auto&& {} = {}.{}({});\n'.format(_RESULT_NAME, '_ipex_self', cpp_sig.def_name, ', '.join(params_name))
+                code += '  auto&& {} = {}.{}({});\n'.format(_RESULT_NAME, '_ipex_self', cpp_sig.def_name, ', '.join(params_name))
         else:
             if self.is_void_func(cpp_sig):
-                return '  at::{}({});\n'.format(cpp_sig.def_name, ', '.join(params_name))
+                code += '  at::{}({});\n'.format(cpp_sig.def_name, ', '.join(params_name))
             else:
-                return '  auto&& {} = at::{}({});\n'.format(_RESULT_NAME, cpp_sig.def_name, ', '.join(params_name))
+                code += '  auto&& {} = at::{}({});\n'.format(_RESULT_NAME, cpp_sig.def_name, ', '.join(params_name))
+
+        return code
 
     def gen_fallback_post_code(self, cpp_sig):
         code = ''
@@ -477,15 +563,32 @@ class DenseOPCodeGen(object):
             return fname in ['convolution_overrideable', 'convolution_backward_overrideable']
 
         func_defs = []
-        for cpp_sig, _, cpp_func_sig_str, aten_func_sig_str in self._sigs:
-            cpp_func_str_h, cpp_func_str_cpp = self.gen_func_signature(cpp_func_sig_str)
+        for cpp_sig, aten_sig, cpp_func_sig_str, aten_func_sig_str in self._sigs:
+            # The operator name should be unique because the new registration mechanism of PyTorch 1.7
+            new_cpp_func_name = aten_sig.def_name.replace('.', '_')
+            cpp_func_str_h, cpp_func_str_cpp = self.gen_func_signature(cpp_func_sig_str, cpp_sig.def_name, new_cpp_func_name)
+
             # Gen declaration code for head file
             func_dec = self.gen_head_dec_code(cpp_func_str_h)
 
-            func_reg = _REG_PATTERN.format(aten_func_sig_str, self.get_func_dec(cpp_sig), "AtenIpexCPUDefault::" + cpp_sig.def_name)
+            func_reg = _REG_PATTERN.format(aten_sig.def_name, self.get_func_dec(cpp_sig), _IPEX_OP_FUNC_NS + "::" + new_cpp_func_name)
 
             # Gen definition code for cpp file
             code = '{} {{\n'.format(cpp_func_str_cpp)
+
+            # Gen OP Name
+            code += '#if defined(IPEX_DISP_OP)\n'
+            code += '  printf("{}::{}\\n");\n'.format(_IPEX_OP_FUNC_NS, cpp_sig.def_name)
+            code += '#endif\n'
+
+            # Gen profile info
+            profiler_inputs = []
+            for param in cpp_sig.input_params:
+                if param.core_type in ['Tensor', 'Scalar']:
+                    profiler_inputs.append(param.name)
+            code += '#if defined(IPEX_PROFILE_OP)\n'
+            code += '  RECORD_FUNCTION("{ns}::{name}", std::vector<c10::IValue>({{{input_names}}}));\n'.format(ns=_IPEX_OP_FUNC_NS, name=cpp_sig.def_name, input_names=', '.join(profiler_inputs))
+            code += '#endif\n'
 
             if is_conv_overrideable_func(cpp_sig.def_name):
                 code += '  return AtenIpexCPUDev::dil_{}({});\n'.format(cpp_sig.def_name, ', '.join([param.name for param in cpp_sig.input_params]))

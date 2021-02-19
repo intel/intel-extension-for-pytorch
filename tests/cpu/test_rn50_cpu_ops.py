@@ -20,23 +20,23 @@ Copyright (c) 2016-present, Facebook Inc. All rights reserved.
 
 All contributions by Facebook:
 Copyright (c) 2016 Facebook Inc.
- 
+
 All contributions by Google:
 Copyright (c) 2015 Google Inc.
 All rights reserved.
- 
+
 All contributions by Yangqing Jia:
 Copyright (c) 2015 Yangqing Jia
 All rights reserved.
- 
+
 All contributions from Caffe:
 Copyright(c) 2013, 2014, 2015, the respective contributors
 All rights reserved.
- 
+
 All other contributions:
 Copyright(c) 2015, 2016 the respective contributors
 All rights reserved.
- 
+
 Caffe2 uses a copyright model similar to Caffe: each contributor holds
 copyright over their contributions to Caffe2. The project versioning records
 all such contribution and copyright details. If a contributor wants to further
@@ -55,8 +55,8 @@ import unittest
 from functools import reduce
 
 import torch
-import _torch_ipex as ipex
-import intel_pytorch_extension
+import intel_pytorch_extension as ipex
+from common_ipex_conf import AutoMixPrecision, AutoDNNL
 
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -78,7 +78,7 @@ def _assertGradAndGradgradChecks(test_case, apply_fn, inputs):
     test_case.assertTrue(gradcheck(apply_fn, inputs))
     test_case.assertTrue(gradgradcheck(apply_fn, inputs))
 
-device = 'dpcpp:0'
+device = ipex.DEVICE
 #device = 'cpu:0'
 SIZE = 100
 
@@ -326,6 +326,54 @@ class TestOP(TestCase):
         self.assertEqual(a1 * a2, torch.tensor([0.11, 0.01], device=device))
         self.assertEqual(a1.mul(a2), a1 * a2)
 
+        with AutoDNNL(True):
+            a1 = torch.randn((1, 1, 3, 2), device=device)
+            a2 = torch.randn((3, 2), device=device)
+            res1 = torch.mul(a1, a2)
+            self.assertTrue(ipex.core.is_dil_tensor(res1))
+            with AutoDNNL(False):
+                a1 = a1.to(device='cpu')
+                a2 = a2.to(device='cpu')
+                res2 = torch.mul(a1, a2)
+                self.assertEqual(res1.to('cpu'), res2)
+
+        with AutoDNNL(True):
+            a1_ipex = torch.randn((1, 2, 4, 6), device=device)
+            a2_ipex = torch.randn((1, 4, 6), device=device)
+            a1_cpu = a1_ipex.to('cpu')
+            a2_cpu = a2_ipex.to('cpu')
+            a1_ipex.mul_(a2_ipex)
+            a1_cpu.mul_(a2_cpu)
+            self.assertEqual(a1_ipex.to('cpu'), a1_cpu)
+
+        with AutoDNNL(True):
+            a1 = torch.randn((1, 2, 3, 2), device=device)
+            a2 = torch.randn((1, 3, 2), device=device)
+            res1 = torch.mul(a1, a2)
+            self.assertTrue(ipex.core.is_dil_tensor(res1))
+            with AutoDNNL(False):
+                a1 = a1.to(device='cpu')
+                a2 = a2.to(device='cpu')
+                res2 = torch.mul(a1, a2)
+                self.assertEqual(res1.to('cpu'), res2)
+
+        with AutoDNNL(True):
+            a1 = torch.randn((1, 2, 3, 2), device=device)
+            a2 = torch.randn((1, 2), device=device)
+            res1 = torch.mul(a1, a2)
+            self.assertTrue(ipex.core.is_dil_tensor(res1))
+            with AutoDNNL(False):
+                a1 = a1.to(device='cpu')
+                a2 = a2.to(device='cpu')
+                res2 = torch.mul(a1, a2)
+                self.assertEqual(res1.to('cpu'), res2)
+
+        with AutoDNNL(True):
+            a1 = torch.randn((1, 2, 3, 2), device=device)
+            a2 = torch.randn((2), device=device)
+            res1 = torch.mul(a1, a2)
+            self.assertTrue(ipex.core.is_dil_tensor(res1))
+
     def test_div(self):
         a1 = torch.tensor([4.2, 6.2], device=device)
         a2 = torch.tensor([2., 2.], device=device)
@@ -417,8 +465,8 @@ class TestOP(TestCase):
         self.assertRaises(RuntimeError, lambda: tensor.view(15, -1, -1))
 
         # TODO(Eikan): DNNL OP does not support >6 dim tensor, so we disable it temporily. When we fix it, we will open it
-        old_dnnl_conf = ipex.get_auto_dnnl()
-        ipex.disable_auto_dnnl()
+        old_dnnl_conf = ipex.core.get_auto_dnnl()
+        ipex.core.disable_auto_dnnl()
         # test view when tensor is not contiguous in every dimension, but only
         # contiguous dimensions are touched.
         tensor = torch.rand(4, 2, 5, 1, 6, 2, 9, 3, device=device).transpose(-1, 2).transpose(-2, 3)
@@ -445,9 +493,9 @@ class TestOP(TestCase):
         view_size = [1, 1, 2, 1, 4, 3, 1, 1, 9, 1, 2, 1, 2, 3, 1, 5, 1, 1]
         self.assertEqual(tensor.view(*view_size), contig_tensor.view(*view_size))
         if old_dnnl_conf:
-            ipex.enable_auto_dnnl()
+            ipex.core.enable_auto_dnnl()
         else:
-            ipex.disable_auto_dnnl()
+            ipex.core.disable_auto_dnnl()
 
         # invalid views
         self.assertRaises(RuntimeError, lambda: tensor.view(-1))
@@ -653,23 +701,23 @@ class TestOP(TestCase):
                 self.assertIsNot(t, t.to(device, t.dtype, non_blocking=non_blocking, copy=True))
 
         a = torch.tensor(5, device='cpu')
-        b = a.to('dpcpp:0')
+        b = a.to(ipex.DEVICE)
         a_clone = a.clone().view(a.numel())
         b_clone = b.clone().view(b.numel())
         self.assertEqual(a.size(), b.size())
         for i in range(0, b.numel()):
             assert (a_clone[i] == b_clone[i])
 
-        a = torch.tensor(5, device='dpcpp:0')
-        self.assertEqual(a.device, a.to('dpcpp:0').device)
+        a = torch.tensor(5, device=ipex.DEVICE)
+        self.assertEqual(a.device, a.to(ipex.DEVICE).device)
 
     def test_index(self):
         s = [2, 3, 1, 8]
         a = torch.randn(3, 10, device='cpu')
-        b = a.to('dpcpp:0')
-        self.assertEqual(a[:, s].to('dpcpp:0'), b[:, s])
-        self.assertEqual(a[1:, s].to('dpcpp:0'), b[1:, s])
-        self.assertEqual(a[:1, s].to('dpcpp:0'), b[:1, s])
+        b = a.to(ipex.DEVICE)
+        self.assertEqual(a[:, s].to(ipex.DEVICE), b[:, s])
+        self.assertEqual(a[1:, s].to(ipex.DEVICE), b[1:, s])
+        self.assertEqual(a[:1, s].to(ipex.DEVICE), b[:1, s])
 
     def test_addmm(self):
         M_cpu = torch.randn(10, 25, requires_grad=True)
@@ -753,7 +801,7 @@ class TestBN(TestCase):
         running_var = torch.rand(10, device=device)
         res1 = F.batch_norm(input, torch.rand(10, device=device), running_var)
 
-        device = 'dpcpp:0'
+        device = ipex.DEVICE
         torch.manual_seed(123)
         input = torch.rand(2, 10, device=device)
         running_var = torch.rand(10, device=device)
@@ -828,6 +876,7 @@ class TestAvgMaxPool(TestCase):
         self.assertRaisesRegex(RuntimeError, "divisor must be not zero",
                                lambda: torch.nn.functional.avg_pool3d(torch.zeros(3, 3, 3, 3), (2, 2, 2), divisor_override=0))
 
+    @unittest.expectedFailure
     def test_max_pool_nan(self):
         for adaptive in ['', 'adaptive_']:
             for num_dim in [1, 2, 3]:
@@ -871,7 +920,7 @@ class TestConv(TestCase):
     def run_conv_double_back_test(self, kern, stride, padding, chan_in, chan_out, batch_size,
                                   inp_size, dilation, no_weight, groups=1, use_cuda=False,
                                   use_bias=True, dtype=torch.double):
-        device = torch.device("dpcpp:0")
+        device = torch.device(device)
         x = torch.randn(batch_size, chan_in, inp_size, inp_size, device=device,
                         dtype=dtype, requires_grad=True)
         weight = torch.randn(chan_out, chan_in // groups, kern, kern, device=device,
@@ -949,5 +998,4 @@ class TestConv(TestCase):
         self.assertEqual(inputs_dpcpp.grad.to('cpu'), inputs_cpu.grad, prec=1e-4)
 
 if __name__ == '__main__':
-    ipex.enable_auto_dnnl()
     test = unittest.main()

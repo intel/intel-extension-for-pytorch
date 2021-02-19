@@ -1,8 +1,11 @@
 #include "torch_ipex/csrc/ipex_tensor_impl.h"
 
+#include <ATen/TensorUtils.h>
+
 #include <c10/core/ScalarType.h>
 #include <c10/core/impl/DeviceGuardImplInterface.h>
 #include <c10/macros/Macros.h>
+#include <torch/csrc/autograd/variable.h>
 
 #include "utils.h"
 
@@ -10,10 +13,10 @@ namespace torch_ipex {
 
 namespace {
 
-thread_local c10::Device g_current_device(at::DeviceType::DPCPP, 0);
+thread_local c10::Device g_current_device(at::DeviceType::XPU, 0);
 
 struct IPEXGuardImpl : public c10::impl::DeviceGuardImplInterface {
-  at::DeviceType type() const override { return at::DeviceType::DPCPP; }
+  at::DeviceType type() const override { return at::DeviceType::XPU; }
 
   c10::Device exchangeDevice(c10::Device device) const override {
     std::swap(g_current_device, device);
@@ -45,24 +48,15 @@ struct IPEXGuardImpl : public c10::impl::DeviceGuardImplInterface {
   }
 };
 
-C10_REGISTER_GUARD_IMPL(DPCPP, IPEXGuardImpl);
+C10_REGISTER_GUARD_IMPL(XPU, IPEXGuardImpl);
 
 }  // namespace
 
-
-IPEXTensorImpl::IPEXTensorImpl(at::Tensor tensor, at::Storage storage, at::DispatchKey type_id) :
-    c10::TensorImpl(std::move(storage), type_id),
-    m_src_data_tensor(std::move(tensor)) {}
-
-IPEXTensorImpl::IPEXTensorImpl(at::Storage storage, at::DispatchKey type_id) :
-    c10::TensorImpl(std::move(storage), type_id) {}
+IPEXTensorImpl::IPEXTensorImpl(at::Storage storage, at::DispatchKey type_id, at::ScalarType dtype) :
+    c10::TensorImpl(std::move(storage), type_id, at::scalarTypeToTypeMeta(dtype)) {}
 
 IPEXTensorImpl::IPEXTensorImpl(at::DispatchKeySet type_set, const caffe2::TypeMeta& data_type, c10::optional<c10::Device> device_opt) :
     c10::TensorImpl(type_set, data_type, device_opt) {}
-
-void IPEXTensorImpl::set_dpcpp_tensor_id() {
-  this->key_set_.add(at::DispatchKey::VariableTensorId);
-}
 
 void IPEXTensorImpl::reset_data_type(at::ScalarType dst_type) {
   this->data_type_ = at::scalarTypeToTypeMeta(dst_type);
@@ -74,13 +68,34 @@ void IPEXTensorImpl::copy_auto_grad(c10::TensorImpl *src_impl) {
     return;
   }
 
-  if (! this->requires_grad())
-    this->set_requires_grad(true);
+  if (! this->requires_grad()){
+    auto cpu_autograd_meta = static_cast<torch::autograd::AutogradMeta*>(src_impl->autograd_meta());
+    if (cpu_autograd_meta->is_view_){
+      auto cpu_view_meta = static_cast<torch::autograd::DifferentiableViewMeta*>(src_impl->autograd_meta());
+      auto base = cpu_view_meta->base_;
+      auto creation_meta = cpu_view_meta->creation_meta;
+      auto has_view_fn = cpu_view_meta->has_view_fn();
+      this->set_autograd_meta(
+        std::make_unique<torch::autograd::DifferentiableViewMeta>(
+          this,
+          base,
+          has_view_fn ? cpu_view_meta->view_fn() : nullptr,
+          creation_meta
+        )
+      );
+    }
+    if (!this->autograd_meta()){
+      this->set_autograd_meta(std::make_unique<torch::autograd::AutogradMeta>());
+    }
+    auto ipex_autograd_meta = static_cast<torch::autograd::AutogradMeta*>(this->autograd_meta());
+    ipex_autograd_meta->grad_fn_ = cpu_autograd_meta->grad_fn_;
+    ipex_autograd_meta->requires_grad_ = cpu_autograd_meta->requires_grad_;
+  }
 
-  this->grad() = src_impl->grad();
+  this->mutable_grad() = src_impl->mutable_grad();
 }
 
-void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl) {
+void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl, bool keep_dtype) {
   // Port from copy_tensor_metadata of TensorImpl.cpp and bypass some fields: storage_, device_opt_, type_set_ and reserved_.
   // NOTE: All these fields is specifically ignored except reserved_. Because there is no public interface to access it. Tthe
   //       field may impact performance. Tensor resize will check the flag. "If tensor is reserved then don't claim its memeory
@@ -94,7 +109,8 @@ void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl) {
   this->sizes_ = src_impl->sizes();
   this->strides_ = src_impl->strides();
   this->storage_offset_ = src_impl->storage_offset();
-  this->data_type_ = src_impl->dtype();
+  if (!keep_dtype)
+    this->data_type_ = src_impl->dtype();
   this->is_contiguous_ = src_impl->is_contiguous();
   this->is_channels_last_contiguous_ = src_impl->is_contiguous(at::MemoryFormat::ChannelsLast);
   this->is_channels_last_ = src_impl->is_strides_like_channels_last();
@@ -102,7 +118,7 @@ void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl) {
   this->is_channels_last_3d_contiguous_ = src_impl->is_contiguous(at::MemoryFormat::ChannelsLast3d);
   this->is_non_overlapping_and_dense_ = src_impl->is_non_overlapping_and_dense();
   this->is_wrapped_number_ = src_impl->is_wrapped_number();
-  this->set_version_counter(src_impl->version_counter().current_version());
+  this->set_version_counter(src_impl->version_counter());
   bool allow_tensor_metadata_change_ = src_impl->allow_tensor_metadata_change();
   this->set_allow_tensor_metadata_change(allow_tensor_metadata_change_);
   if (src_impl->named_tensor_meta() != nullptr) {
@@ -115,43 +131,59 @@ static inline void checkInBoundsForStorage(
     at::IntArrayRef size,
     at::IntArrayRef stride,
     int64_t storage_offset,
-    const at::Storage& new_storage) {
-  // Port from setStrided in Aten/native/Resize.h
-  int64_t storage_size = at::detail::computeStorageSize(size, stride);
-  if (storage_size == 0) {
+    const caffe2::TypeMeta& data_type,
+    const at::Storage& new_storage,
+    int64_t padding_size = 0) {
+  int64_t storage_size_bytes =
+      at::detail::computeStorageNbytes(size, stride, data_type.itemsize());
+  int64_t storage_offset_bytes = storage_offset * data_type.itemsize();
+  if (storage_size_bytes == 0) {
     // NB: (a tensor with arbitrary 0 dims)'s storage can have any numel.
     return;
   }
-  int64_t new_storage_size = new_storage.numel();
+  int64_t new_storage_size_bytes = new_storage.nbytes();
   TORCH_CHECK(
-      storage_offset + storage_size <= new_storage_size,
-      "setStorage: sizes ", size, ", strides ", stride, ","
-      " and storage offset ", storage_offset,
-      " requiring a storage size of ", storage_size + storage_offset,
-      " are out of bounds for storage with numel ", new_storage_size);
+      storage_size_bytes + storage_offset_bytes <= new_storage_size_bytes + padding_size,
+      "setStorage: sizes ",
+      size,
+      ", strides ",
+      stride,
+      ","
+      ", padding_size ",
+      padding_size,
+      " storage offset ",
+      storage_offset,
+      ", and itemsize ",
+      data_type.itemsize(),
+      " requiring a storage size of ",
+      storage_size_bytes,
+      " are out of bounds for storage of size ",
+      new_storage_size_bytes);
 }
 
-void IPEXTensorImpl::force_set_strided(at::IntArrayRef size, at::IntArrayRef stride /*, optional<int64_t> storage_offset_*/) {
+void IPEXTensorImpl::set_strided(at::IntArrayRef size, at::IntArrayRef stride, int64_t storage_offset, at::ScalarType dtype, int64_t padding_size) {
   // Port from setStrided in Aten/native/Resize.h
-  checkInBoundsForStorage(size, stride, this->storage_offset(), this->storage());
-  
-  AT_ASSERT(size.size() == stride.size());
-  if (this->sizes() == size && this->strides() == stride) {
-    return;
-  }
+  checkInBoundsForStorage(size, stride, storage_offset_, at::scalarTypeToTypeMeta(dtype), this->storage(), padding_size);
 
   // In backprop phase, grad variable might be detached (in accumulate_grad.h)
   // and forbids the metadata to be modified.
   // Here we force the metadata changeable, so that we can modify its strides.
   bool orig_allow_tensor_metadata_change = this->allow_tensor_metadata_change();
   this->set_allow_tensor_metadata_change(true);
-  this->set_sizes_and_strides(size, stride);
-  this->set_allow_tensor_metadata_change(orig_allow_tensor_metadata_change);
-}
 
-// Keep data tensor in case the IPEXTensorImpl is shallow-copy from a stack variable.
-void IPEXTensorImpl::keep_source_data_tensor(at::Tensor data_tensor) {
-  this->m_src_data_tensor = data_tensor;
+  /* storage offset */
+  TORCH_CHECK(storage_offset >= 0, "Tensor: invalid storage offset ", storage_offset);
+  this->set_storage_offset(storage_offset);
+
+  /* size and stride */
+  AT_ASSERT(size.size() == stride.size());
+  if (this->sizes() == size && this->strides() == stride) {
+    return;
+  }
+  this->set_sizes_and_strides(size, stride);
+
+  // Restore allow_tensor_metadata_change
+  this->set_allow_tensor_metadata_change(orig_allow_tensor_metadata_change);
 }
 
 // The storage of tensor impl cannot be accessed out of TensorImpl class. So we need to expose an interface
@@ -179,7 +211,7 @@ void IPEXTensorImpl::CopyMetadata(c10::TensorImpl *dest_impl, const c10::TensorI
     dest_impl->set_wrapped_number(src_impl->is_wrapped_number());
   }
 
-  dest_impl->set_version_counter(src_impl->version_counter().current_version());
+  dest_impl->set_version_counter(src_impl->version_counter());
 
   bool allow_tensor_metadata_change_ = src_impl->allow_tensor_metadata_change();
   dest_impl->set_allow_tensor_metadata_change(allow_tensor_metadata_change_);

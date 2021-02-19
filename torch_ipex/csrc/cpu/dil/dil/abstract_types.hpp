@@ -37,6 +37,7 @@ using rnn_direction = dnnl::rnn_direction;
 using query = dnnl::query;
 using scale_t = std::vector<float>;
 using exec_args = std::unordered_map<int, memory>;
+using deleter_ptr = void (*)(void*);
 
 // for computation cache
 using key_t = std::string;

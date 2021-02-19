@@ -8,11 +8,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 SET(DNNL_BUILD_TESTS FALSE CACHE BOOL "" FORCE)
 SET(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "" FORCE)
 SET(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
-# SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
+SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/cpu")
 add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
-
+find_package(TorchCCL REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 FIND_PACKAGE(AVX)
@@ -28,6 +28,14 @@ IF(CMAKE_BUILD_TYPE MATCHES Debug)
 ELSE()
   message("Release build.")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -DNDEBUG")
+ENDIF()
+
+IF("${IPEX_DISP_OP}" STREQUAL "1")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIPEX_DISP_OP")
+ENDIF()
+
+IF("${IPEX_PROFILE_OP}" STREQUAL "1")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIPEX_PROFILE_OP")
 ENDIF()
 
 # ---[ Build flags
@@ -117,9 +125,15 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
 # includes
 
+# include mkl-dnn before PyTorch
+# Otherwise, path_to_pytorch/torch/include/dnnl.hpp will be used as the header
+include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
+include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
+
 # Set installed PyTorch dir
 if(DEFINED PYTORCH_INSTALL_DIR)
   include_directories(${PYTORCH_INSTALL_DIR}/include)
+  include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include/)
 else()
   message(FATAL_ERROR, "Cannot find installed PyTorch directory")
 endif()
@@ -128,9 +142,8 @@ include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
-include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
-include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
+include_directories(${TORCHCCL_INCLUDE_DIR})
 
 # sources
 set(DPCPP_SRCS)
@@ -159,7 +172,7 @@ set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP
 pybind11_add_module(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 target_link_libraries(${PLUGIN_NAME} PRIVATE ${DPCPP_THIRD_PARTY_ROOT}/xsmm/lib/libxsmm.a)
 
-link_directories(${PYTORCH_INSTALL_DIR}/lib)
+#link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libc10.so)
 
@@ -175,11 +188,12 @@ else()
   message(FATAL_ERROR "Unknown ATen parallel backend: ${ATEN_THREADING}")
 endif()
 
-target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl)
 add_dependencies(${PLUGIN_NAME} pybind11)
+add_dependencies(${PLUGIN_NAME} torch_ccl)
 add_dependencies(${PLUGIN_NAME} dnnl)
+target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl)
 add_dependencies(${PLUGIN_NAME} xsmm)
-
+target_link_libraries(${PLUGIN_NAME} PUBLIC torch_ccl)
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_python.so)
 target_link_libraries(${PLUGIN_NAME} PUBLIC ${PYTORCH_INSTALL_DIR}/lib/libtorch_cpu.so)

@@ -14,6 +14,206 @@ class tensor : public memory {
   using blocking_desc_t = dnnl_blocking_desc_t;
   using descriptor = tensor::desc; // for backward compatibility
 
+  struct desc_wrapper {
+    desc_wrapper(const dnnl_memory_desc_t *adata) : data(adata) {}
+
+    int get_ndims() const {
+      return is_grouped() ? data->ndims - 1 : data->ndims;
+    }
+
+    data_type get_data_type() const {
+      return static_cast<data_type>(data->data_type);
+    }
+
+    dim_t get_dim(int index) const {
+      if (!is_grouped()) {
+        if (index < 0 || index >= data->ndims) return static_cast<dim_t>(0);
+        return data->dims[index];
+      } else {
+        if (index < 0 || index >= data->ndims - 1) return static_cast<dim_t>(0);
+        return index == 0 ? data->dims[0] * data->dims[1] : data->dims[index + 1];
+      }
+    }
+
+    dims get_dims() const {
+      if (!is_grouped()) {
+        return dims(data->dims, data->dims + data->ndims);
+      } else {
+        auto ret = dims(data->dims + 1, data->dims + data->ndims);
+        ret[0] *= data->dims[0];  // g == data->dims[0]
+        return ret;
+      }
+    }
+
+    dims get_strides() const {
+      const auto& strides = blocking_strides();
+      if (!is_grouped()) {
+        return dims(strides, strides + data->ndims);
+      } else {
+        auto ret = dims(strides + 1, strides + data->ndims);
+        ret[0] = std::min(strides[0], strides[1]);
+        return ret;
+      }
+    }
+
+    bool is_zero() const { return data->ndims == 0; }
+
+    dim_t nelems(bool with_padding = false) const {
+      if (is_zero()) return 0;
+      auto dims = with_padding ? data->padded_dims : data->dims;
+      return std::accumulate(dims, dims + data->ndims, (dim_t)1,
+                             std::multiplies<dim_t>());
+    }
+
+    bool is_plain() const {
+      return is_blocking_desc() && blocking_desc().inner_nblks == 0;
+    };
+
+    // compute the storage_size using dims and strides
+    int64_t compute_storage_size() const {
+      // port from aten/src/ATen/TensorUtils.cpp
+      const auto &dims = data->dims;
+      const auto &strides = blocking_strides();
+      // size of the underlying storage is 1 bigger than the offset
+      // of the last element according to stride
+      int64_t size = 1;
+      for(size_t i = 0; i < data->ndims; i++) {
+        if(dims[i] == 0) {
+          return 0;
+        }
+        size += strides[i]*(dims[i]-1);
+      }
+      return size;
+    }
+
+    // This should only be called for a public format desc
+    int64_t get_padding_size() const {
+      return compute_storage_size() - nelems();
+    }
+
+    bool is_default() const {
+      if (!is_plain()) return false;
+
+      const auto &strides = blocking_strides();
+      for (int i = 0; i < data->ndims - 1; i++) {
+        if (strides[i] < strides[i + 1]) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    size_t get_item_size() const {
+      return utils::data_type_size(get_data_type());
+    }
+
+    size_t get_size() const {
+      // Because implementation of get_size() is chainging constantly,
+      // so we use library's impl. instead of porting it out, however,
+      // it may cause potential overhead when creating a copy of desc
+      return desc(*data).get_size();
+    }
+
+    bool is_dense(bool with_padding = false) const {
+      if (utils::one_of(format_kind(), dnnl_format_kind_any, dnnl_format_kind_undef))
+        return false;
+      return nelems(with_padding) * get_item_size() == get_size();
+    }
+
+    bool is_nhwc() const {
+      if (!is_plain() || data->ndims != 4) return false;
+      const auto &dims = data->dims;
+      const auto &strides = blocking_strides();
+      const auto n = 0, c = 1, h = 2, w = 3;
+      return strides[n] == dims[h] * dims[w] * dims[c]
+          && strides[h] == dims[w] * dims[c]
+          && strides[w] == dims[c]
+          && strides[c] == 1;
+    };
+
+    bool is_nchw() const {
+      if (!is_plain() || data->ndims != 4) return false;
+      const auto &dims = data->dims;
+      const auto &strides = blocking_strides();
+      const auto n = 0, c = 1, h = 2, w = 3;
+      return strides[n] == dims[c] * dims[h] * dims[w]
+          && strides[c] == dims[h] * dims[w]
+          && strides[h] == dims[w]
+          && strides[w] == 1;
+    };
+
+    bool is_iohw() const {
+      if (!is_plain() || data->ndims != 4) return false;
+      const auto &dims = data->dims;
+      const auto &strides = blocking_strides();
+      const auto o = 0, i = 1, h = 2, w = 3;
+      return strides[i] == dims[o] * dims[h] * dims[w]
+          && strides[o] == dims[h] * dims[w]
+          && strides[h] == dims[w]
+          && strides[w] == 1;
+    };
+
+    // workaround for issue intel/mkl-dnn#588
+    bool is_4c_blocked() const {
+      const auto& blk = blocking_desc();
+      return blk.inner_nblks == 1
+          && blk.inner_idxs[0] == 1 && blk.inner_blks[0] == 4;
+    }
+
+    bool is_limited_blockable() const {
+      const auto& blk = blocking_desc();
+      // compute compatible block_dims with v0.x
+      dims block_dims(data->ndims, 1);
+      for (auto i = 0; i < blk.inner_nblks; i++) {
+        block_dims[blk.inner_idxs[i]] *= blk.inner_blks[i];
+      }
+      for (auto i = 0; i < data->ndims; i++) {
+        if (data->dims[i] < block_dims[i]) continue;
+        if (data->dims[i] % block_dims[i] == 0) continue;
+        return false;
+      }
+      return true;
+    }
+
+    format_kind_t format_kind() const { return data->format_kind; }
+
+    const dims_t &padded_dims() const { return data->padded_dims; }
+
+    const dims_t &padded_offsets() const { return data->padded_offsets; }
+
+    dim_t offset0() const { return data->offset0; }
+
+    bool is_wino_desc() const { return format_kind() == dnnl_format_kind_wino; }
+
+    bool is_rnn_packed_desc() const {
+      return format_kind() == dnnl_format_kind_rnn_packed;
+    }
+
+    bool is_blocking_desc() const { return format_kind() == dnnl_blocked; }
+
+    const blocking_desc_t &blocking_desc() const {
+      DIL_ENFORCE(is_blocking_desc(),
+                    "Cannot get blocking desc on a non-blocking desc");
+      return data->format_desc.blocking;
+    }
+
+    dims_t& blocking_strides() const {
+      DIL_ENFORCE(is_blocking_desc(),
+                    "Cannot get blocking desc on a non-blocking desc");
+      return const_cast<dnnl_memory_desc_t*>(data)->format_desc.blocking.strides;
+    }
+
+    dim g() const {
+      auto reserved_size = sizeof(((dnnl_memory_extra_desc_t *)0)->reserved);
+      auto offset = reserved_size / sizeof(dim) - 1;
+      return reinterpret_cast<const dim *>(data->extra.reserved)[offset];
+    }
+
+    bool is_grouped() const { return g() > 1; }
+
+    const dnnl_memory_desc_t *data;
+  };
+
   struct desc : public memory::desc {
     friend class tensor;
 
@@ -50,120 +250,54 @@ class tensor : public memory {
         : memory::desc(adims, adata_type, astrides) { set_g(1); }
 
     /// public ndims
-    inline int get_ndims() const {
-      return is_grouped() ? data.ndims - 1 : data.ndims;
-    }
+    int get_ndims() const { return get_const_desc().get_ndims(); }
 
     /// Return size of specified dimension
-    inline dim_t get_dim(int index) const {
-      if (!is_grouped()) {
-        if (index < 0 || index >= data.ndims) return static_cast<dim_t>(0);
-        return data.dims[index];
-      } else {
-        if (index < 0 || index >= data.ndims - 1) return static_cast<dim_t>(0);
-        return index == 0 ? data.dims[0] * data.dims[1] : data.dims[index + 1];
-      }
-    }
+    dim_t get_dim(int index) const { return get_const_desc().get_dim(index); }
 
     /// Returns dimension vector
-    inline dims get_dims() const {
-      if (!is_grouped()) {
-        return dims(data.dims, data.dims + data.ndims);
-      } else {
-        auto ret = dims(data.dims + 1, data.dims + data.ndims);
-        ret[0] *= data.dims[0];  // g == data.dims[0]
-        return ret;
-      }
-    }
+    dims get_dims() const { return get_const_desc().get_dims(); }
+
+    /// Returns strides vector
+    dims get_strides() const { return get_const_desc().get_strides(); }
 
     /// Returns descriptor data type
-    inline data_type get_data_type() const {
-      return static_cast<data_type>(data.data_type);
-    }
+    data_type get_data_type() const { return get_const_desc().get_data_type(); }
 
     /** returns true if memory descriptor is zero */
-    bool is_zero() const { return data.ndims == 0; }
+    bool is_zero() const { return get_const_desc().is_zero(); }
 
     /** returns the number of elements including padding if \param with_padding
      * is true, and the number of data elements otherwise */
-    inline dim_t nelems(bool with_padding = false) const {
-      if (is_zero()) return 0;
-      auto dims = with_padding ? data.padded_dims : data.dims;
-      return std::accumulate(dims, dims + data.ndims, 1,
-                             std::multiplies<dim_t>());
+    dim_t nelems(bool with_padding = false) const {
+      return get_const_desc().nelems(with_padding);
     }
 
-    inline bool is_plain() const {
-      return is_blocking_desc() && blocking_desc().inner_nblks == 0;
-    };
+    int64_t get_padding_size() const { return get_const_desc().get_padding_size(); }
 
-    inline bool is_default() const {
-      if (!is_plain()) return false;
+    bool is_plain() const { return get_const_desc().is_plain(); };
 
-      const auto &strides = blocking_strides();
-      for (int i = 0; i < data.ndims - 1; i++) {
-        if (strides[i] < strides[i + 1]) {
-          return false;
-        }
-      }
-      return true;
+    bool is_default() const { return get_const_desc().is_default(); };
+
+    size_t get_item_size() const { return get_const_desc().get_item_size(); }
+
+    bool is_dense(bool with_padding = false) const {
+      return get_const_desc().is_dense(with_padding);
     }
 
-    inline bool is_nhwc() const {
-      if (!is_plain() || data.ndims != 4) return false;
-      const auto &dims = data.dims;
-      const auto &strides = blocking_strides();
-      const auto n = 0, c = 1, h = 2, w = 3;
-      return strides[n] == dims[h] * dims[w] * dims[c]
-          && strides[h] == dims[w] * dims[c]
-          && strides[w] == dims[c]
-          && strides[c] == 1;
-    };
+    bool is_nhwc() const { return get_const_desc().is_nhwc(); };
 
-    inline bool is_nchw() const {
-      if (!is_plain() || data.ndims != 4) return false;
-      const auto &dims = data.dims;
-      const auto &strides = blocking_strides();
-      const auto n = 0, c = 1, h = 2, w = 3;
-      return strides[n] == dims[c] * dims[h] * dims[w]
-          && strides[c] == dims[h] * dims[w]
-          && strides[h] == dims[w]
-          && strides[w] == 1;
-    };
+    bool is_nchw() const { return get_const_desc().is_nchw(); };
 
-    inline bool is_iohw() const {
-      if (!is_plain() || data.ndims != 4) return false;
-      const auto &dims = data.dims;
-      const auto &strides = blocking_strides();
-      const auto o = 0, i = 1, h = 2, w = 3;
-      return strides[i] == dims[o] * dims[h] * dims[w]
-          && strides[o] == dims[h] * dims[w]
-          && strides[h] == dims[w]
-          && strides[w] == 1;
-    };
+    bool is_iohw() const { return get_const_desc().is_iohw(); };
 
     // workaround for issue intel/mkl-dnn#588
-    bool is_4c_blocked() {
-      const auto& blk = blocking_desc();
-      return blk.inner_nblks == 1
-          && blk.inner_idxs[0] == 1 && blk.inner_blks[0] == 4;
-    }
+    bool is_4c_blocked() const { return get_const_desc().is_4c_blocked(); };
 
     // legacy API for caffe2
     bool is_limited_blockable() const {
-      const auto& blk = blocking_desc();
-      // compute compatible block_dims with v0.x
-      dims block_dims(data.ndims, 1);
-      for (auto i = 0; i < blk.inner_nblks; i++) {
-        block_dims[blk.inner_idxs[i]] *= blk.inner_blks[i]; 
-      }
-      for (auto i = 0; i < data.ndims; i++) {
-        if (data.dims[i] < block_dims[i]) continue;
-        if (data.dims[i] % block_dims[i] == 0) continue;
-        return false;
-      }
-      return true;
-    }
+      return get_const_desc().is_limited_blockable();
+    };
 
     desc to_format(format_tag aformat_tag) const {
       auto ret = desc(get_internal_dims(), get_data_type(), aformat_tag);
@@ -333,49 +467,13 @@ class tensor : public memory {
     }
 
    private:
+    const desc_wrapper get_const_desc() const {
+      return desc_wrapper(&data);
+    }
 
     /// Returns dimension vector
     inline dims get_internal_dims() const {
       return dims(data.dims, data.dims + data.ndims);
-    }
-
-    const dims_t &padded_dims() const { return data.padded_dims; }
-
-    const dims_t &padded_offsets() const { return data.padded_offsets; }
-
-    dim_t offset0() const { return data.offset0; }
-
-    inline format_kind_t format_kind() const { return data.format_kind; }
-
-    bool is_blocking_desc() const { return format_kind() == dnnl_blocked; }
-
-    bool is_wino_desc() const { return format_kind() == dnnl_format_kind_wino; }
-
-    bool is_rnn_packed_desc() const {
-      return format_kind() == dnnl_format_kind_rnn_packed;
-    }
-
-    const blocking_desc_t &blocking_desc() const {
-      DIL_ENFORCE(is_blocking_desc(),
-                    "Cannot get blocking desc on a non-blocking desc");
-      return data.format_desc.blocking;
-    }
-
-    dims_t& blocking_strides() const {
-      DIL_ENFORCE(is_blocking_desc(),
-                    "Cannot get blocking desc on a non-blocking desc");
-      return const_cast<dnnl_memory_desc_t&>(data).format_desc.blocking.strides;
-    }
-
-    inline dims get_strides() const {
-      const auto& strides = blocking_strides();
-      if (!is_grouped()) {
-        return dims(strides, strides + data.ndims);
-      } else {
-        auto ret = dims(strides + 1, strides + data.ndims);
-        ret[0] = std::min(strides[0], strides[1]);
-        return ret;
-      }
     }
 
     void set_g(dim groups) {
@@ -384,13 +482,13 @@ class tensor : public memory {
       reinterpret_cast<dim *>(data.extra.reserved)[offset] = groups;
     }
 
-    dim g() const {
-      auto reserved_size = sizeof(((dnnl_memory_extra_desc_t *)0)->reserved);
-      auto offset = reserved_size / sizeof(dim) - 1;
-      return reinterpret_cast<const dim *>(data.extra.reserved)[offset];
+    const blocking_desc_t &blocking_desc() const {
+      return get_const_desc().blocking_desc();
     }
 
-    inline bool is_grouped() const { return g() > 1; }
+    dim g() const { return get_const_desc().g(); }
+
+    bool is_grouped() const { return get_const_desc().is_grouped(); }
   };
 
   desc get_desc() const {
@@ -448,10 +546,22 @@ class tensor : public memory {
     init(adims, adata_type, ahandle, aengine);
   }
 
+  // no format_tag, buffer, with deleter
+  tensor(const dims &adims, data_type adata_type, void *ahandle,
+         deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
+    init(adims, adata_type, ahandle, deleter_fn, aengine);
+  }
+
   // no format_tb, strides, buffer
   tensor(const dims &adims, data_type adata_type, const dims &astrides,
          void *ahandle, const engine &aengine = engine::cpu_engine()) {
     init(adims, adata_type, astrides, ahandle, aengine);
+  }
+
+  // no format_tb, strides, buffer, with deleter
+  tensor(const dims &adims, data_type adata_type, const dims &astrides, void *ahandle,
+         deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
+    init(adims, adata_type, astrides, ahandle, deleter_fn, aengine);
   }
 
   // no format_tag, no buffer
@@ -470,9 +580,29 @@ class tensor : public memory {
     reset_internal(adesc, aengine, ahandle);
   }
 
+  /// Function that refill tensor with new description. Specifiy extra buffer.
+  void init(const desc &adesc, void *ahandle, deleter_ptr deleter_fn,
+              const engine &aengine = engine::cpu_engine()) {
+    buffer_.reset(ahandle, deleter_fn);
+    scale_.reset();
+    zero_point_.reset();
+    eng_ = aengine;
+    reset_internal(adesc, aengine, ahandle);
+  }
+
   /// Function that refill tensor with new description or buffer
   void init(const desc &adesc, const engine &aengine = engine::cpu_engine()) {
     buffer_.reset(aengine.malloc(adesc.get_size()), aengine.free);
+    scale_.reset();
+    zero_point_.reset();
+    eng_ = aengine;
+    reset_internal(adesc, aengine, buffer_.get());
+  }
+
+  void zero_init(const desc &adesc, const engine &aengine = engine::cpu_engine()) {
+    void *data = aengine.malloc(adesc.get_size());
+    memset(data, 0, adesc.get_size());
+    buffer_.reset(data, aengine.free);
     scale_.reset();
     zero_point_.reset();
     eng_ = aengine;
@@ -490,6 +620,11 @@ class tensor : public memory {
     init({adims, adata_type, astrides}, ahandle, aengine);
   }
 
+  void init(const dims &adims, data_type adata_type, const dims &astrides,
+            void *ahandle, deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
+    init({adims, adata_type, astrides}, ahandle, deleter_fn, aengine);
+  }
+
   // format_tag, no buffer
   void init(const dims &adims, data_type adata_type, format_tag aformat_tag,
               const engine &aengine = engine::cpu_engine()) {
@@ -500,6 +635,12 @@ class tensor : public memory {
   void init(const dims &adims, data_type adata_type, void *ahandle,
               const engine &aengine = engine::cpu_engine()) {
     init({adims, adata_type, get_default_format(adims)}, ahandle, aengine);
+  }
+
+  // no format_tag, buffer
+  void init(const dims &adims, data_type adata_type, void *ahandle,
+            deleter_ptr deleter_fn, const engine &aengine = engine::cpu_engine()) {
+    init({adims, adata_type, get_default_format(adims)}, ahandle, deleter_fn, aengine);
   }
 
   // no format_tag, no buffer
@@ -573,50 +714,54 @@ class tensor : public memory {
   const engine &get_engine() const { return eng_; }
 
   /// Returns number of dimensions
-  inline int ndims() const { return get_desc().get_ndims(); }
+  inline int ndims() const { return get_const_desc().get_ndims(); }
 
   /// Return size of specified dimension
-  inline dim_t get_dim(int index) const { return get_desc().get_dim(index); }
+  dim_t get_dim(int index) const { return get_const_desc().get_dim(index); }
 
   /// Returns dimension vector
-  inline dims get_dims() const { return get_desc().get_dims(); }
+  inline dims get_dims() const { return get_const_desc().get_dims(); }
 
   inline dims get_strides() const {
     DIL_ENFORCE(is_public_format(), "Call to_public() before get_strides()");
-    return get_desc().get_strides();
+    return get_const_desc().get_strides();
   }
 
-  inline void set_dims_and_strides(const dims &adims, const dims &astrides) {
-    DIL_ENFORCE(is_public_format(), "Call to_public() before set_dims_and_strides()");
-    DIL_ENFORCE(adims.size() == astrides.size(), "Dims and strides must have the same size");
-    if (get_dims() == adims && get_strides() == astrides)
-      return;
-    auto new_desc = desc(adims, get_data_type(), astrides);
-    DIL_ENFORCE(get_size() == new_desc.get_size(), "Invalid dims and strides for the original desc");
-    set_desc(new_desc);
-  }
+  bool is_grouped() const { return get_const_desc().is_grouped(); }
+
+  dim get_groups() const { return get_const_desc().g(); }
 
   /// Return element number of the param.
   /// The number is the meaning values for a tensor, instead of whole buffer.
   /// It is the number without counting in paddings.
-  inline dim_t get_nelems() const { return get_desc().nelems(); }
+  dim_t get_nelems() const { return get_const_desc().nelems(); }
+
+  int64_t get_padding_size() const { return get_const_desc().get_padding_size(); }
 
   /// Returns descriptor data type
-  inline data_type get_data_type() const { return get_desc().get_data_type(); }
+  data_type get_data_type() const { return get_const_desc().get_data_type(); }
 
-  inline size_t get_size() const { return get_desc().get_size(); }
+  size_t get_size() const { return get_const_desc().get_size(); }
+
+  bool is_dense(bool with_padding = false) const {
+    return get_const_desc().is_dense(with_padding);
+  }
+
+  size_t get_item_size() const {
+    return get_const_desc().get_item_size();
+  }
 
   /// Return whether the tensor is empty
-  inline bool is_empty() const {
-    return get_desc().is_zero() && get_data_handle() == nullptr;
+  bool is_empty() const {
+    return get_const_desc().is_zero() && get_data_handle() == nullptr;
   }
 
   // "public format" has the same semantic as DNNL's "plain format"
-  inline bool is_public_format() const {
-    return get_desc().is_plain();
+  bool is_public_format() const {
+    return get_const_desc().is_plain();
   }
 
-  inline static format_tag get_default_format(const dims &adims) {
+  static format_tag get_default_format(const dims &adims) {
     switch (adims.size()) {
       case 1:
         return format_tag::a;
@@ -638,7 +783,7 @@ class tensor : public memory {
   // legacy API for caffe2
   dims get_public_format_dims() const {
     auto nchw_dims = get_dims();
-    if (get_desc().is_nhwc()) {
+    if (get_const_desc().is_nhwc()) {
       dims nhwc_dims(ndims());
       nhwc_dims[0] = nchw_dims[0];
       nhwc_dims[1] = nchw_dims[2];
@@ -667,23 +812,55 @@ class tensor : public memory {
 
   // no data copy
   tensor make_grouped_weights(int groups, bool is_deconv = false) const {
-    if (groups <= 1) return *this;
 
-    auto old_desc = get_desc();
-    auto old_groups = old_desc.g();
-    if (old_groups > 1) {
-      // weights have already been pre-converted if old_groups > 1
-      DIL_ENFORCE(old_groups == groups,
-                    "groups does not match the pre-converted weights");
-      return *this;
+    // DNNL and Framework have different ways in describing weight dimensions.
+    // This difference is reflected in two cases: grouped conv & deconv.
+    // This function would be better called `make_compatible_weights`.
+    //
+    //                                   fwk dims          dnnl dims
+    // groups <= 1:
+    //                    conv weight:   o, i, ...         no action
+    //                  deconv weight:   i, o, ...      -> o, i, h, w
+    //
+    // groups > 1:
+    //   already grouped, conv weight:   g, o, i, ...      no action
+    //   no grouped,      conv weight:   o, i, ...      -> g, o/g, i, ...
+    //   already grouped, deconv weight: g, i/g, o, ... -> g, o, i/g, ...
+    //   no grouped,      deconv weight: i, o, ...      -> g, o, i/g, ...
+
+    auto desc = get_desc();
+    if (groups <= 1) {
+      if (is_deconv) {
+        auto transposed_desc = desc.transpose(0, 1);
+        auto this_copy = *this;
+        return this_copy.set_desc(transposed_desc);
+      } else {
+        return *this;
+      }
+    };
+
+    if (desc.is_grouped()) {
+      DIL_ENFORCE(
+          desc.g() == groups,
+          "groups does not match the pre-converted weights");
+      if (is_deconv) {
+        auto transposed_grouped_desc = desc.transpose(1, 2);
+        auto this_copy = *this;
+        return this_copy.set_desc(transposed_grouped_desc);
+      } else {
+        return *this; // no action
+      }
+    } else {
+      if (is_deconv) {
+        auto transposed_grouped_desc = desc.to_grouped(groups).transpose(1, 2);
+        auto this_copy = *this;
+        return this_copy.set_desc(transposed_grouped_desc);
+      } else {
+        auto grouped_desc = desc.to_grouped(groups);
+        auto this_copy = *this;
+        return this_copy.set_desc(grouped_desc);
+      }
     }
-
-    auto grouped_desc =
-        is_deconv
-            ? old_desc.transpose(0, 1).to_grouped(groups).transpose(1, 2)
-            : old_desc.to_grouped(groups);
-    auto this_copy = *this;
-    return this_copy.set_desc(grouped_desc);
   }
 
   /// Recreate a param with completely different content from old one
@@ -711,7 +888,7 @@ class tensor : public memory {
       // Since we are going to set the desc to new dims with default format,
       // we have to make sure it's already in default format. In particular,
       // tensor format does not matter if actual rank <= 1
-      if (!get_desc().is_default() && actual_rank(old_dims) > 1) {
+      if (!get_const_desc().is_default() && actual_rank(old_dims) > 1) {
         to_default_format();
       }
       // set desc with default format
@@ -739,8 +916,7 @@ class tensor : public memory {
   }
 
   inline void reorder_to(tensor &dst, const attr_t &aattr = attr_t()) const {
-    auto pd = dnnl::reorder::primitive_desc(*this, dst, aattr);
-    dnnl::reorder(pd)
+    dnnl::reorder({get_engine(), get_desc(), dst.get_engine(), dst.get_desc(), aattr})
         .execute(stream::default_stream(), const_cast<tensor &>(*this), dst);
   }
 
@@ -749,7 +925,7 @@ class tensor : public memory {
                    data_type dst_type = data_type::f32) const {
     auto dst_desc = get_desc();
 
-    // If we get a non-plain blocking format, say `Acdb16A`, we may not be able 
+    // If we get a non-plain blocking format, say `Acdb16A`, we may not be able
     // to recover it to its "unblocked" format `acdb`. Instead, we will convert
     // it to its default format `abcd` based on its dimensions.
     if (!is_public_format()) {
@@ -769,7 +945,7 @@ class tensor : public memory {
       auto dequantize_scale =
           utils::fmap(src_scale, [](float s) { return 1.f / s; });
       auto mask =
-          utils::tensor_scale_mask(src_scale.size(), get_desc().is_grouped());
+          utils::tensor_scale_mask(src_scale.size(), is_grouped());
       this->reorder_to(dst, {mask, dequantize_scale});
     } else {
       this->reorder_to(dst);
@@ -805,8 +981,8 @@ class tensor : public memory {
     }
 
     auto groups = 1;
-    if ((groups = get_desc().g()) > 1 ||
-        (groups = src.get_desc().g()) > 1) {
+    if ((groups = get_const_desc().g()) > 1 ||
+        (groups = src.get_const_desc().g()) > 1) {
       auto mask_dst = this->make_grouped_weights(groups, is_deconv_weights);
       auto mask_src = src.make_grouped_weights(groups, is_deconv_weights);
       int mask = utils::tensor_scale_mask(src_scale.size(), true);
@@ -828,7 +1004,7 @@ class tensor : public memory {
     // TODO(xpz): support per-channel dequantize
     DIL_ENFORCE(get_scale().size() == 1, "Incorrect scale size");
     dst.feed_from(*this);
-    return dst;  
+    return dst;
   }
 
   // reorder src to part of this tensor
@@ -866,6 +1042,8 @@ class tensor : public memory {
   /// Decide wether there is an extra tensor packed in
   bool has_workspace() const { return workspace_ != nullptr; }
 
+  void copy_workspace(const tensor& other) { workspace_ = other.workspace_; }
+
   /// Return the scale of this param.
   const scale_t &get_scale() const { return *scale_.get(); }
 
@@ -875,9 +1053,9 @@ class tensor : public memory {
   /// Return whether the param has a scale
   bool has_scale() const { return scale_ != nullptr && !scale_->empty(); }
 
-  /// Return whether the param has a zero_point 
+  /// Return whether the param has a zero_point
   bool has_zero_point() const { return zero_point_ != nullptr && !zero_point_->empty(); }
-  
+
   /// Return the zero_point of this param.
   const std::vector<int32_t> &get_zero_point() const { return *zero_point_.get(); }
 
@@ -923,6 +1101,27 @@ class tensor : public memory {
     return get_data_handle() == other.get_data_handle();
   }
 
+  tensor to_dense() const {
+    tensor dense(get_desc().to_default_format());
+    dense.feed_from(*this);
+    return dense;
+  }
+
+  dims compute_strides(int axis) const {
+    auto dims = get_dims();
+    auto nd = ndims();
+    std::vector<dim> strides(nd);
+    strides[axis] = 1;
+    auto step = dims[axis];
+    for (auto i = nd - 1; i >= 0; i--) {
+      if (i != axis) {
+        strides[i] = step;
+        step = step * dims[i];
+      }
+    }
+    return strides;
+  }
+
  private:
   void reset_internal(const desc &adesc, const engine &aengine, void *ahandle) {
     dnnl_memory_t result;
@@ -930,6 +1129,13 @@ class tensor : public memory {
         dnnl_memory_create(&result, &adesc.data, aengine.get(), ahandle),
         "could not create a memory");
     reset(result);
+  }
+
+  const desc_wrapper get_const_desc() const {
+    const dnnl_memory_desc_t *cdesc;
+    error::wrap_c_api(dnnl_memory_get_memory_desc(get(), &cdesc),
+            "could not get a memory descriptor from a memory object");
+    return desc_wrapper(cdesc);
   }
 
   inline void to_format(const desc& adesc) {

@@ -32,11 +32,56 @@ struct attr_t : public dnnl::primitive_attr {
     return attr;
   }
 
+  static attr_t fuse_sigmoid(float alpha = 1.0) {
+    attr_t attr;
+    post_ops po;
+    float scale = 1.0;
+    float beta = 0.f;
+    po.append_eltwise(scale, algorithm::eltwise_logistic, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
+  static attr_t fuse_clamp(float lower_bound = -1.0, float upper_bound = 1.0) {
+    attr_t attr;
+    post_ops po;
+    po.append_eltwise(1.0, algorithm::eltwise_clip, lower_bound, upper_bound);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
+  static attr_t fuse_swish(float alpha = 1.0) {
+    attr_t attr;
+    post_ops po;
+    float scale = 1.0;
+    float beta = 0.f;
+    po.append_eltwise(scale, algorithm::eltwise_swish, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
   static attr_t fuse_relu(float scale = 1.0, float alpha = 0.f,
                           float beta = 0.f) {
     attr_t attr;
     post_ops po;
     po.append_eltwise(scale, algorithm::eltwise_relu, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
+  static attr_t fuse_gelu(float scale = 1.0, float alpha = 0.f,
+                          float beta = 0.f) {
+    attr_t attr;
+    post_ops po;
+    po.append_eltwise(scale, algorithm::eltwise_gelu_erf, alpha, beta);
+    attr.set_post_ops(po);
+    return attr;
+  }
+
+  static attr_t fuse_elu(float scale = 1.0f, float alpha = 0.f, float beta = 1.0f) {
+    attr_t attr;
+    post_ops po;
+    po.append_eltwise(scale, algorithm::eltwise_elu, alpha, beta);
     attr.set_post_ops(po);
     return attr;
   }
