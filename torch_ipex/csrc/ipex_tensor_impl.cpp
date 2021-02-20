@@ -143,7 +143,7 @@ static inline void checkInBoundsForStorage(
   }
   int64_t new_storage_size_bytes = new_storage.nbytes();
   TORCH_CHECK(
-      storage_size_bytes + storage_offset_bytes <= new_storage_size_bytes + padding_size,
+      storage_size_bytes + storage_offset_bytes <= new_storage_size_bytes + padding_size * data_type.itemsize(),
       "setStorage: sizes ",
       size,
       ", strides ",

@@ -286,7 +286,8 @@ void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer, int64_t 
       dil_buffer.get_dims(),
       dil_buffer.get_strides(),
       ipex_tensor_impl->storage_offset(),
-      tensor.scalar_type());
+      tensor.scalar_type(),
+      padding_size);
   } else {
     // ??? TORCH_INTERNAL_ASSERT_DEBUG_ONLY(sizes.size() != 1 || sizes[0] != 0);
     // Blockformat does not inlcude stride information
