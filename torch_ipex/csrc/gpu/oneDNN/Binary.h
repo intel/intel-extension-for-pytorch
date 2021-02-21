@@ -99,7 +99,11 @@ static inline Tensor bin(
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
-  create_key(key, tar_md);
+  if (t3.defined()) {
+    create_key(key, algo, md1, md2, tar_md, attr.get_post_ops().len());
+  } else {
+    create_key(key, algo, md1, md2, tar_md);
+  }
 #endif
   binary::primitive_desc pd;
   if (t3.defined()) {

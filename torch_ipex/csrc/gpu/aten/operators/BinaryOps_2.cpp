@@ -4,6 +4,7 @@
 
 #include <core/DPCPP.h>
 #include <utils/Pointwise.h>
+#include <oneDNN/oneDNN.h>
 
 #include "Loops.h"
 
@@ -56,6 +57,10 @@ static Tensor wrapped_scalar_tensor(Scalar scalar) {
   return tensor;
 }
 
+static bool is_wrapped_number(const Tensor& t) {
+  return t.unsafeGetTensorImpl()->is_wrapped_number();
+}
+
 } // namespace impl
 
 Tensor& mul_out(Tensor& result, const Tensor& self, const Tensor& other) {
@@ -87,19 +92,44 @@ Tensor& mul_(Tensor& self, Scalar other) {
 }
 
 Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
-  auto iter = TensorIterator::binary_op(
-      result,
-      self,
-      other);
-  impl::div_kernel_dpcpp(iter);
+  Tensor _self = self, _other = other;
+  if (_self.defined() && _other.defined() && _self.dim() > 0 &&
+      _other.dim() > 0 && _self.dim() == _other.dim() &&
+      oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
+      _self.is_contiguous() && _other.is_contiguous() &&
+      !(DPCPPTensorContext::is_plain(_self) &&
+        !DPCPPTensorContext::is_plain(_other) &&
+        _self.sizes() != _other.sizes()) &&
+      !(is_expandable_to(_self.sizes(), _other.sizes()) &&
+      !is_expandable_to(_other.sizes(), _self.sizes())) &&
+      !impl::is_wrapped_number(_self) && !impl::is_wrapped_number(_other)) {
+    oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
+  } else {
+    auto iter = TensorIterator::binary_op(result, self, other);
+    impl::div_kernel_dpcpp(iter);
+  }
   return result;
 }
 
 Tensor div(const Tensor& self, const Tensor& other) {
-  Tensor result;
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::div_kernel_dpcpp(iter);
-  return iter.output();
+  Tensor result, _self = self, _other = other;
+  if (_self.defined() && _other.defined() && _self.dim() > 0 &&
+      _other.dim() > 0 && _self.dim() == _other.dim() &&
+      oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
+      _self.is_contiguous() && _other.is_contiguous() &&
+      !(DPCPPTensorContext::is_plain(_self) &&
+        !DPCPPTensorContext::is_plain(_other) &&
+        _self.sizes() != _other.sizes()) &&
+      !(is_expandable_to(_self.sizes(), _other.sizes()) &&
+      !is_expandable_to(_other.sizes(), _self.sizes())) &&
+      !impl::is_wrapped_number(_self) && !impl::is_wrapped_number(_other)) {
+    oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
+    return result;
+  } else {
+    auto iter = TensorIterator::binary_op(result, self, other);
+    impl::div_kernel_dpcpp(iter);
+    return iter.output();
+  }
 }
 
 Tensor& div_(Tensor& self, const Tensor& other) {
