@@ -17,12 +17,6 @@ namespace AtenIpexTypeXPU {
 template<typename RNG>
 void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
   auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
-#ifdef _WIN32
-  // TODO: https://github.com/pytorch/pytorch/issues/33793
-  if (iter.dtype() == ScalarType::BFloat16) {
-    TORCH_CHECK(false, "random_() is not supported for bfloat16 CUDA tensors on Windows. Please see https://github.com/pytorch/pytorch/issues/33793");
-  }
-#endif
   if (isFloatingType(iter.dtype())) {
     AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "random_kernel_fp", [&] {
       if (std::is_same<scalar_t, double>::value) {
@@ -81,12 +75,6 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
 template<typename RNG>
 void random_from_to_kernel(TensorIterator& iter, uint64_t range, int64_t base, c10::optional<RNG> gen_) {
   auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());    
-#ifdef _WIN32
-  // TODO: https://github.com/pytorch/pytorch/issues/33793
-  if (iter.dtype() == ScalarType::BFloat16) {
-    TORCH_CHECK(false, "random_() is not supported for bfloat16 tensors on Windows. Please see https://github.com/pytorch/pytorch/issues/33793");
-  }
-#endif
   AT_DISPATCH_ALL_TYPES_AND3(at::ScalarType::Bool, at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "random_from_to_kernel", [&] {
     if ((
       std::is_same<scalar_t, int64_t>::value ||
@@ -120,12 +108,6 @@ void random_from_to_kernel(TensorIterator& iter, uint64_t range, int64_t base, c
 template<typename RNG>
 void random_full_64_bits_range_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
   auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());    
-#ifdef _WIN32
-  // TODO: https://github.com/pytorch/pytorch/issues/33793
-  if (iter.dtype() == ScalarType::BFloat16) {
-    TORCH_CHECK(false, "random_() is not supported for bfloat16 tensors on Windows. Please see https://github.com/pytorch/pytorch/issues/33793");
-  }
-#endif
   AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::BFloat16, iter.dtype(), "random_full_64_bits_range_kernel", [&] {
     if (std::is_same<scalar_t, int64_t>::value ||
         std::is_same<scalar_t, double>::value ||
@@ -166,9 +148,6 @@ struct RandomFromToDPCPPStub {
 };
 
 Tensor & random_(Tensor & self, int64_t from, optional<int64_t> to, c10::optional<Generator> gen_){
-  int64_t to_value = *to;
-  std::cout << from << std::endl;
-  std::cout << to_value << std::endl;
   return at::native::templates::random_from_to_impl<RandomFromToDPCPPStub, Generator>(self, from, to, gen_);
 }
 
