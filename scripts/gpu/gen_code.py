@@ -682,12 +682,20 @@ def process_dpcpp_declarations(declarations, script_path):
     for declaration in declarations:
         if declaration['schema_string'] in schemas:
             declaration['type_method_definition_dispatch']['XPU'] = declaration['name']
+            schemas.remove(declaration['schema_string'])
+
+    if len(schemas) != 0:
+        raise RuntimeError("Those schemas are not found in pytorch. {}".format(schemas))
 
     schemas, errors = extract_schema(script_path + '/gpu/QUANTIZEDDPCPPGPUType.h')
     assert len(errors) == 0, 'parse error'
     for declaration in declarations:
         if declaration['schema_string'] in schemas:
             declaration['type_method_definition_dispatch']['QuantizedXPU'] = declaration['name']
+            schemas.remove(declaration['schema_string'])
+
+    if len(schemas) != 0:
+        raise RuntimeError("Those schemas are not found in pytorch. {}".format(schemas))
 
     for declaration in declarations:
         if len(declaration['type_method_definition_dispatch']) != 0:

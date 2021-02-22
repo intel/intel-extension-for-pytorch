@@ -86,5 +86,5 @@ struct TORCH_API DPCPPType final {
 
   static Tensor quantize_per_tensor(const at::Tensor & self, double scale, int64_t zero_point, at::ScalarType dtype); // aten::quantize_per_tensor(Tensor self, float scale, int zero_point, ScalarType dtype) -> Tensor
 
-  static Tensor record_stream(const Tensor & self, Stream s); // aten::record_stream(Tensor(a) self, Stream s) -> Tensor(a)
+  void record_stream(Tensor & self, Stream s); // {"schema": "aten::record_stream(Tensor(a!) self, Stream s) -> ()", "dispatch": "True", "math": "False"}
 } // namespace at
