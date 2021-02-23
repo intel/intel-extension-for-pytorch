@@ -885,7 +885,7 @@ public:
     THPInsertStorageCopyFunction<THPStorage, THPStorage>(&THPIntStorageType, h, &THXStorage_copyFromCPU<at::kInt>);
     THPInsertStorageCopyFunction<THPStorage, THPStorage>(&THPLongStorageType, h, &THXStorage_copyFromCPU<at::kLong>);
     THPInsertStorageCopyFunction<THPStorage, THPStorage>(&THPHalfStorageType, h, &THXStorage_copyFromCPU<at::kHalf>);
-    THPInsertStorageCopyFunction<THPStorage, THPStorage>(&THPHalfStorageType, h, &THXStorage_copyFromCPU<at::kFloat>);
+    THPInsertStorageCopyFunction<THPStorage, THPStorage>(&THPFloatStorageType, h, &THXStorage_copyFromCPU<at::kFloat>);
     THPInsertStorageCopyFunction<THPStorage, THPStorage>(&THPDoubleStorageType, h, &THXStorage_copyFromCPU<at::kDouble>);
     THPInsertStorageCopyFunction<THPStorage, THPStorage>(&THPBoolStorageType, h, &THXStorage_copyFromCPU<at::kBool>);
     THPInsertStorageCopyFunction<THPStorage, THPStorage>(&THPBFloat16StorageType, h, &THXStorage_copyFromCPU<at::kBFloat16>);

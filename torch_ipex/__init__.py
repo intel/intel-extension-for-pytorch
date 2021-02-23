@@ -387,8 +387,13 @@ class FloatStorage(_C.FloatStorageBase, _StorageBase):
     pass
 
 
+class BFloat16Storage(_C.BFloat16StorageBase, _StorageBase):
+    pass
+
+
 torch._storage_classes.add(DoubleStorage)
 torch._storage_classes.add(FloatStorage)
+torch._storage_classes.add(BFloat16Storage)
 _C._initExtension()
 
 
