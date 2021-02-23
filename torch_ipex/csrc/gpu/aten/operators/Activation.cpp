@@ -10,7 +10,7 @@
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
 
-#include "Eltwise.h"
+#include <oneDNN/oneDNN.h>
 #include "Loops.h"
 #include "Random.h"
 
@@ -24,15 +24,6 @@ template <typename scalar_t>
 static inline bool is_contiguous(const int64_t* strides) {
   return strides[0] == sizeof(scalar_t) && strides[1] == sizeof(scalar_t) &&
       strides[2] == sizeof(scalar_t);
-}
-
-template <typename scalar_t>
-static void dpcpp_threshold_kernel(TensorIterator& iter) {
-  auto loop = [&](char** data, const int64_t* strides, int64_t n) {
-    dpcpp_eltwise_backward<dnnl::algorithm::eltwise_relu>(
-        data[0], data[1], data[2], n, 0.0f, 0.0f);
-  };
-  iter.serial_for_each(loop, {0L, iter.numel()});
 }
 
 // Note: dpcpp compiler does not support uname type in template.
@@ -55,15 +46,10 @@ static void threshold_kernel(
           all_contiguous = all_contiguous && iter.tensor(i).is_contiguous();
         }
 
-        if (threshold == 0 && value == 0 && all_contiguous && iter.dtype() != ScalarType::BFloat16
-            /*is_contiguous<scalar_t>(iter.get_strides().data())*/) {
-          dpcpp_threshold_kernel<scalar_t>(iter);
-        } else {
-          dpcpp_kernel_for_tensor_iter<SyclOpThreshold>(
-              iter, [=](scalar_t x, scalar_t other) -> scalar_t {
-                return x <= threshold ? value : other;
-              });
-        }
+        dpcpp_kernel_for_tensor_iter<SyclOpThreshold>(
+            iter, [=](scalar_t x, scalar_t other) -> scalar_t {
+              return x <= threshold ? value : other;
+            });
       });
 }
 
@@ -244,7 +230,7 @@ static void RReLU_updateGradInput(
     else
     {
       gradInput.resize_as_(input);
-      mul_out(gradInput, gradOutput, noise);
+      at::AtenIpexTypeXPU::mul_out(gradInput, gradOutput, noise);
     }
   }
   else
@@ -471,12 +457,12 @@ void GeluBackwardKernelImpl(
 
 Tensor relu(const Tensor& self) {
   Tensor result;
-  at::dpcpp::dpcpp_eltwise<dnnl::algorithm::eltwise_relu>(result, self, 0.0f, 0.0f);
+  at::dpcpp::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(result, self, 0.0f, 0.0f);
   return result;
 }
 
 Tensor& relu_(Tensor& self) {
-  at::dpcpp::dpcpp_eltwise<dnnl::algorithm::eltwise_relu>(self, self, 0.0f, 0.0f);
+  at::dpcpp::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(self, self, 0.0f, 0.0f);
   return self;
 }
 
@@ -487,9 +473,14 @@ static Tensor threshold_out(
     Scalar value,
     const Tensor& other) {
   Tensor result = opt_result.value_or(Tensor());
-  auto iter = TensorIterator::binary_op(result, self, other);
-  impl::threshold_kernel(iter, threshold, value);
-  return iter.output();
+  if (0.0 == threshold.to<float>() && 0.0 == value.to<float>()) {
+    at::dpcpp::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_relu>(result, self, other, 0.0f, 0.0f);
+    return result;
+  } else {
+    auto iter = TensorIterator::binary_op(result, self, other);
+    impl::threshold_kernel(iter, threshold, value);
+    return iter.output();
+  }
 }
 
 Tensor& threshold_(Tensor& self, Scalar threshold, Scalar value) {
@@ -501,7 +492,7 @@ Tensor threshold(const Tensor& self, Scalar threshold, Scalar value) {
   return threshold_out(nullopt, self, threshold, value, self);
 }
 
-Tensor threshold_out(
+Tensor& threshold_out(
     Tensor& result,
     const Tensor& self,
     Scalar threshold,
@@ -758,7 +749,7 @@ Tensor hardshrink_backward(
 
 Tensor gelu(const Tensor & self){
   Tensor result;
-  at::dpcpp::dpcpp_eltwise<dnnl::algorithm::eltwise_gelu_erf>(result, self, 0.0f, 0.0f);
+  at::dpcpp::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(result, self, 0.0f, 0.0f);
   return result;
 }
 

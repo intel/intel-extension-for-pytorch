@@ -63,7 +63,6 @@ Tensor& sigmoid_backward_out(
         at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
             grad_input, output, grad_output, TensorSigmoidGradOp<scalar_t>());
       });
-
   return grad_input;
 }
 
