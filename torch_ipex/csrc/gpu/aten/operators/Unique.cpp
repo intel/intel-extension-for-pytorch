@@ -39,33 +39,18 @@ std::tuple<Tensor, Tensor, int64_t> compute_unique(
 #ifdef USE_ONEDPL
   // inverse indices
   Tensor inverse_indices;
-#ifndef USE_USM
-  auto data_buff = make_buffer<scalar_t>(data);
-  auto data_begin = oneapi::dpl::begin(data_buff);
-#else
   auto data_begin = data;
-#endif
   if (!return_inverse) {
     inverse_indices = at::empty({0}, options);
   } else {
     TORCH_CHECK(sorted_indices.defined(),
       "return_inverse is set to true, but sorted_indices is undefined. Send a bug report!");
     int64_t *sorted_indices_ptr = sorted_indices.data_ptr<int64_t>();
-#ifndef USE_USM
-    auto sorted_indices_buff = make_buffer<int64_t>(sorted_indices_ptr);
-    auto sorted_indices_begin = oneapi::dpl::begin(sorted_indices_buff);
-#else
     auto sorted_indices_begin = sorted_indices_ptr;
-#endif
     Tensor inv_loc = at::empty({num_inp}, options);
     inverse_indices = at::empty({num_inp}, options);
     int64_t* inv_loc_ptr = inv_loc.data_ptr<int64_t>();
-#ifndef USE_USM
-    auto inv_loc_buff = make_buffer<int64_t>(inv_loc_ptr);
-    auto inv_loc_begin = oneapi::dpl::begin(inv_loc_buff);
-#else
     auto inv_loc_begin = inv_loc_ptr;
-#endif
     std::adjacent_difference(policy, data_begin, data_begin + num_inp, inv_loc_begin, not_equal);
     inv_loc[0] = 0;
     std::inclusive_scan(policy, inv_loc_begin, inv_loc_begin + num_inp, inv_loc_begin);
@@ -89,24 +74,14 @@ std::tuple<Tensor, Tensor, int64_t> compute_unique(
     Tensor range = at::empty({0}, options);
     range = at::AtenIpexTypeXPU::arange_out(range, 0, num_inp + 1, 1);
     int64_t *range_ptr = range.data_ptr<int64_t>();
-#ifndef USE_USM
-    auto range_buff = make_buffer<int64_t>(range_ptr);
-    auto range_begin = oneapi::dpl::begin(range_buff);
-#else
     auto range_begin = range_ptr;
-#endif
     auto zipped_begin = oneapi::dpl::make_zip_iterator(data_begin, range_begin);
     num_out = std::unique(policy, zipped_begin, zipped_begin + num_inp, equal_by_key) - zipped_begin;
     range[num_out] = num_inp;
     counts.resize_(num_out);
     int64_t* counts_ptr = counts.data_ptr<int64_t>();
-#ifndef USE_USM
-    auto counts_buff = make_buffer<int64_t>(counts_ptr);
-    auto counts_begin = oneapi::dpl::begin(counts_buff);
-#else
     //auto counts_begin = oneapi::dpl::begin(counts_ptr);
     auto counts_begin = counts_ptr;
-#endif
     std::adjacent_difference(policy, range_begin + 1, range_begin + num_out + 1, counts_begin);
   }
 
@@ -129,12 +104,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
   Tensor output = self.clone().reshape(-1);
   int64_t num_inp = output.numel();
   scalar_t* output_data = output.data_ptr<scalar_t>();
-#ifndef USE_USM
-  auto output_buff = make_buffer<scalar_t>(output_data);
-  auto output_begin = oneapi::dpl::begin(output_buff);
-#else
   auto output_begin = output_data;
-#endif
   Tensor sorted_indices;
   if (!return_inverse) {
     if (!consecutive) {
@@ -144,12 +114,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
     sorted_indices = at::arange(0, num_inp, options);
     if (!consecutive) {
       int64_t *sorted_indices_ptr = sorted_indices.data_ptr<int64_t>();
-#ifndef USE_USM
-      auto sorted_indices_buff = make_buffer<int64_t>(sorted_indices_ptr);
-      auto sorted_indices_begin = oneapi::dpl::begin(sorted_indices_buff);
-#else
       auto sorted_indices_begin = sorted_indices_ptr;
-#endif
       auto zipped_begin = oneapi::dpl::make_zip_iterator(output_begin, sorted_indices_begin);
       std::stable_sort(
         policy, zipped_begin, zipped_begin + num_inp, 
@@ -204,7 +169,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
   const bool return_inverse,
   const bool return_counts
 ) {
-#if defined(USE_ONEDPL) && defined(USE_USM)
+#ifdef USE_ONEDPL
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto policy = oneapi::dpl::execution::make_device_policy<Unique_Dpcpp_Kernel<scalar_t>>(dpcpp_queue);
 

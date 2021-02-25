@@ -12,14 +12,8 @@
 #include <utils/ATDispatch.h>
 #include <iostream>
 
-
 #include "Loops.h"
-#ifndef USE_USM
 #include "Reduce.h"
-#else
-#include "ReduceUSM.h"
-#endif
-
 
 using namespace at::dpcpp;
 using namespace at::native;

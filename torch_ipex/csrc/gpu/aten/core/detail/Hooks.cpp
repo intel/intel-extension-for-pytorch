@@ -17,7 +17,6 @@ namespace at {
 namespace dpcpp {
 namespace detail {
 
-#ifdef USE_USM
 void XPUHooks::initXPU() const {
   // TODO:
 }
@@ -72,7 +71,6 @@ XPUHooks::getDefaultXPUGenerator(DeviceIndex device_index) const {
 }
 
 REGISTER_XPU_HOOKS(XPUHooks);
-#endif
 
 } // detail
 } // dpcpp

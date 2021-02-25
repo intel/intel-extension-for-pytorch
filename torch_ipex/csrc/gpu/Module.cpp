@@ -118,14 +118,6 @@ void init_module(pybind11::module& m) {
       },
       "enable split SGD for BF16 weight update. on Intel device");
 
-#if defined(USE_USM)
-  m.def("_usm_is_enabled",
-        []() {return true;});
-#else
-  m.def("_usm_is_enabled",
-        []() {return false;});
-#endif
-
 #if defined(USE_ONEDPL)
   m.def("_onedpl_is_enabled",
         []() {return true;});

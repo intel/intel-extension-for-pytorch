@@ -3,7 +3,6 @@
 ##############################################################
 # Build options:
 #
-# USE_USM               - to use USM, instead of SYCL buffer
 # USE_ONEDPL            - to use oneDPL in operators
 # USE_ONEMKL            - to use oneMKL in operators
 # USE_GEN12HP_ONEDNN    - to use oneDNN Gen12HP branch
@@ -302,8 +301,7 @@ setup(
     package_data={
         '': [
             'README.md',
-            'requirements.txt',
-            'THIRD-PARTY-PROGRAMS.txt'],
+            'requirements.txt'],
         'torch_ipex':[
             '*.py',
             'lib/*.so',

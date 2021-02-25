@@ -147,53 +147,9 @@ DeviceIndex dpcppGetDeviceIndex(DPCPP::device device) {
   return -1;
 }
 
-/************************dpcpp memory buffer map pool****************/
-#define MAX_DPCPP_MEM_PER_DEVICE 17179869184 // 16*1024*1024*1024 -- 16GB
-// Global buffer map pool state
-static std::once_flag init_buffer_map_flag;
-static std::vector<DPCPP::codeplay::PointerMapper*> gBufferMapPoolPtr;
-static void initBufferMapPoolStates() {
-  int device_count;
-  AT_DPCPP_CHECK(dpcppGetDeviceCount(&device_count));
-  gBufferMapPoolPtr.resize(device_count);
-  for (int i = 0; i < device_count; i++) {
-    gBufferMapPoolPtr[i] = new DPCPP::codeplay::PointerMapper(
-        4096 + i * MAX_DPCPP_MEM_PER_DEVICE);
-  }
-}
-
-static void initBufferMapPoolCallOnce() {
-  std::call_once(init_buffer_map_flag, initBufferMapPoolStates);
-}
-
-DPCPP::codeplay::PointerMapper& dpcppGetBufferMap() {
-#ifndef USE_USM
-  initBufferMapPoolCallOnce();
-  DeviceIndex device_id;
-  AT_DPCPP_CHECK(dpcppGetDevice(&device_id));
-  return *gBufferMapPoolPtr[device_id];
-#else
-  throw(std::runtime_error("Invalid call get sycl buffer map in USM mode"));
-#endif
-}
-
 int dpcppGetDeviceIdFromPtr(DeviceIndex* device_id, void* ptr) {
-#ifndef USE_USM
-  int device_index = reinterpret_cast<uint64_t>(ptr) / MAX_DPCPP_MEM_PER_DEVICE;
-  int device_count;
-  dpcppGetDeviceCount(&device_count);
-  if (device_index >= device_count) {
-    throw(std::out_of_range("this pointer is invalid"));
-  }
-  if (gBufferMapPoolPtr[device_index]->get_offset(ptr) > 0) {
-    *device_id = static_cast<DeviceIndex>(device_index);
-  } else {
-    throw(std::out_of_range("the pointer is not allocated"));
-  }
-#else
   auto raw_device = DPCPP::get_pointer_device(ptr, at::dpcpp::getDeviceContext());
   *device_id = dpcppGetDeviceIndex(raw_device);
-#endif
   return DPCPP_SUCCESS;
 }
 

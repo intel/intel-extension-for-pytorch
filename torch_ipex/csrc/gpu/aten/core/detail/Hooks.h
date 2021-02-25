@@ -1,7 +1,6 @@
 #ifndef DPCPP_HOOK_IMPL_H
 #define DPCPP_HOOK_IMPL_H
 
-#ifdef USE_USM
 #include <ATen/detail/XPUHooksInterface.h>
 #include <ATen/Generator.h>
 
@@ -25,5 +24,4 @@ struct XPUHooks : public at::XPUHooksInterface {
 
 }}} // at::dpcpp::detail
 
-#endif
 #endif // DPCPP_HOOK_IMPL_H

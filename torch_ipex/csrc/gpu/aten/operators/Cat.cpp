@@ -23,7 +23,6 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-#ifdef USE_USM
 constexpr int CAT_ARRAY_BATCH_SIZE = 1024;
 constexpr int CAT_ARRAY_MAX_INPUT_DIMS = 3;
 
@@ -211,7 +210,6 @@ void parallel_cat(Tensor &out, const TensorList &inputs,
 #undef HANDLE_CASE
   }
 }
-#endif
 
 void check_shape_except_dim(Tensor& first, Tensor& second, int dimension) {
   int first_dims = first.dim();
@@ -291,7 +289,6 @@ static void cat(
       return !t.defined() || t.is_contiguous();
     });
 
-#ifdef USE_USM
   if (inputs.size() > 1 &&
       !hasSkippedInput &&
       result.dim() <= CAT_ARRAY_MAX_INPUT_DIMS &&
@@ -304,7 +301,6 @@ static void cat(
       parallel_cat<scalar_t>(result, inputs, dimension, nDims);
     });
   } else {
-#endif
     offset = 0;
     for (j = 0; j < numInputs; j++) {
       if (should_skip(inputs[j]))
@@ -314,9 +310,7 @@ static void cat(
       nt.copy_(inputs[j]);
       offset += dimSize;
     }
-#ifdef USE_USM
   }
-#endif
 }
 
 static void dnnl_cat(

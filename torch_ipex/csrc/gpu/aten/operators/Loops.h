@@ -501,24 +501,11 @@ void dpcpp_small_index_kernel_impl(
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto out_data = get_buffer<dpcpp_discard_w_mode>(__cgh, (char*)iter.data_ptr(0));
     auto in_data = get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(1));
-#ifdef USE_USM
     using index_buf_type = decltype(get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(0)));
     at::detail::Array<index_buf_type, MAX_TENSORINFO_DIMS> index_ptrs;
     for (size_t i = 0; i < num_indices; i++) {
       index_ptrs[i] = get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(i + 2));
     }
-#else
-    // Initial the index_datas with some dummy valid address.
-    auto index_datas =
-      at::detail::Array<char*, MAX_TENSORINFO_DIMS>((char*)iter.data_ptr(1));
-    for (size_t i = 0; i < num_indices; i++) {
-      index_datas[i] = (char*)iter.data_ptr(i + 2);
-    }
-#define ACCESSOR_DEFINE(n) \
-  auto in_acc_##n = get_buffer<dpcpp_r_mode>(__cgh, index_datas[n]);
-    REPEAT_PATTERN(MAX_TENSORINFO_DIMS, ACCESSOR_DEFINE)
-#undef ACCESSOR_DEFINE
-#endif
 
     using local_accessor_t = DPCPP::accessor<
        int64_t,
@@ -530,14 +517,6 @@ void dpcpp_small_index_kernel_impl(
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
       auto local_id = item_id.get_local_id(0);
       auto group_id = item_id.get_group(0);
-
-#ifndef USE_USM
-      at::detail::Array<char*, MAX_TENSORINFO_DIMS> index_ptrs;
-#define ACCESSOR_DEREFER(n) \
-  index_ptrs[n] = in_acc_##n.template get_pointer();
-      REPEAT_PATTERN(MAX_TENSORINFO_DIMS, ACCESSOR_DEREFER)
-#undef ACCESSOR_DEREFER
-#endif
 
       // construct a indices_size table on SLM
       for (int64_t local_index = local_id; local_index < indices_size; local_index += wgroup_size) {
@@ -613,40 +592,18 @@ void dpcpp_index_kernel_impl(
   auto cgf = DPCPP_Q_CGF(__cgh) {
     auto out_data = get_buffer<dpcpp_discard_w_mode>(__cgh, (char*)iter.data_ptr(0));
     auto in_data = get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(1));
-#ifdef USE_USM
     using index_buf_type = decltype(get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(0)));
     at::detail::Array<index_buf_type, MAX_TENSORINFO_DIMS> index_ptrs;
     for (size_t i = 0; i < num_indices; i++) {
       index_ptrs[i] = get_buffer<dpcpp_r_mode>(__cgh, (char*)iter.data_ptr(i + 2));
     }
-#else
-    // Initial the index_datas with some dummy valid address.
-    auto index_datas =
-      at::detail::Array<char*, MAX_TENSORINFO_DIMS>((char*)iter.data_ptr(1));
-    for (size_t i = 0; i < num_indices; i++) {
-      index_datas[i] = (char*)iter.data_ptr(i + 2);
-    }
-#define ACCESSOR_DEFINE(n) \
-  auto in_acc_##n = get_buffer<dpcpp_r_mode>(__cgh, index_datas[n]);
-    REPEAT_PATTERN(MAX_TENSORINFO_DIMS, ACCESSOR_DEFINE)
-#undef ACCESSOR_DEFINE
-#endif
-
 
     auto offset_calc = make_offset_calculator<3>(iter);
-
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
       auto linear_idx = item_id.get_linear_id();
       auto offsets    = offset_calc.get(linear_idx);
       auto out_ptr = get_pointer(out_data) + offsets[0];
       auto in_ptr = get_pointer(in_data) + offsets[1];
-#ifndef USE_USM
-      at::detail::Array<char*, MAX_TENSORINFO_DIMS> index_ptrs;
-#define ACCESSOR_DEREFER(n) \
-  index_ptrs[n] = in_acc_##n.template get_pointer();
-      REPEAT_PATTERN(MAX_TENSORINFO_DIMS, ACCESSOR_DEREFER)
-#undef ACCESSOR_DEREFER
-#endif
       int64_t offset  = 0;
       //#pragma unroll
       for (size_t i = 0; i < num_indices; i++) {

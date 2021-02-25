@@ -232,8 +232,7 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
 
   // Prepare input tensor strides for calculating result index
   if (N > 0) {
-#if defined(USE_USM)
-#  if defined(USE_ONEDPL)
+#if defined(USE_ONEDPL)
     auto dpcpp_queue = dpcppGetCurrentQueue();
     auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
     auto tensor_begin = tensor.data_ptr<long>();
@@ -268,53 +267,8 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
       }
     }
   tensor.resize_({num_nonzeros, num_dim});
-#  else
-    throw std::runtime_error("no oneDPL found when compile. USM nonzero not supported");
-#  endif
 #else
-    if (canUse32BitIndexMath(self)) {
-      TensorInfo<scalar_t, uint32_t> input =
-        getTensorInfo<scalar_t, uint32_t>(self);
-      auto idx_fuc = idx_functor<uint32_t>(input);
-      input.collapseDims();
-
-      TensorInfo<long, uint32_t> output = getTensorInfo<long, uint32_t>(tensor);
-      output.collapseDims();
-
-      auto queue = dpcppGetCurrentQueue();
-      auto num_nonzeros = pattern_scan(
-        queue,
-        input,
-        output,
-        static_cast<uint32_t>(N),
-        NonZeroOp<scalar_t>{},
-        idx_fuc);
-
-      // Resize the output tensor to the real size
-      int64_t real_sizes[2] = {(int64_t)num_nonzeros, (int64_t)num_dim};
-      TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 2, real_sizes, nullptr);
-    } else {
-      TensorInfo<scalar_t, uint64_t> input =
-        getTensorInfo<scalar_t, uint64_t>(self);
-      auto idx_fuc = idx_functor<uint64_t>(input);
-      input.collapseDims();
-
-      TensorInfo<long, uint64_t> output = getTensorInfo<long, uint64_t>(tensor);
-      output.collapseDims();
-
-      auto queue = dpcppGetCurrentQueue();
-      auto num_nonzeros = pattern_scan(
-        queue,
-        input,
-        output,
-        static_cast<uint64_t>(N),
-        NonZeroOp<scalar_t>{},
-        idx_fuc);
-
-      // Resize the output tensor to the real size
-      int64_t real_sizes[2] = {(int64_t)num_nonzeros, (int64_t)num_dim};
-      TensorImpl_resizeNd(TensorImpl_Unwrap(tensor), 2, real_sizes, nullptr);
-    }
+    throw std::runtime_error("no oneDPL found when compile. USM nonzero not supported");
 #endif
 
   }

@@ -14,8 +14,7 @@
 #include <core/TensorImplUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <utils/ATDispatch.h>
-
-
+#include <utils/SimpelReduce.h>
 #include <operators/Reduce.h>
 
 DPCPP_DEF_K2(updateOutputName, typename scalar_t);
@@ -618,11 +617,11 @@ void spatial_class_nll_criterion_update_output_kernel(
       partial_sums[local_idx] = input_sum;
       partial_weight[local_idx] = acc_weight;
 
-      at::dpcpp::reduce(item_id, partial_sums, [](accscalar_t a, accscalar_t b) {
+      at::dpcpp::simple_reduce(item_id, partial_sums, [](accscalar_t a, accscalar_t b) {
         return Numerics<accscalar_t>::add(a, b);
       });
 
-      at::dpcpp::reduce(item_id, partial_weight, [](accscalar_t a, accscalar_t b) {
+      at::dpcpp::simple_reduce(item_id, partial_weight, [](accscalar_t a, accscalar_t b) {
         return Numerics<accscalar_t>::add(a, b);
       });
 

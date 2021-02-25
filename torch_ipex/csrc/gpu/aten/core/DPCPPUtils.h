@@ -5,19 +5,9 @@
 
 #include <core/DPCPP.h>
 #include <core/Device.h>
-#include <core/virtual_ptr.h>
 
 namespace at {
 namespace dpcpp {
-
-// move to c10/dpcpp/DPCPPFunctions.h
-// DeviceIndex device_count();
-
-// move to c10/dpcpp/DPCPPFunctions.h
-// DeviceIndex current_device();
-
-// move to c10/dpcpp/DPCPPFunctions.h
-// void set_device(DeviceIndex device);
 
 int dpcppGetDeviceCount(int* deviceCount);
 
@@ -30,8 +20,6 @@ int dpcppGetDeviceIdFromPtr(DeviceIndex* device_id, void* ptr);
 DPCPP::device dpcppGetRawDevice(DeviceIndex device_index);
 
 DPCPPDeviceSelector dpcppGetDeviceSelector(DeviceIndex device_index);
-
-DPCPP::codeplay::PointerMapper& dpcppGetBufferMap();
 
 DPCPP::queue& dpcppGetCurrentQueue();
 

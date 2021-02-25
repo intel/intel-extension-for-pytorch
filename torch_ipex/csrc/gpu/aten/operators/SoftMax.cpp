@@ -6,7 +6,7 @@
 #include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
 #include <utils/Numerics.h>
-#include <operators/Reduce.h>
+#include <utils/SimpelReduce.h>
 
 #ifdef USE_PRIMITIVE_CACHE
 #include <oneDNN/LRUCache.h>
@@ -121,7 +121,7 @@ void SpatialSoftMaxForward(
           // to accscalar_t
           local_acc_max[local_id] = static_cast<accscalar_t>(max_input);
 
-          at::dpcpp::reduce(item_id, local_acc_max, [](accscalar_t a, accscalar_t b) {
+          at::dpcpp::simple_reduce(item_id, local_acc_max, [](accscalar_t a, accscalar_t b) {
             return Numerics<accscalar_t>::max(a, b);
           });
 
@@ -134,7 +134,7 @@ void SpatialSoftMaxForward(
           }
           local_acc_sum[local_id] = sum_input;
 
-          at::dpcpp::reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
+          at::dpcpp::simple_reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
             return a + b;
           });
 
@@ -198,7 +198,7 @@ void SpatialSoftMaxBackward(
           }
           local_acc_sum[local_id] = thread_sum;
 
-          at::dpcpp::reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
+          at::dpcpp::simple_reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
             return a + b;
           });
 

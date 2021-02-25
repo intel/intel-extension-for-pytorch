@@ -28,13 +28,7 @@ Tensor lgamma(const Tensor & self) {
   Tensor out = at::empty_like(self);
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lgamma", [&] {
-#ifdef USE_USM
     oneapi::mkl::vm::lgamma(dpcpp_queue, n, (scalar_t *)self.data_ptr(), (scalar_t *)out.data_ptr());
-#else
-    auto a = make_buffer<scalar_t>(self.data_ptr());
-    auto y = make_buffer<scalar_t>(out.data_ptr());
-    oneapi::mkl::vm::lgamma(dpcpp_queue, n, a, y);
-#endif
   });
 
   return out;
@@ -48,12 +42,7 @@ Tensor& lgamma_(Tensor & self) {
   int64_t n = self.numel();
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lgamma_", [&] {
-#ifdef USE_USM
     oneapi::mkl::vm::lgamma(dpcpp_queue, n, (scalar_t *)self.data_ptr(), (scalar_t *)self.data_ptr());
-#else
-    auto a = make_buffer<scalar_t>(self.data_ptr());
-    oneapi::mkl::vm::lgamma(dpcpp_queue, n, a, a);
-#endif
   });
 
   return self;

@@ -78,10 +78,14 @@ struct ReduceConfig {
   DPCPP::range<2> get_local_size() const {
     int sg_size =
         DPCPP_SUB_GROUP_SIZE; // to be replaced with real sub_group_size;
+    //return DPCPP::range<2>(sg_size, work_group_size / sg_size);
     return DPCPP::range<2>(work_group_size / sg_size, sg_size);
   }
 
   DPCPP::range<2> get_global_size() const {
+    //return DPCPP::range<2>(
+    //    div_up(num_outputs, step_output) * DPCPP_SUB_GROUP_SIZE,
+    //    wg_per_output * work_group_size / DPCPP_SUB_GROUP_SIZE);
     return DPCPP::range<2>(
         wg_per_output * work_group_size / DPCPP_SUB_GROUP_SIZE,
         div_up(num_outputs, step_output) * DPCPP_SUB_GROUP_SIZE);
@@ -214,7 +218,7 @@ void strided_iterate(func_t f, index_t begin, index_t end, index_t stride) {
 
 template <int vt, typename index_t, typename type_t, typename foo_t>
 Array<type_t, vt> load_memory(
-    const dpcpp_global_ptr_pt<type_t>& in,
+    const type_t *in,
     index_t begin,
     index_t end,
     index_t stride,
@@ -230,7 +234,7 @@ Array<type_t, vt> load_memory(
 
 template <int vt, typename index_t, typename type_t>
 Array<type_t, vt> load_memory(
-    const dpcpp_global_ptr_pt<type_t>& in,
+    const type_t *in,
     index_t begin,
     index_t end,
     index_t stride) {
@@ -316,7 +320,7 @@ struct ReduceOp {
         noutputs(noutputs) {}
 
   Array<scalar_t, vt0> load_inputs(
-      const dpcpp_global_ptr_pt<scalar_t>& data,
+      const scalar_t *data,
       index_t offset) const {
     index_t end = config.num_inputs;
     index_t stride = input_calc.strides_[0][0] / sizeof(scalar_t);
@@ -334,7 +338,7 @@ struct ReduceOp {
   }
 
   arg_t thread_reduce_once(
-      const dpcpp_global_ptr_pt<scalar_t>& data,
+      const scalar_t *data,
       index_t offset) const {
     auto values = load_inputs(data, offset);
 
@@ -349,7 +353,7 @@ struct ReduceOp {
   }
 
   arg_t thread_reduce(
-      const dpcpp_global_ptr_pt<scalar_t>& data,
+      const scalar_t *data,
       const DPCPP::nd_item<2>& item_id) const {
     arg_t value = ident;
     index_t idx = config.input_idx(item_id);
@@ -390,11 +394,11 @@ struct ReduceOp {
 
   bool mark_block_finished(
       const dpcpp_local_ptr_pt<int>& last_wg_done_ptr,
-      const dpcpp_global_ptr_pt<int>& smem,
+      int *smem,
       const DPCPP::nd_item<2>& item_id) const {
     item_id.barrier(dpcpp_global_and_local_fence);
     if (item_id.get_local_linear_id() == 0) {
-      dpcpp_multi_ptr<int, dpcpp_global_space> sema_multi_ptr(smem);
+      dpcpp_multi_ptr<int, dpcpp_global_space> sema_multi_ptr((dpcpp_global_ptr_pt<int>)smem);
       DPCPP::atomic<int> at_var(sema_multi_ptr + item_id.get_group(1));
       int prev_blocks_finished = at_var.fetch_add(1);
 
@@ -410,7 +414,7 @@ struct ReduceOp {
 
   template <bool can_acc>
   arg_t accumulate_in_output(
-      const dpcpp_global_ptr_pt<out_scalar_t>& out,
+      const out_scalar_t *out,
       arg_t value,
       typename std::enable_if<can_acc>::type* = nullptr) const {
     return ops.combine(*out, value);
@@ -421,7 +425,7 @@ struct ReduceOp {
   // when accumulation in the output is not possible.
   template <bool can_acc>
   arg_t accumulate_in_output(
-      const dpcpp_global_ptr_pt<out_scalar_t>& out,
+      out_scalar_t *out,
       arg_t,
       typename std::enable_if<!can_acc>::type* = nullptr) const {
     // TODO: Replace following assert with dpcpp counterparts.
@@ -432,16 +436,16 @@ struct ReduceOp {
   template <class T>
   void set_results(
       const T x,
-      const dpcpp_global_ptr_pt<out_scalar_t>& out0,
-      const dpcpp_global_ptr_pt<out_scalar_t>& out1) const {
+      out_scalar_t *out0,
+      out_scalar_t *out1) const {
     *out0 = x;
   }
 
   template <class T>
   void set_results(
       const std::pair<T, T> x,
-      const dpcpp_global_ptr_pt<out_scalar_t>& out0,
-      const dpcpp_global_ptr_pt<out_scalar_t>& out1) const {
+      out_scalar_t *out0,
+      out_scalar_t *out1) const {
     if (noutputs >= 1) {
       *out0 = x.first;
     }
@@ -452,18 +456,18 @@ struct ReduceOp {
 
   void set_results_to_output(
       arg_t value,
-      const dpcpp_global_ptr_pt<out_scalar_t>& out0,
-      const dpcpp_global_ptr_pt<out_scalar_t>& out1) const {
+      out_scalar_t *out0,
+      out_scalar_t *out1) const {
     set_results(ops.project(value), out0, out1);
   }
 
   arg_t global_reduce(
       arg_t value,
-      const dpcpp_global_ptr_pt<out_scalar_t>& out0,
-      const dpcpp_global_ptr_pt<out_scalar_t>& out1,
+      out_scalar_t *out0,
+      out_scalar_t *out1,
       const dpcpp_local_ptr_pt<arg_t>& local_ptr,
-      const dpcpp_global_ptr_pt<char>& global_reduce_buf,
-      const dpcpp_global_ptr_pt<int>& smem,
+      char *global_reduce_buf,
+      int  *smem,
       const DPCPP::nd_item<2>& item_id) const {
     arg_t* reduce_buffer = (arg_t*)global_reduce_buf;
     bool should_store =
@@ -516,12 +520,12 @@ struct ReduceOp {
   }
 
   void run(
-      const dpcpp_global_ptr_pt<char>& input,
-      const dpcpp_global_ptr_pt<char>& output0,
-      const dpcpp_global_ptr_pt<char>& output1,
+      const char *input,
+      char *output0,
+      char *output1,
       const dpcpp_local_ptr_pt<arg_t>& local_ptr,
-      const dpcpp_global_ptr_pt<char>& global_reduce_buf,
-      const dpcpp_global_ptr_pt<int>& smem,
+      char *global_reduce_buf,
+      int *smem,
       const DPCPP::nd_item<2>& item_id) const {
     index_t output_idx = config.output_idx(item_id);
     index_t input_idx = config.input_idx(item_id);
@@ -531,7 +535,7 @@ struct ReduceOp {
         input_idx < static_cast<index_t>(config.num_inputs)) {
       auto input_slice = (char*)input + base_offsets[1];
       value =
-          thread_reduce((dpcpp_global_ptr_pt<scalar_t>)input_slice, item_id);
+          thread_reduce((scalar_t *)input_slice, item_id);
     }
     bool should_wg_reduce = config.should_wg_reduce();
     if (should_wg_reduce) {
@@ -547,8 +551,8 @@ struct ReduceOp {
     if (config.should_global_reduce()) {
       value = global_reduce(
           value,
-          (dpcpp_global_ptr_pt<out_scalar_t>)out0,
-          (dpcpp_global_ptr_pt<out_scalar_t>)out1,
+          (out_scalar_t*)out0,
+          (out_scalar_t*)out1,
           local_ptr,
           global_reduce_buf,
           smem,
@@ -556,12 +560,12 @@ struct ReduceOp {
     } else if (config.should_store(output_idx, item_id)) {
       if (accumulate) {
         value = accumulate_in_output<can_accumulate_in_output>(
-            (dpcpp_global_ptr_pt<out_scalar_t>)out0, value);
+            (out_scalar_t*)out0, value);
       }
       set_results_to_output(
           value,
-          (dpcpp_global_ptr_pt<out_scalar_t>)out0,
-          (dpcpp_global_ptr_pt<out_scalar_t>)out1);
+          (out_scalar_t*)out0,
+          (out_scalar_t*)out1);
     }
   }
 };
@@ -573,7 +577,6 @@ static void launch_reduce_kernel(
   using acc_t = typename R::arg_t;
   using output_t = typename R::out_t;
   auto queue = dpcppGetCurrentQueue();
-  DPCPP::buffer<uint8_t, 1> dummy_buffer(DPCPP::range<1>(1));
 
   // This is a work-around because dpcpp_discard_w_mode doesn't work in some
   // conditions
@@ -583,30 +586,20 @@ static void launch_reduce_kernel(
   }
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_acc = DPCPPAccessor<dpcpp_r_mode>(cgh, reduction.src);
-    auto out0_acc = DPCPPAccessor<dpcpp_discard_w_mode>(
-        cgh, reduction.dst0);
-    auto out1_acc = reduction.noutputs <= 1
-        ? DPCPPAccessor<dpcpp_discard_w_mode>(cgh, dummy_buffer)
-        : // dummy
-        DPCPPAccessor<dpcpp_discard_w_mode>(
-            cgh, reduction.dst1);
+    auto in_ptr = static_cast<const char *>(reduction.src);
+    auto out0_ptr = static_cast<char *>(reduction.dst0);
+    auto out1_ptr = reduction.noutputs <= 1
+        ? NULL
+        : static_cast<char *>(reduction.dst1);
     auto local_acc = dpcpp_local_acc_t<acc_t>(config.work_group_size, cgh);
 
-    auto global_reduce_acc = config.should_global_reduce()
-        ? DPCPPAccessor<dpcpp_rw_mode>(cgh, reduction.buffer)
-        : DPCPPAccessor<dpcpp_rw_mode>(cgh, dummy_buffer); // dummy
-    auto sema_acc = config.should_global_reduce()
-        ? DPCPPAccessor<dpcpp_rw_mode>(cgh, reduction.semaphores)
-        : DPCPPAccessor<dpcpp_rw_mode>(cgh, dummy_buffer); // dummy
+    auto global_reduce_ptr = config.should_global_reduce()
+        ? static_cast<char *>(reduction.buffer) : NULL;
+    auto sema_ptr = config.should_global_reduce()
+        ? static_cast<int *>(reduction.semaphores) : NULL;
 
     auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<2> item_id) {
-      auto in_ptr = in_acc.template get_pointer<char>();
-      auto out0_ptr = out0_acc.template get_pointer<char>();
-      auto out1_ptr = out1_acc.template get_pointer<char>();
       auto local_ptr = (dpcpp_local_ptr_pt<acc_t>)local_acc.get_pointer().get();
-      auto global_reduce_ptr = global_reduce_acc.template get_pointer<char>();
-      auto sema_ptr = sema_acc.template get_pointer<int>();
       reduction.run(
           in_ptr,
           out0_ptr,
@@ -749,26 +742,5 @@ inline void dpcpp_reduce_kernel(
     launch_reduce_kernel<scalar_t>(config, reduce);
   }
 }
-
-template <typename reduce_op, typename nd_item_id, typename local_shared>
-static inline void reduce(
-  nd_item_id item_id,
-  const local_shared& local_shared_mem,
-  reduce_op bin_op) {
-  auto local_idx = item_id.get_local_id(0);
-  auto group_size = item_id.get_local_range().size();
-
-  decltype(group_size) __k = 1;
-  do {
-    item_id.barrier(DPCPP::access::fence_space::local_space);
-    if (local_idx % (2 * __k) == 0 && local_idx + __k < group_size) {
-      local_shared_mem[local_idx] = bin_op(
-        local_shared_mem[local_idx], local_shared_mem[local_idx + __k]);
-    }
-    __k *= 2;
-  } while (__k < group_size);
-  item_id.barrier(DPCPP::access::fence_space::local_space);
-}
-
 } // namespace dpcpp
 } // namespace at

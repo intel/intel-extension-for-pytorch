@@ -27,14 +27,7 @@ Tensor mv(const Tensor & self, const Tensor & vec) {
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "mv", [&] {
-#ifdef USE_USM
     oneapi::mkl::blas::row_major::gemv(dpcpp_queue, oneapi::mkl::transpose::N, m, n, (scalar_t)1.0, (scalar_t *)self.data_ptr(), lda, (scalar_t *)vec.data_ptr(), 1, (scalar_t)0, (scalar_t *)out.data_ptr(), 1);
-#else
-    auto self_buf = make_buffer<scalar_t>(self.data_ptr());
-    auto vec_buf = make_buffer<scalar_t>(vec.data_ptr());
-    auto out_buf = make_buffer<scalar_t>(out.data_ptr());
-    oneapi::mkl::blas::row_major::gemv(dpcpp_queue, oneapi::mkl::transpose::N, m, n, (scalar_t)1.0, self_buf, lda, vec_buf, 1, (scalar_t)0, out_buf, 1);
-#endif
   });
 
   return out;
@@ -42,10 +35,6 @@ Tensor mv(const Tensor & self, const Tensor & vec) {
   AT_ERROR("mv: oneMKL library not found in compilation");
 #endif
 }
-
-
-
-
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

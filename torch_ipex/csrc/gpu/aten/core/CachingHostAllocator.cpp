@@ -12,28 +12,6 @@
 namespace at {
 namespace dpcpp {
 
-#ifndef USE_USM
-
-Allocator* dpcpp_getCachingHostAllocator() {
-  // Not support host allocator if no USM support
-  throw std::runtime_error("The host allocator is not supported without USM support.");
-  return nullptr;
-}
-
-void dpcpp_recordEventInCachingHostAllocator(void* ptr, DPCPP::event& e) {
-  // Do nothing if no USM support
-}
-
-void dpcpp_emptyCacheInCachingHostAllocator() {
-  // Do nothing if no USM support
-}
-
-bool dpcpp_isAllocatedByCachingHostAllocator(void* ptr) {
-  return false;
-}
-
-#else // USE_USM
-
 class CHABlock {
 public:
   CHABlock(size_t size, void* ptr = nullptr) : mSize(size), mPtr(ptr) {}
@@ -223,5 +201,4 @@ bool dpcpp_isAllocatedByCachingHostAllocator(void* ptr) {
   return CachingHostAllocator::Instance()->isHostPtr(ptr);
 }
 
-#endif
 }} // namespace at::dpcpp

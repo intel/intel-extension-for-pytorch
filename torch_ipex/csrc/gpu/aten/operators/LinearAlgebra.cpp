@@ -34,16 +34,8 @@ void copy_triangle_symmetric_template(Tensor& self, bool upper) {
 
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
-#ifdef USE_USM
     auto data_ptr = (scalar_t *)self.data_ptr();
-#else
-    auto data_acc = DPCPPAccessor<dpcpp_rw_mode>(__cgh, self.data_ptr());
-#endif
-
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id) {
-#ifndef USE_USM
-      auto data_ptr = data_acc.template get_pointer<scalar_t>();
-#endif
       auto linear_id = item_id.get_linear_id();
       float triangle_row_ = (Numerics<float>::sqrt(1 + 8.0 * linear_id) - 1 ) / 2;
       int64_t triangle_row = triangle_row_;
@@ -95,13 +87,8 @@ Tensor & cholesky_inverse_out(Tensor & out, const Tensor & self, bool upper) {
     auto upper_lower = upper ? (oneapi::mkl::uplo::upper) : (oneapi::mkl::uplo::lower);
     std::int64_t scratchpadsize = oneapi::mkl::lapack::potri_scratchpad_size<scalar_t>(dpcpp_queue, upper_lower, n, lda);
     Tensor scratchpad_at = at::empty({scratchpadsize}, out.options());
-#ifdef USE_USM
-    oneapi::mkl::lapack::potri(dpcpp_queue, upper_lower, n, (scalar_t *)out.data_ptr(), lda, (scalar_t *)scratchpad_at.data_ptr(), scratchpadsize);
-#else
-    auto a = make_buffer<scalar_t>(out.data_ptr());
-    auto scratchpad_buf = make_buffer<scalar_t>(scratchpad_at.data_ptr());
-    oneapi::mkl::lapack::potri(dpcpp_queue, upper_lower, n, a, lda, scratchpad_buf, scratchpadsize);
-#endif
+    oneapi::mkl::lapack::potri(dpcpp_queue, upper_lower, n,
+        (scalar_t *)out.data_ptr(), lda, (scalar_t *)scratchpad_at.data_ptr(), scratchpadsize);
 
     impl::copy_triangle_symmetric_template<scalar_t>(out, upper);
   });
@@ -140,14 +127,9 @@ std::tuple<Tensor&, Tensor&> geqrf_out(Tensor &ra, Tensor &tau, const Tensor &a)
     std::int64_t scratchpadsize = oneapi::mkl::lapack::geqrf_scratchpad_size<scalar_t>(dpcpp_queue, m, n, lda);
     Tensor scratchpad_at = at::empty({scratchpadsize}, a.options());
 
-#ifdef USE_USM
-    oneapi::mkl::lapack::geqrf(dpcpp_queue, m, n, (scalar_t *)ra.data_ptr(), lda, (scalar_t *)tau.data_ptr(), (scalar_t *)scratchpad_at.data_ptr(), scratchpadsize);
-#else
-    auto scratchpad_buf = make_buffer<scalar_t>(scratchpad_at.data_ptr());
-    auto a_ = make_buffer<scalar_t>(ra.data_ptr());
-    auto tau_ = make_buffer<scalar_t>(tau.data_ptr());
-    oneapi::mkl::lapack::geqrf(dpcpp_queue, m, n, a_, lda, tau_, scratchpad_buf, scratchpadsize);
-#endif
+    oneapi::mkl::lapack::geqrf(
+        dpcpp_queue, m, n, (scalar_t *)ra.data_ptr(), lda,
+        (scalar_t *)tau.data_ptr(), (scalar_t *)scratchpad_at.data_ptr(), scratchpadsize);
   });
 
   return std::tuple<Tensor&, Tensor&>(ra, tau);
@@ -184,15 +166,9 @@ Tensor& ger_out(Tensor & out, const Tensor & self, const Tensor & vec2) {
 
   IPEX_DISPATCH_FLOATING_TYPES(out.scalar_type(), "ger_out", [&] {
     auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-#ifdef USE_USM
     auto x = (scalar_t *)self.data_ptr();
     auto y = (scalar_t *)vec2.data_ptr();
     auto a = (scalar_t *)out.data_ptr();
-#else
-    auto x = make_buffer<scalar_t>(self.data_ptr());
-    auto y = make_buffer<scalar_t>(vec2.data_ptr());
-    auto a = make_buffer<scalar_t>(out.data_ptr());
-#endif
     // The BLAS API is column major. To save the transpose and element move, we switch the two input.
     // The ger documents https://spec.oneapi.com/versions/0.6.0/oneMKL/GUID-BD2E87B3-5FA7-4E0C-88E2-1982AB0773A2.html
     oneapi::mkl::blas::ger(dpcpp_queue, m, n, (float)1.0, y, vec2_stride, x, input_stride, a, m);

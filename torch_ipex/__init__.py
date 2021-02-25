@@ -216,9 +216,6 @@ def library_paths():
     return paths
 
 
-def _usm_is_enabled():
-    return _C._usm_is_enabled()
-
 def _onedpl_is_enabled():
     return _C._onedpl_is_enabled()
 

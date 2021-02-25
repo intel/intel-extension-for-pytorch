@@ -47,16 +47,7 @@ namespace dpcpp {
 
 static inline dnnl::memory dpcpp_onednn_memory(
     dnnl::memory::desc md, dnnl::engine& engine, void* ptr) {
-#ifdef USE_USM
-  {
-    return dnnl::memory(md, engine, ptr);
-  }
-#else
-  {
-    auto buffer = make_buffer<uint8_t>(ptr);
-    return dnnl::sycl_interop::make_memory(md, engine, buffer);
-  }
-#endif
+  return dnnl::memory(md, engine, ptr);
 }
 
 //

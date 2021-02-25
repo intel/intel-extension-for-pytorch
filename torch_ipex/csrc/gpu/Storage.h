@@ -395,12 +395,7 @@ public:
     auto dpcpp_queue = at::dpcpp::dpcppGetCurrentQueue();
     auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
     scalar_t* data_ptr = THXStorage_data(storage);
-#ifdef USE_USM
     auto self_begin = data_ptr;
-#else
-    auto data_buff = at::dpcpp::make_buffer<scalar_t>(data_ptr);
-    auto self_begin = oneapi::dpl::begin(data_buff);
-#endif
     std::fill(policy, self_begin, self_begin + (storage->nbytes() / sizeof(scalar_t)), value);
 #else
     AT_ERROR("no pstl");

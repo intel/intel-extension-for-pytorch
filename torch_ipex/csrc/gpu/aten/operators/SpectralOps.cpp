@@ -158,13 +158,8 @@ void _mkl_dft(
 
   desc.commit(dpcpp_queue);
 
-#ifdef USE_USM
   auto in_data = (scalar_t*)input.data_ptr();
   auto out_data = (scalar_t*)output.data_ptr();
-#else
-  auto in_data = make_buffer<scalar_t>(input.data_ptr());
-  auto out_data = make_buffer<scalar_t>(output.data_ptr());
-#endif
 
   if (!inverse) {
     desc.compute_forward(in_data, out_data);
