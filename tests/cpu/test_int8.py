@@ -28,13 +28,15 @@ class TestQuantizationConfigueTune(TestCase):
         x = torch.randn((4, 5), dtype=torch.float32).to(device)
         model = torch.nn.Linear(5, 10, bias=True).float().to(device)
 
+        model1 = copy.deepcopy(model)
+        x1 = x.clone()
         conf = ipex.AmpConf(torch.int8)
         with ipex.AutoMixPrecision(conf, running_mode='calibration'):
-            ref = model(x)
+            ref = model1(x1)
         conf.save('configure.json')
         conf = ipex.AmpConf(torch.int8, 'configure.json')
         with ipex.AutoMixPrecision(conf, running_mode='inference'):
-            y = model(x)
+            y = model1(x1)
         self.assertTrue(ipex.core.is_int8_dil_tensor(y))
         jsonFile = open('configure.json', 'r')
         data = json.load(jsonFile)
@@ -42,15 +44,19 @@ class TestQuantizationConfigueTune(TestCase):
         self.assertTrue(data[0]['quantized'])
 
         # check configure's change can works for calibration step,
-        # need get fp32 tensor for quantized=False.
+        # we need use origin model, because after running inference
+        # step, the model has beem quantized, after change quantized
+        # to False, the output should be fp32, i.e. not be quantized.
         data[0]['quantized'] = False
         jsonFile = open('configure.json', "w+")
         jsonFile.write(json.dumps(data))
         jsonFile.close()
         # use user's changed configure.
+        model2 = copy.deepcopy(model)
+        x2 = x.clone()
         conf = ipex.AmpConf(torch.int8, 'configure.json')
         with ipex.AutoMixPrecision(conf, running_mode='calibration'):
-            ref = model(x)
+            ref = model2(x2)
         conf.save('configure.json')
         conf = ipex.AmpConf(torch.int8, 'configure.json')
         jsonFile = open('configure.json', 'r')
@@ -59,7 +65,7 @@ class TestQuantizationConfigueTune(TestCase):
         self.assertFalse(data[0]['quantized'])
 
         with ipex.AutoMixPrecision(conf, running_mode='inference'):
-            y = model(x)
+            y = model2(x2)
         self.assertTrue(ipex.core.is_fp32_dil_tensor(y))
         os.remove('configure.json')
 
