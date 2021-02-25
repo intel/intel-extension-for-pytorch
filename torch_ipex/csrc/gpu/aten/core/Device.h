@@ -14,25 +14,21 @@ namespace dpcpp {
 
 class DPCPPDeviceSelector : public DPCPP::device_selector {
  public:
-  DPCPPDeviceSelector(const DPCPP::device& dev) : m_target_device(dev.get()) {}
+  DPCPPDeviceSelector(const DPCPP::device& dev) : m_device(dev) {}
 
   DPCPPDeviceSelector(const DPCPPDeviceSelector& other)
       : DPCPP::device_selector(other),
-        m_target_device(other.get_target_device()) {}
+        m_device(other.m_device) {}
 
   int operator()(const DPCPP::device& candidate) const override {
-    if (candidate.is_gpu() && candidate.get() == m_target_device)
+    if (candidate.is_gpu() && candidate == m_device)
       return 100;
     else
       return -1;
   }
 
-  cl_device_id get_target_device() const {
-    return m_target_device;
-  }
-
  private:
-  cl_device_id m_target_device;
+   const DPCPP::device& m_device;
 };
 
 struct DPCPPDevicePool {
