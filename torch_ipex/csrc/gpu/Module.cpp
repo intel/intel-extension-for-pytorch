@@ -48,6 +48,10 @@ static PyObject * THPModule_initExtension(PyObject *self, PyObject *noargs)
   if (!module) throw python_error();
 
   // Register Storage Python objects with DynamicTypes.cpp
+  THXPStorage_postInit<at::kHalf>(module);
+  THXPStorage_postInit<at::kInt>(module);
+  THXPStorage_postInit<at::kBool>(module);
+  THXPStorage_postInit<at::kLong>(module);
   THXPStorage_postInit<at::kFloat>(module);
   THXPStorage_postInit<at::kDouble>(module);
   THXPStorage_postInit<at::kBFloat16>(module);
@@ -167,6 +171,10 @@ void init_module(pybind11::module& m) {
   auto module = m.ptr();
   THDPStream_init(module);
   PyModule_AddFunctions(module, _THCPModule_methods);
+  ASSERT_TRUE(THXPStorage_init<at::kInt>(module));
+  ASSERT_TRUE(THXPStorage_init<at::kLong>(module));
+  ASSERT_TRUE(THXPStorage_init<at::kHalf>(module));
+  ASSERT_TRUE(THXPStorage_init<at::kBool>(module));
   ASSERT_TRUE(THXPStorage_init<at::kFloat>(module));
   ASSERT_TRUE(THXPStorage_init<at::kDouble>(module));
   ASSERT_TRUE(THXPStorage_init<at::kBFloat16>(module));

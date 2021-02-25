@@ -379,6 +379,22 @@ def default_stream(device: Optional[_device_t] = None) -> Stream:
 from torch.storage import _StorageBase
 
 
+class IntStorage(_C.IntStorageBase, _StorageBase):
+    pass
+
+
+class LongStorage(_C.LongStorageBase, _StorageBase):
+    pass
+
+
+class BoolStorage(_C.BoolStorageBase, _StorageBase):
+    pass
+
+
+class HalfStorage(_C.HalfStorageBase, _StorageBase):
+    pass
+
+
 class DoubleStorage(_C.DoubleStorageBase, _StorageBase):
     pass
 
@@ -391,6 +407,10 @@ class BFloat16Storage(_C.BFloat16StorageBase, _StorageBase):
     pass
 
 
+torch._storage_classes.add(IntStorage)
+torch._storage_classes.add(LongStorage)
+torch._storage_classes.add(BoolStorage)
+torch._storage_classes.add(HalfStorage)
 torch._storage_classes.add(DoubleStorage)
 torch._storage_classes.add(FloatStorage)
 torch._storage_classes.add(BFloat16Storage)

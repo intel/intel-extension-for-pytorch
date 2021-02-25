@@ -20,7 +20,7 @@ void THPPointer<THXP_Storage>::free() {
                              {        \
                                 return THP##n##Utils_newReal(value); \
                              };
-AT_FORALL_SCALAR_TYPES_AND(BFloat16,DEFINE_THPUTLIS_NEW);
+AT_FORALL_SCALAR_TYPES_AND3(Bool, Half, BFloat16,DEFINE_THPUTLIS_NEW);
 #undef DEFINE_THPUTLIS_NEW
 
 #define DEFINE_THPUTLIS_UNPACK(s, n) template <> \
@@ -28,5 +28,5 @@ AT_FORALL_SCALAR_TYPES_AND(BFloat16,DEFINE_THPUTLIS_NEW);
                              {        \
                                 return THP##n##Utils_unpackReal(obj); \
                              };
-AT_FORALL_SCALAR_TYPES_AND(BFloat16,DEFINE_THPUTLIS_UNPACK);
+AT_FORALL_SCALAR_TYPES_AND3(Bool, Half, BFloat16,DEFINE_THPUTLIS_UNPACK);
 #undef DEFINE_THPUTLIS_NEW
