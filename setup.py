@@ -7,7 +7,7 @@
 # USE_ONEMKL            - to use oneMKL in operators
 # USE_GEN12HP_ONEDNN    - to use oneDNN Gen12HP branch
 # USE_PERSIST_STREAM    - to use persistent oneDNN stream
-# USE_PRIMITIVE_CACHE   - to use FRAMEWORK primitive cache to cache oneDNN primitives
+# USE_PRIMITIVE_CACHE   - to Cache oneDNN primitives by framework
 # USE_MULTI_CONTEXT     - to create DPC++ runtime context per device
 # USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
