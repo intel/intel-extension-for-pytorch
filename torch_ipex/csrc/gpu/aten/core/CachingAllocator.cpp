@@ -426,6 +426,18 @@ class CachingAllocator {
     return result;
   }
 
+  void dpcpp_dumpMemoryStatus(int deviceIndex) {
+    CADeviceStats& stats = get_stats_for_device(deviceIndex);
+    auto dpcppDev = dpcppGetRawDevice(deviceIndex);
+    size_t device_total = dpcppDev.get_info<dpcpp_dev_global_mem_size>();
+    TORCH_WARN("GPU", deviceIndex, " memory status:");
+    TORCH_WARN("Total capacity: ", format_size(device_total));
+    TORCH_WARN("Allocated: ",
+              format_size(stats.allocated_bytes[static_cast<size_t>(CAStatType::AGGREGATE)].current));
+    TORCH_WARN("Reserved: ",
+              format_size(stats.reserved_bytes[static_cast<size_t>(CAStatType::AGGREGATE)].current));
+  }
+
  private:
 
   at::dpcpp::CADeviceStats& get_stats_for_device(at::DeviceIndex device) {

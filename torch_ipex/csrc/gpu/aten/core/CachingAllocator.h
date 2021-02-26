@@ -74,6 +74,7 @@ void dpcpp_recordQueue(const DataPtr&, at::dpcpp::DPCPPStream stream);
 CADeviceStats dpcpp_getDeviceStats(int device);
 void dpcpp_resetAccumulatedStats(int device);
 void dpcpp_resetPeakStats(int device);
+void dpcpp_dumpMemoryStatus(int deviceIndex);
 std::vector<CASegmentInfo> dpcpp_snapshot();
 std::mutex* getFreeMutex();
 
