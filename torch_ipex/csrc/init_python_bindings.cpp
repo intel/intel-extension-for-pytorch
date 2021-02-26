@@ -20,15 +20,17 @@
 #include "utils.h"
 #include "auto_opt_config.h"
 
+#include "cpu/dil/dil.hpp"
+#include "cpu/dbl/Common.h"
+#include "cpu/ShadeDataContext.h"
 #include "cpu/ExtendOPs.h"
+#include "cpu/MlpOPs.h"
 #include "cpu/ExternalOPs.h"
 #include "cpu/FusionOPs.h"
-#include "cpu/MlpOPs.h"
-#include "cpu/ShadeDataContext.h"
-#include "cpu/dbl/Common.h"
-#include "cpu/dil/dil.hpp"
 #include "cpu/int8/Config.h"
 #include "cpu/int8/quantization/Observer.h"
+#include "ProcessGroupCCL.hpp"
+#include <pybind11/chrono.h>
 
 namespace torch_ipex {
 namespace {
@@ -113,7 +115,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_auto_dnnl", []() { return AutoOptConfig::singleton().get_auto_dnnl(); });
   m.def("enable_mix_bf16_fp32", []() { AutoOptConfig::singleton().set_mix_bf16_fp32(true); });
   m.def("disable_mix_bf16_fp32", []() { AutoOptConfig::singleton().set_mix_bf16_fp32(false); });
-  m.def("get_mix_bf16_fp32", []() { return AutoOptConfig::singleton().get_mix_bf16_fp32(); }); 
+  m.def("get_mix_bf16_fp32", []() { return AutoOptConfig::singleton().get_mix_bf16_fp32(); });
   m.def("packed_add_",
         [](at::Tensor &top_half, at::Tensor &bot_half,
            const at::Tensor &grad, float alpha) {
@@ -202,6 +204,20 @@ void InitIpexModuleBindings(py::module m) {
     }
     Int8OptConfig::get_config().set_indicators(indicators);
   });
+  
+  m.def("enable_torch_ccl", [=]() {
+       py::object module = py::module::import("torch.distributed");
+       py::object register_backend = module.attr("Backend").attr("register_backend"); 
+       register_backend("ccl", py::cpp_function(&c10d::ProcessGroupCCL::createProcessGroupCCL,
+                                            py::arg("store"),
+                                            py::arg("rank"),
+                                            py::arg("size"),
+                                            py::arg("timeout") = std::chrono::milliseconds(
+                                              ::c10d::ProcessGroupCCL::OP_TIMEOUT_MILLIS)));
+       
+  });
+  m.def("set_xpu_mode", [=](std::string mode){
+       AutoOptConfig::singleton().set_xpu_mode(torch_ipex::stringToXPUMode(mode));});
 
   // external OPs
   m.def("roi_align_forward", &IpexExternal::ROIAlign_forward);
@@ -217,7 +233,7 @@ using namespace torch::jit;
 void InitIpexBindings(py::module m) {
   InitIpexModuleBindings(m);
   // jit fusion pass
-  RegisterPreFusionPass pre_pass([](std::shared_ptr<Graph>& g) {
+  torch::jit::registerPrePass([](std::shared_ptr<Graph>& g) {
     if (AutoOptConfig::singleton().get_jit_fuse()) {
       torch::jit::FusionPass(g);
     }

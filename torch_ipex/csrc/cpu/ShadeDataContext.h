@@ -113,7 +113,7 @@ struct ShadeDataContext {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.layout() == c10::Layout::Strided);
 
-    if (tensor.device().type() != c10::DeviceType::DPCPP) {
+    if (tensor.device().type() != c10::DeviceType::XPU) {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.device().type() == c10::DeviceType::CPU);
       return false;
     }
@@ -212,7 +212,7 @@ struct ShadeDataContext {
     if (aten_tensor_type != at::kFloat) {
       return false;
     }
-    auto res = (dil_tensor_type == dil::data_type::bf16 
+    auto res = (dil_tensor_type == dil::data_type::bf16
         || dil_tensor_type == dil::data_type::u8 || dil_tensor_type == dil::data_type::s8);
 
     // Check mix_precision
@@ -235,7 +235,7 @@ struct ShadeDataContext {
   static inline bool isParameterTensor(const at::Tensor &tensor) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
 
-    if (tensor.device().type() != c10::DeviceType::DPCPP) {
+    if (tensor.device().type() != c10::DeviceType::XPU) {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.device().type() == c10::DeviceType::CPU);
       return false;
     }
@@ -257,10 +257,10 @@ struct ShadeDataContext {
    */
   static inline void setParameterTensor(const at::Tensor &tensor) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.has_storage());
-    
-    // TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.device().type() == c10::DeviceType::DPCPP);
+
+    // TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.device().type() == c10::DeviceType::XPU);
     // TODO: if device is cpu, this function should not be called
-    if (tensor.device().type() != c10::DeviceType::DPCPP) {
+    if (tensor.device().type() != c10::DeviceType::XPU) {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.device().type() == c10::DeviceType::CPU);
       return;
     }

@@ -6,6 +6,16 @@ namespace torch_ipex {
 
 using namespace torch_ipex::cpu::lp::int8;
 
+enum class XPUMode  {CPU, GPU, FPGA};
+
+inline XPUMode stringToXPUMode(std::string mode){
+   if(mode == "CPU"){
+     return XPUMode::CPU;
+   }else{
+     throw std::runtime_error("Unknown xpu mode");     
+   }
+}
+
 class AutoOptConfig {
 public:
   static AutoOptConfig& singleton() {
@@ -58,10 +68,18 @@ public:
   inline bool get_int8_calibration() {
     return calibration_step_;
   }
+  inline void set_xpu_mode(XPUMode xpu_mode){
+    xpu_mode_ = xpu_mode;
+  }
+ 
+  inline XPUMode get_xpu_mode(){
+    return xpu_mode_;
+  }
+
 private:
-  AutoOptConfig()
-      : auto_dnnl_(true), mix_bf16_fp32_(false), mix_int8_fp32_(false),
-        jit_fuse_(true), train_(false), calibration_step_(false) {}
+  AutoOptConfig() : auto_dnnl_(true), mix_bf16_fp32_(false), mix_int8_fp32_(false),
+                    jit_fuse_(true), train_(false), calibration_step_(false), xpu_mode_(XPUMode::CPU) {}
+
   ~AutoOptConfig() = default;
   AutoOptConfig(const AutoOptConfig&) = default;
   AutoOptConfig& operator=(const AutoOptConfig&) = default;
@@ -75,6 +93,7 @@ private:
   bool mix_int8_fp32_;
   // the flag for one iteration of calibration step whether end or not
   bool calibration_step_;
+  XPUMode xpu_mode_;
 };
 
 } // namespace torch_ipex

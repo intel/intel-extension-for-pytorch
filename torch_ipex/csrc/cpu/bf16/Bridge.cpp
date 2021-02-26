@@ -24,13 +24,14 @@ at::Tensor gen_consistent_tensor(const at::Tensor & self) {
     nullptr,
     &(c10::detail::deleteNothing),
     at::DeviceType::CPU);
+  size_t nbytes = self_dil_storage.get_nelems() * c10::elementSize(at::kBFloat16);
   auto storage_impl = c10::make_intrusive<at::StorageImpl>(
-    at::scalarTypeToTypeMeta(at::kBFloat16),
-    self_dil_storage.get_nelems(),
+    at::StorageImpl::use_byte_size_t(),
+    nbytes,
     std::move(shade_data_ptr),
     nullptr,
     /*resizeable=*/false);
-  auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::CPUTensorId);
+  auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::CPU, at::kBFloat16);
   IPEXTensorImpl* cur_ipex_impl = (IPEXTensorImpl *)_tensor.unsafeGetTensorImpl();
   cur_ipex_impl->copy_meta_info(self.unsafeGetTensorImpl(), true);
   return _tensor;

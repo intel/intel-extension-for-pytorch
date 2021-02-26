@@ -203,7 +203,7 @@ void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> s
   TORCH_CHECK(!(tensor_dtype == at::kQInt8 || tensor_dtype == at::kQUInt8), "Please disable auto mix-precision if you want to enable int8/uint8 manually");
   if (tensor_dtype != at::kFloat)
     return;
- 
+
   auto src_type = try_gen_dil_storage(tensor).get_data_type();
   if (!uint8_used && (src_type == dil::data_type::u8 || src_type == dil::data_type::s8))
     return;
@@ -217,7 +217,7 @@ void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> s
       inner_scales.push_back(float(127.5) / tensor[i].abs().max().item<float>());
     }
   }
- 
+
   reorder_to_dtype(tensor, dst_scalar_type, inner_scales);
 }
 
@@ -236,8 +236,8 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, 
 
 void equip_dil_buffer_nosync_shape(const at::Tensor& tensor, dil::tensor dil_buffer) {
   TORCH_CHECK(
-      tensor.device().is_dpcpp(),
-      "dil buffer can only be equipped to dpcpp tensor");
+      tensor.device().is_xpu(),
+      "dil buffer can only be equipped to xpu tensor");
 
   // Build new shade data context
   cpu::ShadeDataContext *new_shade_data_context = cpu::ShadeDataContext::allocShadeDataContext();
@@ -245,7 +245,7 @@ void equip_dil_buffer_nosync_shape(const at::Tensor& tensor, dil::tensor dil_buf
 
   //dil_buffer.get_desc().print_desc();
   // TORCH_CHECK(dil_buffer.is_dense(true), "dil storage must be dense");
-  
+
   new_shade_data_context->dil_tensor = dil_buffer;
 
   void *tensor_data = nullptr;
@@ -267,15 +267,14 @@ void equip_dil_buffer_nosync_shape(const at::Tensor& tensor, dil::tensor dil_buf
     tensor_data,
     new_shade_data_context,
     &(cpu::ShadeDataContext::freeShadeDataContext),
-    tensor.device().type());
+    tensor.device());
 
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)tensor.unsafeGetTensorImpl();
   ipex_tensor_impl->storage().set_data_ptr(std::move(shade_data_ptr));
 
   // After equip_dil_buffer(), whole storage should be managed by dil tensor,
   // and thus storage metadata should be overwritten by dil tensor
-  // Note: Storage::set_numel() might be removed later
-  ipex_tensor_impl->storage().set_numel(dil_buffer.get_nelems());
+  ipex_tensor_impl->storage().set_nbytes(dil_buffer.get_nelems() * tensor.itemsize());
 }
 
 void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer, int64_t padding_size) {
@@ -283,10 +282,12 @@ void equip_dil_buffer(const at::Tensor& tensor, dil::tensor dil_buffer, int64_t 
 
   IPEXTensorImpl* ipex_tensor_impl = (IPEXTensorImpl *)tensor.unsafeGetTensorImpl();
   if (dil_buffer.is_public_format()) {
-    // We add the padding_size here since the dil_buffer could be plain format with paddings
-    // (for example the expected LSTM weight format of oneDNN), we should take the paddings 
-    // into consideration during checkInBoundsForStorage
-    ipex_tensor_impl->set_strided(dil_buffer.get_dims(), dil_buffer.get_strides(), ipex_tensor_impl->storage_offset(), padding_size);
+    ipex_tensor_impl->set_strided(
+      dil_buffer.get_dims(),
+      dil_buffer.get_strides(),
+      ipex_tensor_impl->storage_offset(),
+      tensor.scalar_type(),
+      padding_size);
   } else {
     // ??? TORCH_INTERNAL_ASSERT_DEBUG_ONLY(sizes.size() != 1 || sizes[0] != 0);
     // Blockformat does not inlcude stride information
@@ -326,14 +327,15 @@ at::Tensor gen_aten_tensor_by(dil::tensor&& dil_tensor) {
     tensor_data,
     shade_data_context,
     cpu::ShadeDataContext::freeShadeDataContext,
-    at::DeviceType::DPCPP);
+    c10::Device(at::DeviceType::XPU, 0));
+  size_t nbytes = shade_data_context->dil_tensor->get_nelems() * c10::elementSize(at_data_type);
   auto storage_impl = c10::make_intrusive<at::StorageImpl>(
-    at::scalarTypeToTypeMeta(at_data_type),
-    shade_data_context->dil_tensor->get_nelems(),
+    at::StorageImpl::use_byte_size_t(),
+    nbytes,
     std::move(shade_data_ptr),
     nullptr,
     /*resizeable=*/false);
-  auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::DPCPPTensorId);
+  auto _tensor = at::detail::make_tensor<torch_ipex::IPEXTensorImpl>(storage_impl, at::DispatchKey::XPU, at_data_type);
   sync_shape_from_dil_to_aten(_tensor, shade_data_context->dil_tensor.value());
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(_tensor.layout() == c10::kStrided);
   return _tensor;
@@ -352,9 +354,9 @@ void sync_shape_from_dil_to_aten(const at::Tensor& ipex_tensor, const dil::tenso
   dil::dims sizes = dil_tensor.get_dims();
   if (dil_tensor.is_public_format()) {
     dil::dims strides = dil_tensor.get_strides();
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipex_tensor.device().type() == at::DeviceType::DPCPP);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(ipex_tensor.device().type() == at::DeviceType::XPU);
     auto* _tensor_impl = (IPEXTensorImpl *)ipex_tensor.unsafeGetTensorImpl();
-    _tensor_impl->set_strided(sizes, strides, _tensor_impl->storage_offset());
+    _tensor_impl->set_strided(sizes, strides, _tensor_impl->storage_offset(), ipex_tensor.scalar_type());
   } else {
     // Blockformat does not inlcude stride information
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(sizes.size() != 1 || sizes[0] != 0);
@@ -399,7 +401,7 @@ void reorder_to_public(const at::Tensor& tensor, bool remain_dtype) {
 // Reorder *Storage* to expected_desc
 void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc, const std::vector<float> scales) {
   auto& mutex = cpu::ShadeDataContext::getMutex(tensor);
-  std::lock_guard<std::mutex> lock(mutex); 
+  std::lock_guard<std::mutex> lock(mutex);
   auto src = try_gen_dil_storage(tensor);
   if (src.get_desc() == expected_desc)
     return;

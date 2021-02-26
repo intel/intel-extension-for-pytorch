@@ -63,7 +63,7 @@ bool dnnl_tensor_has_data(const std::vector<at::Tensor> &tensor_vec) {
 
 bool all_is_dpcpp(const std::vector<at::Tensor> &tensor_vec) {
   for (auto it = tensor_vec.begin(); it != tensor_vec.end(); ++it) {
-    if (!it->device().is_dpcpp()) {
+    if (it->defined() && (!it->device().is_xpu())) {
       // Not DPCPP device
       if (is_scalar_tensor(*it) || !it->defined() || it->numel() == 0) {
         // If the tensor is scalar tensor or the tensor does not contains any elements, do nothing

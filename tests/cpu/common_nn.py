@@ -18,23 +18,23 @@ Copyright (c) 2016-present, Facebook Inc. All rights reserved.
 
 All contributions by Facebook:
 Copyright (c) 2016 Facebook Inc.
- 
+
 All contributions by Google:
 Copyright (c) 2015 Google Inc.
 All rights reserved.
- 
+
 All contributions by Yangqing Jia:
 Copyright (c) 2015 Yangqing Jia
 All rights reserved.
- 
+
 All contributions from Caffe:
 Copyright(c) 2013, 2014, 2015, the respective contributors
 All rights reserved.
- 
+
 All other contributions:
 Copyright(c) 2015, 2016 the respective contributors
 All rights reserved.
- 
+
 Caffe2 uses a copyright model similar to Caffe: each contributor holds
 copyright over their contributions to Caffe2. The project versioning records
 all such contribution and copyright details. If a contributor wants to further
@@ -536,7 +536,7 @@ def bce_with_logistic_no_reduce_scalar_test():
 
 def kldivloss_with_target_no_reduce_test():
     i = torch.rand(10, 10).log()
-    
+
     return dict(
         fullname='KLDivLoss_with_target_no_reduce',
         constructor=wrap_functional(
@@ -4405,7 +4405,7 @@ class ModuleTest(TestBase):
         self.check_forward_only = kwargs.get('check_forward_only', False)
 
     def __call__(self, test_case):
-        module = self.constructor(*self.constructor_args).to('dpcpp')
+        module = self.constructor(*self.constructor_args).to('xpu')
         input = self._get_input()
 
         if self.reference_fn is not None:
@@ -4680,7 +4680,7 @@ class NewModuleTest(InputVariableMixin, ModuleTest):
             test_case.assertEqual(input._version, input_version)
 
             input_ip = deepcopy(input)
-            if input.device == torch.device('dpcpp'):
+            if input.device.type == 'xpu':
                 input_ip.requires_grad = True
             input_ip_clone = input_ip.clone()
             with freeze_rng_state():
@@ -4732,22 +4732,22 @@ class NewModuleTest(InputVariableMixin, ModuleTest):
                 module(input)
                 for p in module.parameters():
                     test_case.assertIsInstance(p, torch.DoubleTensor)
-            # else: # for dpcpp
+            # else: # for xpu
             #     print()
-            #     if not isinstance(input, torch.dpcpp.LongTensor):
+            #     if not isinstance(input, torch.xpu.LongTensor):
             #         input = input.float()
             #     module.float()
             #     module(input)
             #     for p in module.parameters():
-            #         test_case.assertIsInstance(p, torch.dpcpp.FloatTensor)
+            #         test_case.assertIsInstance(p, torch.xpu.FloatTensor)
 
             #     # and back to double
-            #     if not isinstance(input, torch.dpcpp.LongTensor):
+            #     if not isinstance(input, torch.xpu.LongTensor):
             #         input = input.double()
             #     module.double()
             #     module(input)
             #     for p in module.parameters():
-            #         test_case.assertIsInstance(p, torch.dpcpp.DoubleTensor)
+            #         test_case.assertIsInstance(p, torch.xpu.DoubleTensor)
 
             if TEST_CUDA and self.should_test_cuda:
                 # check that cuda() moves module parameters to correct GPU device,

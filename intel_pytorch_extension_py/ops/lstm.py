@@ -34,9 +34,9 @@ def fallback_lstm(*args, device):
         else:
             item_cpu = item
         args_cpu.append(item_cpu)
-    
+
     output = VF_lstm(*args_cpu)
-    
+
     # move output to the original device
     output_device = []
     # output is a tuple which does not support item assignment
