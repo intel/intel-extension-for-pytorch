@@ -8,6 +8,7 @@ import unittest
 import itertools
 import time
 import json
+import sys
 
 import torch
 import torch.nn as nn
@@ -21,6 +22,9 @@ from torch.nn import Parameter
 import torch.nn.functional as F
 
 from common_utils import TestCase
+
+def get_rand_seed():
+    return int(time.time() * 1000000000)
 
 device = ipex.DEVICE
 class TestQuantizationConfigueTune(TestCase):
@@ -71,7 +75,7 @@ class TestQuantizationConfigueTune(TestCase):
 
 
 class TestQuantization(TestCase):
-    def compare_fp32_int8(self, model, x):
+    def _compare_fp32_int8(self, model, x):
         conf = ipex.AmpConf(torch.int8)
         with ipex.AutoMixPrecision(conf, running_mode='calibration'):
             ref = model(x)
@@ -83,6 +87,25 @@ class TestQuantization(TestCase):
 
         self.assertTrue(ipex.core.is_int8_dil_tensor(y))
         self.assertEqual(ref, y, prec=0.1)
+        os.remove('configure.json')
+
+    def _lstm_compare_fp32_int8(self, model, *args):
+        conf = ipex.AmpConf(torch.int8)
+        with ipex.AutoMixPrecision(conf, running_mode='calibration'):
+            with torch.no_grad():
+                ref, hy_ref = model(*args)
+        conf.save('configure.json')
+
+        conf = ipex.AmpConf(torch.int8, 'configure.json')
+        with ipex.AutoMixPrecision(conf, running_mode='inference'):
+            with torch.no_grad():
+                y, hy = model(*args)
+
+        self.assertTrue(ipex.core.is_int8_dil_tensor(y))
+
+        self.assertEqual(ref, y, prec=0.1)
+        self.assertEqual(hy_ref[0], hy[0], prec=0.01)
+        self.assertEqual(hy_ref[1], hy[1], prec=0.01)
         os.remove('configure.json')
 
     def test_conv2d(self):
@@ -100,12 +123,12 @@ class TestQuantization(TestCase):
                                      dilation=dilation,
                                      bias=bias,
                                      groups=groups).float().to(device)
-            self.compare_fp32_int8(conv2d, x)
+            self._compare_fp32_int8(conv2d, x)
 
     def test_relu(self):
         x = torch.randn((4, 5), dtype=torch.float32).to(device)
         relu = nn.ReLU()
-        self.compare_fp32_int8(relu, x)
+        self._compare_fp32_int8(relu, x)
 
     def test_max_pool2d(self):
         N = torch.randint(3, 10, (1,)).item()
@@ -118,7 +141,7 @@ class TestQuantization(TestCase):
                                               stride=stride,
                                               padding=1,
                                               ceil_mode=ceil_mode)
-                    self.compare_fp32_int8(max_pool2d, x)
+                    self._compare_fp32_int8(max_pool2d, x)
 
     def test_avg_pool2d(self):
         N = torch.randint(3, 10, (1,)).item()
@@ -131,7 +154,7 @@ class TestQuantization(TestCase):
                 stride=2,
                 padding=1,
                 count_include_pad=count_include_pad)
-            self.compare_fp32_int8(avg_pool2d, x)
+            self._compare_fp32_int8(avg_pool2d, x)
 
     def test_adaptive_avg_pool2d(self):
         N = torch.randint(3, 10, (1,)).item()
@@ -139,7 +162,7 @@ class TestQuantization(TestCase):
         x = torch.randn(N, C, 224, 224, dtype=torch.float32).to(device)
 
         adaptive_avg_pool2d = torch.nn.AdaptiveAvgPool2d(7)
-        self.compare_fp32_int8(adaptive_avg_pool2d, x)
+        self._compare_fp32_int8(adaptive_avg_pool2d, x)
 
     def test_linear(self):
         in_features = torch.randint(3, 10, (1,)).item()
@@ -148,8 +171,32 @@ class TestQuantization(TestCase):
         for bias in [True, False]:
             x = torch.randn(3, in_features, dtype=torch.float32).to(device)
             linear = torch.nn.Linear(in_features, out_features, bias=bias).float().to(device)
-            self.compare_fp32_int8(linear, x)
+            self._compare_fp32_int8(linear, x)
 
+    def _lstm_int8(self, seq_len, batch_size, input_size, hidden_size, num_layers, bidirectional, bias, empty_state):
+        rand_seed = int(get_rand_seed())
+
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+
+        num_directions = 2 if bidirectional else 1
+
+        input_dpcpp = torch.FloatTensor(seq_len, batch_size, input_size).uniform_(-1, 1).to(device=device)
+        h0_dpcpp = torch.FloatTensor(num_layers * num_directions, batch_size, hidden_size).uniform_(-1, 1).to(device=device)
+        c0_dpcpp = torch.FloatTensor(num_layers * num_directions, batch_size, hidden_size).uniform_(-1, 1).to(device=device)
+        model_dpcpp = torch.nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias).to(device=device).eval()
+
+        self._lstm_compare_fp32_int8(model_dpcpp, input_dpcpp)
+
+    def test_lstm(self):
+        self._lstm_int8(seq_len=5, batch_size=2, input_size=16, hidden_size=16, num_layers=1, bidirectional=False, bias=True, empty_state=False)
+        
+        self._lstm_int8(seq_len=5, batch_size=2, input_size=16, hidden_size=16, num_layers=1, bidirectional=True, bias=True, empty_state=False)
+        
+        self._lstm_int8(seq_len=5, batch_size=2, input_size=16, hidden_size=16, num_layers=1, bidirectional=False, bias=False, empty_state=False)
+        
+        self._lstm_int8(seq_len=5, batch_size=2, input_size=16, hidden_size=16, num_layers=1, bidirectional=True, bias=False, empty_state=False)
+    
 if __name__ == '__main__':
     rand_seed = int(time.time() * 1000000000)
     torch.manual_seed(rand_seed)
