@@ -112,6 +112,13 @@ dil::tensor dil_tensor_from_dil_buffer(const at::Tensor& tensor, const std::vect
     result.copy_workspace(dil_buffer);
   }
   // TODO(xpz): copy scales and zero_points of qtensor (what if slicing?)
+  if (dil_buffer.has_scale()) {
+    result.set_scale(dil_buffer.get_scale());
+  }
+  if (dil_buffer.has_zero_point()) {
+    result.set_zero_point(dil_buffer.get_zero_point());
+  }
+
   return result;
 }
 
@@ -195,7 +202,15 @@ bool get_int8_quantized_status(const int64_t ops_id) {
   return false;
 }
 
-void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> scales, bool uint8_used) {
+std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<int32_t>>> get_int8_asymmetric(const int64_t ops_id) {
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    return get_indicator_asymmetric(ops_id);
+  } else {
+    return std::make_tuple(std::vector<std::vector<float>>(), std::vector<std::vector<int32_t>>());
+  }
+}
+
+void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> scales, bool uint8_used, std::vector<int32_t> shift) {
   if (!check_auto_mix_int8_fp32() || check_int8_calibration())
     return;
 
@@ -218,10 +233,10 @@ void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> s
     }
   }
 
-  reorder_to_dtype(tensor, dst_scalar_type, inner_scales);
+  reorder_to_dtype(tensor, dst_scalar_type, inner_scales, shift);
 }
 
-void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, std::vector<float> scales) {
+void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, std::vector<float> scales, std::vector<int32_t> shift) {
   auto src = try_gen_dil_storage(tensor);
   if (get_at_data_type(src.get_data_type()) == dst_scalar_type) {
     // The data type of DIL tensor is same as the dst data type. DO NOTHING
@@ -231,7 +246,7 @@ void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dst_scalar_type, 
   IPEX_CHECK(cpu::ShadeDataContext::isDilTensor(tensor) || check_tensor_own_whole_storage(tensor),  "Reorder only works while tensor owns the whole storage or tensor is a dil tensor");
 
   auto dst_desc = src.get_desc().to_type(get_dil_data_type(dst_scalar_type));
-  reorder_to_desc(tensor, dst_desc, scales);
+  reorder_to_desc(tensor, dst_desc, scales, shift);
 }
 
 void equip_dil_buffer_nosync_shape(const at::Tensor& tensor, dil::tensor dil_buffer) {
@@ -399,17 +414,32 @@ void reorder_to_public(const at::Tensor& tensor, bool remain_dtype) {
 }
 
 // Reorder *Storage* to expected_desc
-void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc, const std::vector<float> scales) {
+void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc, const std::vector<float> scales, const std::vector<int32_t> shift) {
   auto& mutex = cpu::ShadeDataContext::getMutex(tensor);
   std::lock_guard<std::mutex> lock(mutex);
   auto src = try_gen_dil_storage(tensor);
   if (src.get_desc() == expected_desc)
     return;
   dil::tensor dst {expected_desc};
-  if(!scales.empty()) {
+
+  if (!scales.empty()) {
     dst.set_scale(scales);
   }
-  dst.feed_from(src);
+  if (!shift.empty()) {
+    dst.set_zero_point(shift);
+  }
+
+  // TODO: how to differ asymmetric quant/dequant for other OPs from LSTM?
+  // TODO: LSTM weight from s8 blocked to s8 public, from s8 public to fp32 public unsupported
+  if (src.get_data_type() == dil::data_type::f32 && dst.get_data_type() == dil::data_type::u8 && !shift.empty()) {
+    // shift not empty => rnn data asymmetric quantization
+    dst.feed_from_for_rnn_data(src);
+  } else if (src.get_data_type() == dil::data_type::u8 && dst.get_data_type() == dil::data_type::f32 && src.has_zero_point()) {
+    // src has zero point => rnn data asymmetric de-quantization
+    dst.feed_from_for_rnn_data_fallback(src);
+  } else{
+    dst.feed_from(src);
+  }
 
   // If a max pool output is converting from bf16 back to fp32,
   // its workspace has also to be copied onto the new tensor

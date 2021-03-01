@@ -28,11 +28,12 @@ bool check_auto_mix_int8_fp32();
 bool check_int8_calibration();
 void insert_or_updata_observer(const at::TensorList &inputs,
                                const at::TensorList &ouputs,
-                               std::string op_name, int64_t ops_id);
+                               std::string op_name, int64_t ops_id, bool asymmetric = false);
 std::vector<std::vector<float>>
 get_indicator_scales(std::vector<bool> i_uint8_used,
                      std::vector<bool> o_uint8_used, const int64_t ops_id);
 bool get_indicator_quantized_status(const int64_t ops_id);
+std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<int32_t>>> get_indicator_asymmetric(const int64_t ops_id);
 bool check_tensor_own_whole_storage(const at::Tensor& tensor);
 bool check_tensor_own_shade_context(const at::Tensor& tensor);
 bool check_aten_dil_shape_info(const at::Tensor& ipex_tensor, const dil::tensor &dil_tensor);
