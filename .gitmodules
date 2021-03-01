@@ -3,10 +3,10 @@
 	url = https://github.com/pybind/pybind11.git
 [submodule "third_party/mkl-dnn"]
 	path = third_party/mkl-dnn
-	url = https://github.com/intel/mkl-dnn.git
+    url = https://github.com/oneapi-src/oneDNN
 [submodule "third_party/xsmm"]
 	path = third_party/xsmm
 	url = https://github.com/hfp/libxsmm.git
 [submodule "third_party/torch_ccl"]
 	path = third_party/torch_ccl
-	url = https://liangan1:jr9CgvEEQrZ3_zYyr3mn@gitlab.devtools.intel.com/intel-pytorch-extension/torch-ccl.git
+	url = https://github.com/intel/torch-ccl.git

@@ -50,9 +50,9 @@ RUN --mount=type=cache,target=/opt/ccache \
     cd intel-extension-for-pytorch && git submodule sync && \
     git submodule update --init --recursive && \
     git clone https://github.com/pytorch/pytorch && \
-    cd pytorch && git checkout v1.5.1 && git submodule sync && \
+    cd pytorch && git checkout v1.7.0 && git submodule sync && \
     git submodule update --init --recursive && \
-    git apply ../torch_patches/dpcpp-v1.5.1.patch && \
+    git apply ../torch_patches/xpu-1.7.patch && \
     USE_MKLDNN=1 USE_CUDA=0 USE_NNPACK=0 USE_CUDNN=0 \
     CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" pip install -v . && \
     cd .. && pip install -v . && rm -rf *
