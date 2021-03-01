@@ -19,7 +19,8 @@ _FN_BYPASS_REGEX = [
     r'[^(]*cudnn',
     r'[^(]*cufft',
     r'[^(]*mkldnn',
-    r'[^(]*_amp'
+    r'[^(]*_amp',
+    r'[^(]*_test_',
 ]
 
 _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST = 'shallowFallbackToCPUTensorList'
@@ -166,7 +167,7 @@ class SparseOPCodeGen(object):
             aten_func_sig_literal = m.group(2)
 
             aten_func_sig = aten_func_sig_literal
-            if "schema" in aten_func_sig_literal and "compound" in aten_func_sig_literal:
+            if "schema" in aten_func_sig_literal and "dispatch" in aten_func_sig_literal:
                 res = json.loads(aten_func_sig_literal)
                 aten_func_sig = res["schema"]
 

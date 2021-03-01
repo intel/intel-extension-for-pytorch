@@ -19,7 +19,8 @@ _FN_BYPASS_REGEX = [
     r'[^(]*cudnn',
     r'[^(]*cufft',
     r'[^(]*mkldnn',
-    r'[^(]*_amp'
+    r'[^(]*_amp',
+    r'[^(]*_test_',
 ]
 
 _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
@@ -251,7 +252,7 @@ class DenseOPCodeGen(object):
             aten_func_sig_literal = m.group(2)
 
             aten_func_sig = aten_func_sig_literal
-            if "schema" in aten_func_sig_literal and "compound" in aten_func_sig_literal:
+            if "schema" in aten_func_sig_literal and "dispatch" in aten_func_sig_literal:
                 res = json.loads(aten_func_sig_literal)
                 aten_func_sig = res["schema"]
 
@@ -516,7 +517,9 @@ class DenseOPCodeGen(object):
 
             if cpp_sig.contain_output_tensor:
                 output_params = cpp_sig.get_output_tensors()
-                assert len(output_params) == 1
+                # NOTE: We cannot assume that only one input tensor can be modified during execution according to
+                # the aten signature. ex. aten::_linalg_inv_out_helper_(Tensor(a!) self, Tensor(b!) infos_lu, Tensor(c!) infos_getri) -> Tensor(a!)
+                # assert len(output_params) == 1
                 code += '  return {};\n'.format(output_params[0].name)
                 return code
             else:
