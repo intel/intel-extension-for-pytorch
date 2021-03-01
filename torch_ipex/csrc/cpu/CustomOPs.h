@@ -714,7 +714,8 @@ class NewRNNLayerOp : public torch::autograd::Function<NewRNNLayerOp> {
 public:
   static std::vector<at::Tensor> _forward(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
     const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse, int64_t mode,
-    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
+    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes, 
+    const std::vector<float>& scales = {}, const std::vector<int32_t>& shift = {}, bool quantized = false) {
 #if defined(IPEX_PROFILE_OP)
     RECORD_FUNCTION("NewRNNLayerOp::_forward", std::vector<c10::IValue>({}));
 #endif
@@ -722,7 +723,7 @@ public:
       if (torch_ipex::check_auto_dnnl() &&
           input.device().type() == c10::DeviceType::XPU) {
         return torch_ipex::cpu::AtenIpexCPUDev::dil_rnn_layer(
-            input, w1, w2, w3, w4, hx, cx, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes);
+            input, w1, w2, w3, w4, hx, cx, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes, scales, shift, quantized);
       }
     } catch (std::exception &e) {
 #if defined(_DEBUG)
@@ -782,6 +783,7 @@ public:
         return {grad_inputs[0], grad_inputs[1], grad_inputs[2],
           grad_inputs[3], grad_inputs[4], grad_inputs[5],
           grad_inputs[6], at::Tensor(), at::Tensor(),
+          at::Tensor(), at::Tensor(), at::Tensor(),
           at::Tensor(), at::Tensor(), at::Tensor(),
           at::Tensor(), at::Tensor(), at::Tensor()};
       }

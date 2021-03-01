@@ -153,15 +153,74 @@ void prepack_lstm_weights(
   dil::rnn_kind _rnn_kind,
   const bool reverse = false,
   dil::prop_kind aprop = dil::prop_kind::forward,
+  const std::vector<float>& data_scale = dil::scale_t(),
+  const std::vector<int32_t>& data_shift = {},
+  const int weights_scale_mask = -1,
+  const std::vector<float>& weights_scales = dil::scale_t(),
   const dil::engine& aengine = dil::engine::cpu_engine()) {
-    if (cpu::ShadeDataContext::isPackedTensor(weight_ih) && cpu::ShadeDataContext::isPackedTensor(weight_hh)) {
-        return;
-    }
+  if (cpu::ShadeDataContext::isPackedTensor(weight_ih) && cpu::ShadeDataContext::isPackedTensor(weight_hh)) {
+      return;
+  }
 
-    auto w1 = dbl::comm::try_gen_dil_tensor(weight_ih, {1, 1, input_size, num_gates, hidden_size}, dil::format_tag::ldgoi);
-    auto w2 = dbl::comm::try_gen_dil_tensor(weight_hh, {1, 1, hidden_size, num_gates, hidden_size}, dil::format_tag::ldgoi);
- 
-    dil::tensor::desc expected_weights_layer_desc, expected_weights_iter_desc;
+  dil::tensor w1, w2;
+  dil::tensor::desc expected_weights_layer_desc, expected_weights_iter_desc;
+
+  // TODO: add int8 for gru and rnn
+  if (src_layer.get_data_type() == dil::data_type::u8 && _rnn_kind == dil::rnn_kind::LSTM) {
+    auto weight_ih_ = weight_ih.reshape({1, 1, num_gates, hidden_size, input_size}).permute({0, 1, 4, 2, 3}).contiguous();
+    auto weight_hh_ = weight_hh.reshape({1, 1, num_gates, hidden_size, hidden_size}).permute({0, 1, 4, 2, 3}).contiguous();
+
+    /*
+    weight_ih_ and weight_hh_ are already contiguous, so that we can set contiguous format abcde here
+
+    We need to set the format during try gen because:
+    if weight_ih if of shape {4, 1},
+    after doing weight_ih.reshape(weight_ih_desc_size).permute({0, 1, 4, 2, 3}).contiguous()
+    shape of weight_ih will be {1,1,1,4,1}
+    stride of weight_ih will be {4,4,1,1,1}
+
+    However, mkldnn need the stride to be {4,4,4,1,1}. Otherwise, mkldnn will consider the tensor as non-contiguous.
+    As a result, we need to set the format to be abcde here when generting the dil tensor to force it to have the
+    stride we need.
+    */
+    w1 = dbl::comm::try_gen_dil_tensor(weight_ih_, weight_ih_.sizes().vec(), dil::format_tag::abcde);
+    w2 = dbl::comm::try_gen_dil_tensor(weight_hh_, weight_hh_.sizes().vec(), dil::format_tag::abcde);
+
+    std::tie(expected_weights_layer_desc, expected_weights_iter_desc) = dil::lstm_forward::expected_weights_desc(
+                        output_sizes,
+                        src_layer,
+                        src_iter,
+                        src_iter_c,
+                        w1,
+                        w2,
+                        bias,
+                        reverse,
+                        aprop,
+                        data_scale,
+                        data_shift,
+                        weights_scale_mask,
+                        weights_scales,
+                        aengine);
+
+    dil::attr_t attr;
+    IPEX_CHECK(data_scale.size() == 1 && data_shift.size() == 1 && weights_scale_mask > -1 && !weights_scales.empty(), "Incorrect size for scale or zero point");
+    attr.set_rnn_data_qparams(data_scale[0], data_shift[0]);
+    attr.set_rnn_weights_qparams(weights_scale_mask, weights_scales);
+
+    // attr has the scale and mask to quantize the weight
+    auto expected_weight_ih = w1.reorder_if_differ_in(expected_weights_layer_desc, attr);
+    auto expected_weight_hh = w2.reorder_if_differ_in(expected_weights_iter_desc, attr);
+
+    expected_weight_ih.set_scale(weights_scales);
+    expected_weight_hh.set_scale(weights_scales);
+
+    dbl::comm::equip_dil_buffer(weight_ih, expected_weight_ih, /*padding_size*/expected_weight_ih.get_padding_size());
+    dbl::comm::equip_dil_buffer(weight_hh, expected_weight_hh, /*padding_size*/expected_weight_hh.get_padding_size());
+      
+  } else {
+    w1 = dbl::comm::try_gen_dil_tensor(weight_ih, {1, 1, input_size, num_gates, hidden_size}, dil::format_tag::ldgoi);
+    w2 = dbl::comm::try_gen_dil_tensor(weight_hh, {1, 1, hidden_size, num_gates, hidden_size}, dil::format_tag::ldgoi);
+
 
     // TODO: add prepack of GRU
     if (_rnn_kind == dil::rnn_kind::LSTM) {
@@ -175,21 +234,26 @@ void prepack_lstm_weights(
                         bias,
                         reverse,
                         aprop,
+                        data_scale,
+                        data_shift,
+                        weights_scale_mask,
+                        weights_scales,
                         aengine);
     } else {
       TORCH_CHECK(_rnn_kind == dil::rnn_kind::RNN_RELU || _rnn_kind == dil::rnn_kind::RNN_TANH,
             "mkldnn_rnn: unsuppored rnn mode: ", _rnn_kind);
-    std::tie(expected_weights_layer_desc, expected_weights_iter_desc) = dil::rnn_forward::expected_weights_desc(
-                        output_sizes, 
-                        src_layer, 
-                        src_iter, 
-                        w1, 
-                        w2, 
-                        bias,
-                        _rnn_kind,
-                        reverse,
-                        aprop,
-                        aengine);
+      // TODO: add int8 input for rnn
+      std::tie(expected_weights_layer_desc, expected_weights_iter_desc) = dil::rnn_forward::expected_weights_desc(
+                          output_sizes,
+                          src_layer,
+                          src_iter,
+                          w1,
+                          w2,
+                          bias,
+                          _rnn_kind,
+                          reverse,
+                          aprop,
+                          aengine);
     }
 
     dil::tensor expected_weight_ih {expected_weights_layer_desc};
@@ -198,17 +262,30 @@ void prepack_lstm_weights(
     expected_weight_ih.feed_from(w1);
     expected_weight_hh.feed_from(w2);
 
-    // TODO: int8 weight is blocked format
     dbl::comm::equip_dil_buffer(weight_ih, expected_weight_ih, /*padding_size*/expected_weight_ih.get_padding_size());
     dbl::comm::equip_dil_buffer(weight_hh, expected_weight_hh, /*padding_size*/expected_weight_hh.get_padding_size());
-    
-    cpu::ShadeDataContext::setPackedTensor(weight_ih, true);
-    cpu::ShadeDataContext::setPackedTensor(weight_hh, true);
   }
+
+  cpu::ShadeDataContext::setPackedTensor(weight_ih, true);
+  cpu::ShadeDataContext::setPackedTensor(weight_hh, true);
+}
+
+std::vector<float> compute_lstm_weight_scales(const at::Tensor& weight_ih, const at::Tensor& weight_hh) {
+  IPEX_CHECK(weight_ih.size(0) == weight_hh.size(0), "size(0) of weight_ih and weight_hh should equal.")
+  std::vector<float> weights_scales = {};
+  
+  float max_s8 = static_cast<float>(std::numeric_limits<int8_t>::max());
+  for (int i = 0; i < weight_ih.size(0); i++) {
+    weights_scales.push_back(max_s8 / std::max(weight_ih[i].abs().max().item<float>(), weight_hh[i].abs().max().item<float>()));
+  }
+
+  return weights_scales;
+}
 
 std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tensor& weight1, const at::Tensor& weight2,
     const at::Tensor& weight3, const at::Tensor& weight4, const at::Tensor& hx_, const at::Tensor& cx_tmp, bool reverse, int64_t mode,
-    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
+    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes, 
+    const std::vector<float>& scales_from_json, const std::vector<int32_t>& shift_from_json, bool quantized) {
 
   RNNParams rnn(input, batch_sizes, mode, hidden_size, num_layers, bidirectional, train);
   auto output_size = _output_size</*is_single_direction*/true>(rnn);
@@ -227,17 +304,66 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
   } else {
     cx_ = cx_tmp;
   }
-  // TODO: should we do these reorder in DevOPs??
-  dbl::comm::reorder_to_bf16_for_mix_prec(input);
-  dbl::comm::reorder_to_bf16_for_mix_prec(hx_, true);
-  dbl::comm::reorder_to_bf16_for_mix_prec(weight_ih, true);
-  dbl::comm::reorder_to_bf16_for_mix_prec(weight_hh, true);
-  // cx, cy and bias should always be fp32 in bf16 inference
+
+  std::vector<float> data_scale = {};
+  std::vector<int32_t> data_shift = {};
+  int weights_scale_mask = -1;
+  std::vector<float> weights_scales = {};
+
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration() && static_cast<dil::rnn_kind>(rnn.mode) == dil::rnn_kind::LSTM) {
+    if (quantized) {
+      if (ShadeDataContext::isTensorMixPrecision(input, MIX_PREC_TYPE::MIX_INT8_FP32)) {
+        // TODO: add check (do we fallback here if not satisfied?), should enforce the input to have scale and zero point here.
+        // IPEX_CHECK(cpu::ShadeDataContext::getDilStorage(input).has_scale(), "input of u8 type should have scale");
+        // IPEX_CHECK(cpu::ShadeDataContext::getDilStorage(input).has_zero_point(), "input of u8 type should have zero point");
+        data_scale = cpu::ShadeDataContext::getDilStorage(input).get_scale();
+        data_shift = cpu::ShadeDataContext::getDilStorage(input).get_zero_point();
+      } else {
+        data_scale = scales_from_json;
+        data_shift = shift_from_json;
+        dbl::comm::reorder_to_int8_for_mix_prec(input, data_scale, /*uint8_used*/true, data_shift);
+      }
+
+      // When feeding to mkldnn, weight is in `ldigo` but here it is in (ldgo) * i
+      weights_scale_mask = 0
+              + (1 << 3) // bit, indicating the unique scales for `g` dim in `ldigo`
+              + (1 << 4); // bit, indicating the unique scales for `o` dim in `ldigo`
+
+      if (ShadeDataContext::isTensorMixPrecision(weight_ih, MIX_PREC_TYPE::MIX_INT8_FP32)) {
+        weights_scales = cpu::ShadeDataContext::getDilStorage(weight_ih).get_scale();
+      } else {
+        // If the weight has been prepacked as fp32 or bf16 dil tensor, it will be of dimension 5 of format ldigo.
+        // We do not support this use case in IPEX
+        if (ShadeDataContext::isDilTensor(weight_ih)) {
+          IPEX_CHECK(cpu::ShadeDataContext::getDilStorage(weight_ih).ndims() == 2, "weight in int8 reference should not have been prepacked before");
+        }
+        weights_scales = compute_lstm_weight_scales(weight_ih, weight_hh);
+      }
+      dbl::comm::reorder_to_dtype(hx_, at::kFloat);
+    } else {
+      dbl::comm::reorder_to_dtype(input, at::kFloat);
+      dbl::comm::reorder_to_dtype(hx_, at::kFloat);
+      // TODO: check the shape after this reorder, should be (ldgo) * i
+      dbl::comm::reorder_to_dtype(weight_ih, at::kFloat);
+      dbl::comm::reorder_to_dtype(weight_hh, at::kFloat);
+    }
+  } else if (check_auto_mix_bf16_fp32()) {
+    dbl::comm::reorder_to_bf16_for_mix_prec(input);
+    dbl::comm::reorder_to_bf16_for_mix_prec(hx_, true);
+    dbl::comm::reorder_to_bf16_for_mix_prec(weight_ih, true);
+    dbl::comm::reorder_to_bf16_for_mix_prec(weight_hh, true);
+  } else {
+    dbl::comm::reorder_to_dtype(input, at::kFloat);
+    dbl::comm::reorder_to_dtype(hx_, at::kFloat);
+    dbl::comm::reorder_to_dtype(weight_ih, at::kFloat);
+    dbl::comm::reorder_to_dtype(weight_hh, at::kFloat);
+  }
+
+  // cx, cy and bias should always be fp32
   dbl::comm::reorder_to_dtype(bias, at::kFloat);
   dbl::comm::reorder_to_dtype(cx_, at::kFloat);
   auto x = dbl::comm::try_gen_dil_tensor(input, {rnn.seq_length, rnn.mini_batch, input_size}, dil::format_tag::tnc);
   auto hx = dbl::comm::try_gen_dil_tensor(hx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
-
   auto cx = dbl::comm::try_gen_dil_tensor(cx_, {1, 1, rnn.mini_batch, rnn.hidden_size}, dil::format_tag::ldnc);
   auto b = dbl::comm::try_gen_dil_tensor(bias, {1, 1, rnn.num_bias_gates, rnn.hidden_size}, dil::format_tag::ldgo);
   dil::prop_kind aprop_kind = dil::prop_kind::forward;
@@ -260,22 +386,29 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
   // TODO: prepack for GRU inference: GRU need to shuffle weight
   // We need to design how to sync the shape of the dil tensor and the aten tensor
   // during FW and BW
-  if (!train && _rnn_kind != dil::rnn_kind::GRU) {
+
+  // Do not prepack during int8 calibration
+  if (!train && _rnn_kind != dil::rnn_kind::GRU && !check_int8_calibration()) {
     prepack_lstm_weights(
       weight_ih,
       weight_hh,
       input_size,
       rnn.num_gates,
       rnn.hidden_size,
-      {output_size.cbegin(), output_size.cend()}, 
+      {output_size.cbegin(), output_size.cend()},
       x,
       hx,
       cx,
       b,
       _rnn_kind,
       reverse,
-      aprop_kind
+      aprop_kind,
+      data_scale,
+      data_shift,
+      weights_scale_mask,
+      weights_scales
     );
+
     w1 = dbl::comm::try_gen_dil_tensor(weight_ih);
     w2 = dbl::comm::try_gen_dil_tensor(weight_hh);
   } else {
@@ -288,7 +421,7 @@ std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tens
 
   if (_rnn_kind == dil::rnn_kind::LSTM) {
     dil::tensor cy;
-    dil::lstm_forward::compute({output_size.cbegin(), output_size.cend()}, x, hx, cx, w1, w2, b, y, hy, cy, reverse, aprop_kind);
+    dil::lstm_forward::compute({output_size.cbegin(), output_size.cend()}, x, hx, cx, w1, w2, b, y, hy, cy, reverse, aprop_kind, data_scale, data_shift, weights_scale_mask, weights_scales);
     return {dbl::comm::gen_aten_tensor_by(std::move(y)), dbl::comm::gen_aten_tensor_by(std::move(hy)).reshape(hx_.sizes()), dbl::comm::gen_aten_tensor_by(std::move(cy)).reshape(cx_.sizes())};
   } else if (_rnn_kind == dil::rnn_kind::GRU) {
     dil::lbr_gru_forward::compute({output_size.cbegin(), output_size.cend()}, x, hx, w1, w2, b, y, hy, reverse);

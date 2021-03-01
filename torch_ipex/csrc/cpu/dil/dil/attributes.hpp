@@ -14,6 +14,28 @@ struct attr_t : public dnnl::primitive_attr {
 
   attr_t(int mask, const scale_t& scales) { set_output_scales(mask, scales); }
 
+  /* TODO: for rnn input quantization with scale + shift from f32 to u8
+   Failed to use it in IPEX since:
+   x_aten is in ntc and is an aten tensor
+   x_dil = x_aten.transpose(0,1)
+   x_dil will become a dil tensor
+   x_dil_storage = try_gen_dil_storage(x_dil)
+   x_dil_storage will have the stride that corresponds to an ntc format
+   When we use set_rnn_data_qparams on x_dil_storage, cannot pass the format check
+  */
+  attr_t(float scale, float shift) { set_rnn_data_qparams(scale, shift); }
+
+  attr_t(const scale_t& scales, const std::vector<int32_t>& shift, bool rnn_data_quantize) { 
+    set_output_scales(0, scales); 
+    if (rnn_data_quantize) {
+      // Workaround: for rnn input quantization with scale + shift from f32 to u8
+      set_zero_points(DNNL_ARG_DST, 0, shift); 
+    } else {
+      // for rnn input dequantization with scale + shift from u8 to f32
+      set_zero_points(DNNL_ARG_SRC, 0, shift);
+    }
+  }
+
   std::pair<scale_t, int> get_output_scales() const {
     dnnl_dim_t count;
     int c_mask;

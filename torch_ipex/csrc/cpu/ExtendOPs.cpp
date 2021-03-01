@@ -3,9 +3,11 @@
 #include "CustomOPs.h"
 #include "DevOPs.h"
 #include "FusionOPs.h"
+#include "dbl/Common.h"
 #include "aten/aten.hpp"
 #include "bf16/vec/bf16_vec_kernel.h"
 #include "dil/dil.hpp"
+#include "torch_ipex/csrc/cpu/int8/Config.h"
 #include "xsmm/libxsmm_utils.h"
 #include <ATen/Parallel.h>
 #include <ATen/MatrixRef.h>
@@ -465,16 +467,19 @@ std::vector<at::Tensor> rnn_layer(const at::Tensor& input,
     at::TensorList weights, const at::Tensor& hx,
     const at::Tensor& cx, bool reverse, int64_t mode,
     int64_t hidden_size, int64_t num_layers, bool train,
-    bool bidirectional, at::IntArrayRef batch_sizes) {
+    bool bidirectional, at::IntArrayRef batch_sizes,
+    const std::vector<float>& scales,
+    const std::vector<int32_t>& shift, 
+    bool quantized) {
   TORCH_CHECK(weights.size() == 2 || weights.size() == 4);
   if (weights.size() == 4) {
     if (at::GradMode::is_enabled())
       return NewRNNLayerOp::apply(input, weights[0], weights[1], weights[2], weights[3], hx, cx, reverse, mode, hidden_size, num_layers, true, train, bidirectional, batch_sizes);
-    return NewRNNLayerOp::_forward(input, weights[0], weights[1], weights[2], weights[3], hx, cx, reverse, mode, hidden_size, num_layers, true, train, bidirectional, batch_sizes);
+    return NewRNNLayerOp::_forward(input, weights[0], weights[1], weights[2], weights[3], hx, cx, reverse, mode, hidden_size, num_layers, true, train, bidirectional, batch_sizes, scales, shift, quantized);
   } else {
     if (at::GradMode::is_enabled())
       return NewRNNLayerOp::apply(input, weights[0], weights[1], at::zeros(weights[0].sizes(), weights[0].options()), at::zeros(weights[1].sizes(), weights[1].options()), hx, cx, reverse, mode, hidden_size, num_layers, false, train, bidirectional, batch_sizes);
-    return NewRNNLayerOp::_forward(input, weights[0], weights[1], at::zeros(weights[0].sizes(), weights[0].options()), at::zeros(weights[1].sizes(), weights[1].options()), hx, cx, reverse, mode, hidden_size, num_layers, false, train, bidirectional, batch_sizes);
+    return NewRNNLayerOp::_forward(input, weights[0], weights[1], at::zeros(weights[0].sizes(), weights[0].options()), at::zeros(weights[1].sizes(), weights[1].options()), hx, cx, reverse, mode, hidden_size, num_layers, false, train, bidirectional, batch_sizes, scales, shift, quantized);
   }
 }
 // MKLDNN RNN integration notes:
@@ -514,6 +519,27 @@ std::vector<at::Tensor> rnn(
   at::MatrixRef<at::Tensor> weights{weight, static_cast<size_t>(weight_stride0)};
 
   auto num_directions = bidirectional ? 2 : 1;
+
+  // no need to do calibration for the output in lstm, will use the scale & zero point of the input
+  // to dequantize the output from u8 to f32, need to add an "output" here but actually unused
+  // For LSTM, we only need to calibrate the input to the first layer
+  // TODO: add int8 for gru and rnn. 
+  if (check_auto_mix_int8_fp32() && check_int8_calibration() && static_cast<dil::rnn_kind>(mode) == dil::rnn_kind::LSTM) {
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    insert_or_updata_observer({input}, {input}, "lstm", num_ops_id, /*asymmetric*/true);
+  }
+
+  bool quantized = false;
+  std::vector<std::vector<float>> scales = {};
+  std::vector<std::vector<int32_t>> shift = {};
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration() && static_cast<dil::rnn_kind>(mode) == dil::rnn_kind::LSTM) {
+      int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+      quantized = torch_ipex::cpu::dbl::comm::get_int8_quantized_status(num_ops_id);
+      std::tie(scales, shift) = torch_ipex::cpu::dbl::comm::get_int8_asymmetric(num_ops_id);
+      IPEX_CHECK(scales.size() > 0, "incorrect scale size");
+      IPEX_CHECK(shift.size() > 0, "incorrect shift size");
+  }
+
   auto layer_input = input;
   std::vector<at::Tensor> layer_output(num_directions);
   std::vector<at::Tensor> layer_hy(num_layers * num_directions);
@@ -525,7 +551,7 @@ std::vector<at::Tensor> rnn(
       auto layer_hx = hx[index];
       auto layer_cx = cx[index];
       auto reverse = (direction > 0);
-      auto outputs = rnn_layer(layer_input, layer_weights, layer_hx, layer_cx, reverse, mode, hidden_size, num_layers, train, bidirectional, batch_sizes);
+      auto outputs = rnn_layer(layer_input, layer_weights, layer_hx, layer_cx, reverse, mode, hidden_size, num_layers, train, bidirectional, batch_sizes, scales[0], shift[0], quantized);
       layer_output[direction] = outputs[0];
       layer_hy[index] = outputs[1];
       layer_cy[index] = outputs[2];

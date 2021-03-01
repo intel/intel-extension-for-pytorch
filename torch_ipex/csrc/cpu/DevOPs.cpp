@@ -2075,6 +2075,12 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
   dim = at::legacy_cat_wrap_dim(dim, tensors);
   std::vector<dil::tensor> x;
   at::Tensor tensors_contiguous[tensors.size()];
+
+  bool has_scale = false;
+  bool has_shift = false;
+  dil::scale_t data_scale;
+  std::vector<int32_t> data_shift;
+
   for (auto i = 0; i < tensors.size(); i++) {
     IPEX_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
       "Currently Mkldnn cat operators do not support empty tensor.");
@@ -2082,10 +2088,47 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
 
     dbl::comm::reorder_to_bf16_for_mix_prec(tensors_contiguous[i], true);
 
-    x.push_back(dbl::comm::try_gen_dil_tensor(tensors_contiguous[i]));
+    auto dil_input = dbl::comm::try_gen_dil_tensor(tensors_contiguous[i]);
+
+    // TODO: verify using a simpler way??
+    if (i == 0) {
+      if (dil_input.has_scale()) {
+        IPEX_CHECK(dil_input.get_scale().size() == 1, "only support scale size == 1");
+        has_scale = true;
+        data_scale = dil_input.get_scale();
+      }
+      if (dil_input.has_zero_point()) {
+        IPEX_CHECK(dil_input.get_zero_point().size() == 1, "only support zero point size == 1");
+        has_shift = true;
+        data_shift = dil_input.get_zero_point();
+      }
+    } else {
+      IPEX_CHECK(dil_input.has_scale() == has_scale, "tensors to cat should have same scale");
+      if (dil_input.has_scale()) {
+        IPEX_CHECK(dil_input.get_scale().size() == 1, "only support scale size == 1");
+        IPEX_CHECK(dil_input.get_scale()[0] == data_scale[0], "tensors to cat should have same scale");
+      }
+      IPEX_CHECK(dil_input.has_zero_point() == has_shift, "tensors to cat should have same zero point");
+      if (dil_input.has_zero_point()) {
+        IPEX_CHECK(dil_input.get_zero_point().size() == 1, "only support zero point size == 1");
+        IPEX_CHECK(dil_input.get_zero_point()[0] == data_shift[0], "tensors to cat should have same zero point");
+      }
+    }
+
+    x.push_back(dil_input);
   }
   dil::tensor y;
   dil::concat::compute(x, dim, y);
+
+  // For bidirectional LSTM output cat
+  if (has_scale){
+    y.set_scale(data_scale);
+  }
+
+  if (has_shift) {
+    y.set_zero_point(data_shift);
+  }
+
   return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
@@ -2597,10 +2640,12 @@ at::Tensor& AtenIpexCPUDev::dil_copy_(
 
 std::vector<at::Tensor> AtenIpexCPUDev::dil_rnn_layer(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
     const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse, int64_t mode,
-    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
+    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes, 
+    const std::vector<float>& scales, const std::vector<int32_t>& shift, bool quantized) {
   DEBUG("AtenIpexCPUDev::dil_rnn_layer\n");
+
   return dbl::rnn::mkldnn_rnn_layer(input, w1, w2, w3, w4, hx, cx, reverse, mode,
-      hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes);
+      hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes, scales, shift, quantized);
 }
 
 std::vector<at::Tensor> AtenIpexCPUDev::dil_rnn_layer_backward(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
