@@ -1,7 +1,7 @@
 From d43bd78d66438d32071429d6bbd04c1d70e0d8cc Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Tue, 2 Feb 2021 19:12:08 +0800
-Subject: [PATCH 12/13] Add qint changes.
+Subject: [PATCH 12/14] Add qint changes.
 
 ---
  aten/src/ATen/core/jit_type.h                 | 17 ++++++-------

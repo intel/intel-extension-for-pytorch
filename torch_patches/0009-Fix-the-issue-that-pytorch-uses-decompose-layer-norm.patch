@@ -1,7 +1,7 @@
 From ceb76001cdc7a6fb478becfaa401dafc907ed5d3 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
 Date: Thu, 21 Jan 2021 21:39:19 +0800
-Subject: [PATCH 09/13] Fix the issue that pytorch uses decompose layer norm
+Subject: [PATCH 09/14] Fix the issue that pytorch uses decompose layer norm
  for GPU device.
 
 ---
