@@ -10,6 +10,7 @@ sycl_device = torch.device("xpu")
 class TestNNMethod(TestCase):
     def test_random(self):
         # This test is flaky with p<=(2/(ub-lb))^200=6e-36
+        original_dtype = torch.get_default_dtype()
         torch.set_default_dtype(torch.double)
         t = torch.empty(200, device=sycl_device)
         lb = 1
@@ -24,6 +25,7 @@ class TestNNMethod(TestCase):
         t = t.random_(ub)
         self.assertEqual(t.min(), 0)
         self.assertEqual(t.max(), ub - 1)
+        torch.set_default_dtype(original_dtype)
 
     def test_random_bool(self):
         size = 2000
