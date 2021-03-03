@@ -260,8 +260,8 @@ class TestNNMethod(TestCase):
         else:
             to_inc = torch.iinfo(dtype).max
 
-        t = torch.empty(size, device=sycl_device)
+        t = torch.empty(size, device=sycl_device, dtype=dtype)
         t.random_()
-        self.assertTrue(0 <= t.to(torch.double).min() < alpha * to_inc)
-        self.assertTrue((to_inc - alpha * to_inc) < t.to(torch.double).max() <= to_inc)
+        self.assertTrue(0 <= t.min() < alpha * to_inc)
+        self.assertTrue((to_inc - alpha * to_inc) < t.max() <= to_inc)
 
