@@ -106,8 +106,10 @@ void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl, bool keep_d
   dest_impl->reserved_ = src_impl->reserved_;
   dest_impl->type_set_ = src_impl->type_set();
   */
-  this->sizes_ = src_impl->sizes();
-  this->strides_ = src_impl->strides();
+  this->sizes_and_strides_.set_sizes(src_impl->sizes());
+  for (int i = 0; i < src_impl->dim(); i++) {
+    this->sizes_and_strides_.stride_at_unchecked(i) = src_impl->stride(i);
+  }
   this->storage_offset_ = src_impl->storage_offset();
   if (!keep_dtype)
     this->data_type_ = src_impl->dtype();

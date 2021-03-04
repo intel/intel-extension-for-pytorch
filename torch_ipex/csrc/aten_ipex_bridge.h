@@ -3,6 +3,7 @@
 #include <ATen/Device.h>
 #include <ATen/Functions.h>
 #include <ATen/Tensor.h>
+#include <ATen/core/List.h>
 #include "cpu/dbl/Common.h"
 
 #include <vector>
@@ -13,6 +14,7 @@ namespace bridge {
 // Convert DPCPP tensor to CPU tensor
 at::Tensor shallowFallbackToCPUTensor(const at::Tensor& ipexTensor);
 std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList&);
+c10::List<c10::optional<at::Tensor>> shallowFallbackToCPUTensorList(const c10::List<c10::optional<at::Tensor>>& tensor_list);
 std::vector<at::Tensor> shallowFallbackToCPUTensorVec(const std::vector<at::Tensor> &tensor_vec);
 void attachShadeDataContext(const at::Tensor& tensor);
 

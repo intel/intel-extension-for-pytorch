@@ -2512,7 +2512,7 @@ at::Tensor AtenIpexCPUDev::dil_index_select(
   return at::Tensor();
 }
 
-at::Tensor AtenIpexCPUDev::dil_index(const at::Tensor & self, at::TensorList indices) {
+at::Tensor AtenIpexCPUDev::dil_index(const at::Tensor & self, const c10::List<c10::optional<at::Tensor>> & indices) {
   DEBUG("AtenIpexCPUDev::dil_index\n");
   torch_ipex::reset_ipex_func_status();
 

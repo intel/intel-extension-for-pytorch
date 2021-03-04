@@ -346,6 +346,18 @@ const at::Tensor& shallowUpgradeToDPCPPTensorAW(const at::Tensor& ipexTensor, co
   }
 }
 
+c10::List<c10::optional<at::Tensor>> shallowFallbackToCPUTensorList(const c10::List<c10::optional<at::Tensor>>& tensor_list) {
+  c10::List<c10::optional<at::Tensor>> dpcpp_tensor_vec;
+  for (size_t i = 0; i < tensor_list.size(); ++i) {
+    auto tensor = tensor_list[i];
+    if (tensor) {
+      dpcpp_tensor_vec.push_back(shallowFallbackToCPUTensor(tensor.value()));
+    } else {
+      dpcpp_tensor_vec.push_back(tensor);
+    }
+  }
+  return dpcpp_tensor_vec;
+}
 
 std::vector<at::Tensor> shallowFallbackToCPUTensorList(const at::TensorList& tensor_list) {
   std::vector<at::Tensor> dpcpp_tensor_vec(tensor_list.size());

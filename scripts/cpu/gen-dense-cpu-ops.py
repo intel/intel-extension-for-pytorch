@@ -128,7 +128,7 @@ _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_A = 'shallowUpgradeToDPCPPTensorA'
 _SHALLOW_UPGRADE_TO_DPCPP_TENSOR_AW = 'shallowUpgradeToDPCPPTensorAW'
 
 _REG_PATTERN =  """
-    m.impl_UNBOXED("{}", static_cast<{}>(&{}));"""
+    m.impl("{}", static_cast<{}>(&{}));"""
 
 _REG_BLOCK = """
 namespace {{

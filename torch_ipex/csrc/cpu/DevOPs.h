@@ -89,7 +89,7 @@ class AtenIpexCPUDev {
   static at::Tensor dil_select(const at::Tensor & self, at::Dimname dim, int64_t index);
   static at::Tensor dil_view(const at::Tensor & self, at::IntArrayRef size);
   static at::Tensor dil_index_select(const at::Tensor & self, int64_t dim, const at::Tensor & index);
-  static at::Tensor dil_index(const at::Tensor & self, at::TensorList indices);
+  static at::Tensor dil_index(const at::Tensor & self, const c10::List<c10::optional<at::Tensor>> & indices);
   static at::Tensor dil__unsafe_view(const at::Tensor & self, at::IntArrayRef size);
   static at::Tensor dil_shuffle(const at::Tensor & self, at::IntArrayRef view_shape, int64_t dim0, int64_t dim1);
   static std::tuple<at::Tensor,at::Tensor> dil__pack_padded_sequence(const at::Tensor & input, const at::Tensor & lengths, bool batch_first);

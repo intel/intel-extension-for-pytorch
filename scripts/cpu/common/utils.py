@@ -8,6 +8,8 @@ _TYPE_NSMAP = {
     'TensorList': 'at::TensorList',
     'TensorOptions': 'c10::TensorOptions',
     'IntList': 'at::IntList',
+    'List': 'c10::List',
+    'Stream': 'c10::Stream',
     'IntArrayRef': 'at::IntArrayRef',
     'ArrayRef': 'c10::ArrayRef',
     'Layout': 'c10::Layout',
