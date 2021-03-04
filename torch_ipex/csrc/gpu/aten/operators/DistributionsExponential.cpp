@@ -14,7 +14,7 @@
 #include "Distributions.h"
 
 #ifdef USE_ONEMKL
-#include <mkl_sycl.hpp>
+#include <oneapi/mkl.hpp>
 #include <mkl.h>
 #endif
 
@@ -31,17 +31,16 @@ Tensor& exponential_(Tensor& self, double lambda_, c10::optional<Generator> gen_
     IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
       scalar_t displ = static_cast<scalar_t>(0.0);
       scalar_t scale = static_cast<scalar_t>(std::abs(1/lambda_));
-      auto &sycl_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+      auto &dpcpp_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
       uint64_t seed;
       {
         // See Note [Acquire lock when using random generators]
         std::lock_guard<std::mutex> lock(gen->mutex_);
         seed = gen->current_seed();
       }
-      oneapi::mkl::rng::philox4x32x10 engine(sycl_queue, seed);
+      oneapi::mkl::rng::philox4x32x10 engine(dpcpp_queue, seed);
       oneapi::mkl::rng::exponential<scalar_t> distribution(displ, scale);
-      auto sycl_buffer = make_buffer<scalar_t>(self.data_ptr());
-      oneapi::mkl::rng::generate(distribution, engine, self.numel(), sycl_buffer);
+      DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::rng::generate, distribution, engine, self.numel(), (scalar_t *)(self.data_ptr()));
     });
   } else
 #endif

@@ -13,7 +13,7 @@
 #include "Loops.h"
 
 #ifdef USE_ONEMKL
-#include <mkl_sycl.hpp>
+#include <oneapi/mkl.hpp>
 #include <mkl.h>
 #endif
 
@@ -28,7 +28,7 @@ Tensor lgamma(const Tensor & self) {
   Tensor out = at::empty_like(self);
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lgamma", [&] {
-    oneapi::mkl::vm::lgamma(dpcpp_queue, n, (scalar_t *)self.data_ptr(), (scalar_t *)out.data_ptr());
+    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::vm::lgamma, dpcpp_queue, n, (scalar_t *)self.data_ptr(), (scalar_t *)out.data_ptr());
   });
 
   return out;
@@ -42,7 +42,7 @@ Tensor& lgamma_(Tensor & self) {
   int64_t n = self.numel();
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lgamma_", [&] {
-    oneapi::mkl::vm::lgamma(dpcpp_queue, n, (scalar_t *)self.data_ptr(), (scalar_t *)self.data_ptr());
+    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::vm::lgamma, dpcpp_queue, n, (scalar_t *)self.data_ptr(), (scalar_t *)self.data_ptr());
   });
 
   return self;

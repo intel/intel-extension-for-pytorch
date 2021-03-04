@@ -8,7 +8,7 @@
 #include <utils/ATDispatch.h>
 
 #ifdef USE_ONEMKL
-#include <mkl_sycl.hpp>
+#include <oneapi/mkl.hpp>
 #include <mkl.h>
 #endif
 
@@ -144,33 +144,18 @@ static void apply_lu_dpcpp_(
     Tensor& infos_) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-
-  auto batch_size = native::batchCount(self_);
-  auto m_ = self_.size(-2);
-  auto n_ = self_.size(-1);
-  Tensor self = self_.view({batch_size, m_, n_});
-  Tensor pivots = pivots_.view({batch_size, m_});
-  Tensor infos = infos_.view({batch_size});
-
-  std::vector<std::int64_t> m(batch_size, m_);
-  std::vector<std::int64_t> n(batch_size, n_);
-  std::vector<std::int64_t> lda(batch_size, m_);
-  std::vector< DPCPP::buffer<scalar_t,1>> A_buf;
-  std::vector< DPCPP::buffer<int64_t,1>> ipiv_buf;
-  std::vector< DPCPP::buffer<int64_t,1>> info_buf;
-
-  for (std::int64_t i = 0; i < batch_size; i++)
-  {
-    auto a = make_buffer<scalar_t>(self[i].data_ptr());
-    A_buf.emplace_back(a);
-    auto ipiv = make_buffer<int64_t>(pivots[i].data_ptr());
-    ipiv_buf.emplace_back(ipiv);
-    auto info = make_buffer<int64_t>(infos[i].data_ptr());
-    info_buf.emplace_back(info);
-  }
-  //FIXME later: comment it to make build happy. Once USM bug is fixed, would replace this OP implementation for beta09 oneAPI
-  //oneapi::mkl::lapack::getrf_batch(dpcpp_queue, m, n, A_buf, lda, ipiv_buf, info_buf);
-  AT_ERROR("lu: runtime error");
+  std::int64_t batch_size = native::batchCount(self_);
+  std::int64_t m = self_.size(-2);
+  std::int64_t n = self_.size(-1);
+  scalar_t *a = (scalar_t *)(self_.data_ptr());
+  std::int64_t lda = m;
+  std::int64_t stride_a = lda * n;
+  std::int64_t *ipiv = (std::int64_t *)(pivots_.data_ptr());
+  std::int64_t stride_ipiv = (m < n) ? m : n;
+  std::int64_t scratchpadsize = 
+    oneapi::mkl::lapack::getrf_batch_scratchpad_size<scalar_t>(dpcpp_queue, m, n, lda, stride_a, stride_ipiv, batch_size);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
+  DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::lapack::getrf_batch, dpcpp_queue, m, n, a, lda, stride_a, ipiv, stride_ipiv, batch_size, (scalar_t *)(scratchpad_at.data_ptr()), scratchpadsize);
 #else
   AT_ERROR("lu: oneMKL library not found in compilation");
 #endif

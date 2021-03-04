@@ -439,7 +439,7 @@ struct TORCH_API DPCPPType final {
   static Tensor _fft_with_size(const Tensor & self, int64_t signal_ndim, bool complex_input, bool complex_output, bool inverse, IntArrayRef checked_signal_sizes, int64_t normalization, bool onesided, IntArrayRef output_sizes); // {"schema": "aten::_fft_with_size.norm_modes(Tensor self, int signal_ndim, bool complex_input, bool complex_output, bool inverse, int[] checked_signal_sizes, int normalization, bool onesided, int[] output_sizes) -> Tensor", "compound": "False", "has_math_kernel": "False"}
 
   static std::tuple<Tensor,Tensor,Tensor> _lu_with_info(const Tensor & self, bool pivot, bool check_errors); // aten::_lu_with_info(Tensor self, bool pivot=True, bool check_errors=True) -> (Tensor, Tensor, Tensor)
-  static Tensor& log_normal_(Tensor& self, double mean_, double std_, Generator* gen_); // aten::log_normal_(Tensor(a!) self, float mean=0, float std=1, *, Generator? generator=None) -> Tensor(a!)
+  static Tensor& log_normal_(Tensor& self, double mean_, double std_, Generator* gen_); // aten::log_normal_(Tensor(a!) self, float mean=1, float std=2, *, Generator? generator=None) -> Tensor(a!)
   static Tensor cholesky_inverse(const Tensor & self, bool upper); // aten::cholesky_inverse(Tensor self, bool upper=False) -> Tensor
   static Tensor & cholesky_inverse_out(Tensor & out, const Tensor & self, bool upper); // aten::cholesky_inverse.out(Tensor self, bool upper=False, *, Tensor(a!) out) -> Tensor(a!)
   static std::tuple<Tensor,Tensor> geqrf(const Tensor & self); // aten::geqrf(Tensor self) -> (Tensor a, Tensor tau)

@@ -7,8 +7,8 @@
 
 #ifdef USE_ONEMKL
 #include <mkl.h>
-#include <mkl_sycl.hpp>
-#include "mkl_dfti_sycl.hpp"
+#include <oneapi/mkl.hpp>
+#include <oneapi/mkl/dfti.hpp>
 #endif
 
 DPCPP_DEF_K2(fill_with_conjugate_symmetry_ker, typename scalar_t);
@@ -162,9 +162,9 @@ void _mkl_dft(
   auto out_data = (scalar_t*)output.data_ptr();
 
   if (!inverse) {
-    desc.compute_forward(in_data, out_data);
+    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::dft::compute_forward, desc, in_data, out_data);
   } else {
-    desc.compute_backward(in_data, out_data);
+    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::dft::compute_backward, desc, in_data, out_data);
   }
 
   if (!complex_input && complex_output && !onesided) {

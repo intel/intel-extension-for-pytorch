@@ -2,12 +2,12 @@
 #include <core/DPCPP.h>
 
 #ifdef BUILD_INTERNAL_DEBUG
-#define DPCPP_ONEMKL_SUBMIT(routine, q, ...)                                  \
+#define DPCPP_ONEMKL_SUBMIT(q, routine, ...)                                  \
   {                                                                           \
     static auto verbose = dpcpp_verbose();                                    \
     if (verbose) {                                                            \
       IPEX_TIMER(t, verbose, __func__);                                       \
-      auto e = routine((q), ##__VA_ARGS__);                                   \
+      auto e = routine(__VA_ARGS__);                                   \
       t.now("oneMKL submit");                                                 \
       e.wait_and_throw();                                                     \
       t.now("oneMKL event wait");                                             \
@@ -15,19 +15,19 @@
       t.now("oneMKL queue wait");                                             \
       dpcpp_log("onemkl_kernel", e);                                          \
     } else {                                                                  \
-      auto e = routine((q), ##__VA_ARGS__);                                   \
+      auto e = routine(__VA_ARGS__);                                   \
       dpcpp_log("onemkl_kernel", e);                                          \
       e.wait_and_throw();                                                     \
       DPCPP_Q_FORCE_SYNC(q);                                                  \
     }                                                                         \
   }
 #else
-#define DPCPP_ONEMKL_SUBMIT(routine, q, ...)                                  \
+#define DPCPP_ONEMKL_SUBMIT(q, routine, ...)                                  \
   {                                                                           \
     static auto verbose = dpcpp_verbose();                                    \
     if (verbose) {                                                            \
       IPEX_TIMER(t, verbose, __func__);                                       \
-      auto e = routine((q), ##__VA_ARGS__);                                   \
+      auto e = routine(__VA_ARGS__);                                   \
       t.now("oneMKL submit");                                                 \
       (q).throw_asynchronous();                                               \
       t.now("oneMKL throw asynchronous");                                     \
@@ -35,7 +35,7 @@
       t.now("oneMKL queue wait");                                             \
       dpcpp_log("onemkl_kernel", e);                                          \
     } else {                                                                  \
-      auto e = routine((q), ##__VA_ARGS__);                                   \
+      auto e = routine(__VA_ARGS__);                                   \
       (q).throw_asynchronous();                                               \
       dpcpp_log("onemkl_kernel", e);                                          \
       DPCPP_Q_FORCE_SYNC(q);                                                  \

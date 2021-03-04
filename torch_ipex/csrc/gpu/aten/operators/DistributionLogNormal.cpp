@@ -12,7 +12,7 @@
 #include "Distributions.h"
 
 #ifdef USE_ONEMKL
-#include <mkl_sycl.hpp>
+#include <oneapi/mkl.hpp>
 #endif
 
 namespace at {
@@ -51,8 +51,7 @@ Tensor& log_normal_(Tensor& self, double mean_, double std_, c10::optional<Gener
       auto &dpcpp_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
       oneapi::mkl::rng::philox4x32x10 engine(dpcpp_queue, gen->seed());
       oneapi::mkl::rng::lognormal<scalar_t, oneapi::mkl::rng::lognormal_method::box_muller2> distribution(mean, std, displ, scale);
-      auto dpcpp_buffer = make_buffer<scalar_t>(self.data_ptr());
-      oneapi::mkl::rng::generate(distribution, engine, self.numel(), dpcpp_buffer);
+      DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::rng::generate, distribution, engine, self.numel(), (scalar_t *)(self.data_ptr()));
     });
   } else
 #endif

@@ -34,7 +34,7 @@ endif()
 
 # Try to find Intel MKL DPCPP header
 find_file(MKL_DPCPP_HEADER
-    NAMES mkl_sycl.hpp
+    NAMES mkl.h
     PATHS
         ${mkl_dpcpp_root_hint}
     PATH_SUFFIXES

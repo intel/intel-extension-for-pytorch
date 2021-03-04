@@ -6,7 +6,7 @@ import pytest
 class TestNNMethod(TestCase):
     @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
     def test_fft(self, dtype=torch.float):
-        x = torch.randn(5, 5)
+        x1 = torch.randn(5, 5)
         x2 = torch.randn(4, 3, 2)
         x1_dpcpp = x1.to("xpu")
         x2_dpcpp = x2.to("xpu")

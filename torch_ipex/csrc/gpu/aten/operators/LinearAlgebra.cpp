@@ -9,7 +9,7 @@
 #include <core/Runtime.h>
 
 #ifdef USE_ONEMKL
-#include <mkl_sycl.hpp>
+#include <oneapi/mkl.hpp>
 #include <mkl.h>
 #endif
 
@@ -87,9 +87,7 @@ Tensor & cholesky_inverse_out(Tensor & out, const Tensor & self, bool upper) {
     auto upper_lower = upper ? (oneapi::mkl::uplo::upper) : (oneapi::mkl::uplo::lower);
     std::int64_t scratchpadsize = oneapi::mkl::lapack::potri_scratchpad_size<scalar_t>(dpcpp_queue, upper_lower, n, lda);
     Tensor scratchpad_at = at::empty({scratchpadsize}, out.options());
-    oneapi::mkl::lapack::potri(dpcpp_queue, upper_lower, n,
-        (scalar_t *)out.data_ptr(), lda, (scalar_t *)scratchpad_at.data_ptr(), scratchpadsize);
-
+    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::lapack::potri, dpcpp_queue, upper_lower, n, (scalar_t *)out.data_ptr(), lda, (scalar_t *)scratchpad_at.data_ptr(), scratchpadsize);
     impl::copy_triangle_symmetric_template<scalar_t>(out, upper);
   });
 
@@ -127,9 +125,7 @@ std::tuple<Tensor&, Tensor&> geqrf_out(Tensor &ra, Tensor &tau, const Tensor &a)
     std::int64_t scratchpadsize = oneapi::mkl::lapack::geqrf_scratchpad_size<scalar_t>(dpcpp_queue, m, n, lda);
     Tensor scratchpad_at = at::empty({scratchpadsize}, a.options());
 
-    oneapi::mkl::lapack::geqrf(
-        dpcpp_queue, m, n, (scalar_t *)ra.data_ptr(), lda,
-        (scalar_t *)tau.data_ptr(), (scalar_t *)scratchpad_at.data_ptr(), scratchpadsize);
+    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::lapack::geqrf, dpcpp_queue, m, n, (scalar_t *)ra.data_ptr(), lda, (scalar_t *)tau.data_ptr(), (scalar_t *)scratchpad_at.data_ptr(), scratchpadsize);
   });
 
   return std::tuple<Tensor&, Tensor&>(ra, tau);
@@ -171,7 +167,7 @@ Tensor& ger_out(Tensor & out, const Tensor & self, const Tensor & vec2) {
     auto a = (scalar_t *)out.data_ptr();
     // The BLAS API is column major. To save the transpose and element move, we switch the two input.
     // The ger documents https://spec.oneapi.com/versions/0.6.0/oneMKL/GUID-BD2E87B3-5FA7-4E0C-88E2-1982AB0773A2.html
-    oneapi::mkl::blas::ger(dpcpp_queue, m, n, (float)1.0, y, vec2_stride, x, input_stride, a, m);
+    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::blas::ger, dpcpp_queue, m, n, (float)1.0, y, vec2_stride, x, input_stride, a, m);
   });
 
   return out;

@@ -5,7 +5,7 @@
 #include <core/Macros.h>
 
 #ifdef USE_ONEMKL
-#include <mkl_sycl.hpp>
+#include <oneapi/mkl.hpp>
 #include <mkl.h>
 #include <core/oneMKLUtils.h>
 #endif

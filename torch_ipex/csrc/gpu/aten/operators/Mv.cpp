@@ -8,7 +8,7 @@
 #include <utils/ATDispatch.h>
 
 #ifdef USE_ONEMKL
-#include <mkl_sycl.hpp>
+#include <oneapi/mkl.hpp>
 #include <mkl.h>
 #endif
 
@@ -27,7 +27,9 @@ Tensor mv(const Tensor & self, const Tensor & vec) {
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "mv", [&] {
-    oneapi::mkl::blas::row_major::gemv(dpcpp_queue, oneapi::mkl::transpose::N, m, n, (scalar_t)1.0, (scalar_t *)self.data_ptr(), lda, (scalar_t *)vec.data_ptr(), 1, (scalar_t)0, (scalar_t *)out.data_ptr(), 1);
+    DPCPP_ONEMKL_SUBMIT(
+      dpcpp_queue,
+      oneapi::mkl::blas::row_major::gemv, dpcpp_queue, oneapi::mkl::transpose::N, m, n, (scalar_t)1.0, (scalar_t *)self.data_ptr(), lda, (scalar_t *)vec.data_ptr(), 1, (scalar_t)0, (scalar_t *)out.data_ptr(), 1);
   });
 
   return out;
