@@ -1,6 +1,7 @@
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/THP.h>
 #include <torch/csrc/jit/python/pybind_utils.h>
+#include <torch/csrc/tensor/python_tensor.h>
 
 #include <ATen/ipex_type_dpcpp_customized.h>
 #include <gpu/jit/fusion_pass.h>
@@ -41,6 +42,23 @@ PyObject * THPModule_getDeviceCount_wrap(PyObject *self, PyObject *noargs)
   END_HANDLE_TH_ERRORS
 }
 
+static PyObject * THPModule_postInitExtension(PyObject *self, PyObject *noargs)
+{
+  HANDLE_TH_ERRORS
+  std::vector<c10::Backend> backends = { c10::Backend::XPU };
+  std::vector<c10::ScalarType> scalar_types = { c10::ScalarType::Byte, c10::ScalarType::Char, c10::ScalarType::Double, c10::ScalarType::Float,
+                                                c10::ScalarType::Int,  c10::ScalarType::Long, c10::ScalarType::Short,  c10::ScalarType::Half,
+                                                c10::ScalarType::Bool, c10::ScalarType::BFloat16};
+  for (auto& backend : backends) {
+    for (auto& scalar_type : scalar_types) {
+      torch::tensors::register_python_tensor_type(backend, scalar_type);
+    }
+  }
+
+  Py_RETURN_NONE;
+  END_HANDLE_TH_ERRORS
+}
+
 static PyObject * THPModule_initExtension(PyObject *self, PyObject *noargs)
 {
   HANDLE_TH_ERRORS
@@ -73,6 +91,7 @@ PyObject * THPModule_getCurrentStream_wrap(
 
 static struct PyMethodDef _THCPModule_methods[] = {
   {"_initExtension",  (PyCFunction)THPModule_initExtension,   METH_NOARGS,       nullptr},
+  {"_postInitExtension",  (PyCFunction)THPModule_postInitExtension,   METH_NOARGS,       nullptr},
   {"_setDevice",   (PyCFunction)THPModule_setDevice_wrap,   METH_O,       nullptr},
   {"_getDevice",   (PyCFunction)THPModule_getDevice_wrap,   METH_NOARGS,  nullptr},
   {"_getDeviceCount", (PyCFunction)THPModule_getDeviceCount_wrap, METH_NOARGS, nullptr},

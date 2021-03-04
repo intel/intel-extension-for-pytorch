@@ -501,3 +501,7 @@ serialization.register_package(30, _xpu_tag, _xpu_deserialize)
 
 
 torch.runtime.register_runtime('xpu', current_module)
+
+
+_C._postInitExtension()
+
