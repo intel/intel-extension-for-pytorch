@@ -185,5 +185,49 @@ Tensor ger(const Tensor & self, const Tensor & vec2) {
   return AtenIpexTypeXPU::ger_out(out, self, vec2);
 }
 
+inline void dot_check(const Tensor& self, const Tensor& other) {
+  TORCH_CHECK(
+      self.dim() == 1 && other.dim() == 1,
+      "1D tensors expected, but got ",
+      self.dim(),
+      "D and ",
+      other.dim(),
+      "D tensors");
+
+  TORCH_CHECK(
+      self.scalar_type() == other.scalar_type(),
+      "dot : expected both vectors to have same dtype, but found ",
+      self.scalar_type(),
+      " and ",
+      other.scalar_type());
+
+  TORCH_CHECK(
+      self.numel() == other.numel(),
+      "inconsistent tensor size, expected tensor [",
+      self.numel(),
+      "] and src [",
+      other.numel(),
+      "] to have the same number of elements, but got ",
+      self.numel(),
+      " and ",
+      other.numel(),
+      " elements respectively");
+}
+
+Tensor dot(const Tensor& self, const Tensor& other){
+#ifdef USE_ONEMKL
+  dot_check(self, other);
+  Tensor result = at::empty({}, self.options());
+  // torch.dot supports all types and complex datatype, but oneapi::mkl::blas only supports float/double
+  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "dot", [&] {
+    auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::blas::dot, dpcpp_queue, self.numel(), (scalar_t *)self.data_ptr(), self.stride(0), (scalar_t *)other.data_ptr(), other.stride(0), (scalar_t *)result.data_ptr());
+  });
+  return result;
+#else
+  AT_ERROR("dot: oneMKL library not found in compilation");
+#endif
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
