@@ -36,7 +36,7 @@ class TestNNMethod(TestCase):
     print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
     self.assertEqual(y_cpu, y_dpcpp.cpu())
-    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), 5*1e-5)
+    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5*1e-5, rtol=0)
 
   def test_conv2d_with_bias(self, dtype=torch.float):
     x_cpu = torch.randn([1, 64, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True)
@@ -59,7 +59,7 @@ class TestNNMethod(TestCase):
     print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
     self.assertEqual(y_cpu, y_dpcpp.cpu())
-    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), 5*1e-5)
+    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5*1e-5, rtol=0)
 
   def test_conv2d_dilated(self, dtype=torch.float):
     x_cpu = torch.randn([1, 64, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True)
@@ -82,7 +82,7 @@ class TestNNMethod(TestCase):
     print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
     self.assertEqual(y_cpu, y_dpcpp.cpu())
-    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), 5*1e-5)
+    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5*1e-5, rtol=0)
 
   def test_conv2d_dilated_with_bias(self, dtype=torch.float):
     x_cpu = torch.randn([1, 64, 256, 256], dtype=dtype, device=cpu_device, requires_grad=True)
@@ -105,7 +105,7 @@ class TestNNMethod(TestCase):
     print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
     self.assertEqual(y_cpu, y_dpcpp.cpu())
-    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), 5*1e-5)
+    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5*1e-5, rtol=0)
 
   def test_conv3d(self, dtype=torch.float):
     x_cpu = torch.randn([2, 16, 10, 128, 128], dtype=dtype, device=cpu_device, requires_grad=True)
@@ -128,7 +128,7 @@ class TestNNMethod(TestCase):
     print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
     self.assertEqual(y_cpu, y_dpcpp.cpu())
-    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), 5*1e-5)
+    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5*1e-5, rtol=0)
 
   def test_conv3d_with_bias(self, dtype=torch.float):
     x_cpu = torch.randn([2, 16, 10, 128, 128], dtype=dtype, device=cpu_device, requires_grad=True)
@@ -151,7 +151,7 @@ class TestNNMethod(TestCase):
     print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
     self.assertEqual(y_cpu, y_dpcpp.cpu())
-    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), 5*1e-5)
+    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5*1e-5, rtol=0)
 
   def test_conv3d_dilated(self, dtype=torch.float):
     x_cpu = torch.randn([2, 16, 10, 128, 128], dtype=dtype, device=cpu_device, requires_grad=True)
@@ -174,7 +174,7 @@ class TestNNMethod(TestCase):
     print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
     self.assertEqual(y_cpu, y_dpcpp.cpu())
-    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), 5*1e-5)
+    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5*1e-5, rtol=0)
 
   def test_conv3d_dilated_with_bias(self, dtype=torch.float):
     x_cpu = torch.randn([2, 16, 10, 128, 128], dtype=dtype, device=cpu_device, requires_grad=True)
@@ -197,7 +197,7 @@ class TestNNMethod(TestCase):
     print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
     self.assertEqual(y_cpu, y_dpcpp.cpu())
-    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), 5*1e-5)
+    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5*1e-5, rtol=0)
 
   def test_conv_with_nosquare_kernel_size(self, dtype=torch.float):
     x_cpu = torch.randn([20, 16, 50, 100], dtype=dtype, device=cpu_device, requires_grad=True)
@@ -220,7 +220,7 @@ class TestNNMethod(TestCase):
     print("real (dpcpp):\n", "output:\n", y_dpcpp.cpu(), "\ngrad weight:\n", y_dpcpp_gw.cpu())
 
     self.assertEqual(y_cpu, y_dpcpp.cpu())
-    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), 5*1e-5)
+    self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5*1e-5, rtol=0)
 
   def test_primitive_cache(self, dtype=torch.float):
     x_cpu = torch.randn([1, 2, 3, 3], dtype=dtype, device=cpu_device, requires_grad=True)
