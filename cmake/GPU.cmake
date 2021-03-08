@@ -193,8 +193,8 @@ set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -D__STRICT_ANSI__")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl-unnamed-lambda")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fno-sycl-early-optimizations")
-# Disable the INT limitation of index in kernel by DPC++ compiler
-set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fno-sycl-id-queries-fit-in-int")
+# Explicitly limit the index range (< Max int32) in kernel
+set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl-id-queries-fit-in-int")
 set_source_files_properties(${TORCH_IPEX_SRCS} COMPILE_FLAGS "${IPEX_COMPILE_FLAGS}")
 
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl")
