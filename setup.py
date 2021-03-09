@@ -22,6 +22,7 @@ from __future__ import print_function
 from subprocess import check_call
 from setuptools import setup, Extension, find_packages, distutils
 import setuptools.command.build_ext
+from setuptools.command import build_py
 import setuptools.command.install
 from distutils.spawn import find_executable
 from sysconfig import get_paths
@@ -162,6 +163,9 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
             self.build_extension(ext)
         self.extensions = [ext for ext in self.extensions if not isinstance(ext, DPCPPExt)]
         super(DPCPPBuild, self).run()
+        build_py = self.get_finalized_command('build_py')
+        build_py.data_files = build_py._get_data_files()
+        build_py.run()
 
 
     def build_extension(self, ext):
