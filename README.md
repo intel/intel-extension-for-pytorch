@@ -51,6 +51,7 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
     cd ${pytorch_directory}
     python setup.py install
     ```
+**Note:** Compiling with gcc 7 on some environments, like CentOS 7, may fail. Please compile with gcc 8 in this case.
 
 ### Install Intel Extension for PyTorch from Source
 Install dependencies
