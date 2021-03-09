@@ -38,15 +38,14 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
       }
     });
   } else if (iter.dtype() == ScalarType::Bool) {
-    AT_DISPATCH_INTEGRAL_TYPES_AND(at::ScalarType::Bool, iter.dtype(), "random_kernel_int", [&] {
-      auto random_func = [] (uint32_t rand) {
-        return static_cast<scalar_t>(rand & 1);
-      };
-      distribution_nullary_kernel<scalar_t, uint32_t>(iter,
-        gen,
-        [] (RandomState<Philox4_32_10>* state) { return state-> random<uint32_t>(); },
-        random_func);
-    });
+    using scalar_t = typename c10::impl::ScalarTypeToCPPType<ScalarType::Bool>::type;
+    auto random_func = [] (uint32_t rand) {
+      return static_cast<scalar_t>(rand & 1);
+    };
+    distribution_nullary_kernel<scalar_t, uint32_t>(iter,
+      gen,
+      [] (RandomState<Philox4_32_10>* state) { return state-> random<uint32_t>(); },
+      random_func);
   } else if (isIntegralType(iter.dtype(), /*includeBool=*/false)) {
     AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "random_kernel_int", [&] {
       if (std::is_same<scalar_t, int64_t>::value) {
