@@ -229,5 +229,30 @@ Tensor dot(const Tensor& self, const Tensor& other){
 #endif
 }
 
+Tensor addr(const Tensor& self, const Tensor& vec1, const Tensor& vec2, Scalar beta, Scalar alpha) {
+  Tensor result = at::AtenIpexTypeXPU::ger(vec1, vec2) * alpha;
+  if (beta.to<double>() == 0.0) {
+    return result;
+  }
+  return result + (self * beta);
+}
+
+Tensor& addr_out(Tensor &result, const Tensor& self, const Tensor& vec1, const Tensor& vec2, Scalar beta, Scalar alpha) {
+  auto addr_result = at::AtenIpexTypeXPU::addr(self, vec1, vec2, beta, alpha);
+  // Validates safe casting
+  const auto result_dtype = addr_result.scalar_type();
+  TORCH_CHECK(canCast(result_dtype, result.scalar_type()),
+              "result type ", result_dtype,
+	      " can't be cast to the desired output type ", result.scalar_type());
+  resize_as_(result, addr_result, c10::nullopt);
+  result.copy_(addr_result);
+  return result;
+}
+
+Tensor& addr_(Tensor& self, const Tensor& vec1, const Tensor& vec2, Scalar beta, Scalar alpha) {
+  return at::AtenIpexTypeXPU::addr_out(self, self, vec1, vec2, beta, alpha);
+}
+
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

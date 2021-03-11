@@ -93,6 +93,25 @@ class TestTorchMethod(TestCase):
         self.assertEqual(A12, A12_dpcpp.to(cpu_device))
         self.assertEqual(A21, A21_dpcpp.to(cpu_device))
 
+    @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
+    def test_addr(self, dtype=torch.float):
+        x1_cpu = torch.randn(3, dtype=torch.float)
+        x2_cpu = torch.randn(2, dtype=torch.float)
+        M_cpu = torch.randn(3, 2, dtype=torch.float)
+        y_cpu = torch.addr(M_cpu, x1_cpu, x2_cpu)
 
+        x1_xpu = x1_cpu.to(dpcpp_device)
+        x2_xpu = x2_cpu.to(dpcpp_device)
+        M_xpu = M_cpu.to(dpcpp_device)
+        y_xpu = torch.addr(M_xpu, x1_xpu, x2_xpu)
 
+        self.assertEqual(y_cpu, y_xpu.cpu())
+
+        y_cpu = M_cpu.addr(x1_cpu, x2_cpu)
+        y_xpu = M_xpu.addr(x1_xpu, x2_xpu)
+        self.assertEqual(y_cpu, y_xpu.cpu())
+
+        M_cpu.addr_(x1_cpu, x2_cpu)
+        M_xpu.addr_(x1_xpu, x2_xpu)
+        self.assertEqual(M_cpu, M_xpu.cpu())
 

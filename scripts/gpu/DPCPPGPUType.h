@@ -449,6 +449,9 @@ struct TORCH_API DPCPPType final {
   static std::tuple<Tensor &,Tensor &> geqrf_out(Tensor & a, Tensor & tau, const Tensor & self); // aten::geqrf.a(Tensor self, *, Tensor(a!) a, Tensor(b!) tau) -> (Tensor(a!) a, Tensor(b!) tau)
   static Tensor ger(const Tensor & self, const Tensor & vec2); // aten::ger(Tensor self, Tensor vec2) -> Tensor
   static Tensor & ger_out(Tensor & out, const Tensor & self, const Tensor & vec2); // aten::ger.out(Tensor self, Tensor vec2, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor addr(const Tensor & self, const Tensor & vec1, const Tensor & vec2, Scalar beta, Scalar alpha); // aten::addr(Tensor self, Tensor vec1, Tensor vec2, *, Scalar beta=1, Scalar alpha=1) -> Tensor
+  static Tensor & addr_(Tensor & self, const Tensor & vec1, const Tensor & vec2, Scalar beta, Scalar alpha); // aten::addr_(Tensor(a!) self, Tensor vec1, Tensor vec2, *, Scalar beta=1, Scalar alpha=1) -> Tensor(a!)
+
 };
   static Tensor isnan(const Tensor & self); // aten::isnan(Tensor self) -> Tensor
   static bool equal(const Tensor & self, const Tensor & other); // aten::equal(Tensor self, Tensor other) -> bool
