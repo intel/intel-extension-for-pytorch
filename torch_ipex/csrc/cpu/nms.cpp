@@ -125,7 +125,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_kernel(const at::
     at::Tensor mask_index = at::nonzero(score > 0.05).squeeze(1);
     at::Tensor bboxes = at::index_select(dets, /*dim*/0, mask_index);
     score = at::index_select(score, /*dim*/0, mask_index);
-    
+
     if (score.size(0) == 0) {
       continue;
     }
@@ -183,7 +183,7 @@ at::Tensor IpexExternal::nms(const at::Tensor& dets,
   printf("IpexExternal::nms\n");
 #endif
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IpexExternal::nms", std::vector<c10::IValue>({dets, scores}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("IpexExternal::nms", std::vector<c10::IValue>({}));
 #endif
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(scores.layout() == c10::kStrided);
@@ -201,7 +201,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> IpexExternal::batch_score_nms(con
   printf("IpexExternal::batch_score_nms\n");
 #endif
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("IpexExternal::batch_score_nms", std::vector<c10::IValue>({dets, scores}), torch::autograd::Node::peek_at_next_sequence_nr());
+  RECORD_FUNCTION("IpexExternal::batch_score_nms", std::vector<c10::IValue>({}));
 #endif
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(scores.layout() == c10::kStrided);

@@ -19,8 +19,7 @@ public:
   static at::Tensor _forward(at::Tensor input, at::Tensor weight,
                              at::Tensor bias = at::Tensor()) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXLinearOp::_forward",
-                    std::vector<c10::IValue>({input, weight, bias}));
+    RECORD_FUNCTION("IPEXLinearOp::_forward", std::vector<c10::IValue>({}));
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
@@ -53,8 +52,7 @@ public:
                             at::Tensor input, at::Tensor weight,
                             at::Tensor bias = at::Tensor()) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXLinearOp::forward",
-                    std::vector<c10::IValue>({input, weight, bias}));
+    RECORD_FUNCTION("IPEXLinearOp::forward", std::vector<c10::IValue>({}));
 #endif
     at::AutoNonVariableTypeMode g;
     ctx->save_for_backward({input, weight, bias});
@@ -162,8 +160,7 @@ public:
            at::IntArrayRef stride, at::IntArrayRef padding,
            at::IntArrayRef dilation, bool ceil_mode) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXMaxPool2dOp::_forward",
-                    std::vector<c10::IValue>({input}));
+    RECORD_FUNCTION("IPEXMaxPool2dOp::_forward", std::vector<c10::IValue>({}));
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
@@ -210,8 +207,7 @@ public:
                             at::IntArrayRef stride, at::IntArrayRef padding,
                             at::IntArrayRef dilation, bool ceil_mode) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXMaxPool2dOp::forward",
-                    std::vector<c10::IValue>({input}));
+    RECORD_FUNCTION("IPEXMaxPool2dOp::forward", std::vector<c10::IValue>({}));
 #endif
     ctx->saved_data["kernel_size"] = kernel_size;
     ctx->saved_data["stride"] = stride;
@@ -293,8 +289,7 @@ public:
            at::IntArrayRef stride, at::IntArrayRef padding,
            at::IntArrayRef dilation, bool ceil_mode) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXMaxPool3dOp::_forward",
-                    std::vector<c10::IValue>({input}));
+    RECORD_FUNCTION("IPEXMaxPool3dOp::_forward", std::vector<c10::IValue>({}));
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
@@ -333,8 +328,7 @@ public:
                             at::IntArrayRef stride, at::IntArrayRef padding,
                             at::IntArrayRef dilation, bool ceil_mode) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXMaxPool3dOp::forward",
-                    std::vector<c10::IValue>({input}));
+    RECORD_FUNCTION("IPEXMaxPool3dOp::forward", std::vector<c10::IValue>({}));
 #endif
     ctx->saved_data["kernel_size"] = kernel_size;
     ctx->saved_data["stride"] = stride;
@@ -414,8 +408,7 @@ class NewApaptiveAvgPoolingOp
 public:
   static at::Tensor _forward(at::Tensor input, at::IntArrayRef output_size) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::_forward",
-                    std::vector<c10::IValue>({input}));
+    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::_forward", std::vector<c10::IValue>({}));
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
@@ -450,8 +443,7 @@ public:
   static at::Tensor forward(torch::autograd::AutogradContext *ctx,
                             at::Tensor input, at::IntArrayRef output_size) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::forward",
-                    std::vector<c10::IValue>({input}));
+    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::forward", std::vector<c10::IValue>({}));
 #endif
     ctx->save_for_backward({input});
     return _forward(input, output_size);
@@ -461,8 +453,7 @@ public:
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::backward",
-                    std::vector<c10::IValue>({}));
+    RECORD_FUNCTION("IPEXApaptiveAvgPoolingOp::backward", std::vector<c10::IValue>({}));
 #endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];
@@ -510,8 +501,7 @@ public:
            bool sparse, bool include_last_offset,
            const at::Tensor per_sample_weights = at::Tensor()) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXEmbeddingBagOp::_forward",
-                    std::vector<c10::IValue>({weight, indices, offsets}));
+    RECORD_FUNCTION("IPEXEmbeddingBagOp::_forward", std::vector<c10::IValue>({}));
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
@@ -570,8 +560,7 @@ public:
           bool include_last_offset,
           const at::Tensor per_sample_weights = at::Tensor()) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("IPEXEmbeddingBagOp::forward",
-                    std::vector<c10::IValue>({weight, indices, offsets}));
+    RECORD_FUNCTION("IPEXEmbeddingBagOp::forward", std::vector<c10::IValue>({}));
 #endif
     at::AutoNonVariableTypeMode g;
     ctx->saved_data["num_weights"] = weight.size(0);
@@ -727,7 +716,7 @@ public:
     const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse, int64_t mode,
     int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("NewRNNLayerOp::_forward", std::vector<c10::IValue>({input, w1, w2, w3, w4, hx, cx, reverse, mode, hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("NewRNNLayerOp::_forward", std::vector<c10::IValue>({}));
 #endif
     try {
       if (torch_ipex::check_auto_dnnl() &&
@@ -762,7 +751,7 @@ public:
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("NewRNNLayerOp::backward", std::vector<c10::IValue>({}), torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("NewRNNLayerOp::backward", std::vector<c10::IValue>({}));
 #endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];
@@ -809,9 +798,7 @@ class FrozenBatchNormOp : public torch::autograd::Function<FrozenBatchNormOp> {
 public:
   static at::Tensor _forward(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean, const at::Tensor& running_var) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("FrozenBatchNormOp::_forward",
-                    std::vector<c10::IValue>({input, weight, bias, running_mean, running_var}),
-                    torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("FrozenBatchNormOp::_forward", std::vector<c10::IValue>({}));
 #endif
     return torch_ipex::cpu::AtenIpexCPUDev::dil_frozen_batch_norm(input, weight, bias, running_mean, running_var, 0);
   }
@@ -819,9 +806,7 @@ public:
   static at::Tensor forward(torch::autograd::AutogradContext *ctx,
                             const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean, const at::Tensor& running_var) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("FrozenBatchNormOp::forward",
-                    std::vector<c10::IValue>({input, weight, bias, running_mean, running_var}),
-                    torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("FrozenBatchNormOp::forward", std::vector<c10::IValue>({}));
 #endif
     ctx->save_for_backward({input, weight, running_mean, running_var});
     return torch_ipex::cpu::AtenIpexCPUDev::dil_frozen_batch_norm(input, weight, bias, running_mean, running_var, 0);
@@ -831,8 +816,7 @@ public:
   backward(torch::autograd::AutogradContext *ctx,
            torch::autograd::tensor_list grad_outputs) {
 #if defined(IPEX_PROFILE_OP)
-    RECORD_FUNCTION("FrozenBatchNormOp::backward", std::vector<c10::IValue>({}),
-                    torch::autograd::Node::peek_at_next_sequence_nr());
+    RECORD_FUNCTION("FrozenBatchNormOp::backward", std::vector<c10::IValue>({}));
 #endif
     auto saved = ctx->get_saved_variables();
     at::Tensor input = saved[0];

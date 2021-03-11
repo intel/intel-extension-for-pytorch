@@ -587,7 +587,7 @@ class DenseOPCodeGen(object):
                 if param.core_type in ['Tensor', 'Scalar']:
                     profiler_inputs.append(param.name)
             code += '#if defined(IPEX_PROFILE_OP)\n'
-            code += '  RECORD_FUNCTION("{ns}::{name}", std::vector<c10::IValue>({{{input_names}}}));\n'.format(ns=_IPEX_OP_FUNC_NS, name=cpp_sig.def_name, input_names=', '.join(profiler_inputs))
+            code += '  RECORD_FUNCTION("{ns}::{name}", std::vector<c10::IValue>({{}}));\n'.format(ns=_IPEX_OP_FUNC_NS, name=cpp_sig.def_name)
             code += '#endif\n'
 
             if is_conv_overrideable_func(cpp_sig.def_name):
