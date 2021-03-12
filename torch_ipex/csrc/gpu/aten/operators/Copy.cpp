@@ -15,7 +15,7 @@
 #include <utils/ATDispatch.h>
 
 #include "Loops.h"
-#include <oneDNN/ReorderCopy.h>
+#include <oneDNN/oneDNN.h>
 
 using namespace at;
 using namespace at::dpcpp;

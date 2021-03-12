@@ -1,19 +1,8 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include "Types.h"
 #include "Sum.h"
 #include "Binary.h"
 #include "Eltwise.h"
-
-
-namespace at {
-namespace dpcpp {
-namespace oneDNN {
-
-enum post_attr {
-  with_relu = 0b01,
-  with_sum = 0b10,
-  with_sigmoid = 0b100,
-};
-
-}}}
+#include "Reorder.h"

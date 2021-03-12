@@ -8,6 +8,7 @@
 #include <core/Runtime.h>
 #include <utils/ATDispatch.h>
 #include "Loops.h"
+#include <oneDNN/oneDNN.h>
 
 DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
 DPCPP_DEF_K1(make_per_channel_quantized_tensor_dpcpp);
@@ -153,30 +154,23 @@ Tensor quantize_tensor_per_tensor_affine(
   engine q_eng = r_eng;
   memory::desc q_md = memory::desc(q_dims, q_dt, q_fmt);
 
+  primitive_attr attr;
+  int mask = 0;
+  attr.set_output_scales(mask, {static_cast<float>(1.0f / scale)});
+  attr.set_zero_points(DNNL_ARG_DST, mask, {static_cast<int>(zero_point)});
+
   memory r_m, q_m;
   Tensor qtensor_opt;
   if (!r_ctx.is_plain() && lazy_reorder_enabled()) {
     if (rtensor.is_quantized())
       return rtensor;
-    r_m = r_ctx.is_plain() ? dpcpp_onednn_memory(r_md, r_eng, rtensor.data_ptr())
-        : dpcpp_onednn_memory({r_ctx.meta()}, r_eng, rtensor.data_ptr());
     auto q_type = qtensor.scalar_type();
     auto quantizer = make_per_tensor_affine_quantizer(scale, zero_point, q_type);
     qtensor_opt = AtenIpexTypeXPU::empty_opaque_qtensor(q_md, c10::nullopt, quantizer);
-
-    q_m = dpcpp_onednn_memory(q_md, q_eng, qtensor_opt.data_ptr());
+    oneDNN::reorder(rtensor, qtensor_opt, attr);
   } else {
-    r_m = dpcpp_onednn_memory(r_md, r_eng, rtensor.data_ptr());
-    q_m = dpcpp_onednn_memory(q_md, q_eng, qtensor.data_ptr());
+    oneDNN::reorder(rtensor, qtensor, attr);
   }
-
-  primitive_attr attr;
-  int mask = 0;
-  attr.set_output_scales(mask, {static_cast<float>(1.0f / scale)});
-  attr.set_zero_points(DNNL_ARG_DST, mask, {static_cast<int>(zero_point)});
-  reorder reorder_p = reorder(r_m, q_m, attr);
-
-  DPCPP_ONEDNN_EXEC(reorder_p, stream, {{DNNL_ARG_FROM, r_m}, {DNNL_ARG_TO, q_m}});
 
   if (!r_ctx.is_plain() && lazy_reorder_enabled()) {
     auto q_opt_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::release_tensor_ctx(qtensor_opt);
