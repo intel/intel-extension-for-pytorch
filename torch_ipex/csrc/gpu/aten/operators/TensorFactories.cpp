@@ -10,8 +10,16 @@
 
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
+#include <core/Generator.h>
 #include <utils/ATDispatch.h>
 #include <utils/Numerics.h>
+
+#ifdef USE_ONEDPL
+#include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/numeric>
+#include <oneapi/dpl/iterator>
+#endif
 
 DPCPP_DEF_K1(intrepr);
 DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
@@ -87,6 +95,46 @@ Tensor& eye_out_dpcpp(Tensor& result, int64_t n) {
   return eye_out_dpcpp(result, n, /*m=*/-1);
 }
 
+template <typename scalar_t>
+Tensor randperm_dpcpp(
+    Tensor& result,
+    int64_t n,
+    c10::optional<Generator> generator) {
+#ifdef USE_ONEDPL
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
+
+  auto keys = at::empty(result.sizes(), result.options()).random_(generator);
+  scalar_t* keys_data = keys.data_ptr<scalar_t>();
+
+  Tensor shuffled;
+  scalar_t* shuffled_data;
+  if (result.is_contiguous()) {
+    shuffled = result;
+    shuffled_data = result.data_ptr<scalar_t>();
+  } else {
+    shuffled = at::empty(n, result.options());
+    shuffled_data = shuffled.data_ptr<scalar_t>();
+  }
+
+  auto count_begin = oneapi::dpl::counting_iterator<int64_t>(0);
+  std::copy(policy, count_begin, count_begin + n, shuffled_data);
+  auto zipped_begin = oneapi::dpl::make_zip_iterator(keys_data, shuffled_data);
+  std::stable_sort(
+    policy, zipped_begin, zipped_begin + n, 
+    [](auto lhs, auto rhs) {
+      using std::get;
+      return get<0>(lhs) < get<0>(rhs);
+    });
+  
+  if (!result.is_contiguous()) {
+    result.copy_(shuffled);
+  }
+  return result;
+#else
+  AT_ERROR("Without ONEDPL support, randperm is not implemented for backend: ", self.device());
+#endif
+}
 
 namespace triangle_dpcpp {
 // To find the max integer that does not exceed the root of an int64_t variable,
@@ -357,6 +405,30 @@ Tensor& eye_out(Tensor& out, int64_t n) {
 Tensor& eye_out(Tensor& out, int64_t n, int64_t m) {
   impl::eye_out_dpcpp(out, n, m);
   return out;
+}
+
+Tensor& randperm_out(Tensor& result, int64_t n, c10::optional<Generator> generator) {
+  TORCH_CHECK(n >= 0, "n must be non-negative, got", n);
+  check_supported_max_int_with_precision(n, result);
+  result.resize_({n});
+  AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, result.scalar_type(), "randperm", [&]() -> void {
+    impl::randperm_dpcpp<scalar_t>(result, n, generator);
+  });
+
+  return result;
+}
+
+Tensor& randperm_out(Tensor& result, int64_t n) {
+  return at::AtenIpexTypeXPU::randperm_out(result, n, c10::nullopt);
+}
+
+Tensor randperm(int64_t n, c10::optional<Generator> generator, const TensorOptions& options) {
+  auto tensor = at::empty(n, options);
+  return at::AtenIpexTypeXPU::randperm_out(tensor, n, generator);
+}
+
+Tensor randperm(int64_t n, const TensorOptions& options) {
+  return at::AtenIpexTypeXPU::randperm(n, c10::nullopt, options);
 }
 
 Tensor tril_indices(

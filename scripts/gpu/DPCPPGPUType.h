@@ -103,6 +103,10 @@ struct TORCH_API DPCPPType final {
   static Tensor & random_(Tensor & self, int64_t from, c10::optional<int64_t> to, c10::optional<Generator> generator); // aten::random_.from(Tensor(a!) self, int from, int? to, *, Generator? generator=None) -> Tensor(a!)
   static Tensor & random_(Tensor & self, int64_t to, c10::optional<Generator> generator); // aten::random_.to(Tensor(a!) self, int to, *, Generator? generator=None) -> Tensor(a!)
   static Tensor & random_(Tensor & self, c10::optional<Generator> generator); // aten::random_(Tensor(a!) self, *, Generator? generator=None) -> Tensor(a!)
+  static Tensor randperm(int64_t n, const TensorOptions & options); // aten::randperm(int n, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+  static Tensor randperm(int64_t n, c10::optional<Generator> generator, const TensorOptions & options); // aten::randperm.generator(int n, *, Generator? generator, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+  static Tensor & randperm_out(Tensor & out, int64_t n); // aten::randperm.out(int n, *, Tensor(a!) out) -> Tensor(a!)
+  static Tensor & randperm_out(Tensor & out, int64_t n, c10::optional<Generator> generator); // aten::randperm.generator_out(int n, *, Generator? generator, Tensor(a!) out) -> Tensor(a!)
   static Tensor & range_out(Tensor & out, Scalar start, Scalar end, Scalar step);  // aten::range.out(Scalar start, Scalar end, Scalar step=1, *, Tensor(a!) out) -> Tensor(a!)
   static Tensor repeat_interleave(const Tensor & repeats); // aten::repeat_interleave.Tensor(Tensor repeats) -> Tensor
   static Tensor rrelu(const Tensor & self, Scalar lower, Scalar upper, bool training, Generator * generator); // aten::rrelu(Tensor self, Scalar lower=0.125, Scalar upper=0.3333333333333333, bool training=False, Generator? generator=None) -> Tensor
