@@ -83,6 +83,5 @@ find_path(LevelZero_INCLUDE_DIR
         NAMES level_zero/ze_api.h
         PATH_SUFFIXES include)
 find_library(LevelZero_LIBRARY
-        NAMES level_zero
-        PATHS
-        PATH_SUFFIXES lib/x64 lib lib64)
+        NAMES ze_loader
+        PATH_SUFFIXES x86_64_linux_gnu lib lib/x64 lib64)
