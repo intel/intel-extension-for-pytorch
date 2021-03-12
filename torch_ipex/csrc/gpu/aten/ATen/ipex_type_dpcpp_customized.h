@@ -28,9 +28,11 @@ at::Tensor & std_var_out(at::Tensor & result, const at::Tensor & self, at::IntAr
 
 std::tuple<Tensor&,Tensor&> std_var_mean_out(const char* fname, Tensor &result1, Tensor &result2, const Tensor &self, IntArrayRef dim, bool unbiased, bool keepdim, bool take_sqrt);
 
-at::Tensor linear_relu(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias);
+at::Tensor linear_relu(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::Scalar beta=1.0f, at::Scalar alpha=1.0f);
 
-at::Tensor linear_sigmoid(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias);
+at::Tensor linear_sigmoid(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::Scalar beta=1.0f, at::Scalar alpha=1.0f);
+
+at::Tensor trans_linear(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::Scalar beta=1.0f, at::Scalar alpha=1.0f);
 
 at::Tensor mul_add(const Tensor& self, const Tensor& other, const Tensor& accumu, Scalar alpha);
 

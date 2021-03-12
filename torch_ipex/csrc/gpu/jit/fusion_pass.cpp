@@ -345,6 +345,9 @@ OpFuser::RuleTab OpFuser::dpcppRules = {
   {{aten::conv2d, Symbol::fromQualString("aten::sigmoid")}, dpcpp::conv2d_sigmoid_sym},
   {{aten::mul, aten::add_}, dpcpp::mul_add_sym},
   {{Symbol::fromQualString("quantized::conv2d"), Symbol::fromQualString("quantized::add_relu")}, dpcpp::q_conv2d_sum_relu_sym},
+  {{aten::t, aten::addmm}, dpcpp::trans_addmm_sym},
+  {{dpcpp::trans_addmm_sym, aten::relu}, dpcpp::trans_addmm_relu_sym},
+  {{dpcpp::trans_addmm_sym, aten::sigmoid}, dpcpp::trans_addmm_sigmoid_sym},
 };
 
 void FusionPass(std::shared_ptr<Graph> &graph) {

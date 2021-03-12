@@ -190,6 +190,18 @@ at::Tensor reorder(
   return at::empty_like(input);
 }
 
+at::Tensor trans_addmm(const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& input, at::Scalar beta, at::Scalar alpha) {
+  return at::AtenIpexTypeXPU::trans_linear(bias, input, weight, beta, alpha);
+}
+
+at::Tensor trans_addmm_relu(const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& input, at::Scalar beta, at::Scalar alpha) {
+  return at::AtenIpexTypeXPU::linear_relu(input, weight, bias, beta, alpha);
+}
+
+at::Tensor trans_addmm_sigmoid(const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& input, at::Scalar beta, at::Scalar alpha) {
+  return at::AtenIpexTypeXPU::linear_sigmoid(input, weight, bias, beta, alpha);
+}
+
 } // dpcpp
 } // jit
 } // torch

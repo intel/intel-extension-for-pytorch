@@ -279,6 +279,57 @@ RegisterOperators op({
       },
       aliasAnalysisFromSchema()
       ),
+    Operator(
+      "dpcpp::trans_addmm(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
+      [] (const Node* node) ->Operation {
+        return [] (Stack* stack) {
+          auto result = torch::jit::dpcpp::trans_addmm(
+            (std::move(peek(stack, 0, 5))).toTensor(),
+            (std::move(peek(stack, 1, 5))).toTensor(),
+            (std::move(peek(stack, 2, 5))).toTensor(),
+            (std::move(peek(stack, 3, 5))).toScalar(),
+            (std::move(peek(stack, 4, 5))).toScalar()
+          );
+          drop(stack, 5);
+          pack(stack, std::move(result));
+        };
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
+      "dpcpp::trans_addmm_relu(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
+      [] (const Node* node) ->Operation {
+        return [] (Stack* stack) {
+          auto result = torch::jit::dpcpp::trans_addmm_relu(
+            (std::move(peek(stack, 0, 5))).toTensor(),
+            (std::move(peek(stack, 1, 5))).toTensor(),
+            (std::move(peek(stack, 2, 5))).toTensor(),
+            (std::move(peek(stack, 3, 5))).toScalar(),
+            (std::move(peek(stack, 4, 5))).toScalar()
+          );
+          drop(stack, 5);
+          pack(stack, std::move(result));
+        };
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
+      "dpcpp::trans_addmm_sigmoid(Tensor weight, Tensor bias, Tensor input, Scalar beta, Scalar alpha) -> Tensor",
+      [] (const Node* node) ->Operation {
+        return [] (Stack* stack) {
+          auto result = torch::jit::dpcpp::trans_addmm_sigmoid(
+            (std::move(peek(stack, 0, 5))).toTensor(),
+            (std::move(peek(stack, 1, 5))).toTensor(),
+            (std::move(peek(stack, 2, 5))).toTensor(),
+            (std::move(peek(stack, 3, 5))).toScalar(),
+            (std::move(peek(stack, 4, 5))).toScalar()
+          );
+          drop(stack, 5);
+          pack(stack, std::move(result));
+        };
+      },
+      aliasAnalysisFromSchema()
+      ),
     });
 }
 }

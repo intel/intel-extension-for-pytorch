@@ -57,6 +57,12 @@ at::Tensor q_conv2d_sum_relu(
     double conv_scale, int64_t conv_zpoint, double sum_scale,
     int64_t sum_zpoint);
 
+at::Tensor trans_addmm(const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& input, at::Scalar beta, at::Scalar alpha);
+
+at::Tensor trans_addmm_relu(const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& input, at::Scalar beta, at::Scalar alpha);
+
+at::Tensor trans_addmm_sigmoid(const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& input, at::Scalar beta, at::Scalar alpha);
+
 } // dpcpp
 } // jit
 } // torch

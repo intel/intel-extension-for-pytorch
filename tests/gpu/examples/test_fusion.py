@@ -65,6 +65,26 @@ class Conv2dSigmoid(torch.nn.Module):
     def forward(self, x, a):
         return torch.sigmoid(self.conv(x))
 
+class LinearReLU(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearReLU, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x = self.relu(self.linear(x))
+        return x
+
+class LinearSigmoid(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(LinearSigmoid, self).__init__()
+        self.linear = nn.Linear(in_channels, out_channels, bias=True)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.sigmoid(self.linear(x))
+        return x
+
 
 class TestNNMethod(TestCase):
     def test_matmul_sum_fusion(self, dtype=torch.float):
@@ -204,3 +224,39 @@ class TestNNMethod(TestCase):
             print("fusion:", y_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.to(cpu_device))
         del modelJit
+
+    def test_linear_relu(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearReLU(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            # print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+
+
+    def test_linear_sigmoid(self, dtype=torch.float):
+        x = torch.randn([2, 4], device=cpu_device)
+        model = LinearSigmoid(4, 4)
+        y = model(x)
+        print("raw: ", y)
+
+        x = x.to("xpu")
+        model.to("xpu")
+        modelJit = torch.jit.trace(model, x)
+
+        with torch.no_grad():
+            # print(modelJit.graph_for(x))
+            y_dpcpp = modelJit(x)
+            print("fusion:", y_dpcpp.cpu())
+        self.assertEqual(y, y_dpcpp.to(cpu_device))
+        del modelJit
+

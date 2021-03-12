@@ -791,10 +791,10 @@ Tensor bmm(const Tensor& self, const Tensor& batch2) {
 }
 
 // FIXME: should not be here
-Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & bias) {
+Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & bias, Scalar beta, Scalar alpha) {
   matmul_attr_t attr(
-      1.f,
-      1.f,
+      alpha.to<float>(),
+      beta.to<float>(),
       matmul_attr_t::kind_with_relu,
       false);
   RECORD_FUNCTION("linear_relu",
@@ -819,10 +819,10 @@ Tensor linear_relu(const Tensor & input, const Tensor & weight, const Tensor & b
   return at::relu(output);
 }
 
-Tensor linear_sigmoid(const Tensor & input, const Tensor & weight, const Tensor & bias) {
+Tensor linear_sigmoid(const Tensor & input, const Tensor & weight, const Tensor & bias, Scalar beta, Scalar alpha) {
   matmul_attr_t attr(
-      1.f,
-      1.f,
+      alpha.to<float>(),
+      beta.to<float>(),
       matmul_attr_t::kind_with_sigmoid,
       false);
   RECORD_FUNCTION("linear_sigmoid",
@@ -849,10 +849,12 @@ Tensor linear_sigmoid(const Tensor & input, const Tensor & weight, const Tensor 
 Tensor trans_linear(
     const Tensor& input,
     const Tensor& m1,
-    const Tensor& m2) {
+    const Tensor& m2,
+    Scalar beta,
+    Scalar alpha) {
   matmul_attr_t attr(
-      1.f,
-      1.f,
+      alpha.to<float>(),
+      beta.to<float>(),
       0,
       false);
   TORCH_CHECK(m1.dim() == 2, "expected 2D tensor");

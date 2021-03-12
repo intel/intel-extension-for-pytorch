@@ -20,6 +20,9 @@ namespace dpcpp {
   static auto trans_matmul_scale_sum_sym = Symbol::fromQualString("dpcpp::trans_matmul_scale_sum");
   static auto mul_add_sym = Symbol::fromQualString("dpcpp::mul_add");
   static auto q_conv2d_sum_relu_sym = Symbol::fromQualString("dpcpp::q_conv2d_sum_relu");
+  static auto trans_addmm_sym = Symbol::fromQualString("dpcpp::trans_addmm");
+  static auto trans_addmm_relu_sym = Symbol::fromQualString("dpcpp::trans_addmm_relu");
+  static auto trans_addmm_sigmoid_sym = Symbol::fromQualString("dpcpp::trans_addmm_sigmoid");
 
   // Fold weights of batch_norm with conv2d's
   static auto fold_weight_sym =
