@@ -2,6 +2,7 @@
 #include <ATen/${Type}.h>
 
 #include <ATen/Context.h>
+#include <ATen/DeviceGuard.h>
 #include <torch/library.h>
 
 namespace at {

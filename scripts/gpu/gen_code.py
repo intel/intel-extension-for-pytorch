@@ -5,9 +5,15 @@ from copy import deepcopy
 import os
 import yaml
 import re
-import common_with_cwrap
+import scripts.gpu.common_with_cwrap as common_with_cwrap
 import ast
-from code_template import CodeTemplate
+import types
+from scripts.gpu.model import *
+import scripts.gpu.local as local
+from scripts.gpu.api import legacy_dispatcher
+from scripts.gpu.api.types import TensorOptionsArguments
+import itertools
+from scripts.gpu.code_template import CodeTemplate
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple, NamedTuple
 
@@ -319,6 +325,7 @@ OpRegistration = NamedTuple('OpRegistration', [
 
 NATIVE_DISPATCH_DEFENITION_HACKY_WRAPPER = CodeTemplate("""\
 ${return_type} ${native_type_method_dispatch}(${declaration_formals}) {
+  ${xpu_guard}
   ${lazy_reorder}
   ${return_call} decltype(c10::impl::hacky_wrapper_for_legacy_signatures<${schema_order_cpp_signature}>(
   ::c10::CompileTimeFunctionPointer<${native_order_cpp_signature}, ${Type}::${native_type_method_decl}>()))::func_ptr()(${actuals});
@@ -327,6 +334,7 @@ ${return_type} ${native_type_method_dispatch}(${declaration_formals}) {
 
 NATIVE_DISPATCH_DEFINITION_GENERIC_BACKEND = CodeTemplate("""\
 ${return_type} ${native_type_method_dispatch}(${declaration_formals}) {
+  ${xpu_guard}
   ${lazy_reorder}
   ${return_call} ${Type}::${native_type_method_decl}(${actuals});
 }
@@ -450,7 +458,6 @@ def native_get_formals(option, schema_order, use_optional_tensor):
     result = [native_translate_formals(argument, option) for argument in arguments]
     return result
 
-
 def create_derived(backend_type_env, declarations):
     # type: (Environment, List[FunctionOption]) -> Tuple[List[str], List[str], List[OpRegistration], List[str], List[str]]
     type_object_declarations = []  # type: List[str]
@@ -478,14 +485,45 @@ def create_derived(backend_type_env, declarations):
                 type_object_declarations.append(
                     NATIVE_DISPATCH_DECLARATION.substitute(env))
 
+                func = FunctionSchema.parse(option['schema_string'])
+                self_args = (a for a in func.arguments if a.name == "self")
+
+                # There is precedence for which argument we use to do
+                # device guard.  This describes the precedence order.
+                candidate_args = itertools.chain(self_args, func.out_arguments, func.arguments)
+
+                # Only tensor like arguments are eligible
+                device_of = next((f'{a.name}' for a in candidate_args if a.type.is_tensor_like()), None)
+
                 if option['use_c10_dispatcher'] == 'full':
                     # Omit the device guard entirely in these cases
                     def_backend = NATIVE_DISPATCH_DEFINITION_GENERIC_BACKEND
+
+                    with local.parametrize(use_c10_dispatcher=UseC10Dispatcher.full):
+                        args = legacy_dispatcher.arguments(func)
                 elif option['use_c10_dispatcher'] == 'with_codegenerated_unboxing_wrapper':
                     def_backend = NATIVE_DISPATCH_DEFINITION_GENERIC_BACKEND
+
+                    with local.parametrize(use_c10_dispatcher=UseC10Dispatcher.with_codegenerated_unboxing_wrapper):
+                        args = legacy_dispatcher.arguments(func)
+                    device_guard = """const DeviceGuard device_guard(options.device());"""
                 else:
                     assert option['use_c10_dispatcher'] == 'hacky_wrapper_for_legacy_signatures'
                     def_backend = NATIVE_DISPATCH_DEFENITION_HACKY_WRAPPER
+
+                    with local.parametrize(use_c10_dispatcher=UseC10Dispatcher.full):
+                        args = legacy_dispatcher.arguments(func)
+                    device_guard = """const DeviceGuard device_guard(device_or_default(device));"""
+
+                has_tensor_options = any(isinstance(a.argument, TensorOptionsArguments) for a in args)
+
+                # works just as well.
+                if option['device_guard'] and has_tensor_options:
+                    option['xpu_guard'] = device_guard
+                elif option['device_guard'] and device_of is not None:
+                    option['xpu_guard'] = f"""const OptionalDeviceGuard device_guard(device_of({device_of}));"""
+                else:
+                    option['xpu_guard'] = """// DeviceGuard omitted"""
 
                 type_object_definitions.append(def_backend.substitute(env))
 
@@ -496,7 +534,6 @@ def create_derived(backend_type_env, declarations):
                             operator_name=OPERATOR_NAME.substitute(option),
                             registration_code=BACKEND_FUNCTION_REGISTRATION.substitute(env)))
                     elif option['use_c10_dispatcher'] == 'with_codegenerated_unboxing_wrapper':
-                        # assert option['use_c10_dispatcher'] == 'with_codegenerated_unboxing_wrapper'
                         op_registrations.append(OpRegistration(
                             operator_name=OPERATOR_NAME.substitute(option),
                             registration_code=BACKEND_UNBOXEDONLY_FUNCTION_REGISTRATION.substitute(env)))

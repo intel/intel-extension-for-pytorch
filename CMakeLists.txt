@@ -27,6 +27,8 @@ cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "
 set(USE_AOT_DEVLIST "" CACHE STRING
   "Use AOT build option for devices separated by commas in the list, for example, bdw,...")
 
+set(IPEX_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
 include(cmake/GPU.cmake)
 
 function (print_configuration_summary)

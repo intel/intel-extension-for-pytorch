@@ -94,10 +94,12 @@ add_custom_command(OUTPUT
         COMMAND
         mkdir -p ${DPCPP_GPU_ATEN_GENERATED} && mkdir -p ${DPCPP_GPU_ATEN_GENERATED}/ATen
         COMMAND
-        "${PYTHON_EXECUTABLE}" ${PROJECT_SOURCE_DIR}/scripts/gpu/gen_code.py --declarations-path
+        "${PYTHON_EXECUTABLE}" -m scripts.gpu.gen_code --declarations-path
         ${PROJECT_SOURCE_DIR}/scripts/declarations/Declarations.yaml
         --out ${DPCPP_GPU_ATEN_GENERATED}/ATen/
         --source-path ${PROJECT_SOURCE_DIR}
+        WORKING_DIRECTORY
+        ${IPEX_ROOT_DIR}/
         DEPENDS
         ${PROJECT_SOURCE_DIR}/scripts/declarations/Declarations.yaml
         ${PROJECT_SOURCE_DIR}/scripts/gpu/gen_code.py
