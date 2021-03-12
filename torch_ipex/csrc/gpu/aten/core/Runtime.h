@@ -25,20 +25,25 @@ using namespace dnnl;
 #define DPCPP_ONEDNN_EXEC(prim, stream, ...)                                  \
   {                                                                           \
     static auto verbose = dpcpp_verbose();                                    \
+    cl::sycl::queue Q = dnnl::sycl_interop::get_queue((stream));              \
     if (verbose) {                                                            \
       IPEX_TIMER(t, verbose, __func__);                                       \
-      auto e = dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__);  \
+      cl::sycl::event start_evt = submit_empty_kernel(Q);                     \
+      dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__);           \
       t.now("oneDNN execute in sycl_interop");                                \
-      dnnl::sycl_interop::get_queue((stream)).throw_asynchronous();           \
-      t.now("oneDNN throw asynchronous");                                     \
+      cl::sycl::event end_evt = submit_empty_kernel(Q);                       \
+      dpcpp_log("onednn_kernel", start_evt, end_evt);                         \
       DPCPP_ONEDNN_FORCE_SYNC(stream);                                        \
       t.now("oneDNN stream wait");                                            \
-      dpcpp_log("onednn_kernel", e);                                          \
+      Q.throw_asynchronous();                                                 \
+      t.now("oneDNN throw asynchronous");                                     \
     } else {                                                                  \
-      auto e = dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__);  \
-      dnnl::sycl_interop::get_queue((stream)).throw_asynchronous();           \
-      dpcpp_log("onednn_kernel", e);                                          \
+      cl::sycl::event start_evt = submit_empty_kernel(Q);                     \
+      dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__);           \
+      cl::sycl::event end_evt = submit_empty_kernel(Q);                       \
+      dpcpp_log("onednn_kernel", start_evt, end_evt);                         \
       DPCPP_ONEDNN_FORCE_SYNC(stream);                                        \
+      Q.throw_asynchronous();                                                 \
     }                                                                         \
   }
 
