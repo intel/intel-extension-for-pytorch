@@ -2116,15 +2116,18 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& s
 }
 
 
+template<bool check_layout = true>
 at::Tensor dil_as_strided(
     const at::Tensor& self,
     at::IntArrayRef size,
     at::IntArrayRef stride,
     c10::optional<int64_t> storage_offset_) {
 
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
-      self.scalar_type() != at::kFloat || dbl::comm::try_gen_dil_tensor(self).is_public_format(),
-      "Cannot set sizes and strides for DIL tensor with non-public format");
+  if (check_layout) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+        self.scalar_type() != at::kFloat || dbl::comm::try_gen_dil_tensor(self).is_public_format(),
+        "Cannot set sizes and strides for DIL tensor with non-public format");
+  }
 
   // share storage
   auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
@@ -2690,7 +2693,6 @@ at::Tensor AtenIpexCPUDev::dil_upsample_trilinear3d_backward(const at::Tensor & 
 
 at::Tensor AtenIpexCPUDev::dil_unsqueeze(const at::Tensor& self, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_unsqueeze\n");
-  dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
 
   dim = at::maybe_wrap_dim(dim, self.dim() + 1);
   auto sizes = self.sizes().vec();
@@ -2698,7 +2700,16 @@ at::Tensor AtenIpexCPUDev::dil_unsqueeze(const at::Tensor& self, int64_t dim) {
   int64_t new_stride = dim >= self.dim() ? 1 : sizes[dim] * strides[dim];
   sizes.insert(sizes.begin() + dim, 1);
   strides.insert(strides.begin() + dim, new_stride);
-  return dil_as_strided(self, sizes, strides, self.storage_offset());
+
+  // Fast path to check if the shape of the dil buffer is as same as aten wrapper
+  if (cpu::ShadeDataContext::isDilTensor(self)) {
+    auto&& dil_self_tensor = dbl::comm::try_gen_dil_tensor(self);
+    if (dil_self_tensor.get_dims() != sizes) {
+      dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
+    }
+  }
+
+  return dil_as_strided<false/*don't check layout*/>(self, sizes, strides, self.storage_offset());
 }
 
 at::Tensor AtenIpexCPUDev::dil_div(const at::Tensor &self,
