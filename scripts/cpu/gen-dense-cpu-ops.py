@@ -195,6 +195,8 @@ class DenseOPCodeGen(object):
         self._op_h_file_path = op_h_file_path
         self._op_cpp_file_path = op_cpp_file_path
         self._sigs = []
+        self._native_sigs = []
+        self._native_sigs_str = []
         self._err_info = []
         self._func_data = ''
 
@@ -243,7 +245,61 @@ class DenseOPCodeGen(object):
                     cpp_input_param.is_to_be_written = aten_sig_param.is_to_be_written
                     cpp_input_param.is_alias = aten_sig_param.is_alias
 
+    def parse_native_functions(self):
+        with open(self._func_file_path, 'r') as ff:
+            self._func_data = ff.read()
+
+        for line in open(self._func_file_path, 'r'):
+            m = re.match(r'TORCH_API *(.*); *', line)
+            if not m:
+                continue
+            native_cpp_sig_str = m.group(1).replace('at::', '').replace('c10::', '').replace('Reduction::', '')
+            # Remove ={xxx}
+            native_cpp_sig_str = re.sub("\=\{.*?\}\,", ",", native_cpp_sig_str)
+            # Remove =xxx,
+            native_cpp_sig_str = re.sub("\=.*?\,", ",", native_cpp_sig_str)
+            # Remove =),
+            native_cpp_sig_str = re.sub("\=.*?\)", ")", native_cpp_sig_str)
+            if not self.is_tensor_api(native_cpp_sig_str):
+                continue
+            self._native_sigs_str.append(native_cpp_sig_str)
+
+    def compare_params(self, params1, params2):
+        if len(params1) != len(params2):
+            return False
+
+        for param_item in params1:
+            if param_item not in params2:
+                return False
+        return True
+
+    def get_native_functions(self, cpp_sig):
+        cnt = 0
+        cur_native_cpp_sig_str = ''
+        ret_native_cpp_sig = None
+        try:
+            for native_sig_str_item in self._native_sigs_str:
+                target_str = ' {}('.format(cpp_sig.def_name)
+                if native_sig_str_item.find(target_str) >= 0:
+                    cur_native_cpp_sig_str = native_sig_str_item
+                    native_cpp_sig = CPPSig(cur_native_cpp_sig_str)
+                    params1 = [param.ipex_name if param.ipex_name != '' else param.name for param in native_cpp_sig.input_params]
+                    params2 = [param.ipex_name if param.ipex_name != '' else param.name for param in cpp_sig.input_params]
+                    if self.compare_params(params1, params2):
+                        cnt = cnt + 1
+                        ret_native_cpp_sig = native_cpp_sig
+        except Exception as e:
+            self._err_info.append((cur_native_cpp_sig_str, str(e)))
+            print('[NativeFunctions] Error parsing "{}": {}'.format(cur_native_cpp_sig_str, e), file=sys.stderr)
+
+        if cnt == 0:
+            raise Exception("Cannot the function:{} in Functions.h".format(cpp_sig.def_name))
+        return ret_native_cpp_sig
+
     def prepare_functions(self):
+        # Get all functions in Functions.h
+        self.parse_native_functions()
+
         for line in open(self._reg_dec_file_path, 'r'):
             m = re.match(r'\s*([^\s].*); //\s+(.*)', line)
             if not m:
@@ -264,17 +320,18 @@ class DenseOPCodeGen(object):
                 if self.is_bypass_func(cpp_sig):
                     continue
 
+                native_cpp_sig = None
+                if utils.is_out_func(cpp_sig.def_name):
+                    native_cpp_sig = self.get_native_functions(cpp_sig)
+
                 aten_sig = AtenSig(aten_func_sig)
 
                 self.cross_correct_sig(cpp_sig, aten_sig)
 
-                self._sigs.append((cpp_sig, aten_sig, cpp_func_sig, aten_func_sig))
+                self._sigs.append((cpp_sig, aten_sig, native_cpp_sig, cpp_func_sig, aten_func_sig))
             except Exception as e:
                 self._err_info.append((cpp_func_sig, str(e)))
-                print('Error parsing "{}": {}'.format(cpp_func_sig, e), file=sys.stderr)
-
-        with open(self._func_file_path, 'r') as ff:
-            self._func_data = ff.read()
+                print('[RegistrationDeclarations] Error parsing "{}": {}'.format(cpp_func_sig, e), file=sys.stderr)
 
         print('Extracted {} functions ({} errors) from {}'.format(
               len(self._sigs),
@@ -306,18 +363,24 @@ class DenseOPCodeGen(object):
 
         return cpp_func_str_h, cpp_func_str_cpp
 
-    def gen_dnnl_code(self, cpp_sig, aten_func_sig_str):
+    def gen_dnnl_code(self, cpp_sig, native_cpp_sig, aten_func_sig_str):
         code = ''
-
-        def is_out_func(fname):
-            return fname.endswith("_out")
 
         if not self.is_dnnl_func(aten_func_sig_str):
             return code
 
         param_vars = []
         dnnl_tensor_param_vars = []
-        for param in cpp_sig.input_params:
+
+        input_params = cpp_sig.input_params
+        # Reorder the input parameters
+        if native_cpp_sig is not None:
+            params1_name = [param.name for param in cpp_sig.input_params]
+            params2_name = [param.name for param in native_cpp_sig.input_params]
+            new_idxs = utils.reorder_params_idx(params1_name, params2_name)
+            input_params = [cpp_sig.input_params[new_idxs[idx]] for idx in range(len(new_idxs))]
+
+        for param in input_params:
             if param.core_type == 'Tensor':
                 dnnl_tensor_param_vars.append(param)
 
@@ -431,12 +494,20 @@ class DenseOPCodeGen(object):
                 param.ipex_name = ipex_name
         return op_check_code + code
 
-    def gen_fallback_code(self, cpp_sig):
+    def gen_fallback_code(self, cpp_sig, native_cpp_sig):
         func_name = cpp_sig.def_name
 
         for param in cpp_sig.input_params:
             assert param.name
-        params_name = [param.ipex_name if param.ipex_name != '' else param.name for param in cpp_sig.input_params]
+
+        if native_cpp_sig is None:
+            params_name = [param.ipex_name if param.ipex_name != '' else param.name for param in cpp_sig.input_params]
+        else:
+            params1_name = [param.name for param in cpp_sig.input_params]
+            params2_name = [param.name for param in native_cpp_sig.input_params]
+            new_idxs = utils.reorder_params_idx(params1_name, params2_name)
+            input_params = cpp_sig.input_params
+            params_name = [input_params[new_idxs[idx]].ipex_name if input_params[new_idxs[idx]].ipex_name != '' else input_params[new_idxs[idx]].name for idx in range(len(new_idxs))]
 
         code = ''
         # Wrap the input parameters as tensor option
@@ -566,7 +637,7 @@ class DenseOPCodeGen(object):
             return fname in ['convolution_overrideable', 'convolution_backward_overrideable']
 
         func_defs = []
-        for cpp_sig, aten_sig, cpp_func_sig_str, aten_func_sig_str in self._sigs:
+        for cpp_sig, aten_sig, native_cpp_sig, cpp_func_sig_str, aten_func_sig_str in self._sigs:
             # The operator name should be unique because the new registration mechanism of PyTorch 1.7
             new_cpp_func_name = aten_sig.def_name.replace('.', '_')
             cpp_func_str_h, cpp_func_str_cpp = self.gen_func_signature(cpp_func_sig_str, cpp_sig.def_name, new_cpp_func_name)
@@ -596,9 +667,9 @@ class DenseOPCodeGen(object):
             if is_conv_overrideable_func(cpp_sig.def_name):
                 code += '  return AtenIpexCPUDev::dil_{}({});\n'.format(cpp_sig.def_name, ', '.join([param.name for param in cpp_sig.input_params]))
             else:
-                code += self.gen_dnnl_code(cpp_sig, aten_func_sig_str)
+                code += self.gen_dnnl_code(cpp_sig, native_cpp_sig, aten_func_sig_str)
                 code += self.gen_fallback_prepare_code(cpp_sig)
-                code += self.gen_fallback_code(cpp_sig)
+                code += self.gen_fallback_code(cpp_sig, native_cpp_sig)
                 code += self.gen_fallback_post_code(cpp_sig)
 
             code += '}\n\n'

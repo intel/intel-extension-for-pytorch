@@ -99,7 +99,7 @@ at::Tensor _sparse_coo_tensor_unsafe(const at::Tensor& indices, const at::Tensor
   assert(options.has_layout() && options.layout() == c10::kSparse);
   int64_t sparse_dim = indices.size(0);
   int64_t dense_dim = values.dim() - 1;
-  return at::native::new_with_dims_and_tensor_sparse(sparse_dim, dense_dim, size, indices, values, values.options().layout(c10::kSparse));
+  return at::native::new_with_dims_and_tensor_sparse(sparse_dim, dense_dim, size, indices, values, options.dtype().toScalarType(), at::kSparse);
 }
 
 template<typename T>

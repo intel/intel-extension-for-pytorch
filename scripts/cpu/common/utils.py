@@ -55,6 +55,17 @@ def query_tensor_options(input_params):
             start_idx = -1
     return start_idx, end_idx
 
+def is_out_func(fname):
+    return fname.endswith("_out") or fname.endswith("_outf")
+
+def reorder_params_idx(to_be_reordered_params, ref_params):
+    new_idxs = {}
+    assert len(to_be_reordered_params) == len(ref_params)
+    for param in to_be_reordered_params:
+        assert param in ref_params
+        new_idxs[ref_params.index(param)] = to_be_reordered_params.index(param)
+    return new_idxs
+
 if __name__ == '__main__':
     sigs = [
     "aten::abs.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)",
