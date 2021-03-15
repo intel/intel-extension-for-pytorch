@@ -32,7 +32,6 @@
 #include "cpu/int8/quantization/Observer.h"
 #include "ProcessGroupCCL.hpp"
 #include <pybind11/chrono.h>
-#include "autocast_mode.h"
 #include <torch/csrc/api/include/torch/python.h>
 #include <c10/core/DeviceType.h>
 #include <torch/csrc/Exceptions.h>
@@ -112,14 +111,6 @@ void reorder_to_float32(at::Tensor &tensor){
   cpu::dbl::comm::reorder_to_dtype(tensor, at::kFloat);
 }
 /// ****************************
-
-inline at::Layout py_object_to_layout(py::object object) {
-  PyObject* obj = object.ptr();
-  if (THPLayout_Check(obj)) {
-    return reinterpret_cast<THPLayout*>(obj)->layout;
-  }
-  throw torch::TypeError("Expected layout");
-}
 
 void InitIpexModuleBindings(py::module m) {
   m.def("_get_git_revs", []() { return GetRevisions(); });
@@ -238,34 +229,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("nms", &IpexExternal::nms);
   m.def("batch_score_nms", &IpexExternal::batch_score_nms);
   m.def("linear_relu", &AtenIpexTypeExt::linear_relu);
-
-  // ipex amp autocast
-  m.def("is_autocast_enabled", &torch_ipex::autocast::is_autocast_enabled);
-  m.def("set_autocast_enabled", &torch_ipex::autocast::set_autocast_enabled);
-  m.def("get_autocast_dtype", []() {
-    at::ScalarType current_dtype = torch_ipex::autocast::get_autocast_dtype();
-    return py::reinterpret_steal<py::object>(
-        THPDtype_New(current_dtype, scalarTypeName(current_dtype)));
-  });
-  m.def("set_autocast_dtype", [](py::object dtype) {
-    at::ScalarType target_dtype =
-        torch::python::detail::py_object_to_dtype(dtype);
-    torch_ipex::autocast::set_autocast_dtype(target_dtype);
-  });
-  m.def("get_autocast_layout", []() {
-    at::Layout current_layout = torch_ipex::autocast::get_autocast_layout();
-    return py::reinterpret_steal<py::object>(
-        THPLayout_New(current_layout, LayoutName(current_layout)));
-  });
-  m.def("set_autocast_layout", [](py::object layout) {
-    at::Layout target_layout = py_object_to_layout(layout);
-    torch_ipex::autocast::set_autocast_layout(target_layout);
-  });
-  m.def("autocast_increment_nesting",
-        &torch_ipex::autocast::autocast_increment_nesting);
-  m.def("autocast_decrement_nesting",
-        &torch_ipex::autocast::autocast_decrement_nesting);
-  m.def("clear_autocast_cache", &torch_ipex::autocast::clear_autocast_cache);
 }
 }  // namespace
 using namespace torch::jit;

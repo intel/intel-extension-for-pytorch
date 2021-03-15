@@ -46,8 +46,6 @@ IPEXFuncStatus get_ipex_func_status();
 bool is_ipex_func_success();
 void reset_ipex_func_status();
 void set_ipex_func_status(IPEXFuncStatus ipex_fun_status);
-const char* scalarTypeName(const at::ScalarType type);
-const char* LayoutName(const at::Layout layout);
 
 // A light-weight TORCH_CHECK that does not collect any backtrace info
 #if defined(_DEBUG)

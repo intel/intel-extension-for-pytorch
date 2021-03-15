@@ -208,32 +208,4 @@ bool is_scalar_tensor(const at::Tensor& tensor) {
   return tensor.numel() == 1;
 }
 
-#define AT_FOR_AUTOCAST_SCALAR_TYPES(_) \
-  _(int8, Char)                         \
-  _(float32, Float)                     \
-  _(bfloat16, BFloat16)
-
-const char* scalarTypeName(const at::ScalarType type) {
-  switch (type) {
-#define DEFINE_CASE(ctype, name) \
-  case at::ScalarType::name:     \
-    return #ctype;
-    AT_FOR_AUTOCAST_SCALAR_TYPES(DEFINE_CASE)
-#undef DEFINE_CASE
-    default:
-      throw std::runtime_error("unknown scalar type");
-  }
-}
-
-const char* LayoutName(const at::Layout layout) {
-  switch (layout) {
-    case at::kStrided:
-      return "torch.strided";
-    case at::kMkldnn:
-      return "torch._mkldnn";
-    default:
-      AT_ERROR("Unknown layout");
-  }
-}
-
 }  // namespace torch_ipex
