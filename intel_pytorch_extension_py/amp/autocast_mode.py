@@ -2,7 +2,7 @@ import torch
 import functools
 import warnings
 import numpy as np
-from torch._six import container_abcs, string_classes
+#from torch._six import container_abcs, string_classes
 import _torch_ipex as core
 
 def get_target_layout():

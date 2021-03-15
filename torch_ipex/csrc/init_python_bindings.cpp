@@ -30,7 +30,7 @@
 #include "cpu/FusionOPs.h"
 #include "cpu/int8/Config.h"
 #include "cpu/int8/quantization/Observer.h"
-#include "ProcessGroupCCL.hpp"
+//#include "ProcessGroupCCL.hpp"
 #include <pybind11/chrono.h>
 #include "autocast_mode.h"
 #include <torch/csrc/api/include/torch/python.h>
@@ -46,7 +46,7 @@ py::object GetRevisions() {
   py_dict["torch"] = std::string(TORCH_GITREV);
   return py_dict;
 }
-
+/*
 void setAutoDNNL(bool val) {
   AutoOptConfig::singleton().set_auto_dnnl(val);
 }
@@ -110,7 +110,7 @@ dil::dims getDilStorageStrides(const at::Tensor &tensor) {
 
 void reorder_to_float32(at::Tensor &tensor){
   cpu::dbl::comm::reorder_to_dtype(tensor, at::kFloat);
-}
+}*/
 /// ****************************
 
 inline at::Layout py_object_to_layout(py::object object) {
@@ -123,7 +123,7 @@ inline at::Layout py_object_to_layout(py::object object) {
 
 void InitIpexModuleBindings(py::module m) {
   m.def("_get_git_revs", []() { return GetRevisions(); });
-  m.def("enable_auto_dnnl", []() { AutoOptConfig::singleton().set_auto_dnnl(true); });
+  /*m.def("enable_auto_dnnl", []() { AutoOptConfig::singleton().set_auto_dnnl(true); });
   m.def("disable_auto_dnnl", []() { AutoOptConfig::singleton().set_auto_dnnl(false); });
   m.def("get_auto_dnnl", []() { return AutoOptConfig::singleton().get_auto_dnnl(); });
   m.def("enable_mix_bf16_fp32", []() { AutoOptConfig::singleton().set_mix_bf16_fp32(true); });
@@ -237,7 +237,7 @@ void InitIpexModuleBindings(py::module m) {
   m.def("roi_align_backward", &IpexExternal::ROIAlign_backward);
   m.def("nms", &IpexExternal::nms);
   m.def("batch_score_nms", &IpexExternal::batch_score_nms);
-  m.def("linear_relu", &AtenIpexTypeExt::linear_relu);
+  m.def("linear_relu", &AtenIpexTypeExt::linear_relu);*/
 
   // ipex amp autocast
   m.def("is_autocast_enabled", &torch_ipex::autocast::is_autocast_enabled);
@@ -273,11 +273,11 @@ using namespace torch::jit;
 void InitIpexBindings(py::module m) {
   InitIpexModuleBindings(m);
   // jit fusion pass
-  torch::jit::registerPrePass([](std::shared_ptr<Graph>& g) {
+  /*torch::jit::registerPrePass([](std::shared_ptr<Graph>& g) {
     if (AutoOptConfig::singleton().get_jit_fuse()) {
       torch::jit::FusionPass(g);
     }
-  });
+  });*/
 }
 
 }  // namespace torch_ipex

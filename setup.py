@@ -187,7 +187,7 @@ class IPEXBuild(build_ext, object):
     print("run")
 
     # Generate the code before globbing!
-    generate_ipex_cpu_aten_code(base_dir)
+    #generate_ipex_cpu_aten_code(base_dir)
 
     cmake = get_cmake_command()
 

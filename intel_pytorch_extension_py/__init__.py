@@ -3,15 +3,15 @@ import json
 import warnings
 import torch
 from .version import __version__
-from .tensor import *
-from .optim import *
-from .ops import *
+#from .tensor import *
+#from .optim import *
+#from .ops import *
 from .amp import *
 import _torch_ipex as core
-core.enable_torch_ccl()
+#core.enable_torch_ccl()
 
-DEVICE = 'xpu:0'
-
+#DEVICE = 'xpu:0'
+"""
 class AmpConf(object):
     def __init__(self, mixed_dtype = torch.bfloat16, configure_file = None):
         self.dtype = mixed_dtype
@@ -34,10 +34,10 @@ class AmpConf(object):
         configures = core.get_int8_configures()
         with open(configure_file, 'w') as fp:
             json.dump(configures, fp, indent = 4)
-
-class _DecoratorContextManager:
-    """Allow a context manager to be used as a decorator, copy form pytorch FW"""
-
+"""
+#class _DecoratorContextManager:
+    #"""Allow a context manager to be used as a decorator, copy form pytorch FW"""
+"""
     def __call__(self, func):
         if inspect.isgeneratorfunction(func):
             return self._wrap_generator(func)
@@ -47,10 +47,10 @@ class _DecoratorContextManager:
             with self:
                 return func(*args, **kwargs)
         return decorate_context
-
-    def _wrap_generator(self, func):
-        """Wrap each generator invocation with the context manager"""
-        @functools.wraps(func)
+"""
+#    def _wrap_generator(self, func):
+        #"""Wrap each generator invocation with the context manager"""
+"""        @functools.wraps(func)
         def generator_context(*args, **kwargs):
             gen = func(*args, **kwargs)
             while True:
@@ -75,21 +75,21 @@ def _enable_auto_optimization(mixed_dtype = None, train = False):
         core.enable_auto_dnnl()
     enable_auto_mixed_precision(mixed_dtype, train)
 
-def enable_auto_mixed_precision(mixed_dtype = torch.bfloat16, train = False):
-    r""" Enable auto-mixed-precision to improve performance for global scope.
+def enable_auto_mixed_precision(mixed_dtype = torch.bfloat16, train = False):"""
+    #r""" Enable auto-mixed-precision to improve performance for global scope.
 
-    The auto-mixed-precision auto reorders the tensor to the specified low precision data type.
-    You don't need to convert the input tensors and the model to the specified data type manually,
-    the extension will do it automatically and then dispatch the extension backend to accelerate
-    computation
+    #The auto-mixed-precision auto reorders the tensor to the specified low precision data type.
+    #You don't need to convert the input tensors and the model to the specified data type manually,
+    #the extension will do it automatically and then dispatch the extension backend to accelerate
+    #computation
 
-    Args:
-        mixed_dtype(torch.dtype): Auto reorder the input tensors to the specified low precision data type
-            and dispatch to oneDNN backend for computation, can be torch.bfloat16 or None.
-    """
-    running_mode = 'training' if train else 'inference'
-    AutoMixPrecision(AmpConf(mixed_dtype), running_mode).__enter__()
-
+    #Args:
+    #    mixed_dtype(torch.dtype): Auto reorder the input tensors to the specified low precision data type
+    #        and dispatch to oneDNN backend for computation, can be torch.bfloat16 or None.
+    #"""
+#    running_mode = 'training' if train else 'inference'
+#    AutoMixPrecision(AmpConf(mixed_dtype), running_mode).__enter__()
+"""
 def _get_auto_optimization():
     return get_auto_mix_precision
 
@@ -141,3 +141,4 @@ class AutoMixPrecision(_DecoratorContextManager):
             core.disable_mix_int8_fp32()
             core.disable_mix_bf16_fp32()
         core.set_execution_mode(train = self.pre_running_mode)
+"""
