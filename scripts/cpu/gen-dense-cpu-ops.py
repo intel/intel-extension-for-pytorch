@@ -452,7 +452,7 @@ class DenseOPCodeGen(object):
         code = ''
         op_check_code = ''
         for param in cpp_sig.input_params:
-            if param.core_type == 'TensorList':
+            if param.core_type == 'TensorList' or param.core_type == 'List':
                 ipex_name = '_ipex_{}'.format(param.name)
                 code += ('  auto&& {} = bridge::{}({});\n').format(ipex_name, _SHALLOW_FALLBACK_TO_CPU_TENSOR_LIST, param.name)
                 param.ipex_name = ipex_name
