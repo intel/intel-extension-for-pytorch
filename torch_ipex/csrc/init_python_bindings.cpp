@@ -252,15 +252,6 @@ void InitIpexModuleBindings(py::module m) {
         torch::python::detail::py_object_to_dtype(dtype);
     torch_ipex::autocast::set_autocast_dtype(target_dtype);
   });
-  m.def("get_autocast_layout", []() {
-    at::Layout current_layout = torch_ipex::autocast::get_autocast_layout();
-    return py::reinterpret_steal<py::object>(
-        THPLayout_New(current_layout, LayoutName(current_layout)));
-  });
-  m.def("set_autocast_layout", [](py::object layout) {
-    at::Layout target_layout = py_object_to_layout(layout);
-    torch_ipex::autocast::set_autocast_layout(target_layout);
-  });
   m.def("autocast_increment_nesting",
         &torch_ipex::autocast::autocast_increment_nesting);
   m.def("autocast_decrement_nesting",
