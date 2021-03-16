@@ -92,14 +92,14 @@ class TestSimpleNet(TestCase):
 
         model = SimpleNet() 
         model.eval()
-        ipex.core.disable_jit_opt()
+        #ipex.core.disable_jit_opt()
         x = torch.rand((1, 3, 224, 224))
         with ipex.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
             traced_model = torch.jit.trace(model, x)
         with torch.no_grad():
             y = traced_model(x)
             #print(traced_model.graph_for(x))
-        ipex.core.enable_jit_opt()
+        #ipex.core.enable_jit_opt()
 
 if __name__ == '__main__':
     test = unittest.main()
