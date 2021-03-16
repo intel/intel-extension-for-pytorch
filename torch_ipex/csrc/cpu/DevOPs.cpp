@@ -2708,6 +2708,17 @@ at::Tensor AtenIpexCPUDev::dil_upsample_linear1d_backward(const at::Tensor & gra
   return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_linear, scales);
 }
 
+at::Tensor AtenIpexCPUDev::dil_upsample_bilinear2d(const at::Tensor & self,  c10::optional<at::IntArrayRef> output_size, bool align_corners, c10::optional<c10::ArrayRef<double>> scale_factors) {
+  DEBUG("AtenIpexCPUDev::dil_upsample_bilinear2d_vec\n");
+  auto scale_h = c10::optional<double>(1.0);
+  auto scale_w = c10::optional<double>(1.0);
+  if (scale_factors.has_value()) {
+    scale_h = c10::optional<double>(scale_factors->at(0));
+    scale_w = c10::optional<double>(scale_factors->at(1));
+  }
+  return dbl::upsample::dil_upsample(self, output_size.value(), dil::algorithm::resampling_linear, scale_h, scale_w);
+}
+
 at::Tensor AtenIpexCPUDev::dil_upsample_bilinear2d(const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   DEBUG("AtenIpexCPUDev::dil_upsample_bilinear2d\n");
   IPEX_CHECK(align_corners == false, "dil_upsample_bilinear2d not support align_corners mode yet");
@@ -2719,6 +2730,19 @@ at::Tensor AtenIpexCPUDev::dil_upsample_bilinear2d_backward(const at::Tensor & g
   DEBUG("AtenIpexCPUDev::dil_upsample_bilinear2d_backward\n");
   IPEX_CHECK(align_corners == false, "dil_upsample_bilinear2d_backward not support align_corners mode yet");
   CHECK_DNNL_OP_PRE_COND(grad_output);
+  return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_linear, scales_h, scales_w);
+}
+
+at::Tensor AtenIpexCPUDev::dil_upsample_bilinear2d_backward(const at::Tensor & grad_output, c10::optional<at::IntArrayRef> output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<c10::ArrayRef<double>> scale_factors) {
+  DEBUG("AtenIpexCPUDev::dil_upsample_bilinear2d_backward_vec\n");
+  IPEX_CHECK(align_corners == false, "dil_upsample_bilinear2d_backward_vec not support align_corners mode yet");
+  CHECK_DNNL_OP_PRE_COND(grad_output);
+  auto scales_h = c10::optional<double>(1.0);
+  auto scales_w = c10::optional<double>(1.0);
+  if (scale_factors.has_value()) {
+    scales_h = c10::optional<double>(scale_factors->at(0));
+    scales_w = c10::optional<double>(scale_factors->at(1));
+  }
   return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_linear, scales_h, scales_w);
 }
 
