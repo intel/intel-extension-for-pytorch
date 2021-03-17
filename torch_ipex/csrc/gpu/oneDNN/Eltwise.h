@@ -131,6 +131,11 @@ static inline void eltwise_backward(
     diff_dst_memory = dpcpp_onednn_memory(diff_dst_md, engine, diff_dst.data_ptr());
   }
 
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  create_key(key, alg_kind, src_dst_md, alpha, beta);
+#endif
+
   eltwise_forward::desc eltwise_eltwiseFwd_desc(
       prop_kind::forward_training, alg_kind, src_dst_md, alpha, beta);
   auto eltwise_forward_pd =eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, engine);
@@ -158,8 +163,14 @@ static inline void eltwise_backward(
     }
   }
 
-  auto strm = GpuStreamManager::Instance().get_stream();
+#ifdef USE_PRIMITIVE_CACHE
+  auto eltwise_bwd =
+      fetch_or_create_m<dnnl::eltwise_backward>(key, eltwise_backward_pd);
+#else
   auto eltwise_bwd = dnnl::eltwise_backward(eltwise_backward_pd);
+#endif
+
+  auto strm = GpuStreamManager::Instance().get_stream();
   if (alg_kind == algorithm::eltwise_logistic_use_dst_for_bwd) {
     DPCPP_ONEDNN_EXEC(eltwise_bwd, strm,
         {{DNNL_ARG_DST, src_dst_memory},
