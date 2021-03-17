@@ -105,11 +105,12 @@ at::Tensor convolution(
 
   primitive_attr pattr;
   float in_scale;
-  std::vector<float> conv_scale;
-  int conv_zero_point;
+  std::vector<float> conv_scale = {1};
+  int conv_zero_point = 0;
   if (input.is_quantized()) {
     auto out_scale = attr.oscale_;
     in_scale = input.q_scale();
+    conv_scale.clear();
     for (int i = 0; i < weight_scales.size(); i++) {
       conv_scale.push_back(1.f / (out_scale / (in_scale * weight_scales[i])));
     }
@@ -121,8 +122,8 @@ at::Tensor convolution(
   }
 
 #ifdef USE_PRIMITIVE_CACHE
-  lru_key_t key;
-  create_key(key, input_md, weight_md, bias.defined(), dst_data_t,
+  lru_key_t key_pd;
+  create_key(key_pd, input_md, weight_md, bias.defined(), dst_data_t,
       _stride, _dilation, _padding, _padding, attr, conv_scale, conv_zero_point);
 #endif
 
@@ -296,7 +297,7 @@ at::Tensor convolution(
   }
 
 #ifdef USE_PRIMITIVE_CACHE
-  auto conv_forward = fetch_or_create_m<convolution_forward>(key, conv_forward_pd);
+  auto conv_forward = fetch_or_create_m<convolution_forward>(key_pd, conv_forward_pd);
 #else
   auto conv_forward = convolution_forward(conv_forward_pd);
 #endif
