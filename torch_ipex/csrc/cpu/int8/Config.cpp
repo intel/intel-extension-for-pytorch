@@ -7,7 +7,7 @@ using namespace torch_ipex::cpu::lp::int8;
 
 void Int8OptConfig::insert_or_updata_observer(
     std::string op_name, std::vector<std::vector<float>> i_min_max_values,
-    std::vector<std::vector<float>> o_min_max_values, int64_t ops_id) {
+    std::vector<std::vector<float>> o_min_max_values, int64_t ops_id, bool asymmetric) {
   if (observers_.size() <= ops_id) {
     // this path is that to set int8 op's configure, using default configures if
     // user not set it.
@@ -17,8 +17,9 @@ void Int8OptConfig::insert_or_updata_observer(
     std::string weight_granularity = "per_channel";
     const int nums_input = i_min_max_values.size();
     const int nums_output = o_min_max_values.size();
-    std::vector<bool> inputs_dtype_uint8(nums_input, false);
-    std::vector<bool> outputs_dtype_uint8(nums_output, false);
+    bool uint8_used = asymmetric ? true : false;
+    std::vector<bool> inputs_dtype_uint8(nums_input, uint8_used);
+    std::vector<bool> outputs_dtype_uint8(nums_output, uint8_used);
     bool quantized = true;
     if (!indicators_.empty()) {
       observer_algorithm = indicators_[ops_id].get_indicator_algorithm();
@@ -81,18 +82,61 @@ void Int8OptConfig::add_indicators() {
   // default used is s8
   for (auto i = 0; i < observers_.size(); i++) {
     std::vector<float> inputs_scale, outputs_scale;
+    std::vector<int32_t> inputs_zero_point, outputs_zero_point;
     std::vector<std::vector<float>> inputs_values =
         observers_[i].inputs_min_max_values;
     std::vector<std::vector<float>> outputs_values =
         observers_[i].outputs_min_max_values;
 
+    std::vector<bool> inputs_dtype_uint8 = observers_[i].inputs_dtype_uint8;
+    std::vector<bool> outputs_dtype_uint8 = observers_[i].outputs_dtype_uint8;
+
     for (auto i = 0; i < inputs_values.size(); i++) {
-      inputs_scale.push_back(
-          127.5 / std::max(std::abs(inputs_values[i][0]), inputs_values[i][1]));
+      if (inputs_values[i][2]) {
+        // asymmetric quantization
+        if (inputs_values[i][1] - inputs_values[i][0] == 0) {
+          // if min == max, set max to 1 and min to -1
+          inputs_values[i][1] = 1.;
+          inputs_values[i][0] = -1.;
+        } 
+        float asymmetric_scale = 255. / (inputs_values[i][1] - inputs_values[i][0]);
+        int zero_point = (int)(255. - asymmetric_scale * inputs_values[i][1]);
+        
+        inputs_scale.push_back(asymmetric_scale);
+        inputs_zero_point.push_back(zero_point);
+        inputs_dtype_uint8.push_back(true);
+      } else {
+        // symmetric quantization
+        inputs_scale.push_back(
+        127.5 / std::max(std::abs(inputs_values[i][0]), inputs_values[i][1]));
+        // TODO: default zero point = 128 for s8 (not used)
+        inputs_zero_point.push_back(128);
+        inputs_dtype_uint8.push_back(false);
+      }
     }
     for (auto j = 0; j < outputs_values.size(); j++) {
-      outputs_scale.push_back(127.5 / std::max(std::abs(outputs_values[j][0]),
-                                               outputs_values[j][1]));
+
+      if (outputs_values[j][2]) {
+          // asymmetric quantization
+          if (outputs_values[j][1] - outputs_values[j][0] == 0) {
+            // if min == max, set max to 1 and min to -1
+            outputs_values[j][1] = 1.;
+            outputs_values[j][0] = -1.;
+          }
+          float asymmetric_scale = 255. / (outputs_values[j][1] - outputs_values[j][0]);
+          int zero_point = (int)(255. - asymmetric_scale * outputs_values[j][1]);
+
+          outputs_scale.push_back(asymmetric_scale);
+          outputs_zero_point.push_back(zero_point);
+          outputs_dtype_uint8.push_back(true);
+        } else {
+          // symmetric quantization
+          outputs_scale.push_back(127.5 / std::max(std::abs(outputs_values[j][0]),
+                                                  outputs_values[j][1]));
+          // TODO: default zero point = 128 for s8 (not used)
+          outputs_zero_point.push_back(128);
+          outputs_dtype_uint8.push_back(false);
+        }
     }
     // zero_points not used now, zero_points = 0 for u8 and 128 for s8.
     // zero_point = 128;
@@ -100,7 +144,7 @@ void Int8OptConfig::add_indicators() {
         observers_[i].id, observers_[i].name, observers_[i].algorithm,
         observers_[i].weight_granularity, inputs_scale, outputs_scale,
         observers_[i].inputs_dtype_uint8, observers_[i].outputs_dtype_uint8,
-        observers_[i].quantized);
+        observers_[i].quantized, inputs_zero_point, outputs_zero_point);
     indicators_.push_back(new_indicator);
   }
   observers_.clear();
@@ -164,6 +208,18 @@ void Int8OptConfig::set_indicators(std::vector<Indicator> indicators) {
   for (auto i: indicators){
     indicators_.emplace_back(i);
   }
+}
+
+std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<int32_t>>> Int8OptConfig::get_indicator_asymmetric(int64_t ops_id) {
+    std::vector<float> inputs_scale, outputs_scale;
+    std::vector<int32_t> inputs_zero_point, outputs_zero_point;
+    std::tie(inputs_scale, outputs_scale) = indicators_[ops_id].get_indicator_scales();
+    std::tie(inputs_zero_point, outputs_zero_point) = indicators_[ops_id].get_indicator_zero_point();
+
+    std::vector<std::vector<float>> input_output_scale = {inputs_scale, outputs_scale};
+    std::vector<std::vector<int32_t>> input_output_zero_point = {inputs_zero_point, outputs_zero_point};
+
+    return std::make_tuple(input_output_scale, input_output_zero_point);
 }
 
 std::vector<Indicator> Int8OptConfig::get_indicators() { return indicators_; }

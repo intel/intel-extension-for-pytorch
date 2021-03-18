@@ -87,8 +87,13 @@ class tensor : public memory {
     }
 
     // This should only be called for a public format desc
+    // for blocked format, return 0 as padding_size?
     int64_t get_padding_size() const {
-      return compute_storage_size() - nelems();
+      if (is_plain()) {
+        return compute_storage_size() - nelems();
+      } else {
+        return 0;
+      }
     }
 
     bool is_default() const {
@@ -278,6 +283,8 @@ class tensor : public memory {
     bool is_plain() const { return get_const_desc().is_plain(); };
 
     bool is_default() const { return get_const_desc().is_default(); };
+
+    bool is_rnn_packed() const { return get_const_desc().is_rnn_packed_desc(); }
 
     size_t get_item_size() const { return get_const_desc().get_item_size(); }
 
@@ -761,6 +768,10 @@ class tensor : public memory {
     return get_const_desc().is_plain();
   }
 
+  bool is_rnn_packed() const {
+    return get_const_desc().is_rnn_packed_desc();
+  }
+
   static format_tag get_default_format(const dims &adims) {
     switch (adims.size()) {
       case 1:
@@ -993,6 +1004,33 @@ class tensor : public memory {
     }
   }
 
+  void feed_from_for_rnn_data(const tensor &src) {
+    DIL_ENFORCE(has_scale(), "Can not find dst scales");
+    DIL_ENFORCE(get_scale().size() == 1, "Incorrect dst scale size");
+
+    DIL_ENFORCE(has_zero_point(), "Cannot find dst zero_point");
+    DIL_ENFORCE(get_zero_point().size() == 1, "Incorrect dst zero_point size");
+    // int8 to fp32
+    src.reorder_to(*this, {get_scale(), get_zero_point(), /*rnn_data_quantize*/true});
+  }
+
+  void feed_from_for_rnn_data_fallback(const tensor &src) {
+    DIL_ENFORCE(src.has_scale(), "Can not find src scales");
+    DIL_ENFORCE(src.get_scale().size() == 1, "Incorrect src scale size");
+
+    DIL_ENFORCE(src.has_zero_point(), "Can not find src zero_point");
+    DIL_ENFORCE(src.get_zero_point().size() == 1, "Incorrect src zero_point size");
+
+    std::vector<int32_t> shift = src.get_zero_point();
+    scale_t scales = src.get_scale();
+
+    for (int i = 0; i < scales.size(); i++) {
+      scales[i] = 1./scales[i];
+    }
+    // fp32 to int8
+    src.reorder_to(*this, {scales, shift, /*rnn_data_quantize*/false});
+  }
+
   // For backward compatibility. Will be deprecated.
   void feed_from(const dims &adims, data_type adata_type, const void *array) {
     feed_from({adims, adata_type, const_cast<void *>(array)});
@@ -1059,7 +1097,7 @@ class tensor : public memory {
   /// Return the zero_point of this param.
   const std::vector<int32_t> &get_zero_point() const { return *zero_point_.get(); }
 
-  /// Set new scale into param
+  /// Set new zero point into param
   void set_zero_point(const std::vector<int32_t> &zp) { zero_point_.reset(new std::vector<int32_t>(zp)); }
 
   /// Need reorder if current param used by non DNNL routines.

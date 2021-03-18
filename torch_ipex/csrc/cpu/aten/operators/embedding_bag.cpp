@@ -37,13 +37,26 @@ static inline at::Tensor _embedding_bag_index_add_select_fast(const at::Tensor s
   int64_t ddim = src.size(1);
   auto* src_data = src.data_ptr<T>();
   int64_t output_size = offsets.numel() - 1;
-  auto* offsets_data = offsets.data_ptr<int64_t>();
+  int64_t* offsets_data = offsets.data_ptr<int64_t>();
   std::vector<int64_t> offsets_include_last;
 
   if (!include_last_offset) {
     output_size = offsets.numel();
     offsets_include_last.resize(output_size + 1);
-    std::memcpy(offsets_include_last.data(), offsets_data, sizeof(int64_t) * output_size);
+    int64_t* offsets_include_last_data = offsets_include_last.data();
+    int64_t iter_time = (output_size >> 5);
+    int64_t align32_size = (iter_time << 5);
+    int64_t left_size = output_size - align32_size;
+    //std::memcpy(offsets_include_last.data(), offsets_data, sizeof(int64_t) * output_size);
+    at::parallel_for(0, iter_time, 16, [&](int64_t start, int64_t end) {
+      for (int64_t i = start; i < end; i += 1) {
+        auto start_offset = i << 5;
+        move_ker(&offsets_include_last_data[start_offset], &offsets_data[start_offset], 32);
+      }
+    });
+    if (left_size > 0) {
+      move_ker(&offsets_include_last_data[align32_size], &offsets_data[align32_size], left_size);
+    }
     offsets_include_last[output_size] = select_indices.numel();
     offsets_data = offsets_include_last.data();
   }

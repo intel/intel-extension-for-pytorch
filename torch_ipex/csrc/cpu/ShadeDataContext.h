@@ -227,6 +227,16 @@ struct ShadeDataContext {
     return res;
   }
 
+  static inline bool isTensorMixPrecision(const at::Tensor &tensor, MIX_PREC_TYPE mix_dtype) {
+    // Check whether tensor is mix_type.
+    void *raw_context = tensor.storage().data_ptr().get_context();
+    ShadeDataContext *shade_data_context = (ShadeDataContext*)raw_context;
+    if (shade_data_context->mix_prec_type == mix_dtype && mix_dtype != MIX_PREC_TYPE::NONE) {
+      return true;
+    }
+    return false;
+  }
+
   /**
    * Check if the input aten tensor is a parameter.
    *

@@ -95,7 +95,9 @@ _FN_DNNL_FUNCS_WITH_SIMPLE_ATEN_SIG = [
     'aten::upsample_linear1d(Tensor self, int[1] output_size, bool align_corners, float? scales=None) -> Tensor',
     'aten::upsample_linear1d_backward(Tensor grad_output, int[1] output_size, int[3] input_size, bool align_corners, float? scales=None) -> Tensor',
     'aten::upsample_bilinear2d(Tensor self, int[2] output_size, bool align_corners, float? scales_h=None, float? scales_w=None) -> Tensor',
+    'aten::upsample_bilinear2d.vec(Tensor input, int[]? output_size, bool align_corners, float[]? scale_factors) -> Tensor',
     'aten::upsample_bilinear2d_backward(Tensor grad_output, int[2] output_size, int[4] input_size, bool align_corners, float? scales_h=None, float? scales_w=None) -> Tensor',
+    'aten::upsample_bilinear2d_backward.vec(Tensor grad_output, int[]? output_size, int[] input_size, bool align_corners, float[]? scale_factors) -> Tensor',
     'aten::upsample_trilinear3d(Tensor self, int[3] output_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> Tensor',
     'aten::upsample_trilinear3d_backward(Tensor grad_output, int[3] output_size, int[5] input_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> Tensor',
     'aten::unsqueeze(Tensor(a) self, int dim) -> Tensor(a)',
@@ -578,7 +580,7 @@ class DenseOPCodeGen(object):
 
             # Gen OP Name
             code += '#if defined(IPEX_DISP_OP)\n'
-            code += '  printf("{}::{}\\n");\n'.format(_IPEX_OP_FUNC_NS, cpp_sig.def_name)
+            code += '  printf("{}::{}\\n");\n'.format(_IPEX_OP_FUNC_NS, new_cpp_func_name)
             code += '#endif\n'
 
             # Gen profile info
@@ -587,7 +589,7 @@ class DenseOPCodeGen(object):
                 if param.core_type in ['Tensor', 'Scalar']:
                     profiler_inputs.append(param.name)
             code += '#if defined(IPEX_PROFILE_OP)\n'
-            code += '  RECORD_FUNCTION("{ns}::{name}", std::vector<c10::IValue>({{{input_names}}}));\n'.format(ns=_IPEX_OP_FUNC_NS, name=cpp_sig.def_name, input_names=', '.join(profiler_inputs))
+            code += '  RECORD_FUNCTION("{ns}::{name}", std::vector<c10::IValue>({{}}));\n'.format(ns=_IPEX_OP_FUNC_NS, name=new_cpp_func_name)
             code += '#endif\n'
 
             if is_conv_overrideable_func(cpp_sig.def_name):

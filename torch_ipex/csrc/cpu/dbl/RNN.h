@@ -13,7 +13,8 @@ namespace rnn {
 
 std::vector<at::Tensor> mkldnn_rnn_layer(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
     const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx_, const at::Tensor& cx_, bool reverse, int64_t mode,
-    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes);
+    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes, 
+    const std::vector<float>& scales_from_json, const std::vector<int32_t>& shift_from_json, bool quantized);
 
 std::vector<at::Tensor> mkldnn_rnn_layer_backward(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
     const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx_, const at::Tensor& cx_, const at::Tensor& output, const at::Tensor& hy_,

@@ -13,6 +13,8 @@ import sys
 import itertools
 import torch
 import intel_pytorch_extension as ipex
+import contextlib
+import io
 
 from common_ipex_conf import AutoMixPrecision, AutoDNNL
 
@@ -1303,6 +1305,33 @@ class TestTensorShape(TestCase):
             x_dpcpp = x.clone().to(device=device)
             self.assertEqual(x_dpcpp.unsqueeze(1), x.unsqueeze(1))
 
+        with AutoDNNL(True):
+            x = torch.randn(3, 64, 64, dtype=torch.float32)
+            x_xpu = x.clone().to(device=device)
+            conv2d_cpu = torch.nn.Conv2d(3, 6, (3, 3))
+            conv2d_xpu = copy.deepcopy(conv2d_cpu).to(device=device)
+            x_nchw = x.unsqueeze(0)
+            x_xpu_nchw = x_xpu.unsqueeze(0)
+            self.assertEqual(conv2d_cpu(x_nchw), conv2d_xpu(x_xpu_nchw))
+
+            conv2d_cpu = torch.nn.Conv2d(3, 1, (3, 3))
+            conv2d_xpu = copy.deepcopy(conv2d_cpu).to(ipex.DEVICE)
+            # reshape the conv2d weight to chw
+            conv2d_weight_seq = conv2d_xpu.weight.clone().squeeze()
+            # reshape the conv2d weight to nchw
+            conv2d_weight_unseq = torch.unsqueeze(conv2d_weight_seq, 0)
+
+            conv2d_xpu.weight.data = conv2d_weight_unseq
+
+            a = torch.randn(1, 3, 10, 10).to(ipex.DEVICE)
+            # Make sure the conv2d_xpu.weight is blocked format
+            conv2d_xpu(a)
+            # Make sure the unsqueeze does not trigger reorder
+            conv2d_weight_unseq = torch.unsqueeze(conv2d_weight_seq, 0)
+            self.assertEqual(conv2d_xpu(a), conv2d_cpu(a.to("cpu")))
+
+
+
 class TestSoftMax(TestCase):
     def test_softmax(self):
         with AutoDNNL(True):
@@ -1580,7 +1609,7 @@ class TestRNN(TestCase):
         if cell == "RNN":
             params_dict["nonlinearity"] = ["tanh"] # ["tanh", "relu"] TODO relu has accuracy issue
         elif cell == "GRU":
-            params_dict["nonlinearity"] = [""] 
+            params_dict["nonlinearity"] = [""]
 
         params_list = []
 
@@ -1592,16 +1621,16 @@ class TestRNN(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        
+
         params_list = self._lstm_params_list("LSTM")
 
         for input_size, hidden_size, num_layers, bidirectional, bias, empty_state, batch_first, dropout, batch_size, seq_len in itertools.product(*params_list):
             # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
             if dropout > 0 and num_layers == 1:
                 continue
-            
+
             num_directions = 2 if bidirectional else 1
-            
+
             if batch_first:
                 input = torch.randn(batch_size, seq_len, input_size)
             else:
@@ -1649,7 +1678,7 @@ class TestRNN(TestCase):
                     hy_cpu[0].sum().backward(retain_graph=True)
                     hy_dpcpp[0].sum().backward(retain_graph=True)
                     self.assertEqual(h0_dpcpp.grad.to('cpu'), h_cpu.grad)
-                    
+
                     hy_cpu[1].sum().backward(retain_graph=True)
                     hy_dpcpp[1].sum().backward(retain_graph=True)
                     self.assertEqual(c0_dpcpp.grad.to('cpu'), c_cpu.grad)
@@ -1658,16 +1687,16 @@ class TestRNN(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        
+
         params_list = self._lstm_params_list(cell)
 
         for input_size, hidden_size, num_layers, bidirectional, bias, empty_state, batch_first, dropout, batch_size, seq_len, nonlinearity in itertools.product(*params_list):
             # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
             if dropout > 0 and num_layers == 1:
                 continue
-            
+
             num_directions = 2 if bidirectional else 1
-            
+
             if batch_first:
                 input = torch.randn(batch_size, seq_len, input_size)
             else:
@@ -1683,7 +1712,7 @@ class TestRNN(TestCase):
                 model_cpu = torch.nn.RNN(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first, nonlinearity=nonlinearity)
             elif cell == "GRU":
                 model_cpu = torch.nn.GRU(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
-                
+
             model_cpu.train() if training else model_cpu.eval()
 
             input_dpcpp = input.clone().to(device=device).requires_grad_(training)
@@ -1720,7 +1749,7 @@ class TestRNN(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        
+
         embedding_dim = 1024
         hidden_dim = 10
         batch_size = 24
@@ -1755,7 +1784,7 @@ class TestRNN(TestCase):
 
         lstm_out, hidden_out = lstm(embeds, (hidden_0, hidden_1))
         lstm_out, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_out, batch_first=True)
-        
+
         with AutoDNNL(True):
             lstm_out_dpcpp, hidden_out_dpcpp = lstm_dpcpp(embeds_dpcpp, (hidden_0_dpcpp, hidden_1_dpcpp))
             lstm_out_dpcpp, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_out_dpcpp, batch_first=True)
@@ -1770,16 +1799,16 @@ class TestRNN(TestCase):
                 self.assertEqual(sentences_dpcpp.grad.to('cpu'), sentences.grad)
                 self.assertEqual(lstm_dpcpp.weight_ih_l0.grad.to('cpu'), lstm.weight_ih_l0.grad)
                 self.assertEqual(lstm_dpcpp.weight_hh_l0.grad.to('cpu'), lstm.weight_hh_l0.grad)
-                    
+
                 self.assertEqual(lstm_dpcpp.bias_ih_l0.grad.to('cpu'), lstm.bias_ih_l0.grad)
                 self.assertEqual(lstm_dpcpp.bias_hh_l0.grad.to('cpu'), lstm.bias_hh_l0.grad)
-                
+
                 self.assertEqual(hidden_0_dpcpp.grad.to('cpu'), hidden_0.grad)
                 self.assertEqual(hidden_1_dpcpp.grad.to('cpu'), hidden_1.grad)
 
     def test_lstm_inference(self):
         self._test_lstm(training=False)
-    
+
     def test_lstm_training(self):
         self._test_lstm(training=True)
 
@@ -1932,6 +1961,17 @@ class TestInterpolate(TestCase):
             x_dpcpp = x.clone().to(device=device).requires_grad_()
             y_cpu = F.interpolate(x_cpu, scale_factor = 2, mode='bilinear', align_corners=False, recompute_scale_factor=False)
             y_dpcpp = F.interpolate(x_dpcpp, scale_factor = 2, mode='bilinear', align_corners=False, recompute_scale_factor=False)
+            self.assertEqual(y_cpu, y_dpcpp)
+            y_cpu.sum().backward()
+            y_dpcpp.sum().backward()
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad)
+
+        with AutoDNNL(True):
+            x = torch.randn(2, 2, 4, 4)
+            x_cpu = x.clone().requires_grad_()
+            x_dpcpp = x.clone().to(device=device).requires_grad_()
+            y_cpu = F.interpolate(x_cpu, scale_factor = [2, 3], mode='bilinear', align_corners=False, recompute_scale_factor=False)
+            y_dpcpp = F.interpolate(x_dpcpp, scale_factor = [2, 3], mode='bilinear', align_corners=False, recompute_scale_factor=False)
             self.assertEqual(y_cpu, y_dpcpp)
             y_cpu.sum().backward()
             y_dpcpp.sum().backward()

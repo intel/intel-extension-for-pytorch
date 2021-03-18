@@ -23,7 +23,10 @@ get_int8_scales(const at::TensorList &tensor, bool uint8_used, int64_t ops_id);
 
 bool get_int8_quantized_status(const int64_t ops_id);
 
-void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> scales, bool uint8_used = false);
+// for asymmetric quantization
+std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<int32_t>>> get_int8_asymmetric(const int64_t ops_id);
+
+void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> scales, bool uint8_used = false, std::vector<int32_t> shift = {});
 
 /**
  * Reorder the input tensor to the specified scalar type.
@@ -32,7 +35,7 @@ void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> s
  * @param[in] dst_scalar_type The scalar type which the shade buffer of the ipex tensor will be reordered to. It should
  *                            be at::kBFloat16 or at::kFloat
  */
-void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dtype, std::vector<float> sclaes = {});
+void reorder_to_dtype(const at::Tensor& tensor, at::ScalarType dtype, std::vector<float> sclaes = {}, std::vector<int32_t> shift = {});
 
 /**
  * Reorder (outplace) the dil input tensor to the specified dil data type.
@@ -55,7 +58,7 @@ void reorder_to_public(const at::Tensor &tensor, bool remain_dtype = false);
  * @param[in] tensor        The tensor to be reordered to the spcified oneDNN descriptor
  * @param[in] expected_desc The dil buffer of the input tensor will be reordered to expected_desc
  */
-void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc, const std::vector<float> scales = {});
+void reorder_to_desc(const at::Tensor& tensor, const dil::tensor::desc& expected_desc, const std::vector<float> scales = {}, const std::vector<int32_t> shift = {});
 
 /**
  * Replace the whole original storage with a dil storage `dil_buffer`

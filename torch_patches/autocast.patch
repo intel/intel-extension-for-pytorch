@@ -1,0 +1,12 @@
+diff --git a/c10/core/DispatchKey.h b/c10/core/DispatchKey.h
+index b32f991df3..99bf28b380 100644
+--- a/c10/core/DispatchKey.h
++++ b/c10/core/DispatchKey.h
+@@ -227,6 +227,7 @@ enum class DispatchKey : uint8_t {
+   // Autocasting precedes VariableTypeId, to ensure casts are autograd-exposed
+   // and inputs are saved for backward in the post-autocast type.
+   Autocast,
++  AutocastCPU,
+ 
+   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~ WRAPPERS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
+   // There are a number of alternative modes which may want to handle before
