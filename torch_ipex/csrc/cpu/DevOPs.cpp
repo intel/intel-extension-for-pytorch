@@ -2075,6 +2075,12 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
   dim = at::legacy_cat_wrap_dim(dim, tensors);
   std::vector<dil::tensor> x;
   at::Tensor tensors_contiguous[tensors.size()];
+
+  bool has_scale = false;
+  bool has_shift = false;
+  dil::scale_t data_scale;
+  std::vector<int32_t> data_shift;
+
   for (auto i = 0; i < tensors.size(); i++) {
     IPEX_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
       "Currently Mkldnn cat operators do not support empty tensor.");
@@ -2082,10 +2088,47 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
 
     dbl::comm::reorder_to_bf16_for_mix_prec(tensors_contiguous[i], true);
 
-    x.push_back(dbl::comm::try_gen_dil_tensor(tensors_contiguous[i]));
+    auto dil_input = dbl::comm::try_gen_dil_tensor(tensors_contiguous[i]);
+
+    // TODO: verify using a simpler way??
+    if (i == 0) {
+      if (dil_input.has_scale()) {
+        IPEX_CHECK(dil_input.get_scale().size() == 1, "only support scale size == 1");
+        has_scale = true;
+        data_scale = dil_input.get_scale();
+      }
+      if (dil_input.has_zero_point()) {
+        IPEX_CHECK(dil_input.get_zero_point().size() == 1, "only support zero point size == 1");
+        has_shift = true;
+        data_shift = dil_input.get_zero_point();
+      }
+    } else {
+      IPEX_CHECK(dil_input.has_scale() == has_scale, "tensors to cat should have same scale");
+      if (dil_input.has_scale()) {
+        IPEX_CHECK(dil_input.get_scale().size() == 1, "only support scale size == 1");
+        IPEX_CHECK(dil_input.get_scale()[0] == data_scale[0], "tensors to cat should have same scale");
+      }
+      IPEX_CHECK(dil_input.has_zero_point() == has_shift, "tensors to cat should have same zero point");
+      if (dil_input.has_zero_point()) {
+        IPEX_CHECK(dil_input.get_zero_point().size() == 1, "only support zero point size == 1");
+        IPEX_CHECK(dil_input.get_zero_point()[0] == data_shift[0], "tensors to cat should have same zero point");
+      }
+    }
+
+    x.push_back(dil_input);
   }
   dil::tensor y;
   dil::concat::compute(x, dim, y);
+
+  // For bidirectional LSTM output cat
+  if (has_scale){
+    y.set_scale(data_scale);
+  }
+
+  if (has_shift) {
+    y.set_zero_point(data_shift);
+  }
+
   return dbl::comm::gen_aten_tensor_by(std::move(y));
 }
 
@@ -2116,15 +2159,18 @@ std::vector<at::Tensor> AtenIpexCPUDev::dil_split_with_sizes(const at::Tensor& s
 }
 
 
+template<bool check_layout = true>
 at::Tensor dil_as_strided(
     const at::Tensor& self,
     at::IntArrayRef size,
     at::IntArrayRef stride,
     c10::optional<int64_t> storage_offset_) {
 
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
-      self.scalar_type() != at::kFloat || dbl::comm::try_gen_dil_tensor(self).is_public_format(),
-      "Cannot set sizes and strides for DIL tensor with non-public format");
+  if (check_layout) {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+        self.scalar_type() != at::kFloat || dbl::comm::try_gen_dil_tensor(self).is_public_format(),
+        "Cannot set sizes and strides for DIL tensor with non-public format");
+  }
 
   // share storage
   auto* self_storage = self.unsafeGetTensorImpl()->storage().unsafeGetStorageImpl();
@@ -2594,10 +2640,12 @@ at::Tensor& AtenIpexCPUDev::dil_copy_(
 
 std::vector<at::Tensor> AtenIpexCPUDev::dil_rnn_layer(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
     const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse, int64_t mode,
-    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes) {
+    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes, 
+    const std::vector<float>& scales, const std::vector<int32_t>& shift, bool quantized) {
   DEBUG("AtenIpexCPUDev::dil_rnn_layer\n");
+
   return dbl::rnn::mkldnn_rnn_layer(input, w1, w2, w3, w4, hx, cx, reverse, mode,
-      hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes);
+      hidden_size, num_layers, has_biases, train, bidirectional, batch_sizes, scales, shift, quantized);
 }
 
 std::vector<at::Tensor> AtenIpexCPUDev::dil_rnn_layer_backward(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
@@ -2660,6 +2708,17 @@ at::Tensor AtenIpexCPUDev::dil_upsample_linear1d_backward(const at::Tensor & gra
   return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_linear, scales);
 }
 
+at::Tensor AtenIpexCPUDev::dil_upsample_bilinear2d(const at::Tensor & self,  c10::optional<at::IntArrayRef> output_size, bool align_corners, c10::optional<c10::ArrayRef<double>> scale_factors) {
+  DEBUG("AtenIpexCPUDev::dil_upsample_bilinear2d_vec\n");
+  auto scale_h = c10::optional<double>(1.0);
+  auto scale_w = c10::optional<double>(1.0);
+  if (scale_factors.has_value()) {
+    scale_h = c10::optional<double>(scale_factors->at(0));
+    scale_w = c10::optional<double>(scale_factors->at(1));
+  }
+  return dbl::upsample::dil_upsample(self, output_size.value(), dil::algorithm::resampling_linear, scale_h, scale_w);
+}
+
 at::Tensor AtenIpexCPUDev::dil_upsample_bilinear2d(const at::Tensor & self, at::IntArrayRef output_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
   DEBUG("AtenIpexCPUDev::dil_upsample_bilinear2d\n");
   IPEX_CHECK(align_corners == false, "dil_upsample_bilinear2d not support align_corners mode yet");
@@ -2671,6 +2730,19 @@ at::Tensor AtenIpexCPUDev::dil_upsample_bilinear2d_backward(const at::Tensor & g
   DEBUG("AtenIpexCPUDev::dil_upsample_bilinear2d_backward\n");
   IPEX_CHECK(align_corners == false, "dil_upsample_bilinear2d_backward not support align_corners mode yet");
   CHECK_DNNL_OP_PRE_COND(grad_output);
+  return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_linear, scales_h, scales_w);
+}
+
+at::Tensor AtenIpexCPUDev::dil_upsample_bilinear2d_backward(const at::Tensor & grad_output, c10::optional<at::IntArrayRef> output_size, at::IntArrayRef input_size, bool align_corners, c10::optional<c10::ArrayRef<double>> scale_factors) {
+  DEBUG("AtenIpexCPUDev::dil_upsample_bilinear2d_backward_vec\n");
+  IPEX_CHECK(align_corners == false, "dil_upsample_bilinear2d_backward_vec not support align_corners mode yet");
+  CHECK_DNNL_OP_PRE_COND(grad_output);
+  auto scales_h = c10::optional<double>(1.0);
+  auto scales_w = c10::optional<double>(1.0);
+  if (scale_factors.has_value()) {
+    scales_h = c10::optional<double>(scale_factors->at(0));
+    scales_w = c10::optional<double>(scale_factors->at(1));
+  }
   return dbl::upsample::dil_upsample_backward(grad_output, input_size, dil::algorithm::resampling_linear, scales_h, scales_w);
 }
 
@@ -2690,7 +2762,6 @@ at::Tensor AtenIpexCPUDev::dil_upsample_trilinear3d_backward(const at::Tensor & 
 
 at::Tensor AtenIpexCPUDev::dil_unsqueeze(const at::Tensor& self, int64_t dim) {
   DEBUG("AtenIpexCPUDev::dil_unsqueeze\n");
-  dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
 
   dim = at::maybe_wrap_dim(dim, self.dim() + 1);
   auto sizes = self.sizes().vec();
@@ -2698,7 +2769,16 @@ at::Tensor AtenIpexCPUDev::dil_unsqueeze(const at::Tensor& self, int64_t dim) {
   int64_t new_stride = dim >= self.dim() ? 1 : sizes[dim] * strides[dim];
   sizes.insert(sizes.begin() + dim, 1);
   strides.insert(strides.begin() + dim, new_stride);
-  return dil_as_strided(self, sizes, strides, self.storage_offset());
+
+  // Fast path to check if the shape of the dil buffer is as same as aten wrapper
+  if (cpu::ShadeDataContext::isDilTensor(self)) {
+    auto&& dil_self_tensor = dbl::comm::try_gen_dil_tensor(self);
+    if (dil_self_tensor.get_dims() != sizes) {
+      dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
+    }
+  }
+
+  return dil_as_strided<false/*don't check layout*/>(self, sizes, strides, self.storage_offset());
 }
 
 at::Tensor AtenIpexCPUDev::dil_div(const at::Tensor &self,

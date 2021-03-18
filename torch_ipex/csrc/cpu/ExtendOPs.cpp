@@ -3,9 +3,11 @@
 #include "CustomOPs.h"
 #include "DevOPs.h"
 #include "FusionOPs.h"
+#include "dbl/Common.h"
 #include "aten/aten.hpp"
 #include "bf16/vec/bf16_vec_kernel.h"
 #include "dil/dil.hpp"
+#include "torch_ipex/csrc/cpu/int8/Config.h"
 #include "xsmm/libxsmm_utils.h"
 #include <ATen/Parallel.h>
 #include <ATen/MatrixRef.h>
@@ -107,8 +109,28 @@ void AtenIpexTypeExt::packed_add_(at::Tensor &top_half, at::Tensor &bot_half,
     auto top_half_ptr = (unsigned short *)top_half.data_ptr();
     auto bot_half_ptr = (unsigned short *)bot_half.data_ptr();
 
-    at::parallel_for(0, len, 0, [&](int64_t start, int64_t end) {
-      for (int64_t i = start; i < end; i++) {
+    at::parallel_for(0, len, 64, [&](int64_t start, int64_t end) {
+      int64_t i = start;
+      auto alpha_vec = _mm512_set1_ps(alpha);
+      for (; i < end - 31; i+=32) {
+	auto bot0 = _mm256_loadu_si256((__m256i *)(bot_half_ptr + i));
+	auto bot1 = _mm256_loadu_si256((__m256i *)(bot_half_ptr + i + 16));
+	auto top0 = _mm256_loadu_si256((__m256i *)(top_half_ptr + i));
+	auto top1 = _mm256_loadu_si256((__m256i *)(top_half_ptr + i + 16));
+	auto value0 = _mm256_loadu_si256((__m256i *)(value_ptr + i));
+	auto value1 = _mm256_loadu_si256((__m256i *)(value_ptr + i + 16));
+	auto pack0_fp32 = pack_bf16_to_fp32(top0, bot0);
+	auto pack1_fp32 = pack_bf16_to_fp32(top1, bot1);
+	auto value0_fp32 = cvt_bf16_to_fp32(value0);
+	auto value1_fp32 = cvt_bf16_to_fp32(value1);
+	auto result0 = _mm512_fmadd_ps(alpha_vec, value0_fp32, pack0_fp32);
+	auto result1 = _mm512_fmadd_ps(alpha_vec, value1_fp32, pack1_fp32);
+        _mm256_storeu_si256((__m256i *)(top_half_ptr + i), trunc_fp32_to_bf16(result0));
+        _mm256_storeu_si256((__m256i *)(top_half_ptr + i + 16), trunc_fp32_to_bf16(result1));
+        _mm256_storeu_si256((__m256i *)(bot_half_ptr + i), _mm512_cvtepi32_epi16(_mm512_castps_si512(result0)));
+        _mm256_storeu_si256((__m256i *)(bot_half_ptr + i + 16), _mm512_cvtepi32_epi16(_mm512_castps_si512(result1)));
+      }
+      for (; i < end; i++) {
         packed_bf16 p16;
         p16.s[0] = bot_half_ptr[i];
         p16.s[1] = top_half_ptr[i];
@@ -123,15 +145,15 @@ void AtenIpexTypeExt::packed_add_(at::Tensor &top_half, at::Tensor &bot_half,
 template <typename T>
 static inline void cat(const T *in1, const T *in2, T *out, size_t in1_size,
                        size_t in2_size) {
-  std::memcpy(out, in1, in1_size * sizeof(T));
-  std::memcpy(&out[in1_size], in2, in2_size * sizeof(T));
+  move_ker(out, in1, in1_size);
+  move_ker(&out[in1_size], in2, in2_size);
 }
 
 template <typename T>
 static inline void cat_backward(const T *in, T *out1, T *out2, size_t out1_size,
                                 size_t out2_size) {
-  std::memcpy(out1, in, out1_size * sizeof(T));
-  std::memcpy(out2, &in[out1_size], out2_size * sizeof(T));
+  move_ker(out1, in, out1_size);
+  move_ker(out2, &in[out1_size], out2_size);
 }
 
 template <typename T>
@@ -139,8 +161,7 @@ static inline void cat(T *out, const std::vector<T *> &in,
                        const std::vector<uint32_t> &feature_sizes, int64_t bs) {
   size_t offset = 0;
   for (int j = 0; j < feature_sizes.size(); j++) {
-    std::memcpy(&out[offset], &in[j][bs * feature_sizes[j]],
-                feature_sizes[j] * sizeof(T));
+    move_ker(&out[offset], &in[j][bs * feature_sizes[j]], feature_sizes[j]);
     offset += feature_sizes[j];
   }
 }
@@ -151,8 +172,8 @@ static inline void cat_backward(const T *in, std::vector<T *> &out,
                                 int64_t bs) {
   size_t offset = 0;
   for (int j = 0; j < feature_sizes.size(); j++) {
-    std::memcpy(&out[j][bs * feature_sizes[j]], &in[offset],
-                feature_sizes[j] * sizeof(T));
+    //std::memcpy(&out[j][bs * feature_sizes[j]], &in[offset], feature_sizes[j] * sizeof(T));
+    move_ker(&out[j][bs * feature_sizes[j]], &in[offset], feature_sizes[j]);
     offset += feature_sizes[j];
   }
 }
@@ -161,7 +182,7 @@ template <typename T>
 static inline void flat_triangle(const T *in, T *out, size_t size) {
   size_t offset = 0;
   for (int i = 1; i < size; i++) {
-    std::memcpy(&out[offset], &in[i * size], i * sizeof(T));
+    move_ker(&out[offset], &in[i * size], i);
     offset += i;
   }
 }
@@ -173,15 +194,8 @@ static inline void flat_triangle_backward(const T *in, T *out, size_t size) {
     out[i] = 0.f;
   }
   for (int i = 1; i < size; i++) {
-    std::memcpy(&out[i * size], &in[offset], i * sizeof(T));
+    move_ker(&out[i * size], &in[offset], i);
     offset += i;
-  }
-}
-
-template <typename T> static inline void add(const T *in, T *out, size_t size) {
-#pragma omp simd
-  for (size_t i = 0; i < size; i++) {
-    out[i] += in[i];
   }
 }
 
@@ -337,7 +351,7 @@ _interaction_backward(const at::Tensor &grad_out,
       mm_backward(grad_cat_buf, grad_mm_buf, cat_buf, vector_nums, vector_size,
                   mm_kernel);
       cat_backward<T>(grad_cat_buf, output_data, feature_sizes, i);
-      add<T>(grad_input0_buf, &output_data[0][i * vector_size], vector_size);
+      add_ker(grad_input0_buf, &output_data[0][i * vector_size], vector_size);
     }
   });
   return output;
@@ -453,16 +467,19 @@ std::vector<at::Tensor> rnn_layer(const at::Tensor& input,
     at::TensorList weights, const at::Tensor& hx,
     const at::Tensor& cx, bool reverse, int64_t mode,
     int64_t hidden_size, int64_t num_layers, bool train,
-    bool bidirectional, at::IntArrayRef batch_sizes) {
+    bool bidirectional, at::IntArrayRef batch_sizes,
+    const std::vector<float>& scales,
+    const std::vector<int32_t>& shift, 
+    bool quantized) {
   TORCH_CHECK(weights.size() == 2 || weights.size() == 4);
   if (weights.size() == 4) {
     if (at::GradMode::is_enabled())
       return NewRNNLayerOp::apply(input, weights[0], weights[1], weights[2], weights[3], hx, cx, reverse, mode, hidden_size, num_layers, true, train, bidirectional, batch_sizes);
-    return NewRNNLayerOp::_forward(input, weights[0], weights[1], weights[2], weights[3], hx, cx, reverse, mode, hidden_size, num_layers, true, train, bidirectional, batch_sizes);
+    return NewRNNLayerOp::_forward(input, weights[0], weights[1], weights[2], weights[3], hx, cx, reverse, mode, hidden_size, num_layers, true, train, bidirectional, batch_sizes, scales, shift, quantized);
   } else {
     if (at::GradMode::is_enabled())
       return NewRNNLayerOp::apply(input, weights[0], weights[1], at::zeros(weights[0].sizes(), weights[0].options()), at::zeros(weights[1].sizes(), weights[1].options()), hx, cx, reverse, mode, hidden_size, num_layers, false, train, bidirectional, batch_sizes);
-    return NewRNNLayerOp::_forward(input, weights[0], weights[1], at::zeros(weights[0].sizes(), weights[0].options()), at::zeros(weights[1].sizes(), weights[1].options()), hx, cx, reverse, mode, hidden_size, num_layers, false, train, bidirectional, batch_sizes);
+    return NewRNNLayerOp::_forward(input, weights[0], weights[1], at::zeros(weights[0].sizes(), weights[0].options()), at::zeros(weights[1].sizes(), weights[1].options()), hx, cx, reverse, mode, hidden_size, num_layers, false, train, bidirectional, batch_sizes, scales, shift, quantized);
   }
 }
 // MKLDNN RNN integration notes:
@@ -502,6 +519,27 @@ std::vector<at::Tensor> rnn(
   at::MatrixRef<at::Tensor> weights{weight, static_cast<size_t>(weight_stride0)};
 
   auto num_directions = bidirectional ? 2 : 1;
+
+  // no need to do calibration for the output in lstm, will use the scale & zero point of the input
+  // to dequantize the output from u8 to f32, need to add an "output" here but actually unused
+  // For LSTM, we only need to calibrate the input to the first layer
+  // TODO: add int8 for gru and rnn. 
+  if (check_auto_mix_int8_fp32() && check_int8_calibration() && static_cast<dil::rnn_kind>(mode) == dil::rnn_kind::LSTM) {
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    insert_or_updata_observer({input}, {input}, "lstm", num_ops_id, /*asymmetric*/true);
+  }
+
+  bool quantized = false;
+  std::vector<std::vector<float>> scales = {};
+  std::vector<std::vector<int32_t>> shift = {};
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration() && static_cast<dil::rnn_kind>(mode) == dil::rnn_kind::LSTM) {
+      int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+      quantized = torch_ipex::cpu::dbl::comm::get_int8_quantized_status(num_ops_id);
+      std::tie(scales, shift) = torch_ipex::cpu::dbl::comm::get_int8_asymmetric(num_ops_id);
+      IPEX_CHECK(scales.size() > 0, "incorrect scale size");
+      IPEX_CHECK(shift.size() > 0, "incorrect shift size");
+  }
+
   auto layer_input = input;
   std::vector<at::Tensor> layer_output(num_directions);
   std::vector<at::Tensor> layer_hy(num_layers * num_directions);
@@ -513,7 +551,7 @@ std::vector<at::Tensor> rnn(
       auto layer_hx = hx[index];
       auto layer_cx = cx[index];
       auto reverse = (direction > 0);
-      auto outputs = rnn_layer(layer_input, layer_weights, layer_hx, layer_cx, reverse, mode, hidden_size, num_layers, train, bidirectional, batch_sizes);
+      auto outputs = rnn_layer(layer_input, layer_weights, layer_hx, layer_cx, reverse, mode, hidden_size, num_layers, train, bidirectional, batch_sizes, scales[0], shift[0], quantized);
       layer_output[direction] = outputs[0];
       layer_hy[index] = outputs[1];
       layer_cy[index] = outputs[2];
@@ -597,7 +635,6 @@ at::Tensor AtenIpexTypeExt::frozen_batch_norm(const at::Tensor& input, const at:
     return FrozenBatchNormOp::apply(input, weight, bias, running_mean, running_var);
   return FrozenBatchNormOp::_forward(input, weight, bias, running_mean, running_var);
 }
-
 } // namespace torch_ipex
 
 namespace {

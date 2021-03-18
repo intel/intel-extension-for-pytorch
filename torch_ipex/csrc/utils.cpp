@@ -131,16 +131,24 @@ bool check_int8_calibration() {
 
 void insert_or_updata_observer(const at::TensorList &inputs,
                                const at::TensorList &outputs,
-                               std::string op_name, int64_t ops_id) {
+                               std::string op_name, int64_t ops_id, bool asymmetric) {
   std::vector<std::vector<float>> inputs_min_max_values, outputs_min_max_values;
   for (auto i = 0; i < inputs.size(); i++) {
-    inputs_min_max_values.push_back({inputs[i].abs().min().item<float>(), inputs[i].abs().max().item<float>()});
+    if (asymmetric) {
+      inputs_min_max_values.push_back({inputs[i].min().item<float>(), inputs[i].max().item<float>(), /*asymmetric*/true});
+    } else {
+      inputs_min_max_values.push_back({inputs[i].abs().min().item<float>(), inputs[i].abs().max().item<float>(), /*asymmetric*/false});
+    }
   }
   for (auto j = 0; j < outputs.size(); j++) {
-    outputs_min_max_values.push_back({outputs[j].abs().min().item<float>(), outputs[j].abs().max().item<float>()});
+    if (asymmetric) {
+      outputs_min_max_values.push_back({outputs[j].min().item<float>(), outputs[j].max().item<float>(), /*asymmetric*/true});
+    } else {
+      outputs_min_max_values.push_back({outputs[j].abs().min().item<float>(), outputs[j].abs().max().item<float>(), /*asymmetric*/false});
+    }
   }
   Int8OptConfig::get_config().insert_or_updata_observer(
-      op_name, inputs_min_max_values, outputs_min_max_values, ops_id);
+      op_name, inputs_min_max_values, outputs_min_max_values, ops_id, asymmetric);
 }
 
 std::vector<std::vector<float>>
@@ -152,6 +160,10 @@ get_indicator_scales(std::vector<bool> i_uint8_used,
 
 bool get_indicator_quantized_status(const int64_t ops_id) {
   return Int8OptConfig::get_config().get_indicator_quantized_status(ops_id);
+}
+
+std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<int32_t>>> get_indicator_asymmetric(const int64_t ops_id) {
+  return Int8OptConfig::get_config().get_indicator_asymmetric(ops_id);
 }
 
 bool check_tensor_own_whole_storage(const at::Tensor& tensor) {

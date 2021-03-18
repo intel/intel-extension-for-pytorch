@@ -41,26 +41,40 @@ inline void packed_bf16_add_ker(at::BFloat16 *a1, at::BFloat16 *a2, at::BFloat16
 }
 
 inline void add_ker(at::BFloat16 *inout, at::BFloat16 *in, int len) {
-  int i = 0;
+  int i;
   #pragma unroll(2)
-  for(; i < len - 15; i += 16) {
-    auto x1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i)));
-    auto x2 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i)));
-    x1 = _mm512_add_ps(x1, x2);
-    _mm256_storeu_si256((__m256i*)(inout + i), cvt_fp32_to_bf16(x1));
+  for(i = 0; i < len - 31; i += 32) {
+    auto inout1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i)));
+    auto inout2 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i + 16)));
+    auto in1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i)));
+    auto in2 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i + 16)));
+    inout1 = _mm512_add_ps(inout1, in1);
+    inout2 = _mm512_add_ps(inout2, in2);
+    _mm256_storeu_si256((__m256i*)(inout + i), cvt_fp32_to_bf16(inout1));
+    _mm256_storeu_si256((__m256i*)(inout + i + 16), cvt_fp32_to_bf16(inout2));
   }
+
+  if (i < len - 15) {
+    auto inout1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i)));
+    auto in1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i)));
+    inout1 = _mm512_add_ps(inout1, in1);
+    _mm256_storeu_si256((__m256i*)(inout + i), cvt_fp32_to_bf16(inout1));
+    i += 16;
+  }
+
   if(i < len) {
     auto mask = (1 << (len - i)) - 1;
-    auto x1 = cvt_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, inout + i));
-    auto x2 = cvt_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, in + i));
-    x1 = _mm512_add_ps(x1, x2);
-    _mm256_mask_storeu_epi16(inout + i, mask, cvt_fp32_to_bf16(x1));
+    auto inout1 = cvt_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, inout + i));
+    auto in1 = cvt_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, in + i));
+    inout1 = _mm512_add_ps(inout1, in1);
+    _mm256_mask_storeu_epi16(inout + i, mask, cvt_fp32_to_bf16(inout1));
   }
 }
 
-inline void add_ker(float *inout, float *in, int len) {
-  int i = 0;
-  for(; i < len - 31; i += 32) {
+static inline void add_ker(float *inout, float *in, int len) {
+  int i;
+  #pragma unroll(2)
+  for(i = 0; i < len - 31; i += 32) {
     auto out1 = _mm512_loadu_ps(inout + i);
     auto out2 = _mm512_loadu_ps(inout + i + 16);
     auto in1 = _mm512_loadu_ps(in + i);
@@ -74,53 +88,53 @@ inline void add_ker(float *inout, float *in, int len) {
   if (i < len - 15) {
     auto out1 = _mm512_loadu_ps(inout + i);
     auto in1 = _mm512_loadu_ps(in + i);
-    out1 = _mm512_add_ps(out1, in1);
-    _mm512_storeu_ps(inout + i, out1);
+    _mm512_storeu_ps(inout + i, _mm512_add_ps(out1, in1));
     i += 16;
   }
 
   if(i < len) {
     auto mask = (1 << (len - i)) - 1;
-    auto x1 = _mm512_maskz_loadu_ps(mask, inout + i);
-    auto x2 = _mm512_maskz_loadu_ps(mask, in + i);
-    x1 = _mm512_add_ps(x1, x2);
-    _mm512_mask_storeu_ps(inout + i, mask, x1);
+    auto out1 = _mm512_maskz_loadu_ps(mask, inout + i);
+    auto in1 = _mm512_maskz_loadu_ps(mask, in + i);
+    _mm512_mask_storeu_ps(inout + i, mask, _mm512_add_ps(out1, in1));
   }
 }
 
-inline void add_ker(float *inout, at::BFloat16 *in, int len) {
-  int i = 0;
-  for(; i < len - 31; i += 32) {
-    auto out1 = _mm512_loadu_ps(inout + i);
-    auto out2 = _mm512_loadu_ps(inout + i + 16);
+static inline void add_ker(float *inout, at::BFloat16 *in, int len) {
+  int i;
+  #pragma unroll(2)
+  for(i = 0; i < len - 31; i += 32) {
     auto in1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i)));
     auto in2 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i + 16)));
-    out1 = _mm512_add_ps(out1, in1);
-    out2 = _mm512_add_ps(out2, in2);
-    _mm512_storeu_ps(inout + i, out1);
-    _mm512_storeu_ps(inout + i + 16, out2);
+    auto inout1 = _mm512_loadu_ps(inout + i);
+    auto inout2 = _mm512_loadu_ps(inout + i + 16);
+    inout1 = _mm512_add_ps(inout1, in1);
+    inout2 = _mm512_add_ps(inout2, in2);
+    _mm512_storeu_ps(inout + i, inout1);
+    _mm512_storeu_ps(inout + i + 16, inout2);
   }
 
   if (i < len - 15) {
-    auto out1 = _mm512_loadu_ps(inout + i);
     auto in1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i)));
-    out1 = _mm512_add_ps(out1, in1);
-    _mm512_storeu_ps(inout + i, out1);
+    auto inout1 = _mm512_loadu_ps(inout + i);
+    inout1 = _mm512_add_ps(inout1, in1);
+    _mm512_storeu_ps(inout + i, inout1);
     i += 16;
   }
 
   if(i < len) {
     auto mask = (1 << (len - i)) - 1;
-    auto x1 = _mm512_maskz_loadu_ps(mask, inout + i);
-    auto x2 = cvt_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, in + i));
-    x1 = _mm512_add_ps(x1, x2);
-    _mm512_mask_storeu_ps(inout + i, mask, x1);
+    auto in1 = cvt_bf16_to_fp32(_mm256_maskz_loadu_epi16(mask, in + i));
+    auto inout1 = _mm512_maskz_loadu_ps(mask, inout + i);
+    inout1 = _mm512_add_ps(inout1, in1);
+    _mm512_mask_storeu_ps(inout + i, mask, inout1);
   }
 }
 
 static inline void move_ker(at::BFloat16 *out, float *in, int64_t len) {
-  int64_t i = 0;
-  for (; i < len - 31; i += 32) {
+  int64_t i;
+  #pragma unroll(4)
+  for (i = 0; i < len - 31; i += 32) {
     auto in0 = cvt_fp32_to_bf16(_mm512_loadu_ps(in + i));
     auto in1 = cvt_fp32_to_bf16(_mm512_loadu_ps(in + i + 16));
     _mm256_storeu_si256((__m256i *)(out + i), in0);
@@ -140,19 +154,12 @@ static inline void move_ker(at::BFloat16 *out, float *in, int64_t len) {
   }
 }
 
-static inline void move_ker(float *out, float *in, int64_t len) {
-  int64_t i = 0;
-  for (; i < len - 31 ; i += 32) {
+static inline void move_ker(float *out, const float *in, int64_t len) {
+  int64_t i;
+  #pragma unroll(4)
+  for (i = 0; i < len - 15 ; i += 16) {
     auto in0 = _mm512_loadu_ps(in + i );
-    auto in1 = _mm512_loadu_ps(in + i + 16);
     _mm512_storeu_ps(out + i, in0);
-    _mm512_storeu_ps(out + i + 16, in1);
-  }
-
-  if (i < len - 15) {
-    auto in0 = _mm512_loadu_ps(in + i);
-    _mm512_storeu_ps(out + i, in0);
-    i += 16;
   }
 
   if (i < len) {
@@ -162,19 +169,12 @@ static inline void move_ker(float *out, float *in, int64_t len) {
   }
 }
 
-static inline void move_ker(at::BFloat16 *out, at::BFloat16 *in, int64_t len) {
-  int64_t i = 0;
-  for (; i < len - 63; i += 64) {
-    auto in0 = _mm512_loadu_si512(in + i);
-    auto in1 = _mm512_loadu_si512(in + i + 32);
-    _mm512_storeu_si512(out + i, in0);
-    _mm512_storeu_si512(out + i + 32, in1);
-  }
-
-  if (i < len - 31) {
+static inline void move_ker(at::BFloat16 *out, const at::BFloat16 *in, int64_t len) {
+  int64_t i;
+  #pragma unroll(4)
+  for (i = 0; i < len - 31; i += 32) {
     auto in0 = _mm512_loadu_si512(in + i);
     _mm512_storeu_si512(out + i, in0);
-    i += 31;
   }
 
   if (i < len) {
@@ -184,10 +184,41 @@ static inline void move_ker(at::BFloat16 *out, at::BFloat16 *in, int64_t len) {
   }
 }
 
+static inline void move_ker(int64_t *out, int64_t *in, int64_t len) {
+  int64_t i;
+  #pragma unroll(4)
+  for (i = 0; i < len - 7 ; i += 8) {
+    auto in0 = _mm512_loadu_pd(in + i );
+    _mm512_storeu_pd(out + i, in0);
+  }
+
+  if (i < len) {
+    auto mask = ((1 << (len - i)) - 1);
+    auto in0 = _mm512_maskz_loadu_pd(mask, in + i);
+    _mm512_mask_storeu_pd(out + i, mask, in0);
+  }
+}
+
+static inline void move_ker(int32_t *out, const int32_t *in, int64_t len) {
+  int64_t i;
+  #pragma unroll(4)
+  for (i = 0; i < len - 15 ; i += 16) {
+    auto in0 = _mm512_loadu_ps(in + i );
+    _mm512_storeu_ps(out + i, in0);
+  }
+
+  if (i < len) {
+    auto mask = ((1 << (len - i)) - 1);
+    auto in0 = _mm512_maskz_loadu_ps(mask, in + i);
+    _mm512_mask_storeu_ps(out + i, mask, in0);
+  }
+}
+
 static inline void zero_ker(float *out, int64_t len) {
-  int64_t i = 0;
+  int64_t i;
   __m512 zero_512 = _mm512_setzero_ps();
-  for (; i < len - 15; i += 16) {
+  #pragma unroll(4)
+  for (i = 0; i < len - 15; i += 16) {
     _mm512_storeu_ps(out + i, zero_512);
   }
 
@@ -198,9 +229,10 @@ static inline void zero_ker(float *out, int64_t len) {
 }
 
 static inline void zero_ker(at::BFloat16 *out, int64_t len) {
-  int64_t i = 0;
+  int64_t i;
   __m512i zero_512 = _mm512_setzero_si512();
-  for (; i < len - 31; i += 32) {
+  #pragma unroll(4)
+  for (i = 0; i < len - 31; i += 32) {
     _mm512_storeu_si512(out + i, zero_512);
   }
 

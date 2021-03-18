@@ -31,11 +31,12 @@ public:
             std::string granu = "per_tensor", std::vector<float> i_scale = {1},
             std::vector<float> o_scale = {1},
             std::vector<bool> i_uint8_used = {false},
-            std::vector<bool> o_uint8_used = {false}, bool quant = true)
+            std::vector<bool> o_uint8_used = {false}, bool quant = true, 
+            std::vector<int32_t> i_zero_point = {0}, std::vector<int32_t> o_zero_point = {0})
       : id(i), name(n), algorithm(alg), weight_granularity(granu),
         inputs_scale(i_scale), outputs_scale(o_scale),
         inputs_uint8_used(i_uint8_used), outputs_uint8_used(o_uint8_used),
-        quantized(quant) {}
+        quantized(quant), inputs_zero_point(i_zero_point), outputs_zero_point(o_zero_point) {}
 
     Indicator(const Indicator& other){
       UniqueReadLock<ReadWriteMutex> lock(rwmutex);
@@ -48,6 +49,8 @@ public:
       inputs_uint8_used = other.inputs_uint8_used;
       outputs_uint8_used = other.outputs_uint8_used;
       quantized = other.quantized;
+      inputs_zero_point = other.inputs_zero_point;
+      outputs_zero_point = other.outputs_zero_point;
     }
 
   int64_t get_indicator_id() { return id; }
@@ -89,6 +92,10 @@ public:
     quantized = new_quantized;
   }
 
+  std::tuple<std::vector<int32_t>, std::vector<int32_t>> get_indicator_zero_point() {
+    return std::make_tuple(inputs_zero_point, outputs_zero_point);
+  }
+
 private:
   int64_t id;
   std::string name;
@@ -98,6 +105,8 @@ private:
   std::vector<float> outputs_scale;
   std::vector<bool> inputs_uint8_used;
   std::vector<bool> outputs_uint8_used;
+  std::vector<int32_t> inputs_zero_point;
+  std::vector<int32_t> outputs_zero_point;
   bool quantized;
   mutable ReadWriteMutex rwmutex;
 };

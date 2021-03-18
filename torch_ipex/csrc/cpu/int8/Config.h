@@ -15,7 +15,7 @@ public:
 public:
   void insert_or_updata_observer(
       std::string op_name, std::vector<std::vector<float>> i_min_max_values,
-      std::vector<std::vector<float>> o_min_max_values, int64_t ops_id);
+      std::vector<std::vector<float>> o_min_max_values, int64_t ops_id, bool asymmetric);
 
   void clear_indicators();
 
@@ -28,6 +28,8 @@ public:
   bool get_indicator_quantized_status(int64_t ops_id);
 
   void set_indicators(std::vector<Indicator> indicators);
+
+  std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<int32_t>>> get_indicator_asymmetric(int64_t ops_id);
 
   std::vector<Indicator> get_indicators();
 
