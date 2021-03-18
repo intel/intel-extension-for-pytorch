@@ -8,13 +8,9 @@ using at::Tensor;
 using at::TensorList;
 using namespace c10;
 
-#define INT8_DTYPE_PRIORITY 2 //INT8
-#define BF16_DTYPE_PRIORITY 1 //BF16
-#define FP32_DTYPE_PRIORITY 0 //FP32
-
 enum class DtypeCastPolicy : uint8_t {
   user_defined_dtype=0,
-  fp32,  // Cast all inputs to at::kHalf before running the op.
+  fp32,  // Cast all inputs to at::kFloat before running the op.
   fp32_set_opt_dtype, // Treats functions (like softmax) that
                       //   1. we'd like to run in fp32 and
                       //   2. have a c10::optional<ScalarType> arg that controls the output type.
@@ -75,6 +71,59 @@ std::map<int, T> flip_map(std::map<T, int> input) {
   for (typename std::map<T, int>::iterator i = input.begin(); i != input.end(); ++i)
     reversed[i->second] = i->first;
   return reversed;
+}
+
+// Overload to catch Tensor args.
+// If nextArg is floating-point, compare its scalar_type with our
+// current best guess for the promote type, and update if necessary.
+inline at::ScalarType prioritize(at::ScalarType current, const Tensor& nextArg) {
+  if (current == at::kDouble) {
+    AT_ERROR("promote type is double in at::autocast::prioritize");
+    return current;
+  }
+  if (is_eligible_cpu(nextArg)) {
+    auto next = nextArg.scalar_type();
+    if (next == at::kDouble) {
+      return current; // ignores double tensors
+    } else if (current == at::kFloat || next == at::kFloat) {
+      return at::kFloat; // prioritizes float over bfloat16
+    } else if (current == at::kBFloat16 && next == at::kBFloat16) {
+      return at::kBFloat16;
+    } else {
+      AT_ERROR("Unexpected floating ScalarType in at::autocast::prioritize");
+      return current;
+    }
+  } else {
+    return current;
+  }
+}
+
+// Overload to catch TensorList args (for e.g. cat, stack).
+// Reuses the overload above to process each Tensor in the list.
+inline at::ScalarType prioritize(at::ScalarType current, const TensorList& list) {
+  for (const auto& tensor : list) {
+    current = prioritize(current, tensor);
+  }
+  return current;
+}
+
+// Template to catch non-Tensor args (no-op that returns current best guess)
+template<typename T>
+inline at::ScalarType prioritize(at::ScalarType current, T nextArg) {
+  return current;
+}
+
+// Overload for the tail case.
+inline at::ScalarType promote_type(at::ScalarType current) {
+  return current;
+}
+
+// Unpack args and determine if incoming bfloat16 tensors need to be promoted to float32.
+// Non-Tensor arguments are ignored.
+template<typename Arg0, typename... Args>
+inline at::ScalarType promote_type(at::ScalarType current, Arg0 arg0, Args... args) {
+  auto new_current = prioritize(current, arg0);
+  return promote_type(new_current, args...);
 }
 
 }  // namespace autocast
