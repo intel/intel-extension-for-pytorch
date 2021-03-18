@@ -1,27 +1,22 @@
-#include <ATen/ATen.h>
-#include <ATen/NativeFunctions.h>
-
-#include <c10/util/intrusive_ptr.h>
-#include <c10/core/impl/LocalDispatchKeySet.h>
-#include <torch/library.h>
-#include <torch/csrc/jit/frontend/tracer.h>
-
 #include <iostream>
 #include <exception>
 #include "autocast_mode.h"
+#include "autocast_kernel.hpp"
 
 namespace torch_ipex {
 namespace autocast {
 
 namespace {
-using weakref_type = c10::weak_intrusive_ptr<TensorImpl, UndefinedTensorImpl>;
-using val_type = std::tuple<weakref_type, Tensor>;
-thread_local std::unordered_map<TensorImpl *, val_type> cached_casts;
+
+using weakref_type = c10::weak_intrusive_ptr<c10::TensorImpl, c10::UndefinedTensorImpl>;
+using val_type = std::tuple<weakref_type, at::Tensor>;
+thread_local std::unordered_map<c10::TensorImpl *, val_type> cached_casts;
 
 thread_local int nesting = 0;
 
 thread_local at::ScalarType current_target_dtype = at::kFloat;
 }  // namespace
+
 
 bool is_autocast_enabled() {
   return c10::impl::tls_is_dispatch_key_included(c10::DispatchKey::AutocastCPU);
@@ -141,7 +136,7 @@ TORCH_LIBRARY_IMPL(_, AutocastCPU, m) {
 TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
   //user_defined_dtype
   KERNEL_CPU(ADD_NS(conv1d), "conv1d", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, int64_t), user_defined_dtype)
-  KERNEL_CPU(ADD_NS(conv2d), "conv2d", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, int64_t), user_defined_dtype)
+  //KERNEL_CPU(ADD_NS(conv2d), "conv2d", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, int64_t), user_defined_dtype)
   KERNEL_CPU(ADD_NS(conv3d), "conv3d", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, int64_t), user_defined_dtype)
   KERNEL_CPU(ADD_NS(_log_softmax), "_log_softmax", Tensor (const Tensor &, int64_t, bool), user_defined_dtype)
   KERNEL_CPU(ADD_NS(bmm), "bmm", Tensor (const Tensor &, const Tensor &), user_defined_dtype)
@@ -149,7 +144,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
   KERNEL_CPU(ADD_NS(baddbmm), "baddbmm", Tensor (const Tensor &, const Tensor &, const Tensor &, const Scalar&, const Scalar&), user_defined_dtype)
   KERNEL_CPU(ADD_NS(addmm), "addmm", Tensor (const Tensor &, const Tensor &, const Tensor &, const Scalar&, const Scalar&), user_defined_dtype)
   KERNEL_CPU(ADD_NS(addbmm), "addbmm", Tensor (const Tensor &, const Tensor &, const Tensor &, const Scalar&, const Scalar&), user_defined_dtype)
-  KERNEL_CPU(ADD_NS(linear), "linear", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&), user_defined_dtype)
+  //KERNEL_CPU(ADD_NS(linear), "linear", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&), user_defined_dtype)
   //KERNEL_CPU(ADD_NS(mul), "mul.Tensor", Tensor (const Tensor &, const Tensor &), user_defined_dtype)
   //KERNEL_CPU(ADD_NS(mul), "mul.Scalar", Tensor (const Tensor &, Scalar), user_defined_dtype)
 
@@ -157,12 +152,14 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
   KERNEL_CPU(ADD_NS(convolution), "convolution", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, bool, IntArrayRef, int64_t), fp32)
   //KERNEL_CPU(ADD_NS(batch_norm), "batch_norm", Tensor (const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, bool, double, double, bool), fp32)
   KERNEL_CPU(ADD_NS(dropout), "dropout", Tensor (const Tensor &, double, bool), fp32)
+  /*
   m.impl(TORCH_SELECTIVE_NAME("aten::native_batch_norm"),
          TORCH_FN((&CPU_WrapFunction<DtypeCastPolicy::fp32,
                                  std::tuple<Tensor,Tensor,Tensor> (const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, bool, double, double),
                                  std::tuple<Tensor,Tensor,Tensor> (const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, bool, double, double),
                                  &ADD_NS(native_batch_norm)>::type::call)));
-  KERNEL_CPU(ADD_NS(max_pool2d), "max_pool2d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, IntArrayRef, bool), fp32)
+  */
+  // KERNEL_CPU(ADD_NS(max_pool2d), "max_pool2d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, IntArrayRef, bool), fp32)
   m.impl(TORCH_SELECTIVE_NAME("aten::topk"),
          TORCH_FN((&CPU_WrapFunction<DtypeCastPolicy::fp32,
                                  std::tuple<Tensor,Tensor> (const Tensor &, int64_t, int64_t, bool, bool),
@@ -170,15 +167,10 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
                                  &ADD_NS(topk)>::type::call)));
   KERNEL_CPU(ADD_NS(avg_pool2d), "avg_pool2d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>), fp32)
   KERNEL_CPU(ADD_NS(avg_pool3d), "avg_pool3d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>), fp32)
-  KERNEL_CPU(ADD_NS(adaptive_avg_pool2d), "adaptive_avg_pool2d", Tensor (const Tensor &, IntArrayRef), fp32)
-  KERNEL_CPU(ADD_NS(relu), "relu", Tensor (const Tensor &), fp32)
+  // KERNEL_CPU(ADD_NS(adaptive_avg_pool2d), "adaptive_avg_pool2d", Tensor (const Tensor &, IntArrayRef), fp32)
+  // KERNEL_CPU(ADD_NS(relu), "relu", Tensor (const Tensor &), fp32)
   KERNEL_CPU(ADD_NS(_softmax), "_softmax", Tensor (const Tensor &, int64_t, bool), fp32)
   KERNEL_CPU(ADD_NS(gelu), "gelu", Tensor (const Tensor &), fp32)
-  m.impl(TORCH_SELECTIVE_NAME("aten::native_layer_norm"),
-         TORCH_FN((&CPU_WrapFunction<DtypeCastPolicy::fp32,
-                                 std::tuple<Tensor,Tensor,Tensor> (const Tensor&, IntArrayRef, const c10::optional<Tensor>&, const c10::optional<Tensor>&, double),
-                                 std::tuple<Tensor,Tensor,Tensor> (const Tensor&, IntArrayRef, const c10::optional<Tensor>&, const c10::optional<Tensor>&, double),
-                                 &ADD_NS(native_layer_norm)>::type::call)));
   KERNEL_CPU(ADD_NS(upsample_nearest1d), "upsample_nearest1d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>), fp32)
   KERNEL_CPU(ADD_NS(upsample_nearest1d), "upsample_nearest1d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, c10::optional<ArrayRef<double>>), fp32)
   KERNEL_CPU(ADD_NS(upsample_nearest2d), "upsample_nearest2d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>, c10::optional<double>), fp32)
@@ -213,6 +205,17 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
   // promote
   KERNEL_CPU(ADD_NS(cat), "cat", Tensor (TensorList, int64_t), promote)
   KERNEL_CPU(ADD_NS(stack), "stack", Tensor (TensorList, int64_t), promote)
+ 
+  // for int8 path
+  m.impl(TORCH_SELECTIVE_NAME("aten::conv2d"), TORCH_FN((&torch_ipex::autocast::conv2d))); 
+  m.impl(TORCH_SELECTIVE_NAME("aten::_convolution"), TORCH_FN((&torch_ipex::autocast::_convolution)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::_convolution.deprecated"), TORCH_FN((&torch_ipex::autocast::_convolution_deprecated)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::batch_norm"), TORCH_FN((&torch_ipex::autocast::batch_norm)));
+  // m.impl(TORCH_SELECTIVE_NAME("aten::linear"), TORCH_FN((&torch_ipex::autocast::linear)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::max_pool2d"), TORCH_FN((&torch_ipex::autocast::max_pool2d)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::adaptive_avg_pool2d"), TORCH_FN((&torch_ipex::autocast::adaptive_avg_pool2d)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::relu"), TORCH_FN((&torch_ipex::autocast::relu)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::linear"), TORCH_FN((&torch_ipex::autocast::linear)));
 }
 
 }  // namespace autocast

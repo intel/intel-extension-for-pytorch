@@ -12,6 +12,9 @@
 #include <vector>
 
 #include "utils.h"
+#include "auto_opt_config.hpp"
+#include "quantization/Observer.hpp"
+#include "quantization/Config.hpp"
 
 //#include "ProcessGroupCCL.hpp"
 #include <pybind11/chrono.h>
@@ -32,13 +35,6 @@ py::object GetRevisions() {
 
 void InitIpexModuleBindings(py::module m) {
   m.def("_get_git_revs", []() { return GetRevisions(); });
-  /*// external OPs
-  m.def("roi_align_forward", &IpexExternal::ROIAlign_forward);
-  m.def("roi_align_backward", &IpexExternal::ROIAlign_backward);
-  m.def("nms", &IpexExternal::nms);
-  m.def("batch_score_nms", &IpexExternal::batch_score_nms);
-  m.def("linear_relu", &AtenIpexTypeExt::linear_relu);*/
-
   // ipex amp autocast
   m.def("is_autocast_enabled", &torch_ipex::autocast::is_autocast_enabled);
   m.def("set_autocast_enabled", &torch_ipex::autocast::set_autocast_enabled);
@@ -57,18 +53,91 @@ void InitIpexModuleBindings(py::module m) {
   m.def("autocast_decrement_nesting",
         &torch_ipex::autocast::autocast_decrement_nesting);
   m.def("clear_autocast_cache", &torch_ipex::autocast::clear_autocast_cache);
+
+
+  // int8 path
+  m.def("enable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(true); });
+  m.def("disable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(false); });
+  m.def("get_int8_calibration",
+        []() { AutoOptConfig::singleton().get_int8_calibration(); });
+  m.def("calibration_reset", []() { Int8OptConfig::calibration_reset(); });
+
+  m.def("add_indicators",
+        []() { Int8OptConfig::get_config().add_indicators(); });
+  m.def("clear_indicators",
+        []() { Int8OptConfig::get_config().clear_indicators(); });
+  // clear indicators for case having many scopes which have different structure
+
+  m.def("get_int8_configures", []() {
+      py::list output_list;
+      auto indicators = Int8OptConfig::get_config().get_indicators();
+      for (auto indicator: indicators) {
+        py::dict d;
+        d["id"] = indicator.get_indicator_id();
+        d["name"] = indicator.get_indicator_name();
+        d["algorithm"] = indicator.get_indicator_algorithm();
+        d["weight_granularity"] = indicator.get_indicator_weight_granularity();
+        std::vector<float> i_scale, o_scale;
+        std::vector<float> w_scale;
+        std::tie(i_scale, o_scale) = indicator.get_indicator_scales();
+        w_scale = indicator.get_indicator_weight_scales();
+        d["inputs_scale"] = i_scale;
+        d["outputs_scale"] = o_scale;
+        d["weight_scale"] = w_scale; 
+        std::vector<bool> i_uint8_used, o_uint8_used;
+        std::tie(i_uint8_used, o_uint8_used)= indicator.get_indicator_uint8_status();
+        d["inputs_uint8_used"] = i_uint8_used;
+        d["outputs_uint8_used"] = o_uint8_used;
+        d["quantized"] = indicator.get_indicator_quantized_status();
+        bool pre_quant = true, post_quant = true;
+        std::tie(pre_quant, post_quant) = indicator.get_indicator_insert_quantized_status(); 
+        d["pre_quantized"] = pre_quant;
+        d["post_quantized"] = post_quant;
+        output_list.append(d);
+      }
+      return output_list; } );
+  m.def("load_indicators_file", [](const py::list &l) {
+    std::vector<Indicator> indicators;
+    for (py::handle i : l) {
+      int64_t id = py::cast<std::int64_t>(i["id"]);
+      std::string op_name = py::cast<std::string>(i["name"]);
+      std::string algorithm = py::cast<std::string>(i["algorithm"]);
+      std::string weight_granularity =
+          py::cast<std::string>(i["weight_granularity"]);
+      std::vector<float> i_scale =
+          py::cast<std::vector<float>>(i["inputs_scale"]);
+      std::vector<float> w_scale = {};
+      if (i.contains("weight_scale")) {
+        w_scale = py::cast<std::vector<float>>(i["weight_scale"]);
+      }
+      std::vector<float> o_scale =
+          py::cast<std::vector<float>>(i["outputs_scale"]);
+      std::vector<bool> i_uint8_used =
+          py::cast<std::vector<bool>>(i["inputs_uint8_used"]);
+      std::vector<bool> o_uint8_used =
+          py::cast<std::vector<bool>>(i["outputs_uint8_used"]);
+      bool quantized = py::cast<bool>(i["quantized"]);
+      bool pre_quantized = true, post_quantized = true;
+      if (i.contains("pre_quantized")) {
+        pre_quantized = py::cast<bool>(i["pre_quantized"]);
+      }
+      if (i.contains("post_quantized")) {
+        post_quantized = py::cast<bool>(i["post_quantized"]);
+      }
+      Indicator temp(id, op_name, algorithm, weight_granularity, i_scale,
+                     w_scale, o_scale, i_uint8_used, o_uint8_used, quantized,
+                     pre_quantized, post_quantized);
+      indicators.push_back(temp);
+    }
+    Int8OptConfig::get_config().set_indicators(indicators);
+  });
+
 }
 }  // namespace
 using namespace torch::jit;
 
 void InitIpexBindings(py::module m) {
   InitIpexModuleBindings(m);
-  // jit fusion pass
-  /*torch::jit::registerPrePass([](std::shared_ptr<Graph>& g) {
-    if (AutoOptConfig::singleton().get_jit_fuse()) {
-      torch::jit::FusionPass(g);
-    }
-  });*/
 }
 
 }  // namespace torch_ipex

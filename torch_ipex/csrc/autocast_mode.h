@@ -1,5 +1,14 @@
 #pragma once
 
+#include <ATen/ATen.h>
+#include <ATen/NativeFunctions.h>
+
+#include <c10/util/intrusive_ptr.h>
+#include <c10/core/UndefinedTensorImpl.h>
+#include <c10/core/impl/LocalDispatchKeySet.h>
+#include <torch/library.h>
+#include <torch/csrc/jit/frontend/tracer.h>
+
 namespace torch_ipex {
 namespace autocast {
 
