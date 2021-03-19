@@ -6,12 +6,6 @@ import numpy as np
 import _torch_ipex as core
 from .. import conf
 
-def get_target_layout():
-    return core.get_autocast_layout()
-
-def set_target_layout(layout):
-    core.set_autocast_layout(layout)
-
 class autocast(object):
     def __init__(self, enabled=True, configure=conf.AmpConf(torch.bfloat16)): 
         supported_dtype = [torch.float32, torch.bfloat16, torch.int8]

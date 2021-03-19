@@ -143,7 +143,6 @@ include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
 include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
-include_directories(${TORCHCCL_INCLUDE_DIR})
 
 # sources
 set(DPCPP_SRCS)
