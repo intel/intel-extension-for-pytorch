@@ -63,7 +63,7 @@ Tensor cpu_cached_cast(at::ScalarType to_type, const Tensor& arg) {
       //casted_arg = arg.to(at::kBFloat16).to_mkldnn();
       casted_arg = arg.to(at::kBFloat16);
       // casted_arg = arg.to_mkldnn(at::kBFloat16);
-    } else {
+    } else if (arg.scalar_type() == at::kBFloat16) {
       //casted_arg = arg.to_dense().to(at::kFloat);
       casted_arg = arg.to(at::kFloat);
       // casted_arg = arg.to_dense(at::kFloat);
