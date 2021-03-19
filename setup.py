@@ -296,7 +296,8 @@ setup(
     packages=[
       'torch_ipex',
       'intel_pytorch_extension',
-      'intel_pytorch_extension.amp'],
+      'intel_pytorch_extension.amp',
+      'intel_pytorch_extension.fx'],
     package_dir={'intel_pytorch_extension': 'intel_pytorch_extension_py'},
     zip_safe=False,
     ext_modules=[IPEXExt('_torch_ipex')],
