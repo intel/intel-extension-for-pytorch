@@ -118,7 +118,7 @@ struct CPU_WrapFunction_<DtypeCastPolicy::promote, Redispatch, F, Ret,
                          guts::typelist::typelist<Args...>> {
   static Ret call(Args... args) {
     c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-    auto to_type = promote_type(at::kHalf, args...);
+    auto to_type = promote_type(at::kBFloat16, args...);
     return (*F)(cpu_cached_cast(to_type, args)...);
   }
 };
