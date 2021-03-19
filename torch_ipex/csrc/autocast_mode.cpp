@@ -59,12 +59,12 @@ Tensor cpu_cached_cast(at::ScalarType to_type, const Tensor& arg) {
       }
     }
     auto casted_arg = arg;
-    if (to_type == at::kBFloat16) {
-      //casted_arg = arg.to(at::kBFloat16).to_mkldnn();
+    if (arg.scalar_type() == at::kFloat && to_type == at::kBFloat16) {
+      // This path works for fp32 to bf16
       casted_arg = arg.to(at::kBFloat16);
       // casted_arg = arg.to_mkldnn(at::kBFloat16);
-    } else if (arg.scalar_type() == at::kBFloat16) {
-      //casted_arg = arg.to_dense().to(at::kFloat);
+    } else if (arg.scalar_type() == at::kBFloat16 && to_type == at::kFloat) {
+     // This path works for bf16 to fp32
       casted_arg = arg.to(at::kFloat);
       // casted_arg = arg.to_dense(at::kFloat);
     }
@@ -180,11 +180,17 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
                                  std::tuple<Tensor,Tensor,Tensor> (const Tensor&, IntArrayRef, const c10::optional<Tensor>&, const c10::optional<Tensor>&, double),
                                  &ADD_NS(native_layer_norm)>::type::call)));
   KERNEL_CPU(ADD_NS(upsample_nearest1d), "upsample_nearest1d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>), fp32)
+  KERNEL_CPU(ADD_NS(upsample_nearest1d), "upsample_nearest1d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, c10::optional<ArrayRef<double>>), fp32)
   KERNEL_CPU(ADD_NS(upsample_nearest2d), "upsample_nearest2d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>, c10::optional<double>), fp32)
+  KERNEL_CPU(ADD_NS(upsample_nearest2d), "upsample_nearest2d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, c10::optional<ArrayRef<double>>), fp32)
   KERNEL_CPU(ADD_NS(upsample_nearest3d), "upsample_nearest3d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>, c10::optional<double>, c10::optional<double>), fp32)
+  KERNEL_CPU(ADD_NS(upsample_nearest3d), "upsample_nearest3d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, c10::optional<ArrayRef<double>>), fp32)
   KERNEL_CPU(ADD_NS(upsample_linear1d), "upsample_linear1d", Tensor (const Tensor &, IntArrayRef, bool, c10::optional<double>), fp32)
+  KERNEL_CPU(ADD_NS(upsample_linear1d), "upsample_linear1d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, bool, c10::optional<ArrayRef<double>>), fp32)
   KERNEL_CPU(ADD_NS(upsample_bilinear2d), "upsample_bilinear2d", Tensor (const Tensor &, IntArrayRef, bool, c10::optional<double>, c10::optional<double>), fp32)
+  KERNEL_CPU(ADD_NS(upsample_bilinear2d), "upsample_bilinear2d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, bool, c10::optional<ArrayRef<double>>), fp32)
   KERNEL_CPU(ADD_NS(upsample_trilinear3d), "upsample_trilinear3d", Tensor (const Tensor &, IntArrayRef, bool, c10::optional<double>, c10::optional<double>, c10::optional<double>), fp32)
+  KERNEL_CPU(ADD_NS(upsample_trilinear3d), "upsample_trilinear3d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, bool, c10::optional<ArrayRef<double>>), fp32)
   KERNEL_CPU(ADD_NS(binary_cross_entropy), "binary_cross_entropy", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, int64_t), fp32)
   KERNEL_CPU(ADD_NS(binary_cross_entropy_with_logits), "binary_cross_entropy_with_logits", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, int64_t), fp32)
   KERNEL_CPU(ADD_NS(pow), "pow.Tensor_Scalar", Tensor (const Tensor &, const Scalar&), fp32)
@@ -199,6 +205,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
                                  &ADD_NS(sort)>::type::call)));
   KERNEL_CPU(ADD_NS(reflection_pad1d), "reflection_pad1d", Tensor (const Tensor &, IntArrayRef), fp32)
   KERNEL_CPU(ADD_NS(std), "std", Tensor (const Tensor &, bool), fp32)
+  KERNEL_CPU(ADD_NS(std), "std.dim", Tensor (const Tensor &, IntArrayRef, bool, bool), fp32)
   KERNEL_CPU(ADD_NS(layer_norm), "layer_norm", Tensor (const Tensor &, IntArrayRef, const c10::optional<Tensor>&, const c10::optional<Tensor>&, double, bool), fp32)
   KERNEL_CPU(ADD_NS(bucketize), "bucketize.Tensor", Tensor (const Tensor &, const Tensor &, bool, bool), fp32)
   KERNEL_CPU(ADD_NS(bucketize), "bucketize.Scalar", Tensor (const Scalar&, const Tensor &, bool, bool), fp32)
