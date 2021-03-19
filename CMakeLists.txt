@@ -19,13 +19,13 @@ option(USE_PERSIST_STREAM "Use persistent oneDNN stream" ON)
 option(USE_PRIMITIVE_CACHE "Cache oneDNN primitives by FRAMEWORK" ON)
 option(USE_MULTI_CONTEXT "Create DPC++ runtime context per device" OFF)
 option(USE_ITT "Use Intel(R) VTune Profiler ITT functionality" OFF)
-option(BUILD_BY_PER_KERNEL "Build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)" ON)
+option(BUILD_BY_PER_KERNEL "Build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)" OFF)
 option(BUILD_NO_L0_ONEDNN "Build oneDNN without LevelZero support" OFF)
 option(BUILD_INTERNAL_DEBUG "Use internal debug code path" OFF)
 cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "BUILD_INTERNAL_DEBUG" OFF)
-
 set(USE_AOT_DEVLIST "" CACHE STRING
   "Use AOT build option for devices separated by commas in the list, for example, bdw,...")
+cmake_dependent_option(USE_AOT "Use AOT build option" ON "NOT BUILD_BY_PER_KERNEL" OFF)
 
 set(IPEX_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -76,10 +76,9 @@ function (print_configuration_summary)
     message(STATUS "  BUILD_BY_PER_KERNEL   : ${BUILD_BY_PER_KERNEL}")
     message(STATUS "  BUILD_NO_L0_ONEDNN    : ${BUILD_NO_L0_ONEDNN}")
 
-  if(NOT BUILD_BY_PER_KERNEL AND USE_AOT_DEVLIST)
+  message(STATUS "  USE_AOT               : ${USE_AOT}")
+  if(NOT BUILD_BY_PER_KERNEL AND USE_AOT)
     message(STATUS "  USE_AOT_DEVLIST       : ${USE_AOT_DEVLIST}")
-  else()
-    message(STATUS "  USE_AOT_DEVLIST       : OFF")
   endif()
 
     message(STATUS "  BUILD_INTERNAL_DEBUG  : ${BUILD_INTERNAL_DEBUG}")
