@@ -1,6 +1,7 @@
 
 #include "Common.hpp"
 
+#include <ATen/ATen.h>
 #include <ATen/Tensor.h>
 #include <c10/util/Exception.h>
 
@@ -36,13 +37,13 @@ void insert_or_updata_observer(const at::TensorList& inputs,
   for (auto i = 0; i < inputs.size(); i++) {
     inputs_min_max_values.push_back({inputs[i].abs().min().item<float>(), inputs[i].abs().max().item<float>()});
   } 
-  // TODO: enable per_channel case
-  /*
+
   for (auto k = 0; k < weight.size(0); k++) {
     weight_min_max_values.push_back({weight[k].abs().min().item<float>(), weight[k].abs().max().item<float>()});
-  }*/
-  
-  weight_min_max_values.push_back({weight.abs().min().item<float>(), weight.abs().max().item<float>()});
+  }
+
+  // TODO: enable per_tensor case
+  //weight_min_max_values.push_back({weight.abs().min().item<float>(), weight.abs().max().item<float>()});
 
   for (auto j = 0; j < outputs.size(); j++) {
     outputs_min_max_values.push_back({outputs[j].abs().min().item<float>(), outputs[j].abs().max().item<float>()});

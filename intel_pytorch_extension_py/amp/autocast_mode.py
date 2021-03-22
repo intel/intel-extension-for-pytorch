@@ -7,7 +7,7 @@ import _torch_ipex as core
 from .. import conf
 
 class autocast(object):
-    def __init__(self, enabled=True, configure=conf.AmpConf(torch.bfloat16)): 
+    def __init__(self, enabled=True, configure=conf.AmpConf(torch.bfloat16)):
         supported_dtype = [torch.float32, torch.bfloat16, torch.int8]
         if configure.dtype not in supported_dtype :
             warnings.warn("In CPU autocast, but the target dtype is not supported. Disable the autocast.")
@@ -31,6 +31,7 @@ class autocast(object):
         # Drop the cache when we exit to a nesting level that's outside any instance of autocast.
         if core.autocast_decrement_nesting() == 0:
             core.clear_autocast_cache()
+            core.clear_autocast_cache_int8()
         core.set_autocast_enabled(self.prev)
         core.set_autocast_dtype(self.prev_dtype)
         if torch.int8 == self._dtype:

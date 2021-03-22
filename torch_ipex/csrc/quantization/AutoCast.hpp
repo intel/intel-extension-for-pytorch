@@ -6,6 +6,8 @@ namespace torch_ipex {
 namespace autocast {
 namespace int8 {
 
+void clear_autocast_cache_int8();
+
 at::Tensor conv2d(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias,
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups);
 

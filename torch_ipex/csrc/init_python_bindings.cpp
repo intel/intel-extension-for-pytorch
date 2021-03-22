@@ -15,6 +15,7 @@
 #include "auto_opt_config.hpp"
 #include "quantization/Observer.hpp"
 #include "quantization/Config.hpp"
+#include "quantization/AutoCast.hpp"
 
 //#include "ProcessGroupCCL.hpp"
 #include <pybind11/chrono.h>
@@ -56,6 +57,7 @@ void InitIpexModuleBindings(py::module m) {
 
 
   // int8 path
+  m.def("clear_autocast_cache_int8", &torch_ipex::autocast::int8::clear_autocast_cache_int8);
   m.def("enable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(true); });
   m.def("disable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(false); });
   m.def("get_int8_calibration",
