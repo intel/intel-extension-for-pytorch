@@ -229,7 +229,219 @@ void kthvalue_template(
   }
 }
 
+template <typename scalar_t>
+class mode_updateOutput_dpcpp_kernel_vertical{};
+
+template <typename scalar_t>
+class mode_updateOutput_dpcpp_kernel_horizontal{};
+
+template <typename scalar_t>
+std::tuple<Tensor &,Tensor &> mode_out_template(
+    Tensor & values,
+    Tensor & indices,
+    const Tensor & self,
+    int64_t dim,
+    bool keepdim) {
+
+  auto self_ = self.contiguous();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto total_threads = values.size(0);
+
+  // vertical
+  /*  0 | 0 |  1  | 0 | 1
+      5 | 2 | -1  | 1 | 3
+      1 | 0 |  4  | 1 | 3
+      2 | 1 |  3  | 2 | 2
+      2 | 1 |  0  | 4 | 4
+  */
+  if (dim == 0 && self_.dim() != 1) {
+    auto length = self_.size(1);
+    auto cgf = DPCPP_Q_CGF(cgh) {
+
+    auto self_data = get_buffer<dpcpp_r_mode>(cgh, self_.data_ptr<scalar_t>());
+    auto values_data = get_buffer<dpcpp_discard_w_mode>(cgh, values.data_ptr<scalar_t>());
+    auto indices_data = get_buffer<dpcpp_discard_w_mode>(cgh, indices.data_ptr<long>());
+
+    cgh.parallel_for<mode_updateOutput_dpcpp_kernel_vertical<scalar_t>>(
+      DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item){
+        auto self_ptr = get_pointer(self_data);
+        auto values_ptr = get_pointer(values_data);
+        auto indices_ptr = get_pointer(indices_data);
+
+        auto id = item.get_linear_id();
+        scalar_t value;
+        auto indices = 0, max_count = 0;
+        bool allCountOne = true;
+
+        for (int i = 0; i < length; ++i) {
+
+          auto elm = self_ptr[i * total_threads + id];
+          auto elm_count = 1;
+
+          for (int j = i + 1; j < length; ++j) {
+            if (elm == self_ptr[j * total_threads + id]) {
+              allCountOne = false;
+              elm_count++;
+              if (elm_count > max_count) {
+                value = elm;
+                max_count = elm_count;
+                indices = j;
+              } else if (elm_count == max_count && elm < value) {
+                value = elm;
+                max_count = elm_count;
+                indices = j;
+              }
+            }
+          }
+        }
+
+        // evey element only occur just once, we seek out
+        if (allCountOne) {
+          for (int i = 0; i < length; ++i) {
+            auto elm = self_ptr[i * total_threads + id];
+            if (elm < value) {
+              value = elm;
+              indices = i;
+            }
+          }
+        }
+
+        values_ptr[id] = value;
+        indices_ptr[id] = indices;
+
+      });
+    };
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+
+
+  } else {
+  /*  self_.dim == 1 or horizontal seek mode.
+      0 0  1 0 1
+    --------------
+      5 2 -1 1 3
+    --------------
+      1 0  4 1 3
+    --------------
+      2 1  3 2 2
+    --------------
+      2 1  0 4 4
+    --------------
+  */
+    auto cgf = DPCPP_Q_CGF(cgh) {
+
+    auto length = self_.size(0);
+    auto self_data = get_buffer<dpcpp_r_mode>(cgh, self_.data_ptr<scalar_t>());
+    auto values_data = get_buffer<dpcpp_discard_w_mode>(cgh, values.data_ptr<scalar_t>());
+    auto indices_data = get_buffer<dpcpp_discard_w_mode>(cgh, indices.data_ptr<long>());
+
+    cgh.parallel_for<mode_updateOutput_dpcpp_kernel_horizontal<scalar_t>>(
+      DPCPP::range<1>(total_threads), [=](DPCPP::item<1> item){
+        auto self_ptr = get_pointer(self_data);
+        auto values_ptr = get_pointer(values_data);
+        auto indices_ptr = get_pointer(indices_data);
+
+        auto id = item.get_linear_id();
+        scalar_t value;
+        auto indices = 0, max_count = 0;
+        bool allCountOne = true;
+
+        for (int i = 0; i < length; ++i) {
+
+          auto elm = self_ptr[id * total_threads + i];
+          auto elm_count = 1;
+
+          for (int j = i + 1; j < length; ++j) {
+            if (elm == self_ptr[id * total_threads + j]) {
+              allCountOne = false;
+              elm_count++;
+              if (elm_count > max_count) {
+                value = elm;
+                max_count = elm_count;
+                indices = j;
+              } else if (elm_count == max_count && elm < value) {
+                value = elm;
+                max_count = elm_count;
+                indices = j;
+              }
+            }
+          }
+        }
+
+        // evey element only occur just once, we seek out
+        if (allCountOne) {
+          for (int i = 0; i < length; ++i) {
+            auto elm = self_ptr[i * total_threads + id];
+            if (elm < value) {
+              value = elm;
+              indices = i;
+            }
+          }
+        }
+
+        values_ptr[id] = value;
+        indices_ptr[id] = indices;
+
+      });
+    };
+    DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+
+  }
+  return std::forward_as_tuple(values, indices);
+}
+
 } // namespace impl
+
+std::tuple<Tensor &,Tensor &> mode_out(
+    Tensor & values,
+    Tensor & indices,
+    const Tensor & self,
+    int64_t dim,
+    bool keepdim) {
+
+  IPEX_DISPATCH_ALL_TYPES_AND(
+    at::ScalarType::Half, self.scalar_type(), "mode", [&] {
+      impl::mode_out_template<scalar_t>(
+          values, indices, self, dim, keepdim);
+    });
+  return std::forward_as_tuple(values, indices);
+}
+
+std::tuple<Tensor, Tensor> mode(
+  const Tensor& self,
+   int64_t dim,
+   bool keepdim) {
+
+  // https://pytorch.org/docs/stable/generated/torch.mode.html?highlight=mode#torch.mode
+  // Mode means seeking out the value and indices, whose element appears most often in chosen dimensions of tensor.
+  // If evey element appears just once, then return the smallest element and its indices.
+  // For now, we only implement less than 2 dimensions Tensor and no keepdim.
+  TORCH_CHECK(
+      self.dim() > 0 && self.dim() <= 2,
+      "Input Tensor's dimension must be within (0, 2]");
+
+  TORCH_CHECK(
+      dim == -1 || dim == 0 || dim == 1,
+      "Input dim must be -1, 0, 1");
+
+  Tensor values, indices;
+
+  if (self.dim() != 1) {
+    auto size = self.size(dim);
+    values = at::empty(size, self.options());
+    indices = at::empty(size, self.options().dtype(kLong));
+    auto ans = at::AtenIpexTypeXPU::mode_out(values, indices, self, dim, keepdim);
+    values = std::get<0>(ans);
+    indices = std::get<1>(ans);
+  } else {
+    values = at::empty({1}, self.options());
+    indices = at::empty({1}, self.options().dtype(kLong));
+    auto ans = at::AtenIpexTypeXPU::mode_out(values, indices, self, dim, keepdim);
+    values = std::get<0>(ans).view({});
+    indices = std::get<1>(ans).view({});
+  }
+
+  return std::forward_as_tuple(values, indices);
+}
 
 Tensor median(const Tensor& self) {
   return IPEX_DISPATCH_ALL_TYPES_AND(
