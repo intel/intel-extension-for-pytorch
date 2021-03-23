@@ -211,7 +211,7 @@ if(USE_AOT)
       message(SEND_ERROR "AOT device list cannot be accepted by compiler: ${COMP_OUT}")
     endif()
   else()
-    foreach(DEVNAME "gen12lp" "dg1" "cfl" "glk" "icllp" "kbl" "lkf" "skl" "tgl")
+    foreach(DEVNAME "gen12lp" "cfl" "glk" "kbl" "skl" "tgl")
       set(CMAKE_CXX_FLAGS "${ORIGIN_CMAKE_FLAGS} ${IPEX_COMPILE_FLAGS} -Xs '-device ${DEVNAME}'")
       try_compile(COMP_RESULT ${CMAKE_BINARY_DIR}
                   SOURCES ${PROJECT_SOURCE_DIR}/cmake/test/aot/test_aot.cpp
