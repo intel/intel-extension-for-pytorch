@@ -96,25 +96,23 @@ void Int8OptConfig::add_indicators() {
     std::vector<std::vector<float>> weight_values =
         observers_[i].weight_min_max_values;
 
+    // for symmetric: s = 2max(|x_min|, x_max) / (Q_max - Q_min),
+    // z = 0 for qint8 and z = 128 for quint8;
+    // otherwise: s = (x_max - x_min) / (Q_max - Q_min),
+    // z = Q_min - round(x_min / s).
     for (auto i = 0; i < inputs_values.size(); i++) {
       inputs_scale.push_back(
-          127.5 / std::max(std::abs(inputs_values[i][0]), inputs_values[i][1]));
+          std::max(std::abs(inputs_values[i][0]), inputs_values[i][1]) / 127.5);
     }
     for (auto j = 0; j < outputs_values.size(); j++) {
-      outputs_scale.push_back(127.5 / std::max(std::abs(outputs_values[j][0]),
-                                               outputs_values[j][1]));
+      outputs_scale.push_back(
+          std::max(std::abs(outputs_values[j][0]), outputs_values[j][1]) / 127.5);
     }
     for (auto j = 0; j < weight_values.size(); j++) {
-      weight_scales.push_back(127.5 / std::max(std::abs(weight_values[j][0]),
-                                               weight_values[j][1]));
+      weight_scales.push_back(
+          std::max(std::abs(weight_values[j][0]), weight_values[j][1]) / 127.5);
     }
-
-    /*
-    at::Tensor w_scales_tensor = at::from_blob(weight_scales.data(),
-          {static_cast<int64_t>(weight_scales.size())}, at::device(at::kCPU).dtype(at::kDouble));
-    std::cout<<w_scales_tensor<<std::endl;
-    */
-    // zero_points not used now, zero_points = 0 for u8 and 128 for s8.
+    // zero_points not used now, zero_points = 0 for s8 and 128 for u8.
     // zero_point = 128;
     Indicator new_indicator(
         observers_[i].id, observers_[i].name, observers_[i].algorithm,
@@ -131,43 +129,7 @@ Int8OptConfig::get_indicator_scales(std::vector<bool> i_uint8_used,
                                     std::vector<bool> o_uint8_used,
                                     int64_t ops_id) {
   std::vector<float> inputs_scales, outputs_scales;
-  std::vector<bool> inputs_uint8_used, outputs_uint8_used;
-  std::tie(inputs_uint8_used, outputs_uint8_used) =
-      indicators_[ops_id].get_indicator_uint8_status();
-  std::tie(inputs_scales, outputs_scales) =
-      indicators_[ops_id].get_indicator_scales();
-  bool scale_update = false;
-  for (auto i = 0; i < i_uint8_used.size(); i++) {
-    if (!inputs_uint8_used[i] && i_uint8_used[i]) {
-      // update zero_point and scales
-      inputs_scales[i] /= 127.5;
-      inputs_scales[i] *= 255.5;
-      scale_update = true;
-    } else if (inputs_uint8_used[i] && !i_uint8_used[i]) {
-      // update zero_point and scales
-      inputs_scales[i] /= 255.5;
-      inputs_scales[i] *= 127.5;
-      scale_update = true;
-    }
-  }
-  for (auto j = 0; j < o_uint8_used.size(); j++) {
-    if (!outputs_uint8_used[j] && o_uint8_used[j]) {
-      // update zero_point and scales
-      outputs_scales[j] /= 127.5;
-      outputs_scales[j] *= 255.5;
-      scale_update = true;
-    } else if (outputs_uint8_used[j] && !o_uint8_used[j]) {
-      // update zero_point and scales
-      outputs_scales[j] /= 255.5;
-      outputs_scales[j] *= 127.5;
-      scale_update = true;
-    }
-  }
-  if (scale_update) {
-    indicators_[ops_id].set_indicator_scales(inputs_scales, outputs_scales);
-    indicators_[ops_id].set_indicator_uint8_status(inputs_uint8_used,
-                                                   outputs_uint8_used);
-  }
+  std::tie(inputs_scales, outputs_scales) = indicators_[ops_id].get_indicator_scales();
   return  {inputs_scales, outputs_scales};
 }
 

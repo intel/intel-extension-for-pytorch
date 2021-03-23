@@ -20,10 +20,10 @@ void insert_or_updata_observer(const at::TensorList &inputs,
                                std::string op_name, int64_t ops_id) {
   std::vector<std::vector<float>> inputs_min_max_values, outputs_min_max_values;
   for (auto i = 0; i < inputs.size(); i++) {
-    inputs_min_max_values.push_back({inputs[i].abs().min().item<float>(), inputs[i].abs().max().item<float>()});
+    inputs_min_max_values.push_back({inputs[i].min().item<float>(), inputs[i].max().item<float>()});
   } 
   for (auto j = 0; j < outputs.size(); j++) {
-    outputs_min_max_values.push_back({outputs[j].abs().min().item<float>(), outputs[j].abs().max().item<float>()});
+    outputs_min_max_values.push_back({outputs[j].min().item<float>(), outputs[j].max().item<float>()});
   }
   Int8OptConfig::get_config().insert_or_updata_observer(
       op_name, inputs_min_max_values, {}, outputs_min_max_values, ops_id);
@@ -35,18 +35,18 @@ void insert_or_updata_observer(const at::TensorList& inputs,
                                std::string op_name, int64_t ops_id) {
   std::vector<std::vector<float>> inputs_min_max_values, outputs_min_max_values, weight_min_max_values={};
   for (auto i = 0; i < inputs.size(); i++) {
-    inputs_min_max_values.push_back({inputs[i].abs().min().item<float>(), inputs[i].abs().max().item<float>()});
+    inputs_min_max_values.push_back({inputs[i].min().item<float>(), inputs[i].max().item<float>()});
   } 
 
   for (auto k = 0; k < weight.size(0); k++) {
-    weight_min_max_values.push_back({weight[k].abs().min().item<float>(), weight[k].abs().max().item<float>()});
+    weight_min_max_values.push_back({weight[k].min().item<float>(), weight[k].max().item<float>()});
   }
 
   // TODO: enable per_tensor case
   //weight_min_max_values.push_back({weight.abs().min().item<float>(), weight.abs().max().item<float>()});
 
   for (auto j = 0; j < outputs.size(); j++) {
-    outputs_min_max_values.push_back({outputs[j].abs().min().item<float>(), outputs[j].abs().max().item<float>()});
+    outputs_min_max_values.push_back({outputs[j].min().item<float>(), outputs[j].max().item<float>()});
   }
   Int8OptConfig::get_config().insert_or_updata_observer(
       op_name, inputs_min_max_values, weight_min_max_values, outputs_min_max_values, ops_id);
