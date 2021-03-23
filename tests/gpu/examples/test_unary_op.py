@@ -199,4 +199,7 @@ class TetsTorchMethod(TestCase):
         self.assertEqual(torch.reciprocal(y_cpu_float),
                          torch.reciprocal(y_dpcpp_float).to("cpu"))
 
+        print("conj cpu", torch.conj(y_cpu_float))
+        print("conj dpcpp", torch.conj(y_dpcpp_float))
+        self.assertEqual(torch.conj(y_cpu_float), torch.conj(y_dpcpp_float).to("cpu"))
 
