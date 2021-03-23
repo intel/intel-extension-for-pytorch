@@ -38,12 +38,15 @@ void insert_or_updata_observer(const at::TensorList& inputs,
     inputs_min_max_values.push_back({inputs[i].min().item<float>(), inputs[i].max().item<float>()});
   } 
 
+
+  // TODO: enable per_channel case
+  /*
   for (auto k = 0; k < weight.size(0); k++) {
     weight_min_max_values.push_back({weight[k].min().item<float>(), weight[k].max().item<float>()});
   }
+  */
 
-  // TODO: enable per_tensor case
-  //weight_min_max_values.push_back({weight.abs().min().item<float>(), weight.abs().max().item<float>()});
+  weight_min_max_values.push_back({weight.min().item<float>(), weight.max().item<float>()});
 
   for (auto j = 0; j < outputs.size(); j++) {
     outputs_min_max_values.push_back({outputs[j].min().item<float>(), outputs[j].max().item<float>()});
