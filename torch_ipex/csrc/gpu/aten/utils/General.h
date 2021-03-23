@@ -91,6 +91,8 @@
    std::is_same<scalar_t, int64_t>::value || \
    std::is_same<scalar_t, int16_t>::value)
 
+#define IS_BFLOAT16(scalar_t) (std::is_same<scalar_t, at::BFloat16>::value)
+
 #define IS_HALF(scalar_t) (std::is_same<scalar_t, at::Half>::value)
 
 #define IS_FLOAT32(scalar_t) (std::is_same<scalar_t, float>::value)
