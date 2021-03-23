@@ -88,6 +88,8 @@ static inline dnnl::memory::format_tag get_dnnl_default_format(int ndims) {
       return dnnl::memory::format_tag::abcd;
     case 5:
       return dnnl::memory::format_tag::abcde;
+    case 6:
+      return dnnl::memory::format_tag::abcdef;
     default:
       return dnnl::memory::format_tag::any;
   }

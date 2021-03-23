@@ -20,41 +20,80 @@ namespace at {
 namespace dpcpp {
 namespace oneDNN {
 
+typedef struct ReorderAttr {
+public:
+  ReorderAttr(bool is_group = false)
+      : pattr_(primitive_attr()),
+        sc_(std::vector<float>()) {}
+
+public:
+  void set_src_sc_and_zp(int scmask,
+                         std::vector<float> sc,
+                         int zpmask,
+                         std::vector<int> zp) {
+    pattr_.set_output_scales(scmask, sc);
+    pattr_.set_zero_points(DNNL_ARG_SRC, zpmask, zp);
+    sc_ = sc;
+  }
+
+  void set_dst_sc_and_zp(int scmask,
+                         std::vector<float> sc,
+                         int zpmask,
+                         std::vector<int> zp) {
+    pattr_.set_output_scales(scmask, sc);
+    pattr_.set_zero_points(DNNL_ARG_DST, zpmask, zp);
+    sc_ = sc;
+  }
+
+  bool is_quant() const { return !sc_.empty(); }
+
+  std::vector<float> sc() const { return sc_; }
+
+  primitive_attr pattr() const { return pattr_; }
+
+  memory::dims dims(const Tensor& t) const {
+    return memory::dims(t.sizes().vec());
+  }
+
+  memory::format_tag fmt(const Tensor& t) const {
+    return get_dnnl_default_format(t.ndimension());
+  }
+
+  memory::data_type dt(const Tensor& t) const {
+    return dt_to_dnnl(t.scalar_type());
+  }
+
+private:
+  primitive_attr pattr_;
+  std::vector<float> sc_;
+} ReorderAttr;
+
 static inline void reorder(const Tensor& src, Tensor& dst,
-                           const primitive_attr& pattr = primitive_attr()) {
+                           const ReorderAttr& rattr = ReorderAttr()) {
   TORCH_CHECK(dst.data_ptr() != src.data_ptr(),
              "oneDNN reorder supports out-place implementation only ...");
 
   auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  memory::dims src_tz = src.sizes().vec();
-  memory::dims dst_tz = dst.sizes().vec();
-  auto src_dt = dt_to_dnnl(src.scalar_type());
-  auto dst_dt = dt_to_dnnl(dst.scalar_type());
-  auto src_fmt = get_dnnl_default_format(src.ndimension());
-  auto dst_fmt = get_dnnl_default_format(dst.ndimension());
-
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  memory::desc src_desc = src_ctx.is_plain() ?
-                          memory::desc(src_tz, src_dt, src_fmt) :
-                          src_ctx.meta();
+  memory::desc src_desc = src_ctx.is_plain()
+      ? memory::desc(rattr.dims(src), rattr.dt(src), rattr.fmt(src))
+      : src_ctx.meta();
   auto src_mem = dpcpp_onednn_memory(src_desc, engine, src.data_ptr());
 
   auto dst_ctx = DPCPPTensorContext::get_tensor_ctx(dst);
-  memory::desc dst_desc = dst_ctx.is_plain() ?
-                          memory::desc(dst_tz, dst_dt, dst_fmt) :
-                          dst_ctx.meta();
+  memory::desc dst_desc = dst_ctx.is_plain()
+      ? memory::desc(rattr.dims(dst), rattr.dt(dst), rattr.fmt(dst))
+      : dst_ctx.meta();
   auto dst_mem = dpcpp_onednn_memory(dst_desc, engine, dst.data_ptr());
 
-  std::vector<float> oscale;
-  int mask = src_ctx.scales().size() > 1 ? ONEDNN_SCALES_MASK_BY_CHANNEL(0) : 0;
-  pattr.get_output_scales(mask, oscale);
-
   primitive prim;
-  if (!oscale.empty()) {
+  if (rattr.is_quant()) {
+  auto pattr = rattr.pattr();
 #ifdef USE_PRIMITIVE_CACHE
     lru_key_t key;
+    auto oscale = rattr.sc();
     create_key(key, src_desc, dst_desc, oscale);
     prim = fetch_or_create_m<dnnl::reorder>(key, src_mem, dst_mem, pattr);
 #else

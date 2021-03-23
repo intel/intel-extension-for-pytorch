@@ -197,7 +197,6 @@ at::Tensor convolution(
   auto weight_memory = weight_usr_memory;
   Tensor weight_;
   if (weight_usr_md != expected_weight_md) {
-    Tensor weight_opt;
     if (weight_cache_enabled()) {
       if (input.is_quantized()) {
         QuantizerPtr quantizer;
@@ -210,31 +209,20 @@ at::Tensor convolution(
         } else {
           quantizer = make_per_tensor_affine_quantizer(weight_scales[0], 0, kQInt8);
         }
-        weight_opt = empty_opaque_qtensor(expected_weight_md, c10::nullopt, quantizer);
+        weight_ = empty_opaque_qtensor(expected_weight_md, c10::nullopt, quantizer);
       } else {
-        weight_opt = empty_opaque_tensor(expected_weight_md, weight.options(), c10::nullopt);
+        weight_ = empty_opaque_tensor(expected_weight_md, weight.options(), c10::nullopt);
       }
-      weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_opt.data_ptr());
     } else {
-      auto item_num = static_cast<int64_t>(expected_weight_md.get_size() / weight.itemsize());
-      weight_ = at::AtenIpexTypeXPU::empty({item_num}, weight.options(), c10::nullopt);
-      weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_.data_ptr());
+      weight_ = empty_opaque_tensor(expected_weight_md, weight.options(), c10::nullopt);
     }
-#ifdef USE_PRIMITIVE_CACHE
-    lru_key_t key;
-    create_key(key, weight_usr_md, expected_weight_md);
-    auto reorder_p = fetch_or_create_m<dnnl::reorder>(key, weight_usr_memory, weight_memory);
-#else
-    auto reorder_p = dnnl::reorder(weight_usr_memory, weight_memory);
-#endif
-    DPCPP_ONEDNN_EXEC(
-        reorder_p,
-        strm,
-        {{DNNL_ARG_FROM, weight_usr_memory}, {DNNL_ARG_TO, weight_memory}});
+
+    weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_.data_ptr());
+    oneDNN::reorder(weight.reshape(weight_tz), weight_);
 
     if (weight_cache_enabled()) {
       strm.wait();
-      auto weight_opt_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::release_tensor_ctx(weight_opt);
+      auto weight_opt_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::release_tensor_ctx(weight_);
       at::AtenIpexTypeXPU::DPCPPTensorContext::set_tensor_ctx(weight, std::move(weight_opt_ctx));
     }
   }
@@ -267,23 +255,22 @@ at::Tensor convolution(
         : dpcpp_onednn_memory({bias_ctx.meta()}, engine, bias.data_ptr());
 
     if (bias_ctx.is_plain() && input.is_quantized()) {
-      primitive_attr attr;
       std::vector<float> bias_scale;
       for (int i = 0; i < weight_scales.size(); i++) {
         bias_scale.push_back(1.f / (in_scale * weight_scales[i] / 1.f));
       }
 
       int mask = weight_scales.size() > 1 ? ONEDNN_SCALES_MASK_BY_CHANNEL(0) : 0;
-      attr.set_output_scales(mask, bias_scale);
-      attr.set_zero_points(DNNL_ARG_DST, 0, {0}); // TODO:Asymmetric
+      auto reorder_attr = oneDNN::ReorderAttr();
+      reorder_attr.set_dst_sc_and_zp(mask, bias_scale, 0, {0});
 
       if (weight_cache_enabled()) {
         bias_opt = empty_opaque_tensor(bias_md, bias.options(), c10::nullopt);
-        oneDNN::reorder(bias, bias_opt, attr);
+        oneDNN::reorder(bias, bias_opt, reorder_attr);
         bias_memory = dpcpp_onednn_memory(bias_md, engine, bias_opt.data_ptr());
       } else {
         bias_ = empty_opaque_tensor(bias_md, bias.options(), c10::nullopt);
-        oneDNN::reorder(bias, bias_, attr);
+        oneDNN::reorder(bias, bias_, reorder_attr);
         bias_memory = dpcpp_onednn_memory(bias_md, engine, bias_.data_ptr());
       }
 
