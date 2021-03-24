@@ -26,3 +26,30 @@ class AmpConf(object):
         with open(configure_file, 'w') as fp:
             json.dump(configures, fp, indent = 4)
 
+    def default_recipe(self, configure_file):
+        elt_wise = ['relu', 'sigmoid']
+        # get default recipe,
+        # q+dq+conv+q+dq+relu_ => q+dq+conv+relu
+        # q+dq+op1+q+dq+q+dq+op2+q+dq => q+dq+op1+q+dq+op2+q+dq
+        core.add_indicators()
+        configures = core.get_int8_configures()
+        nums_op = len(configures)
+        for i in range(nums_op):
+            current_op = configures[i]
+            inputs = current_op['inputs_flow']
+            op_name = current_op['name']
+            for inp in inputs:
+                for j in range(i):
+                    # assume op only has one output
+                    if configures[j]['outputs_flow'][0] == inp:
+                        configures[j]['post_quantized'] = False
+                        # for conv+relu, linear+relu, not have quant and dequan between them.
+                        if op_name in elt_wise \
+                                and (configures[j]['name'] == 'conv2d' \
+                                    or configures[j]['name'] == 'conv3d' \
+                                    or configures[j]['name'] == 'linear'):
+                            configures[i]['pre_quantized'] = False
+        with open(configure_file, 'w') as fp:
+            json.dump(configures, fp, indent = 4)
+
+
