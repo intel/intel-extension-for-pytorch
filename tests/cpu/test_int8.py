@@ -82,7 +82,7 @@ class TestQuantization(TestCase):
             y = model(x)
 
         self.assertTrue(ipex.core.is_int8_dil_tensor(y))
-        self.assertEqual(ref, y, prec=0.1)
+        self.assertEqual(ref, y, atol=1e-1, rtol=1e-5)
         os.remove('configure.json')
 
     def test_conv2d(self):

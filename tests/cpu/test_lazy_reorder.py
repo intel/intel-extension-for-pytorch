@@ -24,11 +24,13 @@ from torch.autograd import gradcheck
 from torch.autograd.gradcheck import gradgradcheck
 from torch._six import inf, nan
 
-from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MKL, \
-    TEST_LIBROSA, run_tests, download_file, skipIfNoLapack, suppress_warnings, \
-    IS_WINDOWS, PY3, NO_MULTIPROCESSING_SPAWN, do_test_dtypes, do_test_empty_full, \
-    IS_SANDCASTLE, load_tests, brute_pdist, brute_cdist, slowTest, \
-    skipCUDANonDefaultStreamIf, skipCUDAMemoryLeakCheckIf
+from common_utils import (
+    TestCase, TEST_WITH_ROCM, run_tests,
+    IS_WINDOWS, IS_FILESYSTEM_UTF8_ENCODING, NO_MULTIPROCESSING_SPAWN,
+    do_test_dtypes, IS_SANDCASTLE, IS_FBCODE, IS_REMOTE_GPU, load_tests, slowTest,
+    skipCUDAMemoryLeakCheckIf, BytesIOContext,
+    skipIfRocm, skipIfNoSciPy, TemporaryFileName, TemporaryDirectoryName,
+    wrapDeterministicFlagAPITest, DeterministicGuard, make_tensor)
 
 def get_rand_seed():
     return int(time.time() * 1000000000)
@@ -556,8 +558,8 @@ class TestMixOp(TestCase):
         res_dcpp_cpu.sum().backward()
         res_cpu.sum().backward()
 
-        self.assertEqual(input_dpcpp_dnnl.grad.to('cpu'), input_cpu.grad, prec=0.0)
-        self.assertEqual(input_dpcpp_cpu.grad.to('cpu'), input_cpu.grad, prec=0.0)
+        self.assertEqual(input_dpcpp_dnnl.grad.to('cpu'), input_cpu.grad, atol=1e-1, rtol=1e-5)
+        self.assertEqual(input_dpcpp_cpu.grad.to('cpu'), input_cpu.grad, atol=1e-1, rtol=1e-5)
 
 class TestLinearAlgebraOps(TestCase):
     def test_mm(self):
@@ -1354,7 +1356,7 @@ class TestSoftMax(TestCase):
                 y_dpcpp = F.log_softmax(x_dpcpp, dim=dim).sum()
                 y_cpu.backward()
                 y_dpcpp.backward()
-                self.assertEqual(x_cpu.grad, x_dpcpp.grad, 1e-4)
+                self.assertEqual(x_cpu.grad, x_dpcpp.grad, atol=1e-1, rtol=1e-5)
 
 class TestSigmoid(TestCase):
     def test_sigmoid(self):
@@ -1580,7 +1582,7 @@ class TestRNN(TestCase):
         if cell == "RNN":
             params_dict["nonlinearity"] = ["tanh"] # ["tanh", "relu"] TODO relu has accuracy issue
         elif cell == "GRU":
-            params_dict["nonlinearity"] = [""] 
+            params_dict["nonlinearity"] = [""]
 
         params_list = []
 
@@ -1592,16 +1594,16 @@ class TestRNN(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        
+
         params_list = self._lstm_params_list("LSTM")
 
         for input_size, hidden_size, num_layers, bidirectional, bias, empty_state, batch_first, dropout, batch_size, seq_len in itertools.product(*params_list):
             # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
             if dropout > 0 and num_layers == 1:
                 continue
-            
+
             num_directions = 2 if bidirectional else 1
-            
+
             if batch_first:
                 input = torch.randn(batch_size, seq_len, input_size)
             else:
@@ -1649,7 +1651,7 @@ class TestRNN(TestCase):
                     hy_cpu[0].sum().backward(retain_graph=True)
                     hy_dpcpp[0].sum().backward(retain_graph=True)
                     self.assertEqual(h0_dpcpp.grad.to('cpu'), h_cpu.grad)
-                    
+
                     hy_cpu[1].sum().backward(retain_graph=True)
                     hy_dpcpp[1].sum().backward(retain_graph=True)
                     self.assertEqual(c0_dpcpp.grad.to('cpu'), c_cpu.grad)
@@ -1658,16 +1660,16 @@ class TestRNN(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        
+
         params_list = self._lstm_params_list(cell)
 
         for input_size, hidden_size, num_layers, bidirectional, bias, empty_state, batch_first, dropout, batch_size, seq_len, nonlinearity in itertools.product(*params_list):
             # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
             if dropout > 0 and num_layers == 1:
                 continue
-            
+
             num_directions = 2 if bidirectional else 1
-            
+
             if batch_first:
                 input = torch.randn(batch_size, seq_len, input_size)
             else:
@@ -1683,7 +1685,7 @@ class TestRNN(TestCase):
                 model_cpu = torch.nn.RNN(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first, nonlinearity=nonlinearity)
             elif cell == "GRU":
                 model_cpu = torch.nn.GRU(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
-                
+
             model_cpu.train() if training else model_cpu.eval()
 
             input_dpcpp = input.clone().to(device=device).requires_grad_(training)
@@ -1720,7 +1722,7 @@ class TestRNN(TestCase):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)
-        
+
         embedding_dim = 1024
         hidden_dim = 10
         batch_size = 24
@@ -1755,7 +1757,7 @@ class TestRNN(TestCase):
 
         lstm_out, hidden_out = lstm(embeds, (hidden_0, hidden_1))
         lstm_out, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_out, batch_first=True)
-        
+
         with AutoDNNL(True):
             lstm_out_dpcpp, hidden_out_dpcpp = lstm_dpcpp(embeds_dpcpp, (hidden_0_dpcpp, hidden_1_dpcpp))
             lstm_out_dpcpp, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_out_dpcpp, batch_first=True)
@@ -1770,16 +1772,16 @@ class TestRNN(TestCase):
                 self.assertEqual(sentences_dpcpp.grad.to('cpu'), sentences.grad)
                 self.assertEqual(lstm_dpcpp.weight_ih_l0.grad.to('cpu'), lstm.weight_ih_l0.grad)
                 self.assertEqual(lstm_dpcpp.weight_hh_l0.grad.to('cpu'), lstm.weight_hh_l0.grad)
-                    
+
                 self.assertEqual(lstm_dpcpp.bias_ih_l0.grad.to('cpu'), lstm.bias_ih_l0.grad)
                 self.assertEqual(lstm_dpcpp.bias_hh_l0.grad.to('cpu'), lstm.bias_hh_l0.grad)
-                
+
                 self.assertEqual(hidden_0_dpcpp.grad.to('cpu'), hidden_0.grad)
                 self.assertEqual(hidden_1_dpcpp.grad.to('cpu'), hidden_1.grad)
 
     def test_lstm_inference(self):
         self._test_lstm(training=False)
-    
+
     def test_lstm_training(self):
         self._test_lstm(training=True)
 

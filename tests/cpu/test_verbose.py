@@ -1,6 +1,14 @@
 import unittest
-from common_utils import VerboseTestCase
+from utils.utils import VerboseTestCase
 import subprocess
+
+from common_utils import (
+    TestCase, TEST_WITH_ROCM, run_tests,
+    IS_WINDOWS, IS_FILESYSTEM_UTF8_ENCODING, NO_MULTIPROCESSING_SPAWN,
+    do_test_dtypes, IS_SANDCASTLE, IS_FBCODE, IS_REMOTE_GPU, load_tests, slowTest,
+    skipCUDAMemoryLeakCheckIf, BytesIOContext,
+    skipIfRocm, skipIfNoSciPy, TemporaryFileName, TemporaryDirectoryName,
+    wrapDeterministicFlagAPITest, DeterministicGuard, make_tensor)
 
 class TestLinearWeightPack(VerboseTestCase):
     def test_linear_weight_pack(self):
