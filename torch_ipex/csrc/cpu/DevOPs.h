@@ -81,8 +81,11 @@ class AtenIpexCPUDev {
   static at::Tensor dil_gelu(const at::Tensor& input);
   static at::Tensor dil_gelu_backward(const at::Tensor& grad_output, const at::Tensor& input);
   static std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_native_layer_norm(const at::Tensor& X, const at::Tensor& gamma, const at::Tensor& beta, int64_t M, int64_t N, double eps);
+  static std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_native_layer_norm(const at::Tensor& input, at::IntArrayRef normalized_shape, const c10::optional<at::Tensor> & weight, const c10::optional<at::Tensor> & bias, double eps);
   static std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_native_layer_norm_backward(const at::Tensor& dY, const at::Tensor& X, const at::Tensor& mean, const at::Tensor& rstd, const at::Tensor& gamma, int64_t M, int64_t N, std::array<bool, 3> grad_input_mask);
+  static std::tuple<at::Tensor, at::Tensor, at::Tensor> dil_native_layer_norm_backward(const at::Tensor & grad_out, const at::Tensor & input, at::IntArrayRef normalized_shape, const at::Tensor & mean, const at::Tensor & rstd, const c10::optional<at::Tensor> & weight, const c10::optional<at::Tensor> & bias, std::array<bool,3> output_mask);
   static at::Tensor dil_slice(const at::Tensor & self, int64_t dim, int64_t start, int64_t end, int64_t step);
+  static at::Tensor dil_slice(const at::Tensor & self, int64_t dim, c10::optional<int64_t> start, c10::optional<int64_t> end, int64_t step);
   static std::vector<at::Tensor> dil_unbind(const at::Tensor &self, int64_t dim);
   static std::vector<at::Tensor> dil_unbind(const at::Tensor& self, at::Dimname dim);
   static at::Tensor dil_select(const at::Tensor & self, int64_t dim, int64_t index);
