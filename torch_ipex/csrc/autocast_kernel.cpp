@@ -30,11 +30,9 @@ at::Tensor _convolution(const at::Tensor& input, const at::Tensor& weight, const
     return int8::_convolution(input, weight, bias, stride, padding, dilation, transposed,
                               output_padding, groups, benchmark, deterministic, cudnn_enabled, allow_tf32);
   }
-  return at::_convolution(cpu_cached_cast(target_type, input),
-                          cpu_cached_cast(target_type, weight),
-                          cpu_cached_cast(target_type, bias),
-                          stride, padding, dilation, transposed, output_padding,
-                          groups, benchmark, deterministic, cudnn_enabled, allow_tf32);
+  // makeFallthrough to support 3DUNET transposed conv3d jit path
+  return at::_convolution(input, weight, bias, stride, padding, dilation, transposed,
+                          output_padding, groups, benchmark, deterministic, cudnn_enabled, allow_tf32);
 }
 
 at::Tensor _convolution_deprecated(const at::Tensor& input, const at::Tensor& weight,
