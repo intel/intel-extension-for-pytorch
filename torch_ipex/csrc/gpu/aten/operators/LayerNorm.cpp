@@ -159,6 +159,10 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
   auto input_md = memory::desc({input_tz}, data_t, format_nchw);
   auto grad_output_md = input_md;
 
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  create_key(key, input_md, epsilon, flags);
+#endif
   layer_normalization_forward::desc layer_norm_forward_desc(
       dnnl::prop_kind::forward_training, input_md, epsilon, flags);
   auto lnorm_fwd_pd = layer_normalization_forward::primitive_desc(
@@ -217,7 +221,12 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
   }
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  DPCPP_ONEDNN_EXEC(layer_normalization_backward(lnorm_bwd_pd), strm, args);
+#ifdef USE_PRIMITIVE_CACHE
+  auto ln_backward = fetch_or_create_m<layer_normalization_backward>(key, lnorm_bwd_pd);
+#else
+  auto ln_backward = layer_normalization_backward(lnorm_bwd_pd);
+#endif
+  DPCPP_ONEDNN_EXEC(ln_backward, strm, args);
 
   if (useScaleShift) {
     dpcppMemcpyAsync(
