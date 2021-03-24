@@ -14,10 +14,26 @@ namespace int8 {
 
 namespace {
 
+struct pair_hash {
+    template <class T1, class T2>
+    std::size_t operator () (const std::pair<T1,T2> &p) const {
+        auto h1 = std::hash<T1>{}(p.first);
+        auto h2 = std::hash<T2>{}(p.second);
+
+        // Mainly for demonstration purposes, i.e. works but is overly simple
+        // In the real world, use sth. like boost.hash_combine
+        return h1 ^ h2; 
+    }
+};
+
 using weakref_scales = c10::weak_intrusive_ptr<c10::TensorImpl, c10::UndefinedTensorImpl>;
 using val_scales = std::tuple<weakref_scales, at::Tensor>;
 // TODO: zero_points cached
 thread_local std::unordered_map<c10::TensorImpl *, val_scales> scales_casts;
+// cach op tensors flow
+// TODO: change the key work for slice or view.
+using val_name = std::tuple<weakref_scales, std::string>;
+thread_local std::unordered_map<c10::TensorImpl *, val_name> tensors_flow;
 
 }  // namespace
 
@@ -25,11 +41,25 @@ void clear_autocast_cache_int8() { scales_casts.clear(); }
 
 at::Tensor conv2d(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups) {
   if (torch_ipex::check_int8_calibration()) {
+    auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
+    std::vector<std::string> op_inputs, op_outputs;
+    if (it == tensors_flow.end()) {
+      std::string op_input = "conv2d." + std::to_string(op_id) + ".input";
+      op_inputs.push_back(op_input);
+    } else {
+      op_inputs.push_back(std::get<1>(it->second));
+    }
     auto output = at::conv2d(input, weight, bias, stride, padding, dilation, groups);
-    torch_ipex::insert_or_updata_observer({input}, {output}, weight, "conv2d",
-        torch_ipex::Int8OptConfig::fetch_and_add_ops_id());
+    std::string op_output = "conv2d." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    tensors_flow.emplace(output.unsafeGetTensorImpl(),
+        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
+    torch_ipex::insert_or_updata_observer({input}, {output}, weight,
+        "conv2d", op_id, op_inputs, op_outputs);
     return output;
   }
+
   int64_t num_ops_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   bool quantized = torch_ipex::get_int8_quantized_status(num_ops_id);
   std::vector<std::vector<float>> scales = torch_ipex::get_int8_scales(
@@ -96,9 +126,23 @@ at::Tensor batch_norm(const at::Tensor& input, const c10::optional<at::Tensor>& 
     const c10::optional<at::Tensor>& bias, const c10::optional<at::Tensor>& running_mean, 
     const c10::optional<at::Tensor>& running_var, bool training, double momentum, double eps, bool cudnn_enabled) {
   if (check_int8_calibration()) {
-    auto output = at::batch_norm(input, weight, bias, running_mean, running_var, training, momentum, eps, cudnn_enabled);
+    auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
+    std::vector<std::string> op_inputs, op_outputs;
+    if (it == tensors_flow.end()) {
+      std::string op_input = "batch_norm." + std::to_string(op_id) + ".input";
+      op_inputs.push_back(op_input);
+    } else {
+      op_inputs.push_back(std::get<1>(it->second));
+    }
+    auto output = at::batch_norm(input, weight, bias, running_mean, running_var,
+                                 training, momentum, eps, cudnn_enabled);
+    std::string op_output = "batch_norm." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    tensors_flow.emplace(output.unsafeGetTensorImpl(),
+        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
     torch_ipex::insert_or_updata_observer({input}, {output}, "batch_norm",
-        torch_ipex::Int8OptConfig::fetch_and_add_ops_id());
+                                          op_id, op_inputs, op_outputs);
     return output;
   }
   int64_t num_ops_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
@@ -127,11 +171,25 @@ at::Tensor batch_norm(const at::Tensor& input, const c10::optional<at::Tensor>& 
 at::Tensor max_pool2d(const at::Tensor& input, at::IntArrayRef kernel_size, at::IntArrayRef stride,
     at::IntArrayRef padding, at::IntArrayRef dilation, bool ceil_mode) {
   if (check_int8_calibration()) {
+    auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
+    std::vector<std::string> op_inputs, op_outputs;
+    if (it == tensors_flow.end()) {
+      std::string op_input = "max_pool2d." + std::to_string(op_id) + ".input";
+      op_inputs.push_back(op_input);
+    } else {
+      op_inputs.push_back(std::get<1>(it->second));
+    }
     auto output = at::max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode);
+    std::string op_output = "max_pool2d." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    tensors_flow.emplace(output.unsafeGetTensorImpl(),
+        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
     torch_ipex::insert_or_updata_observer({input}, {output}, "max_pool2d",
-        torch_ipex::Int8OptConfig::fetch_and_add_ops_id());
+                                          op_id, op_inputs, op_outputs);
     return output;
   }
+
   int64_t num_ops_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   bool quantized = torch_ipex::get_int8_quantized_status(num_ops_id);
   std::vector<std::vector<float>> scales = torch_ipex::get_int8_scales({false}, {false}, num_ops_id);
@@ -158,9 +216,23 @@ at::Tensor max_pool2d(const at::Tensor& input, at::IntArrayRef kernel_size, at::
 
 at::Tensor adaptive_avg_pool2d(const at::Tensor& input, at::IntArrayRef output_size) {
   if (check_int8_calibration()) {
+    auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
+    std::vector<std::string> op_inputs, op_outputs;
+    if (it == tensors_flow.end()) {
+      std::string op_input = "adaptive_avg_pool2d." + std::to_string(op_id) + ".input";
+      op_inputs.push_back(op_input);
+    } else {
+      op_inputs.push_back(std::get<1>(it->second));
+    }
+
     auto output = at::adaptive_avg_pool2d(input, output_size);
+    std::string op_output = "adaptive_avg_pool2d." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    tensors_flow.emplace(output.unsafeGetTensorImpl(),
+        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
     torch_ipex::insert_or_updata_observer({input}, {output}, "adaptive_avg_pool2d",
-        torch_ipex::Int8OptConfig::fetch_and_add_ops_id());
+                                          op_id, op_inputs, op_outputs);
     return output;
   }
   int64_t num_ops_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
@@ -189,11 +261,26 @@ at::Tensor adaptive_avg_pool2d(const at::Tensor& input, at::IntArrayRef output_s
 
 at::Tensor relu(const at::Tensor& input) {
   if (check_int8_calibration()) {
+    auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
+    std::vector<std::string> op_inputs, op_outputs;
+    if (it == tensors_flow.end()) {
+      std::string op_input = "relu." + std::to_string(op_id) + ".input";
+      op_inputs.push_back(op_input);
+    } else {
+      op_inputs.push_back(std::get<1>(it->second));
+    }
+
     auto output = at::relu(input);
+    std::string op_output = "relu." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    tensors_flow.emplace(output.unsafeGetTensorImpl(),
+        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
     torch_ipex::insert_or_updata_observer({input}, {output}, "relu",
-        torch_ipex::Int8OptConfig::fetch_and_add_ops_id());
+                                          op_id, op_inputs, op_outputs);
     return output;
   }
+
   int64_t num_ops_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   bool quantized = torch_ipex::get_int8_quantized_status(num_ops_id);
   std::vector<std::vector<float>> scales = torch_ipex::get_int8_scales({false}, {false}, num_ops_id);
@@ -218,13 +305,56 @@ at::Tensor relu(const at::Tensor& input) {
   return output;
 }
 
-at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
+at::Tensor& relu_(at::Tensor& input) {
+  // always add id, but not compute scales or insert quant and dequant.
   if (torch_ipex::check_int8_calibration()) {
-    auto output = at::linear(input, weight, bias);
-    torch_ipex::insert_or_updata_observer({input}, {output}, weight, "linear",
-        torch_ipex::Int8OptConfig::fetch_and_add_ops_id());
+    auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
+    std::vector<std::string> op_inputs, op_outputs;
+    if (it == tensors_flow.end()) {
+      std::string op_input = "relu_." + std::to_string(op_id) + ".input";
+      op_inputs.push_back(op_input);
+    } else {
+      op_inputs.push_back(std::get<1>(it->second));
+    }
+    auto& output = at::relu_(input);
+    std::string op_output = "relu_." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    if (it == tensors_flow.end()) {
+      tensors_flow.emplace(output.unsafeGetTensorImpl(),
+        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
+    } else {
+      it->second = val_name{weakref_scales(output.getIntrusivePtr()), op_output};
+    }
+    torch_ipex::insert_or_updata_observer({}, {}, "relu_", op_id, op_inputs, op_outputs);
     return output;
   }
+
+  int64_t num_ops_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+  return at::relu_(input);
+}
+
+at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
+  if (torch_ipex::check_int8_calibration()) {
+    auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
+    std::vector<std::string> op_inputs, op_outputs;
+    if (it == tensors_flow.end()) {
+      std::string op_input = "linear." + std::to_string(op_id) + ".input";
+      op_inputs.push_back(op_input);
+    } else {
+      op_inputs.push_back(std::get<1>(it->second));
+    }
+    auto output = at::linear(input, weight, bias);
+    std::string op_output = "linear." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    tensors_flow.emplace(output.unsafeGetTensorImpl(),
+        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
+    torch_ipex::insert_or_updata_observer({input}, {output}, weight,
+        "linear", op_id, op_inputs, op_outputs);
+    return output;
+  }
+
   int64_t num_ops_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
   bool quantized = torch_ipex::get_int8_quantized_status(num_ops_id);
   std::vector<std::vector<float>> scales = torch_ipex::get_int8_scales(

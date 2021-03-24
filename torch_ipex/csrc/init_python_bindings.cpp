@@ -95,6 +95,10 @@ void InitIpexModuleBindings(py::module m) {
         std::tie(pre_quant, post_quant) = indicator.get_indicator_insert_quantized_status(); 
         d["pre_quantized"] = pre_quant;
         d["post_quantized"] = post_quant;
+        std::vector<std::string> inputs_flow, outputs_flow;
+        std::tie(inputs_flow, outputs_flow) = indicator.get_indicator_quantized_flow();
+        d["inputs_flow"] = inputs_flow;
+        d["outputs_flow"] = outputs_flow;
         output_list.append(d);
       }
       return output_list; } );
@@ -126,9 +130,16 @@ void InitIpexModuleBindings(py::module m) {
       if (i.contains("post_quantized")) {
         post_quantized = py::cast<bool>(i["post_quantized"]);
       }
+      std::vector<std::string> inputs_flow, outputs_flow;
+      if (i.contains("inputs_flow")) {
+        inputs_flow = py::cast<std::vector<std::string>>(i["inputs_flow"]);
+      }
+      if (i.contains("outputs_flow")) {
+        outputs_flow = py::cast<std::vector<std::string>>(i["outputs_flow"]);
+      }
       Indicator temp(id, op_name, algorithm, weight_granularity, i_scale,
                      w_scale, o_scale, i_uint8_used, o_uint8_used, quantized,
-                     pre_quantized, post_quantized);
+                     pre_quantized, post_quantized, inputs_flow, outputs_flow);
       indicators.push_back(temp);
     }
     Int8OptConfig::get_config().set_indicators(indicators);

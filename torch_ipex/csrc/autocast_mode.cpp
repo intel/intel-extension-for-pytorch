@@ -216,6 +216,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
   m.impl(TORCH_SELECTIVE_NAME("aten::max_pool2d"), TORCH_FN((&torch_ipex::autocast::max_pool2d)));
   m.impl(TORCH_SELECTIVE_NAME("aten::adaptive_avg_pool2d"), TORCH_FN((&torch_ipex::autocast::adaptive_avg_pool2d)));
   m.impl(TORCH_SELECTIVE_NAME("aten::relu"), TORCH_FN((&torch_ipex::autocast::relu)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::relu_"), TORCH_FN((&torch_ipex::autocast::relu_)));
   m.impl(TORCH_SELECTIVE_NAME("aten::linear"), TORCH_FN((&torch_ipex::autocast::linear)));
 }
 

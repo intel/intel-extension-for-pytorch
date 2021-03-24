@@ -14,9 +14,13 @@ public:
   }
 
 public:
-  void insert_or_updata_observer(
-      std::string op_name, std::vector<std::vector<float>> i_min_max_values, std::vector<std::vector<float>> w_min_max_values,
-      std::vector<std::vector<float>> o_min_max_values, int64_t ops_id);
+  void insert_or_updata_observer(std::string op_name,
+                                 std::vector<std::vector<float>> i_min_max_values,
+                                 std::vector<std::vector<float>> w_min_max_values,
+                                 std::vector<std::vector<float>> o_min_max_values,
+                                 int64_t ops_id,
+                                 std::vector<std::string> inputs_flow,
+                                 std::vector<std::string> output_flow);
 
   void clear_indicators();
 

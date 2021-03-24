@@ -9,7 +9,8 @@ using namespace int8;
 void Int8OptConfig::insert_or_updata_observer(
     std::string op_name, std::vector<std::vector<float>> i_min_max_values,
     std::vector<std::vector<float>> w_min_max_values,
-    std::vector<std::vector<float>> o_min_max_values, int64_t ops_id) {
+    std::vector<std::vector<float>> o_min_max_values, int64_t ops_id,
+    std::vector<std::string> inputs_flow, std::vector<std::string> outputs_flow) {
   if (observers_.size() <= ops_id) {
     // this path is that to set int8 op's configure, using default configures if
     // user not set it. Note: weight's value only set onece.
@@ -44,7 +45,9 @@ void Int8OptConfig::insert_or_updata_observer(
                              outputs_dtype_uint8,
                              quantized,
                              pre_quantized,
-                             post_quantized};
+                             post_quantized,
+                             inputs_flow,
+                             outputs_flow};
     observers_.push_back(new_observer);
   } else {
     // user has set configure or have run one interation
@@ -118,7 +121,8 @@ void Int8OptConfig::add_indicators() {
         observers_[i].id, observers_[i].name, observers_[i].algorithm,
         observers_[i].weight_granularity, inputs_scale, weight_scales, outputs_scale,
         observers_[i].inputs_dtype_uint8, observers_[i].outputs_dtype_uint8,
-        observers_[i].quantized, observers_[i].pre_quantized, observers_[i].post_quantized);
+        observers_[i].quantized, observers_[i].pre_quantized, observers_[i].post_quantized,
+        observers_[i].inputs_flow, observers_[i].outputs_flow);
     indicators_.push_back(new_indicator);
   }
   observers_.clear();

@@ -32,6 +32,8 @@ at::Tensor adaptive_avg_pool2d(const at::Tensor& input, at::IntArrayRef output_s
 
 at::Tensor relu(const at::Tensor& input);
 
+at::Tensor& relu_(at::Tensor& input);
+
 at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias);
 
 } // namespace int8

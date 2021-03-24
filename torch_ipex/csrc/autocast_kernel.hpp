@@ -31,5 +31,7 @@ at::Tensor adaptive_avg_pool2d(const at::Tensor& input, at::IntArrayRef output_s
 
 at::Tensor relu(const at::Tensor& input);
 
+at::Tensor& relu_(at::Tensor& input);
+
 } // autocast
 } // torch_ipex

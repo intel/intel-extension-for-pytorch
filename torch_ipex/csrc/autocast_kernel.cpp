@@ -112,5 +112,15 @@ at::Tensor relu(const at::Tensor& input) {
   return at::relu(input);
 }
 
+at::Tensor& relu_(at::Tensor& input) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  auto target_type = get_autocast_dtype();
+  if (at::ScalarType::Char == target_type) {
+    return int8::relu_(input);
+  }
+  // make fall makeFallthrough.
+  return at::relu_(input);
+}
+
 } // autocast
 } // torch_ipex

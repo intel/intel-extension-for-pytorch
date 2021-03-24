@@ -25,21 +25,31 @@ struct Observer {
   bool quantized = true;
   bool pre_quantized = true;
   bool post_quantized = true;
+  std::vector<std::string> inputs_flow;
+  std::vector<std::string> outputs_flow;
 };
 
 class Indicator {
 public:
-  Indicator(int64_t i = 0, std::string n = "", std::string alg = "min_max",
-            std::string granu = "per_tensor", std::vector<float> i_scale = {1},
+  Indicator(int64_t i = 0, std::string n = "",
+            std::string alg = "min_max",
+            std::string granu = "per_tensor",
+            std::vector<float> i_scale = {1},
             std::vector<float> w_scales = {},
             std::vector<float> o_scale = {1},
             std::vector<bool> i_uint8_used = {false},
-            std::vector<bool> o_uint8_used = {false}, bool quant = true,
-            bool pre_quant = true, bool post_quant = true)
+            std::vector<bool> o_uint8_used = {false},
+            bool quant = true,
+            bool pre_quant = true,
+            bool post_quant = true,
+            std::vector<std::string> i_flow = {},
+            std::vector<std::string> o_flow = {})
       : id(i), name(n), algorithm(alg), weight_granularity(granu),
         inputs_scale(i_scale), weight_scales(std::move(w_scales)), outputs_scale(o_scale),
         inputs_uint8_used(i_uint8_used), outputs_uint8_used(o_uint8_used),
-        quantized(quant), pre_quantized(pre_quant), post_quantized(post_quant) {}
+        quantized(quant), pre_quantized(pre_quant), post_quantized(post_quant),
+        inputs_flow(i_flow), outputs_flow(o_flow) {}
+
     Indicator(const Indicator& other){
       UniqueReadLock<ReadWriteMutex> lock(rwmutex);
       id = other.id;
@@ -54,6 +64,8 @@ public:
       quantized = other.quantized;
       pre_quantized = other.pre_quantized;
       post_quantized = other.post_quantized;
+      inputs_flow = other.inputs_flow;
+      outputs_flow = other.outputs_flow;
     }
 
   int64_t get_indicator_id() { return id; }
@@ -103,6 +115,10 @@ public:
     quantized = new_quantized;
   }
 
+  std::tuple<std::vector<std::string>, std::vector<std::string>> get_indicator_quantized_flow() {
+    return std::make_tuple(inputs_flow, outputs_flow);
+  }
+
 private:
   int64_t id;
   std::string name;
@@ -116,6 +132,8 @@ private:
   bool quantized;
   bool pre_quantized;
   bool post_quantized;
+  std::vector<std::string> inputs_flow;
+  std::vector<std::string> outputs_flow;
   mutable ReadWriteMutex rwmutex;
 };
 

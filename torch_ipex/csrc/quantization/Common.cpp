@@ -17,7 +17,10 @@ bool check_int8_calibration() {
 
 void insert_or_updata_observer(const at::TensorList &inputs,
                                const at::TensorList &outputs,
-                               std::string op_name, int64_t ops_id) {
+                               std::string op_name,
+                               int64_t ops_id,
+                               std::vector<std::string> inputs_flow,
+                               std::vector<std::string> outputs_flow) {
   std::vector<std::vector<float>> inputs_min_max_values, outputs_min_max_values;
   for (auto i = 0; i < inputs.size(); i++) {
     inputs_min_max_values.push_back({inputs[i].min().item<float>(), inputs[i].max().item<float>()});
@@ -26,18 +29,19 @@ void insert_or_updata_observer(const at::TensorList &inputs,
     outputs_min_max_values.push_back({outputs[j].min().item<float>(), outputs[j].max().item<float>()});
   }
   Int8OptConfig::get_config().insert_or_updata_observer(
-      op_name, inputs_min_max_values, {}, outputs_min_max_values, ops_id);
+      op_name, inputs_min_max_values, {}, outputs_min_max_values, ops_id, inputs_flow, outputs_flow);
 }
 
 void insert_or_updata_observer(const at::TensorList& inputs,
                                const at::TensorList& outputs,
                                const at::Tensor& weight,
-                               std::string op_name, int64_t ops_id) {
+                               std::string op_name, int64_t ops_id,
+                               std::vector<std::string> op_inputs,
+                               std::vector<std::string> op_outputs ) {
   std::vector<std::vector<float>> inputs_min_max_values, outputs_min_max_values, weight_min_max_values={};
   for (auto i = 0; i < inputs.size(); i++) {
     inputs_min_max_values.push_back({inputs[i].min().item<float>(), inputs[i].max().item<float>()});
   } 
-
 
   // TODO: enable per_channel case
   /*
@@ -52,7 +56,8 @@ void insert_or_updata_observer(const at::TensorList& inputs,
     outputs_min_max_values.push_back({outputs[j].min().item<float>(), outputs[j].max().item<float>()});
   }
   Int8OptConfig::get_config().insert_or_updata_observer(
-      op_name, inputs_min_max_values, weight_min_max_values, outputs_min_max_values, ops_id);
+      op_name, inputs_min_max_values, weight_min_max_values, outputs_min_max_values, ops_id,
+      op_inputs, op_outputs);
 }
 
 std::vector<std::vector<float>> get_int8_scales(std::vector<bool> i_uint8_used,
