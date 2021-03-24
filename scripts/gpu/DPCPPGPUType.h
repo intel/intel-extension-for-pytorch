@@ -57,9 +57,11 @@ static Tensor _empty_affine_quantized(IntArrayRef size, c10::optional<ScalarType
 static Tensor _empty_per_channel_affine_quantized(IntArrayRef size, const Tensor & scales, const Tensor & zero_points, int64_t axis, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<MemoryFormat> memory_format); // {"schema": "aten::_empty_per_channel_affine_quantized(int[] size, *, Tensor scales, Tensor zero_points, int axis, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=contiguous_format) -> Tensor", "dispatch": "True", "math": "False"}
 static Tensor _fft_with_size(const Tensor & self, int64_t signal_ndim, bool complex_input, bool complex_output, bool inverse, IntArrayRef checked_signal_sizes, int64_t normalization, bool onesided, IntArrayRef output_sizes); // {"schema": "aten::_fft_with_size.norm_modes(Tensor self, int signal_ndim, bool complex_input, bool complex_output, bool inverse, int[] checked_signal_sizes, int normalization, bool onesided, int[] output_sizes) -> Tensor", "compound": "False", "has_math_kernel": "False"}
 static Tensor & _index_put_impl_(Tensor & self, TensorList indices, const Tensor & values, bool accumulate, bool unsafe); // aten::_index_put_impl_(Tensor(a!) self, Tensor?[] indices, Tensor values, bool accumulate=False, bool unsafe=False) -> Tensor(a!)
+static Tensor _inverse_helper(const Tensor & self); // aten::_inverse_helper(Tensor self) -> Tensor
 static Scalar _local_scalar_dense(const Tensor & self); // aten::_local_scalar_dense(Tensor self) -> Scalar
 static Tensor _log_softmax(const Tensor & self, int64_t dim, bool half_to_float); // aten::_log_softmax(Tensor self, int dim, bool half_to_float) -> Tensor
 static Tensor _log_softmax_backward_data(const Tensor & grad_output, const Tensor & output, int64_t dim, const Tensor & self); // aten::_log_softmax_backward_data(Tensor grad_output, Tensor output, int dim, Tensor self) -> Tensor
+static Tensor _lu_solve_helper(const Tensor & self, const Tensor & LU_data, const Tensor & LU_pivots); // aten::_lu_solve_helper(Tensor self, Tensor LU_data, Tensor LU_pivots) -> Tensor
 static std::tuple<Tensor,Tensor,Tensor> _lu_with_info(const Tensor & self, bool pivot, bool check_errors); // aten::_lu_with_info(Tensor self, bool pivot=True, bool check_errors=True) -> (Tensor, Tensor, Tensor)
 static Tensor _make_per_channel_quantized_tensor(const Tensor & self, const Tensor & scale, const Tensor & zero_point, int64_t axis); // aten::_make_per_channel_quantized_tensor(Tensor self, Tensor scale, Tensor zero_point, int axis) -> Tensor
 static Tensor _make_per_tensor_quantized_tensor(const Tensor & self, double scale, int64_t zero_point); // aten::_make_per_tensor_quantized_tensor(Tensor self, float scale, int zero_point) -> Tensor
@@ -69,6 +71,7 @@ static std::tuple<Tensor,Tensor> _min(const Tensor & self, int64_t dim, bool kee
 static std::tuple<Tensor &,Tensor &> _min_out(Tensor & min, Tensor & min_indices, const Tensor & self, int64_t dim, bool keepdim); // aten::_min.min(Tensor self, int dim, bool keepdim=False, *, Tensor(a!) min, Tensor(b!) min_indices) -> (Tensor(a!), Tensor(b!))
 static Tensor _pdist_backward(const Tensor & grad, const Tensor & self, double p, const Tensor & pdist); // aten::_pdist_backward(Tensor grad, Tensor self, float p, Tensor pdist) -> Tensor
 static Tensor _pdist_forward(const Tensor & self, double p); // aten::_pdist_forward(Tensor self, float p=2) -> Tensor
+static std::tuple<Tensor,Tensor> _qr_helper(const Tensor & self, bool some); // aten::_qr_helper(Tensor self, bool some) -> (Tensor, Tensor)
 static Tensor _s_where(const Tensor & condition, const Tensor & self, const Tensor & other); // aten::_s_where(Tensor condition, Tensor self, Tensor other) -> Tensor
 static Tensor _softmax(const Tensor & self, int64_t dim, bool half_to_float); // aten::_softmax(Tensor self, int dim, bool half_to_float) -> Tensor
 static Tensor _softmax_backward_data(const Tensor & grad_output, const Tensor & output, int64_t dim, const Tensor & self); // aten::_softmax_backward_data(Tensor grad_output, Tensor output, int dim, Tensor self) -> Tensor
@@ -282,6 +285,8 @@ static Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, Sc
 static Tensor & index_fill_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & value); // aten::index_fill_.int_Tensor(Tensor(a!) self, int dim, Tensor index, Tensor value) -> Tensor(a!)
 static Tensor index_select(const Tensor & self, int64_t dim, const Tensor & index); // aten::index_select(Tensor self, int dim, Tensor index) -> Tensor
 static Tensor & index_select_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index); // aten::index_select.out(Tensor self, int dim, Tensor index, *, Tensor(a!) out) -> Tensor(a!)
+static Tensor inverse(const Tensor & self); // aten::inverse(Tensor self) -> Tensor
+static Tensor & inverse_out(Tensor & out, const Tensor & self); // aten::inverse.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 static bool is_set_to(const Tensor & self, const Tensor & tensor); // aten::is_set_to(Tensor self, Tensor tensor) -> bool
 static Tensor isnan(const Tensor & self); // aten::isnan(Tensor self) -> Tensor
 static std::tuple<Tensor &,Tensor &> kthvalue_out(Tensor & values, Tensor & indices, const Tensor & self, int64_t k, int64_t dim, bool keepdim); // aten::kthvalue.values(Tensor self, int k, int dim=-1, bool keepdim=False, *, Tensor(a!) values, Tensor(b!) indices) -> (Tensor(a!) values, Tensor(b!) indices)
@@ -324,6 +329,8 @@ static Tensor lt(const Tensor & self, Scalar other); // aten::lt.Scalar(Tensor s
 static Tensor lt(const Tensor & self, const Tensor & other); // aten::lt.Tensor(Tensor self, Tensor other) -> Tensor
 static Tensor & lt_out(Tensor & out, const Tensor & self, Scalar other); // aten::lt.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor & lt_out(Tensor & out, const Tensor & self, const Tensor & other); // aten::lt.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+static Tensor lu_solve(const Tensor & self, const Tensor & LU_data, const Tensor & LU_pivots); // aten::lu_solve(Tensor self, Tensor LU_data, Tensor LU_pivots) -> Tensor
+static Tensor & lu_solve_out(Tensor & out, const Tensor & self, const Tensor & LU_data, const Tensor & LU_pivots); // aten::lu_solve.out(Tensor self, Tensor LU_data, Tensor LU_pivots, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor & masked_fill_(Tensor & self, const Tensor & mask, Scalar value); // aten::masked_fill_.Scalar(Tensor(a!) self, Tensor mask, Scalar value) -> Tensor(a!)
 static Tensor & masked_fill_(Tensor & self, const Tensor & mask, const Tensor & value); // aten::masked_fill_.Tensor(Tensor(a!) self, Tensor mask, Tensor value) -> Tensor(a!)
 static Tensor & masked_scatter_(Tensor & self, const Tensor & mask, const Tensor & source); // aten::masked_scatter_(Tensor(a!) self, Tensor mask, Tensor source) -> Tensor(a!)
@@ -424,6 +431,10 @@ static Tensor & normal_(Tensor & self, double mean, double std, Generator * gene
 static Tensor & normal_out(Tensor & out, const Tensor & mean, double std, Generator * generator); // aten::normal.Tensor_float_out(Tensor mean, float std=1, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
 static Tensor & normal_out(Tensor & out, double mean, const Tensor & std, Generator * generator); // aten::normal.float_Tensor_out(float mean, Tensor std, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
 static Tensor & normal_out(Tensor & out, const Tensor & mean, const Tensor & std, Generator * generator); // aten::normal.Tensor_Tensor_out(Tensor mean, Tensor std, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
+static Tensor orgqr(const Tensor & self, const Tensor & input2); // aten::orgqr(Tensor self, Tensor input2) -> Tensor
+static Tensor & orgqr_out(Tensor & out, const Tensor & self, const Tensor & input2); // aten::orgqr.out(Tensor self, Tensor input2, *, Tensor(a!) out) -> Tensor(a!)
+static Tensor ormqr(const Tensor & self, const Tensor & input2, const Tensor & input3, bool left, bool transpose); // aten::ormqr(Tensor self, Tensor input2, Tensor input3, bool left=True, bool transpose=False) -> Tensor
+static Tensor & ormqr_out(Tensor & out, const Tensor & self, const Tensor & input2, const Tensor & input3, bool left, bool transpose); // aten::ormqr.out(Tensor self, Tensor input2, Tensor input3, bool left=True, bool transpose=False, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor pow(const Tensor & self, Scalar exponent); // aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> Tensor
 static Tensor pow(const Tensor & self, const Tensor & exponent); // aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -> Tensor
 static Tensor pow(Scalar self, const Tensor & exponent); // aten::pow.Scalar(Scalar self, Tensor exponent) -> Tensor
@@ -438,6 +449,8 @@ static Tensor prod(const Tensor & self, c10::optional<ScalarType> dtype); // ate
 static Tensor prod(const Tensor & self, int64_t dim, bool keepdim, c10::optional<ScalarType> dtype); // aten::prod.dim_int(Tensor self, int dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor
 static Tensor & prod_out(Tensor & out, const Tensor & self, int64_t dim, bool keepdim, c10::optional<ScalarType> dtype); // aten::prod.int_out(Tensor self, int dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
 static Tensor & put_(Tensor & self, const Tensor & index, const Tensor & source, bool accumulate); // aten::put_(Tensor(a!) self, Tensor index, Tensor source, bool accumulate=False) -> Tensor(a!)
+static std::tuple<Tensor,Tensor> qr(const Tensor & self, bool some); // aten::qr(Tensor self, bool some=True) -> (Tensor Q, Tensor R)
+static std::tuple<Tensor &,Tensor &> qr_out(Tensor & Q, Tensor & R, const Tensor & self, bool some); // aten::qr.Q(Tensor self, bool some=True, *, Tensor(a!) Q, Tensor(b!) R) -> (Tensor(a!) Q, Tensor(b!) R)
 static Tensor quantize_per_channel(const Tensor & self, const Tensor & scales, const Tensor & zero_points, int64_t axis, ScalarType dtype); // aten::quantize_per_channel(Tensor self, Tensor scales, Tensor zero_points, int axis, ScalarType dtype) -> Tensor
 static Tensor quantize_per_tensor(const at::Tensor & self, double scale, int64_t zero_point, at::ScalarType dtype); // aten::quantize_per_tensor(Tensor self, float scale, int zero_point, ScalarType dtype) -> Tensor
 static Tensor & random_(Tensor & self, c10::optional<Generator> generator); // aten::random_(Tensor(a!) self, *, Generator? generator=None) -> Tensor(a!)

@@ -104,47 +104,6 @@ Tensor cholesky_inverse(const Tensor & self, bool upper) {
   return AtenIpexTypeXPU::cholesky_inverse_out(out, self, upper);
 }
 
-std::tuple<Tensor&, Tensor&> geqrf_out(Tensor &ra, Tensor &tau, const Tensor &a) {
-#ifdef USE_ONEMKL
-  TORCH_CHECK(a.dim() == 2, "input must be 2-d matrix. input shape=", a.sizes());
-  TORCH_CHECK(a.numel() != 0, "input must not be empty");
-  auto m = a.size(0); // rows of matrix
-  auto n = a.size(1); // columns of matrix
-
-  ra = native::cloneBatchedColumnMajor(a);
-  tau.resize_(std::min(m, n));
-
-  IPEX_DISPATCH_FLOATING_TYPES(a.scalar_type(), "geqrf_out", [&] {
-    dnnl::primitive_attr attr;
-    assert(attr.get_scratchpad_mode() == dnnl::scratchpad_mode::library);
-    attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-
-    auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-
-    auto lda = m;
-    std::int64_t scratchpadsize = oneapi::mkl::lapack::geqrf_scratchpad_size<scalar_t>(dpcpp_queue, m, n, lda);
-    Tensor scratchpad_at = at::empty({scratchpadsize}, a.options());
-
-    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::lapack::geqrf, dpcpp_queue, m, n, (scalar_t *)ra.data_ptr(), lda, (scalar_t *)tau.data_ptr(), (scalar_t *)scratchpad_at.data_ptr(), scratchpadsize);
-  });
-
-  return std::tuple<Tensor&, Tensor&>(ra, tau);
-#else
-  AT_ERROR("geqrf: oneMKL library not found in compilation");
-#endif
-}
-
-std::tuple<Tensor,Tensor> geqrf(const Tensor &a) {
-  TORCH_CHECK(a.dim() == 2, "input must be 2-d matrix. input shape=", a.sizes());
-  TORCH_CHECK(a.numel() != 0, "input must not be empty");
-  auto m = a.size(0); // rows of matrix
-  auto n = a.size(1); // columns of matrix
-  Tensor ra;
-  Tensor rtau = at::empty({std::min(m, n)}, a.options());
-  AtenIpexTypeXPU::geqrf_out(ra, rtau, a);
-  return std::tuple<Tensor, Tensor>(ra, rtau);
-}
-
 Tensor& ger_out(Tensor & out, const Tensor & self, const Tensor & vec2) {
 #ifdef USE_ONEMKL
   TORCH_CHECK(self.dim() == 1, "input must be 1-d vector. input shape=", self.sizes());
