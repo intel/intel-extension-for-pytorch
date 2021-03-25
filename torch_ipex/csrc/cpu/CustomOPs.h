@@ -14,6 +14,118 @@
 #include <torch/csrc/autograd/variable.h>
 #include <torch/script.h>
 
+class IPEXLayerNorm : public torch::autograd::Function<IPEXLayerNorm> {
+public:
+  static std::tuple<at::Tensor, at::Tensor, at::Tensor> _forward_impl(
+      const at::Tensor & input,
+      at::IntArrayRef normalized_shape,
+      const c10::optional<at::Tensor> & weight,
+      const c10::optional<at::Tensor> & bias,
+      double eps) {
+    try {
+      if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::XPU) {
+        return torch_ipex::cpu::AtenIpexCPUDev::dil_native_layer_norm(
+          input,
+          normalized_shape,
+          weight,
+          bias,
+          eps);
+      }
+    } catch (std::exception &e) {
+#if defined(_DEBUG)
+      TORCH_WARN(e.what());
+#endif
+    }
+
+    return at::native_layer_norm(input, normalized_shape, weight, bias, eps);
+  }
+
+  static at::Tensor _forward(
+      const at::Tensor & input,
+      at::IntArrayRef normalized_shape,
+      const c10::optional<at::Tensor> & weight,
+      const c10::optional<at::Tensor> & bias,
+      double eps) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXLayerNorm::_forward", std::vector<c10::IValue>({}));
+#endif
+    auto res = _forward_impl(input, normalized_shape, weight, bias, eps);
+    return std::get<0>(res);
+  }
+
+  static at::Tensor forward(
+      torch::autograd::AutogradContext *ctx,
+      const at::Tensor & input,
+      at::IntArrayRef normalized_shape,
+      const c10::optional<at::Tensor> & weight,
+      const c10::optional<at::Tensor> & bias,
+      double eps) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXLayerNorm::forward", std::vector<c10::IValue>({}));
+#endif
+    at::AutoNonVariableTypeMode g;
+    auto res = _forward_impl(input, normalized_shape, weight, bias, eps);
+    auto mean = std::get<1>(res);
+    auto rstd = std::get<2>(res);
+    ctx->saved_data["normalized_shape"] = normalized_shape;
+    ctx->save_for_backward({
+      input,
+      weight.has_value() ? weight.value() : at::Tensor(),
+      bias.has_value() ? bias.value() : at::Tensor(),
+      mean,
+      rstd});
+
+    return std::get<0>(res);
+  }
+
+  static torch::autograd::tensor_list backward(
+      torch::autograd::AutogradContext *ctx,
+      torch::autograd::tensor_list grad_outputs) {
+#if defined(IPEX_PROFILE_OP)
+    RECORD_FUNCTION("IPEXLayerNorm::backward", std::vector<c10::IValue>({}));
+#endif
+    auto normalized_shape = ctx->saved_data["normalized_shape"].toIntVector();
+    auto saved = ctx->get_saved_variables();
+    at::Tensor input = saved[0];
+    at::Tensor weight = saved[1];
+    at::Tensor bias = saved[2];
+    at::Tensor mean = saved[3];
+    at::Tensor rstd = saved[4];
+
+    at::Tensor grad_output = grad_outputs[0];
+
+    try {
+      if (torch_ipex::check_auto_dnnl() && input.device().type() == c10::DeviceType::XPU) {
+        auto res = torch_ipex::cpu::AtenIpexCPUDev::dil_native_layer_norm_backward(
+          grad_output,
+          input,
+          normalized_shape,
+          mean,
+          rstd,
+          weight,
+          bias,
+          {});
+        return {std::get<0>(res), at::Tensor(), std::get<1>(res), std::get<2>(res), at::Tensor()};
+      }
+    } catch (std::exception &e) {
+#if defined(_DEBUG)
+      TORCH_WARN(e.what());
+#endif
+    }
+
+    auto res = at::native_layer_norm_backward(
+      grad_output,
+      input,
+      normalized_shape,
+      mean,
+      rstd,
+      weight,
+      bias,
+      {});
+    return {std::get<0>(res), at::Tensor(), std::get<1>(res), std::get<2>(res), at::Tensor()};
+  }
+};
+
 class NewLinearOp : public torch::autograd::Function<NewLinearOp> {
 public:
   static at::Tensor _forward(at::Tensor input, at::Tensor weight,

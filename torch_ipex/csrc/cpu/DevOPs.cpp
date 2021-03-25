@@ -2548,7 +2548,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_
   auto M = std::get<3>(inputs);
   auto N = std::get<4>(inputs);
   return dil_native_layer_norm_backward(
-    grad_out,
+    grad_out.is_contiguous() ? grad_out : grad_out.contiguous(),
     X,
     mean,
     rstd,

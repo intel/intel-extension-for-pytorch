@@ -445,7 +445,6 @@ at::Tensor AtenIpexTypeExt::max_pool3d(const at::Tensor &input,
   return std::get<0>(ret);
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // RNN OPS
 
@@ -587,7 +586,7 @@ std::vector<at::Tensor> AtenIpexTypeExt::gru(
 at::Tensor AtenIpexTypeExt::linear_relu(const at::Tensor &input,
                                    const at::Tensor &weight,
                                    const c10::optional<at::Tensor> &bias) {
-  if (bias.has_value()) 
+  if (bias.has_value())
     return cpu::AtenIpexJITDev::dil_linear_fuse_eltwise(input, weight, bias.value(), dil::attr_t::fuse_relu());
   return cpu::AtenIpexJITDev::dil_linear_fuse_eltwise(input, weight, at::Tensor(), dil::attr_t::fuse_relu());
 }
@@ -596,6 +595,29 @@ at::Tensor AtenIpexTypeExt::frozen_batch_norm(const at::Tensor& input, const at:
   if (at::GradMode::is_enabled())
     return FrozenBatchNormOp::apply(input, weight, bias, running_mean, running_var);
   return FrozenBatchNormOp::_forward(input, weight, bias, running_mean, running_var);
+}
+
+at::Tensor AtenIpexTypeExt::layer_norm(
+    const at::Tensor & input,
+    at::IntArrayRef normalized_shape,
+    const c10::optional<at::Tensor> & weight,
+    const c10::optional<at::Tensor> & bias,
+    double eps) {
+  if (at::GradMode::is_enabled()) {
+    return IPEXLayerNorm::apply(
+      input,
+      normalized_shape,
+      weight,
+      bias,
+      eps);
+  } else {
+    return IPEXLayerNorm::_forward(
+      input,
+      normalized_shape,
+      weight,
+      bias,
+      eps);
+  }
 }
 
 } // namespace torch_ipex
@@ -653,5 +675,6 @@ static auto dispatch =
             })
         .op("torch_ipex::interaction_forward", &torch_ipex::AtenIpexTypeExt::interaction_forward)
         .op("torch_ipex::interaction_backward", &torch_ipex::AtenIpexTypeExt::interaction_backward)
-        .op("torch_ipex::frozen_batch_norm", torch_ipex::AtenIpexTypeExt::frozen_batch_norm);
+        .op("torch_ipex::frozen_batch_norm", &torch_ipex::AtenIpexTypeExt::frozen_batch_norm)
+        .op("torch_ipex::layer_norm", &torch_ipex::AtenIpexTypeExt::layer_norm);
 }
