@@ -63,7 +63,7 @@ Tensor dequantize_tensor_per_tensor_affine(
 
 #ifdef USE_PRIMITIVE_CACHE
      lru_key_t key;
-     create_key(key, q_md, r_md);
+     create_key(key, q_md, r_md, scale);
      auto reorder_p = fetch_or_create_m<dnnl::reorder>(key, q_m, r_m, attr);
 #else
      auto reorder_p = dnnl::reorder(q_m, r_m, attr);

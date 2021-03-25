@@ -175,7 +175,14 @@ Tensor quantize_tensor_per_tensor_affine(
   int mask = 0;
   attr.set_output_scales(mask, {static_cast<float>(1.0f / scale)});
   attr.set_zero_points(DNNL_ARG_DST, mask, {static_cast<int>(zero_point)});
-  reorder reorder_p = reorder(r_m, q_m, attr);
+
+#ifdef USE_PRIMITIVE_CACHE
+     lru_key_t key;
+     create_key(key, r_md, q_md, scale);
+     auto reorder_p = fetch_or_create_m<dnnl::reorder>(key, r_m, q_m, attr);
+#else
+     auto reorder_p = dnnl::reorder(r_m, q_m, attr);
+#endif
 
   DPCPP_ONEDNN_EXEC(reorder_p, stream, {{DNNL_ARG_FROM, r_m}, {DNNL_ARG_TO, q_m}});
 
