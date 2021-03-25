@@ -63,7 +63,6 @@ void adaptive_avg_pool3d_out_template(
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
 
   auto alg_kind = algorithm::pooling_avg_exclude_padding;
-  auto prop_kind = prop_kind::forward_training;
 
   Tensor input_ = input.contiguous();
 
@@ -73,63 +72,27 @@ void adaptive_avg_pool3d_out_template(
     output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
   }
 
-  if(!input_.is_quantized()){
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        input_.scalar_type(),
-        "adaptive_avg_pool3d",
-        [&] {
-          avg_pool_out_frame<scalar_t>(
-            input_,
-            output,
-            nbatch,
-            nblock,
-            inputDepth,
-            inputHeight,
-            inputWidth,
-            outputDepth,
-            outputHeight,
-            outputWidth,
-            kD,
-            kH,
-            kW,
-            dD,
-            dH,
-            dW,
-            padD,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-        });
-  } else {
-    IPEX_DISPATCH_QINT_TYPES(
-        input_.scalar_type(), "q_adaptive_avg_pool3d", [&] {
-          avg_pool_out_frame<scalar_t>(
-            input_,
-            output,
-            nbatch,
-            nblock,
-            inputDepth,
-            inputHeight,
-            inputWidth,
-            outputDepth,
-            outputHeight,
-            outputWidth,
-            kD,
-            kH,
-            kW,
-            dD,
-            dH,
-            dW,
-            padD,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-        });
-  }
+  avg_pool_out_frame<algorithm::pooling_avg_exclude_padding>(
+    input_,
+    output,
+    nbatch,
+    nblock,
+    inputDepth,
+    inputHeight,
+    inputWidth,
+    outputDepth,
+    outputHeight,
+    outputWidth,
+    kD,
+    kH,
+    kW,
+    dD,
+    dH,
+    dW,
+    padD,
+    padH,
+    padW);
+
 }
 
 Tensor& adaptive_avg_pool3d_backward_out_template(
@@ -166,41 +129,28 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
   int padH = (dH * (gradOutputHeight - 1) + kH - gradInputHeight) / 2;
   int padW = (dW * (gradOutputWidth - 1) + kW - gradInputWidth) / 2;
 
-  auto alg_kind = algorithm::pooling_avg_exclude_padding;
-  auto prop_kind = prop_kind::forward_training;
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      input.scalar_type(), 
-      "adaptive_avg_pool3d_backward", 
-      [&] {
-        scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();
-        scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();
+  avg_pool_backward_out_frame<algorithm::pooling_avg_exclude_padding>(
+      gradInput,
+      gradOutput,
+      nbatch,
+      nblock,
+      gradInputDepth,
+      gradInputHeight,
+      gradInputWidth,
+      gradOutputDepth,
+      gradOutputHeight,
+      gradOutputWidth,
+      kD,
+      kH,
+      kW,
+      dD,
+      dH,
+      dW,
+      padD,
+      padH,
+      padW);
 
-        avg_pool_backward_out_frame<scalar_t>(
-            gradInput_data,
-            gradOutput_data,
-            nbatch,
-            nblock,
-            gradInputDepth,
-            gradInputHeight,
-            gradInputWidth,
-            gradOutputDepth,
-            gradOutputHeight,
-            gradOutputWidth,
-            kD,
-            kH,
-            kW,
-            dD,
-            dH,
-            dW,
-            padD,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-      });
   return gradInput;
 }
 

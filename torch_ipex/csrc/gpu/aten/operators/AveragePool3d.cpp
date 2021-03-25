@@ -113,67 +113,51 @@ void avg_pool3d_out_template(
 
   TORCH_CHECK(output.is_contiguous(), "avg_pool3d: output must be contiguous");
 
-  auto alg_kind = count_include_pad ? algorithm::pooling_avg_include_padding
-                                    : algorithm::pooling_avg_exclude_padding;
-  auto prop_kind = dnnl::prop_kind::forward_training;
-
-  if(!input_.is_quantized()){
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        input_.scalar_type(),
-        "avg_pool3d_out_frame",
-        [&] {
-          avg_pool_out_frame<scalar_t>(
-            input_,
-            output,
-            nbatch,
-            nblock,
-            idepth,
-            iheight,
-            iwidth,
-            outputDepth,
-            outputHeight,
-            outputWidth,
-            kD,
-            kH,
-            kW,
-            dD,
-            dH,
-            dW,
-            padD,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-        });
+  if (count_include_pad) {
+    avg_pool_out_frame<algorithm::pooling_avg_include_padding>(
+      input_,
+      output,
+      nbatch,
+      nblock,
+      idepth,
+      iheight,
+      iwidth,
+      outputDepth,
+      outputHeight,
+      outputWidth,
+      kD,
+      kH,
+      kW,
+      dD,
+      dH,
+      dW,
+      padD,
+      padH,
+      padW);
   } else {
-    IPEX_DISPATCH_QINT_TYPES(
-        input_.scalar_type(), "q_avg_pool3d_out_frame", [&] {
-    avg_pool_out_frame<scalar_t>(
-            input_,
-            output,
-            nbatch,
-            nblock,
-            idepth,
-            iheight,
-            iwidth,
-            outputDepth,
-            outputHeight,
-            outputWidth,
-            kD,
-            kH,
-            kW,
-            dD,
-            dH,
-            dW,
-            padD,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-        });
+    avg_pool_out_frame<algorithm::pooling_avg_exclude_padding>(
+      input_,
+      output,
+      nbatch,
+      nblock,
+      idepth,
+      iheight,
+      iwidth,
+      outputDepth,
+      outputHeight,
+      outputWidth,
+      kD,
+      kH,
+      kW,
+      dD,
+      dH,
+      dW,
+      padD,
+      padH,
+      padW);      
   }
+
+
 }
 
 Tensor& avg_pool3d_backward_out_template(
@@ -287,42 +271,52 @@ Tensor& avg_pool3d_backward_out_template(
         work_grad_output.reshape({nbatch * nblock, odepth, oheight, owidth});
   }
 
-  auto alg_kind = count_include_pad ? algorithm::pooling_avg_include_padding
-                                    : algorithm::pooling_avg_exclude_padding;
-  auto prop_kind = dnnl::prop_kind::forward_training;
+  if (count_include_pad) {
+    avg_pool_backward_out_frame<algorithm::pooling_avg_include_padding>(
+        gradInput,
+        gradOutput,
+        nbatch,
+        nblock,
+        idepth,
+        iheight,
+        iwidth,
+        odepth,
+        oheight,
+        owidth,
+        kD,
+        kH,
+        kW,
+        dD,
+        dH,
+        dW,
+        padD,
+        padH,
+        padW);
+  } else {
+    avg_pool_backward_out_frame<algorithm::pooling_avg_exclude_padding>(
+        gradInput,
+        gradOutput,
+        nbatch,
+        nblock,
+        idepth,
+        iheight,
+        iwidth,
+        odepth,
+        oheight,
+        owidth,
+        kD,
+        kH,
+        kW,
+        dD,
+        dH,
+        dW,
+        padD,
+        padH,
+        padW);  
+  }
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      input.scalar_type(), 
-      "avg_pool3d_backward_out_frame", 
-      [&] {
-        scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();
-        scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();
 
-        avg_pool_backward_out_frame<scalar_t>(
-            gradInput_data,
-            gradOutput_data,
-            nbatch,
-            nblock,
-            idepth,
-            iheight,
-            iwidth,
-            odepth,
-            oheight,
-            owidth,
-            kD,
-            kH,
-            kW,
-            dD,
-            dH,
-            dW,
-            padD,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-      });
+
 
   return gradInput;
 }

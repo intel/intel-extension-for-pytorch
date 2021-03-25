@@ -75,70 +75,50 @@ void avg_pool2d_out_template(
 
   output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
 
-  TORCH_CHECK(output.is_contiguous(), "avg_pool2d: output must be contiguous");
-
   Tensor input = input_.contiguous();
 
-  auto alg_kind = count_include_pad ? algorithm::pooling_avg_include_padding
-    : algorithm::pooling_avg_exclude_padding;
-  auto prop_kind = dnnl::prop_kind::forward_training;
-
-  if(!input.is_quantized()){
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        input.scalar_type(),
-        "avg_pool2d_out_frame",
-        [&] {
-          avg_pool_out_frame<scalar_t>(
-            input,
-            output,
-            nbatch,
-            nInputPlane,
-            0,
-            inputHeight,
-            inputWidth,
-            0,
-            outputHeight,
-            outputWidth,
-            0,
-            kH,
-            kW,
-            0,
-            dH,
-            dW,
-            0,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-        });
+  if (count_include_pad) {
+    avg_pool_out_frame<algorithm::pooling_avg_include_padding>(
+      input,
+      output,
+      nbatch,
+      nInputPlane,
+      0,
+      inputHeight,
+      inputWidth,
+      0,
+      outputHeight,
+      outputWidth,
+      0,
+      kH,
+      kW,
+      0,
+      dH,
+      dW,
+      0,
+      padH,
+      padW);
   } else {
-    IPEX_DISPATCH_QINT_TYPES(
-        input.scalar_type(), "q_avg_pool2d_out_frame", [&] {
-        avg_pool_out_frame<scalar_t>(
-            input,
-            output,
-            nbatch,
-            nInputPlane,
-            0,
-            inputHeight,
-            inputWidth,
-            0,
-            outputHeight,
-            outputWidth,
-            0,
-            kH,
-            kW,
-            0,
-            dH,
-            dW,
-            0,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-        });
+    avg_pool_out_frame<algorithm::pooling_avg_exclude_padding>(
+      input,
+      output,
+      nbatch,
+      nInputPlane,
+      0,
+      inputHeight,
+      inputWidth,
+      0,
+      outputHeight,
+      outputWidth,
+      0,
+      kH,
+      kW,
+      0,
+      dH,
+      dW,
+      0,
+      padH,
+      padW);    
   }
 }
 
@@ -204,47 +184,51 @@ Tensor& avg_pool2d_backward_out_template(
   /* get contiguous gradOutput */
   const Tensor gradOutput = gradOutput_.contiguous();
 
-  /* resize */
-  gradInput.resize_as_(input);
-  gradInput.zero_();
-  TORCH_CHECK(gradInput.is_contiguous(), "gradInput must be contiguous");
+  if (count_include_pad){
+    avg_pool_backward_out_frame<algorithm::pooling_avg_include_padding>(
+        gradInput,
+        gradOutput,
+        nbatch,
+        nInputPlane,
+        0,
+        inputHeight,
+        inputWidth,
+        0,
+        outputHeight,
+        outputWidth,
+        0,
+        kH,
+        kW,
+        0,
+        dH,
+        dW,
+        0,
+        padH,
+        padW);
+  } else {
+    avg_pool_backward_out_frame<algorithm::pooling_avg_exclude_padding>(
+        gradInput,
+        gradOutput,
+        nbatch,
+        nInputPlane,
+        0,
+        inputHeight,
+        inputWidth,
+        0,
+        outputHeight,
+        outputWidth,
+        0,
+        kH,
+        kW,
+        0,
+        dH,
+        dW,
+        0,
+        padH,
+        padW); 
+  }
 
-  auto alg_kind = count_include_pad ? algorithm::pooling_avg_include_padding
-    : algorithm::pooling_avg_exclude_padding;
-  auto prop_kind = dnnl::prop_kind::forward_training;
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      input.scalar_type(),
-      "avg_pool2d_backward_out_frame",
-      [&] {
-        scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();
-        scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();
-
-        avg_pool_backward_out_frame<scalar_t>(
-            gradInput_data,
-            gradOutput_data,
-            nbatch,
-            nInputPlane,
-            0,
-            inputHeight,
-            inputWidth,
-            0,
-            outputHeight,
-            outputWidth,
-            0,
-            kH,
-            kW,
-            0,
-            dH,
-            dW,
-            0,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-      });
   return gradInput;
 }
 
@@ -338,7 +322,7 @@ Tensor avg_pool2d_backward(
     bool ceil_mode,
     bool count_include_pad,
     c10::optional<int64_t> divisor_override) {
-  Tensor grad_input = at::zeros_like(input, MemoryFormat::Contiguous);
+  Tensor grad_input = at::empty_like(input, MemoryFormat::Contiguous);
   return at::AtenIpexTypeXPU::avg_pool2d_backward_out(
       grad_input,
       grad_output,

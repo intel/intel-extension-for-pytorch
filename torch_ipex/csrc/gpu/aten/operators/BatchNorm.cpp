@@ -281,13 +281,14 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   Tensor grad_bias;
 
   if (grad_input_mask[0]) {
-    grad_input = at::empty_like(input);
+    if (!lazy_reorder_enabled())
+      grad_input = at::empty_like(input);
   }
   if (grad_input_mask[1]) {
-    grad_weight = at::empty_like(weight);
+      grad_weight = at::empty_like(weight);
   }
   if (grad_input_mask[2]) {
-    grad_bias = at::empty_like(weight);
+      grad_bias = at::empty_like(weight);
   }
 
   // backward only support training mode
@@ -308,12 +309,38 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   impl::get_dnnl_format(input, dnnl_format, input_tz);
   auto data_t = dt_to_dnnl(input.scalar_type());
 
-  auto input_md = memory::desc({input_tz}, data_t, dnnl_format);
-  auto grad_output_md = input_md;
+  auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
+  auto input_md = input_ctx.is_plain() ? memory::desc({input_tz}, data_t, dnnl_format) :
+      input_ctx.meta();
+  auto input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
+  auto input_memory = input_usr_memory;
+
+  auto grad_output_ctx =
+      at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_output);
+  auto grad_output_md = grad_output_ctx.is_plain() ? memory::desc({input_tz}, data_t, dnnl_format) :
+      grad_output_ctx.meta();
+  auto grad_output_usr_memory = dpcpp_onednn_memory(grad_output_md, engine, grad_output.data_ptr());
+  auto grad_output_memory = grad_output_usr_memory;
+
   batch_normalization_forward::desc batch_norm_forward_desc(
       prop_kind::forward_training, input_md, epsilon, flags);
   auto batch_norm_forward_pd = batch_normalization_forward::primitive_desc(
       batch_norm_forward_desc, engine);
+
+  auto expected_output_md = batch_norm_forward_pd.dst_desc();
+  Tensor grad_output_opt;
+  if (grad_output_ctx.is_plain() && (!input_ctx.is_plain())) {
+    grad_output_opt = at::empty_like(input);
+    grad_output_memory = dpcpp_onednn_memory(expected_output_md, engine, grad_output_opt.data_ptr());
+    grad_output_md = expected_output_md;
+    DPCPP_ONEDNN_EXEC(reorder(grad_output_usr_memory, grad_output_memory),
+        strm, {{DNNL_ARG_FROM, grad_output_usr_memory}, {DNNL_ARG_TO, grad_output_memory}});
+  }
+
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  create_key(key, grad_output_md, input_md, epsilon, flags);
+#endif
 
   prop_kind p_kind;
 
@@ -338,12 +365,6 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   auto bn_bwd_pd = batch_normalization_backward::primitive_desc(
       bwd_desc, engine, batch_norm_forward_pd);
 
-  auto input_usr_memory = dpcpp_onednn_memory(
-      {input_tz, data_t, dnnl_format}, engine, input.data_ptr());
-
-  auto grad_output_memory = dpcpp_onednn_memory(
-      {input_tz, data_t, dnnl_format}, engine, grad_output.data_ptr());
-
   memory mean_memory, var_memory;
   if (training) {
     mean_memory = dpcpp_onednn_memory(
@@ -356,14 +377,25 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     var_memory = dpcpp_onednn_memory(
         batch_norm_forward_pd.variance_desc(), engine, running_var.data_ptr());
   }
-
+  
+  if (lazy_reorder_enabled()) {
+    if (!grad_output_ctx.is_plain()) {
+      grad_input = at::AtenIpexTypeXPU::empty_opaque_tensor(bn_bwd_pd.diff_src_desc(), grad_output.options(), c10::nullopt);
+    } else {
+      grad_input = at::empty_like(grad_output);
+    }
+  }
   auto grad_input_memory = dpcpp_onednn_memory(
-      {input_tz, data_t, dnnl_format}, engine, grad_input.data_ptr());
+      bn_bwd_pd.diff_src_desc(), engine, grad_input.data_ptr());
 
+#ifdef USE_PRIMITIVE_CACHE
+  auto bn_bwd = fetch_or_create_m<batch_normalization_backward>(key, bn_bwd_pd);
+#else
   auto bn_bwd = batch_normalization_backward(bn_bwd_pd);
+#endif
 
   std::unordered_map<int, memory> args = {
-      {DNNL_ARG_SRC, input_usr_memory},
+      {DNNL_ARG_SRC, input_memory},
       {DNNL_ARG_DIFF_DST, grad_output_memory},
       {DNNL_ARG_MEAN, mean_memory},
       {DNNL_ARG_VARIANCE, var_memory},
@@ -373,6 +405,8 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   Tensor grad_weight_bias;
   if ((bool)(flags & normalization_flags::use_scale_shift)) {
     auto weight_bias = at::empty(2 * feature_num, weight.options());
+    auto weight_bias_memory = dpcpp_onednn_memory(
+        batch_norm_forward_pd.weights_desc(), engine, weight_bias.data_ptr());
     dpcppMemcpyAsync(
         weight_bias.data_ptr(),
         weight.data_ptr(),
@@ -382,8 +416,6 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
         static_cast<uint8_t*>(weight_bias.data_ptr()) + feature_num * sizeof(float),
         0,
         feature_num * sizeof(float));
-    auto weight_bias_memory = dpcpp_onednn_memory(
-        batch_norm_forward_pd.weights_desc(), engine, weight_bias.data_ptr());
 
     grad_weight_bias = at::empty(2 * feature_num, weight.options());
     auto grad_weight_bias_memory = dpcpp_onednn_memory(

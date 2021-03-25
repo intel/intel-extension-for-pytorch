@@ -62,42 +62,32 @@ void adaptive_max_pool2d_out_template(
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
 
-  auto alg_kind = algorithm::pooling_max;
-  auto prop_kind = dnnl::prop_kind::forward_training;
-
   output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
   indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      input_.scalar_type(),
-      "adaptive_max_pool2d",
-      [&] {
-        max_pool_out_frame<scalar_t>(
-            input_,
-            output,
-            indices,
-            nbatch,
-            nInputPlane,
-            0,
-            inputHeight,
-            inputWidth,
-            0,
-            outputHeight,
-            outputWidth,
-            0,
-            kH,
-            kW,
-            0,
-            dH,
-            dW,
-            0,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-      });
+
+  max_pool_out_frame<algorithm::pooling_max>(
+    input_,
+    output,
+    indices,
+    nbatch,
+    nInputPlane,
+    0,
+    inputHeight,
+    inputWidth,
+    0,
+    outputHeight,
+    outputWidth,
+    0,
+    kH,
+    kW,
+    0,
+    dH,
+    dW,
+    0,
+    padH,
+    padW);
+
 }
 
 Tensor& adaptive_max_pool2d_backward_out_template(
@@ -131,46 +121,28 @@ Tensor& adaptive_max_pool2d_backward_out_template(
   int padW = (dW * (gradOutputWidth - 1) + kW - gradInputWidth) / 2;
 
   gradInput.resize_as_(input);
-  gradInput.zero_();
 
-  auto alg_kind = algorithm::pooling_max;
-  auto prop_kind = dnnl::prop_kind::forward_training;
-
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      input.scalar_type(),
-      "adaptive_max_pool2d_backward",
-      [&] {
-        /* get raw pointers */
-        scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();
-        scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();
-        int64_t* indices_data = indices.data_ptr<int64_t>();
-
-        max_pool_backward_out_frame<scalar_t>(
-            gradInput_data,
-            gradOutput_data,
-            indices_data,
-            nbatch,
-            nPlane,
-            0,
-            gradInputHeight,
-            gradInputWidth,
-            0,
-            gradOutputHeight,
-            gradOutputWidth,
-            0,
-            kH,
-            kW,
-            0,
-            dH,
-            dW,
-            0,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-      });
+  max_pool_backward_out_frame<algorithm::pooling_max>(
+      gradInput,
+      gradOutput,
+      indices,
+      nbatch,
+      nPlane,
+      0,
+      gradInputHeight,
+      gradInputWidth,
+      0,
+      gradOutputHeight,
+      gradOutputWidth,
+      0,
+      kH,
+      kW,
+      0,
+      dH,
+      dW,
+      0,
+      padH,
+      padW);
   return gradInput;
 }
 
@@ -209,7 +181,7 @@ Tensor adaptive_max_pool2d_backward(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& indices) {
-  auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
+  auto grad_input = at::empty_like(self, MemoryFormat::Contiguous);
   return at::AtenIpexTypeXPU::adaptive_max_pool2d_backward_out(
       grad_input, grad_output, self, indices);
 }

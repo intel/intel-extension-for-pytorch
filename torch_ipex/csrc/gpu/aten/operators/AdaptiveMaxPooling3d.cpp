@@ -80,33 +80,27 @@ void adaptive_max_pool3d_out_template(
     indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
   }
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half, at::ScalarType::BFloat16,
-      input_.scalar_type(), "adaptive_max_pool3d", [&] {
-        max_pool_out_frame<scalar_t>(
-            input_,
-            output,
-            indices,
-            nbatch,
-            nblock,
-            inputDepth,
-            inputHeight,
-            inputWidth,
-            outputDepth,
-            outputHeight,
-            outputWidth,
-            kD,
-            kH,
-            kW,
-            dD,
-            dH,
-            dW,
-            padD,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-      });
+  max_pool_out_frame<algorithm::pooling_max>(
+      input_,
+      output,
+      indices,
+      nbatch,
+      nblock,
+      inputDepth,
+      inputHeight,
+      inputWidth,
+      outputDepth,
+      outputHeight,
+      outputWidth,
+      kD,
+      kH,
+      kW,
+      dD,
+      dH,
+      dW,
+      padD,
+      padH,
+      padW);
 }
 
 Tensor& adaptive_max_pool3d_backward_out_template(
@@ -147,41 +141,27 @@ Tensor& adaptive_max_pool3d_backward_out_template(
   gradInput.resize_as_(input);
   gradInput.zero_();
 
-  auto alg_kind = algorithm::pooling_max;
-  auto prop_kind = dnnl::prop_kind::forward_training;
-
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      input.scalar_type(), "adaptive_max_pool3d_backward", [&] {
-        /* get raw pointers */
-        scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();
-        scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();
-        int64_t* indices_data = indices.data_ptr<int64_t>();
-
-        max_pool_backward_out_frame<scalar_t>(
-            gradInput_data,
-            gradOutput_data,
-            indices_data,
-            nbatch,
-            nblock,
-            gradInputDepth,
-            gradInputHeight,
-            gradInputWidth,
-            gradOutputDepth,
-            gradOutputHeight,
-            gradOutputWidth,
-            kD,
-            kH,
-            kW,
-            dD,
-            dH,
-            dW,
-            padD,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-      });
+  max_pool_backward_out_frame<algorithm::pooling_max>(
+      gradInput,
+      gradOutput,
+      indices,
+      nbatch,
+      nblock,
+      gradInputDepth,
+      gradInputHeight,
+      gradInputWidth,
+      gradOutputDepth,
+      gradOutputHeight,
+      gradOutputWidth,
+      kD,
+      kH,
+      kW,
+      dD,
+      dH,
+      dW,
+      padD,
+      padH,
+      padW);
   return gradInput;
 }
 

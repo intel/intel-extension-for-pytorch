@@ -91,65 +91,27 @@ void max_pool2d_with_indices_out_template(
   auto alg_kind = algorithm::pooling_max;
   auto prop_kind = dnnl::prop_kind::forward_training;
   
-  if(!input.is_quantized()){
-    IPEX_DISPATCH_FLOATING_TYPES_AND2(
-        at::ScalarType::Half,
-        at::ScalarType::BFloat16,
-        input.scalar_type(),
-        "max_pool2d_with_indices",
-        [&] {
-          max_pool_out_frame<scalar_t>(
-              input,
-              output,
-              indices,
-              nbatch,
-              nInputPlane,
-              0,
-              inputHeight,
-              inputWidth,
-              0,
-              outputHeight,
-              outputWidth,
-              0,
-              kH,
-              kW,
-              0,
-              dH,
-              dW,
-              0,
-              padH,
-              padW,
-              alg_kind,
-              prop_kind);
-        });
-  } else {
-    IPEX_DISPATCH_QINT_TYPES(
-        input.scalar_type(), "q_max_pool2d_with_indices", [&] {
-          max_pool_out_frame<scalar_t>(
-              input,
-              output,
-              indices,
-              nbatch,
-              nInputPlane,
-              0,
-              inputHeight,
-              inputWidth,
-              0,
-              outputHeight,
-              outputWidth,
-              0,
-              kH,
-              kW,
-              0,
-              dH,
-              dW,
-              0,
-              padH,
-              padW,
-              alg_kind,
-              prop_kind);
-        });
-  }
+  max_pool_out_frame<algorithm::pooling_max>(
+      input,
+      output,
+      indices,
+      nbatch,
+      nInputPlane,
+      0,
+      inputHeight,
+      inputWidth,
+      0,
+      outputHeight,
+      outputWidth,
+      0,
+      kH,
+      kW,
+      0,
+      dH,
+      dW,
+      0,
+      padH,
+      padW);
 }
 
 Tensor& max_pool2d_with_indices_backward_out_template(
@@ -196,10 +158,6 @@ Tensor& max_pool2d_with_indices_backward_out_template(
   /* get contiguous gradOutput */
   const Tensor gradOutput = gradOutput_.contiguous();
 
-  /* resize */
-  gradInput.resize_as_(input);
-  gradInput.zero_();
-
   /* sizes */
   const auto nbatch = input.size(-4);
   const auto nInputPlane = input.size(-3);
@@ -212,9 +170,6 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       inputHeight, kH, padH, dH, dilationH, ceil_mode);
   const auto outputWidth_for_shape_check = pooling_output_shape<int64_t>(
       inputWidth, kW, padW, dW, dilationW, ceil_mode);
-
-  auto alg_kind = algorithm::pooling_max;
-  auto prop_kind = dnnl::prop_kind::forward_training;
 
   max_pool2d_backward_shape_check(
       input,
@@ -235,41 +190,28 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       outputHeight_for_shape_check,
       outputWidth_for_shape_check);
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      input.scalar_type(),
-      "max_pool2d_with_indices_backward",
-      [&] {
-        /* get raw pointers */
-        scalar_t* gradInput_data = gradInput.data_ptr<scalar_t>();
-        scalar_t* gradOutput_data = gradOutput.data_ptr<scalar_t>();
-        int64_t* indices_data = indices.data_ptr<int64_t>();
+  max_pool_backward_out_frame<algorithm::pooling_max>(
+      gradInput,
+      gradOutput,
+      indices,
+      nbatch,
+      nInputPlane,
+      0,
+      inputHeight,
+      inputWidth,
+      0,
+      outputHeight,
+      outputWidth,
+      0,
+      kH,
+      kW,
+      0,
+      dH,
+      dW,
+      0,
+      padH,
+      padW);
 
-        max_pool_backward_out_frame<scalar_t>(
-            gradInput_data,
-            gradOutput_data,
-            indices_data,
-            nbatch,
-            nInputPlane,
-            0,
-            inputHeight,
-            inputWidth,
-            0,
-            outputHeight,
-            outputWidth,
-            0,
-            kH,
-            kW,
-            0,
-            dH,
-            dW,
-            0,
-            padH,
-            padW,
-            alg_kind,
-            prop_kind);
-      });
   return gradInput;
 }
 
@@ -350,7 +292,7 @@ Tensor max_pool2d_with_indices_backward(
     IntArrayRef dilation,
     bool ceil_mode,
     const Tensor& indices) {
-  auto grad_input = at::zeros_like(self, MemoryFormat::Contiguous);
+  auto grad_input = at::empty_like(self, MemoryFormat::Contiguous);
   return at::AtenIpexTypeXPU::max_pool2d_with_indices_backward_out(
       grad_input,
       grad_output,

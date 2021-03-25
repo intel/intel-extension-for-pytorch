@@ -433,8 +433,7 @@ Tensor dpcpp_convolution_backward_input(
   auto expected_grad_input_md = conv_backward_data_pd.diff_src_desc();
   auto grad_input_memory = grad_input_usr_memory;
   if (grad_input_memory.get_desc() != expected_grad_input_md) {
-    auto item_num = static_cast<int64_t>(expected_grad_input_md.get_size() / grad_input.itemsize());
-    grad_input_ = at::AtenIpexTypeXPU::empty({item_num}, grad_input.options(), c10::nullopt);
+    grad_input_ = empty_opaque_tensor(expected_grad_input_md, grad_input.options(), c10::nullopt);
     grad_input_memory = dpcpp_onednn_memory(expected_grad_input_md, engine, grad_input_.data_ptr());
   }
 

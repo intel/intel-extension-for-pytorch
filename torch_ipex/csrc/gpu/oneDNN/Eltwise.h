@@ -105,6 +105,7 @@ static inline void eltwise_backward(
     float beta = 0) {
   Device curDevice = Device(kXPU, current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
+  auto strm = GpuStreamManager::Instance().get_stream();
 
   auto data_t = dt_to_dnnl(src_dst.scalar_type());
   std::vector<int64_t> src_dst_dims;
@@ -117,19 +118,21 @@ static inline void eltwise_backward(
   auto src_dst_md = memory::desc({src_dst_tz}, data_t, format_data);
   auto diff_dst_md = memory::desc({src_dst_tz}, data_t, format_data);
 
-  memory src_dst_memory, diff_dst_memory;
+  memory src_dst_usr_memory, diff_dst_usr_memory;
   if (!lazy_reorder_enabled()) {
-    src_dst_memory  = dpcpp_onednn_memory(src_dst_md, engine, src_dst.data_ptr());
-    diff_dst_memory = dpcpp_onednn_memory(diff_dst_md, engine, diff_dst.data_ptr());
+    src_dst_usr_memory  = dpcpp_onednn_memory(src_dst_md, engine, src_dst.data_ptr());
+    diff_dst_usr_memory = dpcpp_onednn_memory(diff_dst_md, engine, diff_dst.data_ptr());
   } else {
     auto src_dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src_dst);
     src_dst_md = src_dst_ctx.is_plain() ? src_dst_md : src_dst_ctx.meta();
-    src_dst_memory = dpcpp_onednn_memory(src_dst_md, engine, src_dst.data_ptr());
+    src_dst_usr_memory = dpcpp_onednn_memory(src_dst_md, engine, src_dst.data_ptr());
 
     auto diff_dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_dst);
     diff_dst_md = diff_dst_ctx.is_plain() ? diff_dst_md : diff_dst_ctx.meta();
-    diff_dst_memory = dpcpp_onednn_memory(diff_dst_md, engine, diff_dst.data_ptr());
+    diff_dst_usr_memory = dpcpp_onednn_memory(diff_dst_md, engine, diff_dst.data_ptr());
   }
+  auto src_dst_memory = src_dst_usr_memory;
+  auto diff_dst_memory = diff_dst_usr_memory;
 
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
@@ -139,6 +142,19 @@ static inline void eltwise_backward(
   eltwise_forward::desc eltwise_eltwiseFwd_desc(
       prop_kind::forward_training, alg_kind, src_dst_md, alpha, beta);
   auto eltwise_forward_pd =eltwise_forward::primitive_desc(eltwise_eltwiseFwd_desc, engine);
+
+  auto expected_dst_md = eltwise_forward_pd.dst_desc();
+  if (lazy_reorder_enabled()) {
+    auto src_dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src_dst);
+    auto diff_dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_dst);
+    if ((diff_dst_ctx.is_plain()) && (!src_dst_ctx.is_plain())) {
+      auto diff_dst_ = at::empty_like(src_dst);
+      auto diff_dst_memory = dpcpp_onednn_memory(expected_dst_md, engine, diff_dst_.data_ptr());
+      diff_dst_md = expected_dst_md;
+      DPCPP_ONEDNN_EXEC(reorder(diff_dst_usr_memory, diff_dst_memory),
+          strm, {{DNNL_ARG_FROM, diff_dst_usr_memory}, {DNNL_ARG_TO, diff_dst_memory}});
+    } 
+  }
   eltwise_backward::desc eltwise_eltwiseBwd_desc(alg_kind, diff_dst_md, src_dst_md, alpha, beta);
   auto eltwise_backward_pd = eltwise_backward::primitive_desc(
       eltwise_eltwiseBwd_desc, engine, eltwise_forward_pd);
@@ -170,7 +186,7 @@ static inline void eltwise_backward(
   auto eltwise_bwd = dnnl::eltwise_backward(eltwise_backward_pd);
 #endif
 
-  auto strm = GpuStreamManager::Instance().get_stream();
+
   if (alg_kind == algorithm::eltwise_logistic_use_dst_for_bwd) {
     DPCPP_ONEDNN_EXEC(eltwise_bwd, strm,
         {{DNNL_ARG_DST, src_dst_memory},
