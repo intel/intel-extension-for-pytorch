@@ -334,6 +334,52 @@ at::Tensor& relu_(at::Tensor& input) {
   return at::relu_(input);
 }
 
+at::Tensor sigmoid(const at::Tensor& input) {
+  if (check_int8_calibration()) {
+    auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
+    std::vector<std::string> op_inputs, op_outputs;
+    if (it == tensors_flow.end()) {
+      std::string op_input = "sigmoi." + std::to_string(op_id) + ".input";
+      op_inputs.push_back(op_input);
+    } else {
+      op_inputs.push_back(std::get<1>(it->second));
+    }
+
+    auto output = at::sigmoid(input);
+    std::string op_output = "sigmoid." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    tensors_flow.emplace(output.unsafeGetTensorImpl(),
+        val_name{weakref_scales(output.getIntrusivePtr()), op_output});
+    torch_ipex::insert_or_updata_observer({input}, {output}, "sigmoid",
+                                          op_id, op_inputs, op_outputs);
+    return output;
+  }
+
+  int64_t num_ops_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+  bool quantized = torch_ipex::get_int8_quantized_status(num_ops_id);
+  std::vector<std::vector<float>> scales = torch_ipex::get_int8_scales({false}, {false}, num_ops_id);
+
+  if (!quantized) {
+    return at::sigmoid(input);
+  }
+  bool pre_quantized = true, post_quantized = true;
+  std::tie(pre_quantized, post_quantized) = torch_ipex::get_int8_insert_quantized_status(num_ops_id);
+  auto sigmoid_x = input;
+  if (pre_quantized) {
+    // add quantize and dequantize for input.
+    const auto input_q = at::quantize_per_tensor(input, scales[0][0], 0, at::kQInt8);
+    sigmoid_x = input_q.dequantize();
+  }
+  auto output = at::sigmoid(sigmoid_x);
+  // add quantize and dequantize output.
+  if (post_quantized) {
+    auto output_q = at::quantize_per_tensor(output, scales[1][0], 0,  at::kQInt8);
+    return output_q.dequantize();
+  }
+  return output;
+}
+
 at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias) {
   if (torch_ipex::check_int8_calibration()) {
     auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();

@@ -122,5 +122,15 @@ at::Tensor& relu_(at::Tensor& input) {
   return at::relu_(input);
 }
 
+at::Tensor sigmoid(const at::Tensor& input) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  auto target_type = get_autocast_dtype();
+  if (at::ScalarType::Char == target_type) {
+    return int8::sigmoid(input);
+  }
+  // make fall makeFallthrough.
+  return at::sigmoid(input);
+}
+
 } // autocast
 } // torch_ipex

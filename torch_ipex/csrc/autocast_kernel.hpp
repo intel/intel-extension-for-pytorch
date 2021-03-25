@@ -33,5 +33,7 @@ at::Tensor relu(const at::Tensor& input);
 
 at::Tensor& relu_(at::Tensor& input);
 
+at::Tensor sigmoid(const at::Tensor& input);
+
 } // autocast
 } // torch_ipex
