@@ -136,29 +136,18 @@ TORCH_LIBRARY_IMPL(_, AutocastCPU, m) {
 TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
   //user_defined_dtype
   KERNEL_CPU(ADD_NS(conv1d), "conv1d", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, int64_t), user_defined_dtype)
-  //KERNEL_CPU(ADD_NS(conv2d), "conv2d", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, int64_t), user_defined_dtype)
-  KERNEL_CPU(ADD_NS(conv3d), "conv3d", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, int64_t), user_defined_dtype)
   KERNEL_CPU(ADD_NS(_log_softmax), "_log_softmax", Tensor (const Tensor &, int64_t, bool), user_defined_dtype)
   KERNEL_CPU(ADD_NS(bmm), "bmm", Tensor (const Tensor &, const Tensor &), user_defined_dtype)
   KERNEL_CPU(ADD_NS(mm), "mm", Tensor (const Tensor &, const Tensor &), user_defined_dtype)
   KERNEL_CPU(ADD_NS(baddbmm), "baddbmm", Tensor (const Tensor &, const Tensor &, const Tensor &, const Scalar&, const Scalar&), user_defined_dtype)
   KERNEL_CPU(ADD_NS(addmm), "addmm", Tensor (const Tensor &, const Tensor &, const Tensor &, const Scalar&, const Scalar&), user_defined_dtype)
   KERNEL_CPU(ADD_NS(addbmm), "addbmm", Tensor (const Tensor &, const Tensor &, const Tensor &, const Scalar&, const Scalar&), user_defined_dtype)
-  //KERNEL_CPU(ADD_NS(linear), "linear", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&), user_defined_dtype)
   //KERNEL_CPU(ADD_NS(mul), "mul.Tensor", Tensor (const Tensor &, const Tensor &), user_defined_dtype)
   //KERNEL_CPU(ADD_NS(mul), "mul.Scalar", Tensor (const Tensor &, Scalar), user_defined_dtype)
 
   //fp32 cast policy
   KERNEL_CPU(ADD_NS(convolution), "convolution", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, bool, IntArrayRef, int64_t), fp32)
   KERNEL_CPU(ADD_NS(dropout), "dropout", Tensor (const Tensor &, double, bool), fp32)
-  /*
-  m.impl(TORCH_SELECTIVE_NAME("aten::native_batch_norm"),
-         TORCH_FN((&CPU_WrapFunction<DtypeCastPolicy::fp32,
-                                 std::tuple<Tensor,Tensor,Tensor> (const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, bool, double, double),
-                                 std::tuple<Tensor,Tensor,Tensor> (const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, bool, double, double),
-                                 &ADD_NS(native_batch_norm)>::type::call)));
-  */
-  // KERNEL_CPU(ADD_NS(max_pool2d), "max_pool2d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, IntArrayRef, bool), fp32)
   m.impl(TORCH_SELECTIVE_NAME("aten::topk"),
          TORCH_FN((&CPU_WrapFunction<DtypeCastPolicy::fp32,
                                  std::tuple<Tensor,Tensor> (const Tensor &, int64_t, int64_t, bool, bool),
@@ -201,14 +190,15 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
   KERNEL_CPU(ADD_NS(bucketize), "bucketize.Tensor", Tensor (const Tensor &, const Tensor &, bool, bool), fp32)
   KERNEL_CPU(ADD_NS(bucketize), "bucketize.Scalar", Tensor (const Scalar&, const Tensor &, bool, bool), fp32)
   KERNEL_CPU(ADD_NS(instance_norm), "instance_norm", Tensor (const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, bool, double, double, bool), fp32)
-  KERNEL_CPU(ADD_NS(conv_transpose3d), "conv_transpose3d.input", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, int64_t, IntArrayRef), fp32)
 
   // promote
   KERNEL_CPU(ADD_NS(cat), "cat", Tensor (TensorList, int64_t), promote)
   KERNEL_CPU(ADD_NS(stack), "stack", Tensor (TensorList, int64_t), promote)
  
   // for int8 path
-  m.impl(TORCH_SELECTIVE_NAME("aten::conv2d"), TORCH_FN((&torch_ipex::autocast::conv2d))); 
+  m.impl(TORCH_SELECTIVE_NAME("aten::conv2d"), TORCH_FN((&torch_ipex::autocast::conv2d)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::conv3d"), TORCH_FN((&torch_ipex::autocast::conv3d)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::conv_transpose3d.input"), TORCH_FN((&torch_ipex::autocast::conv_transpose3d)));
   m.impl(TORCH_SELECTIVE_NAME("aten::_convolution"), TORCH_FN((&torch_ipex::autocast::_convolution)));
   m.impl(TORCH_SELECTIVE_NAME("aten::_convolution.deprecated"), TORCH_FN((&torch_ipex::autocast::_convolution_deprecated)));
   m.impl(TORCH_SELECTIVE_NAME("aten::batch_norm"), TORCH_FN((&torch_ipex::autocast::batch_norm)));

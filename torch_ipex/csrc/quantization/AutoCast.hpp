@@ -11,6 +11,12 @@ void clear_autocast_cache_int8();
 at::Tensor conv2d(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias,
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups);
 
+at::Tensor conv3d(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias,
+    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups);
+
+at::Tensor conv_transpose3d(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias,
+    at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef output_padding, int64_t groups, at::IntArrayRef dilation);
+
 at::Tensor _convolution(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias,
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
     bool transposed, at::IntArrayRef output_padding, int64_t groups,
