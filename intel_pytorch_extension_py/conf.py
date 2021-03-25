@@ -20,36 +20,34 @@ class AmpConf(object):
                 assert False, 'Can not load a empty file or none existed file, plese first do calibartion step'
 
     # for int8 quantization, will save the date after doing calibration step.
-    def save(self, configure_file):
+    def save(self, configure_file, default_recipe=True):
         core.add_indicators()
         configures = core.get_int8_configures()
+        if default_recipe:
+            configures = self.get_default_recipe(configures)
         with open(configure_file, 'w') as fp:
             json.dump(configures, fp, indent = 4)
 
-    def default_recipe(self, configure_file):
+    def get_default_recipe(self, configures):
         elt_wise = ['relu', 'sigmoid']
         # get default recipe,
         # q+dq+conv+q+dq+relu_ => q+dq+conv+relu
         # q+dq+op1+q+dq+q+dq+op2+q+dq => q+dq+op1+q+dq+op2+q+dq
-        core.add_indicators()
-        configures = core.get_int8_configures()
-        nums_op = len(configures)
+        default_configures = configures
+        nums_op = len(default_configures)
         for i in range(nums_op):
-            current_op = configures[i]
+            current_op = default_configures[i]
             inputs = current_op['inputs_flow']
             op_name = current_op['name']
             for inp in inputs:
                 for j in range(i):
                     # assume op only has one output
-                    if configures[j]['outputs_flow'][0] == inp:
-                        configures[j]['post_quantized'] = False
+                    if default_configures[j]['outputs_flow'][0] == inp:
+                        default_configures[j]['post_quantized'] = False
                         # for conv+relu, linear+relu, not have quant and dequan between them.
                         if op_name in elt_wise \
-                                and (configures[j]['name'] == 'conv2d' \
-                                    or configures[j]['name'] == 'conv3d' \
-                                    or configures[j]['name'] == 'linear'):
-                            configures[i]['pre_quantized'] = False
-        with open(configure_file, 'w') as fp:
-            json.dump(configures, fp, indent = 4)
-
-
+                                and (default_configures[j]['name'] == 'conv2d' \
+                                    or default_configures[j]['name'] == 'conv3d' \
+                                    or default_configures[j]['name'] == 'linear'):
+                            default_configures[i]['pre_quantized'] = False
+        return default_configures
