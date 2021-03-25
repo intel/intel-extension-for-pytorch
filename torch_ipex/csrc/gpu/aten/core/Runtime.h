@@ -134,12 +134,14 @@ struct GpuStreamManager {
   }
 
 #ifdef USE_PERSIST_STREAM
-  dnnl::stream& get_stream(int device_index = 0) {
+  dnnl::stream& get_stream() {
+    int device_index = current_device();
     TORCH_INTERNAL_ASSERT(device_index < at::dpcpp::device_count());
     return *stream_pool.at(device_index);
   }
 #else
-  dnnl::stream get_stream(int device_index = 0) {
+  dnnl::stream get_stream() {
+    int device_index = current_device();
     TORCH_INTERNAL_ASSERT(device_index < at::dpcpp::device_count());
     return dnnl::sycl_interop::make_stream(
         GpuEngineManager::Instance().get_engine({kXPU, device_index}),
