@@ -218,7 +218,7 @@ at::Tensor convolution(
     }
 
     weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_.data_ptr());
-    oneDNN::reorder(weight.reshape(weight_tz), weight_);
+    oneDNN::reorder(weight.view(weight_tz), weight_);
 
     if (weight_cache_enabled()) {
       strm.wait();

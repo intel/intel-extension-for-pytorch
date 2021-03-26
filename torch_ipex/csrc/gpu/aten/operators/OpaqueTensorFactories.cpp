@@ -3,7 +3,6 @@
 #include <tensor/Context.h>
 
 
-
 namespace at {
 namespace AtenIpexTypeXPU {
 

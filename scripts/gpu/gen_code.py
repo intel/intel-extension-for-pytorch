@@ -417,6 +417,7 @@ lazy_reorder_block_list = set([
     'quantize_per_tensor',
     'quantize_per_channel',
     'dequantize',
+    'view',
 ])
 
 

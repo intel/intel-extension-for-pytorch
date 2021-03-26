@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/ipex_type_dpcpp_customized.h>
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -24,7 +25,23 @@ Tensor as_strided(
 }
 
 Tensor view(const Tensor& self, IntArrayRef size) {
-  return at::native::view(self, size);
+  bool inplace_reshape = [&]() -> bool {
+    if (size.size() == 0)
+      return false;
+    int numel = self.numel(), numel_ = 1;
+    for (int d = 0; d < size.size(); d++)
+      numel_ *= size.at(d);
+    if (numel == numel_)
+      return true;
+    else
+      return false;
+  } ();
+
+  Tensor self_ = self;
+  // propagate internal format when inplace reshape
+  if (!inplace_reshape)
+    self_ = at::AtenIpexTypeXPU::to_plain_if_needed(self);
+  return at::native::view(self_, size);
 }
 
 Tensor narrow_copy(
@@ -47,7 +64,23 @@ Tensor unfold(
 
 namespace AtenIpexTypeQuantizedXPU {
 Tensor view(const Tensor& self, IntArrayRef size) {
-  return at::native::view(self, size);
+  bool inplace_reshape = [&]() -> bool {
+    if (size.size() == 0)
+      return false;
+    int numel = self.numel(), numel_ = 1;
+    for (int d = 0; d < size.size(); d++)
+      numel_ *= size.at(d);
+    if (numel == numel_)
+      return true;
+    else
+      return false;
+  } ();
+
+  Tensor self_ = self;
+  // propagate internal format when inplace reshape
+  if (!inplace_reshape)
+    self_ = at::AtenIpexTypeXPU::to_plain_if_needed(self);
+  return at::native::view(self_, size);
 }
 
 Tensor as_strided(
