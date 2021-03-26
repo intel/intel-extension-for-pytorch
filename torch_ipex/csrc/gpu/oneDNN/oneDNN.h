@@ -6,3 +6,4 @@
 #include "Binary.h"
 #include "Eltwise.h"
 #include "Reorder.h"
+#include "LayerNorm.h"

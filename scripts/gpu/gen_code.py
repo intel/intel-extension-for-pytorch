@@ -390,6 +390,7 @@ lazy_reorder_block_list = set([
     'threshold_backward',
     'native_batch_norm',
     'native_batch_norm_backward',
+    'native_layer_norm',
     'add_',
     'add',
     'add_out',

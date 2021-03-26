@@ -79,3 +79,45 @@ class TestNNMethod(TestCase):
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
         self.assertEqual(layer_norm.weight.grad,
                          layer_norm_dpcpp.weight.grad.cpu())
+
+    # pass on latest github oneDNN
+    # will retrieve after oneDNN update
+    '''
+    (feng) gta@gtax-ubuntu-2004:~/feng/intel-pytorch-extension/tests/gpu/examples$ pytest test_layer_norm.py
+    ==================================================================== test session starts =====================================================================
+    platform linux -- Python 3.7.9, pytest-6.2.2, py-1.10.0, pluggy-0.13.1
+    rootdir: /home/gta/feng/intel-pytorch-extension
+    collected 2 items
+
+    test_layer_norm.py ..                                                                                                                                  [100%]
+
+    ====================================================================== warnings summary ======================================================================
+    ../../../../../miniconda3/envs/feng/lib/python3.7/site-packages/torch/testing/_internal/common_utils.py:359
+      /home/gta/miniconda3/envs/feng/lib/python3.7/site-packages/torch/testing/_internal/common_utils.py:359: DeprecationWarning: `np.bool` is a deprecated alias for the builtin `bool`. To silence this warning, use `bool` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.bool_` here.
+        Deprecated in NumPy 1.20; for more details and guidance: https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+            np.bool       : torch.bool,
+
+            -- Docs: https://docs.pytest.org/en/stable/warnings.html
+            ================================================================ 2 passed, 1 warning in 9.13s ================================================================
+    '''
+    # def test_layer_norm_bert(self, dtype=torch.float):
+    #     linear = nn.Linear(512, 512)
+    #     layer_norm1 = nn.LayerNorm(512)
+    #     layer_norm2 = nn.LayerNorm([1024, 512])
+    #     x = torch.randn([1024, 512], device=cpu_device, dtype=torch.float)
+
+    #     y = linear(x)
+    #     ref1 = layer_norm1(y)
+    #     ref2 = layer_norm2(y)
+
+    #     x = x.to(dpcpp_device)
+    #     linear = linear.to(dpcpp_device)
+    #     layer_norm1 = layer_norm1.to(dpcpp_device)
+    #     layer_norm2 = layer_norm2.to(dpcpp_device)
+
+    #     y = linear(x)
+    #     real1 = layer_norm1(y)
+    #     real2 = layer_norm2(y)
+
+    #     self.assertEqual(ref1, real1.cpu(), rtol=10e-5, atol=10e-5)
+    #     self.assertEqual(ref2, real2.cpu(), rtol=10e-5, atol=10e-5)
