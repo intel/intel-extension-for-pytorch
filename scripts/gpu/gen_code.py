@@ -391,6 +391,7 @@ lazy_reorder_block_list = set([
     'native_batch_norm',
     'native_batch_norm_backward',
     'native_layer_norm',
+    'native_layer_norm_backward',
     'add_',
     'add',
     'add_out',
