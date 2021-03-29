@@ -24,6 +24,8 @@
 #include <c10/core/DeviceType.h>
 #include <torch/csrc/Exceptions.h>
 
+#include "cpu/ExtendOPs.h"
+
 namespace torch_ipex {
 namespace {
 
@@ -145,6 +147,9 @@ void InitIpexModuleBindings(py::module m) {
     Int8OptConfig::get_config().set_indicators(indicators);
   });
 
+  // extend OPs
+  m.def("roi_align_forward", &AtenIpexTypeExt::ROIAlign_forward);
+  m.def("roi_align_backward", &AtenIpexTypeExt::ROIAlign_backward);
 }
 }  // namespace
 using namespace torch::jit;
