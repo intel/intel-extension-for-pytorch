@@ -1,5 +1,8 @@
 #include "torch_ipex/csrc/utils.h"
 
+#include <ATen/NativeFunctions.h>
+#include <torch/csrc/autograd/function.h>
+
 #include "Config.hpp"
 // #include "Observer.hpp"
 
@@ -15,8 +18,7 @@ void Int8OptConfig::insert_or_updata_observer(
     // this path is that to set int8 op's configure, using default configures if
     // user not set it. Note: weight's value only set onece.
     std::string observer_algorithm = "min_max";
-    float averaging_constant =
-        0.01; // will be enabled for moving_averager_min_max
+    float averaging_constant = 0.01; // will be enabled for moving_averager_min_max
     std::string weight_granularity = "per_channel";
     const int nums_input = i_min_max_values.size();
     const int nums_output = o_min_max_values.size();
@@ -137,8 +139,23 @@ Int8OptConfig::get_indicator_scales(std::vector<bool> i_uint8_used,
   return  {inputs_scales, outputs_scales};
 }
 
-std::vector<float> Int8OptConfig::get_indicator_weight_scales(int64_t ops_id) {
-   return indicators_[ops_id].get_indicator_weight_scales();
+std::string Int8OptConfig::get_indicator_weight_granularity(const int64_t ops_id) {
+  std::string weight_granularity = "per_channel";
+  // user not set weight granularity, using default granularity
+  if (indicators_.empty()) {
+    return weight_granularity;
+  }
+
+  weight_granularity = indicators_[ops_id].get_indicator_weight_granularity();
+  return weight_granularity;
+}
+
+float Int8OptConfig::get_indicator_weight_scale(const int64_t ops_id) {
+  return indicators_[ops_id].get_indicator_weight_scales()[0];
+}
+
+at::Tensor& Int8OptConfig::get_indicator_weight_tensor_scale(const int64_t ops_id) {
+  return weights_scales_[ops_id];
 }
 
 bool Int8OptConfig::get_indicator_quantized_status(const int64_t ops_id) {
@@ -154,6 +171,13 @@ void Int8OptConfig::set_indicators(std::vector<Indicator> indicators) {
   // have not been handdled properly
   indicators_.reserve(indicators.size());
   for (auto i: indicators){
+    // if weight_granularity is per_channle, first cache the scales tensor for trace.
+    if (i.get_indicator_weight_granularity() == "per_channel") {
+      auto id = i.get_indicator_id();
+      auto w_scales = i.get_indicator_weight_scales();
+      auto casted_scale = at::tensor(w_scales, at::device(at::kCPU).dtype(at::kDouble));
+      weights_scales_.emplace(id, casted_scale);
+    }
     indicators_.emplace_back(i);
   }
 }

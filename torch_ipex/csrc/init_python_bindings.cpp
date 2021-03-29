@@ -117,6 +117,7 @@ void InitIpexModuleBindings(py::module m) {
       std::vector<float> w_scale = {};
       if (i.contains("weight_scale")) {
         w_scale = py::cast<std::vector<float>>(i["weight_scale"]);
+
       }
       std::vector<float> o_scale =
           py::cast<std::vector<float>>(i["outputs_scale"]);

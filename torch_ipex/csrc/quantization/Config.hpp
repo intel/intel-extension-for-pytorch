@@ -1,5 +1,10 @@
 #pragma once
 
+#include <ATen/ATen.h>
+
+#include <ATen/Tensor.h>
+#include <torch/torch.h>
+
 #include "Observer.hpp"
 
 namespace torch_ipex {
@@ -30,7 +35,11 @@ public:
   get_indicator_scales(std::vector<bool> i_uint8_used,
                        std::vector<bool> o_uint8_used, int64_t ops_id);
 
-  std::vector<float> get_indicator_weight_scales(int64_t ops_id);
+  std::string get_indicator_weight_granularity(const int64_t ops_id);
+
+  float get_indicator_weight_scale(const int64_t ops_id);
+
+  at::Tensor& get_indicator_weight_tensor_scale(const int64_t ops_id);
 
   bool get_indicator_quantized_status(const int64_t ops_id);
 
@@ -55,6 +64,7 @@ private:
 private:
   std::vector<Observer> observers_;
   std::vector<Indicator> indicators_;
+  std::unordered_map<int64_t, at::Tensor> weights_scales_;
   thread_local static int64_t current_ops_id;
 };
 

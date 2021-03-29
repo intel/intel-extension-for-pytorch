@@ -43,14 +43,13 @@ void insert_or_updata_observer(const at::TensorList& inputs,
     inputs_min_max_values.push_back({inputs[i].min().item<float>(), inputs[i].max().item<float>()});
   } 
 
-  // TODO: enable per_channel case
-  /*
-  for (auto k = 0; k < weight.size(0); k++) {
-    weight_min_max_values.push_back({weight[k].min().item<float>(), weight[k].max().item<float>()});
+  if (Int8OptConfig::get_config().get_indicator_weight_granularity(ops_id) == "per_channel") {
+    for (auto k = 0; k < weight.size(0); k++) {
+      weight_min_max_values.push_back({weight[k].min().item<float>(), weight[k].max().item<float>()});
+    }
+  } else {
+    weight_min_max_values.push_back({weight.min().item<float>(), weight.max().item<float>()});
   }
-  */
-
-  weight_min_max_values.push_back({weight.min().item<float>(), weight.max().item<float>()});
 
   for (auto j = 0; j < outputs.size(); j++) {
     outputs_min_max_values.push_back({outputs[j].min().item<float>(), outputs[j].max().item<float>()});
@@ -61,14 +60,22 @@ void insert_or_updata_observer(const at::TensorList& inputs,
 }
 
 std::vector<std::vector<float>> get_int8_scales(std::vector<bool> i_uint8_used,
-                                                     std::vector<bool> o_uint8_used,
-                                                     const int64_t ops_id) {
+                                                std::vector<bool> o_uint8_used,
+                                                const int64_t ops_id) {
   return Int8OptConfig::get_config().get_indicator_scales(i_uint8_used,
                                                           o_uint8_used, ops_id);
 }
 
-std::vector<float> get_int8_weight_scales(const int64_t ops_id) {
-  return Int8OptConfig::get_config().get_indicator_weight_scales(ops_id);
+std::string get_int8_weight_granularity(const int64_t ops_id) {
+  return Int8OptConfig::get_config().get_indicator_weight_granularity(ops_id);
+}
+
+float get_int8_weight_scale(const int64_t ops_id) {
+  return Int8OptConfig::get_config().get_indicator_weight_scale(ops_id);
+}
+
+at::Tensor& get_int8_weight_tensor_scale(const int64_t ops_id) {
+  return Int8OptConfig::get_config().get_indicator_weight_tensor_scale(ops_id);
 }
 
 bool get_int8_quantized_status(const int64_t ops_id) {

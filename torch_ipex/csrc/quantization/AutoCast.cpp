@@ -64,8 +64,6 @@ at::Tensor conv2d(const at::Tensor& input, const at::Tensor& weight, const c10::
   bool quantized = torch_ipex::get_int8_quantized_status(num_ops_id);
   std::vector<std::vector<float>> scales = torch_ipex::get_int8_scales(
     {false}, {false}, num_ops_id);
-  std::vector<float> w_scales = torch_ipex::get_int8_weight_scales(num_ops_id);
-
   if (!quantized) {
     return at::conv2d(input, weight, bias, stride, padding, dilation, groups);
   }
@@ -77,21 +75,15 @@ at::Tensor conv2d(const at::Tensor& input, const at::Tensor& weight, const c10::
     // add quantize and dequantize for input and weight.
     const auto input_q = at::quantize_per_tensor(input, scales[0][0], 0, at::kQInt8);
     conv_x = input_q.dequantize();
-    if (w_scales.size() == 1) {
-      auto weight_q = at::quantize_per_tensor(weight, w_scales[0], 0, at::kQInt8);
-      conv_w = weight_q.dequantize();
-    } else {
-      // first cache the scales for imperative path.
-      if (scales_casts.find(weight.unsafeGetTensorImpl()) == scales_casts.end()) {
-        const auto casted_scale = at::tensor(w_scales, at::device(at::kCPU).dtype(at::kDouble));
-        scales_casts.emplace(weight.unsafeGetTensorImpl(),
-            val_scales{weakref_scales(weight.getIntrusivePtr()), casted_scale});
-      }
-      auto it = scales_casts.find(weight.unsafeGetTensorImpl());
-      auto weight_scale = std::get<1>(it->second);
-      auto zero_points = at::zeros(w_scales.size(), at::dtype(at::kLong));
+    if (torch_ipex::get_int8_weight_granularity(num_ops_id) == "per_channel") { 
+      auto& weight_scale = torch_ipex::get_int8_weight_tensor_scale(num_ops_id);
+      auto zero_points = at::zeros(weight_scale.numel(), at::dtype(at::kLong));
       auto weight_q = at::quantize_per_channel(weight, weight_scale, zero_points, 0, c10::kQInt8);
-      conv_w = weight_q.dequantize();
+      conv_w = weight_q.dequantize(); 
+    } else {
+      float w_scale = torch_ipex::get_int8_weight_scale(num_ops_id);
+      auto weight_q = at::quantize_per_tensor(weight, w_scale, 0, at::kQInt8);
+      conv_w = weight_q.dequantize(); 
     }
   }
 
@@ -129,7 +121,6 @@ at::Tensor conv3d(const at::Tensor& input, const at::Tensor& weight, const c10::
   bool quantized = torch_ipex::get_int8_quantized_status(num_ops_id);
   std::vector<std::vector<float>> scales = torch_ipex::get_int8_scales(
     {false}, {false}, num_ops_id);
-  std::vector<float> w_scales = torch_ipex::get_int8_weight_scales(num_ops_id);
 
   if (!quantized) {
     return at::conv3d(input, weight, bias, stride, padding, dilation, groups);
@@ -142,21 +133,15 @@ at::Tensor conv3d(const at::Tensor& input, const at::Tensor& weight, const c10::
     // add quantize and dequantize for input and weight.
     const auto input_q = at::quantize_per_tensor(input, scales[0][0], 0, at::kQInt8);
     conv_x = input_q.dequantize();
-    if (w_scales.size() == 1) {
-      auto weight_q = at::quantize_per_tensor(weight, w_scales[0], 0, at::kQInt8);
-      conv_w = weight_q.dequantize();
-    } else {
-      // first cache the scales for imperative path.
-      if (scales_casts.find(weight.unsafeGetTensorImpl()) == scales_casts.end()) {
-        const auto casted_scale = at::tensor(w_scales, at::device(at::kCPU).dtype(at::kDouble));
-        scales_casts.emplace(weight.unsafeGetTensorImpl(),
-            val_scales{weakref_scales(weight.getIntrusivePtr()), casted_scale});
-      }
-      auto it = scales_casts.find(weight.unsafeGetTensorImpl());
-      auto weight_scale = std::get<1>(it->second);
-      auto zero_points = at::zeros(w_scales.size(), at::dtype(at::kLong));
+    if (torch_ipex::get_int8_weight_granularity(num_ops_id) == "per_channel") { 
+      auto& weight_scale = torch_ipex::get_int8_weight_tensor_scale(num_ops_id);
+      auto zero_points = at::zeros(weight_scale.numel(), at::dtype(at::kLong));
       auto weight_q = at::quantize_per_channel(weight, weight_scale, zero_points, 0, c10::kQInt8);
-      conv_w = weight_q.dequantize();
+      conv_w = weight_q.dequantize(); 
+    } else {
+      float w_scale = torch_ipex::get_int8_weight_scale(num_ops_id);
+      auto weight_q = at::quantize_per_tensor(weight, w_scale, 0, at::kQInt8);
+      conv_w = weight_q.dequantize(); 
     }
   }
 
@@ -195,7 +180,6 @@ at::Tensor conv_transpose3d(const at::Tensor& input, const at::Tensor& weight, c
   bool quantized = torch_ipex::get_int8_quantized_status(num_ops_id);
   std::vector<std::vector<float>> scales = torch_ipex::get_int8_scales(
     {false}, {false}, num_ops_id);
-  std::vector<float> w_scales = torch_ipex::get_int8_weight_scales(num_ops_id);
 
   if (!quantized) {
     return at::conv_transpose3d(input, weight, bias, stride, padding, output_padding, groups, dilation);
@@ -208,21 +192,15 @@ at::Tensor conv_transpose3d(const at::Tensor& input, const at::Tensor& weight, c
     // add quantize and dequantize for input and weight.
     const auto input_q = at::quantize_per_tensor(input, scales[0][0], 0, at::kQInt8);
     conv_x = input_q.dequantize();
-    if (w_scales.size() == 1) {
-      auto weight_q = at::quantize_per_tensor(weight, w_scales[0], 0, at::kQInt8);
-      conv_w = weight_q.dequantize();
-    } else {
-      // first cache the scales for imperative path.
-      if (scales_casts.find(weight.unsafeGetTensorImpl()) == scales_casts.end()) {
-        const auto casted_scale = at::tensor(w_scales, at::device(at::kCPU).dtype(at::kDouble));
-        scales_casts.emplace(weight.unsafeGetTensorImpl(),
-            val_scales{weakref_scales(weight.getIntrusivePtr()), casted_scale});
-      }
-      auto it = scales_casts.find(weight.unsafeGetTensorImpl());
-      auto weight_scale = std::get<1>(it->second);
-      auto zero_points = at::zeros(w_scales.size(), at::dtype(at::kLong));
+    if (torch_ipex::get_int8_weight_granularity(num_ops_id) == "per_channel") { 
+      auto& weight_scale = torch_ipex::get_int8_weight_tensor_scale(num_ops_id);
+      auto zero_points = at::zeros(weight_scale.numel(), at::dtype(at::kLong));
       auto weight_q = at::quantize_per_channel(weight, weight_scale, zero_points, 0, c10::kQInt8);
-      conv_w = weight_q.dequantize();
+      conv_w = weight_q.dequantize(); 
+    } else {
+      float w_scale = torch_ipex::get_int8_weight_scale(num_ops_id);
+      auto weight_q = at::quantize_per_tensor(weight, w_scale, 0, at::kQInt8);
+      conv_w = weight_q.dequantize(); 
     }
   }
 
@@ -256,7 +234,6 @@ at::Tensor _convolution(const at::Tensor& input, const at::Tensor& weight, const
 at::Tensor batch_norm(const at::Tensor& input, const c10::optional<at::Tensor>& weight,
     const c10::optional<at::Tensor>& bias, const c10::optional<at::Tensor>& running_mean, 
     const c10::optional<at::Tensor>& running_var, bool training, double momentum, double eps, bool cudnn_enabled) {
-    std::cout<<"using batch_norm"<<std::endl;
   if (check_int8_calibration()) {
     auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
     auto it = tensors_flow.find(input.unsafeGetTensorImpl());
@@ -537,7 +514,6 @@ at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const c10::
   bool quantized = torch_ipex::get_int8_quantized_status(num_ops_id);
   std::vector<std::vector<float>> scales = torch_ipex::get_int8_scales(
     {false}, {false}, num_ops_id);
-  std::vector<float> w_scales = torch_ipex::get_int8_weight_scales(num_ops_id);
 
   if (!quantized) {
     return at::linear(input, weight, bias);
@@ -550,21 +526,15 @@ at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const c10::
     // add quantize and dequantize for input and weight.
     auto input_q = at::quantize_per_tensor(input, scales[0][0], 0, at::kQInt8);
     linear_x = input_q.dequantize();
-    if (w_scales.size() == 1) {
-      auto weight_q = at::quantize_per_tensor(weight, w_scales[0], 0, at::kQInt8);
-      linear_w = weight_q.dequantize();
-    } else {
-      // first cache the scales for imperative path.
-      if (scales_casts.find(weight.unsafeGetTensorImpl()) == scales_casts.end()) {
-        const auto casted_scale = at::tensor(w_scales, at::device(at::kCPU).dtype(at::kDouble));
-        scales_casts.emplace(weight.unsafeGetTensorImpl(),
-            val_scales{weakref_scales(weight.getIntrusivePtr()), casted_scale});
-      }
-      auto it = scales_casts.find(weight.unsafeGetTensorImpl());
-      auto weight_scale = std::get<1>(it->second);
-      auto zero_points = at::zeros(w_scales.size(), at::dtype(at::kLong));
+    if (torch_ipex::get_int8_weight_granularity(num_ops_id) == "per_channel") { 
+      auto& weight_scale = torch_ipex::get_int8_weight_tensor_scale(num_ops_id);
+      auto zero_points = at::zeros(weight_scale.numel(), at::dtype(at::kLong));
       auto weight_q = at::quantize_per_channel(weight, weight_scale, zero_points, 0, c10::kQInt8);
-      linear_w = weight_q.dequantize();
+      linear_w = weight_q.dequantize(); 
+    } else {
+      float w_scale = torch_ipex::get_int8_weight_scale(num_ops_id);
+      auto weight_q = at::quantize_per_tensor(weight, w_scale, 0, at::kQInt8);
+      linear_w = weight_q.dequantize(); 
     }
   }
   auto output = at::linear(linear_x, linear_w, bias);

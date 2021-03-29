@@ -33,7 +33,7 @@ class Indicator {
 public:
   Indicator(int64_t i = 0, std::string n = "",
             std::string alg = "min_max",
-            std::string granu = "per_tensor",
+            std::string granu = "per_channel",
             std::vector<float> i_scale = {1},
             std::vector<float> w_scales = {},
             std::vector<float> o_scale = {1},

@@ -23,7 +23,11 @@ std::vector<std::vector<float>> get_int8_scales(std::vector<bool> i_uint8_used,
                                                 std::vector<bool> o_uint8_used,
                                                 const int64_t ops_id);
 
-std::vector<float> get_int8_weight_scales(const int64_t ops_id);
+std::string get_int8_weight_granularity(const int64_t ops_id);
+
+float get_int8_weight_scale(const int64_t ops_id);
+
+at::Tensor& get_int8_weight_tensor_scale(const int64_t ops_id);
 
 bool get_int8_quantized_status(const int64_t ops_id);
 
