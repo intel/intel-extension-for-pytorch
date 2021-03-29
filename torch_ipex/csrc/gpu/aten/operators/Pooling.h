@@ -88,8 +88,8 @@ static void avg_pool_out_frame(
                                     : src_ctx.meta();
   }
 
-  lru_key_t key;
 #ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
   create_key(key, src_md, dst_md_any, stride, kernel, padding, padding, alg_kind);
 #endif
   auto pooling_forward_desc = pooling_forward::desc(
@@ -212,8 +212,8 @@ static void avg_pool_backward_out_frame(
     diff_dst_md = diff_dst_ctx.is_plain()? diff_dst_md : diff_dst_ctx.meta();
   }
 
-  lru_key_t key;
 #ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
   create_key(key, diff_src_md_any, diff_dst_md, stride, kernel, padding, padding, alg_kind);
 #endif
   auto pooling_forward_desc = pooling_forward::desc(
@@ -324,8 +324,8 @@ static void max_pool_out_frame(
     src_md = src_ctx.is_plain() ? src_md : src_ctx.meta();
   }
 
-  lru_key_t key;
 #ifdef USE_PRIMITIVE_CACHE
+    lru_key_t key;
     create_key(key, src_md, dst_md_any, stride, kernel, padding, padding, alg_kind);
 #endif
     auto pooling_forward_desc = pooling_forward::desc(
@@ -482,8 +482,8 @@ static void max_pool_backward_out_frame(
     diff_dst_md = diff_dst_ctx.is_plain() ? diff_dst_md : diff_dst_ctx.meta();
   }
 
-  lru_key_t key;
 #ifdef USE_PRIMITIVE_CACHE
+    lru_key_t key;
     create_key(key, diff_src_md_any, diff_dst_md, stride, kernel, padding, padding, alg_kind);
 #endif
   auto pooling_forward_desc = pooling_forward::desc(

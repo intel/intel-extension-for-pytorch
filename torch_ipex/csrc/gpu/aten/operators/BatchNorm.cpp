@@ -281,7 +281,6 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   Tensor grad_bias;
 
   if (grad_input_mask[0]) {
-    if (!lazy_reorder_enabled())
       grad_input = at::empty_like(input);
   }
   if (grad_input_mask[1]) {
@@ -330,7 +329,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   auto expected_output_md = batch_norm_forward_pd.dst_desc();
   Tensor grad_output_opt;
   if (grad_output_ctx.is_plain() && (!input_ctx.is_plain())) {
-    grad_output_opt = at::empty_like(input);
+    grad_output_opt = empty_opaque_tensor(expected_output_md, input.options(), c10::nullopt);
     grad_output_memory = dpcpp_onednn_memory(expected_output_md, engine, grad_output_opt.data_ptr());
     grad_output_md = expected_output_md;
     DPCPP_ONEDNN_EXEC(reorder(grad_output_usr_memory, grad_output_memory),
@@ -377,13 +376,11 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
     var_memory = dpcpp_onednn_memory(
         batch_norm_forward_pd.variance_desc(), engine, running_var.data_ptr());
   }
-  
-  if (lazy_reorder_enabled()) {
-    if (!grad_output_ctx.is_plain()) {
-      grad_input = at::AtenIpexTypeXPU::empty_opaque_tensor(bn_bwd_pd.diff_src_desc(), grad_output.options(), c10::nullopt);
-    } else {
-      grad_input = at::empty_like(grad_output);
-    }
+
+  auto plain_grad_input_md = memory::desc({input_tz, data_t, dnnl_format});
+  auto expected_grad_input_md = bn_bwd_pd.diff_src_desc();
+  if (plain_grad_input_md != expected_grad_input_md) {
+    grad_input = at::AtenIpexTypeXPU::empty_opaque_tensor(bn_bwd_pd.diff_src_desc(), grad_output.options(), c10::nullopt);
   }
   auto grad_input_memory = dpcpp_onednn_memory(
       bn_bwd_pd.diff_src_desc(), engine, grad_input.data_ptr());

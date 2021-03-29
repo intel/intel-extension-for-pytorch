@@ -363,9 +363,10 @@ Tensor _softmax_onednn(
   get_dnnl_format(input, dnnl_format, input_tz);
 
   auto data_t = dt_to_dnnl(input.scalar_type());
-  auto input_md = memory::desc({input_tz}, data_t, dnnl_format);
 
-  auto output = at::empty_like(input);
+  auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
+  auto input_md = input_ctx.is_plain()? memory::desc({input_tz}, data_t, dnnl_format) :
+      input_ctx.meta();
 
   auto axis = dim < 0 ? dim + input.dim(): dim;
 
@@ -379,10 +380,15 @@ Tensor _softmax_onednn(
 
   // Create primitive descriptor.
   auto softmax_forward_pd = softmax_forward::primitive_desc(softmax_forward_desc, engine);
-  auto input_usr_memory = dpcpp_onednn_memory(
-         {input_tz, data_t, dnnl_format}, engine, input.data_ptr());
-  auto output_usr_memory = dpcpp_onednn_memory(
-         {input_tz, data_t, dnnl_format}, engine, output.data_ptr());
+
+  Tensor output;
+  if (input_ctx.is_plain()) {
+    output = at::empty_like(input);
+  } else {
+    output = empty_opaque_tensor(softmax_forward_pd.dst_desc(), input.options(), c10::nullopt);
+  }
+  auto input_usr_memory = dpcpp_onednn_memory(input_md, engine, input.data_ptr());
+  auto output_usr_memory = dpcpp_onednn_memory(softmax_forward_pd.dst_desc(), engine, output.data_ptr());
 
   // Create the primitive.
 #ifdef USE_PRIMITIVE_CACHE
@@ -424,34 +430,48 @@ Tensor _softmax_backward_onednn(
 
   auto output_t = dt_to_dnnl(output.scalar_type());
   auto grad_t = dt_to_dnnl(grad.scalar_type());
-  auto output_md = memory::desc({output_tz}, output_t, output_dnnl_format);
-  auto grad_md = memory::desc({grad_tz}, grad_t, grad_dnnl_format);
 
   auto axis = dim < 0 ? dim + grad.dim(): dim;
 
-  // Create operation descriptor.
-  auto softmax_backward_desc = softmax_backward::desc(grad_md, output_md, axis);
+  auto output_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(output);
+  auto output_md = output_ctx.is_plain() ? memory::desc({output_tz}, output_t, output_dnnl_format) :
+      output_ctx.meta();
+  auto output_memory = dpcpp_onednn_memory(output_md, engine, output.data_ptr());
 
+  auto grad_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad);
+  auto grad_md = grad_ctx.is_plain() ? memory::desc({grad_tz, grad_t, grad_dnnl_format}) :
+      grad_ctx.meta();
+  auto grad_usr_memory = dpcpp_onednn_memory(grad_md, engine, grad.data_ptr());
+
+  auto softmax_forward_desc = softmax_forward::desc(prop_kind::forward, output_md, axis);
+  auto softmax_forward_pd = softmax_forward::primitive_desc(softmax_forward_desc, engine);
+
+  Tensor grad_opt;
+  auto grad_memory = grad_usr_memory;
+  if (grad_ctx.is_plain() && (!output_ctx.is_plain())) {
+    grad_opt = empty_opaque_tensor(softmax_forward_pd.dst_desc(), grad.options(), c10::nullopt);
+    grad_memory = dpcpp_onednn_memory(softmax_forward_pd.dst_desc(), engine, grad_opt.data_ptr());
+    grad_md = softmax_forward_pd.dst_desc();
+    DPCPP_ONEDNN_EXEC(reorder(grad_usr_memory, grad_memory),
+        strm, {{DNNL_ARG_FROM, grad_usr_memory}, {DNNL_ARG_TO, grad_memory}});
+  }
+
+  auto softmax_backward_desc = softmax_backward::desc(grad_md, output_md, axis);
+  auto softmax_backward_pd = softmax_backward::primitive_desc(
+                                                 softmax_backward_desc,
+                                                 engine,
+                                                 softmax_forward_pd);
 #ifdef USE_PRIMITIVE_CACHE
   lru_key_t key;
   create_key (key, grad_md, output_md, axis);
 #endif
 
-  auto softmax_forward_desc = softmax_forward::desc(prop_kind::forward, output_md, axis);
-  auto softmax_forward_pd = softmax_forward::primitive_desc(softmax_forward_desc, engine);
-
-  // Create primitive descriptor.
-  auto softmax_backward_pd = softmax_backward::primitive_desc(
-                                                 softmax_backward_desc,
-                                                 engine,
-                                                 softmax_forward_pd);
-  auto grad_usr_memory = dpcpp_onednn_memory(
-         {grad_tz, grad_t, grad_dnnl_format}, engine, grad.data_ptr());
-
-  auto gi_usr_memory = dpcpp_onednn_memory(
-         {grad_tz, grad_t, grad_dnnl_format}, engine, gI.data_ptr());
-  auto output_usr_memory = dpcpp_onednn_memory(
-         {output_tz, output_t, output_dnnl_format}, engine, output.data_ptr());
+  auto plain_gi_md = memory::desc({grad_tz, grad_t, grad_dnnl_format});
+  auto expected_gi_md = softmax_backward_pd.diff_src_desc();
+  if (plain_gi_md != expected_gi_md) {
+    gI = empty_opaque_tensor(expected_gi_md, grad.options(), c10::nullopt);
+  }
+  auto gi_memory = dpcpp_onednn_memory(expected_gi_md, engine, gI.data_ptr());
 
   // Create the primitive.
 #ifdef USE_PRIMITIVE_CACHE
@@ -465,9 +485,9 @@ Tensor _softmax_backward_onednn(
   DPCPP_ONEDNN_EXEC(
       softmax_onednn_backward,
       strm,
-      {{DNNL_ARG_DST, output_usr_memory},
-      {DNNL_ARG_DIFF_SRC, gi_usr_memory},
-      {DNNL_ARG_DIFF_DST, grad_usr_memory}});
+      {{DNNL_ARG_DST, output_memory},
+      {DNNL_ARG_DIFF_SRC, gi_memory},
+      {DNNL_ARG_DIFF_DST, grad_memory}});
 
   return gI;
 }

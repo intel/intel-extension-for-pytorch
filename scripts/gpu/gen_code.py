@@ -418,6 +418,8 @@ lazy_reorder_block_list = set([
     'quantize_per_tensor',
     'quantize_per_channel',
     'dequantize',
+    '_softmax',
+    '_softmax_backward_data',
     'view',
 ])
 
