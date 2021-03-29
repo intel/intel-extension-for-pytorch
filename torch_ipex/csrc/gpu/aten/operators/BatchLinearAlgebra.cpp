@@ -578,9 +578,8 @@ std::tuple<Tensor, Tensor, Tensor> _lu_with_info(
     self_working_copy = at::empty_like(self);
   } else {
     self_working_copy = native::cloneBatchedColumnMajor(self);
-    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lu_dpcpp", [&] {
-      impl::apply_lu_dpcpp_<scalar_t>(
-          self_working_copy, pivots_tensor, infos_tensor);
+    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lu_dpcpp", [&]{
+      impl::apply_lu_dpcpp_<scalar_t>(self_working_copy, pivots_tensor, infos);
     });
   }
   if (check_errors) {
