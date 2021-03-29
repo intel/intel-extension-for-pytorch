@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 #include <c10/core/StorageImpl.h>
 #include <c10/util/Exception.h>
 #include <c10/util/UniqueVoidPtr.h>

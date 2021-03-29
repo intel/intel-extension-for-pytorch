@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 
 #include "cpu/dil/dil.hpp"
 
@@ -70,7 +70,7 @@ dil::tensor try_gen_dil_tensor(const at::Tensor &input, const dil::tensor::desc&
 
 /**
  * TODO: only for LSTM, may need to rewrite later
- */ 
+ */
 dil::tensor try_gen_dil_tensor(const at::Tensor &input, const std::vector<int64_t> desc_size, const dil::format_tag dil_format_tag);
 dil::tensor try_gen_dil_storage(const at::Tensor& input);
 at::Tensor gen_aten_tensor_by(dil::tensor&& tensor);
@@ -79,7 +79,7 @@ dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor, dil::deleter_pt
 
 /**
  * TODO: only for LSTM, may need to rewrite later
- */ 
+ */
 dil::tensor dil_tensor_from_cpu_buffer(const at::Tensor& tensor, const std::vector<int64_t> desc_size, const dil::format_tag dil_format_tag);
 at::Tensor empty_dil_tensor(at::IntArrayRef sizes, const at::TensorOptions& options);
 void sync_shape_from_dil_to_aten(const at::Tensor& ipex_tensor, const dil::tensor &dil_tensor);

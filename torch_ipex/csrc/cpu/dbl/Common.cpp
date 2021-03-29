@@ -1,7 +1,7 @@
 #include "Common.h"
 
 #include <ATen/ATen.h>
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 #include <c10/util/Exception.h>
 
 #include "cpu/dil/dil_pin_singletons.hpp"

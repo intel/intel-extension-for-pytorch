@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 #include "Common.h"
 #include "cpu/dil/dil.hpp"
 

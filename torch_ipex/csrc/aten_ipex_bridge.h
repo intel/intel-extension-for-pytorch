@@ -2,7 +2,7 @@
 
 #include <ATen/Device.h>
 #include <ATen/Functions.h>
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 #include <ATen/core/List.h>
 #include "cpu/dbl/Common.h"
 

@@ -7,7 +7,7 @@
 #include "torch_ipex/csrc/aten_ipex_bridge.h"
 #include "torch_ipex/csrc/utils.h"
 #include "ShadeDataContext.h"
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 #include <c10/util/Optional.h>
 #include <torch/csrc/autograd/custom_function.h>
 #include <torch/csrc/autograd/function.h>

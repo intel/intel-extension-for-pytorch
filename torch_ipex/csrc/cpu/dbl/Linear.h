@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 
 #include "cpu/dil/dil.hpp"
 
@@ -22,7 +22,7 @@ void prepack_linear_weights(
     const at::Tensor& input,
     const dil::tensor& dil_input,
     const at::Tensor& weight);
-    
+
 } // namespace linear
 } // namespace dbl
 } // namespace cpu

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 #include <c10/util/Exception.h>
 #include <c10/util/Optional.h>
 
@@ -59,7 +59,7 @@ struct ShadeDataContext {
   // Generally, to get bert performance oneDNN kernel,  we need pack tensor to specific format (like ab -> ba)
   // For weight tensor, since each iter the packed format is the same, we should only pack once via using this flag
   // Note: while a tensor has been inplace reordered, this tensor will be attached a new ShadeDataContext
-  // and the flag for "packed" will be auto automaticly set to "false". This is  exactly what we want now because 
+  // and the flag for "packed" will be auto automaticly set to "false". This is  exactly what we want now because
   // only reorder for auto mix precision is inplace now, and new dtype may need new format for oneDNN kernel
   bool packed;
 
