@@ -26,6 +26,15 @@ class AtenIpexTypeExt {
                                       const int height,
                                       const int width,
                                       const int sampling_ratio);
+    
+  static at::Tensor nms(const at::Tensor& dets,
+                        const at::Tensor& scores,
+                        const float threshold);
+
+  static std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms(const at::Tensor& dets,
+                        const at::Tensor& scores,
+                        const float threshold);
+
 };
 
 }  // namespace torch_ipex
