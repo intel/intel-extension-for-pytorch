@@ -14,7 +14,7 @@ class TestFunction(TestCase):
         torch.manual_seed(rand_seed)
         _in_cpu = torch.rand((1, 1, 7, 7))
         _conv = torch.nn.Conv2d(1, 1, (3, 3))
-        with ipex.amp.autocast(enabled=True, dtype=torch.bfloat16):
+        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
             out_autocast = _conv(_in_cpu)
         self.assertEqual(out_autocast.dtype, torch.bfloat16)
 
@@ -24,12 +24,12 @@ class TestFunction(TestCase):
         torch.manual_seed(rand_seed)
         _in_cpu = torch.rand((1, 1, 7, 7))
         _conv = torch.nn.Conv2d(1, 1, (3, 3))
-        with ipex.amp.autocast(enabled=True, dtype=torch.bfloat16):
-            with ipex.amp.autocast(enabled=False, dtype=torch.bfloat16):
+        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
+            with ipex.amp.autocast(enabled=False):
                 out_autocast = _conv(_in_cpu)
             self.assertEqual(out_autocast.dtype, torch.float)
 
-            with ipex.amp.autocast(enabled=True, dtype=torch.float):
+            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.float)):
                 out_autocast = _conv(_in_cpu)
             self.assertEqual(out_autocast.dtype, torch.float)
 
@@ -43,7 +43,7 @@ class TestConv(TestCase):
         _conv = torch.nn.Conv2d(1, 1, (3, 3))
         
         out = _conv(_in_cpu)
-        with ipex.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
             out_autocast = _conv(_in_cpu)
         self.assertEqual(out_autocast.dtype, torch.bfloat16)
         self.assertEqual(out, out_autocast.to(torch.float), 1e-2)
@@ -63,7 +63,7 @@ class TestConv(TestCase):
         
         out = conv_cpu(_in_cpu).sum()
         out.backward()
-        with ipex.amp.autocast(enabled=True, dtype=torch.bfloat16):
+        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
             out_autocast = conv_auto_cast(in_autocast).sum()
         out_autocast.backward()
             #loss = criterion(y_autocast, target)
@@ -94,12 +94,13 @@ class TestSimpleNet(TestCase):
         model.eval()
         #ipex.core.disable_jit_opt()
         x = torch.rand((1, 3, 224, 224))
-        with ipex.amp.autocast(enabled=True, dtype=torch.bfloat16), torch.no_grad():
+        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
             traced_model = torch.jit.trace(model, x)
         with torch.no_grad():
             y = traced_model(x)
             #print(traced_model.graph_for(x))
         #ipex.core.enable_jit_opt()
+        self.assertEqual(y.dtype, torch.float) #conv whitelist, bn blacklist, relu fallthrough
 
 if __name__ == '__main__':
     test = unittest.main()
