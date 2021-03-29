@@ -231,16 +231,20 @@ static void apply_svd(
 }
 
 template <typename scalar_t>
-static void apply_symeig(Tensor& self, Tensor& eigvals, bool eigenvectors, bool upper, std::vector<int64_t>& infos) {
+static void apply_symeig(
+    Tensor& self,
+    Tensor& eigvals,
+    bool eigenvectors,
+    bool upper,
+    std::vector<int64_t>& infos) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto n = self.size(-1);
   auto batch_size = native::batchCount(self);
-  auto jobz = eigenvectors ? oneapi::mkl::job::vec :
-      oneapi::mkl::job::novec;
-  auto uplo = upper ? oneapi::mkl::uplo::upper :
-      oneapi::mkl::uplo::lower;
-  std::int64_t scratchpadsize = oneapi::mkl::lapack::syevd_scratchpad_size<scalar_t>(
+  auto jobz = eigenvectors ? oneapi::mkl::job::vec : oneapi::mkl::job::novec;
+  auto uplo = upper ? oneapi::mkl::uplo::upper : oneapi::mkl::uplo::lower;
+  std::int64_t scratchpadsize =
+      oneapi::mkl::lapack::syevd_scratchpad_size<scalar_t>(
           dpcpp_queue, jobz, uplo, n, n);
 
   Tensor scratchpad_at = at::empty({scratchpadsize}, self.options());
@@ -260,6 +264,50 @@ static void apply_symeig(Tensor& self, Tensor& eigvals, bool eigenvectors, bool 
   AT_ERROR("symeig: oneMKL library not found in compilation");
 #endif
 }
+
+template <typename scalar_t>
+static void apply_triangular_solve(
+    Tensor& b,
+    Tensor& A,
+    bool upper,
+    bool transpose,
+    bool unitriangular) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  oneapi::mkl::uplo uplo = upper ? oneapi::mkl::uplo::U : oneapi::mkl::uplo::L;
+  oneapi::mkl::transpose trans =
+      transpose ? oneapi::mkl::transpose::T : oneapi::mkl::transpose::N;
+  oneapi::mkl::diag diag =
+      unitriangular ? oneapi::mkl::diag::U : oneapi::mkl::diag::N;
+
+  auto n = A.size(-2);
+  auto nrhs = b.size(-1);
+  std::int64_t lda = A.size(-2);
+  std::int64_t ldb = b.size(-2);
+  std::int64_t scratchpadsize =
+      oneapi::mkl::lapack::trtrs_scratchpad_size<scalar_t>(
+          dpcpp_queue, uplo, trans, diag, n, nrhs, lda, ldb);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, A.options());
+  DPCPP_ONEMKL_SUBMIT(
+      dpcpp_queue,
+      oneapi::mkl::lapack::trtrs,
+      dpcpp_queue,
+      uplo,
+      trans,
+      diag,
+      n,
+      nrhs,
+      (scalar_t*)(A.data_ptr()),
+      lda,
+      (scalar_t*)(b.data_ptr()),
+      ldb,
+      (scalar_t*)(scratchpad_at.data_ptr()),
+      scratchpadsize);
+#else
+  AT_ERROR("triangular_solve: oneMKL library not found in compilation");
+#endif
+}
+
 } // namespace impl
 
 Tensor& triu_out(Tensor& out, const Tensor& self, int64_t diagonal) {
@@ -397,7 +445,10 @@ std::tuple<Tensor&, Tensor&, Tensor&> svd_out(
   return std::tuple<Tensor&, Tensor&, Tensor&>(U, S, VT);
 }
 
-std::tuple<Tensor, Tensor> _symeig_helper(const Tensor& self, bool eigenvectors, bool upper) {
+std::tuple<Tensor, Tensor> _symeig_helper(
+    const Tensor& self,
+    bool eigenvectors,
+    bool upper) {
   std::vector<int64_t> infos(native::batchCount(self), 0);
 
   auto self_sizes = self.sizes().vec();
@@ -405,12 +456,14 @@ std::tuple<Tensor, Tensor> _symeig_helper(const Tensor& self, bool eigenvectors,
   auto eigvals = at::empty(self_sizes, self.options());
 
   if (self.numel() == 0) {
-    return std::tuple<Tensor, Tensor>(eigvals, at::empty_like(self, MemoryFormat::Contiguous));
+    return std::tuple<Tensor, Tensor>(
+        eigvals, at::empty_like(self, MemoryFormat::Contiguous));
   }
 
   auto self_working_copy = native::cloneBatchedColumnMajor(self);
-  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "symeig", [&]{
-    impl::apply_symeig<scalar_t>(self_working_copy, eigvals, eigenvectors, upper, infos);
+  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "symeig", [&] {
+    impl::apply_symeig<scalar_t>(
+        self_working_copy, eigvals, eigenvectors, upper, infos);
   });
 
   if (self.dim() > 2) {
@@ -423,6 +476,61 @@ std::tuple<Tensor, Tensor> _symeig_helper(const Tensor& self, bool eigenvectors,
   } else {
     return std::tuple<Tensor, Tensor>(eigvals, at::empty({0}, self.options()));
   }
+}
+
+std::tuple<Tensor, Tensor> _triangular_solve_helper(
+    const Tensor& self,
+    const Tensor& A,
+    bool upper,
+    bool transpose,
+    bool unitriangular) {
+  auto self_working_copy = native::cloneBatchedColumnMajor(self);
+  auto A_working_copy = native::cloneBatchedColumnMajor(A);
+  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "triangular_solve_cpu", [&] {
+    impl::apply_triangular_solve<scalar_t>(
+        self_working_copy, A_working_copy, upper, transpose, unitriangular);
+  });
+  return std::tuple<Tensor, Tensor>(self_working_copy, A_working_copy);
+}
+
+// Supports arbitrary batch dimensions for self and A
+std::tuple<Tensor, Tensor> triangular_solve(
+    const Tensor& self,
+    const Tensor& A,
+    bool upper,
+    bool transpose,
+    bool unitriangular) {
+  TORCH_CHECK(
+      self.dim() >= 2,
+      "b should have at least 2 dimensions, but has ",
+      self.dim(),
+      " dimensions instead");
+  TORCH_CHECK(
+      A.dim() >= 2,
+      "u should have at least 2 dimensions, but has ",
+      A.dim(),
+      " dimensions instead");
+  Tensor self_broadcasted, A_broadcasted;
+  std::tie(self_broadcasted, A_broadcasted) =
+      native::_linalg_broadcast_batch_dims(self, A, "triangular_solve");
+  return at::_triangular_solve_helper(
+      self_broadcasted, A_broadcasted, upper, transpose, unitriangular);
+}
+
+std::tuple<Tensor&, Tensor&> triangular_solve_out(
+    Tensor& result,
+    Tensor& clone_A,
+    const Tensor& self,
+    const Tensor& A,
+    bool upper,
+    bool transpose,
+    bool unitriangular) {
+  Tensor result_tmp, clone_A_tmp;
+  std::tie(result_tmp, clone_A_tmp) =
+      at::_triangular_solve_helper(self, A, upper, transpose, unitriangular);
+  result.resize_as_(result_tmp).copy_(result_tmp);
+  clone_A.resize_as_(clone_A_tmp).copy_(clone_A_tmp);
+  return std::tuple<Tensor&, Tensor&>(result, clone_A);
 }
 
 } // namespace AtenIpexTypeXPU
