@@ -531,6 +531,7 @@ static Tensor & sub_out(Tensor & out, const Tensor & self, const Tensor & other,
 static Tensor sum(const Tensor & self, c10::optional<ScalarType> dtype); // aten::sum(Tensor self, *, ScalarType? dtype=None) -> Tensor
 static Tensor sum(const Tensor & self, IntArrayRef dim, bool keepdim, c10::optional<ScalarType> dtype); // aten::sum.dim_IntList(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor
 static Tensor & sum_out(Tensor & out, const Tensor & self, IntArrayRef dim, bool keepdim, c10::optional<ScalarType> dtype); // aten::sum.IntList_out(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
+static std::tuple<Tensor,Tensor> _symeig_helper(const Tensor & self, bool eigenvectors, bool upper); // {"schema": "aten::_symeig_helper(Tensor self, bool eigenvectors, bool upper) -> (Tensor, Tensor)", "dispatch": "True", "math": "False"}
 static Tensor take(const Tensor & self, const Tensor & index); // aten::take(Tensor self, Tensor index) -> Tensor
 static Tensor & take_out(Tensor & out, const Tensor & self, const Tensor & index); // aten::take.out(Tensor self, Tensor index, *, Tensor(a!) out) -> Tensor(a!)
 static Tensor & tan_(Tensor & self); // aten::tan_(Tensor(a!) self) -> Tensor(a!)

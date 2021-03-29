@@ -229,6 +229,37 @@ static void apply_svd(
   AT_ERROR("svd: oneMKL library not found in compilation");
 #endif
 }
+
+template <typename scalar_t>
+static void apply_symeig(Tensor& self, Tensor& eigvals, bool eigenvectors, bool upper, std::vector<int64_t>& infos) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+  auto n = self.size(-1);
+  auto batch_size = native::batchCount(self);
+  auto jobz = eigenvectors ? oneapi::mkl::job::vec :
+      oneapi::mkl::job::novec;
+  auto uplo = upper ? oneapi::mkl::uplo::upper :
+      oneapi::mkl::uplo::lower;
+  std::int64_t scratchpadsize = oneapi::mkl::lapack::syevd_scratchpad_size<scalar_t>(
+          dpcpp_queue, jobz, uplo, n, n);
+
+  Tensor scratchpad_at = at::empty({scratchpadsize}, self.options());
+  DPCPP_ONEMKL_SUBMIT(
+      dpcpp_queue,
+      oneapi::mkl::lapack::syevd,
+      dpcpp_queue,
+      jobz,
+      uplo,
+      n,
+      (scalar_t*)(self.data_ptr()),
+      n,
+      (scalar_t*)(eigvals.data_ptr()),
+      (scalar_t*)(scratchpad_at.data_ptr()),
+      scratchpadsize);
+#else
+  AT_ERROR("symeig: oneMKL library not found in compilation");
+#endif
+}
 } // namespace impl
 
 Tensor& triu_out(Tensor& out, const Tensor& self, int64_t diagonal) {
@@ -364,6 +395,34 @@ std::tuple<Tensor&, Tensor&, Tensor&> svd_out(
   S.resize_as_(S_tmp).copy_(S_tmp);
   VT.resize_as_(VT_tmp).copy_(VT_tmp);
   return std::tuple<Tensor&, Tensor&, Tensor&>(U, S, VT);
+}
+
+std::tuple<Tensor, Tensor> _symeig_helper(const Tensor& self, bool eigenvectors, bool upper) {
+  std::vector<int64_t> infos(native::batchCount(self), 0);
+
+  auto self_sizes = self.sizes().vec();
+  self_sizes.pop_back();
+  auto eigvals = at::empty(self_sizes, self.options());
+
+  if (self.numel() == 0) {
+    return std::tuple<Tensor, Tensor>(eigvals, at::empty_like(self, MemoryFormat::Contiguous));
+  }
+
+  auto self_working_copy = native::cloneBatchedColumnMajor(self);
+  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "symeig", [&]{
+    impl::apply_symeig<scalar_t>(self_working_copy, eigvals, eigenvectors, upper, infos);
+  });
+
+  if (self.dim() > 2) {
+    native::batchCheckErrors(infos, "symeig");
+  } else {
+    native::singleCheckErrors(infos[0], "symeig");
+  }
+  if (eigenvectors) {
+    return std::tuple<Tensor, Tensor>(eigvals, self_working_copy);
+  } else {
+    return std::tuple<Tensor, Tensor>(eigvals, at::empty({0}, self.options()));
+  }
 }
 
 } // namespace AtenIpexTypeXPU
