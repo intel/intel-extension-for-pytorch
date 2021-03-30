@@ -40,9 +40,9 @@ namespace cpu {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.defined());                                \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.layout() == c10::kStrided)
 
-#define CHECK_ATEN_BF16_USABLE(tensor)                                                                                     \
-  ShadeDataContext::isDilTensor(tensor) &&                                                                                         \
-  ShadeDataContext::isTensorMixPrecision(tensor) &&                                                                     \
+#define CHECK_ATEN_BF16_USABLE(tensor)                                                 \
+  ShadeDataContext::isDilTensor(tensor) &&                                             \
+  ShadeDataContext::isTensorMixPrecision(tensor) &&                                    \
   ShadeDataContext::getDilStorage(tensor).get_data_type() ==  dil::data_type::bf16 &&  \
   dbl::comm::try_gen_dil_tensor(tensor).is_public_format()
 
@@ -2236,6 +2236,7 @@ at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, 
 at::Tensor AtenIpexCPUDev::dil_slice(const at::Tensor & self, int64_t dim, int64_t start, int64_t end, int64_t step) {
   DEBUG("AtenIpexCPUDev::dil_slice\n");
   CHECK_DNNL_OP_PRE_COND(self);
+  dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
 
   // TODO use weight TAG to decide whether to reorder or not
   dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
@@ -2578,7 +2579,7 @@ at::Tensor AtenIpexCPUDev::dil_index(const at::Tensor & self, at::TensorList ind
 at::Tensor AtenIpexCPUDev::dil_shuffle(const at::Tensor & self, at::IntArrayRef view_shape, int64_t dim0, int64_t dim1) {
   DEBUG("AtenIpexCPUDev::dil_shuffle\n");
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexCPUDev::dil_shuffle", std::vector<c10::IValue>({self}));
+  RECORD_FUNCTION("AtenIpexCPUDev::dil_shuffle", std::vector<c10::IValue>({}));
 #endif
   // NOTE: We do NOT add sanity checks here. Because PyTorch does not has shuffle operator. This dil operator is for fusion and the fusion logic
   // has more sanity checks. We found that there are some models use view + transpose + view to implement shuffle semantic. So IPEX will fuse these
@@ -2594,7 +2595,7 @@ at::Tensor AtenIpexCPUDev::dil_shuffle(const at::Tensor & self, at::IntArrayRef 
 std::tuple<at::Tensor,at::Tensor> AtenIpexCPUDev::dil__pack_padded_sequence(const at::Tensor & input, const at::Tensor & lengths, bool batch_first) {
   DEBUG("AtenIpexCPUDev::dil__pack_padded_sequence\n");
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexCPUDev::dil__pack_padded_sequence", std::vector<c10::IValue>({input, lengths}));
+  RECORD_FUNCTION("AtenIpexCPUDev::dil__pack_padded_sequence", std::vector<c10::IValue>({}));
 #endif
   torch_ipex::reset_ipex_func_status();
 
@@ -2638,7 +2639,7 @@ at::Tensor& AtenIpexCPUDev::dil_copy_(
 
 std::vector<at::Tensor> AtenIpexCPUDev::dil_rnn_layer(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
     const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse, int64_t mode,
-    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes, 
+    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes,
     const std::vector<float>& scales, const std::vector<int32_t>& shift, bool quantized) {
   DEBUG("AtenIpexCPUDev::dil_rnn_layer\n");
 
