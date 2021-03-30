@@ -185,55 +185,23 @@ if(USE_ONEDPL)
   target_compile_definitions(torch_ipex PUBLIC ONEDPL_USE_TBB_BACKEND=0)
 endif()
 
-set(AOT_ARCH_OPT "spir64_gen-unknown-unknown-sycldevice")
-set(SPIRV_OPT "spir64-unknown-unknown-sycldevice")
-if(USE_AOT)
-  set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT}")
-endif()
-
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -D__STRICT_ANSI__")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl-unnamed-lambda")
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fno-sycl-early-optimizations")
 ## Explicitly limit the index range (< Max int32) in kernel
 #set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl-id-queries-fit-in-int")
-set_source_files_properties(${TORCH_IPEX_SRCS} COMPILE_FLAGS "${IPEX_COMPILE_FLAGS}")
-
-########################## Auto define AOT device list ##########################
-if(USE_AOT)
-  set(ORIGIN_CMAKE_FLAGS ${CMAKE_CXX_FLAGS})
-  if(USE_AOT_DEVLIST)
-    set(CMAKE_CXX_FLAGS "${ORIGIN_CMAKE_FLAGS} ${IPEX_COMPILE_FLAGS} -Xs '-device ${USE_AOT_DEVLIST}'")
-    try_compile(COMP_RESULT ${CMAKE_BINARY_DIR}
-                SOURCES ${PROJECT_SOURCE_DIR}/cmake/test/aot/test_aot.cpp
-                OUTPUT_VARIABLE COMP_OUT)
-    if(NOT COMP_RESULT)
-      message(SEND_ERROR "AOT device list cannot be accepted by compiler: ${COMP_OUT}")
-    endif()
-  else()
-    foreach(DEVNAME "gen12lp" "cfl" "glk" "kbl" "skl" "tgl")
-      set(CMAKE_CXX_FLAGS "${ORIGIN_CMAKE_FLAGS} ${IPEX_COMPILE_FLAGS} -Xs '-device ${DEVNAME}'")
-      try_compile(COMP_RESULT ${CMAKE_BINARY_DIR}
-                  SOURCES ${PROJECT_SOURCE_DIR}/cmake/test/aot/test_aot.cpp
-                  OUTPUT_VARIABLE COMP_OUT)
-      if(COMP_RESULT)
-	message(STATUS "AOT compile test for device \"${DEVNAME}\": ... SUCCESS")
-	set(USE_AOT_DEVLIST "${DEVNAME},${USE_AOT_DEVLIST}")
-      else()
-        message(STATUS "AOT compile test for device \"${DEVNAME}\": ... FAILED")
-      endif()
-    endforeach(DEVNAME)
-  endif()
-  set(CMAKE_CXX_FLAGS ${ORIGIN_CMAKE_FLAGS})
-endif()
-#################################################################################
 
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
+
 if(BUILD_BY_PER_KERNEL)
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
 elseif(USE_AOT_DEVLIST)
+  set(SPIRV_OPT "spir64-unknown-unknown-sycldevice")
+  set(AOT_ARCH_OPT "spir64_gen-unknown-unknown-sycldevice")
+  set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT}")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT}")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xsycl-target-backend=${AOT_ARCH_OPT}")
@@ -241,6 +209,8 @@ elseif(USE_AOT_DEVLIST)
 else()
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
 endif()
+
+set_source_files_properties(${TORCH_IPEX_SRCS} COMPILE_FLAGS "${IPEX_COMPILE_FLAGS}")
 message(STATUS "DPCPP found. Compiling with SYCL support")
 
 if (USE_MULTI_CONTEXT)

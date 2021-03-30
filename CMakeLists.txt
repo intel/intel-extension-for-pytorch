@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 project(torch_ipex VERSION "0.1.2")
 
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules)
+set(IPEX_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+list(APPEND CMAKE_MODULE_PATH ${IPEX_ROOT_DIR}/cmake/Modules)
 
 set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)
@@ -23,11 +24,8 @@ option(BUILD_BY_PER_KERNEL "Build by DPC++ per_kernel option (exclusive with USE
 option(BUILD_NO_L0_ONEDNN "Build oneDNN without LevelZero support" OFF)
 option(BUILD_INTERNAL_DEBUG "Use internal debug code path" OFF)
 cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "BUILD_INTERNAL_DEBUG" OFF)
-set(USE_AOT_DEVLIST "" CACHE STRING
-  "Use AOT build option for devices separated by commas in the list, for example, bdw,...")
-cmake_dependent_option(USE_AOT "Use AOT build option" ON "NOT BUILD_BY_PER_KERNEL" OFF)
+set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build (for example, skl,ats,...)")
 
-set(IPEX_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 include(cmake/GPU.cmake)
 
@@ -76,9 +74,10 @@ function (print_configuration_summary)
     message(STATUS "  BUILD_BY_PER_KERNEL   : ${BUILD_BY_PER_KERNEL}")
     message(STATUS "  BUILD_NO_L0_ONEDNN    : ${BUILD_NO_L0_ONEDNN}")
 
-  message(STATUS "  USE_AOT               : ${USE_AOT}")
-  if(NOT BUILD_BY_PER_KERNEL AND USE_AOT)
+  if(NOT BUILD_BY_PER_KERNEL AND USE_AOT_DEVLIST)
     message(STATUS "  USE_AOT_DEVLIST       : ${USE_AOT_DEVLIST}")
+  else()
+    message(STATUS "  USE_AOT_DEVLIST       : OFF")
   endif()
 
     message(STATUS "  BUILD_INTERNAL_DEBUG  : ${BUILD_INTERNAL_DEBUG}")
