@@ -19,7 +19,7 @@ from . import profiler as profiler
 from . import itt as itt
 
 
-
+default_generators: Tuple[torch._C.Generator] = _C.default_generators
 _device_t = Union[_device, str, int]
 
 
