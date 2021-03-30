@@ -476,7 +476,7 @@ static void max_pool_backward_out_frame(
   auto format_any = memory::format_tag::any;
   auto diff_src_md = memory::desc({diff_src_tz}, data_t, format);
   auto diff_dst_md = memory::desc({diff_dst_tz}, data_t, format);
-  auto diff_src_md_any = memory::desc({diff_src_tz}, data_t, format);
+  auto diff_src_md_any = memory::desc({diff_src_tz}, data_t, format_any);
   if (lazy_reorder_enabled()) {
     auto diff_dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_dst);
     diff_dst_md = diff_dst_ctx.is_plain() ? diff_dst_md : diff_dst_ctx.meta();
