@@ -1,9 +1,16 @@
 #include <ATen/native/UpSample.h>
+#include <ATen/ipex_type_dpcpp_customized.h>
+#include <tensor/Context.h>
 #include "UpSample.h"
+
+#ifdef USE_PRIMITIVE_CACHE
+#include <oneDNN/LRUCache.h>
+#endif
 
 using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
+using namespace at::AtenIpexTypeXPU;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -41,34 +48,51 @@ static void upsample_nearest_out_dpcpp_kernel(
       scales_d);
 
   output.resize_(dst_dims);
-  output.zero_();
 
   memory::format_tag data_format = ndims == 5
       ? memory::format_tag::ncdhw
       : (ndims == 4 ? memory::format_tag::nchw : memory::format_tag::ncw);
+  memory::format_tag format_any = memory::format_tag::any;
   memory::data_type data_type = dt_to_dnnl(input.scalar_type());
 
-  std::shared_ptr<memory::desc> dst_desc;
-  auto src_desc = memory::desc(src_dims, data_type, data_format);
+  std::shared_ptr<memory::desc> dst_md;
   if (!is_customer_scales)
-    dst_desc.reset(new memory::desc(dst_dims, data_type, data_format));
+    dst_md.reset(new memory::desc(dst_dims, data_type, format_any));
+
+  auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
+  auto src_md = src_ctx.is_plain() ? memory::desc(src_dims, data_type, data_format) :
+      src_ctx.meta();
+
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  if (!is_customer_scales) {
+    create_key(key, algorithm::resampling_nearest, factors, src_md, *dst_md);
+  } else {
+    create_key(key, algorithm::resampling_nearest, factors, src_md);
+  }
+#endif
 
   auto resampling_desc = resampling_forward::desc(
       prop_kind::forward,
       algorithm::resampling_nearest,
       factors,
-      src_desc,
-      *dst_desc);
+      src_md,
+      *dst_md);
   auto resampling_pd = resampling_forward::primitive_desc(resampling_desc, eng);
-  resampling_pd = resampling_forward::primitive_desc(resampling_pd.get());
 
-  auto src = dpcpp_onednn_memory(
-      resampling_pd.src_desc(), eng, input.data_ptr());
-  auto dst = dpcpp_onednn_memory(
-      resampling_pd.dst_desc(), eng, output.data_ptr());
+#ifdef USE_PRIMITIVE_CACHE
+  auto resample_forward = fetch_or_create_m<resampling_forward>(key, resampling_pd);
+#else
+  auto resample_forward = resampling_forward(resampling_pd);
+#endif
 
-  DPCPP_ONEDNN_EXEC(resampling_forward(resampling_pd),
-      strm, {{DNNL_ARG_SRC, src}, {DNNL_ARG_DST, dst}});
+  if (!src_ctx.is_plain()) {
+    output = empty_opaque_tensor(resampling_pd.dst_desc(), input.options(), c10::nullopt);
+  }
+  memory src_memory = dpcpp_onednn_memory(resampling_pd.src_desc(), eng, input.data_ptr());
+  memory dst_memory = dpcpp_onednn_memory(resampling_pd.dst_desc(), eng, output.data_ptr());
+
+  DPCPP_ONEDNN_EXEC(resample_forward, strm, {{DNNL_ARG_SRC, src_memory}, {DNNL_ARG_DST, dst_memory}});
 }
 
 static void upsample_nearest_backward_out_dpcpp_kernel(
@@ -103,44 +127,61 @@ static void upsample_nearest_backward_out_dpcpp_kernel(
       scales_d);
 
   grad_input.resize_(src_dims);
-  grad_input.zero_();
 
   memory::format_tag data_format = ndims == 5
       ? memory::format_tag::ncdhw
       : (ndims == 4 ? memory::format_tag::nchw : memory::format_tag::ncw);
+  memory::format_tag format_any = memory::format_tag::any;
   memory::data_type data_type = dt_to_dnnl(grad_output.scalar_type());
 
-  std::shared_ptr<memory::desc> dst_desc;
-  auto src_desc = memory::desc(src_dims, data_type, data_format);
+  std::shared_ptr<memory::desc> dst_md;
+  auto src_md = memory::desc(src_dims, data_type, data_format);
+  auto diff_src_md = memory::desc(src_dims, data_type, format_any);
   if (!is_customer_scales)
-    dst_desc.reset(new memory::desc(dst_dims, data_type, data_format));
+    dst_md.reset(new memory::desc(dst_dims, data_type, data_format));
 
   auto resampling_desc = resampling_forward::desc(
       prop_kind::forward,
       algorithm::resampling_nearest,
       factors,
-      src_desc,
-      *dst_desc);
+      src_md,
+      *dst_md);
   auto resampling_pd = resampling_forward::primitive_desc(resampling_desc, eng);
-  resampling_pd = resampling_forward::primitive_desc(resampling_pd.get());
+
+  auto diff_dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(grad_output);
+  auto diff_dst_md = diff_dst_ctx.is_plain() ? resampling_pd.dst_desc() :
+      diff_dst_ctx.meta();
+
+#ifdef USE_PRIMITIVE_CACHE
+  lru_key_t key;
+  if (!is_customer_scales) {
+    create_key(key, algorithm::resampling_nearest, factors, src_md, *dst_md, diff_src_md, diff_dst_md);
+  } else {
+    create_key(key, algorithm::resampling_nearest, factors, src_md, diff_src_md, diff_dst_md);
+  }
+#endif
 
   auto resampling_bwd_desc = resampling_backward::desc(
       algorithm::resampling_nearest,
       factors,
-      src_desc,
-      resampling_pd.dst_desc());
-  auto resampling_bwd_pd = resampling_backward::primitive_desc(
-      resampling_bwd_desc, eng, resampling_pd);
-  resampling_bwd_pd =
-      resampling_backward::primitive_desc(resampling_bwd_pd.get());
+      diff_src_md,
+      diff_dst_md);
+  auto resampling_bwd_pd = resampling_backward::primitive_desc(resampling_bwd_desc, eng, resampling_pd);
+#ifdef USE_PRIMITIVE_CACHE
+  auto resampling_bwd = fetch_or_create_m<resampling_backward>(key, resampling_bwd_pd);
+#else
+  auto resampling_bwd = resampling_backward(resampling_bwd_pd);
+#endif
 
-  memory grad_src = dpcpp_onednn_memory(
+  if (!diff_dst_ctx.is_plain()) {
+    grad_input = empty_opaque_tensor(resampling_bwd_pd.diff_src_desc(), grad_output.options(), c10::nullopt);
+  }
+  memory diff_src_memory = dpcpp_onednn_memory(
       resampling_bwd_pd.diff_src_desc(), eng, grad_input.data_ptr());
-  memory grad_dst = dpcpp_onednn_memory(
+  memory diff_dst_memory = dpcpp_onednn_memory(
       resampling_bwd_pd.diff_dst_desc(), eng, grad_output.data_ptr());
 
-  DPCPP_ONEDNN_EXEC(resampling_backward(resampling_bwd_pd),
-      strm, {{DNNL_ARG_DIFF_SRC, grad_src}, {DNNL_ARG_DIFF_DST, grad_dst}});
+  DPCPP_ONEDNN_EXEC(resampling_bwd, strm, {{DNNL_ARG_DIFF_SRC, diff_src_memory}, {DNNL_ARG_DIFF_DST, diff_dst_memory}});
 }
 
 } // namespace impl
@@ -249,7 +290,7 @@ Tensor upsample_nearest3d_backward(
   auto scale_d = get_scale_value(scale_factors, 0);
   auto scale_h = get_scale_value(scale_factors, 1);
   auto scale_w = get_scale_value(scale_factors, 2);
-  auto grad_input = at::zeros(input_size, grad_output.options());
+  auto grad_input = at::empty({0}, grad_output.options());
   upsample_nearest_backward_out_dpcpp_kernel(
           grad_input,
           grad_output,
@@ -350,7 +391,7 @@ Tensor upsample_nearest2d_backward(
   auto osize = compute_output_size(input_size, output_size, scale_factors);
   auto scale_h = get_scale_value(scale_factors, 0);
   auto scale_w = get_scale_value(scale_factors, 1);
-  auto grad_input = at::zeros(input_size, grad_output.options());
+  auto grad_input = at::empty({0}, grad_output.options());
   upsample_nearest_backward_out_dpcpp_kernel(
           grad_input,
           grad_output,
@@ -422,7 +463,7 @@ Tensor upsample_nearest1d_backward(
     IntArrayRef output_size,
     IntArrayRef input_size,
     c10::optional<double> scales) {
-  auto grad_input = at::zeros(input_size, grad_output.options());
+  auto grad_input = at::empty({0}, grad_output.options());
   upsample_nearest_backward_out_dpcpp_kernel(
       grad_input,
       grad_output,
@@ -439,7 +480,7 @@ Tensor upsample_nearest1d_backward(
         c10::optional<ArrayRef<double>> scale_factors) {
   auto osize = compute_output_size(input_size, output_size, scale_factors);
   auto scale_w = get_scale_value(scale_factors, 0);
-  auto grad_input = at::zeros(input_size, grad_output.options());
+  auto grad_input = at::empty({0}, grad_output.options());
   upsample_nearest_backward_out_dpcpp_kernel(
           grad_input,
           grad_output,
