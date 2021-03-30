@@ -65,21 +65,36 @@ static inline void reorder(const Tensor& src, Tensor& dst,
   auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
+  auto check_group_and_create_plain_md =
+      [](const Tensor& src, const Tensor& dst) -> memory::desc {
+        if (src.ndimension() == dst.ndimension()) {
+          return memory::desc(get_onednn_dims(src),
+                              get_onednn_dtype(src),
+                              get_onednn_strides(src));
+        } else if ((src.ndimension() == dst.ndimension() - 1) &&
+                   (src.size(0) == dst.size(0) * dst.size(1))) {
+          // group tensor
+          return memory::desc(get_onednn_dims(dst),
+                              get_onednn_dtype(src),
+                              get_onednn_strides(dst.contiguous()));
+        } else {
+          TORCH_CHECK(0, "invalid src/dst dimension in oneDNN reorder ...");
+        }
+      };
+
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  memory::desc src_desc = src_ctx.is_plain() ?
-      memory::desc(get_onednn_dims(src),
-                   get_onednn_dtype(src),
-                   get_onednn_strides(src)) :
+  memory::desc src_md = src_ctx.is_plain() ?
+      check_group_and_create_plain_md(src, dst) :
       src_ctx.meta();
-  auto src_mem = dpcpp_onednn_memory(src_desc, engine, src.data_ptr());
+  auto src_mem = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
 
   auto dst_ctx = DPCPPTensorContext::get_tensor_ctx(dst);
-  memory::desc dst_desc = dst_ctx.is_plain() ?
+  memory::desc dst_md = dst_ctx.is_plain() ?
       memory::desc(get_onednn_dims(dst),
                    get_onednn_dtype(dst),
                    get_onednn_strides(dst)) :
       dst_ctx.meta();
-  auto dst_mem = dpcpp_onednn_memory(dst_desc, engine, dst.data_ptr());
+  auto dst_mem = dpcpp_onednn_memory(dst_md, engine, dst.data_ptr());
 
   primitive prim;
   if (rattr.is_quant()) {
@@ -87,7 +102,7 @@ static inline void reorder(const Tensor& src, Tensor& dst,
 #ifdef USE_PRIMITIVE_CACHE
     lru_key_t key;
     auto oscale = rattr.sc();
-    create_key(key, src_desc, dst_desc, oscale);
+    create_key(key, src_md, dst_md, oscale);
     prim = fetch_or_create_m<dnnl::reorder>(key, src_mem, dst_mem, pattr);
 #else
     prim = dnnl::reorder(src_mem, dst_mem, pattr);
@@ -95,7 +110,7 @@ static inline void reorder(const Tensor& src, Tensor& dst,
   } else {
 #ifdef USE_PRIMITIVE_CACHE
     lru_key_t key;
-    create_key(key, src_desc, dst_desc);
+    create_key(key, src_md, dst_md);
     prim = fetch_or_create_m<dnnl::reorder>(key, src_mem, dst_mem);
 #else
     prim = dnnl::reorder(src_mem, dst_mem);
@@ -112,25 +127,25 @@ static inline Tensor reorder_copy(Tensor& dst, const Tensor& src) {
 
   // align to dst
   auto dst_ctx = DPCPPTensorContext::get_tensor_ctx(dst);
-  memory::desc dst_desc = dst_ctx.is_plain() ?
-                             memory::desc(get_onednn_dims(dst),
-                                          get_onednn_dtype(dst),
-                                          get_onednn_strides(dst)) :
-                             dst_ctx.meta();
-  memory dst_mem = dpcpp_onednn_memory(dst_desc, engine, dst.data_ptr());
+  memory::desc dst_md = dst_ctx.is_plain() ?
+                        memory::desc(get_onednn_dims(dst),
+                                     get_onednn_dtype(dst),
+                                     get_onednn_strides(dst)) :
+                        dst_ctx.meta();
+  memory dst_mem = dpcpp_onednn_memory(dst_md, engine, dst.data_ptr());
 
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  memory::desc src_desc = src_ctx.is_plain() ?
-                          memory::desc(get_onednn_dims(src),
-                                       get_onednn_dtype(src),
-                                       get_onednn_strides(src)) :
-                          src_ctx.meta();
-  memory src_mem = dpcpp_onednn_memory(src_desc, engine, src.data_ptr());
+  memory::desc src_md = src_ctx.is_plain() ?
+                        memory::desc(get_onednn_dims(src),
+                                     get_onednn_dtype(src),
+                                     get_onednn_strides(src)) :
+                        src_ctx.meta();
+  memory src_mem = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
   // simple copy checking address only
   if (dst.data_ptr() != src.data_ptr()) {
 #ifdef USE_PRIMITIVE_CACHE
     lru_key_t key;
-    create_key(key, src_desc, dst_desc);
+    create_key(key, src_md, dst_md);
     auto prim = fetch_or_create_m<dnnl::reorder>(key, src_mem, dst_mem);
 #else
     auto prim = dnnl::reorder(src_mem, dst_mem);
