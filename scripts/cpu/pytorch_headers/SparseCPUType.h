@@ -32,39 +32,41 @@ struct Quantizer;
 using ConstQuantizerPtr = const c10::intrusive_ptr<Quantizer>&;
 
 namespace SparseCPUType {
+  Tensor empty(IntArrayRef size, optional<DimnameList> names, optional<ScalarType> dtype, optional<Layout> layout, optional<Device> device, optional<bool> pin_memory, optional<MemoryFormat> memory_format);
+  Tensor empty(IntArrayRef size, optional<ScalarType> dtype, optional<Layout> layout, optional<Device> device, optional<bool> pin_memory, optional<MemoryFormat> memory_format);
   Tensor add(const Tensor & self, const Tensor & other, Scalar alpha);
   Tensor & add_(Tensor & self, const Tensor & other, Scalar alpha);
-  Tensor & add_out(Tensor & out, const Tensor & self, const Tensor & other, Scalar alpha);
+  Tensor & add_out(const Tensor & self, const Tensor & other, Scalar alpha, Tensor & out);
   Tensor div(const Tensor & self, const Tensor & other);
   Tensor & div_(Tensor & self, const Tensor & other);
-  Tensor & div_out(Tensor & out, const Tensor & self, const Tensor & other);
-  Tensor empty(IntArrayRef size, const TensorOptions & options, optional<MemoryFormat> memory_format);
+  Tensor & div_out(const Tensor & self, const Tensor & other, Tensor & out);
   Tensor floor_divide(const Tensor & self, const Tensor & other);
   Tensor & floor_divide_(Tensor & self, const Tensor & other);
-  Tensor & floor_divide_out(Tensor & out, const Tensor & self, const Tensor & other);
+  Tensor & floor_divide_out(const Tensor & self, const Tensor & other, Tensor & out);
   Tensor isnan(const Tensor & self);
   Tensor & log1p_(Tensor & self);
-  Tensor & log1p_out(Tensor & out, const Tensor & self);
+  Tensor & log1p_out(const Tensor & self, Tensor & out);
   Tensor mm(const Tensor & self, const Tensor & mat2);
-  Tensor & mm_out(Tensor & out, const Tensor & self, const Tensor & mat2);
+  Tensor & mm_out(const Tensor & self, const Tensor & mat2, Tensor & out);
   Tensor mul(const Tensor & self, const Tensor & other);
   Tensor & mul_(Tensor & self, const Tensor & other);
-  Tensor & mul_out(Tensor & out, const Tensor & self, const Tensor & other);
+  Tensor & mul_out(const Tensor & self, const Tensor & other, Tensor & out);
   Tensor narrow_copy(const Tensor & self, int64_t dim, int64_t start, int64_t length);
-  Tensor & sspaddmm_out(Tensor & out, const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);
+  Tensor & narrow_copy_out(const Tensor & self, int64_t dim, int64_t start, int64_t length, Tensor & out);
+  Tensor & sspaddmm_out(const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha, Tensor & out);
   Tensor true_divide(const Tensor & self, const Tensor & other);
   Tensor & true_divide_(Tensor & self, const Tensor & other);
-  Tensor & true_divide_out(Tensor & out, const Tensor & self, const Tensor & other);
+  Tensor & true_divide_out(const Tensor & self, const Tensor & other, Tensor & out);
   Tensor native_norm(const Tensor & self, Scalar p);
   Tensor _sparse_sum_backward(const Tensor & grad, const Tensor & self, IntArrayRef dim);
   Tensor clone(const Tensor & self, optional<MemoryFormat> memory_format);
-  Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent);
+  Tensor & pow_out(const Tensor & self, const Tensor & exponent, Tensor & out);
   Tensor pow(const Tensor & self, Scalar exponent);
   Tensor & zero_(Tensor & self);
-  Tensor & sub_out(Tensor & out, const Tensor & self, const Tensor & other, Scalar alpha);
+  Tensor & sub_out(const Tensor & self, const Tensor & other, Scalar alpha, Tensor & out);
   Tensor sub(const Tensor & self, const Tensor & other, Scalar alpha);
   Tensor & sub_(Tensor & self, const Tensor & other, Scalar alpha);
-  Tensor & addmm_out(Tensor & out, const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);
+  Tensor & addmm_out(const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha, Tensor & out);
   Tensor addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);
   Tensor & addmm_(Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha);
   Tensor _sparse_coo_tensor_with_dims(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size, optional<ScalarType> dtype, optional<Layout> layout, optional<Device> device, optional<bool> pin_memory);
@@ -72,7 +74,7 @@ namespace SparseCPUType {
   Tensor & sparse_resize_(Tensor & self, IntArrayRef size, int64_t sparse_dim, int64_t dense_dim);
   Tensor & sparse_resize_and_clear_(Tensor & self, IntArrayRef size, int64_t sparse_dim, int64_t dense_dim);
   Tensor sparse_mask(const Tensor & self, const Tensor & mask);
-  Tensor to_dense(const Tensor & self);
+  Tensor to_dense(const Tensor & self, optional<ScalarType> dtype);
   int64_t sparse_dim(const Tensor & self);
   int64_t _dimI(const Tensor & self);
   int64_t dense_dim(const Tensor & self);
@@ -85,11 +87,12 @@ namespace SparseCPUType {
   Tensor & _coalesced_(Tensor & self, bool coalesced);
   Tensor indices(const Tensor & self);
   Tensor values(const Tensor & self);
-  Tensor & hspmm_out(Tensor & out, const Tensor & mat1, const Tensor & mat2);
+  Tensor & hspmm_out(const Tensor & mat1, const Tensor & mat2, Tensor & out);
   Tensor hspmm(const Tensor & mat1, const Tensor & mat2);
   Tensor & copy_sparse_to_sparse_(Tensor & self, const Tensor & src, bool non_blocking);
   Tensor index_select(const Tensor & self, int64_t dim, const Tensor & index);
   Tensor any(const Tensor & self);
+  Tensor & copy_(Tensor & self, const Tensor & src, bool non_blocking);
 }
 
 } // namespace at

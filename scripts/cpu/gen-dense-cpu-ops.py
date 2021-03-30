@@ -13,6 +13,7 @@ from common.codegen import write_or_skip
 from common.cpp_sig_parser import CPPSig
 from common.aten_sig_parser import AtenSig
 import common.utils as utils
+from common.native_functions import NativeFunctions
 
 _FN_BYPASS_REGEX = [
     # ATEN CUDA functions
@@ -201,17 +202,7 @@ class DenseOPCodeGen(object):
         self._native_sigs = []
         self._native_sigs_str = []
         self._err_info = []
-        self._func_data = ''
-
-    def is_tensor_api(self, func_name):
-        m = re.search(r'\bTensor\b', func_name)
-        return m is not None
-
-    def is_tensor_member_function(self, func_name):
-        if self._func_data.find(' {}('.format(func_name)) >= 0:
-            return False
-        else:
-            return True
+        self._native_funcs = NativeFunctions(func_file_path)
 
     def is_void_func(self, cpp_sig):
         ret_params = cpp_sig.ret_params
@@ -248,61 +239,7 @@ class DenseOPCodeGen(object):
                     cpp_input_param.is_to_be_written = aten_sig_param.is_to_be_written
                     cpp_input_param.is_alias = aten_sig_param.is_alias
 
-    def parse_native_functions(self):
-        with open(self._func_file_path, 'r') as ff:
-            self._func_data = ff.read()
-
-        for line in open(self._func_file_path, 'r'):
-            m = re.match(r'TORCH_API *(.*); *', line)
-            if not m:
-                continue
-            native_cpp_sig_str = m.group(1).replace('at::', '').replace('c10::', '').replace('Reduction::', '')
-            # Remove ={xxx}
-            native_cpp_sig_str = re.sub("\=\{.*?\}\,", ",", native_cpp_sig_str)
-            # Remove =xxx,
-            native_cpp_sig_str = re.sub("\=.*?\,", ",", native_cpp_sig_str)
-            # Remove =),
-            native_cpp_sig_str = re.sub("\=.*?\)", ")", native_cpp_sig_str)
-            if not self.is_tensor_api(native_cpp_sig_str):
-                continue
-            self._native_sigs_str.append(native_cpp_sig_str)
-
-    def compare_params(self, params1, params2):
-        if len(params1) != len(params2):
-            return False
-
-        for param_item in params1:
-            if param_item not in params2:
-                return False
-        return True
-
-    def get_native_functions(self, cpp_sig):
-        cnt = 0
-        cur_native_cpp_sig_str = ''
-        ret_native_cpp_sig = None
-        try:
-            for native_sig_str_item in self._native_sigs_str:
-                target_str = ' {}('.format(cpp_sig.def_name)
-                if native_sig_str_item.find(target_str) >= 0:
-                    cur_native_cpp_sig_str = native_sig_str_item
-                    native_cpp_sig = CPPSig(cur_native_cpp_sig_str)
-                    params1 = [param.ipex_name if param.ipex_name != '' else param.name for param in native_cpp_sig.input_params]
-                    params2 = [param.ipex_name if param.ipex_name != '' else param.name for param in cpp_sig.input_params]
-                    if self.compare_params(params1, params2):
-                        cnt = cnt + 1
-                        ret_native_cpp_sig = native_cpp_sig
-        except Exception as e:
-            self._err_info.append((cur_native_cpp_sig_str, str(e)))
-            print('[NativeFunctions] Error parsing "{}": {}'.format(cur_native_cpp_sig_str, e), file=sys.stderr)
-
-        if cnt == 0:
-            raise Exception("Cannot the function:{} in Functions.h".format(cpp_sig.def_name))
-        return ret_native_cpp_sig
-
     def prepare_functions(self):
-        # Get all functions in Functions.h
-        self.parse_native_functions()
-
         for line in open(self._reg_dec_file_path, 'r'):
             m = re.match(r'\s*([^\s].*); //\s+(.*)', line)
             if not m:
@@ -315,7 +252,7 @@ class DenseOPCodeGen(object):
                 res = json.loads(aten_func_sig_literal)
                 aten_func_sig = res["schema"]
 
-            if not self.is_tensor_api(cpp_func_sig):
+            if not utils.is_tensor_api(cpp_func_sig):
                 continue
 
             try:
@@ -325,7 +262,7 @@ class DenseOPCodeGen(object):
 
                 native_cpp_sig = None
                 if utils.is_out_func(cpp_sig.def_name):
-                    native_cpp_sig = self.get_native_functions(cpp_sig)
+                    native_cpp_sig = self._native_funcs.query(cpp_sig)
 
                 aten_sig = AtenSig(aten_func_sig)
 
@@ -523,7 +460,7 @@ class DenseOPCodeGen(object):
             # Remove original param name
             params_name = params_name[:start_idx] + [wrapped_options] + params_name[end_idx + 1:]
 
-        if self.is_tensor_member_function(func_name):
+        if self._native_funcs.is_tensor_member_function(func_name):
             assert "_ipex_self" in params_name
             params_name.remove('_ipex_self')
             if self.is_void_func(cpp_sig):

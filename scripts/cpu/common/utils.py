@@ -24,6 +24,18 @@ _TYPE_NSMAP = {
     'DimnameList': 'at::DimnameList',  # Cover DimnameList and Dimname
 }
 
+def is_tensor_api(func_name):
+    m = re.search(r'\bTensor\b', func_name)
+    return m is not None
+
+def compare_params(params1, params2):
+    if len(params1) != len(params2):
+        return False
+
+    for param_item in params1:
+        if param_item not in params2:
+            return False
+    return True
 
 def add_ns(pt_string):
     splited_str = re.split(r'([^a-zA-Z0-9_])', pt_string)

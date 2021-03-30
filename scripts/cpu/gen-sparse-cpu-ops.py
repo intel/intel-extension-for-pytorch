@@ -13,6 +13,7 @@ from common.codegen import write_or_skip
 from common.cpp_sig_parser import CPPSig
 from common.aten_sig_parser import AtenSig
 import common.utils as utils
+from common.native_functions import NativeFunctions
 
 _FN_BYPASS_REGEX = [
     # ATEN CUDA functions
@@ -100,17 +101,7 @@ class SparseOPCodeGen(object):
         self._sparse_attr_data = ''
         self._sparse_sigs = []
         self._err_info = []
-        self._func_data = ''
-
-    def is_tensor_api(self, func_name):
-        m = re.search(r'\bTensor\b', func_name)
-        return m is not None
-
-    def is_tensor_member_function(self, func_name):
-        if self._func_data.find(' {}('.format(func_name)) >= 0:
-            return False
-        else:
-            return True
+        self._native_funcs = NativeFunctions(func_file_path)
 
     def is_sparse_attr_function(self, func_name):
         if self._sparse_attr_data.find(' {}('.format(func_name)) >= 0:
@@ -172,23 +163,27 @@ class SparseOPCodeGen(object):
                 res = json.loads(aten_func_sig_literal)
                 aten_func_sig = res["schema"]
 
-            if not self.is_tensor_api(cpp_func_sig):
+            if not utils.is_tensor_api(cpp_func_sig):
                 continue
 
             try:
-                cpp_sig = CPPSig(cpp_func_sig)
-                if self.is_bypass_func(cpp_sig):
-                    continue
-
                 for sparse_cpp_sig_str in _sparse_sig_strs:
                     if sparse_cpp_sig_str.find("clone") >= 0 and cpp_func_sig.find("clone") >= 0:
                         print("{} {}".format(sparse_cpp_sig_str, cpp_func_sig))
+
                     if sparse_cpp_sig_str.replace(' ', '') == cpp_func_sig.replace(' ', ''):
                         sparse_sig = CPPSig(sparse_cpp_sig_str)
-                        sparse_sig.is_tensor_member_func = self.is_tensor_member_function(sparse_sig.def_name)
+                        sparse_sig.is_tensor_member_func = self._native_funcs.is_tensor_member_function(sparse_sig.def_name)
+
+                        native_cpp_sig = None
+                        if utils.is_out_func(sparse_sig.def_name):
+                            native_cpp_sig = self._native_funcs.query(sparse_sig)
+
                         aten_sig = AtenSig(aten_func_sig)
+
                         self.cross_correct_sig(sparse_sig, aten_sig)
-                        self._sigs.append((sparse_sig, aten_sig, sparse_cpp_sig_str, aten_func_sig))
+
+                        self._sigs.append((sparse_sig, aten_sig, native_cpp_sig, sparse_cpp_sig_str, aten_func_sig))
                     else:
                         continue
             except Exception as e:
@@ -253,11 +248,18 @@ class SparseOPCodeGen(object):
                 param.ipex_name = ipex_name
         return op_check_code + code
 
-    def gen_fallback_code(self, cpp_sig):
+    def gen_fallback_code(self, cpp_sig, native_cpp_sig):
         for param in cpp_sig.input_params:
             assert param.name
-        params_name = [param.ipex_name if param.ipex_name != '' else param.name for param in cpp_sig.input_params]
 
+        if native_cpp_sig is None:
+            params_name = [param.ipex_name if param.ipex_name != '' else param.name for param in cpp_sig.input_params]
+        else:
+            params1_name = [param.name for param in cpp_sig.input_params]
+            params2_name = [param.name for param in native_cpp_sig.input_params]
+            new_idxs = utils.reorder_params_idx(params1_name, params2_name)
+            input_params = cpp_sig.input_params
+            params_name = [input_params[new_idxs[idx]].ipex_name if input_params[new_idxs[idx]].ipex_name != '' else input_params[new_idxs[idx]].name for idx in range(len(new_idxs))]
 
         code = ''
         start_idx, end_idx = utils.query_tensor_options(cpp_sig.input_params)
@@ -380,7 +382,7 @@ class SparseOPCodeGen(object):
         assert len(self._err_info) == 0
 
         func_defs = []
-        for cpp_sparse_sig, aten_sig, cpp_sparse_func_sig_str, aten_func_sig_str in self._sigs:
+        for cpp_sparse_sig, aten_sig, native_cpp_sig, cpp_sparse_func_sig_str, aten_func_sig_str in self._sigs:
             # The operator name should be unique because the new registration mechanism of PyTorch 1.7
             new_cpp_func_name = aten_sig.def_name.replace('.', '_')
 
@@ -412,7 +414,7 @@ class SparseOPCodeGen(object):
                 code += '#endif\n'
 
                 code += self.gen_fallback_prepare_code(cpp_sparse_sig)
-                code += self.gen_fallback_code(cpp_sparse_sig)
+                code += self.gen_fallback_code(cpp_sparse_sig, native_cpp_sig)
                 code += self.gen_fallback_post_code(cpp_sparse_sig)
 
                 code += '}\n\n'
