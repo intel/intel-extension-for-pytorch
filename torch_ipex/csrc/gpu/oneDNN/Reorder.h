@@ -15,12 +15,13 @@
 
 using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
+using namespace at::dpcpp::oneDNN; // workaround
 
 namespace at {
-namespace dpcpp {
+namespace xpu {
 namespace oneDNN {
 
-typedef struct ReorderAttr {
+struct ReorderAttr {
 public:
   ReorderAttr(bool is_group = false)
       : pattr_(primitive_attr()),
@@ -51,22 +52,10 @@ public:
 
   primitive_attr pattr() const { return pattr_; }
 
-  memory::dims dims(const Tensor& t) const {
-    return memory::dims(t.sizes().vec());
-  }
-
-  memory::format_tag fmt(const Tensor& t) const {
-    return get_dnnl_default_format(t.ndimension());
-  }
-
-  memory::data_type dt(const Tensor& t) const {
-    return dt_to_dnnl(t.scalar_type());
-  }
-
 private:
   primitive_attr pattr_;
   std::vector<float> sc_;
-} ReorderAttr;
+};
 
 static inline void reorder(const Tensor& src, Tensor& dst,
                            const ReorderAttr& rattr = ReorderAttr()) {
@@ -77,15 +66,19 @@ static inline void reorder(const Tensor& src, Tensor& dst,
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  memory::desc src_desc = src_ctx.is_plain()
-      ? memory::desc(rattr.dims(src), rattr.dt(src), rattr.fmt(src))
-      : src_ctx.meta();
+  memory::desc src_desc = src_ctx.is_plain() ?
+      memory::desc(get_onednn_dims(src),
+                   get_onednn_dtype(src),
+                   get_onednn_strides(src)) :
+      src_ctx.meta();
   auto src_mem = dpcpp_onednn_memory(src_desc, engine, src.data_ptr());
 
   auto dst_ctx = DPCPPTensorContext::get_tensor_ctx(dst);
-  memory::desc dst_desc = dst_ctx.is_plain()
-      ? memory::desc(rattr.dims(dst), rattr.dt(dst), rattr.fmt(dst))
-      : dst_ctx.meta();
+  memory::desc dst_desc = dst_ctx.is_plain() ?
+      memory::desc(get_onednn_dims(dst),
+                   get_onednn_dtype(dst),
+                   get_onednn_strides(dst)) :
+      dst_ctx.meta();
   auto dst_mem = dpcpp_onednn_memory(dst_desc, engine, dst.data_ptr());
 
   primitive prim;

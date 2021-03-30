@@ -7,3 +7,4 @@
 #include "Eltwise.h"
 #include "Reorder.h"
 #include "LayerNorm.h"
+#include "Matmul.h"

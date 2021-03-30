@@ -268,7 +268,7 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   if (same_device && has_sz_st &&
       oneDNN::is_supported_onednn_dtype(self) &&
       oneDNN::is_supported_onednn_dtype(src)) {
-    oneDNN::reorder_copy(self, src);
+    at::xpu::oneDNN::reorder_copy(self, src);
   } else {
     impl::copy_kernel_dpcpp(iter, non_blocking);
   }

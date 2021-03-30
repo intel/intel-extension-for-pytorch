@@ -187,7 +187,7 @@ at::Tensor convolution(
       input_memory = dpcpp_onednn_memory(expected_input_md, engine, input.data_ptr());
     } else {
       input_ = empty_opaque_tensor(expected_input_md, input.options(), c10::nullopt);
-      oneDNN::reorder(input, input_);
+      at::xpu::oneDNN::reorder(input, input_);
       input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
     }
   }
@@ -218,7 +218,7 @@ at::Tensor convolution(
     }
 
     weight_memory = dpcpp_onednn_memory(expected_weight_md, engine, weight_.data_ptr());
-    oneDNN::reorder(weight.view(weight_tz), weight_);
+    at::xpu::oneDNN::reorder(weight.view(weight_tz), weight_);
 
     if (weight_cache_enabled()) {
       strm.wait();
@@ -239,7 +239,7 @@ at::Tensor convolution(
       output_ = empty_opaque_tensor(expected_output_md, output.options(), c10::nullopt);
     }
     if (attr.with_sum()) {
-      oneDNN::reorder(output, output_);
+      at::xpu::oneDNN::reorder(output, output_);
     }
     output_memory = dpcpp_onednn_memory(expected_output_md, engine, output_.data_ptr());
   }
@@ -261,16 +261,16 @@ at::Tensor convolution(
       }
 
       int mask = weight_scales.size() > 1 ? ONEDNN_SCALES_MASK_BY_CHANNEL(0) : 0;
-      auto reorder_attr = oneDNN::ReorderAttr();
+      auto reorder_attr = at::xpu::oneDNN::ReorderAttr();
       reorder_attr.set_dst_sc_and_zp(mask, bias_scale, 0, {0});
 
       if (weight_cache_enabled()) {
         bias_opt = empty_opaque_tensor(bias_md, bias.options(), c10::nullopt);
-        oneDNN::reorder(bias, bias_opt, reorder_attr);
+        at::xpu::oneDNN::reorder(bias, bias_opt, reorder_attr);
         bias_memory = dpcpp_onednn_memory(bias_md, engine, bias_opt.data_ptr());
       } else {
         bias_ = empty_opaque_tensor(bias_md, bias.options(), c10::nullopt);
-        oneDNN::reorder(bias, bias_, reorder_attr);
+        at::xpu::oneDNN::reorder(bias, bias_, reorder_attr);
         bias_memory = dpcpp_onednn_memory(bias_md, engine, bias_.data_ptr());
       }
 
@@ -298,7 +298,7 @@ at::Tensor convolution(
        {DNNL_ARG_DST, output_memory}});
 
   if (!lazy_reorder_enabled() && output_.data_ptr() != output.data_ptr()) {
-    oneDNN::reorder(output_, output);
+    at::xpu::oneDNN::reorder(output_, output);
   } else if (
       lazy_reorder_enabled() && output_.data_ptr() != output.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(output_);
