@@ -11,7 +11,8 @@ SET(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
 SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/cpu")
-add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
+#add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
+add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn)
 #find_package(TorchCCL REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
@@ -131,8 +132,12 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
 # include mkl-dnn before PyTorch
 # Otherwise, path_to_pytorch/torch/include/dnnl.hpp will be used as the header
-include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
-include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
+#include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
+#include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
+include_directories(${PROJECT_SOURCE_DIR}/build/third_party/ideep/include)
+include_directories(${DPCPP_THIRD_PARTY_ROOT}/ideep/include)
+include_directories(${PROJECT_SOURCE_DIR}/build/third_party/ideep/mkl-dnn/include)
+include_directories(${DPCPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include)
 
 # Set installed PyTorch dir
 if(DEFINED PYTORCH_INSTALL_DIR)

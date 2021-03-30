@@ -262,7 +262,6 @@ class IPEXBuild(build_ext, object):
       check_call(['ninja'] + build_args, cwd=ext.build_dir, env=env)
     else:
       check_call(['make'] + build_args, cwd=ext.build_dir, env=env)
-    check_call(['make', 'install'] + build_args, cwd=ext.build_dir, env=env)
 
 ipex_git_sha, torch_git_sha = get_git_head_sha(base_dir)
 version = get_build_version(ipex_git_sha)
