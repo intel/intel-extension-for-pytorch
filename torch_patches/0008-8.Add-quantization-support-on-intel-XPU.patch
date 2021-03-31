@@ -1,16 +1,16 @@
-From d43bd78d66438d32071429d6bbd04c1d70e0d8cc Mon Sep 17 00:00:00 2001
+From 82ab83f5f48354fe0a9a68a3c4e732da58617979 Mon Sep 17 00:00:00 2001
 From: johnlu <chengjun.lu@intel.com>
-Date: Tue, 2 Feb 2021 19:12:08 +0800
-Subject: [PATCH 12/14] Add qint changes.
+Date: Wed, 31 Mar 2021 21:49:51 +0800
+Subject: [PATCH 8/8] 8.Add quantization support on intel XPU
 
 ---
- aten/src/ATen/core/jit_type.h                 | 17 ++++++-------
- .../passes/quantization/insert_observers.cpp  |  7 +++---
+ aten/src/ATen/core/jit_type.h                 | 17 ++++++++-------
+ .../passes/quantization/insert_observers.cpp  |  7 ++++---
  torch/nn/quantized/modules/conv.py            |  4 ++++
- .../quantized/modules/functional_modules.py   |  5 ++++
- torch/quantization/observer.py                | 24 ++++++++++++-------
- torch/quantization/quantize_jit.py            |  3 ++-
- 6 files changed, 39 insertions(+), 21 deletions(-)
+ .../quantized/modules/functional_modules.py   |  5 +++++
+ torch/quantization/observer.py                | 21 +++++++++++--------
+ torch/quantization/quantize_jit.py            |  8 ++++---
+ 6 files changed, 39 insertions(+), 23 deletions(-)
 
 diff --git a/aten/src/ATen/core/jit_type.h b/aten/src/ATen/core/jit_type.h
 index 7e0a290801..86b881d37f 100644
@@ -90,10 +90,15 @@ index d3fa7189e0..dfebb15cfe 100644
          return r
  
 diff --git a/torch/quantization/observer.py b/torch/quantization/observer.py
-index fc0d2a436d..bab55e6672 100644
+index fc0d2a436d..63993bb4de 100644
 --- a/torch/quantization/observer.py
 +++ b/torch/quantization/observer.py
-@@ -262,14 +262,17 @@ class _ObserverBase(ObserverBase):
+@@ -258,18 +258,21 @@ class _ObserverBase(ObserverBase):
+ 
+         scale = torch.ones(min_val_neg.size(), dtype=torch.float32)
+         zero_point = torch.zeros(min_val_neg.size(), dtype=torch.int64)
+-        device = 'cuda' if min_val_neg.is_cuda else 'cpu'
++        device = min_val_neg.device
  
          if self.qscheme == torch.per_tensor_symmetric or self.qscheme == torch.per_channel_symmetric:
              max_val_pos = torch.max(-min_val_neg, max_val_pos)
@@ -119,30 +124,22 @@ index fc0d2a436d..bab55e6672 100644
          elif self.qscheme == torch.per_channel_affine_float_qparams:
              scale = (max_val - min_val) / float(quant_max - quant_min)
              scale = torch.where(scale > self.eps, scale, torch.ones_like(scale))
-@@ -388,8 +391,11 @@ class MinMaxObserver(_ObserverBase):
-     def forward(self, x_orig):
-         r"""Records the running minimum and maximum of ``x``."""
-         x = x_orig.detach()  # avoid keeping autograd tape
--        x = x.to(self.min_val.dtype)
-+        #Optimize to compatible with more devices like gpu.
-+        #x = x.to(self.min_val.dtype)
-         min_val_cur, max_val_cur = torch._aminmax(x)
-+        self.min_val = self.min_val.to(min_val_cur.device)
-+        self.max_val = self.max_val.to(max_val_cur.device)
-         min_val = torch.min(min_val_cur, self.min_val)
-         max_val = torch.max(max_val_cur, self.max_val)
-         self.min_val.copy_(min_val)
 diff --git a/torch/quantization/quantize_jit.py b/torch/quantization/quantize_jit.py
-index ef6792d521..100609e30b 100644
+index ef6792d521..2400b12675 100644
 --- a/torch/quantization/quantize_jit.py
 +++ b/torch/quantization/quantize_jit.py
-@@ -76,7 +76,8 @@ def _convert_jit(model, inplace=False, debug=False, quant_type=QuantType.STATIC,
+@@ -74,9 +74,11 @@ def _convert_jit(model, inplace=False, debug=False, quant_type=QuantType.STATIC,
+     model_c = model._c
+     model_c = torch._C._jit_pass_insert_quant_dequant(model_c, 'forward', inplace, debug, quant_type)
      if not debug:
-         # Moving model parameters to CPU since quantized operators
-         # are only supported on CPU right now
+-        # Moving model parameters to CPU since quantized operators
+-        # are only supported on CPU right now
 -        model.cpu()
-+        #Optimize to compatible with more devices like gpu.
-+        #model.cpu()
++        is_xpu = all(p.device.type == 'xpu' for p in model.parameters())
++        if not is_xpu:
++            # Moving model parameters to CPU since quantized operators
++            # are only supported on CPU and XPU right now
++            model.cpu()
          if preserved_attrs is None:
              preserved_attrs = []
          model_c = torch._C._jit_pass_quant_finalize(model_c, quant_type, preserved_attrs)

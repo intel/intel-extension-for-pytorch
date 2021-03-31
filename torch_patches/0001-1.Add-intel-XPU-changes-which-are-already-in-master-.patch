@@ -1,40 +1,39 @@
-From dff0601c9b0b6dc9647a64bf9cc423dc376d737d Mon Sep 17 00:00:00 2001
+From 1482f5d9ee7a9cefe935758e0c15d8b61e8fe039 Mon Sep 17 00:00:00 2001
 From: chengjun <chengjun.lu@intel.com>
-Date: Wed, 14 Oct 2020 00:13:00 +0800
-Subject: [PATCH 05/14] Define the record_stream method in
- native_functions.yaml (#44301)
+Date: Thu, 29 Oct 2020 21:49:28 +0800
+Subject: [PATCH 1/8] 1.Add intel XPU changes which are already in master
+ pytorch.
 
-Summary:
-The record_stream method was hard coded for CUDA device. Define the record_stream in the native_functions.yaml to enable the dynamic dispatch to different end device.
-
-Fixes https://github.com/pytorch/pytorch/issues/36556
-
-Pull Request resolved: https://github.com/pytorch/pytorch/pull/44301
-
-Reviewed By: glaringlee
-
-Differential Revision: D23763954
-
-Pulled By: ezyang
-
-fbshipit-source-id: e6d24f5e7892b56101fa858a6cad2abc5cdc4293
-
-(cherry picked from commit 5741de883af2ac63cec537fc8a554610a5cea853)
 ---
+ aten/src/ATen/SparseTensorImpl.cpp            |   2 +
  aten/src/ATen/core/ivalue.cpp                 |   6 +
  aten/src/ATen/core/ivalue.h                   |  10 ++
  aten/src/ATen/core/ivalue_inl.h               |   7 ++
  aten/src/ATen/core/jit_type.h                 |  29 +++++
  aten/src/ATen/core/type.cpp                   |   4 +
  aten/src/ATen/function_wrapper.py             |   0
+ aten/src/ATen/native/TensorIterator.cpp       |   2 +-
  aten/src/ATen/native/cuda/RecordStream.cu     |   7 ++
  aten/src/ATen/native/native_functions.yaml    |   6 +
- aten/src/ATen/templates/TensorBody.h          |   3 +
- aten/src/ATen/templates/TensorMethods.cpp     |   3 +
+ aten/src/ATen/native/sparse/SparseTensor.cpp  |   2 +
+ aten/src/ATen/templates/TensorBody.h          |   6 +
+ aten/src/ATen/templates/TensorMethods.cpp     |  13 ++
+ c10/core/Backend.h                            |  72 +++++++++++
+ c10/core/Device.cpp                           |   6 +-
+ c10/core/DeviceType.cpp                       |   3 +
+ c10/core/DeviceType.h                         |   4 +-
+ c10/core/DispatchKey.cpp                      |   6 +
+ c10/core/DispatchKey.h                        |   4 +
+ c10/core/DispatchKeySet.cpp                   |   1 +
+ c10/core/DispatchKeySet.h                     |   1 +
+ c10/core/Layout.h                             |   1 +
+ c10/core/TensorImpl.h                         |  19 ++-
+ c10/core/TensorOptions.h                      |  14 +++
+ setup.py                                      |   1 +
  test/test_overrides.py                        |   2 +
  tools/autograd/gen_python_functions.py        |   1 +
  tools/autograd/gen_variable_type.py           |   2 +
- .../templates/python_variable_methods.cpp     |  25 +---
+ .../templates/python_variable_methods.cpp     |  48 +++----
  tools/build_variables.bzl                     |   1 +
  tools/codegen/api/cpp.py                      |   2 +-
  tools/codegen/model.py                        |   1 +
@@ -43,25 +42,47 @@ fbshipit-source-id: e6d24f5e7892b56101fa858a6cad2abc5cdc4293
  torch/csrc/Module.cpp                         |   2 +
  torch/csrc/Stream.cpp                         | 117 ++++++++++++++++++
  torch/csrc/Stream.h                           |  18 +++
+ torch/csrc/autograd/python_variable.cpp       |  12 ++
  torch/csrc/cuda/Stream.cpp                    |   7 +-
  torch/csrc/cuda/Stream.h                      |   5 +-
+ torch/csrc/distributed/c10d/reducer.cpp       |   2 +-
  .../csrc/jit/frontend/schema_type_parser.cpp  |   2 +
  torch/csrc/jit/frontend/string_to_type.cpp    |   1 +
  torch/csrc/jit/frontend/tracer.cpp            |   3 +
  torch/csrc/jit/frontend/tracer.h              |   1 +
  torch/csrc/jit/ir/constants.cpp               |   7 ++
+ torch/csrc/jit/passes/graph_fuser.cpp         |   2 +
  torch/csrc/jit/python/pybind_utils.h          |   7 ++
  torch/csrc/jit/python/python_ir.cpp           |   3 +
- torch/csrc/jit/serialization/unpickler.cpp    |   1 +
+ torch/csrc/jit/serialization/pickler.cpp      |   3 +-
+ torch/csrc/jit/serialization/unpickler.cpp    |   3 +
  torch/csrc/utils/python_arg_parser.cpp        |   7 ++
  torch/csrc/utils/python_arg_parser.h          |  12 +-
+ torch/csrc/utils/tensor_new.cpp               |  10 +-
+ torch/csrc/utils/tensor_types.cpp             |   2 +
+ torch/distributed/nn/api/remote_module.py     |   3 +
  torch/jit/annotations.py                      |   4 +-
- 35 files changed, 286 insertions(+), 34 deletions(-)
+ torch/nn/modules/module.py                    |  16 +++
+ torch/nn/parallel/distributed.py              |   9 +-
+ 59 files changed, 503 insertions(+), 52 deletions(-)
  create mode 100644 aten/src/ATen/function_wrapper.py
  create mode 100644 aten/src/ATen/native/cuda/RecordStream.cu
  create mode 100644 torch/csrc/Stream.cpp
  create mode 100644 torch/csrc/Stream.h
 
+diff --git a/aten/src/ATen/SparseTensorImpl.cpp b/aten/src/ATen/SparseTensorImpl.cpp
+index ee1ff71b54..f6e7a30245 100644
+--- a/aten/src/ATen/SparseTensorImpl.cpp
++++ b/aten/src/ATen/SparseTensorImpl.cpp
+@@ -9,6 +9,8 @@ namespace {
+   DeviceType sparseTensorSetToDeviceType(DispatchKeySet key_set) {
+     if (key_set.has(DispatchKey::SparseCPU)) {
+       return kCPU;
++    } else if (key_set.has(DispatchKey::SparseXPU)) {
++      return kXPU;
+     } else if (key_set.has(DispatchKey::SparseCUDA)) {
+       return kCUDA;
+     } else {
 diff --git a/aten/src/ATen/core/ivalue.cpp b/aten/src/ATen/core/ivalue.cpp
 index e786d36256..9b9cf0b35a 100644
 --- a/aten/src/ATen/core/ivalue.cpp
@@ -218,6 +239,19 @@ index 13e82d4346..45bee50ccb 100644
 diff --git a/aten/src/ATen/function_wrapper.py b/aten/src/ATen/function_wrapper.py
 new file mode 100644
 index 0000000000..e69de29bb2
+diff --git a/aten/src/ATen/native/TensorIterator.cpp b/aten/src/ATen/native/TensorIterator.cpp
+index 71b552718a..88a240b582 100644
+--- a/aten/src/ATen/native/TensorIterator.cpp
++++ b/aten/src/ATen/native/TensorIterator.cpp
+@@ -374,7 +374,7 @@ void TensorIterator::compute_types(const TensorIteratorConfig& config) {
+     // Checks all tensors are on the same device, if requested
+     if (config.check_all_same_device_) {
+       // Handles CPU scalars on CUDA kernels that support them
+-      if (common_device.is_cuda() &&
++      if ((common_device.is_cuda() || common_device.type() == at::kXPU)&&
+           config.allow_cpu_scalars_ &&
+           !op.is_output &&
+           op.tensor.dim() == 0 &&
 diff --git a/aten/src/ATen/native/cuda/RecordStream.cu b/aten/src/ATen/native/cuda/RecordStream.cu
 new file mode 100644
 index 0000000000..d48561df00
@@ -248,8 +282,21 @@ index 4d748250ab..44831e401c 100644
  - func: isposinf(Tensor self) -> Tensor
    use_c10_dispatcher: full
    variants: function, method
+diff --git a/aten/src/ATen/native/sparse/SparseTensor.cpp b/aten/src/ATen/native/sparse/SparseTensor.cpp
+index 3196c083ee..3fdcf08edc 100644
+--- a/aten/src/ATen/native/sparse/SparseTensor.cpp
++++ b/aten/src/ATen/native/sparse/SparseTensor.cpp
+@@ -76,6 +76,8 @@ SparseTensor new_sparse(const TensorOptions& options) {
+   DispatchKey dispatch_key;
+   if (options.device().is_cuda()) {
+     dispatch_key = DispatchKey::SparseCUDA;
++  } else if (options.device().type() == DeviceType::XPU) {
++    dispatch_key = DispatchKey::SparseXPU;
+   } else {
+     dispatch_key = DispatchKey::SparseCPU;
+   }
 diff --git a/aten/src/ATen/templates/TensorBody.h b/aten/src/ATen/templates/TensorBody.h
-index d4f0f267b7..f6f48f1a08 100644
+index 202b2124f2..f6f48f1a08 100644
 --- a/aten/src/ATen/templates/TensorBody.h
 +++ b/aten/src/ATen/templates/TensorBody.h
 @@ -4,6 +4,7 @@
@@ -269,8 +316,18 @@ index d4f0f267b7..f6f48f1a08 100644
  namespace impl {
  inline bool variable_excluded_from_dispatch() {
  #ifdef C10_MOBILE
+@@ -317,6 +320,9 @@ class CAFFE2_API Tensor {
+   /// Returns if a `Tensor` has CUDA backend.
+   bool is_cuda() const;
+ 
++  /// Returns if a `Tensor` has XPU backend.
++  bool is_xpu() const;
++
+   /// Returns if a `Tensor` has HIP backend.
+   bool is_hip() const;
+ 
 diff --git a/aten/src/ATen/templates/TensorMethods.cpp b/aten/src/ATen/templates/TensorMethods.cpp
-index 7b50f9dba6..2cf15f771e 100644
+index 064f5911cb..2cf15f771e 100644
 --- a/aten/src/ATen/templates/TensorMethods.cpp
 +++ b/aten/src/ATen/templates/TensorMethods.cpp
 @@ -1,6 +1,7 @@
@@ -290,6 +347,519 @@ index 7b50f9dba6..2cf15f771e 100644
  Tensor Tensor::cpu() const {
    return to(options().device(DeviceType::CPU), /*non_blocking*/ false, /*copy*/ false);
  }
+@@ -74,6 +77,16 @@ bool Tensor::is_cuda() const {
+   return impl_->is_cuda();
+ }
+ 
++bool Tensor::is_xpu() const {
++  // NB: this is not a native function to avoid dispatching overhead.
++  return impl_->is_xpu();
++}
++
++bool is_xpu(Tensor self) {
++  // NB: this is not a native function to avoid dispatching overhead.
++  return self.is_xpu();
++}
++
+ NamedTensorMeta* Tensor::get_named_tensor_meta() {
+   return static_cast<NamedTensorMeta*>(impl_->named_tensor_meta());
+ }
+diff --git a/c10/core/Backend.h b/c10/core/Backend.h
+index ab0c45ad1f..25dbb6e0e8 100644
+--- a/c10/core/Backend.h
++++ b/c10/core/Backend.h
+@@ -31,14 +31,17 @@ enum class Backend {
+   CUDA,
+   HIP,
+   FPGA,
++  XPU,
+   SparseCPU,
+   SparseCUDA,
+   SparseHIP,
++  SparseXPU,
+   MSNPU,
+   XLA,
+   Vulkan,
+   QuantizedCPU,
+   QuantizedCUDA,
++  QuantizedXPU,
+   Undefined,
+   MkldnnCPU,
+   NumOptions
+@@ -48,6 +51,8 @@ static inline Backend toSparse(Backend b) {
+   switch (b) {
+     case Backend::CPU:
+       return Backend::SparseCPU;
++    case Backend::XPU:
++      return Backend::SparseXPU;
+     case Backend::CUDA:
+       return Backend::SparseCUDA;
+     case Backend::HIP:
+@@ -77,6 +82,10 @@ static inline Backend toDense(Backend b) {
+       return Backend::MSNPU;
+     case Backend::XLA:
+       return Backend::XLA;
++    case Backend::XPU:
++      return Backend::XPU;
++    case Backend::SparseXPU:
++      return Backend::XPU;
+     case Backend::SparseCPU:
+       return Backend::CPU;
+     case Backend::SparseCUDA:
+@@ -87,6 +96,8 @@ static inline Backend toDense(Backend b) {
+       return Backend::QuantizedCPU;
+     case Backend::QuantizedCUDA:
+       return Backend::QuantizedCUDA;
++    case Backend::QuantizedXPU:
++      return Backend::QuantizedXPU;
+     default:
+       throw std::runtime_error("Unknown backend");
+   }
+@@ -119,6 +130,12 @@ static inline Backend dispatchKeyToBackend(DispatchKey t) {
+     return Backend::QuantizedCPU;
+   } else if (t == DispatchKey::QuantizedCUDA) {
+     return Backend::QuantizedCUDA;
++  } else if (t == DispatchKey::XPU) {
++    return Backend::XPU;
++  } else if (t == DispatchKey::SparseXPU) {
++    return Backend::SparseXPU;
++  } else if (t == DispatchKey::QuantizedXPU) {
++    return Backend::QuantizedXPU;
+   } else if (t == DispatchKey::Undefined) {
+     return Backend::Undefined;
+   } else {
+@@ -140,6 +157,10 @@ static inline DispatchKey backendToDispatchKey(Backend b) {
+       return DispatchKey::MSNPU;
+     case Backend::XLA:
+       return DispatchKey::XLA;
++    case Backend::XPU:
++      return DispatchKey::XPU;
++    case Backend::SparseXPU:
++      return DispatchKey::SparseXPU;
+     case Backend::SparseCPU:
+       return DispatchKey::SparseCPU;
+     case Backend::SparseCUDA:
+@@ -154,6 +175,8 @@ static inline DispatchKey backendToDispatchKey(Backend b) {
+       return DispatchKey::QuantizedCPU;
+     case Backend::QuantizedCUDA:
+       return DispatchKey::QuantizedCUDA;
++    case Backend::QuantizedXPU:
++      return DispatchKey::QuantizedXPU;
+     case Backend::Undefined:
+       return DispatchKey::Undefined;
+     default:
+@@ -181,6 +204,10 @@ static inline DeviceType backendToDeviceType(Backend b) {
+       return DeviceType::CUDA;
+     case Backend::SparseHIP:
+       return DeviceType::HIP;
++    case Backend::XPU:
++    case Backend::SparseXPU:
++    case Backend::QuantizedXPU:
++      return DeviceType::XPU;
+     case Backend::MkldnnCPU:
+     case Backend::QuantizedCPU:
+       return DeviceType::CPU;
+@@ -205,12 +232,16 @@ static inline Backend backendToCPU(Backend b) {
+       return Backend::CPU;
+     case Backend::FPGA:
+       return Backend::CPU;
++    case Backend::XPU:
++      return Backend::CPU;
+     case Backend::SparseCPU:
+       return Backend::SparseCPU;
+     case Backend::SparseCUDA:
+       return Backend::SparseCPU;
+     case Backend::SparseHIP:
+       return Backend::SparseCPU;
++    case Backend::SparseXPU:
++      return Backend::SparseCPU;
+     case Backend::MSNPU:
+     case Backend::XLA:
+       return Backend::CPU;
+@@ -220,6 +251,36 @@ static inline Backend backendToCPU(Backend b) {
+       return Backend::QuantizedCPU;
+     case Backend::QuantizedCUDA:
+       return Backend::QuantizedCPU;
++    case Backend::QuantizedXPU:
++      return Backend::QuantizedCPU;
++    case Backend::Undefined:
++      return Backend::Undefined;
++    default:
++      AT_ERROR("Unknown backend");
++  }
++}
++
++static inline Backend backendToXPU(Backend b) {
++  switch (b) {
++    case Backend::CPU:
++    case Backend::CUDA:
++    case Backend::HIP:
++    case Backend::FPGA:
++    case Backend::XPU:
++    case Backend::MSNPU:
++    case Backend::XLA:
++    case Backend::MkldnnCPU:
++    case Backend::Vulkan:
++      return Backend::XPU;
++    case Backend::SparseCPU:
++    case Backend::SparseCUDA:
++    case Backend::SparseXPU:
++    case Backend::SparseHIP:
++      return Backend::SparseXPU;
++    case Backend::QuantizedCPU:
++    case Backend::QuantizedCUDA:
++    case Backend::QuantizedXPU:
++      return Backend::QuantizedXPU;
+     case Backend::Undefined:
+       return Backend::Undefined;
+     default:
+@@ -229,6 +290,7 @@ static inline Backend backendToCPU(Backend b) {
+ 
+ static inline Backend backendToCUDA(Backend b) {
+   switch (b) {
++    case Backend::XPU:
+     case Backend::CPU:
+     case Backend::CUDA:
+     case Backend::HIP:
+@@ -236,6 +298,7 @@ static inline Backend backendToCUDA(Backend b) {
+     case Backend::MSNPU:
+     case Backend::XLA:
+       return Backend::CUDA;
++    case Backend::SparseXPU:
+     case Backend::SparseCPU:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
+@@ -249,6 +312,7 @@ static inline Backend backendToCUDA(Backend b) {
+ 
+ static inline Backend backendToHIP(Backend b) {
+   switch (b) {
++    case Backend::XPU:
+     case Backend::CPU:
+     case Backend::CUDA:
+     case Backend::HIP:
+@@ -256,6 +320,7 @@ static inline Backend backendToHIP(Backend b) {
+     case Backend::MSNPU:
+     case Backend::XLA:
+       return Backend::HIP;
++    case Backend::SparseXPU:
+     case Backend::SparseCPU:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
+@@ -278,6 +343,8 @@ static inline const char* toString(Backend b) {
+       return "HIP";
+     case Backend::FPGA:
+       return "FPGA";
++    case Backend::XPU:
++      return "XPU";
+     case Backend::MSNPU:
+       return "MSNPU";
+     case Backend::XLA:
+@@ -288,6 +355,8 @@ static inline const char* toString(Backend b) {
+       return "SparseCUDA";
+     case Backend::SparseHIP:
+       return "SparseHIP";
++    case Backend::SparseXPU:
++      return "SparseXPU";
+     case Backend::MkldnnCPU:
+       return "MkldnnCPU";
+     case Backend::Vulkan:
+@@ -296,6 +365,8 @@ static inline const char* toString(Backend b) {
+       return "QuantizedCPU";
+     case Backend::QuantizedCUDA:
+       return "QuantizedCUDA";
++    case Backend::QuantizedXPU:
++      return "QuantizedXPU";
+     default:
+       return "UNKNOWN_BACKEND";
+   }
+@@ -303,6 +374,7 @@ static inline const char* toString(Backend b) {
+ 
+ static inline bool isSparse(Backend b) {
+   switch (b) {
++    case Backend::SparseXPU:
+     case Backend::SparseCPU:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
+diff --git a/c10/core/Device.cpp b/c10/core/Device.cpp
+index 60c40b516f..1213e29970 100644
+--- a/c10/core/Device.cpp
++++ b/c10/core/Device.cpp
+@@ -30,9 +30,11 @@
+ namespace c10 {
+ namespace {
+ DeviceType parse_type(const std::string& device_string) {
+-  static const std::array<std::pair<std::string, DeviceType>, 10> types = {{
++  static const std::array<std::pair<std::string, DeviceType>,
++                          static_cast<size_t>(DeviceType::COMPILE_TIME_MAX_DEVICE_TYPES)> types = {{
+       {"cpu", DeviceType::CPU},
+       {"cuda", DeviceType::CUDA},
++      {"xpu", DeviceType::XPU},
+       {"mkldnn", DeviceType::MKLDNN},
+       {"opengl", DeviceType::OPENGL},
+       {"opencl", DeviceType::OPENCL},
+@@ -52,7 +54,7 @@ DeviceType parse_type(const std::string& device_string) {
+     return device->second;
+   }
+   AT_ERROR(
+-      "Expected one of cpu, cuda, mkldnn, opengl, opencl, ideep, hip, msnpu, xla device type at start of device string: ", device_string);
++      "Expected one of cpu, cuda, xpu, mkldnn, opengl, opencl, ideep, hip, msnpu, xla device type at start of device string: ", device_string);
+ }
+ } // namespace
+ 
+diff --git a/c10/core/DeviceType.cpp b/c10/core/DeviceType.cpp
+index 9c8c53b3f0..d5ba8dadc9 100644
+--- a/c10/core/DeviceType.cpp
++++ b/c10/core/DeviceType.cpp
+@@ -29,6 +29,8 @@ std::string DeviceTypeName(DeviceType d, bool lower_case) {
+       return lower_case ? "xla" : "XLA";
+     case DeviceType::Vulkan:
+       return lower_case ? "vulkan" : "VULKAN";
++    case DeviceType::XPU:
++      return lower_case ? "xpu" : "XPU";
+     default:
+       AT_ERROR(
+           "Unknown device: ",
+@@ -62,6 +64,7 @@ bool isValidDeviceType(DeviceType d) {
+     case DeviceType::MSNPU:
+     case DeviceType::XLA:
+     case DeviceType::Vulkan:
++    case DeviceType::XPU:
+       return true;
+     default:
+       return false;
+diff --git a/c10/core/DeviceType.h b/c10/core/DeviceType.h
+index 0289cf0a02..d7eaa9cc36 100644
+--- a/c10/core/DeviceType.h
++++ b/c10/core/DeviceType.h
+@@ -24,11 +24,12 @@ enum class DeviceType : int16_t {
+   MSNPU = 8, // MSNPU
+   XLA = 9, // XLA / TPU
+   Vulkan = 10, // Vulkan
++  XPU = 11, // XPU
+   // NB: If you add more devices:
+   //  - Change the implementations of DeviceTypeName and isValidDeviceType
+   //    in DeviceType.cpp
+   //  - Change the number below
+-  COMPILE_TIME_MAX_DEVICE_TYPES = 11,
++  COMPILE_TIME_MAX_DEVICE_TYPES = 12,
+   ONLY_FOR_TEST = 20901, // This device type is only for test.
+ };
+ 
+@@ -39,6 +40,7 @@ constexpr DeviceType kFPGA = DeviceType::FPGA;
+ constexpr DeviceType kMSNPU = DeviceType::MSNPU;
+ constexpr DeviceType kXLA = DeviceType::XLA;
+ constexpr DeviceType kVulkan = DeviceType::Vulkan;
++constexpr DeviceType kXPU = DeviceType::XPU;
+ 
+ // define explicit int constant
+ constexpr int COMPILE_TIME_MAX_DEVICE_TYPES =
+diff --git a/c10/core/DispatchKey.cpp b/c10/core/DispatchKey.cpp
+index 70c36de555..4545ed5fca 100644
+--- a/c10/core/DispatchKey.cpp
++++ b/c10/core/DispatchKey.cpp
+@@ -15,6 +15,8 @@ const char* toString(DispatchKey t) {
+       return "HIP";
+     case DispatchKey::FPGA:
+       return "FPGA";
++    case DispatchKey::XPU:
++      return "XPU";
+     case DispatchKey::MSNPU:
+       return "MSNPU";
+     case DispatchKey::XLA:
+@@ -35,6 +37,8 @@ const char* toString(DispatchKey t) {
+       return "QuantizedCPU";
+     case DispatchKey::QuantizedCUDA:
+       return "QuantizedCUDA";
++    case DispatchKey::QuantizedXPU:
++      return "QuantizedXPU";
+ 
+     case DispatchKey::ComplexCPU:
+       return "ComplexCPU";
+@@ -52,6 +56,8 @@ const char* toString(DispatchKey t) {
+       return "SparseCUDA";
+     case DispatchKey::SparseHIP:
+       return "SparseHIP";
++    case DispatchKey::SparseXPU:
++      return "SparseXPU";
+ 
+     case DispatchKey::PrivateUse1:
+       return "PrivateUse1";
+diff --git a/c10/core/DispatchKey.h b/c10/core/DispatchKey.h
+index b32f991df3..eac2ec435c 100644
+--- a/c10/core/DispatchKey.h
++++ b/c10/core/DispatchKey.h
+@@ -60,6 +60,7 @@ enum class DispatchKey : uint8_t {
+          // test/cpp_extensions/msnpu_extension.cpp
+   XLA, // lives out of tree at https://github.com/pytorch/xla
+   Vulkan,
++  XPU, // For out of tree Intel's heterogeneous computing plug-in
+ 
+   // These are Caffe2 device types which we grandfathered into
+   // DispatchKey.
+@@ -74,6 +75,7 @@ enum class DispatchKey : uint8_t {
+   // based on the dtype of the tensor.
+   QuantizedCPU, // registered at build/aten/src/ATen/QuantizedCPUType.cpp
+   QuantizedCUDA, // registered at build/aten/src/ATen/QuantizedCUDAType.cpp
++  QuantizedXPU, // For out of tree Intel's heterogeneous computing plug-in
+   ComplexCPU, // lives out of tree at
+               // https://gitlab.com/pytorch-complex/pytorch-cpu-strided-complex
+   ComplexCUDA, // and
+@@ -102,6 +104,7 @@ enum class DispatchKey : uint8_t {
+   SparseCUDA, // registered at build/aten/src/ATen/SparseCUDAType.cpp
+   SparseHIP, // TODO: I think this is not actually used, due to Note
+              // [Masquerading as CUDA]
++  SparseXPU, // For out of tree Intel's heterogeneous computing plug-in
+ 
+   // Here are reserved backends for user-defined backends, see Note [Private use
+   // DispatchKey]
+@@ -216,6 +219,7 @@ enum class DispatchKey : uint8_t {
+   AutogradCPU,
+   AutogradCUDA,
+   AutogradXLA,
++  AutogradXPU,
+   // Here are some reserved pre-autograd keys for user-defined backends, see
+   // Note [Private use DispatchKey]
+   AutogradPrivateUse1,
+diff --git a/c10/core/DispatchKeySet.cpp b/c10/core/DispatchKeySet.cpp
+index b331fd5a75..f13891f1c0 100644
+--- a/c10/core/DispatchKeySet.cpp
++++ b/c10/core/DispatchKeySet.cpp
+@@ -28,6 +28,7 @@ constexpr DispatchKeySet backend_dispatch_keyset = autogradother_backends | Disp
+   DispatchKey::CPU,
+   DispatchKey::CUDA,
+   DispatchKey::XLA,
++  DispatchKey::XPU,
+   DispatchKey::PrivateUse1,
+   DispatchKey::PrivateUse2,
+   DispatchKey::PrivateUse3,
+diff --git a/c10/core/DispatchKeySet.h b/c10/core/DispatchKeySet.h
+index 58d6beec7f..4aeb06def6 100644
+--- a/c10/core/DispatchKeySet.h
++++ b/c10/core/DispatchKeySet.h
+@@ -192,6 +192,7 @@ constexpr DispatchKeySet autograd_dispatch_keyset = DispatchKeySet({
+   DispatchKey::AutogradCPU,
+   DispatchKey::AutogradCUDA,
+   DispatchKey::AutogradXLA,
++  DispatchKey::AutogradXPU,
+   DispatchKey::AutogradPrivateUse1,
+   DispatchKey::AutogradPrivateUse2,
+   DispatchKey::AutogradPrivateUse3,
+diff --git a/c10/core/Layout.h b/c10/core/Layout.h
+index 7e33c81cbb..02fbd26c19 100644
+--- a/c10/core/Layout.h
++++ b/c10/core/Layout.h
+@@ -17,6 +17,7 @@ inline Layout layout_from_backend(Backend backend) {
+     case Backend::SparseCPU:
+     case Backend::SparseCUDA:
+     case Backend::SparseHIP:
++    case Backend::SparseXPU:
+       return Layout::Sparse;
+     case Backend::MkldnnCPU:
+       return Layout::Mkldnn;
+diff --git a/c10/core/TensorImpl.h b/c10/core/TensorImpl.h
+index 5b383303df..5a39bd7ce6 100644
+--- a/c10/core/TensorImpl.h
++++ b/c10/core/TensorImpl.h
+@@ -434,13 +434,15 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+     // NB: This method is not virtual and avoid dispatches for performance reasons.
+     return key_set_.has(DispatchKey::SparseCPU) ||
+            key_set_.has(DispatchKey::SparseCUDA) ||
+-           key_set_.has(DispatchKey::SparseHIP);
++           key_set_.has(DispatchKey::SparseHIP) ||
++           key_set_.has(DispatchKey::SparseXPU);
+   }
+ 
+   bool is_quantized() const {
+     // NB: This method is not virtual and avoid dispatches for performance reasons.
+     return key_set_.has(DispatchKey::QuantizedCPU) ||
+-        key_set_.has(DispatchKey::QuantizedCUDA);
++        key_set_.has(DispatchKey::QuantizedCUDA) ||
++        key_set_.has(DispatchKey::QuantizedXPU);
+   }
+ 
+   bool is_meta() const {
+@@ -455,6 +457,13 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+         key_set_.has(DispatchKey::QuantizedCUDA);
+   }
+ 
++  bool is_xpu() const {
++    // NB: This method is not virtual and avoid dispatches for performance reasons.
++    return key_set_.has(DispatchKey::XPU) ||
++           key_set_.has(DispatchKey::SparseXPU) ||
++           key_set_.has(DispatchKey::QuantizedXPU);
++  }
++
+   bool is_hip() const {
+     // NB: This method is not virtual and avoid dispatches for performance reasons.
+     return key_set_.has(DispatchKey::HIP) ||
+@@ -913,12 +922,14 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
+     auto is_dense = [](DispatchKeySet ts) {
+       return ts.has(DispatchKey::CPU) ||
+              ts.has(DispatchKey::CUDA) ||
+-             ts.has(DispatchKey::HIP);
++             ts.has(DispatchKey::HIP) ||
++             ts.has(DispatchKey::XPU);
+     };
+     auto is_sparse = [](DispatchKeySet ts) {
+       return ts.has(DispatchKey::SparseCPU) ||
+              ts.has(DispatchKey::SparseCUDA) ||
+-             ts.has(DispatchKey::SparseHIP);
++             ts.has(DispatchKey::SparseHIP) ||
++             ts.has(DispatchKey::SparseXPU);
+     };
+     return (key_set_ == from) || (is_dense(key_set_) && is_dense(from)) || (is_sparse(key_set_) && is_sparse(from));
+   }
+diff --git a/c10/core/TensorOptions.h b/c10/core/TensorOptions.h
+index dd92f91966..3fa76224a6 100644
+--- a/c10/core/TensorOptions.h
++++ b/c10/core/TensorOptions.h
+@@ -595,6 +595,12 @@ inline DispatchKey computeDispatchKey(c10::optional<ScalarType> dtype, c10::opti
+             }
+             return DispatchKey::CUDA;
+           }
++          case DeviceType::XPU: {
++            if (isQIntType(dtype_)) {
++              return DispatchKey::QuantizedXPU;
++            }
++            return DispatchKey::XPU;
++          }
+           case DeviceType::MKLDNN:
+             return DispatchKey::MKLDNN;
+           case DeviceType::OPENGL:
+@@ -625,6 +631,8 @@ inline DispatchKey computeDispatchKey(c10::optional<ScalarType> dtype, c10::opti
+             return DispatchKey::SparseCUDA;
+           case DeviceType::HIP:
+             return DispatchKey::SparseHIP;
++          case DeviceType::XPU:
++            return DispatchKey::SparseXPU;
+           default:
+             AT_ERROR("Unsupported device type for sparse layout: ", device_.type());
+         }
+@@ -675,6 +683,12 @@ inline DeviceType computeDeviceType(DispatchKey tid) {
+     return DeviceType::CPU;
+   } else if (tid == DispatchKey::Vulkan) {
+     return DeviceType::Vulkan;
++  } else if (tid == DispatchKey::XPU) {
++    return DeviceType::XPU;
++  } else if (tid == DispatchKey::SparseXPU) {
++    return DeviceType::XPU;
++  } else if (tid == DispatchKey::QuantizedXPU) {
++    return DeviceType::XPU;
+   } else {
+     AT_ASSERTM(false, "Unknown DispatchKey: ", tid);
+   }
+diff --git a/setup.py b/setup.py
+index 2db381644c..355bce6b6a 100644
+--- a/setup.py
++++ b/setup.py
+@@ -881,6 +881,7 @@ if __name__ == '__main__':
+                 'include/torch/csrc/jit/testing/*.h',
+                 'include/torch/csrc/onnx/*.h',
+                 'include/torch/csrc/utils/*.h',
++                'include/torch/csrc/generic/*.h',
+                 'include/pybind11/*.h',
+                 'include/pybind11/detail/*.h',
+                 'include/TH/*.h*',
 diff --git a/test/test_overrides.py b/test/test_overrides.py
 index ffd627379f..df34f96e7a 100644
 --- a/test/test_overrides.py
@@ -329,7 +899,7 @@ index ee37c4749a..d3af7dfda6 100644
  
  # The C -> R functions at the time of adding this are still being audited and tested
 diff --git a/tools/autograd/templates/python_variable_methods.cpp b/tools/autograd/templates/python_variable_methods.cpp
-index 5dafd11786..f79e5ea395 100644
+index eaecf0d818..f79e5ea395 100644
 --- a/tools/autograd/templates/python_variable_methods.cpp
 +++ b/tools/autograd/templates/python_variable_methods.cpp
 @@ -12,7 +12,6 @@
@@ -356,7 +926,36 @@ index 5dafd11786..f79e5ea395 100644
  using namespace torch::autograd::utils;
  
  namespace torch { namespace autograd {
-@@ -726,27 +727,6 @@ static PyObject * THPVariable_numpy(PyObject* self, PyObject* arg)
+@@ -502,6 +503,28 @@ static PyObject * THPVariable_cuda(PyObject* self, PyObject* args, PyObject* kwa
+   END_HANDLE_TH_ERRORS
+ }
+ 
++static PyObject * THPVariable_xpu(PyObject* self, PyObject* args, PyObject* kwargs)
++{
++  HANDLE_TH_ERRORS
++  static PythonArgParser parser({
++    "xpu(Device? device=None, bool non_blocking=False, *, MemoryFormat? memory_format=None)",
++    "xpu(Device? device=None, bool async=False, *, MemoryFormat? memory_format=None)|deprecated"
++  });
++  auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
++  ParsedArgs<3> parsed_args;
++  auto r = parser.parse(self, args, kwargs, parsed_args);
++
++  if(r.has_torch_function()){
++    return handle_torch_function(r, self, args, kwargs, THPVariableClass, "torch.Tensor");
++  }
++
++  auto device = r.isNone(0) ? at::Device(at::DeviceType::XPU) : r.device(0);
++  auto opt_memory_format = r.memoryformatOptional(2);
++  TORCH_CHECK(device.type() == at::DeviceType::XPU, "Invalid device, must be xpu device");
++  return THPVariable_Wrap(dispatch_to(self_, device, r.toBool(1), false, opt_memory_format));
++  END_HANDLE_TH_ERRORS
++}
++
+ static PyObject * THPVariable_to_type(PyObject* self, ScalarType scalarType, c10::optional<c10::MemoryFormat> optional_memory_format) {
+   HANDLE_TH_ERRORS
+   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
+@@ -704,27 +727,6 @@ static PyObject * THPVariable_numpy(PyObject* self, PyObject* arg)
    END_HANDLE_TH_ERRORS
  }
  
@@ -384,7 +983,15 @@ index 5dafd11786..f79e5ea395 100644
  static PyObject * THPVariable_requires_grad_(PyObject* self, PyObject* args, PyObject* kwargs)
  {
    HANDLE_TH_ERRORS
-@@ -1204,7 +1184,6 @@ PyMethodDef variable_methods[] = {
+@@ -1158,6 +1160,7 @@ PyMethodDef variable_methods[] = {
+   {"copy_", (PyCFunction)(void(*)(void))THPVariable_copy_, METH_VARARGS | METH_KEYWORDS, NULL},
+   {"cpu", (PyCFunction)(void(*)(void))THPVariable_cpu, METH_VARARGS | METH_KEYWORDS, NULL},
+   {"cuda", (PyCFunction)(void(*)(void))THPVariable_cuda, METH_VARARGS | METH_KEYWORDS, NULL},
++  {"xpu", (PyCFunction)(void(*)(void))THPVariable_xpu, METH_VARARGS | METH_KEYWORDS, NULL},
+   {"data_ptr", (PyCFunction)THPVariable_data_ptr, METH_NOARGS, NULL},
+   {"dim", (PyCFunction)THPVariable_dim, METH_NOARGS, NULL},
+   {"has_names", (PyCFunction)THPVariable_has_names, METH_NOARGS, NULL},
+@@ -1181,7 +1184,6 @@ PyMethodDef variable_methods[] = {
    {"nonzero", (PyCFunction)(void(*)(void))THPVariable_nonzero, METH_VARARGS | METH_KEYWORDS, NULL},
    {"numel", (PyCFunction)THPVariable_numel, METH_NOARGS, NULL},
    {"numpy", (PyCFunction)THPVariable_numpy, METH_NOARGS, NULL},
@@ -639,6 +1246,36 @@ index 0000000000..8d507977e1
 +}
 +
 +#endif // THP_STREAM_INC
+diff --git a/torch/csrc/autograd/python_variable.cpp b/torch/csrc/autograd/python_variable.cpp
+index 81e10a9a1d..81eadd9219 100644
+--- a/torch/csrc/autograd/python_variable.cpp
++++ b/torch/csrc/autograd/python_variable.cpp
+@@ -544,6 +544,17 @@ PyObject *THPVariable_is_cuda(THPVariable *self, void *unused)
+   END_HANDLE_TH_ERRORS
+ }
+ 
++PyObject *THPVariable_is_xpu(THPVariable *self, void *unused)
++{
++  HANDLE_TH_ERRORS
++  if (check_has_torch_function((PyObject *)self)) {
++    return handle_torch_function_getter(self, "is_xpu");
++  }
++  auto& self_ = self->cdata;
++  return torch::autograd::utils::wrap(self_.is_xpu());
++  END_HANDLE_TH_ERRORS
++}
++
+ PyObject *THPVariable_is_sparse(THPVariable *self, void *unused)
+ {
+   HANDLE_TH_ERRORS
+@@ -693,6 +704,7 @@ static struct PyGetSetDef THPVariable_properties[] = {
+   {"name", (getter)THPVariable_get_name, nullptr, nullptr, nullptr},
+   {"shape", (getter)THPVariable_get_shape, nullptr, nullptr, nullptr},
+   {"is_cuda", (getter)THPVariable_is_cuda, nullptr, nullptr, nullptr},
++  {"is_xpu", (getter)THPVariable_is_xpu, nullptr, nullptr, nullptr},
+   {"is_sparse", (getter)THPVariable_is_sparse, nullptr, nullptr, nullptr},
+   {"is_mkldnn", (getter)THPVariable_is_mkldnn, nullptr, nullptr, nullptr},
+   {"is_complex", (getter)THPVariable_is_complex, nullptr, nullptr, nullptr},
 diff --git a/torch/csrc/cuda/Stream.cpp b/torch/csrc/cuda/Stream.cpp
 index 775d48e16f..844d7b1e86 100644
 --- a/torch/csrc/cuda/Stream.cpp
@@ -695,6 +1332,19 @@ index c98d1352e3..71acdc5b7d 100644
    at::cuda::CUDAStream cuda_stream;
  };
  extern PyObject *THCPStreamClass;
+diff --git a/torch/csrc/distributed/c10d/reducer.cpp b/torch/csrc/distributed/c10d/reducer.cpp
+index 92a8f9ed15..8ef8d5001a 100644
+--- a/torch/csrc/distributed/c10d/reducer.cpp
++++ b/torch/csrc/distributed/c10d/reducer.cpp
+@@ -357,7 +357,7 @@ void Reducer::copy_grad_to_bucket(at::Tensor& grad, at::Tensor& bucket_view) {
+     auto wrapped = c10::scalar_to_tensor(double(1.) / divFactor_);
+     wrapped.unsafeGetTensorImpl()->set_wrapped_number(true);
+     // Divides while copying into the bucket view.
+-    at::native::mul_out(bucket_view, grad, wrapped);
++    at::mul_out(bucket_view, grad, wrapped);
+   } else {
+     bucket_view.copy_(grad);
+   }
 diff --git a/torch/csrc/jit/frontend/schema_type_parser.cpp b/torch/csrc/jit/frontend/schema_type_parser.cpp
 index a089abf7fb..e18b5bd08d 100644
 --- a/torch/csrc/jit/frontend/schema_type_parser.cpp
@@ -778,6 +1428,19 @@ index 8b2c0a0da5..3a81adf088 100644
    } else if (node->mustBeNone()) {
      return IValue();
    } else if (type->cast<EnumType>()) {
+diff --git a/torch/csrc/jit/passes/graph_fuser.cpp b/torch/csrc/jit/passes/graph_fuser.cpp
+index 027daba912..88c295fea0 100644
+--- a/torch/csrc/jit/passes/graph_fuser.cpp
++++ b/torch/csrc/jit/passes/graph_fuser.cpp
+@@ -184,6 +184,8 @@ struct GraphFuser {
+       return canFuseOnCPU();
+     } else if ((*device).is_cuda()) {
+       return canFuseOnGPU();
++    } else if ((*device).is_xpu()) {
++      return false;
+     }
+     throw std::runtime_error("Unknown device");
+   }
 diff --git a/torch/csrc/jit/python/pybind_utils.h b/torch/csrc/jit/python/pybind_utils.h
 index 4be55a9caa..a719f701ee 100644
 --- a/torch/csrc/jit/python/pybind_utils.h
@@ -824,8 +1487,22 @@ index c5889144bd..6992ee6405 100644
    py::class_<PyObjectType, Type, std::shared_ptr<PyObjectType>>(
        m, "PyObjectType")
        .def_static("get", &PyObjectType::get);
+diff --git a/torch/csrc/jit/serialization/pickler.cpp b/torch/csrc/jit/serialization/pickler.cpp
+index 2bc9abea8c..5ec6d955ea 100644
+--- a/torch/csrc/jit/serialization/pickler.cpp
++++ b/torch/csrc/jit/serialization/pickler.cpp
+@@ -603,7 +603,8 @@ WriteableTensorData getWriteableTensorData(const at::Tensor& tensor) {
+   result.tensor_ = tensor;
+   result.size_ = tensor.storage().nbytes();
+   // TODO HIP support
+-  if (tensor.storage().device_type() == DeviceType::CUDA) {
++  if (tensor.storage().device_type() == DeviceType::CUDA ||
++      tensor.storage().device_type() == DeviceType::XPU) {
+     // NB: This new tensor is created to support cuda tensors.
+     // Storages can be mutated when converting tensors from cuda to cpu,
+     // and we need a cpu tensor to copy data from.
 diff --git a/torch/csrc/jit/serialization/unpickler.cpp b/torch/csrc/jit/serialization/unpickler.cpp
-index cb36fd6b7e..68145bf2a5 100644
+index 9b8fce0b48..68145bf2a5 100644
 --- a/torch/csrc/jit/serialization/unpickler.cpp
 +++ b/torch/csrc/jit/serialization/unpickler.cpp
 @@ -67,6 +67,7 @@ void restoreAccurateTypeTags(const IValue& root, const TypePtr& type_tag) {
@@ -836,6 +1513,15 @@ index cb36fd6b7e..68145bf2a5 100644
        case QSchemeType::Kind:
        case LayoutType::Kind:
        case ScalarTypeType::Kind:
+@@ -426,6 +427,8 @@ PickleOpCode Unpickler::readInstruction() {
+ 
+       if (device.type() == DeviceType::CUDA) {
+         tensor = tensor.to(device, tensor.scalar_type());
++      } else if (device.type() == DeviceType::XPU) {
++        tensor = tensor.to(device, tensor.scalar_type());
+       } else if (device.type() != DeviceType::CPU) {
+         AT_ERROR(
+             "supported devices include CPU and CUDA, however got ",
 diff --git a/torch/csrc/utils/python_arg_parser.cpp b/torch/csrc/utils/python_arg_parser.cpp
 index 81c55b83bf..00df557a1b 100644
 --- a/torch/csrc/utils/python_arg_parser.cpp
@@ -912,6 +1598,75 @@ index 0454e7e2af..832d8b77b9 100644
  inline PyObject* PythonArgs::pyobject(int i) {
    if (!args[i]) return Py_None;
    return args[i];
+diff --git a/torch/csrc/utils/tensor_new.cpp b/torch/csrc/utils/tensor_new.cpp
+index ee86239aa9..9fc730755e 100644
+--- a/torch/csrc/utils/tensor_new.cpp
++++ b/torch/csrc/utils/tensor_new.cpp
+@@ -59,6 +59,8 @@ Backend backendToBackendOfDeviceType(Backend b, DeviceType d) {
+     case DeviceType::XLA:
+       TORCH_CHECK(!isSparse(b), "Sparse not implemented for XLA");
+       return Backend::XLA;
++    case DeviceType::XPU:
++      return backendToXPU(b);
+     default:
+       AT_ERROR("Unknown device type");
+   }
+@@ -337,20 +339,24 @@ void check_base_legacy_new(c10::DispatchKey dispatch_key, at::Layout expected_la
+     TORCH_CHECK(dispatch_key == c10::DispatchKey::CPU
+                 || dispatch_key == c10::DispatchKey::CUDA
+                 || dispatch_key == c10::DispatchKey::HIP
+-                || dispatch_key == c10::DispatchKey::XLA,
++                || dispatch_key == c10::DispatchKey::XLA
++                || dispatch_key == c10::DispatchKey::XPU,
+                 "new(): expected DispatchKey: ", c10::DispatchKey::CPU,
+                 " or ", c10::DispatchKey::CUDA,
+                 " or ", c10::DispatchKey::HIP,
+                 " or ", c10::DispatchKey::XLA,
++                " or ", c10::DispatchKey::XPU,
+                 " but got: ", dispatch_key);
+   } else if(expected_layout == c10::kSparse) {
+     // NOTE: no sparse XLA
+     TORCH_CHECK(dispatch_key == c10::DispatchKey::SparseCPU
+                 || dispatch_key == c10::DispatchKey::SparseCUDA
+-                || dispatch_key == c10::DispatchKey::SparseHIP,
++                || dispatch_key == c10::DispatchKey::SparseHIP
++                || dispatch_key == c10::DispatchKey::SparseXPU,
+                 "new(): expected DispatchKey: ", c10::DispatchKey::SparseCPU,
+                 " or ", c10::DispatchKey::SparseCUDA,
+                 " or ", c10::DispatchKey::SparseHIP,
++                " or ", c10::DispatchKey::SparseXPU,
+                 " but got: ", dispatch_key);
+   } else {
+     TORCH_INTERNAL_ASSERT(false, "unexpected layout");
+diff --git a/torch/csrc/utils/tensor_types.cpp b/torch/csrc/utils/tensor_types.cpp
+index e6b851a3a7..e29fb93c52 100644
+--- a/torch/csrc/utils/tensor_types.cpp
++++ b/torch/csrc/utils/tensor_types.cpp
+@@ -19,8 +19,10 @@ static const char* backend_to_string(const at::Backend& backend) {
+   switch (backend) {
+     case at::Backend::CPU: return "torch";
+     case at::Backend::CUDA: return "torch.cuda";
++    case at::Backend::XPU: return "torch.xpu";
+     case at::Backend::SparseCPU: return "torch.sparse";
+     case at::Backend::SparseCUDA: return "torch.cuda.sparse";
++    case at::Backend::SparseXPU: return "torch.xpu.sparse";
+     default: AT_ERROR("Unimplemented backend ", backend);
+   }
+ }
+diff --git a/torch/distributed/nn/api/remote_module.py b/torch/distributed/nn/api/remote_module.py
+index 225cb4842b..a4de2f3cd2 100644
+--- a/torch/distributed/nn/api/remote_module.py
++++ b/torch/distributed/nn/api/remote_module.py
+@@ -219,6 +219,9 @@ class _RemoteModule(nn.Module):
+     def cuda(self: T, device: Optional[Union[int, device]] = None) -> T:
+         _raise_not_supported(self.cuda.__name__)
+ 
++    def xpu(self: T, device: Optional[Union[int, device]] = None) -> T:
++        _raise_not_supported(self.xpu.__name__)
++
+     def cpu(self: T) -> T:
+         _raise_not_supported(self.cpu.__name__)
+ 
 diff --git a/torch/jit/annotations.py b/torch/jit/annotations.py
 index ba68920fa6..d8e5727f5e 100644
 --- a/torch/jit/annotations.py
@@ -934,6 +1689,54 @@ index ba68920fa6..d8e5727f5e 100644
      if ann is torch.dtype:
          return IntType.get()  # dtype not yet bound in as its own type
      if inspect.isclass(ann) and issubclass(ann, enum.Enum):
+diff --git a/torch/nn/modules/module.py b/torch/nn/modules/module.py
+index 30e732e6d8..33161763a0 100644
+--- a/torch/nn/modules/module.py
++++ b/torch/nn/modules/module.py
+@@ -462,6 +462,22 @@ class Module:
+         """
+         return self._apply(lambda t: t.cuda(device))
+ 
++    def xpu(self: T, device: Optional[Union[int, device]] = None) -> T:
++        r"""Moves all model parameters and buffers to the XPU.
++
++        This also makes associated parameters and buffers different objects. So
++        it should be called before constructing optimizer if the module will
++        live on XPU while being optimized.
++
++        Arguments:
++            device (int, optional): if specified, all parameters will be
++                copied to that device
++
++        Returns:
++            Module: self
++        """
++        return self._apply(lambda t: t.xpu(device))
++
+     def cpu(self: T) -> T:
+         r"""Moves all model parameters and buffers to the CPU.
+ 
+diff --git a/torch/nn/parallel/distributed.py b/torch/nn/parallel/distributed.py
+index 3d2f00ead9..db450f2166 100644
+--- a/torch/nn/parallel/distributed.py
++++ b/torch/nn/parallel/distributed.py
+@@ -613,13 +613,10 @@ class DistributedDataParallel(Module):
+             # Notify joined ranks whether they should sync in backwards pass or not.
+             self._check_global_requires_backward_grad_sync(is_joined_rank=False)
+ 
+-        if self.device_ids:
++        if self.device_ids and len(self.device_ids) != 1:
+             inputs, kwargs = self.scatter(inputs, kwargs, self.device_ids)
+-            if len(self.device_ids) == 1:
+-                output = self.module(*inputs[0], **kwargs[0])
+-            else:
+-                outputs = self.parallel_apply(self._module_copies[:len(inputs)], inputs, kwargs)
+-                output = self.gather(outputs, self.output_device)
++            outputs = self.parallel_apply(self._module_copies[:len(inputs)], inputs, kwargs)
++            output = self.gather(outputs, self.output_device)
+         else:
+             output = self.module(*inputs, **kwargs)
+ 
 -- 
 2.25.1
 

@@ -1,7 +1,7 @@
-From ddd61eef157d31a6f96741f6e945a9ea8cfbcc78 Mon Sep 17 00:00:00 2001
+From 871da03ba62668034144339240ec034965f7960e Mon Sep 17 00:00:00 2001
 From: chengjun <chengjun.lu@intel.com>
 Date: Thu, 29 Oct 2020 21:47:49 +0800
-Subject: [PATCH 04/14] To disable __assert_fail in pytorch for the conflict
+Subject: [PATCH 4/8] 4.To disable __assert_fail in pytorch for the conflict
  declaration with dpcpp.
 
 ---
