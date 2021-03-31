@@ -2,6 +2,7 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/native/DistributionTemplates.h>
 #include <ATen/ExpandUtils.h>
+#include <ATen/core/DistributionsHelper.h>
 
 #include <core/Generator.h>
 #include <utils/ATDispatch.h>
@@ -21,7 +22,7 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
     AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "random_kernel_fp", [&] {
       if (std::is_same<scalar_t, double>::value) {
         auto random_func = [] (uint64_t rand) {
-          return static_cast<scalar_t>(rand % static_cast<uint64_t>((1ULL << std::numeric_limits<scalar_t>::digits) + 1));
+          return transformation::uniform_int<scalar_t>(rand);
         };
         distribution_nullary_kernel<scalar_t, uint64_t>(iter,
           gen,
@@ -29,7 +30,7 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
           random_func);
       } else {
         auto random_func = [] (uint32_t rand) {
-          return static_cast<scalar_t>(rand % static_cast<uint64_t>((1ULL << std::numeric_limits<scalar_t>::digits) + 1));
+          return transformation::uniform_int<scalar_t>(rand);
         };
         distribution_nullary_kernel<scalar_t, uint32_t>(iter,
           gen,
@@ -40,7 +41,7 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
   } else if (iter.dtype() == ScalarType::Bool) {
     using scalar_t = typename c10::impl::ScalarTypeToCPPType<ScalarType::Bool>::type;
     auto random_func = [] (uint32_t rand) {
-      return static_cast<scalar_t>(rand & 1);
+      return transformation::uniform_int<scalar_t>(rand);
     };
     distribution_nullary_kernel<scalar_t, uint32_t>(iter,
       gen,
@@ -50,7 +51,7 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
     AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "random_kernel_int", [&] {
       if (std::is_same<scalar_t, int64_t>::value) {
         auto random_func = [] (uint64_t rand) {
-          return static_cast<scalar_t>(rand % (static_cast<uint64_t>(std::numeric_limits<scalar_t>::max()) + 1));
+          return transformation::uniform_int<scalar_t>(rand);
         };
         distribution_nullary_kernel<scalar_t, uint64_t>(iter,
           gen,
@@ -58,7 +59,7 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
           random_func);
       } else {
         auto random_func = [] (uint32_t rand) {
-          return static_cast<scalar_t>(rand % (static_cast<uint64_t>(std::numeric_limits<scalar_t>::max()) + 1));
+          return transformation::uniform_int<scalar_t>(rand);
         };
         distribution_nullary_kernel<scalar_t, uint32_t>(iter,
           gen,
@@ -83,7 +84,7 @@ void random_from_to_kernel(TensorIterator& iter, uint64_t range, int64_t base, c
     {
       // define lambda to mod with range and add base
       auto random_func = [range, base] (uint64_t rand) {
-        return static_cast<scalar_t>(static_cast<int64_t>((rand % range) + base));
+        return transformation::uniform_int_from_to<scalar_t>(rand, range, base);
       };
       distribution_nullary_kernel<scalar_t, uint64_t>(iter,
         gen,
@@ -91,7 +92,7 @@ void random_from_to_kernel(TensorIterator& iter, uint64_t range, int64_t base, c
         random_func);
     } else {
       auto random_func = [range, base] (uint32_t rand) {
-        return static_cast<scalar_t>(static_cast<int64_t>((rand % range) + base));
+        return transformation::uniform_int_from_to<scalar_t>(rand, range, base);
       };
       distribution_nullary_kernel<scalar_t, uint32_t>(iter,
         gen,
@@ -113,7 +114,7 @@ void random_full_64_bits_range_kernel(TensorIterator& iter, c10::optional<RNG> g
         std::is_same<scalar_t, float>::value ||
         std::is_same<scalar_t, at::BFloat16>::value) {
       auto random_func = [] (uint64_t rand) {
-        return static_cast<scalar_t>(static_cast<int64_t>(rand));
+        return transformation::uniform_int_full_range<scalar_t>(rand);
       };
       distribution_nullary_kernel<scalar_t, uint64_t>(iter,
         gen,
