@@ -36,7 +36,7 @@ void AtenIpexTypeExt::packed_add_(at::Tensor &top_half, at::Tensor &bot_half,
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(bot_half.is_contiguous());
 
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("packed_add_", std::vector<c10::IValue>({top_half, bot_half, grad, alpha}));
+  RECORD_FUNCTION("packed_add_", std::vector<c10::IValue>({}));
 #endif
 
   if (grad.is_sparse()) {
@@ -238,7 +238,7 @@ static inline void mm_backward(at::BFloat16 *out, const at::BFloat16 *in1,
 template <typename T>
 inline at::Tensor _interaction_forward(const std::vector<at::Tensor> &input) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("_interaction_forward", std::vector<c10::IValue>({input}));
+  RECORD_FUNCTION("_interaction_forward", std::vector<c10::IValue>({}));
 #endif
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
@@ -291,7 +291,7 @@ _interaction_backward(const at::Tensor &grad_out,
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.is_contiguous());
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("_interaction_backward",
-                  std::vector<c10::IValue>({grad_out, input}));
+                  std::vector<c10::IValue>({}));
 #endif
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
@@ -469,7 +469,7 @@ std::vector<at::Tensor> rnn_layer(const at::Tensor& input,
     int64_t hidden_size, int64_t num_layers, bool train,
     bool bidirectional, at::IntArrayRef batch_sizes,
     const std::vector<float>& scales,
-    const std::vector<int32_t>& shift, 
+    const std::vector<int32_t>& shift,
     bool quantized) {
   TORCH_CHECK(weights.size() == 2 || weights.size() == 4);
   if (weights.size() == 4) {
@@ -523,7 +523,7 @@ std::vector<at::Tensor> rnn(
   // no need to do calibration for the output in lstm, will use the scale & zero point of the input
   // to dequantize the output from u8 to f32, need to add an "output" here but actually unused
   // For LSTM, we only need to calibrate the input to the first layer
-  // TODO: add int8 for gru and rnn. 
+  // TODO: add int8 for gru and rnn.
   if (check_auto_mix_int8_fp32() && check_int8_calibration() && static_cast<dil::rnn_kind>(mode) == dil::rnn_kind::LSTM) {
     int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
     insert_or_updata_observer({input}, {input}, "lstm", num_ops_id, /*asymmetric*/true);
@@ -625,7 +625,7 @@ std::vector<at::Tensor> AtenIpexTypeExt::gru(
 at::Tensor AtenIpexTypeExt::linear_relu(const at::Tensor &input,
                                    const at::Tensor &weight,
                                    const c10::optional<at::Tensor> &bias) {
-  if (bias.has_value()) 
+  if (bias.has_value())
     return cpu::AtenIpexJITDev::dil_linear_fuse_eltwise(input, weight, bias.value(), dil::attr_t::fuse_relu());
   return cpu::AtenIpexJITDev::dil_linear_fuse_eltwise(input, weight, at::Tensor(), dil::attr_t::fuse_relu());
 }

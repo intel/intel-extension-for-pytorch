@@ -26,6 +26,7 @@ namespace bridge {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(a.unsafeGetTensorImpl()->dtype() == b.unsafeGetTensorImpl()->dtype()); \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(a.unsafeGetTensorImpl()->is_contiguous() == b.unsafeGetTensorImpl()->is_contiguous()); \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(a.unsafeGetTensorImpl()->is_contiguous(at::MemoryFormat::ChannelsLast) == b.unsafeGetTensorImpl()->is_contiguous(at::MemoryFormat::ChannelsLast)); \
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(a.unsafeGetTensorImpl()->is_contiguous(at::MemoryFormat::ChannelsLast3d) == b.unsafeGetTensorImpl()->is_contiguous(at::MemoryFormat::ChannelsLast3d)); \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(a.unsafeGetTensorImpl()->is_strides_like_channels_last() == b.unsafeGetTensorImpl()->is_strides_like_channels_last()); \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(a.unsafeGetTensorImpl()->is_non_overlapping_and_dense() == b.unsafeGetTensorImpl()->is_non_overlapping_and_dense()); \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(a.unsafeGetTensorImpl()->is_wrapped_number() == b.unsafeGetTensorImpl()->is_wrapped_number()); \
