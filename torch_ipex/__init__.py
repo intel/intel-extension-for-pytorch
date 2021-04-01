@@ -479,13 +479,13 @@ def _xpu(self, device_idx=None, non_blocking=False, **kwargs):
 
 def _xpu_deserialize(obj, location):
     if location.startswith('xpu'):
-        device = validate_xpu_device(location)
+        device_id = validate_xpu_device(location)
         if getattr(obj, "_torch_load_uninitialized", False):
-            storage_type = getattr(_C, type(obj).__name__)
-            with _C.device(device):
+            storage_type = getattr(current_module, type(obj).__name__)
+            with device(device_id):
                 return storage_type(obj.size())
         else:
-            return _xpu(obj, device=device)
+            return _xpu(obj, device=device_id)
 
 
 def get_device_type() -> str:
