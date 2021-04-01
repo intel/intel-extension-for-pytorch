@@ -528,6 +528,106 @@ void indexFill(
   DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
 }
 
+
+DPCPP_DEF_K1(index_copy_ker);
+template <typename scalar_t>
+void indexCopy(
+    Tensor& dst,
+    int64_t dim,
+    const Tensor& indices,
+    const Tensor& source) {
+  TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
+  TORCH_CHECK(indices.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
+  TORCH_CHECK(source.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
+
+  // The `src` is partitioned into two parts:
+  // -the size of each slice we are indexing, which is the
+  // total size of the tensor ignoring dimension `dim`;
+  // -the number of indices we are choosing, which is the total size
+  // of the tensor `indices`.
+  int dstDims = dst.dim() == 0 ? 1 : dst.dim();
+
+  TORCH_CHECK(dim >= 0 && dim < dstDims, "Indexing dim is out of bounds");
+
+  ptrdiff_t sliceSize = 1;
+  for (int d = 0; d < dstDims; d++) {
+    if (d != dim) {
+      sliceSize *= dst.dim() == 0 ? 1 : dst.size(d);
+    }
+  }
+  ptrdiff_t dstTotalSize = dst.numel();
+  int64_t dstFillDimSize = dst.dim() == 0 ? 1 : dst.dim();
+  ptrdiff_t numIndices = indices.numel();
+
+  if (sliceSize == 0) {
+    return;
+  }
+
+  TensorInfo<int64_t, unsigned int> indices_info =
+      getTensorInfo<int64_t, unsigned int>(indices);
+  indices_info.collapseDims();
+
+  TensorInfo<scalar_t, unsigned int> src_info =
+      getTensorInfo<scalar_t, unsigned int>(source);
+  int src_dim = src_info.collapseDims(0);
+  src_info.reduceDim(src_dim);
+
+  TensorInfo<scalar_t, unsigned int> dst_info =
+      getTensorInfo<scalar_t, unsigned int>(dst);
+  int dst_fill_dim = dst_info.collapseDims(dim);
+  dst_info.reduceDim(dst_fill_dim);
+
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
+
+  auto wgroup_size =
+      dpcpp_queue.get_device().template get_info<dpcpp_dev_max_wgroup_size>();
+
+  wgroup_size = std::min(decltype(wgroup_size)(sliceSize), wgroup_size);
+  auto n_work_item_iter = (sliceSize + wgroup_size - 1) / wgroup_size;
+
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto dst_data = get_buffer<dpcpp_discard_w_mode>(cgh, dst.data_ptr<scalar_t>());
+    auto src_data = get_buffer<dpcpp_r_mode>(cgh, source.data_ptr<scalar_t>());
+    auto idx_data = get_buffer<dpcpp_r_mode>(cgh, indices.data_ptr<long>());
+
+    auto kfn = DPCPP_Q_KFN(DPCPP::nd_item<1> item_id) {
+        auto dst_ptr = get_pointer(dst_data);
+        auto src_ptr = get_pointer(src_data);
+        auto idx_ptr = get_pointer(idx_data);
+
+        auto dst_slice_id = item_id.get_group(0);
+        auto g_idx_ptr = idx_ptr;
+        auto g_dst_ptr = dst_ptr + g_idx_ptr[dst_slice_id] * dst_info.strides[dst_fill_dim];
+        auto g_src_ptr = src_ptr + dst_slice_id * src_info.strides[src_dim];
+
+        auto ii_ = item_id.get_local_id(0);
+        auto dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(ii_, dst_info);
+        auto src_offset_ = IndexToOffset<scalar_t, unsigned int>::get(ii_, src_info);
+        g_dst_ptr[dst_offset_] = g_src_ptr[src_offset_];
+
+        for (int iter = 1; iter < n_work_item_iter; iter++) {
+          auto idx_offset_ =
+              IndexToOffset<int64_t, unsigned int>::get(iter, indices_info);
+          auto __inner_idx = g_idx_ptr[idx_offset_] * wgroup_size + ii_;
+
+          if (__inner_idx < dstTotalSize) {
+            dst_offset_ = IndexToOffset<scalar_t, unsigned int>::get(
+                __inner_idx, dst_info);
+
+            g_dst_ptr[dst_offset_] = src_ptr[ii_];
+          }
+        }
+
+    };
+
+    cgh.parallel_for<DPCPP_K(
+      index_copy_ker, scalar_t)>(
+      DPCPP::nd_range<1>(DPCPP::range<1>(numIndices * wgroup_size), DPCPP::range<1>(wgroup_size)), kfn);
+  };
+
+  DPCPP_Q_ASYNC_SUBMIT(dpcpp_queue, cgf);
+}
+
 DPCPP_DEF_K1(diag_from_dpcpp_ker);
 DPCPP_DEF_K1(diag_to_dpcpp_ker);
 template <typename scalar_t>
@@ -1073,6 +1173,49 @@ Tensor& index_add_(
   return self;
 }
 
+Tensor& index_copy_(Tensor& self, int64_t dim, const Tensor& index, const Tensor& source) {
+  dim = maybe_wrap_dim(dim, self.dim());
+  TORCH_CHECK_INDEX(index.dim() < 2, "index_copy_(): Index should have dimension 1 or 0 (got ", index.dim(), ")");
+
+  int64_t numIndices = index.numel();
+  if (source.dim() == 0 && numIndices != 1) {
+    TORCH_CHECK_INDEX(false, "index_copy_(): When source is scalar, index should have one element (got ", numIndices, ")");
+  } else if ((source.dim() != self.dim()) && (source.dim() != 0 && self.dim() != 0)) {
+    TORCH_CHECK_INDEX(false, "index_copy_(): When source and destination are not scalars, their dimensionality must match. Source dimensionality (",
+                   source.dim(), "), destination dimensionality (", self.dim(), ")");
+  }
+
+  TORCH_CHECK_INDEX(index.scalar_type() == ScalarType::Long, "index_copy_(): Expected LongTensor for index");
+  // Check that source and destination slices have the same size
+  auto selfSlicedSizes = self.sizes().vec();
+  if (selfSlicedSizes.size() > 0) {
+    selfSlicedSizes.erase(selfSlicedSizes.begin() + dim);
+  }
+  auto sourceSlicedSizes = source.sizes().vec();
+  if (sourceSlicedSizes.size() > 0) {
+    sourceSlicedSizes.erase(sourceSlicedSizes.begin() + dim);
+  }
+  if (selfSlicedSizes.size() != sourceSlicedSizes.size() ||
+      !std::equal(selfSlicedSizes.begin(), selfSlicedSizes.end(),
+                  sourceSlicedSizes.begin())) {
+    std::stringstream ss;
+    ss << "index_copy_(): Source/destination tensor must have same slice shapes. ";
+    ss << "Destination slice shape: " << selfSlicedSizes << " at dimension " << dim;
+    ss << " and source slice shape: " << sourceSlicedSizes << " at dimension 0.";
+    TORCH_CHECK(false, ss.str());
+  }
+  TORCH_CHECK_INDEX(source.dim() == 0 || numIndices == source.size(dim),
+          "index_copy_(): Number of indices (", numIndices, ") should be equal to source.size(dim) (", source.size(dim), ")");
+
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "indexCopy",
+      [&]() { impl::indexCopy<scalar_t>(self, dim, index, source); });
+  return self;
+}
+
 Tensor& index_fill_(
     Tensor& self,
     int64_t dim,
@@ -1263,7 +1406,7 @@ Tensor index(const Tensor& self, TensorList indices) {
 
   auto info = make_info(self, indices);
   auto iter = make_index_iterator(info);
-  impl::index(iter, info.indexed_sizes, info.indexed_strides, 
+  impl::index(iter, info.indexed_sizes, info.indexed_strides,
       info.non_indexed_sizes, info.non_indexed_strides);
   return iter.output();
 }
