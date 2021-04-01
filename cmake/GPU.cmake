@@ -113,11 +113,14 @@ add_subdirectory(torch_ipex/csrc/gpu/aten)
 set(DPCPP_JIT_SRCS)
 add_subdirectory(torch_ipex/csrc/gpu/jit)
 
+set(DPCPP_TENSOR_SRCS)
+add_subdirectory(torch_ipex/csrc/gpu/tensor)
+
 set(TORCH_IPEX_SRCS)
 file(GLOB IPEX_UTIL_SRC "${IPEX_C_SOURCE_DIR}/*.cpp")
 list(REMOVE_ITEM IPEX_UTIL_SRC "${IPEX_C_SOURCE_DIR}/_C.cpp")
 file(GLOB GPU_UTIL_SRC "${DPCPP_GPU_ROOT}/*.cpp")
-list(APPEND TORCH_IPEX_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_JIT_SRCS} ${IPEX_UTIL_SRC} ${GPU_UTIL_SRC})
+list(APPEND TORCH_IPEX_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_JIT_SRCS} ${DPCPP_TENSOR_SRCS} ${IPEX_UTIL_SRC} ${GPU_UTIL_SRC})
 
 add_library(torch_ipex SHARED ${TORCH_IPEX_SRCS}
         ${DPCPP_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeXPU.cpp

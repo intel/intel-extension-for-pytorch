@@ -281,6 +281,8 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
     if (weight_cache_enabled()) {
       strm.wait();
       auto ctx_ = at::AtenIpexTypeXPU::DPCPPTensorContext::release_tensor_ctx(m2_);
+      // assume oneDNN.matmul.weight is the permution of torch.nn.Linear.weight
+      ctx_.set_permution({1, 0});
       at::AtenIpexTypeXPU::DPCPPTensorContext::set_tensor_ctx(m2, std::move(ctx_));
     }
   }
