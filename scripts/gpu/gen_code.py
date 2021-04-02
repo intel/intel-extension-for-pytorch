@@ -420,7 +420,6 @@ lazy_reorder_block_list = set([
     'dequantize',
     '_softmax',
     '_softmax_backward_data',
-    'view',
     'upsample_trilinear3d_out',
     'upsample_trilinear3d',
     'upsample_trilinear3d_backward_out',
