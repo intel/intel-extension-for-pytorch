@@ -40,9 +40,9 @@ namespace cpu {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.defined());                                \
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(tensor.layout() == c10::kStrided)
 
-#define CHECK_ATEN_BF16_USABLE(tensor)                                                                                     \
-  ShadeDataContext::isDilTensor(tensor) &&                                                                                         \
-  ShadeDataContext::isTensorMixPrecision(tensor) &&                                                                     \
+#define CHECK_ATEN_BF16_USABLE(tensor)                                                 \
+  ShadeDataContext::isDilTensor(tensor) &&                                             \
+  ShadeDataContext::isTensorMixPrecision(tensor) &&                                    \
   ShadeDataContext::getDilStorage(tensor).get_data_type() ==  dil::data_type::bf16 &&  \
   dbl::comm::try_gen_dil_tensor(tensor).is_public_format()
 
@@ -232,7 +232,7 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
     at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups, std::array<bool,3> output_mask)
 {
   DEBUG("AtenIpexCPUDev::dil_convolution_backward\n");
-  at::Tensor grad_output = grad_output_t.is_contiguous() ? grad_output_t : grad_output_t.contiguous();
+  at::Tensor grad_output = IS_CONTIGUOUS_ANY(grad_output_t) ? grad_output_t : grad_output_t.contiguous();
   CHECK_DNNL_OP_PRE_COND(input);
   CHECK_DNNL_OP_PRE_COND(weight);
   dbl::comm::reorder_to_bf16_for_mix_prec(input);
@@ -429,14 +429,29 @@ at::Tensor AtenIpexCPUDev::dil_convolution_overrideable(const at::Tensor & input
       }
       if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
         if (transposed) {
-          return AtenIpexCPUDev::dil_deconvolution(input.is_contiguous() ? input : input.contiguous(), weight.is_contiguous() ? weight : weight.contiguous(), (bias.has_value() && bias.value().defined()) ? (bias.value().is_contiguous() ? bias.value() : bias.value().contiguous()) : at::Tensor(), padding, output_padding, stride, dilation, groups);
+          return AtenIpexCPUDev::dil_deconvolution(
+            IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
+            IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous(),
+            (bias.has_value() && bias.value().defined()) ? (IS_CONTIGUOUS_ANY(bias.value()) ? bias.value() : bias.value().contiguous()) : at::Tensor(),
+            padding,
+            output_padding,
+            stride,
+            dilation,
+            groups);
         } else {
           // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
           auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
-          auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8 || input.is_contiguous()) ? input : input.contiguous();
+          auto input_temp = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8 || IS_CONTIGUOUS_ANY(input)) ? input : input.contiguous();
           auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
-          auto weight_temp = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
-          return AtenIpexCPUDev::dil_convolution(input_temp, weight_temp, (bias.has_value() && bias.value().defined()) ? bias.value() : at::Tensor(), stride, padding, dilation, groups);
+          auto weight_temp = (weight_dil_type == dil::data_type::s8 || IS_CONTIGUOUS_ANY(weight)) ? weight : weight.contiguous();
+          return AtenIpexCPUDev::dil_convolution(
+            input_temp,
+            weight_temp,
+            (bias.has_value() && bias.value().defined()) ? (IS_CONTIGUOUS_ANY(bias.value()) ? bias.value() : bias.value().contiguous()) : at::Tensor(),
+            stride,
+            padding,
+            dilation,
+            groups);
         }
       }
     }
@@ -472,9 +487,9 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
       if (dbl::chk::dnnl_support_the_tensors(dnnl_input_tensors)) {
         if (transposed) {
           return AtenIpexCPUDev::dil_deconvolution_backward(
-            input.is_contiguous() ? input : input.contiguous(),
-            grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
-            weight.is_contiguous() ? weight : weight.contiguous(),
+            IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
+            IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous(),
+            IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous(),
             padding,
             output_padding,
             stride,
@@ -483,9 +498,9 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::dil_convolution_bac
             output_mask);
         } else {
           return AtenIpexCPUDev::dil_convolution_backward(
-            input.is_contiguous() ? input : input.contiguous(),
-            grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
-            weight.is_contiguous() ? weight : weight.contiguous(),
+            IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
+            IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous(),
+            IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous(),
             padding,
             stride,
             dilation,
@@ -577,9 +592,9 @@ std::tuple<at::Tensor,at::Tensor,at::Tensor> AtenIpexCPUDev::cpu_deconvolution_b
 
   std::vector<at::Tensor> g_input(groups), g_weight(groups), g_bias(groups);
 
-  _ipex_self = _ipex_self.is_contiguous() ? _ipex_self : _ipex_self.contiguous();
-  _ipex_grad_output = _ipex_grad_output.is_contiguous() ? _ipex_grad_output : _ipex_grad_output.contiguous();
-  _ipex_weight = _ipex_weight.is_contiguous() ? _ipex_weight : _ipex_weight.contiguous();
+  _ipex_self = IS_CONTIGUOUS_ANY(_ipex_self) ? _ipex_self : _ipex_self.contiguous();
+  _ipex_grad_output = IS_CONTIGUOUS_ANY(_ipex_grad_output) ? _ipex_grad_output : _ipex_grad_output.contiguous();
+  _ipex_weight = IS_CONTIGUOUS_ANY(_ipex_weight) ? _ipex_weight : _ipex_weight.contiguous();
   for (int g = 0; g < groups; ++g) {
     auto _ipex_self_g = dbl::comm::subtensor(_ipex_self, 1, groups, g);
     auto _ipex_grad_output_g = dbl::comm::subtensor(_ipex_grad_output, 1, groups, g);
@@ -1315,7 +1330,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_batch_
   CHECK_DNNL_OP_PRE_COND(weight);
 
   IPEX_CHECK(train, "mkldnn_batch_norm_backward: currently mkldnn only support train model");
-  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  auto grad_output_contiguous = IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous();
 
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
@@ -1395,7 +1410,7 @@ at::Tensor AtenIpexCPUDev::dil_frozen_batch_norm_backward(const at::Tensor& grad
   CHECK_DNNL_OP_PRE_COND(input);
   CHECK_DNNL_OP_PRE_COND(weight);
 
-  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  auto grad_output_contiguous = IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous();
 
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
@@ -1483,7 +1498,7 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool2d(
   }
 
   return dbl::pool::_dil_pooling(
-      input.is_contiguous() ? input : input.contiguous(),
+      IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
       kernel_size,
       stride,
       padding,
@@ -1509,7 +1524,7 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool3d(
   dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
 
   return dbl::pool::_dil_pooling(
-      input.is_contiguous() ? input : input.contiguous(),
+      IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
       kernel_size,
       stride,
       padding,
@@ -1592,9 +1607,9 @@ at::Tensor AtenIpexCPUDev::dil_max_pooling_backward(
   dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
 
   return dbl::pool::_dil_pooling_backward(
-      grad_output.is_contiguous() ? grad_output : grad_output.contiguous(),
-      output.is_contiguous() ? output : output.contiguous(),
-      input.is_contiguous() ? input : input.contiguous(),
+      IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous(),
+      IS_CONTIGUOUS_ANY(output) ? output : output.contiguous(),
+      IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
       kernel_size,
       stride,
       padding,
@@ -1616,14 +1631,14 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool2d_backward(
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(input);
 
-  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  auto grad_output_contiguous = IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous();
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
 
   return dbl::pool::_dil_pooling_backward(
       grad_output_contiguous,
       grad_output_contiguous,
-      input.is_contiguous() ? input : input.contiguous(),
+      IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
       kernel_size,
       stride,
       padding,
@@ -1646,7 +1661,7 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool3d_backward(
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(input);
 
-  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  auto grad_output_contiguous = IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous();
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
 
@@ -1654,7 +1669,7 @@ at::Tensor AtenIpexCPUDev::dil_avg_pool3d_backward(
   return dbl::pool::_dil_pooling_backward(
       grad_output_contiguous,
       grad_output_contiguous,
-      input.is_contiguous() ? input : input.contiguous(),
+      IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
       kernel_size,
       stride,
       padding,
@@ -1696,7 +1711,7 @@ at::Tensor AtenIpexCPUDev::dil_adaptive_avg_pool2d_backward(
   return dbl::pool::_dil_pooling_backward(
       grad_output,
       grad_output,
-      input.is_contiguous() ? input : input.contiguous(),
+      IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
       kernel_size,
       /*stride*/ kernel_size,
       /*padding*/ padding,
@@ -1777,7 +1792,7 @@ at::Tensor AtenIpexCPUDev::dil_threshold_backward(const at::Tensor& grad_output,
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(input);
 
-  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  auto grad_output_contiguous = IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous();
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
 
@@ -1819,7 +1834,7 @@ at::Tensor AtenIpexCPUDev::dil__softmax_backward_data(
   CHECK_DNNL_OP_PRE_COND(output);
   CHECK_DNNL_OP_PRE_COND(self);
 
-  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  auto grad_output_contiguous = IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous();
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(output, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
@@ -1861,7 +1876,7 @@ at::Tensor AtenIpexCPUDev::dil__log_softmax_backward_data(
   CHECK_DNNL_OP_PRE_COND(output);
   CHECK_DNNL_OP_PRE_COND(self);
 
-  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  auto grad_output_contiguous = IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous();
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(output, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
@@ -1909,7 +1924,7 @@ at::Tensor AtenIpexCPUDev::dil_sigmoid_backward(
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(output);
 
-  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  auto grad_output_contiguous = IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous();
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(output, true);
 
@@ -1956,7 +1971,7 @@ at::Tensor AtenIpexCPUDev::dil_tanh_backward(
   CHECK_DNNL_OP_PRE_COND(grad_output);
   CHECK_DNNL_OP_PRE_COND(output);
 
-  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  auto grad_output_contiguous = IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous();
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
   dbl::comm::reorder_to_bf16_for_mix_prec(output, true);
 
@@ -2084,7 +2099,7 @@ at::Tensor AtenIpexCPUDev::dil_cat(at::TensorList tensors, int64_t dim) {
   for (auto i = 0; i < tensors.size(); i++) {
     IPEX_CHECK(!(tensors[i].dim() == 1 && tensors[i].sizes()[0] == 0),
       "Currently Mkldnn cat operators do not support empty tensor.");
-    tensors_contiguous[i] = tensors[i].is_contiguous() ? tensors[i] : tensors[i].contiguous();
+    tensors_contiguous[i] = IS_CONTIGUOUS_ANY(tensors[i]) ? tensors[i] : tensors[i].contiguous();
 
     dbl::comm::reorder_to_bf16_for_mix_prec(tensors_contiguous[i], true);
 
@@ -2236,6 +2251,7 @@ at::Tensor AtenIpexCPUDev::dil_transpose(const at::Tensor & self, int64_t dim0, 
 at::Tensor AtenIpexCPUDev::dil_slice(const at::Tensor & self, int64_t dim, int64_t start, int64_t end, int64_t step) {
   DEBUG("AtenIpexCPUDev::dil_slice\n");
   CHECK_DNNL_OP_PRE_COND(self);
+  dbl::comm::reorder_to_public(self, /*remain_dtype=*/true);
 
   // TODO use weight TAG to decide whether to reorder or not
   dbl::comm::reorder_to_bf16_for_mix_prec(self, true);
@@ -2447,7 +2463,7 @@ at::Tensor AtenIpexCPUDev::dil_gelu_backward(const at::Tensor& grad_output, cons
 
   dbl::comm::reorder_to_bf16_for_mix_prec(input, true);
 
-  auto grad_output_contiguous = grad_output.is_contiguous() ? grad_output : grad_output.contiguous();
+  auto grad_output_contiguous = IS_CONTIGUOUS_ANY(grad_output) ? grad_output : grad_output.contiguous();
   dbl::comm::reorder_to_bf16_for_mix_prec(grad_output_contiguous, true);
 
   dil::tensor x = dbl::comm::try_gen_dil_tensor(input);
@@ -2467,8 +2483,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_
     double eps) {
   DEBUG("AtenIpexCPUDev::dil_native_layer_norm\n");
   CHECK_DNNL_OP_PRE_COND(X);
-  //It's a temporary solution to fall back to fp32 since bf16 layer_norm is not ready for dnnl path now.
-  dbl::comm::reorder_to_dtype(X, at::kFloat);
+  dbl::comm::reorder_to_bf16_for_mix_prec(X, true);
   dil::tensor x = dbl::comm::try_gen_dil_tensor(X);
   const dil::tensor scale = dbl::comm::try_gen_dil_tensor(gamma);
   const dil::tensor shift = dbl::comm::try_gen_dil_tensor(beta);
@@ -2508,9 +2523,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexCPUDev::dil_native_layer_
   DEBUG("AtenIpexCPUDev::dil_native_layer_norm_backward\n");
   CHECK_DNNL_OP_PRE_COND(dY);
   CHECK_DNNL_OP_PRE_COND(X);
-  //it's a temporary solution to fall back to fp32 since bf16 layer_norm is not ready for dnnl path now.
-  dbl::comm::reorder_to_dtype(dY, at::kFloat);
-  dbl::comm::reorder_to_dtype(X, at::kFloat);
+  dbl::comm::reorder_to_bf16_for_mix_prec(dY, true);
+  dbl::comm::reorder_to_bf16_for_mix_prec(X, true);
   dil::tensor dy = dbl::comm::try_gen_dil_tensor(dY);
   dil::tensor x = dbl::comm::try_gen_dil_tensor(X);
   dil::tensor m = dbl::comm::try_gen_dil_tensor(mean);
@@ -2580,7 +2594,7 @@ at::Tensor AtenIpexCPUDev::dil_index(const at::Tensor & self, at::TensorList ind
 at::Tensor AtenIpexCPUDev::dil_shuffle(const at::Tensor & self, at::IntArrayRef view_shape, int64_t dim0, int64_t dim1) {
   DEBUG("AtenIpexCPUDev::dil_shuffle\n");
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexCPUDev::dil_shuffle", std::vector<c10::IValue>({self}));
+  RECORD_FUNCTION("AtenIpexCPUDev::dil_shuffle", std::vector<c10::IValue>({}));
 #endif
   // NOTE: We do NOT add sanity checks here. Because PyTorch does not has shuffle operator. This dil operator is for fusion and the fusion logic
   // has more sanity checks. We found that there are some models use view + transpose + view to implement shuffle semantic. So IPEX will fuse these
@@ -2596,7 +2610,7 @@ at::Tensor AtenIpexCPUDev::dil_shuffle(const at::Tensor & self, at::IntArrayRef 
 std::tuple<at::Tensor,at::Tensor> AtenIpexCPUDev::dil__pack_padded_sequence(const at::Tensor & input, const at::Tensor & lengths, bool batch_first) {
   DEBUG("AtenIpexCPUDev::dil__pack_padded_sequence\n");
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexCPUDev::dil__pack_padded_sequence", std::vector<c10::IValue>({input, lengths}));
+  RECORD_FUNCTION("AtenIpexCPUDev::dil__pack_padded_sequence", std::vector<c10::IValue>({}));
 #endif
   torch_ipex::reset_ipex_func_status();
 
@@ -2640,7 +2654,7 @@ at::Tensor& AtenIpexCPUDev::dil_copy_(
 
 std::vector<at::Tensor> AtenIpexCPUDev::dil_rnn_layer(const at::Tensor& input, const at::Tensor& w1, const at::Tensor& w2,
     const at::Tensor& w3, const at::Tensor& w4, const at::Tensor& hx, const at::Tensor& cx, bool reverse, int64_t mode,
-    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes, 
+    int64_t hidden_size, int64_t num_layers, bool has_biases, bool train, bool bidirectional, at::IntArrayRef batch_sizes,
     const std::vector<float>& scales, const std::vector<int32_t>& shift, bool quantized) {
   DEBUG("AtenIpexCPUDev::dil_rnn_layer\n");
 

@@ -42,9 +42,9 @@ at::Tensor dil_convolution_outplace_fusion(
   // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
   auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
   auto input_contiguous = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8
-                           || input.is_contiguous()) ? input : input.contiguous();
+                           || IS_CONTIGUOUS_ANY(input)) ? input : input.contiguous();
   auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
-  auto weight_contiguous = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
+  auto weight_contiguous = (weight_dil_type == dil::data_type::s8 || IS_CONTIGUOUS_ANY(weight)) ? weight : weight.contiguous();
 
   bool quantized = false;
   std::vector<float> output_scale = {};
@@ -78,7 +78,7 @@ at::Tensor dil_convolution_outplace_fusion(
   dil_weight = try_gen_dil_tensor(weight_contiguous);
 
   if (bias.defined()) {
-    auto bias_contiguous = bias.is_contiguous() ? bias : bias.contiguous();
+    auto bias_contiguous = IS_CONTIGUOUS_ANY(bias) ? bias : bias.contiguous();
     if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
       if (quantized) {
         auto src = dbl::comm::try_gen_dil_storage(bias_contiguous);
@@ -136,11 +136,11 @@ static at::Tensor& dil_convolution_inplace_fusion(
   // for int8 path, input always acbd format which is non-contiguous, .contiguous() will reorder to fp32
   auto src_dil_type = dbl::comm::try_gen_dil_tensor(input).get_data_type();
   auto input_contiguous = (src_dil_type == dil::data_type::u8 || src_dil_type == dil::data_type::s8
-                           || input.is_contiguous()) ? input : input.contiguous();
+                           || IS_CONTIGUOUS_ANY(input)) ? input : input.contiguous();
   auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).get_data_type();
-  auto weight_contiguous = (weight_dil_type == dil::data_type::s8 || weight.is_contiguous()) ? weight : weight.contiguous();
+  auto weight_contiguous = (weight_dil_type == dil::data_type::s8 || IS_CONTIGUOUS_ANY(weight)) ? weight : weight.contiguous();
   auto ouput_dil_type = dbl::comm::try_gen_dil_tensor(accumu).get_data_type();
-  auto output_contiguous = (ouput_dil_type == dil::data_type::u8 || ouput_dil_type == dil::data_type::s8 || accumu.is_contiguous()) ? accumu : accumu.contiguous();
+  auto output_contiguous = (ouput_dil_type == dil::data_type::u8 || ouput_dil_type == dil::data_type::s8 || IS_CONTIGUOUS_ANY(accumu)) ? accumu : accumu.contiguous();
 
   bool quantized = false;
   std::vector<float> output_scale = {};
@@ -179,7 +179,7 @@ static at::Tensor& dil_convolution_inplace_fusion(
   dil_weight = try_gen_dil_tensor(weight_contiguous);
 
   if (bias.defined()) {
-    auto bias_contiguous = bias.is_contiguous() ? bias : bias.contiguous();
+    auto bias_contiguous = IS_CONTIGUOUS_ANY(bias) ? bias : bias.contiguous();
     if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
       if (quantized) {
         auto src = dbl::comm::try_gen_dil_storage(bias_contiguous);
@@ -228,7 +228,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_swish(
     at::IntArrayRef dilation,
     int64_t groups) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_swish", std::vector<c10::IValue>({input, weight, bias}));
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_swish", std::vector<c10::IValue>({}));
 #endif
   return dil_convolution_outplace_fusion(
     input,
@@ -250,7 +250,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_sigmoid(
     at::IntArrayRef dilation,
     int64_t groups) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sigmoid", std::vector<c10::IValue>({input, weight, bias}));
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sigmoid", std::vector<c10::IValue>({}));
 #endif
   return dil_convolution_outplace_fusion(
     input,
@@ -274,7 +274,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_clamp(
     float lower_bound,
     float upper_bound) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_clamp", std::vector<c10::IValue>({input, weight, bias}));
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_clamp", std::vector<c10::IValue>({}));
 #endif
   return dil_convolution_outplace_fusion(
     input,
@@ -296,7 +296,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
     at::IntArrayRef dilation,
     int64_t groups) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_relu", std::vector<c10::IValue>({input, weight, bias}));
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_relu", std::vector<c10::IValue>({}));
 #endif
   return dil_convolution_outplace_fusion(
     input,
@@ -322,7 +322,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_elu(
     at::Scalar scale,
     at::Scalar input_scale) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_elu", std::vector<c10::IValue>({input, weight, bias}));
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_elu", std::vector<c10::IValue>({}));
 #endif
   auto scale_value = scale.to<float>();
   auto input_scale_value = input_scale.to<float>();
@@ -348,7 +348,7 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum(
     at::Tensor& accumu,
     at::Scalar alpha) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum", std::vector<c10::IValue>({input, weight, bias}));
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum", std::vector<c10::IValue>({}));
 #endif
   auto scale = alpha.to<float>();
   return dil_convolution_inplace_fusion(
@@ -375,7 +375,7 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
     at::Tensor& accumu,
     at::Scalar alpha) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum_relu", std::vector<c10::IValue>({input, weight, bias}));
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum_relu", std::vector<c10::IValue>({}));
 #endif
   auto scale = alpha.to<float>();
   at::Tensor& output = dil_convolution_inplace_fusion(
@@ -404,7 +404,7 @@ at::Tensor AtenIpexJITDev::dil_linear_fuse_eltwise(
     const at::Tensor& bias,
     const dil::attr_t& attr) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_linear_fuse_eltwise", std::vector<c10::IValue>({self, weight, bias}));
+  RECORD_FUNCTION("AtenIpexJITDev::dil_linear_fuse_eltwise", std::vector<c10::IValue>({}));
 #endif
   return AtenIpexCPUDev::dil_linear(self, weight, bias, attr);
 }

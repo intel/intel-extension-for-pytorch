@@ -406,7 +406,7 @@ class SparseOPCodeGen(object):
                     if param.core_type in ['Tensor', 'Scalar']:
                         profiler_inputs.append(param.name)
                 code += '#if defined(IPEX_PROFILE_OP)\n'
-                code += '  RECORD_FUNCTION("{ns}::{name}", std::vector<c10::IValue>({{{input_names}}}));\n'.format(ns=_IPEX_OP_FUNC_NS, name=cpp_sparse_sig.def_name, input_names=', '.join(profiler_inputs))
+                code += '  RECORD_FUNCTION("{ns}::{name}", std::vector<c10::IValue>({{{input_names}}}));\n'.format(ns=_IPEX_OP_FUNC_NS, name=cpp_sparse_sig.def_name, input_names='')
                 code += '#endif\n'
 
                 code += self.gen_fallback_prepare_code(cpp_sparse_sig)

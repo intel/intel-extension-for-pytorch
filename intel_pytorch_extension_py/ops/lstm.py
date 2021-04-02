@@ -3,11 +3,12 @@ from torch import _VF
 
 VF_lstm = _VF.lstm
 
-def ipex_lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first):
-    if input.device.type == 'xpu' and (dropout == 0 or training == False):
-        return torch.ops.torch_ipex.lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
+def ipex_lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first, device):
+    # For LSTM training with dropout, fallback to cpu due to performance issue in oneDNN mode
+    if training and dropout != 0:
+        return fallback_lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first, device=device)
     else:
-        return VF_lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
+        return torch.ops.torch_ipex.lstm(input, hx, _flat_weights, bias, num_layers, dropout, training, bidirectional, batch_first)
 
 # users may only transfer the data but not the module to IPEX device, need to check if every item in the args is on "cpu" device
 def get_device(*args):
@@ -45,14 +46,14 @@ def fallback_lstm(*args, device):
     return tuple(output_device)
 
 def lstm(*args):
+    device = get_device(*args)
+    if device == "cpu":
+        return VF_lstm(*args)
+    
+    # For LSTM with pack_padded_sequence as input, fallback to cpu due to performance issue in oneDNN mode
     if isinstance(args[1], torch.Tensor):
-        # For LSTM with pack_padded_sequence as input, fallback to cpu due to performance issue in oneDNN mode
-        device = get_device(*args)
-        if device == "cpu":
-            return VF_lstm(*args)
-        else:
-            return fallback_lstm(*args, device=device)
+        return fallback_lstm(*args, device=device)
     else:
-        return ipex_lstm(*args)
+        return ipex_lstm(*args, device=device)
 
 _VF.lstm = lstm
