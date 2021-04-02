@@ -35,6 +35,9 @@ class AtenIpexTypeExt {
                         const at::Tensor& scores,
                         const float threshold);
 
+  static at::Tensor interaction_forward(const std::vector<at::Tensor> & input);
+  static std::vector<at::Tensor> interaction_backward(const at::Tensor & grad_out, 
+                                                                     const std::vector<at::Tensor> & input);
 };
 
 }  // namespace torch_ipex
