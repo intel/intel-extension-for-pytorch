@@ -41,7 +41,7 @@ IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(atan, Numerics<scalar_t>::atan, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(erf, Numerics<scalar_t>::erf, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(erfc, Numerics<scalar_t>::erfc, Real);
 IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(exp, Numerics<scalar_t>::exp, Real);
-
+IPEX_OUT_INPLACE_FLOAT_UNARY_FUNC_OPS(sgn, Numerics<scalar_t>::sgn, Real);
 
 Tensor& sqrt_out(Tensor& result, const Tensor& self) {
   checkBackend("sqrt_out", {self}, Backend::XPU);

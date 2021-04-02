@@ -22,6 +22,15 @@ static inline T powi(T a, T b) {
   return result;
 }
 
+template<typename T>
+static inline T sgni(T z) {
+  if (z == (T)(0)) {
+    return (T)(0);
+  } else {
+    return z / abs(z);
+  }
+}
+
 template <>
 struct Numerics<uint8_t> {
   static inline uint8_t lower_bound() {
@@ -239,6 +248,10 @@ struct Numerics<int16_t> {
   static inline bool isnan(int16_t a) {
     return false;
   }
+
+  static inline int16_t sgn(int16_t a) {
+    return sgni<int16_t>(a);
+  }
 };
 
 template <>
@@ -294,6 +307,10 @@ struct Numerics<int32_t> {
   static inline bool isnan(int32_t a) {
     return false;
   }
+
+  static inline int32_t sgn(int32_t a) {
+    return sgni<int32_t>(a);
+  }
 };
 
 template <>
@@ -348,6 +365,10 @@ struct Numerics<int64_t> {
 
   static inline bool isnan(int64_t a) {
     return false;
+  }
+
+  static inline int64_t sgn(int64_t a) {
+    return sgni<int64_t>(a);
   }
 };
 
@@ -497,6 +518,10 @@ struct Numerics<at::Half> {
   static inline bool isnan(at::Half a) {
     return DPCPP::isnan((float)a);
   }
+
+  static inline at::Half sgn(at::Half a) {
+    return sgni<at::Half>(a);
+  }
 };
 
 template <>
@@ -643,6 +668,9 @@ struct Numerics<at::BFloat16> {
   }
   static inline bool isnan(at::BFloat16 a) {
     return DPCPP::isnan((float)a);
+  }
+  static inline at::BFloat16 sgn(at::BFloat16 a) {
+    return sgni<at::BFloat16>(a);
   }
 };
 
@@ -791,6 +819,9 @@ struct Numerics<float> {
   static inline bool isnan(float a) {
     return DPCPP::isnan(a);
   }
+  static inline float sgn(float a) {
+    return sgni<float>(a);
+  }
 };
 
 template <>
@@ -936,6 +967,9 @@ struct Numerics<double> {
   }
   static inline bool isnan(double a) {
     return DPCPP::isnan(a);
+  }
+  static inline double sgn(double a) {
+    return sgni<double>(a);
   }
 };
 
