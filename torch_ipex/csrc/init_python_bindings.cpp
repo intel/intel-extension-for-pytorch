@@ -6,6 +6,12 @@
 #include <c10/util/Optional.h>
 #include <torch/csrc/utils/pybind.h>
 
+#include <torch/csrc/jit/python/pybind_utils.h>
+#include <torch/csrc/jit/runtime/custom_operator.h>
+#include <torch/csrc/jit/runtime/operator_options.h>
+#include <torch/csrc/jit/passes/pass_manager.h>
+#include "jit/fusion_pass.h"
+
 #include <cstring>
 #include <sstream>
 #include <string>
@@ -56,6 +62,9 @@ void InitIpexModuleBindings(py::module m) {
   m.def("autocast_decrement_nesting",
         &torch_ipex::autocast::autocast_decrement_nesting);
   m.def("clear_autocast_cache", &torch_ipex::autocast::clear_autocast_cache);
+  m.def("enable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(true); });
+  m.def("disable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
+  m.def("get_jit_opt", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
 
 
   // int8 path
@@ -143,6 +152,12 @@ using namespace torch::jit;
 
 void InitIpexBindings(py::module m) {
   InitIpexModuleBindings(m);
+  // jit fusion pass
+  torch::jit::registerPrePass([](std::shared_ptr<Graph>& g) {
+    if (AutoOptConfig::singleton().get_jit_fuse()) {
+      torch::jit::FusionPass(g);
+    }
+  });
 }
 
 }  // namespace torch_ipex

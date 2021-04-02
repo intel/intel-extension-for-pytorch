@@ -12,6 +12,15 @@ public:
   }
 
 public:
+  inline void set_jit_fuse(bool jit_fuse) {
+    jit_fuse_ = jit_fuse;
+  }
+
+  inline bool get_jit_fuse() {
+    return jit_fuse_;
+  }
+
+public:
   // int8
   inline void set_int8_calibration(bool value) {
     calibration_step_ = value;
@@ -21,7 +30,7 @@ public:
   }
 
 private:
-  AutoOptConfig() :  calibration_step_(false) {}
+  AutoOptConfig() :  jit_fuse_(true), calibration_step_(false) {}
 
   ~AutoOptConfig() = default;
   AutoOptConfig(const AutoOptConfig&) = default;
@@ -29,6 +38,7 @@ private:
 
 private:
   // the flag for one iteration of calibration step whether end or not
+  bool jit_fuse_;
   bool calibration_step_;
 };
 

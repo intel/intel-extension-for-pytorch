@@ -6,4 +6,4 @@
 	url = https://github.com/hfp/libxsmm.git
 [submodule "third_party/ideep"]
 	path = third_party/ideep
-	url = https://github.com/intel/ideep.git
+	url = https://github.com/jiayisunx/ideep.git

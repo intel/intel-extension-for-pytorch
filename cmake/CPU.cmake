@@ -161,7 +161,7 @@ set(DPCPP_JIT_SRCS)
 
 add_subdirectory(${DPCPP_ROOT})
 add_subdirectory(${DPCPP_ROOT}/quantization)
-#add_subdirectory(${DPCPP_ROOT}/jit)
+add_subdirectory(${DPCPP_ROOT}/jit)
 add_subdirectory(${DPCPP_ROOT}/cpu)
 
 # libxsmm
