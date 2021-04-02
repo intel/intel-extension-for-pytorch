@@ -11,6 +11,11 @@
 
 #include "QUtil.h"
 
+#ifdef USE_ONEMKL
+#include <oneapi/mkl.hpp>
+#include <mkl.h>
+#endif
+
 #ifdef USE_PRIMITIVE_CACHE
 #include <oneDNN/LRUCache.h>
 #endif
@@ -73,7 +78,49 @@ void gemm_broadcast(Tensor& result,
     result.resize_(result_shape);
   }
 
-  at::xpu::oneDNN::matmul(result, m1, m2, bc_bias, attr);
+  if(result.scalar_type() == ScalarType::Double ||
+      m1.scalar_type() == ScalarType::Double ||
+      m2.scalar_type() == ScalarType::Double){
+#ifdef USE_ONEMKL
+    Tensor _result;
+    if(result.is_contiguous() && result.scalar_type() == ScalarType::Double){
+      _result = result; 
+    } else{
+      _result = at::empty_like(result, result.options().dtype(ScalarType::Double));
+    }
+    Tensor _m1 = m1.contiguous().to(ScalarType::Double);
+    Tensor _m2 = m2.contiguous().to(ScalarType::Double);
+    size_t dims = _result.dim();
+    TORCH_CHECK(dims == 2 || dims == 3, "oneMKL matmul only works with 2D or 3D, got ", dims);
+    TORCH_CHECK(dims == _m1.dim() && dims == _m2.dim(), "oneMKL input matrixes must have the same ranks");
+    
+    int64_t m = _result.size(-2);
+    int64_t k = _m1.size(-1);
+    int64_t n = _result.size(-1);
+    int64_t stridea = m*k;
+    int64_t strideb = k*n;
+    int64_t stridec = m*n;
+    int64_t mb = 1;
+
+    if (dims == 3) {
+      mb = _result.size(0);
+      TORCH_CHECK(mb == _m1.size(0) && mb == _m2.size(0), "batch size mismatch, result mb: ",\
+          mb, "m1 mb", _m1.size(0), " m2 mb: ", _m2.size(0));
+    }
+
+    auto& dpcpp_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+    DPCPP_ONEMKL_SUBMIT(
+      dpcpp_queue, 
+      oneapi::mkl::blas::row_major::gemm_batch, dpcpp_queue, oneapi::mkl::transpose::N, oneapi::mkl::transpose::N, m, n, k, attr.alpha_, (double *)_m1.data_ptr(), m, stridea, (double *)_m2.data_ptr(), k, strideb, attr.beta_, (double *)_result.data_ptr(), m, stridec, mb);
+    if(!_result.is_same(result)){
+      result.copy_(_result);
+    }  
+#else
+    AT_ERROR("Double datatype matmul is not supported. Include oneMKL library in compilation");
+#endif
+  } else {
+    at::xpu::oneDNN::matmul(result, m1, m2, bc_bias, attr);
+  }
 }
 } // namespace impl
 
