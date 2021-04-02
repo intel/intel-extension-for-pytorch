@@ -8,6 +8,8 @@
 #include <core/TensorImplUtils.h>
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
+#include <ATen/native/TensorIterator.h>
+#include "Loops.h"
 
 using namespace at::dpcpp;
 
@@ -81,22 +83,20 @@ struct TensorNEOp {
   }
 };
 
+DPCPP_DEF_K1(softshrink_forward);
 template <typename ScalarTypeOut, typename ScalarType, class Op>
 void logicalTensor(
     Tensor& self_,
     const Tensor& src1,
     const Tensor& src2,
     Op op) {
-  if (at::dpcpp::TensorImpl_Unwrap(self_) ==
-      at::dpcpp::TensorImpl_Unwrap(src1)) {
-    at::dpcpp::DPCPP_tensor_apply2<ScalarType, ScalarType>(self_, src2, op);
-  } else {
-    at::AtenIpexTypeXPU::resize_as_(self_, src1, c10::nullopt);
+  auto iter = TensorIterator::comparison_op(self_, src1, src2);
 
-    TORCH_CHECK(src1.numel() == src2.numel(), "sizes do not match");
-    at::dpcpp::DPCPP_tensor_apply3<ScalarTypeOut, ScalarType, ScalarType>(
-        self_, src1, src2, op);
-  }
+  dpcpp_kernel_for_tensor_iter<DPCPP_K(softshrink_forward, Op)>(iter, [=](ScalarType src1, ScalarType src2){
+    ScalarTypeOut ret;
+    op(ret, src1, src2);
+    return ret;
+  });
 }
 
 template <typename scalar_t>
