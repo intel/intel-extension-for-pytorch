@@ -64,14 +64,10 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
   auto m2_usr_dt = m2_dt;
   auto dst_usr_dt = dst_dt;
 
-  memory::desc m1_md, m1_usr_md;
-  memory::desc m2_md, m2_usr_md;
-  memory::desc dst_md, dst_usr_md;
+  memory::desc m1_md, m1_any_md;
+  memory::desc m2_md, m2_any_md;
+  memory::desc dst_md, dst_any_md;
   memory::desc b_md;
-
-  memory::desc m1_md_any;
-  memory::desc m2_md_any;
-  memory::desc dst_md_any;
 
   // STEP1: create memory desc
 
@@ -91,27 +87,15 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
             memory::desc({k, n}, m2_dt, {m2.stride(1), m2.stride(0)});
     dst_md = memory::desc({m, n}, dst_dt, {dst.stride(0), dst.stride(1)});
 
-    m1_usr_md = memory::desc({m, k}, m1_usr_dt, {m1.stride(0), m1.stride(1)});
-    m2_usr_md = attr.m2_trans_ ?
-                memory::desc({k, n}, m2_usr_dt, {m2.stride(0), m2.stride(1)}) :
-                memory::desc({k, n}, m2_usr_dt, {m2.stride(1), m2.stride(0)});
-    dst_usr_md = memory::desc({m, n}, dst_usr_dt, {dst.stride(0), dst.stride(1)});
-
-    m1_md_any = memory::desc({m, k}, m1_dt, memory::format_tag::any);
-    m2_md_any = memory::desc({k, n}, m2_dt, memory::format_tag::any);
-    dst_md_any = memory::desc({m, n}, dst_dt, memory::format_tag::any);
+    m1_any_md = memory::desc({m, k}, m1_dt, memory::format_tag::any);
+    m2_any_md = memory::desc({k, n}, m2_dt, memory::format_tag::any);
+    dst_any_md = memory::desc({m, n}, dst_dt, memory::format_tag::any);
   } else {
     m1_md = memory::desc({mb, m, k}, m1_dt, {m1.stride(0), m1.stride(1), m1.stride(2)});
     m2_md = attr.m2_trans_ ?
             memory::desc({mb, k, n}, m2_dt, {m2.stride(0), m2.stride(1), m2.stride(2)}) :
             memory::desc({mb, k, n}, m2_dt, {m2.stride(0), m2.stride(2), m2.stride(1)});
     dst_md = memory::desc({mb, m, n}, dst_dt, {dst.stride(0), dst.stride(1), dst.stride(2)});
-
-    m1_usr_md = memory::desc({mb, m, k}, m1_usr_dt, {m1.stride(0), m1.stride(1), m1.stride(2)});
-    m2_usr_md = attr.m2_trans_ ?
-                memory::desc({mb, k, n}, m2_usr_dt, {m2.stride(0), m2.stride(1), m2.stride(2)}) :
-                memory::desc({mb, k, n}, m2_usr_dt, {m2.stride(0), m2.stride(2), m2.stride(1)});
-    dst_usr_md = memory::desc({mb, m, n}, dst_usr_dt, {dst.stride(0), dst.stride(1), dst.stride(2)});
   }
 
   // STEP2: creat attribute
@@ -202,9 +186,9 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
     if (dims == 2 && lazy_reorder_enabled()) {
       // attr + blk
     #ifdef USE_PRIMITIVE_CACHE
-      create_key(key, m1_md_any, m2_md_any, b_md, dst_md_any, attr.beta_, attr.alpha_, post_flags);
+      create_key(key, m1_any_md, m2_any_md, b_md, dst_any_md, attr.beta_, attr.alpha_, post_flags);
     #endif
-      matmul_desc = matmul::desc(m1_md_any, m2_md_any, b_md, dst_md_any);
+      matmul_desc = matmul::desc(m1_any_md, m2_any_md, b_md, dst_any_md);
     } else {
       // attr + plain
     #ifdef USE_PRIMITIVE_CACHE
@@ -216,9 +200,9 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
     if (dims == 2 && lazy_reorder_enabled()) {
       // no attr + blk
     #ifdef USE_PRIMITIVE_CACHE
-      create_key(key, m1_md_any, m2_md_any, dst_md_any, attr.beta_, attr.alpha_, post_flags);
+      create_key(key, m1_any_md, m2_any_md, dst_any_md, attr.beta_, attr.alpha_, post_flags);
     #endif
-      matmul_desc = matmul::desc(m1_md_any, m2_md_any, dst_md_any);
+      matmul_desc = matmul::desc(m1_any_md, m2_any_md, dst_any_md);
     } else {
       // no attr + plain
     #ifdef USE_PRIMITIVE_CACHE
@@ -244,17 +228,17 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
   // STEP4: create memory
   auto m1_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m1);
   auto m1_usr_m = m1_ctx.is_plain() ?
-      dpcpp_onednn_memory(m1_usr_md, engine, m1.data_ptr()) :
+      dpcpp_onednn_memory(m1_md, engine, m1.data_ptr()) :
       dpcpp_onednn_memory({m1_ctx.meta()}, engine, m1.data_ptr());
 
   auto m2_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m2);
   auto m2_usr_m = m2_ctx.is_plain() ?
-      dpcpp_onednn_memory(m2_usr_md, engine, m2.data_ptr()) :
+      dpcpp_onednn_memory(m2_md, engine, m2.data_ptr()) :
       dpcpp_onednn_memory({m2_ctx.meta()}, engine, m2.data_ptr());
 
   auto dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(dst);
   auto dst_usr_m = dst_ctx.is_plain() ?
-      dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr()) :
+      dpcpp_onednn_memory(dst_md, engine, dst.data_ptr()) :
       dpcpp_onednn_memory({dst_ctx.meta()}, engine, dst.data_ptr());
 
   auto expected_m1_md = matmul_pd.src_desc();
@@ -267,16 +251,16 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
   // reorder cases
   // case1: master weight support to reorder data type
   // case2: block format support to reorder format
-  if (m1_usr_md != expected_m1_md) {
+  if (m1_usr_m.get_desc() != expected_m1_md) {
     m1_ = empty_opaque_tensor(expected_m1_md, m1.options(), c10::nullopt);
     m1_m = dpcpp_onednn_memory(expected_m1_md, engine, m1_.data_ptr());
     at::xpu::oneDNN::reorder(m1, m1_);
   }
 
-  if (m2_usr_md != expected_m2_md) {
+  if (m2_usr_m.get_desc() != expected_m2_md) {
     m2_ = empty_opaque_tensor(expected_m2_md, m2.options(), c10::nullopt);
     m2_m = dpcpp_onednn_memory(expected_m2_md, engine, m2_.data_ptr());
-    at::xpu::oneDNN::reorder(m2, m2_);
+    at::xpu::oneDNN::reorder(attr.m2_trans_ ? m2 : m2.t(), m2_);
 
     if (weight_cache_enabled()) {
       strm.wait();
@@ -289,7 +273,7 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
 
 #ifdef USE_GEN12HP_ONEDNN
   // bias add for gen12hp platform
-  if (dst_usr_md != expected_dst_md) {
+  if (dst_md != expected_dst_md) {
     dst_ = empty_opaque_tensor(expected_dst_md, dst.options(), c10::nullopt);
     dst_m = dpcpp_onednn_memory(expected_dst_md, engine, dst_.data_ptr());
     if (attr.beta_ != 1.f)
