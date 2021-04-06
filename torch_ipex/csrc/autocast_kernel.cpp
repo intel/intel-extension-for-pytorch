@@ -160,5 +160,26 @@ at::Tensor sigmoid(const at::Tensor& input) {
   return at::sigmoid(input);
 }
 
+at::Tensor& add_tensor_(at::Tensor& input, const at::Tensor& other, const at::Scalar& alpha) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  auto target_type = get_autocast_dtype();
+  if (at::ScalarType::Char == target_type) {
+    return int8::add_tensor_(input, other, alpha);
+  }
+  // make fall makeFallthrough.
+  input.add_(other, alpha);
+  return input;
+}
+
+at::Tensor add_tensor(const at::Tensor& input, const at::Tensor& other, const at::Scalar& alpha) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  auto target_type = get_autocast_dtype();
+  if (at::ScalarType::Char == target_type) {
+    return int8::add_tensor(input, other, alpha);
+  }
+  // make fall makeFallthrough.
+  return at::add(input, other, alpha);
+}
+
 } // autocast
 } // torch_ipex

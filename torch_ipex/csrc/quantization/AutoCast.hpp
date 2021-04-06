@@ -44,6 +44,10 @@ at::Tensor sigmoid(const at::Tensor& input);
 
 at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const c10::optional<at::Tensor>& bias);
 
+at::Tensor& add_tensor_(at::Tensor& input, const at::Tensor& other, const at::Scalar& alpha);
+
+at::Tensor add_tensor(const at::Tensor& input, const at::Tensor& other, const at::Scalar& alpha);
+
 } // namespace int8
 } // namespace autocast
 } // namespace torch_ipex

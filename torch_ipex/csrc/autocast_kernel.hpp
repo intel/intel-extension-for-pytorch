@@ -41,5 +41,9 @@ at::Tensor& relu_(at::Tensor& input);
 
 at::Tensor sigmoid(const at::Tensor& input);
 
+at::Tensor& add_tensor_(at::Tensor& input, const at::Tensor& other, const at::Scalar& alpha);
+
+at::Tensor add_tensor(const at::Tensor& input, const at::Tensor& other, const at::Scalar& alpha);
+
 } // autocast
 } // torch_ipex

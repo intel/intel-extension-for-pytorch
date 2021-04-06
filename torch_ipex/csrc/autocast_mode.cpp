@@ -209,6 +209,9 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
   m.impl(TORCH_SELECTIVE_NAME("aten::relu_"), TORCH_FN((&torch_ipex::autocast::relu_)));
   m.impl(TORCH_SELECTIVE_NAME("aten::sigmoid"), TORCH_FN((&torch_ipex::autocast::sigmoid)));
   m.impl(TORCH_SELECTIVE_NAME("aten::linear"), TORCH_FN((&torch_ipex::autocast::linear)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::add_.Tensor"), TORCH_FN((&torch_ipex::autocast::add_tensor_)));
+  m.impl(TORCH_SELECTIVE_NAME("aten::add.Tensor"), TORCH_FN((&torch_ipex::autocast::add_tensor)));
+
 }
 
 }  // namespace autocast

@@ -25,6 +25,11 @@ void Int8OptConfig::insert_or_updata_observer(
     std::vector<bool> inputs_dtype_uint8(nums_input, false);
     std::vector<bool> outputs_dtype_uint8(nums_output, false);
     bool quantized = true, pre_quantized = true, post_quantized = true;
+    if (op_name == "relu_" || op_name == "add" || op_name == "add_") {
+      quantized = false;
+      pre_quantized = false;
+      post_quantized = false;
+    }
     if (!indicators_.empty()) {
       observer_algorithm = indicators_[ops_id].get_indicator_algorithm();
       weight_granularity =

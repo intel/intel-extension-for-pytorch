@@ -29,7 +29,7 @@ class AmpConf(object):
             json.dump(configures, fp, indent = 4)
 
     def get_default_recipe(self, configures):
-        elt_wise = ['relu', 'sigmoid']
+        elt_wise = ['relu', 'relu_', 'sigmoid']
         # get default recipe,
         # q+dq+conv+q+dq+relu_ => q+dq+conv+relu
         # q+dq+op1+q+dq+q+dq+op2+q+dq => q+dq+op1+q+dq+op2+q+dq
@@ -39,15 +39,29 @@ class AmpConf(object):
             current_op = default_configures[i]
             inputs = current_op['inputs_flow']
             op_name = current_op['name']
-            for inp in inputs:
+            if op_name in elt_wise:
+                inp = inputs[0]
                 for j in range(i):
-                    # assume op only has one output
-                    if default_configures[j]['outputs_flow'][0] == inp:
+                    # for conv+relu(_), linear+relu(_), not have quant and dequan between them.
+                    if default_configures[j]['outputs_flow'][0] == inp \
+                            and (default_configures[j]['name'] == 'conv2d' \
+                                 or default_configures[j]['name'] == 'conv3d' \
+                                 or default_configures[j]['name'] == 'linear'):
                         default_configures[j]['post_quantized'] = False
-                        # for conv+relu, linear+relu, not have quant and dequan between them.
-                        if op_name in elt_wise \
-                                and (default_configures[j]['name'] == 'conv2d' \
-                                    or default_configures[j]['name'] == 'conv3d' \
-                                    or default_configures[j]['name'] == 'linear'):
-                            default_configures[i]['pre_quantized'] = False
+                        default_configures[i]['pre_quantized'] = False
+            elif op_name == 'add_' or op_name == 'add':
+                # only need check first input for add.
+                inp = inputs[0]
+                for j in range(i):
+                    # conv+sum fusion path,
+                    if default_configures[j]['outputs_flow'][0] == inp \
+                            and (default_configures[j]['name'] == 'conv2d' \
+                                 or default_configures[j]['name'] == 'conv3d'):
+                        default_configures[j]['post_quantized'] = False
+            else:
+                for inp in inputs:
+                    for j in range(i):
+                        # assume op only has one output
+                        if default_configures[j]['outputs_flow'][0] == inp:
+                            default_configures[j]['post_quantized'] = False
         return default_configures
