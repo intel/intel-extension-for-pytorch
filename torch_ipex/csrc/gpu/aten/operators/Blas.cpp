@@ -64,11 +64,7 @@ void gemm_broadcast(Tensor& result,
   }
 
   Tensor bc_bias = bias;
-#ifdef USE_GEN12HP_ONEDNN
   if (bias.defined() && attr.beta_ && (attr.beta_ != 1.f || m1.is_quantized())) {
-#else
-  if (bias.defined() && attr.beta_) {
-#endif
     TORCH_CHECK(check_broadcast(bias, result_shape),
                 "bias ", bias.sizes(), " cannot broadcast to ", result_shape);
     std::tie(bc_bias) = expand_size(bias, result_shape, "gemm_broadcast");

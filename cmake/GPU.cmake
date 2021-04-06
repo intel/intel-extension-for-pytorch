@@ -170,10 +170,6 @@ if(BUILD_DOUBLE_KERNEL)
   target_compile_definitions(torch_ipex PUBLIC BUILD_DOUBLE_KERNEL)
 endif()
 
-if (USE_GEN12HP_ONEDNN)
-  target_compile_definitions(torch_ipex PUBLIC USE_GEN12HP_ONEDNN)
-endif()
-
 if (USE_PRIMITIVE_CACHE)
   # Enable FRAMEWORK primitive cache
   target_compile_definitions(torch_ipex PUBLIC USE_PRIMITIVE_CACHE)

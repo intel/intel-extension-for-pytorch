@@ -104,7 +104,6 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
   int64_t post_flags = 0;
   if (attr.alpha_ != 1.f)
     pattr.set_output_scales(/* mask */ 0, {(float)attr.alpha_});
-#ifdef USE_GEN12HP_ONEDNN
   // Handle difference cases based-on beta value here:
   // 1. beta == 0, nothing is needed to do
   // 2. quantization path, no bias fusion support in oneDNN so far
@@ -115,10 +114,6 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
                             m1.is_quantized() ||
                             m2.is_quantized())) {
     po.append_sum(attr.beta_);
-#else
-  if (attr.beta_ != 0.f) {
-    po.append_sum(attr.beta_);
-#endif
     post_flags |= at::dpcpp::oneDNN::with_sum;
   }
 
@@ -168,7 +163,6 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
 
   auto matmul_desc = matmul::desc(m1_md, m2_md, dst_md);
 
-#ifdef USE_GEN12HP_ONEDNN
   if (attr.beta_ == 1.f && attr.alpha_ == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_dt = b.defined() ? dt_to_dnnl(b.scalar_type()) : memory::data_type::f32;
     if (b.sizes() != dst.sizes()) {
@@ -211,11 +205,6 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
       matmul_desc = matmul::desc(m1_md, m2_md, dst_md);
     }
   }
-#else
-#ifdef USE_PRIMITIVE_CACHE
-  create_key(key, m1_md, m2_md, dst_md, attr.beta_, attr.alpha_, post_flags);
-#endif
-#endif
 
   auto matmul_pd = matmul::primitive_desc(matmul_desc, pattr, engine);
 
@@ -271,7 +260,6 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
     }
   }
 
-#ifdef USE_GEN12HP_ONEDNN
   // bias add for gen12hp platform
   if (dst_md != expected_dst_md) {
     dst_ = empty_opaque_tensor(expected_dst_md, dst.options(), c10::nullopt);
@@ -294,13 +282,6 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
                        {DNNL_ARG_WEIGHTS, m2_m},
                        {DNNL_ARG_DST, dst_m}});
   }
-#else
-  // post sum for non-gen12hp platform
-  DPCPP_ONEDNN_EXEC(matmul_p, strm,
-                    {{DNNL_ARG_SRC, m1_m},
-                     {DNNL_ARG_WEIGHTS, m2_m},
-                     {DNNL_ARG_DST, dst_m}});
-#endif
 
   if (lazy_reorder_enabled() && dst_m != dst_usr_m && dims == 2) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
