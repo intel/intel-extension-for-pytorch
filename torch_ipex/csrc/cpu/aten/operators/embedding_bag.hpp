@@ -1,7 +1,8 @@
 #pragma once
 
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 #include <ATen/Parallel.h>
+#include <ATen/NativeFunctions.h>
 #include <c10/core/ScalarType.h>
 
 #include <vector>

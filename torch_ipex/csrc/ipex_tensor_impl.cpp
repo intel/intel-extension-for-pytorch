@@ -72,15 +72,28 @@ void IPEXTensorImpl::copy_auto_grad(c10::TensorImpl *src_impl) {
     auto cpu_autograd_meta = static_cast<torch::autograd::AutogradMeta*>(src_impl->autograd_meta());
     if (cpu_autograd_meta->is_view_){
       auto cpu_view_meta = static_cast<torch::autograd::DifferentiableViewMeta*>(src_impl->autograd_meta());
-      auto base = cpu_view_meta->base_;
-      auto creation_meta = cpu_view_meta->creation_meta;
-      auto has_view_fn = cpu_view_meta->has_view_fn();
+
+      c10::optional<torch::autograd::ViewInfo> backward_info_;
+      c10::optional<torch::autograd::ViewInfo> forward_info_;
+
+      if (cpu_view_meta->has_fw_view()) {
+        auto fw_view_info = cpu_view_meta->get_forward_view();
+        torch::autograd::ViewInfo fw_view_info_copy(fw_view_info.base_, fw_view_info.view_fn_);
+        forward_info_ = fw_view_info_copy;
+      }
+
+      if (cpu_view_meta->has_bw_view()) {
+        auto bw_view_info = cpu_view_meta->get_backward_view();
+        torch::autograd::ViewInfo bw_view_info_copy(bw_view_info.base_, bw_view_info.view_fn_);
+        backward_info_ = bw_view_info_copy;
+      }
+
       this->set_autograd_meta(
         std::make_unique<torch::autograd::DifferentiableViewMeta>(
           this,
-          base,
-          has_view_fn ? cpu_view_meta->view_fn() : nullptr,
-          creation_meta
+          backward_info_,
+          forward_info_,
+          cpu_view_meta->get_creation_meta()
         )
       );
     }
@@ -106,8 +119,10 @@ void IPEXTensorImpl::copy_meta_info(const c10::TensorImpl *src_impl, bool keep_d
   dest_impl->reserved_ = src_impl->reserved_;
   dest_impl->type_set_ = src_impl->type_set();
   */
-  this->sizes_ = src_impl->sizes();
-  this->strides_ = src_impl->strides();
+  this->sizes_and_strides_.set_sizes(src_impl->sizes());
+  for (int i = 0; i < src_impl->dim(); i++) {
+    this->sizes_and_strides_.stride_at_unchecked(i) = src_impl->stride(i);
+  }
   this->storage_offset_ = src_impl->storage_offset();
   if (!keep_dtype)
     this->data_type_ = src_impl->dtype();

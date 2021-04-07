@@ -1,6 +1,8 @@
 #pragma once
 
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
+#include <c10/util/Exception.h>
+
 #include "cpu/dil/dil.hpp"
 
 #ifndef IS_CONTIGUOUS_ANY

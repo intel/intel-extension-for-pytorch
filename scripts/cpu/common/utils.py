@@ -8,6 +8,8 @@ _TYPE_NSMAP = {
     'TensorList': 'at::TensorList',
     'TensorOptions': 'c10::TensorOptions',
     'IntList': 'at::IntList',
+    'List': 'c10::List',
+    'Stream': 'c10::Stream',
     'IntArrayRef': 'at::IntArrayRef',
     'ArrayRef': 'c10::ArrayRef',
     'Layout': 'c10::Layout',
@@ -22,6 +24,18 @@ _TYPE_NSMAP = {
     'DimnameList': 'at::DimnameList',  # Cover DimnameList and Dimname
 }
 
+def is_tensor_api(func_name):
+    m = re.search(r'\bTensor\b', func_name)
+    return m is not None
+
+def compare_params(params1, params2):
+    if len(params1) != len(params2):
+        return False
+
+    for param_item in params1:
+        if param_item not in params2:
+            return False
+    return True
 
 def add_ns(pt_string):
     splited_str = re.split(r'([^a-zA-Z0-9_])', pt_string)
@@ -52,6 +66,17 @@ def query_tensor_options(input_params):
         else:
             start_idx = -1
     return start_idx, end_idx
+
+def is_out_func(fname):
+    return fname.endswith("_out") or fname.endswith("_outf")
+
+def reorder_params_idx(to_be_reordered_params, ref_params):
+    new_idxs = {}
+    assert len(to_be_reordered_params) == len(ref_params)
+    for param in to_be_reordered_params:
+        assert param in ref_params
+        new_idxs[ref_params.index(param)] = to_be_reordered_params.index(param)
+    return new_idxs
 
 if __name__ == '__main__':
     sigs = [

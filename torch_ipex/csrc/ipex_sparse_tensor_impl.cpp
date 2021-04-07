@@ -26,7 +26,7 @@ void IPEXSparseTensorImpl::copy_meta_info(const at::SparseTensorImpl *src_impl) 
   this->is_channels_last_contiguous_ = src_impl->is_contiguous(at::MemoryFormat::ChannelsLast);
   */
 
-  this->sizes_ = src_impl->sizes();
+  this->sizes_and_strides_.set_sizes(src_impl->sizes());
   this->data_type_ = src_impl->dtype();
   this->is_channels_last_ = src_impl->is_strides_like_channels_last();
   this->is_channels_last_3d_ = src_impl->is_strides_like_channels_last_3d();

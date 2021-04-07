@@ -113,18 +113,18 @@ void AtenIpexTypeExt::packed_add_(at::Tensor &top_half, at::Tensor &bot_half,
       int64_t i = start;
       auto alpha_vec = _mm512_set1_ps(alpha);
       for (; i < end - 31; i+=32) {
-	auto bot0 = _mm256_loadu_si256((__m256i *)(bot_half_ptr + i));
-	auto bot1 = _mm256_loadu_si256((__m256i *)(bot_half_ptr + i + 16));
-	auto top0 = _mm256_loadu_si256((__m256i *)(top_half_ptr + i));
-	auto top1 = _mm256_loadu_si256((__m256i *)(top_half_ptr + i + 16));
-	auto value0 = _mm256_loadu_si256((__m256i *)(value_ptr + i));
-	auto value1 = _mm256_loadu_si256((__m256i *)(value_ptr + i + 16));
-	auto pack0_fp32 = pack_bf16_to_fp32(top0, bot0);
-	auto pack1_fp32 = pack_bf16_to_fp32(top1, bot1);
-	auto value0_fp32 = cvt_bf16_to_fp32(value0);
-	auto value1_fp32 = cvt_bf16_to_fp32(value1);
-	auto result0 = _mm512_fmadd_ps(alpha_vec, value0_fp32, pack0_fp32);
-	auto result1 = _mm512_fmadd_ps(alpha_vec, value1_fp32, pack1_fp32);
+        auto bot0 = _mm256_loadu_si256((__m256i *)(bot_half_ptr + i));
+        auto bot1 = _mm256_loadu_si256((__m256i *)(bot_half_ptr + i + 16));
+        auto top0 = _mm256_loadu_si256((__m256i *)(top_half_ptr + i));
+        auto top1 = _mm256_loadu_si256((__m256i *)(top_half_ptr + i + 16));
+        auto value0 = _mm256_loadu_si256((__m256i *)(value_ptr + i));
+        auto value1 = _mm256_loadu_si256((__m256i *)(value_ptr + i + 16));
+        auto pack0_fp32 = pack_bf16_to_fp32(top0, bot0);
+        auto pack1_fp32 = pack_bf16_to_fp32(top1, bot1);
+        auto value0_fp32 = cvt_bf16_to_fp32(value0);
+        auto value1_fp32 = cvt_bf16_to_fp32(value1);
+        auto result0 = _mm512_fmadd_ps(alpha_vec, value0_fp32, pack0_fp32);
+        auto result1 = _mm512_fmadd_ps(alpha_vec, value1_fp32, pack1_fp32);
         _mm256_storeu_si256((__m256i *)(top_half_ptr + i), trunc_fp32_to_bf16(result0));
         _mm256_storeu_si256((__m256i *)(top_half_ptr + i + 16), trunc_fp32_to_bf16(result1));
         _mm256_storeu_si256((__m256i *)(bot_half_ptr + i), _mm512_cvtepi32_epi16(_mm512_castps_si512(result0)));
@@ -459,7 +459,6 @@ at::Tensor AtenIpexTypeExt::max_pool3d(const at::Tensor &input,
   return std::get<0>(ret);
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // RNN OPS
 
@@ -635,6 +634,30 @@ at::Tensor AtenIpexTypeExt::frozen_batch_norm(const at::Tensor& input, const at:
     return FrozenBatchNormOp::apply(input, weight, bias, running_mean, running_var);
   return FrozenBatchNormOp::_forward(input, weight, bias, running_mean, running_var);
 }
+
+at::Tensor AtenIpexTypeExt::layer_norm(
+    const at::Tensor & input,
+    at::IntArrayRef normalized_shape,
+    const c10::optional<at::Tensor> & weight,
+    const c10::optional<at::Tensor> & bias,
+    double eps) {
+  if (at::GradMode::is_enabled()) {
+    return IPEXLayerNorm::apply(
+      input,
+      normalized_shape,
+      weight,
+      bias,
+      eps);
+  } else {
+    return IPEXLayerNorm::_forward(
+      input,
+      normalized_shape,
+      weight,
+      bias,
+      eps);
+  }
+}
+
 } // namespace torch_ipex
 
 namespace {
@@ -690,5 +713,6 @@ static auto dispatch =
             })
         .op("torch_ipex::interaction_forward", &torch_ipex::AtenIpexTypeExt::interaction_forward)
         .op("torch_ipex::interaction_backward", &torch_ipex::AtenIpexTypeExt::interaction_backward)
-        .op("torch_ipex::frozen_batch_norm", torch_ipex::AtenIpexTypeExt::frozen_batch_norm);
+        .op("torch_ipex::frozen_batch_norm", &torch_ipex::AtenIpexTypeExt::frozen_batch_norm)
+        .op("torch_ipex::layer_norm", &torch_ipex::AtenIpexTypeExt::layer_norm);
 }

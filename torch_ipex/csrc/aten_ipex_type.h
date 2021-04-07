@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 
 namespace torch_ipex {
 

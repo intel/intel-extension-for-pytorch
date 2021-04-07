@@ -15,11 +15,13 @@ from torch.autograd import gradcheck
 from torch.autograd.gradcheck import gradgradcheck
 from torch._six import inf, nan
 
-from common_utils import TestCase, iter_indices, TEST_NUMPY, TEST_SCIPY, TEST_MKL, \
-    TEST_LIBROSA, run_tests, download_file, skipIfNoLapack, suppress_warnings, \
-    IS_WINDOWS, PY3, NO_MULTIPROCESSING_SPAWN, do_test_dtypes, do_test_empty_full, \
-    IS_SANDCASTLE, load_tests, brute_pdist, brute_cdist, slowTest, \
-    skipCUDANonDefaultStreamIf, skipCUDAMemoryLeakCheckIf
+from common_utils import (
+    TestCase, TEST_WITH_ROCM, run_tests,
+    IS_WINDOWS, IS_FILESYSTEM_UTF8_ENCODING, NO_MULTIPROCESSING_SPAWN,
+    do_test_dtypes, IS_SANDCASTLE, IS_FBCODE, IS_REMOTE_GPU, load_tests, slowTest,
+    skipCUDAMemoryLeakCheckIf, BytesIOContext,
+    skipIfRocm, skipIfNoSciPy, TemporaryFileName, TemporaryDirectoryName,
+    wrapDeterministicFlagAPITest, DeterministicGuard, make_tensor)
 
 K=1 #128
 C=16 #64
@@ -50,9 +52,6 @@ class TestMLPCases(TestCase):
 
   def test_mlp(self):
     for data_type in [torch.float32, torch.bfloat16]:
-      prec = 1e-5
-      if data_type == torch.bfloat16:
-        prec = 1.2e-2
       seed = self.get_rand_seed()
       ipex_fc = self._ipxex_linear(seed, data_type)
       cpu_fc = self._cpu_linear(seed, data_type)
@@ -64,9 +63,9 @@ class TestMLPCases(TestCase):
       if input_grad_ipex is None:
         self.assertTrue(input_grad_cpu is None)
       else:
-        self.assertEqual(input_grad_ipex.to(torch.float32), input_grad_cpu.to(torch.float32), prec)
-      self.assertEqual(weight_grad_ipex.to(torch.float32), weight_grad_cpu.to(torch.float32), prec)
-      self.assertEqual(bias_grad_ipex.to(torch.float32), bias_grad_cpu.to(torch.float32), prec)
+        self.assertEqual(input_grad_ipex.to(torch.float32), input_grad_cpu.to(torch.float32), atol=1e-1, rtol=1e-5)
+      self.assertEqual(weight_grad_ipex.to(torch.float32), weight_grad_cpu.to(torch.float32), atol=1e-1, rtol=1e-5)
+      self.assertEqual(bias_grad_ipex.to(torch.float32), bias_grad_cpu.to(torch.float32), atol=1e-1, rtol=1e-5)
 
 if __name__ == '__main__':
     test = unittest.main()

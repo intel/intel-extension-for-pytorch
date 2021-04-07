@@ -33,10 +33,12 @@ _ATEN_SIG_GRAMMAR = r"""
               | SIGNED_NUMBER
               | ESCAPED_STRING
               | CNAME
+              | STR_LITERAL
 
     array_list: array_val
               | array_val "," array_list
     array_val: NUMBER*
+             | SIGNED_NUMBER*
              | CNAME
     return_type: "("* ret_param_list ")"*
                | "()"
@@ -72,6 +74,7 @@ _ATEN_SIG_GRAMMAR = r"""
 
     ATEN_NS: "aten::"
     VEC: "[" (NUMBER)* "]"
+    STR_LITERAL: "'" (CNAME)* "'"
     TENSOR_TYPE: "Tensor"
     W_SYM: "!"
     OPTIONAL_SYM: "?"
@@ -165,6 +168,7 @@ class AtenSig(SigParser):
 
 if __name__ == '__main__':
     sigs = [
+    "aten::fft_fft2(Tensor self, int[1]? s=None, int[1] dim=[-2,-1], str? norm=None) -> Tensor",
     "aten::abs.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)",
     "aten::abs_(Tensor(a!) self) -> Tensor(a!)",
     "aten::angle(Tensor self) -> Tensor",

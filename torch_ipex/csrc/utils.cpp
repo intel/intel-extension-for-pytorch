@@ -1,6 +1,6 @@
 #include "utils.h"
 
-#include <ATen/Tensor.h>
+#include <ATen/ATen.h>
 #include <c10/util/Exception.h>
 
 #include "auto_opt_config.h"
