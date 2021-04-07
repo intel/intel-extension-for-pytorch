@@ -2,7 +2,7 @@
 #include <ATen/Functions.h>
 #include <ATen/ScalarOps.h>
 #include <ATen/AtenIpexTypeXPU.h>
-
+#include <ATen/quantized/QTensorImpl.h>
 
 #include <core/ApplyUtils.h>
 #include <core/TensorImplUtils.h>
@@ -489,4 +489,30 @@ Tensor ne(const Tensor& self, const Tensor& other) {
 }
 
 } // namespace AtenIpexTypeXPU
+
+namespace AtenIpexTypeQuantizedXPU {
+bool equal(const Tensor& self, const Tensor& other) {
+  if (!other.is_quantized()) {
+    return false;
+  }
+
+  // Delegate to virtual equalTo method. This will ensure different concrete
+  // Quantizers can have specific logic for comparison
+  auto self_quantizer = get_qtensorimpl(self)->quantizer();
+  auto other_quantizer = get_qtensorimpl(other)->quantizer();
+  if (!self_quantizer->equalTo(other_quantizer)) {
+    return false;
+  }
+
+  // Sizes and element types must be the same
+  if (self.sizes() != other.sizes()) {
+    return false;
+  }
+  if (self.element_size() != other.element_size()) {
+    return false;
+  }
+
+  return at::AtenIpexTypeXPU::equal(self, other);
+}
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
