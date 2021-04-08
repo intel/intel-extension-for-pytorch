@@ -53,6 +53,10 @@ get_onednn_dtype(const at::Tensor& tensor) {
     return memory::data_type::u8;
   case at::ScalarType::Char:
     return memory::data_type::s8;
+  case at::ScalarType::QInt8:
+    return memory::data_type::s8;
+  case at::ScalarType::QUInt8:
+    return memory::data_type::u8;
   case at::ScalarType::Int:
     return memory::data_type::s32;
   case at::ScalarType::Half:
