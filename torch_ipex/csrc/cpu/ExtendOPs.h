@@ -38,7 +38,20 @@ class AtenIpexTypeExt {
   static at::Tensor interaction_forward(const std::vector<at::Tensor> & input);
   static std::vector<at::Tensor> interaction_backward(const at::Tensor & grad_out, 
                                                                      const std::vector<at::Tensor> & input);
+
+  static std::vector<at::Tensor> embedding_bag(
+      const at::Tensor &weight, const at::Tensor &indices,
+      const at::Tensor &offsets, bool scale_grad_by_freq, int64_t mode,
+      bool sparse, const c10::optional<at::Tensor> &per_sample_weights,
+      bool include_last_offset);
 };
 
 }  // namespace torch_ipex
 
+// namespace {
+// static auto dispatch =
+//     torch::RegisterOperators()
+//         // .op("torch_ipex::embedding_bag", &torch_ipex::AtenIpexTypeExt::embedding_bag)
+//         .op("torch_ipex::interaction_forward", &torch_ipex::AtenIpexTypeExt::interaction_forward)
+//         .op("torch_ipex::interaction_backward", &torch_ipex::AtenIpexTypeExt::interaction_backward);
+// }

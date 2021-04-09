@@ -111,7 +111,6 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor> &input) {
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("_interaction_forward", std::vector<c10::IValue>({}));
 #endif
-    printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   uint32_t vector_size = input[0].sizes()[1];
