@@ -4,11 +4,10 @@
 #include <ATen/core/op_registration/op_registration.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
+#include <ATen/ipex_type_dpcpp_customized.h>
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
-
 #include <utils/ParamUtils.h>
-
 #include "InnerProduct.h"
 #include "QUtil.h"
 
@@ -36,37 +35,19 @@ at::Tensor dpcppLinear(
     bias = at::empty({0}, input.options());
   }
 
-Tensor output;
-  if(weight.is_quantized()){
-    output = at::addmm(
-        bias,
-        input,
-        weight,
-        bias.is_quantized() ? bias.q_scale() : 1.f,
-        output_scale);
+  if (weight.is_quantized()) {
+    return at::addmm(bias, input, weight,
+        bias.is_quantized() ? bias.q_scale() : 1.f, output_scale);
   } else {
-    output = at::empty({input.size(0), weight.size(0)}, weight.options());
-  
-    int M = input.size(0);
-    int K = input.size(1);
-    int N = weight.size(0);
-    bool use_bias = pack_ptr->bias_.has_value();
-    inner_product(
-        M,
-        N,
-        K,
-        output,
-        input,
-        weight,
-        bias,
-        use_bias);
+    // omit transpose on weight
+    return trans_linear(
+        bias, input.is_quantized()? at::dequantize(input) : input, weight, 0.f, 1.f);
   }
-  return output;
 }
 
 TORCH_LIBRARY_IMPL(quantized, QuantizedXPU, m) {
   m.impl("quantized::linear", dpcppLinear);
 }
 
-} //namespace AtenIpexTypeQuantizedXPU 
+} //namespace AtenIpexTypeQuantizedXPU
 } // namespace at

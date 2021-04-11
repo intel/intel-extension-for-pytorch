@@ -32,7 +32,7 @@ at::Tensor linear_relu(const at::Tensor & input, const at::Tensor & weight, cons
 
 at::Tensor linear_sigmoid(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::Scalar beta=1.0f, at::Scalar alpha=1.0f);
 
-at::Tensor trans_linear(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::Scalar beta=1.0f, at::Scalar alpha=1.0f);
+at::Tensor trans_linear(const at::Tensor & input, const at::Tensor & m1, const at::Tensor & m2, at::Scalar beta=1.0f, at::Scalar alpha=1.0f);
 
 at::Tensor mul_add(const Tensor& self, const Tensor& other, const Tensor& accumu, Scalar alpha);
 
@@ -60,7 +60,11 @@ at::Tensor dequantize_tensor_per_tensor_affine(at::Tensor& rtensor, const at::Te
 
 at::Tensor dequantize_tensor_per_channel_affine(at::Tensor& rtensor, const at::Tensor& qtensor, const at::Tensor& scales, const at::Tensor& zero_points, int64_t axis);
 
-}
-}
+}}
+
+namespace at {
+namespace AtenIpexTypeQuantizedXPU {
+at::Tensor trans_linear(const at::Tensor & input, const at::Tensor & m1, const at::Tensor & m2, at::Scalar beta=1.0f, at::Scalar alpha=1.0f);
+}}
 
 #endif

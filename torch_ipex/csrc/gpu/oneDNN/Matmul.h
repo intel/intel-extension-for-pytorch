@@ -129,7 +129,7 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
   pattr.set_post_ops(po);
 
   std::vector<float> weight_scales;
-  if(m2.is_quantized()){
+  if (m2.is_quantized()) {
     if (m2.qscheme() == kPerTensorAffine) {
       weight_scales.push_back(static_cast<float>(m2.q_scale()));
     } else {
@@ -138,7 +138,7 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
     }
   }
 
-  if(m1.is_quantized()){
+  if (m1.is_quantized()) {
     auto in_scale = m1.q_scale();
     auto out_scale = dst.is_quantized()? dst.q_scale() : 1.f;
     std::vector<float> matmul_scale;
@@ -163,7 +163,8 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
 
   auto matmul_desc = matmul::desc(m1_md, m2_md, dst_md);
 
-  if (attr.beta_ == 1.f && attr.alpha_ == 1.f && (!m1.is_quantized()) && (!m2.is_quantized())) {
+  if (attr.beta_ == 1.f && attr.alpha_ == 1.f &&
+      (!m1.is_quantized()) && (!m2.is_quantized())) {
     auto b_dt = b.defined() ? dt_to_dnnl(b.scalar_type()) : memory::data_type::f32;
     if (b.sizes() != dst.sizes()) {
       memory::dims b_dims(dst.sizes().size() - 1, 1);
