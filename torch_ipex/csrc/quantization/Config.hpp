@@ -41,9 +41,8 @@ public:
 
   at::Tensor& get_indicator_weight_tensor_scale(const int64_t ops_id);
 
-  bool get_indicator_quantized_status(const int64_t ops_id);
 
-  std::tuple<bool, bool> get_indicator_insert_quantized_status(const int64_t ops_id);
+  std::tuple<std::vector<bool>, std::vector<bool>> get_indicator_insert_quantized_status(const int64_t ops_id);
 
   void set_indicators(std::vector<Indicator> indicators);
 

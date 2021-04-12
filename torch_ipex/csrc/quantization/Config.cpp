@@ -22,22 +22,23 @@ void Int8OptConfig::insert_or_updata_observer(
     std::string weight_granularity = "per_channel";
     const int nums_input = i_min_max_values.size();
     const int nums_output = o_min_max_values.size();
-    std::vector<bool> inputs_dtype_uint8(nums_input, false);
-    std::vector<bool> outputs_dtype_uint8(nums_output, false);
-    bool quantized = true, pre_quantized = true, post_quantized = true;
-    if (op_name == "relu_" || op_name == "add" || op_name == "add_") {
-      quantized = false;
-      pre_quantized = false;
-      post_quantized = false;
+    std::vector<std::string> input_quantized_dtypes(nums_input, "int8");
+    std::vector<std::string> output_quantized_dtypes(nums_output, "int8");
+    const auto num_inputs = i_min_max_values.size();
+    std::vector<bool> inputs_quantized(num_inputs, true);
+    const auto num_outputs = o_min_max_values.size();
+    std::vector<bool> outputs_quantized(num_outputs, true);
+    if (op_name == "relu_" || op_name == "add_") {
+      std::fill(inputs_quantized.begin(), inputs_quantized.end(), false);
+      std::fill(outputs_quantized.begin(), outputs_quantized.end(), false);
     }
     if (!indicators_.empty()) {
       observer_algorithm = indicators_[ops_id].get_indicator_algorithm();
       weight_granularity =
           indicators_[ops_id].get_indicator_weight_granularity();
-      std::tie(inputs_dtype_uint8, outputs_dtype_uint8) =
-          indicators_[ops_id].get_indicator_uint8_status();
-      quantized = indicators_[ops_id].get_indicator_quantized_status();
-      std::tie(pre_quantized, post_quantized) =
+      std::tie(input_quantized_dtypes, output_quantized_dtypes) =
+          indicators_[ops_id].get_indicator_quantized_dtypes();
+      std::tie(inputs_quantized, outputs_quantized) =
           indicators_[ops_id].get_indicator_insert_quantized_status();
     }
     Observer new_observer = {ops_id,
@@ -48,11 +49,10 @@ void Int8OptConfig::insert_or_updata_observer(
                              observer_algorithm,
                              averaging_constant,
                              weight_granularity,
-                             inputs_dtype_uint8,
-                             outputs_dtype_uint8,
-                             quantized,
-                             pre_quantized,
-                             post_quantized,
+                             input_quantized_dtypes,
+                             output_quantized_dtypes,
+                             inputs_quantized,
+                             outputs_quantized,
                              inputs_flow,
                              outputs_flow};
     observers_.push_back(new_observer);
@@ -97,7 +97,7 @@ void Int8OptConfig::add_indicators() {
   indicators_.clear();
   // default used is s8
   for (auto i = 0; i < observers_.size(); i++) {
-    std::vector<float> inputs_scale, outputs_scale;
+    std::vector<float> input_scales, output_scales;
     std::vector<float> weight_scales;
     std::vector<std::vector<float>> inputs_values =
         observers_[i].inputs_min_max_values;
@@ -111,11 +111,11 @@ void Int8OptConfig::add_indicators() {
     // otherwise: s = (x_max - x_min) / (Q_max - Q_min),
     // z = Q_min - round(x_min / s).
     for (auto i = 0; i < inputs_values.size(); i++) {
-      inputs_scale.push_back(
+      input_scales.push_back(
           std::max(std::abs(inputs_values[i][0]), inputs_values[i][1]) / 127.5);
     }
     for (auto j = 0; j < outputs_values.size(); j++) {
-      outputs_scale.push_back(
+      output_scales.push_back(
           std::max(std::abs(outputs_values[j][0]), outputs_values[j][1]) / 127.5);
     }
     for (auto j = 0; j < weight_values.size(); j++) {
@@ -126,9 +126,9 @@ void Int8OptConfig::add_indicators() {
     // zero_point = 128;
     Indicator new_indicator(
         observers_[i].id, observers_[i].name, observers_[i].algorithm,
-        observers_[i].weight_granularity, inputs_scale, weight_scales, outputs_scale,
-        observers_[i].inputs_dtype_uint8, observers_[i].outputs_dtype_uint8,
-        observers_[i].quantized, observers_[i].pre_quantized, observers_[i].post_quantized,
+        observers_[i].weight_granularity, input_scales, weight_scales, output_scales,
+        observers_[i].input_quantized_dtypes, observers_[i].output_quantized_dtypes,
+        observers_[i].inputs_quantized, observers_[i].outputs_quantized,
         observers_[i].inputs_flow, observers_[i].outputs_flow);
     indicators_.push_back(new_indicator);
   }
@@ -163,11 +163,8 @@ at::Tensor& Int8OptConfig::get_indicator_weight_tensor_scale(const int64_t ops_i
   return weights_scales_[ops_id];
 }
 
-bool Int8OptConfig::get_indicator_quantized_status(const int64_t ops_id) {
-  return indicators_[ops_id].get_indicator_quantized_status();
-}
-
-std::tuple<bool, bool> Int8OptConfig::get_indicator_insert_quantized_status(const int64_t ops_id) {
+std::tuple<std::vector<bool>, std::vector<bool>>
+Int8OptConfig::get_indicator_insert_quantized_status(const int64_t ops_id) {
    return indicators_[ops_id].get_indicator_insert_quantized_status();
 }
 

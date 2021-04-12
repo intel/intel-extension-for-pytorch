@@ -19,35 +19,33 @@ struct Observer {
   // only useful for conv, onednn only support per_channel foo conv's weight,
   // default is per_channel
   std::string weight_granularity = "per_channel";
-  // ture means input will be quantized to int8, otherwise quantized to uint8.
-  std::vector<bool> inputs_dtype_uint8 = {false};
-  std::vector<bool> outputs_dtype_uint8 = {false};
-  bool quantized = true;
-  bool pre_quantized = true;
-  bool post_quantized = true;
+  // "int8" means input will be quantized to int8, otherwise quantized to "uint8".
+  std::vector<std::string> input_quantized_dtypes;
+  std::vector<std::string> output_quantized_dtypes;
+  std::vector<bool> inputs_quantized;
+  std::vector<bool> outputs_quantized;
   std::vector<std::string> inputs_flow;
   std::vector<std::string> outputs_flow;
 };
 
 class Indicator {
 public:
-  Indicator(int64_t i = 0, std::string n = "",
-            std::string alg = "min_max",
-            std::string granu = "per_channel",
-            std::vector<float> i_scale = {1},
-            std::vector<float> w_scales = {},
-            std::vector<float> o_scale = {1},
-            std::vector<bool> i_uint8_used = {false},
-            std::vector<bool> o_uint8_used = {false},
-            bool quant = true,
-            bool pre_quant = true,
-            bool post_quant = true,
-            std::vector<std::string> i_flow = {},
-            std::vector<std::string> o_flow = {})
+  Indicator(int64_t i, std::string n,
+            std::string alg,
+            std::string granu,
+            std::vector<float> i_scale,
+            std::vector<float> w_scales,
+            std::vector<float> o_scale,
+            std::vector<std::string> i_quantized_dtype,
+            std::vector<std::string> o_quantized_dtype,
+            std::vector<bool> inputs_quant,
+            std::vector<bool> outputs_quant,
+            std::vector<std::string> i_flow,
+            std::vector<std::string> o_flow )
       : id(i), name(n), algorithm(alg), weight_granularity(granu),
         inputs_scale(i_scale), weight_scales(std::move(w_scales)), outputs_scale(o_scale),
-        inputs_uint8_used(i_uint8_used), outputs_uint8_used(o_uint8_used),
-        quantized(quant), pre_quantized(pre_quant), post_quantized(post_quant),
+        input_quantized_dtypes(i_quantized_dtype), output_quantized_dtypes(o_quantized_dtype),
+        inputs_quantized(inputs_quant), outputs_quantized(outputs_quant),
         inputs_flow(i_flow), outputs_flow(o_flow) {}
 
     Indicator(const Indicator& other){
@@ -59,11 +57,10 @@ public:
       inputs_scale = other.inputs_scale;
       weight_scales = other.weight_scales;
       outputs_scale = other.outputs_scale;
-      inputs_uint8_used = other.inputs_uint8_used;
-      outputs_uint8_used = other.outputs_uint8_used;
-      quantized = other.quantized;
-      pre_quantized = other.pre_quantized;
-      post_quantized = other.post_quantized;
+      input_quantized_dtypes = other.input_quantized_dtypes;
+      output_quantized_dtypes = other.output_quantized_dtypes;
+      inputs_quantized = other.inputs_quantized;
+      outputs_quantized = other.outputs_quantized;
       inputs_flow = other.inputs_flow;
       outputs_flow = other.outputs_flow;
     }
@@ -85,16 +82,14 @@ public:
     return weight_scales;
   }
 
-  std::tuple<std::vector<bool>, std::vector<bool>>
-  get_indicator_uint8_status() {
+  std::tuple<std::vector<std::string>, std::vector<std::string>>
+  get_indicator_quantized_dtypes() {
     UniqueReadLock<ReadWriteMutex> lock(rwmutex);
-    return std::make_tuple(inputs_uint8_used, outputs_uint8_used);
+    return std::make_tuple(input_quantized_dtypes, output_quantized_dtypes);
   }
 
-  bool get_indicator_quantized_status() { return quantized; }
-
-  std::tuple<bool, bool> get_indicator_insert_quantized_status() {
-    return std::make_tuple(pre_quantized, post_quantized);
+  std::tuple<std::vector<bool>, std::vector<bool>> get_indicator_insert_quantized_status() {
+    return std::make_tuple(inputs_quantized, outputs_quantized);
   }
 
   void set_indicator_scales(std::vector<float> new_inputs_scale,
@@ -104,15 +99,11 @@ public:
     outputs_scale = new_outputs_scale;
   }
 
-  void set_indicator_uint8_status(std::vector<bool> new_inputs_uint8_used,
-                                  std::vector<bool> new_outputs_uint8_used) {
+  void set_indicator_quantized_dtypes(std::vector<std::string> new_input_quantized_dtypes,
+                                  std::vector<std::string> new_output_quantized_dtypes) {
     UniqueWriteLock<ReadWriteMutex> lock(rwmutex);
-    inputs_uint8_used = new_inputs_uint8_used;
-    outputs_uint8_used = new_outputs_uint8_used;
-  }
-
-  void set_indicator_quantized_status(bool new_quantized) {
-    quantized = new_quantized;
+    input_quantized_dtypes = new_input_quantized_dtypes;
+    output_quantized_dtypes = new_output_quantized_dtypes;
   }
 
   std::tuple<std::vector<std::string>, std::vector<std::string>> get_indicator_quantized_flow() {
@@ -127,11 +118,10 @@ private:
   std::vector<float> inputs_scale;
   std::vector<float> weight_scales;
   std::vector<float> outputs_scale;
-  std::vector<bool> inputs_uint8_used;
-  std::vector<bool> outputs_uint8_used;
-  bool quantized;
-  bool pre_quantized;
-  bool post_quantized;
+  std::vector<std::string> input_quantized_dtypes;
+  std::vector<std::string> output_quantized_dtypes;
+  std::vector<bool> inputs_quantized;
+  std::vector<bool> outputs_quantized;
   std::vector<std::string> inputs_flow;
   std::vector<std::string> outputs_flow;
   mutable ReadWriteMutex rwmutex;

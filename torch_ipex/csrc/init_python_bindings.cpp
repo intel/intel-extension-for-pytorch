@@ -81,22 +81,20 @@ void InitIpexModuleBindings(py::module m) {
         d["name"] = indicator.get_indicator_name();
         d["algorithm"] = indicator.get_indicator_algorithm();
         d["weight_granularity"] = indicator.get_indicator_weight_granularity();
-        std::vector<float> i_scale, o_scale;
-        std::vector<float> w_scale;
-        std::tie(i_scale, o_scale) = indicator.get_indicator_scales();
-        w_scale = indicator.get_indicator_weight_scales();
-        d["inputs_scale"] = i_scale;
-        d["outputs_scale"] = o_scale;
-        d["weight_scale"] = w_scale; 
-        std::vector<bool> i_uint8_used, o_uint8_used;
-        std::tie(i_uint8_used, o_uint8_used)= indicator.get_indicator_uint8_status();
-        d["inputs_uint8_used"] = i_uint8_used;
-        d["outputs_uint8_used"] = o_uint8_used;
-        d["quantized"] = indicator.get_indicator_quantized_status();
-        bool pre_quant = true, post_quant = true;
-        std::tie(pre_quant, post_quant) = indicator.get_indicator_insert_quantized_status(); 
-        d["pre_quantized"] = pre_quant;
-        d["post_quantized"] = post_quant;
+        std::vector<float> i_scales, o_scales;
+        std::tie(i_scales, o_scales) = indicator.get_indicator_scales();
+        std::vector<float> w_scales = indicator.get_indicator_weight_scales();
+        d["input_scales"] = i_scales;
+        d["output_scales"] = o_scales;
+        d["weight_scales"] = w_scales; 
+        std::vector<std::string> i_quantized_dtypes, o_quantized_dtypes;
+        std::tie(i_quantized_dtypes, o_quantized_dtypes)= indicator.get_indicator_quantized_dtypes();
+        d["input_quantized_dtypes"] = i_quantized_dtypes;
+        d["output_quantized_dtypes"] = o_quantized_dtypes;
+        std::vector<bool> inputs_quantized, outputs_quantized;
+        std::tie(inputs_quantized, outputs_quantized) = indicator.get_indicator_insert_quantized_status(); 
+        d["inputs_quantized"] = inputs_quantized;
+        d["outputs_quantized"] = outputs_quantized;
         std::vector<std::string> inputs_flow, outputs_flow;
         std::tie(inputs_flow, outputs_flow) = indicator.get_indicator_quantized_flow();
         d["inputs_flow"] = inputs_flow;
@@ -112,37 +110,22 @@ void InitIpexModuleBindings(py::module m) {
       std::string algorithm = py::cast<std::string>(i["algorithm"]);
       std::string weight_granularity =
           py::cast<std::string>(i["weight_granularity"]);
-      std::vector<float> i_scale =
-          py::cast<std::vector<float>>(i["inputs_scale"]);
-      std::vector<float> w_scale = {};
-      if (i.contains("weight_scale")) {
-        w_scale = py::cast<std::vector<float>>(i["weight_scale"]);
-
-      }
-      std::vector<float> o_scale =
-          py::cast<std::vector<float>>(i["outputs_scale"]);
-      std::vector<bool> i_uint8_used =
-          py::cast<std::vector<bool>>(i["inputs_uint8_used"]);
-      std::vector<bool> o_uint8_used =
-          py::cast<std::vector<bool>>(i["outputs_uint8_used"]);
-      bool quantized = py::cast<bool>(i["quantized"]);
-      bool pre_quantized = true, post_quantized = true;
-      if (i.contains("pre_quantized")) {
-        pre_quantized = py::cast<bool>(i["pre_quantized"]);
-      }
-      if (i.contains("post_quantized")) {
-        post_quantized = py::cast<bool>(i["post_quantized"]);
-      }
-      std::vector<std::string> inputs_flow, outputs_flow;
-      if (i.contains("inputs_flow")) {
-        inputs_flow = py::cast<std::vector<std::string>>(i["inputs_flow"]);
-      }
-      if (i.contains("outputs_flow")) {
-        outputs_flow = py::cast<std::vector<std::string>>(i["outputs_flow"]);
-      }
-      Indicator temp(id, op_name, algorithm, weight_granularity, i_scale,
-                     w_scale, o_scale, i_uint8_used, o_uint8_used, quantized,
-                     pre_quantized, post_quantized, inputs_flow, outputs_flow);
+      std::vector<float> i_scales =
+          py::cast<std::vector<float>>(i["input_scales"]);
+      std::vector<float> w_scales = py::cast<std::vector<float>>(i["weight_scales"]);
+      std::vector<float> o_scales =
+          py::cast<std::vector<float>>(i["output_scales"]);
+      std::vector<std::string> i_quantized_dtypes =
+          py::cast<std::vector<std::string>>(i["input_quantized_dtypes"]);
+      std::vector<std::string> o_quantized_dtypes =
+          py::cast<std::vector<std::string>>(i["output_quantized_dtypes"]);
+      std::vector<bool> inputs_quantized = py::cast<std::vector<bool>>(i["inputs_quantized"]);
+      std::vector<bool> outputs_quantized = py::cast<std::vector<bool>>(i["outputs_quantized"]);
+      std::vector<std::string> inputs_flow = py::cast<std::vector<std::string>>(i["inputs_flow"]);
+      std::vector<std::string> outputs_flow = py::cast<std::vector<std::string>>(i["outputs_flow"]);
+      Indicator temp(id, op_name, algorithm, weight_granularity, i_scales,
+                     w_scales, o_scales, i_quantized_dtypes, o_quantized_dtypes,
+                     inputs_quantized, outputs_quantized, inputs_flow, outputs_flow);
       indicators.push_back(temp);
     }
     Int8OptConfig::get_config().set_indicators(indicators);

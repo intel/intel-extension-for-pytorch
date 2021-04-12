@@ -31,6 +31,6 @@ at::Tensor& get_int8_weight_tensor_scale(const int64_t ops_id);
 
 bool get_int8_quantized_status(const int64_t ops_id);
 
-std::tuple<bool, bool> get_int8_insert_quantized_status(const int64_t ops_id);
+std::tuple<std::vector<bool>, std::vector<bool>> get_int8_insert_quantized_status(const int64_t ops_id);
 
 }
