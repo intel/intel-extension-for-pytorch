@@ -56,17 +56,17 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
   }
   // ipex matmul support both ab/ba shape for m2 tensor, we don't check any more
 
-  auto m1_dt = dt_to_dnnl(m1.scalar_type());
-  auto m2_dt = dt_to_dnnl(m2.scalar_type());
-  auto dst_dt = dt_to_dnnl(dst.scalar_type());
+  auto m1_usr_dt = dt_to_dnnl(m1.scalar_type());
+  auto m2_usr_dt = dt_to_dnnl(m2.scalar_type());
+  auto dst_usr_dt = dt_to_dnnl(dst.scalar_type());
 
-  auto m1_usr_dt = m1_dt;
-  auto m2_usr_dt = m2_dt;
-  auto dst_usr_dt = dst_dt;
+  auto m1_dt = m1_usr_dt;
+  auto m2_dt = m2_usr_dt;
+  auto dst_dt = dst_usr_dt;
 
-  memory::desc m1_md, m1_any_md;
-  memory::desc m2_md, m2_any_md;
-  memory::desc dst_md, dst_any_md;
+  memory::desc m1_md, m1_usr_md, m1_any_md;
+  memory::desc m2_md, m2_usr_md, m2_any_md;
+  memory::desc dst_md, dst_usr_md, dst_any_md;
   memory::desc b_md;
 
   // STEP1: create memory desc
@@ -87,6 +87,12 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
             memory::desc({k, n}, m2_dt, {m2.stride(1), m2.stride(0)});
     dst_md = memory::desc({m, n}, dst_dt, {dst.stride(0), dst.stride(1)});
 
+    m1_usr_md = memory::desc({m, k}, m1_usr_dt, {m1.stride(0), m1.stride(1)});
+    m2_usr_md = attr.m2_trans_ ?
+                memory::desc({k, n}, m2_usr_dt, {m2.stride(0), m2.stride(1)}) :
+                memory::desc({k, n}, m2_usr_dt, {m2.stride(1), m2.stride(0)});
+    dst_usr_md = memory::desc({m, n}, dst_usr_dt, {dst.stride(0), dst.stride(1)});
+
     m1_any_md = memory::desc({m, k}, m1_dt, memory::format_tag::any);
     m2_any_md = memory::desc({k, n}, m2_dt, memory::format_tag::any);
     dst_any_md = memory::desc({m, n}, dst_dt, memory::format_tag::any);
@@ -96,6 +102,12 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
             memory::desc({mb, k, n}, m2_dt, {m2.stride(0), m2.stride(1), m2.stride(2)}) :
             memory::desc({mb, k, n}, m2_dt, {m2.stride(0), m2.stride(2), m2.stride(1)});
     dst_md = memory::desc({mb, m, n}, dst_dt, {dst.stride(0), dst.stride(1), dst.stride(2)});
+
+    m1_usr_md = memory::desc({mb, m, k}, m1_usr_dt, {m1.stride(0), m1.stride(1), m1.stride(2)});
+    m2_usr_md = attr.m2_trans_ ?
+                memory::desc({mb, k, n}, m2_usr_dt, {m2.stride(0), m2.stride(1), m2.stride(2)}) :
+                memory::desc({mb, k, n}, m2_usr_dt, {m2.stride(0), m2.stride(2), m2.stride(1)});
+    dst_usr_md = memory::desc({mb, m, n}, dst_usr_dt, {dst.stride(0), dst.stride(1), dst.stride(2)});
   }
 
   // STEP2: creat attribute
@@ -218,17 +230,17 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
   // STEP4: create memory
   auto m1_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m1);
   auto m1_usr_m = m1_ctx.is_plain() ?
-      dpcpp_onednn_memory(m1_md, engine, m1.data_ptr()) :
+      dpcpp_onednn_memory(m1_usr_md, engine, m1.data_ptr()) :
       dpcpp_onednn_memory({m1_ctx.meta()}, engine, m1.data_ptr());
 
   auto m2_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(m2);
   auto m2_usr_m = m2_ctx.is_plain() ?
-      dpcpp_onednn_memory(m2_md, engine, m2.data_ptr()) :
+      dpcpp_onednn_memory(m2_usr_md, engine, m2.data_ptr()) :
       dpcpp_onednn_memory({m2_ctx.meta()}, engine, m2.data_ptr());
 
   auto dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(dst);
   auto dst_usr_m = dst_ctx.is_plain() ?
-      dpcpp_onednn_memory(dst_md, engine, dst.data_ptr()) :
+      dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr()) :
       dpcpp_onednn_memory({dst_ctx.meta()}, engine, dst.data_ptr());
 
   auto expected_m1_md = matmul_pd.src_desc();
@@ -262,7 +274,7 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
   }
 
   // bias add for gen12hp platform
-  if (dst_md != expected_dst_md) {
+  if (dst_usr_m.get_desc() != expected_dst_md) {
     dst_ = empty_opaque_tensor(expected_dst_md, dst.options(), c10::nullopt);
     dst_m = dpcpp_onednn_memory(expected_dst_md, engine, dst_.data_ptr());
     if (attr.beta_ != 1.f)
