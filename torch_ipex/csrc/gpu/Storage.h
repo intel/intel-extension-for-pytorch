@@ -7,11 +7,10 @@
 #include <structmember.h>
 #include <torch/csrc/autograd/utils/wrap_outputs.h>
 #include <torch/csrc/copy_utils.h>
-//#include <torch/csrc/utils/pycfunction_helpers.h>
 #include <ATen/AtenIpexTypeXPU.h>
 #include <core/Memory.h>
 
-#ifdef USE_PSTL
+#if defined(USE_ONEDPL)
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
 #include <oneapi/dpl/numeric>
@@ -43,6 +42,11 @@ AT_FORALL_SCALAR_TYPES_WITH_COMPLEX_AND_QINTS(DECLEAR_UNPACK)
 AT_FORALL_SCALAR_TYPES_WITH_COMPLEX_AND_QINTS(DECLEAR_NEW)
 #undef DECLEAR_NEW
 
+#define DECLEAR_CHECK(s, n) template <> \
+                             bool THPUtils_checkReal<s>(PyObject*);
+AT_FORALL_SCALAR_TYPES_WITH_COMPLEX_AND_QINTS(DECLEAR_CHECK)
+#undef DECLEAR_CHECK
+
 struct THXP_Storage {
   PyObject_HEAD
   at::StorageImpl *cdata;
@@ -68,8 +72,8 @@ public:
   static void THXStorage_copyToCPU(at::StorageImpl * cpu, at::StorageImpl * xpu_src) {
     // std::cout << "copyToCPU" << std::endl;
     using src_scalar_t = typename c10::impl::ScalarTypeToCPPType<cpuType>::type;
-    at::TensorImpl *selfTensor = THXSTensor_newWithStorage1d(cpu, 0, cpu->nbytes() / sizeof(scalar_t), 1, at::DispatchKey::CPU);
-    at::TensorImpl *srcTensor = THXSTensor_newWithStorage1d(xpu_src, 0, xpu_src->nbytes() / sizeof(src_scalar_t), 1,at::DispatchKey::XPU);
+    at::TensorImpl *selfTensor = THXSTensor_newWithStorage1d<cpuType>(cpu, 0, cpu->nbytes() / sizeof(scalar_t), 1, at::DispatchKey::CPU);
+    at::TensorImpl *srcTensor = THXSTensor_newWithStorage1d<scalarType>(xpu_src, 0, xpu_src->nbytes() / sizeof(src_scalar_t), 1,at::DispatchKey::XPU);
     THXTensor_copy(selfTensor, srcTensor);
     THTensor_free(selfTensor);
     THTensor_free(srcTensor);
@@ -120,9 +124,11 @@ public:
                              storageOffset_, size_, stride_);
   }
 
+  template <at::ScalarType T>
   static at::TensorImpl *THXSTensor_newWithStorage1d(at::StorageImpl *storage, ptrdiff_t storageOffset,
                                           int64_t size0, int64_t stride0, at::DispatchKey key)
   {
+    using scalar_t = typename c10::impl::ScalarTypeToCPPType<T>::type;
     c10::raw::intrusive_ptr::incref(storage);
     THTensor* self = c10::make_intrusive<at::TensorImpl, at::UndefinedTensorImpl>(
             c10::intrusive_ptr<at::StorageImpl>::reclaim(storage),
@@ -143,10 +149,9 @@ public:
 
   template <at::ScalarType cpuType>
   static void THXStorage_copyFromCPU(at::StorageImpl * xpu, at::StorageImpl * cpu_src) {
-    // std::cout << "copyFromCPU" << std::endl;
     using src_scalar_t = typename c10::impl::ScalarTypeToCPPType<cpuType>::type;
-    at::TensorImpl *selfTensor = THXSTensor_newWithStorage1d(xpu, 0, xpu->nbytes() / sizeof(scalar_t), 1, at::DispatchKey::XPU);
-    at::TensorImpl *srcTensor = THXSTensor_newWithStorage1d(cpu_src, 0, cpu_src->nbytes() / sizeof(src_scalar_t), 1,at::DispatchKey::CPU);
+    at::TensorImpl *selfTensor = THXSTensor_newWithStorage1d<scalarType>(xpu, 0, xpu->nbytes() / sizeof(scalar_t), 1, at::DispatchKey::XPU);
+    at::TensorImpl *srcTensor = THXSTensor_newWithStorage1d<cpuType>(cpu_src, 0, cpu_src->nbytes() / sizeof(src_scalar_t), 1,at::DispatchKey::CPU);
     THXTensor_copy(selfTensor, srcTensor);
     THTensor_free(selfTensor);
     THTensor_free(srcTensor);
@@ -154,13 +159,32 @@ public:
 
   template <>
   static void THXStorage_copyFromCPU<scalarType>(at::StorageImpl * xpu, at::StorageImpl * cpu_src) {
-    // std::cout << "copyFromCPU" << std::endl;
     THArgCheck(xpu->nbytes() == cpu_src->nbytes(), 2, "size does not match");
     at::dpcpp::dpcppMemcpy(
             xpu->data(),
             cpu_src->data(),
             xpu->nbytes(),
             at::dpcpp::dpcppMemcpyKind::HostToDevice);
+  }
+
+  template <at::ScalarType srcType>
+  static void THXStorage_copyFromXPU(at::StorageImpl * xpu, at::StorageImpl * xpu_src) {
+    using src_scalar_t = typename c10::impl::ScalarTypeToCPPType<srcType>::type;
+    at::TensorImpl *selfTensor = THXSTensor_newWithStorage1d<scalarType>(xpu, 0, xpu->nbytes() / sizeof(scalar_t), 1, at::DispatchKey::XPU);
+    at::TensorImpl *srcTensor = THXSTensor_newWithStorage1d<srcType>(xpu_src, 0, xpu_src->nbytes() / sizeof(src_scalar_t), 1,at::DispatchKey::XPU);
+    THXTensor_copy(selfTensor, srcTensor);
+    THTensor_free(selfTensor);
+    THTensor_free(srcTensor);
+  }
+
+  template <>
+  static void THXStorage_copyFromXPU<scalarType>(at::StorageImpl * xpu, at::StorageImpl * xpu_src) {
+    THArgCheck(xpu->nbytes() == xpu_src->nbytes(), 2, "size does not match");
+    at::dpcpp::dpcppMemcpy(
+            xpu->data(),
+            xpu_src->data(),
+            xpu->nbytes(),
+            at::dpcpp::dpcppMemcpyKind::DeviceToDevice);
   }
 //#if !defined(THC_REAL_IS_COMPLEXFLOAT) && !defined(THC_REAL_IS_COMPLEXDOUBLE)
 ////  THC_XPU_STORAGE_IMPLEMENT_COPY(Byte,Byte)
@@ -390,7 +414,7 @@ public:
 
   static void THXStorage_fill(at::StorageImpl *storage, scalar_t value)
   {
-#ifdef USE_PSTL
+#if defined(USE_ONEDPL)
     //TODO: only dpcpp runtime here. naive CPU TBD.
     auto dpcpp_queue = at::dpcpp::dpcppGetCurrentQueue();
     auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
@@ -885,6 +909,17 @@ public:
     THPInsertStorageCopyFunction<THPStorage, THPStorage>(&THPBoolStorageType, h, &THXStorage_copyFromCPU<at::kBool>);
     THPInsertStorageCopyFunction<THPStorage, THPStorage>(&THPBFloat16StorageType, h, &THXStorage_copyFromCPU<at::kBFloat16>);
 
+    THPInsertStorageCopyFunction<THPStorage, THPStorage>(THXPStorage_Bridge<at::kByte>::THXPStorage_Type, h, &THXStorage_copyFromXPU<at::kByte>);
+    THPInsertStorageCopyFunction<THPStorage, THPStorage>(THXPStorage_Bridge<at::kChar>::THXPStorage_Type, h, &THXStorage_copyFromXPU<at::kChar>);
+    THPInsertStorageCopyFunction<THPStorage, THPStorage>(THXPStorage_Bridge<at::kShort>::THXPStorage_Type, h, &THXStorage_copyFromXPU<at::kShort>);
+    THPInsertStorageCopyFunction<THPStorage, THPStorage>(THXPStorage_Bridge<at::kInt>::THXPStorage_Type, h, &THXStorage_copyFromXPU<at::kInt>);
+    THPInsertStorageCopyFunction<THPStorage, THPStorage>(THXPStorage_Bridge<at::kLong>::THXPStorage_Type, h, &THXStorage_copyFromXPU<at::kLong>);
+    THPInsertStorageCopyFunction<THPStorage, THPStorage>(THXPStorage_Bridge<at::kHalf>::THXPStorage_Type, h, &THXStorage_copyFromXPU<at::kHalf>);
+    THPInsertStorageCopyFunction<THPStorage, THPStorage>(THXPStorage_Bridge<at::kFloat>::THXPStorage_Type, h, &THXStorage_copyFromXPU<at::kFloat>);
+    THPInsertStorageCopyFunction<THPStorage, THPStorage>(THXPStorage_Bridge<at::kDouble>::THXPStorage_Type, h, &THXStorage_copyFromXPU<at::kDouble>);
+    THPInsertStorageCopyFunction<THPStorage, THPStorage>(THXPStorage_Bridge<at::kBool>::THXPStorage_Type, h, &THXStorage_copyFromXPU<at::kBool>);
+    THPInsertStorageCopyFunction<THPStorage, THPStorage>(THXPStorage_Bridge<at::kBFloat16>::THXPStorage_Type, h, &THXStorage_copyFromXPU<at::kBFloat16>);
+
     // from this storage to CPU.
 #define THXP_STORAGE_COPY_TO_CPU(TYPE) extern THPCopyList TH##TYPE##Storage_copy_functions; \
     THPInsertStorageCopyFunction<THPStorage, THPStorage>(THXPStorage_Type, TH##TYPE##Storage_copy_functions, &THXStorage_copyToCPU<at::k##TYPE>);
@@ -1096,7 +1131,6 @@ bool THXPStorage_init(PyObject *module)
   Py_INCREF(&THXPStorage_Type);
   PyModule_AddObject(module, module_name.c_str(), (PyObject *)&THXPStorage_Type);
   THXPStorage_Bridge<scalarType>::THXPStorage_Type = &THXPStorage_Type;
-  THXPStorage_Bridge<scalarType>::THXPStorage_initCopyMethods();
 
   return true;
 }
@@ -1104,6 +1138,9 @@ bool THXPStorage_init(PyObject *module)
 template <at::ScalarType scalarType>
 void THXPStorage_postInit(PyObject *module)
 {
+  // Initialize the copy method.
+  THXPStorage_Bridge<scalarType>::THXPStorage_initCopyMethods();
+
   std::string module_name(toString(scalarType));
   module_name.append("Storage");
   THXPStorage_Bridge<scalarType>::THXPStorage_Class = PyObject_GetAttrString(module,(char*)module_name.c_str());
