@@ -1,6 +1,5 @@
 import torch
 from torch.optim.optimizer import Optimizer, required
-import _torch_ipex
 
 _available = False
 try:

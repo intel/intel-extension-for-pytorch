@@ -67,10 +67,15 @@ static inline at::Tensor _embedding_bag_index_add_select_fast(const at::Tensor s
   at::parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
     for (int64_t i = start; i < end; i++) {
       auto* out_data_ptr = &output_data[i * ddim];
-      zero_ker((T*)out_data_ptr, ddim);
       auto inputs_start = offsets_data[i];
       auto inputs_end = offsets_data[i + 1];
-      for (int64_t s = inputs_start; s < inputs_end; s++) {
+      if (inputs_start >= inputs_end) {
+        zero_ker((T*)out_data_ptr, ddim);
+      } else {
+        T* select_data_ptr = &src_data[indices_accessor[inputs_start] * ddim];
+        move_ker((T *)out_data_ptr, (T *)select_data_ptr, ddim);
+      }
+      for (int64_t s = (inputs_start + 1); s < inputs_end; s++) {
         T* select_data_ptr = &src_data[indices_accessor[s] * ddim];
         add_ker((T *)out_data_ptr, (T *)select_data_ptr, ddim);
       }
