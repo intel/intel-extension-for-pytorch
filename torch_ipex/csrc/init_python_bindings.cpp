@@ -36,6 +36,9 @@
 #include <c10/core/DeviceType.h>
 #include <torch/csrc/Exceptions.h>
 
+#include "cpu/toolkit/sklearn.h"
+#include "cpu/toolkit/thread.h"
+
 namespace torch_ipex {
 namespace {
 
@@ -244,6 +247,8 @@ void InitIpexModuleBindings(py::module m) {
   m.def("nms", &IpexExternal::nms);
   m.def("batch_score_nms", &IpexExternal::batch_score_nms);
   m.def("linear_relu", &AtenIpexTypeExt::linear_relu);
+  m.def("roc_auc_score", &toolkit::roc_auc_score);
+  m.def("thread_bind", &toolkit::thread_bind);
 }
 }  // namespace
 using namespace torch::jit;

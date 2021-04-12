@@ -145,6 +145,9 @@ void AtenIpexTypeExt::packed_add_(at::Tensor &top_half, at::Tensor &bot_half,
 template <typename T>
 static inline void cat(const T *in1, const T *in2, T *out, size_t in1_size,
                        size_t in2_size) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("ExtendOps::_cat", std::vector<c10::IValue>({}));
+#endif
   move_ker(out, in1, in1_size);
   move_ker(&out[in1_size], in2, in2_size);
 }
@@ -159,6 +162,9 @@ static inline void cat_backward(const T *in, T *out1, T *out2, size_t out1_size,
 template <typename T>
 static inline void cat(T *out, const std::vector<T *> &in,
                        const std::vector<uint32_t> &feature_sizes, int64_t bs) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("ExtendOps::_cat_array", std::vector<c10::IValue>({}));
+#endif
   size_t offset = 0;
   for (int j = 0; j < feature_sizes.size(); j++) {
     move_ker(&out[offset], &in[j][bs * feature_sizes[j]], feature_sizes[j]);
@@ -180,6 +186,9 @@ static inline void cat_backward(const T *in, std::vector<T *> &out,
 
 template <typename T>
 static inline void flat_triangle(const T *in, T *out, size_t size) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("ExtendOps::_flat_triangle", std::vector<c10::IValue>({}));
+#endif
   size_t offset = 0;
   for (int i = 1; i < size; i++) {
     move_ker(&out[offset], &in[i * size], i);
@@ -190,9 +199,8 @@ static inline void flat_triangle(const T *in, T *out, size_t size) {
 template <typename T>
 static inline void flat_triangle_backward(const T *in, T *out, size_t size) {
   size_t offset = 0;
-  for (int i = 0; i < size * size; i++) {
-    out[i] = 0.f;
-  }
+  zero_ker(out, size*size);
+  #pragma unroll(2)
   for (int i = 1; i < size; i++) {
     move_ker(&out[i * size], &in[offset], i);
     offset += i;
@@ -243,9 +251,10 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor> &input) {
   uint32_t total_feature_size = 0;
   int64_t batch_size = input[0].sizes()[0];
   uint32_t vector_size = input[0].sizes()[1];
-  std::vector<uint32_t> feature_sizes(input.size());
-  std::vector<T *> input_data(input.size());
-  for (int i = 0; i < input.size(); i++) {
+  uint32_t input_size = input.size();
+  std::vector<uint32_t> feature_sizes(input_size);
+  std::vector<T *> input_data(input_size);
+  for (int i = 0; i < input_size; i++) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].is_contiguous());
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].device().is_xpu());
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].dim() == 2);
@@ -260,6 +269,7 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor> &input) {
   auto out = at::empty({batch_size, interact_feature_size + vector_size},
                        input[0].options());
   auto out_data = out.data_ptr<T>();
+  auto out_data_line_len = interact_feature_size + vector_size;
 
   auto mm_kernel = get_mm_kernel<T>(vector_nums, vector_nums, vector_size);
   auto tr_kernel = get_tr_kernel(tr_vector_size, vector_nums, vector_nums);
@@ -268,16 +278,14 @@ inline at::Tensor _interaction_forward(const std::vector<at::Tensor> &input) {
     T cat_buf[vector_nums * vector_size];
     T tr_buf[vector_nums * vector_size];
     T mm_buf[vector_nums * vector_nums];
-    T flat_buf[interact_feature_size];
     for (int64_t i = start; i < end; i++) {
       cat<T>(cat_buf, input_data, feature_sizes, i);
       tr_kernel(cat_buf, &tr_vector_size, tr_buf, &vector_nums);
+      move_ker(&out_data[i * out_data_line_len], &input_data[0][i * vector_size], vector_size);
       mm_kernel((xsmm_dtype<T> *)tr_buf, (xsmm_dtype<T> *)cat_buf,
                 (xsmm_dtype<T> *)mm_buf);
+      T* flat_buf = (T*)(&out_data[i * out_data_line_len] + vector_size);
       flat_triangle<T>(mm_buf, flat_buf, vector_nums);
-      cat<T>(&input_data[0][i * vector_size], flat_buf,
-             &out_data[i * (interact_feature_size + vector_size)], vector_size,
-             interact_feature_size);
     }
   });
 
