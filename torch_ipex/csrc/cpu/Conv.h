@@ -37,14 +37,5 @@ void convolution_inplace_impl(
     int64_t groups,
     const ideep::attr_t& attr);
 
-// void prepack_conv_weights(
-//     const at::Tensor& input,
-//     const at::Tensor& dil_input,
-//     const at::Tensor& weight,
-//     at::IntArrayRef stride,
-//     at::IntArrayRef padding,
-//     at::IntArrayRef dilation,
-//     int64_t groups);
-
 }  // namespace cpu
 }  // namespace torch_ipex

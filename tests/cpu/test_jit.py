@@ -472,11 +472,11 @@ class Tester(TestCase):
         with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
             # bf16, native path
             result = model(x)
-            script_fused_model = torch.jit.script(copy.deepcopy(model))
+            # script_fused_model = torch.jit.script(copy.deepcopy(model))
             trace_fused_model = torch.jit.trace(copy.deepcopy(model), x3)
             # bf16, jit script path
-            script_graph =  script_fused_model.graph_for(x2)
-            fused_sresult = script_fused_model(x2)
+            # script_graph =  script_fused_model.graph_for(x2)
+            # fused_sresult = script_fused_model(x2)
             # bf 16, jit trace path
             trace_graph = trace_fused_model.graph_for(x3)
             fused_tresult = trace_fused_model(x3)
@@ -485,20 +485,20 @@ class Tester(TestCase):
         # to avoid affecting other scripts
         # core.disable_mix_bf16_fp32()
 
-        self.assertEqual(fused_sresult, result, prec=prec)
+        # self.assertEqual(fused_sresult, result, prec=prec)
         self.assertEqual(fused_tresult, result, prec=prec)
-        self.assertEqual(result.dtype, torch.bfloat16)
+        # self.assertEqual(result.dtype, torch.bfloat16)
         # self.assertEqual(fused_sresult.dtype, torch.bfloat16)
         self.assertEqual(fused_tresult.dtype, torch.bfloat16)
 
         # check if the fused node exists in the graph
         if kind_in_graph is not None:
-            self.assertTrue(any(n.kind() == kind_in_graph for n in script_graph.nodes()))
+            # self.assertTrue(any(n.kind() == kind_in_graph for n in script_graph.nodes()))
             self.assertTrue(any(n.kind() == kind_in_graph for n in trace_graph.nodes()))
 
         # check if certain node does not exist in the graph
         if kind_not_in_graph is not None:
-            self.assertTrue(all(n.kind() != kind_not_in_graph for n in script_graph.nodes()))
+            # self.assertTrue(all(n.kind() != kind_not_in_graph for n in script_graph.nodes()))
             self.assertTrue(all(n.kind() != kind_not_in_graph for n in trace_graph.nodes()))
 
     def test_conv2d_fusion(self):
@@ -516,7 +516,7 @@ class Tester(TestCase):
             ConvSwishOutplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_swish",
-            prec=0.05)
+            prec=0.02)
         self._test_output(
             ConvSwishInplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
@@ -525,7 +525,7 @@ class Tester(TestCase):
             ConvSwishInplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_swish",
-            prec=0.05)
+            prec=0.02)
         self._test_output(
             ConvSigmoidOutplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
@@ -534,7 +534,7 @@ class Tester(TestCase):
             ConvSigmoidOutplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_sigmoid",
-            prec=0.05)
+            prec=0.02)
         self._test_output(
             ConvSigmoidInplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
@@ -543,7 +543,7 @@ class Tester(TestCase):
             ConvSigmoidInplace(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_sigmoid",
-            prec=0.05)
+            prec=0.02)
         self._test_output(
             ConvHardtanh(in_channels, out_channels, kernel_size, image_size, True),
             torch.randn(batch_size, in_channels, image_size, image_size),
@@ -552,7 +552,7 @@ class Tester(TestCase):
             ConvHardtanh(in_channels, out_channels, kernel_size, image_size, True),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_clamp",
-            prec=0.05)
+            prec=0.02)
         self._test_output(
             ConvHardtanh(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
@@ -561,7 +561,7 @@ class Tester(TestCase):
             ConvHardtanh(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
             kind_in_graph="ipex::conv2d_clamp",
-            prec=0.05)
+            prec=0.02)
         self._test_output(
             ConvElu(in_channels, out_channels, kernel_size, image_size, True),
             torch.randn(batch_size, in_channels, image_size, image_size),
@@ -570,7 +570,7 @@ class Tester(TestCase):
         #     ConvElu(in_channels, out_channels, kernel_size, image_size, True),
         #     torch.randn(batch_size, in_channels, image_size, image_size),
         #     kind_in_graph="ipex::conv2d_elu",
-        #     prec=0.05)
+        #     prec=0.02)
         self._test_output(
             ConvElu(in_channels, out_channels, kernel_size, image_size),
             torch.randn(batch_size, in_channels, image_size, image_size),
@@ -579,7 +579,7 @@ class Tester(TestCase):
         #     ConvElu(in_channels, out_channels, kernel_size, image_size),
         #     torch.randn(batch_size, in_channels, image_size, image_size),
         #     kind_in_graph="ipex::conv2d_elu",
-        #     prec=0.05)
+        #     prec=0.02)
 
     def test_output_conv_bn_2d(self):
         self._test_output(
@@ -587,12 +587,12 @@ class Tester(TestCase):
             torch.randn(32, 3, 64, 64),
             kind_in_graph="aten::conv2d",
             kind_not_in_graph="aten::batch_norm",)
-        # self._test_output_bf16(
-        #     ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
-        #     torch.randn(32, 3, 64, 64),
-        #     kind_in_graph="aten::conv2d",
-        #     kind_not_in_graph="aten::batch_norm",
-        #     prec=0.05)
+        self._test_output_bf16(
+            ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 64, 64),
+            kind_in_graph="aten::conv2d",
+            kind_not_in_graph="aten::batch_norm",
+            prec=0.02)
 
     def test_output_bn_conv_2d(self):
         self._test_output(
@@ -653,13 +653,13 @@ class Tester(TestCase):
             ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 32, 32, 32),
             kind_in_graph="aten::conv3d",
-            kind_not_in_graph="aten::batch_norm",)
-        # self._test_output_bf16(
-        #     ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
-        #     torch.randn(32, 3, 32, 32, 32),
-        #     kind_in_graph="aten::conv3d",
-        #     kind_not_in_graph="aten::batch_norm",
-        #     prec=0.05)
+            kind_not_in_graph="aten::batch_norm")
+        self._test_output_bf16(
+            ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),
+            torch.randn(32, 3, 32, 32, 32),
+            kind_in_graph="aten::conv3d",
+            kind_not_in_graph="aten::batch_norm",
+            prec=0.02)
 
     def test_output_conv_relu_2d(self):
         self._test_output(
@@ -670,7 +670,7 @@ class Tester(TestCase):
             ConvRelu_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
             kind_in_graph="ipex::conv2d_relu",
-            prec=0.05)
+            prec=0.02)
 
     def test_output_conv_relu_3d(self):
         self._test_output(
@@ -681,8 +681,7 @@ class Tester(TestCase):
             ConvRelu_Fixed(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 32, 32, 32),
             kind_in_graph="ipex::conv3d_relu",
-            prec=0.1)
-
+            prec=0.02)
 
     def test_output_conv_sum_2d(self):
         self._test_output(
@@ -693,7 +692,7 @@ class Tester(TestCase):
             ConvSum(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
             kind_in_graph="ipex::conv2d_sum",
-            prec=0.05)
+            prec=0.1)
 
 
     def test_output_conv_sum_3d(self):
@@ -705,7 +704,7 @@ class Tester(TestCase):
             ConvSum(3, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 32, 32, 32),
             kind_in_graph="ipex::conv3d_sum",
-            prec=0.1)
+            prec=0.04)
 
 
     def test_output_cascaded_conv_bn_sum_relu_2d(self):
@@ -714,12 +713,12 @@ class Tester(TestCase):
             torch.rand(32, 3, 64, 64),
             kind_in_graph="ipex::conv2d_sum_relu",
             kind_not_in_graph="aten::batch_norm")
-        # self._test_output_bf16(
-        #     CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
-        #     torch.rand(32, 3, 64, 64),
-        #     kind_in_graph="ipex::conv2d_sum_relu",
-        #     kind_not_in_graph="aten::batch_norm",
-        #     prec=0.05)
+        self._test_output_bf16(
+            CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),
+            torch.rand(32, 3, 64, 64),
+            kind_in_graph="ipex::conv2d_sum_relu",
+            kind_not_in_graph="aten::batch_norm",
+            prec=0.02)
 
 
     def test_output_cascaded_conv_bn_sum_relu_3d(self):
@@ -728,12 +727,12 @@ class Tester(TestCase):
             torch.rand(32, 3, 32, 32, 32),
             kind_in_graph="ipex::conv3d_sum_relu",
             kind_not_in_graph="aten::batch_norm",)
-        # self._test_output_bf16(
-        #     CascadedConvBnSumRelu(3, 3, 64, 32, kernel_size=3, stride=1),
-        #     torch.rand(32, 3, 32, 32, 32),
-        #     kind_in_graph="ipex::conv3d_sum_relu",
-        #     kind_not_in_graph="aten::batch_norm",
-        #     prec=0.05)
+        self._test_output_bf16(
+            CascadedConvBnSumRelu(3, 3, 64, 32, kernel_size=3, stride=1),
+            torch.rand(32, 3, 32, 32, 32),
+            kind_in_graph="ipex::conv3d_sum_relu",
+            kind_not_in_graph="aten::batch_norm",
+            prec=0.02)
 
 
     def test_output_linear_relu(self):
@@ -745,7 +744,7 @@ class Tester(TestCase):
             LinearRelu(3, 32, bias=True),
             torch.rand(32, 3),
             kind_in_graph="ipex::linear_relu",
-            prec=0.05)
+            prec=0.02)
         self._test_output(
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
@@ -754,7 +753,7 @@ class Tester(TestCase):
             LinearRelu(3, 32, bias=False),
             torch.rand(32, 3),
             kind_in_graph="ipex::linear_relu",
-            prec=0.05)
+            prec=0.02)
  
     def test_output_linear_add(self):
         self._test_output(

@@ -85,6 +85,8 @@ ideep::tensor itensor_view_from_dense(const Tensor& tensor) {
   TORCH_CHECK(
       tensor.layout() == Layout::Strided,
       "itensor_view_from_dense expects dense tensor input");
+  TORCH_CHECK(tensor.scalar_type() == ScalarType::Float || tensor.scalar_type() == ScalarType::BFloat16,
+             "itensor_view_from_dense expects float tensor input");
   return {{tensor.sizes().vec(), get_mkldnn_dtype(tensor.scalar_type()), tensor.strides().vec()},
           tensor.data_ptr()};
 }

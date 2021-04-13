@@ -30,19 +30,26 @@ at::Tensor convolution_impl(
     at::IntArrayRef dilation,
     int64_t groups,
     const ideep::attr_t& attr) {
-
-  const ideep::tensor mkldnn_input = at::native::itensor_from_tensor(input);
-  const ideep::tensor mkldnn_weight = at::native::itensor_from_tensor(weight);
+// TODO: the input will be actively converted to channels last format
+// after the 5-D tensor supports channels last format.
+  const ideep::tensor mkldnn_input = at::native::itensor_view_from_dense(input);
+  const ideep::tensor mkldnn_weight = at::native::itensor_view_from_dense(weight);
 
   auto kernel_size = mkldnn_weight.get_dims();
-
   std::vector<int64_t> input_size = mkldnn_input.get_dims();
   std::vector<int64_t> output_sizes =
       calc_conv_output_size(input_size, kernel_size, padding, stride, dilation);
 
+  bool is_channels_last = input.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
+  auto output = at::empty({0}, input.options());
   ideep::tensor mkldnn_output;
+  if (is_channels_last) {
+    output.resize_(output_sizes, input.suggest_memory_format());
+    mkldnn_output = at::native::itensor_view_from_dense(output);
+  }
+
   if (bias.defined()) {
-    const ideep::tensor mkldnn_bias = at::native::itensor_from_tensor(bias);
+    const ideep::tensor mkldnn_bias = at::native::itensor_view_from_dense(bias);
     ideep::convolution_forward::compute(
         mkldnn_input,
         mkldnn_weight,
@@ -75,9 +82,13 @@ at::Tensor convolution_impl(
         attr);
   }
 
-  return at::native::mkldnn_to_dense(
-      at::native::new_with_itensor_mkldnn(std::move(mkldnn_output), optTypeMetaToScalarType(input.options().dtype_opt()),
-                              input.options().device_opt()));
+  if (is_channels_last) {
+    return output;
+  } else {
+    return at::native::mkldnn_to_dense(
+        at::native::new_with_itensor_mkldnn(std::move(mkldnn_output), optTypeMetaToScalarType(input.options().dtype_opt()),
+                                input.options().device_opt()));
+  }
 }
 
 void convolution_inplace_impl(
@@ -90,19 +101,22 @@ void convolution_inplace_impl(
     at::IntArrayRef dilation,
     int64_t groups,
     const ideep::attr_t& attr) {
-
-  const ideep::tensor mkldnn_input = at::native::itensor_from_tensor(input);
-  const ideep::tensor mkldnn_weight = at::native::itensor_from_tensor(weight);
+// TODO: the input will be actively converted to channels last format
+// after the 5-D tensor supports channels last format.
+  const ideep::tensor mkldnn_input = at::native::itensor_view_from_dense(input);
+  const ideep::tensor mkldnn_weight = at::native::itensor_view_from_dense(weight);
 
   auto kernel_size = mkldnn_weight.get_dims();
-
   std::vector<int64_t> input_size = mkldnn_input.get_dims();
   std::vector<int64_t> output_sizes =
       calc_conv_output_size(input_size, kernel_size, padding, stride, dilation);
 
-  ideep::tensor mkldnn_output = at::native::itensor_from_tensor(output);
+  bool is_channels_last = input.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
+  output.resize_(output_sizes, input.suggest_memory_format());
+  ideep::tensor mkldnn_output = at::native::itensor_view_from_dense(output);
+
   if (bias.defined()) {
-    const ideep::tensor mkldnn_bias = at::native::itensor_from_tensor(bias);
+    const ideep::tensor mkldnn_bias = at::native::itensor_view_from_dense(bias);
     ideep::convolution_forward::compute(
         mkldnn_input,
         mkldnn_weight,
@@ -134,54 +148,13 @@ void convolution_inplace_impl(
         ideep::scale_t(),
         attr);
   }
-  output = at::native::mkldnn_to_dense(
-      at::native::new_with_itensor_mkldnn(std::move(mkldnn_output), optTypeMetaToScalarType(input.options().dtype_opt()),
-                              input.options().device_opt()));
+
+  if (!is_channels_last) {
+    output = at::native::mkldnn_to_dense(
+        at::native::new_with_itensor_mkldnn(std::move(mkldnn_output), optTypeMetaToScalarType(input.options().dtype_opt()),
+                                input.options().device_opt()));
+  }
 }
-
-// void prepack_conv_weights(
-//     const at::Tensor& input,
-//     const at::Tensor& dil_input,
-//     const at::Tensor& weight,
-//     at::IntArrayRef stride,
-//     at::IntArrayRef padding,
-//     at::IntArrayRef dilation,
-//     int64_t groups) {
-//   // Prepack weight tensor if it's either a *cpu tensor* or a *plain dil tensor*
-//   //
-//   // Note: weight tensor will not be re-packed unless user has implicitly
-//   //       triggered `to_public` by accessing its data
-//   //       One caveat is when the input size has changed and prepacked weight
-//   //       might not be the best fit for new input size, the weight will not
-//   //       be re-packed in such cases, but it still ensures the correctness
-//   //
-//   // TODO: once semantics of "own shade context" is equivalent to
-//   //       "is dil tensor", we could remove the first check below
-//   if (!cpu::ShadeDataContext::isPackedTensor(weight)) {
-//     auto dil_weight = dbl::comm::try_gen_dil_tensor(weight);
-//     auto packed_desc = ideep::convolution_forward::expected_weights_desc(
-//       weight.sizes().vec(),
-//       dil_weight.get_data_type(),
-//       stride.vec(),
-//       padding.vec(),
-//       padding.vec(),
-//       dilation.vec(),
-//       groups,
-//       ideep::algorithm::convolution_direct,
-//       ideep::prop_kind::forward,
-//       dil_input.get_data_type(),
-//       input.sizes().vec());
-
-//     at::Tensor packed_weight {packed_desc};
-    
-//     if (dil_weight.has_scale()) {
-//       packed_weight.set_scale(dil_weight.get_scale());
-//     }
-//     packed_weight.feed_from(dil_weight);
-//     dbl::comm::equip_dil_buffer(weight, packed_weight);
-//     cpu::ShadeDataContext::setPackedTensor(weight, true);
-//   }
-// }
 
 }  // namespace cpu
 }  // namespace torch_ipex

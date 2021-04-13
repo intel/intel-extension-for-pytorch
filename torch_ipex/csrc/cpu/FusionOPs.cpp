@@ -27,16 +27,6 @@ at::Tensor dil_convolution_outplace_fusion(
     const ideep::attr_t& op_attr,
     const std::string& op_name) {
 
-  // dbl::conv::prepack_conv_weights(
-  //   input_contiguous,
-  //   dil_input,
-  //   weight_contiguous,
-  //   stride,
-  //   padding,
-  //   dilation,
-  //   groups);
-  // dil_weight = try_gen_dil_tensor(weight_contiguous);
-
   at::Tensor output = convolution_impl(
     IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
     IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous(),
@@ -61,16 +51,6 @@ static at::Tensor& dil_convolution_inplace_fusion(
     int64_t groups,
     const ideep::attr_t& attr,
     const std::string& op_name) {
-
-  // dbl::conv::prepack_conv_weights(
-  //   input_contiguous,
-  //   dil_input,
-  //   weight_contiguous,
-  //   stride,
-  //   padding,
-  //   dilation,
-  //   groups);
-  // dil_weight = try_gen_dil_tensor(weight_contiguous);
 
   convolution_inplace_impl(
     IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
