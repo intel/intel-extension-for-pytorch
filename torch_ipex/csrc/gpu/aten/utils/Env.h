@@ -1,4 +1,5 @@
 #pragma once
+#include <c10/util/Exception.h>
 
 enum DPCPP_ENV {
   ENV_VERBOSE = 0,
@@ -28,7 +29,13 @@ static inline int lazy_reorder_enabled() {
 }
 
 static inline int weight_cache_enabled() {
-  return dpcpp_env(ENV_WEIGHT_CACHE);
+  auto weight_cache_env = dpcpp_env(ENV_WEIGHT_CACHE);
+  if (weight_cache_env) {
+    TORCH_CHECK(
+        lazy_reorder_enabled() == 1,
+        "IPEX_WEIGHT_CACHE can be set only when IPEX_LAZY_REORDER=1.");
+  }
+  return weight_cache_env;
 }
 
 static inline bool tile_as_device() {
