@@ -4,7 +4,7 @@
 
 #include <torch/csrc/jit/runtime/custom_operator.h>
 
-#include <ideep.hpp>
+#include "ideep/ideep.hpp"
 
 namespace torch { namespace jit {
 

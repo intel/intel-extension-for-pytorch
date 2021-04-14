@@ -4,7 +4,7 @@
 
 #if AT_MKLDNN_ENABLED()
 
-#include <ideep.hpp>
+#include "ideep/ideep.hpp"
 
 namespace at { namespace native {
 

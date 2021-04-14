@@ -2,7 +2,7 @@
 
 #include <ATen/Tensor.h>
 
-#include <ideep.hpp>
+#include "ideep/ideep.hpp"
 
 #include <vector>
 

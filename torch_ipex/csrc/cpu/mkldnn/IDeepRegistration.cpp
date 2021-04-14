@@ -4,7 +4,7 @@
 #if AT_MKLDNN_ENABLED()
 
 // needs to be included only once in library.
-#include <ideep_pin_singletons.hpp>
+#include "ideep/ideep_pin_singletons.hpp"
 
 using namespace ideep;
 
