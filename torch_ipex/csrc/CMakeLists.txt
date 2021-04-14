@@ -7,6 +7,7 @@ LIST(APPEND DPCPP_COMMON_SRCS
     ${DPCPP_ROOT}/utils.cpp
     ${DPCPP_ROOT}/autocast_mode.cpp
     ${DPCPP_ROOT}/autocast_kernel.cpp
+    ${DPCPP_ROOT}/autocast_verbose.cpp
 )
 
 # Pass to parent

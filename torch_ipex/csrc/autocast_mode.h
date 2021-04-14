@@ -8,6 +8,7 @@
 #include <c10/core/impl/LocalDispatchKeySet.h>
 #include <torch/library.h>
 #include <torch/csrc/jit/frontend/tracer.h>
+#include "utils.h"
 
 namespace torch_ipex {
 namespace autocast {
@@ -74,14 +75,6 @@ inline bool is_eligible_cpu(const Tensor& arg) {
           (arg.scalar_type() != at::kDouble));
 }
 
-template<typename T>
-std::map<int, T> flip_map(std::map<T, int> input) {
-  std::map<int, T> reversed;
-  for (typename std::map<T, int>::iterator i = input.begin(); i != input.end(); ++i)
-    reversed[i->second] = i->first;
-  return reversed;
-}
-
 // Overload to catch Tensor args.
 // If nextArg is floating-point, compare its scalar_type with our
 // current best guess for the promote type, and update if necessary.
@@ -133,6 +126,11 @@ template<typename Arg0, typename... Args>
 inline at::ScalarType promote_type(at::ScalarType current, Arg0 arg0, Args... args) {
   auto new_current = prioritize(current, arg0);
   return promote_type(new_current, args...);
+}
+
+template <class Redispatch, Redispatch* F>
+std::string get_op_name() {
+  return "unknow_operator";
 }
 
 }  // namespace autocast

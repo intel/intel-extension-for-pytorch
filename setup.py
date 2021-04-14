@@ -70,7 +70,6 @@ def get_cmake_command():
 def _check_env_flag(name, default=''):
   return os.getenv(name, default).upper() in ['ON', '1', 'YES', 'TRUE', 'Y']
 
-
 def _get_env_backend():
   env_backend_var_name = 'IPEX_BACKEND'
   env_backend_options = ['cpu', 'gpu']
@@ -245,6 +244,9 @@ class IPEXBuild(build_ext, object):
     if _check_env_flag("USE_NINJA"):
       use_ninja = True
       cmake_args += ['-GNinja']
+
+    if _check_env_flag("ENABLE_AUTOCAST_VERBOSE"):
+      cmake_args += ['-DENABLE_AUTOCAST_VERBOSE=1']
 
     build_args = ['-j', str(multiprocessing.cpu_count())]
 

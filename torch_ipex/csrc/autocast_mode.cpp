@@ -2,6 +2,7 @@
 #include <exception>
 #include "autocast_mode.h"
 #include "autocast_kernel.hpp"
+#include "autocast_verbose.h"
 
 namespace torch_ipex {
 namespace autocast {
@@ -16,7 +17,6 @@ thread_local int nesting = 0;
 
 thread_local at::ScalarType current_target_dtype = at::kFloat;
 }  // namespace
-
 
 bool is_autocast_enabled() {
   return c10::impl::tls_is_dispatch_key_included(c10::DispatchKey::AutocastCPU);
@@ -56,10 +56,16 @@ Tensor cpu_cached_cast(at::ScalarType to_type, const Tensor& arg) {
     auto casted_arg = arg;
     if (arg.scalar_type() == at::kFloat && to_type == at::kBFloat16) {
       // This path works for fp32 to bf16
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+      verbose::autocast_verbose(to_type, arg);
+#endif
       casted_arg = arg.to(at::kBFloat16);
       // casted_arg = arg.to_mkldnn(at::kBFloat16);
     } else if (arg.scalar_type() == at::kBFloat16 && to_type == at::kFloat) {
-     // This path works for bf16 to fp32
+      // This path works for bf16 to fp32
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+      verbose::autocast_verbose(to_type, arg);
+#endif
       casted_arg = arg.to(at::kFloat);
       // casted_arg = arg.to_dense(at::kFloat);
     }
@@ -98,6 +104,9 @@ struct CPU_WrapFunction_<DtypeCastPolicy::user_defined_dtype, Redispatch, F, Ret
                         guts::typelist::typelist<Args...>> {
   static Ret call(Args... args) {
     c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+    verbose::OpNameGuard op_name(get_op_name<Redispatch, F>());
+#endif
     return (*F)(cpu_cached_cast(current_target_dtype, args)...);
   }
 };
@@ -108,6 +117,9 @@ struct CPU_WrapFunction_<DtypeCastPolicy::fp32, Redispatch, F, Ret,
                          guts::typelist::typelist<Args...>> {
   static Ret call(Args... args) {
     c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+    verbose::OpNameGuard op_name(get_op_name<Redispatch, F>());
+#endif
     return (*F)(cpu_cached_cast(at::kFloat, args)...);
   }
 };
@@ -119,6 +131,9 @@ struct CPU_WrapFunction_<DtypeCastPolicy::promote, Redispatch, F, Ret,
   static Ret call(Args... args) {
     c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
     auto to_type = promote_type(at::kBFloat16, args...);
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+    verbose::OpNameGuard op_name(get_op_name<Redispatch, F>());
+#endif
     return (*F)(cpu_cached_cast(to_type, args)...);
   }
 };
@@ -133,67 +148,83 @@ TORCH_LIBRARY_IMPL(_, AutocastCPU, m) {
   m.fallback(torch::CppFunction::makeFallthrough());
 }
 
-TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
-  //user_defined_dtype
-  KERNEL_CPU(ADD_NS(conv1d), "conv1d", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, int64_t), user_defined_dtype)
-  KERNEL_CPU(ADD_NS(_log_softmax), "_log_softmax", Tensor (const Tensor &, int64_t, bool), user_defined_dtype)
-  KERNEL_CPU(ADD_NS(bmm), "bmm", Tensor (const Tensor &, const Tensor &), user_defined_dtype)
-  KERNEL_CPU(ADD_NS(mm), "mm", Tensor (const Tensor &, const Tensor &), user_defined_dtype)
-  KERNEL_CPU(ADD_NS(baddbmm), "baddbmm", Tensor (const Tensor &, const Tensor &, const Tensor &, const Scalar&, const Scalar&), user_defined_dtype)
-  KERNEL_CPU(ADD_NS(addmm), "addmm", Tensor (const Tensor &, const Tensor &, const Tensor &, const Scalar&, const Scalar&), user_defined_dtype)
-  KERNEL_CPU(ADD_NS(addbmm), "addbmm", Tensor (const Tensor &, const Tensor &, const Tensor &, const Scalar&, const Scalar&), user_defined_dtype)
-  //KERNEL_CPU(ADD_NS(mul), "mul.Tensor", Tensor (const Tensor &, const Tensor &), user_defined_dtype)
-  //KERNEL_CPU(ADD_NS(mul), "mul.Scalar", Tensor (const Tensor &, Scalar), user_defined_dtype)
+template <>
+std::string get_op_name<std::tuple<Tensor,Tensor> (const Tensor &, int64_t, int64_t, bool, bool), at::topk>() {
+    return "topk";
+}
 
-  //fp32 cast policy
-  KERNEL_CPU(ADD_NS(convolution), "convolution", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, bool, IntArrayRef, int64_t), fp32)
-  KERNEL_CPU(ADD_NS(dropout), "dropout", Tensor (const Tensor &, double, bool), fp32)
+template <>
+std::string get_op_name<std::tuple<Tensor,Tensor> (const Tensor &, int64_t, bool), at::sort>() {
+    return "sort";
+}
+
+#define MAKE_REGISTER_FUNC(FUNC, NAME, SIG, CAST_POLICY) \
+TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){ \
+   KERNEL_CPU(FUNC, NAME, SIG, CAST_POLICY)\
+}\
+template <> \
+std::string get_op_name<SIG, FUNC>() \
+{\
+   return NAME;\
+}
+
+// user_defined_dtype
+MAKE_REGISTER_FUNC(ADD_NS(conv1d), "conv1d", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, int64_t), user_defined_dtype)
+MAKE_REGISTER_FUNC(ADD_NS(_log_softmax), "_log_softmax", Tensor (const Tensor &, int64_t, bool), user_defined_dtype)
+MAKE_REGISTER_FUNC(ADD_NS(bmm), "bmm", Tensor (const Tensor &, const Tensor &), user_defined_dtype)
+MAKE_REGISTER_FUNC(ADD_NS(mm), "mm", Tensor (const Tensor &, const Tensor &), user_defined_dtype)
+MAKE_REGISTER_FUNC(ADD_NS(baddbmm), "baddbmm", Tensor (const Tensor &, const Tensor &, const Tensor &, const Scalar&, const Scalar&), user_defined_dtype)
+MAKE_REGISTER_FUNC(ADD_NS(addmm), "addmm", Tensor (const Tensor &, const Tensor &, const Tensor &, const Scalar&, const Scalar&), user_defined_dtype)
+MAKE_REGISTER_FUNC(ADD_NS(addbmm), "addbmm", Tensor (const Tensor &, const Tensor &, const Tensor &, const Scalar&, const Scalar&), user_defined_dtype)
+
+// fp32 cast policy
+MAKE_REGISTER_FUNC(ADD_NS(convolution), "convolution", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, bool, IntArrayRef, int64_t), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(dropout), "dropout", Tensor (const Tensor &, double, bool), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(avg_pool2d), "avg_pool2d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(avg_pool3d), "avg_pool3d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(_softmax), "_softmax", Tensor (const Tensor &, int64_t, bool), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(gelu), "gelu", Tensor (const Tensor &), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(upsample_nearest1d), "upsample_nearest1d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(upsample_nearest1d), "upsample_nearest1d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, c10::optional<ArrayRef<double>>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(upsample_nearest2d), "upsample_nearest2d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>, c10::optional<double>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(upsample_nearest2d), "upsample_nearest2d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, c10::optional<ArrayRef<double>>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(upsample_nearest3d), "upsample_nearest3d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>, c10::optional<double>, c10::optional<double>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(upsample_nearest3d), "upsample_nearest3d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, c10::optional<ArrayRef<double>>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(upsample_linear1d), "upsample_linear1d", Tensor (const Tensor &, IntArrayRef, bool, c10::optional<double>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(upsample_linear1d), "upsample_linear1d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, bool, c10::optional<ArrayRef<double>>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(upsample_bilinear2d), "upsample_bilinear2d", Tensor (const Tensor &, IntArrayRef, bool, c10::optional<double>, c10::optional<double>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(upsample_bilinear2d), "upsample_bilinear2d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, bool, c10::optional<ArrayRef<double>>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(upsample_trilinear3d), "upsample_trilinear3d", Tensor (const Tensor &, IntArrayRef, bool, c10::optional<double>, c10::optional<double>, c10::optional<double>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(upsample_trilinear3d), "upsample_trilinear3d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, bool, c10::optional<ArrayRef<double>>), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(binary_cross_entropy), "binary_cross_entropy", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, int64_t), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(binary_cross_entropy_with_logits), "binary_cross_entropy_with_logits", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, int64_t), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(pow), "pow.Tensor_Scalar", Tensor (const Tensor &, const Scalar &), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(pow), "pow.Tensor_Tensor", Tensor (const Tensor &, const Tensor &), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(pow), "pow.Scalar", Tensor (const Scalar&, const Tensor &), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(smooth_l1_loss), "smooth_l1_loss", Tensor (const Tensor &, const Tensor &, int64_t, double), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(reflection_pad1d), "reflection_pad1d", Tensor (const Tensor &, IntArrayRef), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(std), "std", Tensor (const Tensor &, bool), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(std), "std.dim", Tensor (const Tensor &, IntArrayRef, bool, bool), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(layer_norm), "layer_norm", Tensor (const Tensor &, IntArrayRef, const c10::optional<Tensor>&, const c10::optional<Tensor>&, double, bool), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(bucketize), "bucketize.Tensor", Tensor (const Tensor &, const Tensor &, bool, bool), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(bucketize), "bucketize.Scalar", Tensor (const Scalar&, const Tensor &, bool, bool), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(instance_norm), "instance_norm", Tensor (const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, bool, double, double, bool), fp32)
+
+// promote
+MAKE_REGISTER_FUNC(ADD_NS(cat), "cat", Tensor (TensorList, int64_t), promote)
+MAKE_REGISTER_FUNC(ADD_NS(stack), "stack", Tensor (TensorList, int64_t), promote)
+
+TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
   m.impl(TORCH_SELECTIVE_NAME("aten::topk"),
          TORCH_FN((&CPU_WrapFunction<DtypeCastPolicy::fp32,
                                  std::tuple<Tensor,Tensor> (const Tensor &, int64_t, int64_t, bool, bool),
                                  std::tuple<Tensor,Tensor> (const Tensor &, int64_t, int64_t, bool, bool),
                                  &ADD_NS(topk)>::type::call)));
-  KERNEL_CPU(ADD_NS(avg_pool2d), "avg_pool2d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>), fp32)
-  KERNEL_CPU(ADD_NS(avg_pool3d), "avg_pool3d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>), fp32)
-  // KERNEL_CPU(ADD_NS(adaptive_avg_pool2d), "adaptive_avg_pool2d", Tensor (const Tensor &, IntArrayRef), fp32)
-  // KERNEL_CPU(ADD_NS(relu), "relu", Tensor (const Tensor &), fp32)
-  KERNEL_CPU(ADD_NS(_softmax), "_softmax", Tensor (const Tensor &, int64_t, bool), fp32)
-  KERNEL_CPU(ADD_NS(gelu), "gelu", Tensor (const Tensor &), fp32)
-  KERNEL_CPU(ADD_NS(upsample_nearest1d), "upsample_nearest1d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>), fp32)
-  KERNEL_CPU(ADD_NS(upsample_nearest1d), "upsample_nearest1d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, c10::optional<ArrayRef<double>>), fp32)
-  KERNEL_CPU(ADD_NS(upsample_nearest2d), "upsample_nearest2d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>, c10::optional<double>), fp32)
-  KERNEL_CPU(ADD_NS(upsample_nearest2d), "upsample_nearest2d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, c10::optional<ArrayRef<double>>), fp32)
-  KERNEL_CPU(ADD_NS(upsample_nearest3d), "upsample_nearest3d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>, c10::optional<double>, c10::optional<double>), fp32)
-  KERNEL_CPU(ADD_NS(upsample_nearest3d), "upsample_nearest3d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, c10::optional<ArrayRef<double>>), fp32)
-  KERNEL_CPU(ADD_NS(upsample_linear1d), "upsample_linear1d", Tensor (const Tensor &, IntArrayRef, bool, c10::optional<double>), fp32)
-  KERNEL_CPU(ADD_NS(upsample_linear1d), "upsample_linear1d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, bool, c10::optional<ArrayRef<double>>), fp32)
-  KERNEL_CPU(ADD_NS(upsample_bilinear2d), "upsample_bilinear2d", Tensor (const Tensor &, IntArrayRef, bool, c10::optional<double>, c10::optional<double>), fp32)
-  KERNEL_CPU(ADD_NS(upsample_bilinear2d), "upsample_bilinear2d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, bool, c10::optional<ArrayRef<double>>), fp32)
-  KERNEL_CPU(ADD_NS(upsample_trilinear3d), "upsample_trilinear3d", Tensor (const Tensor &, IntArrayRef, bool, c10::optional<double>, c10::optional<double>, c10::optional<double>), fp32)
-  KERNEL_CPU(ADD_NS(upsample_trilinear3d), "upsample_trilinear3d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, bool, c10::optional<ArrayRef<double>>), fp32)
-  KERNEL_CPU(ADD_NS(binary_cross_entropy), "binary_cross_entropy", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, int64_t), fp32)
-  KERNEL_CPU(ADD_NS(binary_cross_entropy_with_logits), "binary_cross_entropy_with_logits", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, int64_t), fp32)
-  KERNEL_CPU(ADD_NS(pow), "pow.Tensor_Scalar", Tensor (const Tensor &, const Scalar &), fp32)
-  KERNEL_CPU(ADD_NS(pow), "pow.Tensor_Tensor", Tensor (const Tensor &, const Tensor &), fp32)
-  KERNEL_CPU(ADD_NS(pow), "pow.Scalar", Tensor (const Scalar&, const Tensor &), fp32)
-
-  KERNEL_CPU(ADD_NS(smooth_l1_loss), "smooth_l1_loss", Tensor (const Tensor &, const Tensor &, int64_t, double), fp32)
   m.impl(TORCH_SELECTIVE_NAME("aten::sort"),
          TORCH_FN((&CPU_WrapFunction<DtypeCastPolicy::fp32,
                                  std::tuple<Tensor,Tensor> (const Tensor &, int64_t, bool),
                                  std::tuple<Tensor,Tensor> (const Tensor &, int64_t, bool),
                                  &ADD_NS(sort)>::type::call)));
-  KERNEL_CPU(ADD_NS(reflection_pad1d), "reflection_pad1d", Tensor (const Tensor &, IntArrayRef), fp32)
-  KERNEL_CPU(ADD_NS(std), "std", Tensor (const Tensor &, bool), fp32)
-  KERNEL_CPU(ADD_NS(std), "std.dim", Tensor (const Tensor &, IntArrayRef, bool, bool), fp32)
-  KERNEL_CPU(ADD_NS(layer_norm), "layer_norm", Tensor (const Tensor &, IntArrayRef, const c10::optional<Tensor>&, const c10::optional<Tensor>&, double, bool), fp32)
-  KERNEL_CPU(ADD_NS(bucketize), "bucketize.Tensor", Tensor (const Tensor &, const Tensor &, bool, bool), fp32)
-  KERNEL_CPU(ADD_NS(bucketize), "bucketize.Scalar", Tensor (const Scalar&, const Tensor &, bool, bool), fp32)
-  KERNEL_CPU(ADD_NS(instance_norm), "instance_norm", Tensor (const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, bool, double, double, bool), fp32)
-
-  // promote
-  KERNEL_CPU(ADD_NS(cat), "cat", Tensor (TensorList, int64_t), promote)
-  KERNEL_CPU(ADD_NS(stack), "stack", Tensor (TensorList, int64_t), promote)
  
   // for int8 path
   m.impl(TORCH_SELECTIVE_NAME("aten::conv2d"), TORCH_FN((&torch_ipex::autocast::conv2d)));

@@ -1,6 +1,6 @@
 #include "autocast_mode.h"
 #include "autocast_kernel.hpp"
-
+#include "autocast_verbose.h"
 #include "quantization/AutoCast.hpp"
 
 namespace torch_ipex {
@@ -14,6 +14,9 @@ at::Tensor conv2d(const at::Tensor& input, const at::Tensor& weight, const c10::
   if (at::ScalarType::Char == target_type) {
     return int8::conv2d(input, weight, bias, stride, padding, dilation, groups);
   }
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("conv2d");
+#endif
   return at::conv2d(cpu_cached_cast(target_type, input),
                     cpu_cached_cast(target_type, weight),
                     cpu_cached_cast(target_type, bias),
@@ -28,6 +31,9 @@ at::Tensor conv3d(const at::Tensor& input, const at::Tensor& weight, const c10::
   if (at::ScalarType::Char == target_type) {
     return int8::conv3d(input, weight, bias, stride, padding, dilation, groups);
   }
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("conv3d");
+#endif
   return at::conv3d(cpu_cached_cast(target_type, input),
                     cpu_cached_cast(target_type, weight),
                     cpu_cached_cast(target_type, bias),
@@ -42,6 +48,9 @@ at::Tensor conv_transpose3d(const at::Tensor& input, const at::Tensor& weight, c
   if (at::ScalarType::Char == target_type) {
     return int8::conv_transpose3d(input, weight, bias, stride, padding, output_padding, groups, dilation);
   }
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("conv_transpose3d");
+#endif
   return at::conv_transpose3d(cpu_cached_cast(at::kFloat, input),
                               cpu_cached_cast(at::kFloat, weight),
                               cpu_cached_cast(at::kFloat, bias),
@@ -73,6 +82,9 @@ at::Tensor _convolution_deprecated(const at::Tensor& input, const at::Tensor& we
     return int8::_convolution(input, weight, bias, stride, padding, dilation, transposed, 
                               output_padding, groups, benchmark, deterministic, cudnn_enabled);
   }
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("_convolution_deprecated");
+#endif
   return at::_convolution(cpu_cached_cast(target_type, input),
                             cpu_cached_cast(target_type, weight),
                             cpu_cached_cast(target_type, bias),
@@ -89,6 +101,9 @@ at::Tensor batch_norm(const at::Tensor& input, const c10::optional<at::Tensor>& 
     return int8::batch_norm(input, weight, bias, running_mean, running_var, training, momentum, eps, cudnn_enabled);
   }
   // convert to fp32 path.
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("batch_norm");
+#endif
   return at::batch_norm(cpu_cached_cast(at::kFloat, input),
                         cpu_cached_cast(at::kFloat, weight),
                         cpu_cached_cast(at::kFloat, bias),
@@ -103,7 +118,9 @@ at::Tensor linear(const at::Tensor& input, const at::Tensor& weight, const c10::
   if (at::ScalarType::Char == target_type) {
     return int8::linear(input, weight, bias);
   }
- 
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("linear");
+#endif
   return at::linear(cpu_cached_cast(target_type, input),
                     cpu_cached_cast(target_type, weight),
                     cpu_cached_cast(target_type, bias));
@@ -117,6 +134,9 @@ at::Tensor max_pool2d(const at::Tensor& input, at::IntArrayRef kernel_size, at::
     return int8::max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode);
   }
   // convert to fp32 path.
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("max_pool2d");
+#endif
   return at::max_pool2d(cpu_cached_cast(at::kFloat, input), kernel_size, stride, padding, dilation, ceil_mode);
 }
 
@@ -126,7 +146,10 @@ at::Tensor adaptive_avg_pool2d(const at::Tensor& input, at::IntArrayRef output_s
   if (at::ScalarType::Char == target_type) {
     return int8::adaptive_avg_pool2d(input, output_size);
   }
-  //convert to fp32 path..
+  //convert to fp32 path.
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("adaptive_avg_pool2d");
+#endif
   return at::adaptive_avg_pool2d(cpu_cached_cast(at::kFloat, input), output_size);
 }
 
