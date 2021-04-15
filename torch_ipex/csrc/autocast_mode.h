@@ -62,6 +62,15 @@ inline std::vector<Tensor> cpu_cached_cast(at::ScalarType to_type, const TensorL
   return vec;
 }
 
+inline std::vector<Tensor> cpu_cached_cast(at::ScalarType to_type, const std::vector<at::Tensor>& arg) {
+  std::vector<Tensor> vec;
+  vec.reserve(arg.size());
+  for (const auto& t : arg) {
+    vec.push_back(cpu_cached_cast(to_type, t));
+  }
+  return vec;
+}
+
 template <typename T>
 inline T cpu_cached_cast(at::ScalarType to_type, T arg) {
   return arg;
@@ -103,6 +112,13 @@ inline at::ScalarType prioritize(at::ScalarType current, const Tensor& nextArg) 
 // Overload to catch TensorList args (for e.g. cat, stack).
 // Reuses the overload above to process each Tensor in the list.
 inline at::ScalarType prioritize(at::ScalarType current, const TensorList& list) {
+  for (const auto& tensor : list) {
+    current = prioritize(current, tensor);
+  }
+  return current;
+}
+
+inline at::ScalarType prioritize(at::ScalarType current, const std::vector<Tensor>& list) {
   for (const auto& tensor : list) {
     current = prioritize(current, tensor);
   }

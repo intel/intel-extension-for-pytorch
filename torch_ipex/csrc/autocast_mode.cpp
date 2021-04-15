@@ -44,7 +44,7 @@ void clear_autocast_cache() { cached_casts.clear(); }
 Tensor cpu_cached_cast(at::ScalarType to_type, const Tensor& arg) {
   if (is_eligible_cpu(arg) && (arg.scalar_type() != to_type)) {
     bool can_try_cache =
-        (to_type == at::kBFloat16 && arg.scalar_type() == at::kFloat &&
+        !at::GradMode::is_enabled() && (to_type == at::kBFloat16 && arg.scalar_type() == at::kFloat &&
         arg.requires_grad() && arg.is_leaf() && !arg.is_view() && !torch::jit::tracer::isTracing()); //Leslie Disable cache when we use the jit mode
 
     if (can_try_cache) {

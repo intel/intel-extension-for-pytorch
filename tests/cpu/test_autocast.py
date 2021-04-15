@@ -1,5 +1,6 @@
 import unittest, copy
 import torch
+import torch.nn as nn
 import intel_pytorch_extension as ipex
 from common_utils import TestCase
 import time, sys
@@ -101,6 +102,84 @@ class TestSimpleNet(TestCase):
             #print(traced_model.graph_for(x))
         #ipex.core.enable_jit_opt()
         self.assertEqual(y.dtype, torch.float) #conv whitelist, bn blacklist, relu fallthrough
+
+class TestCustomerOps(TestCase):
+    def test_interaction_op(self):
+        def interact_fusion(x, ly):
+            A = [x] + ly
+            R = ipex.interaction(*A)
+            return R
+        
+        def interact_fusion_autocast(x, ly):
+            A = [x] + ly
+            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
+                R = ipex.interaction(*A)
+            return R
+
+        dtypes=[torch.float32]
+        for dtype in dtypes:
+            x1 = torch.randn([2048, 128]).to(dtype).clone().detach().requires_grad_()
+            x2 = x1.clone().bfloat16().detach().requires_grad_()
+            ly1 = []
+            ly2 = []
+            for i in range(0, 26):
+                V = torch.randn([2048, 128]).to(dtype).clone().detach().requires_grad_()
+                ly1.append(V)
+                ly2.append(V.clone().bfloat16().detach().requires_grad_())
+
+            A = interact_fusion(x1, ly1) # all fp32
+            B = interact_fusion_autocast(x2, ly2) # all bf16
+            C = interact_fusion_autocast(x1, ly2) #  fp32 dense bf16 emb 
+            D = interact_fusion_autocast(x2, ly1) #  bf16 dense fp32 emb
+
+            self.assertEqual(A.dtype, torch.float)
+            self.assertEqual(B.dtype, torch.bfloat16)
+            #promote to fp32
+            self.assertEqual(C.dtype, torch.float)
+            self.assertEqual(D.dtype, torch.float)
+
+            self.assertTrue(torch.allclose(A, B.float(), rtol=0.05, atol=0.1))
+            self.assertTrue(torch.allclose(A, C.float(), rtol=0.05, atol=0.1))
+            self.assertTrue(torch.allclose(A, D.float(), rtol=0.05, atol=0.1))
+
+            A.mean().backward()
+            B.mean().backward()
+            
+            self.assertEqual(x1.grad.dtype, torch.float)
+            self.assertEqual(x2.grad.dtype, torch.bfloat16)
+
+            self.assertEqual(x1.grad, x2.grad, 1e-03)
+            for i in range(0, 26):
+                self.assertEqual(ly1[i].grad.dtype, torch.float)
+                self.assertEqual(ly2[i].grad.dtype, torch.bfloat16)
+                self.assertEqual(ly1[i].grad, ly2[i].grad, 1e-03)
+
+    def test_embeddingbag_op(self):
+        cpu_emb = nn.EmbeddingBag(10, 3, mode='sum', sparse=True)
+        autocast_emb = copy.deepcopy(cpu_emb)
+
+        input = torch.LongTensor([1,2,4,5,4,3,2,9])
+        # bf16_input = input.clone().detach()
+
+        offsets = torch.LongTensor([0,1,2,3,4,5,6,7])
+        # bf16_offsets = offsets.clone().detach()
+
+        cpu_out = cpu_emb(input, offsets)
+        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+            inference_out = autocast_emb(input, offsets)
+
+        self.assertEqual(cpu_out.dtype, torch.float)
+        self.assertEqual(inference_out.dtype, torch.bfloat16)
+        self.assertEqual(cpu_out, inference_out.float(), 1e-2)
+
+        # re-init autocast_emb
+        autocast_emb = copy.deepcopy(cpu_emb)
+        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)):
+            traininig_out = autocast_emb(input, offsets)
+
+        # do not cast weight to bf16 while not inference only
+        self.assertEqual(traininig_out.dtype, torch.float)
+        self.assertEqual(cpu_out, traininig_out)
 
 if __name__ == '__main__':
     test = unittest.main()

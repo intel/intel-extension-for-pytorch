@@ -10,6 +10,9 @@
 #include <algorithm>
 #include "cpu/bf16/vec/bf16_vec_kernel.h"
 #include "ExtendOPs.h"
+#include "torch_ipex/csrc/autocast_mode.h"
+#include "torch_ipex/csrc/autocast_verbose.h"
+
 namespace torch_ipex {
 
 const int MODE_SUM = 0;
@@ -458,3 +461,30 @@ static auto dispatch =
     torch::RegisterOperators()
         .op("torch_ipex::embedding_bag", &torch_ipex::AtenIpexTypeExt::embedding_bag);
 }
+
+namespace torch_ipex {
+namespace autocast {
+
+std::vector<at::Tensor> embedding_bag(
+    const at::Tensor &weight, const at::Tensor &indices,
+    const at::Tensor &offsets, bool scale_grad_by_freq, int64_t mode,
+    bool sparse, const c10::optional<at::Tensor> &per_sample_weights,
+    bool include_last_offset){
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+    .findSchemaOrThrow("torch_ipex::embedding_bag", "")
+    .typed<decltype(embedding_bag)>();
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("embedding_bag");
+#endif
+  auto casted_weight = at::GradMode::is_enabled() ? weight : cpu_cached_cast(at::kBFloat16, weight);
+  return op.call(casted_weight, indices, offsets,
+                 scale_grad_by_freq, mode,  sparse, 
+                 per_sample_weights, include_last_offset);
+}
+
+TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m){
+  m.impl("embedding_bag", torch_ipex::autocast::embedding_bag);
+}
+
+}}
