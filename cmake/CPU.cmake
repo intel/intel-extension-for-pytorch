@@ -11,8 +11,14 @@ SET(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
 SET(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 set(DPCPP_CPU_ROOT "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/cpu")
-add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
-#add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn)
+
+
+# TODO: Once llga is merged into oneDNN, use oneDNN directly as the third_party of IPEX
+# use the oneDNN in llga temporarily: third_party/llga/third_party/oneDNN
+add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/llga)
+# add_subdirectory(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn)
+
+
 #find_package(TorchCCL REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
@@ -132,12 +138,20 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-trapping-math")
 
 # include mkl-dnn before PyTorch
 # Otherwise, path_to_pytorch/torch/include/dnnl.hpp will be used as the header
-include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
-include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
-#include_directories(${PROJECT_SOURCE_DIR}/build/third_party/ideep/include)
-#include_directories(${DPCPP_THIRD_PARTY_ROOT}/ideep/include)
-#include_directories(${PROJECT_SOURCE_DIR}/build/third_party/ideep/mkl-dnn/include)
-#include_directories(${DPCPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include)
+
+include_directories(${PROJECT_SOURCE_DIR})
+include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
+include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
+
+include_directories(${DPCPP_THIRD_PARTY_ROOT}/llga/include)
+include_directories(${PROJECT_SOURCE_DIR}/build/third_party/llga/third_party/oneDNN/include)
+include_directories(${DPCPP_THIRD_PARTY_ROOT}/llga/third_party/oneDNN/include)
+# TODO: once llga is merged into oneDNN, use oneDNN directly as the third_party instead of using that inside llga
+# include_directories(${PROJECT_SOURCE_DIR}/build/third_party/mkl-dnn/include)
+# include_directories(${DPCPP_THIRD_PARTY_ROOT}/mkl-dnn/include)
+
+include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
+
 
 # Set installed PyTorch dir
 if(DEFINED PYTORCH_INSTALL_DIR)
@@ -147,11 +161,9 @@ else()
   message(FATAL_ERROR, "Cannot find installed PyTorch directory")
 endif()
 
-include_directories(${PROJECT_SOURCE_DIR})
-include_directories(${PROJECT_SOURCE_DIR}/torch_ipex)
-include_directories(${PROJECT_SOURCE_DIR}/torch_ipex/csrc/)
+# include pybind11 after pytorch include
+# to be able to use the py::class defined in PyTorch when binding c++ API to Python in IPEX
 include_directories(${DPCPP_THIRD_PARTY_ROOT}/pybind11/include)
-include_directories(${DPCPP_THIRD_PARTY_ROOT}/xsmm/include)
 
 # sources
 set(DPCPP_SRCS)
@@ -199,8 +211,8 @@ endif()
 
 add_dependencies(${PLUGIN_NAME} pybind11)
 #add_dependencies(${PLUGIN_NAME} torch_ccl)
-add_dependencies(${PLUGIN_NAME} dnnl)
-target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl)
+add_dependencies(${PLUGIN_NAME} dnnl_graph)
+target_link_libraries(${PLUGIN_NAME} PUBLIC dnnl_graph)
 add_dependencies(${PLUGIN_NAME} xsmm)
 #target_link_libraries(${PLUGIN_NAME} PUBLIC torch_ccl)
 link_directories(${PYTORCH_INSTALL_DIR}/lib)
