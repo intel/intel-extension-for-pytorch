@@ -6,6 +6,7 @@ LIST(APPEND DPCPP_COMMON_SRCS
     ${DPCPP_ROOT}/version.cpp
     ${DPCPP_ROOT}/utils.cpp
     ${DPCPP_ROOT}/autocast_mode.cpp
+    ${DPCPP_ROOT}/LlgaTensorImpl.cpp
     ${DPCPP_ROOT}/autocast_kernel.cpp
     ${DPCPP_ROOT}/autocast_verbose.cpp
 )
