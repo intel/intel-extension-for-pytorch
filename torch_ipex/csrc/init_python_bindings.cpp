@@ -1,5 +1,6 @@
 #include "init_python_bindings.h"
 #include "version.h"
+#include "jit/codegen/onednn/interface.h"
 
 #include <c10/core/Device.h>
 #include <c10/core/Layout.h>
@@ -29,6 +30,7 @@
 #include <torch/csrc/api/include/torch/python.h>
 #include <c10/core/DeviceType.h>
 #include <torch/csrc/Exceptions.h>
+#include <torch/csrc/jit/passes/pass_manager.h>
 
 #include "cpu/ExtendOPs.h"
 
@@ -62,6 +64,14 @@ void InitIpexModuleBindings(py::module m) {
   m.def("autocast_decrement_nesting",
         &torch_ipex::autocast::autocast_decrement_nesting);
   m.def("clear_autocast_cache", &torch_ipex::autocast::clear_autocast_cache);
+  
+  // llga path
+  m.def("_jit_set_llga_enabled", &torch::jit::RegisterLlgaFuseGraph::setEnabled);
+  m.def("_jit_llga_enabled", &torch::jit::RegisterLlgaFuseGraph::isEnabled);
+  m.def("_jit_llga_fuser", [](std::shared_ptr<torch::jit::Graph> g) {
+        return torch::jit::fuser::onednn::fuseGraph(g);
+  });
+
   m.def("enable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(true); });
   m.def("disable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
   m.def("get_jit_opt", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
@@ -152,6 +162,13 @@ using namespace torch::jit;
 
 void InitIpexBindings(py::module m) {
   InitIpexModuleBindings(m);
+  
+  // // llga jit fusion pass
+  // torch::jit::registerPrePass([](std::shared_ptr<Graph>& g) {
+  //   if (torch::jit::RegisterLlgaFuseGraph::isEnabled()) {
+  //     torch::jit::fuser::onednn::fuseGraph(g);
+  //   }
+  // });
   // jit fusion pass
   torch::jit::registerPrePass([](std::shared_ptr<Graph>& g) {
     if (AutoOptConfig::singleton().get_jit_fuse()) {
