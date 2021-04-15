@@ -30,12 +30,15 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
   GRAPH_DUMP("After PrepareBinaryForLLGA. Before EliminateCommonSubexpression", g);
   EliminateCommonSubexpression(g);
   GRAPH_DUMP("After EliminateCommonSubexpression. Before PrepareDequantForLLGA", g);
+  // PrepareDequantForLLGA must be placed after EliminateCommonSubexpression
   PrepareDequantForLLGA(g);
   GRAPH_DUMP("After PrepareDequantForLLGA. Before DeferSizeCheck", g);
   DeferSizeCheck(g);  
   GRAPH_DUMP("After DeferSizeCheck. Before CreateLlgaSubgraphs", g);
+  // CreateLlgaSubgraphs must be placed after all the preparation passes above
   CreateLlgaSubgraphs(g);
   GRAPH_DUMP("After CreateLlgaSubgraphs. Before PropagateLayout", g);
+  // PropagateLayout and PropagateDtype must be placed after CreateLlgaSubgraphs
   PropagateLayout(g);
   GRAPH_DUMP("After PropagateLayout. Before PropagateDtype", g);
   PropagateDtype(g);

@@ -28,9 +28,9 @@ void DtypePropagation(Node* n) {
   auto output_node = subgraph->outputs()[0]->node();
 
   if (output_node->kind() == Symbol::aten("quantize_per_tensor")) {
-    LlgaNodeWrapper(n).setOutputDtypes(offset, output_dtype[Operator::String(output_node, 3)]);
+    LlgaNodeWrapper(n).setOutputDtypes(offset, output_dtype[Operator::String(output_node, /* offset */3)]);
   } else if (output_node->kind() == Symbol::aten("quantize_per_channel")) {
-    LlgaNodeWrapper(n).setOutputDtypes(offset, output_dtype[Operator::String(output_node, 4)]);
+    LlgaNodeWrapper(n).setOutputDtypes(offset, output_dtype[Operator::String(output_node, /* offset */4)]);
   } else if (output_node->kind() == Symbol::aten("dequantize")) {
     LlgaNodeWrapper(n).setOutputDtypes(offset, output_dtype[std::string("fp32")]);
   } else {

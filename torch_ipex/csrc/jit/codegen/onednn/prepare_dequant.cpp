@@ -6,12 +6,14 @@ namespace fuser {
 namespace onednn {
 
 void mayDecomposeDequant(Node* node) {
-  if (node->input(0)->node()->kind()!= Symbol::aten("quantize_per_tensor") && node->input(0)->node()->kind()!= Symbol::aten("quantize_per_channel")) {
+  if (node->input(0)->node()->kind() != Symbol::aten("quantize_per_tensor") && node->input(0)->node()->kind() != Symbol::aten("quantize_per_channel")) {
       return;
   }
 
-  auto* output = node->output(0);
-  auto& uses = output->uses();
+  auto* quant_node = node->input(0);
+
+  auto* dequant = node->output(0);
+  auto& uses = dequant->uses();
   if (uses.size() < 2) {
       return;
   }
@@ -20,10 +22,16 @@ void mayDecomposeDequant(Node* node) {
   auto g = node->owningGraph();
   int nb_uses = uses.size();
 
+  // save the dequant_users before modifying the graph
+  std::vector<torch::jit::Node*> dequant_users;
+  for (const auto& use : uses) {
+    dequant_users.push_back(use.user);
+  }
+
   for (int i = 1; i < nb_uses; i++) {
-    auto dequant = g->insert(Symbol::aten("dequantize"), {node->input(0)});
-    auto right_fork =  uses[i].user;
-    right_fork->replaceInputWith(output, dequant);
+    auto split_dequant = g->insert(Symbol::aten("dequantize"), {quant_node});
+    auto dequant_user =  dequant_users[i];
+    dequant_user->replaceInputWith(dequant, split_dequant);
   }
 }
 

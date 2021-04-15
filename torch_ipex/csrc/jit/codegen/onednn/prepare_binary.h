@@ -11,12 +11,15 @@ namespace onednn {
 //
 // The pass does the following:
 //
-// - Convert scalar input of aten::add and aten::mul into Float tensor with
+// - (1). Convert scalar input of aten::add and aten::mul into Float tensor with
 //   dimension [1]
 //
-// - Decompose fused add into aten::mul + aten::add when alpha != 1.0
+// - (2). Decompose fused add into aten::mul + aten::add when alpha != 1.0
 //
-// - Eliminate identity add/mul, i.e., tensor + 0, tensor * 1
+// - (3). Eliminate identity add/mul, i.e., tensor + 0, tensor * 1
+//
+// (1) and (2) are in the purpose of aligning with the OP spec of LLGA.
+// (3) is an optimization pass to remove the redundant calculation
 //
 void PrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph);
 
