@@ -6,6 +6,7 @@
 #include <c10/core/Layout.h>
 #include <c10/util/Optional.h>
 #include <torch/csrc/utils/pybind.h>
+#include <ATen/native/quantized/cpu/quant_utils.h>
 
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/jit/runtime/custom_operator.h>
@@ -100,11 +101,23 @@ void InitIpexModuleBindings(py::module m) {
         d["name"] = indicator.get_indicator_name();
         d["algorithm"] = indicator.get_indicator_algorithm();
         d["weight_granularity"] = indicator.get_indicator_weight_granularity();
-        std::vector<float> i_scales, o_scales;
-        std::tie(i_scales, o_scales) = indicator.get_indicator_scales();
+        std::vector<float> x_scales, y_scales;
+        std::vector<int64_t> x_zero_points, y_zero_points;
+        std::vector<quant_utils::TensorQuantizationParams> x_params, y_params; 
+        std::tie(x_params, y_params) = indicator.get_indicator_scales();
+        for (auto& p: x_params) {
+          x_scales.push_back(p.scale);
+          x_zero_points.push_back(p.zero_point);
+        }
+        for (auto& p: y_params) {
+          y_scales.push_back(p.scale);
+          y_zero_points.push_back(p.zero_point);
+        }
         std::vector<float> w_scales = indicator.get_indicator_weight_scales();
-        d["input_scales"] = i_scales;
-        d["output_scales"] = o_scales;
+        d["input_scales"] = x_scales;
+        d["input_zero_points"] = x_zero_points;
+        d["output_scales"] = y_scales;
+        d["output_zero_points"] = y_zero_points;
         d["weight_scales"] = w_scales; 
         std::vector<std::string> i_quantized_dtypes, o_quantized_dtypes;
         std::tie(i_quantized_dtypes, o_quantized_dtypes)= indicator.get_indicator_quantized_dtypes();
@@ -127,13 +140,25 @@ void InitIpexModuleBindings(py::module m) {
       int64_t id = py::cast<std::int64_t>(i["id"]);
       std::string op_name = py::cast<std::string>(i["name"]);
       std::string algorithm = py::cast<std::string>(i["algorithm"]);
-      std::string weight_granularity =
-          py::cast<std::string>(i["weight_granularity"]);
-      std::vector<float> i_scales =
-          py::cast<std::vector<float>>(i["input_scales"]);
+      std::string weight_granularity = py::cast<std::string>(i["weight_granularity"]);
+      std::vector<double> x_scales = py::cast<std::vector<double>>(i["input_scales"]);
+      std::vector<int32_t> x_zero_points = py::cast<std::vector<int32_t>>(i["input_zero_points"]);
+      std::vector<double> y_scales = py::cast<std::vector<double>>(i["output_scales"]);
+      std::vector<int32_t> y_zero_points = py::cast<std::vector<int32_t>>(i["output_zero_points"]);
+      std::vector<quant_utils::TensorQuantizationParams> x_params, y_params;
+      for (auto i = 0; i < x_scales.size(); i++) {
+        quant_utils::TensorQuantizationParams param;
+        param.scale = x_scales[i];
+        param.zero_point = x_zero_points[i];
+        x_params.push_back(param);
+      }
+      for (auto i = 0; i < y_scales.size(); i++) {
+        quant_utils::TensorQuantizationParams param;
+        param.scale = y_scales[i];
+        param.zero_point = y_zero_points[i];
+        y_params.push_back(param);
+      }
       std::vector<float> w_scales = py::cast<std::vector<float>>(i["weight_scales"]);
-      std::vector<float> o_scales =
-          py::cast<std::vector<float>>(i["output_scales"]);
       std::vector<std::string> i_quantized_dtypes =
           py::cast<std::vector<std::string>>(i["input_quantized_dtypes"]);
       std::vector<std::string> o_quantized_dtypes =
@@ -142,8 +167,8 @@ void InitIpexModuleBindings(py::module m) {
       std::vector<bool> outputs_quantized = py::cast<std::vector<bool>>(i["outputs_quantized"]);
       std::vector<std::string> inputs_flow = py::cast<std::vector<std::string>>(i["inputs_flow"]);
       std::vector<std::string> outputs_flow = py::cast<std::vector<std::string>>(i["outputs_flow"]);
-      Indicator temp(id, op_name, algorithm, weight_granularity, i_scales,
-                     w_scales, o_scales, i_quantized_dtypes, o_quantized_dtypes,
+      Indicator temp(id, op_name, algorithm, weight_granularity, x_params,
+                     w_scales, y_params, i_quantized_dtypes, o_quantized_dtypes,
                      inputs_quantized, outputs_quantized, inputs_flow, outputs_flow);
       indicators.push_back(temp);
     }

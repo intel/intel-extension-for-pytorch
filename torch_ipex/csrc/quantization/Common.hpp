@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/Tensor.h>
+#include <ATen/native/quantized/cpu/quant_utils.h>
 
 namespace torch_ipex {
 
@@ -19,9 +20,7 @@ void insert_or_updata_observer(const at::TensorList &inputs,
                                std::vector<std::string> inputs_flow,
                                std::vector<std::string> outputs_flow);
 
-std::vector<std::vector<float>> get_int8_scales(std::vector<bool> i_uint8_used,
-                                                std::vector<bool> o_uint8_used,
-                                                const int64_t ops_id);
+std::vector<std::vector<quant_utils::TensorQuantizationParams>> get_int8_scales(const int64_t ops_id);
 
 std::string get_int8_weight_granularity(const int64_t ops_id);
 
@@ -32,5 +31,7 @@ at::Tensor& get_int8_weight_tensor_scale(const int64_t ops_id);
 bool get_int8_quantized_status(const int64_t ops_id);
 
 std::tuple<std::vector<bool>, std::vector<bool>> get_int8_insert_quantized_status(const int64_t ops_id);
+
+std::tuple<std::vector<at::ScalarType>, std::vector<at::ScalarType>> get_int8_quantized_dtypes(const int64_t ops_id);
 
 }

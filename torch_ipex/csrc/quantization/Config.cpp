@@ -22,8 +22,8 @@ void Int8OptConfig::insert_or_updata_observer(
     std::string weight_granularity = "per_channel";
     const int nums_input = i_min_max_values.size();
     const int nums_output = o_min_max_values.size();
-    std::vector<std::string> input_quantized_dtypes(nums_input, "int8");
-    std::vector<std::string> output_quantized_dtypes(nums_output, "int8");
+    std::vector<std::string> input_quantized_dtypes(nums_input, "uint8");
+    std::vector<std::string> output_quantized_dtypes(nums_output, "uint8");
     const auto num_inputs = i_min_max_values.size();
     std::vector<bool> inputs_quantized(num_inputs, true);
     const auto num_outputs = o_min_max_values.size();
@@ -95,38 +95,54 @@ void Int8OptConfig::clear_indicators() { indicators_.clear(); }
 
 void Int8OptConfig::add_indicators() {
   indicators_.clear();
-  // default used is s8
+  // default used is u8
+  const int precision = 8;
   for (auto i = 0; i < observers_.size(); i++) {
-    std::vector<float> input_scales, output_scales;
+    std::vector<quant_utils::TensorQuantizationParams> input_params, output_params;
     std::vector<float> weight_scales;
-    std::vector<std::vector<float>> inputs_values =
-        observers_[i].inputs_min_max_values;
-    std::vector<std::vector<float>> outputs_values =
-        observers_[i].outputs_min_max_values;
-    std::vector<std::vector<float>> weight_values =
-        observers_[i].weight_min_max_values;
 
+    std::vector<std::vector<float>> input_values = observers_[i].inputs_min_max_values;
+    std::vector<std::vector<float>> output_values = observers_[i].outputs_min_max_values;
+    std::vector<std::vector<float>> weight_values = observers_[i].weight_min_max_values;
+    std::vector<std::string> x_quantized_types = observers_[i].input_quantized_dtypes;
+    std::vector<std::string> y_quantized_types = observers_[i].output_quantized_dtypes;
     // for symmetric: s = 2max(|x_min|, x_max) / (Q_max - Q_min),
     // z = 0 for qint8 and z = 128 for quint8;
     // otherwise: s = (x_max - x_min) / (Q_max - Q_min),
     // z = Q_min - round(x_min / s).
-    for (auto i = 0; i < inputs_values.size(); i++) {
-      input_scales.push_back(
-          std::max(std::abs(inputs_values[i][0]), inputs_values[i][1]) / 127.5);
+    for (auto j = 0; j < input_values.size(); j++) {
+      bool is_signed = x_quantized_types[j] == "int8" ? true : false;
+      auto qparams = quant_utils::ChooseQuantizationParams(
+          /*min*/ input_values[j][0],
+          /*max*/ input_values[j][1],
+          /*q_min*/ is_signed ? -(1 << (precision - 1)) : 0,
+          /*q_max*/ is_signed ? ((1 << (precision - 1)) - 1) : (1 << precision) - 1
+      );
+      input_params.push_back(qparams);
     }
-    for (auto j = 0; j < outputs_values.size(); j++) {
-      output_scales.push_back(
-          std::max(std::abs(outputs_values[j][0]), outputs_values[j][1]) / 127.5);
+    for (auto k = 0; k < output_values.size(); k++) {
+      bool is_signed = y_quantized_types[k] == "int8" ? true : false;
+      auto qparams = quant_utils::ChooseQuantizationParams(
+          /*min*/ output_values[k][0],
+          /*max*/ output_values[k][1],
+          /*q_min*/ is_signed ? -(1 << (precision - 1)) : 0,
+          /*q_max*/ is_signed ? ((1 << (precision - 1)) - 1) : (1 << precision) - 1);
+      output_params.push_back(qparams);
     }
-    for (auto j = 0; j < weight_values.size(); j++) {
-      weight_scales.push_back(
-          std::max(std::abs(weight_values[j][0]), weight_values[j][1]) / 127.5);
+    // for weight, always using symetric quantization, quantized to int8 dtype.
+    // is_signed = true;
+    for (auto m = 0; m < weight_values.size(); m++) {
+      auto max_value = std::max(std::abs(weight_values[m][0]), weight_values[m][1]);
+      auto qparams = quant_utils::ChooseQuantizationParams(
+          /*min*/ -max_value,
+          /*max*/ max_value,
+          /*q_min*/ -(1 << (precision - 1)),
+          /*q_max*/ ((1 << (precision - 1)) - 1));
+      weight_scales.push_back(qparams.scale);
     }
-    // zero_points not used now, zero_points = 0 for s8 and 128 for u8.
-    // zero_point = 128;
     Indicator new_indicator(
         observers_[i].id, observers_[i].name, observers_[i].algorithm,
-        observers_[i].weight_granularity, input_scales, weight_scales, output_scales,
+        observers_[i].weight_granularity, input_params, weight_scales, output_params,
         observers_[i].input_quantized_dtypes, observers_[i].output_quantized_dtypes,
         observers_[i].inputs_quantized, observers_[i].outputs_quantized,
         observers_[i].inputs_flow, observers_[i].outputs_flow);
@@ -135,13 +151,10 @@ void Int8OptConfig::add_indicators() {
   observers_.clear();
 }
 
-std::vector<std::vector<float>>
-Int8OptConfig::get_indicator_scales(std::vector<bool> i_uint8_used,
-                                    std::vector<bool> o_uint8_used,
-                                    int64_t ops_id) {
-  std::vector<float> inputs_scales, outputs_scales;
-  std::tie(inputs_scales, outputs_scales) = indicators_[ops_id].get_indicator_scales();
-  return  {inputs_scales, outputs_scales};
+std::vector<std::vector<quant_utils::TensorQuantizationParams>> Int8OptConfig::get_indicator_scales(const int64_t ops_id) {
+  std::vector<quant_utils::TensorQuantizationParams> x_params, y_params;
+  std::tie(x_params, y_params) = indicators_[ops_id].get_indicator_scales();
+  return  {x_params, y_params};
 }
 
 std::string Int8OptConfig::get_indicator_weight_granularity(const int64_t ops_id) {
@@ -166,6 +179,11 @@ at::Tensor& Int8OptConfig::get_indicator_weight_tensor_scale(const int64_t ops_i
 std::tuple<std::vector<bool>, std::vector<bool>>
 Int8OptConfig::get_indicator_insert_quantized_status(const int64_t ops_id) {
    return indicators_[ops_id].get_indicator_insert_quantized_status();
+}
+
+std::tuple<std::vector<std::string>, std::vector<std::string>>
+Int8OptConfig::get_indicator_quantized_dtypes(const int64_t ops_id) {
+   return indicators_[ops_id].get_indicator_quantized_dtypes();
 }
 
 void Int8OptConfig::set_indicators(std::vector<Indicator> indicators) {

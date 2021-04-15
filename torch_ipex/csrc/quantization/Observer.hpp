@@ -1,9 +1,11 @@
 #pragma once
-
+#include <ATen/native/quantized/cpu/quant_utils.h>
 #include "torch_ipex/csrc/rw_lock.h"
 
 namespace torch_ipex {
 namespace int8 {
+
+using namespace quant_utils;
 
 struct Observer {
   int64_t id;
@@ -33,18 +35,18 @@ public:
   Indicator(int64_t i, std::string n,
             std::string alg,
             std::string granu,
-            std::vector<float> i_scale,
+            std::vector<TensorQuantizationParams> i_params,
             std::vector<float> w_scales,
-            std::vector<float> o_scale,
-            std::vector<std::string> i_quantized_dtype,
-            std::vector<std::string> o_quantized_dtype,
+            std::vector<TensorQuantizationParams> o_params,
+            std::vector<std::string> i_quantized_dtypes,
+            std::vector<std::string> o_quantized_dtypes,
             std::vector<bool> inputs_quant,
             std::vector<bool> outputs_quant,
             std::vector<std::string> i_flow,
             std::vector<std::string> o_flow )
       : id(i), name(n), algorithm(alg), weight_granularity(granu),
-        inputs_scale(i_scale), weight_scales(std::move(w_scales)), outputs_scale(o_scale),
-        input_quantized_dtypes(i_quantized_dtype), output_quantized_dtypes(o_quantized_dtype),
+        input_params(i_params), weight_scales(std::move(w_scales)), output_params(o_params),
+        input_quantized_dtypes(i_quantized_dtypes), output_quantized_dtypes(o_quantized_dtypes),
         inputs_quantized(inputs_quant), outputs_quantized(outputs_quant),
         inputs_flow(i_flow), outputs_flow(o_flow) {}
 
@@ -54,9 +56,9 @@ public:
       name = other.name;
       algorithm = other.algorithm;
       weight_granularity = other.weight_granularity;
-      inputs_scale = other.inputs_scale;
+      input_params = other.input_params;
       weight_scales = other.weight_scales;
-      outputs_scale = other.outputs_scale;
+      output_params = other.output_params;
       input_quantized_dtypes = other.input_quantized_dtypes;
       output_quantized_dtypes = other.output_quantized_dtypes;
       inputs_quantized = other.inputs_quantized;
@@ -73,17 +75,16 @@ public:
 
   std::string get_indicator_weight_granularity() { return weight_granularity; }
 
-  std::tuple<std::vector<float>, std::vector<float>> get_indicator_scales() {
+  std::tuple<std::vector<TensorQuantizationParams>, std::vector<TensorQuantizationParams>> get_indicator_scales() {
     UniqueReadLock<ReadWriteMutex> lock(rwmutex);
-    return std::make_tuple(inputs_scale, outputs_scale);
+    return std::make_tuple(input_params, output_params);
   }
 
   std::vector<float> get_indicator_weight_scales() {
     return weight_scales;
   }
 
-  std::tuple<std::vector<std::string>, std::vector<std::string>>
-  get_indicator_quantized_dtypes() {
+  std::tuple<std::vector<std::string>, std::vector<std::string>> get_indicator_quantized_dtypes() {
     UniqueReadLock<ReadWriteMutex> lock(rwmutex);
     return std::make_tuple(input_quantized_dtypes, output_quantized_dtypes);
   }
@@ -92,11 +93,11 @@ public:
     return std::make_tuple(inputs_quantized, outputs_quantized);
   }
 
-  void set_indicator_scales(std::vector<float> new_inputs_scale,
-                            std::vector<float> new_outputs_scale) {
+  void set_indicator_scales(std::vector<TensorQuantizationParams> new_input_params,
+                            std::vector<TensorQuantizationParams> new_output_params) {
     UniqueWriteLock<ReadWriteMutex> lock(rwmutex);
-    inputs_scale = new_inputs_scale;
-    outputs_scale = new_outputs_scale;
+    input_params = new_input_params;
+    output_params = new_output_params;
   }
 
   void set_indicator_quantized_dtypes(std::vector<std::string> new_input_quantized_dtypes,
@@ -115,9 +116,9 @@ private:
   std::string name;
   std::string algorithm;
   std::string weight_granularity;
-  std::vector<float> inputs_scale;
+  std::vector<TensorQuantizationParams> input_params;
+  std::vector<TensorQuantizationParams> output_params; 
   std::vector<float> weight_scales;
-  std::vector<float> outputs_scale;
   std::vector<std::string> input_quantized_dtypes;
   std::vector<std::string> output_quantized_dtypes;
   std::vector<bool> inputs_quantized;

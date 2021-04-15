@@ -4,6 +4,7 @@
 
 #include <ATen/Tensor.h>
 #include <torch/torch.h>
+#include <ATen/native/quantized/cpu/quant_utils.h>
 
 #include "Observer.hpp"
 
@@ -31,9 +32,7 @@ public:
 
   void add_indicators();
 
-  std::vector<std::vector<float>>
-  get_indicator_scales(std::vector<bool> i_uint8_used,
-                       std::vector<bool> o_uint8_used, int64_t ops_id);
+  std::vector<std::vector<quant_utils::TensorQuantizationParams>> get_indicator_scales(const int64_t ops_id);
 
   std::string get_indicator_weight_granularity(const int64_t ops_id);
 
@@ -44,6 +43,8 @@ public:
 
   std::tuple<std::vector<bool>, std::vector<bool>> get_indicator_insert_quantized_status(const int64_t ops_id);
 
+std::tuple<std::vector<std::string>, std::vector<std::string>> get_indicator_quantized_dtypes(const int64_t ops_id);
+  
   void set_indicators(std::vector<Indicator> indicators);
 
   std::vector<Indicator> get_indicators();
