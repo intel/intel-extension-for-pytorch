@@ -37,6 +37,11 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
   normalization_flags flags = normalization_flags::use_scale_shift;
   bool useScaleShift = (bool)(flags & normalization_flags::use_scale_shift);
 
+  TORCH_CHECK(wgh.scalar_type() == ScalarType::Float,
+      "LayerNorm scale need keep on FP32 to get corret precsion ...");
+  TORCH_CHECK(bia.scalar_type() == ScalarType::Float,
+      "LayerNorm shift need keep on FP32 to get corret precsion ...");
+
   int32_t n, ic, ih;
   memory::dims tz, st, stats_tz;
   memory::format_tag stats_fmt;
@@ -86,11 +91,11 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
   if (training) {
     auto stats_usr_md = memory::desc(stats_tz, stats_dt, stats_fmt);
     if (!src_ctx.is_plain() && stats_exp_md != stats_usr_md) {
-      mean = empty_opaque_tensor(stats_exp_md, src.options(), c10::nullopt);
-      rstd = empty_opaque_tensor(stats_exp_md, src.options(), c10::nullopt);
+      mean = empty_opaque_tensor(stats_exp_md, wgh.options(), c10::nullopt);
+      rstd = empty_opaque_tensor(stats_exp_md, wgh.options(), c10::nullopt);
     } else {
-      mean = at::empty(stats_tz, src.options());
-      rstd = at::empty(stats_tz, src.options());
+      mean = at::empty(stats_tz, wgh.options());
+      rstd = at::empty(stats_tz, wgh.options());
     }
 
     auto mean_memory = dpcpp_onednn_memory(stats_exp_md, engine, mean.data_ptr());
@@ -166,7 +171,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
     ih = src.size(1);
     src_tz = {ic, ih};
     src_st = {src.stride(0), src.stride(1)};
-    diff_dst_tz = {n, ic, ih};
+    diff_dst_tz = {ic, ih};
     diff_dst_st = {diff_dst.stride(0), diff_dst.stride(1)};
     stats_tz = {ic};
     stats_fmt = memory::format_tag::a;
