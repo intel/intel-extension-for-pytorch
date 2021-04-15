@@ -7,3 +7,6 @@
 [submodule "third_party/mkl-dnn"]
 	path = third_party/mkl-dnn
 	url = https://github.com/intel/mkl-dnn.git
+[submodule "third_party/llga"]
+	path = third_party/llga
+	url = https://github.com/intel-innersource/libraries.performance.math.onednn.git
