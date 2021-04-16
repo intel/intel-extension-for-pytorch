@@ -502,7 +502,7 @@ at::Tensor AtenIpexTypeExt::ROIAlign_forward(const at::Tensor& input,
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexTypeExt::ROIAlign_forward", std::vector<c10::IValue>({input, rois}), torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
-  return ROIAlign_forward_cpu(input, rois, spatial_scale, pooled_height, pooled_width, sampling_ratio);
+  return ROIAlign_forward_cpu(input.contiguous().to(torch::kFloat), rois, spatial_scale, pooled_height, pooled_width, sampling_ratio);
 }
 
 at::Tensor AtenIpexTypeExt::ROIAlign_backward(const at::Tensor& grad,
@@ -521,7 +521,7 @@ at::Tensor AtenIpexTypeExt::ROIAlign_backward(const at::Tensor& grad,
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexTypeExt::ROIAlign_backward", std::vector<c10::IValue>({grad, rois}), torch::autograd::Node::peek_at_next_sequence_nr());
 #endif
-  return ROIAlign_backward_cpu(grad, rois, spatial_scale, pooled_height, pooled_width, batch_size, channels, height, width, sampling_ratio);
+  return ROIAlign_backward_cpu(grad.contiguous().to(torch::kFloat), rois, spatial_scale, pooled_height, pooled_width, batch_size, channels, height, width, sampling_ratio);
 }
 
 }
