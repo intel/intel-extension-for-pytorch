@@ -9,6 +9,7 @@ LIST(APPEND DPCPP_JIT_SRCS
     ${DPCPP_ROOT}/jit/codegen/onednn/prepare_binary.cpp
     ${DPCPP_ROOT}/jit/codegen/onednn/prepare_dequant.cpp
     ${DPCPP_ROOT}/jit/codegen/onednn/runtime.cpp
+    ${DPCPP_ROOT}/jit/codegen/onednn/fusion_group_name.cpp
     ${DPCPP_ROOT}/jit/fusion_pass.cpp
     ${DPCPP_ROOT}/jit/register_dnnl_jit_ops.cpp
     ${DPCPP_ROOT}/jit/graph_rewrite.cpp

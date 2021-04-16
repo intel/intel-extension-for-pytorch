@@ -6,6 +6,7 @@
 #include "jit/codegen/onednn/defer_size_check.h"
 #include "jit/codegen/onednn/prepare_dequant.h"
 #include "jit/codegen/onednn/dtype_propagation.h"
+#include "jit/codegen/onednn/fusion_group_name.h"
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/decompose_ops.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
@@ -59,7 +60,7 @@ Operation createLlgaKernel(const Node* node) {
 
 RegisterOperators LLGAFusionGroupOp({
     torch::jit::Operator(
-        Symbol::fromQualString("ipex::LlgaFusionGroup"),
+        Symbol::fromQualString(fuser::onednn::LlgaFusionGroupName()),
         createLlgaKernel,
         AliasAnalysisKind::PURE_FUNCTION),
 });

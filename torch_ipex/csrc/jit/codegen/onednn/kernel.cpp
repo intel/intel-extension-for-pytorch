@@ -36,6 +36,9 @@ LlgaKernel::LlgaKernel(const Node* fusionNode)
       nInputs_(graph_->inputs().size()),
       nOutputs_(graph_->outputs().size()),
       debugName_(genDebugName()) {
+  // TODO: This is a workaround to recreate the partitions here. 
+  // The ideal way is to use the partition serialization API (not available from LLGA now) 
+  // to carry a serialized string representation from graph rewrite and deserialize it here.
   auto partitions = LlgaGraphHelper(graph_).getPartitions();
   TORCH_CHECK(
       partitions.size() == 1,

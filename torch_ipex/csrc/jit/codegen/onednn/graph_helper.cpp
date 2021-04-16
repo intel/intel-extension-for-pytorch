@@ -1,5 +1,6 @@
 #include "torch_ipex/csrc/LlgaTensorImpl.h"
 #include "jit/codegen/onednn/graph_helper.h"
+#include "jit/codegen/onednn/fusion_group_name.h"
 
 #include <ATen/core/functional.h>
 #include <torch/csrc/jit/jit_log.h>
@@ -459,7 +460,7 @@ LlgaGraphHelper::LlgaGraphHelper(
 
 bool LlgaGraphHelper::isLlgaSubgraph(const Node* node) {
   return node->hasAttribute(attr::Subgraph) &&
-      node->kind() == Symbol::fromQualString("ipex::LlgaFusionGroup");
+      node->kind() == Symbol::fromQualString(LlgaFusionGroupName());
 }
 
 bool LlgaGraphHelper::shouldMerge(Node* toMerge, Node* subgraph) {
@@ -502,7 +503,7 @@ Node* LlgaGraphHelper::createSingletonSubgraph(Node* n, AliasDb& aliasDb) {
   GRAPH_DEBUG(
       "Creating FusionGroup_", partitionId, " for ", n->kind().toQualString());
   auto group = SubgraphUtils::createSingletonSubgraphAndUpdateAliasing(
-      n, Symbol::fromQualString("ipex::LlgaFusionGroup"), aliasDb);
+      n, Symbol::fromQualString(LlgaFusionGroupName()), aliasDb);
   opToOwningPartition.add(group, partitionId);
   LlgaNodeWrapper(group).initOutputLayouts();
   LlgaNodeWrapper(group).initOutputDtypes();
