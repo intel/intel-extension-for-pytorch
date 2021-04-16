@@ -182,7 +182,6 @@ MAKE_REGISTER_FUNC(ADD_NS(convolution), "convolution", Tensor (const Tensor &, c
 MAKE_REGISTER_FUNC(ADD_NS(dropout), "dropout", Tensor (const Tensor &, double, bool), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(avg_pool2d), "avg_pool2d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(avg_pool3d), "avg_pool3d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(_softmax), "_softmax", Tensor (const Tensor &, int64_t, bool), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(gelu), "gelu", Tensor (const Tensor &), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(upsample_nearest1d), "upsample_nearest1d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(upsample_nearest1d), "upsample_nearest1d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, c10::optional<ArrayRef<double>>), fp32)
@@ -205,9 +204,6 @@ MAKE_REGISTER_FUNC(ADD_NS(smooth_l1_loss), "smooth_l1_loss", Tensor (const Tenso
 MAKE_REGISTER_FUNC(ADD_NS(reflection_pad1d), "reflection_pad1d", Tensor (const Tensor &, IntArrayRef), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(std), "std", Tensor (const Tensor &, bool), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(std), "std.dim", Tensor (const Tensor &, IntArrayRef, bool, bool), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(layer_norm), "layer_norm", Tensor (const Tensor &, IntArrayRef, const c10::optional<Tensor>&, const c10::optional<Tensor>&, double, bool), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(bucketize), "bucketize.Tensor", Tensor (const Tensor &, const Tensor &, bool, bool), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(bucketize), "bucketize.Scalar", Tensor (const Scalar&, const Tensor &, bool, bool), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(instance_norm), "instance_norm", Tensor (const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, bool, double, double, bool), fp32)
 
 // promote
