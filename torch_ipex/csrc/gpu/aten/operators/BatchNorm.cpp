@@ -59,6 +59,12 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
     bool training,
     double momentum,
     double epsilon) {
+  TORCH_CHECK(
+      weight_.scalar_type() == ScalarType::Float,
+      "BatchNorm weight only support FP32 data type in oneDNN.");
+  TORCH_CHECK(
+      bias_.scalar_type() == ScalarType::Float,
+      "BatchNorm bias only support FP32 data type in oneDNN.");
   auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -69,6 +75,9 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   Tensor running_var = condition_contiguous(running_var_);
   Tensor output;
 
+  auto feature_num = input.size(1);
+  auto feature_size = input.numel() / feature_num;
+
   if (!lazy_reorder_enabled())
       output = at::empty_like(input);
 
@@ -76,11 +85,11 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   normalization_flags flag = normalization_flags::use_scale_shift;
 
   if (!weight.defined()) {
-    weight = at::ones(input.size(1), input.options());
+    weight = at::ones(feature_num, weight.options());
   }
 
   if (!bias.defined()) {
-    bias = at::zeros(input.size(1), input.options());
+    bias = at::zeros(feature_num, weight.options());
   }
 
   if (!weight.defined() || !bias.defined()) {
@@ -102,8 +111,6 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
     //    trainning");
   }
 
-  auto feature_num = input.size(1);
-  auto feature_size = input.numel() / feature_num;
   memory::format_tag dnnl_format;
   memory::dims input_tz;
   get_dnnl_format(input, dnnl_format, input_tz);
@@ -154,28 +161,26 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   };
 
   // local memory freed before kernel finished
-  auto weight_bias = at::empty(2 * feature_num, weight.options().dtype(ScalarType::Float));
+  auto weight_bias = at::empty(2 * feature_num, weight.options());
   auto weight_bias_memory = dpcpp_onednn_memory(
       batch_norm_forward_pd.weights_desc(), engine, weight_bias.data_ptr());
-  Tensor _weight = weight.to(ScalarType::Float);
-  Tensor _bias = bias.to(ScalarType::Float);
 
   dpcppMemcpyAsync(
       weight_bias.data_ptr(),
-      _weight.data_ptr(),
+      weight.data_ptr(),
       feature_num * sizeof(float),
       DeviceToDevice);
   dpcppMemcpyAsync(
       static_cast<uint8_t*>(weight_bias.data_ptr()) +
           feature_num * sizeof(float),
-      _bias.data_ptr(),
+      bias.data_ptr(),
       feature_num * sizeof(float),
       DeviceToDevice);
 
   args.insert({DNNL_ARG_SCALE_SHIFT, weight_bias_memory});
 
-  Tensor save_mean = at::empty({feature_num}, input.options()).to(ScalarType::Float);
-  Tensor save_var = at::empty({feature_num}, input.options()).to(ScalarType::Float);
+  Tensor save_mean = at::empty(feature_num, weight.options());
+  Tensor save_var = at::empty(feature_num, weight.options());
 
   void* mean_data = nullptr;
   void* var_data = nullptr;
