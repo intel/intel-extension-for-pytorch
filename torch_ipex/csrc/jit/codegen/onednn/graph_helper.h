@@ -60,8 +60,6 @@ class LlgaGraphHelper {
 
   std::vector<dnnl::graph::partition> getPartitions() const;
 
-  bool shouldSkipEliminateCommonSubexpression(const std::shared_ptr<Graph>& graph);
-  
  private:
   size_t countSupportedOps(const std::shared_ptr<Graph>& graph) const;
 

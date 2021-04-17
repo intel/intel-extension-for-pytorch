@@ -39,12 +39,9 @@ class GraphRewriter {
     // subgraphs and then recursively cleanup & unmerge the small subgraphs
     buildupSubgraphs();
     cleanupSubgraphs();
-    // Run CSE globally onceto eliminate duplicates that may have occurred
+    // Run CSE globally once to eliminate duplicates that may have occurred
     // while inlining subgraphs.
-    // need disable this pass after decompose dequant
-    if (!llgaHelper.shouldSkipEliminateCommonSubexpression(graph_)) {
-      EliminateCommonSubexpression(graph_);
-    }
+    EliminateCommonSubexpression(graph_);
     EliminateDeadCode(graph_);
   }
 

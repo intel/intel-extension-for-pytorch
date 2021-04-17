@@ -573,24 +573,6 @@ size_t LlgaGraphHelper::countSupportedOps(
   return cnt;
 }
 
-bool LlgaGraphHelper::shouldSkipEliminateCommonSubexpression(
-  const std::shared_ptr<Graph>& graph) {
-  // TODO: check nodes in top-level block for now
-  for (auto* node : graph->block()->nodes()) {
-    if (node->kind() == Symbol::aten("quantize_per_tensor") || node->kind() == Symbol::aten("quantize_per_channel")) {
-      if (node->output(0)->uses().size() > 1) {
-        for (int i = 0; i < node->output(0)->uses().size(); i++) {
-          if (node->output(0)->uses()[i].user->kind() != Symbol::aten("dequantize")) {
-            return false;
-          }
-          return true;
-        }
-      }
-    }
-  }
-  return false;
-}
-
 std::vector<dnnl::graph::partition> LlgaGraphHelper::getPartitions() const {
   return partitions;
 }
