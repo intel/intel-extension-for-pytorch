@@ -1,7 +1,7 @@
 #include "jit/codegen/onednn/graph_helper.h"
 #include "jit/codegen/onednn/kernel.h"
 #include "jit/codegen/onednn/runtime.h"
-#include "jit/codegen/onednn/dtype_propagation.h"
+#include "jit/codegen/onednn/subgraph_dtype_setter.h"
 
 #include <ATen/core/functional.h>
 #include <torch/csrc/jit/jit_log.h>

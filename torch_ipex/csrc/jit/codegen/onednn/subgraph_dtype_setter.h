@@ -15,7 +15,7 @@ enum OutputDtype : int64_t {
     fp32,
 };
 
-void PropagateDtype(const std::shared_ptr<Graph>& graph);
+void SetSubgraphDtype(const std::shared_ptr<Graph>& graph);
 
 } // namespace onednn
 } // namespace fuser

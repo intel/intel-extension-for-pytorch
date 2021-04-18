@@ -1,5 +1,5 @@
 LIST(APPEND DPCPP_JIT_SRCS
-    ${DPCPP_ROOT}/jit/codegen/onednn/dtype_propagation.cpp
+    ${DPCPP_ROOT}/jit/codegen/onednn/subgraph_dtype_setter.cpp
     ${DPCPP_ROOT}/jit/codegen/onednn/graph_fuser.cpp
     ${DPCPP_ROOT}/jit/codegen/onednn/graph_helper.cpp
     ${DPCPP_ROOT}/jit/codegen/onednn/interface.cpp

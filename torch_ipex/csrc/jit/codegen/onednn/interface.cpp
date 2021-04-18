@@ -5,7 +5,6 @@
 #include "jit/codegen/onednn/prepare_binary.h"
 #include "jit/codegen/onednn/defer_size_check.h"
 #include "jit/codegen/onednn/prepare_dequant.h"
-#include "jit/codegen/onednn/dtype_propagation.h"
 #include "jit/codegen/onednn/fusion_group_name.h"
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/decompose_ops.h>
@@ -39,11 +38,9 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
   // CreateLlgaSubgraphs must be placed after all the preparation passes above
   CreateLlgaSubgraphs(g);
   GRAPH_DUMP("After CreateLlgaSubgraphs. Before PropagateLayout", g);
-  // PropagateLayout and PropagateDtype must be placed after CreateLlgaSubgraphs
+  // PropagateLayout must be placed after CreateLlgaSubgraphs
   PropagateLayout(g);
-  GRAPH_DUMP("After PropagateLayout. Before PropagateDtype", g);
-  PropagateDtype(g);
-  GRAPH_DUMP("After PropagateDtype. End of LLGA optimization pass", g);
+  GRAPH_DUMP("After PropagateLayout. End of LLGA optimization pass", g);
 }
 
 } // namespace onednn

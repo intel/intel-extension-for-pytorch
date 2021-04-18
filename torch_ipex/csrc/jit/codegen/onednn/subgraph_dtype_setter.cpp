@@ -1,5 +1,5 @@
 #include "jit/codegen/onednn/graph_helper.h"
-#include "jit/codegen/onednn/dtype_propagation.h"
+#include "jit/codegen/onednn/subgraph_dtype_setter.h"
 
 namespace torch {
 namespace jit {
@@ -13,7 +13,7 @@ static std::map<std::string, OutputDtype> output_dtype {
     {std::string("default"), OutputDtype::undef},
 };
 
-void DtypePropagation(Node* n) {
+void SubgraphDtypeSetter(Node* n) {
   if (!LlgaGraphHelper::isLlgaSubgraph(n))
     return;
   
@@ -39,14 +39,14 @@ void DtypePropagation(Node* n) {
   return;
 }
 
-void DtypePropagation(at::ArrayRef<Block*> blocks) {
+void SubgraphDtypeSetter(at::ArrayRef<Block*> blocks) {
   for (Block* block : blocks)
     for (Node* node : block->nodes())
-      DtypePropagation(node);
+      SubgraphDtypeSetter(node);
 }
 
-void PropagateDtype(const std::shared_ptr<Graph>& graph) {
-  DtypePropagation(graph->block());
+void SetSubgraphDtype(const std::shared_ptr<Graph>& graph) {
+  SubgraphDtypeSetter(graph->block());
 }
 
 } // namespace onednn
