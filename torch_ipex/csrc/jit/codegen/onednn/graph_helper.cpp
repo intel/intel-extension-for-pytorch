@@ -441,20 +441,20 @@ LlgaGraphHelper::LlgaGraphHelper(
   }
 
   GRAPH_DEBUG("Get Partitions");
-  partitions = g.get_partitions(policy);
+  partitions_ = g.get_partitions(policy);
 
-  GRAPH_DEBUG("  Got #partitions: ", partitions.size());
-  for (size_t partId = 0; partId < partitions.size(); partId++) {
-    if (partitions[partId].is_supported()) {
-      for (auto opId : partitions[partId].get_ops()) {
-        opToOwningPartition.add(opId, partId);
+  GRAPH_DEBUG("  Got #partitions: ", partitions_.size());
+  for (size_t partId = 0; partId < partitions_.size(); partId++) {
+    if (partitions_[partId].is_supported()) {
+      for (auto opId : partitions_[partId].get_ops()) {
+        opToOwningPartition_.add(opId, partId);
       }
     }
   }
 
   // Scanning the graph again for post processing
   for (auto* node : graph->block()->nodes()) {
-    mayAddListConstructIntoConcatPartition(node, opToOwningPartition);
+    mayAddListConstructIntoConcatPartition(node, opToOwningPartition_);
   }
 }
 
@@ -470,7 +470,7 @@ bool LlgaGraphHelper::shouldMerge(Node* toMerge, Node* subgraph) {
   if (!shouldConsiderForMerge(toMerge)) {
     return false;
   }
-  return opToOwningPartition.get(toMerge) == opToOwningPartition.get(subgraph);
+  return opToOwningPartition_.get(toMerge) == opToOwningPartition_.get(subgraph);
 }
 
 bool isViewOp(Node* n) {
@@ -495,16 +495,16 @@ bool LlgaGraphHelper::shouldConsiderForMerge(Node* node) {
   if (isViewOp(node)) {
     return false;
   }
-  return opToOwningPartition.has(node);
+  return opToOwningPartition_.has(node);
 }
 
 Node* LlgaGraphHelper::createSingletonSubgraph(Node* n, AliasDb& aliasDb) {
-  auto partitionId = opToOwningPartition.get(n);
+  auto partitionId = opToOwningPartition_.get(n);
   GRAPH_DEBUG(
       "Creating FusionGroup_", partitionId, " for ", n->kind().toQualString());
   auto group = SubgraphUtils::createSingletonSubgraphAndUpdateAliasing(
       n, Symbol::fromQualString(LlgaFusionGroupName()), aliasDb);
-  opToOwningPartition.add(group, partitionId);
+  opToOwningPartition_.add(group, partitionId);
   LlgaNodeWrapper(group).initOutputLayouts();
   LlgaNodeWrapper(group).initOutputDtypes();
   return group;
@@ -519,11 +519,11 @@ void LlgaGraphHelper::mergeNodeIntoSubgraph(
         "Merging ",
         toMerge->kind().toQualString(),
         "_",
-        opToOwningPartition.get(toMerge),
+        opToOwningPartition_.get(toMerge),
         " into ",
         subgraphNode->kind().toQualString(),
         "_",
-        opToOwningPartition.get(subgraphNode));
+        opToOwningPartition_.get(subgraphNode));
   } else {
     GRAPH_DEBUG(
         "Merging ",
@@ -531,7 +531,7 @@ void LlgaGraphHelper::mergeNodeIntoSubgraph(
         " into ",
         subgraphNode->kind().toQualString(),
         "_",
-        opToOwningPartition.get(subgraphNode));
+        opToOwningPartition_.get(subgraphNode));
   }
 
   SubgraphUtils::mergeNodeIntoSubgraphAndUpdateAliasing(
@@ -541,8 +541,8 @@ void LlgaGraphHelper::mergeNodeIntoSubgraph(
 void LlgaGraphHelper::unmergeIfAnyNodeIsMissing(Node* subgraphNode) {
   TORCH_CHECK(isLlgaSubgraph(subgraphNode), "Cannot unmerge a non-LLGA node");
 
-  auto partitionId = opToOwningPartition.get(subgraphNode);
-  auto expectOpNum = partitions[partitionId].get_ops_num();
+  auto partitionId = opToOwningPartition_.get(subgraphNode);
+  auto expectOpNum = partitions_[partitionId].get_ops_num();
   auto actualOpNum = countSupportedOps(subgraphNode->g(attr::Subgraph));
 
   if (expectOpNum != actualOpNum) {
@@ -574,7 +574,7 @@ size_t LlgaGraphHelper::countSupportedOps(
 }
 
 std::vector<dnnl::graph::partition> LlgaGraphHelper::getPartitions() const {
-  return partitions;
+  return partitions_;
 }
 
 LlgaNodeWrapper::LlgaNodeWrapper(const Node* node)

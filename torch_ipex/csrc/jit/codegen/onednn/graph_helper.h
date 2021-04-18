@@ -63,8 +63,8 @@ class LlgaGraphHelper {
  private:
   size_t countSupportedOps(const std::shared_ptr<Graph>& graph) const;
 
-  OpPartitionMap opToOwningPartition;
-  std::vector<dnnl::graph::partition> partitions;
+  OpPartitionMap opToOwningPartition_;
+  std::vector<dnnl::graph::partition> partitions_;
 };
 
 class LlgaNodeWrapper {
