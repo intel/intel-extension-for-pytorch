@@ -23,6 +23,9 @@ def get_eltwise_fn(name):
     else:
         raise NameError('Eltwise function %s not found' % name)
 
+# TODO: UTs could run separately but not all together due to IPEX config cache
+# enable all the UTs once the IPEX config cache is fixed
+
 # class TestOp(JitLlgaTestCase):
 #     def test_conv2d(self):
 #         for [
