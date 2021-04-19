@@ -1,7 +1,6 @@
 import torch
 from torch.autograd import Function
 import torch.nn.functional as F
-import _torch_ipex as core
 from torch.nn.modules.utils import _single, _pair
 from typing import List
 
