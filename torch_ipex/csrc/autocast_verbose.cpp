@@ -5,7 +5,7 @@ namespace autocast {
 namespace verbose {
 
 #if defined(ENABLE_AUTOCAST_VERBOSE)
-thread_local string current_op_name;
+thread_local string current_op_name = "unknow_operator";
 
 string get_current_op_name(){
     return current_op_name;

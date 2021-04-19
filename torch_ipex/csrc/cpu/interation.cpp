@@ -6,6 +6,8 @@
 #include <c10/util/Exception.h>
 #include <algorithm>
 #include "bf16/vec/bf16_vec_kernel.h"
+#include "torch_ipex/csrc/autocast_mode.h"
+#include "torch_ipex/csrc/autocast_verbose.h"
 
 /*
  Custom op to optimize DLRM interaction part
@@ -250,7 +252,13 @@ AtenIpexTypeExt::interaction_backward(const at::Tensor &grad_out,
     return _interaction_backward<float>(grad_out, input);
   } else {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad_out.scalar_type() == at::kBFloat16);
-    return _interaction_backward<at::BFloat16>(grad_out, input);
+    // todo: move the autograd registion from python into C++.
+    // Performance overhead in training here if you use autocast.
+    // Because we save the ctx.arg in python before autocast, we have duplicated cast for the input: here and in autocast of the forward path.
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  torch_ipex::autocast::verbose::OpNameGuard op_name("interaction_backward");
+#endif
+    return _interaction_backward<at::BFloat16>(grad_out, torch_ipex::autocast::cpu_cached_cast(at::kBFloat16, input));
   }
 }
 } // namespace torch_ipex
@@ -261,3 +269,24 @@ static auto dispatch =
         .op("torch_ipex::interaction_forward", &torch_ipex::AtenIpexTypeExt::interaction_forward)
         .op("torch_ipex::interaction_backward", &torch_ipex::AtenIpexTypeExt::interaction_backward);
 }
+
+namespace torch_ipex {
+namespace autocast {
+
+at::Tensor interaction_forward(const std::vector<at::Tensor> &input){
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+    .findSchemaOrThrow("torch_ipex::interaction_forward", "")
+    .typed<decltype(interaction_forward)>();
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("interaction_forward");
+#endif
+  auto type = promote_type(at::kBFloat16, input);
+  return op.call(cpu_cached_cast(type, input));
+}
+
+TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m){
+  m.impl("interaction_forward", torch_ipex::autocast::interaction_forward);
+}
+
+}}
