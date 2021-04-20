@@ -1,6 +1,9 @@
 #include "embedding_bag.hpp"
 #include "aten_ipex_bridge.h"
 #include "cpu/bf16/vec/bf16_vec_kernel.h"
+#include "cpu/int8/vec/int8_vec_kernel.h"
+#include "utils.h"
+#include "cpu/int8/Config.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -39,7 +42,6 @@ static inline at::Tensor _embedding_bag_index_add_select_fast(const at::Tensor s
   int64_t output_size = offsets.numel() - 1;
   int64_t* offsets_data = offsets.data_ptr<int64_t>();
   std::vector<int64_t> offsets_include_last;
-
   if (!include_last_offset) {
     output_size = offsets.numel();
     offsets_include_last.resize(output_size + 1);
@@ -60,7 +62,6 @@ static inline at::Tensor _embedding_bag_index_add_select_fast(const at::Tensor s
     offsets_include_last[output_size] = select_indices.numel();
     offsets_data = offsets_include_last.data();
   }
-
   at::Tensor output = at::empty({output_size, src.size(1)}, src.options());
   auto* output_data = output.data_ptr<T>();
   auto indices_accessor = select_indices.accessor<int64_t, 1>();
@@ -85,6 +86,60 @@ static inline at::Tensor _embedding_bag_index_add_select_fast(const at::Tensor s
   return output;
 }
 
+static inline dil::tensor _embedding_bag_index_add_select_fast_int8(
+    const at::Tensor select_indices,
+    const dil::tensor src,
+    const std::vector<float> scale,
+    const at::Tensor offsets,
+    bool include_last_offset) {
+  int64_t ddim = src.get_dim(1);
+  int8_t* src_data = static_cast<int8_t *>(src.get_data_handle());
+  int64_t output_size = offsets.numel() - 1;
+  int64_t* offsets_data = offsets.data_ptr<int64_t>();
+  std::vector<int64_t> offsets_include_last;
+  if (!include_last_offset) {
+    output_size = offsets.numel();
+    offsets_include_last.resize(output_size + 1);
+    int64_t* offsets_include_last_data = offsets_include_last.data();
+    int64_t iter_time = (output_size >> 5);
+    int64_t align32_size = (iter_time << 5);
+    int64_t left_size = output_size - align32_size;
+    //std::memcpy(offsets_include_last.data(), offsets_data, sizeof(int64_t) * output_size);
+    at::parallel_for(0, iter_time, 16, [&](int64_t start, int64_t end) {
+      for (int64_t i = start; i < end; i += 1) {
+        auto start_offset = i << 5;
+        move_ker(&offsets_include_last_data[start_offset], &offsets_data[start_offset], 32);
+      }
+    });
+    if (left_size > 0) {
+      move_ker(&offsets_include_last_data[align32_size], &offsets_data[align32_size], left_size);
+    }
+    offsets_include_last[output_size] = select_indices.numel();
+    offsets_data = offsets_include_last.data();
+  }
+  // init output tensor
+  dil::dims dst_dims{output_size, src.get_dim(1)};
+  dil::tensor::desc dst_desc(dst_dims, dil::data_type::s8);
+  dil::tensor output{dst_desc};
+  output.set_scale(scale);
+  int8_t* output_data = static_cast<int8_t *>(output.get_data_handle());
+  auto indices_accessor = select_indices.accessor<int64_t, 1>();
+  at::parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
+    for (int64_t i = start; i < end; i++) {
+      int8_t* out_data_ptr = &output_data[i * ddim];
+      zero_ker(out_data_ptr, ddim);
+      auto inputs_start = offsets_data[i];
+      auto inputs_end = offsets_data[i + 1];
+      for (int64_t s = inputs_start; s < inputs_end; s++) {
+          int8_t* select_data_ptr = &src_data[indices_accessor[s] * ddim];
+        add_ker(out_data_ptr, select_data_ptr, ddim);
+      }
+    }
+  });
+
+  return output;
+}
+
 at::Tensor embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indices,
   const at::Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse,
   const at::Tensor & per_sample_weights, bool include_last_offset) {
@@ -93,11 +148,64 @@ at::Tensor embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indi
 
   at::Tensor output;
   if(is_bfloat16_tensor(weight)) {
-      output = _embedding_bag_index_add_select_fast<at::BFloat16>(indices, weight, offsets_, include_last_offset);
-  } else {
-      output = _embedding_bag_index_add_select_fast<float>(indices, weight, offsets_, include_last_offset);
+      output = _embedding_bag_index_add_select_fast<at::BFloat16>(
+          indices, weight, offsets_, include_last_offset);
+      return output;
+  }
+  if (check_auto_mix_int8_fp32() and
+      (not check_int8_calibration())) {
+      output = embedding_bag_int8_impl(weight, indices, offsets_,
+                                       include_last_offset);
+      return output;
+  }
+
+  output = _embedding_bag_index_add_select_fast<float>(
+      indices, weight, offsets_,
+      include_last_offset);
+  if (check_auto_mix_int8_fp32() and check_int8_calibration()) {
+      // calibration based on results of float datatype
+      auto op_name = "EmbeddingBag";
+      insert_or_updata_observer({output},
+                                {output},
+                                op_name,
+                                Int8OptConfig::fetch_and_add_ops_id());
   }
   return output;
+}
+
+at::Tensor embedding_bag_int8_impl(const at::Tensor & weight,
+                                   const at::Tensor & indices,
+                                   const at::Tensor & offsets,
+                                   bool include_last_offset) {
+    // from DevOps.cpp AtenIpexCPUDev::dil_linear L1039
+    at::Tensor output;
+    // int8 no calibration
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    bool quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
+    std::vector<float> input_scale;
+    std::vector<std::vector<float >> scales =
+        dbl::comm::get_int8_scales({weight},
+                                   false,
+                                   num_ops_id);
+    if (quantized) {
+        // if quantizetion info is provided,
+        // reorder float to int8 if necessary
+        input_scale.push_back(scales[0][0]);
+        // reorder weight in float to weight in int8 by input_scale
+        dbl::comm::reorder_to_int8_for_mix_prec(weight, input_scale);
+        dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
+        // query
+        auto dil_output = _embedding_bag_index_add_select_fast_int8(
+            indices, w, input_scale, offsets, include_last_offset);
+        output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
+    } else {
+        // reorder weight in float
+        dbl::comm::reorder_to_dtype(weight, at::kFloat);
+        // query
+        output = _embedding_bag_index_add_select_fast<float>(
+                 indices, weight, offsets, include_last_offset);
+    }
+    return output;
 }
 
 static inline at::Tensor expand_values_if_needed(const at::Tensor& values) {
