@@ -14,7 +14,7 @@ include(cmake/DPCPP.cmake)
 # The options to build torch_ipex
 include(CMakeDependentOption)
 option(USE_ONEDPL "Use oneDPL" ON)
-option(USE_ONEMKL "Use oneMKL BLAS" OFF)
+option(USE_ONEMKL "Use oneMKL BLAS" ON)
 option(USE_GEN12HP_ONEDNN "Use the oneDNN Gen12HP branch" OFF)
 option(USE_PERSIST_STREAM "Use persistent oneDNN stream" ON)
 option(USE_PRIMITIVE_CACHE "Cache oneDNN primitives by FRAMEWORK, instead of oneDNN itself" OFF)
