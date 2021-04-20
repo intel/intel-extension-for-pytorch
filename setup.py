@@ -158,6 +158,9 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
         if platform.system() == "Windows":
             raise RuntimeError("Does not support windows")
 
+        os.popen('cp README.md torch_ipex/')
+        os.popen('cp requirements.txt torch_ipex/')
+
         dpcpp_exts = [ext for ext in self.extensions if isinstance(ext, DPCPPExt)]
         for ext in dpcpp_exts:
             self.build_extension(ext)
@@ -294,6 +297,9 @@ def get_c_module():
                   extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
     return C_ext
 
+def read(fname):
+    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+
 setup(
     name='torch_ipex',
     version=version,
@@ -303,16 +309,17 @@ setup(
     # Exclude the build files.
     packages=['torch_ipex'],
     package_data={
-        '': [
-            'README.md',
-            'requirements.txt'],
         'torch_ipex':[
+            'README.md',
+            'requirements.txt',
             '*.py',
             'lib/*.so',
             'include/*.h',
             'include/core/*.h',
             'include/utils/*.h']
         },
+    long_description=read('README.md'),
+    long_description_content_type='test/markdown',
     zip_safe=False,
     ext_modules=[DPCPPExt('torch_ipex'), get_c_module()],
     cmdclass={
