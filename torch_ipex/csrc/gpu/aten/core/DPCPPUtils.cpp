@@ -42,9 +42,11 @@ static void initGlobalDevicePoolState() {
     }
   }
 
-  // Check whether TILE_AS_DEVICE is setup. If true, we map device to 
-  // physical tile
-  if (tile_as_device()) {
+  // Mapping framework device to physical tile by default.
+  // If IPEX_DISABLE_TILE_PARTITION enabled, mapping framework device to physical device.
+  if (disable_tile_partition()) {
+    gDevPool.devices = std::move(root_devices);
+  } else {
     constexpr DPCPP::info::partition_property partition_by_affinity =
       DPCPP::info::partition_property::partition_by_affinity_domain;
     constexpr DPCPP::info::partition_affinity_domain next_partitionable =
@@ -52,18 +54,13 @@ static void initGlobalDevicePoolState() {
     for (const auto &root_device : root_devices) {
       std::vector<DPCPP::device> sub_devices;
       try {
-        sub_devices = root_device.create_sub_devices<partition_by_affinity>(next_partitionable); 
-        gDevPool.devices.insert(gDevPool.devices.end(), 
-                                sub_devices.begin(),
-                                sub_devices.end());
+        sub_devices = root_device.create_sub_devices<partition_by_affinity>(next_partitionable);
+        gDevPool.devices.insert(gDevPool.devices.end(), sub_devices.begin(), sub_devices.end());
       } catch (DPCPP::feature_not_supported &e) {
-        TORCH_WARN("Can not split into tile for Device ", 
-          root_device.get_info<dpcpp_dev_name>());
+        TORCH_WARN("Can not split into tile for Device ", root_device.get_info<dpcpp_dev_name>());
         gDevPool.devices.push_back(root_device);
       }
     }
-  } else {
-    gDevPool.devices = std::move(root_devices);
   }
 
   // Set device selector
