@@ -73,14 +73,6 @@ static void initGlobalDevicePoolState() {
   auto device_count = gDevPool.devices.size();
   TORCH_CHECK(device_count > 0, "DPCPP Device count is zero");
 
-  auto device_index = ipex_dev_index();
-  if (device_index >= 0 && device_index < device_count) {
-    cur_dev_index = device_index;
-  } else {
-    cur_dev_index = 0;
-    TORCH_WARN("IPEX_DEV_INDEX out of range");
-  }
-
   // Note: DPCPPRuntime's destruction happens before the destroy of the
   // global vars except the global vars with dpcpp type. This will make
   // our global device pool destruction crash. So we use atexit to
