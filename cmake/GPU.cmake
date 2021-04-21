@@ -212,6 +212,11 @@ endif()
 set_source_files_properties(${TORCH_IPEX_SRCS} COMPILE_FLAGS "${IPEX_COMPILE_FLAGS}")
 message(STATUS "DPCPP found. Compiling with SYCL support")
 
+if (USE_MULTI_CONTEXT)
+  target_compile_definitions(torch_ipex PUBLIC USE_MULTI_CONTEXT)
+  message(STATUS "multi context is enabled!")
+endif()
+
 if (USE_ONEMKL)
   find_package(MKLDPCPP QUIET)
   if (MKLDPCPP_FOUND)
