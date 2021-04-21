@@ -91,24 +91,24 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 6)
                 self.assertFused(graph, ['aten::conv2d', 'aten::' + eltwise, 'aten::quantize_per_tensor', 'aten::quantize_per_channel', 'aten::dequantize'])
 
-    def test_conv2d_bn(self):
-        class M(nn.Module):
-            def __init__(self):
-                super(M, self).__init__()
-                self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=False) # TODO: bias=True
-                self.bn1 = nn.BatchNorm2d(32)
+    # def test_conv2d_bn(self):
+    #     class M(nn.Module):
+    #         def __init__(self):
+    #             super(M, self).__init__()
+    #             self.conv1 = nn.Conv2d(32, 32, 3, padding=1, bias=False) # TODO: bias=True
+    #             self.bn1 = nn.BatchNorm2d(32)
 
-            def forward(self, x):
-                x = self.conv1(x)
-                x = self.bn1(x)
-                return x
+    #         def forward(self, x):
+    #             x = self.conv1(x)
+    #             x = self.bn1(x)
+    #             return x
         
-        m = M().eval()
-        x = torch.rand(1, 32, 28, 28)
+    #     m = M().eval()
+    #     x = torch.rand(1, 32, 28, 28)
         
-        graph = self.checkQuantizeTrace(m, x, atol=1e-1, folding=True)
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
-        self.assertFused(graph, ['aten::conv2d', 'aten::quantize_per_tensor', 'aten::quantize_per_channel', 'aten::dequantize'])
+    #     graph = self.checkQuantizeTrace(m, x, atol=1e-1, folding=True)
+    #     self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
+    #     self.assertFused(graph, ['aten::conv2d', 'aten::quantize_per_tensor', 'aten::quantize_per_channel', 'aten::dequantize'])
 
 
 # class TestModel(JitLlgaTestCase):

@@ -142,7 +142,7 @@ compiled_partition LlgaKernel::compile(const partition& partition) {
 
   // Build static mapping from output id to input offset
   // in accordance with available inplace options
-  for (auto&& option : compilation.get_inplace_options()) {
+  for (auto&& option : compilation.get_inplace_ports()) {
     size_t inputId = option.first;
     size_t outputId = option.second;
     auto inputSpecIter =
