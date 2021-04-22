@@ -39,6 +39,8 @@ class AmpConf(object):
         add_ids = []
         for cur_id in range(num_ops):
             cur_op = default_configures[cur_id]['name']
+            if cur_op == 'dropout':
+                break
             if cur_op == 'add':
                 add_ids.append(cur_id)
             inputs = default_configures[cur_id]['inputs_flow']
@@ -58,7 +60,7 @@ class AmpConf(object):
                             if (cur_op not in inplace_ops) \
                                     or (cur_op in inplace_ops and \
                                         (pre_op == 'conv2d' or pre_op == 'conv3d' or pre_op == 'linear')):
-                                if pre_op not in inplace_ops:
+                                if pre_op not in inplace_ops and pre_op != 'dropout':
                                     default_configures[pre_id]['outputs_quantized'][o_num] = False
                             if cur_op in elt_wise \
                                     and (pre_op == 'conv2d' or pre_op == 'conv3d' or pre_op == 'linear' or pre_op == 'add'):

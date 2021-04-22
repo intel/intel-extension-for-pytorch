@@ -204,5 +204,18 @@ at::Tensor add_tensor(const at::Tensor& input, const at::Tensor& other, const at
   return at::add(input, other, alpha);
 }
 
+at::Tensor dropout(const at::Tensor& input, double p, bool train) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  auto target_type = get_autocast_dtype();
+  if (at::ScalarType::Char == target_type) {
+    return int8::dropout(input, p, train);
+  }
+  //convert to fp32 path.
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("dropout");
+#endif
+  return at::dropout(cpu_cached_cast(at::kFloat, input), p, train);
+}
+
 } // autocast
 } // torch_ipex

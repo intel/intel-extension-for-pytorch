@@ -609,6 +609,34 @@ at::Tensor add_tensor(const at::Tensor &input, const at::Tensor &other, const at
   return output;
 }
 
+at::Tensor dropout(const at::Tensor &input, double p, bool train) {
+  // always add id, but not compute scales or insert quant and dequant.
+  auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+  if (torch_ipex::check_int8_calibration()) {
+    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
+    std::vector<std::string> op_inputs, op_outputs;
+    if (it == tensors_flow.end()) {
+      std::string op_input = "dropout." + std::to_string(op_id) + ".input";
+      op_inputs.push_back(op_input);
+    } else {
+      op_inputs.push_back(std::get<1>(it->second));
+    }
+    auto output = at::dropout(input, p, train);
+    std::string op_output = "dropout." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    if (it == tensors_flow.end()) {
+      tensors_flow.emplace(output.unsafeGetTensorImpl(),
+                           val_name{weakref_scales(output.getIntrusivePtr()), op_output});
+    } else {
+      it->second = val_name{weakref_scales(output.getIntrusivePtr()), op_output};
+    }
+    torch_ipex::insert_or_updata_observer({}, {}, "dropout", op_id, op_inputs, op_outputs);
+    return output;
+  }
+
+  return at::dropout(input, p, train);
+}
+
 } // namespace autocast
 } // namespace cpu
 } // namespace torch_ipex

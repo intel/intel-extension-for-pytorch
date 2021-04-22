@@ -48,6 +48,8 @@ at::Tensor& add_tensor_(at::Tensor& input, const at::Tensor& other, const at::Sc
 
 at::Tensor add_tensor(const at::Tensor& input, const at::Tensor& other, const at::Scalar& alpha);
 
+at::Tensor dropout(const at::Tensor &input, double p, bool train);
+
 } // namespace int8
 } // namespace autocast
 } // namespace torch_ipex
