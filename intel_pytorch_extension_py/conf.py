@@ -40,7 +40,7 @@ class AmpConf(object):
         for cur_id in range(num_ops):
             cur_op = default_configures[cur_id]['name']
             if cur_op == 'dropout':
-                break
+                continue
             if cur_op == 'add':
                 add_ids.append(cur_id)
             inputs = default_configures[cur_id]['inputs_flow']
@@ -79,9 +79,10 @@ class AmpConf(object):
                     if value == 'conv2d' or value == 'conv3d':
                         default_configures[cur_id]['inputs_quantized'][key] = False
                         break
-            # TODO: check only onn pre op?
-            # if add hasn't pre op, not need add q, dq for accuracy.
-            if cur_op == 'add' and len(pre_ops) == 0:
+
+            # if add pre_op hasn't conv, not need add q, dq for accuracy.
+            pre_inputs = pre_ops.values()
+            if cur_op == 'add' and ('conv2d' not in pre_inputs and 'conv3d' not in pre_inputs):
                 default_configures[cur_id]['inputs_quantized'][0] = False
                 default_configures[cur_id]['inputs_quantized'][1] = False
 
