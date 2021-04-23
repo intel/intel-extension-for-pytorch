@@ -76,6 +76,9 @@ ENDIF()
 IF (C_AVX512_BF16_FOUND OR CXX_AVX512_BF16_FOUND)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512bf16 -DAVX512_BF16")
 ENDIF()
+IF (C_AVX512_VNNI_FOUND OR CXX_AVX512_VNNI_FOUND)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -mavx512vnni -DAVX512_VNNI")
+ENDIF()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
 # These flags are not available in GCC-4.8.5. Set only when using clang.
 # Compared against https://gcc.gnu.org/onlinedocs/gcc-4.8.5/gcc/Option-Summary.html

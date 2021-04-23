@@ -27,6 +27,23 @@ SET(AVX512_BF16_CODE "
   }
 ")
 
+SET(AVX512_VNNI_CODE "
+  #include <stdint.h>
+  #include <immintrin.h>
+
+  int main() {
+    char a1 = 1;
+    char a2 = 2;
+    char a3 = 0;
+    __m512i src1 = _mm512_set1_epi8(a1);
+    __m512i src2 = _mm512_set1_epi8(a2);
+    __m512i src3 = _mm512_set1_epi8(a3);
+    // detect avx512f and avx512_vnni
+    _mm512_dpbusds_epi32(src3, src1, src2);
+    return 0;
+  }
+")
+
 MACRO(CHECK_SSE lang type flags)
   SET(__FLAG_I 1)
   SET(CMAKE_REQUIRED_FLAGS_SAVE ${CMAKE_REQUIRED_FLAGS})
@@ -60,3 +77,6 @@ CHECK_SSE(CXX "AVX512" " ;-mavx512f -mavx512bw -mavx512vl")
 
 CHECK_SSE(C "AVX512_BF16" " ;-mavx512f -mavx512bf16")
 CHECK_SSE(CXX "AVX512_BF16" " ;-mavx512f -mavx512bf16")
+
+CHECK_SSE(C "AVX512_VNNI" " ;-mavx512vnni -march=native")
+CHECK_SSE(CXX "AVX512_VNNI" " ;-mavx512vnni -march=native")
