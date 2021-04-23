@@ -12,6 +12,7 @@ inline __m512 pack_bf16_to_fp32(const __m256i top, const __m256i bot) {
 inline void packed_bf16_add_ker(at::BFloat16 *a1, at::BFloat16 *a2, at::BFloat16 *b, int len, float alpha) {
   auto vAlpha = _mm512_set1_ps(alpha);
   int i = 0;
+  #pragma unroll(4)
   for (; i < len - 15; i += 16) {
     auto x1 = _mm256_loadu_si256((__m256i *)(a1 + i));
     auto x2 = _mm256_loadu_si256((__m256i *)(a2 + i));
@@ -42,7 +43,7 @@ inline void packed_bf16_add_ker(at::BFloat16 *a1, at::BFloat16 *a2, at::BFloat16
 
 inline void add_ker(at::BFloat16 *inout, at::BFloat16 *in, int len) {
   int i;
-  #pragma unroll(2)
+  #pragma unroll(4)
   for(i = 0; i < len - 31; i += 32) {
     auto inout1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i)));
     auto inout2 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(inout + i + 16)));
@@ -73,7 +74,7 @@ inline void add_ker(at::BFloat16 *inout, at::BFloat16 *in, int len) {
 
 static inline void add_ker(float *inout, float *in, int len) {
   int i;
-  #pragma unroll(2)
+  #pragma unroll(4)
   for(i = 0; i < len - 31; i += 32) {
     auto out1 = _mm512_loadu_ps(inout + i);
     auto out2 = _mm512_loadu_ps(inout + i + 16);
@@ -102,7 +103,7 @@ static inline void add_ker(float *inout, float *in, int len) {
 
 static inline void add_ker(float *inout, at::BFloat16 *in, int len) {
   int i;
-  #pragma unroll(2)
+  #pragma unroll(4)
   for(i = 0; i < len - 31; i += 32) {
     auto in1 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i)));
     auto in2 = cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(in + i + 16)));
@@ -156,9 +157,9 @@ static inline void move_ker(at::BFloat16 *out, float *in, int64_t len) {
 
 static inline void move_ker(float *out, const float *in, int64_t len) {
   int64_t i;
-  #pragma unroll(4)
+  #pragma unroll(8)
   for (i = 0; i < len - 15 ; i += 16) {
-    auto in0 = _mm512_loadu_ps(in + i );
+    auto in0 = _mm512_loadu_ps(in + i);
     _mm512_storeu_ps(out + i, in0);
   }
 
@@ -181,36 +182,6 @@ static inline void move_ker(at::BFloat16 *out, const at::BFloat16 *in, int64_t l
     auto mask = (1 << (len - i)) - 1;
     auto in0 = _mm512_maskz_loadu_epi16(mask, in + i);
     _mm512_mask_storeu_epi16(out + i, mask, in0);
-  }
-}
-
-static inline void move_ker(int64_t *out, int64_t *in, int64_t len) {
-  int64_t i;
-  #pragma unroll(4)
-  for (i = 0; i < len - 7 ; i += 8) {
-    auto in0 = _mm512_loadu_pd(in + i );
-    _mm512_storeu_pd(out + i, in0);
-  }
-
-  if (i < len) {
-    auto mask = ((1 << (len - i)) - 1);
-    auto in0 = _mm512_maskz_loadu_pd(mask, in + i);
-    _mm512_mask_storeu_pd(out + i, mask, in0);
-  }
-}
-
-static inline void move_ker(int32_t *out, const int32_t *in, int64_t len) {
-  int64_t i;
-  #pragma unroll(4)
-  for (i = 0; i < len - 15 ; i += 16) {
-    auto in0 = _mm512_loadu_ps(in + i );
-    _mm512_storeu_ps(out + i, in0);
-  }
-
-  if (i < len) {
-    auto mask = ((1 << (len - i)) - 1);
-    auto in0 = _mm512_maskz_loadu_ps(mask, in + i);
-    _mm512_mask_storeu_ps(out + i, mask, in0);
   }
 }
 
