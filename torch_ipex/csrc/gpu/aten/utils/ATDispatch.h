@@ -13,6 +13,7 @@
       AT_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)             \
       AT_PRIVATE_CASE_TYPE(at::ScalarType::Half, at::Half, __VA_ARGS__)           \
       AT_PRIVATE_CASE_TYPE(at::ScalarType::BFloat16, at::BFloat16, __VA_ARGS__)   \
+      AT_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)           \
       default:                                                                    \
         AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");            \
     }                                                                             \
