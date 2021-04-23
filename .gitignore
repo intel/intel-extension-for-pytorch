@@ -25,7 +25,6 @@
 torch_ipex/version.py
 torch_ipex/README.md
 torch_ipex/requirements.txt
-torch_ipex/csrc/version.h
 torch_ipex/csrc/aten_ipex_sparse_type_default.*
 torch_ipex/csrc/cpu/SparseOPs.*
 torch_ipex/include/

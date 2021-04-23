@@ -24,7 +24,8 @@ _device_t = Union[_device, str, int]
 
 
 def version():
-    print("ipex gpu version: {}".format(__version__))
+    version = __version__.split('+')[0]
+    print("ipex gpu version: {}".format(version))
     print("ipex gpu git sha: {}".format(__ipex_gitrev__))
 
 
