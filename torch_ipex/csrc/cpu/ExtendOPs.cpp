@@ -12,6 +12,105 @@
 #include "DevOPs.h"
 
 namespace torch_ipex {
+inline float pack_bfloat16_float(at::BFloat16 a, at::BFloat16 b) {
+  uint16_t* ap = reinterpret_cast<uint16_t*>(&a);
+  uint16_t* bp = reinterpret_cast<uint16_t*>(&b);
+  uint32_t hi = static_cast<uint32_t>(*ap);
+  uint32_t lo = static_cast<uint32_t>(*bp);
+  uint32_t out = (hi << 16) + lo;
+  float* outp = reinterpret_cast<float*>(&out);
+  return *outp;
+}
+
+inline std::tuple<at::BFloat16, at::BFloat16> unpack_float_bfloat16(float a) {
+  uint32_t* ap = reinterpret_cast<uint32_t*>(&a);
+  uint16_t hi = static_cast<uint16_t>((*ap) >> 16);
+  uint16_t lo = static_cast<uint16_t>((*ap));
+  at::BFloat16* hip = reinterpret_cast<at::BFloat16*>(&hi);
+  at::BFloat16* lop = reinterpret_cast<at::BFloat16*>(&lo);
+  return std::make_tuple(*hip, *lop);
+}
+
+void AtenIpexTypeExt::lamb_fused_step_(at::Tensor & param, at::Tensor & grad, at::Tensor & param2, at::Tensor & exp_avg, at::Tensor & exp_avg_sq,  int64_t step, float lr, float beta1, float beta2, float weight_decay, float eps){
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad.scalar_type() ==
+                                   at::ScalarType::BFloat16);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(param.scalar_type() ==
+                                   at::ScalarType::BFloat16);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(param2.scalar_type() ==
+                                   at::ScalarType::BFloat16);
+  RECORD_FUNCTION("ipex::lamb_fused_step", std::vector<c10::IValue>({param, param2, grad}), torch::autograd::Node::peek_at_next_sequence_nr());
+  at::BFloat16* param_data = param.data_ptr<at::BFloat16>();
+  float* exp_avg_data = exp_avg.data_ptr<float>();
+  float* exp_avg_sq_data = exp_avg_sq.data_ptr<float>();
+  at::BFloat16* grad_data = grad.data_ptr<at::BFloat16>();
+  at::BFloat16* param2_data = param2.data_ptr<at::BFloat16>();
+  int num_threads = at::get_num_threads();
+  float param_norm_acc[num_threads];
+  float rtw_norm_acc[num_threads];
+  std::fill_n(&param_norm_acc[0], num_threads, float(0));
+  std::fill_n(&rtw_norm_acc[0], num_threads, float(0));
+  int64_t numel = param.numel();
+  at::Tensor workspace = at::empty({numel}, exp_avg.options());
+  float* workspace_data = workspace.data_ptr<float>();
+  int64_t grain_size = 512;
+
+  at::parallel_for(0, numel, grain_size, [&](int64_t begin, int64_t end) {
+    int tid = at::get_thread_num();
+    // local pointers
+    at::BFloat16* param_ptr = param_data + begin;
+    float* exp_avg_ptr = exp_avg_data + begin;
+    float* exp_avg_sq_ptr = exp_avg_sq_data + begin;
+    at::BFloat16* grad_ptr = grad_data + begin;
+    at::BFloat16* param2_ptr = param2_data + begin;
+    float* workspace_ptr = workspace_data + begin;
+    const int64_t size = end - begin;
+    float sum1_val = float(0);
+    float sum2_val = float(0);
+    int64_t d = 0;
+    for (; d < size; d++) {
+      float grad_val = float(grad_ptr[d]);
+      exp_avg_ptr[d] = exp_avg_ptr[d] * beta1 + grad_val * (1 - beta1);
+      exp_avg_sq_ptr[d] = exp_avg_sq_ptr[d] * beta2 + grad_val * grad_val * (1 - beta2);
+      float adam_step_val = exp_avg_ptr[d] / (std::sqrt(exp_avg_sq_ptr[d]) + eps);
+
+      float param_val = pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
+      //adam_step_val += param_val * weight_decay;
+      workspace_ptr[d] = adam_step_val;
+
+      sum1_val += param_val * param_val;
+      sum2_val += adam_step_val * adam_step_val;
+    }
+    param_norm_acc[tid] = sum1_val;
+    rtw_norm_acc[tid] = sum2_val;
+  });
+  //std::cout<< "grad: " <<grad<<std::endl;
+  //std::cout <<"param: "<<param <<std::endl;
+ // std::cout <<"param2: "<<param2 <<std::endl;
+  float param_norm_sum = float(0);
+  float rtw_norm_sum = float(0);
+  for (int64_t tid = 0; tid < num_threads; tid++) {
+      param_norm_sum += param_norm_acc[tid];
+      rtw_norm_sum += rtw_norm_acc[tid];
+  }
+
+  float true_ratio = std::min(float(10), std::max(float(0), std::sqrt(param_norm_sum))) / std::sqrt(rtw_norm_sum);
+  //printf("param_norm_sum= %f, rtw_norm_sum= %f, true_ratio in fused kernel = %f\n", std::min(float(10), std::max(float(0), std::sqrt(param_norm_sum))),rtw_norm_sum,true_ratio);
+  at::parallel_for(0, numel, grain_size, [&](int64_t begin, int64_t end) {
+      at::BFloat16* param_ptr = param_data + begin;
+      at::BFloat16* param2_ptr = param2_data + begin;
+      float* workspace_ptr = workspace_data + begin;
+
+      const int64_t size = end - begin;
+
+      int64_t d = 0;
+      for (; d < size; d++) {
+         float param_val = pack_bfloat16_float(param_ptr[d], param2_ptr[d]);
+         param_val -= workspace_ptr[d] * lr * true_ratio;
+         std::tie(param_ptr[d], param2_ptr[d]) = unpack_float_bfloat16(param_val);
+      }
+  });
+
+}
 
 void AtenIpexTypeExt::packed_add_(at::Tensor & top_half, at::Tensor & bot_half, const at::Tensor & grad, float alpha) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(grad.scalar_type() == at::ScalarType::BFloat16);

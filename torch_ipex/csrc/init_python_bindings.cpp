@@ -66,6 +66,11 @@ void InitIpexModuleBindings(py::module m) {
   m.def("enable_pure_bf16", []() { AutoOptConfig::singleton().set_pure_bf16(true); });
   m.def("disable_pure_bf16", []() { AutoOptConfig::singleton().set_pure_bf16(false); });
   m.def("get_pure_bf16", []() { return AutoOptConfig::singleton().get_pure_bf16(); });
+  m.def("lamb_fused_step_",
+        [](at::Tensor &param, at::Tensor &grad, at::Tensor & param2, at::Tensor & exp_avg, at::Tensor & exp_avg_sq, int64_t step, float lr, float beta1, float beta2, float weight_decay, float eps) {
+          AtenIpexTypeExt::lamb_fused_step_(param, grad, param2, exp_avg, exp_avg_sq, step, lr, beta1, beta2, weight_decay, eps);
+        });
+
   m.def("packed_add_",
         [](at::Tensor &top_half, at::Tensor &bot_half,
            const at::Tensor &grad, float alpha) {
