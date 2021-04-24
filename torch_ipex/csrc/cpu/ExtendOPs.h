@@ -7,6 +7,7 @@ namespace torch_ipex {
 
 class AtenIpexTypeExt {
  public:
+  static void lamb_fused_step_(at::Tensor & weight, at::Tensor & grad, at::Tensor & bot_half, at::Tensor & exp_avg, at::Tensor & exp_avg_sq,  int64_t step, float lr, float beta1, float beta2, float weight_decay, float eps);
   static void packed_add_(at::Tensor & top_half, at::Tensor & bot_half, const at::Tensor & grad, float alpha);
   static at::Tensor interaction_forward(const std::vector<at::Tensor> & input);
   static std::vector<at::Tensor> interaction_backward(const at::Tensor & grad_out, const std::vector<at::Tensor> & input);
