@@ -127,11 +127,16 @@ static inline dil::tensor _embedding_bag_index_add_select_fast_int8(
   at::parallel_for(0, output_size, 16, [&](int64_t start, int64_t end) {
     for (int64_t i = start; i < end; i++) {
       int8_t* out_data_ptr = &output_data[i * ddim];
-      zero_ker(out_data_ptr, ddim);
       auto inputs_start = offsets_data[i];
       auto inputs_end = offsets_data[i + 1];
-      for (int64_t s = inputs_start; s < inputs_end; s++) {
-          int8_t* select_data_ptr = &src_data[indices_accessor[s] * ddim];
+      if (inputs_start >= inputs_end) {
+        zero_ker(out_data_ptr, ddim);
+      } else {
+        int8_t* select_data_ptr = &src_data[indices_accessor[inputs_start] * ddim];
+        move_ker(out_data_ptr, select_data_ptr, ddim);
+      }
+      for (int64_t s = (inputs_start + 1); s < inputs_end; s++) {
+        int8_t* select_data_ptr = &src_data[indices_accessor[s] * ddim];
         add_ker(out_data_ptr, select_data_ptr, ddim);
       }
     }
