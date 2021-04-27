@@ -248,6 +248,8 @@ Supported Quantization Operators:
 - ```convolution + sum + relu```
 - ```convolution + BatchNorm```
 
+## Tutorials
+[Performance Tuning](tutorials/Performance_Tuning.md)
 
 ## Contribution
 
