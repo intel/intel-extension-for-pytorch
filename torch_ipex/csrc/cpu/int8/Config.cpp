@@ -166,11 +166,13 @@ Int8OptConfig::get_indicator_scales(std::vector<bool> i_uint8_used,
       // update zero_point and scales
       inputs_scale[i] /= 127.5;
       inputs_scale[i] *= 255.5;
+      inputs_uint8_used[i] = i_uint8_used[i];
       scale_update = true;
     } else if (inputs_uint8_used[i] && !i_uint8_used[i]) {
       // update zero_point and scales
       inputs_scale[i] /= 255.5;
       inputs_scale[i] *= 127.5;
+      inputs_uint8_used[i] = i_uint8_used[i];
       scale_update = true;
     }
   }
@@ -179,11 +181,13 @@ Int8OptConfig::get_indicator_scales(std::vector<bool> i_uint8_used,
       // update zero_point and scales
       outputs_scale[j] /= 127.5;
       outputs_scale[j] *= 255.5;
+      outputs_uint8_used[j] = o_uint8_used[j];
       scale_update = true;
     } else if (outputs_uint8_used[j] && !o_uint8_used[j]) {
       // update zero_point and scales
       outputs_scale[j] /= 255.5;
       outputs_scale[j] *= 127.5;
+      outputs_uint8_used[j] = o_uint8_used[j];
       scale_update = true;
     }
   }
@@ -198,7 +202,11 @@ Int8OptConfig::get_indicator_scales(std::vector<bool> i_uint8_used,
 }
 
 bool Int8OptConfig::get_indicator_quantized_status(int64_t ops_id) {
-  return indicators_[ops_id].get_indicator_quantized_status();
+  if (ops_id < indicators_.size()) {
+    return indicators_[ops_id].get_indicator_quantized_status();
+  } else {
+    return false;
+  }
 }
 void Int8OptConfig::set_indicators(std::vector<Indicator> indicators) {
   // avoid to use copy assignment since the copy assignment for indicator with rw_mutex
