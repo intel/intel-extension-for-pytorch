@@ -34,9 +34,6 @@ IF (NOT ONEDNN_INCLUDE_DIR)
   MESSAGE(FATAL_ERROR "oneDNN source files not found!")
 ENDIF(NOT ONEDNN_INCLUDE_DIR)
 
-SET(DNNL_CPU_RUNTIME "SYCL" CACHE STRING "oneDNN cpu backend" FORCE)
-SET(DNNL_GPU_RUNTIME "SYCL" CACHE STRING "oneDNN gpu backend" FORCE)
-
 IF (USE_PRIMITIVE_CACHE)
   # Disable oneDNN primitive cache if already cached by FRAMEWORK
   SET(DNNL_ENABLE_PRIMITIVE_CACHE FALSE CACHE BOOL "oneDNN sycl primitive cache" FORCE)
@@ -63,6 +60,12 @@ ELSE()
   ENDIF()
 ENDIF()
 
+# FIXME: Set threading to THREADPOOL to bypass issues due to not found TBB or OMP.
+# NOTE: We will not use TBB, but we cannot enable OMP. We build whole oneDNN by DPC++
+# compiler which only provides the Intel iomp. But oneDNN cmake scripts only try to
+# find the iomp in ICC compiler, which caused a build fatal error here.
+SET(DNNL_CPU_RUNTIME "THREADPOOL" CACHE STRING "oneDNN cpu backend" FORCE)
+SET(DNNL_GPU_RUNTIME "SYCL" CACHE STRING "oneDNN gpu backend" FORCE)
 SET(DNNL_BUILD_TESTS FALSE CACHE BOOL "build with oneDNN tests" FORCE)
 SET(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "build with oneDNN examples" FORCE)
 SET(DNNL_ENABLE_CONCURRENT_EXEC TRUE CACHE BOOL "multi-thread primitive execution" FORCE)
