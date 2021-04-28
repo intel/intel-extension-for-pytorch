@@ -202,11 +202,7 @@ Int8OptConfig::get_indicator_scales(std::vector<bool> i_uint8_used,
 }
 
 bool Int8OptConfig::get_indicator_quantized_status(int64_t ops_id) {
-  if (ops_id < indicators_.size()) {
-    return indicators_[ops_id].get_indicator_quantized_status();
-  } else {
-    return false;
-  }
+  return indicators_[ops_id].get_indicator_quantized_status();
 }
 void Int8OptConfig::set_indicators(std::vector<Indicator> indicators) {
   // avoid to use copy assignment since the copy assignment for indicator with rw_mutex
