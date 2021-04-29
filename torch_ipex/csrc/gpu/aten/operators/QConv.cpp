@@ -6,17 +6,16 @@
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
 #include <core/Quantizer.h>
+#include <oneDNN/oneDNN.h>
 
-#include "Conv.h"
 #include "QUtil.h"
 
 using namespace dnnl;
 using namespace at::dpcpp;
 using namespace at::native;
+using namespace at::xpu::oneDNN;
 
 namespace at {
-
-using namespace AtenIpexTypeXPU::impl;
 
 namespace AtenIpexTypeQuantizedXPU {
 
@@ -36,10 +35,10 @@ at::Tensor q_conv2d(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
-  conv_attr_t attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), 0};
+  ConvAttr attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), 0};
 
   Tensor output = _empty_affine_quantized(
-      conv_output_size(
+      conv_dst_tz(
           input.ndimension(),
           input.sizes(),
           weight.sizes(),
@@ -80,10 +79,10 @@ at::Tensor q_conv2d_relu(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
-  conv_attr_t attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), conv_attr_t::kind_with_relu};
+  ConvAttr attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), ConvAttr::kind_with_relu};
 
   Tensor output = _empty_affine_quantized(
-      conv_output_size(
+      conv_dst_tz(
           input.ndimension(),
           input.sizes(),
           weight.sizes(),
@@ -135,8 +134,8 @@ at::Tensor q_conv2d_sum_relu(
   auto groups = pack_ptr->groups();
   auto dilation = pack_ptr->dilation();
 
-  conv_attr_t attr = {static_cast<float>(accumu.q_scale() / sum_scale), 0.f, 0.f,
-      static_cast<float>(sum_scale), conv_attr_t::kind_with_relu | conv_attr_t::kind_with_sum};
+  ConvAttr attr = {static_cast<float>(accumu.q_scale() / sum_scale), 0.f, 0.f,
+      static_cast<float>(sum_scale), ConvAttr::kind_with_relu | ConvAttr::kind_with_sum};
 
   convolution(
     accumu,

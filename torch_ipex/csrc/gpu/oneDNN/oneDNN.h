@@ -8,3 +8,4 @@
 #include "Reorder.h"
 #include "LayerNorm.h"
 #include "Matmul.h"
+#include "Conv.h"
