@@ -15,8 +15,8 @@ test_nn.py::TestNNDeviceTypeXPU::test_conv_cudnn_nhwc_support_xpu_float32
 test_nn.py::TestNNDeviceTypeXPU::test_conv_noncontig_weights_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_embedding_padding_idx_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_empty_dropout_xpu
-test_nn.py::TestNNDeviceTypeXPU::test_gumbel_softmax_xpu_float32
-test_nn.py::TestNNDeviceTypeXPU::test_gumbel_softmax_xpu_float64
+# test_nn.py::TestNNDeviceTypeXPU::test_gumbel_softmax_xpu_float32
+# test_nn.py::TestNNDeviceTypeXPU::test_gumbel_softmax_xpu_float64
 test_nn.py::TestNNDeviceTypeXPU::test_instancenorm_raises_error_if_less_than_one_value_per_channel_xpu
 test_nn.py::TestNNDeviceTypeXPU::test_max_pool_nan_xpu_bfloat16
 test_nn.py::TestNNDeviceTypeXPU::test_max_pool_nan_xpu_float16
