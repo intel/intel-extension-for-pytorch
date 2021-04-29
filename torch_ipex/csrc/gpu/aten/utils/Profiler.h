@@ -58,13 +58,10 @@ struct DPCPPProfilerStubsImpl : public XPUStubs {
   }
 };
 
-static inline cl::sycl::event submit_empty_kernel(cl::sycl::queue& Q) {
+static inline cl::sycl::event submit_barrier(cl::sycl::queue& Q) {
   cl::sycl::event e;
   if (dpcpp_profiling() && profilerEnabled()) {
-  e = Q.submit( [&](cl::sycl::handler& cgh) {
-    cgh.parallel_for<class empty_kernel>(cl::sycl::range<1> {1}, [=](cl::sycl::id<1> index) {
-        /* dummy kernel does nothing inside */ });
-    });
+    e = Q.submit_barrier();
   }
   return e;
 }

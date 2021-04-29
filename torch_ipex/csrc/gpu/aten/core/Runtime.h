@@ -28,19 +28,19 @@ using namespace dnnl;
     cl::sycl::queue Q = dnnl::sycl_interop::get_queue((stream));              \
     if (verbose) {                                                            \
       IPEX_TIMER(t, verbose, __func__);                                       \
-      cl::sycl::event start_evt = submit_empty_kernel(Q);                     \
+      cl::sycl::event start_evt = submit_barrier(Q);                     \
       dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__);           \
       t.now("oneDNN execute in sycl_interop");                                \
-      cl::sycl::event end_evt = submit_empty_kernel(Q);                       \
+      cl::sycl::event end_evt = submit_barrier(Q);                       \
       dpcpp_log("onednn_kernel", start_evt, end_evt);                         \
       DPCPP_ONEDNN_FORCE_SYNC(stream);                                        \
       t.now("oneDNN stream wait");                                            \
       Q.throw_asynchronous();                                                 \
       t.now("oneDNN throw asynchronous");                                     \
     } else {                                                                  \
-      cl::sycl::event start_evt = submit_empty_kernel(Q);                     \
+      cl::sycl::event start_evt = submit_barrier(Q);                     \
       dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__);           \
-      cl::sycl::event end_evt = submit_empty_kernel(Q);                       \
+      cl::sycl::event end_evt = submit_barrier(Q);                       \
       dpcpp_log("onednn_kernel", start_evt, end_evt);                         \
       DPCPP_ONEDNN_FORCE_SYNC(stream);                                        \
       Q.throw_asynchronous();                                                 \
