@@ -215,12 +215,24 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
                                  std::tuple<Tensor,Tensor> (const Tensor &, int64_t, int64_t, bool, bool),
                                  std::tuple<Tensor,Tensor> (const Tensor &, int64_t, int64_t, bool, bool),
                                  &ADD_NS(topk)>::type::call)));
+
   m.impl(TORCH_SELECTIVE_NAME("aten::sort"),
          TORCH_FN((&CPU_WrapFunction<DtypeCastPolicy::fp32,
                                  std::tuple<Tensor,Tensor> (const Tensor &, int64_t, bool),
                                  std::tuple<Tensor,Tensor> (const Tensor &, int64_t, bool),
                                  &ADD_NS(sort)>::type::call)));
- 
+
+   m.impl(TORCH_SELECTIVE_NAME("aten::kthvalue"),
+         TORCH_FN((&CPU_WrapFunction<DtypeCastPolicy::fp32,
+                                 std::tuple<Tensor,Tensor> (const Tensor &, int64_t, int64_t, bool),
+                                 std::tuple<Tensor,Tensor> (const Tensor &, int64_t, int64_t, bool),
+                                 &ADD_NS(kthvalue)>::type::call)));
+
+   m.impl(TORCH_SELECTIVE_NAME("aten::kthvalue.dimname"),
+         TORCH_FN((&CPU_WrapFunction<DtypeCastPolicy::fp32,
+                                 std::tuple<Tensor,Tensor> (const Tensor &, int64_t, at::Dimname, bool),
+                                 std::tuple<Tensor,Tensor> (const Tensor &, int64_t, at::Dimname, bool),
+                                 &ADD_NS(kthvalue)>::type::call)));
   // for int8 path
   m.impl(TORCH_SELECTIVE_NAME("aten::conv2d"), TORCH_FN((&torch_ipex::autocast::conv2d)));
   m.impl(TORCH_SELECTIVE_NAME("aten::conv3d"), TORCH_FN((&torch_ipex::autocast::conv3d)));
