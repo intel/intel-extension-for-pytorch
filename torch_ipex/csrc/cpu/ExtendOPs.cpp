@@ -6,6 +6,7 @@
 #include "dbl/Common.h"
 #include "aten/aten.hpp"
 #include "bf16/vec/bf16_vec_kernel.h"
+#include "int8/vec/int8_vec_kernel.h"
 #include "dil/dil.hpp"
 #include "torch_ipex/csrc/cpu/int8/Config.h"
 #include "xsmm/libxsmm_utils.h"
@@ -14,6 +15,7 @@
 #include <algorithm>
 #include <c10/util/Exception.h>
 #include <torch/csrc/autograd/function.h>
+#include "cpu/int8/Config.h"
 
 namespace torch_ipex {
 
@@ -365,21 +367,147 @@ _interaction_backward(const at::Tensor &grad_out,
   return output;
 }
 
+static inline void _AAt_lower_triangle_s8s8_scale_s32s8(int8_t *out, const int8_t * A,
+                         size_t M, size_t K, const std::vector<float>& scales) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("ExtendOps::_AAt_lower_triangle_s8s8_scale_s32s8", std::vector<c10::IValue>({}));
+#endif
+  size_t offset = 0;
+  for (int i = 1; i < M; i++) {
+    const int8_t* a = &A[i * K];
+    for (int j = 0; j < i; j++) {
+      const int8_t* b = &A[j * K];
+      out[offset] = _dot_s8s8_scale_s32s8(a, b, K, scales[offset]);
+      offset++;
+    }
+  }
+}
+
+static inline void _interaction_s8s8_scale_s32s8(int8_t *out, const std::vector<int8_t *>& inputs,
+                         int64_t bs, size_t M, size_t K, const std::vector<float>& scales) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("ExtendOps::_interaction_s8s8_scale_s32s8", std::vector<c10::IValue>({}));
+#endif
+  size_t offset = 0;
+  auto row_len = bs * K;
+  std::vector<int8_t*> input_addr(M);
+  for (int i = 0; i < M; i++) {
+    input_addr[i] = &inputs[i][row_len];
+  }
+
+  for (int i = 1; i < M; i++) {
+    int8_t* a = input_addr[i];
+    for (int j = 0; j < i; j++) {
+      int8_t* b = input_addr[j];
+      out[offset] = _dot_s8s8_scale_s32s8(a, b, K, scales[offset]);
+      offset++;
+    }
+  }
+}
+
+inline at::Tensor _interaction_forward_quantization(const std::vector<at::Tensor> &input, int64_t num_ops_id) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("_interaction_forward_quantization", std::vector<c10::IValue>({}));
+#endif
+  std::vector<std::vector<float>> scales = cpu::dbl::comm::get_int8_scales({input}, /*uint8_used for output*/ false, num_ops_id);
+  uint32_t input_size = input.size();
+  uint32_t total_feature_size = 0;
+  int64_t batch_size = input[0].sizes()[0];
+  uint32_t vector_size = input[0].sizes()[1];
+
+  float output_scale = scales[1][0];
+  std::vector<float> in_scales(input_size);
+  std::vector<uint32_t> feature_sizes(input_size);
+  std::vector<int8_t *> input_data(input_size);
+  for (auto i = 0 ; i < input_size; i++) {
+    auto cur_input = input[i];
+    in_scales[i] = scales[0][i];
+    std::vector<float> cur_scale = {};
+    cur_scale.push_back(scales[0][i]);
+    cpu::dbl::comm::reorder_to_int8_for_mix_prec(cur_input, cur_scale);
+
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cur_input.sizes()[0] >= batch_size);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].is_contiguous());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].device().is_xpu());
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].dim() == 2);
+    feature_sizes[i] = cur_input.sizes()[1];
+    total_feature_size += feature_sizes[i];
+    auto qinput = cpu::dbl::comm::try_gen_dil_tensor(cur_input);
+    input_data[i] = (int8_t*)qinput.get_data_handle();
+  }
+
+  auto vector_nums = total_feature_size / vector_size;
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(total_feature_size % vector_size == 0);
+  auto interact_feature_size = vector_nums * (vector_nums - 1) / 2;
+  auto out_data_line_len = interact_feature_size + vector_size;
+  dil::dims dst_dims{batch_size, out_data_line_len};
+  dil::tensor::desc dst_desc(dst_dims, dil::data_type::s8);
+  dil::tensor out_dil{dst_desc};
+  out_dil.set_scale(scales[1]);
+  auto out_data = (int8_t*)out_dil.get_data_handle();
+
+  std::vector<float> out_in_scales(interact_feature_size);
+  size_t offset = 0;
+  for (int i = 1; i < vector_nums; i++) {
+    for (int j = 0; j < i; j++) {
+      float input_scale = in_scales[i] * in_scales[j];
+      out_in_scales[offset] = output_scale / input_scale;
+      offset++;
+    }
+  }
+  float dense_scale = output_scale / in_scales[0];
+
+  at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
+    //int8_t cat_buf[vector_nums * vector_size] __attribute__((aligned(64)));
+    for (int64_t i = start; i < end; i++) {
+      if (vector_size == 128) {
+        scale_and_move_ker_128(&out_data[i * out_data_line_len], &input_data[0][i * vector_size], dense_scale);
+      } else {
+        scale_and_move_ker(&out_data[i * out_data_line_len], &input_data[0][i * vector_size], dense_scale, vector_size);
+      }
+      //cat<int8_t>(cat_buf, input_data, feature_sizes, i);
+      std::vector<int8_t*> input_ptr(vector_nums);
+      int8_t* flat_buf = (int8_t*)(&out_data[i * out_data_line_len] + vector_size);
+      //_AAt_lower_triangle_s8s8_scale_s32s8(flat_buf, cat_buf, vector_nums, vector_size, out_in_scales);
+      _interaction_s8s8_scale_s32s8(flat_buf, input_data, i, vector_nums, vector_size, out_in_scales);
+    }
+  });
+
+  return cpu::dbl::comm::gen_aten_tensor_by(std::move(out_dil));
+}
+
 at::Tensor
 AtenIpexTypeExt::interaction_forward(const std::vector<at::Tensor> &input) {
-  if (input[0].scalar_type() == at::kFloat) {
-    for (auto &in : input) {
-      cpu::dbl::comm::reorder_to_public(in);
-      TORCH_INTERNAL_ASSERT_DEBUG_ONLY(in.scalar_type() == at::kFloat);
-    }
-    return _interaction_forward<float>(input);
-  } else {
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[0].scalar_type() == at::kBFloat16);
+  if (input[0].scalar_type() == at::kBFloat16) {
     for (const auto &in : input) {
       TORCH_INTERNAL_ASSERT_DEBUG_ONLY(in.scalar_type() == at::kBFloat16);
     }
     return _interaction_forward<at::BFloat16>(input);
   }
+
+  bool quantized = false;
+  if (false && check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+    int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
+    quantized = cpu::dbl::comm::get_int8_quantized_status(num_ops_id);
+    if (quantized) {
+      return _interaction_forward_quantization(input, num_ops_id);;
+    } else {
+      for (auto &in : input) {
+        cpu::dbl::comm::reorder_to_dtype(in, at::kFloat);
+      }
+    }
+  }
+
+  for (auto &in : input) {
+    cpu::dbl::comm::reorder_to_public(in);
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(in.scalar_type() == at::kFloat);
+  }
+
+  auto out =  _interaction_forward<float>(input);
+  if (false && check_int8_calibration() && check_auto_mix_int8_fp32()) {
+    insert_or_updata_observer({input}, {out}, "interaction_forward", Int8OptConfig::fetch_and_add_ops_id());
+  }
+  return out;
 }
 
 std::vector<at::Tensor>

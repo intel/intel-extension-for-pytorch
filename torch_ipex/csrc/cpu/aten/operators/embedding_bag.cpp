@@ -152,22 +152,23 @@ at::Tensor embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indi
   at::Tensor offsets_ = offsets.is_contiguous()? offsets : offsets.contiguous();
 
   at::Tensor output;
+
   if(is_bfloat16_tensor(weight)) {
       output = _embedding_bag_index_add_select_fast<at::BFloat16>(
           indices, weight, offsets_, include_last_offset);
       return output;
   }
-  if (check_auto_mix_int8_fp32() and
-      (not check_int8_calibration())) {
-      output = embedding_bag_int8_impl(weight, indices, offsets_,
-                                       include_last_offset);
+
+  if ((not check_int8_calibration()) and check_auto_mix_int8_fp32()) {
+      output = embedding_bag_int8_impl(weight, indices, offsets_, include_last_offset);
       return output;
   }
 
   output = _embedding_bag_index_add_select_fast<float>(
       indices, weight, offsets_,
       include_last_offset);
-  if (check_auto_mix_int8_fp32() and check_int8_calibration()) {
+
+  if (check_int8_calibration() and check_auto_mix_int8_fp32()) {
       // calibration based on results of float datatype
       auto op_name = "EmbeddingBag";
       insert_or_updata_observer({output},
