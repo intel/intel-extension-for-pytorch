@@ -23,6 +23,8 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
  |[v1.0.1](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.1)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
  |[v1.0.0](https://github.com/intel/intel-extension-for-pytorch/tree/v1.0.0)|[v1.5.0-rc3](https://github.com/pytorch/pytorch/tree/v1.5.0-rc3 "v1.5.0-rc3")|
 
+**Note:** Intel-Extension-for-PyTorch requires to have AVX-512 instruction set supported on your CPU for now. Compilation will fail on CPUs those don't have AVX-512 instruction set.
+
  Take Intel-Extension-for-Pytorch v1.2.0 as the example.
 
  1. Get PyTorch v1.7.0 source(Refer to [PyTorch guide](https://github.com/pytorch/pytorch#get-the-pytorch-source) for more details)
