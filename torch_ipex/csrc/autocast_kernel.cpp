@@ -133,7 +133,6 @@ at::Tensor max_pool2d(const at::Tensor& input, at::IntArrayRef kernel_size, at::
   if (at::ScalarType::Char == target_type) {
     return int8::max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode);
   }
-  // convert to fp32 path.
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("max_pool2d");
 #endif
@@ -146,7 +145,6 @@ at::Tensor adaptive_avg_pool2d(const at::Tensor& input, at::IntArrayRef output_s
   if (at::ScalarType::Char == target_type) {
     return int8::adaptive_avg_pool2d(input, output_size);
   }
-  //convert to fp32 path.
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("adaptive_avg_pool2d");
 #endif
@@ -214,7 +212,7 @@ at::Tensor dropout(const at::Tensor& input, double p, bool train) {
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("dropout");
 #endif
-  return at::dropout(cpu_cached_cast(at::kFloat, input), p, train);
+  return at::dropout(input, p, train);
 }
 
 } // autocast
