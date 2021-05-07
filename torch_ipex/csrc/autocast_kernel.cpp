@@ -137,7 +137,7 @@ at::Tensor max_pool2d(const at::Tensor& input, at::IntArrayRef kernel_size, at::
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("max_pool2d");
 #endif
-  return at::max_pool2d(cpu_cached_cast(at::kFloat, input), kernel_size, stride, padding, dilation, ceil_mode);
+  return at::max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode);
 }
 
 at::Tensor adaptive_avg_pool2d(const at::Tensor& input, at::IntArrayRef output_size) {
@@ -150,7 +150,7 @@ at::Tensor adaptive_avg_pool2d(const at::Tensor& input, at::IntArrayRef output_s
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("adaptive_avg_pool2d");
 #endif
-  return at::adaptive_avg_pool2d(cpu_cached_cast(at::kFloat, input), output_size);
+  return at::adaptive_avg_pool2d(input, output_size);
 }
 
 at::Tensor relu(const at::Tensor& input) {
