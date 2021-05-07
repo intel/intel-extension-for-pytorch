@@ -1,4 +1,4 @@
-import _torch_ipex as core
+import torch
 
-nms = core.nms
-batch_score_nms = core.batch_score_nms
+nms = torch.ops.torch_ipex.nms
+batch_score_nms = torch.ops.torch_ipex.batch_score_nms

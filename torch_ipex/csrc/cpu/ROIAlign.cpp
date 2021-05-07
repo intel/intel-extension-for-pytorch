@@ -1,5 +1,7 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 #include "ExtendOPs.h"
+#include "torch_ipex/csrc/autocast_mode.h"
+#include "torch_ipex/csrc/autocast_verbose.h"
 namespace torch_ipex {
 
 // implementation taken from Caffe2
@@ -492,37 +494,93 @@ at::Tensor ROIAlign_backward_cpu(const at::Tensor& grad,
 
 at::Tensor AtenIpexTypeExt::ROIAlign_forward(const at::Tensor& input,
                                              const at::Tensor& rois,
-                                             const float spatial_scale,
-                                             const int pooled_height,
-                                             const int pooled_width,
-                                             const int sampling_ratio) {
+                                             const double spatial_scale,
+                                             const int64_t pooled_height,
+                                             const int64_t pooled_width,
+                                             const int64_t sampling_ratio) {
 #if defined(IPEX_DISP_OP)
   printf("AtenIpexTypeExt::ROIAlign_forward\n");
 #endif
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexTypeExt::ROIAlign_forward", std::vector<c10::IValue>({}));
 #endif
-  return ROIAlign_forward_cpu(input.contiguous().to(torch::kFloat), rois, spatial_scale, pooled_height, pooled_width, sampling_ratio);
+// input needs to be converted to contiguous temporarily, because ROIAlign dose not support channel-last format yet.
+  return ROIAlign_forward_cpu(input.contiguous(), rois, spatial_scale, pooled_height, pooled_width, sampling_ratio);
 }
 
 at::Tensor AtenIpexTypeExt::ROIAlign_backward(const at::Tensor& grad,
                                               const at::Tensor& rois,
-                                              const float spatial_scale,
-                                              const int pooled_height,
-                                              const int pooled_width,
-                                              const int batch_size,
-                                              const int channels,
-                                              const int height,
-                                              const int width,
-                                              const int sampling_ratio) {
+                                              const double spatial_scale,
+                                              const int64_t pooled_height,
+                                              const int64_t pooled_width,
+                                              const int64_t batch_size,
+                                              const int64_t channels,
+                                              const int64_t height,
+                                              const int64_t width,
+                                              const int64_t sampling_ratio) {
 #if defined(IPEX_DISP_OP)
   printf("AtenIpexTypeExt::ROIAlign_backward\n");
 #endif
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexTypeExt::ROIAlign_backward", std::vector<c10::IValue>({}));
 #endif
-  return ROIAlign_backward_cpu(grad.contiguous().to(torch::kFloat), rois, spatial_scale, pooled_height, pooled_width, batch_size, channels, height, width, sampling_ratio);
+// grad needs to be converted to contiguous temporarily, because ROIAlign dose not support channel-last format yet.
+  return ROIAlign_backward_cpu(grad.contiguous(), rois, spatial_scale, pooled_height, pooled_width, batch_size, channels, height, width, sampling_ratio);
 }
 
+} // namespace torch_ipex
+
+namespace {
+static auto dispatch =
+    torch::RegisterOperators()
+        .op("torch_ipex::ROIAlign_forward", &torch_ipex::AtenIpexTypeExt::ROIAlign_forward)
+        .op("torch_ipex::ROIAlign_backward", &torch_ipex::AtenIpexTypeExt::ROIAlign_backward);
 }
+
+namespace torch_ipex {
+namespace autocast {
+
+at::Tensor ROIAlign_forward(const at::Tensor& input,
+                            const at::Tensor& rois,
+                            const double spatial_scale,
+                            const int64_t pooled_height,
+                            const int64_t pooled_width,
+                            const int64_t sampling_ratio) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+    .findSchemaOrThrow("torch_ipex::ROIAlign_forward", "")
+    .typed<decltype(ROIAlign_forward)>();
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("ROIAlign_forward");
+#endif
+  return op.call(cpu_cached_cast(at::kFloat, input), rois, spatial_scale, pooled_height, pooled_width, sampling_ratio);
+}
+
+at::Tensor ROIAlign_backward(const at::Tensor& grad,
+                             const at::Tensor& rois,
+                             const double spatial_scale,
+                             const int64_t pooled_height,
+                             const int64_t pooled_width,
+                             const int64_t batch_size,
+                             const int64_t channels,
+                             const int64_t height,
+                             const int64_t width,
+                             const int64_t sampling_ratio) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+    .findSchemaOrThrow("torch_ipex::ROIAlign_backward", "")
+    .typed<decltype(ROIAlign_backward)>();
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("ROIAlign_backward");
+#endif
+  return op.call(cpu_cached_cast(at::kFloat, grad), rois, spatial_scale, pooled_height, pooled_width, batch_size, channels, height, width, sampling_ratio);
+}
+
+TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m){
+  m.impl("ROIAlign_forward", torch_ipex::autocast::ROIAlign_forward);
+  m.impl("ROIAlign_backward", torch_ipex::autocast::ROIAlign_backward);
+}
+
+} // namespace autocast
+} // namespace torch_ipex
 

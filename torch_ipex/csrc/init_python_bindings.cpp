@@ -176,11 +176,6 @@ void InitIpexModuleBindings(py::module m) {
   });
 
   // extend OPs
-  m.def("roi_align_forward", &AtenIpexTypeExt::ROIAlign_forward);
-  m.def("roi_align_backward", &AtenIpexTypeExt::ROIAlign_backward);
-
-  m.def("nms", &AtenIpexTypeExt::nms);
-  m.def("batch_score_nms", &AtenIpexTypeExt::batch_score_nms);
   m.def("embedding_bag_fast_path_sum", &AtenIpexTypeExt::embedding_bag_fast_path_sum);
 }
 }  // namespace

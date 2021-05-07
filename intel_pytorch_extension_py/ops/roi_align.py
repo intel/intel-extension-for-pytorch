@@ -5,8 +5,6 @@ from torch.autograd import Function
 from torch.autograd.function import once_differentiable
 from torch.nn.modules.utils import _pair
 
-import _torch_ipex as core
-
 
 class _ROIAlign(Function):
     @staticmethod
@@ -16,7 +14,7 @@ class _ROIAlign(Function):
         ctx.spatial_scale = spatial_scale
         ctx.sampling_ratio = sampling_ratio
         ctx.input_shape = input.size()
-        output = core.roi_align_forward(
+        output = torch.ops.torch_ipex.ROIAlign_forward(
             input, roi, spatial_scale, output_size[0], output_size[1], sampling_ratio
         )
         return output
@@ -29,7 +27,7 @@ class _ROIAlign(Function):
         spatial_scale = ctx.spatial_scale
         sampling_ratio = ctx.sampling_ratio
         bs, ch, h, w = ctx.input_shape
-        grad_input = core.roi_align_backward(
+        grad_input = torch.ops.torch_ipex.ROIAlign_backward(
             grad_output,
             rois,
             spatial_scale,

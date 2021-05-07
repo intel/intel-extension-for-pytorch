@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <c10/util/Exception.h>
 #include <torch/csrc/autograd/function.h>
+#include "torch_ipex/csrc/autocast_mode.h"
+#include "torch_ipex/csrc/autocast_verbose.h"
 namespace torch_ipex {
 
 /*
@@ -176,7 +178,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms_cpu(const at::Ten
 
 at::Tensor AtenIpexTypeExt::nms(const at::Tensor& dets,
                const at::Tensor& scores,
-               const float threshold) {
+               const double threshold) {
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::nms\n");
 #endif
@@ -195,7 +197,7 @@ at::Tensor AtenIpexTypeExt::nms(const at::Tensor& dets,
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::batch_score_nms(const at::Tensor& dets,
                const at::Tensor& scores,
-               const float threshold) {
+               const double threshold) {
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::batch_score_nms\n");
 #endif
@@ -211,4 +213,50 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> AtenIpexTypeExt::batch_score_nms(
   //return std::tuple<at::Tensor,at::Tensor,at::Tensor>(bridge::shallowUpgradeToDPCPPTensor(std::get<0>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<1>(_ipex_result)), bridge::shallowUpgradeToDPCPPTensor(std::get<2>(_ipex_result)));
   return std::tuple<at::Tensor,at::Tensor,at::Tensor>(std::get<0>(result), std::get<1>(result), std::get<2>(result));
 }
+} // namespace torch_ipex
+
+
+namespace {
+static auto dispatch =
+    torch::RegisterOperators()
+        .op("torch_ipex::nms", &torch_ipex::AtenIpexTypeExt::nms)
+        .op("torch_ipex::batch_score_nms", &torch_ipex::AtenIpexTypeExt::batch_score_nms);
 }
+
+namespace torch_ipex {
+namespace autocast {
+
+at::Tensor nms(const at::Tensor& dets,
+               const at::Tensor& scores,
+               const double threshold) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+    .findSchemaOrThrow("torch_ipex::nms", "")
+    .typed<decltype(nms)>();
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("nms");
+#endif
+  return op.call(dets, cpu_cached_cast(at::kFloat, scores), threshold);
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms(const at::Tensor& dets,
+                           const at::Tensor& scores,
+                           const double threshold) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+    .findSchemaOrThrow("torch_ipex::batch_score_nms", "")
+    .typed<decltype(batch_score_nms)>();
+#if defined(ENABLE_AUTOCAST_VERBOSE)
+  verbose::OpNameGuard op_name("batch_score_nms");
+#endif
+  return op.call(dets, cpu_cached_cast(at::kFloat, scores), threshold);
+}
+
+TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m){
+  m.impl("nms", torch_ipex::autocast::nms);
+  m.impl("batch_score_nms", torch_ipex::autocast::batch_score_nms);
+}
+
+} // namespace autocast
+} // namespace torch_ipex
+
