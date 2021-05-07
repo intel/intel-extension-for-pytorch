@@ -33,9 +33,10 @@ static inline bool is_bfloat16_tensor(const at::Tensor tensor_) {
   return false;
 }
 
-bool embedding_bag_fast_path_sum(const at::Tensor weight, const at::Tensor per_sample_weights, int64_t mode) {
-  if ((mode != MODE_SUM) || (weight.stride(1) != 1) || per_sample_weights.defined()) return false;
+bool AtenIpexTypeExt::embedding_bag_fast_path_sum(const at::Tensor weight, const c10::optional<at::Tensor> per_sample_weights, int64_t mode, const c10::optional<int64_t> padding_idx) {
+  if ((mode != MODE_SUM) || (weight.stride(1) != 1)) return false;
   if ((weight.scalar_type() != at::kFloat) && (weight.scalar_type() != at::kBFloat16)) return false;
+  if (padding_idx.has_value() || (per_sample_weights.has_value() && per_sample_weights.value().defined())) return false;
   return true;
 }
 
@@ -88,9 +89,11 @@ static inline at::Tensor _embedding_bag_index_add_select_fast(const at::Tensor s
   return output;
 }
 
-at::Tensor embedding_bag_impl(const at::Tensor & weight, const at::Tensor & indices,
-  const at::Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse,
-  const at::Tensor & per_sample_weights, bool include_last_offset) {
+at::Tensor embedding_bag_impl(
+  const at::Tensor & weight,
+  const at::Tensor & indices,
+  const at::Tensor & offsets,
+  bool include_last_offset) {
 
   at::Tensor offsets_ = offsets.is_contiguous()? offsets : offsets.contiguous();
 
@@ -128,10 +131,12 @@ at::Tensor _sparse_coo_tensor_unsafe(const at::Tensor& indices, const at::Tensor
 
 template<typename T>
 static inline at::Tensor embedding_bag_sparse_backward_sum_fast(
-    const at::Tensor grad, const at::Tensor indices,
-    const at::Tensor offsets, int num_weights, int mode) {
+    const at::Tensor grad,
+    const at::Tensor indices,
+    const at::Tensor offsets,
+    int num_weights) {
 
-  assert((mode == MODE_SUM) && (grad.stride(1) == 1));
+  assert(grad.stride(1) == 1);
 
   int64_t indices_size0 = indices.size(0);
   int64_t ddim = grad.size(1);
@@ -185,10 +190,14 @@ count_and_map_uniq(const at::TensorAccessor<int64_t, 1>& indices_accessor, int64
 }
 
 template<typename T>
-static inline at::Tensor embedding_bag_dense_backward_sum_fast(const at::Tensor grad, const at::Tensor indices, const at::Tensor offsets, int num_weights, int mode) {
+static inline at::Tensor embedding_bag_dense_backward_sum_fast(
+    const at::Tensor grad,
+    const at::Tensor indices,
+    const at::Tensor offsets,
+    int num_weights) {
 
   int64_t indices_numel = indices.numel();
-  assert((mode == MODE_SUM) && (grad.stride(1) == 1) && (indices_numel > 0));
+  assert(grad.stride(1) == 1 && indices_numel > 0);
   auto offset_numel = offsets.numel();
   at::Tensor offset2bag_ ;
   if (offset_numel != indices_numel) {
@@ -281,79 +290,57 @@ embedding_bag_get_offset2bag(const at::Tensor indices, const at::Tensor & offset
   return offset2bag_;
 }
 
-at::Tensor embedding_bag_backward_impl(const at::Tensor & grad, const at::Tensor & indices,
-  const at::Tensor & offsets, const at::Tensor & offset2bag, const at::Tensor & bag_size, const at::Tensor & maximum_indices,
-  int64_t num_weights, bool scale_grad_by_freq, int64_t mode, bool sparse,
-  const at::Tensor & per_sample_weights) {
+at::Tensor embedding_bag_backward_impl(
+    const at::Tensor & grad,
+    const at::Tensor & indices,
+    const at::Tensor & offsets,
+    int64_t num_weights,
+    bool sparse) {
   if (sparse) {
     if (is_bfloat16_tensor(grad)) {
-      return embedding_bag_sparse_backward_sum_fast<at::BFloat16>(grad, indices, offsets, num_weights, mode);
+      return embedding_bag_sparse_backward_sum_fast<at::BFloat16>(grad, indices, offsets, num_weights);
     } else {
-      return embedding_bag_sparse_backward_sum_fast<float>(grad, indices, offsets, num_weights, mode);
+      return embedding_bag_sparse_backward_sum_fast<float>(grad, indices, offsets, num_weights);
     } 
   } else {
-    auto grad_c = grad.contiguous();
     if (is_bfloat16_tensor(grad)) {
-      return embedding_bag_dense_backward_sum_fast<at::BFloat16>(grad_c, indices, offsets, num_weights, mode);
+      return embedding_bag_dense_backward_sum_fast<at::BFloat16>(grad, indices, offsets, num_weights);
     } else {
-      return embedding_bag_dense_backward_sum_fast<float>(grad_c, indices, offsets, num_weights, mode);
+      return embedding_bag_dense_backward_sum_fast<float>(grad, indices, offsets, num_weights);
     }
   }
 }
 
 class NewEmbeddingBagOp : public torch::autograd::Function<NewEmbeddingBagOp> {
 public:
-  static std::vector<at::Tensor>
-  _forward(const at::Tensor &weight, const at::Tensor &indices,
-           const at::Tensor &offsets, bool scale_grad_by_freq, int64_t mode,
-           bool sparse, bool include_last_offset,
-           const at::Tensor per_sample_weights = at::Tensor()) {
+  static at::Tensor
+  _forward(
+      const at::Tensor &weight, 
+      const at::Tensor &indices,
+      const at::Tensor &offsets,
+      bool sparse,
+      bool include_last_offset) {
 #if defined(IPEX_PROFILE_OP)
     RECORD_FUNCTION("IPEXEmbeddingBagOp::_forward", std::vector<c10::IValue>({}));
 #endif
-    try {
-      if (embedding_bag_fast_path_sum(weight, per_sample_weights, mode)) {
-        auto ret = embedding_bag_impl(
-            weight, indices, offsets, scale_grad_by_freq, mode, sparse,
-            per_sample_weights, include_last_offset);
-        return {ret};
-      }
-    } catch (std::exception &e) {
-#if defined(_DEBUG)
-      TORCH_WARN(e.what());
-#endif
-    }
-    auto ret =
-        at::embedding_bag(weight, indices, offsets, scale_grad_by_freq, mode,
-                          sparse, per_sample_weights, include_last_offset);
-    return {std::get<0>(ret), std::get<1>(ret), std::get<2>(ret),std::get<3>(ret)};
+    auto ret = embedding_bag_impl(weight, indices, offsets,  include_last_offset);
+    return ret;
   }
-
-  static std::vector<at::Tensor>
-  forward(torch::autograd::AutogradContext *ctx, const at::Tensor &weight,
-          const at::Tensor &indices, const at::Tensor &offsets,
-          bool scale_grad_by_freq, int64_t mode, bool sparse,
-          bool include_last_offset,
-          const at::Tensor per_sample_weights = at::Tensor()) {
+  static at::Tensor
+  forward(
+      torch::autograd::AutogradContext *ctx,
+      const at::Tensor &weight,
+      const at::Tensor &indices,
+      const at::Tensor &offsets,
+      bool sparse,
+      bool include_last_offset) {
 #if defined(IPEX_PROFILE_OP)
     RECORD_FUNCTION("IPEXEmbeddingBagOp::forward", std::vector<c10::IValue>({}));
 #endif
     at::AutoNonVariableTypeMode g;
-    ctx->saved_data["num_weights"] = weight.size(0);
-    ctx->saved_data["scale_grad_by_freq"] = scale_grad_by_freq;
-    ctx->saved_data["mode"] = mode;
     ctx->saved_data["sparse"] = sparse;
-    ctx->saved_data["include_last_offset"] = include_last_offset;
-    auto ret = _forward(weight, indices, offsets, scale_grad_by_freq, mode,
-                        sparse, include_last_offset, per_sample_weights);
-    if (ret.size() != 1)
-      ctx->save_for_backward({weight, indices, offsets, per_sample_weights,
-                              ret[1], ret[2],
-                              ret[3]});
-    else
-      ctx->save_for_backward({weight, indices, offsets, per_sample_weights,
-                              at::empty({0}, offsets.options()), at::Tensor(),
-                              at::Tensor()});
+    auto ret = _forward(weight, indices, offsets, sparse, include_last_offset);
+    ctx->save_for_backward({weight, indices, offsets});
     return ret;
   }
 
@@ -368,90 +355,29 @@ public:
     at::Tensor weight = saved[0];
     at::Tensor indices = saved[1];
     at::Tensor offsets = saved[2];
-    at::Tensor per_sample_weights = saved[3];
-    at::Tensor offset2bag = saved[4];
-    at::Tensor bag_size = saved[5];
-    at::Tensor maximum_indices = saved[6];
 
-    int64_t num_weights = ctx->saved_data["num_weights"].toInt();
-    bool scale_grad_by_freq = ctx->saved_data["scale_grad_by_freq"].toBool();
-    int64_t mode = ctx->saved_data["mode"].toInt();
+    int64_t num_weights =weight.size(0);
     bool sparse = ctx->saved_data["sparse"].toBool();
-    bool include_last_offset = ctx->saved_data["include_last_offset"].toBool();
 
-    at::Tensor grad = grad_outputs[0];
-    if (!sparse)
-      grad = grad.contiguous();
-
-    try {
-      if ((embedding_bag_backward_fast_path_sum(
-                   grad, indices, offset2bag, per_sample_weights,
-                   scale_grad_by_freq, mode))) {
-        return {
-            embedding_bag_backward_impl(
-                grad, indices, offsets, offset2bag, bag_size, maximum_indices,
-                num_weights, scale_grad_by_freq, mode, sparse,
-                per_sample_weights),
-            at::Tensor(),
-            at::Tensor(),
-            at::Tensor(),
-            at::Tensor(),
-            at::Tensor(),
-            at::Tensor()};
-      }
-    } catch (std::exception &e) {
-#if defined(_DEBUG)
-      TORCH_WARN(e.what());
-#endif
-    }
-    bool compute_per_sample_weights_grad =
-        per_sample_weights.defined() && per_sample_weights.requires_grad();
-    at::Tensor offset2bag_ =
-        embedding_bag_get_offset2bag(
-            indices, offsets, offset2bag);
-    auto weight_grad =
-        sparse
-            ? at::_embedding_bag_sparse_backward(
-                  grad, indices, offsets, offset2bag_, bag_size, num_weights,
-                  scale_grad_by_freq, mode, per_sample_weights)
-            : at::_embedding_bag_dense_backward(
-                  grad, indices, offsets, offset2bag_, bag_size,
-                  maximum_indices, num_weights, scale_grad_by_freq, mode,
-                  per_sample_weights);
-    auto per_sample_weights_grad =
-        compute_per_sample_weights_grad
-            ? at::_embedding_bag_per_sample_weights_backward(
-                  grad, grad, indices, offsets, offset2bag_, mode)
-            : at::Tensor();
-    return {weight_grad,  per_sample_weights_grad,
-            at::Tensor(), at::Tensor(),
-            at::Tensor(), at::Tensor(),
-            at::Tensor(), at::Tensor()};
+    at::Tensor grad = sparse ? grad_outputs[0] : grad_outputs[0].contiguous();
+    return {
+      embedding_bag_backward_impl(grad, indices, offsets, num_weights, sparse),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor(),
+      at::Tensor()};
   }
 };
 
-std::vector<at::Tensor> AtenIpexTypeExt::embedding_bag(
-    const at::Tensor &weight, const at::Tensor &indices,
-    const at::Tensor &offsets, bool scale_grad_by_freq, int64_t mode,
-    bool sparse, const c10::optional<at::Tensor> &per_sample_weights,
+at::Tensor AtenIpexTypeExt::embedding_bag(
+    const at::Tensor &weight, 
+    const at::Tensor &indices,
+    const at::Tensor &offsets,
+    bool sparse,
     bool include_last_offset) {
-  if (per_sample_weights.has_value()) {
-    if (at::GradMode::is_enabled() && weight.requires_grad())
-      return NewEmbeddingBagOp::apply(
-          weight, indices, offsets, scale_grad_by_freq, mode, sparse,
-          include_last_offset, per_sample_weights.value());
-    return NewEmbeddingBagOp::_forward(
-        weight, indices, offsets, scale_grad_by_freq, mode, sparse,
-        include_last_offset, per_sample_weights.value());
-  } else {
-    if (at::GradMode::is_enabled() && weight.requires_grad())
-      return NewEmbeddingBagOp::apply(weight, indices, offsets,
-                                    scale_grad_by_freq, mode, sparse,
-                                    include_last_offset);
-    return NewEmbeddingBagOp::_forward(weight, indices, offsets,
-                                    scale_grad_by_freq, mode, sparse,
-                                    include_last_offset);
-  }
+  if (at::GradMode::is_enabled() && weight.requires_grad())
+    return NewEmbeddingBagOp::apply(weight, indices, offsets, sparse, include_last_offset);
+  return NewEmbeddingBagOp::_forward(weight, indices, offsets, sparse, include_last_offset);
 }
 
 }  // namespace torch_ipex
@@ -465,10 +391,11 @@ static auto dispatch =
 namespace torch_ipex {
 namespace autocast {
 
-std::vector<at::Tensor> embedding_bag(
-    const at::Tensor &weight, const at::Tensor &indices,
-    const at::Tensor &offsets, bool scale_grad_by_freq, int64_t mode,
-    bool sparse, const c10::optional<at::Tensor> &per_sample_weights,
+at::Tensor embedding_bag(
+    const at::Tensor &weight, 
+    const at::Tensor &indices,
+    const at::Tensor &offsets,
+    bool sparse,
     bool include_last_offset){
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
@@ -478,9 +405,7 @@ std::vector<at::Tensor> embedding_bag(
   verbose::OpNameGuard op_name("embedding_bag");
 #endif
   auto casted_weight = at::GradMode::is_enabled() ? weight : cpu_cached_cast(at::kBFloat16, weight);
-  return op.call(casted_weight, indices, offsets,
-                 scale_grad_by_freq, mode,  sparse, 
-                 per_sample_weights, include_last_offset);
+  return op.call(casted_weight, indices, offsets, sparse, include_last_offset);
 }
 
 TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m){

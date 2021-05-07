@@ -181,6 +181,7 @@ void InitIpexModuleBindings(py::module m) {
 
   m.def("nms", &AtenIpexTypeExt::nms);
   m.def("batch_score_nms", &AtenIpexTypeExt::batch_score_nms);
+  m.def("embedding_bag_fast_path_sum", &AtenIpexTypeExt::embedding_bag_fast_path_sum);
 }
 }  // namespace
 using namespace torch::jit;

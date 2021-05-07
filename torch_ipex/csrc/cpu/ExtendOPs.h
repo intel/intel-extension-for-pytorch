@@ -39,11 +39,19 @@ class AtenIpexTypeExt {
   static std::vector<at::Tensor> interaction_backward(const at::Tensor & grad_out, 
                                                                      const std::vector<at::Tensor> & input);
 
-  static std::vector<at::Tensor> embedding_bag(
-      const at::Tensor &weight, const at::Tensor &indices,
-      const at::Tensor &offsets, bool scale_grad_by_freq, int64_t mode,
-      bool sparse, const c10::optional<at::Tensor> &per_sample_weights,
+  static at::Tensor embedding_bag(
+      const at::Tensor &weight,
+      const at::Tensor &indices,
+      const at::Tensor &offsets,
+      bool sparse,
       bool include_last_offset);
+
+  static bool embedding_bag_fast_path_sum(
+      const at::Tensor weight, 
+      const c10::optional<at::Tensor> per_sample_weights, 
+      int64_t mode, 
+      const c10::optional<int64_t> padding_idx);
+
 };
 
 }  // namespace torch_ipex
