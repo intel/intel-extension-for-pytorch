@@ -59,12 +59,6 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
     bool training,
     double momentum,
     double epsilon) {
-  TORCH_CHECK(
-      weight_.scalar_type() == ScalarType::Float,
-      "BatchNorm weight only support FP32 data type in oneDNN.");
-  TORCH_CHECK(
-      bias_.scalar_type() == ScalarType::Float,
-      "BatchNorm bias only support FP32 data type in oneDNN.");
   auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -160,6 +154,15 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
       {DNNL_ARG_DST, output_usr_memory},
   };
 
+  // BatchNorm weight/bias only support FP32 data type in oneDNN
+  weight = weight.scalar_type() == ScalarType::Half ||
+          weight.scalar_type() == ScalarType::BFloat16
+      ? weight.to(ScalarType::Float)
+      : weight;
+  bias = bias.scalar_type() == ScalarType::Half ||
+          bias.scalar_type() == ScalarType::BFloat16
+      ? bias.to(ScalarType::Float)
+      : bias;
   // local memory freed before kernel finished
   auto weight_bias = at::empty(2 * feature_num, weight.options());
   auto weight_bias_memory = dpcpp_onednn_memory(
@@ -168,13 +171,13 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   dpcppMemcpyAsync(
       weight_bias.data_ptr(),
       weight.data_ptr(),
-      feature_num * sizeof(float),
+      feature_num * weight.dtype().itemsize(),
       DeviceToDevice);
   dpcppMemcpyAsync(
       static_cast<uint8_t*>(weight_bias.data_ptr()) +
-          feature_num * sizeof(float),
+          feature_num * bias.itemsize(),
       bias.data_ptr(),
-      feature_num * sizeof(float),
+      feature_num * bias.itemsize(),
       DeviceToDevice);
 
   args.insert({DNNL_ARG_SCALE_SHIFT, weight_bias_memory});

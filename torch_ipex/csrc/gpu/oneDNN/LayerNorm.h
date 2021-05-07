@@ -37,11 +37,6 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
   normalization_flags flags = normalization_flags::use_scale_shift;
   bool useScaleShift = (bool)(flags & normalization_flags::use_scale_shift);
 
-  TORCH_CHECK(wgh.scalar_type() == ScalarType::Float,
-      "LayerNorm scale need keep on FP32 to get corret precsion ...");
-  TORCH_CHECK(bia.scalar_type() == ScalarType::Float,
-      "LayerNorm shift need keep on FP32 to get corret precsion ...");
-
   int32_t n, ic, ih;
   memory::dims tz, st, stats_tz;
   memory::format_tag stats_fmt;
@@ -105,18 +100,26 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
     args.insert({DNNL_ARG_VARIANCE, var_memory});
   }
 
-  // weight/bias need fp32 data type
+  // LayerNorm weight/bias only support FP32 data type in oneDNN
+  Tensor wgh_ = wgh.scalar_type() == ScalarType::Half ||
+          wgh.scalar_type() == ScalarType::BFloat16
+      ? wgh.to(ScalarType::Float)
+      : wgh;
+  Tensor bia_ = bia.scalar_type() == ScalarType::Half ||
+          bia.scalar_type() == ScalarType::BFloat16
+      ? bia.to(ScalarType::Float)
+      : bia;
   if (useScaleShift) {
-    auto wgh_bia = at::empty(2 * ih, wgh.options());
+    auto wgh_bia = at::empty(2 * ih, wgh_.options());
     dpcppMemcpyAsync(
         wgh_bia.data_ptr(),
-        wgh.data_ptr(),
-        ih * wgh.itemsize(),
+        wgh_.data_ptr(),
+        ih * wgh_.itemsize(),
         DeviceToDevice);
     dpcppMemcpyAsync(
-        static_cast<uint8_t*>(wgh_bia.data_ptr()) + ih * wgh.itemsize(),
-        bia.data_ptr(),
-        ih * bia.itemsize(),
+        static_cast<uint8_t*>(wgh_bia.data_ptr()) + ih * wgh_.itemsize(),
+        bia_.data_ptr(),
+        ih * bia_.itemsize(),
         DeviceToDevice);
 
     auto wgh_bia_m = dpcpp_onednn_memory(

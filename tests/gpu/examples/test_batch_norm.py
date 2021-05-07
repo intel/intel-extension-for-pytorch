@@ -9,6 +9,26 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
+    def test_batch_norm_half(self, dtype=torch.half):
+        x_i = torch.randn([2, 2, 3, 3], device=cpu_device)
+        x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
+
+        bn = nn.BatchNorm2d(2)
+        y_cpu = bn(x_i)
+        bn.to(dpcpp_device).to(dtype)
+        y_dpcpp = bn(x_dpcpp_i)
+        self.assertEqual(y_cpu, y_dpcpp.cpu().float(), atol=1e-2, rtol=0)
+
+    def test_batch_norm_bfloat16(self, dtype=torch.bfloat16):
+        x_i = torch.randn([2, 2, 3, 3], device=cpu_device)
+        x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
+
+        bn = nn.BatchNorm2d(2)
+        y_cpu = bn(x_i)
+        bn.to(dpcpp_device).to(dtype)
+        y_dpcpp = bn(x_dpcpp_i)
+        self.assertEqual(y_cpu, y_dpcpp.cpu().float(), atol=1e-1, rtol=0)
+
     def test_batch_norm(self, dtype=torch.float):
 
         x_i = torch.randn([2, 2, 3, 3], device=cpu_device)

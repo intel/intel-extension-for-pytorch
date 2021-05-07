@@ -133,3 +133,23 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(ref, real.cpu().float(), rtol=10e-4, atol=10e-2)
         self.assertEqual(diff, zero, rtol=10e-4, atol=10e-2)
+
+    def test_layer_norm_half(self, dtype=torch.half):
+        x_i = torch.randn([1, 1, 3, 3], device=cpu_device)
+        x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
+
+        layernorm = nn.LayerNorm([1,3,3])
+        y_cpu = layernorm(x_i)
+        layernorm.to(dpcpp_device).to(dtype)
+        y_dpcpp = layernorm(x_dpcpp_i)
+        self.assertEqual(y_cpu, y_dpcpp.cpu().float(), atol=1e-2, rtol=0)
+
+    def test_layer_norm_bfloat16(self, dtype=torch.bfloat16):
+        x_i = torch.randn([1, 1, 3, 3], device=cpu_device)
+        x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
+
+        layernorm = nn.LayerNorm([1,3,3])
+        y_cpu = layernorm(x_i)
+        layernorm.to(dpcpp_device).to(dtype)
+        y_dpcpp = layernorm(x_dpcpp_i)
+        self.assertEqual(y_cpu, y_dpcpp.cpu().float(), atol=1e-1, rtol=0)
