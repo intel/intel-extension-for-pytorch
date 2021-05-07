@@ -317,6 +317,8 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   // getSubgraphRewriter().runOnGraph(graph);
   OpFuser(graph->block(), graph).run();
 
+  // replace aten conv with ipex conv
+  graph_rewrite::replaceAtenConvolutionWithIpexConv(graph);
   // TODO: Some post processing?? ECS/EDC/Peephole???
   ConstantPropagation(graph);
 }

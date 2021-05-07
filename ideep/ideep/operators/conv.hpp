@@ -142,6 +142,7 @@ struct convolution_forward
         attr, aalgorithm, aprop_kind, alowp_kind, aengine);
   }
 
+  template <bool channels_last = false>
   static tensor::desc expected_weights_desc(
       const dims& weights_dims,
       data_type dtype = data_type::f32,
@@ -209,6 +210,12 @@ struct convolution_forward
     auto y_dtype = dtype != data_type::s8 ? dtype : data_type::s32;
     tensor::desc src_desc(x_dims, x_dtype);
     tensor::desc dst_desc(y_dims, y_dtype);
+    auto src_query = src_desc;
+    auto dst_query = dst_desc;
+    if (channels_last) {
+      src_query = src_desc.to_format(5 == src_size ? tag::ndhwc : tag::nhwc);
+      dst_query = dst_desc.to_format(5 == src_size ? tag::ndhwc : tag::nhwc);
+    }
 
     // FIXME: workaroud winograd format issue in inference
     // If prop_kind == forward_inference, the dnnl_wino_fmt for weights is
@@ -224,7 +231,7 @@ struct convolution_forward
     }
 
     auto pd = get_primitive_desc</*with_bias=*/false>(
-        src_desc, weights_desc, tensor::desc(), dst_desc, strides, dilates_,
+        src_query, weights_desc, tensor::desc(), dst_query, strides, dilates_,
         padding_l, padding_r, attr_t(), aalgorithm, apkind);
 
     // embed group info into weights_desc

@@ -368,6 +368,20 @@ void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph) {
   rewriter_conv3d.runOnGraph(graph, filter_conv3d);
 }
 
+void replaceAtenConvolutionWithIpexConv(std::shared_ptr<Graph>& graph) {
+  std::string conv2d = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
+        %r = aten::conv2d(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        return (%r) )";
+  std::string ipex_conv2d = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):
+        %r = ipex::conv2d_base(%a, %w, %b, %stride, %padding, %dilation, %groups)
+        return (%r) )";
+  SubgraphRewriter rewriter_conv2d;
+  rewriter_conv2d.RegisterRewritePattern(conv2d, ipex_conv2d);
+  rewriter_conv2d.runOnGraph(graph);
+ }
+
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

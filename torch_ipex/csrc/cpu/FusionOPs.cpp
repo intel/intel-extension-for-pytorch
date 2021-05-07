@@ -66,6 +66,28 @@ static at::Tensor& dil_convolution_inplace_fusion(
   return output;
 }
 
+at::Tensor AtenIpexJITDev::dil_convolution_base(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    int64_t groups) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_base", std::vector<c10::IValue>({}));
+#endif
+  return convolution_impl(
+    IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
+    IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous(),
+    (!bias.defined()) || IS_CONTIGUOUS_ANY(bias) ? bias : bias.contiguous(),
+    stride,
+    padding,
+    dilation,
+    groups,
+    ideep::attr_t());
+}
+
 at::Tensor AtenIpexJITDev::dil_convolution_swish(
     const at::Tensor& input,
     const at::Tensor& weight,

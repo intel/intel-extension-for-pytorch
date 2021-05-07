@@ -12,6 +12,7 @@ namespace torch { namespace jit {
 // And the alias analysis is not working for namespace other than aten ...
 // So we fake some op namespaces to workaround that.
 namespace ipex {
+  static auto conv2d_base = Symbol::fromQualString("ipex::conv2d_base");
   static auto conv2d_relu = Symbol::fromQualString("ipex::conv2d_relu");
   static auto conv2d_sum = Symbol::fromQualString("ipex::conv2d_sum");
   // static auto conv2d_relu_sum = Symbol::fromQualString("ipex::conv2d_relu_sum");
@@ -35,6 +36,9 @@ namespace cpu {
 class AtenIpexJITDev {
  public:
   // for JIT ops
+ static at::Tensor dil_convolution_base(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups);
+
+
   static at::Tensor dil_convolution_swish(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups);
 
   static at::Tensor dil_convolution_sigmoid(const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, int64_t groups);

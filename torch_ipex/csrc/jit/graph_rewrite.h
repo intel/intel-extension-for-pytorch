@@ -20,6 +20,7 @@ c10::optional<IValue> getIValue(
     const std::unordered_map<const Value*, Value*>& match_vmap,
     const std::unordered_map<std::string, Value*>& vmap);
 void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph);
+void replaceAtenConvolutionWithIpexConv(std::shared_ptr<Graph>& graph);
 void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph);
 void FuseShuffle(std::shared_ptr<Graph>& graph);
 

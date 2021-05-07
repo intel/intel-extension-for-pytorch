@@ -94,6 +94,7 @@ using namespace torch_ipex::cpu;
       aliasAnalysisFromSchema())
 
 RegisterOperators op({
+    CreateConvEltwiseOperator(2d, base),
     CreateConvEltwiseOperator(2d, relu),
     CreateConvEltwiseOperator(2d, sigmoid),
     CreateConvEltwiseOperator(2d, swish),
