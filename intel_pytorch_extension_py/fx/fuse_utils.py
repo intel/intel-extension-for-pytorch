@@ -1,8 +1,9 @@
 import torch
+import torch.nn as nn
 import torch.fx as fx
+from torch.fx.node import Argument, Target
 from torch.nn.utils.fusion import fuse_conv_bn_eval
-from typing import Type, Dict, Any, Tuple, Iterable
-import torch
+from typing import Type, Dict, Any, Tuple, Iterable, Optional, List, cast, Callable
 import copy
 
 def _parent_name(target : str) -> Tuple[str, str]:
@@ -63,3 +64,17 @@ def conv_bn_fuse(model: torch.nn.Module, inplace=False) -> torch.nn.Module:
                 new_graph.erase_node(node)
     return fx.GraphModule(fx_model, new_graph)
 
+def remove_dropout(model: nn.Module) -> nn.Module:
+    """
+    Removes all dropout layers from the module.
+    """
+    fx_model = fx.symbolic_trace(model)
+
+    class DropoutRemover(torch.fx.Transformer):
+        def call_module(self, target : Target, args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
+            if isinstance(self.submodules[target], nn.Dropout):
+                assert len(args) == 1
+                return args[0]
+            else:
+                return super().call_module(target, args, kwargs)
+    return DropoutRemover(fx_model).transform()

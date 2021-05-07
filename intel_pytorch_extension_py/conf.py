@@ -76,13 +76,14 @@ class AmpConf(object):
             #          add                    add
             if len(pre_ops) > 0:
                 for key, value in pre_ops.items():
-                    if value == 'conv2d' or value == 'conv3d':
+                    if value == 'conv2d' or value == 'conv3d' or value == 'linear':
                         default_configures[cur_id]['inputs_quantized'][key] = False
                         break
 
-            # if add pre_op hasn't conv, not need add q, dq for accuracy.
+            # if add pre_op hasn't conv and linear, not need add q, dq for accuracy.
             pre_inputs = pre_ops.values()
-            if cur_op == 'add' and ('conv2d' not in pre_inputs and 'conv3d' not in pre_inputs):
+            if cur_op == 'add' and \
+                    ('conv2d' not in pre_inputs and 'conv3d' not in pre_inputs and 'linear' not in pre_inputs):
                 default_configures[cur_id]['inputs_quantized'][0] = False
                 default_configures[cur_id]['inputs_quantized'][1] = False
 
