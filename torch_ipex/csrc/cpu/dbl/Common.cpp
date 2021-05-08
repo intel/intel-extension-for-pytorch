@@ -210,7 +210,7 @@ std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<int32_t>>> g
   }
 }
 
-void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> scales, bool uint8_used, std::vector<int32_t> shift) {
+void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> scales, bool uint8_used, std::vector<int32_t> shift, bool per_tensor) {
   if (!check_auto_mix_int8_fp32() || check_int8_calibration())
     return;
 
@@ -227,9 +227,13 @@ void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> s
 
   auto inner_scales = scales;
   if (scales.empty()) {
+    if (per_tensor) {
+      inner_scales.push_back(float(127.5) / tensor.abs().max().item<float>());
+    } else {
     // compute weight scales for per_channel
-    for (auto i = 0; i < tensor.size(0); i++) {
-      inner_scales.push_back(float(127.5) / tensor[i].abs().max().item<float>());
+      for (auto i = 0; i < tensor.size(0); i++) {
+        inner_scales.push_back(float(127.5) / tensor[i].abs().max().item<float>());
+      }
     }
   }
 

@@ -26,7 +26,7 @@ bool get_int8_quantized_status(const int64_t ops_id);
 // for asymmetric quantization
 std::tuple<std::vector<std::vector<float>>, std::vector<std::vector<int32_t>>> get_int8_asymmetric(const int64_t ops_id);
 
-void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> scales, bool uint8_used = false, std::vector<int32_t> shift = {});
+void reorder_to_int8_for_mix_prec(const at::Tensor& tensor, std::vector<float> scales, bool uint8_used = false, std::vector<int32_t> shift = {}, bool per_tensor = false);
 
 /**
  * Reorder the input tensor to the specified scalar type.

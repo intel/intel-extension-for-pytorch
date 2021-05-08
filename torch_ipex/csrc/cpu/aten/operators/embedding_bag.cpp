@@ -89,7 +89,6 @@ static inline at::Tensor _embedding_bag_index_add_select_fast(const at::Tensor s
 static inline dil::tensor _embedding_bag_index_add_select_fast_int8(
     const at::Tensor select_indices,
     const dil::tensor src,
-    const std::vector<float> scale,
     const at::Tensor offsets,
     bool include_last_offset) {
   int64_t ddim = src.get_dim(1);
@@ -121,6 +120,7 @@ static inline dil::tensor _embedding_bag_index_add_select_fast_int8(
   dil::dims dst_dims{output_size, src.get_dim(1)};
   dil::tensor::desc dst_desc(dst_dims, dil::data_type::s8);
   dil::tensor output{dst_desc};
+  auto scale = src.get_scale();
   output.set_scale(scale);
   int8_t* output_data = static_cast<int8_t *>(output.get_data_handle());
   auto indices_accessor = select_indices.accessor<int64_t, 1>();
@@ -188,21 +188,15 @@ at::Tensor embedding_bag_int8_impl(const at::Tensor & weight,
     // int8 no calibration
     int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
     bool quantized = dbl::comm::get_int8_quantized_status(num_ops_id);
-    std::vector<float> input_scale;
-    std::vector<std::vector<float >> scales =
-        dbl::comm::get_int8_scales({weight},
-                                   false,
-                                   num_ops_id);
     if (quantized) {
         // if quantizetion info is provided,
         // reorder float to int8 if necessary
-        input_scale.push_back(scales[0][0]);
-        // reorder weight in float to weight in int8 by input_scale
-        dbl::comm::reorder_to_int8_for_mix_prec(weight, input_scale);
+        // reorder weight in float to weight in int8
+        dbl::comm::reorder_to_int8_for_mix_prec(weight, {}, false, {}, true);
         dil::tensor w = dbl::comm::try_gen_dil_tensor(weight);
         // query
         auto dil_output = _embedding_bag_index_add_select_fast_int8(
-            indices, w, input_scale, offsets, include_last_offset);
+            indices, w, offsets, include_last_offset);
         output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
     } else {
         // reorder weight in float
