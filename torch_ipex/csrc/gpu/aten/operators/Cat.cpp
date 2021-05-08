@@ -379,9 +379,9 @@ static void dnnl_cat(
     }
 
     memory::dims input_tz = dims;
-    auto data_t = dt_to_dnnl(cat_tensors[i].scalar_type());
+    auto data_t = at::xpu::oneDNN::get_onednn_dtype(cat_tensors[i]);
     auto format_plain = get_dnnl_default_format(cat_tensors[i].dim());
-    
+
     memory::desc tensor_md;
     if (!lazy_reorder_enabled()) {
       tensor_md = memory::desc({input_tz}, data_t, format_plain);
@@ -393,13 +393,13 @@ static void dnnl_cat(
           input_ctx.meta();
     }
     cat_tensors_md.push_back(tensor_md);
-    
+
     auto input_usr_memory = dpcpp_onednn_memory(
         tensor_md, engine, cat_tensors[i].data_ptr());
     cat_tensors_mem.push_back(input_usr_memory);
   }
-   
-  auto data_t = dt_to_dnnl(cat_tensors[0].scalar_type());
+
+  auto data_t = at::xpu::oneDNN::get_onednn_dtype(cat_tensors[0]);
   auto format_plain = get_dnnl_default_format(cat_tensors[0].dim());
   auto output_md = memory::desc(output_dims, data_t, format_plain);
   auto concat_pd = concat::primitive_desc(
@@ -409,7 +409,7 @@ static void dnnl_cat(
   lru_key_t key;
   create_key(key, output_dims, static_cast<int>(dimension), cat_tensors_md);
 #endif
-  
+
   //Tensor output;
   memory output_usr_memory;
   if (!lazy_reorder_enabled()) {

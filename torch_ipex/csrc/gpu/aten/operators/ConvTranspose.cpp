@@ -39,13 +39,13 @@ Tensor dpcpp_convolution_transpose(
       input.sizes(), weight.sizes(), padding, stride, dilation, output_padding, groups);
   auto output = at::empty(output_tz, input.options());
 
-  auto src_data_t = dt_to_dnnl(input.scalar_type());
-  auto wei_data_t = dt_to_dnnl(weight.scalar_type());
-  auto dst_data_t = dt_to_dnnl(output.scalar_type());
+  auto src_data_t = at::xpu::oneDNN::get_onednn_dtype(input);
+  auto wei_data_t = at::xpu::oneDNN::get_onednn_dtype(weight);
+  auto dst_data_t = at::xpu::oneDNN::get_onednn_dtype(output);
   auto bias_data_t = dnnl::memory::data_type::f32;
 
   if (bias.defined()) {
-    bias_data_t = dt_to_dnnl(bias.scalar_type());
+    bias_data_t = at::xpu::oneDNN::get_onednn_dtype(bias);
   }
   auto usr_bias_data_t = dnnl::memory::data_type::f32;
 
@@ -208,14 +208,14 @@ Tensor dpcpp_convolution_transpose_backward_input(
   auto ndim = input.ndimension();
   auto grad_input = at::empty(input.sizes(), grad_output.options());
 
-  auto src_data_t = dt_to_dnnl(input.scalar_type());
-  auto wei_data_t = dt_to_dnnl(weight.scalar_type());
-  auto dst_data_t = dt_to_dnnl(grad_output.scalar_type());
+  auto src_data_t = at::xpu::oneDNN::get_onednn_dtype(input);
+  auto wei_data_t = at::xpu::oneDNN::get_onednn_dtype(weight);
+  auto dst_data_t = at::xpu::oneDNN::get_onednn_dtype(grad_output);
   auto bias_data_t = dnnl::memory::data_type::f32;
   auto usr_bias_data_t = dnnl::memory::data_type::f32;
 
   if (bias_defined) {
-    bias_data_t = dt_to_dnnl(weight.scalar_type());
+    bias_data_t = at::xpu::oneDNN::get_onednn_dtype(weight);
   }
 
   auto format_any = memory::format_tag::any;
@@ -379,16 +379,16 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_transpose_backward_weights(
   auto ndim = input.ndimension();
   auto grad_weight = at::empty(weight.sizes(), grad_output.options());
 
-  auto src_data_t = dt_to_dnnl(input.scalar_type());
-  auto wei_data_t = dt_to_dnnl(weight.scalar_type());
-  auto dst_data_t = dt_to_dnnl(grad_output.scalar_type());
+  auto src_data_t = at::xpu::oneDNN::get_onednn_dtype(input);
+  auto wei_data_t = at::xpu::oneDNN::get_onednn_dtype(weight);
+  auto dst_data_t = at::xpu::oneDNN::get_onednn_dtype(grad_output);
   auto bias_data_t = dnnl::memory::data_type::f32;
   auto usr_bias_data_t = dnnl::memory::data_type::f32;
 
   Tensor grad_bias;
   if (bias_defined) {
     grad_bias = at::empty({grad_output.size(1)}, grad_output.options());
-    bias_data_t = dt_to_dnnl(weight.scalar_type());
+    bias_data_t = at::xpu::oneDNN::get_onednn_dtype(weight);
   }
 
   auto format_any = memory::format_tag::any;

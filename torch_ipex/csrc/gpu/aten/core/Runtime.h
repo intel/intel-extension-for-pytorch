@@ -55,27 +55,6 @@ static inline dnnl::memory dpcpp_onednn_memory(
   return dnnl::memory(md, engine, ptr);
 }
 
-//
-// convert ScalarType to MKL-DNN's memory type
-//
-static inline dnnl::memory::data_type dt_to_dnnl(const ScalarType scalar_type) {
-  if (scalar_type == ScalarType::Half) {
-    return dnnl::memory::data_type::f16;
-  } else if (scalar_type == ScalarType::BFloat16) {
-    return dnnl::memory::data_type::bf16;
-  } else if (scalar_type == ScalarType::QInt8) {
-    return dnnl::memory::data_type::s8;
-  } else if (scalar_type == ScalarType::QUInt8) {
-    return dnnl::memory::data_type::u8;
-  } else if (scalar_type == ScalarType::QInt32) {
-    return dnnl::memory::data_type::s32;
-  } else if (scalar_type == ScalarType::Float) {
-    return dnnl::memory::data_type::f32;
-  } else {
-    AT_ERROR("This data type is not supported in oneDNN so far: (", c10::toString(scalar_type), ")!");
-  }
-}
-
 static inline dnnl::memory::format_tag get_dnnl_default_format(int ndims) {
   switch (ndims) {
     case 1:

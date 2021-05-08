@@ -457,12 +457,12 @@ void GeluBackwardKernelImpl(
 
 Tensor relu(const Tensor& self) {
   Tensor result;
-  at::dpcpp::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(result, self, 0.0f, 0.0f);
+  at::xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(result, self, 0.0f, 0.0f);
   return result;
 }
 
 Tensor& relu_(Tensor& self) {
-  at::dpcpp::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(self, self, 0.0f, 0.0f);
+  at::xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(self, self, 0.0f, 0.0f);
   return self;
 }
 
@@ -474,7 +474,7 @@ static Tensor threshold_out(
     const Tensor& other) {
   Tensor result = opt_result.value_or(Tensor());
   if (0.0 == threshold.to<float>() && 0.0 == value.to<float>()) {
-    at::dpcpp::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_relu>(result, self, other, 0.0f, 0.0f);
+    at::xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_relu>(result, self, other, 0.0f, 0.0f);
     return result;
   } else {
     auto iter = TensorIterator::binary_op(result, self, other);
@@ -749,7 +749,7 @@ Tensor hardshrink_backward(
 
 Tensor gelu(const Tensor & self){
   Tensor result;
-  at::dpcpp::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(result, self, 0.0f, 0.0f);
+  at::xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(result, self, 0.0f, 0.0f);
   return result;
 }
 

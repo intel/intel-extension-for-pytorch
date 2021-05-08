@@ -24,9 +24,9 @@ namespace xpu {
 namespace oneDNN {
 
 struct ConvAttr {
-  static const int64_t kind_with_relu = at::dpcpp::oneDNN::with_relu; // 0b01;
-  static const int64_t kind_with_sum = at::dpcpp::oneDNN::with_sum; // 0b10;
-  static const int64_t kind_with_sigmoid = at::dpcpp::oneDNN::with_sigmoid; // 0b100;
+  static const int64_t kind_with_relu = at::xpu::oneDNN::with_relu; // 0b01;
+  static const int64_t kind_with_sum = at::xpu::oneDNN::with_sum; // 0b10;
+  static const int64_t kind_with_sigmoid = at::xpu::oneDNN::with_sigmoid; // 0b100;
 
   ConvAttr() : scale_(1.f), alpha_(0.f), beta_(0.f), oscale_(1.f), attr_(0) {}
   ConvAttr(float scale, float alpha, float beta, float oscale, int64_t attr)
@@ -146,15 +146,17 @@ static at::Tensor convolution(
     dst = at::empty(dst_tz, src.is_quantized() ? dst_dt : src.options());
   }
 
-  auto src_data_t = dt_to_dnnl(src.scalar_type());
-  auto wei_usr_data_t = dt_to_dnnl(wgh.scalar_type());
-  auto wei_data_t = src.is_quantized() ? memory::data_type::s8
-    : dt_to_dnnl(wgh.scalar_type());
-  auto dst_data_t = dst.defined() ? dt_to_dnnl(dst.scalar_type()) : src_data_t;
+  auto src_data_t = get_onednn_dtype(src);
+  auto wei_usr_data_t = get_onednn_dtype(wgh);
+  auto wei_data_t = src.is_quantized() ?
+                    memory::data_type::s8 :
+                    get_onednn_dtype(wgh);
+  auto dst_data_t = dst.defined() ? get_onednn_dtype(dst) : src_data_t;
   auto bia_data_t = memory::data_type::f32;
   if (bia.defined()) {
-    bia_data_t = (!lazy_reorder_enabled() && src.is_quantized()) ? memory::data_type::s32
-      : dt_to_dnnl(bia.scalar_type());
+    bia_data_t = (!lazy_reorder_enabled() && src.is_quantized()) ?
+                 memory::data_type::s32 :
+                 get_onednn_dtype(bia);
   }
   auto usr_bia_data_t = memory::data_type::f32;
 

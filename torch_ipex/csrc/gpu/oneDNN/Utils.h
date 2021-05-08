@@ -6,7 +6,7 @@
 using namespace dnnl;
 
 namespace at {
-namespace dpcpp {
+namespace xpu {
 namespace oneDNN {
 
 static bool is_supported_onednn_dtype(const at::Tensor& tensor) {

@@ -19,7 +19,6 @@
 
 using namespace at;
 using namespace at::dpcpp;
-using namespace at::dpcpp::oneDNN;
 
 namespace at {
 namespace impl {
@@ -266,8 +265,8 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
                    self.sizes().size() != 0 &&
                    self.strides().size() != 0;
   if (same_device && has_sz_st &&
-      oneDNN::is_supported_onednn_dtype(self) &&
-      oneDNN::is_supported_onednn_dtype(src)) {
+      at::xpu::oneDNN::is_supported_onednn_dtype(self) &&
+      at::xpu::oneDNN::is_supported_onednn_dtype(src)) {
     at::xpu::oneDNN::reorder_copy(self, src);
   } else {
     impl::copy_kernel_dpcpp(iter, non_blocking);

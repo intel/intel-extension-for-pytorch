@@ -110,7 +110,7 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   get_dnnl_format(input, dnnl_format, input_tz);
 
   memory::desc input_md;
-  auto data_t = dt_to_dnnl(input.scalar_type());
+  auto data_t = at::xpu::oneDNN::get_onednn_dtype(input);
   auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
   if (!lazy_reorder_enabled()) {
     input_md = memory::desc({input_tz}, data_t, dnnl_format);
@@ -314,7 +314,7 @@ std::tuple<Tensor, Tensor, Tensor> native_batch_norm_backward(
   memory::format_tag dnnl_format;
   memory::dims input_tz;
   impl::get_dnnl_format(input, dnnl_format, input_tz);
-  auto data_t = dt_to_dnnl(input.scalar_type());
+  auto data_t = at::xpu::oneDNN::get_onednn_dtype(input);
 
   auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
   auto input_md = input_ctx.is_plain() ? memory::desc({input_tz}, data_t, dnnl_format) :

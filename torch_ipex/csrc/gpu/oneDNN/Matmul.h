@@ -21,8 +21,8 @@ namespace xpu {
 namespace oneDNN {
 
 struct MatmulAttr {
-  static const int64_t kind_with_relu = at::dpcpp::oneDNN::with_relu;
-  static const int64_t kind_with_sigmoid = at::dpcpp::oneDNN::with_sigmoid;
+  static const int64_t kind_with_relu = at::xpu::oneDNN::with_relu;
+  static const int64_t kind_with_sigmoid = at::xpu::oneDNN::with_sigmoid;
 
   MatmulAttr() : alpha_(1.f), beta_(0.f), attr_(0), m2_trans_(true) {}
   MatmulAttr(float alpha, float beta, int64_t attr, bool m2_trans) :
@@ -56,9 +56,9 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
   }
   // ipex matmul support both ab/ba shape for m2 tensor, we don't check any more
 
-  auto m1_usr_dt = dt_to_dnnl(m1.scalar_type());
-  auto m2_usr_dt = dt_to_dnnl(m2.scalar_type());
-  auto dst_usr_dt = dt_to_dnnl(dst.scalar_type());
+  auto m1_usr_dt = get_onednn_dtype(m1);
+  auto m2_usr_dt = get_onednn_dtype(m2);
+  auto dst_usr_dt = get_onednn_dtype(dst);
 
   auto m1_dt = m1_usr_dt;
   auto m2_dt = m2_usr_dt;
@@ -126,17 +126,17 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
                             m1.is_quantized() ||
                             m2.is_quantized())) {
     po.append_sum(attr.beta_);
-    post_flags |= at::dpcpp::oneDNN::with_sum;
+    post_flags |= at::xpu::oneDNN::with_sum;
   }
 
   if (attr.with_relu()) {
     po.append_eltwise(1.f, algorithm::eltwise_relu, 0.f, 0.f);
-    post_flags |= at::dpcpp::oneDNN::with_relu;
+    post_flags |= at::xpu::oneDNN::with_relu;
   }
 
   if (attr.with_sigmoid()) {
     po.append_eltwise(1.f, algorithm::eltwise_logistic, 0.f, 0.f);
-    post_flags |= at::dpcpp::oneDNN::with_sigmoid;
+    post_flags |= at::xpu::oneDNN::with_sigmoid;
   }
   pattr.set_post_ops(po);
 
@@ -177,7 +177,7 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
 
   if (attr.beta_ == 1.f && attr.alpha_ == 1.f &&
       (!m1.is_quantized()) && (!m2.is_quantized())) {
-    auto b_dt = b.defined() ? dt_to_dnnl(b.scalar_type()) : memory::data_type::f32;
+    auto b_dt = b.defined() ? get_onednn_dtype(b) : memory::data_type::f32;
     if (b.sizes() != dst.sizes()) {
       memory::dims b_dims(dst.sizes().size() - 1, 1);
       b_dims.push_back(n);

@@ -45,7 +45,7 @@ static void avg_pool_out_frame(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   prop_kind prop_kind = dnnl::prop_kind::forward_training;
-  auto data_t = dt_to_dnnl(src.scalar_type());
+  auto data_t = at::xpu::oneDNN::get_onednn_dtype(src);
   if (data_t == memory::data_type::f16 || data_t == memory::data_type::s8 ||
       data_t == memory::data_type::u8 || data_t == memory::data_type::s32) {
     prop_kind = dnnl::prop_kind::forward_inference;
@@ -167,7 +167,7 @@ static void avg_pool_backward_out_frame(
   auto strm = GpuStreamManager::Instance().get_stream();
   prop_kind prop_kind = dnnl::prop_kind::forward_training;
 
-  auto data_t = dt_to_dnnl(diff_dst.scalar_type());
+  auto data_t = at::xpu::oneDNN::get_onednn_dtype(diff_dst);
   if (data_t == memory::data_type::f16) {
     // rise error
   }
@@ -283,7 +283,7 @@ static void max_pool_out_frame(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto prop_kind = dnnl::prop_kind::forward_training;
-  auto data_t = dt_to_dnnl(src.scalar_type());
+  auto data_t = at::xpu::oneDNN::get_onednn_dtype(src);
   if (data_t == memory::data_type::f16 || data_t == memory::data_type::s8 ||
       data_t == memory::data_type::u8 || data_t == memory::data_type::s32) {
     prop_kind = dnnl::prop_kind::forward_inference;
@@ -445,7 +445,7 @@ static void max_pool_backward_out_frame(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto prop_kind = dnnl::prop_kind::forward_training;
-  auto data_t = dt_to_dnnl(diff_dst.scalar_type());
+  auto data_t = at::xpu::oneDNN::get_onednn_dtype(diff_dst);
   if (data_t == memory::data_type::f16) {
     // rise error
   }

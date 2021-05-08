@@ -18,7 +18,7 @@ using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
 
 namespace at {
-namespace dpcpp {
+namespace xpu {
 namespace oneDNN {
 
 template <dnnl::algorithm algo>

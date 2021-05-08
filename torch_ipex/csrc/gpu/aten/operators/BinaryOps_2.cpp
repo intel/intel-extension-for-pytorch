@@ -95,7 +95,8 @@ Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
   Tensor _self = self, _other = other;
   if (_self.defined() && _other.defined() && _self.dim() > 0 &&
       _other.dim() > 0 && _self.dim() == _other.dim() &&
-      oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
+      at::xpu::oneDNN::is_supported_dtype_in_binary(
+          _self.scalar_type(), _other.scalar_type()) &&
       _self.is_contiguous() && _other.is_contiguous() &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
@@ -103,7 +104,7 @@ Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
       !is_expandable_to(_other.sizes(), _self.sizes())) &&
       !impl::is_wrapped_number(_self) && !impl::is_wrapped_number(_other)) {
-    oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
+    at::xpu::oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
   } else {
     auto iter = TensorIterator::binary_op(result, self, other);
     impl::div_kernel_dpcpp(iter);
@@ -115,7 +116,8 @@ Tensor div(const Tensor& self, const Tensor& other) {
   Tensor result, _self = self, _other = other;
   if (_self.defined() && _other.defined() && _self.dim() > 0 &&
       _other.dim() > 0 && _self.dim() == _other.dim() &&
-      oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
+      at::xpu::oneDNN::is_supported_dtype_in_binary(
+          _self.scalar_type(), _other.scalar_type()) &&
       _self.is_contiguous() && _other.is_contiguous() &&
       !(DPCPPTensorContext::is_plain(_self) &&
         !DPCPPTensorContext::is_plain(_other) &&
@@ -123,7 +125,7 @@ Tensor div(const Tensor& self, const Tensor& other) {
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
       !is_expandable_to(_other.sizes(), _self.sizes())) &&
       !impl::is_wrapped_number(_self) && !impl::is_wrapped_number(_other)) {
-    oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
+    at::xpu::oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
     return result;
   } else {
     auto iter = TensorIterator::binary_op(result, self, other);

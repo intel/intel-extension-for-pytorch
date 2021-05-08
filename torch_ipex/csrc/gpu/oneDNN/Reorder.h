@@ -15,7 +15,6 @@
 
 using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
-using namespace at::dpcpp::oneDNN; // workaround
 
 namespace at {
 namespace xpu {

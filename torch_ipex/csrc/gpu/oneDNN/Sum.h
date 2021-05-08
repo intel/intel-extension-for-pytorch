@@ -15,7 +15,7 @@ using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
 
 namespace at {
-namespace dpcpp {
+namespace xpu {
 namespace oneDNN {
 
 static inline Tensor sum(Tensor& output,

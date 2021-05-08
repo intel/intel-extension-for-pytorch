@@ -43,10 +43,10 @@ Tensor dpcpp_convolution_backward_input(
   auto oc = grad_output.size(1);
 
   // align data type with bf16
-  auto data_grad = dt_to_dnnl(grad_output.scalar_type());
-  auto weight_t = dt_to_dnnl(weight.scalar_type());
+  auto data_grad = get_onednn_dtype(grad_output);
+  auto weight_t = get_onednn_dtype(weight);
   auto bias_t = dnnl::memory::data_type::f32;
-  auto weight_usr_t = dt_to_dnnl(weight.scalar_type());
+  auto weight_usr_t = weight_t;
   auto format_any = memory::format_tag::any;
   auto format_input = conv_src_fmt(ndim);
   auto format_weight = conv_wgh_fmt(ndim, groups != 1);
@@ -199,8 +199,8 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_backward_weights(
   auto oc = grad_output.size(1);
 
   // align data type with bf16
-  auto data_grad = dt_to_dnnl(grad_output.scalar_type());
-  auto weight_t = dt_to_dnnl(grad_output.scalar_type());
+  auto data_grad = get_onednn_dtype(grad_output);
+  auto weight_t = data_grad;
   auto bias_t = memory::data_type::f32;
   auto format_any = memory::format_tag::any;
   auto format_input = conv_src_fmt(ndim);

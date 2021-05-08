@@ -362,7 +362,7 @@ Tensor _softmax_onednn(
   memory::dims input_tz;
   get_dnnl_format(input, dnnl_format, input_tz);
 
-  auto data_t = dt_to_dnnl(input.scalar_type());
+  auto data_t = at::xpu::oneDNN::get_onednn_dtype(input);
 
   auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
   auto input_md = input_ctx.is_plain()? memory::desc({input_tz}, data_t, dnnl_format) :
@@ -428,8 +428,8 @@ Tensor _softmax_backward_onednn(
   get_dnnl_format(output, output_dnnl_format, output_tz);
   get_dnnl_format(grad, grad_dnnl_format, grad_tz);
 
-  auto output_t = dt_to_dnnl(output.scalar_type());
-  auto grad_t = dt_to_dnnl(grad.scalar_type());
+  auto output_t = at::xpu::oneDNN::get_onednn_dtype(output);
+  auto grad_t = at::xpu::oneDNN::get_onednn_dtype(grad);
 
   auto axis = dim < 0 ? dim + grad.dim(): dim;
 

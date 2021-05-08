@@ -57,7 +57,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
     stats_fmt = memory::format_tag::a;
   }
 
-  memory::data_type dt = dt_to_dnnl(src.scalar_type());
+  memory::data_type dt = get_onednn_dtype(src);
   memory::data_type stats_dt = memory::data_type::f32;
 
   auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
@@ -180,7 +180,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
     stats_fmt = memory::format_tag::a;
   }
 
-  memory::data_type dt = dt_to_dnnl(src.scalar_type());
+  memory::data_type dt = get_onednn_dtype(src);
   memory::data_type stats_dt = memory::data_type::f32;
 
   auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);

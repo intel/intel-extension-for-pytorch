@@ -16,7 +16,7 @@ using dnnl::algorithm;
 using namespace at::dpcpp;
 
 namespace at {
-namespace dpcpp {
+namespace xpu {
 namespace oneDNN {
 
 template <algorithm alg_kind>
@@ -34,7 +34,7 @@ static inline void eltwise(
   }
 
   memory::dims src_tz = dims;
-  auto data_t = dt_to_dnnl(src.scalar_type());
+  auto data_t = at::xpu::oneDNN::get_onednn_dtype(src);
   auto format_data = get_dnnl_default_format(src.dim());
   auto src_md = memory::desc({src_tz}, data_t, format_data);
 
@@ -107,7 +107,7 @@ static inline void eltwise_backward(
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  auto data_t = dt_to_dnnl(src_dst.scalar_type());
+  auto data_t = at::xpu::oneDNN::get_onednn_dtype(src_dst);
   std::vector<int64_t> src_dst_dims;
   for (size_t i = 0; i < src_dst.dim(); i++) {
     src_dst_dims.push_back(src_dst.size(i));
@@ -201,5 +201,5 @@ static inline void eltwise_backward(
 }
 
 } // namespace oneDNN
-} // namespace dpcpp
+} // namespace xpu
 } // namespace at
