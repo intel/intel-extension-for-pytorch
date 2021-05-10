@@ -7,15 +7,15 @@
 #include "aten/aten.hpp"
 #include "bf16/vec/bf16_vec_kernel.h"
 #include "int8/vec/int8_vec_kernel.h"
+#include "int8/Config.h"
 #include "dil/dil.hpp"
-#include "torch_ipex/csrc/cpu/int8/Config.h"
 #include "xsmm/libxsmm_utils.h"
 #include <ATen/Parallel.h>
 #include <ATen/MatrixRef.h>
 #include <algorithm>
+#include <immintrin.h>
 #include <c10/util/Exception.h>
 #include <torch/csrc/autograd/function.h>
-#include "cpu/int8/Config.h"
 
 namespace torch_ipex {
 
@@ -367,34 +367,28 @@ _interaction_backward(const at::Tensor &grad_out,
   return output;
 }
 
-static inline void _AAt_lower_triangle_s8s8_scale_s32s8(int8_t *out, const int8_t * A,
-                         size_t M, size_t K, const std::vector<float>& scales) {
+static inline void _interaction_s8s8_scale_s32s8_128(int8_t *out, const std::vector<int8_t *>& input_addr,
+                         size_t M, const std::vector<float>& scales) {
 #if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("ExtendOps::_AAt_lower_triangle_s8s8_scale_s32s8", std::vector<c10::IValue>({}));
+  RECORD_FUNCTION("ExtendOps::_interaction_s8s8_scale_s32s8", std::vector<c10::IValue>({}));
 #endif
   size_t offset = 0;
   for (int i = 1; i < M; i++) {
-    const int8_t* a = &A[i * K];
+    const void* a = (const void *)input_addr[i];
     for (int j = 0; j < i; j++) {
-      const int8_t* b = &A[j * K];
-      out[offset] = _dot_s8s8_scale_s32s8(a, b, K, scales[offset]);
+      const void* b = (const void *)input_addr[j];
+      out[offset] = _dot_s8s8_scale_s32s8_128(a, b, scales[offset]);
       offset++;
     }
   }
 }
 
-static inline void _interaction_s8s8_scale_s32s8(int8_t *out, const std::vector<int8_t *>& inputs,
-                         int64_t bs, size_t M, size_t K, const std::vector<float>& scales) {
+static inline void _interaction_s8s8_scale_s32s8(int8_t *out, const std::vector<int8_t *>& input_addr,
+                         size_t M, size_t K, const std::vector<float>& scales) {
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("ExtendOps::_interaction_s8s8_scale_s32s8", std::vector<c10::IValue>({}));
 #endif
   size_t offset = 0;
-  auto row_len = bs * K;
-  std::vector<int8_t*> input_addr(M);
-  for (int i = 0; i < M; i++) {
-    input_addr[i] = &inputs[i][row_len];
-  }
-
   for (int i = 1; i < M; i++) {
     int8_t* a = input_addr[i];
     for (int j = 0; j < i; j++) {
@@ -445,12 +439,11 @@ inline at::Tensor _interaction_forward_quantization(const std::vector<at::Tensor
   dil::tensor out_dil{dst_desc};
   out_dil.set_scale(scales[1]);
   auto out_data = (int8_t*)out_dil.get_data_handle();
-
   std::vector<float> out_in_scales(interact_feature_size);
   size_t offset = 0;
   for (int i = 1; i < vector_nums; i++) {
     for (int j = 0; j < i; j++) {
-      float input_scale = in_scales[i] * in_scales[j];
+      auto input_scale = in_scales[i] * in_scales[j];
       out_in_scales[offset] = output_scale / input_scale;
       offset++;
     }
@@ -459,17 +452,22 @@ inline at::Tensor _interaction_forward_quantization(const std::vector<at::Tensor
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
     //int8_t cat_buf[vector_nums * vector_size] __attribute__((aligned(64)));
+    std::vector<int8_t*> input_addr(vector_nums);
     for (int64_t i = start; i < end; i++) {
+      int8_t* flat_buf = (int8_t*)(&out_data[i * out_data_line_len] + vector_size);
+      auto row_len = i * vector_size;
+      for (int i = 0; i < vector_nums; i++) {
+        input_addr[i] = &input_data[i][row_len];
+      }
       if (vector_size == 128) {
         scale_and_move_ker_128(&out_data[i * out_data_line_len], &input_data[0][i * vector_size], dense_scale);
+        _interaction_s8s8_scale_s32s8_128(flat_buf, input_addr, vector_nums, out_in_scales);
       } else {
         scale_and_move_ker(&out_data[i * out_data_line_len], &input_data[0][i * vector_size], dense_scale, vector_size);
+        _interaction_s8s8_scale_s32s8(flat_buf, input_addr, vector_nums, vector_size, out_in_scales);
       }
       //cat<int8_t>(cat_buf, input_data, feature_sizes, i);
-      std::vector<int8_t*> input_ptr(vector_nums);
-      int8_t* flat_buf = (int8_t*)(&out_data[i * out_data_line_len] + vector_size);
       //_AAt_lower_triangle_s8s8_scale_s32s8(flat_buf, cat_buf, vector_nums, vector_size, out_in_scales);
-      _interaction_s8s8_scale_s32s8(flat_buf, input_data, i, vector_nums, vector_size, out_in_scales);
     }
   });
 
@@ -503,7 +501,7 @@ AtenIpexTypeExt::interaction_forward(const std::vector<at::Tensor> &input) {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(in.scalar_type() == at::kFloat);
   }
 
-  auto out =  _interaction_forward<float>(input);
+  auto out = _interaction_forward<float>(input);
   if (false && check_int8_calibration() && check_auto_mix_int8_fp32()) {
     insert_or_updata_observer({input}, {out}, "interaction_forward", Int8OptConfig::fetch_and_add_ops_id());
   }

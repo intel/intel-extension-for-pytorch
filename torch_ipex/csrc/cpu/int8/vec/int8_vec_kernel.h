@@ -251,6 +251,61 @@ static inline void scale_and_move_ker(int8_t *out, const int8_t *in, float scale
 }
 
 static inline __attribute__((always_inline))
+int8_t mul_and_sum_int8_128_with_scale(const void *a, const void *b, float scale) {
+  int32_t sum;
+  auto a0 = _mm256_loadu_si256((__m256i*)a);
+  auto a0_high = _mm256_loadu_si256((__m256i*)(a + 32));
+  auto a1 = _mm256_loadu_si256((__m256i*)(a + 64));
+  auto a1_high = _mm256_loadu_si256((__m256i*)(a + 96));
+  auto b0 = _mm256_loadu_si256((__m256i*)b);
+  auto b0_high = _mm256_loadu_si256((__m256i*)(b + 32));
+  auto b1 = _mm256_loadu_si256((__m256i*)(b + 64));
+  auto b1_high = _mm256_loadu_si256((__m256i*)(b + 96));
+  auto a_0_i = _mm512_cvtepi8_epi16(a0);
+  auto a_1_i = _mm512_cvtepi8_epi16(a0_high);
+  auto a_2_i = _mm512_cvtepi8_epi16(a1);
+  auto a_3_i = _mm512_cvtepi8_epi16(a1_high);
+  auto b_0_i = _mm512_cvtepi8_epi16(b0);
+  auto b_1_i = _mm512_cvtepi8_epi16(b0_high);
+  auto b_2_i = _mm512_cvtepi8_epi16(b1);
+  auto b_3_i = _mm512_cvtepi8_epi16(b1_high);
+  a_0_i = _mm512_madd_epi16(a_0_i, b_0_i);
+  a_2_i = _mm512_madd_epi16(a_2_i, b_2_i);
+#ifdef AVX512_VNNI
+  a_0_i = _mm512_dpwssd_epi32(a_0_i, a_1_i, b_1_i);
+  a_2_i = _mm512_dpwssd_epi32(a_2_i, a_3_i, b_3_i);
+#else
+  a_1_i = _mm512_madd_epi16(a_1_i, b_1_i);
+  a_3_i = _mm512_madd_epi16(a_3_i, b_3_i);
+  a_0_i = _mm512_add_epi32(a_0_i, a_1_i);
+  a_2_i = _mm512_add_epi32(a_2_i, a_3_i);
+#endif
+  a_0_i = _mm512_add_epi32(a_0_i, a_2_i);
+  auto ab_256_high = _mm512_extracti32x8_epi32(a_0_i, 1);
+  auto s_simd = _mm_set1_ps(scale);
+  auto ab_256_low = _mm512_castsi512_si256(a_0_i);
+  ab_256_low = _mm256_add_epi32(ab_256_low, ab_256_high);
+  auto ab_128_high = _mm256_extracti128_si256(ab_256_low, 1);
+  auto ab_128_low = _mm256_castsi256_si128(ab_256_low);
+  ab_128_low = _mm_add_epi32(ab_128_low, ab_128_high);
+  ab_128_high = _mm_unpackhi_epi64(ab_128_low, ab_128_low);
+  ab_128_low = _mm_add_epi32(ab_128_low, ab_128_high);
+  ab_128_high = _mm_shuffle_epi32(ab_128_low, 0xe1);
+  ab_128_low = _mm_add_epi32(ab_128_low, ab_128_high);
+  auto ab_128_low_f = _mm_cvtepi32_ps(ab_128_low);
+  ab_128_low_f = _mm_mul_round_ss(ab_128_low_f, s_simd, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC)); 
+  auto sum_vec = _mm_cvtps_epi32(ab_128_low_f);
+  sum_vec = _mm_cvtsepi32_epi8(sum_vec);
+  sum = _mm_cvtsi128_si32(sum_vec);
+  return (int8_t)sum;
+}
+
+static inline __attribute__((always_inline))
+int8_t _dot_s8s8_scale_s32s8_128(const void *a, const void *b, float scale) {
+  return mul_and_sum_int8_128_with_scale(a, b, scale);
+}
+
+static inline __attribute__((always_inline))
 int32_t mul_and_sum_int8_128(const void *a, const void *b) {
   int32_t sum;
   auto a_0_16i = _mm512_cvtepi8_epi16(_mm256_loadu_si256((__m256i*)a));
@@ -274,10 +329,11 @@ int32_t mul_and_sum_int8_128(const void *a, const void *b) {
   auto ab_128_high = _mm256_extracti128_si256(ab_256_low, 1);
   auto ab_128_low = _mm256_castsi256_si128(ab_256_low);
   ab_128_low = _mm_add_epi32(ab_128_low, ab_128_high);
-  ab_128_low = _mm_hadd_epi32(ab_128_low, ab_128_low);
-  ab_128_low = _mm_hadd_epi32(ab_128_low, ab_128_low);
-  auto sum_addr = (float*)(&sum);
-  _mm_store_ss(sum_addr, _mm_castsi128_ps(ab_128_low));
+  ab_128_high = _mm_unpackhi_epi64(ab_128_low, ab_128_low);
+  ab_128_low = _mm_add_epi32(ab_128_low, ab_128_high);
+  ab_128_high = _mm_shuffle_epi32(ab_128_low, 0xe1);
+  ab_128_low = _mm_add_epi32(ab_128_low, ab_128_high);
+  sum = _mm_cvtsi128_si32(ab_128_low);
   return sum;
 }
 
@@ -297,10 +353,11 @@ int32_t mul_and_sum_int8_64(const void *a, const void *b) {
   auto ab_128_high = _mm256_extracti128_si256(ab_256_low, 1);
   auto ab_128_low = _mm256_castsi256_si128(ab_256_low);
   ab_128_low = _mm_add_epi32(ab_128_low, ab_128_high);
-  ab_128_low = _mm_hadd_epi32(ab_128_low, ab_128_low);
-  ab_128_low = _mm_hadd_epi32(ab_128_low, ab_128_low);
-  auto sum_addr = (float*)(&sum);
-  _mm_store_ss(sum_addr, _mm_castsi128_ps(ab_128_low));
+  ab_128_high = _mm_unpackhi_epi64(ab_128_low, ab_128_low);
+  ab_128_low = _mm_add_epi32(ab_128_low, ab_128_high);
+  ab_128_high = _mm_shuffle_epi32(ab_128_low, 0xe1);
+  ab_128_low = _mm_add_epi32(ab_128_low, ab_128_high);
+  sum = _mm_cvtsi128_si32(ab_128_low);
   return sum;
 }
 
@@ -311,16 +368,10 @@ int32_t _scale_int32(int32_t value, float scale) {
   v_simd = _mm_cvt_si2ss(v_simd, value);
   v_simd = _mm_mul_round_ss(v_simd, s_simd, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
   int32_t c = _mm_cvt_roundss_si32(v_simd, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  auto c_simd =_mm_set1_epi32(c);
+  c_simd = _mm_cvtsepi32_epi8(c_simd);
+  c = _mm_cvtsi128_si32(c_simd);
   return c;
-}
-
-static inline __attribute__((always_inline))
-int8_t _dot_s8s8_scale_s32s8_128(const int8_t* a, const int8_t* b, float scale) {
-  int32_t c = 0;
-  c += mul_and_sum_int8_128((const void*)a, (const void*)b);
-  c = _scale_int32(c, scale);
-  int8_t result = (c >= 127 ? (int8_t)127 : c <= -127 ? (int8_t)-127 : (int8_t)c);
-  return result;
 }
 
 static inline __attribute__((always_inline))
@@ -338,6 +389,5 @@ int8_t _dot_s8s8_scale_s32s8(const int8_t* a, const int8_t* b, size_t len, float
     c += (int32_t)a[i] * (int32_t)b[i];
   }
   c = _scale_int32(c, scale);
-  int8_t result = (c >= 127 ? (int8_t)127 : c <= -127 ? (int8_t)-127 : (int8_t)c);
-  return result;
+  return (int8_t)c;
 }
