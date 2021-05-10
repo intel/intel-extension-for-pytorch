@@ -31,9 +31,24 @@ class AtenIpexTypeExt {
                         const at::Tensor& scores,
                         const double threshold);
 
-  static std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_score_nms(const at::Tensor& dets,
+  /// \brief Perform non-maximum suppression.
+  ///
+  /// C++ version of Encoder::decode_single.
+  /// Refer to https://github.com/mlcommons/inference/blob/v0.7/others/cloud/single_stage_detector/pytorch/utils.py.
+  ///
+  /// \param dets: predicted loc in ltrb format, size [BS, number_boxes, 4], for example: [1, 15130, 4].
+  /// \param scores: predicted score, size [BS, number_boxes, class_number], for example: [1, 15130, 81].
+  /// \param threshold: IOU threshold(scalar) to suppress bboxs which has the IOU val larger than the threshold.
+  /// \param max_output: the max number of output bbox.
+  ///
+  /// \return result is a list of tuble. In each tuble, there are 3 tensors:
+  ///   bboxes_out_: the selected out bboxes coordinate, size [max_output, 4].
+  ///   labels_out_: the label of each selected out bboxes, size [max_output].
+  ///   scores_out_: the score of each selected out bboxes, size [max_output].
+  static std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms(const at::Tensor& dets,
                         const at::Tensor& scores,
-                        const double threshold);
+                        const double threshold,
+                        const int64_t max_output);
 
   static at::Tensor interaction_forward(const std::vector<at::Tensor> & input);
   static std::vector<at::Tensor> interaction_backward(const at::Tensor & grad_out, 
@@ -52,6 +67,25 @@ class AtenIpexTypeExt {
       int64_t mode, 
       const c10::optional<int64_t> padding_idx);
 
+  /// \brief Do scale and transform from xywh to ltrb for predicted loc and do Softmax along the last dim for predicted score.
+  ///
+  /// C++ version of Encoder::scale_back_batch.
+  /// Refer to https://github.com/mlcommons/inference/blob/v0.7/others/cloud/single_stage_detector/pytorch/utils.py.
+  ///
+  /// \param bboxes_in: predicted loc in xywh format, size [BS, number_boxes, 4], for example: [1, 15130, 4].
+  /// \param scores_in: predicted score, size [BS, number_boxes, class_number], for example: [1, 15130, 81].
+  /// \param dboxes_xywh: scale factor for each bbox from predicted loc to true loc, size [1, number_boxes, 4].
+  /// \param scale_xy: scale factor(scalar) of xy dimention for bboxes_in.
+  /// \param scale_wh: scale factor(scalar) of wh dimention for bboxes_in.
+  ///
+  /// \return tuple<bbox_result, bbox_result>,
+  ///   bbox_result: True loc in lrtb format, size [BS, number_boxes, 4], for example: [1, 15130, 4].
+  ///   scores_result: Normalized score, size [BS, number_boxes, class_number], for example: [1, 15130, 81].
+  static std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(const at::Tensor& bboxes_in,
+                        const at::Tensor& scores_in,
+                        const at::Tensor& dboxes_xywh,
+                        const double scale_xy,
+                        const double scale_wh);
 };
 
 }  // namespace torch_ipex
