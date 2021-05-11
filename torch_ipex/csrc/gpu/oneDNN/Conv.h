@@ -95,16 +95,30 @@ static inline memory::dims compatible_dilation(IntArrayRef &dilation) {
   return ret;
 }
 
-static inline memory::format_tag conv_src_fmt(int64_t ndim) {
-  return (ndim == 4) ? memory::format_tag::nchw :
-                       ((ndim == 5) ? memory::format_tag::ncdhw :
-                                      memory::format_tag::undef);
+static inline memory::format_tag
+conv_src_fmt(int64_t ndim, bool is_channels_last = false) {
+  if (!is_channels_last) {
+    return (ndim == 4) ? memory::format_tag::nchw :
+                         ((ndim == 5) ? memory::format_tag::ncdhw :
+                                        memory::format_tag::undef);
+  } else {
+    return (ndim == 4) ? memory::format_tag::nhwc :
+                         ((ndim == 5) ? memory::format_tag::ndhwc :
+                                        memory::format_tag::undef);
+  }
 }
 
-static inline memory::format_tag conv_wgh_fmt(int64_t ndim, bool grouped = false) {
-  return (ndim == 4) ? (grouped ? memory::format_tag::goihw : memory::format_tag::oihw) :
-                       ((ndim == 5) ? (grouped ? memory::format_tag::goidhw : memory::format_tag::oidhw) :
-                       memory::format_tag::undef);
+static inline memory::format_tag
+conv_wgh_fmt(int64_t ndim, bool grouped = false, bool is_channels_last = false) {
+  if (!is_channels_last) {
+    return (ndim == 4) ? (grouped ? memory::format_tag::goihw : memory::format_tag::oihw) :
+                         ((ndim == 5) ? (grouped ? memory::format_tag::goidhw : memory::format_tag::oidhw) :
+                         memory::format_tag::undef);
+  } else {
+    return (ndim == 4) ? (grouped ? memory::format_tag::gohwi : memory::format_tag::ohwi) :
+                         ((ndim == 5) ? (grouped ? memory::format_tag::godhwi : memory::format_tag::odhwi) :
+                         memory::format_tag::undef);
+  }
 }
 
 static inline memory::dims compatible_wgh_dims(
@@ -137,13 +151,22 @@ static at::Tensor convolution(
     ConvAttr attr) {
   auto engine = GpuEngineManager::Instance().get_engine({kXPU, current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
-
   auto ndim = src.ndimension();
+
   auto dst_tz = conv_dst_tz(
       ndim, src.sizes(), wgh.sizes(), padding, stride, dilation);
   if (!lazy_reorder_enabled() && !dst.defined()) {
-    auto dst_dt = attr.with_relu() ? device(kXPU).dtype(kQUInt8) : device(kXPU).dtype(kQInt8);
-    dst = at::empty(dst_tz, src.is_quantized() ? dst_dt : src.options());
+    auto dst_opt = src.options();
+    if (src.is_quantized()) {
+      dst_opt = attr.with_relu() ?
+                device(kXPU).dtype(kQUInt8) :
+                device(kXPU).dtype(kQInt8);
+    }
+    if (src.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+      dst_opt = dst_opt.memory_format(at::MemoryFormat::ChannelsLast);
+    }
+
+    dst = at::empty(dst_tz, dst_opt);
   }
 
   auto src_data_t = get_onednn_dtype(src);
@@ -160,20 +183,31 @@ static at::Tensor convolution(
   }
   auto usr_bia_data_t = memory::data_type::f32;
 
-  //master wgh
+  // master wgh
   if (src_data_t == memory::data_type::bf16) {
     wei_data_t = memory::data_type::bf16;
     bia_data_t = memory::data_type::bf16;
     dst_data_t = src_data_t;
   }
 
-  auto fmt_any = memory::format_tag::any;
-  auto fmt_src = conv_src_fmt(ndim);
-  auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1);
-  auto fmt_bia = memory::format_tag::x;
-
   auto ic = src.size(1);
   auto oc = dst_tz[1];
+
+  auto fmt_any = memory::format_tag::any;
+  // 4D: n/c/h/w (n/h/w/c)
+  // 5D: n/c/d/h/w (n/d/h/w/c)
+  auto fmt_src = conv_src_fmt(ndim,
+      ndim == 4 ?
+      src.is_contiguous(at::MemoryFormat::ChannelsLast) :
+      src.is_contiguous(at::MemoryFormat::ChannelsLast3d));
+  // 4D: (g)o/i/h/w ((g)o/h/w/i)
+  // 5D: (g)o/i/d/h/w ((g)o/d/h/w/i)
+  auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1, wgh.size(1) == 1 ? false :
+      (wgh.ndimension() == 4 ?
+       wgh.is_contiguous(at::MemoryFormat::ChannelsLast) :
+       wgh.is_contiguous(at::MemoryFormat::ChannelsLast3d)));
+  auto fmt_bia = memory::format_tag::x;
+
   memory::dims src_tz = src.sizes().vec();
   memory::dims wgh_tz = compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
   memory::dims bia_tz = {oc};
@@ -187,9 +221,11 @@ static at::Tensor convolution(
   auto bia_md = bia.defined() ? memory::desc(bia_tz, bia_data_t, fmt_bia) : memory::desc();
 
   if (lazy_reorder_enabled()) {
-    src_md = memory::desc(src_tz, src_data_t, fmt_any);
+    src_md = memory::desc(src_tz, src_data_t,
+        src.is_contiguous(at::MemoryFormat::ChannelsLast) ? fmt_src : fmt_any);
+    dst_md = memory::desc(dst_tz, dst_data_t,
+        src.is_contiguous(at::MemoryFormat::ChannelsLast) ? fmt_src : fmt_any);
     wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
-    dst_md = memory::desc(dst_tz, dst_data_t, fmt_any);
   }
 
   auto conv_forward_desc =
@@ -280,10 +316,14 @@ static at::Tensor convolution(
     } else {
       auto expected_dst_md = conv_forward_pd.dst_desc();
       auto plain_dst_md = memory::desc({dst_tz}, dst_data_t, fmt_src);
+      auto dst_opt = src.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+                     src.options().memory_format(at::MemoryFormat::ChannelsLast) :
+                     src.options();
       if (expected_dst_md != plain_dst_md) {
-        dst = empty_opaque_tensor(expected_dst_md, src.options(), c10::nullopt);
+        dst = empty_opaque_tensor(expected_dst_md, dst_opt, c10::nullopt);
       } else {
-        dst = at::empty(dst_tz, src.options());
+        // ChannelsLast in block mode
+        dst = at::empty(dst_tz, dst_opt);
       }
     }
   }

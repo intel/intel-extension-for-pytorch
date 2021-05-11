@@ -260,3 +260,23 @@ class TestNNMethod(TestCase):
 
     self.assertEqual(real.cpu(), ref)
 
+  def test_channels_last_simple_fwd(self, dtype=torch.float):
+    x = torch.ones(2, 2, 3, 3, dtype=torch.float)
+    w = torch.ones(2, 2, 3, 3, dtype=torch.float)
+    conv = torch.nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
+    conv.weight.data = w
+    ref = conv(x)
+
+    x = x.contiguous(memory_format=torch.channels_last).to("xpu")
+    w = w.to("xpu").contiguous(memory_format=torch.channels_last)
+    conv.weight.data = w
+    real = conv(x)
+
+    print(real.shape)
+    print(real.stride())
+    print(real.contiguous().cpu())
+    print(ref.shape)
+    print(ref.stride())
+    print(ref)
+
+    self.assertEqual(real.contiguous().cpu(), ref)

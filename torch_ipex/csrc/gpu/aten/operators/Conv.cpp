@@ -649,8 +649,12 @@ Tensor _convolution_out(
     int64_t groups_,
     ConvAttr attr) {
   auto output = output_r;
-  auto input = input_r.contiguous();
-  auto weight = weight_r.contiguous();
+  auto input = input_r.is_contiguous() ||
+               input_r.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+               input_r : input_r.contiguous();
+  auto weight = weight_r.is_contiguous() ||
+                weight_r.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+                weight_r : weight_r.contiguous();
   auto bias = bias_r;
   auto k = weight.ndimension();
   if (k == input.ndimension() + 1) {

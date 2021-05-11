@@ -69,6 +69,10 @@ static inline void eltwise(
     } else {
       auto plain_dst_md = memory::desc({src_tz}, data_t, format_data);
       auto expected_dst_md = eltwise_forward_pd.dst_desc();
+      auto dst_opt = src.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+                     src.options().memory_format(at::MemoryFormat::ChannelsLast) :
+                     src.options();
+
       if (plain_dst_md != expected_dst_md) {
         dst = at::AtenIpexTypeXPU::empty_opaque_tensor(
             expected_dst_md, src.options(), c10::nullopt);

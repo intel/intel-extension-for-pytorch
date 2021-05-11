@@ -33,6 +33,26 @@ class  TestNNMethod(TestCase):
         print("dpcpp relu bwd", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
 
+    def test_activation_relu_channels_last(self, dtype=torch.float):
+        x = torch.randn(1, 2, 3, 3, dtype=torch.float)
+        w = torch.randn(2, 2, 3, 3, dtype=torch.float)
+        conv = torch.nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
+        relu = torch.nn.ReLU()
+        conv.weight.data = w
+        ref = conv(x)
+        ref = relu(ref)
+
+        x = x.to("xpu").to(memory_format=torch.channels_last)
+        w = w.to("xpu").to(memory_format=torch.channels_last)
+        conv.weight.data = w
+        real = conv(x)
+        real = relu(real)
+        real = real.contiguous().cpu()
+
+        print(real)
+        print(ref)
+        self.assertEqual(real, ref)
+
     def test_activation_rrelu(self, dtype=torch.float):
         # Will not check the result due to different random seeds on cpu and xpu
         RReLU = torch.nn.RReLU(0.1,0.3)
