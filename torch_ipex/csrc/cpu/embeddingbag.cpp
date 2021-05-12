@@ -404,7 +404,10 @@ at::Tensor embedding_bag(
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("embedding_bag");
 #endif
-  auto casted_weight = at::GradMode::is_enabled() ? weight : cpu_cached_cast(at::kBFloat16, weight);
+  auto target_type = get_autocast_dtype();
+  // only have bf16 support now, keep fp32 for other target_type
+  bool cast_to_bfloat16 = !at::GradMode::is_enabled() && at::kBFloat16 == target_type;
+  auto casted_weight = cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, weight) : weight;
   return op.call(casted_weight, indices, offsets, sparse, include_last_offset);
 }
 
