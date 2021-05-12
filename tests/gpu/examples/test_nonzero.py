@@ -1,12 +1,14 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 import torch_ipex
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif("not torch_ipex._onedpl_is_enabled()")
     def test_nonzero(self, dtype=torch.float):
 
         #

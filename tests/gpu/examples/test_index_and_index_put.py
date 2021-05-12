@@ -2,6 +2,8 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 import torch_ipex
 import numpy as np
+import pytest
+
 np.set_printoptions(threshold=np.inf)
 
 cpu_device = torch.device("cpu")
@@ -9,6 +11,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif("not torch_ipex._onedpl_is_enabled()")
     def test_index_and_index_put(self, dtype=torch.float):
         x_cpu = torch.randn([3, 3], dtype=torch.float, device=cpu_device)
         y_cpu = torch.randn([3, 3], dtype=torch.float, device=cpu_device)

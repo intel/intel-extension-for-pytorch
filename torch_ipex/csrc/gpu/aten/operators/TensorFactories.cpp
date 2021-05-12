@@ -138,7 +138,7 @@ Tensor randperm_dpcpp(
   }
   return result;
 #else
-  AT_ERROR("Without ONEDPL support, randperm is not implemented for backend: ", self.device());
+  AT_ERROR("Without ONEDPL support, randperm is not implemented for backend: ", result.device());
 #endif
 }
 
