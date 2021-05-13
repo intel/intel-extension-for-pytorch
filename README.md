@@ -9,10 +9,10 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
      - [Automatically Mix Precison](#automatically-mix-precision)
         - [BFloat16](#BFloat16)
         - [INT8](#int8-quantization)
-     - [Supported Customized Operators](#Supported Customized Operators)
-     - [Supported Fusion Patterns](#Supported Fusion Patterns)
- - [Tutorials](#Tutorials)
- - [Joint-blogs](#Joint-blogs)
+     - [Supported Customized Operators](#supported-customized-operators)
+     - [Supported Fusion Patterns](#supported-fusion-patterns)
+ - [Tutorials](#tutorials)
+ - [Joint blogs](#joint-blogs)
  - [License](#license)
 
 ## Installation
@@ -260,7 +260,7 @@ Supported Quantization Operators:
 
 
 ## Tutorials
-[Performance Tuning](tutorials/Performance_Tuning.md)
+*  [Performance Tuning](tutorials/Performance_Tuning.md)
 
 ## Joint-blogs
 * [Intel and Facebook Accelerate PyTorch Performance with 3rd Gen Intel® Xeon® Processors and Intel® Deep Learning Boost’s new BFloat16 capability](https://www.intel.com/content/www/us/en/artificial-intelligence/posts/intel-facebook-boost-bfloat16.html)
