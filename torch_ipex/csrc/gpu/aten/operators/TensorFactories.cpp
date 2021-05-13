@@ -21,11 +21,12 @@
 #include <oneapi/dpl/iterator>
 #endif
 
+
 DPCPP_DEF_K1(intrepr);
 DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
 
-using namespace at::dpcpp;
 using namespace at::native;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace impl {
@@ -40,7 +41,7 @@ Tensor empty_dpcpp(
   // been
   // "unpacked"
 
-  auto* allocator = at::dpcpp::getDPCPPDeviceAllocator();
+  auto* allocator = xpu::dpcpp::getDPCPPDeviceAllocator();
   int64_t nelements = prod_intlist(size);
   auto dtype = options.dtype();
   int64_t size_bytes = nelements * dtype.itemsize();

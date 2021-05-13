@@ -1,7 +1,10 @@
+#pragma once
+
 #include <ATen/ExpandUtils.h>
 #include <ATen/native/TensorIterator.h>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 [[noreturn]] static void invalid_mask(

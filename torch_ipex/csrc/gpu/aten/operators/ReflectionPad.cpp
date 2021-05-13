@@ -6,7 +6,8 @@
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -82,7 +83,7 @@ void reflection_pad1d_out_template(
     const Tensor& input_,
     IntArrayRef padding) {
   TORCH_CHECK(
-      dpcpp::detail::canUse32BitIndexMath(input_),
+      xpu::dpcpp::detail::canUse32BitIndexMath(input_),
       "input tensor must fit into 32-bit index math");
 
   int64_t dim_plane = 0;
@@ -196,11 +197,11 @@ void reflection_pad1d_backward_out_template(
     const Tensor& input,
     IntArrayRef padding) {
   TORCH_CHECK(
-      dpcpp::detail::canUse32BitIndexMath(input),
+      xpu::dpcpp::detail::canUse32BitIndexMath(input),
       "input tensor must fit into 32-bit index math");
 
   TORCH_CHECK(
-      dpcpp::detail::canUse32BitIndexMath(grad_output_),
+      xpu::dpcpp::detail::canUse32BitIndexMath(grad_output_),
       "input tensor must fit into 32-bit index math");
 
   int64_t dim_plane = 0;

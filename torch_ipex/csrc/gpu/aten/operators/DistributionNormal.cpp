@@ -9,9 +9,9 @@
 #include "Random.h"
 #include "Distributions.h"
 
+
 namespace at {
 namespace AtenIpexTypeXPU {
-
 
 bool resize_output_for_normal(at::Tensor& output, const at::Tensor& mean, const at::Tensor& std) {
   bool expandable = at::are_expandable(mean.sizes(), std.sizes());
@@ -49,7 +49,8 @@ bool resize_output_for_normal(at::Tensor& output, const at::Tensor& mean, const 
 
 
 void normal_dpcpp(TensorIterator& iter, double mean_, double std_, c10::optional<Generator> gen_) {
-  auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
+  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
+      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "normal_dpcpp", [&] {
     using accscalar_t = dist_acctype<scalar_t>;
     auto mean = static_cast<accscalar_t>(mean_);

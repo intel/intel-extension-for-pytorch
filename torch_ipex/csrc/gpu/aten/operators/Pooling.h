@@ -11,9 +11,10 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
 using namespace at::native;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -45,7 +46,7 @@ static void avg_pool_out_frame(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   prop_kind prop_kind = dnnl::prop_kind::forward_training;
-  auto data_t = at::xpu::oneDNN::get_onednn_dtype(src);
+  auto data_t = xpu::oneDNN::get_onednn_dtype(src);
   if (data_t == memory::data_type::f16 || data_t == memory::data_type::s8 ||
       data_t == memory::data_type::u8 || data_t == memory::data_type::s32) {
     prop_kind = dnnl::prop_kind::forward_inference;
@@ -116,7 +117,7 @@ static void avg_pool_out_frame(
     if (expected_dst_md != plain_dst_md) {
       // reallocate memory due to padding needed by oneDNN in some blk fmt
       if (src.is_quantized()) {
-        auto quantizer = at::dpcpp::make_per_tensor_affine_quantizer(
+        auto quantizer = xpu::dpcpp::make_per_tensor_affine_quantizer(
             src.q_scale(),
             src.q_zero_point(),
             typeMetaToScalarType(src.options().dtype()));
@@ -167,7 +168,7 @@ static void avg_pool_backward_out_frame(
   auto strm = GpuStreamManager::Instance().get_stream();
   prop_kind prop_kind = dnnl::prop_kind::forward_training;
 
-  auto data_t = at::xpu::oneDNN::get_onednn_dtype(diff_dst);
+  auto data_t = xpu::oneDNN::get_onednn_dtype(diff_dst);
   if (data_t == memory::data_type::f16) {
     // rise error
   }
@@ -283,7 +284,7 @@ static void max_pool_out_frame(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto prop_kind = dnnl::prop_kind::forward_training;
-  auto data_t = at::xpu::oneDNN::get_onednn_dtype(src);
+  auto data_t = xpu::oneDNN::get_onednn_dtype(src);
   if (data_t == memory::data_type::f16 || data_t == memory::data_type::s8 ||
       data_t == memory::data_type::u8 || data_t == memory::data_type::s32) {
     prop_kind = dnnl::prop_kind::forward_inference;
@@ -353,7 +354,7 @@ static void max_pool_out_frame(
     if (expected_dst_md != plain_dst_md) {
       // reallocate memory due to padding needed by oneDNN in some blk fmt
       if (src.is_quantized()) {
-        auto quantizer = at::dpcpp::make_per_tensor_affine_quantizer(
+        auto quantizer = xpu::dpcpp::make_per_tensor_affine_quantizer(
             src.q_scale(),
             src.q_zero_point(),
             typeMetaToScalarType(src.options().dtype()));
@@ -445,7 +446,7 @@ static void max_pool_backward_out_frame(
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto prop_kind = dnnl::prop_kind::forward_training;
-  auto data_t = at::xpu::oneDNN::get_onednn_dtype(diff_dst);
+  auto data_t = xpu::oneDNN::get_onednn_dtype(diff_dst);
   if (data_t == memory::data_type::f16) {
     // rise error
   }

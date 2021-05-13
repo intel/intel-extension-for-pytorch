@@ -6,7 +6,7 @@
 #include "Quantizer.h"
 
 
-namespace at {
+namespace xpu {
 namespace dpcpp {
 
 struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
@@ -172,4 +172,4 @@ inline QuantizerPtr make_per_channel_affine_quantizer(
       scalar_type, scales_double, zero_points_int64, axis);
 }
 
-}} // at::dpcpp
+}} // xpu::dpcpp

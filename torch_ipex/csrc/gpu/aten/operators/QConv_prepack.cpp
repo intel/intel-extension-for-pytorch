@@ -6,9 +6,10 @@
 
 #include "QUtil.h"
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
 using namespace at::native;
+using namespace xpu::dpcpp;
 
 c10::intrusive_ptr<ConvPackedParamsBase<2>> at::AtenIpexTypeQuantizedXPU::PackedConvWeightQDPCPP::prepack(
         at::Tensor weight,

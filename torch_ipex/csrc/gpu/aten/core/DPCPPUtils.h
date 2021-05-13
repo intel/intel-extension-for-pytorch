@@ -6,7 +6,10 @@
 #include <core/DPCPP.h>
 #include <core/Device.h>
 
-namespace at {
+
+using namespace at;
+
+namespace xpu {
 namespace dpcpp {
 
 int dpcppGetDeviceCount(int* deviceCount);
@@ -139,5 +142,10 @@ static DPCPP::async_handler dpcppAsyncHandler = [](DPCPP::exception_list eL) {
   }
 };
 
+#define NUM_THREADS (C10_WARP_SIZE * 2)
+#define THREAD_WORK_SIZE 4
+#define BLOCK_WORK_SIZE (THREAD_WORK_SIZE * num_threads)
+#define thread_work_size THREAD_WORK_SIZE
+
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

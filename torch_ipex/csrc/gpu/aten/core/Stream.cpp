@@ -1,4 +1,5 @@
 #include <c10/util/Exception.h>
+
 #include <core/Context.h>
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
@@ -14,10 +15,10 @@
 #include <memory>
 #include <mutex>
 #include <vector>
-
 #include <cstdlib>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 enum class StreamType : uint8_t {
@@ -36,12 +37,12 @@ class DPCPPStreamImpl {
       : /* queue_(dpcppGetRawDevice(di), asyncHandler),*/
         queue_([&]() -> DPCPP::queue {
               return dpcpp_profiling() ?
-                  DPCPP::queue(at::dpcpp::getDeviceContext((int)di),
+                  DPCPP::queue(xpu::dpcpp::getDeviceContext((int)di),
                    dpcppGetDeviceSelector(di),
                    asyncHandler,
                    {DPCPP::property::queue::in_order(),
                     DPCPP::property::queue::enable_profiling()}) :
-                  DPCPP::queue(at::dpcpp::getDeviceContext((int)di),
+                  DPCPP::queue(xpu::dpcpp::getDeviceContext((int)di),
                    dpcppGetDeviceSelector(di),
                    asyncHandler,
                    {DPCPP::property::queue::in_order()});

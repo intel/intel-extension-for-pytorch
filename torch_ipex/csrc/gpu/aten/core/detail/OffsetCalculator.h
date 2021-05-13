@@ -7,6 +7,7 @@
 #include <core/Array.h>
 #include <utils/IntegerDivider.h>
 
+
 /// OffsetCalculator calculates the offset in bytes of a linear index for NARGS
 /// operands that share the same shape, but may have different strides.
 
@@ -15,7 +16,7 @@ struct OffsetCalculator {
   static constexpr int MAX_DIMS = 12;
 
   // The offset for each argument (in bytes). Wrapper around fixed-size array.
-  using offset_type = at::dpcpp::Array<index_t, NARGS>;
+  using offset_type = xpu::dpcpp::Array<index_t, NARGS>;
 
   // This is a workaround for the compute cpp.
   // An issue was found that if the tailing member data is the two dim array
@@ -79,7 +80,7 @@ template <int NARGS, typename index_t = uint32_t>
 struct TrivialOffsetCalculator {
   // The offset for each argument. Wrapper around fixed-size array.
   // The offsets are in # of elements, not in bytes.
-  using offset_type = at::dpcpp::Array<index_t, std::max<int>(NARGS, 1)>;
+  using offset_type = xpu::dpcpp::Array<index_t, std::max<int>(NARGS, 1)>;
 
   C10_HOST_DEVICE offset_type get(index_t linear_idx) const {
     offset_type offsets;

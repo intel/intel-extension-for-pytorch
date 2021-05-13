@@ -6,7 +6,8 @@
 #include <core/Memory.h>
 #include <utils/General.h>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 void StorageImpl_resize(at::StorageImpl* self, ptrdiff_t size_bytes) {
@@ -46,7 +47,7 @@ at::StorageImpl* StorageImpl_new() {
       c10::make_intrusive<at::StorageImpl>(
         c10::StorageImpl::use_byte_size_t(),
         0,
-        at::dpcpp::getDPCPPDeviceAllocator(),
+        xpu::dpcpp::getDPCPPDeviceAllocator(),
         true)
           .release();
   return storage;

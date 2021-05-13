@@ -3,12 +3,13 @@
 #include <core/DPCPPUtils.h>
 #include <core/Stream.h>
 
+
 DPCPP_DEF_K1(memory_copy);
 #define SyclConvertToActualTypePtr(Scalar, buf_acc) \
   static_cast<Scalar*>(static_cast<void*>(((buf_acc.get_pointer().get()))))
 #define SyclConvertToActualOffset(Scalar, offset) offset / sizeof(Scalar)
 
-namespace at {
+namespace xpu {
 namespace dpcpp {
 
 using buffer_data_type_t = uint8_t;

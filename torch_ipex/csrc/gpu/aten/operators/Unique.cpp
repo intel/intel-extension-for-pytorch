@@ -15,9 +15,12 @@
 #include <oneapi/dpl/numeric>
 #include <oneapi/dpl/iterator>
 #endif
-using namespace at::dpcpp;
+
+
 template <typename scalar_t>
 class Unique_Dpcpp_Kernel {};
+
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

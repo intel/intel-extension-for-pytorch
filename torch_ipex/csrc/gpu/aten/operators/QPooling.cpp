@@ -8,15 +8,12 @@
 #include <utils/ParamUtils.h>
 
 
-
 using namespace dnnl;
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 using namespace at::native;
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
-
-using namespace impl;
 
 at::Tensor quantized_max_pool2d(
     const Tensor& qx,

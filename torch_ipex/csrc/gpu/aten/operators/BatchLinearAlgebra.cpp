@@ -12,7 +12,8 @@
 #include <oneapi/mkl.hpp>
 #endif
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 DPCPP_DEF_K2(triuTrilSycl, typename scalar_t, typename IndexType, bool upper);
 DPCPP_DEF_K2(triuTrilBatchSycl, typename scalar_t, typename IndexType, bool upper);
@@ -91,7 +92,7 @@ Tensor& triu_tril_dpcpp_template(
       self.scalar_type(),
       name,
       [&] {
-        if (dpcpp::detail::canUse32BitIndexMath(self)) {
+        if (xpu::dpcpp::detail::canUse32BitIndexMath(self)) {
           apply_triu_tril<scalar_t, int32_t, upper>(result, self, k);
         } else {
           apply_triu_tril<scalar_t, int64_t, upper>(result, self, k);

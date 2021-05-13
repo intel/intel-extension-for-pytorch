@@ -7,8 +7,9 @@
 #include <utils/Atomics.h>
 #include <utils/Numerics.h>
 
-using namespace at::dpcpp::detail;
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp::detail;
+using namespace xpu::dpcpp;
 
 // Compute the offsets into the given tensors for a linear index. For the 't2'
 // tensor, dimension 'dim' is skipped. The tensors are assumed to have the same

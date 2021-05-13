@@ -12,6 +12,7 @@
 #include <oneapi/dnnl/dnnl_sycl.hpp>
 #include <vector>
 
+
 using namespace dnnl;
 
 #define DPCPP_ONEDNN_FORCE_SYNC(stream)               \
@@ -47,7 +48,7 @@ using namespace dnnl;
     }                                                                         \
   }
 
-namespace at {
+namespace xpu {
 namespace dpcpp {
 
 static inline dnnl::memory dpcpp_onednn_memory(
@@ -83,7 +84,7 @@ struct GpuEngineManager {
 
   engine& get_engine(const Device& device) {
     TORCH_INTERNAL_ASSERT(device.type() == kXPU);
-    TORCH_INTERNAL_ASSERT(device.index() < at::dpcpp::device_count());
+    TORCH_INTERNAL_ASSERT(device.index() < xpu::dpcpp::device_count());
     return *engine_pool[device.index()];
   }
 
@@ -92,11 +93,11 @@ struct GpuEngineManager {
 
  protected:
   GpuEngineManager() {
-    int device_count = (int)at::dpcpp::device_count();
+    int device_count = (int)xpu::dpcpp::device_count();
     TORCH_INTERNAL_ASSERT(device_count > 0);
     for (int i = 0; i < device_count; i++) {
       engine_pool.push_back(std::make_shared<dnnl::engine>(
-          dnnl::sycl_interop::make_engine(dpcppGetRawDevice(i), at::dpcpp::getDeviceContext(i))));
+          dnnl::sycl_interop::make_engine(dpcppGetRawDevice(i), xpu::dpcpp::getDeviceContext(i))));
     }
   }
   ~GpuEngineManager() {}
@@ -115,13 +116,13 @@ struct GpuStreamManager {
 #ifdef USE_PERSIST_STREAM
   dnnl::stream& get_stream() {
     int device_index = current_device();
-    TORCH_INTERNAL_ASSERT(device_index < at::dpcpp::device_count());
+    TORCH_INTERNAL_ASSERT(device_index < xpu::dpcpp::device_count());
     return *stream_pool.at(device_index);
   }
 #else
   dnnl::stream get_stream() {
     int device_index = current_device();
-    TORCH_INTERNAL_ASSERT(device_index < at::dpcpp::device_count());
+    TORCH_INTERNAL_ASSERT(device_index < xpu::dpcpp::device_count());
     return dnnl::sycl_interop::make_stream(
         GpuEngineManager::Instance().get_engine({kXPU, device_index}),
         getDefaultDPCPPStream(device_index).dpcpp_queue());
@@ -134,7 +135,7 @@ struct GpuStreamManager {
  protected:
   GpuStreamManager() {
 #ifdef USE_PERSIST_STREAM
-    int deviceCount = at::dpcpp::device_count();
+    int deviceCount = xpu::dpcpp::device_count();
     TORCH_INTERNAL_ASSERT(deviceCount > 0);
     for (DeviceIndex dev = 0; dev < deviceCount; dev++) {
       stream_pool.push_back(std::make_shared<dnnl::stream>(
@@ -153,4 +154,4 @@ struct GpuStreamManager {
 };
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

@@ -10,13 +10,13 @@
 
 #include "QUtil.h"
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
 using namespace at::native;
-using namespace at::xpu::oneDNN;
+using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace at {
-
 namespace AtenIpexTypeQuantizedXPU {
 
 at::Tensor q_conv2d(
@@ -149,7 +149,7 @@ at::Tensor q_conv2d_sum_relu(
     attr);
 
   accumu.set_quantizer_(
-    at::dpcpp::make_per_tensor_affine_quantizer(
+    xpu::dpcpp::make_per_tensor_affine_quantizer(
       sum_scale, sum_zero_point, accumu.scalar_type()));
 
   return accumu;

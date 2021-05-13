@@ -13,7 +13,7 @@
 
 using namespace at;
 using namespace DPCPP;
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 
 static inline void col2im_shape_check(
     const Tensor& input,

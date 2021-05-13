@@ -13,7 +13,8 @@
 #include <mkl.h>
 #endif
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 //DPCPP_DEF_K2(triuTrilSycl, typename scalar_t, typename IndexType, bool upper);
 

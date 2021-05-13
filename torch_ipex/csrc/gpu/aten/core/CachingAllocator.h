@@ -9,7 +9,8 @@
 #include <core/Memory.h>
 #include <core/Stream.h>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 class DPCPPOutOfMemoryError : public c10::Error {
@@ -27,7 +28,7 @@ enum struct CAStatType : uint64_t {
   AGGREGATE = 0,
   SMALL_POOL = 1,
   LARGE_POOL = 2,
-  NUM_TYPES = 3  
+  NUM_TYPES = 3
 };
 
 typedef std::array<CAStat, static_cast<size_t>(CAStatType::NUM_TYPES)> CAStatArray;
@@ -41,7 +42,7 @@ struct CADeviceStats {
   CAStatArray reserved_bytes;
   CAStatArray active_bytes;
   CAStatArray inactive_split_bytes;
-  
+
   int64_t num_alloc_retries = 0;
   int64_t num_ooms = 0;
 };
@@ -70,7 +71,7 @@ Allocator* dpcpp_getCachingAllocator();
 void dpcpp_emptyCache();
 void dpcpp_cacheInfo(int dev_id, size_t* cachedAndFree, size_t* largestBlock);
 void* dpcpp_getBaseAllocation(void *ptr, size_t *size);
-void dpcpp_recordQueue(const DataPtr&, at::dpcpp::DPCPPStream stream);
+void dpcpp_recordQueue(const DataPtr&, xpu::dpcpp::DPCPPStream stream);
 CADeviceStats dpcpp_getDeviceStats(int device);
 void dpcpp_resetAccumulatedStats(int device);
 void dpcpp_resetPeakStats(int device);
@@ -78,6 +79,6 @@ void dpcpp_dumpMemoryStatus(int deviceIndex);
 std::vector<CASegmentInfo> dpcpp_snapshot();
 std::mutex* getFreeMutex();
 
-}} // namespace at::dpcpp
+}} // namespace xpu::dpcpp
 
 #endif

@@ -14,10 +14,10 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
+
 using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
 
-namespace at {
 namespace xpu {
 namespace oneDNN {
 
@@ -32,8 +32,9 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
 
   // FP16 Data Type only support forward_inference
   bool training = src.scalar_type() == ScalarType::Half ? false : true;
-  auto prop = training ? prop_kind::forward_training
-                              : prop_kind::forward_inference;
+  auto prop = training ?
+              prop_kind::forward_training :
+              prop_kind::forward_inference;
   normalization_flags flags = normalization_flags::use_scale_shift;
   bool useScaleShift = (bool)(flags & normalization_flags::use_scale_shift);
 
@@ -212,7 +213,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   memory src_m = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
   if (src_md != exp_md) {
     src_ = empty_opaque_tensor(exp_md, src.options(), c10::nullopt);
-    at::xpu::oneDNN::reorder(src, src_);
+    xpu::oneDNN::reorder(src, src_);
     src_m = dpcpp_onednn_memory(exp_md, engine, src_.data_ptr());
   }
 
@@ -220,7 +221,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   memory diff_dst_m = dpcpp_onednn_memory(diff_dst_md, engine, diff_dst.data_ptr());
   if (diff_dst_md != exp_md) {
     diff_dst_ = empty_opaque_tensor(exp_md, diff_dst.options(), c10::nullopt);
-    at::xpu::oneDNN::reorder(diff_dst, diff_dst_);
+    xpu::oneDNN::reorder(diff_dst, diff_dst_);
     diff_dst_m = dpcpp_onednn_memory(exp_md, engine, diff_dst_.data_ptr());
   }
 
@@ -234,7 +235,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   memory mean_m = dpcpp_onednn_memory(mean_md, engine, mean.data_ptr());
   if (mean_md != stats_exp_md) {
     mean_ = empty_opaque_tensor(stats_exp_md, mean.options(), c10::nullopt);
-    at::xpu::oneDNN::reorder(mean, mean_);
+    xpu::oneDNN::reorder(mean, mean_);
     mean_m = dpcpp_onednn_memory(stats_exp_md, engine, mean_.data_ptr());
   }
 
@@ -242,7 +243,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   memory rstd_m = dpcpp_onednn_memory(rstd_md, engine, rstd.data_ptr());
   if (rstd_md != stats_exp_md) {
     rstd_ = empty_opaque_tensor(stats_exp_md, rstd.options(), c10::nullopt);
-    at::xpu::oneDNN::reorder(rstd, rstd_);
+    xpu::oneDNN::reorder(rstd, rstd_);
     rstd_m = dpcpp_onednn_memory(stats_exp_md, engine, rstd_.data_ptr());
   }
 
@@ -303,4 +304,4 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   return std::make_tuple(diff_src, diff_wgh, diff_bia);
 }
 
-}}}
+}}

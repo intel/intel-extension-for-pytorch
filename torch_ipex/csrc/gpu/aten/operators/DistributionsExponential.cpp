@@ -18,20 +18,21 @@
 #include <mkl.h>
 #endif
 
-using namespace at::dpcpp::detail;
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp::detail;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
 
 Tensor& exponential_(Tensor& self, double lambda_, c10::optional<Generator> gen_) {
-  auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
+  auto gen = get_generator_or_default<DPCPPGeneratorImpl>(gen_, getDefaultDPCPPGenerator());
 #ifdef USE_ONEMKL
   if (lambda_ > 0 && self.is_contiguous()) {
     IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "exponential_dpcpp_", [&] {
       scalar_t displ = static_cast<scalar_t>(0.0);
       scalar_t scale = static_cast<scalar_t>(std::abs(1/lambda_));
-      auto &dpcpp_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+      auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
       uint64_t seed;
       {
         // See Note [Acquire lock when using random generators]

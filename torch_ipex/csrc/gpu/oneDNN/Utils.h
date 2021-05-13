@@ -3,9 +3,9 @@
 #include <ATen/ATen.h>
 #include <oneapi/dnnl/dnnl.hpp>
 
+
 using namespace dnnl;
 
-namespace at {
 namespace xpu {
 namespace oneDNN {
 
@@ -86,4 +86,4 @@ get_onednn_strides(const at::Tensor& tensor) {
   return strides;
 }
 
-}}}
+}}

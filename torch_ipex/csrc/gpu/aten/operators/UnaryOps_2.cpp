@@ -10,7 +10,8 @@
 #include <oneDNN/oneDNN.h>
 #include "Loops.h"
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -49,7 +50,7 @@ Tensor& sqrt_out(Tensor& result, const Tensor& self) {
     "unsupported dtype for self:", self.scalar_type());
   result = at::empty_like(self);
   if (self.dim() > 0 && self.scalar_type() != ScalarType::Double) {
-    at::xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_sqrt>(result, self, 0.0f, 0.0f);
+    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_sqrt>(result, self, 0.0f, 0.0f);
   } else {
     ipex_sqrt_out(result, self);
   }

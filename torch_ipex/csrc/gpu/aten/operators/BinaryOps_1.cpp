@@ -9,8 +9,7 @@
 
 #include "Loops.h"
 
-using namespace at::dpcpp;
-using namespace at::xpu::oneDNN;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace impl {
@@ -83,7 +82,7 @@ Tensor& add_out(
     Scalar alpha) {
   Tensor self, other;
  if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
-      at::xpu::oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
+      xpu::oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
       _self.dim() > 0 && _other.dim() > 0 &&
       _self.dim() == _other.dim() &&
       _self.is_contiguous() && _other.is_contiguous() &&
@@ -93,7 +92,7 @@ Tensor& add_out(
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
       !is_expandable_to(_other.sizes(), _self.sizes())) &&
       !impl::is_wrapped_number(_self) && !impl::is_wrapped_number(_other)) {
-    at::xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
+    xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {
     result = to_plain_if_needed(result);
@@ -111,7 +110,7 @@ Tensor& add_out(
 Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
   Tensor result, self, other;
  if (1.0 == alpha.to<float>() && _self.defined() && _other.defined() &&
-      at::xpu::oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
+      xpu::oneDNN::is_supported_dtype_in_binary(_self.scalar_type(), _other.scalar_type()) &&
       _self.dim() > 0 && _other.dim() > 0 &&
       _self.dim() == _other.dim() &&
       _self.is_contiguous() && _other.is_contiguous() &&
@@ -121,7 +120,7 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
       !is_expandable_to(_other.sizes(), _self.sizes())) &&
       !impl::is_wrapped_number(_self) && !impl::is_wrapped_number(_other)) {
-    at::xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
+    xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {
     self = to_plain_if_needed(_self);
@@ -211,7 +210,7 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
       !impl::is_wrapped_number(_other) &&
       (!DPCPPTensorContext::is_plain(_self) ||
        !DPCPPTensorContext::is_plain(_other))) {
-    at::xpu::oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
+    xpu::oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});
     return result;
   } else {
     self = to_plain_if_needed(_self);

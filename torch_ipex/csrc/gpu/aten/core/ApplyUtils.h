@@ -1,14 +1,15 @@
 #pragma once
 
 #include <ATen/TensorUtils.h>
+
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
-
 #include <core/Context.h>
 
 #include <math.h>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 // We pull the kernel name from anonymous namespace to outside,

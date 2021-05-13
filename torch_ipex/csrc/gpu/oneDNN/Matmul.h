@@ -13,16 +13,16 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
+
 using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
 
-namespace at {
 namespace xpu {
 namespace oneDNN {
 
 struct MatmulAttr {
-  static const int64_t kind_with_relu = at::xpu::oneDNN::with_relu;
-  static const int64_t kind_with_sigmoid = at::xpu::oneDNN::with_sigmoid;
+  static const int64_t kind_with_relu = xpu::oneDNN::with_relu;
+  static const int64_t kind_with_sigmoid = xpu::oneDNN::with_sigmoid;
 
   MatmulAttr() : alpha_(1.f), beta_(0.f), attr_(0), m2_trans_(true) {}
   MatmulAttr(float alpha, float beta, int64_t attr, bool m2_trans) :
@@ -126,17 +126,17 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
                             m1.is_quantized() ||
                             m2.is_quantized())) {
     po.append_sum(attr.beta_);
-    post_flags |= at::xpu::oneDNN::with_sum;
+    post_flags |= xpu::oneDNN::with_sum;
   }
 
   if (attr.with_relu()) {
     po.append_eltwise(1.f, algorithm::eltwise_relu, 0.f, 0.f);
-    post_flags |= at::xpu::oneDNN::with_relu;
+    post_flags |= xpu::oneDNN::with_relu;
   }
 
   if (attr.with_sigmoid()) {
     po.append_eltwise(1.f, algorithm::eltwise_logistic, 0.f, 0.f);
-    post_flags |= at::xpu::oneDNN::with_sigmoid;
+    post_flags |= xpu::oneDNN::with_sigmoid;
   }
   pattr.set_post_ops(po);
 
@@ -256,13 +256,13 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
   if (m1_usr_m.get_desc() != expected_m1_md) {
     m1_ = empty_opaque_tensor(expected_m1_md, m1.options(), c10::nullopt);
     m1_m = dpcpp_onednn_memory(expected_m1_md, engine, m1_.data_ptr());
-    at::xpu::oneDNN::reorder(m1, m1_);
+    xpu::oneDNN::reorder(m1, m1_);
   }
 
   if (m2_usr_m.get_desc() != expected_m2_md) {
     m2_ = empty_opaque_tensor(expected_m2_md, m2.options(), c10::nullopt);
     m2_m = dpcpp_onednn_memory(expected_m2_md, engine, m2_.data_ptr());
-    at::xpu::oneDNN::reorder(attr.m2_trans_ ? m2 : m2.t(), m2_);
+    xpu::oneDNN::reorder(attr.m2_trans_ ? m2 : m2.t(), m2_);
 
     if (weight_cache_enabled()) {
       strm.wait();
@@ -278,7 +278,7 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
     dst_ = empty_opaque_tensor(expected_dst_md, dst.options(), c10::nullopt);
     dst_m = dpcpp_onednn_memory(expected_dst_md, engine, dst_.data_ptr());
     if (attr.beta_ != 1.f)
-      at::xpu::oneDNN::reorder(dst, dst_);
+      xpu::oneDNN::reorder(dst, dst_);
   }
 
   if (attr.beta_ == 1.f && attr.alpha_ == 1.f &&
@@ -302,4 +302,4 @@ static inline void matmul(Tensor& dst, const Tensor& m1,
   }
 }
 
-}}}
+}}

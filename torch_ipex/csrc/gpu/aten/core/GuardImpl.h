@@ -8,9 +8,10 @@
 #include <core/Functions.h>
 #include <core/Stream.h>
 
-using namespace at::dpcpp;
 
-namespace at {
+using namespace xpu::dpcpp;
+
+namespace xpu {
 namespace dpcpp {
 namespace impl {
 

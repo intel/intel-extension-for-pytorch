@@ -3,14 +3,11 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
-
 #include <core/DPCPP.h>
+#include "UpSample.h"
 
-using namespace DPCPP;
-using namespace at::dpcpp;
 
-// DPCPP_DEF_K2(im2col_dpcpp_kernel);
-// DPCPP_DEF_K2(col2im_dpcpp_kernel);
+using namespace xpu::dpcpp;
 
 template <typename T>
 class im2col_dpcpp_kernel {};
@@ -114,11 +111,11 @@ static void col2im_kernel(
           const int64_t w_col_start = (w_im < kernel_extent_w)
               ? 0
               : (w_im - kernel_extent_w) / stride_w + 1;
-          const int64_t w_col_end = ::min(w_im / stride_w + 1, output_width);
+          const int64_t w_col_end = min(w_im / stride_w + 1, output_width);
           const int64_t h_col_start = (h_im < kernel_extent_h)
               ? 0
               : (h_im - kernel_extent_h) / stride_h + 1;
-          const int64_t h_col_end = ::min(h_im / stride_h + 1, output_height);
+          const int64_t h_col_end = min(h_im / stride_h + 1, output_height);
 
           for (int64_t h_col = h_col_start; h_col < h_col_end; h_col += 1) {
             for (int64_t w_col = w_col_start; w_col < w_col_end; w_col += 1) {

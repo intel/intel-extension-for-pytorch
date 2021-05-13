@@ -1,15 +1,4 @@
 #pragma once
-
-
-#define NUM_THREADS (C10_WARP_SIZE * 2)
-#define THREAD_WORK_SIZE 4
-#define BLOCK_WORK_SIZE (THREAD_WORK_SIZE * num_threads)
-
-//constexpr int num_threads = NUM_THREADS;
-//constexpr int thread_work_size = THREAD_WORK_SIZE;
-constexpr int thread_work_size = THREAD_WORK_SIZE;
-//constexpr int block_work_size = BLOCK_WORK_SIZE;
-
 #include <ATen/ATen.h>
 #include <ATen/core/Array.h>
 #include <ATen/detail/FunctionTraits.h>
@@ -23,9 +12,10 @@ constexpr int thread_work_size = THREAD_WORK_SIZE;
 #include <core/Memory.h>
 #include "MemoryAccess.h"
 
-using namespace at::dpcpp;
 
-namespace at {
+using namespace xpu::dpcpp;
+
+namespace xpu {
 namespace dpcpp {
 
 #define MAX_INPUT_TENSOR_NUM 3
@@ -676,12 +666,12 @@ void dpcpp_index_kernel(
     // the max_local_mem_size = 65536B (64KB)
     auto max_local_mem_size = dpcppLocalMemSize(dpcpp_queue);
     auto indice_table_size = indices_size * sizeof(int64_t);
-    
+
     // check whether the current case satisfying conditions 2,3,4
-    small_index = (total_index_iter > 2 * max_group_num && local_index > wgroup_size 
-        && indice_table_size < max_local_mem_size * 0.5); 
+    small_index = (total_index_iter > 2 * max_group_num && local_index > wgroup_size
+        && indice_table_size < max_local_mem_size * 0.5);
     if (small_index) {
-      dpcpp_small_index_kernel_impl<kernel_name, func_t>(iter, index_size, index_stride, 
+      dpcpp_small_index_kernel_impl<kernel_name, func_t>(iter, index_size, index_stride,
           non_index_size, non_index_stride, f);
       return;
     }
@@ -698,4 +688,4 @@ void dpcpp_index_kernel(
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

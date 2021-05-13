@@ -8,7 +8,8 @@
 #include <core/Macros.h>
 #include <cstddef>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 struct DPCPPGuard {

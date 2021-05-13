@@ -9,7 +9,10 @@
 #include <mutex>
 #include <vector>
 
-namespace at {
+
+using namespace at;
+
+namespace xpu {
 namespace dpcpp {
 
 class DPCPPDeviceSelector : public DPCPP::device_selector {
@@ -46,5 +49,5 @@ inline Device getDeviceFromPtr(void* ptr) {
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu
 #endif

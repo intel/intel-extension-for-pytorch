@@ -177,7 +177,7 @@ Tensor& multinomial_out(
   bool replacement,
   c10::optional<Generator> gen_) {
   auto gen = get_generator_or_default<DPCPPGeneratorImpl>(
-    gen_, dpcpp::detail::getDefaultDPCPPGenerator());
+    gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   auto shape = self_.sizes();
   TORCH_CHECK(
     shape.size() > 0 && shape.size() <= 2,

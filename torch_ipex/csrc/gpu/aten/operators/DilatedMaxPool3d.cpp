@@ -9,8 +9,9 @@
 
 #include "Pooling.h"
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 using namespace at::native;
 
 namespace at {

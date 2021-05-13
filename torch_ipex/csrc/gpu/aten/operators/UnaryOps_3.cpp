@@ -10,7 +10,8 @@
 
 #include "Loops.h"
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -54,13 +55,13 @@ Tensor& reciprocal_out(Tensor& out, const Tensor& self) {
     self.scalar_type(), 
     "reciprocal", [&] {
     using acc_t = acc_type<scalar_t>;
-    if (at::dpcpp::TensorImpl_Unwrap(out) ==
-        at::dpcpp::TensorImpl_Unwrap(self)) {
-      at::dpcpp::DPCPP_tensor_apply1<scalar_t>(
+    if (xpu::dpcpp::TensorImpl_Unwrap(out) ==
+        xpu::dpcpp::TensorImpl_Unwrap(self)) {
+      xpu::dpcpp::DPCPP_tensor_apply1<scalar_t>(
           out, TensorReciprocalOp<scalar_t, acc_t>());
     } else {
       at::AtenIpexTypeXPU::resize_as_(out, self, c10::nullopt);
-      at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
           out, self, TensorReciprocalOp<scalar_t, acc_t>());
     }
   });

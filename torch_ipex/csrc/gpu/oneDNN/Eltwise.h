@@ -11,11 +11,11 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
+
 using namespace dnnl;
 using dnnl::algorithm;
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 
-namespace at {
 namespace xpu {
 namespace oneDNN {
 
@@ -34,7 +34,7 @@ static inline void eltwise(
   }
 
   memory::dims src_tz = dims;
-  auto data_t = at::xpu::oneDNN::get_onednn_dtype(src);
+  auto data_t = xpu::oneDNN::get_onednn_dtype(src);
   auto format_data = get_dnnl_default_format(src.dim());
   auto src_md = memory::desc({src_tz}, data_t, format_data);
 
@@ -111,7 +111,7 @@ static inline void eltwise_backward(
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  auto data_t = at::xpu::oneDNN::get_onednn_dtype(src_dst);
+  auto data_t = xpu::oneDNN::get_onednn_dtype(src_dst);
   std::vector<int64_t> src_dst_dims;
   for (size_t i = 0; i < src_dst.dim(); i++) {
     src_dst_dims.push_back(src_dst.size(i));
@@ -206,4 +206,3 @@ static inline void eltwise_backward(
 
 } // namespace oneDNN
 } // namespace xpu
-} // namespace at

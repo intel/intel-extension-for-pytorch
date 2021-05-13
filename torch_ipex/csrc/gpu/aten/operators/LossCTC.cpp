@@ -11,7 +11,7 @@
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
 
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 
 template <typename...>
 class ctc_loss_alpha_kernel {};

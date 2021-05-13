@@ -14,10 +14,10 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
+
 using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
 
-namespace at {
 namespace xpu {
 namespace oneDNN {
 
@@ -130,4 +130,4 @@ static inline Tensor bin(
   return output;
 }
 
-}}}
+}}

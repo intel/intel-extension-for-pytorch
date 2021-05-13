@@ -1,9 +1,12 @@
-#include <pybind11/pybind11.h>
-#include <Stream.h>
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/utils/object_ptr.h>
 #include <torch/csrc/Device.h>
+
+#include <Stream.h>
+
+#include <pybind11/pybind11.h>
 #include <structmember.h>
+
 
 PyObject *THDPStreamClass = nullptr;
 
@@ -26,15 +29,15 @@ static PyObject * THDPStream_pynew(PyTypeObject *type, PyObject *args, PyObject 
     return nullptr;
   }
 
-  at::dpcpp::DPCPPStream stream =
+  xpu::dpcpp::DPCPPStream stream =
     cdata ?
-    at::dpcpp::DPCPPStream::unpack(cdata) :
-    at::dpcpp::getDPCPPStreamFromPool(
+    xpu::dpcpp::DPCPPStream::unpack(cdata) :
+    xpu::dpcpp::getDPCPPStreamFromPool(
       /* isHighPriority */ priority < 0 ? true : false, current_device);
 
   THDPStream* self = (THDPStream *)ptr.get();
   self->base.cdata = stream.pack();
-  new (&self->dpcpp_stream) at::dpcpp::DPCPPStream(stream);
+  new (&self->dpcpp_stream) xpu::dpcpp::DPCPPStream(stream);
 
   return (PyObject *)ptr.release();
   END_HANDLE_TH_ERRORS
@@ -68,7 +71,7 @@ static PyObject * THDPStream_priority_range() {
   HANDLE_TH_ERRORS
   int least_priority = 0, greatest_priority = 0;
 //  std::tie(least_priority, greatest_priority) =
-//  at::xpu::XPUStream::priority_range();
+//  xpu::XPUStream::priority_range();
   return Py_BuildValue("(ii)", least_priority, greatest_priority);
   END_HANDLE_TH_ERRORS
 }

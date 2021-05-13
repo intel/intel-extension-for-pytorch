@@ -11,6 +11,7 @@
 #include <core/DPCPP.h>
 #include <core/detail/TensorInfo.h>
 
+
 // Maximum size per grid dimension that we assume (compute capability >= 2.0)
 
 using namespace at;
@@ -22,11 +23,11 @@ void run_launcher(
     const Tensor& self,
     int64_t dim,
     Launcher l) {
-  auto self_info = at::dpcpp::detail::getTensorInfo<scalar_t, index_t>(self);
+  auto self_info = xpu::dpcpp::detail::getTensorInfo<scalar_t, index_t>(self);
   auto values_info =
-      at::dpcpp::detail::getTensorInfo<scalar_t, index_t>(values);
+      xpu::dpcpp::detail::getTensorInfo<scalar_t, index_t>(values);
   auto indices_info =
-      at::dpcpp::detail::getTensorInfo<int64_t, index_t>(indices);
+      xpu::dpcpp::detail::getTensorInfo<int64_t, index_t>(indices);
 
   int64_t slice_size = self.size(dim);
   /* We use these structures solely to find the offset to */

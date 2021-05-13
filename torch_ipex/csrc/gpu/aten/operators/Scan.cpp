@@ -7,8 +7,9 @@
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
 
+
 using namespace at::detail;
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

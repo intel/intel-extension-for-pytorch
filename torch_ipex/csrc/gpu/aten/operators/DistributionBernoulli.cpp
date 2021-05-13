@@ -27,7 +27,8 @@ Tensor& bernoulli_(Tensor& self, const Tensor& p_, c10::optional<Generator> gen_
 }
 
 void bernoulli_scalar_dpcpp(TensorIterator& iter, double p_, c10::optional<Generator> gen_) {
-  auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
+  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
+      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "bernoulli_scalar_dpcpp", [&] {
     using accscalar_t = DiscreteDistributionType<scalar_t>::type;
     auto p = static_cast<accscalar_t>(p_);

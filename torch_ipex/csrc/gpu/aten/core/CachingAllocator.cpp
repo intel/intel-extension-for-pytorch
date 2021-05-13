@@ -18,10 +18,10 @@
 #include <vector>
 
 
-namespace at {
+namespace xpu {
 namespace dpcpp {
 
-using queue_set = std::unordered_set<at::dpcpp::DPCPPStream>;
+using queue_set = std::unordered_set<xpu::dpcpp::DPCPPStream>;
 
 constexpr size_t kMinBlockSize = 512;
 constexpr size_t kSmallSize = 1048576;
@@ -30,9 +30,9 @@ constexpr size_t kLargeBuffer = 20971520;
 constexpr size_t kMinLargeAlloc = 10485760;
 constexpr size_t kRoundLarge = 2097152;
 
-typedef std::bitset<static_cast<size_t>(at::dpcpp::CAStatType::NUM_TYPES)> CAStatTypes;
+typedef std::bitset<static_cast<size_t>(xpu::dpcpp::CAStatType::NUM_TYPES)> CAStatTypes;
 
-void update_stat(at::dpcpp::CAStat& stat, int64_t amount) {
+void update_stat(xpu::dpcpp::CAStat& stat, int64_t amount) {
   stat.current += amount;
 
   TORCH_INTERNAL_ASSERT(stat.current >= 0, "Negative tracked stat in DPCPP Caching allocator (likely logic error).");
@@ -46,16 +46,16 @@ void update_stat(at::dpcpp::CAStat& stat, int64_t amount) {
   }
 }
 
-void reset_accumulated_stat(at::dpcpp::CAStat& stat) {
+void reset_accumulated_stat(xpu::dpcpp::CAStat& stat) {
   stat.allocated = 0;
   stat.freed = 0;
 }
 
-void reset_peak_stat(at::dpcpp::CAStat& stat) {
+void reset_peak_stat(xpu::dpcpp::CAStat& stat) {
   stat.peak = stat.current;
 }
 
-void update_stat_array(at::dpcpp::CAStatArray& stat_array, int64_t amount, const at::dpcpp::CAStatTypes& stat_types) {
+void update_stat_array(xpu::dpcpp::CAStatArray& stat_array, int64_t amount, const xpu::dpcpp::CAStatTypes& stat_types) {
   for (size_t stat_type = 0; stat_type < stat_types.size(); ++stat_type) {
     if (stat_types[stat_type]) {
       update_stat(stat_array[stat_type], amount);
@@ -135,7 +135,7 @@ class CachingAllocator {
 
   mutable std::mutex dpcpp_free_mutex;
 
-  std::vector<at::dpcpp::CADeviceStats> device_stats;
+  std::vector<xpu::dpcpp::CADeviceStats> device_stats;
 
   CABlockPool large_blocks;
 
@@ -306,7 +306,7 @@ class CachingAllocator {
     return basePtr;
   }
 
-  void recordQueue(const at::DataPtr& ptr, at::dpcpp::DPCPPStream stream) {
+  void recordQueue(const at::DataPtr& ptr, xpu::dpcpp::DPCPPStream stream) {
     if (!ptr.get()) {
       return;
     }
@@ -339,7 +339,7 @@ class CachingAllocator {
     cache_info_aux(small_blocks, di, total, largest);
   }
 
-  at::dpcpp::CADeviceStats getStatsForDevice(at::DeviceIndex di) {
+  xpu::dpcpp::CADeviceStats getStatsForDevice(at::DeviceIndex di) {
     std::lock_guard<std::recursive_mutex> lock(mutex);
     return get_stats_for_device(di);
   }
@@ -379,10 +379,10 @@ class CachingAllocator {
     }
   }
 
-  std::vector<at::dpcpp::CASegmentInfo> snapshot() const {
+  std::vector<xpu::dpcpp::CASegmentInfo> snapshot() const {
     std::lock_guard<std::recursive_mutex> lock(mutex);
 
-    std::vector<at::dpcpp::CASegmentInfo> result;
+    std::vector<xpu::dpcpp::CASegmentInfo> result;
     const auto all_blocks = get_all_blocks();
 
     for (const CABlock* const head_block : all_blocks) {
@@ -440,7 +440,7 @@ class CachingAllocator {
 
  private:
 
-  at::dpcpp::CADeviceStats& get_stats_for_device(at::DeviceIndex device) {
+  xpu::dpcpp::CADeviceStats& get_stats_for_device(at::DeviceIndex device) {
     TORCH_CHECK(device >= 0);
     if ((size_t) device >= device_stats.size()) {
       device_stats.resize(device + 1);
@@ -534,7 +534,7 @@ class CachingAllocator {
     }
   }
 
-  at::dpcpp::CAStatType get_stat_type_for_pool(const CABlockPool& pool) {
+  xpu::dpcpp::CAStatType get_stat_type_for_pool(const CABlockPool& pool) {
     if (&pool == &small_blocks) {
       return CAStatType::SMALL_POOL;
     } else if (&pool == &large_blocks) {
@@ -575,16 +575,16 @@ class CachingAllocator {
 
   int dpcpp_malloc_with_retry(DeviceIndex di, void** devPtr, size_t size)
   {
-    auto syclDev = at::dpcpp::dpcppGetRawDevice(di);
+    auto syclDev = xpu::dpcpp::dpcppGetRawDevice(di);
     // Our minimum allocated memory is 512. Thus we set mem align to 512.
     const size_t alignment = 512;
-    *devPtr = DPCPP::aligned_alloc_device(alignment, size, syclDev, at::dpcpp::getDeviceContext((int)di));
+    *devPtr = DPCPP::aligned_alloc_device(alignment, size, syclDev, xpu::dpcpp::getDeviceContext((int)di));
 
     if (*devPtr == NULL) {
       CADeviceStats& stats = get_stats_for_device(di);
       stats.num_alloc_retries += 1;
       free_cached_blocks(di);
-      *devPtr = DPCPP::aligned_alloc_device(alignment, size, syclDev, at::dpcpp::getDeviceContext((int)di));
+      *devPtr = DPCPP::aligned_alloc_device(alignment, size, syclDev, xpu::dpcpp::getDeviceContext((int)di));
       if (*devPtr == NULL) {
         return DPCPP_FAILURE;
       }
@@ -615,7 +615,7 @@ class CachingAllocator {
     while (it != end) {
       CABlock* block = *it;
       if (!block->prev && !block->next) {
-        DPCPP::free((void*)block->ptr, at::dpcpp::getDeviceContext(block->device));
+        DPCPP::free((void*)block->ptr, xpu::dpcpp::getDeviceContext(block->device));
 
         CADeviceStats& stats = get_stats_for_device(block->device);
         CAStatTypes stat_types;
@@ -750,7 +750,7 @@ void* dpcpp_getBaseAllocation(void *ptr, size_t *size)
   return caching_allocator.getBaseAllocation(ptr, size);
 }
 
-void dpcpp_recordQueue(const DataPtr& ptr, at::dpcpp::DPCPPStream stream) {
+void dpcpp_recordQueue(const DataPtr& ptr, xpu::dpcpp::DPCPPStream stream) {
   caching_allocator.recordQueue(ptr, stream);
 }
 
@@ -760,7 +760,7 @@ std::mutex* getFreeMutex()
 }
 
 static inline void assertValidDevice(DeviceIndex di) {
-  int device_num = (int)at::dpcpp::device_count();
+  int device_num = (int)xpu::dpcpp::device_count();
   AT_ASSERTM(0 <= (int)di && (int)di < device_num, "Invalid device argument.");
 }
 

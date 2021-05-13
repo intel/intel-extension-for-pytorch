@@ -13,10 +13,10 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
+
 using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
 
-namespace at {
 namespace xpu {
 namespace oneDNN {
 
@@ -155,4 +155,4 @@ static inline Tensor reorder_copy(Tensor& dst, const Tensor& src) {
   return dst;
 }
 
-}}}
+}}

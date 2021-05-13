@@ -9,7 +9,10 @@
 #include <core/DPCPPUtils.h>
 #include <core/Macros.h>
 
-namespace at {
+
+using namespace at;
+
+namespace xpu {
 namespace dpcpp {
 
 #define dpcppStream_t unsigned long
@@ -91,12 +94,12 @@ getDPCPPStreamOnDevice(DeviceIndex device_index, int stream_index);
 C10_API std::ostream& operator<<(std::ostream& stream, const DPCPPStream& s);
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu
 
 namespace std {
 template <>
-struct hash<at::dpcpp::DPCPPStream> {
-  size_t operator()(at::dpcpp::DPCPPStream s) const noexcept {
+struct hash<xpu::dpcpp::DPCPPStream> {
+  size_t operator()(xpu::dpcpp::DPCPPStream s) const noexcept {
     return std::hash<c10::Stream>{}(s.unwrap());
   }
 };

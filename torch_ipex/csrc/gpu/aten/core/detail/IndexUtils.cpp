@@ -1,7 +1,8 @@
 #include <core/detail/IndexUtils.h>
 #include <vector>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -21,7 +22,7 @@ int compareSizeAndStride(const void *a, const void *b) {
   return 1;
 }
 
-bool maybeOverlappingIndices(const Tensor &t) {
+bool maybeOverlappingIndices(const at::Tensor &t) {
   std::vector<SizeAndStride> info(t.dim());
   int dims = t.dim();
   int nonSize1Dims = 0;
@@ -54,7 +55,7 @@ bool maybeOverlappingIndices(const Tensor &t) {
   return false;
 }
 
-bool canUse32BitIndexMath(const Tensor &t, int64_t max_elem) {
+bool canUse32BitIndexMath(const at::Tensor &t, int64_t max_elem) {
   int64_t elements = t.numel();
 
   if (elements == 0) {

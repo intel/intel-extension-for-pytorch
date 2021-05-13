@@ -3,23 +3,21 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
-
 #include <core/ApplyUtils.h>
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
-
-#include <utils/ATDispatch.h>
-
 #include <core/Runtime.h>
+#include <utils/ATDispatch.h>
 
 #include "Im2Col.h"
 #include "Im2ColShapeCheck.h"
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
 using namespace at::native;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

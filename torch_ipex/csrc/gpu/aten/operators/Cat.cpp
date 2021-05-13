@@ -16,8 +16,9 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -282,7 +283,7 @@ static void cat(
 
   const bool all32BitIndexable = std::all_of(inputs.begin(), inputs.end(),
     [] (const Tensor& t) {
-      return dpcpp::detail::canUse32BitIndexMath(t);
+      return xpu::dpcpp::detail::canUse32BitIndexMath(t);
     });
   const bool allContiguous = std::all_of(inputs.begin(), inputs.end(),
     [](const Tensor& t) {
@@ -292,7 +293,7 @@ static void cat(
   if (inputs.size() > 1 &&
       !hasSkippedInput &&
       result.dim() <= CAT_ARRAY_MAX_INPUT_DIMS &&
-      dpcpp::detail::canUse32BitIndexMath(result) &&
+      xpu::dpcpp::detail::canUse32BitIndexMath(result) &&
       allContiguous &&
       all32BitIndexable) {
     IPEX_DISPATCH_ALL_TYPES_AND3(
@@ -379,7 +380,7 @@ static void dnnl_cat(
     }
 
     memory::dims input_tz = dims;
-    auto data_t = at::xpu::oneDNN::get_onednn_dtype(cat_tensors[i]);
+    auto data_t = xpu::oneDNN::get_onednn_dtype(cat_tensors[i]);
     auto format_plain = get_dnnl_default_format(cat_tensors[i].dim());
 
     memory::desc tensor_md;
@@ -399,7 +400,7 @@ static void dnnl_cat(
     cat_tensors_mem.push_back(input_usr_memory);
   }
 
-  auto data_t = at::xpu::oneDNN::get_onednn_dtype(cat_tensors[0]);
+  auto data_t = xpu::oneDNN::get_onednn_dtype(cat_tensors[0]);
   auto format_plain = get_dnnl_default_format(cat_tensors[0].dim());
   auto output_md = memory::desc(output_dims, data_t, format_plain);
   auto concat_pd = concat::primitive_desc(

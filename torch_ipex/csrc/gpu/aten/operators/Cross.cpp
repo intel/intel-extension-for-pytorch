@@ -3,7 +3,8 @@
 
 #include <utils/Pointwise.h>
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

@@ -14,7 +14,6 @@
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
 
-
 #include "IndexingUtils.h"
 #include "Loops.h"
 #include "ParttenScan.h"
@@ -26,7 +25,8 @@
 #include <oneapi/dpl/iterator>
 #endif
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -716,7 +716,7 @@ template <typename scalar_t>
 void MaskedFillBool(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
   auto value = value_scalar.to<scalar_t>();
   TORCH_CHECK(tensor.numel() == mask.numel(), "sizes do not match");
-  at::dpcpp::DPCPP_tensor_apply2<scalar_t, bool>(
+  xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, bool>(
       tensor, mask, TensorMaskedFillOp<scalar_t, bool>(value));
 }
 
@@ -724,7 +724,7 @@ template <typename scalar_t>
 void MaskedFill(Tensor& tensor, const Tensor& mask, Scalar value_scalar) {
   auto value = value_scalar.to<scalar_t>();
   TORCH_CHECK(tensor.numel() == mask.numel(), "sizes do not match");
-  at::dpcpp::DPCPP_tensor_apply2<scalar_t, uint8_t>(
+  xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, uint8_t>(
       tensor, mask, TensorMaskedFillOp<scalar_t, unsigned char>(value));
 }
 

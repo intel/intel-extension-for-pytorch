@@ -17,6 +17,7 @@
 #include <oneapi/dpl/iterator>
 #endif
 
+
 template <typename scalar_t>
 scalar_t THPUtils_unpackReal(PyObject*){
   throw std::runtime_error("Could not parse Scalar");
@@ -83,11 +84,11 @@ public:
   static void THXStorage_copyToCPU<scalarType>(at::StorageImpl * cpu, at::StorageImpl * xpu_src) {
     // std::cout << "copyToCPU" << std::endl;
     THArgCheck(cpu->nbytes() == xpu_src->nbytes(), 2, "size does not match");
-    at::dpcpp::dpcppMemcpy(
+    xpu::dpcpp::dpcppMemcpy(
             cpu->data(),
             xpu_src->data(),
             cpu->nbytes(),
-            at::dpcpp::dpcppMemcpyKind::DeviceToHost);
+            xpu::dpcpp::dpcppMemcpyKind::DeviceToHost);
   }
 
 #if 0
@@ -160,11 +161,11 @@ public:
   template <>
   static void THXStorage_copyFromCPU<scalarType>(at::StorageImpl * xpu, at::StorageImpl * cpu_src) {
     THArgCheck(xpu->nbytes() == cpu_src->nbytes(), 2, "size does not match");
-    at::dpcpp::dpcppMemcpy(
+    xpu::dpcpp::dpcppMemcpy(
             xpu->data(),
             cpu_src->data(),
             xpu->nbytes(),
-            at::dpcpp::dpcppMemcpyKind::HostToDevice);
+            xpu::dpcpp::dpcppMemcpyKind::HostToDevice);
   }
 
   template <at::ScalarType srcType>
@@ -180,11 +181,11 @@ public:
   template <>
   static void THXStorage_copyFromXPU<scalarType>(at::StorageImpl * xpu, at::StorageImpl * xpu_src) {
     THArgCheck(xpu->nbytes() == xpu_src->nbytes(), 2, "size does not match");
-    at::dpcpp::dpcppMemcpy(
+    xpu::dpcpp::dpcppMemcpy(
             xpu->data(),
             xpu_src->data(),
             xpu->nbytes(),
-            at::dpcpp::dpcppMemcpyKind::DeviceToDevice);
+            xpu::dpcpp::dpcppMemcpyKind::DeviceToDevice);
   }
 //#if !defined(THC_REAL_IS_COMPLEXFLOAT) && !defined(THC_REAL_IS_COMPLEXDOUBLE)
 ////  THC_XPU_STORAGE_IMPLEMENT_COPY(Byte,Byte)
@@ -224,11 +225,11 @@ public:
     int64_t numel = size_bytes / sizeof(scalar_t);
     std::unique_ptr<char[]> cpu_data(new char[size_bytes]);
     data = (scalar_t*)cpu_data.get();
-    at::dpcpp::dpcppMemcpy(
+    xpu::dpcpp::dpcppMemcpy(
         data,
         THXStorage_data(self),
         size_bytes,
-        at::dpcpp::dpcppMemcpyKind::DeviceToHost);
+        xpu::dpcpp::dpcppMemcpyKind::DeviceToHost);
     if (save_size) {
       if (torch::utils::THP_nativeByteOrder() ==
           torch::utils::THPByteOrder::THP_LITTLE_ENDIAN)
@@ -347,7 +348,7 @@ public:
       }
     }
 
-    at::dpcpp::dpcppMemcpy(THXStorage_data(storage), data, size * sizeof(scalar_t), at::dpcpp::dpcppMemcpyKind::HostToDevice );
+    xpu::dpcpp::dpcppMemcpy(THXStorage_data(storage), data, size * sizeof(scalar_t), xpu::dpcpp::dpcppMemcpyKind::HostToDevice );
 
     return storage.release();
   }
@@ -363,7 +364,7 @@ public:
     at::StorageImpl* storage = c10::make_intrusive<at::StorageImpl>(
       c10::StorageImpl::use_byte_size_t(),
       0,
-      at::dpcpp::getDPCPPDeviceAllocator(),
+      xpu::dpcpp::getDPCPPDeviceAllocator(),
       true)
       .release();
     return storage;
@@ -387,7 +388,7 @@ public:
     THAssert(self->allocator() != nullptr);
     int device = 0;
     //TODO: add current device
-    //at::dpcpp::getCurrentDevice
+    //xpu::dpcpp::getCurrentDevice
 
     if (!self->resizable())
       THError("Trying to resize storage that is not resizable");
@@ -399,11 +400,11 @@ public:
       at::DataPtr data = self->allocator()->allocate(size_bytes);
 
       if (self->data_ptr()) {
-        at::dpcpp::dpcppMemcpyAsync(
+        xpu::dpcpp::dpcppMemcpyAsync(
           data.get(),
           self->data(),
           THMin(self->nbytes(), size_bytes),
-          at::dpcpp::dpcppMemcpyKind::DeviceToDevice);
+          xpu::dpcpp::dpcppMemcpyKind::DeviceToDevice);
       }
 
       // Destructively overwrite data_ptr
@@ -416,7 +417,7 @@ public:
   {
 #if defined(USE_ONEDPL)
     //TODO: only dpcpp runtime here. naive CPU TBD.
-    auto dpcpp_queue = at::dpcpp::dpcppGetCurrentQueue();
+    auto dpcpp_queue = xpu::dpcpp::dpcppGetCurrentQueue();
     auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
     scalar_t* data_ptr = THXStorage_data(storage);
     auto self_begin = data_ptr;
@@ -432,8 +433,8 @@ public:
       (index >= 0) && (index < (self->nbytes() / sizeof(scalar_t))),
       2,
       "index out of bounds");
-    at::dpcpp::DPCPPStream stream = at::dpcpp::getCurrentDPCPPStream();
-    dpcppMemcpy(self->data<scalar_t>() + index, &value, sizeof(scalar_t), at::dpcpp::dpcppMemcpyKind::HostToDevice);
+    xpu::dpcpp::DPCPPStream stream = xpu::dpcpp::getCurrentDPCPPStream();
+    dpcppMemcpy(self->data<scalar_t>() + index, &value, sizeof(scalar_t), xpu::dpcpp::dpcppMemcpyKind::HostToDevice);
   }
 
   static scalar_t THXStorage_get(const at::StorageImpl *self, ptrdiff_t index)
@@ -443,8 +444,8 @@ public:
       2,
       "index out of bounds");
     scalar_t value;
-    at::dpcpp::DPCPPStream stream = at::dpcpp::getCurrentDPCPPStream();
-    dpcppMemcpy(&value, self->data<scalar_t>() + index, sizeof(scalar_t), at::dpcpp::dpcppMemcpyKind::DeviceToHost);
+    xpu::dpcpp::DPCPPStream stream = xpu::dpcpp::getCurrentDPCPPStream();
+    dpcppMemcpy(&value, self->data<scalar_t>() + index, sizeof(scalar_t), xpu::dpcpp::dpcppMemcpyKind::DeviceToHost);
     return value;
   }
 
@@ -469,7 +470,7 @@ public:
     THStorage* storage = c10::make_intrusive<at::StorageImpl>(
       c10::StorageImpl::use_byte_size_t(),
       size * sizeof(typename c10::impl::ScalarTypeToCPPType<scalarType>::type),
-      at::dpcpp::getDPCPPDeviceAllocator(),
+      xpu::dpcpp::getDPCPPDeviceAllocator(),
       true)
       .release();
     return storage;

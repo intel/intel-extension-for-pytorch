@@ -9,7 +9,8 @@
 
 #include "Loops.h"
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -18,13 +19,13 @@ namespace impl {
 template <typename scalar_t>
 typename std::enable_if<IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t), void>::type
 __and___out(Tensor& result, const Tensor& self, const Tensor& other) {
-  if (at::dpcpp::TensorImpl_Unwrap(result) ==
-      at::dpcpp::TensorImpl_Unwrap(self)) {
-    at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+  if (xpu::dpcpp::TensorImpl_Unwrap(result) ==
+      xpu::dpcpp::TensorImpl_Unwrap(self)) {
+    xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
         result, other, TensorBitAndOp<scalar_t>());
   } else {
     at::AtenIpexTypeXPU::resize_as_(result, self, c10::nullopt);
-    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         result, self, other, TensorBitAndOp<scalar_t>());
   }
 }
@@ -37,13 +38,13 @@ typename std::enable_if<!(IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t)), void>::
 template <typename scalar_t>
 typename std::enable_if<IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t), void>::type
 __or___out(Tensor& result, const Tensor& self, const Tensor& other) {
-  if (at::dpcpp::TensorImpl_Unwrap(result) ==
-      at::dpcpp::TensorImpl_Unwrap(self)) {
-    at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+  if (xpu::dpcpp::TensorImpl_Unwrap(result) ==
+      xpu::dpcpp::TensorImpl_Unwrap(self)) {
+    xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
         result, other, TensorBitOrOp<scalar_t>());
   } else {
     at::AtenIpexTypeXPU::resize_as_(result, self, c10::nullopt);
-    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         result, self, other, TensorBitOrOp<scalar_t>());
   }
 }
@@ -56,13 +57,13 @@ typename std::enable_if<!(IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t)), void>::
 template <typename scalar_t>
 typename std::enable_if<IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t), void>::type
 __xor___out(Tensor& result, const Tensor& self, const Tensor& other) {
-  if (at::dpcpp::TensorImpl_Unwrap(result) ==
-      at::dpcpp::TensorImpl_Unwrap(self)) {
-    at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+  if (xpu::dpcpp::TensorImpl_Unwrap(result) ==
+      xpu::dpcpp::TensorImpl_Unwrap(self)) {
+    xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
         result, other, TensorBitXorOp<scalar_t>());
   } else {
     at::AtenIpexTypeXPU::resize_as_(result, self, c10::nullopt);
-    at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         result, self, other, TensorBitXorOp<scalar_t>());
   }
 }

@@ -12,7 +12,8 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 void uniform_kernel(TensorIterator& iter, double from_, double to_, c10::optional<Generator> gen_) {
-  auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
+  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
+      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   IPEX_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "uniform_dpcpp", [&] {
     auto from = static_cast<scalar_t>(from_);
     auto to = static_cast<scalar_t>(to_);

@@ -14,7 +14,9 @@
 #include "Loops.h"
 #include "Random.h"
 
-using namespace at::dpcpp::detail;
+
+using namespace xpu::dpcpp::detail;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -103,7 +105,7 @@ static void RReLU_updateOutput(
   bool inplace,
   c10::optional<Generator> generator)
 {
-  auto gen = at::get_generator_or_default<at::DPCPPGeneratorImpl>(
+  auto gen = at::get_generator_or_default<DPCPPGeneratorImpl>(
       generator, getDefaultDPCPPGenerator());
   if(train){
     auto input_ = input.contiguous();
@@ -193,14 +195,14 @@ static void RReLU_updateOutput(
     const scalar_t negSlope = ScalarConvert<double, scalar_t>::to((lower + upper) / 2);
     if (inplace)
     {
-      at::dpcpp::DPCPP_tensor_apply1<scalar_t>(
+      xpu::dpcpp::DPCPP_tensor_apply1<scalar_t>(
         input, RReLUUpdateOutputEvalOp<scalar_t>(negSlope));
       output.set_(input);
     }
     else
     {
       output.resize_as_(input);
-      at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
         output, input, RReLUUpdateOutputEvalOp<scalar_t>(negSlope));
     }
   }
@@ -238,14 +240,14 @@ static void RReLU_updateGradInput(
     const scalar_t negSlope = ScalarConvert<double, scalar_t>::to((lower + upper) / 2);
     if (inplace)
     {
-      at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
         gradOutput, input, RReLUupdateGradInputEvalOp<scalar_t>(negSlope));
       gradInput.set_(gradOutput);
     }
     else
     {
       gradInput.resize_as_(input);
-      at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+      xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         gradInput, gradOutput, input, RReLUupdateGradInputEvalOp<scalar_t>(negSlope));
     }
   }
@@ -457,12 +459,12 @@ void GeluBackwardKernelImpl(
 
 Tensor relu(const Tensor& self) {
   Tensor result;
-  at::xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(result, self, 0.0f, 0.0f);
+  xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(result, self, 0.0f, 0.0f);
   return result;
 }
 
 Tensor& relu_(Tensor& self) {
-  at::xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(self, self, 0.0f, 0.0f);
+  xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(self, self, 0.0f, 0.0f);
   return self;
 }
 
@@ -474,7 +476,7 @@ static Tensor threshold_out(
     const Tensor& other) {
   Tensor result = opt_result.value_or(Tensor());
   if (0.0 == threshold.to<float>() && 0.0 == value.to<float>()) {
-    at::xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_relu>(result, self, other, 0.0f, 0.0f);
+    xpu::oneDNN::eltwise_backward<dnnl::algorithm::eltwise_relu>(result, self, other, 0.0f, 0.0f);
     return result;
   } else {
     auto iter = TensorIterator::binary_op(result, self, other);
@@ -749,7 +751,7 @@ Tensor hardshrink_backward(
 
 Tensor gelu(const Tensor & self){
   Tensor result;
-  at::xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(result, self, 0.0f, 0.0f);
+  xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_gelu_erf>(result, self, 0.0f, 0.0f);
   return result;
 }
 

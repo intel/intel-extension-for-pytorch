@@ -14,10 +14,11 @@
 
 #include "Loops.h"
 
+
 DPCPP_DEF_K1(intrepr);
 
-using namespace at::dpcpp;
 using namespace at::native;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
@@ -79,7 +80,7 @@ Tensor new_qtensor(
   auto memory_format =
     options.memory_format_opt().value_or(MemoryFormat::Contiguous);
 
-  at::Allocator *allocator = at::dpcpp::getDPCPPDeviceAllocator();
+  at::Allocator *allocator = xpu::dpcpp::getDPCPPDeviceAllocator();
 
   at::DispatchKey tensorDispatchKey = options.computeDispatchKey();
   native::check_size_nonnegative(sizes);

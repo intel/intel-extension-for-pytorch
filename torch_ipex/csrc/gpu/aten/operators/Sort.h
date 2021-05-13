@@ -10,8 +10,8 @@
 #include <utils/Numerics.h>
 
 using namespace at;
-using namespace at::dpcpp::detail;
-using namespace at::dpcpp;
+using namespace xpu::dpcpp::detail;
+using namespace xpu::dpcpp;
 
 // Collection of kernel sort routimes
 // Collection of kernel sort routines

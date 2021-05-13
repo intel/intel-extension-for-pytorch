@@ -1,15 +1,16 @@
 #include <ATen/core/op_registration/op_registration.h>
 #include <ATen/native/quantized/cpu/packed_params.h>
+
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
-
 #include <utils/ParamUtils.h>
 
 #include "QUtil.h"
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
 using namespace at::native;
+using namespace xpu::dpcpp;
 
 c10::intrusive_ptr<LinearPackedParamsBase> at::AtenIpexTypeQuantizedXPU::PackedLinearWeightQDPCPP::prepack(
         at::Tensor weight,

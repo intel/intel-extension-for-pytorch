@@ -10,7 +10,6 @@
 #include <utils/ATDispatch.h>
 
 
-
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -29,11 +28,11 @@ namespace AtenIpexTypeXPU {
   template <typename scalar_t>                                     \
   void NAME(Tensor& self_, const Tensor& src) {                    \
     if (TensorImpl_Unwrap(self_) == TensorImpl_Unwrap(src)) {      \
-      at::dpcpp::DPCPP_tensor_apply1<scalar_t>(                    \
+      xpu::dpcpp::DPCPP_tensor_apply1<scalar_t>(                    \
           self_, Tensor_##NAME##_##REAL##_Op<scalar_t>());         \
     } else {                                                       \
       at::AtenIpexTypeXPU::resize_as_(self_, src, c10::nullopt); \
-      at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(          \
+      xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(          \
           self_, src, Tensor_##NAME##_##REAL##_Op<scalar_t>());    \
     }                                                              \
   }
@@ -89,13 +88,13 @@ namespace AtenIpexTypeXPU {
   void NAME(POINTWISE_ARGS_DECL_##APPLY_NUM_EXT COMMA_##CALLABLE_ARGS_NUM     \
                 CALLABLE_INIT_ARGS_DECL_##CALLABLE_ARGS_NUM) {                \
     if (CHECK_SAME_TENSOR()) {                                                \
-      at::dpcpp::DPCPP_tensor_apply##APPLY_NUM<REPEAT_AS_ARGLIST_##APPLY_NUM( \
+      xpu::dpcpp::DPCPP_tensor_apply##APPLY_NUM<REPEAT_AS_ARGLIST_##APPLY_NUM( \
           scalar_t)>(                                                         \
           POINTWISE_OPR_ARGS_##APPLY_NUM,                                     \
           CALLABLE<scalar_t>(CALLABLE_INIT_ARGS_##CALLABLE_ARGS_NUM));        \
     } else {                                                                  \
       at::AtenIpexTypeXPU::resize_as_(POINTWISE_ARGS_2, c10::nullopt);      \
-      at::dpcpp::DPCPP_tensor_apply##APPLY_NUM_EXT<                           \
+      xpu::dpcpp::DPCPP_tensor_apply##APPLY_NUM_EXT<                           \
           REPEAT_AS_ARGLIST_##APPLY_NUM_EXT(scalar_t)>(                       \
           POINTWISE_ARGS_##APPLY_NUM_EXT,                                     \
           CALLABLE<scalar_t>(CALLABLE_INIT_ARGS_##CALLABLE_ARGS_NUM));        \

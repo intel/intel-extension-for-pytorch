@@ -5,9 +5,9 @@
 #include "Loops.h"
 #include <utils/Numerics.h>
 
+
 namespace at {
 namespace AtenIpexTypeXPU {
-
 
 template <typename...>
 class exponential_sycl_ker {};
@@ -18,9 +18,9 @@ void distribution_elementwise_grid_stride_kernel(at::TensorIterator& iter,
                                                  const dist_t dist_func,
                                                  const transform_t transform_func) {
 
-  auto &sycl_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+  auto &sycl_queue = xpu::dpcpp::getCurrentDPCPPStream().dpcpp_queue();
 
-  auto offset_calc = at::dpcpp::make_offset_calculator<1>(iter);
+  auto offset_calc = xpu::dpcpp::make_offset_calculator<1>(iter);
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, (char*)iter.data_ptr(0));
     auto kfn = DPCPP_Q_KFN(DPCPP::item<1> item_id)  {
@@ -48,7 +48,7 @@ template<typename scalar_t,
   typename dist_t,
   typename transform_t>
 void distribution_nullary_kernel(at::TensorIterator& iter,
-                                 at::DPCPPGeneratorImpl* gen,
+                                 xpu::dpcpp::DPCPPGeneratorImpl* gen,
                                  const dist_t& dist_func,
                                  const transform_t transform_func) {
   int64_t numel = iter.numel();

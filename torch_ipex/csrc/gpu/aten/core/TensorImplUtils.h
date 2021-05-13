@@ -3,7 +3,9 @@
 #include <c10/core/StorageImpl.h>
 #include <c10/core/TensorImpl.h>
 
-namespace at {
+using namespace at;
+
+namespace xpu {
 namespace dpcpp {
 
 #define DPCPP_DESC_BUFF_LEN 64

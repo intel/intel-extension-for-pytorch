@@ -3,11 +3,12 @@
 
 #include "Math.h"
 
+
 DPCPP_DEF_K1(memory_scale);
 DPCPP_DEF_K1(memory_scale1);
 DPCPP_DEF_K1(memory_scale2);
 
-namespace at {
+namespace xpu {
 namespace dpcpp {
 
 // dst = src * alpha
@@ -99,4 +100,4 @@ void dpcppMemoryScale2(
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

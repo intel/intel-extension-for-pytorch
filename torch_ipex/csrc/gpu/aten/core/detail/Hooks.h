@@ -4,7 +4,10 @@
 #include <ATen/detail/XPUHooksInterface.h>
 #include <ATen/Generator.h>
 
-namespace at { namespace dpcpp { namespace detail {
+
+namespace xpu {
+namespace dpcpp {
+namespace detail {
 
 // The real implementation of XPUHooksInterface
 struct XPUHooks : public at::XPUHooksInterface {
@@ -22,6 +25,6 @@ struct XPUHooks : public at::XPUHooksInterface {
   const Generator& getDefaultXPUGenerator(DeviceIndex device_index = -1) const override;
 };
 
-}}} // at::dpcpp::detail
+}}} // xpu::dpcpp::detail
 
 #endif // DPCPP_HOOK_IMPL_H

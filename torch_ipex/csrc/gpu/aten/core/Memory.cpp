@@ -3,7 +3,8 @@
 #include <core/CachingHostAllocator.h>
 #include <core/Stream.h>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 static void memcpyHostToDevice(
@@ -135,4 +136,4 @@ void dpcppMemsetAsync(void* data, int value, size_t n_bytes) {
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

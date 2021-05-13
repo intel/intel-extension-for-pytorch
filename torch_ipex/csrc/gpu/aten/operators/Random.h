@@ -3,23 +3,10 @@
 
 #include <CL/sycl.hpp>
 #include <core/DPCPP.h>
+#include <ATen/core/DistributionsHelper.h>
 #include <ATen/core/PhiloxRNGEngine.h>
 #include <ATen/core/MT19937RNGEngine.h>
 
-template <typename T>
-struct DistAccumType {  };
-template <> struct DistAccumType<c10::BFloat16> { using type = float; };
-template <> struct DistAccumType<c10::Half> { using type = float; };
-template <> struct DistAccumType<float> { using type = float; };
-template <> struct DistAccumType<double> { using type = double; };
-
-template <typename T>
-using dist_acctype = typename DistAccumType<T>::type;
-
-template <typename T>
-struct DiscreteDistributionType { using type = float; };
-
-template <> struct DiscreteDistributionType<double> { using type = double; };
 
 // TODO: move this into the GeneratorImpl in pytorch-1.7 or later
 using Philox4_32_10 = at::Philox4_32_10;

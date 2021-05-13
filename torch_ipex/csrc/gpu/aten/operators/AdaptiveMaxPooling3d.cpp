@@ -7,8 +7,9 @@
 #include <utils/ATDispatch.h>
 #include "Pooling.h"
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

@@ -1,10 +1,11 @@
 #pragma once
 
-// A fixed-size array type usable from DPCPP kernels.
-
 #include <c10/macros/Macros.h>
 
-namespace at {
+
+// A fixed-size array type usable from DPCPP kernels.
+
+namespace xpu {
 namespace dpcpp {
 
 template <typename T, int size>
@@ -30,4 +31,4 @@ struct alignas(16) Array {
   }
 };
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

@@ -8,7 +8,8 @@
 #include <core/Memory.h>
 #include <core/Stream.h>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 /*

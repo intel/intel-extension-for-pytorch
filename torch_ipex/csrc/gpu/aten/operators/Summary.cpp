@@ -6,7 +6,9 @@
 #include <utils/ATDispatch.h>
 #include "Loops.h"
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp::detail;
+using namespace xpu::dpcpp;
 
 template <bool has_weight, typename...>
 class histogram_kernel {};
@@ -44,9 +46,9 @@ template <
     bool has_weight,
     typename Op>
 void kernelHistogram1D(
-    dpcpp::detail::TensorInfo<output_t, IndexType> a, /* output */
-    dpcpp::detail::TensorInfo<input_t, IndexType> b, /* input */
-    dpcpp::detail::TensorInfo<output_t, IndexType> c, /* weight */
+    TensorInfo<output_t, IndexType> a, /* output */
+    TensorInfo<input_t, IndexType> b, /* input */
+    TensorInfo<output_t, IndexType> c, /* weight */
     int nbins,
     input_t minvalue,
     input_t maxvalue,
@@ -67,14 +69,14 @@ void kernelHistogram1D(
       auto linearIndex = item_id.get_id(0);
       // Convert `linearIndex` into an offset of `b`
       const IndexType bOffset =
-          dpcpp::detail::IndexToOffset<input_t, IndexType>::get(linearIndex, b);
+          IndexToOffset<input_t, IndexType>::get(linearIndex, b);
       const auto bVal = in_ptr[bOffset];
       if (bVal >= minvalue && bVal <= maxvalue) {
         // Use value at `b` as an offset of `a`
         const IndexType bin =
             getBin<input_t, IndexType>(bVal, minvalue, maxvalue, nbins);
         const IndexType aOffset =
-            dpcpp::detail::IndexToOffset<output_t, IndexType, ADims>::get(
+            IndexToOffset<output_t, IndexType, ADims>::get(
                 bin, a);
         atomicAdd((dpcpp_global_ptr_pt<output_t>)&out_ptr[aOffset], getOp(weight_ptr, linearIndex));
       }
@@ -115,20 +117,20 @@ bool dpcpp_tensor_histogram(
   auto totalElements = b.numel();
 
   using IndexType = int64_t;
-  auto aInfo = dpcpp::detail::getTensorInfo<output_t, IndexType>(a);
-  auto bInfo = dpcpp::detail::getTensorInfo<input_t, IndexType>(b);
+  auto aInfo = getTensorInfo<output_t, IndexType>(a);
+  auto bInfo = getTensorInfo<input_t, IndexType>(b);
   if (HasWeights) {
-    auto cInfo = dpcpp::detail::getTensorInfo<output_t, IndexType>(c);
+    auto cInfo = getTensorInfo<output_t, IndexType>(c);
     const auto getWeightsOp =
         [cInfo](output_t* cPtr, IndexType cIndex) {
           const IndexType cOffset =
-              dpcpp::detail::IndexToOffset<output_t, IndexType, 1>::get(
+              IndexToOffset<output_t, IndexType, 1>::get(
                   cIndex, cInfo);
           return cPtr[cOffset];
         };
     HANDLE_CASE(getWeightsOp, true);
   } else {
-    dpcpp::detail::TensorInfo<output_t, IndexType> cInfo;
+    TensorInfo<output_t, IndexType> cInfo;
     // set the dummy cinfo with the ptr to the output
     cInfo.data = aInfo.data;
     static const auto getDummyOp = [](output_t*,

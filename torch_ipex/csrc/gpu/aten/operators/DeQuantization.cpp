@@ -8,7 +8,6 @@
 #include <c10/util/Exception.h>
 #include <ATen/ipex_type_dpcpp_customized.h>
 
-
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
 #include <utils/Numerics.h>
@@ -18,12 +17,13 @@
 
 #include <core/Runtime.h>
 
+
 DPCPP_DEF_K1(intrepr);
 DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
 
 using namespace dnnl;
-using namespace at::dpcpp;
 using namespace at::native;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -39,7 +39,7 @@ Tensor dequantize_tensor_per_tensor_affine(
       ? memory::dims({qtensor.size(0), qtensor.size(1), qtensor.size(2), qtensor.size(3)})
       : qtensor.dim() == 2 ? memory::dims({qtensor.size(0), qtensor.size(1)})
                            : memory::dims({qtensor.size(0)});
-  memory::data_type q_dt = at::xpu::oneDNN::get_onednn_dtype(qtensor);
+  memory::data_type q_dt = xpu::oneDNN::get_onednn_dtype(qtensor);
   memory::format_tag q_fmt = qtensor.dim() == 4 ? memory::format_tag::nchw
       : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
 
@@ -49,7 +49,7 @@ Tensor dequantize_tensor_per_tensor_affine(
       : dpcpp_onednn_memory({q_ctx.meta()}, q_eng, qtensor.data_ptr());
 
   memory::dims r_dims = q_m.get_desc().dims();
-  memory::data_type r_dt = at::xpu::oneDNN::get_onednn_dtype(rtensor);
+  memory::data_type r_dt = xpu::oneDNN::get_onednn_dtype(rtensor);
   memory::format_tag r_fmt = r_dims.size() == 4 ? memory::format_tag::nchw
       : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
   engine r_eng = q_eng;
@@ -86,14 +86,14 @@ Tensor dequantize_tensor_per_channel_affine(
       ? memory::dims({qtensor.size(0), qtensor.size(1), qtensor.size(2), qtensor.size(3)})
       : qtensor.dim() == 2 ? memory::dims({qtensor.size(0), qtensor.size(1)})
                            : memory::dims({qtensor.size(0)});
-  memory::data_type q_dt = at::xpu::oneDNN::get_onednn_dtype(qtensor);
+  memory::data_type q_dt = xpu::oneDNN::get_onednn_dtype(qtensor);
   memory::format_tag q_fmt = qtensor.dim() == 4 ? memory::format_tag::nchw
       : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
   memory::desc q_md = memory::desc(q_dims, q_dt, q_fmt);
   memory q_m = dpcpp_onednn_memory(q_md, q_eng, qtensor.data_ptr());
 
   memory::dims r_dims = q_dims;
-  memory::data_type r_dt = at::xpu::oneDNN::get_onednn_dtype(rtensor);
+  memory::data_type r_dt = xpu::oneDNN::get_onednn_dtype(rtensor);
   memory::format_tag r_fmt = q_fmt;
   engine r_eng = q_eng;
   memory::desc r_md = memory::desc(r_dims, r_dt, r_fmt);

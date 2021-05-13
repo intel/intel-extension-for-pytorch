@@ -3,8 +3,9 @@
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 
-using namespace at::dpcpp::detail;
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp::detail;
+using namespace xpu::dpcpp;
 
 template <typename T>
 struct TensorFillOp {

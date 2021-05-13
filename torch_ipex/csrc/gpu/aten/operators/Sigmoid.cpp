@@ -8,7 +8,8 @@
 #include <utils/Numerics.h>
 #include <utils/Pointwise.h>
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -17,11 +18,11 @@ namespace impl {
 template <typename scalar_t>
 void sigmoid(Tensor& output, const Tensor& self) {
   if (TensorImpl_Unwrap(output) == TensorImpl_Unwrap(self)) {
-    at::dpcpp::DPCPP_tensor_apply1<scalar_t>(
+    xpu::dpcpp::DPCPP_tensor_apply1<scalar_t>(
         output, TensorSigmoidOp<scalar_t>());
   } else {
     output.resize_as_(self);
-    at::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+    xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
         output, self, TensorSigmoidOp<scalar_t>());
   }
 }
@@ -60,7 +61,7 @@ Tensor& sigmoid_backward_out(
       output.scalar_type(),
       "sigmoid_backward_out",
       [&]() {
-        at::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+        xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
             grad_input, output, grad_output, TensorSigmoidGradOp<scalar_t>());
       });
   return grad_input;

@@ -2,7 +2,9 @@
 
 #include <core/Functions.h>
 
-namespace at { namespace dpcpp {
+
+namespace xpu {
+namespace dpcpp {
 
 inline bool check_device(const at::TensorList& tensor_list) {
   if (tensor_list.empty()) {
@@ -15,4 +17,4 @@ inline bool check_device(const at::TensorList& tensor_list) {
   return true;
 }
 
-}} // namespace at::dpcpp
+}} // namespace xpu::dpcpp

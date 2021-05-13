@@ -2,14 +2,14 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/core/op_registration/op_registration.h>
+#include <torch/custom_class.h>
+
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
 #include <utils/ParamUtils.h>
-#include <torch/custom_class.h>
 
 
-
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 using namespace at::native;
 
 namespace at {

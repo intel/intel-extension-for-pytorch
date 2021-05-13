@@ -2,7 +2,11 @@
 
 #include <ATen/core/Generator.h>
 
-namespace at {
+
+using namespace at;
+
+namespace xpu {
+namespace dpcpp {
 
 struct CAFFE2_API DPCPPGeneratorImpl : public GeneratorImpl {
   // Constructors
@@ -25,7 +29,6 @@ struct CAFFE2_API DPCPPGeneratorImpl : public GeneratorImpl {
   uint64_t philox_offset_per_thread_ = 0;
 };
 
-namespace dpcpp {
 namespace detail {
 
 CAFFE2_API const Generator& getDefaultDPCPPGenerator(DeviceIndex device_index = -1);
@@ -33,4 +36,4 @@ CAFFE2_API Generator createDPCPPGenerator(DeviceIndex device_index = -1);
 
 } // namespace detail
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

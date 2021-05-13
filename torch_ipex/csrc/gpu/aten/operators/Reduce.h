@@ -21,12 +21,13 @@
 #include <type_traits>
 #include <utility>
 
-using namespace at::dpcpp;
-using at::dpcpp::Array;
+
+using namespace xpu::dpcpp;
+using xpu::dpcpp::Array;
 
 DPCPP_DEF_K1(reduce_kernel);
 
-namespace at {
+namespace xpu {
 namespace dpcpp {
 
 static inline int64_t div_up(int64_t a, int64_t b) {

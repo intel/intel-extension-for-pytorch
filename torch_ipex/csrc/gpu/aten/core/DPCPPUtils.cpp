@@ -1,16 +1,17 @@
-#include <stdlib.h>
-
 #include <c10/core/Device.h>
 #include <c10/macros/Macros.h>
+
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
 #include <core/Device.h>
 #include <core/Exception.h>
 #include <core/Stream.h>
 #include <utils/Env.h>
+
 #include <cmath>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 // Global device pool state
@@ -19,7 +20,7 @@ static DPCPPDevicePool gDevPool;
 static thread_local DeviceIndex cur_dev_index = 0;
 
 static void clearDPCPPContextAndDevices() {
-  at::dpcpp::clearDeviceContext();
+  xpu::dpcpp::clearDeviceContext();
   gDevPool.dev_sels.clear();
   gDevPool.devices.clear();
 }
@@ -137,7 +138,7 @@ DeviceIndex dpcppGetDeviceIndex(DPCPP::device device) {
 }
 
 int dpcppGetDeviceIdFromPtr(DeviceIndex* device_id, void* ptr) {
-  auto raw_device = DPCPP::get_pointer_device(ptr, at::dpcpp::getDeviceContext());
+  auto raw_device = DPCPP::get_pointer_device(ptr, xpu::dpcpp::getDeviceContext());
   *device_id = dpcppGetDeviceIndex(raw_device);
   return DPCPP_SUCCESS;
 }

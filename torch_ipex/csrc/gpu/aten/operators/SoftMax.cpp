@@ -12,8 +12,10 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
-using namespace at::dpcpp;
+
 using namespace dnnl;
+using namespace xpu::dpcpp::detail;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -85,7 +87,7 @@ template <
 void SpatialSoftMaxForward(
     outscalar_t* output,
     scalar_t* input,
-    dpcpp::detail::TensorInfo<scalar_t, uint64_t> outer_info,
+    TensorInfo<scalar_t, uint64_t> outer_info,
     size_t outer_size,
     size_t dim_size,
     size_t dim_stride) {
@@ -108,7 +110,7 @@ void SpatialSoftMaxForward(
           size_t local_id = item_id.get_local_id(0);
           auto group_id = item_id.get_group(0);
           auto data_offset =
-              dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(
+              IndexToOffset<scalar_t, uint64_t>::get(
                   group_id, outer_info);
           auto in_ptr = get_pointer(in_data) + data_offset;
           auto out_ptr = get_pointer(out_data)+ data_offset;
@@ -121,7 +123,7 @@ void SpatialSoftMaxForward(
           // to accscalar_t
           local_acc_max[local_id] = static_cast<accscalar_t>(max_input);
 
-          at::dpcpp::simple_reduce(item_id, local_acc_max, [](accscalar_t a, accscalar_t b) {
+          xpu::dpcpp::simple_reduce(item_id, local_acc_max, [](accscalar_t a, accscalar_t b) {
             return Numerics<accscalar_t>::max(a, b);
           });
 
@@ -134,7 +136,7 @@ void SpatialSoftMaxForward(
           }
           local_acc_sum[local_id] = sum_input;
 
-          at::dpcpp::simple_reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
+          xpu::dpcpp::simple_reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
             return a + b;
           });
 
@@ -162,7 +164,7 @@ void SpatialSoftMaxBackward(
     scalar_t* gradInput,
     outscalar_t* output,
     outscalar_t* gradOutput,
-    dpcpp::detail::TensorInfo<scalar_t, uint64_t> outer_info,
+    TensorInfo<scalar_t, uint64_t> outer_info,
     size_t outer_size,
     size_t dim_size,
     size_t dim_stride) {
@@ -185,7 +187,7 @@ void SpatialSoftMaxBackward(
           size_t local_id = item_id.get_local_id(0);
           auto group_id = item_id.get_group(0);
           auto data_offset =
-              dpcpp::detail::IndexToOffset<outscalar_t, uint64_t>::get(
+              IndexToOffset<outscalar_t, uint64_t>::get(
                   group_id, outer_info);
           auto gradInput_ptr = get_pointer(gradInput_data) + data_offset;
           auto output_ptr = get_pointer(output_data) + data_offset;
@@ -198,7 +200,7 @@ void SpatialSoftMaxBackward(
           }
           local_acc_sum[local_id] = thread_sum;
 
-          at::dpcpp::simple_reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
+          xpu::dpcpp::simple_reduce(item_id, local_acc_sum, [](accscalar_t a, accscalar_t b) {
             return a + b;
           });
 
@@ -244,8 +246,8 @@ Tensor host_softmax(
           auto dim_stride = input.stride(dim);
           auto dim_size = input.size(dim);
           auto outer_numel = input.numel() / dim_size;
-          dpcpp::detail::TensorInfo<scalar_t, uint64_t> outer_info =
-              dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(input);
+          TensorInfo<scalar_t, uint64_t> outer_info =
+              getTensorInfo<scalar_t, uint64_t>(input);
           outer_info.reduceDim(dim);
           outer_info.collapseDims();
           using accscalar_t = acc_type<scalar_t>;
@@ -296,8 +298,8 @@ Tensor host_softmax_backward(
         auto dim_stride = output.stride(dim);
         auto dim_size = output.size(dim);
         auto outer_numel = output.numel() / dim_size;
-        dpcpp::detail::TensorInfo<outscalar_t, uint64_t> outer_info =
-            dpcpp::detail::getTensorInfo<outscalar_t, uint64_t>(output);
+        TensorInfo<outscalar_t, uint64_t> outer_info =
+            getTensorInfo<outscalar_t, uint64_t>(output);
         outer_info.reduceDim(dim);
         outer_info.collapseDims();
         impl::SpatialSoftMaxBackward<
@@ -362,7 +364,7 @@ Tensor _softmax_onednn(
   memory::dims input_tz;
   get_dnnl_format(input, dnnl_format, input_tz);
 
-  auto data_t = at::xpu::oneDNN::get_onednn_dtype(input);
+  auto data_t = xpu::oneDNN::get_onednn_dtype(input);
 
   auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
   auto input_md = input_ctx.is_plain()? memory::desc({input_tz}, data_t, dnnl_format) :
@@ -428,8 +430,8 @@ Tensor _softmax_backward_onednn(
   get_dnnl_format(output, output_dnnl_format, output_tz);
   get_dnnl_format(grad, grad_dnnl_format, grad_tz);
 
-  auto output_t = at::xpu::oneDNN::get_onednn_dtype(output);
-  auto grad_t = at::xpu::oneDNN::get_onednn_dtype(grad);
+  auto output_t = xpu::oneDNN::get_onednn_dtype(output);
+  auto grad_t = xpu::oneDNN::get_onednn_dtype(grad);
 
   auto axis = dim < 0 ? dim + grad.dim(): dim;
 

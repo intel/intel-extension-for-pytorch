@@ -3,7 +3,8 @@
 #include <core/DPCPPUtils.h>
 #include <core/CachingAllocator.h>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 static std::once_flag initFlag;
@@ -17,21 +18,21 @@ static std::vector<std::unique_ptr<DPCPP::context>> gCtxPool;
 static void initDeviceContext() {
   int cnt;
   DPCPP::vector_class<DPCPP::device> devs;
-  at::dpcpp::dpcppGetDeviceCount(&cnt);
+  xpu::dpcpp::dpcppGetDeviceCount(&cnt);
   for (int i = 0; i < cnt; i++) {
-    devs.push_back(at::dpcpp::dpcppGetRawDevice((int64_t)i));
+    devs.push_back(xpu::dpcpp::dpcppGetRawDevice((int64_t)i));
   }
 
-  gContext.reset(new DPCPP::context(devs, at::dpcpp::dpcppAsyncHandler));
+  gContext.reset(new DPCPP::context(devs, xpu::dpcpp::dpcppAsyncHandler));
 }
 #else
 static void initDeviceContext() {
   int cnt;
-  at::dpcpp::dpcppGetDeviceCount(&cnt);
+  xpu::dpcpp::dpcppGetDeviceCount(&cnt);
   gCtxPool.resize(cnt);
   for (int i = 0; i < cnt; i++) {
-    auto dev = at::dpcpp::dpcppGetRawDevice((int64_t)i);
-    gCtxPool[i].reset(new DPCPP::context({dev}, at::dpcpp::dpcppAsyncHandler));
+    auto dev = xpu::dpcpp::dpcppGetRawDevice((int64_t)i);
+    gCtxPool[i].reset(new DPCPP::context({dev}, xpu::dpcpp::dpcppAsyncHandler));
   }
 }
 #endif
@@ -58,7 +59,7 @@ DPCPP::context getDeviceContext(int device_index) {
 DPCPP::context getDeviceContext(int device_index) {
   std::call_once(initFlag, initDeviceContext);
   int dev_cnt = -1;
-  at::dpcpp::dpcppGetDeviceCount(&dev_cnt);
+  xpu::dpcpp::dpcppGetDeviceCount(&dev_cnt);
   AT_ASSERT(device_index < dev_cnt);
   return *gCtxPool[device_index];
 }
@@ -69,4 +70,4 @@ at::Allocator* getDPCPPDeviceAllocator() {
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

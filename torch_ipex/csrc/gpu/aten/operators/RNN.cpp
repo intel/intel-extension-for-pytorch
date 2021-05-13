@@ -6,8 +6,9 @@
 #include <core/DPCPPUtils.h>
 #include <core/Runtime.h>
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

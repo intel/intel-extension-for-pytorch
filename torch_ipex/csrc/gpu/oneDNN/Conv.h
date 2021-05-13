@@ -15,18 +15,18 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
 
-namespace at {
 namespace xpu {
 namespace oneDNN {
 
 struct ConvAttr {
-  static const int64_t kind_with_relu = at::xpu::oneDNN::with_relu; // 0b01;
-  static const int64_t kind_with_sum = at::xpu::oneDNN::with_sum; // 0b10;
-  static const int64_t kind_with_sigmoid = at::xpu::oneDNN::with_sigmoid; // 0b100;
+  static const int64_t kind_with_relu = xpu::oneDNN::with_relu; // 0b01;
+  static const int64_t kind_with_sum = xpu::oneDNN::with_sum; // 0b10;
+  static const int64_t kind_with_sigmoid = xpu::oneDNN::with_sigmoid; // 0b100;
 
   ConvAttr() : scale_(1.f), alpha_(0.f), beta_(0.f), oscale_(1.f), attr_(0) {}
   ConvAttr(float scale, float alpha, float beta, float oscale, int64_t attr)
@@ -50,11 +50,11 @@ struct ConvAttr {
 
 #ifdef USE_PRIMITIVE_CACHE
   void to_bytes(bytestring& bytes) {
-    at::dpcpp::to_bytes(bytes, scale_);
-    at::dpcpp::to_bytes(bytes, alpha_);
-    at::dpcpp::to_bytes(bytes, beta_);
-    at::dpcpp::to_bytes(bytes, oscale_);
-    at::dpcpp::to_bytes(bytes, attr_);
+    xpu::dpcpp::to_bytes(bytes, scale_);
+    xpu::dpcpp::to_bytes(bytes, alpha_);
+    xpu::dpcpp::to_bytes(bytes, beta_);
+    xpu::dpcpp::to_bytes(bytes, oscale_);
+    xpu::dpcpp::to_bytes(bytes, attr_);
   }
 #endif
 
@@ -339,7 +339,7 @@ static at::Tensor convolution(
     } else {
       src_ = empty_opaque_tensor(expected_src_md, src.options(), c10::nullopt);
       src_m = dpcpp_onednn_memory(expected_src_md, engine, src_.data_ptr());
-      at::xpu::oneDNN::reorder(src, src_);
+      xpu::oneDNN::reorder(src, src_);
     }
   }
 
@@ -349,13 +349,14 @@ static at::Tensor convolution(
     if (weight_cache_enabled() && src.is_quantized()) {
         QuantizerPtr quantizer;
         if (wgh.qscheme() == kPerChannelAffine) {
-          quantizer = make_per_channel_affine_quantizer(
+          quantizer = xpu::dpcpp::make_per_channel_affine_quantizer(
               wgh.q_per_channel_scales(),
               wgh.q_per_channel_zero_points(),
               0,
               kQInt8);
         } else {
-          quantizer = make_per_tensor_affine_quantizer(wgh_scales[0], 0, kQInt8);
+          quantizer =
+              xpu::dpcpp::make_per_tensor_affine_quantizer(wgh_scales[0], 0, kQInt8);
         }
         wgh_ = empty_opaque_qtensor(expected_wgh_md, c10::nullopt, quantizer);
     } else {
@@ -363,7 +364,7 @@ static at::Tensor convolution(
     }
 
     wgh_m = dpcpp_onednn_memory(expected_wgh_md, engine, wgh_.data_ptr());
-    at::xpu::oneDNN::reorder(wgh, wgh_);
+    xpu::oneDNN::reorder(wgh, wgh_);
 
     if (weight_cache_enabled()) {
       strm.wait();
@@ -376,8 +377,9 @@ static at::Tensor convolution(
   auto dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
   if (dst_usr_md != expected_dst_md) {
     if (lazy_reorder_enabled() && dst.is_quantized()) {
-      auto quantizer = make_per_tensor_affine_quantizer(dst.q_scale(), dst.q_zero_point(),
-            typeMetaToScalarType(dst.options().dtype()));
+      auto quantizer =
+          xpu::dpcpp::make_per_tensor_affine_quantizer(dst.q_scale(), dst.q_zero_point(),
+          typeMetaToScalarType(dst.options().dtype()));
       dst_ = empty_opaque_qtensor(expected_dst_md, c10::nullopt, quantizer);
     } else {
       dst_ = empty_opaque_tensor(expected_dst_md, dst.options(), c10::nullopt);
@@ -386,7 +388,7 @@ static at::Tensor convolution(
     dst_m = dpcpp_onednn_memory(expected_dst_md, engine, dst_.data_ptr());
 
     if (attr.with_sum())
-      at::xpu::oneDNN::reorder(dst, dst_);
+      xpu::oneDNN::reorder(dst, dst_);
   }
 
   memory bia_m = memory({{}, bia_data_t, fmt_bia}, engine);
@@ -404,12 +406,12 @@ static at::Tensor convolution(
       }
 
       int mask = wgh_scales.size() > 1 ? ONEDNN_SCALES_MASK_BY_CHANNEL(0) : 0;
-      auto reorder_attr = at::xpu::oneDNN::ReorderAttr();
+      auto reorder_attr = xpu::oneDNN::ReorderAttr();
       reorder_attr.set_dst_sc_and_zp(mask, bia_scale, 0, {0});
 
       bia_ = empty_opaque_tensor(bia_md, bia.options(), c10::nullopt);
       bia_m = dpcpp_onednn_memory(bia_md, engine, bia_.data_ptr());
-      at::xpu::oneDNN::reorder(bia, bia_, reorder_attr);
+      xpu::oneDNN::reorder(bia, bia_, reorder_attr);
 
       if (weight_cache_enabled()) {
         strm.wait();
@@ -443,4 +445,4 @@ static at::Tensor convolution(
   return dst;
 }
 
-}}}
+}}

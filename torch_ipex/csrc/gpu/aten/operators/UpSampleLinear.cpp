@@ -8,8 +8,9 @@
 #include <oneDNN/LRUCache.h>
 #endif
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 using namespace at::native;
 using namespace at::AtenIpexTypeXPU;
 
@@ -54,7 +55,7 @@ static void upsample_linear_out_dpcpp_kernel(
       ? memory::format_tag::ncdhw
       : (ndims == 4 ? memory::format_tag::nchw : memory::format_tag::ncw);
   memory::format_tag format_any = memory::format_tag::any;
-  memory::data_type data_type = at::xpu::oneDNN::get_onednn_dtype(input);
+  memory::data_type data_type = xpu::oneDNN::get_onednn_dtype(input);
 
   std::shared_ptr<memory::desc> dst_md;
   if (!is_customer_scales)
@@ -133,7 +134,7 @@ static void upsample_linear_backward_out_dpcpp_kernel(
       ? memory::format_tag::ncdhw
       : (ndims == 4 ? memory::format_tag::nchw : memory::format_tag::ncw);
   memory::format_tag format_any = memory::format_tag::any;
-  memory::data_type data_type = at::xpu::oneDNN::get_onednn_dtype(grad_output);
+  memory::data_type data_type = xpu::oneDNN::get_onednn_dtype(grad_output);
 
   std::shared_ptr<memory::desc> dst_md;
   auto src_md = memory::desc(src_dims, data_type, data_format);

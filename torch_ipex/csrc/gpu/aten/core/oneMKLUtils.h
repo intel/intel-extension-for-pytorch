@@ -43,8 +43,8 @@
   }
 #endif
 
-namespace at {
-namespace dpcpp {
+namespace xpu {
+namespace oneMKL {
 
 //OneMklExInfoManager singleton
 class OneMklExInfoManager {
@@ -79,6 +79,6 @@ protected:
   ~OneMklExInfoManager() {}
 };
 
-} // namespace dpcpp
-} // namespace at
+} // namespace oneMKL
+} // namespace xpu
 

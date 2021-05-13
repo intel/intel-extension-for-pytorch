@@ -3,7 +3,8 @@
 #include <ATen/ATen.h>
 #include <limits>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -12,5 +13,4 @@ bool canUse32BitIndexMath(const at::Tensor &t, int64_t max_elem=std::numeric_lim
 
 } // detail
 } // dpcpp
-} // at
-
+} // xpu

@@ -11,13 +11,14 @@
 #include "Random.h"
 #include "Distributions.h"
 
+
 namespace at {
 namespace AtenIpexTypeXPU {
 
-
 template<typename RNG>
 void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
-  auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());
+  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
+      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   if (isFloatingType(iter.dtype())) {
     AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "random_kernel_fp", [&] {
       if (std::is_same<scalar_t, double>::value) {
@@ -66,7 +67,7 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
           [] (RandomState<Philox4_32_10>* state) { return state-> random<uint32_t>(); },
           random_func);
       }
-    });    
+    });
   } else {
     TORCH_CHECK(false, "random_kernel handles only integral, floating-point and boolean types");
   }
@@ -74,7 +75,8 @@ void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
 
 template<typename RNG>
 void random_from_to_kernel(TensorIterator& iter, uint64_t range, int64_t base, c10::optional<RNG> gen_) {
-  auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());    
+  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
+      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   AT_DISPATCH_ALL_TYPES_AND3(at::ScalarType::Bool, at::ScalarType::Half, at::ScalarType::BFloat16, iter.dtype(), "random_from_to_kernel", [&] {
     if ((
       std::is_same<scalar_t, int64_t>::value ||
@@ -107,7 +109,8 @@ void random_from_to_kernel(TensorIterator& iter, uint64_t range, int64_t base, c
 // to(exclusive) = None (= std::numeric_limits<int64_t>::max() + 1)
 template<typename RNG>
 void random_full_64_bits_range_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
-  auto gen = get_generator_or_default<at::DPCPPGeneratorImpl>(gen_, dpcpp::detail::getDefaultDPCPPGenerator());    
+  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
+      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::BFloat16, iter.dtype(), "random_full_64_bits_range_kernel", [&] {
     if (std::is_same<scalar_t, int64_t>::value ||
         std::is_same<scalar_t, double>::value ||

@@ -7,7 +7,7 @@
 
 struct THDPStream {
   struct THPStream base;
-  at::dpcpp::DPCPPStream dpcpp_stream;
+  xpu::dpcpp::DPCPPStream dpcpp_stream;
 };
 extern PyObject *THDPStreamClass;
 

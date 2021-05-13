@@ -13,6 +13,7 @@
 
 #define ASSERT_TRUE(cmd) if (!(cmd)) return
 
+
 PyObject* module;
 
 PyObject * THPModule_setDevice_wrap(PyObject *self, PyObject *arg)
@@ -21,7 +22,7 @@ PyObject * THPModule_setDevice_wrap(PyObject *self, PyObject *arg)
   THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to setDevice");
   int64_t device = THPUtils_unpackLong(arg);
 
-  at::dpcpp::set_device(static_cast<c10::DeviceIndex>(device));
+  xpu::dpcpp::set_device(static_cast<c10::DeviceIndex>(device));
 
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
@@ -30,7 +31,7 @@ PyObject * THPModule_setDevice_wrap(PyObject *self, PyObject *arg)
 PyObject * THPModule_getDevice_wrap(PyObject *self, PyObject *noargs)
 {
   HANDLE_TH_ERRORS
-  auto device = static_cast<int>(at::dpcpp::current_device());
+  auto device = static_cast<int>(xpu::dpcpp::current_device());
   return PyLong_FromLong(device);
   END_HANDLE_TH_ERRORS
 }
@@ -38,7 +39,7 @@ PyObject * THPModule_getDevice_wrap(PyObject *self, PyObject *noargs)
 PyObject * THPModule_getDeviceCount_wrap(PyObject *self, PyObject *noargs)
 {
   HANDLE_TH_ERRORS
-  return PyLong_FromLong(at::dpcpp::device_count());
+  return PyLong_FromLong(xpu::dpcpp::device_count());
   END_HANDLE_TH_ERRORS
 }
 
@@ -85,7 +86,7 @@ PyObject * THPModule_getCurrentStream_wrap(
     THPUtils_checkLong(device_index), "invalid argument to getCurrentStream");
   int64_t device = THPUtils_unpackLong(device_index);
   return PyLong_FromUnsignedLongLong(
-    at::dpcpp::getCurrentDPCPPStream(device).pack());
+    xpu::dpcpp::getCurrentDPCPPStream(device).pack());
   END_HANDLE_TH_ERRORS
 }
 
@@ -168,10 +169,10 @@ void init_module(pybind11::module& m) {
       }
   };
 
-  auto num_gpus = at::dpcpp::device_count();
+  auto num_gpus = xpu::dpcpp::device_count();
   auto default_dpcpp_generators = PyTuple_New(static_cast<Py_ssize_t>(num_gpus));
   for(int i = 0; i < num_gpus; i++) {
-    auto gen = at::dpcpp::detail::getDefaultDPCPPGenerator(i);
+    auto gen = xpu::dpcpp::detail::getDefaultDPCPPGenerator(i);
     //auto cast_gen = (THPGenerator*)DPCPPGenerator_initDefaultGenerator(gen);
     auto cast_gen = (THPGenerator*)THPGenerator_initDefaultGenerator(gen);
     // This reference is meant to be given away, so no need to incref here.

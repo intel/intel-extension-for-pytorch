@@ -2,7 +2,6 @@
 
 #define ONEDNN_SCALES_MASK_BY_CHANNEL(x) (1 << x)
 
-namespace at {
 namespace xpu {
 namespace oneDNN {
 
@@ -12,4 +11,4 @@ enum post_attr {
   with_sigmoid = 0b100,
 };
 
-}}}
+}}

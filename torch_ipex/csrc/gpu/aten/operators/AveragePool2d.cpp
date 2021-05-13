@@ -2,14 +2,16 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
+
 #include <core/Runtime.h>
-#include <vector>
 #include <utils/ATDispatch.h>
+
 #include "Pooling.h"
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
 using namespace at::native;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

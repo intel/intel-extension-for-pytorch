@@ -8,6 +8,7 @@
 #include <ATen/core/Array.h>
 #include <ATen/detail/FunctionTraits.h>
 
+
 namespace at { namespace native { namespace Memory {
 
 namespace detail {

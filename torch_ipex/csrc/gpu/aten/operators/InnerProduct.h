@@ -7,9 +7,10 @@
 lru_key_t key;
 #endif
 
+
 using namespace dnnl;
 
-namespace at {
+namespace xpu {
 namespace dpcpp {
 
 void inner_product(

@@ -1,6 +1,9 @@
+#pragma once
+
 #include <utils/Numerics.h>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 template <typename scalar_t>

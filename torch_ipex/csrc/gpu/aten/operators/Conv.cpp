@@ -13,9 +13,9 @@
 #include "ConvTranspose.h"
 
 using namespace dnnl;
-using namespace at::dpcpp;
 using namespace at::native;
-using namespace at::xpu::oneDNN;
+using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {

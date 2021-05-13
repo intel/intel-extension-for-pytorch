@@ -9,7 +9,8 @@
 #include <oneapi/dnnl/dnnl.hpp>
 #include <oneDNN/Utils.h>
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 using mem_desc_t = dnnl::memory::desc;
 using mem_dims_t = dnnl::memory::dims;

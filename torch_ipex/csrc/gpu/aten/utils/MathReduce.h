@@ -11,8 +11,9 @@
 #include <utils/Algorithm.h>
 #include <utils/Numerics.h>
 
+
 using namespace at::native;
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 
 template <typename scalar_t>
 DPCPP_DEVICE struct AddOp {

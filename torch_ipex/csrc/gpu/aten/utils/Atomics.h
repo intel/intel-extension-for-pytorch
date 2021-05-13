@@ -5,7 +5,8 @@
 #include <core/DPCPPUtils.h>
 #include <utils/Numerics.h>
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 static inline DPCPP_DEVICE void atomicAdd(
     const dpcpp_global_ptr_pt<float>& address,

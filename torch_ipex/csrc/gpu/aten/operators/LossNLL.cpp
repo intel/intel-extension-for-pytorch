@@ -17,6 +17,7 @@
 #include <utils/SimpelReduce.h>
 #include <operators/Reduce.h>
 
+
 DPCPP_DEF_K2(updateOutputName, typename scalar_t);
 DPCPP_DEF_K2(updateOutputKernel1Name, typename scalar_t);
 DPCPP_DEF_K2(updateOutputKernelName, typename scalar_t);
@@ -32,7 +33,8 @@ DPCPP_DEF_K2(spacial_class_nll_2d_forward_size_avg, typename scalar_t, typename 
 DPCPP_DEF_K2(spacial_class_nll_2d_backward_kernel_no_reduce, typename scalar_t);
 DPCPP_DEF_K2(spacial_class_nll_2d_backward_kernel, typename scalar_t);
 
-using namespace at::dpcpp;
+using namespace xpu::dpcpp::detail;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -489,18 +491,18 @@ void spatial_class_nll_criterion_update_output_no_reduce_kernel(
   int64_t W = self.size(3);
   int64_t count = batch_size * H * W;
 
-  dpcpp::detail::TensorInfo<scalar_t, uint64_t> self_info =
-    dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(self);
+  TensorInfo<scalar_t, uint64_t> self_info =
+    getTensorInfo<scalar_t, uint64_t>(self);
   int dst_dim = self_info.collapseDims(1);
   self_info.reduceDim(dst_dim);
-  dpcpp::detail::TensorInfo<long, uint64_t> target_info =
-    dpcpp::detail::getTensorInfo<long, uint64_t>(target);
+  TensorInfo<long, uint64_t> target_info =
+    getTensorInfo<long, uint64_t>(target);
   target_info.collapseDims();
-  dpcpp::detail::TensorInfo<scalar_t, uint64_t> output_info =
-    dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(output);
+  TensorInfo<scalar_t, uint64_t> output_info =
+    getTensorInfo<scalar_t, uint64_t>(output);
   output_info.collapseDims();
-  dpcpp::detail::TensorInfo<scalar_t, uint64_t> weight_info =
-    dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(weight);
+  TensorInfo<scalar_t, uint64_t> weight_info =
+    getTensorInfo<scalar_t, uint64_t>(weight);
   weight_info.collapseDims();
 
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
@@ -518,16 +520,16 @@ void spatial_class_nll_criterion_update_output_no_reduce_kernel(
       auto weight_ptr = get_pointer(weight_data);
 
       auto index = item_id.get_linear_id();
-      auto target_offset = dpcpp::detail::IndexToOffset<long, uint64_t>::get(index, target_info);
-      auto output_offset = dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(index, output_info);
+      auto target_offset = IndexToOffset<long, uint64_t>::get(index, target_info);
+      auto output_offset = IndexToOffset<scalar_t, uint64_t>::get(index, output_info);
 
       int64_t cur_target = target_ptr[target_offset];
       if (cur_target == ignore_index) {
         out_ptr[output_offset] = ScalarConvert<int, scalar_t>::to(0);
       }
       else {
-        auto self_offset = dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(index, self_info);
-        auto weight_offset = dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
+        auto self_offset = IndexToOffset<scalar_t, uint64_t>::get(index, self_info);
+        auto weight_offset = IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
 
         auto self_slice_ptr = self_ptr + cur_target * self_info.strides[dst_dim];
         scalar_t value = self_slice_ptr[self_offset];
@@ -560,15 +562,15 @@ void spatial_class_nll_criterion_update_output_kernel(
   auto num_groups = (numel - 1) / wgroup_size + 1;
   num_groups = std::min(decltype(num_groups)(cu_num), num_groups);
 
-  dpcpp::detail::TensorInfo<scalar_t, uint64_t> self_info =
-    dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(self);
+  TensorInfo<scalar_t, uint64_t> self_info =
+    getTensorInfo<scalar_t, uint64_t>(self);
   int dst_dim = self_info.collapseDims(1);
   self_info.reduceDim(dst_dim);
-  dpcpp::detail::TensorInfo<long, uint64_t> target_info =
-    dpcpp::detail::getTensorInfo<long, uint64_t>(target);
+  TensorInfo<long, uint64_t> target_info =
+    getTensorInfo<long, uint64_t>(target);
   target_info.collapseDims();
-  dpcpp::detail::TensorInfo<scalar_t, uint64_t> weight_info =
-    dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(weight);
+  TensorInfo<scalar_t, uint64_t> weight_info =
+    getTensorInfo<scalar_t, uint64_t>(weight);
   weight_info.collapseDims();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -599,14 +601,14 @@ void spatial_class_nll_criterion_update_output_kernel(
       for (uint64_t i = 0; i < num_combine; ++i) {
         auto global_shift = global_idx + i * global_range_size;
         if (global_shift < numel) {
-          auto target_offset = dpcpp::detail::IndexToOffset<long, uint64_t>::get(global_shift, target_info);
+          auto target_offset = IndexToOffset<long, uint64_t>::get(global_shift, target_info);
           int64_t cur_target = target_ptr[target_offset];
 
           if (cur_target != ignore_index) {
-            auto weight_offset = dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
+            auto weight_offset = IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
             scalar_t weight = weight_ptr[weight_offset];
 
-            auto self_offset = dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(global_shift, self_info);
+            auto self_offset = IndexToOffset<scalar_t, uint64_t>::get(global_shift, self_info);
             auto self_slice_ptr = self_ptr + cur_target * self_info.strides[dst_dim];
             scalar_t value = self_slice_ptr[self_offset];
             input_sum -= value * weight;
@@ -617,11 +619,11 @@ void spatial_class_nll_criterion_update_output_kernel(
       partial_sums[local_idx] = input_sum;
       partial_weight[local_idx] = acc_weight;
 
-      at::dpcpp::simple_reduce(item_id, partial_sums, [](accscalar_t a, accscalar_t b) {
+      xpu::dpcpp::simple_reduce(item_id, partial_sums, [](accscalar_t a, accscalar_t b) {
         return Numerics<accscalar_t>::add(a, b);
       });
 
-      at::dpcpp::simple_reduce(item_id, partial_weight, [](accscalar_t a, accscalar_t b) {
+      xpu::dpcpp::simple_reduce(item_id, partial_weight, [](accscalar_t a, accscalar_t b) {
         return Numerics<accscalar_t>::add(a, b);
       });
 
@@ -673,18 +675,18 @@ void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
   int64_t W = target.size(2);
   int64_t count = batch_size * H * W;
 
-  dpcpp::detail::TensorInfo<scalar_t, uint64_t> grad_input_info =
-    dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(grad_input);
+  TensorInfo<scalar_t, uint64_t> grad_input_info =
+    getTensorInfo<scalar_t, uint64_t>(grad_input);
   int dst_dim = grad_input_info.collapseDims(1);
   grad_input_info.reduceDim(dst_dim);
-  dpcpp::detail::TensorInfo<long, uint64_t> target_info =
-    dpcpp::detail::getTensorInfo<long, uint64_t>(target);
+  TensorInfo<long, uint64_t> target_info =
+    getTensorInfo<long, uint64_t>(target);
   target_info.collapseDims();
-  dpcpp::detail::TensorInfo<scalar_t, uint64_t> grad_output_info =
-    dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(grad_output);
+  TensorInfo<scalar_t, uint64_t> grad_output_info =
+    getTensorInfo<scalar_t, uint64_t>(grad_output);
   grad_output_info.collapseDims();
-  dpcpp::detail::TensorInfo<scalar_t, uint64_t> weight_info =
-    dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(weight);
+  TensorInfo<scalar_t, uint64_t> weight_info =
+    getTensorInfo<scalar_t, uint64_t>(weight);
   weight_info.collapseDims();
 
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
@@ -702,17 +704,17 @@ void spatial_class_nll_criterion_update_grad_input_no_reduce_kernel(
       auto weight_ptr = get_pointer(weight_data);
 
       auto index = item_id.get_linear_id();
-      auto target_offset = dpcpp::detail::IndexToOffset<long, uint64_t>::get(index, target_info);
+      auto target_offset = IndexToOffset<long, uint64_t>::get(index, target_info);
 
       int64_t cur_target = target_ptr[target_offset];
       if (cur_target != ignore_index) {
-        auto grad_output_offset = dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(index, grad_output_info);
-        auto weight_offset = dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
+        auto grad_output_offset = IndexToOffset<scalar_t, uint64_t>::get(index, grad_output_info);
+        auto weight_offset = IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
 
         scalar_t value = grad_output_ptr[grad_output_offset];
         scalar_t weight = weight_ptr[weight_offset];
 
-        auto grad_input_offset = dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(index, grad_input_info);
+        auto grad_input_offset = IndexToOffset<scalar_t, uint64_t>::get(index, grad_input_info);
         auto grad_input_slice_ptr = grad_input_ptr + cur_target * grad_input_info.strides[dst_dim];
 
         grad_input_slice_ptr[grad_input_offset] = -value * weight;
@@ -740,15 +742,15 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
   int64_t W = target.size(2);
   int64_t count = batch_size * H * W;
 
-  dpcpp::detail::TensorInfo<scalar_t, uint64_t> grad_input_info =
-    dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(grad_input);
+  TensorInfo<scalar_t, uint64_t> grad_input_info =
+    getTensorInfo<scalar_t, uint64_t>(grad_input);
   int dst_dim = grad_input_info.collapseDims(1);
   grad_input_info.reduceDim(dst_dim);
-  dpcpp::detail::TensorInfo<long, uint64_t> target_info =
-    dpcpp::detail::getTensorInfo<long, uint64_t>(target);
+  TensorInfo<long, uint64_t> target_info =
+    getTensorInfo<long, uint64_t>(target);
   target_info.collapseDims();
-  dpcpp::detail::TensorInfo<scalar_t, uint64_t> weight_info =
-    dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(weight);
+  TensorInfo<scalar_t, uint64_t> weight_info =
+    getTensorInfo<scalar_t, uint64_t>(weight);
   weight_info.collapseDims();
 
   auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
@@ -769,20 +771,20 @@ void spatial_class_nll_criterion_update_grad_input_kernel(
       auto target_ptr = get_pointer(target_data);
 
       auto index = item_id.get_linear_id();
-      auto target_offset = dpcpp::detail::IndexToOffset<long, uint64_t>::get(index, target_info);
+      auto target_offset = IndexToOffset<long, uint64_t>::get(index, target_info);
 
       int64_t cur_target = target_ptr[target_offset];
       if (cur_target != ignore_index) {
         auto grad_input_ptr = get_pointer(grad_input_data);
         auto grad_output_ptr = get_pointer(grad_output_data);
         auto weight_ptr = get_pointer(weight_data);
-        auto weight_offset = dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
+        auto weight_offset = IndexToOffset<scalar_t, uint64_t>::get(cur_target, weight_info);
         scalar_t weight = weight_ptr[weight_offset];
 
         scalar_t norm = (reduction == at::Reduction::Mean) ?
                         (ScalarConvert<int, scalar_t>::to(1) / total_weight) : ScalarConvert<int, scalar_t>::to(1);
 
-        auto grad_input_offset = dpcpp::detail::IndexToOffset<scalar_t, uint64_t>::get(index, grad_input_info);
+        auto grad_input_offset = IndexToOffset<scalar_t, uint64_t>::get(index, grad_input_info);
         auto grad_input_slice_ptr = grad_input_ptr + cur_target * grad_input_info.strides[dst_dim];
 
         grad_input_slice_ptr[grad_input_offset] = -weight * norm * grad_output_ptr[0];
@@ -922,11 +924,11 @@ Tensor& nll_loss2d_backward_out(
   grad_input.resize_(self.sizes()).fill_(0);
 
   if (weight.defined()) {
-    TORCH_CHECK(dpcpp::check_device({self, target, weight, grad_input, total_weight}),
+    TORCH_CHECK(check_device({self, target, weight, grad_input, total_weight}),
                 "Some of weight/gradient/input tensors are located on different GPUs. Please move them to a single one.");
   }
   else {
-    TORCH_CHECK(dpcpp::check_device({self, target, grad_input, total_weight}),
+    TORCH_CHECK(check_device({self, target, grad_input, total_weight}),
                 "Some of weight/gradient/input tensors are located on different GPUs. Please move them to a single one.");
   }
 
@@ -1004,11 +1006,11 @@ std::tuple<Tensor&,Tensor&> nll_loss2d_forward_out(
   total_weight.resize_({});
 
   if (weight.defined()) {
-    TORCH_CHECK(dpcpp::check_device({self, target, weight, output, total_weight}),
+    TORCH_CHECK(check_device({self, target, weight, output, total_weight}),
       "Some of weight/gradient/input tensors are located on different GPUs. Please move them to a single one.");
   }
   else {
-    TORCH_CHECK(dpcpp::check_device({self, target, output, total_weight}),
+    TORCH_CHECK(check_device({self, target, output, total_weight}),
       "Some of weight/gradient/input tensors are located on different GPUs. Please move them to a single one.");
   }
 

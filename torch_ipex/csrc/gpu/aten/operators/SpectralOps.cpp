@@ -11,9 +11,11 @@
 #include <oneapi/mkl/dfti.hpp>
 #endif
 
+
 DPCPP_DEF_K2(fill_with_conjugate_symmetry_ker, typename scalar_t);
 
-using namespace at::dpcpp;
+using namespace xpu::dpcpp::detail;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -26,8 +28,8 @@ static inline void _fft_fill_with_conjugate_symmetry_slice(
     int64_t size_last_dim,
     int64_t start_last_dim_idx,
     int64_t numel) {
-  dpcpp::detail::TensorInfo<scalar_t, int64_t> output_info =
-      dpcpp::detail::getTensorInfo<scalar_t, int64_t>(output);
+  TensorInfo<scalar_t, int64_t> output_info =
+      getTensorInfo<scalar_t, int64_t>(output);
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
 
   int64_t last_dim_to_fill_size =
@@ -113,7 +115,7 @@ void _mkl_dft(
     int64_t normalization,
     bool onesided,
     int64_t batch) {
-  auto& dpcpp_queue = dpcpp::getCurrentDPCPPStream().dpcpp_queue();
+  auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   std::vector<int64_t> mkl_signal_sizes(
       checked_signal_sizes.begin(), checked_signal_sizes.end());
   oneapi::mkl::dft::descriptor<prec, signal_type> desc(mkl_signal_sizes);

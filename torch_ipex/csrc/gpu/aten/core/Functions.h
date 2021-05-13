@@ -1,14 +1,15 @@
 #pragma once
 
-
-// #include <dpcpp_runtime_api.h>
-
 #include <c10/core/Device.h>
 #include <c10/macros/Macros.h>
+
 #include <core/DPCPPUtils.h>
 #include <core/Exception.h>
 
-namespace at {
+
+using namespace at;
+
+namespace xpu {
 namespace dpcpp {
 
 inline DeviceIndex device_count() noexcept {
@@ -29,4 +30,4 @@ inline void set_device(DeviceIndex device) {
   AT_DPCPP_CHECK(dpcppSetDevice(static_cast<int>(device)));
 }
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

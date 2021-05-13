@@ -5,10 +5,11 @@
 #include <core/DPCPP.h>
 #include "Loops.h"
 
+
 DPCPP_DEF_K1(SyclOpElu);
 DPCPP_DEF_K1(SyclOpEluBackward);
 
-using namespace at::dpcpp;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

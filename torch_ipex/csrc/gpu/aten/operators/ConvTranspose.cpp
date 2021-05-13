@@ -1,18 +1,17 @@
 #include <ATen/ipex_type_dpcpp_customized.h>
 #include <ATen/quantized/QTensorImpl.h>
 #include <core/DPCPPUtils.h>
-//#include <core/Quantizer.h>
 #include <core/Runtime.h>
 #include <core/TensorImplUtils.h>
 #include <tensor/Context.h>
 #include <utils/ParamUtils.h>
 
-//#include "Conv.h"
 #include "ConvTranspose.h"
 
+
 using namespace dnnl;
-using namespace at::dpcpp;
 using namespace at::native;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -39,13 +38,13 @@ Tensor dpcpp_convolution_transpose(
       input.sizes(), weight.sizes(), padding, stride, dilation, output_padding, groups);
   auto output = at::empty(output_tz, input.options());
 
-  auto src_data_t = at::xpu::oneDNN::get_onednn_dtype(input);
-  auto wei_data_t = at::xpu::oneDNN::get_onednn_dtype(weight);
-  auto dst_data_t = at::xpu::oneDNN::get_onednn_dtype(output);
+  auto src_data_t = xpu::oneDNN::get_onednn_dtype(input);
+  auto wei_data_t = xpu::oneDNN::get_onednn_dtype(weight);
+  auto dst_data_t = xpu::oneDNN::get_onednn_dtype(output);
   auto bias_data_t = dnnl::memory::data_type::f32;
 
   if (bias.defined()) {
-    bias_data_t = at::xpu::oneDNN::get_onednn_dtype(bias);
+    bias_data_t = xpu::oneDNN::get_onednn_dtype(bias);
   }
   auto usr_bias_data_t = dnnl::memory::data_type::f32;
 
@@ -121,7 +120,7 @@ Tensor dpcpp_convolution_transpose(
   if (input_usr_md != expected_input_md) {
     input_ = empty_opaque_tensor(expected_input_md, input.options(), c10::nullopt);
     input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
-    at::xpu::oneDNN::reorder(input, input_);
+    xpu::oneDNN::reorder(input, input_);
   }
 
   auto expected_weight_md = deconv_forward_pd.weights_desc();
@@ -179,7 +178,7 @@ Tensor dpcpp_convolution_transpose(
        {DNNL_ARG_DST, output_memory}});
 
   if (!lazy_reorder_enabled() && output_.data_ptr() != output.data_ptr()) {
-    at::xpu::oneDNN::reorder(output_, output);
+    xpu::oneDNN::reorder(output_, output);
   } else if (lazy_reorder_enabled() && output_.data_ptr() != output.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(output_);
     DPCPPTensorContext::set_tensor_ctx(output, std::move(blk_ctx));
@@ -208,14 +207,14 @@ Tensor dpcpp_convolution_transpose_backward_input(
   auto ndim = input.ndimension();
   auto grad_input = at::empty(input.sizes(), grad_output.options());
 
-  auto src_data_t = at::xpu::oneDNN::get_onednn_dtype(input);
-  auto wei_data_t = at::xpu::oneDNN::get_onednn_dtype(weight);
-  auto dst_data_t = at::xpu::oneDNN::get_onednn_dtype(grad_output);
+  auto src_data_t = xpu::oneDNN::get_onednn_dtype(input);
+  auto wei_data_t = xpu::oneDNN::get_onednn_dtype(weight);
+  auto dst_data_t = xpu::oneDNN::get_onednn_dtype(grad_output);
   auto bias_data_t = dnnl::memory::data_type::f32;
   auto usr_bias_data_t = dnnl::memory::data_type::f32;
 
   if (bias_defined) {
-    bias_data_t = at::xpu::oneDNN::get_onednn_dtype(weight);
+    bias_data_t = xpu::oneDNN::get_onednn_dtype(weight);
   }
 
   auto format_any = memory::format_tag::any;
@@ -303,7 +302,7 @@ Tensor dpcpp_convolution_transpose_backward_input(
   if (grad_output_usr_md != expected_grad_output_md) {
     grad_output_ = empty_opaque_tensor(expected_grad_output_md, grad_output.options(), c10::nullopt);
     grad_output_memory = dpcpp_onednn_memory(expected_grad_output_md, engine, grad_output_.data_ptr());
-    at::xpu::oneDNN::reorder(grad_output, grad_output_);
+    xpu::oneDNN::reorder(grad_output, grad_output_);
   }
 
   auto expected_weight_md = deconv_backward_data_pd.weights_desc();
@@ -352,7 +351,7 @@ Tensor dpcpp_convolution_transpose_backward_input(
        {DNNL_ARG_DIFF_SRC, grad_input_memory}});
 
   if (!lazy_reorder_enabled() && grad_input_.data_ptr() != grad_input.data_ptr()) {
-    at::xpu::oneDNN::reorder(grad_input_, grad_input);
+    xpu::oneDNN::reorder(grad_input_, grad_input);
   } else if(lazy_reorder_enabled() && grad_input_.data_ptr() != grad_input.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(grad_input_);
     DPCPPTensorContext::set_tensor_ctx(grad_input, std::move(blk_ctx));
@@ -379,16 +378,16 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_transpose_backward_weights(
   auto ndim = input.ndimension();
   auto grad_weight = at::empty(weight.sizes(), grad_output.options());
 
-  auto src_data_t = at::xpu::oneDNN::get_onednn_dtype(input);
-  auto wei_data_t = at::xpu::oneDNN::get_onednn_dtype(weight);
-  auto dst_data_t = at::xpu::oneDNN::get_onednn_dtype(grad_output);
+  auto src_data_t = xpu::oneDNN::get_onednn_dtype(input);
+  auto wei_data_t = xpu::oneDNN::get_onednn_dtype(weight);
+  auto dst_data_t = xpu::oneDNN::get_onednn_dtype(grad_output);
   auto bias_data_t = dnnl::memory::data_type::f32;
   auto usr_bias_data_t = dnnl::memory::data_type::f32;
 
   Tensor grad_bias;
   if (bias_defined) {
     grad_bias = at::empty({grad_output.size(1)}, grad_output.options());
-    bias_data_t = at::xpu::oneDNN::get_onednn_dtype(weight);
+    bias_data_t = xpu::oneDNN::get_onednn_dtype(weight);
   }
 
   auto format_any = memory::format_tag::any;
@@ -498,7 +497,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_transpose_backward_weights(
   if (input_usr_md != expected_input_md) {
     input_ = empty_opaque_tensor(expected_input_md, input.options(), c10::nullopt);
     input_memory = dpcpp_onednn_memory(expected_input_md, engine, input_.data_ptr());
-    at::xpu::oneDNN::reorder(input, input_);
+    xpu::oneDNN::reorder(input, input_);
   }
 
   auto expected_grad_output_md = deconv_backward_weights_pd.diff_dst_desc();
@@ -506,7 +505,7 @@ std::tuple<at::Tensor, at::Tensor> dpcpp_convolution_transpose_backward_weights(
   if (grad_output_usr_md != expected_grad_output_md) {
     grad_output_ = empty_opaque_tensor(expected_grad_output_md, grad_output.options(), c10::nullopt);
     grad_output_memory = dpcpp_onednn_memory(expected_grad_output_md, engine, grad_output_.data_ptr());
-    at::xpu::oneDNN::reorder(grad_output, grad_output_);
+    xpu::oneDNN::reorder(grad_output, grad_output_);
   }
 
   auto expected_grad_weight_md = deconv_backward_weights_pd.diff_weights_desc();

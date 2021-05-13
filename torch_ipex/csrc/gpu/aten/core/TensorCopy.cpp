@@ -6,8 +6,7 @@
 #include <core/TensorImplUtils.h>
 
 
-
-namespace at {
+namespace xpu {
 namespace dpcpp {
 
 void TensorImpl_copy(TensorImpl* dst, TensorImpl* src) {

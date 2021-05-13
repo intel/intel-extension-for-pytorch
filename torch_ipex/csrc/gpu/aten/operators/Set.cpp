@@ -1,7 +1,8 @@
 #include <core/TensorImplUtils.h>
 #include <ATen/core/TensorBody.h>
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

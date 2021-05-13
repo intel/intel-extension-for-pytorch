@@ -4,9 +4,10 @@
 #include <core/detail/TensorInfo.h>
 #include <utils/General.h>
 
-using namespace at::dpcpp::detail;
 
-namespace at {
+using namespace xpu::dpcpp::detail;
+
+namespace xpu {
 namespace dpcpp {
 
 TensorImpl* TensorImpl_new(caffe2::TypeMeta type_meta, bool is_quantized) {

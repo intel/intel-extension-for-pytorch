@@ -13,7 +13,8 @@
 #include <functional>
 #include <memory>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -54,7 +55,7 @@ int XPUHooks::getDeviceCount() const {
 }
 
 at::Device XPUHooks::getDeviceFromPtr(void* data) const {
-  return at::dpcpp::getDeviceFromPtr(data);
+  return xpu::dpcpp::getDeviceFromPtr(data);
 }
 
 bool XPUHooks::isPinnedPtr(void* data) const {
@@ -67,7 +68,7 @@ at::Allocator* XPUHooks::getPinnedMemoryAllocator() const {
 
 const Generator&
 XPUHooks::getDefaultXPUGenerator(DeviceIndex device_index) const {
-  return at::dpcpp::detail::getDefaultDPCPPGenerator(device_index);
+  return xpu::dpcpp::detail::getDefaultDPCPPGenerator(device_index);
 }
 
 REGISTER_XPU_HOOKS(XPUHooks);

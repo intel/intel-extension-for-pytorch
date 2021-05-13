@@ -7,8 +7,9 @@
 #include <list>
 #include <oneapi/dnnl/dnnl.hpp>
 
-namespace at {
-namespace dpcpp {
+
+namespace xpu {
+namespace oneDNN {
 
 using bytestring = std::string;
 using lru_key_t = bytestring;

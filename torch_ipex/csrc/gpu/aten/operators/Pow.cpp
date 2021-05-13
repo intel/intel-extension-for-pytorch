@@ -5,7 +5,8 @@
 #include <utils/Pointwise.h>
 #include <utils/ATDispatch.h>
 
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -18,35 +19,35 @@ typename std::enable_if<!IS_FLOAT(scalar_t), void>::type pow(
     scalar_t value) {
   if (TensorImpl_Unwrap(self_) == TensorImpl_Unwrap(src)) {
     if (Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(1))) {
-      dpcpp::DPCPP_tensor_apply1<scalar_t>(
+      DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, 1>(value));
     } else if (Numerics<scalar_t>::eq(
                    value, ScalarConvert<int, scalar_t>::to(2))) {
-      dpcpp::DPCPP_tensor_apply1<scalar_t>(
+      DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, 2>(value));
     } else if (Numerics<scalar_t>::eq(
                    value, ScalarConvert<int, scalar_t>::to(3))) {
-      dpcpp::DPCPP_tensor_apply1<scalar_t>(
+      DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, 3>(value));
     } else {
-      dpcpp::DPCPP_tensor_apply1<scalar_t>(
+      DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, -3>(value));
     }
   } else {
     self_.resize_as_(src);
     if (Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(1))) {
-      dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, 1>(value));
     } else if (Numerics<scalar_t>::eq(
                    value, ScalarConvert<int, scalar_t>::to(2))) {
-      dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, 2>(value));
     } else if (Numerics<scalar_t>::eq(
                    value, ScalarConvert<int, scalar_t>::to(3))) {
-      dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, 3>(value));
     } else {
-      dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, -3>(value));
     }
   }
@@ -59,51 +60,51 @@ typename std::enable_if<IS_FLOAT(scalar_t), void>::type pow(
     scalar_t value) {
   if (TensorImpl_Unwrap(self_) == TensorImpl_Unwrap(src)) {
     if (Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(1))) {
-      dpcpp::DPCPP_tensor_apply1<scalar_t>(
+      DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, 1>(value));
     } else if (Numerics<scalar_t>::eq(
                    value, ScalarConvert<int, scalar_t>::to(2))) {
-      dpcpp::DPCPP_tensor_apply1<scalar_t>(
+      DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, 2>(value));
     } else if (Numerics<scalar_t>::eq(
                    value, ScalarConvert<int, scalar_t>::to(3))) {
-      dpcpp::DPCPP_tensor_apply1<scalar_t>(
+      DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, 3>(value));
     } else if (Numerics<scalar_t>::eq(
                    value, ScalarConvert<int, scalar_t>::to(-1))) {
-      dpcpp::DPCPP_tensor_apply1<scalar_t>(
+      DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, -1>(value));
     } else if (Numerics<scalar_t>::eq(
                    value, ScalarConvert<int, scalar_t>::to(-2))) {
-      dpcpp::DPCPP_tensor_apply1<scalar_t>(
+      DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, -2>(value));
     } else {
-      dpcpp::DPCPP_tensor_apply1<scalar_t>(
+      DPCPP_tensor_apply1<scalar_t>(
           self_, TensorPowOp<scalar_t, -3>(value));
     }
   } else {
     self_.resize_as_(src);
     if (Numerics<scalar_t>::eq(value, ScalarConvert<int, scalar_t>::to(1))) {
-      dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, 1>(value));
     } else if (Numerics<scalar_t>::eq(
                    value, ScalarConvert<int, scalar_t>::to(2))) {
-      dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, 2>(value));
     } else if (Numerics<scalar_t>::eq(
                    value, ScalarConvert<int, scalar_t>::to(3))) {
-      dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, 3>(value));
     } else if (Numerics<scalar_t>::eq(
                    value, ScalarConvert<int, scalar_t>::to(-1))) {
-      dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, -1>(value));
     } else if (Numerics<scalar_t>::eq(
                    value, ScalarConvert<int, scalar_t>::to(-2))) {
-      dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, -2>(value));
     } else {
-      dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+      DPCPP_tensor_apply2<scalar_t, scalar_t>(
           self_, src, TensorPowOp<scalar_t, -3>(value));
     }
   }
@@ -113,11 +114,11 @@ template <typename scalar_t>
 void cpow(Tensor& self_, const Tensor& src1, const Tensor& src2) {
   TORCH_CHECK(src1.numel() == src2.numel(), "sizes do not match");
   if (TensorImpl_Unwrap(self_) == TensorImpl_Unwrap(src1)) {
-    dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+    DPCPP_tensor_apply2<scalar_t, scalar_t>(
         self_, src2, TensorCPowOp<scalar_t>());
   } else {
     self_.resize_as_(src1);
-    dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
+    DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
         self_, src1, src2, TensorCPowOp<scalar_t>());
   }
 }
@@ -125,10 +126,10 @@ void cpow(Tensor& self_, const Tensor& src1, const Tensor& src2) {
 template <typename scalar_t>
 void tpow(Tensor& self_, scalar_t value, const Tensor& src) {
   if (TensorImpl_Unwrap(self_) == TensorImpl_Unwrap(src)) {
-    dpcpp::DPCPP_tensor_apply1<scalar_t>(self_, TensorTPowOp<scalar_t>(value));
+    DPCPP_tensor_apply1<scalar_t>(self_, TensorTPowOp<scalar_t>(value));
   } else {
     self_.resize_as_(src);
-    dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
+    DPCPP_tensor_apply2<scalar_t, scalar_t>(
         self_, src, TensorTPowOp<scalar_t>(value));
   }
 }

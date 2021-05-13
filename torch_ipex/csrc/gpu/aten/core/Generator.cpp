@@ -1,8 +1,8 @@
 #include <core/Functions.h>
 #include <core/Generator.h>
 
-namespace at {
 
+namespace xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -50,7 +50,6 @@ Generator createDPCPPGenerator(DeviceIndex device_index) {
 }
 
 } // namespace detail
-} // namespace dpcpp
 
 DPCPPGeneratorImpl::DPCPPGeneratorImpl(DeviceIndex device_index)
     : GeneratorImpl{Device(DeviceType::XPU, device_index),
@@ -101,4 +100,5 @@ DPCPPGeneratorImpl* DPCPPGeneratorImpl::clone_impl() const {
   return gen;
 }
 
-} // namespace at
+} // namespace dpcpp
+} // namespace xpu

@@ -15,7 +15,7 @@
 #define AT_DPCPP_CATCH_RETHROW(filename, lineno) \
   }                                              \
   catch (oneapi::mkl::lapack::exception & e) {   \
-    OneMklExInfoManager::Instance().setLastInfo(e.info()); \
+    xpu::oneMKL::OneMklExInfoManager::Instance().setLastInfo(e.info()); \
     TORCH_WARN(                                  \
         "ONEMKL Exception:",                     \
         e.info(),                                \
@@ -39,7 +39,7 @@
 #define AT_DPCPP_CATCH_NOTHROW(filename, lineno) \
   }                                              \
   catch (oneapi::mkl::lapack::exception & e) {   \
-    OneMklExInfoManager::Instance().setLastInfo(e.info()); \
+    xpu::oneMKL::OneMklExInfoManager::Instance().setLastInfo(e.info()); \
     TORCH_WARN(                                  \
         "ONEMKL Exception:",                     \
         e.info(),                                \

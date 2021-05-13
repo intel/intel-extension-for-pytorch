@@ -2,7 +2,8 @@
 
 #include <core/DPCPP.h>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 template <typename reduce_op, typename nd_item_id, typename local_shared>
@@ -26,4 +27,4 @@ DPCPP_DEVICE static inline void simple_reduce(
 }
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

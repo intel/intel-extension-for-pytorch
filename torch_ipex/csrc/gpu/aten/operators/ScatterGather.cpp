@@ -9,8 +9,9 @@
 #include <utils/ATDispatch.h>
 #include "ScatterGather.h"
 
-using namespace at::dpcpp::detail;
-using namespace at::dpcpp;
+
+using namespace xpu::dpcpp::detail;
+using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

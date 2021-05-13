@@ -2,7 +2,10 @@
 
 #include <torch/csrc/jit/runtime/custom_operator.h>
 
-namespace torch { namespace jit {
+
+namespace torch {
+namespace jit {
+
 // XXX: PyTorch does not support nesting namespace
 // And the alias analysis is not working for namespace other than aten ...
 // So we fake some op namespaces to workaround that.

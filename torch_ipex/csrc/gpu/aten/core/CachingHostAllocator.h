@@ -7,7 +7,8 @@
 #include <core/DPCPPUtils.h>
 #include <core/Functions.h>
 
-namespace at {
+
+namespace xpu {
 namespace dpcpp {
 
 // Provide a caching allocator for host allocation by USM malloc_host
@@ -20,6 +21,6 @@ void dpcpp_recordEventInCachingHostAllocator(void* ptr, DPCPP::event& e);
 void dpcpp_emptyCacheInCachingHostAllocator();
 
 bool dpcpp_isAllocatedByCachingHostAllocator(void* ptr);
-}} // namespace at::dpcpp
+}} // namespace xpu::dpcpp
 
 #endif
