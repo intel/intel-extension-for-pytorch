@@ -11,7 +11,8 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
         - [INT8](#int8-quantization)
      - [Supported Customized Operators](#Supported Customized Operators)
      - [Supported Fusion Patterns](#Supported Fusion Patterns)
- - [Contribution](#contribution)
+ - [Tutorials](#Tutorials)
+ - [Joint-blogs](#Joint-blogs)
  - [License](#license)
 
 ## Installation
