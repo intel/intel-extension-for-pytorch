@@ -348,7 +348,8 @@ static at::Tensor convolution(
   if (wgh_usr_md != expected_wgh_md) {
     if (weight_cache_enabled() && src.is_quantized()) {
         QuantizerPtr quantizer;
-        if (wgh.qscheme() == kPerChannelAffine) {
+
+        if (wgh.is_quantized() && wgh.qscheme() == kPerChannelAffine) {
           quantizer = xpu::dpcpp::make_per_channel_affine_quantizer(
               wgh.q_per_channel_scales(),
               wgh.q_per_channel_zero_points(),
