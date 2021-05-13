@@ -156,39 +156,52 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_template(
   };
 
   // BatchNorm weight/bias only support FP32 data type in oneDNN
-  weight = weight.scalar_type() == ScalarType::Half ||
-          weight.scalar_type() == ScalarType::BFloat16
-      ? weight.to(ScalarType::Float)
-      : weight;
-  bias = bias.scalar_type() == ScalarType::Half ||
-          bias.scalar_type() == ScalarType::BFloat16
-      ? bias.to(ScalarType::Float)
-      : bias;
+  Tensor weight_f32 = at::empty_like(weight, at::kFloat);
+  Tensor bias_f32 = at::empty_like(bias, at::kFloat);
+  if (weight.scalar_type() == ScalarType::Half) {
+    dpcppMemoryCopyType(weight_f32.data_ptr<float>(), weight.data_ptr<at::Half>(), feature_num);
+    dpcppMemoryCopyType(bias_f32.data_ptr<float>(), bias.data_ptr<at::Half>(), feature_num);
+  } else if (weight.scalar_type() == ScalarType::BFloat16) {
+    dpcppMemoryCopyType(weight_f32.data_ptr<float>(), weight.data_ptr<at::BFloat16>(), feature_num);
+    dpcppMemoryCopyType(bias_f32.data_ptr<float>(), bias.data_ptr<at::BFloat16>(), feature_num);
+  } else {
+    weight_f32 = weight;
+    bias_f32 = bias;
+  }
+
   // local memory freed before kernel finished
-  auto weight_bias = at::empty(2 * feature_num, weight.options());
+  auto weight_bias = at::empty(2 * feature_num, weight_f32.options());
   auto weight_bias_memory = dpcpp_onednn_memory(
       batch_norm_forward_pd.weights_desc(), engine, weight_bias.data_ptr());
 
   dpcppMemcpyAsync(
       weight_bias.data_ptr(),
-      weight.data_ptr(),
-      feature_num * weight.dtype().itemsize(),
+      weight_f32.data_ptr(),
+      feature_num * weight_f32.itemsize(),
       DeviceToDevice);
   dpcppMemcpyAsync(
       static_cast<uint8_t*>(weight_bias.data_ptr()) +
-          feature_num * bias.itemsize(),
-      bias.data_ptr(),
-      feature_num * bias.itemsize(),
+          feature_num * bias_f32.itemsize(),
+      bias_f32.data_ptr(),
+      feature_num * bias_f32.itemsize(),
       DeviceToDevice);
 
   args.insert({DNNL_ARG_SCALE_SHIFT, weight_bias_memory});
 
-  Tensor save_mean = at::empty(feature_num, weight.options());
-  Tensor save_var = at::empty(feature_num, weight.options());
+  Tensor save_mean = at::empty(feature_num, weight_f32.options());
+  Tensor save_var = at::empty(feature_num, weight_f32.options());
 
   void* mean_data = nullptr;
   void* var_data = nullptr;
   if ((bool)(flag & normalization_flags::use_global_stats)) {
+    running_mean = running_mean.scalar_type() == ScalarType::Half ||
+            running_mean.scalar_type() == ScalarType::BFloat16
+        ? running_mean.to(ScalarType::Float)
+        : running_mean;
+    running_var = running_var.scalar_type() == ScalarType::Half ||
+            running_var.scalar_type() == ScalarType::BFloat16
+        ? running_var.to(ScalarType::Float)
+        : running_var;
     mean_data = running_mean.data_ptr();
     var_data = running_var.data_ptr();
   } else {

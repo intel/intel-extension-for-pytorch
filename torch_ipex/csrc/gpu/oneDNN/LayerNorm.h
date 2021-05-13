@@ -102,14 +102,19 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
   }
 
   // LayerNorm weight/bias only support FP32 data type in oneDNN
-  Tensor wgh_ = wgh.scalar_type() == ScalarType::Half ||
-          wgh.scalar_type() == ScalarType::BFloat16
-      ? wgh.to(ScalarType::Float)
-      : wgh;
-  Tensor bia_ = bia.scalar_type() == ScalarType::Half ||
-          bia.scalar_type() == ScalarType::BFloat16
-      ? bia.to(ScalarType::Float)
-      : bia;
+  Tensor wgh_ = at::empty_like(wgh, at::kFloat);
+  Tensor bia_ = at::empty_like(bia, at::kFloat);
+  if (wgh.scalar_type() == ScalarType::Half) {
+    dpcppMemoryCopyType(wgh_.data_ptr<float>(), wgh.data_ptr<at::Half>(), ih);
+    dpcppMemoryCopyType(bia_.data_ptr<float>(), bia.data_ptr<at::Half>(), ih);
+  } else if (wgh.scalar_type() == ScalarType::BFloat16) {
+    dpcppMemoryCopyType(wgh_.data_ptr<float>(), wgh.data_ptr<at::BFloat16>(), ih);
+    dpcppMemoryCopyType(bia_.data_ptr<float>(), bia.data_ptr<at::BFloat16>(), ih);
+  } else {
+    wgh_ = wgh;
+    bia_ = bia;
+  }
+
   if (useScaleShift) {
     auto wgh_bia = at::empty(2 * ih, wgh_.options());
     dpcppMemcpyAsync(
