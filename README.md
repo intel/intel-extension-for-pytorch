@@ -250,10 +250,9 @@ Supported Quantization Operators:
 - ```convolution + sum + relu```
 - ```convolution + BatchNorm```
 
-##Supported Customized Operators
+## Supported Customized Operators
 
-
-###Supported Fusion Patterns
+### Supported Fusion Patterns
 
 
 ## Tutorials
