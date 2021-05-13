@@ -368,18 +368,21 @@ _interaction_backward(const at::Tensor &grad_out,
 }
 
 static inline void _interaction_s8s8_scale_s32s8_128(int8_t *out, const std::vector<int8_t *>& input_addr,
-                         size_t M, const std::vector<float>& scales) {
+                         size_t M, const std::vector<float>& scales, __m512i * cat_buf) {
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("ExtendOps::_interaction_s8s8_scale_s32s8", std::vector<c10::IValue>({}));
 #endif
   size_t offset = 0;
   for (int i = 1; i < M; i++) {
-    const void* a = (const void *)input_addr[i];
+    auto * a = (const int8_t *)input_addr[i];
     for (int j = 0; j < i; j++) {
-      const void* b = (const void *)input_addr[j];
-      out[offset] = _dot_s8s8_scale_s32s8_128(a, b, scales[offset]);
+      auto * b = (const int8_t *)input_addr[j];
+      mul_and_sum_s8x128_to_s32x16_aligned_store(&cat_buf[offset], a, b);
       offset++;
     }
+  }
+  for (auto off = 0 ; off < offset; off++) {
+    out[off] = hadd_s32x16_with_scale(cat_buf[off], scales[off]);
   }
 }
 
@@ -414,20 +417,19 @@ inline at::Tensor _interaction_forward_quantization(const std::vector<at::Tensor
   std::vector<uint32_t> feature_sizes(input_size);
   std::vector<int8_t *> input_data(input_size);
   for (auto i = 0 ; i < input_size; i++) {
-    auto cur_input = input[i];
-    in_scales[i] = scales[0][i];
-    std::vector<float> cur_scale = {};
-    cur_scale.push_back(scales[0][i]);
-    cpu::dbl::comm::reorder_to_int8_for_mix_prec(cur_input, cur_scale);
-
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cur_input.sizes()[0] >= batch_size);
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].is_contiguous());
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].device().is_xpu());
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(input[i].dim() == 2);
-    feature_sizes[i] = cur_input.sizes()[1];
-    total_feature_size += feature_sizes[i];
+
+    auto cur_input = input[i];
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(cur_input.sizes()[0] >= batch_size);
+    cpu::dbl::comm::reorder_to_int8_for_mix_prec(cur_input, {scales[0][i]});
+
     auto qinput = cpu::dbl::comm::try_gen_dil_tensor(cur_input);
     input_data[i] = (int8_t*)qinput.get_data_handle();
+    in_scales[i] = qinput.get_scale()[0];
+    feature_sizes[i] = cur_input.sizes()[1];
+    total_feature_size += feature_sizes[i];
   }
 
   auto vector_nums = total_feature_size / vector_size;
@@ -451,7 +453,7 @@ inline at::Tensor _interaction_forward_quantization(const std::vector<at::Tensor
   float dense_scale = output_scale / in_scales[0];
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
-    //int8_t cat_buf[vector_nums * vector_size] __attribute__((aligned(64)));
+    __m512i cat_buf[offset] __attribute__((aligned(64)));
     std::vector<int8_t*> input_addr(vector_nums);
     for (int64_t i = start; i < end; i++) {
       int8_t* flat_buf = (int8_t*)(&out_data[i * out_data_line_len] + vector_size);
@@ -461,13 +463,11 @@ inline at::Tensor _interaction_forward_quantization(const std::vector<at::Tensor
       }
       if (vector_size == 128) {
         scale_and_move_ker_128(&out_data[i * out_data_line_len], &input_data[0][i * vector_size], dense_scale);
-        _interaction_s8s8_scale_s32s8_128(flat_buf, input_addr, vector_nums, out_in_scales);
+        _interaction_s8s8_scale_s32s8_128(flat_buf, input_addr, vector_nums, out_in_scales, cat_buf);
       } else {
         scale_and_move_ker(&out_data[i * out_data_line_len], &input_data[0][i * vector_size], dense_scale, vector_size);
         _interaction_s8s8_scale_s32s8(flat_buf, input_addr, vector_nums, vector_size, out_in_scales);
       }
-      //cat<int8_t>(cat_buf, input_data, feature_sizes, i);
-      //_AAt_lower_triangle_s8s8_scale_s32s8(flat_buf, cat_buf, vector_nums, vector_size, out_in_scales);
     }
   });
 
@@ -484,7 +484,7 @@ AtenIpexTypeExt::interaction_forward(const std::vector<at::Tensor> &input) {
   }
 
   bool quantized = false;
-  if (false && check_auto_mix_int8_fp32() && !check_int8_calibration()) {
+  if (check_auto_mix_int8_fp32() && !check_int8_calibration()) {
     int64_t num_ops_id = Int8OptConfig::fetch_and_add_ops_id();
     quantized = cpu::dbl::comm::get_int8_quantized_status(num_ops_id);
     if (quantized) {
@@ -502,7 +502,7 @@ AtenIpexTypeExt::interaction_forward(const std::vector<at::Tensor> &input) {
   }
 
   auto out = _interaction_forward<float>(input);
-  if (false && check_int8_calibration() && check_auto_mix_int8_fp32()) {
+  if (check_int8_calibration() && check_auto_mix_int8_fp32()) {
     insert_or_updata_observer({input}, {out}, "interaction_forward", Int8OptConfig::fetch_and_add_ops_id());
   }
   return out;
