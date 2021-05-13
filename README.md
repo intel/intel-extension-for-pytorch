@@ -9,6 +9,8 @@ Intel Extension for PyTorch is a Python package to extend official PyTorch. It i
      - [Automatically Mix Precison](#automatically-mix-precision)
         - [BFloat16](#BFloat16)
         - [INT8](#int8-quantization)
+     - [Supported Customized Operators](#Supported Customized Operators)
+     - [Supported Fusion Patterns](#Supported Fusion Patterns)
  - [Contribution](#contribution)
  - [License](#license)
 
@@ -247,6 +249,12 @@ Supported Quantization Operators:
 - ```convolution + sum```
 - ```convolution + sum + relu```
 - ```convolution + BatchNorm```
+
+##Supported Customized Operators
+
+
+###Supported Fusion Patterns
+
 
 ## Tutorials
 [Performance Tuning](tutorials/Performance_Tuning.md)
