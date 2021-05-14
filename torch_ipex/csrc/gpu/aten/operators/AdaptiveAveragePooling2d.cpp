@@ -2,10 +2,12 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
+
 #include <core/Runtime.h>
-#include <vector>
 #include <utils/ATDispatch.h>
-#include "Pooling.h"
+#include <oneDNN/oneDNN.h>
+
+#include <vector>
 
 
 using namespace dnnl;
@@ -44,13 +46,18 @@ void adaptive_avg_pool2d_out_template(
   int padW = (dW * (nOutputCols - 1) + kW - nInputCols) / 2;
   int padH = (dH * (nOutputRows - 1) + kH - nInputRows) / 2;
 
-  Tensor input_ = input.contiguous();
+  Tensor input_ = input;
+  if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols},
+        at::MemoryFormat::ChannelsLast);
+  } else {
+    input_ = input.contiguous();
+    output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols});
+  }
 
-  output.resize_({batchSize, nInputPlane, nOutputRows, nOutputCols});
-
-  avg_pool_out_frame<algorithm::pooling_avg_exclude_padding>(
-      input_,
+  ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
       output,
+      input_,
       batchSize,
       nInputPlane,
       0,
@@ -68,7 +75,6 @@ void adaptive_avg_pool2d_out_template(
       0,
       padH,
       padW);
-
 }
 
 void adaptive_avg_pool2d_backward_out_template(
@@ -104,7 +110,7 @@ void adaptive_avg_pool2d_backward_out_template(
 
   auto alg_kind = algorithm::pooling_avg_exclude_padding;
 
-  avg_pool_backward_out_frame<algorithm::pooling_avg_exclude_padding>(
+  ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
       gradInput,
       gradOutput,
       batchSize,

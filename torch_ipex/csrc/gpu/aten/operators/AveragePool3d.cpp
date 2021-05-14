@@ -2,10 +2,12 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
+
 #include <core/Runtime.h>
-#include <vector>
 #include <utils/ATDispatch.h>
-#include "Pooling.h"
+#include <oneDNN/oneDNN.h>
+
+#include <vector>
 
 
 using namespace dnnl;
@@ -29,7 +31,9 @@ void avg_pool3d_out_template(
   //
   //  checkAllSameGPU("avg_pool3d_out_sycl", {output_arg, input_arg});
 
-  Tensor input_ = input.contiguous();
+  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+                  input :
+                  input.contiguous();
 
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
@@ -107,58 +111,63 @@ void avg_pool3d_out_template(
       /*check_input_size=*/true);
 
   if (input_.ndimension() == 4) {
+    // cannot give channels last for 4D tensor from frontend user perspective
+    // the 2nd dim is outputDepth, not channel dim
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
-    output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
+    if (input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+          at::MemoryFormat::ChannelsLast);
+    } else {
+      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
+    }
   }
 
   TORCH_CHECK(output.is_contiguous(), "avg_pool3d: output must be contiguous");
 
   if (count_include_pad) {
-    avg_pool_out_frame<algorithm::pooling_avg_include_padding>(
-      input_,
-      output,
-      nbatch,
-      nblock,
-      idepth,
-      iheight,
-      iwidth,
-      outputDepth,
-      outputHeight,
-      outputWidth,
-      kD,
-      kH,
-      kW,
-      dD,
-      dH,
-      dW,
-      padD,
-      padH,
-      padW);
+    ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_include_padding>(
+        output,
+        input_,
+        nbatch,
+        nblock,
+        idepth,
+        iheight,
+        iwidth,
+        outputDepth,
+        outputHeight,
+        outputWidth,
+        kD,
+        kH,
+        kW,
+        dD,
+        dH,
+        dW,
+        padD,
+        padH,
+        padW);
   } else {
-    avg_pool_out_frame<algorithm::pooling_avg_exclude_padding>(
-      input_,
-      output,
-      nbatch,
-      nblock,
-      idepth,
-      iheight,
-      iwidth,
-      outputDepth,
-      outputHeight,
-      outputWidth,
-      kD,
-      kH,
-      kW,
-      dD,
-      dH,
-      dW,
-      padD,
-      padH,
-      padW);      
+    ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+        output,
+        input_,
+        nbatch,
+        nblock,
+        idepth,
+        iheight,
+        iwidth,
+        outputDepth,
+        outputHeight,
+        outputWidth,
+        kD,
+        kH,
+        kW,
+        dD,
+        dH,
+        dW,
+        padD,
+        padH,
+        padW);
   }
-
-
 }
 
 Tensor& avg_pool3d_backward_out_template(
@@ -273,7 +282,7 @@ Tensor& avg_pool3d_backward_out_template(
   }
 
   if (count_include_pad) {
-    avg_pool_backward_out_frame<algorithm::pooling_avg_include_padding>(
+    ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_avg_include_padding>(
         gradInput,
         gradOutput,
         nbatch,
@@ -294,7 +303,7 @@ Tensor& avg_pool3d_backward_out_template(
         padH,
         padW);
   } else {
-    avg_pool_backward_out_frame<algorithm::pooling_avg_exclude_padding>(
+    ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
         gradInput,
         gradOutput,
         nbatch,
@@ -313,7 +322,7 @@ Tensor& avg_pool3d_backward_out_template(
         dW,
         padD,
         padH,
-        padW);  
+        padW);
   }
 
 

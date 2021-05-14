@@ -2,10 +2,12 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
+
 #include <core/Runtime.h>
-#include <vector>
 #include <utils/ATDispatch.h>
-#include "Pooling.h"
+#include <oneDNN/oneDNN.h>
+
+#include <vector>
 
 
 using namespace dnnl;
@@ -41,7 +43,9 @@ void adaptive_max_pool3d_out_template(
       output_size.size() == 3,
       "adaptive_max_pool3d: internal error: output_size.size() must be 3");
 
-  Tensor input_ = input.contiguous();
+  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+                  input :
+                  input.contiguous();
 
   int64_t nbatch = input_.ndimension() == 5 ? input_.size(-5) : 1;
   int64_t nblock = input_.size(-4);
@@ -71,20 +75,27 @@ void adaptive_max_pool3d_out_template(
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
 
-  auto alg_kind = algorithm::pooling_max;
-  auto prop_kind = dnnl::prop_kind::forward_training;
   if (input_.ndimension() == 4) {
+    // cannot give channels last for 4D tensor from frontend user perspective
+    // the 2nd dim is outputDepth, not channel dim
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
     indices.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
-    output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
-    indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
+    if (input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+          at::MemoryFormat::ChannelsLast);
+      indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+          at::MemoryFormat::ChannelsLast);
+    } else {
+      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
+      indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
+    }
   }
 
-  max_pool_out_frame<algorithm::pooling_max>(
-      input_,
+  ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
       output,
       indices,
+      input_,
       nbatch,
       nblock,
       inputDepth,
@@ -142,7 +153,7 @@ Tensor& adaptive_max_pool3d_backward_out_template(
   gradInput.resize_as_(input);
   gradInput.zero_();
 
-  max_pool_backward_out_frame<algorithm::pooling_max>(
+  ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
       gradOutput,
       indices,

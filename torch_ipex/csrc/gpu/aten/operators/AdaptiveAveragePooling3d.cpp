@@ -2,10 +2,12 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
+
 #include <core/Runtime.h>
-#include <vector>
 #include <utils/ATDispatch.h>
-#include "Pooling.h"
+#include <oneDNN/oneDNN.h>
+
+#include <vector>
 
 
 using namespace dnnl;
@@ -64,37 +66,42 @@ void adaptive_avg_pool3d_out_template(
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
 
-  auto alg_kind = algorithm::pooling_avg_exclude_padding;
-
-  Tensor input_ = input.contiguous();
-
+  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+                  input :
+                  input.contiguous();
   if (input_.ndimension() == 4) {
+    // cannot give channels last for 4D tensor from frontend user perspective
+    // the 2nd dim is outputDepth, not channel dim
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
-    output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
+    if (input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+          at::MemoryFormat::ChannelsLast);
+    } else {
+      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
+    }
   }
 
-  avg_pool_out_frame<algorithm::pooling_avg_exclude_padding>(
-    input_,
-    output,
-    nbatch,
-    nblock,
-    inputDepth,
-    inputHeight,
-    inputWidth,
-    outputDepth,
-    outputHeight,
-    outputWidth,
-    kD,
-    kH,
-    kW,
-    dD,
-    dH,
-    dW,
-    padD,
-    padH,
-    padW);
-
+  ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+      output,
+      input_,
+      nbatch,
+      nblock,
+      inputDepth,
+      inputHeight,
+      inputWidth,
+      outputDepth,
+      outputHeight,
+      outputWidth,
+      kD,
+      kH,
+      kW,
+      dD,
+      dH,
+      dW,
+      padD,
+      padH,
+      padW);
 }
 
 Tensor& adaptive_avg_pool3d_backward_out_template(
@@ -131,8 +138,7 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
   int padH = (dH * (gradOutputHeight - 1) + kH - gradInputHeight) / 2;
   int padW = (dW * (gradOutputWidth - 1) + kW - gradInputWidth) / 2;
 
-
-  avg_pool_backward_out_frame<algorithm::pooling_avg_exclude_padding>(
+  ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
       gradInput,
       gradOutput,
       nbatch,

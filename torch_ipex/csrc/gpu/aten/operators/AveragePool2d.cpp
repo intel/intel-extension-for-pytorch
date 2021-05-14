@@ -5,8 +5,9 @@
 
 #include <core/Runtime.h>
 #include <utils/ATDispatch.h>
+#include <oneDNN/oneDNN.h>
 
-#include "Pooling.h"
+#include <vector>
 
 
 using namespace dnnl;
@@ -75,52 +76,57 @@ void avg_pool2d_out_template(
       outputHeight,
       outputWidth);
 
-  output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
-
-  Tensor input = input_.contiguous();
+  Tensor input = input_;
+  if (input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth},
+        at::MemoryFormat::ChannelsLast);
+  } else {
+    input = input_.contiguous();
+    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
+  }
 
   if (count_include_pad) {
-    avg_pool_out_frame<algorithm::pooling_avg_include_padding>(
-      input,
-      output,
-      nbatch,
-      nInputPlane,
-      0,
-      inputHeight,
-      inputWidth,
-      0,
-      outputHeight,
-      outputWidth,
-      0,
-      kH,
-      kW,
-      0,
-      dH,
-      dW,
-      0,
-      padH,
-      padW);
+    ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_include_padding>(
+        output,
+        input,
+        nbatch,
+        nInputPlane,
+        0,
+        inputHeight,
+        inputWidth,
+        0,
+        outputHeight,
+        outputWidth,
+        0,
+        kH,
+        kW,
+        0,
+        dH,
+        dW,
+        0,
+        padH,
+        padW);
   } else {
-    avg_pool_out_frame<algorithm::pooling_avg_exclude_padding>(
-      input,
-      output,
-      nbatch,
-      nInputPlane,
-      0,
-      inputHeight,
-      inputWidth,
-      0,
-      outputHeight,
-      outputWidth,
-      0,
-      kH,
-      kW,
-      0,
-      dH,
-      dW,
-      0,
-      padH,
-      padW);    
+    ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+        output,
+        input,
+        nbatch,
+        nInputPlane,
+        0,
+        inputHeight,
+        inputWidth,
+        0,
+        outputHeight,
+        outputWidth,
+        0,
+        kH,
+        kW,
+        0,
+        dH,
+        dW,
+        0,
+        padH,
+        padW);
   }
 }
 
@@ -187,7 +193,7 @@ Tensor& avg_pool2d_backward_out_template(
   const Tensor gradOutput = gradOutput_.contiguous();
 
   if (count_include_pad){
-    avg_pool_backward_out_frame<algorithm::pooling_avg_include_padding>(
+    ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_avg_include_padding>(
         gradInput,
         gradOutput,
         nbatch,
@@ -208,7 +214,7 @@ Tensor& avg_pool2d_backward_out_template(
         padH,
         padW);
   } else {
-    avg_pool_backward_out_frame<algorithm::pooling_avg_exclude_padding>(
+    ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
         gradInput,
         gradOutput,
         nbatch,
@@ -227,7 +233,7 @@ Tensor& avg_pool2d_backward_out_template(
         dW,
         0,
         padH,
-        padW); 
+        padW);
   }
 
 
@@ -375,10 +381,10 @@ Tensor avg_pool2d(
 
   Tensor output;
   output = _empty_affine_quantized({0},
-                                     input.options(),
-                                     input.q_scale(),
-                                     input.q_zero_point(),
-                                     MemoryFormat::Contiguous);
+                                   input.options(),
+                                   input.q_scale(),
+                                   input.q_zero_point(),
+                                   MemoryFormat::Contiguous);
 
   return at::AtenIpexTypeXPU::avg_pool2d_out(
     output,

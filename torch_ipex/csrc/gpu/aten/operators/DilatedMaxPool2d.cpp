@@ -1,12 +1,14 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
-#include <tuple>
 
 #include <core/Runtime.h>
 #include <utils/Math.h>
 #include <utils/ATDispatch.h>
-#include "Pooling.h"
+#include <oneDNN/oneDNN.h>
+
+#include <tuple>
+
 
 using namespace dnnl;
 using namespace at::native;
@@ -84,17 +86,22 @@ void max_pool2d_with_indices_out_template(
       outputWidth);
 
   /* get contiguous input */
-  Tensor input = input_.contiguous();
-  output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
-  indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
+  Tensor input = input_;
+  if (input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth},
+        at::MemoryFormat::ChannelsLast);
+    indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth},
+        at::MemoryFormat::ChannelsLast);
+  } else {
+    input = input_.contiguous();
+    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
+    indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
+  }
 
-  auto alg_kind = algorithm::pooling_max;
-  auto prop_kind = dnnl::prop_kind::forward_training;
-  
-  max_pool_out_frame<algorithm::pooling_max>(
-      input,
+  ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
       output,
       indices,
+      input,
       nbatch,
       nInputPlane,
       0,
@@ -190,7 +197,7 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       outputHeight_for_shape_check,
       outputWidth_for_shape_check);
 
-  max_pool_backward_out_frame<algorithm::pooling_max>(
+  ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
       gradOutput,
       indices,

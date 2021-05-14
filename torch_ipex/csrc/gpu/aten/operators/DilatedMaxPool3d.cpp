@@ -2,12 +2,12 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
+
 #include <core/Runtime.h>
-#include <vector>
-
 #include <utils/ATDispatch.h>
+#include <oneDNN/oneDNN.h>
 
-#include "Pooling.h"
+#include <vector>
 
 
 using namespace dnnl;
@@ -115,37 +115,48 @@ void max_pool3d_with_indices_out_template(
       /*check_input_size=*/true);
 
   /* get contiguous input */
-  Tensor input = input_.contiguous();
+  Tensor input = input_.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+                 input_ :
+                 input_.contiguous();
 
   if (input.ndimension() == 4) {
+    // cannot give channels last for 4D tensor from frontend user perspective
+    // the 2nd dim is outputDepth, not channel dim
     output.resize_({nblock, outputDepth, outputHeight, outputWidth});
     indices.resize_({nblock, outputDepth, outputHeight, outputWidth});
   } else {
-    output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
-    indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
+    if (input.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+          at::MemoryFormat::ChannelsLast);
+      indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth},
+          at::MemoryFormat::ChannelsLast);
+    } else {
+      output.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
+      indices.resize_({nbatch, nblock, outputDepth, outputHeight, outputWidth});
+    }
   }
 
-  max_pool_out_frame<algorithm::pooling_max>(
-    input,
-    output,
-    indices,
-    nbatch,
-    nblock,
-    inputDepth,
-    inputHeight,
-    inputWidth,
-    outputDepth,
-    outputHeight,
-    outputWidth,
-    kD,
-    kH,
-    kW,
-    dD,
-    dH,
-    dW,
-    padD,
-    padH,
-    padW);
+  ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
+      output,
+      indices,
+      input,
+      nbatch,
+      nblock,
+      inputDepth,
+      inputHeight,
+      inputWidth,
+      outputDepth,
+      outputHeight,
+      outputWidth,
+      kD,
+      kH,
+      kW,
+      dD,
+      dH,
+      dW,
+      padD,
+      padH,
+      padW);
 }
 
 Tensor& max_pool3d_with_indices_backward_out_template(
@@ -231,7 +242,6 @@ Tensor& max_pool3d_with_indices_backward_out_template(
   const int64_t gradOutputHeight = gradOutput.size(-2);
   const int64_t gradOutputWidth = gradOutput.size(-1);
 
-
   max_pool3d_backward_shape_check(
       input,
       gradOutput,
@@ -256,9 +266,7 @@ Tensor& max_pool3d_with_indices_backward_out_template(
       gradOutputHeight,
       gradOutputWidth);
 
-
-
-  max_pool_backward_out_frame<algorithm::pooling_max>(
+  ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
       gradOutput,
       indices,

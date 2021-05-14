@@ -2,10 +2,12 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
+
 #include <core/Runtime.h>
-#include <vector>
 #include <utils/ATDispatch.h>
-#include "Pooling.h"
+#include <oneDNN/oneDNN.h>
+
+#include <vector>
 
 
 using namespace dnnl;
@@ -44,7 +46,9 @@ void adaptive_max_pool2d_out_template(
   int64_t outputHeight = output_size[0];
   int64_t outputWidth = output_size[1];
 
-  Tensor input_ = input.contiguous();
+  Tensor input_ = input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+                  input :
+                  input.contiguous();
   int64_t nbatch = input_.size(0);
   int64_t nInputPlane = input_.size(1);
   int64_t inputHeight = input_.size(2);
@@ -63,32 +67,37 @@ void adaptive_max_pool2d_out_template(
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
 
-  output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
-  indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
+  if (input_.is_contiguous(at::MemoryFormat::ChannelsLast)) {
+    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth},
+        at::MemoryFormat::ChannelsLast);
+    indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth},
+        at::MemoryFormat::ChannelsLast);
+  } else {
+    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
+    indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth});
+  }
 
-
-  max_pool_out_frame<algorithm::pooling_max>(
-    input_,
-    output,
-    indices,
-    nbatch,
-    nInputPlane,
-    0,
-    inputHeight,
-    inputWidth,
-    0,
-    outputHeight,
-    outputWidth,
-    0,
-    kH,
-    kW,
-    0,
-    dH,
-    dW,
-    0,
-    padH,
-    padW);
-
+  ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
+      output,
+      indices,
+      input_,
+      nbatch,
+      nInputPlane,
+      0,
+      inputHeight,
+      inputWidth,
+      0,
+      outputHeight,
+      outputWidth,
+      0,
+      kH,
+      kW,
+      0,
+      dH,
+      dW,
+      0,
+      padH,
+      padW);
 }
 
 Tensor& adaptive_max_pool2d_backward_out_template(
@@ -123,7 +132,7 @@ Tensor& adaptive_max_pool2d_backward_out_template(
 
   gradInput.resize_as_(input);
 
-  max_pool_backward_out_frame<algorithm::pooling_max>(
+  ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
       gradInput,
       gradOutput,
       indices,
