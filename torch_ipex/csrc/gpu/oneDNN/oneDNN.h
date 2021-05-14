@@ -10,3 +10,4 @@
 #include "Matmul.h"
 #include "Conv.h"
 #include "Pooling.h"
+#include "BatchNorm.h"

@@ -69,3 +69,25 @@ class TestNNMethod(TestCase):
         print("x_dpcpp.grad", x_dpcpp.grad.cpu())
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
+
+    def test_channels_last_simple_fwd(self, dtype=torch.float):
+        x = torch.randn(1, 2, 3, 3, dtype=torch.float)
+        conv = torch.nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
+        bn = torch.nn.BatchNorm2d(2)
+
+        relu = torch.nn.ReLU()
+        ref = conv(x)
+        ref = bn(ref)
+        ref = relu(ref)
+
+        x = x.to("xpu").to(memory_format=torch.channels_last)
+        conv.to("xpu")
+        bn.to("xpu")
+        real = conv(x)
+        real = bn(real)
+        real = relu(real)
+        real = real.contiguous().cpu()
+
+        print(real)
+        print(ref)
+        self.assertEqual(real, ref) 
