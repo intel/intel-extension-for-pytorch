@@ -5,6 +5,7 @@
 
 #include "torch_ipex/csrc/cpu/FusionOPs.h"
 #include "torch_ipex/csrc/utils.h"
+#include "torch_ipex/csrc/cpu/Pooling.h"
 
 namespace torch {
 namespace jit {
@@ -141,6 +142,23 @@ RegisterOperators op({
                   (std::move(peek(stack, 8, 10))).toScalar(),
                   (std::move(peek(stack, 9, 10))).toScalar());
               drop(stack, 10);
+              pack(stack, std::move(result));
+              return 0;
+            };
+        },
+        aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::max_pool2d(Tensor input, int[2] kernel_size, int[2] stride, int[2] padding, int[2] dilation, bool ceil_mode) -> Tensor",
+        [](const Node* node) -> Operation {
+            return [](Stack* stack) {
+              auto result = torch_ipex::cpu::dil_max_pool2d(
+                  (std::move(peek(stack, 0, 6))).toTensor(),
+                  (std::move(peek(stack, 1, 6))).toIntVector(),
+                  (std::move(peek(stack, 2, 6))).toIntVector(),
+                  (std::move(peek(stack, 3, 6))).toIntVector(),
+                  (std::move(peek(stack, 4, 6))).toIntVector(),
+                  (std::move(peek(stack, 5, 6))).toBool());
+              drop(stack, 6);
               pack(stack, std::move(result));
               return 0;
             };

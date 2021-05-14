@@ -3,6 +3,7 @@
 #include "graph_rewrite.h"
 
 #include "cpu/FusionOPs.h"
+#include "cpu/Pooling.h"
 
 #include <c10/util/hash.h>
 #include <torch/csrc/jit/runtime/operator.h>
@@ -319,6 +320,9 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
 
   // replace aten conv with ipex conv
   graph_rewrite::replaceAtenConvolutionWithIpexConv(graph);
+
+  // replace aten max_pool2d witj ipex max_pool2d
+  graph_rewrite::replaceAtenMaxPool2dWithIpexMaxPool2d(graph);
   // TODO: Some post processing?? ECS/EDC/Peephole???
   ConstantPropagation(graph);
 }

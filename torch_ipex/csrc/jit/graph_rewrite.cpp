@@ -382,6 +382,20 @@ void replaceAtenConvolutionWithIpexConv(std::shared_ptr<Graph>& graph) {
   rewriter_conv2d.runOnGraph(graph);
  }
 
+void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
+  std::string max_pool2d = R"(
+      graph(%a, %kernel_size:int[], %stride:int[], %padding:int[], %dilation:int[], %ceil_mode:bool):
+        %r = aten::max_pool2d(%a, %kernel_size, %stride, %padding, %dilation, %ceil_mode)
+        return (%r) )";
+  std::string ipex_max_pool2d = R"(
+      graph(%a, %kernel_size:int[], %stride:int[], %padding:int[], %dilation:int[], %ceil_mode:bool):
+        %r = ipex::max_pool2d(%a, %kernel_size, %stride, %padding, %dilation, %ceil_mode)
+        return (%r) )";
+  SubgraphRewriter rewriter_max_pool2d;
+  rewriter_max_pool2d.RegisterRewritePattern(max_pool2d, ipex_max_pool2d);
+  rewriter_max_pool2d.runOnGraph(graph);
+}
+
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

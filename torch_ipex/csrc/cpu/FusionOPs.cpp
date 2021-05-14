@@ -2,6 +2,7 @@
 #include "torch_ipex/csrc/utils.h"
 #include "Conv.h"
 #include "Linear.h"
+#include "Pooling.h"
 
 #include <ATen/Context.h>
 #include <ATen/InferSize.h>
