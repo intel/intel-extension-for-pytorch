@@ -29,7 +29,7 @@ class AmpConf(object):
             json.dump(configures, fp, indent = 4)
 
     def get_default_recipe(self, configures):
-        elt_wise = ['relu', 'sigmoid']
+        elt_wise = ['relu', 'sigmoid', 'gelu']
         inplace_ops = ['relu_', 'add_']
         # get default recipe,
         # q+dq+conv+q+dq+relu => q+dq+conv+relu

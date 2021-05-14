@@ -47,5 +47,7 @@ at::Tensor add_tensor(const at::Tensor& input, const at::Tensor& other, const at
 
 at::Tensor dropout(const at::Tensor& input, double p, bool train);
 
+at::Tensor gelu(const at::Tensor& input);
+
 } // autocast
 } // torch_ipex

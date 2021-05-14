@@ -215,5 +215,15 @@ at::Tensor dropout(const at::Tensor& input, double p, bool train) {
   return at::dropout(input, p, train);
 }
 
+at::Tensor gelu(const at::Tensor& input) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  auto target_type = get_autocast_dtype();
+  if (at::ScalarType::Char == target_type) {
+    return int8::gelu(input);
+  }
+  // convert to fp32 path.
+  return at::gelu(cpu_cached_cast(at::kFloat, input));
+}
+
 } // autocast
 } // torch_ipex

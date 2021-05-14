@@ -637,6 +637,29 @@ at::Tensor dropout(const at::Tensor &input, double p, bool train) {
   return at::dropout(input, p, train);
 }
 
+at::Tensor gelu(const at::Tensor &input) {
+  auto op_id = torch_ipex::Int8OptConfig::fetch_and_add_ops_id();
+  if (check_int8_calibration()) {
+    auto it = tensors_flow.find(input.unsafeGetTensorImpl());
+    std::vector<std::string> op_inputs, op_outputs;
+    if (it == tensors_flow.end()) {
+      std::string op_input = "gelu." + std::to_string(op_id) + ".input";
+      op_inputs.push_back(op_input);
+    } else {
+      op_inputs.push_back(std::get<1>(it->second));
+    }
+
+    auto output = at::gelu(input);
+    std::string op_output = "gelu." + std::to_string(op_id) + ".output";
+    op_outputs.push_back(op_output);
+    tensors_flow.emplace(output.unsafeGetTensorImpl(),
+                         val_name{weakref_scales(output.getIntrusivePtr()), op_output});
+    torch_ipex::insert_or_updata_observer({input}, {output}, "gelu",
+                                          op_id, op_inputs, op_outputs);
+    return output;
+  }
+}
+  
 } // namespace autocast
 } // namespace cpu
 } // namespace torch_ipex

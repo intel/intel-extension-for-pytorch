@@ -181,7 +181,6 @@ MAKE_REGISTER_FUNC(ADD_NS(addbmm), "addbmm", Tensor (const Tensor &, const Tenso
 MAKE_REGISTER_FUNC(ADD_NS(convolution), "convolution", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&, IntArrayRef, IntArrayRef, IntArrayRef, bool, IntArrayRef, int64_t), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(avg_pool2d), "avg_pool2d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(avg_pool3d), "avg_pool3d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>), fp32)
-MAKE_REGISTER_FUNC(ADD_NS(gelu), "gelu", Tensor (const Tensor &), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(upsample_nearest1d), "upsample_nearest1d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(upsample_nearest1d), "upsample_nearest1d.vec", Tensor (const Tensor &, c10::optional<IntArrayRef>, c10::optional<ArrayRef<double>>), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(upsample_nearest2d), "upsample_nearest2d", Tensor (const Tensor &, IntArrayRef, c10::optional<double>, c10::optional<double>), fp32)
@@ -250,7 +249,7 @@ TORCH_LIBRARY_IMPL(aten, AutocastCPU, m){
   m.impl(TORCH_SELECTIVE_NAME("aten::add_.Tensor"), TORCH_FN((&torch_ipex::autocast::add_tensor_)));
   m.impl(TORCH_SELECTIVE_NAME("aten::add.Tensor"), TORCH_FN((&torch_ipex::autocast::add_tensor)));
   m.impl(TORCH_SELECTIVE_NAME("aten::dropout"), TORCH_FN((&torch_ipex::autocast::dropout)));
-
+  m.impl(TORCH_SELECTIVE_NAME("aten::gelu"), TORCH_FN((&torch_ipex::autocast::gelu)));
 }
 
 }  // namespace autocast
