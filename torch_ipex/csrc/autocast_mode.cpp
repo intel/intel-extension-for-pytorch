@@ -203,6 +203,7 @@ MAKE_REGISTER_FUNC(ADD_NS(reflection_pad1d), "reflection_pad1d", Tensor (const T
 MAKE_REGISTER_FUNC(ADD_NS(std), "std", Tensor (const Tensor &, bool), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(std), "std.dim", Tensor (const Tensor &, IntArrayRef, bool, bool), fp32)
 MAKE_REGISTER_FUNC(ADD_NS(instance_norm), "instance_norm", Tensor (const Tensor &, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, const c10::optional<Tensor>&, bool, double, double, bool), fp32)
+MAKE_REGISTER_FUNC(ADD_NS(grid_sampler), "grid_sampler", Tensor (const Tensor &, const Tensor &, int64_t, int64_t, bool), fp32)
 
 // promote
 MAKE_REGISTER_FUNC(ADD_NS(cat), "cat", Tensor (TensorList, int64_t), promote)
