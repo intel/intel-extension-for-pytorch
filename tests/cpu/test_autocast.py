@@ -4,6 +4,7 @@ import torch.nn as nn
 import intel_pytorch_extension as ipex
 from common_utils import TestCase
 import time, sys
+from torch.testing._core import _get_default_tolerance
 
 def get_rand_seed():
     return int(time.time() * 1000000000)
@@ -72,36 +73,66 @@ class TestConv(TestCase):
         self.assertEqual(in_autocast.grad.dtype, torch.float)
         self.assertEqual(_in_cpu.grad, in_autocast.grad, 1e-2)
 
-class SimpleNet(torch.nn.Module):
-    def __init__(self):
-        super(SimpleNet, self).__init__()
-        self.conv = torch.nn.Conv2d(3, 16, (3, 3), stride=(2, 2), padding=(3, 3), bias=False)
-        self.bn = torch.nn.BatchNorm2d(16)
-        self.relu = torch.nn.ReLU(inplace=True)
+class TestAutocastWithJit(TestCase):
+    def setUp(self):
+        super(TestAutocastWithJit, self).setUp()
+        from test_jit import Conv_Bn_Relu, BatchNorm_Conv_BatchNorm, ConvBatchNorm_Fixed, ConvReshapeBatchNorm,\
+                            CascadedConvBnSumRelu, LinearBn, Linear_Reshape_Bn
+        self.models = [Conv_Bn_Relu(2, 3, 32, kernel_size=3, stride=1), BatchNorm_Conv_BatchNorm(2, 3, 32, kernel_size=3, stride=1),\
+                    ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1), ConvBatchNorm_Fixed(3, 3, 32, kernel_size=3, stride=1),\
+                    ConvReshapeBatchNorm(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),\
+                    CascadedConvBnSumRelu(2, 3, 64, 32, kernel_size=3, stride=1),\
+                    LinearBn(2 ,32, 32, bias=True),\
+                    Linear_Reshape_Bn(2 ,32, 32,(1,1,64,16),bias=True)]
+        self.inputs = [torch.randn(32, 3, 64, 64), torch.randn(32, 3, 64, 64),\
+                    torch.randn(32, 3, 64, 64), torch.randn(32, 3, 32, 32, 32),\
+                    torch.randn(32, 3, 64, 64),\
+                    torch.rand(32, 3, 64, 64),\
+                    torch.rand(1, 1, 32, 32),\
+                    torch.rand(1, 1, 32, 32)]
 
-    def forward(self, x):
-        x = self.conv(x)
-        x = self.bn(x)
-        x = self.relu(x)
-        return x
+    def test_generate_autocast_jit_trace_model(self):
+        def test_generate_autocast_jit_trace_model(model, x):
+            model.eval()
+            ipex.core.disable_jit_opt()
+            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+                traced_model = torch.jit.trace(model, x)
+            ipex.core.enable_jit_opt()
+            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+                traced_model2 = torch.jit.trace(model, x.clone())
+        for i in range(self.models.__len__()):
+            test_generate_autocast_jit_trace_model(self.models[i], self.inputs[i])
 
-class TestSimpleNet(TestCase):
-    def test_generate_jit_trace_model(self):
-        rand_seed = int(get_rand_seed())
-        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
-        torch.manual_seed(rand_seed)
+    def test_nchw_autocast_jit_trace_model(self):
+        def test_nchw_autocast_jit_trace_model(model, x):
+            model.eval()
+            ipex.core.disable_jit_opt()
+            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+                traced_model = torch.jit.trace(model, x)
+            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+                y = traced_model(x.clone())
+                y2 = model(x.clone())
+            ipex.core.enable_jit_opt()
+            torch.testing.assert_allclose(y.double(), y2.double(), rtol=1e-05, atol=_get_default_tolerance(y, y2)[1])
+        for i in range(self.models.__len__()):
+            test_nchw_autocast_jit_trace_model(self.models[i], self.inputs[i])
 
-        model = SimpleNet() 
-        model.eval()
-        #ipex.core.disable_jit_opt()
-        x = torch.rand((1, 3, 224, 224))
-        with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
-            traced_model = torch.jit.trace(model, x)
-        with torch.no_grad():
-            y = traced_model(x)
-            #print(traced_model.graph_for(x))
-        #ipex.core.enable_jit_opt()
-        self.assertEqual(y.dtype, torch.float) #conv whitelist, bn blacklist, relu fallthrough
+    def test_nhwc_autocast_jit_trace_model(self):
+        def test_nhwc_autocast_jit_trace_model(model, x):
+            model.eval()
+            ipex.core.disable_jit_opt()
+            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+                traced_model = torch.jit.trace(model, x.to(memory_format=torch.channels_last))
+            with ipex.amp.autocast(enabled=True, configure=ipex.conf.AmpConf(torch.bfloat16)), torch.no_grad():
+                y = traced_model(x.clone().to(memory_format=torch.channels_last))
+                y2 = model(x.clone().to(memory_format=torch.channels_last))
+            ipex.core.enable_jit_opt()
+            torch.testing.assert_allclose(y.double(), y2.double(), rtol=1e-05, atol=_get_default_tolerance(y, y2)[1])
+        for i in range(self.models.__len__()):
+            if self.inputs[i].size().__len__() == 5:
+                # NHWC 3D case not support yet
+                continue
+            test_nhwc_autocast_jit_trace_model(self.models[i], self.inputs[i])
 
 class TestCustomerOps(TestCase):
     def test_interaction_op(self):
