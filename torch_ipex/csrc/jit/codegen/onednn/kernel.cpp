@@ -30,6 +30,26 @@ data_type getPropagateDataType(int64_t num) {
   }
 }
 
+// Build static mapping from output id to input offset
+// in accordance with available inplace options
+std::unordered_map<size_t, size_t> getInplacePairs(
+  dnnl::graph::compiled_partition compilation,
+  const ArgSpecs& inputSpecs) {
+  std::unordered_map<size_t, size_t> inplacePairs; // output id -> input offset
+  for (auto&& option : compilation.get_inplace_ports()) {
+    size_t inputId = option.first;
+    size_t outputId = option.second;
+    auto inputSpecIter =
+        std::find_if(inputSpecs.begin(), inputSpecs.end(), [&](auto& spec) {
+          return spec.tid() == inputId;
+        });
+    TORCH_CHECK(inputSpecIter != inputSpecs.end(), "In-place input not found");
+    auto inputOffset = inputSpecIter - inputSpecs.begin();
+    inplacePairs[outputId] = inputOffset;
+  }
+  return inplacePairs;
+}
+
 LlgaKernel::LlgaKernel(const Node* fusionNode)
     : fusionNode_(fusionNode),
       graph_(fusionNode->g(attr::Subgraph)),
@@ -95,20 +115,23 @@ ArgSpecs LlgaKernel::specializeOutputSpecs(
 
 std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
     const TensorArgs& inputs,
-    TensorArgs& outputs) const {
+    TensorArgs& outputs,
+    const ArgSpecs& inputSpecs,
+    const ArgSpecs& outputSpecs,
+    const std::unordered_map<size_t, size_t>& inplacePairs) const {
   RunArgs runInputs, runOutputs;
   for (size_t i = 0; i < nInputs_; i++) {
-    auto spec = inputSpecs_[i];
+    auto spec = inputSpecs[i];
     runInputs.push_back({spec.logical_tensor(), inputs[i].data_ptr()});
   }
 
   for (size_t i = 0; i < nOutputs_; i++) {
-    auto spec = outputSpecs_[i];
+    auto spec = outputSpecs[i];
     auto opt = c10::TensorOptions(spec.aten_scalar_type()).device(device_);
 
     auto outputId = spec.tid();
-    auto iter = inplacePairs_.find(outputId);
-    if (iter != inplacePairs_.end()) {
+    auto iter = inplacePairs.find(outputId);
+    if (iter != inplacePairs.end()) {
       // output reuses one of input tensors
       auto inputOffset = iter->second;
       auto inputTensor = inputs[inputOffset];
@@ -128,31 +151,13 @@ std::tuple<RunArgs, RunArgs> LlgaKernel::prepareRunArgs(
   return std::make_tuple(runInputs, runOutputs);
 }
 
-compiled_partition LlgaKernel::compile(const partition& partition) {
-  auto inputs = fmap(inputSpecs_, toLogicalTensor);
-  auto outputs = fmap(outputSpecs_, toLogicalTensor);
+compiled_partition LlgaKernel::compile(
+  const partition& partition, 
+  const ArgSpecs& inputSpecs,
+  const ArgSpecs& outputSpecs) {
+  auto inputs = fmap(inputSpecs, toLogicalTensor);
+  auto outputs = fmap(outputSpecs, toLogicalTensor);
   auto compilation = partition.compile(inputs, outputs, Engine::getEngine());
-
-  // Since layouts of opaque outputs would be known after compilation,
-  // we need to query them out from compilation and update outputSpecs
-  for (size_t i = 0; i < nOutputs_; i++) {
-    auto tid = outputSpecs_[i].tid();
-    outputSpecs_[i] = compilation.query_logical_tensor(tid);
-  }
-
-  // Build static mapping from output id to input offset
-  // in accordance with available inplace options
-  for (auto&& option : compilation.get_inplace_ports()) {
-    size_t inputId = option.first;
-    size_t outputId = option.second;
-    auto inputSpecIter =
-        std::find_if(inputSpecs_.begin(), inputSpecs_.end(), [&](auto& spec) {
-          return spec.tid() == inputId;
-        });
-    TORCH_CHECK(inputSpecIter != inputSpecs_.end(), "In-place input not found");
-    auto inputOffset = inputSpecIter - inputSpecs_.begin();
-    inplacePairs_[outputId] = inputOffset;
-  }
 
   return compilation;
 }
@@ -170,21 +175,28 @@ void LlgaKernel::run(Stack& stack) {
 
   GRAPH_DEBUG("Specializing input logical tensors");
   auto inputSpecs = specializeInputSpecs(inputs);
-  if (inputSpecs_ != inputSpecs) {
-    inputSpecs_ = inputSpecs;
-    GRAPH_DEBUG("Inferring output logical tensors");
-    outputSpecs_ = specializeOutputSpecs(partition_, inputSpecs_);
-    GRAPH_DEBUG("Compiling partition");
-    compilation_ = compile(partition_);
+  
+  GRAPH_DEBUG("Inferring output logical tensors");
+  auto outputSpecs = specializeOutputSpecs(partition_, inputSpecs);
+  
+  GRAPH_DEBUG("Compiling partition");
+  auto compilation = compile(partition_, inputSpecs, outputSpecs);
+  // Since layouts of opaque outputs would be known after compilation,
+  // we need to query them out from compilation and update outputSpecs
+  for (size_t i = 0; i < nOutputs_; i++) {
+    auto tid = outputSpecs[i].tid();
+    outputSpecs[i] = compilation.query_logical_tensor(tid);
   }
+  // output id -> input offset
+  auto inplacePairs = getInplacePairs(compilation, inputSpecs); // output id -> input offset
 
   GRAPH_DEBUG("Preparing runtime tensors");
   TensorArgs outputs;
   RunArgs runInputs, runOutputs;
-  std::tie(runInputs, runOutputs) = prepareRunArgs(inputs, outputs);
+  std::tie(runInputs, runOutputs) = prepareRunArgs(inputs, outputs, inputSpecs, outputSpecs, inplacePairs);
 
   GRAPH_DEBUG("Executing partition");
-  compilation_.execute(Stream::getStream(), runInputs, runOutputs);
+  compilation.execute(Stream::getStream(), runInputs, runOutputs);
   GRAPH_DEBUG("Partition executed");
 
   // Update the stack.

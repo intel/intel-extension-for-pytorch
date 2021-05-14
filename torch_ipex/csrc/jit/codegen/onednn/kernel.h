@@ -41,11 +41,16 @@ class LlgaKernel {
       const ArgSpecs& inputSpecs) const;
 
   dnnl::graph::compiled_partition compile(
-      const dnnl::graph::partition& partition);
+      const dnnl::graph::partition& partition,
+      const ArgSpecs& inputSpecs,
+      const ArgSpecs& outputSpecs);
 
   std::tuple<RunArgs, RunArgs> prepareRunArgs(
       const TensorArgs& inputs,
-      TensorArgs& outputs) const;
+      TensorArgs& outputs,
+      const ArgSpecs& inputSpecs,
+      const ArgSpecs& outputSpecs,
+      const std::unordered_map<size_t, size_t>& inplacePair) const;
 
   static std::string genDebugName() {
     static size_t debugId = 0;
@@ -62,11 +67,7 @@ class LlgaKernel {
   int64_t nInputs_ = 0;
   int64_t nOutputs_ = 0;
   dnnl::graph::partition partition_;
-  dnnl::graph::compiled_partition compilation_;
-  ArgSpecs inputSpecs_;
-  ArgSpecs outputSpecs_;
   std::string debugName_;
-  std::unordered_map<size_t, size_t> inplacePairs_; // output id -> input offset
 };
 
 } // namespace onednn
