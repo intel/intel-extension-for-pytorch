@@ -182,6 +182,14 @@ if(USE_ONEDPL)
   target_link_libraries(torch_ipex PUBLIC oneDPL)
   target_compile_definitions(torch_ipex PUBLIC USE_ONEDPL)
   target_compile_definitions(torch_ipex PUBLIC ONEDPL_USE_TBB_BACKEND=0)
+  # FIXME:
+  # Refer to oneAPI TBB release note:
+  # https://software.intel.com/content/www/us/en/develop/articles/intel-oneapi-threading-building-blocks-release-notes.html
+  # We must set below two flags to bypass TBB checking by GCC with libstdc++ 9 and libstdc++ 10
+  # Related Jira:
+  # https://jira.devtools.intel.com/browse/ONEDPL-245?focusedCommentId=12217329&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-12217329
+  target_compile_definitions(torch_ipex PUBLIC PSTL_USE_PARALLEL_POLICIES=0)
+  target_compile_definitions(torch_ipex PUBLIC _GLIBCXX_USE_TBB_PAR_BACKEND=0)
 endif()
 
 set(IPEX_COMPILE_FLAGS "${IPEX_COMPILE_FLAGS} -fsycl")

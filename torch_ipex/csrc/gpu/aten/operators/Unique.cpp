@@ -101,7 +101,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_template(
 ) {
 #ifdef USE_ONEDPL
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  auto policy = oneapi::dpl::execution::make_device_policy<Unique_Dpcpp_Kernel<scalar_t>>(dpcpp_queue);
+  auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
 
   auto options = self.options().dtype(kLong);
   Tensor output = self.clone().reshape(-1);
@@ -174,7 +174,7 @@ std::tuple<Tensor, Tensor, Tensor> unique_dim_template(
 ) {
 #ifdef USE_ONEDPL
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  auto policy = oneapi::dpl::execution::make_device_policy<Unique_Dpcpp_Kernel<scalar_t>>(dpcpp_queue);
+  auto policy = oneapi::dpl::execution::make_device_policy(dpcpp_queue);
 
   auto sizes = self.sizes().vec();
   auto num_zero_dims = std::count(sizes.begin(), sizes.end(), 0);
