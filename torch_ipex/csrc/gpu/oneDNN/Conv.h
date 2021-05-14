@@ -215,11 +215,15 @@ static at::Tensor convolution(
   memory::dims _padding = padding.vec();
   memory::dims _dilation = compatible_dilation(dilation);
 
+  // plain combination
   auto src_md = memory::desc(src_tz, src_data_t, fmt_src);
-  auto wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
+  auto wgh_md = src.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+                memory::desc(wgh_tz, wei_data_t, fmt_any) :
+                memory::desc(wgh_tz, wei_data_t, fmt_wgh);
   auto dst_md = memory::desc(dst_tz, dst_data_t, fmt_src);
   auto bia_md = bia.defined() ? memory::desc(bia_tz, bia_data_t, fmt_bia) : memory::desc();
 
+  // block combination
   if (lazy_reorder_enabled()) {
     src_md = memory::desc(src_tz, src_data_t,
         src.is_contiguous(at::MemoryFormat::ChannelsLast) ? fmt_src : fmt_any);
