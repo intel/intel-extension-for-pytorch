@@ -6,14 +6,14 @@
 
 #include <pybind11/pybind11.h>
 #include <structmember.h>
+#include <gpu/aten/core/Functions.h>
 
 
 PyObject *THDPStreamClass = nullptr;
 
 static PyObject * THDPStream_pynew(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
   HANDLE_TH_ERRORS
-  int current_device = 0;
-//      THXPUCheck(xpuGetDevice(&current_device));
+  int current_device = xpu::dpcpp::current_device();
 
   int priority = 0;
   uint64_t cdata = 0;
@@ -54,9 +54,16 @@ static PyObject * THDPStream_get_device(THDPStream *self, void *unused) {
   END_HANDLE_TH_ERRORS
 }
 
-static PyObject * THDPStream_get_dpcpp_stream(THDPStream *self, void *unused) {
+static PyObject * THDPStream_get_xpu_stream(THDPStream *self, void *unused) {
   HANDLE_TH_ERRORS
-  return PyLong_FromLong(self->dpcpp_stream.stream());
+  auto &dpcpp_queue = self->dpcpp_stream.dpcpp_queue();
+  return PyCapsule_New(reinterpret_cast<void *>(new DPCPP::queue(dpcpp_queue)), "SyclQueueRef", [](PyObject *cap) {
+    if (PyCapsule_IsValid(cap, "SyclQueueRef")) {
+      void *ptr = PyCapsule_GetPointer(cap, "SyclQueueRef");
+      DPCPP::queue *q_ptr = reinterpret_cast<DPCPP::queue *>(ptr);
+      delete q_ptr;
+    }
+  });
   END_HANDLE_TH_ERRORS
 }
 
@@ -87,7 +94,7 @@ static PyObject * THDPStream_synchronize(THDPStream *self, PyObject *noargs) {
   HANDLE_TH_ERRORS
   {
     pybind11::gil_scoped_release no_gil;
-//  self->dpcpp_stream.synchronize();
+    self->dpcpp_stream.dpcpp_queue().wait_and_throw();
   }
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
@@ -104,8 +111,7 @@ static struct PyMemberDef THDPStream_members[] = {
 };
 
 static struct PyGetSetDef THDPStream_properties[] = {
-  {"dpcpp_stream",
-               (getter)THDPStream_get_dpcpp_stream, nullptr, nullptr, nullptr},
+  {"xpu_stream", (getter)THDPStream_get_xpu_stream, nullptr, nullptr, nullptr},
   {"priority", (getter)THDPStream_get_priority, nullptr, nullptr, nullptr},
   {nullptr}
 };
@@ -122,7 +128,7 @@ static PyMethodDef THDPStream_methods[] = {
 
 PyTypeObject THDPStreamType = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
-  "torch._C._DPCPPStreamBase",            /* tp_name */
+  "torch._C._XPUStreamBase",            /* tp_name */
   sizeof(THDPStream),                    /* tp_basicsize */
   0,                                     /* tp_itemsize */
   (destructor)THDPStream_dealloc,        /* tp_dealloc */
@@ -173,7 +179,7 @@ void THDPStream_init(PyObject *module)
   }
   Py_INCREF(&THDPStreamType);
   if (PyModule_AddObject(
-    module, "_DPCPPStreamBase", (PyObject *)&THDPStreamType) < 0) {
+    module, "_XPUStreamBase", (PyObject *)&THDPStreamType) < 0) {
     throw python_error();
   }
 }

@@ -6,6 +6,7 @@
 #include <ATen/ipex_type_dpcpp_customized.h>
 #include <gpu/jit/fusion_pass.h>
 #include <Module.h>
+#include <Event.h>
 #include <Stream.h>
 #include <Storage.h>
 #include <core/Functions.h>
@@ -182,6 +183,7 @@ void init_module(pybind11::module& m) {
 
   auto module = m.ptr();
   THDPStream_init(module);
+  THDPEvent_init(module);
   PyModule_AddFunctions(module, _THCPModule_methods);
   ASSERT_TRUE(THXPStorage_init<at::kInt>(module));
   ASSERT_TRUE(THXPStorage_init<at::kLong>(module));

@@ -15,8 +15,6 @@ using namespace at;
 namespace xpu {
 namespace dpcpp {
 
-#define dpcppStream_t unsigned long
-
 #define DPCPP_STREAM_COMPUTATION_INDEX 0
 #define DPCPP_STREAM_IO_INDEX 1
 #define DPCPP_STREAM_NETWORK_INDEX 2
@@ -69,10 +67,6 @@ class AT_DPCPP_API DPCPPStream {
   }
 
   DPCPP::queue& dpcpp_queue() const;
-
-  dpcppStream_t stream() const {
-    return (dpcppStream_t)this->dpcpp_queue().get();
-  }
 
  private:
   Stream stream_;

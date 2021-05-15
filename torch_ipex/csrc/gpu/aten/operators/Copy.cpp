@@ -9,6 +9,7 @@
 #include <core/Guard.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
+#include <core/Event.h>
 #include <c10/core/ScalarType.h>
 #include <ATen/native/Resize.h>
 
@@ -84,12 +85,24 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
 
   Device dst_device = iter.device(0);
   Device src_device = iter.device(1);
-  DPCPPGuard device_guard(src_device);
-  // FIXME:: figure out how to copy buffer between two device
-  TORCH_CHECK(src_device == dst_device, "device not match");
 
+
+  // We always perform the copy on the source device, using the current stream
+  // on the source device, and we fully synchronize on both src and dst's
+  // current streams for completion of the copy.
+  DPCPPGuard device_guard(src_device);
+  DPCPPStream copy_stream = getCurrentDPCPPStream(src_device.index());
   if (src_device != dst_device) {
-    // FIXME
+    // This is a cross-device copy on the src current stream and dst current
+    // stream. We perform a two-way barrier between both devices' streams
+    // before the copy. This ensures that any write-after-write and
+    // write-after-read dependencies on the destination side are handled, so
+    // that no one is operating on the dst memory when we perform the copy.
+    // src waits on dst barrier (src already waits on src)
+    DPCPPEvent dst_ready;
+    dst_ready.record(getCurrentDPCPPStream(dst_device.index()));
+
+    dst_ready.block(copy_stream);
   }
 
   if (memcpy_eligible) {
@@ -124,7 +137,13 @@ void copy_device_to_device(TensorIterator& iter, bool non_blocking) {
   }
 
   if (src_device != dst_device) {
-    // FixMe
+    // dst waits on src barrier (dst already waits on dst). We cannot
+    // operate on dst's copy until the copy is complete.
+    // Still on src_device, record stream event
+    DPCPPEvent src_ready;
+    src_ready.record(copy_stream);
+
+    src_ready.block(getCurrentDPCPPStream(dst_device.index()));
   }
 }
 
@@ -259,8 +278,10 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
     return self;
   }
 
-  bool same_device = self.device().type() == c10::DeviceType::XPU &&
-      src.device().type() == c10::DeviceType::XPU;
+  at::Device src_device =  src.device();
+  at::Device dst_device =  self.device();
+
+  bool same_device = src_device.type() == c10::DeviceType::XPU && src_device == dst_device;
   bool has_sz_st = src.sizes().size() != 0 &&
                    src.strides().size() != 0 &&
                    self.sizes().size() != 0 &&
