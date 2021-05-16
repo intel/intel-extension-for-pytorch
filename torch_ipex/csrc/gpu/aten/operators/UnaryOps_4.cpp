@@ -8,7 +8,7 @@
 #include <ATen/AtenIpexTypeXPU.h>
 
 #include "Loops.h"
-
+#include "zmath.h"
 
 using namespace xpu::dpcpp;
 
@@ -81,25 +81,13 @@ Tensor& sign_(Tensor& self) {
   return at::AtenIpexTypeXPU::sign_out(self, self);
 }
 
-Tensor& real_out(Tensor& out, const Tensor& self) {
-  // TODO: support complex type
-  // IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX(iter.dtype(), "real", [&]() {
-  IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "real", [&]() {
-    out.resize_as_(self);
-    DPCPP_tensor_apply2<scalar_t, scalar_t>(
-        out, self, TensorRealOp<scalar_t>());
-  });
-
-  return out;
-}
-
+class SyclOpConj {};
 Tensor& conj_out(Tensor& out, const Tensor& self) {
-  // TODO: support complex type
-  // IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX(iter.dtype(), "conj", [&]() {
-  IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "conj", [&]() {
-    out.resize_as_(self);
-    DPCPP_tensor_apply2<scalar_t, scalar_t>(
-        out, self, TensorConjOp<scalar_t>());
+  auto iter = TensorIterator::unary_op(out, self);
+  // IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(kBFloat16, kHalf, iter.dtype(), "conj_xpu", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(kBFloat16, kHalf, iter.dtype(), "conj_xpu", [&]() {
+      dpcpp_kernel_for_tensor_iter<SyclOpConj>(
+          iter, [=](scalar_t a) -> scalar_t { return conj_impl(a); });
   });
 
   return out;

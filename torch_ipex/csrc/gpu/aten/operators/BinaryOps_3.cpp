@@ -16,62 +16,45 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-template <typename scalar_t>
-typename std::enable_if<IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t), void>::type
-__and___out(Tensor& result, const Tensor& self, const Tensor& other) {
-  if (xpu::dpcpp::TensorImpl_Unwrap(result) ==
-      xpu::dpcpp::TensorImpl_Unwrap(self)) {
-    xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
-        result, other, TensorBitAndOp<scalar_t>());
+class SyclOpAnd {};
+class SyclOpOr {};
+class SyclOpXor {};
+
+static void and_kernel_dpcpp(TensorIterator& iter) {
+  if (iter.dtype() == ScalarType::Bool) {
+    dpcpp_kernel_with_scalars<SyclOpAnd>(
+        iter, [](bool a, bool b) { return a && b; });
   } else {
-    at::AtenIpexTypeXPU::resize_as_(result, self, c10::nullopt);
-    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
-        result, self, other, TensorBitAndOp<scalar_t>());
+    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_and_xpu", [&]() {
+        dpcpp_kernel_with_scalars<SyclOpAnd>(
+            iter, [](scalar_t a, scalar_t b) { return a & b; });
+    });
   }
 }
 
-template <typename scalar_t>
-typename std::enable_if<!(IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t)), void>::
-    type
-    __and___out(Tensor& result, const Tensor& self, const Tensor& other) {}
-
-template <typename scalar_t>
-typename std::enable_if<IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t), void>::type
-__or___out(Tensor& result, const Tensor& self, const Tensor& other) {
-  if (xpu::dpcpp::TensorImpl_Unwrap(result) ==
-      xpu::dpcpp::TensorImpl_Unwrap(self)) {
-    xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
-        result, other, TensorBitOrOp<scalar_t>());
+static void or_kernel_dpcpp(TensorIterator& iter) {
+  if (iter.dtype() == ScalarType::Bool) {
+    dpcpp_kernel_with_scalars<SyclOpOr>(
+        iter, [](bool a, bool b) { return a || b; });
   } else {
-    at::AtenIpexTypeXPU::resize_as_(result, self, c10::nullopt);
-    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
-        result, self, other, TensorBitOrOp<scalar_t>());
+    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_or_xpu", [&]() {
+        dpcpp_kernel_with_scalars<SyclOpOr>(
+            iter, [](scalar_t a, scalar_t b) { return a | b; });
+    });
   }
 }
 
-template <typename scalar_t>
-typename std::enable_if<!(IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t)), void>::
-    type
-    __or___out(Tensor& result, const Tensor& self, const Tensor& other) {}
-
-template <typename scalar_t>
-typename std::enable_if<IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t), void>::type
-__xor___out(Tensor& result, const Tensor& self, const Tensor& other) {
-  if (xpu::dpcpp::TensorImpl_Unwrap(result) ==
-      xpu::dpcpp::TensorImpl_Unwrap(self)) {
-    xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
-        result, other, TensorBitXorOp<scalar_t>());
+static void xor_kernel_dpcpp(TensorIterator& iter) {
+  if (iter.dtype() == ScalarType::Bool) {
+    dpcpp_kernel_with_scalars<SyclOpXor>(
+        iter, [](bool a, bool b) { return a != b; });
   } else {
-    at::AtenIpexTypeXPU::resize_as_(result, self, c10::nullopt);
-    xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
-        result, self, other, TensorBitXorOp<scalar_t>());
+    IPEX_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_xor_xpu", [&]() {
+        dpcpp_kernel_with_scalars<SyclOpXor>(
+            iter, [](scalar_t a, scalar_t b) { return a ^ b; });
+    });
   }
 }
-
-template <typename scalar_t>
-typename std::enable_if<!(IS_BOOL(scalar_t) || IS_INTEGRAL(scalar_t)), void>::
-    type
-    __xor___out(Tensor& result, const Tensor& self, const Tensor& other) {}
 
 template <typename...>
 class minimum_kernel_bool {};
@@ -138,6 +121,14 @@ void maximum_kernel(TensorIterator& iter) {
     });
   }
 }
+
+// scalar to tensor
+static Tensor wrapped_scalar_tensor(Scalar scalar) {
+  auto tensor = scalar_to_tensor(scalar);
+  tensor.unsafeGetTensorImpl()->set_wrapped_number(true);
+  return tensor;
+}
+
 } // namespace impl
 
 
@@ -193,62 +184,34 @@ Tensor max(const Tensor& self, const Tensor& other) {
   return at::AtenIpexTypeXPU::maximum(self, other);
 }
 
-Tensor& bitwise_and_out(
-    Tensor& result,
-    const Tensor& self,
-    const Tensor& other) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Bool, self.scalar_type(), "__and___out", [&]() {
-        impl::__and___out<scalar_t>(result, self, other);
-      });
-  return result;
+Tensor& bitwise_and_out(Tensor & out, const Tensor & self, const Tensor & other) {
+  auto iter = TensorIterator::binary_op(out, self, other);
+  impl::and_kernel_dpcpp(iter);
+  return out;
 }
 
-Tensor& bitwise_or_out(
-    Tensor& result,
-    const Tensor& self,
-    const Tensor& other) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Bool, self.scalar_type(), "__or___out", [&]() {
-        impl::__or___out<scalar_t>(result, self, other);
-      });
-  return result;
+Tensor& bitwise_and_out(Tensor & out, const Tensor & self, Scalar other) {
+  return at::AtenIpexTypeXPU::bitwise_and_out(out, self, impl::wrapped_scalar_tensor(other));
 }
 
-Tensor& bitwise_xor_out(
-    Tensor& result,
-    const Tensor& self,
-    const Tensor& other) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Bool, self.scalar_type(), "__xor___out", [&]() {
-        impl::__xor___out<scalar_t>(result, self, other);
-      });
-  return result;
+Tensor& bitwise_or_out(Tensor & out, const Tensor & self, const Tensor & other) {
+  auto iter = TensorIterator::binary_op(out, self, other);
+  impl::or_kernel_dpcpp(iter);
+  return out;
 }
 
-
-Tensor& bitwise_and_out(Tensor& out, const Tensor& self, Scalar other) {
-  auto other_ = c10::scalar_to_tensor(other, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other_.resize_as_(self).fill_(other).toType(self.scalar_type());
-  return at::AtenIpexTypeXPU::bitwise_and_out(out, self, new_other);
+Tensor& bitwise_or_out(Tensor & out, const Tensor & self, Scalar other) {
+  return at::AtenIpexTypeXPU::bitwise_or_out(out, self, impl::wrapped_scalar_tensor(other));
 }
 
-Tensor& bitwise_or_out(Tensor& out, const Tensor& self, Scalar other) {
-  auto other_ = c10::scalar_to_tensor(other, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other_.resize_as_(self).fill_(other).toType(self.scalar_type());
-  return at::AtenIpexTypeXPU::bitwise_or_out(out, self, new_other);
+Tensor& bitwise_xor_out(Tensor & out, const Tensor & self, const Tensor & other) {
+  auto iter = TensorIterator::binary_op(out, self, other);
+  impl::xor_kernel_dpcpp(iter);
+  return out;
 }
 
-Tensor& bitwise_xor_out(Tensor& out, const Tensor& self, Scalar other) {
-  auto other_ = c10::scalar_to_tensor(other, kXPU);
-  // TODO: broadcast
-  auto new_other =
-      other_.resize_as_(self).fill_(other).toType(self.scalar_type());
-  return at::AtenIpexTypeXPU::bitwise_xor_out(out, self, new_other);
+Tensor& bitwise_xor_out(Tensor & out, const Tensor & self, Scalar other) {
+  return at::AtenIpexTypeXPU::bitwise_xor_out(out, self, impl::wrapped_scalar_tensor(other));
 }
 
 } // namespace AtenIpexTypeXPU
