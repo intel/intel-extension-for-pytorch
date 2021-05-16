@@ -202,9 +202,6 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
                 'CMAKE_INSTALL_LIBDIR': 'lib',
             }
 
-            if find_executable('ninja') is not None:
-                build_options['CMAKE_GENERATOR'] = 'Ninja'
-
             my_env = os.environ.copy()
             for var, val in my_env.items():
                 if var.startswith(('BUILD_', 'USE_', 'CMAKE_')):
@@ -231,8 +228,6 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
         # build_args += ['VERBOSE=1']
 
         gen_exec = 'make'
-        if find_executable('ninja') is not None:
-            gen_exec = 'ninja'
         print("build args: {}".format(build_args))
         check_call([gen_exec] + build_args, cwd=ext.build_dir, env=env)
 

@@ -8,6 +8,14 @@ set(LINUX TRUE)
 set(CMAKE_INSTALL_MESSAGE NEVER)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(RPATH_VALUE $ORIGIN)
+set(CMAKE_SKIP_BUILD_RPATH  FALSE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+set(CMAKE_INSTALL_RPATH "${RPATH_VALUE}")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+
+set (CMAKE_GENERATOR "Unix Makefiles")
+
 # set compilation env first
 include(cmake/DPCPP.cmake)
 
@@ -26,7 +34,10 @@ cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "
 set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build (for example, skl,ats,...)")
 
 
-include(cmake/GPU.cmake)
+#include(cmake/GPU.cmake)
+add_subdirectory(./torch_ipex/csrc)
+
+#include(cmake/CPU.cmake)
 
 function (print_configuration_summary)
   get_directory_property(CMAKE_COMPILE_DEFINITIONS DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_DEFINITIONS)

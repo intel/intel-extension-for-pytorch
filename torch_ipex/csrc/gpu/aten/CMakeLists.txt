@@ -33,4 +33,10 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/core" "${CMAKE_CURRENT_SOURCE_DIR
 set(aten_src)
 list(APPEND aten_src ${aten_reorg_src})
 list(APPEND aten_src ${aten_core_src})
-set(DPCPP_ATEN_SRCS ${aten_src} PARENT_SCOPE)
+list(APPEND aten_src ${gpu_generated_src})
+#set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/ATen/AtenIpexTypeXPU.cpp
+#        ${CMAKE_CURRENT_SOURCE_DIR}/ATen/AtenIpexTypeQuantizedXPU.cpp PROPERTIES GENERATED TRUE)
+
+set(IPEX_ATEN_SRCS ${aten_src} PARENT_SCOPE)
+#set_property(TARGET torch_ipex APPEND PROPERTY SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/ATen/AtenIpexTypeXPU.cpp
+#        ${CMAKE_CURRENT_SOURCE_DIR}/ATen/AtenIpexTypeQuantizedXPU.cpp)

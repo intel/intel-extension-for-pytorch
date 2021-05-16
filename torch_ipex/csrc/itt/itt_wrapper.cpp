@@ -1,4 +1,4 @@
-#include "ittnotify.h"
+#include <ittnotify.h>
 
 __itt_domain* _itt_domain = __itt_domain_create("torch_ipex");
 
