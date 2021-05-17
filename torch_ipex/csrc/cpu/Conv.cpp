@@ -1,5 +1,6 @@
 #include "Conv.h"
 #include "mkldnn/MKLDNNCommon.h"
+#include "torch_ipex/csrc/utils.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -103,10 +104,9 @@ at::Tensor convolution_impl(
       calc_conv_output_size(input_size, kernel_size, padding, stride, dilation);
 
   bool is_channels_last = input.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
-  auto output = at::empty({0}, input.options());
+  auto output = at::empty(output_sizes, input.options().memory_format(input.suggest_memory_format()));
   ideep::tensor mkldnn_output;
   if (is_channels_last) {
-    output.resize_(output_sizes, input.suggest_memory_format());
     mkldnn_output = at::native::itensor_view_from_dense(output);
   }
 
@@ -173,7 +173,8 @@ void convolution_inplace_impl(
       calc_conv_output_size(input_size, kernel_size, padding, stride, dilation);
 
   bool is_channels_last = input.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
-  output.resize_(output_sizes, input.suggest_memory_format());
+  output = IS_CONTIGUOUS_ANY(output) ? output : output.contiguous();
+  output = output.to(input.suggest_memory_format());
   ideep::tensor mkldnn_output = at::native::itensor_view_from_dense(output);
 
   if (bias.defined()) {
