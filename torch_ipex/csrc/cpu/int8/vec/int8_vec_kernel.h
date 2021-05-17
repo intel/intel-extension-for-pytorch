@@ -261,12 +261,12 @@ __m512i mul_and_sum_s8x128_to_s32x16(const int8_t *a, const int8_t *b) {
   auto b1 = _mm256_loadu_si256((__m256i*)(b + 64));
   auto b1_high = _mm256_loadu_si256((__m256i*)(b + 96));
   auto a_0_i = _mm512_cvtepi8_epi16(a0);
-  auto b_0_i = _mm512_cvtepi8_epi16(b0);
-  auto a_2_i = _mm512_cvtepi8_epi16(a1);
-  auto b_2_i = _mm512_cvtepi8_epi16(b1);
   auto a_1_i = _mm512_cvtepi8_epi16(a0_high);
-  auto b_1_i = _mm512_cvtepi8_epi16(b0_high);
+  auto a_2_i = _mm512_cvtepi8_epi16(a1);
   auto a_3_i = _mm512_cvtepi8_epi16(a1_high);
+  auto b_0_i = _mm512_cvtepi8_epi16(b0);
+  auto b_1_i = _mm512_cvtepi8_epi16(b0_high);
+  auto b_2_i = _mm512_cvtepi8_epi16(b1);
   auto b_3_i = _mm512_cvtepi8_epi16(b1_high);
   a_0_i = _mm512_madd_epi16(a_0_i, b_0_i);
   a_2_i = _mm512_madd_epi16(a_2_i, b_2_i);
@@ -283,7 +283,7 @@ __m512i mul_and_sum_s8x128_to_s32x16(const int8_t *a, const int8_t *b) {
 }
 
 static inline __attribute__((always_inline))
-int32_t hadd_s32x16(__m512i acc_sum) {
+int32_t hadd_s32x16(__m512i& acc_sum) {
   auto ab_256_high = _mm512_extracti32x8_epi32(acc_sum, 1);
   auto ab_256_low = _mm512_castsi512_si256(acc_sum);
   ab_256_low = _mm256_add_epi32(ab_256_low, ab_256_high);
@@ -300,7 +300,7 @@ int32_t hadd_s32x16(__m512i acc_sum) {
 }
 
 static inline __attribute__((always_inline))
-int8_t hadd_s32x16_with_scale(__m512i acc_sum, float scale) {
+int8_t hadd_s32x16_with_scale(__m512i& acc_sum, float scale) {
   auto ab_256_high = _mm512_extracti32x8_epi32(acc_sum, 1);
   auto s_simd = _mm_set1_ps(scale);
   auto ab_256_low = _mm512_castsi512_si256(acc_sum);
@@ -320,6 +320,62 @@ int8_t hadd_s32x16_with_scale(__m512i acc_sum, float scale) {
   auto sum_vec = _mm_cvtps_epi32(ab_128_low_f);
   sum_vec = _mm_cvtsepi32_epi8(sum_vec);
   return (int8_t)_mm_cvtsi128_si32(sum_vec);
+}
+
+static inline __attribute__((always_inline))
+void hadd_s32x16x16_with_scales(int8_t* outs, __m512i* acc_sums, __m512& scales) {
+  auto l0 = _mm512_unpacklo_epi32(acc_sums[0], acc_sums[1]);
+  auto l1 = _mm512_unpackhi_epi32(acc_sums[0], acc_sums[1]);
+  auto l2 = _mm512_unpacklo_epi32(acc_sums[2], acc_sums[3]);
+  auto l3 = _mm512_unpackhi_epi32(acc_sums[2], acc_sums[3]);
+  auto l4 = _mm512_unpacklo_epi32(acc_sums[4], acc_sums[5]);
+  auto l5 = _mm512_unpackhi_epi32(acc_sums[4], acc_sums[5]);
+  auto l6 = _mm512_unpacklo_epi32(acc_sums[6], acc_sums[7]);
+  auto l7 = _mm512_unpackhi_epi32(acc_sums[6], acc_sums[7]);
+  l0 = _mm512_add_epi32(l0, l1);
+  l2 = _mm512_add_epi32(l2, l3);
+  l4 = _mm512_add_epi32(l4, l5);
+  l6 = _mm512_add_epi32(l6, l7);
+  l1 = _mm512_unpacklo_epi64(l0,l2);
+  l3 = _mm512_unpackhi_epi64(l0,l2);
+  l5 = _mm512_unpacklo_epi64(l4,l6);
+  l7 = _mm512_unpackhi_epi64(l4,l6);
+  l1 = _mm512_add_epi32(l1, l3);
+  l5 = _mm512_add_epi32(l5, l7);
+  l0 = _mm512_shuffle_i32x4(l1, l5, 0x88);
+  l2 = _mm512_shuffle_i32x4(l1, l5, 0xdd);
+  l0 = _mm512_add_epi32(l0, l2);
+
+  auto h0 = _mm512_unpacklo_epi32(acc_sums[8], acc_sums[9]);
+  auto h1 = _mm512_unpackhi_epi32(acc_sums[8], acc_sums[9]);
+  auto h2 = _mm512_unpacklo_epi32(acc_sums[10], acc_sums[11]);
+  auto h3 = _mm512_unpackhi_epi32(acc_sums[10], acc_sums[11]);
+  auto h4 = _mm512_unpacklo_epi32(acc_sums[12], acc_sums[13]);
+  auto h5 = _mm512_unpackhi_epi32(acc_sums[12], acc_sums[13]);
+  auto h6 = _mm512_unpacklo_epi32(acc_sums[14], acc_sums[15]);
+  auto h7 = _mm512_unpackhi_epi32(acc_sums[14], acc_sums[15]);
+  h0 = _mm512_add_epi32(h0, h1);
+  h2 = _mm512_add_epi32(h2, h3);
+  h4 = _mm512_add_epi32(h4, h5);
+  h6 = _mm512_add_epi32(h6, h7);
+  h1 = _mm512_unpacklo_epi64(h0,h2);
+  h3 = _mm512_unpackhi_epi64(h0,h2);
+  h5 = _mm512_unpacklo_epi64(h4,h6);
+  h7 = _mm512_unpackhi_epi64(h4,h6);
+  h1 = _mm512_add_epi32(h1, h3);
+  h5 = _mm512_add_epi32(h5, h7);
+  h0 = _mm512_shuffle_i32x4(h1, h5, 0x88);
+  h2 = _mm512_shuffle_i32x4(h1, h5, 0xdd);
+  h0 = _mm512_add_epi32(h0, h2);
+
+  l1 = _mm512_shuffle_i32x4(l0, h0, 0x88);
+  h1 = _mm512_shuffle_i32x4(l0, h0, 0xdd);
+  l1 = _mm512_add_epi32(l1, h1);
+  auto l1_f = _mm512_cvtepi32_ps(l1);
+  l1_f = _mm512_mul_round_ps(l1_f, scales, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC));
+  l1 = _mm512_cvtps_epi32(l1_f);
+  auto out_16 = _mm512_cvtsepi32_epi8(l1);
+  _mm_storeu_si128((__m128i*)outs, out_16);
 }
 
 static inline __attribute__((always_inline))
