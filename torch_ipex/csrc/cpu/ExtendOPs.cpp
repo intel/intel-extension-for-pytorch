@@ -402,24 +402,6 @@ static inline void _interaction_s8s8_scale_s32s8_128(int8_t *out, const std::vec
   for (; off < offset - 15 ; off += 16) {
     __m512 scale_16 = _mm512_load_ps((const void *)(scales + off));
     hadd_s32x16x16_with_scales(out + off, cat_buf + off, scale_16);
-#if 0
-    out[off] = hadd_s32x16_with_scale(cat_buf[off], scales[off]);
-    out[off + 1] = hadd_s32x16_with_scale(cat_buf[off + 1], scales[off + 1]);
-    out[off + 2] = hadd_s32x16_with_scale(cat_buf[off + 2], scales[off + 2]);
-    out[off + 3] = hadd_s32x16_with_scale(cat_buf[off + 3], scales[off + 3]);
-    out[off + 4] = hadd_s32x16_with_scale(cat_buf[off + 4], scales[off + 4]);
-    out[off + 5] = hadd_s32x16_with_scale(cat_buf[off + 5], scales[off + 5]);
-    out[off + 6] = hadd_s32x16_with_scale(cat_buf[off + 6], scales[off + 6]);
-    out[off + 7] = hadd_s32x16_with_scale(cat_buf[off + 7], scales[off + 7]);
-    out[off + 8] = hadd_s32x16_with_scale(cat_buf[off + 8], scales[off + 8]);
-    out[off + 9] = hadd_s32x16_with_scale(cat_buf[off + 9], scales[off + 9]);
-    out[off + 10] = hadd_s32x16_with_scale(cat_buf[off + 10], scales[off + 10]);
-    out[off + 11] = hadd_s32x16_with_scale(cat_buf[off + 11], scales[off + 11]);
-    out[off + 12] = hadd_s32x16_with_scale(cat_buf[off + 12], scales[off + 12]);
-    out[off + 13] = hadd_s32x16_with_scale(cat_buf[off + 13], scales[off + 13]);
-    out[off + 14] = hadd_s32x16_with_scale(cat_buf[off + 14], scales[off + 14]);
-    out[off + 15] = hadd_s32x16_with_scale(cat_buf[off + 15], scales[off + 15]);
-#endif
   }
   for (; off < offset; off++) {
     out[off] = hadd_s32x16_with_scale(cat_buf[off], scales[off]);
