@@ -585,12 +585,12 @@ class Tester(TestCase):
         self._test_output(
             ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
-            kind_in_graph="aten::conv2d",
+            kind_in_graph="ipex::conv2d_base",
             kind_not_in_graph="aten::batch_norm",)
         self._test_output_bf16(
             ConvBatchNorm_Fixed(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
-            kind_in_graph="aten::conv2d",
+            kind_in_graph="ipex::conv2d_base",
             kind_not_in_graph="aten::batch_norm",
             prec=0.02)
 
@@ -619,7 +619,7 @@ class Tester(TestCase):
         self._test_output(
             Conv_Conv_Concat(2, 3, 32, kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
-            kind_in_graph="aten::conv2d",
+            kind_in_graph="ipex::conv2d_base",
             kind_not_in_graph=None,)
 
     def test_output_conv_relu_add(self):
@@ -638,14 +638,14 @@ class Tester(TestCase):
         self._test_output(
             ConvReshapeRelu(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
-            kind_in_graph="aten::conv2d",
+            kind_in_graph="ipex::conv2d_base",
             kind_not_in_graph="ipex::conv2d_relu",)
 
     def test_output_conv_reshape_sum(self):
         self._test_output(
             ConvReshapeSum(2, 3, 32, (64, 16, 62, 62), kernel_size=3, stride=1),
             torch.randn(32, 3, 64, 64),
-            kind_in_graph="aten::conv2d",
+            kind_in_graph="ipex::conv2d_base",
             kind_not_in_graph="ipex::conv2d_sum",)
 
     def test_output_conv_bn_3d(self):
