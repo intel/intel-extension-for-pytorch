@@ -101,6 +101,59 @@ static struct PyMethodDef _THCPModule_methods[] = {
   {nullptr}
 };
 
+std::string get_dev_type(const XPUDeviceProp &prop) {
+  std::ostringstream stream;
+  switch(prop.dev_type) {
+    case DPCPP::info::device_type::cpu:
+      stream << "cpu";
+      break;
+    case DPCPP::info::device_type::gpu:
+      stream << "gpu";
+      break;
+    case DPCPP::info::device_type::accelerator:
+      stream << "accelerator";
+      break;
+    default:
+      stream << "unknown device type:"
+             << static_cast<typename std::underlying_type<DPCPP::info::device_type>::type>(prop.dev_type);
+      break;
+  }
+  return stream.str();
+}
+
+
+static void register_xpu_device_properties(PyObject* module) {
+  // Add _XPUDeviceProperties class to torch_ipex._C
+  auto m = py::handle(module).cast<py::module>();
+  py::class_<XPUDeviceProp>(m, "_XPUDeviceProperties")
+    .def_readonly("name", &XPUDeviceProp::name)
+    .def_readonly("platform_name", &XPUDeviceProp::platform_name)
+    .def_readonly("total_global_memory", &XPUDeviceProp::total_global_mem)
+    .def_readonly("max_compute_units", &XPUDeviceProp::max_compute_units)
+    .def_readonly("sub_devices_number", &XPUDeviceProp::sub_devices_number)
+    .def_property_readonly("dev_type", [](const XPUDeviceProp &prop) {
+      return get_dev_type(prop);
+    })
+    .def("__repr__", [](const XPUDeviceProp &prop) {
+      std::ostringstream stream;
+      stream << "_XPUDeviceProperties(name='" << prop.name
+             << "', platform_name='" << prop.platform_name
+             << "', dev_type='" << get_dev_type(prop)
+             << "', sub_devices_number=" << prop.sub_devices_number
+             << ", total_global_memory=" << prop.total_global_mem / (1024 * 1024)
+             << "MB, max_compute_units=" << prop.max_compute_units << ")";
+      return stream.str();
+    });
+}
+
+static void bindGetDeviceProperties(PyObject* module) {
+  // Add method to torch_ipex._C
+  auto m = py::handle(module).cast<py::module>();
+  m.def("_get_device_properties", [](int device) -> XPUDeviceProp * {
+      return xpu::dpcpp::getDeviceProperties(device);
+  }, py::return_value_policy::reference);
+}
+
 void init_module(pybind11::module& m) {
 
   torch_ipex::jit::InitFusionPass();
@@ -192,4 +245,6 @@ void init_module(pybind11::module& m) {
   ASSERT_TRUE(THXPStorage_init<at::kFloat>(module));
   ASSERT_TRUE(THXPStorage_init<at::kDouble>(module));
   ASSERT_TRUE(THXPStorage_init<at::kBFloat16>(module));
+  register_xpu_device_properties(module);
+  bindGetDeviceProperties(module);
 }

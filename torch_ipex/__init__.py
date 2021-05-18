@@ -217,11 +217,17 @@ def library_paths():
     return paths
 
 
+def _usm_is_enabled():
+    return _C._usm_is_enabled()
+
+
 def _onedpl_is_enabled():
     return _C._onedpl_is_enabled()
 
+
 def _onemkl_is_enabled():
     return _C._onemkl_is_enabled()
+
 
 def _double_kernel_disabled():
     return _C._double_kernel_disabled()
@@ -320,13 +326,12 @@ def get_device_capability(device: Optional[_device_t] = None) -> Tuple[int, int]
     return prop.major, prop.minor
 
 
-def get_device_properties(device: _device_t):# -> _xpuDeviceProperties:
+def get_device_properties(device: _device_t):
     # _lazy_init()  # will define _get_device_properties
-    # device = _get_device_index(device, optional=True)
-    # if device < 0 or device >= device_count():
-    #     raise AssertionError("Invalid device id")
-    # return _get_device_properties(device)
-    pass
+    device = _get_device_index(device, optional=True)
+    if device < 0 or device >= device_count():
+        raise AssertionError("Invalid device id")
+    return _C._get_device_properties(device)
 
 
 def current_device() -> int:
