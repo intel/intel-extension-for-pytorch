@@ -91,7 +91,7 @@ void Int8OptConfig::insert_or_updata_observer(
   }
 }
 
-void Int8OptConfig::clear_indicators() { indicators_.clear(); }
+void Int8OptConfig::clear_indicators() { indicators_.clear(); weights_scales_.clear(); }
 
 void Int8OptConfig::add_indicators() {
   indicators_.clear();

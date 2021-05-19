@@ -13,17 +13,6 @@ namespace onednn {
 
 using opkind = dnnl::graph::op::kind;
 
-struct DequantInfo {
-  size_t unique_id;
-  std::vector<float> scales;
-  std::vector<int64_t> zps;
-  std::string qtype;
-  std::string in_type;
-  int64_t axis;
-};
-
-static std::unordered_map<size_t, DequantInfo> DequantMap;
-
 dnnl::graph::logical_tensor::data_type getQuantizationDataType(std::string dt) {
   
     if (dt == std::string("int8")) {
@@ -50,6 +39,23 @@ c10::optional<size_t> getDimensions(Value* v) {
     return v->type()->cast<TensorType>()->sizes().size();
   else
     return c10::nullopt;
+}
+
+// TODO: tensor to vector? We have assumed that zp and scale tensor is contiguous
+std::vector<float> FloatTensorToVector(const at::Tensor& tensor) {
+  std::vector<float> vectors;
+  for (int i = 0; i < tensor.numel(); i++) {
+    vectors.push_back(tensor[i].item().toFloat());
+  }
+  return vectors;
+}
+
+std::vector<int64_t> IntTensorToVector(const at::Tensor& tensor) {
+  std::vector<int64_t> vectors;
+  for (int i = 0; i < tensor.numel(); i++) {
+    vectors.push_back(tensor[i].item().toInt());
+  }
+  return vectors;
 }
 
 Operator makeWildcardOp(Node* node) {
@@ -83,18 +89,15 @@ Operator makeBinaryOp(Node* node, opkind kind) {
 // Not able to get it directly from the input tensor during compile time
 Operator makeDequantOp(Node* node, Node* input_node) {
   if (input_node->kind() == Symbol::aten("quantize_per_tensor")) {
-    DequantInfo info = {
-      node->output(0)->unique(), 
-      Operator::FloatToVector(input_node, 1), 
-      Operator::IntToVector(input_node, 2), 
-      std::string("per_tensor"),
-      Operator::String(input_node, 3),
-      -1
-    };
-    DequantMap.insert(std::pair<size_t, DequantInfo>(node->output(0)->unique(), info));
+    node->s_(Symbol::attr("qtype"), std::string("per_tensor"));
 
-    // TODO: change the attr name to unique_id
-    node->i_(Symbol::attr("dequant_id"), node->output(0)->unique());
+    std::vector<int64_t> zps_vector = Operator::IntToVector(input_node, 2);
+    node->is_(Symbol::attr("zps"), zps_vector);
+
+    double scale = Operator::Float(input_node, 1);
+    node->fs_(Symbol::attr("scales"), {scale});
+
+    node->s_(Symbol::attr("in_type"), Operator::String(input_node, 3));
 
     return Operator(node, opkind::Dequantize)
       .setQuantizationInputValue(node->input(0), getQuantizationDataType(Operator::String(input_node, 3)))
@@ -103,25 +106,18 @@ Operator makeDequantOp(Node* node, Node* input_node) {
       .setAttr("zps", Operator::IntToVector(input_node, 2))
       .setAttr("in_type", Operator::String(input_node, 3))
       .setAttr("qtype", std::string("per_tensor"));
-  }
-  else {
-    DequantInfo info = {
-      node->output(0)->unique(), 
-      Operator::FloatTensorToVector(input_node, 1), 
-      Operator::IntTensorToVector(input_node, 2), 
-      std::string("per_channel"),
-      Operator::String(input_node, 4),
-      Operator::Int(input_node, 3)
-    };
-    DequantMap.insert(std::pair<size_t, DequantInfo>(node->output(0)->unique(), info));
+  } else {
+    node->s_(Symbol::attr("qtype"), std::string("per_channel"));
+    node->t_(Symbol::attr("zps"), Operator::Tensor(input_node, 2));
+    node->t_(Symbol::attr("scales"), Operator::Tensor(input_node, 1));
+    node->s_(Symbol::attr("in_type"), Operator::String(input_node, 4));
+    node->i_(Symbol::attr("axis"), Operator::Int(input_node, 3));
 
-    // TODO: change the attr name to unique_id
-    node->i_(Symbol::attr("dequant_id"), node->output(0)->unique());
     return Operator(node, opkind::Dequantize)
       .setQuantizationInputValue(node->input(0), getQuantizationDataType(Operator::String(input_node, 4)))
       .setOutput(0)
-      .setAttr("scales", Operator::FloatTensorToVector(input_node, 1))
-      .setAttr("zps", Operator::IntTensorToVector(input_node, 2))
+      .setAttr("scales", FloatTensorToVector(Operator::Tensor(input_node, 1)))
+      .setAttr("zps", IntTensorToVector(Operator::Tensor(input_node, 2)))
       .setAttr("axis", Operator::Int(input_node, 3))
       .setAttr("in_type", Operator::String(input_node, 4))
       .setAttr("qtype", std::string("per_channel"));
@@ -295,13 +291,13 @@ Operator createOperator(Node* node) {
     return Operator(node, opkind::Quantize)
       .setInput(0)
       .setQuantizationOutputValue(node->output(0), getQuantizationDataType(Operator::String(node, 4)))
-      .setAttr("scales", Operator::FloatTensorToVector, 1)
-      .setAttr("zps", Operator::IntTensorToVector, 2)
+      .setAttr("scales", FloatTensorToVector(Operator::Tensor(node, 1)))
+      .setAttr("zps", IntTensorToVector(Operator::Tensor(node, 2)))
       .setAttr("axis", Operator::Int, 3)
       .setAttr("out_type", Operator::String, 4)
       .setAttr("qtype", std::string("per_channel"));
   } else if (node->kind() == Symbol::aten("dequantize")) {
-    if (!node->hasAttribute(Symbol::attr("dequant_id"))) {
+    if (node->numAttributes() == 0) {
       Node* input_node = node->input(0)->node();
       // TODO: how to handle input(1) == Symbol::aten("q_scale")
       REQ(((input_node->kind() == Symbol::aten("quantize_per_tensor")) || (input_node->kind() == Symbol::aten("quantize_per_channel"))) && (input_node->input(1)->node()->kind() != Symbol::aten("q_scale")));
@@ -314,31 +310,31 @@ Operator createOperator(Node* node) {
 
       return makeDequantOp(node, input_node);
     } else {
-      // save the zp, scale... into the node to retrieve it when the node has been added into LLGA fusion group
-      auto unique_id = node->i(Symbol::attr("dequant_id"));
-      auto it = DequantMap.find(unique_id);
-      
-      REQ(it != DequantMap.end());
 
-      DequantInfo dequant_info = it->second;
 
-      if (dequant_info.qtype == std::string("per_tensor")) {
+      if (node->s(Symbol::attr("qtype")) == std::string("per_tensor")) {
+        std::vector<double> scales_double = node->fs(Symbol::attr("scales"));
+        std::vector<float> scales_float;
+        for (int i=0;i<scales_double.size();i++) {
+          scales_float.push_back(static_cast<float>(scales_double[i]));
+        }
+
         return Operator(node, opkind::Dequantize)
-          .setQuantizationInputValue(node->input(0), getQuantizationDataType(dequant_info.in_type))
+          .setQuantizationInputValue(node->input(0), getQuantizationDataType(node->s(Symbol::attr("in_type"))))
           .setOutput(0)
-          .setAttr("scales", dequant_info.scales)
-          .setAttr("zps", dequant_info.zps)
-          .setAttr("in_type", dequant_info.in_type)
-          .setAttr("qtype", dequant_info.qtype);
+          .setAttr("scales", scales_float)
+          .setAttr("zps", node->is(Symbol::attr("zps")))
+          .setAttr("in_type", node->s(Symbol::attr("in_type")))
+          .setAttr("qtype", node->s(Symbol::attr("qtype")));
       } else {
         return Operator(node, opkind::Dequantize)
-          .setQuantizationInputValue(node->input(0), getQuantizationDataType(dequant_info.in_type))
+          .setQuantizationInputValue(node->input(0), getQuantizationDataType(node->s(Symbol::attr("in_type"))))
           .setOutput(0)
-          .setAttr("scales", dequant_info.scales)
-          .setAttr("zps", dequant_info.zps)
-          .setAttr("axis", dequant_info.axis)
-          .setAttr("in_type", dequant_info.in_type)
-          .setAttr("qtype", dequant_info.qtype);
+          .setAttr("scales", FloatTensorToVector(node->t(Symbol::attr("scales"))))
+          .setAttr("zps", IntTensorToVector(node->t(Symbol::attr("zps"))))
+          .setAttr("axis", node->i(Symbol::attr("axis")))
+          .setAttr("in_type", node->s(Symbol::attr("in_type")))
+          .setAttr("qtype", node->s(Symbol::attr("qtype")));
       }
     }
   }

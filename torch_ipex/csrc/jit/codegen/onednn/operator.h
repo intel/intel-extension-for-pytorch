@@ -89,25 +89,6 @@ class Operator {
     return {Int(node, offset)};
   }
 
-  // TODO: tensor to vector? We have assumed that zp and scale tensor is contiguous
-  static std::vector<float> FloatTensorToVector(const Node* node, size_t offset) {
-    at::Tensor tensor = toIValue(node->input(offset))->toTensor();
-    std::vector<float> vectors;
-    for (int i = 0; i < tensor.numel(); i++) {
-      vectors.push_back(tensor[i].item().toFloat());
-    }
-    return vectors;
-  }
-
-  static std::vector<int64_t> IntTensorToVector(const Node* node, size_t offset) {
-    at::Tensor tensor = toIValue(node->input(offset))->toTensor();
-    std::vector<int64_t> vectors;
-    for (int i = 0; i < tensor.numel(); i++) {
-      vectors.push_back(tensor[i].item().toInt());
-    }
-    return vectors;
-  }
-
   static std::string String(const Node* node, size_t offset) {
     std::string str = toString(static_cast<at::ScalarType>(Int(node, offset)));
     TORCH_CHECK((str == "QUInt8") || (str == "QInt8"), "Incorrect scalar type: ", str);
@@ -116,6 +97,10 @@ class Operator {
     } else {
       return std::string("int8");
     }
+  }
+
+  static at::Tensor Tensor(const Node* node, size_t offset) {
+    return toIValue(node->input(offset))->toTensor();
   }
 
   static bool Bool(const Node* node, size_t offset) {
