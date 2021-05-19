@@ -80,12 +80,15 @@ class JitLlgaTestCase(JitTestCase):
         for pat in fused_patterns:
             self.assertGraphContainsExactly(graph, pat, 0)
 
-    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, folding=False, config_name=""):
+    def checkQuantizeTrace(self, model, x, atol=1e-3, rtol=1e-2, folding=False, remove_dropout=False, config_name=""):
         model.eval()
         with torch.no_grad(), torch._jit_internal._disable_emit_hooks():
             # fold conv bn
             if folding:  
                 model = ipex.fx.conv_bn_fuse(model)
+
+            if remove_dropout:
+                ipex.utils._replace_dropout_with_identity(model)
 
             # do calibration
             conf = ipex.AmpConf(torch.int8)

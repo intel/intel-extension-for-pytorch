@@ -260,6 +260,39 @@ class TestFusionPattern(JitLlgaTestCase):
             # ]
             # self.checkPatterns(graph, patterns)
 
+    def test_linear_dropout_sum(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.linear1 = nn.Linear(15, 20)
+                self.dropout = nn.Dropout()
+                self.linear2 = nn.Linear(20, 3)
+
+            def forward(self, x, y):
+                x = self.linear1(x)
+                x = self.dropout(x)
+                z = self.linear2(x + y)
+                return z
+
+        x = torch.randn(2, 15)
+        y = torch.randn(2, 20)
+        m = M()
+        graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, remove_dropout=True, config_name="linear_dropout_sum")
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 11) # TODO: nb FUSION_GROUP=6 when oneDNN support sum post_ops with zps
+        self.assertFused(graph, ['aten::linear', 'aten::add',
+                                 'aten::quantize_per_tensor', 'aten::quantize_per_channel', 'aten::dequantize'])
+
+        # TODO: check patterns when oneDNN support sum post_ops with zps
+        # patterns = [
+        #     ["aten::quantize_per_tensor"],
+        #     ["aten::quantize_per_channel"],
+        #     ["aten::dequantize", "aten::linear", "aten::add", "aten::quantize_per_tensor"],
+        #     ["aten::quantize_per_channel"],
+        #     ["aten::dequantize", "aten::linear", "aten::quantize_per_tensor"],
+        #     ["aten::dequantize"]
+        # ]
+        # self.checkPatterns(graph, patterns)
+
 class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision
     def _test_vision(self, model_name):
