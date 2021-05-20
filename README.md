@@ -345,3 +345,8 @@ Then start VTune for profiling kernels. Make sure ```INTELONEAPIROOT``` is set f
 ## Caveat
 ### 1. Build order of PyTorch and extension:
 Please build IPEX after pytorch is built and installed, otherwise you will get an error “ModuleNotFoundError: No module named 'torch'”.
+
+### 2. To use pybind11 provided by PyTorch
+Please DO NOT install system pybind11 via package manager (such as apt).
+After the PyTorch was installed, please confirm that the pybind11 folder exists under <path to env>/lib/python3.x/site-packages/torch/include/.
+This pybind11 folder should be included in the release version of PyTorch, or should be copied automatically while building PyTorch from source.

@@ -6,7 +6,15 @@ set(GPU_cmake_included true)
 
 # ---[ Build flags
 set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_STANDARD 14)
+# FIXME:
+# For now, we must use this global flag to support latest dpcpp compilers to build without error,
+# BUT it is UNSAFE to use c++17 while PyTorch is built with c++14 standard.
+# We are going to refractor the IPEX codes to seperate those related to PyTorch from who would call
+# SYCL kernels.
+# See this link below to find out why it is unsafe to mix-use different standards in one project:
+# https://stackoverflow.com/questions/67500470/are-there-hidden-dangers-to-link-libraries-compiled-with-different-c-standard/67522688#67522688
+set(CMAKE_CXX_STANDARD 17)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-narrowing")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
