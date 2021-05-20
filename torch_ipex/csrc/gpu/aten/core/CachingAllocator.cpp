@@ -737,7 +737,7 @@ Allocator* dpcpp_getCachingAllocator(void)
   return &device_allocator;
 }
 
-void dpcpp_emptyCache(void) {
+void emptyCache(void) {
   caching_allocator.emptyCache();
 }
 
@@ -769,17 +769,17 @@ CADeviceStats getDeviceStats(DeviceIndex di) {
   return caching_allocator.getStatsForDevice(di);
 }
 
-void dpcpp_resetAccumulatedStats(DeviceIndex di) {
+void resetAccumulatedStats(DeviceIndex di) {
   assertValidDevice(di);
   caching_allocator.resetAccumulatedStats(di);
 }
 
-void dpcpp_resetPeakStats(DeviceIndex di) {
+void resetPeakStats(DeviceIndex di) {
   assertValidDevice(di);
   caching_allocator.resetPeakStats(di);
 }
 
-std::vector<CASegmentInfo> dpcpp_snapshot() {
+std::vector<CASegmentInfo> snapshot() {
   return caching_allocator.snapshot();
 }
 

@@ -68,15 +68,15 @@ void* dpcpp_raw_alloc_with_queue(size_t nbytes, DPCPP::queue &queue);
 void dpcpp_raw_delete(void* ptr);
 
 Allocator* dpcpp_getCachingAllocator();
-void dpcpp_emptyCache();
+void emptyCache();
 void dpcpp_cacheInfo(int dev_id, size_t* cachedAndFree, size_t* largestBlock);
 void* dpcpp_getBaseAllocation(void *ptr, size_t *size);
 void dpcpp_recordQueue(const DataPtr&, xpu::dpcpp::DPCPPStream stream);
-CADeviceStats dpcpp_getDeviceStats(int device);
-void dpcpp_resetAccumulatedStats(int device);
-void dpcpp_resetPeakStats(int device);
+CADeviceStats getDeviceStats(DeviceIndex device);
+void resetAccumulatedStats(DeviceIndex device);
+void resetPeakStats(DeviceIndex device);
 void dpcpp_dumpMemoryStatus(int deviceIndex);
-std::vector<CASegmentInfo> dpcpp_snapshot();
+std::vector<CASegmentInfo> snapshot();
 std::mutex* getFreeMutex();
 
 }} // namespace xpu::dpcpp

@@ -11,6 +11,7 @@
 #include <Storage.h>
 #include <core/Functions.h>
 #include <core/Generator.h>
+#include <core/CachingAllocator.h>
 
 #define ASSERT_TRUE(cmd) if (!(cmd)) return
 
@@ -91,6 +92,123 @@ PyObject * THPModule_getCurrentStream_wrap(
   END_HANDLE_TH_ERRORS
 }
 
+PyObject * THPModule_resetPeakMemoryStats(PyObject *_unused, PyObject *arg)
+{
+  HANDLE_TH_ERRORS
+  THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to reset_peak_memory_stats");
+  const int device = (int) THPUtils_unpackLong(arg);
+  xpu::dpcpp::resetPeakStats(device);
+  END_HANDLE_TH_ERRORS
+  Py_RETURN_NONE;
+}
+
+PyObject * THPModule_resetAccumulatedMemoryStats(PyObject *_unused, PyObject *arg)
+{
+  HANDLE_TH_ERRORS
+  THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to reset_accumulated_memory_stats");
+  const int device = (int) THPUtils_unpackLong(arg);
+  xpu::dpcpp::resetAccumulatedStats(device);
+  END_HANDLE_TH_ERRORS
+  Py_RETURN_NONE;
+}
+
+PyObject * THPModule_emptyCache(PyObject *_unused, PyObject *noargs)
+{
+  HANDLE_TH_ERRORS
+  xpu::dpcpp::emptyCache();
+  END_HANDLE_TH_ERRORS
+  Py_RETURN_NONE;
+}
+
+PyObject * THPModule_memoryStats(PyObject *_unused, PyObject *arg)
+{
+  HANDLE_TH_ERRORS
+  THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to memory_allocated");
+  const int device = (int) THPUtils_unpackLong(arg);
+
+  using xpu::dpcpp::CAStatType;
+  using xpu::dpcpp::CAStat;
+  using xpu::dpcpp::CAStatArray;
+  using xpu::dpcpp::CADeviceStats;
+
+  const auto statToDict = [](const CAStat& stat) {
+      py::dict dict;
+
+      dict["current"] = stat.current;
+      dict["peak"] = stat.peak;
+      dict["allocated"] = stat.allocated;
+      dict["freed"] = stat.freed;
+      return dict;
+  };
+
+  const auto statArrayToDict = [=](const CAStatArray& statArray) {
+      const std::array<const char*, static_cast<size_t>(CAStatType::NUM_TYPES)> statTypeNames = {
+              "all", "small_pool", "large_pool"
+      };
+      py::dict dict;
+      for (size_t i = 0; i < statTypeNames.size(); ++i) {
+        dict[statTypeNames[i]] = statToDict(statArray[i]);
+      }
+      return dict;
+  };
+
+  const CADeviceStats stats = xpu::dpcpp::getDeviceStats(device);
+
+  py::dict result;
+  result["num_alloc_retries"] = stats.num_alloc_retries;
+  result["num_ooms"] = stats.num_ooms;
+  result["allocation"] = statArrayToDict(stats.allocation);
+  result["segment"] = statArrayToDict(stats.segment);
+  result["active"] = statArrayToDict(stats.active);
+  result["inactive_split"] = statArrayToDict(stats.inactive_split);
+  result["allocated_bytes"] = statArrayToDict(stats.allocated_bytes);
+  result["reserved_bytes"] = statArrayToDict(stats.reserved_bytes);
+  result["active_bytes"] = statArrayToDict(stats.active_bytes);
+  result["inactive_split_bytes"] = statArrayToDict(stats.inactive_split_bytes);
+
+  return result.release().ptr();
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject * THPModule_memorySnapshot(PyObject *_unused, PyObject *noargs)
+{
+  HANDLE_TH_ERRORS
+
+      using xpu::dpcpp::CASegmentInfo;
+      using xpu::dpcpp::CABlockInfo;
+
+      const auto segmentInfoToDict = [](const CASegmentInfo& segmentInfo) {
+          py::dict segmentDict;
+          segmentDict["device"] = segmentInfo.device;
+          segmentDict["address"] = segmentInfo.address;
+          segmentDict["total_size"] = segmentInfo.total_size;
+          segmentDict["allocated_size"] = segmentInfo.allocated_size;
+          segmentDict["active_size"] = segmentInfo.active_size;
+          segmentDict["segment_type"] = (segmentInfo.is_large ? "large" : "small");
+
+          py::list blocks;
+          for (const auto& blockInfo : segmentInfo.blocks) {
+            py::dict blockDict;
+            blockDict["size"] = blockInfo.size;
+            blockDict["state"] = (blockInfo.allocated ? "active_allocated" : (blockInfo.active ? "active_pending_free" : "inactive"));
+            blocks.append(blockDict);
+          }
+          segmentDict["blocks"] = blocks;
+
+          return segmentDict;
+      };
+
+      const std::vector<CASegmentInfo>& snapshot = xpu::dpcpp::snapshot();
+      py::list result;
+
+      for (const auto& segmentInfo : snapshot) {
+        result.append(segmentInfoToDict(segmentInfo));
+      }
+
+      return result.release().ptr();
+  END_HANDLE_TH_ERRORS
+}
+
 static struct PyMethodDef _THCPModule_methods[] = {
   {"_initExtension",  (PyCFunction)THPModule_initExtension,   METH_NOARGS,       nullptr},
   {"_postInitExtension",  (PyCFunction)THPModule_postInitExtension,   METH_NOARGS,       nullptr},
@@ -98,6 +216,11 @@ static struct PyMethodDef _THCPModule_methods[] = {
   {"_getDevice",   (PyCFunction)THPModule_getDevice_wrap,   METH_NOARGS,  nullptr},
   {"_getDeviceCount", (PyCFunction)THPModule_getDeviceCount_wrap, METH_NOARGS, nullptr},
   {"_getCurrentStream", (PyCFunction)THPModule_getCurrentStream_wrap, METH_O, nullptr},
+  {"_emptyCache", (PyCFunction) THPModule_emptyCache, METH_NOARGS, nullptr},
+  {"_memoryStats", (PyCFunction)THPModule_memoryStats, METH_O, nullptr},
+  {"_resetAccumulatedMemoryStats", (PyCFunction) THPModule_resetAccumulatedMemoryStats, METH_O, nullptr},
+  {"_resetPeakMemoryStats", (PyCFunction) THPModule_resetPeakMemoryStats, METH_O,  nullptr},
+  {"_memorySnapshot", (PyCFunction) THPModule_memorySnapshot, METH_NOARGS, nullptr},
   {nullptr}
 };
 

@@ -499,7 +499,7 @@ def get_device_type() -> str:
 
 
 from .random import *
-
+from .memory import *
 
 from torch import serialization
 
