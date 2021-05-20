@@ -102,7 +102,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(ref1, real1.cpu(), rtol=10e-5, atol=10e-5)
         self.assertEqual(ref2, real2.cpu(), rtol=10e-5, atol=10e-5)
 
-    def test_layer_norm_bfp16_training(self, dtype=torch.float):
+    def test_layer_norm_bfp16_training(self, dtype=torch.bfloat16):
         layernorm = nn.LayerNorm(10)
         x = torch.randn([10, 10]).requires_grad_()
         x.retain_grad()
@@ -116,7 +116,7 @@ class TestNNMethod(TestCase):
 
         layernorm.zero_grad()
 
-        layernorm = layernorm.to("xpu")
+        layernorm = layernorm.to("xpu").to(dtype)
         x = x.bfloat16().to("xpu").requires_grad_()
         x.retain_grad()
         gy = gy.bfloat16().to("xpu")

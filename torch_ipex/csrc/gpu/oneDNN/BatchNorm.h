@@ -131,39 +131,43 @@ batch_normalization(
       {DNNL_ARG_DST, dst_m},
   };
 
-  // BatchNorm wgh/bia only support FP32 data type in oneDNN
-  auto wgh_f32 = at::empty_like(wgh, at::kFloat);
-  auto bia_f32 = at::empty_like(bia, at::kFloat);
-  if (wgh.scalar_type() == ScalarType::Half) {
-    dpcppMemoryCopyType(wgh_f32.data_ptr<float>(), wgh.data_ptr<at::Half>(), feature_num);
-    dpcppMemoryCopyType(bia_f32.data_ptr<float>(), bia.data_ptr<at::Half>(), feature_num);
-  } else if (wgh.scalar_type() == ScalarType::BFloat16) {
-    dpcppMemoryCopyType(wgh_f32.data_ptr<float>(), wgh.data_ptr<at::BFloat16>(), feature_num);
-    dpcppMemoryCopyType(bia_f32.data_ptr<float>(), bia.data_ptr<at::BFloat16>(), feature_num);
-  } else {
-    wgh_f32 = wgh;
-    bia_f32 = bia;
-  }
-
-  auto wgh_bia = at::empty(2 * feature_num, wgh_f32.options());
+  auto wgh_bia = at::empty(2 * feature_num, wgh.options().dtype(at::kFloat));
   auto wgh_bia_m = dpcpp_onednn_memory(
       bn_fwd_pd.weights_desc(), engine, wgh_bia.data_ptr());
 
-  dpcppMemcpyAsync(
-      wgh_bia.data_ptr(),
-      wgh_f32.data_ptr(),
-      feature_num * wgh_f32.itemsize(),
-      DeviceToDevice);
-  dpcppMemcpyAsync(
-      static_cast<uint8_t*>(wgh_bia.data_ptr()) + feature_num * bia_f32.itemsize(),
-      bia_f32.data_ptr(),
-      feature_num * bia_f32.itemsize(),
-      DeviceToDevice);
+  if (wgh.scalar_type() == ScalarType::Half) {
+    dpcppMemoryCopyType(
+        wgh_bia.data_ptr<float>(),
+        wgh.data_ptr<at::Half>(),
+        feature_num);
+    dpcppMemoryCopyType(
+        wgh_bia.data_ptr<float>() + feature_num,
+        bia.data_ptr<at::Half>(),
+        feature_num);
+  } else if (wgh.scalar_type() == ScalarType::BFloat16) {
+    dpcppMemoryCopyType(
+        wgh_bia.data_ptr<float>(),
+        wgh.data_ptr<at::BFloat16>(),
+        feature_num);
+    dpcppMemoryCopyType(
+        wgh_bia.data_ptr<float>() + feature_num,
+        bia.data_ptr<at::BFloat16>(),
+        feature_num);
+  } else {
+    dpcppMemoryCopyType(
+        wgh_bia.data_ptr<float>(),
+        wgh.data_ptr<float>(),
+        feature_num);
+    dpcppMemoryCopyType(
+        wgh_bia.data_ptr<float>() + feature_num,
+        bia.data_ptr<float>(),
+        feature_num);
+  }
 
   args.insert({DNNL_ARG_SCALE_SHIFT, wgh_bia_m});
 
-  at::Tensor save_mean = at::empty(feature_num, wgh_f32.options());
-  at::Tensor save_var = at::empty(feature_num, wgh_f32.options());
+  at::Tensor save_mean = at::empty(feature_num, wgh.options().dtype(at::kFloat));
+  at::Tensor save_var = at::empty(feature_num, wgh.options().dtype(at::kFloat));
 
   void* mean_data = nullptr;
   void* var_data = nullptr;
@@ -327,20 +331,25 @@ batch_normalization_backward(
 
   at::Tensor diff_wgh_bia;
   if ((bool)(flags & normalization_flags::use_scale_shift)) {
-    auto wgh_bia = at::empty(2 * feature_num, wgh.options());
+    auto wgh_bia = at::empty(2 * feature_num, wgh.options().dtype(at::kFloat));
     auto wgh_bia_m = dpcpp_onednn_memory(
         bn_fwd_pd.weights_desc(), engine, wgh_bia.data_ptr());
-    dpcppMemcpyAsync(
-        wgh_bia.data_ptr(),
-        wgh.data_ptr(),
-        feature_num * sizeof(float),
-        DeviceToDevice);
+    if (wgh.scalar_type() == ScalarType::BFloat16) {
+      dpcppMemoryCopyType(
+          wgh_bia.data_ptr<float>(),
+          wgh.data_ptr<at::BFloat16>(),
+          feature_num);
+    } else {
+      dpcppMemoryCopyType(
+          wgh_bia.data_ptr<float>(),
+          wgh.data_ptr<float>(),
+          feature_num);
+    }
     dpcppMemsetAsync(
-        static_cast<uint8_t*>(wgh_bia.data_ptr()) + feature_num * sizeof(float),
-        0,
-        feature_num * sizeof(float));
-
-    diff_wgh_bia = at::empty(2 * feature_num, wgh.options());
+      static_cast<uint8_t*>(wgh_bia.data_ptr()) + feature_num * sizeof(float),
+      0,
+      feature_num * sizeof(float));
+    diff_wgh_bia = at::empty(2 * feature_num, wgh.options().dtype(at::kFloat));
     auto diff_wgh_bia_m = dpcpp_onednn_memory(
         bn_bwd_pd.diff_weights_desc(), engine, diff_wgh_bia.data_ptr());
 
@@ -351,17 +360,25 @@ batch_normalization_backward(
   DPCPP_ONEDNN_EXEC(bn_bwd, strm, args);
 
   if ((bool)(flags & normalization_flags::use_scale_shift)) {
-    dpcppMemcpyAsync(
-        diff_wgh.data_ptr(),
-        diff_wgh_bia.data_ptr(),
-        feature_num * sizeof(float),
-        DeviceToDevice);
-    dpcppMemcpyAsync(
-        diff_bia.data_ptr(),
-        static_cast<uint8_t*>(diff_wgh_bia.data_ptr()) +
-            feature_num * sizeof(float),
-        feature_num * sizeof(float),
-        DeviceToDevice);
+    if (wgh.scalar_type() == ScalarType::BFloat16) {
+      dpcppMemoryCopyType(
+          diff_wgh.data_ptr<at::BFloat16>(),
+          diff_wgh_bia.data_ptr<float>(),
+          feature_num);
+      dpcppMemoryCopyType(
+          diff_bia.data_ptr<at::BFloat16>(),
+          diff_wgh_bia.data_ptr<float>() + feature_num,
+          feature_num);
+    } else {
+      dpcppMemoryCopyType(
+          diff_wgh.data_ptr<float>(),
+          diff_wgh_bia.data_ptr<float>(),
+          feature_num);
+      dpcppMemoryCopyType(
+          diff_bia.data_ptr<float>(),
+          diff_wgh_bia.data_ptr<float>() + feature_num,
+          feature_num);
+    }
   }
 
   return {diff_src, diff_wgh, diff_bia};

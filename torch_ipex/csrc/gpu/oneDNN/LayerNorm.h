@@ -87,11 +87,11 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
   if (training) {
     auto stats_usr_md = memory::desc(stats_tz, stats_dt, stats_fmt);
     if (!src_ctx.is_plain() && stats_exp_md != stats_usr_md) {
-      mean = empty_opaque_tensor(stats_exp_md, wgh.options(), c10::nullopt);
-      rstd = empty_opaque_tensor(stats_exp_md, wgh.options(), c10::nullopt);
+      mean = empty_opaque_tensor(stats_exp_md, wgh.options().dtype(at::kFloat), c10::nullopt);
+      rstd = empty_opaque_tensor(stats_exp_md, wgh.options().dtype(at::kFloat), c10::nullopt);
     } else {
-      mean = at::empty(stats_tz, wgh.options());
-      rstd = at::empty(stats_tz, wgh.options());
+      mean = at::empty(stats_tz, wgh.options().dtype(at::kFloat));
+      rstd = at::empty(stats_tz, wgh.options().dtype(at::kFloat));
     }
 
     auto mean_memory = dpcpp_onednn_memory(stats_exp_md, engine, mean.data_ptr());
@@ -101,32 +101,36 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
     args.insert({DNNL_ARG_VARIANCE, var_memory});
   }
 
-  // LayerNorm weight/bias only support FP32 data type in oneDNN
-  Tensor wgh_ = at::empty_like(wgh, at::kFloat);
-  Tensor bia_ = at::empty_like(bia, at::kFloat);
-  if (wgh.scalar_type() == ScalarType::Half) {
-    dpcppMemoryCopyType(wgh_.data_ptr<float>(), wgh.data_ptr<at::Half>(), ih);
-    dpcppMemoryCopyType(bia_.data_ptr<float>(), bia.data_ptr<at::Half>(), ih);
-  } else if (wgh.scalar_type() == ScalarType::BFloat16) {
-    dpcppMemoryCopyType(wgh_.data_ptr<float>(), wgh.data_ptr<at::BFloat16>(), ih);
-    dpcppMemoryCopyType(bia_.data_ptr<float>(), bia.data_ptr<at::BFloat16>(), ih);
-  } else {
-    wgh_ = wgh;
-    bia_ = bia;
-  }
-
   if (useScaleShift) {
-    auto wgh_bia = at::empty(2 * ih, wgh_.options());
-    dpcppMemcpyAsync(
-        wgh_bia.data_ptr(),
-        wgh_.data_ptr(),
-        ih * wgh_.itemsize(),
-        DeviceToDevice);
-    dpcppMemcpyAsync(
-        static_cast<uint8_t*>(wgh_bia.data_ptr()) + ih * wgh_.itemsize(),
-        bia_.data_ptr(),
-        ih * bia_.itemsize(),
-        DeviceToDevice);
+    auto wgh_bia = at::empty(2 * ih, wgh.options().dtype(at::kFloat));
+    if (wgh.scalar_type() == ScalarType::Half) {
+      dpcppMemoryCopyType(
+          wgh_bia.data_ptr<float>(),
+          wgh.data_ptr<at::Half>(),
+          ih);
+      dpcppMemoryCopyType(
+          wgh_bia.data_ptr<float>() + ih,
+          bia.data_ptr<at::Half>(),
+          ih);
+    } else if (wgh.scalar_type() == ScalarType::BFloat16) {
+      dpcppMemoryCopyType(
+          wgh_bia.data_ptr<float>(),
+          wgh.data_ptr<at::BFloat16>(),
+          ih);
+      dpcppMemoryCopyType(
+          wgh_bia.data_ptr<float>() + ih,
+          bia.data_ptr<at::BFloat16>(),
+          ih);
+    } else {
+      dpcppMemoryCopyType(
+          wgh_bia.data_ptr<float>(),
+          wgh.data_ptr<float>(),
+          ih);
+      dpcppMemoryCopyType(
+          wgh_bia.data_ptr<float>() + ih,
+          bia.data_ptr<float>(),
+          ih);
+    }
 
     auto wgh_bia_m = dpcpp_onednn_memory(
         ln_fwd_pd.weights_desc(), engine, wgh_bia.data_ptr());
@@ -261,12 +265,18 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   };
   Tensor diff_wgh_bia;
   if (useScaleShift) {
-    auto wgh_bia = at::empty(2 * ih, wgh.options());
-    dpcppMemcpyAsync(
-        wgh_bia.data_ptr(),
-        wgh.data_ptr(),
-        ih * wgh.itemsize(),
-        DeviceToDevice);
+    auto wgh_bia = at::empty(2 * ih, wgh.options().dtype(at::kFloat));
+    if (wgh.scalar_type() == ScalarType::BFloat16) {
+      dpcppMemoryCopyType(
+          wgh_bia.data_ptr<float>(),
+          wgh.data_ptr<at::BFloat16>(),
+          ih);
+    } else {
+      dpcppMemoryCopyType(
+          wgh_bia.data_ptr<float>(),
+          wgh.data_ptr<float>(),
+          ih);
+    }
     dpcppMemsetAsync(
         static_cast<uint8_t*>(wgh_bia.data_ptr()) + ih * sizeof(float),
         0,
@@ -274,7 +284,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
     auto wgh_bia_m = dpcpp_onednn_memory(
         ln_bwd_pd.weights_desc(), engine, wgh_bia.data_ptr());
 
-    diff_wgh_bia = at::empty(2 * ih, wgh.options());
+    diff_wgh_bia = at::empty(2 * ih, wgh.options().dtype(at::kFloat));
     auto diff_wgh_bia_m = dpcpp_onednn_memory(
         ln_bwd_pd.diff_weights_desc(), engine, diff_wgh_bia.data_ptr());
 
@@ -294,16 +304,25 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   Tensor diff_wgh = at::empty_like(wgh);
   Tensor diff_bia = at::empty_like(wgh);
   if (useScaleShift) {
-    dpcppMemcpyAsync(
-        diff_wgh.data_ptr(),
-        diff_wgh_bia.data_ptr(),
-        ih * wgh.itemsize(),
-        DeviceToDevice);
-    dpcppMemcpyAsync(
-        diff_bia.data_ptr(),
-        static_cast<uint8_t*>(diff_wgh_bia.data_ptr()) + ih * wgh.itemsize(),
-        ih * wgh.itemsize(),
-        DeviceToDevice);
+    if (wgh.scalar_type() == ScalarType::BFloat16) {
+      dpcppMemoryCopyType(
+          diff_wgh.data_ptr<at::BFloat16>(),
+          diff_wgh_bia.data_ptr<float>(),
+          ih);
+      dpcppMemoryCopyType(
+          diff_bia.data_ptr<at::BFloat16>(),
+          diff_wgh_bia.data_ptr<float>() + ih,
+          ih);
+    } else {
+      dpcppMemoryCopyType(
+          diff_wgh.data_ptr<float>(),
+          diff_wgh_bia.data_ptr<float>(),
+          ih);
+      dpcppMemoryCopyType(
+          diff_bia.data_ptr<float>(),
+          diff_wgh_bia.data_ptr<float>() + ih,
+          ih);
+    }
   }
 
   return std::make_tuple(diff_src, diff_wgh, diff_bia);

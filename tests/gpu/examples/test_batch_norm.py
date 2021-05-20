@@ -21,13 +21,31 @@ class TestNNMethod(TestCase):
 
     def test_batch_norm_bfloat16(self, dtype=torch.bfloat16):
         x_i = torch.randn([2, 2, 3, 3], device=cpu_device)
-        x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
+        grad_i = torch.randn([2, 2, 3, 3], device=cpu_device)
 
+        x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
+        grad_dpcpp_i = grad_i.to(dpcpp_device).to(dtype)
+
+        x_cpu = Variable(x_i, requires_grad=True)
+        grad_cpu = Variable(grad_i, requires_grad=True)
         bn = nn.BatchNorm2d(2)
-        y_cpu = bn(x_i)
-        bn.to(dpcpp_device).to(dtype)
-        y_dpcpp = bn(x_dpcpp_i)
-        self.assertEqual(y_cpu, y_dpcpp.cpu().float(), atol=1e-1, rtol=0)
+        y_cpu = bn(x_cpu)
+
+        y_cpu.backward(grad_cpu)
+
+        print("x_cpu = ", y_cpu)
+        print("x_cpu.grad = ", x_cpu.grad)
+
+        x_dpcpp = Variable(x_dpcpp_i, requires_grad=True)
+        grad_dpcpp = Variable(grad_dpcpp_i, requires_grad=True)
+        bn.to(dtype).to(dpcpp_device)
+        y_dpcpp = bn(x_dpcpp)
+        y_dpcpp.backward(grad_dpcpp)
+
+        print("y_dpcpp = ", y_dpcpp.cpu())
+        print("x_dpcpp.grad", x_dpcpp.grad.cpu())
+        self.assertEqual(y_cpu, y_dpcpp.to(cpu_device).float(), rtol=10e-4, atol=10e-2)
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device).float(), rtol=10e-4, atol=10e-2)
 
     def test_batch_norm(self, dtype=torch.float):
 
