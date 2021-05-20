@@ -51,9 +51,9 @@ at::Tensor conv_transpose3d(const at::Tensor& input, const at::Tensor& weight, c
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("conv_transpose3d");
 #endif
-  return at::conv_transpose3d(cpu_cached_cast(at::kFloat, input),
-                              cpu_cached_cast(at::kFloat, weight),
-                              cpu_cached_cast(at::kFloat, bias),
+  return at::conv_transpose3d(cpu_cached_cast(target_type, input),
+                              cpu_cached_cast(target_type, weight),
+                              cpu_cached_cast(target_type, bias),
                               stride, padding, output_padding, groups, dilation);
 }
 
@@ -222,7 +222,7 @@ at::Tensor gelu(const at::Tensor& input) {
     return int8::gelu(input);
   }
   // convert to fp32 path.
-  return at::gelu(cpu_cached_cast(at::kFloat, input));
+  return at::gelu(input);
 }
 
 } // autocast

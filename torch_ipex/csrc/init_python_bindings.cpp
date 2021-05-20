@@ -77,7 +77,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("disable_jit_opt", []() { AutoOptConfig::singleton().set_jit_fuse(false); });
   m.def("get_jit_opt", []() { return AutoOptConfig::singleton().get_jit_fuse(); });
 
-
   // int8 path
   m.def("clear_autocast_cache_int8", &torch_ipex::autocast::int8::clear_autocast_cache_int8);
   m.def("enable_int8_calibration", []() { AutoOptConfig::singleton().set_int8_calibration(true); });

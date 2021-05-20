@@ -8,12 +8,12 @@ from .. import conf
 
 class autocast(object):
     def __init__(self, enabled=True, configure=conf.AmpConf(torch.bfloat16)):
-        supported_dtype = [torch.float32, torch.bfloat16, torch.int8]
+        supported_dtype = [torch.bfloat16, torch.int8]
         if configure.dtype not in supported_dtype :
             warnings.warn("In CPU autocast, but the target dtype is not supported. Disable the autocast.")
-            warnings.warn("Supported dtype input is: torch.float32, torch.bfloat16, torch.int8.")
+            warnings.warn("Supported dtype input is: torch.bfloat16, torch.int8.")
             enabled = False
-            configure = conf.AmpConf(torch.float32)
+            configure = conf.AmpConf(torch.bfloat16)
         self._enabled = enabled
         self._dtype = configure.dtype
 
