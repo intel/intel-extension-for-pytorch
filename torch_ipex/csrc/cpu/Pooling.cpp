@@ -2,6 +2,7 @@
 #include "torch_ipex/csrc/utils.h"
 
 #include <ATen/native/Pool.h>
+#include <ATen/core/grad_mode.h>
 
 namespace torch_ipex {
 namespace cpu {
@@ -51,7 +52,7 @@ std::vector<int64_t> pool_output_sizes(
    return output_size;
 }
 
-static at::Tensor _mkldnn_pooling(
+at::Tensor pooling_impl(
     const at::Tensor& input,
     at::IntArrayRef kernel_size,
     at::IntArrayRef stride,
@@ -72,7 +73,8 @@ static at::Tensor _mkldnn_pooling(
 
 // TODO: the input will be actively converted to channels last format
 // after the 5-D tensor supports channels last format.
-  const ideep::tensor mkldnn_input = at::native::itensor_view_from_dense(input);
+  auto input_ = IS_CONTIGUOUS_ANY(input) ? input : input.contiguous();
+  const ideep::tensor mkldnn_input = at::native::itensor_view_from_dense(input_);
   std::vector<int64_t> output_sizes;
 
   if (ceil_mode) {
@@ -119,11 +121,10 @@ static at::Tensor _mkldnn_pooling(
         false /*ceil_mode */);
   }
 
-  bool is_channels_last = input.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
-  auto output = at::empty({0}, input.options());
+  bool is_channels_last = input_.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
+  auto output = at::empty(output_sizes, input_.options().memory_format(input_.suggest_memory_format()));
   ideep::tensor mkldnn_output;
   if (is_channels_last) {
-    output.resize_(output_sizes, input.suggest_memory_format());
     mkldnn_output = at::native::itensor_view_from_dense(output);
   }
 
@@ -155,28 +156,6 @@ static at::Tensor _mkldnn_pooling(
         at::native::new_with_itensor_mkldnn(std::move(mkldnn_output), optTypeMetaToScalarType(input.options().dtype_opt()),
                                 input.options().device_opt()));
   }
-}
-
-at::Tensor dil_max_pool2d(
-    const at::Tensor& input,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool ceil_mode) {
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("AtenIpexJITDev::dil_max_pool2d", std::vector<c10::IValue>({}));
-#endif
-  TORCH_CHECK(std::all_of(dilation.cbegin(), dilation.cend(), [](int64_t i) { return 1 == i; }),
-      "mkldnn_max_pool2d does not support dilation case");
-  return _mkldnn_pooling(
-      IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode,
-      ideep::algorithm::pooling_max);
 }
 
 }  // namespace cpu

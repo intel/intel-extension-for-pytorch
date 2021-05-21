@@ -23,7 +23,11 @@ def convert_module_data_type(module, dtype):
     return module
 
 def optimize(model, dtype=torch.bfloat16, level='O1'):
-    optimized_model = conv_bn_fuse(model)
+    try:
+        optimized_model = conv_bn_fuse(model)
+    except:
+        warnings.warn("Conv BN folding failed during the optimize process.")
+        optimized_model = model
     if dtype == torch.bfloat16:
         optimized_model = convert_module_data_type(optimized_model, torch.bfloat16)
     return optimized_model

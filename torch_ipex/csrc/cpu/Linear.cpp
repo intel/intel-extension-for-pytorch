@@ -1,5 +1,6 @@
 #include "Linear.h"
 #include "mkldnn/MKLDNNCommon.h"
+#include "WeightPrepack.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -9,22 +10,21 @@ at::Tensor linear_impl(
     const at::Tensor& weight,
     const at::Tensor& bias,
     const ideep::attr_t& attr) {
-
+  auto self_ = self.is_contiguous() ? self : self.contiguous();
   const int64_t dim = self.dim();
   // reshape first if input dim != 2 and the reshape will cost a memory copy.
   auto self_reshaped =
-      dim == 2 ? self : self.reshape({-1, self.size(self.dim() - 1)});
-
+      dim == 2 ? self_ : self_.reshape({-1, self.size(self.dim() - 1)});
   const ideep::tensor mkldnn_input = at::native::itensor_view_from_dense(self_reshaped);
-  const ideep::tensor mkldnn_weight = at::native::itensor_view_from_dense(weight);
+  const ideep::tensor mkldnn_weight = get_linear_prepacked_weight(mkldnn_input, weight);
 
   std::vector<int64_t> output_size_reshaped = {self_reshaped.size(0), weight.size(0)};
   auto output = at::empty(output_size_reshaped, self.options());
-  ideep::tensor mkldnn_output;
-  mkldnn_output = at::native::itensor_view_from_dense(output);
+  ideep::tensor mkldnn_output = at::native::itensor_view_from_dense(output);
 
   if (bias.defined()) {
-    const ideep::tensor mkldnn_bias = at::native::itensor_view_from_dense(bias);
+    auto bias_ = self.is_contiguous() ? bias : bias.contiguous();
+    const ideep::tensor mkldnn_bias = at::native::itensor_view_from_dense(bias_);
     ideep::inner_product_forward::compute(
         mkldnn_input,
         mkldnn_weight,

@@ -178,8 +178,8 @@ private:
       // align weights data type with src
       dst_data_type = src.get_data_type() == data_type::bf16 ? data_type::bf16
                                                              : data_type::f32;
-      src_desc = src.get_desc().to_type(dst_data_type);
-      weights_desc = weights.get_desc().to_type(dst_data_type);
+      src_desc = src.get_desc().to_type(dst_data_type).to_format_any();
+      weights_desc = weights.get_desc().to_type(dst_data_type).to_format_any();
       if (with_bias) {
         IDEEP_ENFORCE(utils::one_of(bias.get_data_type(),
                                     data_type::f32, data_type::bf16),
@@ -197,9 +197,16 @@ private:
 
     auto expected_src = src.reorder_if_differ_in(pd.src_desc(), src_attr);
     auto expected_weights = weights.reorder_if_differ_in(pd.weights_desc(), weights_attr);
-    dst.reinit_if_possible(pd.dst_desc());
-    if (!dst_scales.empty() && dst.get_data_type() != data_type::f32) {
-      dst.set_scale(dst_scales_in);
+    // [ Note output buffer ]
+    // In this case, dst is an empty ideep tensor, can be re-init
+    // If dst is not empty, ideep must write result to dst's memory and it is caller's duty to
+    // make sure dst is big enough to hold the result
+    if (dst.is_empty()) {
+      dst.init(pd.dst_desc());
+    }
+    auto expected_dst = dst.reorder_if_differ_in(pd.dst_desc());
+    if (!dst_scales.empty() && utils::one_of(dst.get_data_type(), data_type::u8, data_type::s8)) {  
+      expected_dst.set_scale(dst_scales_in);
     }
 
     if (with_bias){
@@ -208,17 +215,19 @@ private:
                         {{DNNL_ARG_SRC, expected_src},
                          {DNNL_ARG_WEIGHTS, expected_weights},
                          {DNNL_ARG_BIAS, expected_bias},
-                         {DNNL_ARG_DST, dst}});
+                         {DNNL_ARG_DST, expected_dst}});
     } else {
       super(pd).execute(stream::default_stream(),
                         {{DNNL_ARG_SRC, expected_src},
                          {DNNL_ARG_WEIGHTS, expected_weights},
-                         {DNNL_ARG_DST, dst}});
+                         {DNNL_ARG_DST, expected_dst}});
     }
 
-    if (attr.non_negitive_output() && dst.get_data_type() == data_type::s8) {
-      dst.to_type(data_type::u8);
+    if (attr.non_negitive_output() && expected_dst.get_data_type() == data_type::s8) {
+      expected_dst.to_type(data_type::u8);
     }
+    // reorder back to dst's buffer if needed
+    expected_dst.reorder_to_if_differ_from(dst);
   }
 };
 

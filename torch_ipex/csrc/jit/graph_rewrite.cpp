@@ -396,6 +396,20 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
   rewriter_max_pool2d.runOnGraph(graph);
 }
 
+void replaceAtenLinearWithIpexLinear(std::shared_ptr<Graph>& graph) {
+  std::string aten_linear = R"(
+      graph(%a, %w, %b):
+        %r = aten::linear(%a, %w, %b)
+        return (%r) )";
+  std::string ipex_linear = R"(
+      graph(%a, %w, %b):
+        %r = ipex::linear(%a, %w, %b)
+        return (%r) )";
+  SubgraphRewriter rewriter_linear;
+  rewriter_linear.RegisterRewritePattern(aten_linear, ipex_linear);
+  rewriter_linear.runOnGraph(graph);
+}
+
 } // namespace graph_rewrite
 } // namespace jit
 } // namespace torch

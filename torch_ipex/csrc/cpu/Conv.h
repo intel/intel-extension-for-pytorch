@@ -1,10 +1,7 @@
 #pragma once
 
 #include <ATen/Tensor.h>
-
 #include "ideep/ideep.hpp"
-
-#include <vector>
 
 namespace torch_ipex {
 namespace cpu {

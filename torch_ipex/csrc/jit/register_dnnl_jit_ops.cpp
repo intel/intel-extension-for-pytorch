@@ -3,7 +3,7 @@
 #include <torch/csrc/jit/runtime/custom_operator.h>
 #include <torch/csrc/jit/runtime/operator.h>
 
-#include "torch_ipex/csrc/cpu/FusionOPs.h"
+#include "torch_ipex/csrc/cpu/CustomOPs.h"
 #include "torch_ipex/csrc/utils.h"
 #include "torch_ipex/csrc/cpu/Pooling.h"
 
@@ -151,7 +151,7 @@ RegisterOperators op({
         "ipex::max_pool2d(Tensor input, int[2] kernel_size, int[2] stride, int[2] padding, int[2] dilation, bool ceil_mode) -> Tensor",
         [](const Node* node) -> Operation {
             return [](Stack* stack) {
-              auto result = torch_ipex::cpu::dil_max_pool2d(
+              auto result = AtenIpexJITDev::dil_max_pool2d(
                   (std::move(peek(stack, 0, 6))).toTensor(),
                   (std::move(peek(stack, 1, 6))).toIntVector(),
                   (std::move(peek(stack, 2, 6))).toIntVector(),
@@ -164,6 +164,21 @@ RegisterOperators op({
             };
         },
         aliasAnalysisFromSchema()),
+    Operator(
+        "ipex::linear(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor",
+        [](const Node* node) -> Operation {
+            return [](Stack* stack) {
+              auto result = AtenIpexJITDev::dil_linear(
+                  (std::move(peek(stack, 0, 3))).toTensor(),
+                  (std::move(peek(stack, 1, 3))).toTensor(),
+                  toOptionalTensor(std::move(peek(stack, 2, 3))));
+              drop(stack, 3);
+              pack(stack, std::move(result));
+              return 0;
+            };
+        },
+        aliasAnalysisFromSchema()),
       });
+
 } // namespace jit
 } // namespace torch

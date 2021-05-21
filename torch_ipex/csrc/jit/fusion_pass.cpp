@@ -2,7 +2,7 @@
 #include "fusion_pass.h"
 #include "graph_rewrite.h"
 
-#include "cpu/FusionOPs.h"
+#include "cpu/CustomOPs.h"
 #include "cpu/Pooling.h"
 
 #include <c10/util/hash.h>
@@ -321,8 +321,12 @@ void FusionPass(std::shared_ptr<Graph> &graph) {
   // replace aten conv with ipex conv
   graph_rewrite::replaceAtenConvolutionWithIpexConv(graph);
 
-  // replace aten max_pool2d witj ipex max_pool2d
+  // replace aten max_pool2d with ipex max_pool2d
   graph_rewrite::replaceAtenMaxPool2dWithIpexMaxPool2d(graph);
+
+  // replace aten::linear with ipex linear
+  graph_rewrite::replaceAtenLinearWithIpexLinear(graph);
+
   // TODO: Some post processing?? ECS/EDC/Peephole???
   ConstantPropagation(graph);
 }

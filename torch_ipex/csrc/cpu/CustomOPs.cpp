@@ -1,4 +1,4 @@
-#include "torch_ipex/csrc/cpu/FusionOPs.h"
+#include "torch_ipex/csrc/cpu/CustomOPs.h"
 #include "torch_ipex/csrc/utils.h"
 #include "Conv.h"
 #include "Linear.h"
@@ -17,56 +17,6 @@
 namespace torch_ipex {
 namespace cpu {
 
-at::Tensor dil_convolution_outplace_fusion(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups,
-    const ideep::attr_t& op_attr,
-    const std::string& op_name) {
-
-  at::Tensor output = convolution_impl(
-    IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
-    IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous(),
-    (!bias.defined()) || IS_CONTIGUOUS_ANY(bias) ? bias : bias.contiguous(),
-    stride,
-    padding,
-    dilation,
-    groups,
-    op_attr);
-
-  return output;
-}
-
-static at::Tensor& dil_convolution_inplace_fusion(
-    const at::Tensor& input,
-    const at::Tensor& weight,
-    const at::Tensor& bias,
-    at::Tensor& output,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    int64_t groups,
-    const ideep::attr_t& attr,
-    const std::string& op_name) {
-
-  convolution_inplace_impl(
-    IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
-    IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous(),
-    (!bias.defined()) || IS_CONTIGUOUS_ANY(bias) ? bias : bias.contiguous(),
-    output,
-    stride,
-    padding,
-    dilation,
-    groups,
-    attr);
-
-  return output;
-}
-
 at::Tensor AtenIpexJITDev::dil_convolution_base(
     const at::Tensor& input,
     const at::Tensor& weight,
@@ -78,15 +28,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_base(
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_base", std::vector<c10::IValue>({}));
 #endif
-  return convolution_impl(
-    IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(),
-    IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous(),
-    (!bias.defined()) || IS_CONTIGUOUS_ANY(bias) ? bias : bias.contiguous(),
-    stride,
-    padding,
-    dilation,
-    groups,
-    ideep::attr_t());
+  return convolution_impl(input, weight, bias, stride, padding, dilation, groups, ideep::attr_t());
 }
 
 at::Tensor AtenIpexJITDev::dil_convolution_swish(
@@ -100,7 +42,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_swish(
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_swish", std::vector<c10::IValue>({}));
 #endif
-  return dil_convolution_outplace_fusion(
+  return convolution_impl(
     input,
     weight,
     bias,
@@ -108,8 +50,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_swish(
     padding,
     dilation,
     groups,
-    ideep::attr_t::fuse_swish(),
-    "convolution_swish");
+    ideep::attr_t::fuse_swish());
 }
 
 at::Tensor AtenIpexJITDev::dil_convolution_sigmoid(
@@ -123,7 +64,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_sigmoid(
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sigmoid", std::vector<c10::IValue>({}));
 #endif
-  return dil_convolution_outplace_fusion(
+  return convolution_impl(
     input,
     weight,
     bias,
@@ -131,8 +72,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_sigmoid(
     padding,
     dilation,
     groups,
-    ideep::attr_t::fuse_sigmoid(),
-    "convolution_sigmoid");
+    ideep::attr_t::fuse_sigmoid());
 }
 
 at::Tensor AtenIpexJITDev::dil_convolution_clamp(
@@ -148,7 +88,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_clamp(
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_clamp", std::vector<c10::IValue>({}));
 #endif
-  return dil_convolution_outplace_fusion(
+  return convolution_impl(
     input,
     weight,
     bias,
@@ -156,8 +96,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_clamp(
     padding,
     dilation,
     groups,
-    ideep::attr_t::fuse_clamp(lower_bound, upper_bound),
-    "convolution_clamp");
+    ideep::attr_t::fuse_clamp(lower_bound, upper_bound));
 }
 
 at::Tensor AtenIpexJITDev::dil_convolution_relu(
@@ -171,7 +110,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_relu", std::vector<c10::IValue>({}));
 #endif
-  return dil_convolution_outplace_fusion(
+  return convolution_impl(
     input,
     weight,
     bias,
@@ -179,8 +118,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_relu(
     padding,
     dilation,
     groups,
-    ideep::attr_t::fuse_relu(),
-    "Convolution_Relu");
+    ideep::attr_t::fuse_relu());
 }
 
 at::Tensor AtenIpexJITDev::dil_convolution_elu(
@@ -199,7 +137,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_elu(
 #endif
   auto scale_value = scale.to<float>();
   auto input_scale_value = input_scale.to<float>();
-  return dil_convolution_outplace_fusion(
+  return convolution_impl(
     input,
     weight,
     bias,
@@ -207,8 +145,7 @@ at::Tensor AtenIpexJITDev::dil_convolution_elu(
     padding,
     dilation,
     groups,
-    ideep::attr_t::fuse_elu(scale_value, alpha, input_scale_value),
-    "convolution_elu");
+    ideep::attr_t::fuse_elu(scale_value, alpha, input_scale_value));
 }
 
 at::Tensor& AtenIpexJITDev::dil_convolution_sum(
@@ -225,7 +162,7 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum(
   RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum", std::vector<c10::IValue>({}));
 #endif
   auto scale = alpha.to<float>();
-  return dil_convolution_inplace_fusion(
+  convolution_inplace_impl(
     input,
     weight,
     bias,
@@ -234,8 +171,8 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum(
     padding,
     dilation,
     groups,
-    ideep::attr_t::fuse_sum(scale),
-    "Convolution_Sum");
+    ideep::attr_t::fuse_sum(scale));
+  return accumu;
 }
 
 at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
@@ -252,7 +189,7 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
   RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_sum_relu", std::vector<c10::IValue>({}));
 #endif
   auto scale = alpha.to<float>();
-  return dil_convolution_inplace_fusion(
+  convolution_inplace_impl(
     input,
     weight,
     bias,
@@ -261,8 +198,40 @@ at::Tensor& AtenIpexJITDev::dil_convolution_sum_relu(
     padding,
     dilation,
     groups,
-    ideep::attr_t::residual(scale),
-    "Convolution_Sum_Relu");
+    ideep::attr_t::residual(scale));
+  return accumu;
+}
+
+at::Tensor AtenIpexJITDev::dil_max_pool2d(
+    const at::Tensor& input,
+    at::IntArrayRef kernel_size,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    at::IntArrayRef dilation,
+    bool ceil_mode) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("AtenIpexJITDev::dil_max_pool2d", std::vector<c10::IValue>({}));
+#endif
+  TORCH_CHECK(std::all_of(dilation.cbegin(), dilation.cend(), [](int64_t i) { return 1 == i; }),
+      "dil_max_pool2d does not support dilation case");
+  return pooling_impl(
+      input,
+      kernel_size,
+      stride,
+      padding,
+      dilation,
+      ceil_mode,
+      ideep::algorithm::pooling_max);
+}
+
+at::Tensor AtenIpexJITDev::dil_linear(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const at::Tensor& bias) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("AtenIpexJITDev::dil_linear", std::vector<c10::IValue>({}));
+#endif
+  return linear_impl(self, weight, bias, ideep::attr_t());
 }
 
 at::Tensor AtenIpexJITDev::dil_linear_fuse_eltwise(
@@ -273,11 +242,7 @@ at::Tensor AtenIpexJITDev::dil_linear_fuse_eltwise(
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("AtenIpexJITDev::dil_linear_fuse_eltwise", std::vector<c10::IValue>({}));
 #endif
-  return linear_impl(
-    self.is_contiguous() ? self : self.contiguous(),
-    weight.is_contiguous() ? weight : weight.contiguous(),
-    (!bias.defined()) || bias.is_contiguous() ? bias : bias.contiguous(),
-    attr);
+  return linear_impl(self, weight, bias, attr);
 }
 
 }  // namespace cpu
