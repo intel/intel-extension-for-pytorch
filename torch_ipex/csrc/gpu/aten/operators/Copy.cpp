@@ -262,13 +262,14 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
 Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   // TODO: valid check
   if (self.is_quantized() && src.is_quantized()) {
-    if(self.device() != src.device()){
-      self = _empty_affine_quantized(self.sizes(),
-                                     self.options(),
-                                     1.f,
-                                     static_cast<int>(0),
-                                     MemoryFormat::Contiguous);
-    }
+    auto mfmt = self.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+                at::MemoryFormat::ChannelsLast :
+                at::MemoryFormat::Contiguous;
+    self = _empty_affine_quantized(self.sizes(),
+                                   self.options(),
+                                   1.f,
+                                   static_cast<int>(0),
+                                   mfmt);
     self.set_quantizer_(src.quantizer());
   }
 

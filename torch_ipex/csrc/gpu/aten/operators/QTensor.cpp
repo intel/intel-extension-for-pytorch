@@ -98,8 +98,10 @@ Tensor new_qtensor(
     /*resizable=*/true);
   auto tensor = detail::make_tensor<QTensorImpl>(
     storage, at::DispatchKeySet(tensorDispatchKey), dtype, quantizer);
+
   at::get_qtensorimpl(tensor)->set_sizes_contiguous(sizes);
   at::get_qtensorimpl(tensor)->empty_tensor_restride(memory_format);
+
   return tensor;
 }
 }
