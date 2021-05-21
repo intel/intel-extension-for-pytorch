@@ -37,6 +37,10 @@ at::Tensor q_conv2d(
 
   ConvAttr attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), 0};
 
+  auto mfmt = input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+              at::MemoryFormat::ChannelsLast :
+              at::MemoryFormat::Contiguous;
+
   Tensor output = _empty_affine_quantized(
       conv_dst_tz(
           input.ndimension(),
@@ -48,7 +52,8 @@ at::Tensor q_conv2d(
       device(kXPU).dtype(kQInt8),
       output_scale,
       output_zero_point,
-      MemoryFormat::Contiguous);
+      mfmt);
+
   output = convolution(
       output,
       input,
@@ -81,6 +86,10 @@ at::Tensor q_conv2d_relu(
 
   ConvAttr attr = {1.f, 0.f, 0.f, static_cast<float>(output_scale), ConvAttr::kind_with_relu};
 
+  auto mfmt = input.is_contiguous(at::MemoryFormat::ChannelsLast) ?
+              at::MemoryFormat::ChannelsLast :
+              at::MemoryFormat::Contiguous;
+
   Tensor output = _empty_affine_quantized(
       conv_dst_tz(
           input.ndimension(),
@@ -92,7 +101,8 @@ at::Tensor q_conv2d_relu(
       device(kXPU).dtype(kQUInt8),
       output_scale,
       output_zero_point,
-      MemoryFormat::Contiguous);
+      mfmt);
+
   output = convolution(
       output,
       input,
