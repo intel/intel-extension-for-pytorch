@@ -14,13 +14,6 @@ import intel_pytorch_extension as ipex
 
 LLGA_FUSION_GROUP = 'ipex::LlgaFusionGroup'
 
-# disable PyTorch jit profiling
-torch._C._jit_set_profiling_mode(False)
-torch._C._jit_set_profiling_executor(False)
-
-# disbale ipex jit optimization for fp32 and bf16 path
-ipex.core.disable_jit_opt()
-
 def all_backward_graphs(module):
     ge_state = module.get_debug_state()
     fwd_plan = get_execution_plan(ge_state)

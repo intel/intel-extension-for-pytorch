@@ -1,10 +1,14 @@
-import torch
 import unittest
 import itertools
+from functools import wraps
+
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from test_jit_llga_utils import JitLlgaTestCase, run_tests, LLGA_FUSION_GROUP
 from torch.testing._internal.common_utils import TEST_SCIPY
+
+import intel_pytorch_extension as ipex
 
 try:
     import torchvision
@@ -23,7 +27,21 @@ def get_eltwise_fn(name):
     else:
         raise NameError('Eltwise function %s not found' % name)
 
+# For LLGA UT, disable the PyTorch profiling executor and the IPEX JIT opt
+def llga_test_env(func):
+    @wraps(func)
+    def wrapTheFunction(*args):
+        torch._C._jit_set_profiling_mode(False)
+        torch._C._jit_set_profiling_executor(False)
+        ipex.core.disable_jit_opt()
+        func(*args)
+        ipex.core.enable_jit_opt()
+        torch._C._jit_set_profiling_mode(True)
+        torch._C._jit_set_profiling_executor(True)
+    return wrapTheFunction
+
 class TestOp(JitLlgaTestCase):
+    @llga_test_env
     def test_conv2d(self):
         for [
                 spatial,
@@ -68,6 +86,7 @@ class TestOp(JitLlgaTestCase):
             ]
             self.checkPatterns(graph, patterns)
 
+    @llga_test_env
     def test_linear(self):
         for bias in [True, False]:
             x = torch.rand(32, 28)
@@ -86,6 +105,7 @@ class TestOp(JitLlgaTestCase):
             self.checkPatterns(graph, patterns)
 
 class TestFusionPattern(JitLlgaTestCase):
+    @llga_test_env
     def test_conv2d_eltwise(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn):
@@ -122,6 +142,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 ]
                 self.checkPatterns(graph, patterns)
 
+    @llga_test_env
     def test_conv2d_bn(self):
         class M(nn.Module):
             def __init__(self, bias):
@@ -151,6 +172,7 @@ class TestFusionPattern(JitLlgaTestCase):
             ]
             self.checkPatterns(graph, patterns)
 
+    @llga_test_env
     def test_conv2d_bn_relu(self):
         class M(nn.Module):
             def __init__(self):
@@ -179,6 +201,7 @@ class TestFusionPattern(JitLlgaTestCase):
         ]
         self.checkPatterns(graph, patterns)
 
+    @llga_test_env
     def test_linear_eltwise(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn, bias):
@@ -216,6 +239,7 @@ class TestFusionPattern(JitLlgaTestCase):
             ]
             self.checkPatterns(graph, patterns)
 
+    @llga_test_env
     def test_conv2d_sum(self):
         class M(nn.Module):
             def __init__(self, bias=False):
@@ -260,6 +284,7 @@ class TestFusionPattern(JitLlgaTestCase):
             # ]
             # self.checkPatterns(graph, patterns)
 
+    @llga_test_env
     def test_linear_dropout_sum(self):
         class M(nn.Module):
             def __init__(self):
@@ -295,6 +320,7 @@ class TestFusionPattern(JitLlgaTestCase):
 
 class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision
+    @llga_test_env
     def _test_vision(self, model_name):
         m = getattr(torchvision.models, model_name)().eval()
         x = torch.rand(1, 3, 224, 224) / 10
