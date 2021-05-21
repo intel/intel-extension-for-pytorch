@@ -10,9 +10,9 @@ namespace torch_ipex {
 namespace cpu {
 
 // Get the convolution's expected ideep weight tensor, may be a block weight.
-// if the expected weight doesn't not exist, it will create an expected weight according
+// if the expected weight doesn't exist, it will create an expected weight according
 // to the queried desc of OneDNN conv, and the expected weight will be cached.
-// TODO: if weight is a block weight, direct return the weight(ideep tensor).
+// TODO: if weight is already in the expected format, return the weight(ideep tensor) directly.
 
 // input: an ideep tensor, getting from the convolution's input,
 // weight: convolution's weight
@@ -28,9 +28,9 @@ ideep::tensor get_conv_prepacked_weight(
     const ideep::attr_t& attr);
 
 // Get the linear's expected ideep weight tensor, may be a block weight.
-// if the expected weight doesn't not exist, it will create an expected weight according
+// if the expected weight doesn't exist, it will create an expected weight according
 // to the queried desc of OneDNN linear, and the expected weight will be cached.
-// TODO: if weight is a block weight, direct return the weight(ideep tensor).
+// TODO: if weight is already in the expected format, return the weight(ideep tensor) directly.
 
 // input: an ideep tensor, getting from the linear's input,
 // weight: linear's weight

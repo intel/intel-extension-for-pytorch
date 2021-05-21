@@ -25,7 +25,7 @@ ideep::tensor get_conv_prepacked_weight(
   if (it != cached_weights.end()) {
     return std::get<1>(it->second);
   } else { 
-    auto weight_ = IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous();
+    auto weight_ = IS_CONTIGUOUS_ANY(weight) ? weight : weight.contiguous(weight.suggest_memory_format());
     ideep::tensor w = at::native::itensor_view_from_dense(weight_);
     // TODO: 3d check
     bool is_channels_last = input.get_desc().is_nhwc();

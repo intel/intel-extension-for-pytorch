@@ -73,7 +73,7 @@ at::Tensor pooling_impl(
 
 // TODO: the input will be actively converted to channels last format
 // after the 5-D tensor supports channels last format.
-  auto input_ = IS_CONTIGUOUS_ANY(input) ? input : input.contiguous();
+  auto input_ = IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(input.suggest_memory_format());
   const ideep::tensor mkldnn_input = at::native::itensor_view_from_dense(input_);
   std::vector<int64_t> output_sizes;
 

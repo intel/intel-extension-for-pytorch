@@ -34,7 +34,7 @@ at::Tensor convolution_impl(
     const ideep::attr_t& attr) {
 // TODO: the input will be actively converted to channels last format
 // after the 5-D tensor supports channels last format.
-  auto input_ = IS_CONTIGUOUS_ANY(input) ? input : input.contiguous();
+  auto input_ = IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(input.suggest_memory_format());
   const ideep::tensor mkldnn_input = at::native::itensor_view_from_dense(input_);
   ideep::tensor mkldnn_weight = get_conv_prepacked_weight(mkldnn_input, weight, stride, padding, dilation, groups, attr);
   auto kernel_size = mkldnn_weight.get_dims();
@@ -105,7 +105,7 @@ void convolution_inplace_impl(
     const ideep::attr_t& attr) {
 // TODO: the input will be actively converted to channels last format
 // after the 5-D tensor supports channels last format.
-  auto input_ = IS_CONTIGUOUS_ANY(input) ? input : input.contiguous();
+  auto input_ = IS_CONTIGUOUS_ANY(input) ? input : input.contiguous(input.suggest_memory_format());
   const ideep::tensor mkldnn_input = at::native::itensor_view_from_dense(input_);
   ideep::tensor mkldnn_weight = get_conv_prepacked_weight(mkldnn_input, weight, stride, padding, dilation, groups, attr);
   auto kernel_size = mkldnn_weight.get_dims();
@@ -114,7 +114,7 @@ void convolution_inplace_impl(
       calc_conv_output_size(input_size, kernel_size, padding, stride, dilation);
 
   bool is_channels_last = input_.suggest_memory_format() == at::MemoryFormat::ChannelsLast;
-  output = IS_CONTIGUOUS_ANY(output) ? output : output.contiguous();
+  output = IS_CONTIGUOUS_ANY(output) ? output : output.contiguous(output.suggest_memory_format());
   output = output.to(input_.suggest_memory_format());
   ideep::tensor mkldnn_output = at::native::itensor_view_from_dense(output);
 
