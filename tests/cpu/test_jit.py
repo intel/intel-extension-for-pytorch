@@ -131,7 +131,7 @@ class ConvReshapeBatchNorm(nn.Module):
 
     def forward(self, x):
         conv_output = self.conv(x)
-        return self.bn(torch.reshape(conv_output, self.dest_shape)) 
+        return self.bn(torch.reshape(conv_output, self.dest_shape))
 
 class Conv_Conv_Concat(nn.Module):
     def __init__(self, dim, in_channels, out_channels, **kwargs):
@@ -240,7 +240,7 @@ class LinearRelu(nn.Module):
 
     def forward(self, x):
         return F.relu(self.linear(x), inplace=True)
- 
+
 class LinearGelu(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(LinearGelu, self).__init__()
@@ -308,7 +308,7 @@ class ConvSumInDiffBlock(nn.Module):
         seed = 2018
         torch.manual_seed(seed)
         self.conv = conv_module[dim](in_channels, out_channels, bias=False, **kwargs)
-    
+
     def forward(self, x):
         y = self.conv(x)
         if y.size(1) != x.size(1):
@@ -754,36 +754,36 @@ class Tester(TestCase):
             torch.rand(32, 3),
             kind_in_graph="ipex::linear_relu",
             prec=0.02)
- 
+
     def test_output_linear_add(self):
         self._test_output(
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
-            kind_in_graph="aten::linear")
+            kind_in_graph="ipex::linear")
 
     def test_output_linear_reshape_relu(self):
         self._test_output(
             Linear_Reshape_Relu(3, 32,(64,16),bias=True),
             torch.rand(32, 3),
-            kind_in_graph="aten::linear")
+            kind_in_graph="ipex::linear")
 
     def test_output_linear_sigmoid(self):
         self._test_output(
             LinearSigmoid(3, 32, bias=True),
             torch.rand(32, 3),
-            kind_in_graph="aten::linear")
+            kind_in_graph="ipex::linear")
 
     def test_output_linear_bn(self):
         self._test_output(
             LinearBn(2 ,32, 32, bias=True),
             torch.rand(1, 1, 32, 32),
-            kind_in_graph="aten::linear")
+            kind_in_graph="ipex::linear")
 
     def test_output_linear_reshape_bn(self):
         self._test_output(
             Linear_Reshape_Bn(2 ,32, 32,(1,1,64,16),bias=True),
             torch.rand(1, 1, 32, 32),
-            kind_in_graph="aten::linear")
+            kind_in_graph="ipex::linear")
 
     def test_output_linear_gelu(self):
         self._test_output(
