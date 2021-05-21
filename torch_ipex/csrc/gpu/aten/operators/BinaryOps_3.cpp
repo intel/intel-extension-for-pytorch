@@ -6,6 +6,7 @@
 #include <core/DPCPP.h>
 #include <utils/General.h>
 #include <utils/Pointwise.h>
+#include <utils/ScalarOps.h>
 
 #include "Loops.h"
 
@@ -122,13 +123,6 @@ void maximum_kernel(TensorIterator& iter) {
   }
 }
 
-// scalar to tensor
-static Tensor wrapped_scalar_tensor(Scalar scalar) {
-  auto tensor = scalar_to_tensor(scalar);
-  tensor.unsafeGetTensorImpl()->set_wrapped_number(true);
-  return tensor;
-}
-
 } // namespace impl
 
 
@@ -191,7 +185,7 @@ Tensor& bitwise_and_out(Tensor & out, const Tensor & self, const Tensor & other)
 }
 
 Tensor& bitwise_and_out(Tensor & out, const Tensor & self, Scalar other) {
-  return at::AtenIpexTypeXPU::bitwise_and_out(out, self, impl::wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeXPU::bitwise_and_out(out, self, at::wrapped_scalar_tensor(other));
 }
 
 Tensor& bitwise_or_out(Tensor & out, const Tensor & self, const Tensor & other) {
@@ -201,7 +195,7 @@ Tensor& bitwise_or_out(Tensor & out, const Tensor & self, const Tensor & other) 
 }
 
 Tensor& bitwise_or_out(Tensor & out, const Tensor & self, Scalar other) {
-  return at::AtenIpexTypeXPU::bitwise_or_out(out, self, impl::wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeXPU::bitwise_or_out(out, self, at::wrapped_scalar_tensor(other));
 }
 
 Tensor& bitwise_xor_out(Tensor & out, const Tensor & self, const Tensor & other) {
@@ -211,7 +205,7 @@ Tensor& bitwise_xor_out(Tensor & out, const Tensor & self, const Tensor & other)
 }
 
 Tensor& bitwise_xor_out(Tensor & out, const Tensor & self, Scalar other) {
-  return at::AtenIpexTypeXPU::bitwise_xor_out(out, self, impl::wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeXPU::bitwise_xor_out(out, self, at::wrapped_scalar_tensor(other));
 }
 
 } // namespace AtenIpexTypeXPU

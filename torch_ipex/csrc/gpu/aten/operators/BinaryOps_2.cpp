@@ -4,6 +4,7 @@
 
 #include <core/DPCPP.h>
 #include <utils/Pointwise.h>
+#include <utils/ScalarOps.h>
 #include <oneDNN/oneDNN.h>
 
 #include "Loops.h"
@@ -51,17 +52,6 @@ static void div_kernel_dpcpp(TensorIterator& iter) {
   }
 }
 
-// scalar to tensor
-static Tensor wrapped_scalar_tensor(Scalar scalar) {
-  auto tensor = scalar_to_tensor(scalar);
-  tensor.unsafeGetTensorImpl()->set_wrapped_number(true);
-  return tensor;
-}
-
-static bool is_wrapped_number(const Tensor& t) {
-  return t.unsafeGetTensorImpl()->is_wrapped_number();
-}
-
 } // namespace impl
 
 Tensor& mul_out(Tensor& result, const Tensor& self, const Tensor& other) {
@@ -85,11 +75,11 @@ Tensor& mul_(Tensor& self, const Tensor& other) {
 }
 
 Tensor mul(const Tensor& self, Scalar other) {
-  return at::AtenIpexTypeXPU::mul(self, impl::wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeXPU::mul(self, at::wrapped_scalar_tensor(other));
 }
 
 Tensor& mul_(Tensor& self, Scalar other) {
-  return at::AtenIpexTypeXPU::mul_(self, impl::wrapped_scalar_tensor(other));
+  return at::AtenIpexTypeXPU::mul_(self, at::wrapped_scalar_tensor(other));
 }
 
 Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
@@ -104,7 +94,7 @@ Tensor& div_out(Tensor& result, const Tensor& self, const Tensor& other) {
         _self.sizes() != _other.sizes()) &&
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
       !is_expandable_to(_other.sizes(), _self.sizes())) &&
-      !impl::is_wrapped_number(_self) && !impl::is_wrapped_number(_other)) {
+      !at::is_wrapped_number(_self) && !at::is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
   } else {
     auto iter = TensorIterator::binary_op(result, self, other);
@@ -125,7 +115,7 @@ Tensor div(const Tensor& self, const Tensor& other) {
         _self.sizes() != _other.sizes()) &&
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
       !is_expandable_to(_other.sizes(), _self.sizes())) &&
-      !impl::is_wrapped_number(_self) && !impl::is_wrapped_number(_other)) {
+      !at::is_wrapped_number(_self) && !at::is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_div>(result, self, other);
     return result;
   } else {

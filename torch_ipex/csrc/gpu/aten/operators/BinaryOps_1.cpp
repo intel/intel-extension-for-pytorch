@@ -5,6 +5,7 @@
 
 #include <core/DPCPP.h>
 #include <utils/Pointwise.h>
+#include <utils/ScalarOps.h>
 #include <oneDNN/oneDNN.h>
 
 #include "Loops.h"
@@ -47,17 +48,6 @@ static inline void alpha_check(const TensorIterator& iter, Scalar alpha) {
       "point number.");
 }
 
-// scalar to tensor
-static Tensor wrapped_scalar_tensor(Scalar scalar) {
-  auto tensor = scalar_to_tensor(scalar);
-  tensor.unsafeGetTensorImpl()->set_wrapped_number(true);
-  return tensor;
-}
-
-static bool is_wrapped_number(const Tensor& t) {
-  return t.unsafeGetTensorImpl()->is_wrapped_number();
-}
-
 // Basic checking for all sub functions.
 static inline void sub_check(const Tensor& self, const Tensor& other) {
   TORCH_CHECK(
@@ -91,7 +81,7 @@ Tensor& add_out(
         _self.sizes() != _other.sizes()) &&
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
       !is_expandable_to(_other.sizes(), _self.sizes())) &&
-      !impl::is_wrapped_number(_self) && !impl::is_wrapped_number(_other)) {
+      !at::is_wrapped_number(_self) && !at::is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {
@@ -119,7 +109,7 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
         _self.sizes() != _other.sizes()) &&
       !(is_expandable_to(_self.sizes(), _other.sizes()) &&
       !is_expandable_to(_other.sizes(), _self.sizes())) &&
-      !impl::is_wrapped_number(_self) && !impl::is_wrapped_number(_other)) {
+      !at::is_wrapped_number(_self) && !at::is_wrapped_number(_other)) {
     xpu::oneDNN::bin<dnnl::algorithm::binary_add>(result, _self, _other);
     return result;
   } else {
@@ -139,12 +129,12 @@ Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha) {
 
 Tensor add(const Tensor& self, Scalar other, Scalar alpha) {
   return at::AtenIpexTypeXPU::add(
-      self, impl::wrapped_scalar_tensor(other), alpha);
+      self, at::wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& add_(Tensor& self, Scalar other, Scalar alpha) {
   return at::AtenIpexTypeXPU::add_(
-      self, impl::wrapped_scalar_tensor(other), alpha);
+      self, at::wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& sub_out(
@@ -182,17 +172,17 @@ Tensor rsub(const Tensor& self, const Tensor& other, Scalar alpha) {
 
 Tensor sub(const Tensor& self, Scalar other, Scalar alpha) {
   return at::AtenIpexTypeXPU::sub(
-      self, impl::wrapped_scalar_tensor(other), alpha);
+      self, at::wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor& sub_(Tensor& self, Scalar other, Scalar alpha) {
   return at::AtenIpexTypeXPU::sub_(
-      self, impl::wrapped_scalar_tensor(other), alpha);
+      self, at::wrapped_scalar_tensor(other), alpha);
 }
 
 Tensor rsub(const Tensor& self, Scalar other, Scalar alpha) {
   return at::AtenIpexTypeXPU::rsub(
-      self, impl::wrapped_scalar_tensor(other), alpha);
+      self, at::wrapped_scalar_tensor(other), alpha);
 }
 
 } // namespace AtenIpexTypeXPU
@@ -206,8 +196,8 @@ Tensor add(const Tensor& _self, const Tensor& _other, Scalar alpha) {
       _self.defined() &&
       _other.defined() &&
       _self.sizes() == _other.sizes() &&
-      !impl::is_wrapped_number(_self) &&
-      !impl::is_wrapped_number(_other) &&
+      !at::is_wrapped_number(_self) &&
+      !at::is_wrapped_number(_other) &&
       (!DPCPPTensorContext::is_plain(_self) ||
        !DPCPPTensorContext::is_plain(_other))) {
     xpu::oneDNN::sum(result, {_self.contiguous(), _other.contiguous()}, {1.0, 1.0});

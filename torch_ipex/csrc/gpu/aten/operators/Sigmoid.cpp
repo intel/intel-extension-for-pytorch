@@ -8,6 +8,7 @@
 #include <utils/Numerics.h>
 #include <utils/Pointwise.h>
 
+#include "Loops.h"
 
 using namespace xpu::dpcpp;
 
@@ -15,15 +16,48 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename...>
+class TensorSigmoidOp {};
+template <typename...>
+class TensorSigmoidGradOp {};
+
 template <typename scalar_t>
 void sigmoid(Tensor& output, const Tensor& self) {
-  if (TensorImpl_Unwrap(output) == TensorImpl_Unwrap(self)) {
-    xpu::dpcpp::DPCPP_tensor_apply1<scalar_t>(
-        output, TensorSigmoidOp<scalar_t>());
+  output.resize_as_(self);
+  auto iter = TensorIteratorConfig()
+    .set_check_mem_overlap(true)
+    .add_output(output)
+    .add_input(self)
+    .build();
+  dpcpp_kernel_for_tensor_iter<TensorSigmoidOp<scalar_t>>(
+      iter, [=](scalar_t v) -> scalar_t {
+        scalar_t one = (scalar_t)1.0;
+        return one / (one + Numerics<scalar_t>::exp(-static_cast<scalar_t>(v)));
+  });
+}
+
+template <typename scalar_t>
+void sigmoid_backward(Tensor& gradInput, const Tensor& gradOutput, const Tensor& self) {
+  gradInput.resize_as_(self);
+  auto iter = TensorIteratorConfig()
+    .set_check_mem_overlap(true)
+    .add_output(gradInput)
+    .add_input(gradOutput)
+    .add_input(self)
+    .build();
+  if (iter.dtype() == ScalarType::Half) {
+    dpcpp_kernel_for_tensor_iter<TensorSigmoidGradOp<at::Half>>(
+        iter, [=](at::Half go, at::Half in) -> at::Half {
+          float in_float = (float)in;
+          float go_float = (float)go;
+          return (at::Half)(go * (1.f - in_float) * in_float);
+    });
   } else {
-    output.resize_as_(self);
-    xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
-        output, self, TensorSigmoidOp<scalar_t>());
+    dpcpp_kernel_for_tensor_iter<TensorSigmoidGradOp<scalar_t>>(
+        iter, [=](scalar_t go, scalar_t in) -> scalar_t {
+          scalar_t one = (scalar_t)1.0;
+          return go * (one - in) * in;
+    });
   }
 }
 
@@ -35,6 +69,15 @@ Tensor& _sigmoid_out(Tensor& output, const Tensor& self) {
       "_sigmoid_out",
       [&]() { impl::sigmoid<scalar_t>(output, self); });
   return output;
+}
+
+Tensor& _sigmoid_backward_out(Tensor& grad_input, const Tensor& grad_output, const Tensor& self) {
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "_sigmoid_backward_out",
+      [&]() { impl::sigmoid_backward<scalar_t>(grad_input, grad_output, self); });
+  return grad_input;
 }
 
 } // namespace impl
@@ -55,16 +98,7 @@ Tensor& sigmoid_backward_out(
     const Tensor& grad_output,
     const Tensor& output) {
   TORCH_CHECK(output.numel() == grad_output.numel(), "different elements ...");
-  grad_input.resize_as_(output);
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      output.scalar_type(),
-      "sigmoid_backward_out",
-      [&]() {
-        xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
-            grad_input, output, grad_output, TensorSigmoidGradOp<scalar_t>());
-      });
-  return grad_input;
+  return impl::_sigmoid_backward_out(grad_input, grad_output, output);
 }
 
 Tensor sigmoid_backward(const Tensor& grad_output, const Tensor& output) {

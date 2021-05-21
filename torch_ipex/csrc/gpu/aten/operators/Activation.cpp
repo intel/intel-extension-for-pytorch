@@ -55,44 +55,14 @@ static void threshold_kernel(
       });
 }
 
-template <typename scalar_t>
-class rrulu_updateOutput_dpcpp_inplace_kernel{};
-
-template <typename scalar_t>
-class rrulu_updateOutput_dpcpp_kernel{};
-
-template <typename T>
-struct RReLUUpdateOutputEvalOp
-{
-  RReLUUpdateOutputEvalOp(T negSlope) : negSlope_(negSlope) {}
-
-  void operator()(T& in) const {
-    in = (in <= 0) ? in * negSlope_ : in;
-  }
-
-  void operator()(T& out, T& in) const {
-    out = (in <= 0) ? in * negSlope_ : in;
-  }
-
-  const T negSlope_;
-};
-
-template <typename T>
-struct RReLUupdateGradInputEvalOp
-{
-  const T negSlope_;
-
-  RReLUupdateGradInputEvalOp(T negSlope) : negSlope_(negSlope) {}
-
-  void operator()(T& gradOut, T& in) const {
-    gradOut = (in <= 0) ? gradOut * negSlope_ : gradOut;
-  }
-
-  void operator()(T& gradIn, T& gradOut, T& in) const {
-    gradIn = (in <= 0) ? gradOut * negSlope_ : gradOut;
-  }
-};
-
+template <typename ...>
+class rrelu_updateOutput_dpcpp_inplace_kernel{};
+template <typename ...>
+class rrelu_updateOutput_dpcpp_kernel{};
+template <typename ...>
+class rrelu_updateOutput_eval_dpcpp_kernel{};
+template <typename ...>
+class rrelu_updateGradInput_eval_dpcpp_kernel {};
 
 template <typename scalar_t>
 static void RReLU_updateOutput(
@@ -128,7 +98,7 @@ static void RReLU_updateOutput(
       auto cgf = DPCPP_Q_CGF(cgh) {
         auto in_data = get_buffer<dpcpp_r_mode>(cgh, input_.data_ptr<scalar_t>());
         auto noise_data = get_buffer<dpcpp_discard_w_mode>(cgh, noise.data_ptr<scalar_t>());
-        cgh.parallel_for<rrulu_updateOutput_dpcpp_inplace_kernel<scalar_t>>(
+        cgh.parallel_for<rrelu_updateOutput_dpcpp_inplace_kernel<scalar_t>>(
           DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId){
             auto in_ptr = get_pointer(in_data);
             auto noise_ptr = get_pointer(noise_data);
@@ -164,7 +134,7 @@ static void RReLU_updateOutput(
         auto in_data = get_buffer<dpcpp_r_mode>(cgh, input_.data_ptr<scalar_t>());
         auto out_data = get_buffer<dpcpp_discard_w_mode>(cgh, output.data_ptr<scalar_t>());
         auto noise_data = get_buffer<dpcpp_discard_w_mode>(cgh, noise.data_ptr<scalar_t>());
-        cgh.parallel_for<rrulu_updateOutput_dpcpp_kernel<scalar_t>>(
+        cgh.parallel_for<rrelu_updateOutput_dpcpp_kernel<scalar_t>>(
           DPCPP::range<1>(total_threads), [=](DPCPP::item<1> itemId){
             auto in_ptr = get_pointer(in_data);
             auto out_ptr = get_pointer(out_data);
@@ -193,18 +163,16 @@ static void RReLU_updateOutput(
   }
   else{
     const scalar_t negSlope = ScalarConvert<double, scalar_t>::to((lower + upper) / 2);
-    if (inplace)
-    {
-      xpu::dpcpp::DPCPP_tensor_apply1<scalar_t>(
-        input, RReLUUpdateOutputEvalOp<scalar_t>(negSlope));
-      output.set_(input);
-    }
-    else
-    {
-      output.resize_as_(input);
-      xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
-        output, input, RReLUUpdateOutputEvalOp<scalar_t>(negSlope));
-    }
+    output.resize_as_(input);
+    auto iter = TensorIteratorConfig()
+      .set_check_mem_overlap(true)
+      .add_output(output)
+      .add_input(input)
+      .build();
+    dpcpp_kernel_for_tensor_iter<rrelu_updateOutput_eval_dpcpp_kernel<scalar_t>>(
+        iter, [=](scalar_t in) -> scalar_t {
+          return (in <= 0) ? in * negSlope : in;
+        });
   }
 }
 
@@ -238,18 +206,17 @@ static void RReLU_updateGradInput(
   else
   {
     const scalar_t negSlope = ScalarConvert<double, scalar_t>::to((lower + upper) / 2);
-    if (inplace)
-    {
-      xpu::dpcpp::DPCPP_tensor_apply2<scalar_t, scalar_t>(
-        gradOutput, input, RReLUupdateGradInputEvalOp<scalar_t>(negSlope));
-      gradInput.set_(gradOutput);
-    }
-    else
-    {
-      gradInput.resize_as_(input);
-      xpu::dpcpp::DPCPP_tensor_apply3<scalar_t, scalar_t, scalar_t>(
-        gradInput, gradOutput, input, RReLUupdateGradInputEvalOp<scalar_t>(negSlope));
-    }
+    gradInput.resize_as_(input);
+    auto iter = TensorIteratorConfig()
+      .set_check_mem_overlap(true)
+      .add_output(gradInput)
+      .add_input(gradOutput)
+      .add_input(input)
+      .build();
+    dpcpp_kernel_for_tensor_iter<rrelu_updateGradInput_eval_dpcpp_kernel<scalar_t>>(
+        iter, [=](scalar_t grad_out, scalar_t in) -> scalar_t {
+          return (in <= 0) ? grad_out * negSlope : grad_out;
+        });
   }
 }
 
