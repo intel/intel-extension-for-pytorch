@@ -24,6 +24,7 @@ RUN --mount=type=cache,id=apt-dev,target=/var/cache/apt \
     numactl \
     cmake \
     libjpeg-dev \
+    pybind11-dev \
     libpng-dev \
 	pybind11-dev \
     && rm -rf /var/lib/apt/lists/*
