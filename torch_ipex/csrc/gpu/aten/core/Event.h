@@ -18,18 +18,18 @@ namespace xpu { namespace dpcpp {
 * called before the event is ever recorded, it will use the current device.
 * Later streams that record the event must match this device.
 */
-struct TORCH_CUDA_API DPCPPEvent {
+struct  DPCPPEvent {
   // Constructors
   DPCPPEvent() {}
 
 #if 0
   DPCPPEvent(
-      DeviceIndex device_index, const cudaIpcEventHandle_t* handle) {
+      DeviceIndex device_index, const xpuIpcEventHandle_t* handle) {
     #ifndef __HIP_PLATFORM_HCC__
       device_index_ = device_index;
-      CUDAGuard guard(device_index_);
+      DPCPPGuard guard(device_index_);
 
-      AT_CUDA_CHECK(cudaIpcOpenEventHandle(&event_, *handle));
+      AT_CHECK(xpuIpcOpenEventHandle(&event_, *handle));
       is_created_ = true;
     #else
       AT_ERROR("cuIpcOpenEventHandle with HIP is not supported");
@@ -48,7 +48,7 @@ struct TORCH_CUDA_API DPCPPEvent {
     return *this;
   }
 
-//  operator cudaEvent_t() const { return event(); }
+//  operator xpuEvent_t() const { return event(); }
 
   // Less than operator (to allow use in sets)
 //  friend bool operator<(const DPCPPEvent& left, const DPCPPEvent& right) {

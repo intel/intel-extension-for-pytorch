@@ -9,7 +9,7 @@ from ._utils import _get_device_index
 def empty_cache() -> None:
     r"""Releases all unoccupied cached memory currently held by the caching
     allocator so that those can be used in other GPU application and visible in
-    `nvidia-smi`.
+    sysman toolkit.
 
     .. note::
         :func:`~torch.xpu.empty_cache` doesn't increase the amount of GPU
@@ -152,7 +152,7 @@ def memory_allocated(device: Union[Device, int] = None) -> int:
             if :attr:`device` is ``None`` (default).
 
     .. note::
-        This is likely less than the amount shown in `nvidia-smi` since some
+        This is likely less than the amount shown in sysman toolkit since some
         unused memory can be held by the caching allocator and some context
         needs to be created on GPU. See :ref:`xpu-memory-management` for more
         details about GPU memory management.

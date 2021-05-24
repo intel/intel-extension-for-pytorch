@@ -15,10 +15,10 @@ def get_rng_state(device: Union[int, str, torch.device] = 'xpu') -> Tensor:
 
     Args:
         device (torch.device or int, optional): The device to return the RNG state of.
-            Default: ``'cuda'`` (i.e., ``torch.device('cuda')``, the current CUDA device).
+            Default: ``'xpu'`` (i.e., ``torch.device('xpu')``, the current XPU device).
 
     .. warning::
-        This function eagerly initializes CUDA.
+        This function eagerly initializes XPU.
     """
 
     if isinstance(device, str):
@@ -47,7 +47,7 @@ def set_rng_state(new_state: Tensor, device: Union[int, str, torch.device] = 'xp
     Args:
         new_state (torch.ByteTensor): The desired state
         device (torch.device or int, optional): The device to set the RNG state.
-            Default: ``'cuda'`` (i.e., ``torch.device('cuda')``, the current CUDA device).
+            Default: ``'xpu'`` (i.e., ``torch.device('xpu')``, the current XPU device).
     """
     new_state_copy = new_state.clone(memory_format=torch.contiguous_format)
     if isinstance(device, str):
@@ -73,7 +73,7 @@ def set_rng_state_all(new_states: Iterable[Tensor]) -> None:
 
 def manual_seed(seed: int) -> None:
     r"""Sets the seed for generating random numbers for the current GPU.
-    It's safe to call this function if CUDA is not available; in that
+    It's safe to call this function if XPU is not available; in that
     case, it is silently ignored.
 
     Args:
@@ -92,7 +92,7 @@ def manual_seed(seed: int) -> None:
 
 def manual_seed_all(seed: int) -> None:
     r"""Sets the seed for generating random numbers on all GPUs.
-    It's safe to call this function if CUDA is not available; in that
+    It's safe to call this function if XPU is not available; in that
     case, it is silently ignored.
 
     Args:
@@ -107,7 +107,7 @@ def manual_seed_all(seed: int) -> None:
 
 def seed() -> None:
     r"""Sets the seed for generating random numbers to a random number for the current GPU.
-    It's safe to call this function if CUDA is not available; in that
+    It's safe to call this function if XPU is not available; in that
     case, it is silently ignored.
 
     .. warning::
@@ -121,7 +121,7 @@ def seed() -> None:
 
 def seed_all() -> None:
     r"""Sets the seed for generating random numbers to a random number on all GPUs.
-    It's safe to call this function if CUDA is not available; in that
+    It's safe to call this function if XPU is not available; in that
     case, it is silently ignored.
     """
     random_seed = 0
@@ -140,7 +140,7 @@ def initial_seed() -> int:
     r"""Returns the current random seed of the current GPU.
 
     .. warning::
-        This function eagerly initializes CUDA.
+        This function eagerly initializes XPU.
     """
 
     idx = current_device()
