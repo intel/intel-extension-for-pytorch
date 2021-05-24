@@ -551,7 +551,7 @@ class TestLayerNorm(TestCase):
             out_man_bf16 = op_man_bf16(x_man_bf16).sum()
             out_man_bf16.backward()
             self.assertEqual(x_man_bf16.grad.dtype, torch.bfloat16)
-            self.assertEqual(x_cpu.grad.bfloat16().float(), x_man_bf16.grad, 1e-2)
+            self.assertEqual(x_cpu.grad.bfloat16(), x_man_bf16.grad, 1e-2)
 
             # BW train (input is not bf16 dil tensor)
             with AutoMixPrecision(True, train=True):
@@ -2881,7 +2881,7 @@ class TestInterpolate(TestCase):
             x_dpcpp = x.clone().to(device=device).requires_grad_()
             y_cpu = F.interpolate(x_cpu, (4, 8), mode='bilinear', align_corners=False)
             y_dpcpp = F.interpolate(x_dpcpp, (4, 8), mode='bilinear', align_corners=False)
-            self.assertEqual(y_cpu, y_dpcpp, 5e-2)
+            self.assertEqual(y_cpu, y_dpcpp, atol=1e-2, rtol=1e-2)
             y_cpu.sum().backward()
             y_dpcpp.sum().backward()
             self.assertEqual(x_cpu.grad, x_dpcpp.grad)
