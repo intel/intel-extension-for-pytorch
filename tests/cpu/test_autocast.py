@@ -5,6 +5,7 @@ import intel_pytorch_extension as ipex
 from common_utils import TestCase
 import time, sys
 from torch.testing._core import _get_default_tolerance
+import itertools
 
 def get_rand_seed():
     return int(time.time() * 1000000000)
@@ -211,6 +212,144 @@ class TestCustomerOps(TestCase):
         # do not cast weight to bf16 while not inference only
         self.assertEqual(traininig_out.dtype, torch.float)
         self.assertEqual(cpu_out, traininig_out)
+
+class M(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, bidirectional, bias, dropout, batch_first):
+        super(M, self).__init__()
+        self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
+
+    def forward(self, x, h = None):
+        x, h = self.lstm(x, h)
+        return x, h
+class TestLSTM(TestCase):
+    def _lstm_params_list(self):
+        params_dict = {
+            "input_size": [1, 2],
+            "hidden_size": [5],
+            "num_layers": [1, 3],
+            "bidirectional": [False, True],
+            "bias": [False, True],
+            "empty_state": [False, True],
+            "batch_first": [False, True],
+            "dropout": [0, 1],
+            "batch_size": [1, 2],
+            "seq_len": [1, 3]
+        }
+
+        params_list = []
+        for key, value in params_dict.items():
+            params_list.append(value)
+        return params_list
+
+    def _cast_dtype(self, input, bf16):
+        if bf16:
+            input = input.to(torch.bfloat16)
+        return input
+
+    def _test_lstm(self, training, bf16, prec = 1e-5):
+        rand_seed = int(get_rand_seed())
+        print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
+        torch.manual_seed(rand_seed)
+        with torch.set_grad_enabled(training):
+            params_list = self._lstm_params_list()
+            for input_size, hidden_size, num_layers, bidirectional, bias, empty_state, batch_first, dropout, batch_size, seq_len in itertools.product(*params_list):
+                # dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1
+                if dropout > 0 and num_layers == 1:
+                    continue
+
+                num_directions = 2 if bidirectional else 1
+                
+                if batch_first:
+                    input = torch.randn(batch_size, seq_len, input_size)
+                else:
+                    input = torch.randn(seq_len, batch_size, input_size)
+                h = torch.randn(num_layers * num_directions, batch_size, hidden_size)
+                c = torch.randn(num_layers * num_directions, batch_size, hidden_size)
+
+                input_ipex = copy.deepcopy(input)
+                h_ipex = copy.deepcopy(h)
+                c_ipex = copy.deepcopy(c)
+
+                model = M(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, bias=bias, dropout=dropout, batch_first=batch_first)
+                model.train() if training else model.eval()
+
+                model_ipex = copy.deepcopy(model)
+                model_ipex.train() if training else model_ipex.eval()
+                ipex.utils._replace_lstm_with_ipex_lstm(model_ipex)
+
+                with ipex.amp.autocast(enabled=bf16, configure=ipex.conf.AmpConf(torch.bfloat16)):
+                    if empty_state:
+                        y, hy = model(self._cast_dtype(input, bf16))
+                        y_ipex, hy_ipex = model_ipex(input)
+                    else:
+                        y, hy = model(input, (self._cast_dtype(h, bf16), self._cast_dtype(c, bf16)))
+                        y_ipex, hy_ipex = model_ipex(input, (h, c))
+
+                if not training and bf16:
+                    self.assertEqual(input_ipex.dtype, torch.float)
+                    self.assertEqual(h_ipex.dtype, torch.float)
+                    self.assertEqual(c_ipex.dtype, torch.float)
+
+                    # with mkldnn LSTM, y, hy[0] is bf16 and hy[1] is fp32
+                    self.assertEqual(y_ipex.dtype, torch.bfloat16)
+                    self.assertEqual(hy_ipex[0].dtype, torch.bfloat16)
+                    self.assertEqual(hy_ipex[1].dtype, torch.float)
+                self.assertEqual(y, y_ipex, prec=prec)
+                self.assertEqual(hy[0], hy_ipex[0], prec=prec)
+
+                self.assertEqual(hy[1], self._cast_dtype(hy_ipex[1], bf16), prec=prec)
+
+    def _test_lstm_pack_padded_sequence(self):
+        embedding_dim = 1024
+        hidden_dim = 10
+        batch_size = 24
+        num_layers = 1
+        bidirectional = True
+        num_direc = 2 if bidirectional else 1
+        max_lens = 96
+
+        sent = torch.randn(batch_size, max_lens, embedding_dim)
+        hid_0 = torch.rand(num_layers * num_direc, batch_size, hidden_dim)
+        hid_1 = torch.randn(num_layers * num_direc, batch_size, hidden_dim)
+
+        sentences = sent.clone().requires_grad_(False)
+        sent_lens = torch.Tensor([1, 2, 3, 4, 5, 1, 3, 2, 96, 5, 3, 1, 1, 2, 1, 2, 3, 6, \
+        1, 2, 4, 6, 2, 1])
+
+        assert sent_lens.shape[0] == batch_size
+        assert sent_lens.max().item() == max_lens
+
+        hidden_0 = hid_0.clone().requires_grad_(False)
+        hidden_1 = hid_1.clone().requires_grad_(False)
+        embeds = torch.nn.utils.rnn.pack_padded_sequence(sentences, sent_lens, batch_first=True, enforce_sorted=False)
+        
+        model = nn.LSTM(embedding_dim, hidden_dim, num_layers=num_layers, bidirectional=bidirectional, batch_first=True)
+        
+        model_ipex = copy.deepcopy(model)
+        ipex.utils._replace_lstm_with_ipex_lstm(model_ipex)
+
+        lstm_out, hidden_out = model(embeds, (hidden_0, hidden_1))
+        lstm_out, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_out, batch_first=True)
+
+        lstm_out_ipex, hidden_out_ipex = model_ipex(embeds, (hidden_0, hidden_1))
+        lstm_out_ipex, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_out_ipex, batch_first=True)
+
+        self.assertEqual(lstm_out, lstm_out_ipex)
+        self.assertEqual(hidden_out[0], hidden_out_ipex[0])
+        self.assertEqual(hidden_out[1], hidden_out_ipex[1])
+
+    def test_lstm_inference(self):
+        self._test_lstm(training=False, bf16=False)
+
+        self._test_lstm(training=False, bf16=True, prec=2e-2)
+        
+        self._test_lstm(training=True, bf16=False)
+
+        # TODO: autocast does not support LSTM bf16 training
+        # self._test_lstm(training=True, bf16=True)
+    
+    def test_lstm_pack_padded_sequence(self):
+        self._test_lstm_pack_padded_sequence()
 
 if __name__ == '__main__':
     test = unittest.main()

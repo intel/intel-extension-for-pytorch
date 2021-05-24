@@ -1,4 +1,8 @@
+import copy
+
 import torch
+
+from .ops.lstm import IpexLSTM
 from .fx import *
 
 def _replace_dropout_with_identity(model):
@@ -10,6 +14,22 @@ def _replace_dropout_with_identity(model):
                 setattr(model, child_name, torch.nn.Identity())
             else:
                 _replace_dropout_with_identity(child)
+
+def _replace_lstm_with_ipex_lstm(model):
+    # replace lstm with ipex lstm during inference
+    # does not support the case where model itself is torch.nn.LSTM
+    if not model.training:
+        for child_name, child in model.named_children():
+            if isinstance(child, torch.nn.LSTM):
+                assert hasattr(child, "weight_ih_l0"), "torch.nn.LSTM should have weight_ih_l0"
+                ipex_lstm = IpexLSTM(child.input_size, child.hidden_size,
+                    child.num_layers, child.bias, child.batch_first,
+                    child.dropout, child.bidirectional, child.proj_size,
+                    child.weight_ih_l0.device, child.weight_ih_l0.dtype)
+                ipex_lstm.__dict__ = copy.deepcopy(child.__dict__)
+                setattr(model, child_name, ipex_lstm)
+            else:
+                _replace_lstm_with_ipex_lstm(child)
 
 def convert_module_data_type(module, dtype):
     if isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Linear):
