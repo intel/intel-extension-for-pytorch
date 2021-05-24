@@ -25,6 +25,7 @@ RUN --mount=type=cache,id=apt-dev,target=/var/cache/apt \
     cmake \
     libjpeg-dev \
     libpng-dev \
+	pybind11-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN /usr/sbin/update-ccache-symlinks
 RUN mkdir /opt/ccache && ccache --set-config=cache_dir=/opt/ccache
@@ -67,3 +68,4 @@ ARG KMP_HW_SUBSET=1T
 ENV KMP_HW_SUBSET ${KMP_HW_SUBSET}
 ENV MALLOC_CONF "oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:-1,muzzy_decay_ms:-1"
 ENV LD_PRELOAD "/opt/conda/lib/libiomp5.so /usr/lib/x86_64-linux-gnu/libjemalloc.so"
+ENV LD_LIBRARY_PATH "/opt/conda/lib/python3.8/site-packages/lib/"
