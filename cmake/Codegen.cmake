@@ -1,5 +1,5 @@
 
-set(IPEX_GPU_ATEN_GENERATED "${PROJECT_SOURCE_DIR}/torch_ipex/csrc/gpu/aten/generated")
+set(IPEX_GPU_ATEN_GENERATED "${PROJECT_SOURCE_DIR}/csrc/aten/generated")
 
 add_custom_command(OUTPUT
         ${IPEX_GPU_ATEN_GENERATED}/ATen/AtenIpexTypeXPU.cpp

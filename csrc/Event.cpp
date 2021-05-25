@@ -1,6 +1,5 @@
-#include <pybind11/pybind11.h>
-#include <gpu/Event.h>
-#include <gpu/Stream.h>
+#include <Event.h>
+#include <Stream.h>
 #include <torch/csrc/THP.h>
 #include <torch/csrc/utils/python_arg_parser.h>
 

@@ -4,8 +4,8 @@
 #include <torch/csrc/tensor/python_tensor.h>
 
 #include <ATen/ipex_type_dpcpp_customized.h>
-#include <gpu/jit/fusion_pass.h>
-#include <Module.h>
+#include <jit/fusion_pass.h>
+#include "Module.h"
 #include <Event.h>
 #include <Stream.h>
 #include <Storage.h>
@@ -68,14 +68,7 @@ static PyObject * THPModule_initExtension(PyObject *self, PyObject *noargs)
   auto module = THPObjectPtr(PyImport_ImportModule("torch_ipex"));
   if (!module) throw python_error();
 
-  // Register Storage Python objects with DynamicTypes.cpp
-  THXPStorage_postInit<at::kHalf>(module);
-  THXPStorage_postInit<at::kInt>(module);
-  THXPStorage_postInit<at::kBool>(module);
-  THXPStorage_postInit<at::kLong>(module);
-  THXPStorage_postInit<at::kFloat>(module);
-  THXPStorage_postInit<at::kDouble>(module);
-  THXPStorage_postInit<at::kBFloat16>(module);
+  THPStorage_postInitExtension(module);
 
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
@@ -360,14 +353,8 @@ void init_module(pybind11::module& m) {
   auto module = m.ptr();
   THDPStream_init(module);
   THDPEvent_init(module);
+  THPStorage_init(module);
   PyModule_AddFunctions(module, _THCPModule_methods);
-  ASSERT_TRUE(THXPStorage_init<at::kInt>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kLong>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kHalf>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kBool>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kFloat>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kDouble>(module));
-  ASSERT_TRUE(THXPStorage_init<at::kBFloat16>(module));
   register_xpu_device_properties(module);
   bindGetDeviceProperties(module);
 }

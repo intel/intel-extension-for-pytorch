@@ -240,7 +240,7 @@ create_version_files(base_dir, version, ipex_git_sha, torch_git_sha)
 
 def get_c_module():
     main_compile_args = []
-    main_libraries = ['torch_ipex']
+    main_libraries = ['torch_ipex_python']
     main_link_args = []
     main_sources = ["torch_ipex/csrc/_C.cpp"]
     cwd = os.path.dirname(os.path.abspath(__file__))

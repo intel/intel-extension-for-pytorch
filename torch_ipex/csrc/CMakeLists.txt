@@ -1,48 +1,39 @@
-include(${PROJECT_SOURCE_DIR}/cmake/BuildOptions.cmake)
-#include(${PROJECT_SOURCE_DIR}/cmake/Codegen.cmake)
-
 set(IPEX_C_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(IPEX_GPU_ROOT "${IPEX_C_SOURCE_DIR}/gpu")
 
 set(TORCH_IPEX_SRCS)
 set(IPEX_COMMON_SRCS)
-set(IPEX_GPU_SRC)
+set(IPEX_GPU_SRCS)
 
+add_subdirectory(./gpu)
 FILE(GLOB IPEX_COMMON_SRCS "*.cpp")
 list(REMOVE_ITEM IPEX_COMMON_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/_C.cpp")
 
 install(DIRECTORY "./" DESTINATION include FILES_MATCHING PATTERN "*.h")
 
-add_subdirectory(${IPEX_GPU_ROOT})
-# Rewrite the value to parent scope
-set(USE_ONEMKL ${USE_ONEMKL} PARENT_SCOPE)
-set(ONEMKL_INCLUDE_DIR ${ONEMKL_INCLUDE_DIR} PARENT_SCOPE)
-
-list(APPEND TORCH_IPEX_SRCS ${IPEX_COMMON_SRCS})
-add_library(torch_ipex SHARED ${TORCH_IPEX_SRCS})
-set_target_properties(torch_ipex PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}")
-set_target_properties(torch_ipex PROPERTIES OUTPUT_NAME ${LIB_NAME})
+list(APPEND TORCH_IPEX_SRCS ${IPEX_COMMON_SRCS} ${IPEX_GPU_SRCS})
+add_library(torch_ipex_python SHARED ${TORCH_IPEX_SRCS})
 
 if (USE_ITT)
     find_package(ITT QUIET)
     if (ITT_FOUND)
         set(ITT_LIBRARY ${ITT_LIBRARY} PARENT_SCOPE)
         set(ITT_INCLUDE_DIR ${ITT_INCLUDE_DIR} PARENT_SCOPE)
-        target_link_libraries(torch_ipex PUBLIC ${ITT_LIBRARY})
-        target_include_directories(torch_ipex PUBLIC ${ITT_INCLUDE_DIR})
-        target_compile_definitions(torch_ipex PUBLIC USE_ITT)
+        target_link_libraries(torch_ipex_python PUBLIC ${ITT_LIBRARY})
+        target_include_directories(torch_ipex_python PUBLIC ${ITT_INCLUDE_DIR})
+        target_compile_definitions(torch_ipex_python PUBLIC USE_ITT)
 
         set(DPCPP_ITT_SRCS)
         add_subdirectory(./itt)
-        target_sources(torch_ipex PUBLIC ${DPCPP_ITT_SRCS})
+        target_sources(torch_ipex_python PUBLIC ${DPCPP_ITT_SRCS})
     else()
         set(USE_ITT OFF PARENT_SCOPE)
         message(WARNING "Cannot find ITT! Continue to build without ITT!")
     endif()
 endif()
 
-set_target_properties(torch_ipex PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_RPATH}")
+set_target_properties(torch_ipex_python PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_RPATH}")
 
-target_link_libraries(torch_ipex PUBLIC torch_ipex_gpu)
+target_link_libraries(torch_ipex_python PUBLIC torch_ipex_gpu)
 
-install(TARGETS torch_ipex LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS torch_ipex_python LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

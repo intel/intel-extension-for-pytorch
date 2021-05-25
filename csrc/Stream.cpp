@@ -4,9 +4,8 @@
 
 #include <Stream.h>
 
-#include <pybind11/pybind11.h>
 #include <structmember.h>
-#include <gpu/aten/core/Functions.h>
+#include <aten/core/Functions.h>
 
 
 PyObject *THDPStreamClass = nullptr;

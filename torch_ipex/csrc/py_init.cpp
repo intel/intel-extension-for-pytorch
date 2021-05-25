@@ -1,10 +1,10 @@
-#include <py_init.h>
+#include "py_init.h"
 
 #ifdef USE_ITT
 #include <itt/itt.h>
 #endif
 
-#include <gpu/Module.h>
+#include "gpu/Module.h"
 
 namespace py = pybind11;
 

@@ -187,8 +187,8 @@ TAGS
 #
 #
 tests/gpu/examples/simple_trace_case.zip
-torch_ipex/csrc/gpu/aten/generated/ATen/*
-torch_ipex/csrc/gpu/aten/generated/*
+csrc/aten/generated/ATen/*
+csrc/aten/generated/*
 
 # Clion files
 .idea
