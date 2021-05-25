@@ -1,6 +1,7 @@
 import copy
 
 import torch
+import warnings
 
 from .ops.lstm import IpexLSTM
 from .fx import *
