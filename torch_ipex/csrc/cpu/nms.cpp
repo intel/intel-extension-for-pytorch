@@ -6,17 +6,23 @@
 #include <torch/csrc/autograd/function.h>
 #include "torch_ipex/csrc/autocast_mode.h"
 #include "torch_ipex/csrc/autocast_verbose.h"
-namespace torch_ipex {
+#include <immintrin.h>
 
+namespace torch_ipex {
 /*
  When calculating the Intersection over Union:
   MaskRCNN: bias = 1
   SSD-Resnet34: bias = 0
 */
-template <typename scalar_t>
+template <typename scalar_t, bool sorted>
 at::Tensor nms_cpu_kernel(const at::Tensor& dets,
                           const at::Tensor& scores,
-                          const float threshold, float bias=1) {
+                          const float threshold, float bias=1.0);
+
+template <typename scalar_t, bool sorted>
+at::Tensor nms_cpu_kernel(const at::Tensor& dets,
+                          const at::Tensor& scores,
+                          const float threshold, float bias) {
   AT_ASSERTM(!dets.type().is_cuda(), "dets must be a CPU tensor");
   AT_ASSERTM(!scores.type().is_cuda(), "scores must be a CPU tensor");
   AT_ASSERTM(dets.type() == scores.type(), "dets should have the same type as scores");
@@ -32,9 +38,11 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
 
   at::Tensor areas_t = (x2_t - x1_t + bias) * (y2_t - y1_t + bias);
 
-  auto order_t = std::get<1>(scores.sort(0, /* descending=*/true));
-
   auto ndets = dets.size(0);
+  // If scores and dets are already sorted in descending order, we don't need to sort it again.
+  auto order_t = sorted ? at::arange(0, ndets, scores.options().dtype(at::kLong)) :
+                          std::get<1>(scores.sort(0, /* descending=*/true));
+
   at::Tensor suppressed_t = at::zeros({ndets}, dets.options().dtype(at::kByte).device(at::kCPU));
 
   auto suppressed = suppressed_t.data<uint8_t>();
@@ -81,6 +89,198 @@ at::Tensor nms_cpu_kernel(const at::Tensor& dets,
   return at::nonzero(suppressed_t == 0).squeeze(1);
 }
 
+#ifdef AVX512
+// Optimized nms_cpu_kernel specialized for data type: float32 and sorted_score
+template <>
+at::Tensor nms_cpu_kernel</*scalar_t*/float, /*sorted*/true>(const at::Tensor& dets,
+                          const at::Tensor& scores,
+                          const float threshold, float bias) {
+  AT_ASSERTM(!dets.type().is_cuda(), "dets must be a CPU tensor");
+  AT_ASSERTM(!scores.type().is_cuda(), "scores must be a CPU tensor");
+  AT_ASSERTM(dets.type() == scores.type(), "dets should have the same type as scores");
+
+  AT_ASSERTM(dets.sizes().size() == 2, "dets should have 2 dimension");
+  AT_ASSERTM(scores.sizes().size() == 1, "scores should have 1 dimension");
+
+  at::Tensor dets_bbox_number_in_lastdim = dets.permute({1, 0}).contiguous();
+  AT_ASSERTM(dets_bbox_number_in_lastdim.size(1) == scores.size(0), "dets should have number of bboxs as scores");
+  AT_ASSERTM(dets_bbox_number_in_lastdim.size(0) == 4, "each bbox in dets should have 4 coordinates");
+
+  if (dets_bbox_number_in_lastdim.numel() == 0) {
+    return at::empty({0}, dets_bbox_number_in_lastdim.options().dtype(at::kLong).device(at::kCPU));
+  }
+
+  auto x1_t = dets_bbox_number_in_lastdim.select(0, 0).contiguous();
+  auto y1_t = dets_bbox_number_in_lastdim.select(0, 1).contiguous();
+  auto x2_t = dets_bbox_number_in_lastdim.select(0, 2).contiguous();
+  auto y2_t = dets_bbox_number_in_lastdim.select(0, 3).contiguous();
+
+  auto ndets = dets_bbox_number_in_lastdim.size(1);
+  auto ndets_up_scale = (ndets/16+1)*16;
+  auto ndets_down_scale = (ndets/16)*16;
+  at::Tensor&& areas_t = at::zeros({ndets}, dets_bbox_number_in_lastdim.options()).contiguous();
+  auto areas = areas_t.data<float>();
+  auto x1 = x1_t.data<float>();
+  auto y1 = y1_t.data<float>();
+  auto x2 = x2_t.data<float>();
+  auto y2 = y2_t.data<float>();
+  __m512 m512_zero = _mm512_setzero_ps();
+  __m512 m512_bias = _mm512_set1_ps(bias);
+  __m128i m128_zeroi = _mm_setzero_si128();
+
+  // Step1: Calculate the area of all bbox's
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+# pragma omp parallel for simd schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#else
+# pragma omp parallel for schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#endif
+#endif
+  for (int i = 0; i < ndets_up_scale; i += 16) {
+    __m512 m512_x1;
+    __m512 m512_x2;
+    __m512 m512_y1;
+    __m512 m512_y2;
+    __m512 m512_result;
+    if (i < ndets_down_scale) {
+      // vector
+      m512_x1 = _mm512_loadu_ps(x1+i);
+      m512_x2 = _mm512_loadu_ps(x2+i);
+      m512_y1 = _mm512_loadu_ps(y1+i);
+      m512_y2 = _mm512_loadu_ps(y2+i);
+      if (bias == 0) {
+        m512_result = _mm512_mul_ps(_mm512_sub_ps(m512_x2, m512_x1), _mm512_sub_ps(m512_y2, m512_y1));
+      } else {
+        m512_result = _mm512_mul_ps(_mm512_add_ps(_mm512_sub_ps(m512_x2, m512_x1), m512_bias),
+                                   _mm512_add_ps(_mm512_sub_ps(m512_y2, m512_y1), m512_bias));
+      }
+      _mm512_storeu_ps(areas+i, m512_result);
+    } else {
+      // tail case
+      unsigned short left_idx = ndets - ndets_down_scale;
+      __mmask16 mask = (1 << left_idx) - 1; //0x03ff;
+      m512_x1 = _mm512_mask_loadu_ps(m512_zero, mask, x1+i);
+      m512_x2 = _mm512_mask_loadu_ps(m512_zero, mask, x2+i);
+      m512_y1 = _mm512_mask_loadu_ps(m512_zero, mask, y1+i);
+      m512_y2 = _mm512_mask_loadu_ps(m512_zero, mask, y2+i);
+      if (bias == 0) {
+        m512_result = _mm512_mask_mul_ps(m512_zero, mask,
+                                        _mm512_mask_sub_ps(m512_zero, mask, m512_x2, m512_x1),
+                                        _mm512_mask_sub_ps(m512_zero, mask, m512_y2, m512_y1));
+      } else {
+        m512_result = _mm512_mask_mul_ps(m512_zero, mask,
+                                        _mm512_mask_add_ps(m512_zero, mask, _mm512_mask_sub_ps(m512_zero, mask, m512_x2, m512_x1), m512_bias),
+                                        _mm512_mask_add_ps(m512_zero, mask, _mm512_mask_sub_ps(m512_zero, mask, m512_y2, m512_y1), m512_bias));
+      }
+      _mm512_mask_storeu_ps(areas+i, mask, m512_result);
+    }
+  }
+  // Step2: Go through the NMS flow
+  at::Tensor suppressed_t = at::zeros({ndets}, dets_bbox_number_in_lastdim.options().dtype(at::kByte).device(at::kCPU));
+  auto suppressed = suppressed_t.data<uint8_t>();
+  for (int64_t i = 0; i < ndets; i++) {
+    if (suppressed[i] == 1)
+      continue;
+    auto ix1 = x1[i];
+    auto iy1 = y1[i];
+    auto ix2 = x2[i];
+    auto iy2 = y2[i];
+    auto iarea = areas[i];
+
+    __m512 m512_ix1 = _mm512_set1_ps(ix1);
+    __m512 m512_ix2 = _mm512_set1_ps(ix2);
+    __m512 m512_iy1 = _mm512_set1_ps(iy1);
+    __m512 m512_iy2 = _mm512_set1_ps(iy2);
+    __m512 m512_iarea = _mm512_set1_ps(iarea);
+    __m512 m512_threshold = _mm512_set1_ps(threshold);
+
+    auto ndets_i_up_scale = ((ndets-i-1)/16+1)*16;
+    auto ndets_i_down_scale = ((ndets-i-1)/16)*16;
+
+#ifdef _OPENMP
+#if (_OPENMP >= 201307)
+# pragma omp parallel for simd schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#else
+# pragma omp parallel for schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+#endif
+#endif
+    for (int64_t _j = 0; _j < ndets_i_up_scale; _j += 16) {
+      if (_j < ndets_i_down_scale) {
+        int64_t j = _j + i + 1;
+        __m512 m512_x1 = _mm512_loadu_ps(x1+j);
+        __m512 m512_x2 = _mm512_loadu_ps(x2+j);
+        __m512 m512_y1 = _mm512_loadu_ps(y1+j);
+        __m512 m512_y2 = _mm512_loadu_ps(y2+j);
+
+        __m512 m512_xx1 = _mm512_max_ps(m512_ix1, m512_x1);
+        __m512 m512_yy1 = _mm512_max_ps(m512_iy1, m512_y1);
+        __m512 m512_xx2 = _mm512_min_ps(m512_ix2, m512_x2);
+        __m512 m512_yy2 = _mm512_min_ps(m512_iy2, m512_y2);
+
+        __m512 m512_w;
+        __m512 m512_h;
+        if (bias == 0) {
+          m512_w = _mm512_max_ps(m512_zero, _mm512_sub_ps(m512_xx2, m512_xx1));
+          m512_h = _mm512_max_ps(m512_zero, _mm512_sub_ps(m512_yy2, m512_yy1));
+        } else {
+          m512_w = _mm512_max_ps(m512_zero, _mm512_add_ps(_mm512_sub_ps(m512_xx2, m512_xx1), m512_bias));
+          m512_h = _mm512_max_ps(m512_zero, _mm512_add_ps(_mm512_sub_ps(m512_yy2, m512_yy1), m512_bias));
+        }
+
+        __m512 m512_inter = _mm512_mul_ps(m512_w, m512_h);
+        __m512 m512_areas = _mm512_loadu_ps(areas+j);
+        __m512 m512_over =  _mm512_div_ps(m512_inter, _mm512_sub_ps(_mm512_add_ps(m512_iarea, m512_areas), m512_inter));
+        __mmask16 mask_sus = _mm512_cmp_ps_mask(m512_over, m512_threshold, _CMP_GE_OS);
+        __m128i res_sus = _mm_mask_set1_epi8(m128_zeroi, mask_sus, 1);
+        _mm_mask_storeu_epi8(suppressed+j, mask_sus, res_sus);
+
+      } else {
+        // Tail case
+        int64_t j = _j + i + 1;
+        int64_t idx_left = ndets - j;
+        __mmask16 load_mask = (1 << idx_left) - 1;
+
+        __m512 m512_x1 = _mm512_mask_loadu_ps(m512_zero, load_mask, x1+j);
+        __m512 m512_x2 = _mm512_mask_loadu_ps(m512_zero, load_mask, x2+j);
+        __m512 m512_y1 = _mm512_mask_loadu_ps(m512_zero, load_mask, y1+j);
+        __m512 m512_y2 = _mm512_mask_loadu_ps(m512_zero, load_mask, y2+j);
+
+        __m512 m512_xx1 = _mm512_mask_max_ps(m512_zero, load_mask, m512_ix1, m512_x1);
+        __m512 m512_yy1 = _mm512_mask_max_ps(m512_zero, load_mask, m512_iy1, m512_y1);
+        __m512 m512_xx2 = _mm512_mask_min_ps(m512_zero, load_mask, m512_ix2, m512_x2);
+        __m512 m512_yy2 = _mm512_mask_min_ps(m512_zero, load_mask, m512_iy2, m512_y2);
+
+        __m512 m512_w;
+        __m512 m512_h;
+        if (bias == 0) {
+          m512_w = _mm512_mask_max_ps(m512_zero, load_mask, m512_zero,
+                                     _mm512_mask_sub_ps(m512_zero, load_mask, m512_xx2, m512_xx1));
+          m512_h = _mm512_mask_max_ps(m512_zero, load_mask, m512_zero,
+                                     _mm512_mask_sub_ps(m512_zero, load_mask, m512_yy2, m512_yy1));
+        } else {
+          m512_w = _mm512_mask_max_ps(m512_zero, load_mask, m512_zero,
+                                     _mm512_mask_add_ps(m512_zero, load_mask,
+                                     _mm512_mask_sub_ps(m512_zero, load_mask, m512_xx2, m512_xx1), m512_bias));
+          m512_h = _mm512_mask_max_ps(m512_zero, load_mask, m512_zero,
+                                     _mm512_mask_add_ps(m512_zero, load_mask,
+                                     _mm512_mask_sub_ps(m512_zero, load_mask, m512_yy2, m512_yy1), m512_bias));
+        }
+        __m512 m512_inter = _mm512_mask_mul_ps(m512_zero, load_mask, m512_w, m512_h);
+        __m512 m512_areas = _mm512_mask_loadu_ps(m512_zero, load_mask, areas+j);
+        __m512 m512_over =  _mm512_mask_div_ps(m512_zero, load_mask, m512_inter,
+                                         _mm512_mask_sub_ps(m512_zero, load_mask,
+                                         _mm512_mask_add_ps(m512_zero, load_mask, m512_iarea, m512_areas), m512_inter));
+        __mmask16 mask_sus = _mm512_mask_cmp_ps_mask(load_mask, m512_over, m512_threshold, _CMP_GE_OS);
+        __m128i res_sus = _mm_mask_set1_epi8(m128_zeroi, mask_sus, 1);
+        _mm_mask_storeu_epi8(suppressed+j, mask_sus, res_sus);
+
+      }
+    }
+  }
+  return at::nonzero(suppressed_t == 0).squeeze(1);
+}
+#endif
+
 std::vector<at::Tensor> remove_empty(std::vector<at::Tensor>& candidate, int64_t start, int64_t end) {
   std::vector<at::Tensor> valid_candidate;
   for (int64_t i = start; i < end; i++) {
@@ -115,13 +315,13 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms_kern
 #endif
 #endif
   // skip background (i = 0)
-  for(int index = 0; index < nbatch_x_nscore; index++){
+  for (int index = 0; index < nbatch_x_nscore; index++) {
     // Parallel in the dimentaion of: batch * nscore
     auto bs = index / nscore;
     auto i = index % nscore;
 
     // skip background (i = 0)
-    if(i == 0){
+    if (i == 0) {
       continue;
     }
 
@@ -138,19 +338,17 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms_kern
       continue;
     }
 
-    at::Tensor score_sorted, score_idx_sorted;
-    std::tie(score_sorted, score_idx_sorted) = score.sort(0);
+    at::Tensor score_sliced, score_idx_sorted;
+    // select max_output highest' score and bboxes
+    std::tie(score_sliced, score_idx_sorted) = at::topk(score, (max_output>score.size(0))?score.size(0):max_output, 0);
+    at::Tensor bboxes_sliced = at::index_select(bboxes, /*dim*/0, score_idx_sorted);
 
-    // # select max_output indices
-    score_idx_sorted = score_idx_sorted.slice(/*dim*/0, /*start*/std::max(score.size(0) - max_output, static_cast<int64_t>(0)), /*end*/score.size(0));
+    at::Tensor keep = nms_cpu_kernel<scalar_t, /*sorted*/true>(bboxes_sliced, score_sliced, threshold, /*bias*/0);
 
-    at::Tensor keep = nms_cpu_kernel<scalar_t>(at::index_select(bboxes, /*dim*/0, score_idx_sorted), at::index_select(score, /*dim*/0, score_idx_sorted), threshold, /*bias*/0);
-    at::Tensor candidates = at::index_select(score_idx_sorted, /*dim*/0, keep);
-
-    bboxes_out[index] = at::index_select(bboxes, /*dim*/0, candidates);
-    scores_out[index] = at::index_select(score, /*dim*/0, candidates);
+    bboxes_out[index] = at::index_select(bboxes_sliced, /*dim*/0, keep);
+    scores_out[index] = at::index_select(score_sliced, /*dim*/0, keep);
     // TODO optimize the fill_
-    labels_out[index] = at::empty({candidates.sizes()}).fill_(i);
+    labels_out[index] = at::empty({keep.sizes()}).fill_(i);
   }
 
   std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> output(nbatch);
@@ -161,7 +359,7 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms_kern
 # pragma omp parallel for schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
-  for(int bs = 0; bs < nbatch; bs++){
+  for (int bs = 0; bs < nbatch; bs++) {
     // Post process the tensors to get the top max_output(number) for each Batchsize
     std::vector<at::Tensor> valid_bboxes_out = remove_empty(bboxes_out, bs*nscore, (bs+1)*nscore);
     std::vector<at::Tensor> valid_scores_out = remove_empty(scores_out, bs*nscore, (bs+1)*nscore);
@@ -183,10 +381,11 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms_kern
 
 at::Tensor nms_cpu(const at::Tensor& dets,
                const at::Tensor& scores,
-               const float threshold) {
+               const float threshold,
+               const bool sorted) {
   at::Tensor result;
   AT_DISPATCH_FLOATING_TYPES(dets.type(), "nms", [&] {
-    result = nms_cpu_kernel<scalar_t>(dets, scores, threshold);
+    result = sorted ? nms_cpu_kernel<scalar_t, true>(dets, scores, threshold) : nms_cpu_kernel<scalar_t, false>(dets, scores, threshold);
   });
   return result;
 }
@@ -204,7 +403,8 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms_cpu(
 
 at::Tensor AtenIpexTypeExt::nms(const at::Tensor& dets,
                const at::Tensor& scores,
-               const double threshold) {
+               const double threshold,
+               const bool sorted) {
 #if defined(IPEX_DISP_OP)
   printf("IpexExternal::nms\n");
 #endif
@@ -213,7 +413,7 @@ at::Tensor AtenIpexTypeExt::nms(const at::Tensor& dets,
 #endif
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dets.layout() == c10::kStrided);
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(scores.layout() == c10::kStrided);
-  auto&& result = nms_cpu(dets, scores, threshold);
+  auto&& result = nms_cpu(dets, scores, threshold, sorted);
   static_cast<void>(result); // Avoid warnings in case not used
   return result;
 }
@@ -260,7 +460,7 @@ at::Tensor scale_back_batch_kernel(const at::Tensor& _ipex_bboxes_in,
 # pragma omp parallel for schedule(static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
-  for(int64_t k = 0; k < ndets; k++){
+  for (int64_t k = 0; k < ndets; k++) {
     int64_t i = k / boxes_per_image;
     int64_t j = k % boxes_per_image;
 
@@ -331,7 +531,6 @@ std::tuple<at::Tensor, at::Tensor> AtenIpexTypeExt::parallel_scale_back_batch(co
 }
 } // namespace torch_ipex
 
-
 namespace {
 static auto dispatch =
     torch::RegisterOperators()
@@ -342,10 +541,10 @@ static auto dispatch =
 
 namespace torch_ipex {
 namespace autocast {
-
 at::Tensor nms(const at::Tensor& dets,
                const at::Tensor& scores,
-               const double threshold) {
+               const double threshold,
+               const bool sorted) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
     .findSchemaOrThrow("torch_ipex::nms", "")
@@ -353,7 +552,7 @@ at::Tensor nms(const at::Tensor& dets,
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("nms");
 #endif
-  return op.call(dets, cpu_cached_cast(at::kFloat, scores), threshold);
+  return op.call(dets, cpu_cached_cast(at::kFloat, scores), threshold, sorted);
 }
 
 std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms(const at::Tensor& dets,
@@ -374,7 +573,7 @@ std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(const at::Tensor& b
                                                                 const at::Tensor& scores_in,
                                                                 const at::Tensor& dboxes_xywh,
                                                                 const double scale_xy,
-                                                                const double scale_wh){
+                                                                const double scale_wh) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
     .findSchemaOrThrow("torch_ipex::parallel_scale_back_batch", "")
@@ -386,7 +585,7 @@ std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(const at::Tensor& b
                  cpu_cached_cast(at::kFloat, dboxes_xywh), scale_xy, scale_wh);
 }
 
-TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m){
+TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
   m.impl("nms", torch_ipex::autocast::nms);
   m.impl("batch_score_nms", torch_ipex::autocast::batch_score_nms);
   m.impl("parallel_scale_back_batch", torch_ipex::autocast::parallel_scale_back_batch);

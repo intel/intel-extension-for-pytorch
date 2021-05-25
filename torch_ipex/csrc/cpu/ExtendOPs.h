@@ -26,12 +26,21 @@ class AtenIpexTypeExt {
                                       const int64_t height,
                                       const int64_t width,
                                       const int64_t sampling_ratio);
-    
-  static at::Tensor nms(const at::Tensor& dets,
-                        const at::Tensor& scores,
-                        const double threshold);
 
   /// \brief Perform non-maximum suppression.
+  ///
+  /// \param dets: predicted loc in ltrb format for one batchsize, size [number_boxes, 4], for example: [200, 4].
+  /// \param scores: predicted score for one batchsize and one class, size [number_boxes], for example: [200].
+  /// \param threshold: IOU threshold(scalar) to suppress bboxs which has the IOU val larger than the threshold.
+  /// \param sorted: The score and dets are already sorted in Descending order.
+  ///
+  /// \return result is a Tensor of dets' indexs to be keeped.
+  static at::Tensor nms(const at::Tensor& dets,
+                        const at::Tensor& scores,
+                        const double threshold,
+                        const bool sorted);
+
+  /// \brief Perform batch non-maximum suppression.
   ///
   /// C++ version of Encoder::decode_single.
   /// Refer to https://github.com/mlcommons/inference/blob/v0.7/others/cloud/single_stage_detector/pytorch/utils.py.

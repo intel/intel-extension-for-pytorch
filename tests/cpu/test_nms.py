@@ -4,7 +4,7 @@ import torch.nn as nn
 import intel_pytorch_extension as ipex
 from common_utils import TestCase
 import time, sys
-from intel_pytorch_extension import batch_score_nms, parallel_scale_back_batch
+from intel_pytorch_extension import batch_score_nms, parallel_scale_back_batch, nms
 import torch.nn.functional as F
 import os
 
@@ -118,17 +118,16 @@ class TestNMS(TestCase):
         max_ids = max_ids[-max_output:]
         return bboxes_out[max_ids, :], labels_out[max_ids], scores_out[max_ids]
 
-    def test_nms_result(self):
+    def test_batch_nms_result(self):
         batch_size = 1
         number_boxes = 15130
         scale_xy = 0.1
         scale_wh = 0.2
         criteria = 0.50
         max_output = 200
-        predicted_loc = torch.randn((batch_size, number_boxes, 4)).contiguous().to(torch.float32)
-        predicted_score = torch.randn((batch_size, number_boxes, 81)).contiguous().to(torch.float32)
-        dboxes_xywh = torch.randn((1, number_boxes, 4)).contiguous().to(torch.float64)
-        dboxes_xywh = torch.load(os.path.dirname(__file__) + "/data/nms_dboxes_xywh.pt")
+        predicted_loc = torch.load(os.path.join(os.path.dirname(__file__), "data/nms_ploc.pt")) # sizes: [1, 15130, 4]
+        predicted_score = torch.load(os.path.join(os.path.dirname(__file__), "data/nms_plabel.pt")) # sizes: [1, 15130, 81]
+        dboxes_xywh = torch.load(os.path.join(os.path.dirname(__file__), "data/nms_dboxes_xywh.pt"))
         bboxes, probs = parallel_scale_back_batch(predicted_loc, predicted_score, dboxes_xywh, scale_xy, scale_wh)
         bboxes_clone = bboxes.clone()
         probs_clone = probs.clone()
@@ -146,6 +145,47 @@ class TestNMS(TestCase):
             self.assertTrue(torch.allclose(loc, loc2, rtol=1e-4, atol=1e-4))
             self.assertEqual(label, label2)
             self.assertTrue(torch.allclose(prob, prob2, rtol=1e-4, atol=1e-4))
+
+    def test_nms_kernel_result(self):
+        batch_size = 1
+        class_number = 81
+        scale_xy = 0.1
+        scale_wh = 0.2
+        criteria = 0.50
+        max_output = 200
+        predicted_loc = torch.load(os.path.join(os.path.dirname(__file__), "data/nms_ploc.pt")) # sizes: [1, 15130, 4]
+        predicted_score = torch.load(os.path.join(os.path.dirname(__file__), "data/nms_plabel.pt")) # sizes: [1, 15130, 81]
+        dboxes_xywh = torch.load(os.path.join(os.path.dirname(__file__), "data/nms_dboxes_xywh.pt"))
+        bboxes, probs = parallel_scale_back_batch(predicted_loc, predicted_score, dboxes_xywh, scale_xy, scale_wh)
+
+        for bs in range(batch_size):
+            loc = bboxes[bs].squeeze(0)
+            for class_id in range(class_number):
+                if class_id == 0:
+                    # Skip the background
+                    continue
+                score = probs[bs, :, class_id]
+
+                score_sorted, indices = torch.sort(score, descending=True)
+                loc_sorted = torch.index_select(loc, 0, indices)
+
+                result = nms(loc_sorted.clone(), score_sorted.clone(), criteria, True)
+                result_ref = nms(loc.clone(), score.clone(), criteria, False)
+                result_ref2 = nms(loc_sorted.clone().to(dtype=torch.float64), score_sorted.clone().to(dtype=torch.float64), criteria, True)
+
+                bbox_keep, _ = torch.sort(torch.index_select(loc_sorted, 0, result).squeeze(0), 0)
+                bbox_keep_ref, _ = torch.sort(torch.index_select(loc, 0, result_ref).squeeze(0), 0)
+                bbox_keep_ref2, _ = torch.sort(torch.index_select(loc_sorted, 0, result_ref2).squeeze(0), 0)
+
+                score_keep, _ = torch.sort(torch.index_select(score_sorted, 0, result).squeeze(0), 0)
+                score_keep_ref, _ = torch.sort(torch.index_select(score, 0, result_ref).squeeze(0), 0)
+                score_keep_ref2, _ = torch.sort(torch.index_select(score_sorted, 0, result_ref2).squeeze(0), 0)
+
+                self.assertEqual(result.size(0), result_ref.size(0))
+                self.assertTrue(torch.allclose(bbox_keep, bbox_keep_ref, rtol=1e-4, atol=1e-4))
+                self.assertTrue(torch.allclose(score_keep, score_keep_ref, rtol=1e-4, atol=1e-4))
+                self.assertTrue(torch.allclose(bbox_keep, bbox_keep_ref2, rtol=1e-4, atol=1e-4))
+                self.assertTrue(torch.allclose(score_keep, score_keep_ref2, rtol=1e-4, atol=1e-4))
 
 if __name__ == '__main__':
     test = unittest.main()
