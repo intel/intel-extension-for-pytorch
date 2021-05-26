@@ -1,4 +1,4 @@
-from .interaction import interaction
+from .interaction import interaction, fuseinteractemb
 from .embeddingbag import embeddingbag
 from .linear import *
 from .pooling import *

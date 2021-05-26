@@ -11,6 +11,9 @@ def interaction(*args):
         return InteractionFunc.apply(*args)
     return torch.ops.torch_ipex.interaction_forward(args)
 
+def fuseinteractemb(lS_o, lS_i, emb_l, dense_x):
+    return torch.ops.torch_ipex.fuseinteractemb_forward(lS_o, lS_i, emb_l, dense_x)
+
 class InteractionFunc(Function):
     @staticmethod
     def forward(ctx, *args):
