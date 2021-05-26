@@ -33,12 +33,19 @@ def _replace_lstm_with_ipex_lstm(model):
                 _replace_lstm_with_ipex_lstm(child)
 
 def convert_module_data_type(module, dtype):
-    if isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Linear):
-        weight_data = module.weight.detach().clone().to(dtype)
-        module.weight.data = weight_data
-        if module.bias is not None:
-            bias_data = module.bias.detach().clone().to(dtype)
-            module.bias.data = bias_data
+    # convert weights(bias) of module to dtype to reduce dtype reorder
+    module_convert_list = [torch.nn.Conv2d,
+                          torch.nn.Linear,
+                          torch.nn.Embedding,
+                          torch.nn.LayerNorm]
+    for module_cls in module_convert_list:
+        if isinstance(module, module_cls):
+            weight_data = module.weight.detach().clone().to(dtype)
+            module.weight.data = weight_data
+            if hasattr(module, 'bias') and module.bias is not None:
+                bias_data = module.bias.detach().clone().to(dtype)
+                module.bias.data = bias_data
+            break 
     for child in module.children():
         convert_module_data_type(child, dtype)
     return module

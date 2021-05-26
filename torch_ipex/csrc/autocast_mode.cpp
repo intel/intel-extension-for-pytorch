@@ -180,6 +180,7 @@ MAKE_REGISTER_FUNC(ADD_NS(conv_transpose1d), "conv_transpose1d", Tensor (const T
                                                                         IntArrayRef, IntArrayRef, IntArrayRef, int64_t, IntArrayRef), user_defined_dtype)
 MAKE_REGISTER_FUNC(ADD_NS(conv_transpose2d), "conv_transpose2d.input", Tensor (const Tensor &, const Tensor &, const c10::optional<Tensor>&,
                                                                               IntArrayRef, IntArrayRef, IntArrayRef, int64_t, IntArrayRef), user_defined_dtype)
+MAKE_REGISTER_FUNC(ADD_NS(layer_norm), "layer_norm", Tensor (const Tensor &, IntArrayRef, const c10::optional<Tensor>&, const c10::optional<Tensor>&, double, bool), user_defined_dtype)
 
 // fp32 cast policy
 MAKE_REGISTER_FUNC(ADD_NS(avg_pool2d), "avg_pool2d", Tensor (const Tensor &, IntArrayRef, IntArrayRef, IntArrayRef, bool, bool, c10::optional<int64_t>), fp32)
