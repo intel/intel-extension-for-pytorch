@@ -29,6 +29,10 @@ class LlgaKernel {
     return debugName_;
   }
 
+  const std::string& profileName() const {
+    return profileName_;
+  }
+
  private:
   bool useOpaqueLayout(size_t offset) const;
 
@@ -57,6 +61,16 @@ class LlgaKernel {
     return "LlgaPartition_" + std::to_string(debugId++);
   }
 
+  std::string genProfileName() {
+    std::vector<std::string> op_list;
+    for (auto* node : graph_->block()->nodes()) {
+      if (node->kind().is_aten()) {
+        op_list.push_back(node->kind().toUnqualString());
+      }
+    }
+    return c10::Join("+", op_list);
+  }
+
   static dnnl::graph::logical_tensor toLogicalTensor(const ArgSpec& s) {
     return s.logical_tensor();
   }
@@ -68,6 +82,7 @@ class LlgaKernel {
   int64_t nOutputs_ = 0;
   dnnl::graph::partition partition_;
   std::string debugName_;
+  std::string profileName_;
 };
 
 } // namespace onednn

@@ -49,7 +49,7 @@ void fuseGraph(std::shared_ptr<Graph>& g) {
 Operation createLlgaKernel(const Node* node) {
   auto kernel = std::make_shared<fuser::onednn::LlgaKernel>(node);
   return [kernel](Stack* stack) {
-    RECORD_FUNCTION(kernel->debugName(), std::vector<c10::IValue>());
+    RECORD_FUNCTION(kernel->profileName(), std::vector<c10::IValue>());
     kernel->run(*stack);
     return 0;
   };
