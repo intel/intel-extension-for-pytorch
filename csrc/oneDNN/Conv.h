@@ -365,7 +365,9 @@ static at::Tensor convolution(
         }
         wgh_ = empty_opaque_qtensor(expected_wgh_md, c10::nullopt, quantizer);
     } else {
-      wgh_ = empty_opaque_tensor(expected_wgh_md, wgh.options(), c10::nullopt);
+      auto wgh_opt = wgh.options();
+      wgh_opt = src_data_t == memory::data_type::bf16 ? wgh_opt.dtype(kBFloat16) : wgh_opt;
+      wgh_ = empty_opaque_tensor(expected_wgh_md, wgh_opt, c10::nullopt);
     }
 
     wgh_m = dpcpp_onednn_memory(expected_wgh_md, engine, wgh_.data_ptr());
@@ -399,9 +401,16 @@ static at::Tensor convolution(
   memory bia_m = memory({{}, bia_data_t, fmt_bia}, engine);
   if (bia.defined()) {
     auto bia_ctx = DPCPPTensorContext::get_tensor_ctx(bia);
+
+    auto real_bia_data_t = usr_bia_data_t;
+    auto bia_ptr = bia.data_ptr();
+    if (src_data_t == memory::data_type::bf16) {
+      real_bia_data_t = bia_data_t;
+      bia_ptr = bia.to(ScalarType::BFloat16).data_ptr();
+    }
     bia_m = bia_ctx.is_plain()
         ? dpcpp_onednn_memory(
-              {bia_tz, usr_bia_data_t, fmt_bia}, engine, bia.data_ptr())
+              {bia_tz, real_bia_data_t, fmt_bia}, engine, bia_ptr)
         : dpcpp_onednn_memory({bia_ctx.meta()}, engine, bia.data_ptr());
 
     if (bia_ctx.is_plain() && src.is_quantized()) {
