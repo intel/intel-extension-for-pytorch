@@ -104,6 +104,60 @@ class TestOp(JitLlgaTestCase):
             ]
             self.checkPatterns(graph, patterns)
 
+    @llga_test_env
+    def test_max_pool2d(self):
+        for [
+                spatial,
+                kernel,
+                padding,
+                stride,
+                dilation,
+                ceil_mode
+            ] in itertools.product(
+                [15], # [15, 16], TODO: check backend
+                [3, 5], # [3, 4, 5], TODO: check backend
+                [0, 1],
+                [1, 2], # [1, 2, 4], TODO: fix issue in pad calculation
+                [1, 2],
+                [True, False]):
+
+            m = nn.MaxPool2d(kernel_size=kernel,
+                             stride=stride,
+                             padding=padding,
+                             dilation=dilation,
+                             ceil_mode=ceil_mode)
+            x = torch.rand(1, 3, spatial, spatial)
+
+            graph = self.checkQuantizeTrace(m, [x], atol=1e-1, config_name="max_pool2d")
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+            self.assertFused(graph, ['aten::max_pool2d', 'aten::quantize_per_tensor', 'aten::dequantize'])
+
+            patterns = [
+                ["aten::quantize_per_tensor"],
+                ["aten::dequantize", "aten::max_pool2d", "aten::quantize_per_tensor"],
+                ["aten::dequantize"]
+            ]
+            self.checkPatterns(graph, patterns)
+
+    @llga_test_env
+    @unittest.skipIf(True, 'int8 adaptive_avg_pool2d is not supported in the backend')
+    def test_adaptive_avg_pool2d(self):
+        m = nn.AdaptiveAvgPool2d((1, 1))
+        N = torch.randint(3, 10, (1,)).item()
+        C = torch.randint(3, 10, (1,)).item()
+        x = torch.randn(N, C, 224, 224, dtype=torch.float32) * 100
+
+        graph = self.checkQuantizeTrace(m, [x], atol=1e-1, config_name="adaptive_avg_pool2d")
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
+        self.assertFused(graph, ['aten::adaptive_avg_pool2d', 'aten::quantize_per_tensor', 'aten::dequantize'])
+
+        patterns = [
+            ["aten::quantize_per_tensor"],
+            ["aten::dequantize", "aten::adaptive_avg_pool2d", "aten::quantize_per_tensor"],
+            ["aten::dequantize"]
+        ]
+        self.checkPatterns(graph, patterns)
+
 class TestFusionPattern(JitLlgaTestCase):
     @llga_test_env
     def test_conv2d_eltwise(self):

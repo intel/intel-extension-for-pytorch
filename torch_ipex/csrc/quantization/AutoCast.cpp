@@ -274,7 +274,7 @@ at::Tensor max_pool2d(const at::Tensor &input, at::IntArrayRef kernel_size, at::
     op_outputs.push_back(op_output);
     tensors_flow.emplace(output.unsafeGetTensorImpl(),
                          val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, "max_pool2d",
+    torch_ipex::insert_or_updata_observer({input}, {input}, "max_pool2d",
                                           op_id, op_inputs, op_outputs);
     return output;
   }
@@ -318,7 +318,7 @@ at::Tensor adaptive_avg_pool2d(const at::Tensor &input, at::IntArrayRef output_s
     op_outputs.push_back(op_output);
     tensors_flow.emplace(output.unsafeGetTensorImpl(),
                          val_name{weakref_scales(output.getIntrusivePtr()), op_output});
-    torch_ipex::insert_or_updata_observer({input}, {output}, "adaptive_avg_pool2d",
+    torch_ipex::insert_or_updata_observer({input}, {input}, "adaptive_avg_pool2d",
                                           op_id, op_inputs, op_outputs);
     return output;
   }
