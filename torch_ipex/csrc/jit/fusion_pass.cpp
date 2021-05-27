@@ -11,6 +11,7 @@
 #include <torch/csrc/jit/ir/alias_analysis.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/frontend/error_report.h>
+#include <torch/csrc/jit/passes/tensorexpr_fuser.h>
 
 using namespace torch::jit;
 
@@ -304,6 +305,8 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
 };
 
 void FusionPass(std::shared_ptr<Graph> &graph) {
+  RemoveProfileNodesAndSpecializeTypes(graph);
+  RemoveTensorTypeSpecializations(graph);
   // Replace _convolution with conv2d or conv3d
   graph_rewrite::replaceConvolutionWithAtenConv(graph);
 
