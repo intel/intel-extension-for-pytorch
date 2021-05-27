@@ -213,6 +213,9 @@ class IPEXBuild(build_ext, object):
     if _check_env_flag('DEBUG'):
       build_type = 'Debug'
 
+    if _check_env_flag('REL_WITH_DEB_INFO'):
+      build_type = 'RelWithDebInfo'
+
     # install _torch_ipex.so as python module
     if ext.name == 'torch_ipex' and _check_env_flag("USE_SYCL"):
       ext_dir = ext_dir + '/torch_ipex'
