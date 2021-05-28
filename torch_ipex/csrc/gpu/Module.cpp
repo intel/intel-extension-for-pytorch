@@ -308,6 +308,31 @@ void init_module(pybind11::module& m) {
       },
       "enable split SGD for BF16 weight update. on Intel device");
 
+  m.def("fused_adamW",
+      [](at::Tensor& grad_input,
+        const at::Tensor& avg,
+        const at::Tensor& avg_sq,
+        int64_t step,
+        double lr,
+        double eps,
+        double beta1,
+        double beta2,
+        double weight_decay,
+        const bool correct_bias) {
+        return at::AtenIpexTypeXPU::fused_adamW(
+			grad_input,
+			avg,
+			avg_sq,
+			step,
+			lr,
+			eps,
+			beta1,
+			beta2,
+			weight_decay,
+			correct_bias);
+      },
+      "optimized adamW optimizer kernel implemtation on Intel device");
+
 #if defined(USE_ONEDPL)
   m.def("_onedpl_is_enabled",
         []() {return true;});

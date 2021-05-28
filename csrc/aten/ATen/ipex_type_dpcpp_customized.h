@@ -10,6 +10,8 @@ namespace AtenIpexTypeXPU {
 
 struct DPCPPTensorContext;
 
+at::Tensor& fused_adamW(at::Tensor & grad_input, const at::Tensor& avg, const at::Tensor& avg_sq, int64_t step=1.0, double lr=1.0, double eps=1.0, double beta1=1.0, double beta2=1.0, double weight_decay=0.f, const bool correct_bias=true);
+
 at::Tensor convolution_sum(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups, at::Tensor& accumu, at::Scalar scale=1.0, at::Scalar alpha=0.f, at::Scalar beta=0.f);
 
 at::Tensor convolution_sum_relu(const at::Tensor & input, const at::Tensor & weight, const at::Tensor & bias, at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation, bool transposed, at::IntArrayRef output_padding, int64_t groups, at::Tensor& accumu, at::Scalar scale=1.0, at::Scalar alpha=0.f, at::Scalar beta=0.f);
