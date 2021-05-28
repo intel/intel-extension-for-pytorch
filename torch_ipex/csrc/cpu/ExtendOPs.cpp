@@ -372,39 +372,34 @@ static inline void _interaction_s8s8_scale_s32s8_128(int8_t *out, const std::vec
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("ExtendOps::_interaction_s8s8_scale_s32s8", std::vector<c10::IValue>({}));
 #endif
-  size_t offset = 0;
-  auto * a = (const int8_t *)input_addr[1];
-  auto * b = (const int8_t *)input_addr[0];
-  mul_and_sum_s8x128_to_s32x16_aligned_store(&cat_buf[offset], a, b);
-  offset++;
-  auto * c = (const int8_t *)input_addr[2];
-  mul_and_sum_s8x128_to_s32x16_aligned_store(&cat_buf[offset], c, b);
-  offset++;
-  mul_and_sum_s8x128_to_s32x16_aligned_store(&cat_buf[offset], c, a);
-  offset++;
-  for (int i = 3; i < M; i++) {
-    a = (const int8_t *)input_addr[i];
+  auto * a = (const int8_t *)input_addr[0];
+  auto * b = (const int8_t *)input_addr[1];
+  mul_and_sum_s8x128_to_s32x16_aligned_store(cat_buf[0], b, a);
+  size_t offset = 1;
+  for (int i = 2; i < M; i++) {
+    auto * c = (const int8_t *)input_addr[i];
     int j = 0;
     for (; j < i - 1; j += 2) {
-      b = (const int8_t *)input_addr[j];
-      c = (const int8_t *)input_addr[j + 1];
-      mul_and_sum_s8x128_to_s32x16_aligned_store(&cat_buf[offset], a, b);
-      mul_and_sum_s8x128_to_s32x16_aligned_store(&cat_buf[offset + 1], a, c);
+      a = (const int8_t *)input_addr[j];
+      b = (const int8_t *)input_addr[j + 1];
+      mul_and_sum_s8x128x2_to_s32x16x2_aligned_store(cat_buf[offset], cat_buf[offset + 1], c, a, c, b);
       offset+=2;
     }
     for (; j < i; j++) {
-      b = (const int8_t *)input_addr[j];
-      mul_and_sum_s8x128_to_s32x16_aligned_store(&cat_buf[offset], a, b);
+      a = (const int8_t *)input_addr[j];
+      mul_and_sum_s8x128_to_s32x16_aligned_store(cat_buf[offset], c, a);
       offset++;
     }
   }
+
+  //Do reduce add with scale
   size_t off = 0;
   for (; off < offset - 15 ; off += 16) {
     __m512 scale_16 = _mm512_load_ps((const void *)(scales + off));
-    hadd_s32x16x16_with_scales(out + off, cat_buf + off, scale_16);
+    reduce_add_s32x16x16_with_scales(out + off, cat_buf + off, scale_16);
   }
   for (; off < offset; off++) {
-    out[off] = hadd_s32x16_with_scale(cat_buf[off], scales[off]);
+    out[off] = reduce_add_s32x16_with_scale(cat_buf[off], scales[off]);
   }
 }
 

@@ -251,23 +251,23 @@ static inline void scale_and_move_ker(int8_t *out, const int8_t *in, float scale
 }
 
 static inline __attribute__((always_inline))
-__m512i mul_and_sum_s8x128_to_s32x16(const int8_t *a, const int8_t *b) {
-  auto a0 = _mm256_loadu_si256((__m256i*)a);
-  auto a0_high = _mm256_loadu_si256((__m256i*)(a + 32));
-  auto a1 = _mm256_loadu_si256((__m256i*)(a + 64));
-  auto a1_high = _mm256_loadu_si256((__m256i*)(a + 96));
-  auto b0 = _mm256_loadu_si256((__m256i*)b);
-  auto b0_high = _mm256_loadu_si256((__m256i*)(b + 32));
-  auto b1 = _mm256_loadu_si256((__m256i*)(b + 64));
-  auto b1_high = _mm256_loadu_si256((__m256i*)(b + 96));
-  auto a_0_i = _mm512_cvtepi8_epi16(a0);
-  auto a_1_i = _mm512_cvtepi8_epi16(a0_high);
-  auto a_2_i = _mm512_cvtepi8_epi16(a1);
-  auto a_3_i = _mm512_cvtepi8_epi16(a1_high);
-  auto b_0_i = _mm512_cvtepi8_epi16(b0);
-  auto b_1_i = _mm512_cvtepi8_epi16(b0_high);
-  auto b_2_i = _mm512_cvtepi8_epi16(b1);
-  auto b_3_i = _mm512_cvtepi8_epi16(b1_high);
+void mul_and_sum_s8x128_to_s32x16(__m512i& out, const int8_t *a, const int8_t *b) {
+  auto a_0 = _mm256_loadu_si256((__m256i*)a);
+  auto a_1 = _mm256_loadu_si256((__m256i*)(a + 32));
+  auto a_2 = _mm256_loadu_si256((__m256i*)(a + 64));
+  auto a_3 = _mm256_loadu_si256((__m256i*)(a + 96));
+  auto b_0 = _mm256_loadu_si256((__m256i*)b);
+  auto b_1 = _mm256_loadu_si256((__m256i*)(b + 32));
+  auto b_2 = _mm256_loadu_si256((__m256i*)(b + 64));
+  auto b_3 = _mm256_loadu_si256((__m256i*)(b + 96));
+  auto a_0_i = _mm512_cvtepi8_epi16(a_0);
+  auto a_1_i = _mm512_cvtepi8_epi16(a_1);
+  auto a_2_i = _mm512_cvtepi8_epi16(a_2);
+  auto a_3_i = _mm512_cvtepi8_epi16(a_3);
+  auto b_0_i = _mm512_cvtepi8_epi16(b_0);
+  auto b_1_i = _mm512_cvtepi8_epi16(b_1);
+  auto b_2_i = _mm512_cvtepi8_epi16(b_2);
+  auto b_3_i = _mm512_cvtepi8_epi16(b_3);
   a_0_i = _mm512_madd_epi16(a_0_i, b_0_i);
   a_2_i = _mm512_madd_epi16(a_2_i, b_2_i);
 #ifdef AVX512_VNNI
@@ -279,11 +279,68 @@ __m512i mul_and_sum_s8x128_to_s32x16(const int8_t *a, const int8_t *b) {
   a_0_i = _mm512_add_epi32(a_0_i, a_1_i);
   a_2_i = _mm512_add_epi32(a_2_i, a_3_i);
 #endif
-  return _mm512_add_epi32(a_0_i, a_2_i);
+  out = _mm512_add_epi32(a_0_i, a_2_i);
 }
 
 static inline __attribute__((always_inline))
-int32_t hadd_s32x16(__m512i& acc_sum) {
+void mul_and_sum_s8x128x2_to_s32x16x2(__m512i& out0, __m512i& out1, const int8_t *a0, const int8_t *b0, const int8_t *a1, const int8_t *b1) {
+  auto a0_0 = _mm256_loadu_si256((__m256i*)a0);
+  auto a0_1 = _mm256_loadu_si256((__m256i*)(a0 + 32));
+  auto a0_2 = _mm256_loadu_si256((__m256i*)(a0 + 64));
+  auto a0_3 = _mm256_loadu_si256((__m256i*)(a0 + 96));
+  auto b0_0 = _mm256_loadu_si256((__m256i*)b0);
+  auto b0_1 = _mm256_loadu_si256((__m256i*)(b0 + 32));
+  auto b0_2 = _mm256_loadu_si256((__m256i*)(b0 + 64));
+  auto b0_3 = _mm256_loadu_si256((__m256i*)(b0 + 96));
+  auto a0_0_i = _mm512_cvtepi8_epi16(a0_0);
+  auto a0_1_i = _mm512_cvtepi8_epi16(a0_1);
+  auto a0_2_i = _mm512_cvtepi8_epi16(a0_2);
+  auto a0_3_i = _mm512_cvtepi8_epi16(a0_3);
+  auto b0_0_i = _mm512_cvtepi8_epi16(b0_0);
+  auto b0_1_i = _mm512_cvtepi8_epi16(b0_1);
+  auto b0_2_i = _mm512_cvtepi8_epi16(b0_2);
+  auto b0_3_i = _mm512_cvtepi8_epi16(b0_3);
+  auto a1_0 = _mm256_loadu_si256((__m256i*)a1);
+  auto a1_1 = _mm256_loadu_si256((__m256i*)(a1 + 32));
+  auto a1_2 = _mm256_loadu_si256((__m256i*)(a1 + 64));
+  auto a1_3 = _mm256_loadu_si256((__m256i*)(a1 + 96));
+  auto b1_0 = _mm256_loadu_si256((__m256i*)b1);
+  auto b1_1 = _mm256_loadu_si256((__m256i*)(b1 + 32));
+  auto b1_2 = _mm256_loadu_si256((__m256i*)(b1 + 64));
+  auto b1_3 = _mm256_loadu_si256((__m256i*)(b1 + 96));
+  auto a1_0_i = _mm512_cvtepi8_epi16(a1_0);
+  auto a1_1_i = _mm512_cvtepi8_epi16(a1_1);
+  auto a1_2_i = _mm512_cvtepi8_epi16(a1_2);
+  auto a1_3_i = _mm512_cvtepi8_epi16(a1_3);
+  auto b1_0_i = _mm512_cvtepi8_epi16(b1_0);
+  auto b1_1_i = _mm512_cvtepi8_epi16(b1_1);
+  auto b1_2_i = _mm512_cvtepi8_epi16(b1_2);
+  auto b1_3_i = _mm512_cvtepi8_epi16(b1_3);
+  a0_0_i = _mm512_madd_epi16(a0_0_i, b0_0_i);
+  a0_2_i = _mm512_madd_epi16(a0_2_i, b0_2_i);
+  a1_0_i = _mm512_madd_epi16(a1_0_i, b1_0_i);
+  a1_2_i = _mm512_madd_epi16(a1_2_i, b1_2_i);
+#ifdef AVX512_VNNI
+  a0_0_i = _mm512_dpwssd_epi32(a0_0_i, a0_1_i, b0_1_i);
+  a1_0_i = _mm512_dpwssd_epi32(a1_0_i, a1_1_i, b1_1_i);
+  a0_2_i = _mm512_dpwssd_epi32(a0_2_i, a0_3_i, b0_3_i);
+  a1_2_i = _mm512_dpwssd_epi32(a1_2_i, a1_3_i, b1_3_i);
+#else
+  a0_1_i = _mm512_madd_epi16(a0_1_i, b0_1_i);
+  a0_3_i = _mm512_madd_epi16(a0_3_i, b0_3_i);
+  a1_1_i = _mm512_madd_epi16(a1_1_i, b1_1_i);
+  a1_3_i = _mm512_madd_epi16(a1_3_i, b1_3_i);
+  a0_0_i = _mm512_add_epi32(a0_0_i, a0_1_i);
+  a0_2_i = _mm512_add_epi32(a0_2_i, a0_3_i);
+  a1_0_i = _mm512_add_epi32(a1_0_i, a1_1_i);
+  a1_2_i = _mm512_add_epi32(a1_2_i, a1_3_i);
+#endif
+  out0 = _mm512_add_epi32(a0_0_i, a0_2_i);
+  out1 = _mm512_add_epi32(a1_0_i, a1_2_i);
+}
+
+static inline __attribute__((always_inline))
+int32_t reduce_add_s32x16(__m512i& acc_sum) {
   auto ab_256_high = _mm512_extracti32x8_epi32(acc_sum, 1);
   auto ab_256_low = _mm512_castsi512_si256(acc_sum);
   ab_256_low = _mm256_add_epi32(ab_256_low, ab_256_high);
@@ -300,7 +357,7 @@ int32_t hadd_s32x16(__m512i& acc_sum) {
 }
 
 static inline __attribute__((always_inline))
-int8_t hadd_s32x16_with_scale(__m512i& acc_sum, float scale) {
+int8_t reduce_add_s32x16_with_scale(__m512i& acc_sum, float scale) {
   auto ab_256_high = _mm512_extracti32x8_epi32(acc_sum, 1);
   auto s_simd = _mm_set1_ps(scale);
   auto ab_256_low = _mm512_castsi512_si256(acc_sum);
@@ -323,7 +380,7 @@ int8_t hadd_s32x16_with_scale(__m512i& acc_sum, float scale) {
 }
 
 static inline __attribute__((always_inline))
-void hadd_s32x16x16_with_scales(int8_t* outs, __m512i* acc_sums, __m512& scales) {
+void reduce_add_s32x16x16_with_scales(int8_t* outs, __m512i* acc_sums, __m512& scales) {
   auto l0 = _mm512_unpacklo_epi32(acc_sums[0], acc_sums[1]);
   auto l1 = _mm512_unpackhi_epi32(acc_sums[0], acc_sums[1]);
   auto l2 = _mm512_unpacklo_epi32(acc_sums[2], acc_sums[3]);
@@ -379,15 +436,21 @@ void hadd_s32x16x16_with_scales(int8_t* outs, __m512i* acc_sums, __m512& scales)
 }
 
 static inline __attribute__((always_inline))
-void mul_and_sum_s8x128_to_s32x16_aligned_store(__m512i * sum, const int8_t *a, const int8_t *b) {
-  auto acc_sum = mul_and_sum_s8x128_to_s32x16(a, b);
-  _mm512_store_si512((void*)sum, acc_sum);
+void mul_and_sum_s8x128_to_s32x16_aligned_store(__m512i& sum, const int8_t *a, const int8_t *b) {
+  mul_and_sum_s8x128_to_s32x16(sum, a, b);
+}
+
+static inline __attribute__((always_inline))
+void mul_and_sum_s8x128x2_to_s32x16x2_aligned_store(__m512i& sum0, __m512i& sum1,
+	      const int8_t *a0, const int8_t *b0, const int8_t *a1, const int8_t *b1) {
+  mul_and_sum_s8x128x2_to_s32x16x2(sum0, sum1, a0, b0, a1, b1);
 }
 
 static inline __attribute__((always_inline))
 int32_t mul_and_sum_int8_128(const int8_t *a, const int8_t *b) {
-  auto acc_sum = mul_and_sum_s8x128_to_s32x16(a, b);
-  return hadd_s32x16(acc_sum);
+  __m512i acc_sum;
+  mul_and_sum_s8x128_to_s32x16(acc_sum, a, b);
+  return reduce_add_s32x16(acc_sum);
 }
 
 static inline __attribute__((always_inline))
