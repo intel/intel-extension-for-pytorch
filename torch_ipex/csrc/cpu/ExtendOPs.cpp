@@ -326,11 +326,11 @@ _interaction_backward(const at::Tensor &grad_out,
   auto mm_kernel = get_mm_kernel<float>(vector_nums, vector_size, vector_nums);
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
-    T grad_input0_buf[vector_size];
-    T grad_flat_buf[interact_feature_size];
-    T grad_mm_buf[vector_nums * vector_nums];
-    T grad_cat_buf[vector_nums * vector_size];
-    T cat_buf[vector_nums * vector_size];
+    T grad_input0_buf[vector_size] __attribute__((aligned(64)));
+    T grad_flat_buf[interact_feature_size] __attribute__((aligned(64)));
+    T grad_mm_buf[vector_nums * vector_nums] __attribute__((aligned(64)));
+    T grad_cat_buf[vector_nums * vector_size] __attribute__((aligned(64)));
+    T cat_buf[vector_nums * vector_size] __attribute__((aligned(64)));
     for (int64_t i = start; i < end; i++) {
       cat_backward<T>(&grad_out_data[i * (interact_feature_size + vector_size)],
                       grad_input0_buf, grad_flat_buf, vector_size,
@@ -367,27 +367,27 @@ _interaction_backward(const at::Tensor &grad_out,
   return output;
 }
 
-static inline void _interaction_s8s8_scale_s32s8_128(int8_t *out, const std::vector<int8_t *>& input_addr,
-                         size_t M, const float* __attribute__((aligned(64))) scales, __m512i * cat_buf) {
+static inline void _interaction_s8s8_scale_s32s8_128(int8_t *out, size_t M, const float* __attribute__((aligned(64))) scales,
+	       __m512i* convert_to_s16_buf, __m512i * cat_buf) {
 #if defined(IPEX_PROFILE_OP)
   RECORD_FUNCTION("ExtendOps::_interaction_s8s8_scale_s32s8", std::vector<c10::IValue>({}));
 #endif
-  auto * a = (const int8_t *)input_addr[0];
-  auto * b = (const int8_t *)input_addr[1];
-  mul_and_sum_s8x128_to_s32x16_aligned_store(cat_buf[0], b, a);
+  auto * a = (const __m512i *)&convert_to_s16_buf[0];
+  auto * b = (const __m512i *)&convert_to_s16_buf[4];
+  mul_and_sum_s16x128_to_s32x16(cat_buf[0], b, a);
   size_t offset = 1;
   for (int i = 2; i < M; i++) {
-    auto * c = (const int8_t *)input_addr[i];
+    auto * c = (const __m512i *)&convert_to_s16_buf[i * 4];
     int j = 0;
     for (; j < i - 1; j += 2) {
-      a = (const int8_t *)input_addr[j];
-      b = (const int8_t *)input_addr[j + 1];
-      mul_and_sum_s8x128x2_to_s32x16x2_aligned_store(cat_buf[offset], cat_buf[offset + 1], c, a, c, b);
+      a = (const __m512i *)&convert_to_s16_buf[j * 4];
+      b = (const __m512i *)&convert_to_s16_buf[j * 4 + 4];
+      mul_and_sum_s16x128x2_to_s32x16x2(cat_buf[offset], cat_buf[offset + 1], c, a, c, b);
       offset+=2;
     }
     for (; j < i; j++) {
-      a = (const int8_t *)input_addr[j];
-      mul_and_sum_s8x128_to_s32x16_aligned_store(cat_buf[offset], c, a);
+      a = (const __m512i *)&convert_to_s16_buf[j * 4];
+      mul_and_sum_s16x128_to_s32x16(cat_buf[offset], c, a);
       offset++;
     }
   }
@@ -458,7 +458,7 @@ inline at::Tensor _interaction_forward_quantization(const std::vector<at::Tensor
   dil::tensor out_dil{dst_desc};
   out_dil.set_scale(scales[1]);
   auto out_data = (int8_t*)out_dil.get_data_handle();
-  float out_in_scales[interact_feature_size] __attribute__((aligned(64)));;
+  float out_in_scales[interact_feature_size] __attribute__((aligned(64)));
   size_t offset = 0;
   for (int i = 1; i < vector_nums; i++) {
     for (int j = 0; j < i; j++) {
@@ -471,17 +471,25 @@ inline at::Tensor _interaction_forward_quantization(const std::vector<at::Tensor
 
   at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
     __m512i cat_buf[offset] __attribute__((aligned(64)));
+    __m512i convert_to_s16_buf[vector_nums * 4] __attribute__((aligned(64)));
     std::vector<int8_t*> input_addr(vector_nums);
     for (int64_t i = start; i < end; i++) {
       int8_t* flat_buf = (int8_t*)(&out_data[i * out_data_line_len] + vector_size);
       auto row_len = i * vector_size;
-      for (int i = 0; i < vector_nums; i++) {
-        input_addr[i] = &input_data[i][row_len];
-      }
       if (vector_size == 128) {
+        int k = 0;
+        for (; k < vector_nums - 1; k += 2) {
+          load_s8x128x2_to_s16x128x2(&convert_to_s16_buf[k * 4], &input_data[k][row_len], &input_data[k+1][row_len]);
+        }
+        for (; k < vector_nums; k++) {
+          load_s8x128_to_s16x128(&convert_to_s16_buf[k * 4], &input_data[k][row_len]);
+        }
         scale_and_move_ker_128(&out_data[i * out_data_line_len], &input_data[0][i * vector_size], dense_scale);
-        _interaction_s8s8_scale_s32s8_128(flat_buf, input_addr, vector_nums, out_in_scales, cat_buf);
+        _interaction_s8s8_scale_s32s8_128(flat_buf, vector_nums, out_in_scales, convert_to_s16_buf, cat_buf);
       } else {
+        for (int k = 0; k < vector_nums; k++) {
+          input_addr[k] = &input_data[k][row_len];
+        }
         scale_and_move_ker(&out_data[i * out_data_line_len], &input_data[0][i * vector_size], dense_scale, vector_size);
         _interaction_s8s8_scale_s32s8(flat_buf, input_addr, vector_nums, vector_size, out_in_scales);
       }

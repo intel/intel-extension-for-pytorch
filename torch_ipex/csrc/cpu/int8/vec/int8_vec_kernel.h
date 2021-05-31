@@ -1,4 +1,5 @@
 #include <immintrin.h>
+#include <cstdlib>
 
 static inline void zero_ker(int32_t *out, int64_t len) {
   int64_t i;
@@ -216,8 +217,12 @@ static inline void scale_and_store_int8_maskz_16(void * out, const void *in, __m
 
 static inline __attribute__((always_inline))
 void scale_and_move_ker_128(int8_t *out, const int8_t *in, float scale) {
-  __m512 scale_vec512 = _mm512_set1_ps(scale);
-  scale_and_store_int8_128((void*)out, (const void*)in, scale_vec512);
+  if (std::abs(scale - 1.0) < 0.0005) {
+    move_ker(out, in, 128);
+  } else {
+    __m512 scale_vec512 = _mm512_set1_ps(scale);
+    scale_and_store_int8_128((void*)out, (const void*)in, scale_vec512);
+  }
 }
 
 static inline void scale_and_move_ker(int8_t *out, const int8_t *in, float scale, int64_t len) {
@@ -283,6 +288,54 @@ void mul_and_sum_s8x128_to_s32x16(__m512i& out, const int8_t *a, const int8_t *b
 }
 
 static inline __attribute__((always_inline))
+void load_s8x128_to_s16x128(__m512i* out_s16x4, const int8_t * in) {
+  auto in_0 = _mm256_loadu_si256((__m256i*)in);
+  auto in_1 = _mm256_loadu_si256((__m256i*)(in + 32));
+  auto in_2 = _mm256_loadu_si256((__m256i*)(in + 64));
+  auto in_3 = _mm256_loadu_si256((__m256i*)(in + 96));
+  out_s16x4[0] = _mm512_cvtepi8_epi16(in_0);
+  out_s16x4[1] = _mm512_cvtepi8_epi16(in_1);
+  out_s16x4[2] = _mm512_cvtepi8_epi16(in_2);
+  out_s16x4[3] = _mm512_cvtepi8_epi16(in_3);
+}
+
+static inline __attribute__((always_inline))
+void load_s8x128x2_to_s16x128x2(__m512i* out_s16x8, const int8_t * in0, const int8_t* in1) {
+  auto in0_0 = _mm256_loadu_si256((__m256i*)in0);
+  auto in0_1 = _mm256_loadu_si256((__m256i*)(in0 + 32));
+  auto in0_2 = _mm256_loadu_si256((__m256i*)(in0 + 64));
+  auto in0_3 = _mm256_loadu_si256((__m256i*)(in0 + 96));
+  auto in1_0 = _mm256_loadu_si256((__m256i*)in1);
+  auto in1_1 = _mm256_loadu_si256((__m256i*)(in1 + 32));
+  auto in1_2 = _mm256_loadu_si256((__m256i*)(in1 + 64));
+  auto in1_3 = _mm256_loadu_si256((__m256i*)(in1 + 96));
+  out_s16x8[0] = _mm512_cvtepi8_epi16(in0_0);
+  out_s16x8[1] = _mm512_cvtepi8_epi16(in0_1);
+  out_s16x8[2] = _mm512_cvtepi8_epi16(in0_2);
+  out_s16x8[3] = _mm512_cvtepi8_epi16(in0_3);
+  out_s16x8[4] = _mm512_cvtepi8_epi16(in1_0);
+  out_s16x8[5] = _mm512_cvtepi8_epi16(in1_1);
+  out_s16x8[6] = _mm512_cvtepi8_epi16(in1_2);
+  out_s16x8[7] = _mm512_cvtepi8_epi16(in1_3);
+}
+
+static inline __attribute__((always_inline))
+void mul_and_sum_s16x128_to_s32x16(__m512i& out, const __m512i *a16x4, const __m512i *b16x4) {
+  auto a_0_i = _mm512_madd_epi16(a16x4[0], b16x4[0]);
+  auto a_2_i = _mm512_madd_epi16(a16x4[2], b16x4[2]);
+#ifdef AVX512_VNNI
+  a_0_i = _mm512_dpwssd_epi32(a_0_i, a16x4[1], b16x4[1]);
+  a_2_i = _mm512_dpwssd_epi32(a_2_i, a16x4[3], b16x4[3]);
+#else
+  a_1_i = _mm512_madd_epi16(a16x4[1], b16x4[1]);
+  a_3_i = _mm512_madd_epi16(a16x4[3], b16x4[3]);
+  a_0_i = _mm512_add_epi32(a_0_i, a_1_i);
+  a_2_i = _mm512_add_epi32(a_2_i, a_3_i);
+#endif
+  out = _mm512_add_epi32(a_0_i, a_2_i);
+}
+
+static inline __attribute__((always_inline))
 void mul_and_sum_s8x128x2_to_s32x16x2(__m512i& out0, __m512i& out1, const int8_t *a0, const int8_t *b0, const int8_t *a1, const int8_t *b1) {
   auto a0_0 = _mm256_loadu_si256((__m256i*)a0);
   auto a0_1 = _mm256_loadu_si256((__m256i*)(a0 + 32));
@@ -330,6 +383,31 @@ void mul_and_sum_s8x128x2_to_s32x16x2(__m512i& out0, __m512i& out1, const int8_t
   a0_3_i = _mm512_madd_epi16(a0_3_i, b0_3_i);
   a1_1_i = _mm512_madd_epi16(a1_1_i, b1_1_i);
   a1_3_i = _mm512_madd_epi16(a1_3_i, b1_3_i);
+  a0_0_i = _mm512_add_epi32(a0_0_i, a0_1_i);
+  a0_2_i = _mm512_add_epi32(a0_2_i, a0_3_i);
+  a1_0_i = _mm512_add_epi32(a1_0_i, a1_1_i);
+  a1_2_i = _mm512_add_epi32(a1_2_i, a1_3_i);
+#endif
+  out0 = _mm512_add_epi32(a0_0_i, a0_2_i);
+  out1 = _mm512_add_epi32(a1_0_i, a1_2_i);
+}
+
+static inline __attribute__((always_inline))
+void mul_and_sum_s16x128x2_to_s32x16x2(__m512i& out0, __m512i& out1, const __m512i *a0_16x4, const __m512i *b0_16x4, const __m512i *a1_16x4, const __m512i *b1_16x4) {
+  auto a0_0_i = _mm512_madd_epi16(a0_16x4[0], b0_16x4[0]);
+  auto a1_0_i = _mm512_madd_epi16(a1_16x4[0], b1_16x4[0]);
+  auto a0_2_i = _mm512_madd_epi16(a0_16x4[2], b0_16x4[2]);
+  auto a1_2_i = _mm512_madd_epi16(a1_16x4[2], b1_16x4[2]);
+#ifdef AVX512_VNNI
+  a0_0_i = _mm512_dpwssd_epi32(a0_0_i, a0_16x4[1], b0_16x4[1]);
+  a1_0_i = _mm512_dpwssd_epi32(a1_0_i, a1_16x4[1], b1_16x4[1]);
+  a0_2_i = _mm512_dpwssd_epi32(a0_2_i, a0_16x4[3], b0_16x4[3]);
+  a1_2_i = _mm512_dpwssd_epi32(a1_2_i, a1_16x4[3], b1_16x4[3]);
+#else
+  a0_1_i = _mm512_madd_epi16(a0_16x4[1], b0_16x4[1]);
+  a0_3_i = _mm512_madd_epi16(a0_16x4[3], b0_16x4[3]);
+  a1_1_i = _mm512_madd_epi16(a1_16x4[1], b1_16x4[1]);
+  a1_3_i = _mm512_madd_epi16(a1_16x4[3], b1_16x4[3]);
   a0_0_i = _mm512_add_epi32(a0_0_i, a0_1_i);
   a0_2_i = _mm512_add_epi32(a0_2_i, a0_3_i);
   a1_0_i = _mm512_add_epi32(a1_0_i, a1_1_i);
@@ -433,17 +511,6 @@ void reduce_add_s32x16x16_with_scales(int8_t* outs, __m512i* acc_sums, __m512& s
   l1 = _mm512_cvtps_epi32(l1_f);
   auto out_16 = _mm512_cvtsepi32_epi8(l1);
   _mm_storeu_si128((__m128i*)outs, out_16);
-}
-
-static inline __attribute__((always_inline))
-void mul_and_sum_s8x128_to_s32x16_aligned_store(__m512i& sum, const int8_t *a, const int8_t *b) {
-  mul_and_sum_s8x128_to_s32x16(sum, a, b);
-}
-
-static inline __attribute__((always_inline))
-void mul_and_sum_s8x128x2_to_s32x16x2_aligned_store(__m512i& sum0, __m512i& sum1,
-	      const int8_t *a0, const int8_t *b0, const int8_t *a1, const int8_t *b1) {
-  mul_and_sum_s8x128x2_to_s32x16x2(sum0, sum1, a0, b0, a1, b1);
 }
 
 static inline __attribute__((always_inline))
