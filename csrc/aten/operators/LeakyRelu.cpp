@@ -2,6 +2,7 @@
 #include <ATen/Context.h>
 
 #include <core/DPCPP.h>
+#include <oneDNN/oneDNN.h>
 #include <utils/ATDispatch.h>
 
 #include "Loops.h"
@@ -14,10 +15,10 @@ DPCPP_DEF_K1(SyclOpLeakyEluBackward);
 
 Tensor& leaky_relu_out(Tensor& out, const Tensor& self, Scalar negative_slope) {
   auto iter = TensorIteratorConfig()
-  .set_check_mem_overlap(true)
-  .add_output(out)
-  .add_input(self)
-  .build();
+                  .set_check_mem_overlap(true)
+                  .add_output(out)
+                  .add_input(self)
+                  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
@@ -47,11 +48,11 @@ Tensor& leaky_relu_backward_out(
     const Tensor& self,
     Scalar negative_slope) {
   auto iter = TensorIteratorConfig()
-  .set_check_mem_overlap(true)
-  .add_output(grad_input)
-  .add_input(grad_output)
-  .add_input(self)
-  .build();
+                  .set_check_mem_overlap(true)
+                  .add_output(grad_input)
+                  .add_input(grad_output)
+                  .add_input(self)
+                  .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
       at::ScalarType::BFloat16, iter.dtype(), "LeakyReLU_backward", [&]() {
@@ -84,4 +85,27 @@ Tensor& leaky_relu_(Tensor& self, Scalar negative_slope) {
 }
 
 } // namespace AtenIpexTypeXPU
+
+namespace AtenIpexTypeQuantizedXPU {
+Tensor& q_leaky_relu(Tensor& out, const Tensor& self, Scalar negative_slope) {
+  float alpha = negative_slope.to<float>();
+  xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(
+      out, self, alpha, 0.0f);
+  return out;
+}
+
+Tensor& leaky_relu_(Tensor& self, Scalar negative_slope) {
+  return q_leaky_relu(self, self, negative_slope);
+}
+
+Tensor leaky_relu(const Tensor& self, Scalar negative_slope) {
+  Tensor out = at::_empty_affine_quantized(
+      self.sizes(),
+      self.options().dtype(toQIntType(self.scalar_type())),
+      self.q_scale(),
+      self.q_zero_point());
+  auto result = q_leaky_relu(out, self, negative_slope);
+  return result;
+}
+} // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

@@ -17,6 +17,8 @@
 #endif
 
 
+#include "Cat.h"
+
 using namespace dnnl;
 using namespace xpu::dpcpp;
 
@@ -314,7 +316,7 @@ static void cat(
   }
 }
 
-static void dnnl_cat(
+void dnnl_cat(
     Tensor& output,
     TensorList inputs,
     int numInputs,
