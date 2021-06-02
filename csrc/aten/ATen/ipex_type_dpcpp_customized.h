@@ -52,6 +52,10 @@ std::vector<at::Tensor> to_plain_if_needed(TensorList tensor);
 
 at::Tensor new_qtensor(IntArrayRef sizes, const TensorOptions& options, QuantizerPtr quantizer);
 
+at::Tensor dequant_pixelshuffle(const Tensor& self, int64_t upscale_factor);
+
+at::Tensor dequant_pixelshuffle_quant(const Tensor& self, int64_t upscale_factor, double scale, int64_t zero_pad, at::ScalarType dtype);
+
 at::Tensor q_conv2d_sum_relu(at::Tensor& accumu, const at::Tensor& input, const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight, double conv_scale, int64_t conv_zero_point, double sum_scale, int64_t sum_zero_point);
 
 at::Tensor quantize_tensor_per_tensor_affine(at::Tensor& qtensor, const at::Tensor& rtensor, double scale, int64_t zero_point);

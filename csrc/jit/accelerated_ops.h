@@ -26,6 +26,8 @@ namespace dpcpp {
   static auto trans_addmm_sym = Symbol::fromQualString("dpcpp::trans_addmm");
   static auto trans_addmm_relu_sym = Symbol::fromQualString("dpcpp::trans_addmm_relu");
   static auto trans_addmm_sigmoid_sym = Symbol::fromQualString("dpcpp::trans_addmm_sigmoid");
+  static auto dequant_pixelshuffle_sym = Symbol::fromQualString("dpcpp::dequant_pixelshuffle");
+  static auto dequant_pixelshuffle_quant_sym = Symbol::fromQualString("dpcpp::dequant_pixelshuffle_quant");
 
   // Fold weights of batch_norm with conv2d's
   static auto fold_weight_sym =

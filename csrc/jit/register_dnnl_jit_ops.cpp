@@ -260,6 +260,37 @@ RegisterOperators op({
       aliasAnalysisFromSchema()
       ),
     Operator(
+      "dpcpp::dequant_pixelshuffle(Tensor self, int64_t upscale_factor) -> Tensor",
+      [] (const Node* node) ->Operation {
+        return [] (Stack* stack) {
+          auto result = torch::jit::dpcpp::dequant_pixelshuffle(
+              (std::move(peek(stack, 0, 2))).toTensor(),
+              (std::move(peek(stack, 1, 2))).toInt()
+          );
+          return 0;
+        };
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
+      "dpcpp::dequant_pixelshuffle_quant(Tensor self, int64_t upscale_factor, double scale, int64_t zero_pad, ScalarType dtype) -> Tensor",
+      [] (const Node* node) ->Operation {
+        return [] (Stack* stack) {
+          auto result = torch::jit::dpcpp::dequant_pixelshuffle_quant(
+              (std::move(peek(stack, 0, 5))).toTensor(),
+              (std::move(peek(stack, 1, 5))).toInt(),
+              (std::move(peek(stack, 2, 5))).toDouble(),
+              (std::move(peek(stack, 3, 5))).toInt(),
+              (std::move(peek(stack, 4, 5))).toScalarType()
+          );
+          drop(stack, 5);
+          pack(stack, std::move(result));
+          return 0;
+        };
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
       "dpcpp::q_conv2d_sum_relu(Tensor input, __torch__.torch.classes.quantized.Conv2dPackedParamsBase packed_weight, float conv_scale, int conv_zpoint, Tensor(a!) accumu, *, float sum_scale, int sum_zpoint) -> Tensor(a!)",
       [] (const Node* node) ->Operation {
         return [] (Stack* stack) {

@@ -396,6 +396,9 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
   {{aten::t, aten::addmm}, dpcpp::trans_addmm_sym},
   {{dpcpp::trans_addmm_sym, aten::relu}, dpcpp::trans_addmm_relu_sym},
   {{dpcpp::trans_addmm_sym, aten::sigmoid}, dpcpp::trans_addmm_sigmoid_sym},
+  {{Symbol::fromQualString("aten::dequantize"), aten::pixel_shuffle}, dpcpp::dequant_pixelshuffle_sym},
+  {{dpcpp::dequant_pixelshuffle_sym, Symbol::fromQualString("aten::quantize_per_tensor")}, dpcpp::dequant_pixelshuffle_quant_sym},
+
 };
 
 void FusionPass(std::shared_ptr<Graph> &graph) {

@@ -17,6 +17,8 @@ static bool is_supported_onednn_dtype(const at::Tensor& tensor) {
    case at::ScalarType::Half:
    case at::ScalarType::Float:
    case at::ScalarType::BFloat16:
+   case at::ScalarType::QInt8:
+   case at::ScalarType::QUInt8:
      return true;
    default:
      return false;

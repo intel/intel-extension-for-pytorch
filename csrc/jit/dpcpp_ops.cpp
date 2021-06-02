@@ -156,6 +156,14 @@ at::Tensor mul_add(const at::Tensor& self,
   return at::AtenIpexTypeXPU::mul_add(self, other, accumu, alpha);
 }
 
+at::Tensor dequant_pixelshuffle(const at::Tensor& self, int64_t upscale_factor) {
+  return at::empty_like(self);
+}
+
+at::Tensor dequant_pixelshuffle_quant(const at::Tensor& self, int64_t upscale_factor, double scale, int64_t zero_pad, at::ScalarType dtype) {
+  return at::pixel_shuffle(self, upscale_factor);
+}
+
 at::Tensor q_conv2d_sum_relu(at::Tensor& accumu,
     const at::Tensor& input, const c10::intrusive_ptr<ConvPackedParamsBase<2>>& packed_weight,
     double conv_scale, int64_t conv_zpoint, double sum_scale,

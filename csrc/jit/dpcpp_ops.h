@@ -8,6 +8,7 @@ namespace torch {
 namespace jit {
 namespace dpcpp {
 
+
 at::Tensor& conv2d_sum(at::Tensor& accumu,
     const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias,
     at::IntArrayRef stride, at::IntArrayRef padding, at::IntArrayRef dilation,
@@ -36,6 +37,10 @@ at::Tensor trans_matmul_scale_sum(at::Tensor& accumu, const at::Tensor& tensor1,
 
 at::Tensor mul_add(const at::Tensor& self,
     const at::Tensor& other, const at::Tensor& accumu, at::Scalar alpha);
+
+at::Tensor dequant_pixelshuffle(const at::Tensor& self, int64_t upscale_factor);
+
+at::Tensor dequant_pixelshuffle_quant(const at::Tensor& self, int64_t upscale_factor, double scale, int64_t zero_pad, at::ScalarType dtype);
 
 at::Tensor batch_norm(
     const at::Tensor& input, const at::Tensor& weight, const at::Tensor& bias, const at::Tensor& running_mean,
