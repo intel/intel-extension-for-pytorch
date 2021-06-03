@@ -552,7 +552,7 @@ at::Tensor nms(const at::Tensor& dets,
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("nms");
 #endif
-  return op.call(dets, cpu_cached_cast(at::kFloat, scores), threshold, sorted);
+  return op.call(cpu_cached_cast(at::kFloat, dets), cpu_cached_cast(at::kFloat, scores), threshold, sorted);
 }
 
 std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms(const at::Tensor& dets,
@@ -566,7 +566,7 @@ std::vector<std::tuple<at::Tensor, at::Tensor, at::Tensor>> batch_score_nms(cons
 #if defined(ENABLE_AUTOCAST_VERBOSE)
   verbose::OpNameGuard op_name("batch_score_nms");
 #endif
-  return op.call(dets, cpu_cached_cast(at::kFloat, scores), threshold, max_output);
+  return op.call(cpu_cached_cast(at::kFloat, dets), cpu_cached_cast(at::kFloat, scores), threshold, max_output);
 }
 
 std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(const at::Tensor& bboxes_in,
