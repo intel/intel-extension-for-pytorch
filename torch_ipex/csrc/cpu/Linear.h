@@ -15,5 +15,12 @@ at::Tensor linear_impl(
     const at::Tensor& bias,
     const ideep::attr_t& attr);
 
+at::Tensor linear_inplace_impl(
+    const at::Tensor& self,
+    const at::Tensor& weight,
+    const at::Tensor& bias,
+    at::Tensor& output,
+    const ideep::attr_t& attr);
+
 }  // namespace cpu
 }  // namespace torch_ipex

@@ -94,6 +94,7 @@ using namespace torch_ipex::cpu;
       },                                                                      \
       aliasAnalysisFromSchema())
 
+
 RegisterOperators op({
     CreateConvEltwiseOperator(2d, base),
     CreateConvEltwiseOperator(2d, relu),
@@ -178,7 +179,24 @@ RegisterOperators op({
             };
         },
         aliasAnalysisFromSchema()),
-      });
+    Operator(
+        "ipex::linear_add(Tensor input, Tensor weight, Tensor? bias, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
+        [](const Node* node) -> Operation {
+            return [](Stack* stack) {
+              auto output = (std::move(peek(stack, 3, 5))).toTensor();
+              auto result = AtenIpexJITDev::dil_linear_add(
+                  (std::move(peek(stack, 0, 5))).toTensor(),
+                  (std::move(peek(stack, 1, 5))).toTensor(),
+                  toOptionalTensor(std::move(peek(stack, 2, 5))),
+                  output,
+                  (std::move(peek(stack, 4, 5))).toScalar());
+              drop(stack, 5);
+              pack(stack, std::move(result));
+              return 0;
+            };
+        },
+        aliasAnalysisFromSchema()),
 
+      });
 } // namespace jit
 } // namespace torch

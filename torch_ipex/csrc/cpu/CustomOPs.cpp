@@ -245,5 +245,31 @@ at::Tensor AtenIpexJITDev::dil_linear_fuse_eltwise(
   return linear_impl(self, weight, bias, attr);
 }
 
+/**
+ *Dispatch Linear + Add fusion pattern to ipex oneDNN kernel for inference mode.
+ *This feature might improve performance for cases like residual learning blocks
+ *Pattern: accum = accum * alpha + Linear(self, weight, bias) 
+ *
+ *@param self Activatin input for Linear  
+ *@param weight Weight for Linear
+ *@param bias Bias for Linear
+ *@param accum One input for add operation, another is the output of Linear
+ *@param alpha Scale for accum when doing add operation. 
+ *
+ *@return Value for the fusion pattern output. 
+ */
+at::Tensor AtenIpexJITDev::dil_linear_add(
+    const at::Tensor& self, 
+    const at::Tensor& weight, 
+    const at::Tensor& bias, 
+    at::Tensor& accumu, 
+    at::Scalar alpha) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("AtenIpexJITDev::dil_linear_add", std::vector<c10::IValue>({}));
+#endif
+  auto scale = alpha.to<float>();
+  return linear_inplace_impl(self, weight, bias, accumu, ideep::attr_t::fuse_sum(scale));
+}
+
 }  // namespace cpu
 }  // namespace torch_ipex

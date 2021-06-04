@@ -289,6 +289,7 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
   {{ipex::conv2d_sum, aten::relu}, ipex::conv2d_sum_relu},
   {{ipex::conv2d_sum, Symbol::fromQualString("aten::relu_")}, ipex::conv2d_sum_relu},
 
+  {{aten::linear, aten::add}, ipex::linear_add},
   {{aten::linear, aten::relu}, ipex::linear_relu},
   {{aten::linear, aten::gelu}, ipex::linear_gelu},
   {{aten::linear, Symbol::fromQualString("aten::relu_")}, ipex::linear_relu},

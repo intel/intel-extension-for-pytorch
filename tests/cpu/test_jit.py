@@ -258,9 +258,10 @@ class LinearAdd(nn.Module):
         seed = 2018
         torch.manual_seed(seed)
         self.linear = nn.Linear(in_channels, out_channels, **kwargs)
+        self.linear1 = nn.Linear(in_channels, out_channels, **kwargs)
 
     def forward(self, x):
-        return torch.add(self.linear(x),self.linear(x))
+        return torch.add(self.linear(x),self.linear1(x))
 
 class Linear_Reshape_Relu(nn.Module):
     def __init__(self, in_channels, out_channels,dest_shape, **kwargs):
@@ -730,7 +731,7 @@ class Tester(TestCase):
         self._test_output(
             LinearAdd(3, 32, bias=True),
             torch.rand(32, 3),
-            kind_in_graph="ipex::linear")
+            kind_in_graph="ipex::linear_add")
 
     def test_output_linear_reshape_relu(self):
         self._test_output(
