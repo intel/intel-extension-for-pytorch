@@ -8,7 +8,7 @@ import _torch_ipex as core
 
 class IpexMLPHandle:
     def __init__(self, N, C, K, bn, bc, bk, dtype, fuse_bias, act_type):
-        self.handle = core.mlp_create_handle(N, C, K, bn, bc, bk, 1 if dtype == torch.float32 else 2, fuse_bias, act_type)
+        self.handle = _C.mlp_create_handle(N, C, K, bn, bc, bk, 1 if dtype == torch.float32 else 2, fuse_bias, act_type)
         self.N = N
         self.C = C
         self.K = K
@@ -18,11 +18,11 @@ class IpexMLPHandle:
         self.fuse_bias = fuse_bias
         self.act_type = act_type
         if act_type == 1:
-            self.relu_mask_tensor = core.mlp_set_relu_mask(self.handle)
+            self.relu_mask_tensor = _C.mlp_set_relu_mask(self.handle)
 
     def __del__(self):
         if self.handle: 
-            core.mlp_release_handle(self.handle)
+            _C.mlp_release_handle(self.handle)
             self.handle = None
             self.relu_mask_tensor = None
 
@@ -34,7 +34,7 @@ class IpexMLPFC(Function):
         input = input.contiguous()
         weight = weight.contiguous()
         bias = bias.contiguous()
-        output = core.mlp_forward(handle.handle, input, weight, bias)
+        output = _C.mlp_forward(handle.handle, input, weight, bias)
         #t2 = time.time()
         #print("XsmmFCFWD: q=%.3f" % ((t2-t1)*1000.0))
         ctx.ipex_mlp_handle = handle
@@ -49,7 +49,7 @@ class IpexMLPFC(Function):
         input, weight = ctx.saved_variables
         #t1 = time.time()
         grad_output = grad_output.contiguous()
-        grad_input, grad_weight, grad_bias = core.mlp_backward(handle.handle, grad_output, input, weight)
+        grad_input, grad_weight, grad_bias = _C.mlp_backward(handle.handle, grad_output, input, weight)
         #t2 = time.time()
         #print("XsmmFCBWD: q=%.3f w=%.3f" % ((t2-t1)*1000.0, (t3-t2)*1000.0))
         return (grad_input, grad_weight, grad_bias, None)

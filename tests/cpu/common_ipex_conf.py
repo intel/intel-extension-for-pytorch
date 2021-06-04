@@ -1,5 +1,6 @@
 import torch
-import intel_pytorch_extension as ipex
+import torch_ipex as ipex
+# import intel_pytorch_extension as ipex
 
 class AutoMixPrecision(object):
     def __init__(self, enable_or_not = False, train = False):
@@ -27,12 +28,12 @@ class AutoDNNL(object):
 
     def __enter__(self):
         if self.enable_or_not:
-            ipex.core.enable_auto_dnnl()
+            ipex._C.enable_auto_dnnl()
         else:
-            ipex.core.disable_auto_dnnl()
+            ipex._C.disable_auto_dnnl()
 
     def __exit__(self, *args, **kwargs):
         if self.old_value:
-            ipex.core.enable_auto_dnnl()
+            ipex._C.enable_auto_dnnl()
         else:
-            ipex.core.disable_auto_dnnl()
+            ipex._C.disable_auto_dnnl()

@@ -576,7 +576,7 @@ def skipIfNotRegistered(op_name, message):
     """Wraps the decorator to hide the import of the `core`.
 
     Args:
-        op_name: Check if this op is registered in `core._REGISTERED_OPERATORS`.
+        op_name: Check if this op is registered in `_C._REGISTERED_OPERATORS`.
         message: message to fail with.
 
     Usage:
@@ -585,7 +585,7 @@ def skipIfNotRegistered(op_name, message):
     """
     try:
         from caffe2.python import core
-        skipper = unittest.skipIf(op_name not in core._REGISTERED_OPERATORS,
+        skipper = unittest.skipIf(op_name not in _C._REGISTERED_OPERATORS,
                                   message)
     except ImportError:
         skipper = unittest.skip("Cannot import `caffe2.python.core`")

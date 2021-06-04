@@ -129,8 +129,8 @@ class CPUinfo():
             for line in self.cpuinfo:
                 if socket_id == int(line[2]):
                     if line[1] not in cur_socket_physical_core:
-                        cur_socket_physical_core.append(line[1])
-                    cur_socket_logical_core.append(line[0])
+                        cur_socket_physical__C.append(line[1])
+                    cur_socket_logical__C.append(line[0])
             self.socket_physical_cores.append(cur_socket_physical_core)
             self.socket_logical_cores.append(cur_socket_logical_core)
 

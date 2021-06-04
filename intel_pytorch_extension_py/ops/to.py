@@ -19,7 +19,7 @@ def to(module, *args, **kwargs):
 
     def mark_param(t):
         for param in t.parameters():
-            core.set_parameter_tensor(param.data)
+            _C.set_parameter_tensor(param.data)
 
     return apply(m, mark_param)
 

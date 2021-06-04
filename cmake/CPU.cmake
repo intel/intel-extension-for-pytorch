@@ -169,7 +169,8 @@ ExternalProject_Add(xsmm
   )
 # Compile code with pybind11
 set(DPCPP_SRCS ${DPCPP_ATEN_SRCS} ${DPCPP_COMMON_SRCS} ${DPCPP_CPU_SRCS} ${DPCPP_JIT_SRCS})
-pybind11_add_module(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
+# pybind11_add_module(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
+add_library(${PLUGIN_NAME} SHARED ${DPCPP_SRCS})
 target_link_libraries(${PLUGIN_NAME} PRIVATE ${DPCPP_THIRD_PARTY_ROOT}/xsmm/lib/libxsmm.a)
 
 #link_directories(${PYTORCH_INSTALL_DIR}/lib)

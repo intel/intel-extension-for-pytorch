@@ -2,7 +2,7 @@ import torch
 import intel_pytorch_extension as ipex
 from common_utils import int8_calibration
 
-ipex.core.enable_auto_dnnl()
+ipex._C.enable_auto_dnnl()
 
 ic = 1024
 oc = 1024
@@ -30,8 +30,8 @@ if __name__ == "__main__":
     run_linear(bf16_conf)
 
     print(f"back to fp32, {'*' * 50}") 
-    ipex.core.reorder_to_float32(LL.weight)
-    ipex.core.reorder_to_float32(LL.bias)
+    ipex._C.reorder_to_float32(LL.weight)
+    ipex._C.reorder_to_float32(LL.bias)
     run_linear()
 
     print(f"auto-mix for int8, {'*' * 50}") 
@@ -40,6 +40,6 @@ if __name__ == "__main__":
     run_linear(int8_conf)
 
     print(f"back to fp32, {'*' * 50}") 
-    ipex.core.reorder_to_float32(LL.weight)
-    ipex.core.reorder_to_float32(LL.bias)
+    ipex._C.reorder_to_float32(LL.weight)
+    ipex._C.reorder_to_float32(LL.bias)
     run_linear()

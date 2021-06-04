@@ -15,7 +15,8 @@ import torch.nn as nn
 from torch.jit._recursive import wrap_cpp_module
 import copy
 
-import intel_pytorch_extension as ipex
+import torch_ipex as ipex
+# import intel_pytorch_extension as ipex
 
 import torch.nn as nn
 from torch.nn import Parameter
@@ -41,7 +42,7 @@ class TestQuantizationConfigueTune(TestCase):
         conf = ipex.AmpConf(torch.int8, 'configure.json')
         with ipex.AutoMixPrecision(conf, running_mode='inference'):
             y = model1(x1)
-        self.assertTrue(ipex.core.is_int8_dil_tensor(y))
+        self.assertTrue(ipex._C.is_int8_dil_tensor(y))
         jsonFile = open('configure.json', 'r')
         data = json.load(jsonFile)
         jsonFile.close()
@@ -70,7 +71,7 @@ class TestQuantizationConfigueTune(TestCase):
 
         with ipex.AutoMixPrecision(conf, running_mode='inference'):
             y = model2(x2)
-        self.assertTrue(ipex.core.is_fp32_dil_tensor(y))
+        self.assertTrue(ipex._C.is_fp32_dil_tensor(y))
         os.remove('configure.json')
 
 
@@ -85,7 +86,7 @@ class TestQuantization(TestCase):
         with ipex.AutoMixPrecision(conf, running_mode='inference'):
             y = model(x)
 
-        self.assertTrue(ipex.core.is_int8_dil_tensor(y))
+        self.assertTrue(ipex._C.is_int8_dil_tensor(y))
         self.assertEqual(ref, y, atol=1e-1, rtol=1e-5)
         os.remove('configure.json')
 
@@ -101,7 +102,7 @@ class TestQuantization(TestCase):
             with torch.no_grad():
                 y, hy = model(*args)
 
-        self.assertTrue(ipex.core.is_int8_dil_tensor(y))
+        self.assertTrue(ipex._C.is_int8_dil_tensor(y))
 
         # self.assertEqual(ref, y, prec=0.1)
         self.assertEqual(ref, y, atol=0.1, rtol=1e-5)
@@ -201,5 +202,5 @@ class TestQuantization(TestCase):
 if __name__ == '__main__':
     rand_seed = int(time.time() * 1000000000)
     torch.manual_seed(rand_seed)
-    ipex.core.enable_auto_dnnl()
+    ipex._C.enable_auto_dnnl()
     test = unittest.main()

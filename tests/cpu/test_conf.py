@@ -4,7 +4,7 @@ import unittest
 from functools import reduce
 
 import torch
-import _torch_ipex as ipex
+import torch_ipex._C as ipex
 
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
