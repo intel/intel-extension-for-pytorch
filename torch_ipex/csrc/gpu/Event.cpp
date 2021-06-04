@@ -1,5 +1,5 @@
-#include <Event.h>
-#include <Stream.h>
+#include "Event.h"
+#include "Stream.h"
 #include <torch/csrc/THP.h>
 #include <torch/csrc/utils/python_arg_parser.h>
 

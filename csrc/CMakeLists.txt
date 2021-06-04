@@ -12,17 +12,12 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/jit)
 set(IPEX_TENSOR_SRCS)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tensor)
 
-# includes directors
-if(NOT DEFINED PYTORCH_INCLUDE_DIR)
-    message(FATAL_ERROR, "Cannot find installed PyTorch directory")
-endif()
-
 if(NOT DEFINED SYCL_INCLUDE_DIR)
     message(FATAL_ERROR, "Cannot find SYCL include directory")
 endif()
 
 set(IPEX_INCLUDE_DIRS ${PYTHON_INCLUDE_DIR}
-        ${PYTORCH_INCLUDE_DIR}
+        ${TORCH_INCLUDE_DIRS}
         ${SYCL_INCLUDE_DIR}
         ${IPEX_C_SOURCE_DIR}
         ${IPEX_GPU_ROOT}
@@ -31,32 +26,8 @@ set(IPEX_INCLUDE_DIRS ${PYTHON_INCLUDE_DIR}
 
 FILE(GLOB GPU_UTIL_SRC "*.cpp")
 
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl")
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -D__STRICT_ANSI__")
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-unnamed-lambda")
-set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fno-sycl-early-optimizations")
-# Explicitly limit the index range (< Max int32) in kernel
-# set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-id-queries-fit-in-int")
-
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
-if(BUILD_BY_PER_KERNEL)
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_kernel")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl, -T ${PROJECT_SOURCE_DIR}/cmake/per_ker.ld")
-elseif(USE_AOT_DEVLIST)
-    set(SPIRV_OPT "spir64-unknown-unknown-sycldevice")
-    set(AOT_ARCH_OPT "spir64_gen-unknown-unknown-sycldevice")
-    set(IPEX_SYCL_KERNEL_FLAGS "${IPEX_SYCL_KERNEL_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-targets=${AOT_ARCH_OPT},${SPIRV_OPT}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xsycl-target-backend=${AOT_ARCH_OPT}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} '-device ${USE_AOT_DEVLIST}'")
-else()
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsycl-device-code-split=per_source")
-endif()
-message(STATUS "DPCPP found. Compiling with SYCL support")
-
-set_source_files_properties(${GPU_UTIL_SRC} ${IPEX_ATEN_SRCS} ${IPEX_TENSOR_SRCS} COMPILE_FLAGS "${IPEX_SYCL_KERNEL_FLAGS}")
+set(SYCL_SOURCES ${GPU_UTIL_SRC} ${IPEX_JIT_SRCS} ${IPEX_ATEN_SRCS})
+set_sycl_flag("${SYCL_SOURCES}")
 
 set(IPEX_GPU_SRC ${GPU_UTIL_SRC} ${IPEX_JIT_SRCS})
 
@@ -68,17 +39,9 @@ target_include_directories(torch_ipex_kernel PUBLIC ${IPEX_INCLUDE_DIRS})
 
 target_link_libraries(torch_ipex_gpu PUBLIC IPEX_GPU_FILES_GEN_LIB)
 
-set(IPEX_COMPILE_DEFINITIONS)
+target_link_libraries(torch_ipex_gpu PUBLIC ${TORCH_LIBRARIES})
 
-# pytorch library
-if(DEFINED PYTORCH_LIBRARY_DIR)
-    #link_directories(${PYTORCH_LIBRARY_DIR})
-    target_link_libraries(torch_ipex_gpu PUBLIC ${PYTORCH_LIBRARY_DIR}/libtorch_cpu.so)
-    target_link_libraries(torch_ipex_gpu PUBLIC ${PYTORCH_LIBRARY_DIR}/libtorch_python.so)
-    target_link_libraries(torch_ipex_gpu PUBLIC ${PYTORCH_LIBRARY_DIR}/libc10.so)
-else()
-    message(FATAL_ERROR, "Cannot find PyTorch library directory")
-endif()
+set(IPEX_COMPILE_DEFINITIONS)
 
 if(USE_PERSIST_STREAM)
     set(IPEX_COMPILE_DEFINITIONS "${IPEX_COMPILE_DEFINITIONS};USE_PERSIST_STREAM")
@@ -149,4 +112,4 @@ target_link_libraries(torch_ipex_gpu PUBLIC ${EXTRA_SHARED_LIBS} torch_ipex_kern
 
 install(TARGETS torch_ipex_gpu LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(TARGETS torch_ipex_kernel LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(DIRECTORY "./" DESTINATION include FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY "./" DESTINATION include/ipex FILES_MATCHING PATTERN "*.h")

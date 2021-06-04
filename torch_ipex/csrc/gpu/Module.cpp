@@ -6,9 +6,9 @@
 #include <ATen/ipex_type_dpcpp_customized.h>
 #include <jit/fusion_pass.h>
 #include "Module.h"
-#include <Event.h>
-#include <Stream.h>
-#include <Storage.h>
+#include "Event.h"
+#include "Stream.h"
+#include "Storage.h"
 #include <core/Functions.h>
 #include <core/Generator.h>
 #include <core/CachingAllocator.h>
@@ -202,7 +202,7 @@ PyObject * THPModule_memorySnapshot(PyObject *_unused, PyObject *noargs)
   END_HANDLE_TH_ERRORS
 }
 
-static struct PyMethodDef _THCPModule_methods[] = {
+static struct PyMethodDef _THPModule_methods[] = {
   {"_initExtension",  (PyCFunction)THPModule_initExtension,   METH_NOARGS,       nullptr},
   {"_postInitExtension",  (PyCFunction)THPModule_postInitExtension,   METH_NOARGS,       nullptr},
   {"_setDevice",   (PyCFunction)THPModule_setDevice_wrap,   METH_O,       nullptr},
@@ -379,7 +379,7 @@ void init_module(pybind11::module& m) {
   THDPStream_init(module);
   THDPEvent_init(module);
   THPStorage_init(module);
-  PyModule_AddFunctions(module, _THCPModule_methods);
+  PyModule_AddFunctions(module, _THPModule_methods);
   register_xpu_device_properties(module);
   bindGetDeviceProperties(module);
 }

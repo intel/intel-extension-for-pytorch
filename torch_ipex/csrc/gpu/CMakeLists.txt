@@ -1,3 +1,3 @@
-FILE(GLOB gpu_srcs "*.cpp")
+FILE(GLOB GPU_SRCS "*.cpp")
 
-set(IPEX_GPU_SRCS ${gpu_srcs} PARENT_SCOPE)
+set(IPEX_GPU_SRCS ${GPU_SRCS} PARENT_SCOPE)

@@ -34,6 +34,11 @@ cmake_dependent_option(BUILD_DOUBLE_KERNEL "Build double data type kernels" ON "
 set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build (for example, skl,ats,...)")
 
 include(${PROJECT_SOURCE_DIR}/cmake/BuildOptions.cmake)
+
+# Need the torch package
+find_package(Torch REQUIRED)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+
 add_subdirectory(./csrc)
 add_subdirectory(./torch_ipex/csrc)
 

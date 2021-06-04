@@ -2,7 +2,7 @@
 #include <torch/csrc/utils/object_ptr.h>
 #include <torch/csrc/Device.h>
 
-#include <Stream.h>
+#include "Stream.h"
 
 #include <structmember.h>
 #include <aten/core/Functions.h>

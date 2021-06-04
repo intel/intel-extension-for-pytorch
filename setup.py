@@ -20,22 +20,17 @@
 from __future__ import print_function
 
 from subprocess import check_call
-from setuptools import setup, Extension, find_packages, distutils
+from setuptools import setup, Extension, distutils
 import setuptools.command.build_ext
-from setuptools.command import build_py
 import setuptools.command.install
 from distutils.spawn import find_executable
-from sysconfig import get_paths
 
 import distutils.command.clean
-import glob
-import inspect
 import multiprocessing
 import multiprocessing.pool
 import os
 import pathlib
 import platform
-import re
 import shutil
 import subprocess
 import sys
@@ -43,7 +38,7 @@ from scripts.tools.setup.cmake import CMake
 
 try:
     import torch
-    from torch.utils.cpp_extension import include_paths, library_paths
+    from torch.utils.cpp_extension import include_paths, CppExtension, BuildExtension
 except ImportError as e:
     print('Unable to import torch. Error:')
     print('\t', e)
@@ -141,7 +136,7 @@ class DPCPPClean(distutils.command.clean.clean, object):
         distutils.command.clean.clean.run(self)
 
 
-class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
+class DPCPPBuild(BuildExtension, object):
     def run(self):
         if platform.system() == "Windows":
             raise RuntimeError("Does not support windows")
@@ -192,8 +187,8 @@ class DPCPPBuild(setuptools.command.build_ext.build_ext, object):
                 # The default value cannot be easily obtained in CMakeLists.txt. We set it here.
                 # 'CMAKE_PREFIX_PATH': distutils.sysconfig.get_python_lib()
                 'CMAKE_BUILD_TYPE': build_type,
-                'PYTORCH_INCLUDE_DIR': convert_cmake_dirs(include_paths()),
-                'PYTORCH_LIBRARY_DIR': convert_cmake_dirs(library_paths()),
+                # The value cannot be easily obtained in CMakeLists.txt.
+                'CMAKE_PREFIX_PATH': torch.utils.cmake_prefix_path,
                 'PYTHON_EXECUTABLE': sys.executable,
                 'CMAKE_INSTALL_PREFIX': '/'.join([str(ext_dir.absolute()), "torch_ipex"]),
                 'PYTHON_INCLUDE_DIR': distutils.sysconfig.get_python_inc(),
@@ -270,7 +265,7 @@ def get_c_module():
     def make_relative_rpath(path):
             return '-Wl,-rpath,$ORIGIN/' + path
 
-    C_ext = Extension("torch_ipex._C",
+    C_ext = CppExtension("torch_ipex._C",
                   libraries=main_libraries,
                   sources=main_sources,
                   language='c',
