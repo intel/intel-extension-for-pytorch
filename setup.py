@@ -420,7 +420,8 @@ def get_c_module():
                   extra_compile_args=main_compile_args + extra_compile_args,
                   include_dirs=include_paths(),
                   library_dirs=library_dirs,
-                  extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
+                  # extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('lib')])
+                  extra_link_args=extra_link_args + main_link_args + [make_relative_rpath('..')])
     return C_ext
 
 setup(
