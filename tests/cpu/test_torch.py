@@ -83,7 +83,7 @@ from common_device_type import instantiate_device_type_tests, \
     skipIf, skipCPUIfNoLapack, skipCUDAIfNoMagma, skipCUDAIfRocm, onlyCUDA, onlyCPU, \
     dtypes, dtypesIfCUDA, deviceCountAtLeast, skipCUDAIf, precisionOverride, ipex
 import torch.backends.quantized
-import intel_pytorch_extension as ipex
+import torch_ipex as ipex
 
 
 # load_tests from common_utils is used to automatically filter tests for

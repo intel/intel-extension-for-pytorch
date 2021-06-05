@@ -60,8 +60,10 @@ import torch.nn as nn
 from torch.jit._recursive import wrap_cpp_module
 import copy
 
-import intel_pytorch_extension as ipex
-from intel_pytorch_extension import core
+# import intel_pytorch_extension as ipex
+import torch_ipex as ipex
+import torch_ipex._C as core
+# from intel_pytorch_extension import core
 
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -423,8 +425,8 @@ class Tester(TestCase):
 
     def _test_output(self, model, x, kind_in_graph=None, kind_not_in_graph=None):
         modelName = model.__class__.__name__
-        _C.disable_jit_opt()
-        _C.disable_mix_bf16_fp32()
+        core.disable_jit_opt()
+        core.disable_mix_bf16_fp32()
 
         model = model.to(device).eval()
         x = x.to(device)
@@ -443,7 +445,7 @@ class Tester(TestCase):
         self.assertEqual(result, sresult)
         self.assertEqual(result, tresult)
 
-        _C.enable_jit_opt()
+        core.enable_jit_opt()
         script_fused_model = torch.jit.script(model)
         trace_fused_model = torch.jit.trace(model, x)
         with torch.no_grad():
@@ -471,9 +473,9 @@ class Tester(TestCase):
     def _test_output_bf16(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None):
         modelName = model.__class__.__name__
 
-        _C.enable_auto_dnnl()
-        _C.enable_jit_opt()
-        _C.enable_mix_bf16_fp32()
+        core.enable_auto_dnnl()
+        core.enable_jit_opt()
+        core.enable_mix_bf16_fp32()
 
         model = model.to(ipex.DEVICE).eval()
         x = x.to(ipex.DEVICE)
@@ -496,7 +498,7 @@ class Tester(TestCase):
 
         # disable mix_bf16_fp32 when the calculation is done
         # to avoid affecting other scripts
-        _C.disable_mix_bf16_fp32()
+        core.disable_mix_bf16_fp32()
 
         self.assertEqual(fused_sresult, result, atol=1e-1, rtol=1e-5)
         self.assertEqual(fused_tresult, result, atol=1e-1, rtol=1e-5)
@@ -515,8 +517,8 @@ class Tester(TestCase):
     def _test_output_int8(self, model, x, kind_in_graph=None, kind_not_in_graph=None, prec=None):
         modelName = model.__class__.__name__
 
-        _C.enable_auto_dnnl()
-        _C.enable_jit_opt()
+        core.enable_auto_dnnl()
+        core.enable_jit_opt()
         model = model.to(ipex.DEVICE).eval()
         x = x.to(ipex.DEVICE)
         x2 = x.clone()
@@ -935,5 +937,5 @@ class Tester(TestCase):
 
 if __name__ == '__main__':
     torch.manual_seed(2020)
-    _C.enable_auto_dnnl()
+    core.enable_auto_dnnl()
     test = unittest.main()

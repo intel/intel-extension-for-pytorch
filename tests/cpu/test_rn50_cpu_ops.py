@@ -55,7 +55,7 @@ import unittest
 from functools import reduce
 
 import torch
-import intel_pytorch_extension as ipex
+import torch_ipex as ipex
 from common_ipex_conf import AutoMixPrecision, AutoDNNL
 
 import torch.nn as nn
