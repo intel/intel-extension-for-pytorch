@@ -46,11 +46,11 @@ struct ConvAttr {
 
 #ifdef USE_PRIMITIVE_CACHE
   void to_bytes(bytestring& bytes) {
-    xpu::dpcpp::to_bytes(bytes, scale_);
-    xpu::dpcpp::to_bytes(bytes, alpha_);
-    xpu::dpcpp::to_bytes(bytes, beta_);
-    xpu::dpcpp::to_bytes(bytes, oscale_);
-    xpu::dpcpp::to_bytes(bytes, attr_);
+    xpu::oneDNN::to_bytes(bytes, scale_);
+    xpu::oneDNN::to_bytes(bytes, alpha_);
+    xpu::oneDNN::to_bytes(bytes, beta_);
+    xpu::oneDNN::to_bytes(bytes, oscale_);
+    xpu::oneDNN::to_bytes(bytes, attr_);
   }
 #endif
 
