@@ -5,6 +5,7 @@
 #
 # USE_ONEDPL            - to use oneDPL in operators
 # USE_ONEMKL            - to use oneMKL in operators
+# USE_LEVEL_ZERO_ONLY   - to enumerate devices only with Level Zero
 # USE_PERSIST_STREAM    - to use persistent oneDNN stream
 # USE_PRIMITIVE_CACHE   - to Cache oneDNN primitives by framework
 # USE_MULTI_CONTEXT     - to create DPC++ runtime context per device

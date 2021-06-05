@@ -32,9 +32,14 @@ static void initGlobalDevicePoolState() {
   std::vector<DPCPP::device> root_devices;
   // Enumerated root devices(GPU cards) from GPU Platform firstly.
   for (const auto& platform : plaform_list) {
+#ifdef USE_LEVEL_ZERO_ONLY
+    if (platform.get_backend() != DPCPP::backend::level_zero)
+      continue;
+#else
     auto plat_name = platform.get_info<DPCPP::info::platform::name>();
     if (plat_name.compare(getPreferredPlatform()) != 0)
       continue;
+#endif
     auto device_list = platform.get_devices();
     for (const auto& device : device_list) {
       if (device.is_gpu()) {
@@ -58,7 +63,7 @@ static void initGlobalDevicePoolState() {
         sub_devices = root_device.create_sub_devices<partition_by_affinity>(next_partitionable);
         gDevPool.devices.insert(gDevPool.devices.end(), sub_devices.begin(), sub_devices.end());
       } catch (DPCPP::feature_not_supported &e) {
-        TORCH_WARN("Can not split into tile for Device ", root_device.get_info<dpcpp_dev_name>());
+        TORCH_WARN("Tile partition is not supported on this device: ", root_device.get_info<dpcpp_dev_name>());
         gDevPool.devices.push_back(root_device);
       }
     }
