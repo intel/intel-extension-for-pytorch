@@ -7,9 +7,9 @@
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
-#include <core/Runtime.h>
 #include <core/TensorImplUtils.h>
 #include <utils/ATDispatch.h>
+#include <oneDNN/oneDNN.h>
 
 #include "Im2Col.h"
 #include "Im2ColShapeCheck.h"

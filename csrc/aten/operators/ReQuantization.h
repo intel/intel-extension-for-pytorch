@@ -12,8 +12,6 @@
 #include <oneDNN/oneDNN.h>
 #include <utils/Numerics.h>
 
-#include <core/Runtime.h>
-
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 

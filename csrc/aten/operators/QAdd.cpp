@@ -5,8 +5,8 @@
 #include <torch/custom_class.h>
 
 #include <core/DPCPPUtils.h>
-#include <core/Runtime.h>
 #include <utils/ParamUtils.h>
+#include <oneDNN/oneDNN.h>
 
 
 using namespace xpu::dpcpp;

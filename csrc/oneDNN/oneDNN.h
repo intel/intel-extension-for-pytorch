@@ -1,6 +1,10 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <oneDNN/Utils.h>
+#include <oneDNN/Runtime.h>
+#include <oneDNN/LRUCache.h>
+
 #include "Types.h"
 #include "Sum.h"
 #include "Binary.h"

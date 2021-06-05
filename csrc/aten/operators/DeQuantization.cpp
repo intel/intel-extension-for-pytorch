@@ -15,8 +15,6 @@
 
 #include "Loops.h"
 
-#include <core/Runtime.h>
-
 
 DPCPP_DEF_K1(intrepr);
 DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
@@ -24,6 +22,7 @@ DPCPP_DEF_K1(make_per_tensor_quantized_tensor_dpcpp);
 using namespace dnnl;
 using namespace at::native;
 using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -39,7 +38,7 @@ Tensor dequantize_tensor_per_tensor_affine(
       ? memory::dims({qtensor.size(0), qtensor.size(1), qtensor.size(2), qtensor.size(3)})
       : qtensor.dim() == 2 ? memory::dims({qtensor.size(0), qtensor.size(1)})
                            : memory::dims({qtensor.size(0)});
-  memory::data_type q_dt = xpu::oneDNN::get_onednn_dtype(qtensor);
+  memory::data_type q_dt = get_onednn_dtype(qtensor);
   memory::format_tag q_fmt = qtensor.dim() == 4 ? memory::format_tag::nchw
       : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
 
@@ -49,7 +48,7 @@ Tensor dequantize_tensor_per_tensor_affine(
       : dpcpp_onednn_memory({q_ctx.meta()}, q_eng, qtensor.data_ptr());
 
   memory::dims r_dims = q_m.get_desc().dims();
-  memory::data_type r_dt = xpu::oneDNN::get_onednn_dtype(rtensor);
+  memory::data_type r_dt = get_onednn_dtype(rtensor);
   memory::format_tag r_fmt = r_dims.size() == 4 ? memory::format_tag::nchw
       : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
   engine r_eng = q_eng;
@@ -86,14 +85,14 @@ Tensor dequantize_tensor_per_channel_affine(
       ? memory::dims({qtensor.size(0), qtensor.size(1), qtensor.size(2), qtensor.size(3)})
       : qtensor.dim() == 2 ? memory::dims({qtensor.size(0), qtensor.size(1)})
                            : memory::dims({qtensor.size(0)});
-  memory::data_type q_dt = xpu::oneDNN::get_onednn_dtype(qtensor);
+  memory::data_type q_dt = get_onednn_dtype(qtensor);
   memory::format_tag q_fmt = qtensor.dim() == 4 ? memory::format_tag::nchw
       : qtensor.dim() == 2 ? memory::format_tag::nc : memory::format_tag::x;
   memory::desc q_md = memory::desc(q_dims, q_dt, q_fmt);
   memory q_m = dpcpp_onednn_memory(q_md, q_eng, qtensor.data_ptr());
 
   memory::dims r_dims = q_dims;
-  memory::data_type r_dt = xpu::oneDNN::get_onednn_dtype(rtensor);
+  memory::data_type r_dt = get_onednn_dtype(rtensor);
   memory::format_tag r_fmt = q_fmt;
   engine r_eng = q_eng;
   memory::desc r_md = memory::desc(r_dims, r_dt, r_fmt);
@@ -113,7 +112,7 @@ Tensor dequantize_tensor_per_channel_affine(
 
   attr.set_output_scales(mask_0, {scls});
   attr.set_zero_points(DNNL_ARG_SRC, mask_1, {zps});
-  reorder reorder_p = reorder(q_m, r_m, attr);
+  auto reorder_p = dnnl::reorder(q_m, r_m, attr);
 
   DPCPP_ONEDNN_EXEC(reorder_p, stream, {{DNNL_ARG_FROM, q_m}, {DNNL_ARG_TO, r_m}});
   return rtensor;

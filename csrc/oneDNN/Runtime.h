@@ -14,6 +14,7 @@
 
 
 using namespace dnnl;
+using namespace xpu::dpcpp;
 
 #define DPCPP_ONEDNN_FORCE_SYNC(stream)             \
   {                                                 \
@@ -45,30 +46,11 @@ using namespace dnnl;
   }
 
 namespace xpu {
-namespace dpcpp {
+namespace oneDNN {
 
 static inline dnnl::memory dpcpp_onednn_memory(
     dnnl::memory::desc md, dnnl::engine& engine, void* ptr) {
   return dnnl::memory(md, engine, ptr);
-}
-
-static inline dnnl::memory::format_tag get_dnnl_default_format(int ndims) {
-  switch (ndims) {
-    case 1:
-      return dnnl::memory::format_tag::a;
-    case 2:
-      return dnnl::memory::format_tag::ab;
-    case 3:
-      return dnnl::memory::format_tag::abc;
-    case 4:
-      return dnnl::memory::format_tag::abcd;
-    case 5:
-      return dnnl::memory::format_tag::abcde;
-    case 6:
-      return dnnl::memory::format_tag::abcdef;
-    default:
-      return dnnl::memory::format_tag::any;
-  }
 }
 
 // GpuEngineManager singleton

@@ -5,7 +5,7 @@
 
 #include <core/DPCPPUtils.h>
 #include <core/Quantizer.h>
-#include <core/Runtime.h>
+#include <oneDNN/oneDNN.h>
 
 #include "Cat.h"
 #include "QUtil.h"

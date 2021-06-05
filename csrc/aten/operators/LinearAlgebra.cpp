@@ -6,7 +6,7 @@
 #include <core/Context.h>
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
-#include <core/Runtime.h>
+#include <oneDNN/oneDNN.h>
 
 #ifdef USE_ONEMKL
 #include <oneapi/mkl.hpp>
@@ -181,7 +181,16 @@ Tensor dot(const Tensor& self, const Tensor& other){
   // torch.dot supports all types and complex datatype, but oneapi::mkl::blas only supports float/double
   IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "dot", [&] {
     auto &dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-    DPCPP_ONEMKL_SUBMIT(dpcpp_queue, oneapi::mkl::blas::dot, dpcpp_queue, self.numel(), (scalar_t *)self.data_ptr(), self.stride(0), (scalar_t *)other.data_ptr(), other.stride(0), (scalar_t *)result.data_ptr());
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::blas::dot,
+        dpcpp_queue,
+        self.numel(),
+        (scalar_t *)self.data_ptr(),
+        self.stride(0),
+        (scalar_t *)other.data_ptr(),
+        other.stride(0),
+        (scalar_t *)result.data_ptr());
   });
   return result;
 #else
@@ -203,8 +212,8 @@ Tensor& addr_out(Tensor &result, const Tensor& self, const Tensor& vec1, const T
   const auto result_dtype = addr_result.scalar_type();
   TORCH_CHECK(canCast(result_dtype, result.scalar_type()),
               "result type ", result_dtype,
-	      " can't be cast to the desired output type ", result.scalar_type());
-  resize_as_(result, addr_result, c10::nullopt);
+        " can't be cast to the desired output type ", result.scalar_type());
+  at::AtenIpexTypeXPU::resize_as_(result, addr_result, c10::nullopt);
   result.copy_(addr_result);
   return result;
 }

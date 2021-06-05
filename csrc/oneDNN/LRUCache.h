@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef USE_PRIMITIVE_CACHE
+
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -303,3 +305,5 @@ inline void create_key(bytestring& key_to_create, Ts&&... args) {
 }
 
 }}
+
+#endif // USE_PRIMITIVE_CACHE

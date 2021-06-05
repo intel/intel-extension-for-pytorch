@@ -57,4 +57,4 @@ DPCPP::context getDeviceContext(int device_index = 0);
 CAFFE2_API Allocator* getDPCPPDeviceAllocator();
 
 } // namespace dpcpp
-} // namespace at
+} // namespace xpu

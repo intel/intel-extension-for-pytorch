@@ -2,8 +2,8 @@
 #include <ATen/native/quantized/cpu/packed_params.h>
 
 #include <core/DPCPPUtils.h>
-#include <core/Runtime.h>
 #include <utils/ParamUtils.h>
+#include <oneDNN/oneDNN.h>
 
 #include "QUtil.h"
 

@@ -5,7 +5,6 @@
 #include <core/TensorImplUtils.h>
 #include <utils/ATDispatch.h>
 
-#include <core/Runtime.h>
 #include <oneDNN/oneDNN.h>
 #include <vector>
 
@@ -16,9 +15,6 @@
 #include <mkl.h>
 #endif
 
-#ifdef USE_PRIMITIVE_CACHE
-#include <oneDNN/LRUCache.h>
-#endif
 #include <c10/util/typeid.h>
 
 

@@ -3,9 +3,6 @@
 #include <ATen/NativeFunctions.h>
 
 #include <oneDNN/oneDNN.h>
-#ifdef USE_PRIMITIVE_CACHE
-#include <oneDNN/LRUCache.h>
-#endif
 
 #include <core/DPCPP.h>
 

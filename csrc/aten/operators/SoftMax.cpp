@@ -7,15 +7,13 @@
 #include <core/detail/TensorInfo.h>
 #include <utils/Numerics.h>
 #include <utils/SimpelReduce.h>
-
-#ifdef USE_PRIMITIVE_CACHE
-#include <oneDNN/LRUCache.h>
-#endif
+#include <oneDNN/oneDNN.h>
 
 
 using namespace dnnl;
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -364,7 +362,7 @@ Tensor _softmax_onednn(
   memory::dims input_tz;
   get_dnnl_format(input, dnnl_format, input_tz);
 
-  auto data_t = xpu::oneDNN::get_onednn_dtype(input);
+  auto data_t = get_onednn_dtype(input);
 
   auto input_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(input);
   auto input_md = input_ctx.is_plain()? memory::desc({input_tz}, data_t, dnnl_format) :
@@ -430,8 +428,8 @@ Tensor _softmax_backward_onednn(
   get_dnnl_format(output, output_dnnl_format, output_tz);
   get_dnnl_format(grad, grad_dnnl_format, grad_tz);
 
-  auto output_t = xpu::oneDNN::get_onednn_dtype(output);
-  auto grad_t = xpu::oneDNN::get_onednn_dtype(grad);
+  auto output_t = get_onednn_dtype(output);
+  auto grad_t = get_onednn_dtype(grad);
 
   auto axis = dim < 0 ? dim + grad.dim(): dim;
 
@@ -454,7 +452,7 @@ Tensor _softmax_backward_onednn(
     grad_opt = empty_opaque_tensor(softmax_forward_pd.dst_desc(), grad.options(), c10::nullopt);
     grad_memory = dpcpp_onednn_memory(softmax_forward_pd.dst_desc(), engine, grad_opt.data_ptr());
     grad_md = softmax_forward_pd.dst_desc();
-    DPCPP_ONEDNN_EXEC(reorder(grad_usr_memory, grad_memory),
+    DPCPP_ONEDNN_EXEC(dnnl::reorder(grad_usr_memory, grad_memory),
         strm, {{DNNL_ARG_FROM, grad_usr_memory}, {DNNL_ARG_TO, grad_memory}});
   }
 

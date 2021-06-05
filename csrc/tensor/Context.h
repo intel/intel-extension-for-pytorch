@@ -4,9 +4,8 @@
 
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
-#include <core/Runtime.h>
+#include <core/Context.h>
 #include <oneapi/dnnl/dnnl.hpp>
-#include <oneDNN/Utils.h>
 
 
 using namespace xpu::dpcpp;
@@ -17,10 +16,6 @@ using mem_dtype_t = dnnl::memory::data_type;
 using mem_layout_tag_t = dnnl::memory::format_tag;
 using meta_t = mem_desc_t;
 using data_t = void*;
-
-#ifdef USE_PRIMITIVE_CACHE
-#include <oneDNN/LRUCache.h>
-#endif
 
 namespace at {
 namespace AtenIpexTypeXPU {

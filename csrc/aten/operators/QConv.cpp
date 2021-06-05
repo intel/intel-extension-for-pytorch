@@ -4,7 +4,6 @@
 #include <utils/ParamUtils.h>
 
 #include <core/DPCPPUtils.h>
-#include <core/Runtime.h>
 #include <core/Quantizer.h>
 #include <oneDNN/oneDNN.h>
 

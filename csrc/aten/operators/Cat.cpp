@@ -8,19 +8,15 @@
 #include <utils/ATDispatch.h>
 
 #include <core/Memory.h>
-#include <core/Runtime.h>
+#include <oneDNN/oneDNN.h>
 #include <tensor/Context.h>
 #include <ATen/ipex_type_dpcpp_customized.h>
-
-#ifdef USE_PRIMITIVE_CACHE
-#include <oneDNN/LRUCache.h>
-#endif
-
 
 #include "Cat.h"
 
 using namespace dnnl;
 using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -382,7 +378,7 @@ void dnnl_cat(
     }
 
     memory::dims input_tz = dims;
-    auto data_t = xpu::oneDNN::get_onednn_dtype(cat_tensors[i]);
+    auto data_t = get_onednn_dtype(cat_tensors[i]);
     auto format_plain = get_dnnl_default_format(cat_tensors[i].dim());
 
     memory::desc tensor_md;
@@ -402,7 +398,7 @@ void dnnl_cat(
     cat_tensors_mem.push_back(input_usr_memory);
   }
 
-  auto data_t = xpu::oneDNN::get_onednn_dtype(cat_tensors[0]);
+  auto data_t = get_onednn_dtype(cat_tensors[0]);
   auto format_plain = get_dnnl_default_format(cat_tensors[0].dim());
   auto output_md = memory::desc(output_dims, data_t, format_plain);
   auto concat_pd = concat::primitive_desc(

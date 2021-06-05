@@ -1,14 +1,9 @@
 #pragma once
 
-#include <core/Runtime.h>
-
-#ifdef USE_PRIMITIVE_CACHE
-#include <oneDNN/LRUCache.h>
-lru_key_t key;
-#endif
-
+#include <oneDNN/oneDNN.h>
 
 using namespace dnnl;
+using namespace xpu::oneDNN;
 
 namespace xpu {
 namespace dpcpp {

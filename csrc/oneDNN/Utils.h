@@ -9,6 +9,25 @@ using namespace dnnl;
 namespace xpu {
 namespace oneDNN {
 
+static inline dnnl::memory::format_tag get_dnnl_default_format(int ndims) {
+  switch (ndims) {
+    case 1:
+      return dnnl::memory::format_tag::a;
+    case 2:
+      return dnnl::memory::format_tag::ab;
+    case 3:
+      return dnnl::memory::format_tag::abc;
+    case 4:
+      return dnnl::memory::format_tag::abcd;
+    case 5:
+      return dnnl::memory::format_tag::abcde;
+    case 6:
+      return dnnl::memory::format_tag::abcdef;
+    default:
+      return dnnl::memory::format_tag::any;
+  }
+}
+
 static bool is_supported_onednn_dtype(const at::Tensor& tensor) {
    switch (tensor.scalar_type()) {
    case at::ScalarType::Byte:
@@ -25,7 +44,7 @@ static bool is_supported_onednn_dtype(const at::Tensor& tensor) {
    };
 }
 
-static bool is_supported_dtype_in_binary_impl(ScalarType t) {
+static bool is_supported_dtype_in_binary_impl(at::ScalarType t) {
    switch (t) {
    case at::ScalarType::Byte:
    case at::ScalarType::Char:
@@ -37,7 +56,7 @@ static bool is_supported_dtype_in_binary_impl(ScalarType t) {
    };
 }
 
-static bool is_supported_dtype_in_binary(ScalarType src0, ScalarType src1) {
+static bool is_supported_dtype_in_binary(at::ScalarType src0, at::ScalarType src1) {
   if (src0 == at::ScalarType::BFloat16 && src1 == at::ScalarType::BFloat16) {
     return true;
   } else if (is_supported_dtype_in_binary_impl(src0) &&

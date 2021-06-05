@@ -2,11 +2,6 @@
 
 #include <oneDNN/oneDNN.h>
 
-#ifdef USE_PRIMITIVE_CACHE
-#include <oneDNN/LRUCache.h>
-#endif
-
-
 using namespace dnnl;
 using namespace xpu::dpcpp;
 

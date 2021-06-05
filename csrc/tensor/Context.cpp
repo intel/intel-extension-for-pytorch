@@ -1,6 +1,8 @@
 #include "Context.h"
 #include <oneDNN/oneDNN.h>
 
+using namespace xpu::oneDNN;
+
 namespace at {
 namespace AtenIpexTypeXPU {
 

@@ -8,7 +8,7 @@
 #include <ATen/TensorUtils.h>
 
 #include <core/DPCPPUtils.h>
-#include <core/Runtime.h>
+#include <oneDNN/oneDNN.h>
 
 #include <utils/Atomics.h>
 #include <utils/ParamUtils.h>

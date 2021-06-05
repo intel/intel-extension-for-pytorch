@@ -6,7 +6,7 @@
 
 #include <ATen/ipex_type_dpcpp_customized.h>
 #include <core/DPCPPUtils.h>
-#include <core/Runtime.h>
+#include <oneDNN/oneDNN.h>
 #include <utils/ParamUtils.h>
 #include "InnerProduct.h"
 #include "QUtil.h"
@@ -15,6 +15,7 @@
 using namespace dnnl;
 using namespace at::native;
 using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {

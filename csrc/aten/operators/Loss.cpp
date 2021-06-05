@@ -10,8 +10,8 @@
 #include <core/DPCPPTensorUtils.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
-#include <core/Runtime.h>
 #include <core/TensorImplUtils.h>
+#include <oneDNN/oneDNN.h>
 
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>
@@ -38,6 +38,7 @@ class SmoothL1Backward {};
 class SmoothL1Forward {};
 
 using namespace xpu::dpcpp;
+using namespace xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {

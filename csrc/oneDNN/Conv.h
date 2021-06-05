@@ -3,18 +3,14 @@
 #include <ATen/ATen.h>
 
 #include <core/DPCPPUtils.h>
-#include <core/Runtime.h>
+#include <oneDNN/Runtime.h>
+#include <oneDNN/LRUCache.h>
 #include <core/Quantizer.h>
 #include <tensor/Context.h>
 #include "Utils.h"
 #include "Reorder.h"
 
 #include <oneapi/dnnl/dnnl.hpp>
-
-#ifdef USE_PRIMITIVE_CACHE
-#include <oneDNN/LRUCache.h>
-#endif
-
 
 using namespace dnnl;
 using namespace xpu::dpcpp;

@@ -2,7 +2,6 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/Pool.h>
 
-#include <core/Runtime.h>
 #include <utils/Math.h>
 #include <utils/ATDispatch.h>
 #include <oneDNN/oneDNN.h>
