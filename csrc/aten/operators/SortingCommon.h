@@ -1,5 +1,4 @@
-#ifndef SORTINGCOMMON_H
-#define SORTINGCOMMON_H
+#pragma once
 
 #include <ATen/ATen.h>
 #include <ATen/native/SortingUtils.h>
@@ -97,5 +96,3 @@ void run_launcher(
         slice_size);
   }
 }
-
-#endif

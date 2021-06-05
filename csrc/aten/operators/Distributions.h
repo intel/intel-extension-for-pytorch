@@ -1,10 +1,8 @@
-#ifndef TORCH_IPEX_DISTRIBUTIONS_H
-#define TORCH_IPEX_DISTRIBUTIONS_H
+#pragma once
 
 #include "Random.h"
 #include "Loops.h"
 #include <utils/Numerics.h>
-
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -83,5 +81,3 @@ void distribution_nullary_kernel(at::TensorIterator& iter,
 
 }
 }
-
-#endif //TORCH_IPEX_DISTRIBUTIONS_H

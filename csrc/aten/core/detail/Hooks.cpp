@@ -6,7 +6,6 @@
 #include <core/Device.h>
 #include <core/Generator.h>
 #include <core/detail/Hooks.h>
-#include <utils/General.h>
 #include <core/CachingHostAllocator.h>
 
 #include <cstddef>

@@ -1,5 +1,4 @@
-#ifndef ATOMICS_INC
-#define ATOMICS_INC
+#pragma once
 
 #include <core/DPCPP.h>
 #include <core/DPCPPUtils.h>
@@ -106,5 +105,3 @@ static inline DPCPP_DEVICE void atomicAdd(
 // dpcpp_global_ptr_pt<bool *>
 // dpcpp_global_ptr_pt<int64_t>
 // dpcpp_global_ptr_pt<double *>
-
-#endif // ATOMICS_INC

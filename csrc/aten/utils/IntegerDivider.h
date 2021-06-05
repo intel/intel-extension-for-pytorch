@@ -1,5 +1,4 @@
-#ifndef THDPCPP_INTEGER_DIVIDER_INC
-#define THDPCPP_INTEGER_DIVIDER_INC
+#pragma once
 
 #include <assert.h>
 
@@ -117,5 +116,3 @@ struct IntDivider<unsigned int> {
   unsigned int m1; // Magic number: m' above.
   unsigned int shift; // Shift amounts.
 };
-
-#endif // THDPCPP_INTEGER_DIVIDER_INC

@@ -1,5 +1,4 @@
-#ifndef CACHING_ALLOCATOR_H
-#define CACHING_ALLOCATOR_H
+#pragma once
 
 #include <ATen/Context.h>
 #include <ATen/core/ATenGeneral.h>
@@ -80,5 +79,3 @@ std::vector<CASegmentInfo> snapshot();
 std::mutex* getFreeMutex();
 
 }} // namespace xpu::dpcpp
-
-#endif

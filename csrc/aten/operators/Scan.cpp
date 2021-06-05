@@ -2,7 +2,6 @@
 
 #include <core/DPCPP.h>
 #include <core/Memory.h>
-#include <utils/General.h>
 #include <utils/MathReduce.h>
 #include <utils/Numerics.h>
 #include <utils/ATDispatch.h>

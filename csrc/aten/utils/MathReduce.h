@@ -1,5 +1,4 @@
-#ifndef REDUCEDIMINDEX_H
-#define REDUCEDIMINDEX_H
+#pragma once
 
 #include <ATen/ATen.h>
 
@@ -298,5 +297,3 @@ struct MinValuePair {
         : b;
   }
 };
-
-#endif

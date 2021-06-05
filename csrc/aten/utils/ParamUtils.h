@@ -1,6 +1,7 @@
 #pragma once
 
 #include <c10/util/ArrayRef.h>
+#include <utils/General.h>
 #include <vector>
 
 namespace at {

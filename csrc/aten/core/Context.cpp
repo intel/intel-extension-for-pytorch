@@ -1,4 +1,4 @@
-#include <core/Allocator.h>
+#include <ATen/ATen.h>
 #include <core/Context.h>
 #include <core/DPCPPUtils.h>
 #include <core/CachingAllocator.h>

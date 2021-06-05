@@ -1,5 +1,4 @@
-#ifndef _LRU_CACHE_CPP
-#define _LRU_CACHE_CPP
+#pragma once
 
 #include <string>
 #include <vector>
@@ -304,4 +303,3 @@ inline void create_key(bytestring& key_to_create, Ts&&... args) {
 }
 
 }}
-#endif

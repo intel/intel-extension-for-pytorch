@@ -1,5 +1,4 @@
-#ifndef POINTWISE_INC
-#define POINTWISE_INC
+#pragma once
 
 #include <ATen/ATen.h>
 
@@ -1027,5 +1026,3 @@ struct TensorConjOp {
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
-
-#endif

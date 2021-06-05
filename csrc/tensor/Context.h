@@ -2,7 +2,6 @@
 
 #include <ATen/ATen.h>
 
-#include <core/Allocator.h>
 #include <core/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/Runtime.h>

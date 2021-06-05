@@ -1,5 +1,4 @@
-#ifndef IPEX_TYPE_DPCPP_CUSTOMIZED_H
-#define IPEX_TYPE_DPCPP_CUSTOMIZED_H
+#pragma once
 
 #include <ATen/ATen.h>
 #include <tensor/Context.h>
@@ -72,5 +71,3 @@ namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 at::Tensor trans_linear(const at::Tensor & input, const at::Tensor & m1, const at::Tensor & m2, at::Scalar beta=1.0f, at::Scalar alpha=1.0f);
 }}
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef SORT_H
-#define SORT_H
+#pragma once
 
 #include <ATen/ATen.h>
 
@@ -366,5 +365,3 @@ inline void SortKeyValueInplace(Tensor& key, Tensor& value, int dim, bool dir) {
 #undef HANDLE_SORT_CASE
 #undef HANDLE_A_CASE
 }
-
-#endif

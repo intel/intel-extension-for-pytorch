@@ -2,7 +2,6 @@
 #include <core/StorageImplUtils.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/TensorInfo.h>
-#include <utils/General.h>
 
 
 using namespace xpu::dpcpp::detail;

@@ -1,9 +1,9 @@
-#ifndef NUMERICS_INC
-#define NUMERICS_INC
+#pragma once
 
 #include <ATen/ATen.h>
 
 #include <core/DPCPP.h>
+#include <utils/General.h>
 #include <core/NumericLimits.h>
 
 template <typename T>
@@ -1009,5 +1009,3 @@ template <typename T>
 DPCPP_BOTH inline T RoundUp(T a, T b) {
   return CeilDiv(a, b) * b;
 }
-
-#endif

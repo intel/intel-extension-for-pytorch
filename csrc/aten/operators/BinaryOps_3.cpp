@@ -4,7 +4,6 @@
 #include <ATen/AtenIpexTypeXPU.h>
 
 #include <core/DPCPP.h>
-#include <utils/General.h>
 #include <utils/Pointwise.h>
 #include <utils/ScalarOps.h>
 

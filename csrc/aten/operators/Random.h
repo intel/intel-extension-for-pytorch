@@ -1,5 +1,4 @@
-#ifndef TORCH_IPEX_RANDOM_H
-#define TORCH_IPEX_RANDOM_H
+#pragma once
 
 #include <CL/sycl.hpp>
 #include <core/DPCPP.h>
@@ -91,5 +90,3 @@ private:
 
   engine_t engine;
 };
-
-#endif //TORCH_IPEX_RANDOM_H

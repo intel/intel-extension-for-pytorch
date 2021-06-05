@@ -1,5 +1,4 @@
-#ifndef CACHING_HOST_ALLOCATOR_H
-#define CACHING_HOST_ALLOCATOR_H
+#pragma once
 
 #include <ATen/Context.h>
 #include <ATen/core/ATenGeneral.h>
@@ -22,5 +21,3 @@ void dpcpp_emptyCacheInCachingHostAllocator();
 
 bool dpcpp_isAllocatedByCachingHostAllocator(void* ptr);
 }} // namespace xpu::dpcpp
-
-#endif

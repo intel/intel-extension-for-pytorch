@@ -1,8 +1,6 @@
-#ifndef ALGORITHM_INC
-#define ALGORITHM_INC
+#pragma once
 
 #include <core/DPCPP.h>
-#include <utils/General.h>
 #include <utils/Numerics.h>
 
 // alternative for thrust::tabulate
@@ -67,5 +65,3 @@ DPCPP_DEVICE struct dpcpp_identity {
     return t;
   }
 };
-
-#endif

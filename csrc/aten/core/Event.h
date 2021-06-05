@@ -25,15 +25,11 @@ struct  DPCPPEvent {
 #if 0
   DPCPPEvent(
       DeviceIndex device_index, const xpuIpcEventHandle_t* handle) {
-    #ifndef __HIP_PLATFORM_HCC__
       device_index_ = device_index;
       DPCPPGuard guard(device_index_);
 
       AT_CHECK(xpuIpcOpenEventHandle(&event_, *handle));
       is_created_ = true;
-    #else
-      AT_ERROR("cuIpcOpenEventHandle with HIP is not supported");
-    #endif
   }
 #endif
 

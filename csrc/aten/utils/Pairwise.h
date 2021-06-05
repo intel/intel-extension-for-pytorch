@@ -1,5 +1,4 @@
-#ifndef PAIRWISE_INC
-#define PAIRWISE_INC
+#pragma once
 
 #include <ATen/ATen.h>
 #include <core/DPCPP.h>
@@ -180,5 +179,3 @@ struct TensorTriOp {
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
-
-#endif

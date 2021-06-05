@@ -1,6 +1,3 @@
-#ifndef ITT_H
-#define ITT_H
+#pragma once
 
 void IttBindings_init(PyObject* module);
-
-#endif // ITT_H

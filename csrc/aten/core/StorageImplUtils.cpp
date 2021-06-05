@@ -4,7 +4,6 @@
 #include <core/DPCPPUtils.h>
 #include <core/Exception.h>
 #include <core/Memory.h>
-#include <utils/General.h>
 
 
 namespace xpu {
@@ -27,10 +26,11 @@ void StorageImpl_resize(at::StorageImpl* self, ptrdiff_t size_bytes) {
     c10::DataPtr data = self->allocator()->allocate(size_bytes);
 
     if (self->data_ptr()) {
+      auto nbytes = self->nbytes();
       dpcppMemcpyAsync(
           data.get(),
           self->data(),
-          THMin(self->nbytes(), size_bytes),
+          (nbytes < size_bytes ? nbytes : size_bytes),
           DeviceToDevice);
     }
     self->set_data_ptr(std::move(data));

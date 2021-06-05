@@ -1,5 +1,4 @@
-#ifndef THDP_STREAM_INC
-#define THDP_STREAM_INC
+#pragma once
 
 #include <torch/csrc/Stream.h>
 #include <core/Stream.h>
@@ -16,5 +15,3 @@ void THDPStream_init(PyObject *module);
 inline bool THDPStream_Check(PyObject* obj) {
   return THDPStreamClass && PyObject_IsInstance(obj, THDPStreamClass);
 }
-
-#endif // THDP_STREAM_INC

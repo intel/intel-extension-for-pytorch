@@ -1,5 +1,4 @@
-#ifndef DPCPP_HOOK_IMPL_H
-#define DPCPP_HOOK_IMPL_H
+#pragma once
 
 #include <ATen/detail/XPUHooksInterface.h>
 #include <ATen/Generator.h>
@@ -26,5 +25,3 @@ struct XPUHooks : public at::XPUHooksInterface {
 };
 
 }}} // xpu::dpcpp::detail
-
-#endif // DPCPP_HOOK_IMPL_H

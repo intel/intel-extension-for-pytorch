@@ -1,6 +1,5 @@
 #pragma once
 
-
 namespace xpu {
 namespace dpcpp {
 

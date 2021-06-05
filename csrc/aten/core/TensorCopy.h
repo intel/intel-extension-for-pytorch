@@ -1,5 +1,4 @@
-#ifndef TENSOR_COPY_H
-#define TENSOR_COPY_H
+#pragma once
 
 #include <c10/core/TensorImpl.h>
 
@@ -19,5 +18,3 @@ template <typename ScalarType>
 void TensorImpl_copyIgnoringOverlaps(TensorImpl* dst, TensorImpl* src);
 } // namespace native
 } // namespace at
-
-#endif

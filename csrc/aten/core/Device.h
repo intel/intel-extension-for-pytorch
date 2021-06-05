@@ -1,5 +1,4 @@
-#ifndef DPCPP_DEVICE_INC
-#define DPCPP_DEVICE_INC
+#pragma once
 
 #include <c10/core/Device.h>
 #include <core/Exception.h>
@@ -74,4 +73,3 @@ XPUDeviceProp* getDeviceProperties(int64_t device);
 
 } // namespace dpcpp
 } // namespace xpu
-#endif
