@@ -15,37 +15,33 @@
 
 using namespace dnnl;
 
-#define DPCPP_ONEDNN_FORCE_SYNC(stream)               \
-  {                                                   \
-      static auto force_sync = dpcpp_force_sync();    \
-      if (force_sync) {                               \
-          (stream).wait();                            \
-      }                                               \
+#define DPCPP_ONEDNN_FORCE_SYNC(stream)             \
+  {                                                 \
+    static auto force_sync = dpcpp_force_sync();    \
+    if (force_sync) {                               \
+        (stream).wait();                            \
+    }                                               \
   }
 
-#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                                  \
-  {                                                                           \
-    static auto verbose = dpcpp_verbose();                                    \
-    cl::sycl::queue Q = dnnl::sycl_interop::get_queue((stream));              \
-    if (verbose) {                                                            \
-      IPEX_TIMER(t, verbose, __func__);                                       \
-      cl::sycl::event start_evt = submit_barrier(Q);                     \
-      dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__);           \
-      t.now("oneDNN execute in sycl_interop");                                \
-      cl::sycl::event end_evt = submit_barrier(Q);                       \
-      dpcpp_log("onednn_kernel", start_evt, end_evt);                         \
-      DPCPP_ONEDNN_FORCE_SYNC(stream);                                        \
-      t.now("oneDNN stream wait");                                            \
-      Q.throw_asynchronous();                                                 \
-      t.now("oneDNN throw asynchronous");                                     \
-    } else {                                                                  \
-      cl::sycl::event start_evt = submit_barrier(Q);                     \
-      dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__);           \
-      cl::sycl::event end_evt = submit_barrier(Q);                       \
-      dpcpp_log("onednn_kernel", start_evt, end_evt);                         \
-      DPCPP_ONEDNN_FORCE_SYNC(stream);                                        \
-      Q.throw_asynchronous();                                                 \
-    }                                                                         \
+#define DPCPP_ONEDNN_EXEC(prim, stream, ...)                                        \
+  {                                                                                 \
+    static auto verbose = dpcpp_verbose();                                          \
+    auto q = dnnl::sycl_interop::get_queue((stream));                               \
+    if (verbose) {                                                                  \
+      IPEX_TIMER(t, verbose, __func__);                                             \
+      DPCPP_BAR_LOG(q, "onednn_kernel",                                             \
+          dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__));            \
+      t.now("oneDNN execute in sycl_interop");                                      \
+      DPCPP_ONEDNN_FORCE_SYNC(stream);                                              \
+      t.now("oneDNN stream wait");                                                  \
+      q.throw_asynchronous();                                                       \
+      t.now("oneDNN throw asynchronous");                                           \
+    } else {                                                                        \
+      DPCPP_BAR_LOG(q, "onednn_kernel",                                             \
+          dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__));            \
+      DPCPP_ONEDNN_FORCE_SYNC(stream);                                              \
+      q.throw_asynchronous();                                                       \
+    }                                                                               \
   }
 
 namespace xpu {

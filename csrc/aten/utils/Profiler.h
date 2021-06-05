@@ -58,26 +58,30 @@ struct DPCPPProfilerStubsImpl : public XPUStubs {
   }
 };
 
-static inline cl::sycl::event submit_barrier(cl::sycl::queue& Q) {
-  cl::sycl::event e;
-  if (dpcpp_profiling() && profilerEnabled()) {
-    e = Q.submit_barrier();
+static inline bool is_profiler_enabled() {
+  return (dpcpp_profiling() && profilerEnabled());
+}
+
+static inline void dpcpp_mark(std::string name, cl::sycl::event& event) {
+  XPUEventStub dpcpp_evt_stub;
+  dpcpp_evt_stub.reset(new DPCPPEventStubImpl(event));
+  mark_xpu(std::move(name), dpcpp_evt_stub);
+}
+
+static inline void dpcpp_mark(std::string name, cl::sycl::event& start_event, cl::sycl::event& end_event) {
+  XPUEventStub dpcpp_evt_stub;
+  dpcpp_evt_stub.reset(new DPCPPEventStubImpl(start_event, end_event));
+  mark_xpu(std::move(name), dpcpp_evt_stub);
+}
+
+static inline void dpcpp_log(std::string name, cl::sycl::event& event) {
+  if (is_profiler_enabled()) {
+    dpcpp_mark(name, event);
   }
-  return e;
 }
 
 static inline void dpcpp_log(std::string name, cl::sycl::event& start_event, cl::sycl::event& end_event) {
-  if (dpcpp_profiling() && profilerEnabled()) {
-    XPUEventStub dpcpp_evt_stub;
-    dpcpp_evt_stub.reset(new DPCPPEventStubImpl(start_event, end_event));
-    mark_xpu(std::move(name), dpcpp_evt_stub);
-  }
-}
-
-static inline void dpcpp_log(std::string name, cl::sycl::event& dpcpp_event) {
-  if (dpcpp_profiling() && profilerEnabled()) {
-    XPUEventStub dpcpp_evt_stub;
-    dpcpp_evt_stub.reset(new DPCPPEventStubImpl(dpcpp_event));
-    mark_xpu(std::move(name), dpcpp_evt_stub);
+  if (is_profiler_enabled()) {
+    dpcpp_mark(name, start_event, end_event);
   }
 }

@@ -21,6 +21,18 @@ namespace DPCPP = cl::sycl;
 #define DPCPP_Q_KFN(...) [=](__VA_ARGS__)
 #define DPCPP_Q_CGF(h) [&](DPCPP::handler & h)
 
+#define DPCPP_BAR_LOG(q, str, ker_submit)                 \
+    {                                                     \
+      if (is_profiler_enabled()) {                        \
+        auto start_evt = (q).submit_barrier();            \
+        (ker_submit);                                     \
+        auto end_evt = (q).submit_barrier();              \
+        dpcpp_mark((str), start_evt, end_evt);            \
+      } else {                                            \
+        (ker_submit);                                     \
+      }                                                   \
+    }
+
 #define DPCPP_Q_FORCE_SYNC(q)                           \
     {                                                   \
         static auto force_sync = dpcpp_force_sync();    \
