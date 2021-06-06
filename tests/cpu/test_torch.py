@@ -5447,19 +5447,29 @@ tensor([[[1., 1., 1.,  ..., 1., 1., 1.],
         float_tensor = torch.FloatTensor([1.0, tiny_float])
         double_tensor = torch.DoubleTensor([1.0, tiny_float, tiny_double])
 
-        self.assertEqual(float_tensor[0], 1.0, prec=0.0)
-        self.assertEqual(float_tensor[1], tiny_float, prec=tiny_float / 16)
-        self.assertEqual(double_tensor[0], 1.0, prec=0.0)
-        self.assertEqual(double_tensor[1], tiny_float, prec=0.0)
-        self.assertEqual(double_tensor[2], tiny_double, prec=0.0)
+        # self.assertEqual(float_tensor[0], 1.0, prec=0.0)
+        self.assertEqual(float_tensor[0], 1.0, atol=0.0, rtol=1e-5)
+        # self.assertEqual(float_tensor[1], tiny_float, prec=tiny_float / 16)
+        self.assertEqual(float_tensor[1], tiny_float, atol=tiny_float / 16, rtol=1e-5)
+        # self.assertEqual(double_tensor[0], 1.0, prec=0.0)
+        self.assertEqual(double_tensor[0], 1.0, atol=0.0, rtol=1e-5)
+        # self.assertEqual(double_tensor[1], tiny_float, prec=0.0)
+        self.assertEqual(double_tensor[1], tiny_float, atol=0.0, rtol=1e-5)
+        # self.assertEqual(double_tensor[2], tiny_double, prec=0.0)
+        self.assertEqual(double_tensor[2], tiny_double, atol=0.0, rtol=1e-5)
 
         torch.set_flush_denormal(True)
-        self.assertEqual(float_tensor[0], 1.0, prec=0.0)
-        self.assertEqual(float_tensor[1], 0.0, prec=0.0)  # tiny_float to zero
-        self.assertEqual(double_tensor[0], 1.0, prec=0.0)
+        # self.assertEqual(float_tensor[0], 1.0, prec=0.0)
+        self.assertEqual(float_tensor[0], 1.0, atol=0.0, rtol=1e-5)
+        # self.assertEqual(float_tensor[1], 0.0, prec=0.0)  # tiny_float to zero
+        self.assertEqual(float_tensor[1], 0.0, atol=0.0, rtol=1e-5)  # tiny_float to zero
+        # self.assertEqual(double_tensor[0], 1.0, prec=0.0)
+        self.assertEqual(double_tensor[0], 1.0, atol=0.0, rtol=1e-5)
         # tiny_float is not converted to zero in double type
-        self.assertEqual(double_tensor[1], tiny_float, prec=0.0)
-        self.assertEqual(double_tensor[2], 0.0, prec=0.0)  # tiny_double to zero
+        # self.assertEqual(double_tensor[1], tiny_float, prec=0.0)
+        self.assertEqual(double_tensor[1], tiny_float, atol=0.0, rtol=1e-5)
+        # self.assertEqual(double_tensor[2], 0.0, prec=0.0)  # tiny_double to zero
+        self.assertEqual(double_tensor[2], 0.0, atol=0.0, rtol=1e-5)  # tiny_double to zero
         torch.set_flush_denormal(False)
 
     def test_show_config(self):
@@ -14413,9 +14423,12 @@ def generate_test_function(cls,
             # Compares CPU and device inputs and outputs
             precision = half_precision if dtype == torch.half else float_precision
 
-            self.assertEqual(cpu_tensor, device_tensor, prec=precision)
-            self.assertEqual(cpu_args, device_args, prec=precision)
-            self.assertEqual(cpu_result, device_result, prec=precision)
+            # self.assertEqual(cpu_tensor, device_tensor, prec=precision)
+            self.assertEqual(cpu_tensor, device_tensor, atol=precision, rtol=1e-5)
+            # self.assertEqual(cpu_args, device_args, prec=precision)
+            self.assertEqual(cpu_args, device_args, atol=precision, rtol=1e-5)
+            # self.assertEqual(cpu_result, device_result, prec=precision)
+            self.assertEqual(cpu_result, device_result, atol=precision, rtol=1e-5)
 
     test_name = "test_" + op_str + subtest_str
     assert not hasattr(cls, test_name), "{0} already in TestDevicePrecision".format(test_name)
