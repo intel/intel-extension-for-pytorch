@@ -2,7 +2,7 @@
 #include <ATen/native/TensorIterator.h>
 #include "comm/AccumulateType.h"
 
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include "comm/Algorithm.h"
 #include "comm/Numerics.h"

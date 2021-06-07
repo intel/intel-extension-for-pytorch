@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"

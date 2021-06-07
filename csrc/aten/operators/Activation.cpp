@@ -3,9 +3,9 @@
 #include <ATen/native/Activation.h>
 
 #include <core/TensorImplUtils.h>
-#include <core/ApplyUtils.h>
+#include "comm/ApplyUtils.h"
 #include <core/Generator.h>
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <core/Stream.h>
 
 #include <cstdint>

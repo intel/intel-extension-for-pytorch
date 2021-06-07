@@ -1,8 +1,8 @@
 #include <c10/util/intrusive_ptr.h>
 
 #include <core/Context.h>
-#include <core/DPCPPUtils.h>
-#include <core/Exception.h>
+#include <utils/DPCPPUtils.h>
+#include <utils/Exception.h>
 #include <core/Memory.h>
 
 

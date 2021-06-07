@@ -2,8 +2,8 @@
 #include "comm/AccumulateType.h"
 
 #include <core/Context.h>
-#include <core/DPCPPTensorUtils.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
+#include <core/TensorImplUtils.h>
 #include <core/Memory.h>
 #include "comm/ATDispatch.h"
 
@@ -147,7 +147,7 @@ Tensor embedding_dense_backward_dpcpp(
   auto grad_arg = TensorArg(grad_, "grad", 1);
   auto indices_arg = TensorArg(indices, "indices", 1);
   checkScalarType("embedding_backward", indices_arg, kLong);
-  checkSameDPCPP("embedding_backward", grad_arg, indices_arg);
+  IsOnSameDevice("embedding_backward", grad_arg, indices_arg);
 
   auto indices_contig = indices.contiguous();
   auto indices_data = indices_contig.data_ptr<int64_t>();

@@ -8,7 +8,7 @@
 #include <core/detail/TensorInfo.h>
 
 #include <core/Context.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
 #include "MemoryAccess.h"
 
@@ -197,14 +197,14 @@ inline void elementwise_kernel_helper(func_t f, policy_t policy) {
   using return_t = typename traits::result_type;
   using args_t = typename traits::ArgsTuple;
 
-  return_t results[thread_work_size];
-  args_t args[thread_work_size];
+  return_t results[THREAD_WORK_SIZE];
+  args_t args[THREAD_WORK_SIZE];
 
   // load
   policy.load(args);
 
   // compute
-  for (int i = 0; i < thread_work_size; i++) {
+  for (int i = 0; i < THREAD_WORK_SIZE; i++) {
     if (policy.check_inbounds(i)) {
       results[i] = c10::guts::apply(f, args[i]);
     }
@@ -219,7 +219,7 @@ void unrolled_elementwise_kernel(DPCPP::item<1> item_id, int N, func_t f, array_
                                             inp_calc_t ic, out_calc_t oc, loader_t l, storer_t s)
 {
   int thread_idx = item_id.get_linear_id();
-  int remaining = N - thread_idx * thread_work_size;
+  int remaining = N - thread_idx * THREAD_WORK_SIZE;
   auto policy = at::native::Memory::policies::unroll<array_t, inp_calc_t, out_calc_t, loader_t, storer_t>(data, remaining, ic, oc, l, s,
                                                                                                           thread_idx);
   elementwise_kernel_helper(f, policy);
@@ -235,7 +235,7 @@ static inline void launch_unrolled_kernel(int64_t N, const func_t& f, array_t da
 
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
-  int thread_num = (N + thread_work_size - 1)/thread_work_size;
+  int thread_num = (N + THREAD_WORK_SIZE - 1)/THREAD_WORK_SIZE;
 
   auto cgf = DPCPP_Q_CGF(__cgh) {
 

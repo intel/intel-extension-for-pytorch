@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <c10/macros/Macros.h>
 
-#include <core/Array.h>
+#include <operators/comm/Array.h>
 #include <utils/IntegerDivider.h>
 
 

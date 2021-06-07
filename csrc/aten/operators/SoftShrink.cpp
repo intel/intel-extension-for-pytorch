@@ -1,7 +1,7 @@
 #include <ATen/native/TensorIterator.h>
 
 #include <core/Context.h>
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
 

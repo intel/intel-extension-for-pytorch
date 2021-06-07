@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Context.h>
 
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <oneDNN/oneDNN.h>
 #include "comm/ATDispatch.h"
 

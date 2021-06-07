@@ -10,7 +10,7 @@
 #include "comm/ATDispatch.h"
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 
 #include "Loops.h"
 

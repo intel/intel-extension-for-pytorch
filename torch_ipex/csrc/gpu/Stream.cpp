@@ -5,7 +5,7 @@
 #include "Stream.h"
 
 #include <structmember.h>
-#include <aten/core/Functions.h>
+#include <core/Device.h>
 
 
 PyObject *THDPStreamClass = nullptr;

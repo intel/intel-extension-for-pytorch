@@ -2,8 +2,8 @@
 
 #include <ATen/ATen.h>
 
-#include <core/ApplyUtils.h>
-#include <core/DPCPP.h>
+#include "ApplyUtils.h"
+#include <utils/DPCPP.h>
 #include <core/TensorImplUtils.h>
 #include "Numerics.h"
 #include "ATDispatch.h"

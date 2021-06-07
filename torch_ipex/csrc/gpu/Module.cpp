@@ -9,7 +9,7 @@
 #include "Event.h"
 #include "Stream.h"
 #include "Storage.h"
-#include <core/Functions.h>
+#include <core/Device.h>
 #include <core/Generator.h>
 #include <core/CachingAllocator.h>
 

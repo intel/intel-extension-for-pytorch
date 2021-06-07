@@ -7,9 +7,9 @@
 #include <ATen/native/TensorIterator.h>
 #include <assert.h>
 
-#include <core/Array.h>
+#include "comm/Array.h"
 #include <core/Context.h>
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <core/detail/OffsetCalculator.h>
 

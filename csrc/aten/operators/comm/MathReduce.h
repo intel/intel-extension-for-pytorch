@@ -2,8 +2,8 @@
 
 #include <ATen/ATen.h>
 
-#include <core/DPCPP.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPP.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 

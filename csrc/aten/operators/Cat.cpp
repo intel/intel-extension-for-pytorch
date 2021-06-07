@@ -1,8 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 
-#include <core/DPCPP.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPP.h>
+#include <utils/DPCPPUtils.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include "comm/ATDispatch.h"

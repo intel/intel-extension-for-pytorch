@@ -90,6 +90,10 @@ namespace DPCPP = cl::sycl;
 // TODO: set subgourp size with api get_max_sub_group_size
 #define DPCPP_SUB_GROUP_SIZE (1L)
 
+#define NUM_THREADS (C10_WARP_SIZE * 2)
+#define THREAD_WORK_SIZE 4
+#define BLOCK_WORK_SIZE (THREAD_WORK_SIZE * NUM_THREADS)
+
 // dpcpp device info
 static constexpr auto dpcpp_dev_name =
     DPCPP::info::device::name;

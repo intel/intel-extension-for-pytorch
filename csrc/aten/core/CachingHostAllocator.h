@@ -3,8 +3,8 @@
 #include <ATen/Context.h>
 #include <ATen/core/ATenGeneral.h>
 
-#include <core/DPCPPUtils.h>
-#include <core/Functions.h>
+#include <utils/DPCPPUtils.h>
+#include <core/Device.h>
 
 
 namespace xpu {

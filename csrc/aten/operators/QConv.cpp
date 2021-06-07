@@ -3,7 +3,7 @@
 #include <ATen/native/quantized/cpu/conv_packed_params.h>
 #include "comm/ParamUtils.h"
 
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Quantizer.h>
 #include <oneDNN/oneDNN.h>
 

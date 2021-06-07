@@ -2,7 +2,7 @@
 #include <ATen/native/PointwiseOps.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 
 #include "comm/ATDispatch.h"
 

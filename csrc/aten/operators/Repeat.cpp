@@ -1,8 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/native/Repeat.h>
 
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
+#include "comm/Helpers.h"
 
 
 using namespace at::native;

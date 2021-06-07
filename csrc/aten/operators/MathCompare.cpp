@@ -4,7 +4,7 @@
 #include <ATen/AtenIpexTypeXPU.h>
 #include <ATen/quantized/QTensorImpl.h>
 
-#include <core/ApplyUtils.h>
+#include "comm/ApplyUtils.h"
 #include <core/TensorImplUtils.h>
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"

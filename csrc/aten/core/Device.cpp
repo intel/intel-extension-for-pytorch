@@ -1,5 +1,4 @@
 #include "Device.h"
-#include "Functions.h"
 
 
 namespace xpu {

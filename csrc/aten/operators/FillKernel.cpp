@@ -1,7 +1,7 @@
 #include <ATen/native/Fill.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <core/ApplyUtils.h>
+#include "comm/ApplyUtils.h"
 #include <core/detail/IndexUtils.h>
 #include "comm/ATDispatch.h"
 

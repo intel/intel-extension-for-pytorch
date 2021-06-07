@@ -1,14 +1,17 @@
 #pragma once
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 
 #include <c10/util/Exception.h>
-#include <core/Macros.h>
+#include <utils/Macros.h>
 
 #ifdef USE_ONEMKL
 #include <oneapi/mkl.hpp>
 #include <mkl.h>
 #include <core/oneMKLUtils.h>
 #endif
+
+namespace xpu {
+namespace dpcpp {
 
 #define AT_DPCPP_TRY try {
 #ifdef USE_ONEMKL
@@ -125,3 +128,14 @@
       TORCH_CHECK(0, "assert(%s) failed", #cond); \
     }                                             \
   } while (0)
+
+static DPCPP::async_handler dpcppAsyncHandler = [](DPCPP::exception_list eL) {
+  for (auto& e : eL) {
+    AT_DPCPP_TRY
+    std::rethrow_exception(e);
+    AT_DPCPP_CATCH_RETHROW(__FILE__, __LINE__)
+  }
+};
+
+} // namespace dpcpp
+} // namespace xpu

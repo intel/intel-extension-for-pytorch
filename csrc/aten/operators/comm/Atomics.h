@@ -1,8 +1,9 @@
 #pragma once
 
-#include <core/DPCPP.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPP.h>
+#include <utils/DPCPPUtils.h>
 #include "Numerics.h"
+#include "Scalar.h"
 
 
 using namespace xpu::dpcpp;

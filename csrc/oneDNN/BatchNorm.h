@@ -2,7 +2,7 @@
 
 #include <ATen/ATen.h>
 
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <oneDNN/Runtime.h>
 #include <oneDNN/LRUCache.h>
 #include <core/Quantizer.h>

@@ -4,9 +4,9 @@
 
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
-#include <core/DPCPP.h>
-#include <core/DPCPPUtils.h>
-#include <core/ApplyUtils.h>
+#include <utils/DPCPP.h>
+#include <utils/DPCPPUtils.h>
+#include "comm/ApplyUtils.h"
 
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"

@@ -1,9 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/AccumulateType.h>
 #include <ATen/NativeFunctions.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
-#include <core/NumericLimits.h>
+#include "comm/NumericLimits.h"
 #include "comm/Atomics.h"
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"

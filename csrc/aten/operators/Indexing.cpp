@@ -2,14 +2,15 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
-#include <core/ApplyUtils.h>
-#include <core/DPCPP.h>
+#include "comm/ApplyUtils.h"
+#include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/TensorImplUtils.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include "comm/Atomics.h"
+#include "comm/Helpers.h"
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"

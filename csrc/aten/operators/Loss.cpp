@@ -5,10 +5,9 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
-#include <core/ApplyUtils.h>
-#include <core/DPCPP.h>
-#include <core/DPCPPTensorUtils.h>
-#include <core/DPCPPUtils.h>
+#include "comm/ApplyUtils.h"
+#include <utils/DPCPP.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include <oneDNN/oneDNN.h>
@@ -1018,7 +1017,7 @@ void MultilabelMarginCriterion_updateGradInput(
         " for ",
         target_arg);
   }
-  checkSameDPCPP(
+  IsOnSameDevice(
       "multilabel_margin_loss_backward_out", target_arg, is_target_arg);
 
   TORCH_CHECK(

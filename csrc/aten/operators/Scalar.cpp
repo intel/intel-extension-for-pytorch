@@ -2,7 +2,7 @@
 #include <ATen/NativeFunctions.h>
 #include "comm/ATDispatch.h"
 #include <core/Context.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
 
 

@@ -6,8 +6,8 @@
 #include <c10/macros/Macros.h>
 #include <stdlib.h>
 
-#include <core/ApplyUtils.h>
-#include <core/DPCPP.h>
+#include "comm/ApplyUtils.h"
+#include <utils/DPCPP.h>
 #include <core/detail/TensorInfo.h>
 
 

@@ -11,8 +11,9 @@
 #include "comm/QUtil.h"
 
 #ifdef USE_ONEMKL
-#include <oneapi/mkl.hpp>
 #include <mkl.h>
+#include <oneapi/mkl.hpp>
+#include <core/oneMKLUtils.h>
 #endif
 
 #include <c10/util/typeid.h>

@@ -1,8 +1,8 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
-#include <core/NumericLimits.h>
+#include "comm/NumericLimits.h"
 #include "comm/AccumulateType.h"
 #include "comm/ATDispatch.h"
 #include "comm/Atomics.h"

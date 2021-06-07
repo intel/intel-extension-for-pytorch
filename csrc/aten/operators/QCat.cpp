@@ -2,7 +2,7 @@
 #include <ATen/core/op_registration/op_registration.h>
 #include <ATen/native/quantized/cpu/conv_packed_params.h>
 
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Quantizer.h>
 #include <oneDNN/oneDNN.h>
 

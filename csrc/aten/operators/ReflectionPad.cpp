@@ -1,5 +1,5 @@
 #include <ATen/ATen.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/detail/IndexUtils.h>
 #include "comm/Atomics.h"

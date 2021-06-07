@@ -2,7 +2,7 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <oneDNN/oneDNN.h>
 
 #include "comm/ParamUtils.h"

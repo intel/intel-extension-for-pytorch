@@ -4,7 +4,7 @@
 #include <ATen/core/op_registration/op_registration.h>
 #include <torch/custom_class.h>
 
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include "comm/ParamUtils.h"
 #include <oneDNN/oneDNN.h>
 

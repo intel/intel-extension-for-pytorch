@@ -5,7 +5,7 @@
 #include <ATen/AtenIpexTypeXPU.h>
 
 #include <intrinsic/ipex_intrinsic.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <oneDNN/oneDNN.h>
 #include "comm/ParamUtils.h"
 #include "InnerProduct.h"

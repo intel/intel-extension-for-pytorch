@@ -1,6 +1,6 @@
 #pragma once
 
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Stream.h>
 
 

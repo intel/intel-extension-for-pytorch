@@ -3,7 +3,7 @@
 #include "comm/AccumulateType.h"
 
 #include <core/Context.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Generator.h>
 #include <core/Memory.h>
 #include "comm/Numerics.h"
@@ -13,8 +13,9 @@
 #include "Loops.h"
 
 #ifdef USE_ONEMKL
-#include <oneapi/mkl.hpp>
 #include <mkl.h>
+#include <oneapi/mkl.hpp>
+#include <core/oneMKLUtils.h>
 #endif
 
 

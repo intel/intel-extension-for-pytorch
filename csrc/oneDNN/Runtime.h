@@ -3,7 +3,7 @@
 #include <ATen/Config.h>
 
 #include <core/Context.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <utils/Profiler.h>
 #include <utils/Timer.h>

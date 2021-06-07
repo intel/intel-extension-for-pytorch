@@ -7,6 +7,7 @@
 #include <core/Context.h>
 
 #include <math.h>
+#include "Helpers.h"
 
 
 namespace xpu {

@@ -2,7 +2,7 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/LinearAlgebraUtils.h>
 
-#include <core/ApplyUtils.h>
+#include "comm/ApplyUtils.h"
 #include <core/Context.h>
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
@@ -10,6 +10,7 @@
 #ifdef USE_ONEMKL
 #include <mkl.h>
 #include <oneapi/mkl.hpp>
+#include <core/oneMKLUtils.h>
 #endif
 
 

@@ -1,4 +1,4 @@
-#include <core/Functions.h>
+#include <core/Device.h>
 #include <core/Generator.h>
 
 

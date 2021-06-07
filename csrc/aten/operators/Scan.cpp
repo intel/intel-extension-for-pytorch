@@ -1,10 +1,11 @@
 #include <ATen/ATen.h>
 
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
 #include "comm/ATDispatch.h"
+#include "comm/Helpers.h"
 
 
 using namespace at::detail;

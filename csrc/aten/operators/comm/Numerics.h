@@ -2,9 +2,9 @@
 
 #include <ATen/ATen.h>
 
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 #include "General.h"
-#include <core/NumericLimits.h>
+#include "NumericLimits.h"
 
 template <typename T>
 struct Numerics {};

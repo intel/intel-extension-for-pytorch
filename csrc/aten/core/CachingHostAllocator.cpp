@@ -1,5 +1,5 @@
 #include <c10/util/Exception.h>
-#include <core/Macros.h>
+#include <utils/Macros.h>
 #include <core/Context.h>
 #include <core/CachingHostAllocator.h>
 

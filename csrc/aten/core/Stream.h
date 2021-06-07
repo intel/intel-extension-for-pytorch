@@ -6,8 +6,8 @@
 #include <c10/core/Stream.h>
 #include <c10/util/Exception.h>
 
-#include <core/DPCPPUtils.h>
-#include <core/Macros.h>
+#include <utils/DPCPPUtils.h>
+#include <utils/Macros.h>
 
 
 using namespace at;
@@ -20,7 +20,7 @@ namespace dpcpp {
 #define DPCPP_STREAM_NETWORK_INDEX 2
 #define DPCPP_STREAM_MAX_INDEX 32
 
-class AT_DPCPP_API DPCPPStream {
+class IPEX_API DPCPPStream {
  public:
   enum Unchecked { UNCHECKED };
 

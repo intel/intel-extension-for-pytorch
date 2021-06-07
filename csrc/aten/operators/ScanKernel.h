@@ -1,4 +1,4 @@
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 
 // Collection of in-kernel scan / prefix sum utilities
 

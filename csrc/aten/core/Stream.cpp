@@ -1,9 +1,8 @@
 #include <c10/util/Exception.h>
 
 #include <core/Context.h>
-#include <core/DPCPP.h>
-#include <core/DPCPPUtils.h>
-#include <core/Exception.h>
+#include <utils/DPCPP.h>
+#include <utils/Exception.h>
 #include <core/Guard.h>
 #include <core/Stream.h>
 #include <utils/Env.h>

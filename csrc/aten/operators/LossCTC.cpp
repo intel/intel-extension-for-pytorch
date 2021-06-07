@@ -1,9 +1,8 @@
 #include <ATen/ATen.h>
 
 #include <core/Context.h>
-#include <core/DPCPP.h>
-#include <core/DPCPPTensorUtils.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPP.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
 #include "comm/AccumulateType.h"
 #include "comm/ATDispatch.h"

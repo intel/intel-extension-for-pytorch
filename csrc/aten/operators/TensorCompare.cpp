@@ -1,9 +1,9 @@
 #include <ATen/ATen.h>
 #include "comm/AccumulateType.h"
 
-#include <core/ApplyUtils.h>
+#include "comm/ApplyUtils.h"
 #include <core/Context.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
 
 #include "comm/ATDispatch.h"

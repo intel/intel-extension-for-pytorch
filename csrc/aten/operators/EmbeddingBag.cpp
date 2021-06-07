@@ -2,9 +2,9 @@
 #include "comm/AccumulateType.h"
 
 #include <core/Context.h>
-#include <core/DPCPP.h>
-#include <core/DPCPPTensorUtils.h>
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPP.h>
+#include <core/TensorImplUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
 
 #include "comm/Atomics.h"
@@ -812,8 +812,8 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _embedding_bag_dpcpp(
   auto offsets_arg = TensorArg(offsets, "offsets", 1);
   checkScalarType("embedding_bag_dpcpp", offsets_arg, kLong);
   auto weight_arg = TensorArg(weight, "weight", 1);
-  checkSameDPCPP("embedding_bag_dpcpp", weight_arg, indices_arg);
-  checkSameDPCPP("embedding_bag_dpcpp", weight_arg, offsets_arg);
+  IsOnSameDevice("embedding_bag_dpcpp", weight_arg, indices_arg);
+  IsOnSameDevice("embedding_bag_dpcpp", weight_arg, offsets_arg);
 
   int64_t numIndices = indices.size(0);
   int64_t numBags = offsets.size(0);

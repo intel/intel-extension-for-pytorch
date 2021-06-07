@@ -190,17 +190,17 @@ struct unroll {
     data(data), remaining(remaining), input_offset_calculator(ic), output_offset_calculator(oc), loader(l), storer(s), thread_idx(thread_idx) {}
 
    inline bool check_inbounds(int thread_work_elem) {
-     return ((/*thread_idx*thread_work_size + */thread_work_elem) < remaining);
+     return ((/*thread_idx*THREAD_WORK_SIZE + */thread_work_elem) < remaining);
   }
 
   template<typename args_t>
    inline void load(args_t *args) {
     constexpr int arity = std::tuple_size<args_t>::value;
-    for (int i = 0; i < thread_work_size; i++) {
+    for (int i = 0; i < THREAD_WORK_SIZE; i++) {
       if (i >= remaining) {
         return;
       }
-      int linear_idx = thread_idx*thread_work_size + i;
+      int linear_idx = thread_idx*THREAD_WORK_SIZE + i;
       auto offset = input_offset_calculator.get(linear_idx);
       detail::static_unroll<detail::unroll_load_helper, arity>::with_args(*this, args, offset, loader, i, num_outputs);
     }
@@ -208,11 +208,11 @@ struct unroll {
 
   template<typename scalar_t>
    inline void store(scalar_t *from) {
-    for (int i = 0; i < thread_work_size; i++) {
+    for (int i = 0; i < THREAD_WORK_SIZE; i++) {
       if (i >= remaining) {
         return;
       }
-      int linear_idx = thread_idx*thread_work_size + i;
+      int linear_idx = thread_idx*THREAD_WORK_SIZE + i;
       int offset = output_offset_calculator.get(linear_idx)[0];
       storer.store(from[i], data[0], offset);
     }
@@ -227,8 +227,8 @@ struct unroll {
 template <int vec_size, typename data_t>  // vec_size: number of scalars, can be 1, 2, or 4.
 struct vectorized {
 
-  static_assert(thread_work_size % vec_size == 0, "The workload per thread must be a multiple of vec_size");
-  static constexpr int loop_size = thread_work_size / vec_size;
+  static_assert(THREAD_WORK_SIZE % vec_size == 0, "The workload per thread must be a multiple of vec_size");
+  static constexpr int loop_size = THREAD_WORK_SIZE / vec_size;
 
   data_t data;
   int thread_idx;
@@ -266,7 +266,7 @@ struct vectorized {
    inline void store(scalar_t *from) {
     using vec_t = typename aligned_vector<scalar_t, vec_size>::type;
     using element_t = typename aligned_vector<scalar_t, vec_size>::element_type;
-    scalar_t *to = reinterpret_cast<scalar_t *>(data[0])/* + thread_work_size * thread_idx*/;
+    scalar_t *to = reinterpret_cast<scalar_t *>(data[0])/* + THREAD_WORK_SIZE * thread_idx*/;
     vec_t *to_ = reinterpret_cast<vec_t *>(to);
     element_t *from_ = reinterpret_cast<element_t *>(from);
     for (int i = 0; i < loop_size; i++) {
@@ -295,7 +295,7 @@ struct vectorized {
 ////    int thread_idx = threadIdx.x;
 //    int thread_idx = 0;//threadIdx.x;
 ////    #pragma unroll
-//    for (int i = 0; i < thread_work_size; i++) {
+//    for (int i = 0; i < THREAD_WORK_SIZE; i++) {
 //      if (thread_idx >= this->remaining) {
 //        return;
 //      }

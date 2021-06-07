@@ -3,9 +3,9 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
-#include <core/ApplyUtils.h>
-#include <core/DPCPP.h>
-#include <core/DPCPPUtils.h>
+#include "comm/ApplyUtils.h"
+#include <utils/DPCPP.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Memory.h>
 #include <core/TensorImplUtils.h>
 #include "comm/ATDispatch.h"

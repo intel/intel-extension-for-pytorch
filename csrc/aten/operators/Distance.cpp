@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/Distance.h>
 
-#include <core/DPCPP.h>
+#include <utils/DPCPP.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include "comm/Numerics.h"

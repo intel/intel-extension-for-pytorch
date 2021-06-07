@@ -2,7 +2,7 @@
 #include <ATen/Context.h>
 #include <c10/util/Exception.h>
 
-#include <core/DPCPPUtils.h>
+#include <utils/DPCPPUtils.h>
 #include <core/Device.h>
 #include <core/Generator.h>
 #include <core/detail/Hooks.h>
