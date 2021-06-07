@@ -293,7 +293,7 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
   {{aten::linear, aten::relu}, ipex::linear_relu},
   {{aten::linear, aten::gelu}, ipex::linear_gelu},
   {{aten::linear, Symbol::fromQualString("aten::relu_")}, ipex::linear_relu},
-
+  {{aten::matmul, aten::div}, ipex::matmul_div},
   // 3d ops
   {{aten::conv3d, aten::relu}, ipex::conv3d_relu},
   {{aten::conv3d, Symbol::fromQualString("aten::relu_")}, ipex::conv3d_relu},

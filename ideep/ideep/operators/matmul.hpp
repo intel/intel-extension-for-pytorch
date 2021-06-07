@@ -90,10 +90,12 @@ private:
    scale_t dst_scales_in;
    auto dst_data_type = data_type::f32;
 
-   tensor::dims dst_dims = {src.get_dim(0), weights.get_dim(1)};
+   tensor::dims dst_dims = {src.get_dim(0)};
    auto ndims = weights.ndims();
-   if (ndims == 3) 
-       dst_dims = {src.get_dim(0), src.get_dim(1), weights.get_dim(2)};
+   for ( auto i = 1; i < ndims -1; i++){
+     dst_dims.push_back(src.get_dim(i));
+   }
+   dst_dims.push_back( weights.get_dim(ndims-1));
 
    auto weights_scales_in =
        weights.has_scale() ? weights.get_scale() : weights_scales;

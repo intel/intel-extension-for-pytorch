@@ -408,6 +408,26 @@ class ChannelShuffle(nn.Module):
         x = x.view(self.batchsize, -1, self.height, self.width)
         return x
 
+class MatmulDiv(nn.Module):
+    def __init__(self, div_scalar=False, with_out=False):
+        super(MatmulDiv, self).__init__()
+        self.div_scalar = div_scalar
+        self.with_out = with_out
+
+    def forward(self, x):
+        mm_res = None
+        y = torch.transpose(x, 1, 2).contiguous()
+        mm_res_shape = x.size()[:-1] + (y.size()[-1:])
+        if self.with_out:
+            mm_res = torch.randn(mm_res_shape, dtype=x.dtype)
+            torch.matmul(x, y, out=mm_res)
+        else:
+            mm_res = torch.matmul(x, y)
+        if self.div_scalar:
+            return mm_res.div(2.0)  
+        else:
+            return mm_res.div(torch.ones(mm_res_shape,dtype=x.dtype)+1)
+          
 
 class Tester(TestCase):
 
@@ -803,8 +823,53 @@ class Tester(TestCase):
             ConvSumInDiffBlock(2, 3, 32, kernel_size=1, stride=1, padding=0),
             torch.rand(32, 3, 64, 64),
             kind_not_in_graph="ipex::conv2d_sum")
-
-
+    
+    def test_matmul_div(self):
+        self._test_output(
+            MatmulDiv(div_scalar=True, with_out=True),
+            torch.randn(10, 3, 4),
+            kind_in_graph="ipex::matmul_div",
+            kind_not_in_graph=None)
+        self._test_output(
+            MatmulDiv(div_scalar=True, with_out=False),
+            torch.randn(10, 3, 4),
+            kind_in_graph="ipex::matmul_div",
+            kind_not_in_graph=None)
+        self._test_output(
+            MatmulDiv(div_scalar=False, with_out=False),
+            torch.randn(10, 3, 4),
+            kind_in_graph="ipex::matmul_div",
+            kind_not_in_graph=None)
+        self._test_output(
+            MatmulDiv(div_scalar=False, with_out=True),
+            torch.randn(10, 3, 4),
+            kind_in_graph="ipex::matmul_div",
+            kind_not_in_graph=None)
+        self._test_output_bf16(
+            MatmulDiv(div_scalar=True, with_out=True),
+            torch.randn(10, 3, 4, dtype=torch.bfloat16),
+            kind_in_graph="ipex::matmul_div",
+            kind_not_in_graph=None,
+            prec=5e-2)
+        self._test_output_bf16(
+            MatmulDiv(div_scalar=True, with_out=False),
+            torch.randn(10, 3, 4, dtype=torch.bfloat16),
+            kind_in_graph="ipex::matmul_div",
+            kind_not_in_graph=None,
+            prec=5e-2)
+        self._test_output_bf16(
+            MatmulDiv(div_scalar=False, with_out=True),
+            torch.randn(10, 3, 4, dtype=torch.bfloat16),
+            kind_in_graph="ipex::matmul_div",
+            kind_not_in_graph=None,
+            prec=5e-3)
+        self._test_output_bf16(
+            MatmulDiv(div_scalar=False, with_out=False),
+            torch.randn(10, 3, 4, dtype=torch.bfloat16),
+            kind_in_graph="ipex::matmul_div",
+            kind_not_in_graph=None,
+            prec=5e-3)
+ 
 if __name__ == '__main__':
     torch.manual_seed(2020)
     test = unittest.main()

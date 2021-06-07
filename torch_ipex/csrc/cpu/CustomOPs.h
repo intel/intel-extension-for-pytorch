@@ -3,6 +3,7 @@
 #include <ATen/Tensor.h>
 
 #include <torch/csrc/jit/runtime/custom_operator.h>
+#include <c10/core/Scalar.h>
 
 #include "ideep/ideep.hpp"
 
@@ -22,6 +23,7 @@ namespace ipex {
   static auto linear = Symbol::fromQualString("ipex::linear");
   static auto linear_relu = Symbol::fromQualString("ipex::linear_relu");
   static auto linear_gelu = Symbol::fromQualString("ipex::linear_gelu");
+  static auto matmul_div = Symbol::fromQualString("ipex::matmul_div");
 
   // 3d ops
   static auto conv3d_relu = Symbol::fromQualString("ipex::conv3d_relu");
@@ -63,6 +65,10 @@ class AtenIpexJITDev {
   static at::Tensor dil_linear_fuse_eltwise(const at::Tensor& self, const at::Tensor& weight, const at::Tensor& bias, const ideep::attr_t& attr);
 
   static at::Tensor dil_linear_add(const at::Tensor& self, const at::Tensor& weight, const at::Tensor& bias, at::Tensor& accumu, at::Scalar alpha);
+  
+  static at::Tensor dil_matmul_div(const at::Tensor & left, const at::Tensor& right, at::Tensor out_opt, const at::Tensor& div_input);
+
+  static at::Tensor dil_matmul_div(const at::Tensor & left, const at::Tensor& right, at::Tensor out_opt, const c10::Scalar& div_input); 
 
 };
 

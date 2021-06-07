@@ -179,6 +179,7 @@ RegisterOperators op({
             };
         },
         aliasAnalysisFromSchema()),
+
     Operator(
         "ipex::linear_add(Tensor input, Tensor weight, Tensor? bias, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
         [](const Node* node) -> Operation {
@@ -196,7 +197,70 @@ RegisterOperators op({
             };
         },
         aliasAnalysisFromSchema()),
+     
+    Operator(
+        "ipex::matmul_div(Tensor left, Tensor right, Tensor? out_opt, Tensor div_input) -> Tensor",
+        [](const Node* node) -> Operation {
+            return [](Stack* stack) {
+              auto result = AtenIpexJITDev::dil_matmul_div(
+                  (std::move(peek(stack, 0, 4))).toTensor(),
+                  (std::move(peek(stack, 1, 4))).toTensor(),
+                  toOptionalTensor(std::move(peek(stack, 2, 4))),
+                 (std::move(peek(stack, 3, 4))).toTensor());
+              drop(stack, 4);
+              pack(stack, std::move(result));
+              return 0;
+            };
+        },
+        aliasAnalysisFromSchema()),
 
-      });
+    Operator(
+        "ipex::matmul_div(Tensor left, Tensor right, Tensor? out_opt, Scalar div_input) -> Tensor",
+        [](const Node* node) -> Operation {
+            return [](Stack* stack) {
+              auto result = AtenIpexJITDev::dil_matmul_div(
+                  (std::move(peek(stack, 0, 4))).toTensor(),
+                  (std::move(peek(stack, 1, 4))).toTensor(),
+                  toOptionalTensor(std::move(peek(stack, 2, 4))),
+                  (std::move(peek(stack, 3, 4))).toScalar());
+              drop(stack, 4);
+              pack(stack, std::move(result));
+              return 0;
+            };
+        },
+        aliasAnalysisFromSchema()),
+  
+    Operator(
+        "ipex::matmul_div(Tensor left, Tensor right,  Tensor div_input) -> Tensor",
+        [](const Node* node) -> Operation {
+            return [](Stack* stack) {
+              auto result = AtenIpexJITDev::dil_matmul_div(
+                  (std::move(peek(stack, 0, 3))).toTensor(),
+                  (std::move(peek(stack, 1, 3))).toTensor(),
+                  at::Tensor(),
+                 (std::move(peek(stack, 2, 3))).toTensor());
+              drop(stack, 3);
+              pack(stack, std::move(result));
+              return 0;
+            };
+        },
+        aliasAnalysisFromSchema()),
+  
+    Operator(
+        "ipex::matmul_div(Tensor left, Tensor right,  Scalar div_input) -> Tensor",
+        [](const Node* node) -> Operation {
+            return [](Stack* stack) {
+              auto result = AtenIpexJITDev::dil_matmul_div(
+                  (std::move(peek(stack, 0, 3))).toTensor(),
+                  (std::move(peek(stack, 1, 3))).toTensor(),
+                  at::Tensor(),
+                  (std::move(peek(stack, 2, 3))).toScalar());
+              drop(stack, 3);
+              pack(stack, std::move(result));
+              return 0;
+            };
+        },
+        aliasAnalysisFromSchema()),
+    });
 } // namespace jit
 } // namespace torch
