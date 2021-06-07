@@ -55,7 +55,7 @@ import unittest
 from functools import reduce
 
 import torch
-import torch_ipex as ipex
+import intel_pytorch_extension as ipex
 from common_ipex_conf import AutoMixPrecision, AutoDNNL
 
 import torch.nn as nn
@@ -332,7 +332,7 @@ class TestOP(TestCase):
             a1 = torch.randn((1, 1, 3, 2), device=device)
             a2 = torch.randn((3, 2), device=device)
             res1 = torch.mul(a1, a2)
-            self.assertTrue(ipex._C.is_dil_tensor(res1))
+            self.assertTrue(ipex.core.is_dil_tensor(res1))
             with AutoDNNL(False):
                 a1 = a1.to(device='cpu')
                 a2 = a2.to(device='cpu')
@@ -352,7 +352,7 @@ class TestOP(TestCase):
             a1 = torch.randn((1, 2, 3, 2), device=device)
             a2 = torch.randn((1, 3, 2), device=device)
             res1 = torch.mul(a1, a2)
-            self.assertTrue(ipex._C.is_dil_tensor(res1))
+            self.assertTrue(ipex.core.is_dil_tensor(res1))
             with AutoDNNL(False):
                 a1 = a1.to(device='cpu')
                 a2 = a2.to(device='cpu')
@@ -363,7 +363,7 @@ class TestOP(TestCase):
             a1 = torch.randn((1, 2, 3, 2), device=device)
             a2 = torch.randn((1, 2), device=device)
             res1 = torch.mul(a1, a2)
-            self.assertTrue(ipex._C.is_dil_tensor(res1))
+            self.assertTrue(ipex.core.is_dil_tensor(res1))
             with AutoDNNL(False):
                 a1 = a1.to(device='cpu')
                 a2 = a2.to(device='cpu')
@@ -374,7 +374,7 @@ class TestOP(TestCase):
             a1 = torch.randn((1, 2, 3, 2), device=device)
             a2 = torch.randn((2), device=device)
             res1 = torch.mul(a1, a2)
-            self.assertTrue(ipex._C.is_dil_tensor(res1))
+            self.assertTrue(ipex.core.is_dil_tensor(res1))
 
     def test_div(self):
         a1 = torch.tensor([4.2, 6.2], device=device)
@@ -467,8 +467,8 @@ class TestOP(TestCase):
         self.assertRaises(RuntimeError, lambda: tensor.view(15, -1, -1))
 
         # TODO(Eikan): DNNL OP does not support >6 dim tensor, so we disable it temporily. When we fix it, we will open it
-        old_dnnl_conf = ipex._C.get_auto_dnnl()
-        ipex._C.disable_auto_dnnl()
+        old_dnnl_conf = ipex.core.get_auto_dnnl()
+        ipex.core.disable_auto_dnnl()
         # test view when tensor is not contiguous in every dimension, but only
         # contiguous dimensions are touched.
         tensor = torch.rand(4, 2, 5, 1, 6, 2, 9, 3, device=device).transpose(-1, 2).transpose(-2, 3)
@@ -495,9 +495,9 @@ class TestOP(TestCase):
         view_size = [1, 1, 2, 1, 4, 3, 1, 1, 9, 1, 2, 1, 2, 3, 1, 5, 1, 1]
         self.assertEqual(tensor.view(*view_size), contig_tensor.view(*view_size))
         if old_dnnl_conf:
-            ipex._C.enable_auto_dnnl()
+            ipex.core.enable_auto_dnnl()
         else:
-            ipex._C.disable_auto_dnnl()
+            ipex.core.disable_auto_dnnl()
 
         # invalid views
         self.assertRaises(RuntimeError, lambda: tensor.view(-1))

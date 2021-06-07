@@ -2,7 +2,7 @@ import unittest
 import copy
 
 import torch
-import torch_ipex as ipex
+import intel_pytorch_extension as ipex
 import torch.nn as nn
 from common_utils import TestCase
 from numbers import Number

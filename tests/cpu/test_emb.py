@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch_ipex as ipex
+import intel_pytorch_extension as ipex
 import unittest
 import copy
 from common_utils import TestCase

@@ -2,7 +2,7 @@
 from __future__ import print_function
 
 TORCH_VERSION = '1.8.0'
-TORCH_IPEX_VERSION = '1.3.0'
+TORCH_IPEX_VERSION = '1.8.0'
 
 # import torch
 import platform
@@ -436,7 +436,11 @@ setup(
     packages=[
       'torch_ipex',
       'torch_ipex.ops',
-      'torch_ipex.optim'],
+      'torch_ipex.optim',
+      'intel_pytorch_extension',
+      'intel_pytorch_extension.ops',
+      'intel_pytorch_extension.optim'],
+    package_dir={'intel_pytorch_extension': 'torch_ipex'},
     package_data={
         'torch_ipex':[
             'README.md',

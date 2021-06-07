@@ -83,7 +83,7 @@ from common_device_type import instantiate_device_type_tests, \
     skipIf, skipCPUIfNoLapack, skipCUDAIfNoMagma, skipCUDAIfRocm, onlyCUDA, onlyCPU, \
     dtypes, dtypesIfCUDA, deviceCountAtLeast, skipCUDAIf, precisionOverride, ipex
 import torch.backends.quantized
-import torch_ipex as ipex
+import intel_pytorch_extension as ipex
 
 
 # load_tests from common_utils is used to automatically filter tests for
@@ -164,7 +164,7 @@ class BytesIOContext(io.BytesIO):
         pass
 
 
-# This is intentionally prefixed by an unders_C. Otherwise pytest will try to
+# This is intentionally prefixed by an underscore. Otherwise pytest will try to
 # run its methods as test cases.
 class _TestTorchMixin(object):
     def _make_tensors(self, shape, val_range=(-100, 100), use_floating=True, use_integral=True):
