@@ -7,8 +7,8 @@
 #include "comm/Pointwise.h"
 #include <ATen/AtenIpexTypeXPU.h>
 
+#include "comm/zmath.h"
 #include "Loops.h"
-#include "zmath.h"
 
 using namespace xpu::dpcpp;
 
