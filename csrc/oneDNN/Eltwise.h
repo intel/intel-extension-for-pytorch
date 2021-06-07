@@ -7,7 +7,7 @@
 #include <oneDNN/Runtime.h>
 #include <oneDNN/LRUCache.h>
 #include <tensor/Context.h>
-#include <ATen/ipex_type_dpcpp_customized.h>
+#include <intrinsic/ipex_intrinsic.h>
 
 
 using namespace dnnl;

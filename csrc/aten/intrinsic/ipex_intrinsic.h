@@ -69,5 +69,7 @@ at::Tensor dequantize_tensor_per_channel_affine(at::Tensor& rtensor, const at::T
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
+
 at::Tensor trans_linear(const at::Tensor & input, const at::Tensor & m1, const at::Tensor & m2, at::Scalar beta=1.0f, at::Scalar alpha=1.0f);
+
 }}

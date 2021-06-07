@@ -2,7 +2,7 @@
 
 #include <ATen/quantized/Quantizer.h>
 
-#include <ATen/ipex_type_dpcpp_customized.h>
+#include <intrinsic/ipex_intrinsic.h>
 #include "Quantizer.h"
 
 

@@ -5,7 +5,7 @@
 #include <ATen/native/TensorFactories.h>
 #include <ATen/InitialTensorOptions.h>
 #include <ATen/quantized/QTensorImpl.h>
-#include <ATen/ipex_type_dpcpp_customized.h>
+#include <intrinsic/ipex_intrinsic.h>
 
 #include "comm/ATDispatch.h"
 #include <core/Context.h>

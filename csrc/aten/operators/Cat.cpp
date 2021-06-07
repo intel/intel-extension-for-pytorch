@@ -10,7 +10,7 @@
 #include <core/Memory.h>
 #include <oneDNN/oneDNN.h>
 #include <tensor/Context.h>
-#include <ATen/ipex_type_dpcpp_customized.h>
+#include <intrinsic/ipex_intrinsic.h>
 
 #include "Cat.h"
 

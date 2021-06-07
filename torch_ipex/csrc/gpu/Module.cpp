@@ -3,7 +3,7 @@
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/tensor/python_tensor.h>
 
-#include <ATen/ipex_type_dpcpp_customized.h>
+#include <intrinsic/ipex_intrinsic.h>
 #include <jit/fusion_pass.h>
 #include "Module.h"
 #include "Event.h"

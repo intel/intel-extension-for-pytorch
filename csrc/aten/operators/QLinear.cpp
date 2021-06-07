@@ -4,7 +4,7 @@
 #include <ATen/core/op_registration/op_registration.h>
 #include <ATen/AtenIpexTypeXPU.h>
 
-#include <ATen/ipex_type_dpcpp_customized.h>
+#include <intrinsic/ipex_intrinsic.h>
 #include <core/DPCPPUtils.h>
 #include <oneDNN/oneDNN.h>
 #include "comm/ParamUtils.h"

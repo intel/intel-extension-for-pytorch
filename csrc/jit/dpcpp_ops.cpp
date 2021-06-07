@@ -3,7 +3,7 @@
 #include <oneapi/dnnl/dnnl.hpp>
 
 #include <ATen/AtenIpexTypeXPU.h>
-#include <ATen/ipex_type_dpcpp_customized.h>
+#include <intrinsic/ipex_intrinsic.h>
 
 
 namespace torch {

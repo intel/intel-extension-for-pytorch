@@ -1,5 +1,5 @@
 #include <ATen/ATen.h>
-#include <ATen/ipex_type_dpcpp_customized.h>
+#include <intrinsic/ipex_intrinsic.h>
 
 namespace at {
 namespace AtenIpexTypeXPU {

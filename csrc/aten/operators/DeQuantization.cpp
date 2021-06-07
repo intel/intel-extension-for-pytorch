@@ -6,7 +6,7 @@
 #include <ATen/quantized/QTensorImpl.h>
 #include <ATen/quantized/Quantizer.h>
 #include <c10/util/Exception.h>
-#include <ATen/ipex_type_dpcpp_customized.h>
+#include <intrinsic/ipex_intrinsic.h>
 
 #include <core/Context.h>
 #include <core/TensorImplUtils.h>

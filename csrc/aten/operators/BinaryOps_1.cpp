@@ -1,7 +1,7 @@
 #include <ATen/Context.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
-#include <ATen/ipex_type_dpcpp_customized.h>
+#include <intrinsic/ipex_intrinsic.h>
 
 #include <core/DPCPP.h>
 #include "comm/Pointwise.h"
