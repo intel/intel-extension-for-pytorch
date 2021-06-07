@@ -371,7 +371,7 @@ static void apply_ormqr_dpcpp_(
     const int64_t k_,
     const bool left_,
     const bool transpose_,
-    int64_t info_) {
+    int64_t& info_) {
 #ifdef USE_ONEMKL
   auto& dpcpp_queue = getCurrentDPCPPStream().dpcpp_queue();
   auto left_right = (left_ ? oneapi::mkl::side::left : oneapi::mkl::side::right);
@@ -644,6 +644,44 @@ Tensor& lu_solve_out(Tensor& out, const Tensor& self, const Tensor& LU_data, con
   Tensor out_tmp = at::AtenIpexTypeXPU::lu_solve(self, LU_data, LU_pivots);
   out.resize_as_(out_tmp).copy_(out_tmp);
   return out;
+}
+
+std::tuple<Tensor, Tensor> _solve_helper(const Tensor& self, const Tensor& A) {
+  auto self_working_copy = native::cloneBatchedColumnMajor(self);
+  auto A_working_copy = native::cloneBatchedColumnMajor(A);
+  auto req_size = A.sizes().vec();
+  req_size.pop_back();
+  auto pivots_tensor = at::empty(req_size, A.options().dtype(kLong));
+  std::vector<int64_t> infos(native::batchCount(self), 0);
+
+  AT_DISPATCH_FLOATING_TYPES(self.scalar_type(), "solve_dpcpp", [&]{
+      impl::apply_lu_dpcpp_<scalar_t>(A_working_copy, pivots_tensor, infos);
+      impl::apply_lu_solve_dpcpp_<scalar_t>(self_working_copy, A_working_copy, pivots_tensor, infos);
+  });
+  if (self.dim() > 2) {
+    native::batchCheckErrors(infos, "lu_solve_dpcpp");
+  } else {
+    native::singleCheckErrors(infos[0], "lu_solve_dpcpp");
+  }
+  return std::tuple<Tensor, Tensor>(self_working_copy, A_working_copy);
+}
+
+std::tuple<Tensor, Tensor> solve(const Tensor& self, const Tensor& A) {
+  TORCH_CHECK(self.dim() >= 2,
+      "B should have at least 2 dimensions, but has ", self.dim(), " dimensions instead");
+  TORCH_CHECK(A.dim() >= 2,
+      "A should have at least 2 dimensions, but has ", A.dim(), " dimensions instead");
+  Tensor self_broadcasted, A_broadcasted;
+  std::tie(self_broadcasted, A_broadcasted) = native::_linalg_broadcast_batch_dims(self, A, "solve_dpcpp");
+  return at::AtenIpexTypeXPU::_solve_helper(self_broadcasted, A_broadcasted);
+}
+
+std::tuple<Tensor&, Tensor&> solve_out(Tensor& solution, Tensor& lu, const Tensor& self, const Tensor& A) {
+  Tensor solution_tmp, lu_tmp;
+  std::tie(solution_tmp, lu_tmp) = at::AtenIpexTypeXPU::_solve_helper(self, A);
+  solution.resize_as_(solution_tmp).copy_(solution_tmp);
+  lu.resize_as_(lu_tmp).copy_(lu_tmp);
+  return std::tuple<Tensor&, Tensor&>(solution, lu);
 }
 
 Tensor _inverse_helper(const Tensor& self) {

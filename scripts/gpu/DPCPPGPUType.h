@@ -66,6 +66,7 @@ static std::tuple<Tensor,Tensor> _qr_helper(const Tensor & self, bool some); // 
 static Tensor _s_where(const Tensor & condition, const Tensor & self, const Tensor & other); // aten::_s_where(Tensor condition, Tensor self, Tensor other) -> Tensor
 static Tensor _softmax(const Tensor & self, int64_t dim, bool half_to_float); // aten::_softmax(Tensor self, int dim, bool half_to_float) -> Tensor
 static Tensor _softmax_backward_data(const Tensor & grad_output, const Tensor & output, int64_t dim, const Tensor & self); // aten::_softmax_backward_data(Tensor grad_output, Tensor output, int dim, Tensor self) -> Tensor
+static std::tuple<Tensor,Tensor> _solve_helper(const Tensor & self, const Tensor & A); // aten::_solve_helper(Tensor self, Tensor A) -> (Tensor, Tensor)
 static Tensor _std(const Tensor & self, bool unbiased); // aten::_std(Tensor self, bool unbiased=True) -> Tensor
 static std::tuple<Tensor,Tensor> _unique(const Tensor & self, bool sorted, bool return_inverse); // aten::_unique(Tensor self, bool sorted=True, bool return_inverse=False) -> (Tensor, Tensor)
 static std::tuple<Tensor,Tensor,Tensor> _unique2(const Tensor & self, bool sorted, bool return_inverse, bool return_counts); // aten::_unique2(Tensor self, bool sorted=True, bool return_inverse=False, bool return_counts=False) -> (Tensor, Tensor, Tensor)
@@ -521,6 +522,8 @@ static Tensor softshrink(const Tensor & self, Scalar lambd); // aten::softshrink
 static Tensor softshrink_backward(const Tensor & grad_output, const Tensor & self, Scalar lambd); // aten::softshrink_backward(Tensor grad_output, Tensor self, Scalar lambd) -> Tensor
 static Tensor & softshrink_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, Scalar lambd); // aten::softshrink_backward.grad_input(Tensor grad_output, Tensor self, Scalar lambd, *, Tensor(a!) grad_input) -> Tensor(a!)
 static Tensor & softshrink_out(Tensor & out, const Tensor & self, Scalar lambd); // aten::softshrink.out(Tensor self, Scalar lambd=0.5, *, Tensor(a!) out) -> Tensor(a!)
+static std::tuple<Tensor,Tensor> solve(const Tensor & self, const Tensor & A); // aten::solve(Tensor self, Tensor A) -> (Tensor solution, Tensor LU)
+static std::tuple<Tensor &,Tensor &> solve_out(Tensor & solution, Tensor & lu, const Tensor & self, const Tensor & A); // aten::solve.solution(Tensor self, Tensor A, *, Tensor(a!) solution, Tensor(b!) lu) -> (Tensor(a!) solution, Tensor(b!) LU)
 static std::tuple<Tensor,Tensor> sort(const Tensor & self, int64_t dim, bool descending); // aten::sort(Tensor self, int dim=-1, bool descending=False) -> (Tensor values, Tensor indices)
 static std::tuple<Tensor &,Tensor &> sort_out(Tensor & values, Tensor & indices, const Tensor & self, int64_t dim, bool descending); // aten::sort.values(Tensor self, int dim=-1, bool descending=False, *, Tensor(a!) values, Tensor(b!) indices) -> (Tensor(a!) values, Tensor(b!) indices)
 static Tensor & sqrt_out(Tensor & out, const Tensor & self); // aten::sqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)

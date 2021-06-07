@@ -124,6 +124,36 @@ class TestTorchMethod(TestCase):
             _validate(A_xpu.cpu(), x_xpu.cpu(), b_xpu.cpu())
 
     @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
+    def test_solve(self, dtype=torch.float):
+        def _validate(A, x, b):
+            d_ = torch.dist(b, torch.matmul(A, x));
+            d = torch.zeros_like(d_)
+            self.assertEqual(d, d_, rtol=1.3e-6, atol=5e-5)
+
+        for sizeA, sizeb in [[(3, 3), (3, 1)],
+                             [(2, 3, 3), (2, 3, 1)],
+                             [(2, 3, 3), (2, 3, 5)],
+                             [(2, 3, 1, 4, 4), (2, 3, 1, 4, 6)]]:
+            A = torch.randn(sizeA, dtype=dtype)
+            b = torch.randn(sizeb, dtype=dtype)
+
+            # CPU
+            A_cpu = A.to('cpu')
+            b_cpu = b.to('cpu')
+            x_cpu, lu_cpu = torch.solve(b_cpu, A_cpu)
+            _validate(A_cpu, x_cpu, b_cpu)
+            x_cpu, lu_cpu = b_cpu.solve(A_cpu)
+            _validate(A_cpu, x_cpu, b_cpu)
+
+            # XPU
+            A_xpu = A.to('xpu')
+            b_xpu = b.to('xpu')
+            x_xpu, lu_xpu = torch.solve(b_xpu, A_xpu)
+            _validate(A_xpu.cpu(), x_xpu.cpu(), b_xpu.cpu())
+            x_xpu, lu_xpu = b_xpu.solve(A_xpu)
+            _validate(A_xpu.cpu(), x_xpu.cpu(), b_xpu.cpu())
+
+    @pytest.mark.skipif("not torch_ipex._onemkl_is_enabled()")
     def test_inverse(self, dtype=torch.float):
         def _validate(A, A_):
             self.assertEqual(torch.matmul(A, A_), torch.eye(A.size(-1)).expand_as(A),
